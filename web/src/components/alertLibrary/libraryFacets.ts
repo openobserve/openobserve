@@ -77,8 +77,29 @@ export const severityLabel = (t: TranslateFn, severity: string): I18nText =>
  * pack without a frontend release.
  */
 const PACK_LABELS: Record<string, string> = {
+  applications: "Applications",
+  "ci-cd": "CI/CD",
+  "cloud-providers": "Cloud providers",
+  "data-engineering": "Data engineering",
+  databases: "Databases",
+  infrastructure: "Infrastructure",
   k8s: "Kubernetes",
+  "message-brokers": "Message brokers",
+  "network-and-security": "Network and security",
+  observability: "Observability",
   openobserve: "OpenObserve",
+  orchestrators: "Orchestrators",
+  "proxies-and-service-mesh": "Proxies and service mesh",
+  runtimes: "Runtimes",
+  storage: "Storage",
+};
+
+const QUERY_TYPE_LABELS: Record<string, string> = { promql: "PromQL", sql: "SQL" };
+
+// Product names, not shouted acronyms — toUpperCase() rendered "PROMQL".
+export const queryTypeLabel = (queryType: string | null | undefined): I18nText => {
+  const key = String(queryType ?? "").toLowerCase();
+  return raw(QUERY_TYPE_LABELS[key] ?? key.toUpperCase());
 };
 
 export const packLabel = (id: string): I18nText =>

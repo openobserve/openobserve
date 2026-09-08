@@ -137,7 +137,6 @@ pub async fn get_trace_details(
             track_total_hits: false,
             uses_zo_fn: false,
             query_fn: None,
-            action_id: None,
             skip_wal: false,
             sampling_config: None,
             sampling_ratio: None,

@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <div
                 v-if="!sessionState.data.editorValue && !editorFocused"
-                class="query-editor-placeholder-overlay pointer-events-none absolute top-0 right-0 bottom-0 left-0 z-1 flex items-start pt-0.75 pr-2 pb-0 pl-[2.15rem] select-none"
+                class="query-editor-placeholder-overlay pointer-events-none absolute top-0 right-0 bottom-0 left-0 z-1 flex items-start ps-[2.15rem] pe-2 pt-0.75 pb-0 select-none"
               >
                 <span class="query-editor-placeholder-typewriter">{{ editorPlaceholder }}</span>
               </div>
@@ -98,6 +98,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   shortcut-id="rumSessionsRefresh"
                 />
               </OButton>
+              <ShareButton
+                ref="shareButtonRef"
+                data-test="rum-app-sessions-share-link-btn"
+                :url="shareUrl"
+                variant="outline"
+                size="icon-toolbar"
+                shortcut-id="rumSessionsCopyUrl"
+                class="shrink-0"
+              />
             </div>
             <!-- end controls -->
           </div>
@@ -114,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :horizontal="false"
       >
         <template #before>
-          <div class="bg-surface-panel border-border-default h-full overflow-auto border-r py-1">
+          <div class="bg-surface-panel border-border-default h-full overflow-auto border-e py-1">
             <SearchFieldList
               :fields="streamFields"
               :time-stamp="{
@@ -463,6 +472,8 @@ import useStreams from "@/composables/useStreams";
 import { applyFilterTerm, removeFieldCondition } from "@/utils/traces/filterUtils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ShareButton from "@/components/common/ShareButton.vue";
+import useRum from "@/composables/rum/useRum";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -1580,6 +1591,9 @@ const getSessionStatusColor = (row: any) => {
 
 const router = useRouter();
 
+const { shareUrl } = useRum();
+const shareButtonRef = ref<InstanceType<typeof ShareButton> | null>(null);
+
 const handleRowClick = (row: any) => {
   if (!row.session_id) return;
   handleCellClick({ columnName: "action_play", row });
@@ -1700,6 +1714,10 @@ useShortcuts([
     handler: () => {
       if (!isInputFocused()) runQuery();
     },
+  },
+  {
+    id: "rumSessionsCopyUrl",
+    handler: () => shareButtonRef.value?.handleShareClick(),
   },
 ]);
 </script>

@@ -24,12 +24,9 @@ use sea_orm::{
     QuerySelect, Schema, Set, entity::prelude::*,
 };
 
-use super::{
-    entity::organizations::{ActiveModel, Column, Entity, Model},
-    get_lock,
-};
+use super::entity::organizations::{ActiveModel, Column, Entity, Model};
 use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{get_orm_client_ro, get_orm_client_rw},
     errors::{self, DbError, Error},
 };
 
@@ -106,7 +103,7 @@ pub struct OrgId {
 }
 
 pub async fn create_table() -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let builder = client.get_database_backend();
 
     let schema = Schema::new(builder);
@@ -153,10 +150,7 @@ pub async fn add(
         trial_ends_at: now + day_micros(15),
     };
 
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     match Entity::insert(record).exec(client).await {
         Ok(_) => {
             let mut cache = CACHE.write().await;
@@ -172,12 +166,9 @@ pub async fn add(
 
 #[cfg(feature = "cloud")]
 pub async fn set_trial_period_end(org_id: &str, new_end: i64) -> Result<(), errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
     let update_time = chrono::Utc::now().timestamp_micros();
 
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::update_many()
         .col_expr(Column::TrialEndsAt, Expr::value(new_end))
         .col_expr(Column::UpdatedAt, Expr::value(update_time))
@@ -198,12 +189,9 @@ pub async fn set_trial_period_end(org_id: &str, new_end: i64) -> Result<(), erro
 }
 
 pub async fn rename(org_id: &str, new_name: &str) -> Result<(), errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
     let update_time = chrono::Utc::now().timestamp_micros();
 
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::update_many()
         .col_expr(Column::OrgName, Expr::value(new_name.to_string()))
         .col_expr(
@@ -226,10 +214,7 @@ pub async fn rename(org_id: &str, new_name: &str) -> Result<(), errors::Error> {
 }
 
 pub async fn remove(org_id: &str) -> Result<(), errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::delete_many()
         .filter(Column::Identifier.eq(org_id))
         .exec(client)
@@ -245,7 +230,7 @@ pub async fn remove(org_id: &str) -> Result<(), errors::Error> {
 }
 
 pub async fn get(org_id: &str) -> Result<OrganizationRecord, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     {
         let cache = CACHE.read().await;
         if let Some(v) = cache.get(org_id) {
@@ -271,7 +256,7 @@ pub async fn get(org_id: &str) -> Result<OrganizationRecord, errors::Error> {
 }
 
 pub async fn list(filter: ListFilter) -> Result<Vec<OrganizationRecord>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let mut res = Entity::find().order_by(Column::CreatedAt, Order::Desc);
     if let Some(limit) = filter.limit {
         res = res.limit(limit as u64);
@@ -294,7 +279,7 @@ pub async fn list(filter: ListFilter) -> Result<Vec<OrganizationRecord>, errors:
 }
 
 pub async fn get_by_name(org_name: &str) -> Result<Vec<OrganizationRecord>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let records = Entity::find()
         .filter(Column::OrgName.eq(org_name))
         .all(client)
@@ -308,7 +293,7 @@ pub async fn get_by_name(org_name: &str) -> Result<Vec<OrganizationRecord>, erro
 }
 
 pub async fn len() -> usize {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let len = Entity::find().count(client).await;
 
     match len {
@@ -321,10 +306,7 @@ pub async fn len() -> usize {
 }
 
 pub async fn clear() -> Result<(), errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::delete_many()
         .exec(client)
         .await
@@ -338,10 +320,7 @@ pub async fn is_empty() -> bool {
 }
 
 pub async fn batch_remove(org_ids: Vec<String>) -> Result<(), errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::delete_many()
         .filter(Column::Identifier.is_in(org_ids.clone()))
         .exec(client)
@@ -359,10 +338,7 @@ pub async fn batch_remove(org_ids: Vec<String>) -> Result<(), errors::Error> {
 }
 
 pub async fn set_status(org_id: &str, status: &str) -> Result<(), errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let now = config::utils::time::now_micros();
     Entity::update_many()
         .col_expr(Column::Status, Expr::value(status))
@@ -383,10 +359,7 @@ pub async fn set_status_if(
     expected_status: &str,
     new_status: &str,
 ) -> Result<bool, errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let now = config::utils::time::now_micros();
     let result = Entity::update_many()
         .col_expr(Column::Status, Expr::value(new_status))
@@ -413,10 +386,7 @@ pub async fn set_status_if_with_deleted_at(
     new_status: &str,
     deleted_at: Option<i64>,
 ) -> Result<bool, errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let now = config::utils::time::now_micros();
     let result = Entity::update_many()
         .col_expr(Column::Status, Expr::value(new_status))

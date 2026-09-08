@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="ghost"
           size="sm"
           :class="[
-            noBorder ? 'display-none!' : 'ml-1',
+            noBorder ? 'display-none!' : 'ms-1',
             sqlmode ? 'sql-mode' : 'normal-mode',
             noBorder
               ? 'm-0! w-full justify-start border-0! bg-transparent! p-0! hover:bg-transparent!'
@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OIcon name="help" size="sm" />
           <span v-if="label">{{ label }}</span>
-          <span v-else-if="!noBorder" class="ml-1">{{ t("search.syntaxGuideLabel") }}</span>
+          <span v-else-if="!noBorder" class="ms-1">{{ t("search.syntaxGuideLabel") }}</span>
           <OTooltip :content="t('search.syntaxGuideLabel')" />
         </OButton>
       </div>
@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="border-dropdown-separator my-1 border-t" />
         <div class="answers">
           <div class="mb-1.25">
-            <div class="ml-1.25 text-xs">
+            <div class="ms-1.25 text-xs">
               <ul class="mt-2.5 mb-0 px-2.5 text-sm leading-[1.4375rem]">
                 <!-- The prose in each item is translated; the query fragments next to it are
                      NOT — they are syntax, and a translated match_all() would be a query
@@ -148,7 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="border-dropdown-separator my-1 border-t" />
         <div class="answers">
           <div class="mb-1.25">
-            <div class="ml-1.25 text-xs">
+            <div class="ms-1.25 text-xs">
               <ul class="mt-2.5 mb-0 px-2.5 text-sm leading-[1.4375rem]">
                 <!-- As above: the prose is translated, the SQL samples are left literal. -->
                 <!-- eslint-disable vue/no-bare-strings-in-template -->

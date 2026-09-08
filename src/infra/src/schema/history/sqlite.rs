@@ -59,7 +59,6 @@ impl super::SchemaHistory for SqliteSchemaHistory {
     ) -> Result<()> {
         let value = json::to_string(&schema)?;
         let client = CLIENT_RW.clone();
-        let client = client.lock().await;
         match sqlx::query(
             r#"
 INSERT INTO schema_history (org, stream_type, stream_name, start_dt, value)
@@ -71,7 +70,7 @@ INSERT INTO schema_history (org, stream_type, stream_name, start_dt, value)
         .bind(stream_name)
         .bind(start_dt)
         .bind(value)
-        .execute(&*client)
+        .execute(&client)
         .await
         {
             Err(sqlx::Error::Database(e)) => {
@@ -89,7 +88,6 @@ INSERT INTO schema_history (org, stream_type, stream_name, start_dt, value)
 
 pub async fn create_table() -> Result<()> {
     let client = CLIENT_RW.clone();
-    let client = client.lock().await;
     sqlx::query(
         r#"
 CREATE TABLE IF NOT EXISTS schema_history
@@ -103,7 +101,7 @@ CREATE TABLE IF NOT EXISTS schema_history
 );
         "#,
     )
-    .execute(&*client)
+    .execute(&client)
     .await?;
 
     Ok(())

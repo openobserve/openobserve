@@ -25,14 +25,15 @@ use axum::{
 };
 use config::get_config;
 use openobserve_api_common::X_O2_ASSISTANT_SESSION_ID;
-use openobserve_api_ingest::request::{clusters, logs, metrics, rum};
+use openobserve_api_ingest::request::{clusters, logs, metrics, profiles, rum};
 #[cfg(feature = "cloud")]
 use openobserve_api_management::request::cloud;
 #[cfg(feature = "profiling")]
 use openobserve_api_management::request::profiling;
 use openobserve_api_management::request::{
     alerts, announcements, authz, dashboards, db_monitoring, folders, kv, model_pricing,
-    organization, service_accounts, short_url, slos, sourcemaps, status, stream, synthetics, users,
+    organization, service_accounts, short_url, slos, sourcemaps, status, status_pages, stream,
+    synthetics, users,
 };
 use openobserve_api_pipelines::request::{enrichment_table, functions, pipeline, pipelines};
 use openobserve_api_search::{promql, search, traces};
@@ -54,9 +55,9 @@ use {
         config::get_config as get_o2_config,
     },
     openobserve_api_management::request::{
-        actions, ai, annotation_queues, annotations, anomaly_detection, datasets, discovery,
-        domain_management, eval_jobs, gen_ai, keys, license, providers, score_configs, scorers,
-        service_streams, workflows,
+        ai, annotation_queues, annotations, anomaly_detection, datasets, discovery,
+        domain_management, eval_jobs, experiments, gen_ai, keys, license, playground, providers,
+        remote_tasks, score_configs, scorers, service_streams, workflows,
     },
     openobserve_api_pipelines::request::re_pattern,
     openobserve_api_search::search::patterns,
@@ -379,6 +380,28 @@ pub async fn proxy_auth_middleware(request: Request, next: Next) -> Response {
     }
 }
 
+/// Whether this request's body carries a Remote Task secret in plaintext.
+///
+/// `audit_middleware` records request bodies verbatim, so the create call and
+/// every write under `auth`, `headers`, or `signing` has to be redacted —
+/// otherwise the audit trail becomes a second, unencrypted copy of the secret
+/// store.
+#[cfg(feature = "enterprise")]
+fn is_remote_task_secret_write(method: &Method, path: &str) -> bool {
+    if matches!(method, &Method::GET | &Method::HEAD | &Method::OPTIONS) {
+        return false;
+    }
+    let segments = path.split('/').collect::<Vec<_>>();
+    let Some(tasks) = segments.iter().position(|segment| *segment == "tasks") else {
+        return false;
+    };
+    let task_path = &segments[tasks + 1..];
+    (method == Method::POST && (task_path.is_empty() || task_path == &["test"]))
+        || task_path
+            .iter()
+            .any(|segment| matches!(*segment, "auth" | "headers" | "signing"))
+}
+
 #[cfg(feature = "enterprise")]
 pub async fn audit_middleware(request: Request, next: Next) -> Response {
     let http_method = request.method().clone();
@@ -440,7 +463,9 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
         let mut response = next.run(request).await;
 
         if response.status().is_success() || response.status().is_redirection() {
-            let body = if path.ends_with("/settings/logo") {
+            let body = if is_remote_task_secret_write(&http_method, &path) {
+                "[REDACTED: remote task secret write]".to_string()
+            } else if path.ends_with("/settings/logo") {
                 general_purpose::STANDARD.encode(&request_body)
             } else {
                 String::from_utf8(request_body).unwrap_or_default()
@@ -675,6 +700,33 @@ pub fn basic_routes() -> Router {
             alerts::external_events::MAX_BODY_BYTES,
         ));
 
+    // Public status pages — unauthenticated by design, like chart_render
+    // above: existence and visibility are checked inside the handler, and the
+    // handlers are pure meta-store point-reads (no search, storage, or
+    // cross-node calls on this plane).
+    if get_config().synthetics.enabled {
+        router = router
+            .route(
+                "/api/status_pages_public/{slug}",
+                get(status_pages::public::snapshot),
+            )
+            // Password unlock — unauthenticated by design (in-handler crypto +
+            // rate-limit), same plane as the read routes.
+            .route(
+                "/api/status_pages_public/{slug}/auth",
+                post(status_pages::public::auth),
+            )
+            .route(
+                "/api/status_pages_public/{slug}/badge.svg",
+                get(status_pages::public::badge),
+            )
+            .route(
+                "/api/status_pages_public/{slug}/feed.xml",
+                get(status_pages::public::feed),
+            )
+            .route("/status/{slug}", get(status_pages::public::page));
+    }
+
     router
 }
 
@@ -789,11 +841,18 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/loki/api/v1/push", post(logs::loki::loki_push))
         .route("/{org_id}/v1/logs", post(logs::ingest::otlp_logs_write))
         .route("/{org_id}/v1/metrics", post(metrics::ingest::otlp_metrics_write))
+        .route("/{org_id}/v1/profiles", post(profiles::ingest::otlp_profiles_write))
+        // OTLP Profiles is still development; otlp_http exporter defaults to this path.
+        .route(
+            "/{org_id}/v1development/profiles",
+            post(profiles::ingest::otlp_profiles_write),
+        )
         .route("/{org_id}/v1/traces", post(traces::traces_write))
         .route("/{org_id}/traces", post(traces::traces_write))
         .route("/{org_id}/otel/v1/traces", post(traces::traces_write))
 
         // Traces
+        .route("/{org_id}/traces/time_range", get(traces::time_index::get_org_trace_time_range))
         .route("/{org_id}/{stream_name}/traces/latest", get(traces::get_latest_traces))
         .route("/{org_id}/{stream_name}/traces/latest_stream", get(traces::get_latest_traces_stream))
         .route("/{org_id}/{stream_name}/traces/session", get(traces::session::get_latest_sessions))
@@ -1138,7 +1197,13 @@ pub fn service_routes() -> Router {
                 )
                 .route(
                     "/{org_id}/datasets/{dataset_id}/items",
-                    get(datasets::list_dataset_items).post(datasets::push_dataset_item),
+                    get(datasets::list_dataset_items)
+                        .post(datasets::push_dataset_item)
+                        .put(datasets::upsert_dataset_items),
+                )
+                .route(
+                    "/{org_id}/datasets/{dataset_id}/rows",
+                    get(datasets::get_dataset_snapshot_rows),
                 )
                 .route(
                     "/{org_id}/datasets/{dataset_id}/items/{item_id}",
@@ -1152,6 +1217,63 @@ pub fn service_routes() -> Router {
                         .put(datasets::update_dataset)
                         .delete(datasets::delete_dataset),
                 )
+                .route(
+                    "/{org_id}/experiments/preview",
+                    post(experiments::preview_experiment),
+                )
+                .route(
+                    "/{org_id}/experiments",
+                    get(experiments::list_experiments).post(experiments::create_experiment),
+                )
+                .route(
+                    "/{org_id}/experiments/compare",
+                    get(experiments::compare_experiments),
+                )
+                .route(
+                    "/{org_id}/experiments/{experiment_id}",
+                    get(experiments::get_experiment).delete(experiments::delete_experiment),
+                )
+                .route(
+                    "/{org_id}/experiments/{experiment_id}/baseline",
+                    put(experiments::set_experiment_baseline)
+                        .delete(experiments::clear_experiment_baseline),
+                )
+                .route(
+                    "/{org_id}/experiments/{experiment_id}/rows",
+                    get(experiments::list_experiment_result_rows),
+                )
+                .route(
+                    "/{org_id}/experiments/{experiment_id}/rows/{row_id}",
+                    get(experiments::get_experiment_row),
+                )
+                .route(
+                    "/{org_id}/experiments/{experiment_id}/rows/{row_id}/trials/{trial_index}/retry",
+                    post(experiments::retry_experiment_slot),
+                )
+                .route(
+                    "/{org_id}/experiments/{experiment_id}/slots",
+                    get(experiments::list_experiment_slots),
+                )
+                .route(
+                    "/{org_id}/experiments/{experiment_id}/records",
+                    post(experiments::submit_experiment_records),
+                )
+                .route(
+                    "/{org_id}/experiments/{experiment_id}/finalize",
+                    post(experiments::finalize_experiment),
+                )
+                .route(
+                    "/{org_id}/experiments/{experiment_id}/cancel",
+                    post(experiments::cancel_experiment),
+                )
+                    .route(
+                        "/{org_id}/experiments/{experiment_id}/retry",
+                        post(experiments::retry_experiment),
+                    )
+                    .route(
+                        "/{org_id}/experiments/{experiment_id}/clone",
+                        post(experiments::clone_experiment),
+                    )
 
                 // On-demand human annotation from Discovery
                 .route("/{org_id}/annotations", post(annotations::annotate_target))
@@ -1166,7 +1288,22 @@ pub fn service_routes() -> Router {
 
                 // Score Configs (Online Eval Phase 2)
                 // NOTE: /{entity_id}/versions must precede /{entity_id} for routing correctness
-                .route("/{org_id}/score_configs", get(score_configs::list_score_configs).post(score_configs::create_score_config))
+                .route("/{org_id}/tasks", get(remote_tasks::list_remote_tasks).post(remote_tasks::create_remote_task))
+                .route("/{org_id}/tasks/test", post(remote_tasks::test_remote_task))
+                .route("/{org_id}/tasks/{entity_id}/auth", put(remote_tasks::replace_remote_task_auth_secret).delete(remote_tasks::revoke_remote_task_auth_secret))
+                .route("/{org_id}/tasks/{entity_id}/headers/{header_name}/secret", put(remote_tasks::replace_remote_task_header_secret).delete(remote_tasks::revoke_remote_task_header_secret))
+                .route("/{org_id}/tasks/{entity_id}/signing/rotate", post(remote_tasks::rotate_remote_task_signing_secret))
+                .route("/{org_id}/tasks/{entity_id}/signing/test", post(remote_tasks::test_remote_task_signing_candidate))
+                .route("/{org_id}/tasks/{entity_id}/signing/activate", post(remote_tasks::activate_remote_task_signing_candidate))
+                .route("/{org_id}/tasks/{entity_id}/signing/end_grace", post(remote_tasks::end_remote_task_signing_grace))
+                .route("/{org_id}/tasks/{entity_id}/signing", get(remote_tasks::get_remote_task_signing_status).delete(remote_tasks::revoke_remote_task_signing_secret))
+                .route("/{org_id}/tasks/{entity_id}/versions", get(remote_tasks::list_remote_task_versions))
+                .route("/{org_id}/tasks/{entity_id}/stats", get(remote_tasks::get_remote_task_stats))
+                .route("/{org_id}/tasks/{entity_id}/draft", get(remote_tasks::get_remote_task_draft).delete(remote_tasks::discard_remote_task_draft))
+                .route("/{org_id}/tasks/{entity_id}/test_connection", post(remote_tasks::publish_remote_task))
+                .route("/{org_id}/tasks/{entity_id}/test_run", post(remote_tasks::test_run_remote_task))
+                .route("/{org_id}/tasks/{entity_id}", get(remote_tasks::get_remote_task).put(remote_tasks::save_remote_task_draft).delete(remote_tasks::delete_remote_task))
+                .route("/{org_id}/score_configs", get(score_configs::list_score_configs).post(score_configs::create_score_config).put(score_configs::ensure_score_config))
                 .route("/{org_id}/score_configs/{entity_id}/versions", get(score_configs::list_score_config_versions))
                 .route("/{org_id}/score_configs/{entity_id}", get(score_configs::get_score_config).put(score_configs::update_score_config).delete(score_configs::delete_score_config))
 
@@ -1177,6 +1314,12 @@ pub fn service_routes() -> Router {
                 .route("/{org_id}/scorers/llm_judge/output_schema", post(scorers::preview_llm_judge_output_schema))
                 .route("/{org_id}/scorers/{entity_id}/versions", get(scorers::list_scorer_versions))
                 .route("/{org_id}/scorers/{entity_id}", get(scorers::get_scorer).put(scorers::update_scorer).delete(scorers::delete_scorer))
+
+                // Playground (Phase 3.1)
+                .route("/{org_id}/playground/run", post(playground::run_playground_cell))
+                .route("/{org_id}/playground/score", post(playground::score_playground_cell))
+                .route("/{org_id}/playground/snapshots", post(playground::share_playground_snapshot))
+                .route("/{org_id}/playground/snapshots/{snapshot_id}", get(playground::get_playground_snapshot))
 
                 // Online Eval Jobs (Online Eval Phase 2)
                 // NOTE: /activate, /pause, /resume, /archive must precede /{job_id}
@@ -1213,16 +1356,6 @@ pub fn service_routes() -> Router {
             .route("/{org_id}/cipher_keys", get(keys::list).post(keys::save))
             .route("/{org_id}/cipher_keys/bulk", delete(keys::delete_bulk))
             .route("/{org_id}/cipher_keys/{key_name}", get(keys::get).put(keys::update).delete(keys::delete))
-
-            // Actions
-            .route("/{org_id}/actions", get(actions::action::list_actions))
-            .route("/{org_id}/actions/upload", post(actions::action::upload_zipped_action))
-            .route("/{org_id}/actions/bulk", delete(actions::action::delete_action_bulk))
-            .route("/{org_id}/actions/{action_id}", get(actions::action::get_action_from_id).put(actions::action::update_action_details).delete(actions::action::delete_action))
-            .route("/{org_id}/actions/download/{action_id}", get(actions::action::serve_action_zip))
-            .route("/{org_id}/actions/pause/{action_id}", get(actions::operations::pause_action))
-            .route("/{org_id}/actions/resume/{action_id}", get(actions::operations::resume_action))
-            .route("/{org_id}/actions/test/{action_id}", post(actions::operations::test_action))
 
             // Rate limits
             .route("/{org_id}/ratelimit/api_modules", get(ratelimit::api_modules))
@@ -1339,6 +1472,65 @@ pub fn service_routes() -> Router {
             )
             .route("/{org_id}/synthetics/jobs/upload", post(synthetics::job_upload));
 
+        // Status pages — authenticated admin CRUD (the public read plane lives
+        // in basic_routes, not here). Ships with synthetics, no separate
+        // toggle. RBAC is enforced by the OpenFGA route-permission middleware
+        // (resource "status_page"); the per-mapped-check folder-authz is
+        // in-handler (R-1).
+        router = router
+            .route(
+                "/{org_id}/status_pages",
+                get(status_pages::admin::list_pages).post(status_pages::admin::create_page),
+            )
+            .route(
+                "/{org_id}/status_pages/{id}",
+                get(status_pages::admin::get_page)
+                    .put(status_pages::admin::update_page)
+                    .delete(status_pages::admin::delete_page),
+            )
+            .route(
+                "/{org_id}/status_pages/{id}/components",
+                put(status_pages::admin::set_components),
+            )
+            .route(
+                "/{org_id}/status_pages/{id}/rotate_slug",
+                post(status_pages::admin::rotate_slug),
+            )
+            .route(
+                "/{org_id}/status_pages/{id}/preview",
+                get(status_pages::admin::preview),
+            )
+            .route(
+                "/{org_id}/status_pages/{id}/notices",
+                get(status_pages::admin::list_page_notices)
+                    .post(status_pages::admin::create_notice),
+            )
+            .route(
+                "/{org_id}/status_pages/notices/{nid}",
+                put(status_pages::admin::update_notice).delete(status_pages::admin::delete_notice),
+            )
+            .route(
+                "/{org_id}/status_pages/notices/{nid}/updates",
+                get(status_pages::admin::list_notice_updates)
+                    .post(status_pages::admin::add_notice_update),
+            )
+            .route(
+                "/{org_id}/status_pages/notices/{nid}/mark_false_positive",
+                post(status_pages::admin::mark_false_positive),
+            )
+            .route(
+                "/{org_id}/status_pages/{id}/domains",
+                get(status_pages::admin::list_domains).post(status_pages::admin::create_domain),
+            )
+            .route(
+                "/{org_id}/status_pages/domains/{did}",
+                delete(status_pages::admin::delete_domain),
+            )
+            .route(
+                "/{org_id}/status_pages/domains/{did}/verify",
+                post(status_pages::admin::verify_domain),
+            );
+
         // The private-VPC-agent path, and the only part of synthetics that
         // is enterprise. Not registered at all in an OSS build, so these
         // 404 rather than 403 — the endpoints do not exist there.
@@ -1372,6 +1564,15 @@ pub fn service_routes() -> Router {
     #[cfg(feature = "cloud")]
     {
         router = router
+            // Authorized by ROUTE_PERMISSIONS in o2-enterprise; without those rows enterprise auth 403s these for non-root users.
+            .route(
+                "/{org_id}/alerts/destinations/slack/oauth/start",
+                post(alerts::slack_oauth::start),
+            )
+            .route(
+                "/{org_id}/alerts/destinations/slack/oauth/exchange",
+                post(alerts::slack_oauth::exchange),
+            )
             .route(
                 "/{org_id}/invites",
                 get(organization::org::get_org_invites)
@@ -1410,9 +1611,12 @@ pub fn service_routes() -> Router {
                 get(cloud::billings::create_billing_portal_session),
             )
             .route("/{org_id}/ai/usage", get(cloud::billings::get_ai_usage))
+            // Pool-generic limit route. Replaced `/ai/usage_limit`, which was
+            // removed with it: one route, one ROUTE_PERMISSIONS entry, and no
+            // endpoint left that resolve_permission cannot authorize.
             .route(
-                "/{org_id}/ai/usage_limit",
-                put(organization::org::set_ai_usage_limit),
+                "/{org_id}/quota/{pool}/usage_limit",
+                put(organization::org::set_quota_usage_limit),
             )
             .route(
                 "/{org_id}/billings/data_usage/{usage_date}",
@@ -1608,7 +1812,7 @@ pub fn create_app_router(ui_routes: fn(&str) -> Router) -> Router {
         .layer(DefaultBodyLimit::max(cfg.limit.req_payload_limit));
 
     // Apply base_uri if configured
-    if cfg.common.base_uri.is_empty() || cfg.common.base_uri == "/" {
+    let mut outer = if cfg.common.base_uri.is_empty() || cfg.common.base_uri == "/" {
         app
     } else {
         // In axum 0.8, nest("/abc", app) maps the inner "/" route to exactly "/abc",
@@ -1623,7 +1827,18 @@ pub fn create_app_router(ui_routes: fn(&str) -> Router) -> Router {
             );
         }
         outer
+    };
+
+    // Must be the LAST `.layer()` call in this function: `Router::layer` only
+    // wraps routes that exist at call time, so this has to come after the
+    // "/" redirect, "/web" mount, and base_uri trailing-slash redirect above
+    // or a custom domain's Host falls through to those unchecked.
+    if config::get_config().synthetics.enabled {
+        outer = outer.layer(middleware::from_fn(
+            status_pages::public::host_route_middleware,
+        ));
     }
+    outer
 }
 
 #[cfg(test)]
@@ -1633,6 +1848,28 @@ mod tests {
     use tower::ServiceExt;
 
     use super::*;
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn audit_redacts_every_remote_task_secret_write_body() {
+        for (method, path) in [
+            (Method::POST, "api/org/tasks"),
+            (Method::POST, "api/org/tasks/test"),
+            (Method::PUT, "api/org/tasks/task-1/auth"),
+            (Method::PUT, "api/org/tasks/task-1/headers/x-api-key/secret"),
+            (Method::POST, "api/org/tasks/task-1/signing/rotate"),
+        ] {
+            assert!(is_remote_task_secret_write(&method, path));
+        }
+        assert!(!is_remote_task_secret_write(
+            &Method::GET,
+            "api/org/tasks/task-1"
+        ));
+        assert!(!is_remote_task_secret_write(
+            &Method::POST,
+            "api/org/tasks/task-1/test_run"
+        ));
+    }
 
     #[tokio::test]
     async fn test_proxy_routes() {
@@ -1838,6 +2075,37 @@ mod tests {
             json.contains("/{org_id}/query_functions"),
             "query_functions is missing from the OpenAPI surface"
         );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn experiment_lifecycle_actions_are_published_in_the_openapi_surface() {
+        let spec = super::openapi::ApiDoc::openapi();
+        let paths = spec.paths.paths;
+
+        for path in [
+            "/api/{org_id}/experiments/{experiment_id}/cancel",
+            "/api/{org_id}/experiments/{experiment_id}/retry",
+            "/api/{org_id}/experiments/{experiment_id}/clone",
+        ] {
+            let action = paths
+                .get(path)
+                .unwrap_or_else(|| panic!("missing OpenAPI path {path}"));
+            assert!(action.post.is_some(), "{path} must publish POST metadata");
+        }
+    }
+
+    #[test]
+    #[cfg(feature = "enterprise")]
+    fn experiment_row_detail_is_published_in_the_openapi_surface() {
+        let spec = super::openapi::ApiDoc::openapi();
+        let path = spec
+            .paths
+            .paths
+            .get("/api/{org_id}/experiments/{experiment_id}/rows/{row_id}")
+            .expect("missing Experiment row-detail OpenAPI path");
+
+        assert!(path.get.is_some());
     }
 
     // ── tmp/code.md B4 — the query-function catalog route ─────────────────────
@@ -2051,5 +2319,49 @@ mod tests {
                 "unexpected challenge: {v}"
             );
         }
+    }
+
+    // Pins the half of the a36fcfc537 layer ordering that custom domains must not break.
+    #[tokio::test]
+    async fn root_still_redirects_to_web_on_an_unclaimed_host() {
+        let app = create_app_router(|_| Router::new());
+
+        let req = Request::builder()
+            .uri("/")
+            .header(header::HOST, "localhost")
+            .body(Body::empty())
+            .unwrap();
+
+        let response = app.oneshot(req).await.unwrap();
+        assert_eq!(response.status(), StatusCode::PERMANENT_REDIRECT);
+        assert_eq!(
+            response
+                .headers()
+                .get(header::LOCATION)
+                .and_then(|v| v.to_str().ok()),
+            Some("/web/")
+        );
+    }
+
+    // The a36fcfc537 ordering is what lets a claimed Host serve `/` instead of 308ing to /web/.
+    #[tokio::test]
+    async fn the_outermost_layer_intercepts_root_ahead_of_the_web_redirect() {
+        let app = create_app_router(|_| Router::new()).layer(middleware::from_fn(
+            |req: axum::extract::Request, next: middleware::Next| async move {
+                if req.uri().path() == "/" {
+                    return (StatusCode::OK, "intercepted").into_response();
+                }
+                next.run(req).await
+            },
+        ));
+
+        let req = Request::builder()
+            .uri("/")
+            .header(header::HOST, "claimed.example.com")
+            .body(Body::empty())
+            .unwrap();
+
+        let response = app.oneshot(req).await.unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
     }
 }

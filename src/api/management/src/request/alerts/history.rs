@@ -424,9 +424,7 @@ pub async fn get_alert_history(
     // If alert_id filter is provided, validate it exists
     let _folder_id = if let Some(alert_id) = query.alert_id {
         // Verify the alert exists in the organization
-        let conn = infra::db::ORM_CLIENT
-            .get_or_init(infra::db::connect_to_orm)
-            .await;
+        let conn = infra::db::get_orm_client_ro().await;
         match get_by_id(conn, &org_id, alert_id).await {
             Ok((f, _)) => Some(f.folder_id),
             Err(_) => {

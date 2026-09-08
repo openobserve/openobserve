@@ -49,6 +49,7 @@ pub mod org_cleanup;
 pub mod org_usage;
 pub mod organization;
 pub mod pipeline;
+pub mod profiles;
 #[cfg(feature = "enterprise")]
 pub mod providers;
 #[cfg(feature = "enterprise")]
@@ -59,6 +60,7 @@ pub mod service;
 pub mod session;
 pub mod short_url;
 pub mod slo;
+pub mod status_pages;
 pub mod stream;
 pub mod stream_utils;
 pub mod synthetics;

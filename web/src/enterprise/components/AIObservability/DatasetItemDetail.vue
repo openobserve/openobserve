@@ -171,7 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="border-border-default bg-code-bg rounded-default text-text-body h-40 overflow-auto border px-3 py-2 font-mono text-xs wrap-break-word whitespace-pre-wrap"
               data-test="ai-dataset-item-detail-expected"
             >
-              {{ item.expectedOutput }}
+              {{ item.expectedOutput ?? "—" }}
             </div>
           </section>
 
@@ -228,13 +228,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="(version, index) in versions"
               :key="version.rowId"
               class="border-border-default bg-card-bg rounded-default flex flex-col gap-2 border px-3.5 py-3"
-              :data-test="`ai-dataset-item-detail-version-${version.version}`"
+              :data-test="`ai-dataset-item-detail-version-${itemLocalVersion(index)}`"
             >
               <div class="flex flex-wrap items-center gap-2">
                 <span class="text-text-heading text-compact font-bold">
                   {{
                     t("aiObservability.datasets.detail.itemDetail.versionLabel", {
-                      version: version.version,
+                      version: itemLocalVersion(index),
                     })
                   }}
                 </span>
@@ -245,7 +245,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <!-- The raw stored payload, not the reading preview: a version is
                    only meaningful next to what actually changed. -->
-              <OCode block>{{ version.expectedOutput }}</OCode>
+              <OCode block>{{ version.expectedOutput ?? "—" }}</OCode>
             </li>
           </ul>
         </template>
@@ -331,10 +331,19 @@ const tabs = computed<{ id: TabId; label: I18nText; count: number | null }[]>(()
 const versionPillLabel = computed(() =>
   t(
     "aiObservability.datasets.detail.itemDetail.versionPill",
-    { version: props.item.version, count: versionCount.value },
+    { count: versionCount.value },
     versionCount.value,
   ),
 );
+
+/** `version.version` is the dataset-wide MVCC counter (shared across every item
+ *  in the dataset), not this item's own edit count — displaying it as "this
+ *  item's version number" reads as inconsistent with the version count next to
+ *  it. `versions` is sorted newest-first, so the item-local sequence number is
+ *  just its distance from the end. */
+function itemLocalVersion(index: number): number {
+  return versionCount.value - index;
+}
 
 const sourceVariant = computed<BadgeVariant>(() =>
   props.item.source === "trace"

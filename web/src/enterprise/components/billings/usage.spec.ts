@@ -237,7 +237,6 @@ describe("Usage Component", () => {
 
   // Test 9: Icon URLs generation
   it("should generate correct icon URLs", () => {
-    expect(wrapper.vm.actionScriptIcon).toBe("mocked-image-url-images/usage/action_script.svg");
     expect(wrapper.vm.errorTrackingIcon).toBe("mocked-image-url-images/usage/error_tracking.svg");
     expect(wrapper.vm.rumSessionIcon).toBe("mocked-image-url-images/usage/rum_session.svg");
     expect(wrapper.vm.ingestionIcon).toBe("mocked-image-url-images/usage/ingestion.svg");
@@ -609,15 +608,6 @@ describe("Usage Component", () => {
     await flushPromises();
     expect(mockBillingService.get_data_usage).toHaveBeenCalled();
     expect(wrapper.vm.dataLoading).toBe(false);
-  });
-
-  // Test 39: Hidden action script tiles
-  it("should not display action script tiles when v-if is false", () => {
-    const actionScriptTiles = wrapper.findAll('[data-test="billings-usage-tile-title"]');
-    const actionScriptExists = actionScriptTiles.some((tile: any) =>
-      tile.text().includes("Action Scripts"),
-    );
-    expect(actionScriptExists).toBe(false);
   });
 
   // Test 40: Hidden error tracking tiles

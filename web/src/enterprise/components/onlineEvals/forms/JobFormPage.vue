@@ -31,7 +31,7 @@
             data-test="job-form-details-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
+              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
                 t("onlineEvals.job.detailsSection")
               }}</span>
@@ -68,7 +68,7 @@
             data-test="job-form-target-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
+              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
                 t("onlineEvals.job.targetSection")
               }}</span>
@@ -109,7 +109,7 @@
             data-test="job-form-filtering-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
+              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
                 t("onlineEvals.job.filteringSection")
               }}</span>
@@ -130,7 +130,7 @@
             data-test="job-form-sampling-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
+              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
                 t("onlineEvals.job.stepper.sampling")
               }}</span>
@@ -173,7 +173,7 @@
             data-test="job-form-scorers-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
+              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
                 t("onlineEvals.job.scorersSection")
               }}</span>
@@ -207,7 +207,7 @@
             data-test="job-form-completion-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
+              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
                 t("onlineEvals.job.completionSection")
               }}</span>
@@ -358,6 +358,8 @@ import {
   normalizeJobFilterCondition,
 } from "../utils/jobFilter";
 import { buildConditionsString } from "@/utils/alerts/conditionsFormatter";
+import type { StreamFieldsMap } from "@/utils/alerts/alertQueryBuilder";
+import { DEFAULT_JOB_STREAM_FIELDS } from "../utils/defaultStreamFields";
 import {
   buildJobInputMappingPayload,
   mappingUsesSystemProvidedSpans,
@@ -437,6 +439,19 @@ const showActivateChoice = computed(
   () => props.mode === "create" || (props.mode === "edit" && isDraft.value),
 );
 
+// Field types for the SQL formatter: numeric columns must not be quoted and
+// their empty checks must degrade to null checks, or the query fails. Labels
+// are field names (raw identifiers), never prose.
+const filterFieldsMap = computed<StreamFieldsMap>(() => {
+  const fields = streamFields.value.length ? streamFields.value : DEFAULT_JOB_STREAM_FIELDS;
+  return Object.fromEntries(
+    fields.map((field) => [
+      field.value,
+      { label: raw(String(field.label)), value: field.value, type: field.type },
+    ]),
+  );
+});
+
 // SQL WHERE body built from the filter builder — feeds the live "matched
 // spans" count in the preview panel. Built from the CLEANED group (incomplete
 // conditions stripped) so the SQL is always valid. Same formatter the form's
@@ -447,6 +462,7 @@ const filterWhere = computed<string>(() => {
       sqlMode: true,
       addWherePrefix: false,
       formatValues: true,
+      streamFieldsMap: filterFieldsMap.value,
     });
   } catch {
     return "";

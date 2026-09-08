@@ -355,10 +355,10 @@ describe("TableRenderer", () => {
       expect(table.props("enableColumnReorder")).toBe(false);
     });
 
-    it("should set enableCellCopy=true on TenstackTable", () => {
+    it("should set enableCellCopy=false — copy moved to the floating hover-action toolbar", () => {
       wrapper = createWrapper();
       const table = wrapper.findComponent({ name: "OTable" });
-      expect(table.props("enableCellCopy")).toBe(true);
+      expect(table.props("enableCellCopy")).toBe(false);
     });
   });
 

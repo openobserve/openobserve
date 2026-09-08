@@ -77,7 +77,7 @@
     <template #cell-group="{ row }">
       <div v-if="row.labels?.length" class="flex flex-wrap items-center gap-2">
         <span v-for="label in row.labels" :key="label.name" class="inline-flex items-center gap-1">
-          <span class="text-2xs text-text-tertiary uppercase">{{ label.name }}</span>
+          <span class="text-2xs text-text-tertiary">{{ label.name }}</span>
           <span class="text-compact text-text-heading font-mono">{{ label.value }}</span>
         </span>
       </div>

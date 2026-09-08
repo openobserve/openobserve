@@ -40,7 +40,7 @@ describe("DbmDisclosureLine", () => {
       "gap-1.5",
     ]);
     expect(wrapper.findComponent(OIcon).classes()).toEqual(
-      expect.arrayContaining(["mt-px", "shrink-0"]),
+      expect.arrayContaining(["relative", "top-1", "shrink-0"]),
     );
   });
 

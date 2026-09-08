@@ -551,7 +551,10 @@ export default class DashboardPanelTime {
    * Click global refresh button
    */
   async clickGlobalRefresh() {
-    await this.globalRefreshBtn.waitFor({ state: "visible", timeout: 10000 });
+    // The header renders before the dashboard GET resolves, so gate on the global
+    // date-time picker — it sits behind the same v-if as the content subtree.
+    await this.globalDateTimePicker.waitFor({ state: "visible", timeout: 20000 }).catch(() => {});
+    await this.globalRefreshBtn.waitFor({ state: "visible", timeout: 20000 });
     await this.globalRefreshBtn.click();
     await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
   }

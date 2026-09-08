@@ -89,6 +89,7 @@ const DASHBOARD = {
   PANEL_CONTAINER: '[data-test="dashboard-panel-container"]',
   PANEL_REFRESH_BTN: '[data-test="dashboard-panel-refresh-panel-btn"]',
   PANEL_ANY: '[data-test*="dashboard-panel-"]', // Wildcard match for any panel
+  GRID_STACK_ITEM: ".grid-stack-item", // Grid slot of a panel; exists even while the panel itself is lazy-unmounted
 
   // Common autocomplete
   AUTO_COMPLETE: '[data-test="common-auto-complete"]',

@@ -32,6 +32,19 @@ const AIAgentBehaviorPage = () =>
 const AIDatasetsPage = () => import("@/enterprise/views/AIObservability/DatasetsPage.vue");
 const AIDatasetDetailPage = () =>
   import("@/enterprise/views/AIObservability/DatasetDetailPage.vue");
+const AIExperimentComparePage = () =>
+  import("@/enterprise/views/AIObservability/ExperimentComparePage.vue");
+const AIExperimentDetailPage = () =>
+  import("@/enterprise/views/AIObservability/ExperimentDetailPage.vue");
+const AIExperimentsPage = () => import("@/enterprise/views/AIObservability/ExperimentsPage.vue");
+const AIRemoteTasksPage = () => import("@/enterprise/views/AIObservability/RemoteTasksPage.vue");
+const AIRemoteTaskDetailPage = () =>
+  import("@/enterprise/views/AIObservability/RemoteTaskDetailPage.vue");
+const AIRemoteTaskFormPage = () =>
+  import("@/enterprise/components/AIObservability/RemoteTaskFormPage.vue");
+const AIExperimentCreatePage = () =>
+  import("@/enterprise/components/AIObservability/ExperimentForm.vue");
+const AIPlaygroundPage = () => import("@/enterprise/views/AIObservability/PlaygroundPage.vue");
 const AIDiscoveryPage = () => import("@/enterprise/views/AIObservability/DiscoveryPage.vue");
 const AIQueuesPage = () => import("@/enterprise/views/AIObservability/QueuesPage.vue");
 const AIQueueDetailPage = () => import("@/enterprise/views/AIObservability/QueueDetailPage.vue");
@@ -149,6 +162,62 @@ const useEnvRoutes = () => {
           name: "aiDatasetDetail",
           component: AIDatasetDetailPage,
           meta: { titleKey: "routeTitles.aiDatasetDetail", keepAlive: false },
+        },
+        {
+          path: "playground",
+          name: "aiPlayground",
+          component: AIPlaygroundPage,
+          meta: { title: "Playground", keepAlive: false },
+        },
+        {
+          path: "experiments",
+          name: "aiExperiments",
+          component: AIExperimentsPage,
+          meta: { title: "Experiments", keepAlive: false },
+        },
+        {
+          path: "experiments/new",
+          name: "aiExperimentCreate",
+          component: AIExperimentCreatePage,
+          meta: { title: "New Experiment", keepAlive: false },
+        },
+        {
+          path: "experiments/compare/:baselineId/:candidateId",
+          name: "aiExperimentCompare",
+          component: AIExperimentComparePage,
+          meta: { title: "Compare Experiments", keepAlive: false },
+        },
+        {
+          path: "experiments/:id",
+          name: "aiExperimentDetail",
+          component: AIExperimentDetailPage,
+          meta: { title: "Experiment", keepAlive: false },
+        },
+        {
+          // `remote-tasks/new` must precede `remote-tasks/:id`, or "new" is
+          // matched as an entity id.
+          path: "remote-tasks",
+          name: "aiRemoteTasks",
+          component: AIRemoteTasksPage,
+          meta: { title: "Remote Tasks", keepAlive: false },
+        },
+        {
+          path: "remote-tasks/new",
+          name: "aiRemoteTaskCreate",
+          component: AIRemoteTaskFormPage,
+          meta: { title: "New Remote Task", keepAlive: false },
+        },
+        {
+          path: "remote-tasks/:id/edit",
+          name: "aiRemoteTaskEdit",
+          component: AIRemoteTaskFormPage,
+          meta: { title: "Edit Remote Task", keepAlive: false },
+        },
+        {
+          path: "remote-tasks/:id",
+          name: "aiRemoteTaskDetail",
+          component: AIRemoteTaskDetailPage,
+          meta: { title: "Remote Task", keepAlive: false },
         },
         {
           path: "evaluations",

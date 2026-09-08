@@ -27,12 +27,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :io-type="meta?.ioType || 'default'"
     :has-input="meta?.ioType !== 'input'"
     :has-output="meta?.ioType !== 'output'"
+    :output-handles="outputHandles"
     :data-test="`workflow-node-${data?.node_type}`"
-    :class="{ 'wf-node-disabled': isDisabled, 'wf-result-active': isActiveResult }"
+    :class="{
+      'wf-node-disabled': isDisabled,
+      'wf-result-active': isActiveResult,
+      'wf-needs-setup': needsSetupHighlight,
+    }"
     @click="onClick"
     @mouseenter="handleNodeHover"
     @mouseleave="handleNodeLeave"
-    @output-click="onOutputClick"
   >
     <!-- Two-line body: the custom NAME (bold) on top when renamed, then a single
          muted line combining the TYPE and config DETAIL as "Type · detail". Without
@@ -83,6 +87,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OBadge>
         <!-- Placeholder / "Configure Later" marker — e.g. a Destination saved with
              no destination selected. Draft + Test still work; Publish is blocked. -->
+        <!-- A Branch arm left unwired is LEGAL (records on it are dropped), so this
+             is informational only — it never sets meta.incomplete, so Publish stays
+             open, unlike the placeholder badge above. -->
+        <OBadge
+          v-if="unwiredHandles.length"
+          variant="default"
+          size="xs"
+          data-test="workflow-node-branch-unwired-badge"
+        >
+          {{ t("workflow.node.unwiredBadge") }}
+        </OBadge>
         <OBadge
           v-if="isIncomplete"
           variant="warning"
@@ -156,10 +171,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </div>
 
-      <!-- Test result badge — passed (green tick) / not-verified (grey) / errored
-           (red, hover for messages, click to open the step drawer). -->
+      <!-- Test result badge — stale (amber, REPLACES the tick) / passed (green tick) /
+           not-verified (grey) / errored (red, hover for messages, click to open the
+           step drawer). -->
       <div
-        v-if="testStatus === 'ok'"
+        v-if="testStatus === 'dirty'"
+        class="wf-test-badge wf-test-pop nodrag bg-badge-warning-solid-bg text-badge-warning-solid-text cursor-pointer transition-transform duration-150 hover:scale-110"
+        :data-test="`workflow-node-${data?.node_type}-test-dirty`"
+        @pointerdown.stop
+        @click.stop="openResult"
+      >
+        <OIcon name="warning" size="xs" />
+        <OTooltip side="top" align="center" :side-offset="8" max-width="20rem">
+          <template #content>
+            <div class="p-2 text-left text-xs">
+              {{ t(dirtyReasonKey) }}
+            </div>
+          </template>
+        </OTooltip>
+      </div>
+      <div
+        v-else-if="testStatus === 'ok'"
         class="wf-test-badge wf-test-pop nodrag bg-status-positive cursor-pointer text-white transition-transform duration-150 hover:scale-110"
         :data-test="`workflow-node-${data?.node_type}-test-ok`"
         @pointerdown.stop
@@ -170,6 +202,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #content>
             <div class="p-2 text-left text-xs">
               {{ t("workflow.test.stepResult.viewHint") }}
+            </div>
+          </template>
+        </OTooltip>
+      </div>
+      <!-- Passed, but only in rehearsal: a neutral flask, NOT the green tick, so a
+           published workflow never looks verified on a test run's evidence. -->
+      <div
+        v-else-if="testStatus === 'rehearsal'"
+        class="wf-test-badge wf-test-pop nodrag bg-badge-default-solid-bg text-badge-default-solid-text cursor-pointer transition-transform duration-150 hover:scale-110"
+        :data-test="`workflow-node-${data?.node_type}-test-rehearsal`"
+        @pointerdown.stop
+        @click.stop="openResult"
+      >
+        <OIcon name="science" size="xs" />
+        <OTooltip side="top" align="center" :side-offset="8" max-width="20rem">
+          <template #content>
+            <div class="p-2 text-left text-xs">
+              {{ t("workflow.test.rehearsalOnly") }}
             </div>
           </template>
         </OTooltip>
@@ -185,7 +235,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTooltip side="top" align="center" :side-offset="8" max-width="20rem">
           <template #content>
             <div class="p-2 text-left text-xs">
-              {{ t("workflow.test.notVerified") }}
+              {{ t(skippedReasonKey) }}
             </div>
           </template>
         </OTooltip>
@@ -233,6 +283,9 @@ import useWorkflowCanvas, {
   isNodeDisabled,
   isNodeIncomplete,
   toggleNodeDisabled,
+  branchHandles,
+  branchUnwiredHandles,
+  isTestEarnedResult,
 } from "./useWorkflowCanvas";
 
 const props = defineProps<{
@@ -241,7 +294,7 @@ const props = defineProps<{
 }>();
 
 const { t } = useI18nTyped();
-const { editNode, requestDeleteNode, openStepPicker } = useWorkflowCanvas(t);
+const { editNode, requestDeleteNode } = useWorkflowCanvas(t);
 
 // This node's live record in the shared graph — the source for meta-backed
 // display (custom name, comment, disabled). Reactive: mutating meta re-renders.
@@ -255,13 +308,23 @@ const isDisabled = computed(() => isNodeDisabled(node.value));
 // Placeholder / "Configure Later" — e.g. a Destination saved with no destination.
 const isIncomplete = computed(() => isNodeIncomplete(node.value));
 const onToggleDisabled = () => toggleNodeDisabled(props.id);
-
-// This node is the one currently shown in the results dock — highlight it on the
-// canvas so, even with the step list hidden (right dock), it's clear which node's
-// Input/Output is on screen.
-const isActiveResult = computed(
-  () => !!workflowObj.testRun.result && workflowObj.testRun.resultDrawer.nodeId === props.id,
+// Fan-out (Branch) nodes render one source handle per arm; every other type is
+// single-output and passes nothing so the card keeps its lone "output" handle.
+const outputHandles = computed(() => branchHandles(node.value).map((id) => ({ id })));
+const unwiredHandles = computed(() =>
+  branchUnwiredHandles(node.value, workflowObj.currentSelectedWorkflow?.edges || []),
 );
+
+// This node is the one whose results are open in the NDV — highlight it on the
+// canvas so it's clear which node's Input/Output is on screen (matters when the NDV
+// navigates prev/next between steps).
+const isActiveResult = computed(
+  () => !!workflowObj.testRun.result && workflowObj.currentSelectedNodeID === props.id,
+);
+
+// This node was flagged by Publish validation as needing setup (incomplete/dummy) —
+// flash a warning ring so the user sees exactly which steps block publishing.
+const needsSetupHighlight = computed(() => workflowObj.incompleteHighlight.includes(props.id));
 
 // Test result badge state — read from the last Test run. Null (no run, or this
 // node wasn't part of a `from_node` run) → no badge. A node is a real ✓ only when
@@ -269,22 +332,44 @@ const isActiveResult = computed(
 // error. A node the run reached but that received 0 records — e.g. an upstream
 // condition filtered everything out — is "skipped" (grey), NOT a false pass.
 const testResult = computed<any>(() => workflowObj.testRun?.result);
-const testStatus = computed<"ok" | "error" | "skipped" | null>(() => {
+// A ✓ asserts "this step works". A test run cannot assert that about a PUBLISHED
+// workflow — it is a rehearsal on a sample payload with destinations suppressed —
+// so its pass is demoted to a distinct marker rather than deleted (deleting would
+// hide genuine failures). A draft is exactly where rehearsing is the point.
+const isRehearsalEvidence = computed(
+  () => isTestEarnedResult(testResult.value) && !workflowObj.currentSelectedWorkflow?.isDraft,
+);
+const pass = computed<"ok" | "rehearsal">(() => (isRehearsalEvidence.value ? "rehearsal" : "ok"));
+const testStatus = computed<"ok" | "error" | "skipped" | "dirty" | "rehearsal" | null>(() => {
   const r = testResult.value;
   if (!r || !r.ranNodeIds?.includes(props.id)) return null;
+  // Ahead of every other outcome: a config edit since the run means the recorded ✓/✗
+  // no longer describes this step, so it must not render as a pass.
+  if (r.dirtyNodeIds?.includes(props.id)) return "dirty";
   if (r.errors?.[props.id]) return "error";
+  // A never-configured step cannot have done its job, so records reaching it are not a
+  // pass: an empty-destination node records an input, dispatches nowhere and raises no
+  // error, which is otherwise indistinguishable from a real delivery.
+  if (isIncomplete.value) return "skipped";
   // Live Test run carries the per-node `inputs` map: ✓ only if this node got
   // records; otherwise it ran but processed nothing → grey.
-  if (r.inputs) return r.inputs[props.id]?.length ? "ok" : "skipped";
+  if (r.inputs) return r.inputs[props.id]?.length ? pass.value : "skipped";
   // History run (no `inputs` map): fall back to the blocked-downstream logic.
   if (r.blockedNodeIds?.includes(props.id)) return "skipped";
-  return "ok";
+  return pass.value;
 });
 // NodeErrors.errors serializes as an array of [message, value?] tuples.
 const errorMessages = computed<string[]>(() => {
   const raw = testResult.value?.errors?.[props.id];
   if (!Array.isArray(raw?.errors)) return [];
   return raw.errors.map((e: any) => (Array.isArray(e) ? String(e[0]) : String(e)));
+});
+const skippedReasonKey = computed(() =>
+  isIncomplete.value ? "workflow.test.notConfigured" : "workflow.test.notVerified",
+);
+const dirtyReasonKey = computed(() => {
+  const edited = testResult.value?.dirtyEditedId;
+  return edited === props.id ? "workflow.test.dirtySelf" : "workflow.test.dirtyUpstream";
 });
 const errorCount = computed<number>(() => {
   const raw = testResult.value?.errors?.[props.id];
@@ -374,25 +459,24 @@ const handleActionsLeave = () => {
   }, 200);
 };
 
-// Clicking the source handle is the "add next step" affordance (it replaced the
-// hover-`+` that used to sit under the card). Terminal action nodes render no
-// source handle at all, so this can only fire where a next step is legal — and
-// it stays inert on the read-only Runs canvas.
-const onOutputClick = (event: MouseEvent) => {
-  if (workflowObj.readOnly) return;
-  openStepPicker(props.id, "out", event);
-};
+// Adding the next step / a fan-out branch is now the canvas-level append `+` under
+// (or beside) each node — see WorkflowCanvas.appendPoints — so the source handle is
+// just a connection point again (no click-to-add). The source dot still drags to
+// wire edges manually.
 
-// On the read-only Runs canvas the node body isn't editable — the error badge
-// (openResult) is the only affordance. In the editor, click opens the config.
+// Clicking the node body opens its NDV in both modes — read-only on the Runs
+// canvas (see canvasReadOnly in WorkflowNodeDrawer), editable in the editor.
 const onClick = () => {
-  if (workflowObj.readOnly) return;
   editNode(props.id);
 };
 
-// Open the per-node Input/Output result drawer (from the ✓ / error badge).
+// Clicking a node's ✓/✗ badge opens the node's NDV — the SAME Input · Config · Output
+// panel a node-click opens, now populated with this run's Input/Output (testRun.result
+// is set). One UI everywhere: the editor and the read-only Runs view both inspect a
+// step through the NDV (read-only there — see canvasReadOnly in WorkflowNodeDrawer),
+// so there's no separate results dock.
 const openResult = () => {
-  workflowObj.testRun.resultDrawer = { show: true, nodeId: props.id };
+  editNode(props.id);
 };
 </script>
 

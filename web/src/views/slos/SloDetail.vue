@@ -28,7 +28,7 @@
 <template>
   <OPageLayout
     :title="notFound ? t('slos.notFound') : raw(slo?.name || sloId)"
-    icon="track-changes"
+    icon="target"
     :subtitle="notFound ? raw('') : subtitle"
     :back="{ to: backTarget, label: t('slos.title') }"
     title-data-test="slos-slodetail-title"
@@ -113,7 +113,7 @@
     <!-- No `mt-*`: OContent's bottom inset above already separates the strip
          from the tabs, and no horizontal padding either — a tab strip's first
          label self-aligns to the page-edge grid. -->
-    <OTabs v-if="!notFound" v-model="tab" class="shrink-0" data-test="slos-slodetail-tabs">
+    <OTabs v-if="!notFound" v-model="tab" bordered class="shrink-0" data-test="slos-slodetail-tabs">
       <OTab
         name="trend"
         :label="t('slos.tab.trend')"
@@ -440,7 +440,7 @@ const frozenBanner = computed(() => {
     return {
       // Not the snowflake: a window that is still filling is not frozen, and
       // this banner now shows while the SLO is publishing figures.
-      icon: "hourglass_empty",
+      icon: "hourglass-empty",
       title: t("slos.frozen.measuringSinceTitle", { since: measuringSince.value.since }),
       body: t("slos.frozen.measuringSinceBody", measuringSince.value),
     };

@@ -486,9 +486,7 @@ pub async fn location_staleness_watcher() {
                 continue;
             }
 
-            let conn = infra::db::ORM_CLIENT
-                .get_or_init(infra::db::connect_to_orm)
-                .await;
+            let conn = infra::db::get_orm_client_ro().await;
             let checks =
                 infra::table::synthetics_checks::list_referencing_location(conn, &org_id, &loc.id)
                     .await

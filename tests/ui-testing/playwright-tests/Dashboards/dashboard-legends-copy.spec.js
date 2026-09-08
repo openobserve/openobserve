@@ -508,7 +508,7 @@ test.describe("Dashboard Copy Legends and Table Cells", () => {
         if (box) {
           await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
         }
-        const copyBtn = cell.locator('[data-test^="o2-table-cell-copy-"]');
+        const copyBtn = pm.dashboardPanelActions.getFirstTableCellCopyButton();
         await copyBtn.waitFor({ state: 'visible', timeout: 2000 });
         const copiedAttr = await copyBtn.getAttribute('data-copied');
         expect(copiedAttr).not.toBe('true');

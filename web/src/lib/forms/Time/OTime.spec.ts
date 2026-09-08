@@ -145,4 +145,92 @@ describe("OTime", () => {
     await flushPromises();
     expect(document.body.querySelector('[data-test="otime-close"]')).toBeTruthy();
   });
+
+  describe("format24", () => {
+    const openPopup = async (w: VueWrapper) => {
+      await w.find('[aria-label="Open time picker"]').trigger("click");
+      await flushPromises();
+    };
+
+    it("renders a text input instead of a native time input", () => {
+      wrapper = mount(OTime, {
+        attachTo: document.body,
+        props: { format24: true, modelValue: "13:30" },
+      });
+      expect(wrapper.find('input[type="time"]').exists()).toBe(false);
+      const input = wrapper.find('input[type="text"]');
+      expect(input.exists()).toBe(true);
+      expect((input.element as HTMLInputElement).value).toBe("13:30");
+    });
+
+    it("normalises and emits a typed HH:MM value", async () => {
+      wrapper = mount(OTime, {
+        attachTo: document.body,
+        props: { format24: true, modelValue: "" },
+      });
+      const input = wrapper.find('input[type="text"]');
+      (input.element as HTMLInputElement).value = "7:05";
+      await input.trigger("change");
+      expect(wrapper.emitted("update:modelValue")?.at(-1)).toEqual(["07:05"]);
+    });
+
+    it("reverts an unparseable or out-of-range entry without emitting", async () => {
+      wrapper = mount(OTime, {
+        attachTo: document.body,
+        props: { format24: true, modelValue: "09:00" },
+      });
+      const input = wrapper.find('input[type="text"]');
+      (input.element as HTMLInputElement).value = "25:99";
+      await input.trigger("change");
+      expect(wrapper.emitted("update:modelValue")).toBeUndefined();
+      expect((input.element as HTMLInputElement).value).toBe("09:00");
+    });
+
+    it("hides the AM/PM toggle in the popup", async () => {
+      wrapper = mount(OTime, {
+        attachTo: document.body,
+        props: { format24: true },
+      });
+      await openPopup(wrapper);
+      expect(document.body.querySelector('[aria-label="AM"]')).toBeNull();
+      expect(document.body.querySelector('[aria-label="PM"]')).toBeNull();
+    });
+
+    it("renders a dual-ring hour face with 24 hour targets", async () => {
+      wrapper = mount(OTime, {
+        attachTo: document.body,
+        props: { format24: true },
+      });
+      await openPopup(wrapper);
+      const face = document.body.querySelector('[data-test="otime-clock-face"]')!;
+      const numbers = Array.from(face.querySelectorAll("text")).map((t) => t.textContent?.trim());
+      expect(numbers).toHaveLength(24);
+      expect(numbers).toContain("00");
+      expect(numbers).toContain("13");
+      expect(numbers).toContain("23");
+    });
+
+    it("selects an inner-ring hour directly (no AM/PM math)", async () => {
+      wrapper = mount(OTime, {
+        attachTo: document.body,
+        props: { format24: true, modelValue: "" },
+      });
+      await openPopup(wrapper);
+      const face = document.body.querySelector('[data-test="otime-clock-face"]')!;
+      const target = Array.from(face.querySelectorAll('g[role="button"]')).find(
+        (g) => g.querySelector("text")?.textContent?.trim() === "22",
+      )!;
+      (target as HTMLElement).dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await flushPromises();
+      expect(wrapper.emitted("update:modelValue")?.at(-1)).toEqual(["22:00"]);
+    });
+
+    it("keeps the 12-hour face and AM/PM by default", async () => {
+      wrapper = mount(OTime, { attachTo: document.body });
+      await openPopup(wrapper);
+      const face = document.body.querySelector('[data-test="otime-clock-face"]')!;
+      expect(face.querySelectorAll("text")).toHaveLength(12);
+      expect(document.body.querySelector('[aria-label="AM"]')).toBeTruthy();
+    });
+  });
 });

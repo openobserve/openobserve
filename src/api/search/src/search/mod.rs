@@ -32,7 +32,7 @@ use config::{
             default_use_cache,
         },
         self_reporting::usage::{RequestStats, USAGE_STREAM, UsageType},
-        sql::resolve_stream_names,
+        sql::{extract_where, resolve_stream_names},
         stream::StreamType,
     },
     utils::{base64, json, time::now_micros},
@@ -145,7 +145,7 @@ pub mod utils;
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"})),
         ("x-o2-mcp" = json!({
-            "description": "Search data with SQL, you can use `match_all('foo')` to search with full text search, also you can use `str_match(field, 'bar')` to search in a specific field; start_time, end_time can't be zero, need to be a valid micro timestamp. Note: in summary mode, response is capped at 100 hits, request detail='full' if you need more. Tip: set agent_options.output_format='csv' to receive tabular hits as a compact csv block (~40% fewer tokens than json); 'md_table' for small result sets. Tip: set agent_options.mode='partition' when querying a large time range: the server scans time partitions one by one and stops early once enough rows are collected (less data scanned), and aggregation queries build up reusable cache partition by partition. Do NOT split the time range yourself and query partitions in a loop — one call does it server-side.",
+            "description": "Search data with SQL, you can use `match_all('foo')` to search with full text search, also you can use `str_match(field, 'bar')` to search in a specific field; start_time, end_time can't be zero, need to be a valid micro timestamp. Note: in summary mode only took/hits/total/from/size/columns/scan_size/function_error are returned; rows are never capped, so `size` is what controls how many you get. Tip: set agent_options.output_format='csv' to receive tabular hits as a compact csv block (~40% fewer tokens than json); 'md_table' for small result sets. Tip: set agent_options.mode='partition' when querying a large time range: the server scans time partitions one by one and stops early once enough rows are collected (less data scanned), and aggregation queries build up reusable cache partition by partition. Do NOT split the time range yourself and query partitions in a loop — one call does it server-side.",
             "category": "search",
             "pinned": true
         }))
@@ -532,7 +532,7 @@ pub async fn search(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Search logs around a timestamp. Note: in summary mode, hits are capped at 100 and only hits/total/took/columns/scan_size/function_error are returned.", "category": "search"}))
+        ("x-o2-mcp" = json!({"description": "Search logs around a timestamp. Note: in summary mode only took/hits/total/from/size/columns/scan_size/function_error are returned; rows are never capped, so `size` is what controls how many records you get around the key.", "category": "search"}))
     )
 )]
 pub async fn around_v1(
@@ -1972,11 +1972,15 @@ pub async fn result_schema(
         None
     };
 
+    // Single parse → both the full WHERE and the per-stream (join) WHERE.
+    let where_info = extract_where(&req.query.sql);
     Json(ResultSchemaResponse {
         projections: res_schema.projections,
         group_by: res_schema.group_by.into_iter().collect(),
         having: res_schema.having,
         timeseries_field: res_schema.timeseries,
+        where_clause: where_info.where_clause,
+        where_by_stream: where_info.where_by_stream,
         cross_links,
     })
     .into_response()

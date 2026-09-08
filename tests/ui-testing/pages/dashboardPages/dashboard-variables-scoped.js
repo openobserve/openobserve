@@ -381,6 +381,16 @@ export default class DashboardVariablesScoped {
     return this.page.locator(SELECTORS.PANEL_ANY).nth(index);
   }
 
+  /**
+   * Get a panel's grid slot by index. Present for every panel, including
+   * off-screen ones that only render a lazy placeholder.
+   * @param {number} index - 0-based index
+   * @returns {import('@playwright/test').Locator}
+   */
+  getGridStackItem(index = 0) {
+    return this.page.locator(SELECTORS.GRID_STACK_ITEM).nth(index);
+  }
+
   // ==========================================
   // Locator getters (behavior-preserving relocation of raw spec selectors)
   // ==========================================

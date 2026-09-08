@@ -52,9 +52,9 @@ const useLogs = (t: TranslateFn) => {
 
   const { buildSearch } = useSearchStream(t);
 
-  const { getFunctions, getActions, getQueryData } = useSearchBar(t);
+  const { getFunctions, getQueryData } = useSearchBar(t);
 
-  const { fnParsedSQL, fnUnparsedSQL, addTransformToQuery, isActionsEnabled } = logsUtils();
+  const { fnParsedSQL, fnUnparsedSQL, addTransformToQuery } = logsUtils();
 
   const { updateFieldValues, extractFields, updateGridColumns, filterHitsColumns, getStreamList } =
     useStreamFields();
@@ -252,7 +252,7 @@ const useLogs = (t: TranslateFn) => {
       cancelInflightRequests();
       resetFunctions();
 
-      // Create initialStreamSelected variable to handle first time load when api call for function & actions are
+      // Create initialStreamSelected variable to handle first time load when api call for functions is
       // in-progress and user select stream from dropdown in that case it loads data but it should wait for
       // additional details from the user like filter conditions and time range selection before load data
       // it should work in case of page refresh, navigate user from streams page or short url
@@ -260,7 +260,6 @@ const useLogs = (t: TranslateFn) => {
 
       await getStreamList();
       await getFunctions();
-      if (isActionsEnabled.value) await getActions();
       await extractFields();
       if (searchObj.meta.jobId == "") {
         if (initialStreamSelected) {
@@ -282,7 +281,6 @@ const useLogs = (t: TranslateFn) => {
       resetFunctions();
       await getStreamList();
       await getFunctions();
-      if (isActionsEnabled.value) await getActions();
       await extractFields();
     } catch (e: any) {
       searchObj.loading = false;
@@ -294,7 +292,6 @@ const useLogs = (t: TranslateFn) => {
       resetFunctions();
       await getStreamList();
       await getFunctions();
-      if (isActionsEnabled.value) await getActions();
       await extractFields();
     } catch (e: any) {
       searchObj.loading = false;

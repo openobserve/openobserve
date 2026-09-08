@@ -22,12 +22,9 @@ use config::meta::alerts::incidents::{ExternalAlertEvent, ExternalAlertStatus};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set, SqlErr, sea_query::Expr};
 use svix_ksuid::KsuidLike;
 
-use super::{
-    entity::external_alerts::{ActiveModel, Column, Entity, Model},
-    get_lock,
-};
+use super::entity::external_alerts::{ActiveModel, Column, Entity, Model};
 use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{get_orm_client_ro, get_orm_client_rw},
     errors::{self, DbError, Error},
 };
 
@@ -144,8 +141,7 @@ pub async fn upsert_event(
     detected_source: &str,
     ev: &ExternalAlertEvent,
 ) -> Result<(ExternalAlertRecord, UpsertOutcome), errors::Error> {
-    let _lock = get_lock().await;
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
 
     let existing = Entity::find()
         .filter(Column::OrgId.eq(org_id))
@@ -236,7 +232,7 @@ async fn insert_new(
     detected_source: &str,
     ev: &ExternalAlertEvent,
 ) -> Result<ExternalAlertRecord, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let id = svix_ksuid::Ksuid::new(None, None).to_string();
     let labels_json = serde_json::to_string(&ev.labels).unwrap_or_else(|_| "{}".into());
     let last_payload_json = ev.raw.to_string();
@@ -376,7 +372,7 @@ pub async fn get_by_id(
     org_id: &str,
     id: &str,
 ) -> Result<Option<ExternalAlertRecord>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let record = Entity::find()
         .filter(Column::OrgId.eq(org_id))
         .filter(Column::Id.eq(id))
@@ -390,7 +386,7 @@ pub async fn get_by_ids(
     org_id: &str,
     ids: &[String],
 ) -> Result<Vec<ExternalAlertRecord>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let records = Entity::find()
         .filter(Column::OrgId.eq(org_id))
         .filter(Column::Id.is_in(ids.to_vec()))

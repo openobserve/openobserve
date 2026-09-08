@@ -24,6 +24,12 @@ import {
   durationFormatter,
   maskText,
   convertToCamelCase,
+  operatorSymbol,
+  minuteOfDayToHhmm,
+  formatUtcWindows,
+  utcMinuteToTzHhmm,
+  timezoneAbbr,
+  formatUtcWindowsInTz,
 } from "./formatters";
 
 // Buffer-based btoa/atob for jsdom
@@ -494,3 +500,118 @@ describe("convertToCamelCase", () => {
 
 // ---------------------------------------------------------------------------
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// operatorSymbol / minuteOfDayToHhmm / formatUtcWindows (model pricing)
+// ---------------------------------------------------------------------------
+
+describe("operatorSymbol", () => {
+  it("maps the six comparison operators to display symbols", () => {
+    expect(operatorSymbol("gt")).toBe(">");
+    expect(operatorSymbol("gte")).toBe("≥");
+    expect(operatorSymbol("lt")).toBe("<");
+    expect(operatorSymbol("lte")).toBe("≤");
+    expect(operatorSymbol("eq")).toBe("=");
+    expect(operatorSymbol("neq")).toBe("≠");
+  });
+
+  it("returns the input unchanged for unknown operators", () => {
+    expect(operatorSymbol("between")).toBe("between");
+  });
+});
+
+describe("minuteOfDayToHhmm", () => {
+  it("formats minutes past midnight as zero-padded HH:MM", () => {
+    expect(minuteOfDayToHhmm(0)).toBe("00:00");
+    expect(minuteOfDayToHhmm(60)).toBe("01:00");
+    expect(minuteOfDayToHhmm(605)).toBe("10:05");
+    expect(minuteOfDayToHhmm(1439)).toBe("23:59");
+  });
+
+  it("renders exactly 1440 as 24:00 (an end-of-day bound, not a wrap)", () => {
+    expect(minuteOfDayToHhmm(1440)).toBe("24:00");
+  });
+
+  it("normalises out-of-range and negative minutes into the day", () => {
+    expect(minuteOfDayToHhmm(1500)).toBe("01:00");
+    expect(minuteOfDayToHhmm(-60)).toBe("23:00");
+  });
+});
+
+describe("formatUtcWindows", () => {
+  it("joins windows as comma-separated ranges with a UTC suffix", () => {
+    expect(
+      formatUtcWindows([
+        { start_minute: 60, end_minute: 240 },
+        { start_minute: 360, end_minute: 600 },
+      ]),
+    ).toBe("01:00–04:00, 06:00–10:00 UTC");
+  });
+
+  it("keeps a midnight-wrapping window as start–end", () => {
+    expect(formatUtcWindows([{ start_minute: 1320, end_minute: 120 }])).toBe("22:00–02:00 UTC");
+  });
+
+  it("returns an empty string for no windows", () => {
+    expect(formatUtcWindows([])).toBe("");
+    expect(formatUtcWindows(undefined as any)).toBe("");
+  });
+});
+
+describe("utcMinuteToTzHhmm", () => {
+  it("converts a UTC minute into the target timezone (fixed-offset zone)", () => {
+    // Asia/Kolkata is UTC+5:30 year-round — no DST flakiness.
+    expect(utcMinuteToTzHhmm(60, "Asia/Kolkata")).toBe("06:30");
+    expect(utcMinuteToTzHhmm(0, "Asia/Kolkata")).toBe("05:30");
+  });
+
+  it("wraps past midnight in the target timezone", () => {
+    // 22:00 UTC = 03:30 next day in Kolkata.
+    expect(utcMinuteToTzHhmm(1320, "Asia/Kolkata")).toBe("03:30");
+  });
+
+  it("is identity for UTC", () => {
+    expect(utcMinuteToTzHhmm(600, "UTC")).toBe("10:00");
+  });
+
+  it("returns empty string for an unknown timezone", () => {
+    expect(utcMinuteToTzHhmm(60, "Not/AZone")).toBe("");
+  });
+});
+
+describe("timezoneAbbr", () => {
+  it("returns a short display name for a valid zone", () => {
+    const abbr = timezoneAbbr("Asia/Kolkata");
+    expect(abbr.length).toBeGreaterThan(0);
+    expect(abbr).not.toBe("Asia/Kolkata");
+  });
+
+  it("falls back to the input for an unknown zone", () => {
+    expect(timezoneAbbr("Not/AZone")).toBe("Not/AZone");
+  });
+});
+
+describe("formatUtcWindowsInTz", () => {
+  it("converts each window and appends the zone abbreviation", () => {
+    const out = formatUtcWindowsInTz(
+      [
+        { start_minute: 60, end_minute: 240 },
+        { start_minute: 360, end_minute: 600 },
+      ],
+      "Asia/Kolkata",
+    );
+    expect(out).toContain("06:30–09:30");
+    expect(out).toContain("11:30–15:30");
+    expect(out).toContain(timezoneAbbr("Asia/Kolkata"));
+  });
+
+  it("returns empty when the zone is UTC-equivalent — nothing to convert", () => {
+    expect(formatUtcWindowsInTz([{ start_minute: 60, end_minute: 240 }], "UTC")).toBe("");
+  });
+
+  it("returns empty for no windows, missing zone, or an unknown zone", () => {
+    expect(formatUtcWindowsInTz([], "Asia/Kolkata")).toBe("");
+    expect(formatUtcWindowsInTz([{ start_minute: 60, end_minute: 240 }], "")).toBe("");
+    expect(formatUtcWindowsInTz([{ start_minute: 60, end_minute: 240 }], "Not/AZone")).toBe("");
+  });
+});

@@ -287,6 +287,7 @@ import ThumbUpOffAltIcon from "~icons/material-symbols/thumb-up-outline";
 import PersonPinCircleIcon from "~icons/material-symbols/person-pin-circle-outline";
 import ToggleOffIcon from "~icons/material-symbols/toggle-off-outline";
 import TrendingDownIcon from "~icons/material-symbols/trending-down";
+import TrendingFlatIcon from "~icons/material-symbols/trending-flat";
 import TroubleshootIcon from "~icons/material-symbols/troubleshoot";
 import UpdateIcon from "~icons/material-symbols/update";
 import VerifiedIcon from "~icons/material-symbols/verified-outline";
@@ -309,6 +310,7 @@ import PlayCircleFilled from "~icons/material-symbols/play-circle-outline";
 import Pets from "~icons/material-symbols/pets";
 import MonitorHeart from "~icons/material-symbols/monitor-heart-outline";
 import Dataset from "~icons/material-symbols/dataset-outline";
+import Science from "~icons/material-symbols/science-outline";
 import FolderOpen from "~icons/material-symbols/folder-open-outline";
 import Folder from "~icons/material-symbols/folder";
 import FolderOutline from "~icons/material-symbols/folder-outline";
@@ -658,6 +660,7 @@ export const iconRegistry = {
   // "group-work": GroupWorkIcon,
   "toggle-off": ToggleOffIcon,
   "trending-down": TrendingDownIcon,
+  "trending-flat": TrendingFlatIcon,
   troubleshoot: TroubleshootIcon,
   update: UpdateIcon,
   verified: VerifiedIcon,
@@ -701,6 +704,7 @@ export const iconRegistry = {
   // Batch 4: Alert Library (2026-08-20)
   // "no signal arriving" — the alert library's not-ingesting-this-stream state.
   "sensors-off": SensorsOff,
+  science: Science,
 } as const satisfies Record<string, Component>;
 
 export type IconName = keyof typeof iconRegistry;

@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div
         :title="span.operation_name"
-        class="flex w-[calc(100%-1.5rem)] items-center truncate pb-0 pl-1"
+        class="flex w-[calc(100%-1.5rem)] items-center truncate ps-1 pb-0"
         data-test="trace-details-sidebar-header-operation-name"
       >
         <!-- Status Code Badge -->
@@ -31,14 +31,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="inline-flex items-center"
           data-test="trace-details-sidebar-header-toolbar-status-code"
         >
-          <OIcon name="error" size="sm" class="text-status-error-text! mr-1" />
+          <OIcon name="error" size="sm" class="text-status-error-text! me-1" />
         </span>
         <!-- Observation Type Badge (for LLM spans) -->
         <OTag
           v-if="isLLMSpan"
           type="observationType"
           :value="span.gen_ai_operation_name"
-          class="mr-1 normal-case!"
+          class="me-1 normal-case!"
           data-test="trace-details-sidebar-observation-badge"
           >{{
             span.gen_ai_operation_name?.charAt(0) +
@@ -68,14 +68,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Service Badge -->
           <OTag
             type="metricChip"
-            class="text-2xs bg-surface-base border-border-default border-l-badge-blue-ol-border hover:bg-surface-panel mr-[0.325rem] h-5.5 shrink-0 border border-l-[0.1875rem] border-solid px-1.5 transition-all duration-200 hover:-translate-y-px"
+            class="text-2xs bg-surface-base border-border-default border-s-badge-blue-ol-border hover:bg-surface-panel me-[0.325rem] h-5.5 shrink-0 border border-s-[0.1875rem] border-solid px-1.5 transition-all duration-200 hover:-translate-y-px"
             :title="span.service_name"
             data-test="trace-details-sidebar-header-toolbar-service"
           >
             <template #icon>
               <img :src="serviceIconUrl" class="h-3.5 w-3.5 shrink-0" aria-hidden="true" alt="" />
             </template>
-            <span class="text-3xs text-text-secondary mr-0.75 font-medium">{{
+            <span class="text-3xs text-text-secondary me-0.75 font-medium">{{
               t("traces.traceDetailsSidebar.service")
             }}</span>
             <span
@@ -89,12 +89,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Duration Badge -->
           <OTag
             type="metricChip"
-            class="text-2xs bg-surface-base border-border-default border-l-badge-indigo-ol-border hover:bg-surface-panel mr-[0.325rem] h-5.5 shrink-0 border border-l-[0.1875rem] border-solid px-1.5 transition-all duration-200 hover:-translate-y-px"
+            class="text-2xs bg-surface-base border-border-default border-s-badge-indigo-ol-border hover:bg-surface-panel me-[0.325rem] h-5.5 shrink-0 border border-s-[0.1875rem] border-solid px-1.5 transition-all duration-200 hover:-translate-y-px"
             :title="getDuration"
             data-test="trace-details-sidebar-header-toolbar-duration"
           >
             <template #icon><OIcon name="schedule" size="xs" /></template>
-            <span class="text-3xs text-text-secondary mr-0.75 font-medium">{{
+            <span class="text-3xs text-text-secondary me-0.75 font-medium">{{
               t("traces.traceDetailsSidebar.duration")
             }}</span>
             <span class="text-3xs text-text-body font-semibold">{{ getDuration }}</span>
@@ -104,12 +104,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTag
             v-if="getTTFT"
             type="metricChip"
-            class="text-2xs bg-surface-base border-border-default border-l-badge-purple-ol-border hover:bg-surface-panel mr-[0.325rem] h-5.5 shrink-0 border border-l-[0.1875rem] border-solid px-1.5 transition-all duration-200 hover:-translate-y-px"
+            class="text-2xs bg-surface-base border-border-default border-s-badge-purple-ol-border hover:bg-surface-panel me-[0.325rem] h-5.5 shrink-0 border border-s-[0.1875rem] border-solid px-1.5 transition-all duration-200 hover:-translate-y-px"
             :title="getTTFT"
             data-test="trace-details-sidebar-header-toolbar-ttft"
           >
             <template #icon><OIcon name="speed" size="xs" /></template>
-            <span class="text-3xs text-text-secondary mr-0.75 font-medium">{{
+            <span class="text-3xs text-text-secondary me-0.75 font-medium">{{
               t("traces.traceDetailsSidebar.ttft")
             }}</span>
             <span class="text-3xs text-text-body font-semibold">{{ getTTFT }}</span>
@@ -118,12 +118,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Start Time Badge -->
           <OTag
             type="metricChip"
-            class="text-2xs bg-surface-base border-border-default border-l-badge-amber-ol-border hover:bg-surface-panel mr-[0.325rem] h-5.5 shrink-0 border border-l-[0.1875rem] border-solid px-1.5 transition-all duration-200 hover:-translate-y-px"
+            class="text-2xs bg-surface-base border-border-default border-s-badge-amber-ol-border hover:bg-surface-panel me-[0.325rem] h-5.5 shrink-0 border border-s-[0.1875rem] border-solid px-1.5 transition-all duration-200 hover:-translate-y-px"
             :title="getStartTime"
             data-test="trace-details-sidebar-header-toolbar-start-time"
           >
             <template #icon><OIcon name="access-time" size="xs" /></template>
-            <span class="text-3xs text-text-secondary mr-0.75 font-medium">{{
+            <span class="text-3xs text-text-secondary me-0.75 font-medium">{{
               t("traces.traceDetailsSidebar.start")
             }}</span>
             <span class="text-3xs text-text-body font-semibold">{{ getStartTime }}</span>
@@ -133,12 +133,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTag
             v-if="spanHttpResendCount"
             type="metricChip"
-            class="text-2xs bg-surface-base border-border-default hover:bg-surface-panel mr-[0.325rem] h-5.5 shrink-0 border border-solid px-1.5 transition-all duration-200 hover:-translate-y-px"
+            class="text-2xs bg-surface-base border-border-default hover:bg-surface-panel me-[0.325rem] h-5.5 shrink-0 border border-solid px-1.5 transition-all duration-200 hover:-translate-y-px"
             :title="t('traces.traceDetailsSidebar.requestResent', { count: spanHttpResendCount })"
             data-test="trace-details-sidebar-header-toolbar-resend-count"
           >
             <template #icon><OIcon name="replay" size="xs" /></template>
-            <span class="text-3xs text-text-secondary mr-0.75 font-medium">{{
+            <span class="text-3xs text-text-secondary me-0.75 font-medium">{{
               t("traces.traceDetailsSidebar.resends")
             }}</span>
             <span class="text-3xs text-text-body font-semibold">{{ spanHttpResendCount }}</span>
@@ -150,7 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTag
             type="metricChip"
             clickable
-            class="group text-2xs bg-surface-base border-border-default border-l-badge-teal-ol-border hover:bg-surface-panel mr-[0.325rem] h-5.5 shrink-0 cursor-pointer border border-l-[0.1875rem] border-solid px-1.5 transition-all duration-200 hover:-translate-y-px"
+            class="group text-2xs bg-surface-base border-border-default border-s-badge-teal-ol-border hover:bg-surface-panel me-[0.325rem] h-5.5 shrink-0 cursor-pointer border border-s-[0.1875rem] border-solid px-1.5 transition-all duration-200 hover:-translate-y-px"
             :title="t('traces.traceDetailsSidebar.spanIdTitle', { id: span.span_id })"
             @click="copySpanId"
             data-test="trace-details-sidebar-header-toolbar-span-id"
@@ -160,7 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon
               name="content-copy"
               size="xs"
-              class="ml-1 opacity-60 transition-opacity duration-200 group-hover:opacity-100"
+              class="ms-1 opacity-60 transition-opacity duration-200 group-hover:opacity-100"
               data-test="trace-details-sidebar-header-toolbar-span-id-copy-icon"
             />
           </OTag>
@@ -187,7 +187,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- LLM workflow actions — icon-only, matching the trace header. The
                row itself has no gap (its children carry their own margins), so
                these three are grouped and spaced on the header's rhythm. -->
-          <div class="ml-2 flex items-center gap-2">
+          <div class="ms-2 flex items-center gap-2">
             <OButton
               v-if="showEvaluateButton && canPreviewSpan"
               variant="outline"
@@ -222,6 +222,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon name="table-chart" size="sm" />
               <OTooltip side="bottom" :content="t('aiObservability.traceActions.dataset.button')" />
             </OButton>
+
+            <OButton
+              v-if="canOpenPlayground"
+              variant="outline"
+              size="icon-xs"
+              :aria-label="t('aiObservability.traceActions.playground.button')"
+              data-test="trace-details-sidebar-playground-span-btn"
+              @click.stop="openInPlayground"
+            >
+              <OIcon name="play-circle" size="sm" />
+              <OTooltip
+                side="bottom"
+                :content="t('aiObservability.traceActions.playground.hint')"
+              />
+            </OButton>
           </div>
         </div>
       </div>
@@ -236,7 +251,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTag
             type="metricChip"
             icon="psychology"
-            class="text-3xs bg-surface-base border-border-default border-l-badge-purple-ol-border h-5 shrink-0 border border-l-[0.1875rem] border-solid px-1.5 transition-all duration-200 hover:-translate-y-px"
+            class="text-3xs bg-surface-base border-border-default border-s-badge-purple-ol-border h-5 shrink-0 border border-s-[0.1875rem] border-solid px-1.5 transition-all duration-200 hover:-translate-y-px"
             :title="span.gen_ai_response_model"
           >
             <span class="text-3xs text-badge-purple-ol-text font-semibold">{{
@@ -249,11 +264,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Input Tokens -->
             <OTag
               type="metricChip"
-              class="text-3xs bg-surface-base border-border-default border-l-badge-blue-ol-border text-badge-blue-ol-text h-5 min-w-15 shrink-0 justify-center border border-l-[0.1875rem] border-solid px-1.5 transition-all duration-200 hover:-translate-y-px"
+              class="text-3xs bg-surface-base border-border-default border-s-badge-blue-ol-border text-badge-blue-ol-text h-5 min-w-15 shrink-0 justify-center border border-s-[0.1875rem] border-solid px-1.5 transition-all duration-200 hover:-translate-y-px"
               :title="t('traces.traceDetailsSidebar.inputTokens')"
             >
               <template #icon><OIcon name="arrow-upward" size="xs" /></template>
-              <span class="text-3xs mr-0.5 font-medium">{{
+              <span class="text-3xs me-0.5 font-medium">{{
                 t("traces.traceDetailsSidebar.in")
               }}</span>
               <span class="text-3xs font-medium">{{ llmMetrics.usage.input }}</span>
@@ -262,11 +277,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Output Tokens -->
             <OTag
               type="metricChip"
-              class="text-3xs bg-surface-base border-border-default border-l-badge-success-ol-border text-badge-success-ol-text h-5 min-w-15 shrink-0 justify-center border border-l-[0.1875rem] border-solid px-1.5 transition-all duration-200 hover:-translate-y-px"
+              class="text-3xs bg-surface-base border-border-default border-s-badge-success-ol-border text-badge-success-ol-text h-5 min-w-15 shrink-0 justify-center border border-s-[0.1875rem] border-solid px-1.5 transition-all duration-200 hover:-translate-y-px"
               :title="t('traces.traceDetailsSidebar.outputTokens')"
             >
               <template #icon><OIcon name="arrow-downward" size="xs" /></template>
-              <span class="text-3xs mr-0.5 font-medium">{{
+              <span class="text-3xs me-0.5 font-medium">{{
                 t("traces.traceDetailsSidebar.out")
               }}</span>
               <span class="text-3xs font-medium">{{ llmMetrics.usage.output }}</span>
@@ -277,7 +292,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTag
             type="metricChip"
             icon="attach-money"
-            class="text-3xs bg-surface-base border-border-default border-l-badge-orange-ol-border h-5 shrink-0 border border-l-[0.1875rem] border-solid px-1.5 transition-all duration-200 hover:-translate-y-px"
+            class="text-3xs bg-surface-base border-border-default border-s-badge-orange-ol-border h-5 shrink-0 border border-s-[0.1875rem] border-solid px-1.5 transition-all duration-200 hover:-translate-y-px"
             :title="t('traces.traceDetailsSidebar.totalCost')"
           >
             <span class="text-3xs text-badge-orange-ol-text font-semibold"
@@ -332,7 +347,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="hasExceptionEvents.length"
             type="countChip"
             value="error"
-            class="ml-0"
+            class="ms-0"
             data-test="trace-details-sidebar-tabs-error-count"
             >{{ hasExceptionEvents.length }}</OTag
           >
@@ -399,7 +414,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <!-- Input Section -->
               <div
-                class="io-section flex h-full w-1/2 shrink-0 grow-0 basis-[calc(50%-0.4rem)] flex-col pr-2"
+                class="io-section flex h-full w-1/2 shrink-0 grow-0 basis-[calc(50%-0.4rem)] flex-col pe-2"
               >
                 <div
                   class="section-label text-text-heading mb-2 flex items-center justify-between text-sm font-bold"
@@ -579,7 +594,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       })
                     "
                   >
-                    <span class="mr-1 inline-flex shrink-0">
+                    <span class="me-1 inline-flex shrink-0">
                       <OButton variant="ghost" size="icon-xs-circle">
                         <OIcon color="currentColor" class="h-[0.7rem]! w-[0.7rem]! pb-[0.185rem]!">
                           <component :is="action.iconComponent" />
@@ -630,7 +645,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           })
                         "
                       >
-                        <span class="mr-1 inline-flex shrink-0">
+                        <span class="me-1 inline-flex shrink-0">
                           <OButton variant="ghost" size="icon-xs-circle">
                             <OIcon
                               color="currentColor"
@@ -651,8 +666,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTabPanel>
         <OTabPanel name="events" class="flex h-[30.6rem]! flex-col p-0">
           <template v-if="spanDetails.events.length">
+            <!-- Mini-timeline: the same events as the table, plotted against
+                 this span's own duration so "when within the span" is a glance
+                 rather than a subtraction. -->
+            <div
+              class="shrink-0 ps-1 pe-1 pb-[0.325rem]"
+              data-test="trace-details-sidebar-events-timeline"
+            >
+              <div class="text-3xs text-text-muted flex items-center justify-between pb-1">
+                <span>{{ t("traces.spanEventTimeline") }}</span>
+                <span>{{ getDuration }}</span>
+              </div>
+              <div
+                ref="eventTimelineRef"
+                class="bg-surface-panel border-card-glass-border rounded-default relative h-5 w-full border border-solid"
+              >
+                <button
+                  v-for="cluster in spanEventClusters"
+                  :key="cluster.key"
+                  type="button"
+                  class="absolute top-1/2 h-3 w-0.75 -translate-x-1/2 -translate-y-1/2 cursor-pointer p-0 before:absolute before:top-1/2 before:left-1/2 before:h-5 before:w-2.5 before:-translate-x-1/2 before:-translate-y-1/2 before:content-['']"
+                  :class="SEVERITY_MARKER_CLASS[cluster.severity]"
+                  :style="{ left: cluster.left + '%' }"
+                  :title="clusterLabel(cluster)"
+                  :aria-label="clusterAriaLabel(cluster)"
+                  :data-event-severity="cluster.severity"
+                  :data-event-count="cluster.events.length"
+                  data-test="span-event-timeline-marker"
+                  @click="onEventMarkerClick(cluster.events[0])"
+                />
+              </div>
+            </div>
             <!-- Wrap toggle toolbar -->
-            <div class="flex items-center gap-1 pb-[0.325rem] pl-1">
+            <div class="flex items-center gap-1 ps-1 pb-[0.325rem]">
               <OSwitch v-model="eventsWrap" :label="t('common.wrap')" size="md" class="gap-1!" />
             </div>
             <!-- TenstackTable for events -->
@@ -668,6 +714,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <!-- eslint-enable local/no-hardcoded-px -->
               <OTable
+                ref="eventsTableRef"
                 :data="eventsRowsWithKey"
                 :columns="eventsTableColumns"
                 row-key="__rowId"
@@ -681,11 +728,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :enable-column-resize="true"
                 persist-columns
                 table-id="trace-details-events"
+                :expanded-ids="expandedEventIds"
+                @update:expanded-ids="expandedEventIds = $event"
               >
                 <template #expansion="{ row }">
                   <JsonPreview
                     :value="row"
-                    class="py-1.5 pl-1.5"
+                    class="py-1.5 ps-1.5"
                     copyButtonClass="left-1! w-fit! sticky!"
                     mode="expanded"
                     @copy="copyContentToClipboard"
@@ -867,6 +916,14 @@ import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { cloneDeep } from "lodash-es";
 import { timestampToTimezoneDate } from "@/utils/timezone";
+import {
+  useSpanEventMarkers,
+  clusterSpanEventMarkers,
+  truncateEventName,
+  SEVERITY_MARKER_CLASS,
+  type SpanEventMarker,
+  type SpanEventCluster,
+} from "@/composables/traces/useSpanEvents";
 import { copyToClipboard } from "@/utils/clipboard";
 import { toggleFullscreen as domToggleFullScreen } from "@/utils/dom";
 import { defineComponent, onBeforeMount, ref, watch, type Ref, type PropType, inject } from "vue";
@@ -895,6 +952,7 @@ import {
 import DeployedCode from "@/components/icons/DeployedCode.vue";
 import { getServiceIconDataUrl } from "@/utils/traces/convertTraceData";
 import LLMContentRenderer from "@/plugins/traces/LLMContentRenderer.vue";
+import { extractGenAiPartText } from "@/plugins/traces/genAiParts";
 import OTable from "@/lib/core/Table/OTable.vue";
 import {
   hasTracePreview,
@@ -952,6 +1010,15 @@ export default defineComponent({
     parentMode: {
       type: String,
       default: "standalone",
+    },
+    /**
+     * Index of the span event to focus, set when a waterfall or flame-graph
+     * marker is clicked. Selecting a span hides the timeline those markers live
+     * on, so the click lands here instead.
+     */
+    focusEventIndex: {
+      type: Number as PropType<number | null>,
+      default: null,
     },
     activeTab: {
       type: String,
@@ -1178,8 +1245,8 @@ export default defineComponent({
         header: t("traces.traceDetailsSidebar.field"),
         size: 200,
         meta: {
-          headerClass: "border-b border-r border-b-card-glass-border",
-          cellClass: "border-r border-b-card-glass-border text-json-key",
+          headerClass: "border-b border-e border-b-card-glass-border",
+          cellClass: "border-e border-b-card-glass-border text-json-key",
         },
       },
       {
@@ -1319,6 +1386,116 @@ export default defineComponent({
 
     const eventsWrap = ref(false);
 
+    const eventsTableRef = ref<any>(null);
+
+    /**
+     * Row keys expanded in the events table.
+     *
+     * OTable drives expansion from this prop through `useTableExpansion`, which
+     * keeps its own Set — it does not read TanStack's expansion state, so
+     * `row.toggleExpanded()` on the table instance has no visible effect. Rows
+     * are keyed by `__rowId` (the array index, see `eventsRowsWithKey`), and a
+     * normalized event keeps that index, so a marker maps straight onto its row.
+     */
+    const expandedEventIds = ref<string[]>([]);
+
+    // Mini-timeline window is this span, not the trace: start_time is
+    // nanoseconds (see getTTFT above) and duration is already microseconds.
+    const spanEventMarkers = useSpanEventMarkers(
+      () => props.span?.events,
+      () => ({
+        startUs: Number(props.span?.start_time) / 1000,
+        durationUs: Number(props.span?.duration),
+      }),
+      () => store.state.zoConfig?.timestamp_column,
+    );
+
+    const eventMarkerLabel = (marker: SpanEventMarker) =>
+      marker.severity === "error"
+        ? t("traces.exceptionMarkerTooltip", { type: truncateEventName(marker.exceptionType) })
+        : t("traces.eventMarkerTooltip", {
+            name: truncateEventName(marker.name) || t("traces.spanEventFallback"),
+          });
+
+    // The mini-timeline resizes with the sidebar, so the cluster bucket is
+    // derived from the track's measured width rather than a fixed percentage.
+    const eventTimelineRef = ref<HTMLElement | null>(null);
+    const eventTimelineWidth = ref(0);
+
+    const onEventTimelineResize = () => {
+      eventTimelineWidth.value = eventTimelineRef.value?.clientWidth ?? 0;
+    };
+
+    /**
+     * The track is not in the DOM at mount: it lives inside the Events tab
+     * panel, which renders `v-if="isActive"` with no keep-alive, and is further
+     * gated on the span having events. Observing in `onMounted` therefore found
+     * nothing and never retried, leaving the width at 0 — where the cluster
+     * threshold is 0 and every event renders as its own overlapping marker.
+     * Watching the template ref attaches whenever the track appears and
+     * re-attaches after the user leaves the tab and comes back.
+     */
+    watch(
+      eventTimelineRef,
+      (element, _previous, onCleanup) => {
+        if (!element || typeof ResizeObserver === "undefined") return;
+
+        onEventTimelineResize();
+
+        const observer = new ResizeObserver(onEventTimelineResize);
+        observer.observe(element);
+        onCleanup(() => observer.disconnect());
+      },
+      { flush: "post" },
+    );
+
+    const spanEventClusters = computed(() =>
+      clusterSpanEventMarkers(spanEventMarkers.value, eventTimelineWidth.value),
+    );
+
+    const clusterLabel = (cluster: SpanEventCluster) =>
+      cluster.events.length > 1
+        ? t("traces.eventClusterTooltip", { count: cluster.events.length })
+        : eventMarkerLabel(cluster.events[0]);
+
+    const clusterAriaLabel = (cluster: SpanEventCluster) => {
+      if (cluster.events.length === 1) return eventMarkerLabel(cluster.events[0]);
+      const errors = cluster.events.filter((event) => event.severity === "error").length;
+      const count = cluster.events.length;
+      return errors === 1
+        ? t("traces.eventClusterAriaLabel", { count, errors })
+        : t("traces.eventClusterAriaLabelPlural", { count, errors });
+    };
+
+    // Rows are keyed by array index (see `eventsRowsWithKey`), and normalized
+    // events keep that index, so a marker maps straight onto its table row.
+    const focusEvent = (index: number) => {
+      expandedEventIds.value = [String(index)];
+    };
+
+    const onEventMarkerClick = (marker: SpanEventMarker) => {
+      focusEvent(marker.index);
+    };
+
+    // The expansion names a row of *this* span's events table. Carrying it to
+    // the next span expands an unrelated row that happens to share the index.
+    // `focusEventIndex` arrives a tick later (see TraceDetails.onSelectSpanEvent),
+    // so a marker-driven span change still lands on its event.
+    watch(
+      () => props.span?.span_id,
+      () => {
+        expandedEventIds.value = [];
+      },
+    );
+
+    watch(
+      () => props.focusEventIndex,
+      (index) => {
+        if (index === null || index === undefined) return;
+        focusEvent(index);
+      },
+    );
+
     // Keyed by a non-enumerable `__rowId` (the array index): span events can
     // share, or lack, `_timestamp`, so keying expansion on it would expand
     // duplicates together. Non-enumerable keeps it out of the JSON preview.
@@ -1353,8 +1530,8 @@ export default defineComponent({
           accessorFn: (row: any) =>
             timestampToTimezoneDate(row[tsCol] / 1000000, store.state.timezone, HUMAN_TZ_FORMAT),
           meta: {
-            headerClass: "border-b border-r border-b-card-glass-border",
-            cellClass: "border-r border-b-card-glass-border",
+            headerClass: "border-b border-e border-b-card-glass-border",
+            cellClass: "border-e border-b-card-glass-border",
           },
         });
         allKeys.delete(tsCol);
@@ -1380,8 +1557,8 @@ export default defineComponent({
             return typeof val === "object" ? JSON.stringify(val) : String(val);
           },
           meta: {
-            headerClass: "border-b border-r border-b-card-glass-border",
-            cellClass: "border-r border-b-card-glass-border",
+            headerClass: "border-b border-e border-b-card-glass-border",
+            cellClass: "border-e border-b-card-glass-border",
           },
         });
       });
@@ -1535,6 +1712,44 @@ export default defineComponent({
     // sidebar only reports which span was acted on.
     const addSpanToDataset = () => {
       emit("add-to-dataset", props.span);
+    };
+
+    // Gated on the raw fields rather than on a parsed hand-off: this runs on
+    // every render, and parsing a whole conversation to decide whether to draw
+    // a button is work the render loop should not be doing.
+    const canOpenPlayground = computed(
+      () =>
+        props.showAnnotateButtons &&
+        isLLMSpan.value &&
+        Boolean(
+          props.span?.gen_ai_input_messages ||
+          props.span?.gen_ai_output_messages ||
+          props.span?.gen_ai_system_instructions ||
+          props.span?.attributes_prompt ||
+          props.span?.attributes_response,
+        ),
+    );
+
+    /** The Playground is enterprise-only, so its module is pulled on click
+     *  rather than bundled into the traces chunk. */
+    const openInPlayground = async () => {
+      const [{ handoffFromSpan, stashHandoff }, { aiPlaygroundRoute }] = await Promise.all([
+        import("@/enterprise/views/AIObservability/playgroundHandoff"),
+        import("@/enterprise/views/AIObservability/playgroundRoutes"),
+      ]);
+      const handoff = handoffFromSpan(props.span);
+      // Navigating on a failed stash would land the user on an empty bench with
+      // no explanation, so the failure is reported where it happened.
+      if (!handoff || !stashHandoff(handoff)) {
+        toast({
+          variant: "error",
+          message: t("aiObservability.playground.openInPlaygroundFailed"),
+        });
+        return;
+      }
+      router.push(
+        aiPlaygroundRoute(store.state.selectedOrganization?.identifier ?? "", { fromSpan: true }),
+      );
     };
 
     const getStartTime = computed(() => {
@@ -1963,10 +2178,11 @@ export default defineComponent({
           parsed = raw;
         }
         if (Array.isArray(parsed)) {
+          // filter drops both null (unsupported part type) and "" (no content); "" from join -> null so callers get one consistent falsy value.
           return (
             parsed
-              .filter((p: any) => p.type === "text" && p.content)
-              .map((p: any) => p.content)
+              .map((p: any) => extractGenAiPartText(p))
+              .filter((text): text is string => !!text)
               .join("\n") || null
           );
         }
@@ -2043,6 +2259,18 @@ export default defineComponent({
       eventsWrap,
       eventsTableColumns,
       eventsRowsWithKey,
+      eventsTableRef,
+      focusEvent,
+      expandedEventIds,
+      spanEventMarkers,
+      eventMarkerLabel,
+      onEventMarkerClick,
+      eventTimelineRef,
+      onEventTimelineResize,
+      spanEventClusters,
+      clusterLabel,
+      clusterAriaLabel,
+      SEVERITY_MARKER_CLASS,
       pagination,
       spanDetails,
       store,
@@ -2056,6 +2284,8 @@ export default defineComponent({
       viewSpanLogs,
       evaluateSpan,
       addSpanToDataset,
+      canOpenPlayground,
+      openInPlayground,
       spanStartTimeUs,
       spanSourceStream,
       getStartTime,

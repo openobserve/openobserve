@@ -79,8 +79,8 @@ pub async fn remote_write(
     let started_at = Utc::now().timestamp_micros();
 
     let cfg = get_config();
-    let dedup_enabled = cfg.common.metrics_dedup_enabled;
-    let election_interval = cfg.limit.metrics_leader_election_interval * 1000000;
+    let dedup_enabled = cfg.prom.dedup_enabled;
+    let election_interval = cfg.prom.leader_election_interval * 1000000;
     let mut cluster_name = String::new();
     let mut metric_data_map: HashMap<String, HashMap<String, SchemaRecords>> = HashMap::new();
     let mut metric_schema_map: HashMap<String, SchemaCache> = HashMap::new();
@@ -574,7 +574,24 @@ pub async fn remote_write(
         ));
         let mut triggers: TriggerAlertData =
             Vec::with_capacity(cur_stream_alerts.map_or(0, |v| v.len()));
-        let mut evaluated_alerts = HashSet::new();
+        // Constant across every sample in the stream, so built once.
+        let alert_keys: Vec<String> = cur_stream_alerts
+            .map(|alerts| {
+                alerts
+                    .iter()
+                    .map(|alert| {
+                        format!(
+                            "{}/{}/{}/{}",
+                            org_id,
+                            StreamType::Metrics,
+                            alert.stream_name,
+                            alert.get_unique_key()
+                        )
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        let mut trigger_slots: HashMap<String, super::TriggerSlot> = HashMap::new();
 
         for (mut val_map, timestamp) in json_data {
             let hash = super::signature_without_labels(&val_map, &[VALUE_LABEL]);
@@ -649,27 +666,25 @@ pub async fn remote_write(
             hour_buf.records_size += value_str.len();
 
             // start check for alert trigger
-            if let Some(alerts) = cur_stream_alerts
-                && triggers.len() < alerts.len()
-            {
+            if let Some(alerts) = cur_stream_alerts {
                 let end_time = now_micros();
-                for alert in alerts {
-                    let key = format!(
-                        "{}/{}/{}/{}",
-                        org_id,
-                        StreamType::Metrics,
-                        alert.stream_name,
-                        alert.get_unique_key()
-                    );
-                    // For one alert, only one trigger per request
-                    // Trigger for this alert is already added.
-                    if evaluated_alerts.contains(&key) {
+                let dedup = super::series_signature(&val_map);
+                for (alert, key) in alerts.iter().zip(alert_keys.iter()) {
+                    // One row per label set: a series repeats its labels on
+                    // every sample, and only distinct sets reach the template.
+                    if !super::trigger_wants_labels(&trigger_slots, key, dedup) {
                         continue;
                     }
                     match alert.evaluate(Some(&val_map), (None, end_time), None).await {
                         Ok(trigger_results) if trigger_results.data.is_some() => {
-                            triggers.push((alert.clone(), trigger_results.data.unwrap()));
-                            evaluated_alerts.insert(key);
+                            super::merge_trigger_rows(
+                                &mut triggers,
+                                &mut trigger_slots,
+                                key,
+                                dedup,
+                                alert,
+                                trigger_results.data.unwrap(),
+                            );
                         }
                         Ok(_) => {
                             // the data doesn't satisfy the alert condition

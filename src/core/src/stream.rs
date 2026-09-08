@@ -21,7 +21,7 @@ use axum::{
     Json, http,
     response::{IntoResponse, Response},
 };
-use common::meta::http::{ERROR_HEADER, HttpResponse as MetaHttpResponse};
+use common::meta::http::{ERROR_HEADER, HttpResponse as MetaHttpResponse, error_header_value};
 use config::meta::stream::{StreamParams, StreamType};
 
 #[tracing::instrument(skip(cleanup_enrichment_table_resources))]
@@ -63,9 +63,7 @@ async fn cleanup_related_resources(
         .iter()
         .filter_map(|alert| alert.id)
         .collect::<Vec<_>>();
-    let client = infra::db::ORM_CLIENT
-        .get_or_init(infra::db::connect_to_orm)
-        .await;
+    let client = infra::db::get_orm_client_rw().await;
     crate::alerts::alert::delete_many_for_cascade(client, &org_id, &alert_ids)
         .await
         .map_err(alert_cleanup_error)?;
@@ -77,7 +75,10 @@ async fn cleanup_related_resources(
         if let Err(e) = crate::pipeline::db::delete(&pipeline.id).await {
             return Err((
                 http::StatusCode::INTERNAL_SERVER_ERROR,
-                [(ERROR_HEADER, format!("failed to delete stream: {e}"))],
+                [(
+                    ERROR_HEADER,
+                    error_header_value(&format!("failed to delete stream: {e}")),
+                )],
                 Json(MetaHttpResponse::error(
                     http::StatusCode::INTERNAL_SERVER_ERROR,
                     format!(

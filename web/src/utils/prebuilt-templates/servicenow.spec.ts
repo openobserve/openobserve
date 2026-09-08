@@ -117,6 +117,14 @@ describe("servicenow template", () => {
       expect(passwordField?.required).toBe(true);
       expect(passwordField?.type).toBe("password");
     });
+
+    it("persists only the assignment group in destination metadata", () => {
+      const persistentFields = servicenowConfig.credentialFields
+        .filter((field) => field.persistInMetadata)
+        .map((field) => field.key);
+
+      expect(persistentFields).toEqual(["assignmentGroup"]);
+    });
   });
 
   describe("servicenowDestinationType", () => {

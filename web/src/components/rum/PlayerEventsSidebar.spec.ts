@@ -243,6 +243,42 @@ describe("PlayerEventsSidebar", () => {
 
       expect(wrapper.find('[data-test="search-input"]').exists()).toBe(false);
     });
+
+    it("keeps the Traces tab alive across toggles — mounts it exactly once", async () => {
+      // Every toggle used to destroy PlayerTracesTab and refire its whole fetch
+      // pipeline via onMounted. KeepAlive must preserve the instance instead.
+      let mountCount = 0;
+      const CountingTracesTab = {
+        name: "PlayerTracesTab",
+        template: '<div data-test="counting-traces-tab" />',
+        props: ["sessionId", "currentTime", "startTime", "endTime"],
+        mounted() {
+          mountCount++;
+        },
+      };
+      wrapper.unmount();
+      wrapper = mount(PlayerEventsSidebar, {
+        attachTo: "#app",
+        props: { events: mockEvents, sessionDetails: mockSessionDetails },
+        global: { plugins: [i18n], stubs: { ...stubs, PlayerTracesTab: CountingTracesTab } },
+      });
+      await wrapper.vm.$nextTick();
+      const appTabs = wrapper.findComponent({ name: "AppTabs" });
+
+      await appTabs.vm.$emit("update:active-tab", "traces");
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find('[data-test="counting-traces-tab"]').exists()).toBe(true);
+
+      await appTabs.vm.$emit("update:active-tab", "breadcrumbs");
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find('[data-test="counting-traces-tab"]').exists()).toBe(false);
+
+      await appTabs.vm.$emit("update:active-tab", "traces");
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find('[data-test="counting-traces-tab"]').exists()).toBe(true);
+
+      expect(mountCount).toBe(1);
+    });
   });
 
   // ==========================================================================

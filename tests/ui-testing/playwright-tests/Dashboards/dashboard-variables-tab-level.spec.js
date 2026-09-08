@@ -48,9 +48,8 @@ const waitForVariableIdle = async (
   variableName,
   { quietMs = 1000, timeout = 25000 } = {}
 ) => {
-  const spinner = page.locator(
-    `[data-test="variable-selector-${variableName}"] [role="status"]`
-  );
+  const pm = new PageManager(page);
+  const spinner = pm.dashboardVariables.variableLoadingSpinner(variableName);
   const deadline = Date.now() + timeout;
 
   while (Date.now() < deadline) {

@@ -44,7 +44,7 @@ use sea_orm::{
     sea_query::{Expr, Func, SimpleExpr},
 };
 
-use super::{entity::slo_status, get_lock};
+use super::entity::slo_status;
 use crate::errors;
 
 /// `COALESCE(col, 0) + delta` — the increment applied in SQL rather than
@@ -122,9 +122,6 @@ pub async fn apply_status(
     db: &DatabaseConnection,
     write: &StatusWrite,
 ) -> Result<WriteOutcome, errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
     let txn = db.begin().await?;
     let outcome = match apply_status_in_txn(&txn, write).await {
         Ok(outcome) => outcome,
@@ -297,9 +294,6 @@ pub async fn init_generation(
     slo_id: &str,
     definition_generation: i32,
 ) -> Result<(), errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
     slo_status::ActiveModel {
         slo_id: Set(slo_id.to_string()),
         group_key: Set(slo_status::ROLLUP_GROUP_KEY.to_string()),
@@ -318,9 +312,6 @@ pub async fn bump_generation(
     slo_id: &str,
     new_generation: i32,
 ) -> Result<(), errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
     let txn = db.begin().await?;
     // Delete rather than null out: the group set itself belongs to the old
     // definition, so a group that no longer exists under the new one must not
@@ -354,9 +345,6 @@ pub async fn reconcile_from_slices(
 ) -> Result<(), errors::Error> {
     let (good, total, covered) = recomputed;
 
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
     // Assignment, not increment: this is a rebuild from the source of truth,
     // and the watermark is deliberately untouched — reconciliation repairs the
     // aggregate, not the read clamp.
@@ -380,9 +368,6 @@ pub async fn delete_by_org(db: &DatabaseConnection, org: &str) -> Result<(), err
     if slo_ids.is_empty() {
         return Ok(());
     }
-
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
 
     slo_status::Entity::delete_many()
         .filter(slo_status::Column::SloId.is_in(slo_ids))

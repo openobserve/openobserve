@@ -6,7 +6,7 @@
 // (at your option) any later version.
 
 use infra::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::get_orm_client_rw,
     errors::{Error, Result},
     table::entity::{
         llm_annotation_queue_bindings as queue_bindings, llm_annotation_queue_items as queue_items,
@@ -54,7 +54,7 @@ async fn apply_put(queue: queues::Model, bindings: Vec<queue_bindings::Model>) -
         ));
     }
 
-    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let db = get_orm_client_rw().await;
     let txn = db.begin().await?;
     match queues::Entity::find_by_id(&queue.id).one(&txn).await? {
         Some(current) if current.org_id != queue.org_id => {
@@ -93,7 +93,7 @@ async fn apply_put(queue: queues::Model, bindings: Vec<queue_bindings::Model>) -
 }
 
 async fn apply_delete(org_id: &str, queue_id: &str) -> Result<()> {
-    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let db = get_orm_client_rw().await;
     let txn = db.begin().await?;
     queue_bindings::Entity::delete_many()
         .filter(queue_bindings::Column::OrgId.eq(org_id))

@@ -16,11 +16,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!--
   Datasets — the first slice of the AI Observability "Annotate" section. Golden
-  (MVCC) datasets that the annotation workflow feeds into. Frontend-first: this
-  page reads llm-datasets.service.ts, which serves mock fixtures until the
-  backend API lands (see VITE_LLM_ANNOTATION_MOCK). No page-level date range —
-  datasets are configuration objects, not time-series — so it uses OPageLayout
-  directly rather than AiPageShell.
+  (MVCC) datasets that the annotation workflow feeds into, read live from
+  llm-datasets.service.ts. No page-level date range — datasets are
+  configuration objects, not time-series — so it uses OPageLayout directly
+  rather than AiPageShell.
 -->
 <template>
   <OPageLayout
@@ -361,7 +360,7 @@ const columns = computed<OTableColumnDef[]>(() => [
     header: t("aiObservability.datasets.columns.actions"),
     accessorKey: "actions",
     sortable: false,
-    size: 96,
+    size: 128,
     pinned: "right" as const,
     meta: { align: "center", cellClass: "actions-column", actionCount: 2 },
   },

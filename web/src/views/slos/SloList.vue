@@ -27,7 +27,7 @@
 <template>
   <OPageLayout
     :title="t('slos.title')"
-    icon="track-changes"
+    icon="target"
     :subtitle="t('slos.subtitle')"
     title-data-test="slos-slolist-title"
     bleed
@@ -36,13 +36,7 @@
       <!-- The provider behind the Terraform export, which is otherwise only
            discoverable once the export dialog is already open. -->
       <IacRegistryLinks data-test="slos-slolist-iac-registries" />
-      <OButton
-        variant="primary"
-        size="sm-action"
-        icon-left="add"
-        data-test="slos-slolist-new"
-        @click="goToNew"
-      >
+      <OButton variant="primary" size="sm-action" data-test="slos-slolist-new" @click="goToNew">
         {{ t("slos.new") }}
       </OButton>
     </template>
@@ -156,6 +150,7 @@
             :loading="loading"
             selectable
             :selected-key="healthFilter"
+            default-key="total"
             @select="onStatSelect"
           />
         </div>
@@ -227,7 +222,7 @@
 
       <template #cell-window="{ row }">
         <span class="tabular-nums">{{ formatWindow(row.window_secs) }}</span>
-        <span class="text-text-secondary text-compact ml-1">{{ t("slos.rolling") }}</span>
+        <span class="text-text-secondary text-compact ms-1">{{ t("slos.rolling") }}</span>
       </template>
 
       <template #cell-tags="{ row }">
@@ -294,7 +289,7 @@
 
       <template #empty>
         <OEmptyState
-          icon="track-changes"
+          icon="target"
           :title="t('slos.empty.title')"
           :description="t('slos.empty.description')"
         >
@@ -404,7 +399,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
@@ -424,6 +419,7 @@ import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -546,11 +542,11 @@ function folderName(folderId: string): string {
   return folders.find((f: any) => f.folderId === folderId)?.name || folderId;
 }
 
-const typeOptions = computed(() => [
-  { value: "all", label: t("slos.type.all"), icon: "format_list_bulleted" },
+const typeOptions = computed<{ value: string; label: I18nText; icon: IconName }[]>(() => [
+  { value: "all", label: t("slos.type.all"), icon: "format-list-bulleted" },
   { value: "count", label: t("slos.type.count"), icon: "functions" },
-  { value: "time_slice", label: t("slos.type.timeSlice"), icon: "timelapse" },
-  { value: "alert", label: t("slos.type.alert"), icon: "gpp_maybe" },
+  { value: "time_slice", label: t("slos.type.timeSlice"), icon: "timeline" },
+  { value: "alert", label: t("slos.type.alert"), icon: "shield-alert-outline" },
 ]);
 
 const columns = computed<OTableColumnDef<SloListItem>[]>(() => [

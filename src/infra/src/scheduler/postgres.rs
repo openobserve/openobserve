@@ -25,7 +25,7 @@ use super::{TRIGGERS_KEY, Trigger, TriggerModule, TriggerStatus, get_scheduler_m
 use crate::{
     db::{
         self, IndexStatement,
-        postgres::{CLIENT, CLIENT_DDL, CLIENT_RO, add_column, create_index, drop_column},
+        postgres::{CLIENT_DDL, CLIENT_RO, CLIENT_RW, add_column, create_index, drop_column},
     },
     errors::{DbError, Error, Result},
 };
@@ -244,7 +244,7 @@ SELECT COUNT(*)::BIGINT AS num FROM scheduled_jobs WHERE module = $1;"#,
     /// Pushes a Trigger job into the queue
     async fn push(&self, trigger: Trigger) -> Result<()> {
         // let db = db::get_db().await;
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RW.clone();
         let mut tx = pool.begin().await?;
         DB_QUERY_NUMS
             .with_label_values(&["insert", "scheduled_jobs"])
@@ -287,7 +287,7 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
 
     /// Deletes the Trigger job matching the given parameters
     async fn delete(&self, org: &str, module: TriggerModule, key: &str) -> Result<()> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RW.clone();
         log::debug!("Deleting scheduled job for org: {org}, module: {module}, key: {key}",);
         DB_QUERY_NUMS
             .with_label_values(&["delete", "scheduled_jobs"])
@@ -323,7 +323,7 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
         retries: i32,
         data: Option<&str>,
     ) -> Result<()> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RW.clone();
         DB_QUERY_NUMS
             .with_label_values(&["update", "scheduled_jobs"])
             .inc();
@@ -359,7 +359,7 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
     }
 
     async fn update_trigger(&self, trigger: Trigger, clone: bool) -> Result<()> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RW.clone();
         DB_QUERY_NUMS
             .with_label_values(&["update", "scheduled_jobs"])
             .inc();
@@ -408,7 +408,7 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
             return Ok(());
         }
 
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RW.clone();
 
         // Build bulk update query using UNNEST
         let query_builder = String::from(
@@ -503,7 +503,7 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
             return Ok(());
         }
 
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RW.clone();
 
         // Separate updates with and without data
         let mut updates_with_data = Vec::new();
@@ -640,7 +640,7 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
                 .collect::<Vec<_>>()
                 .join(",")
         );
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RW.clone();
         sqlx::query(&sql)
             .bind(TriggerModule::Report)
             .bind(report_max_time)
@@ -675,7 +675,7 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
             .bind(claim.id)
             .bind(claim.claim_epoch)
             .bind(TriggerStatus::Processing)
-            .execute(&CLIENT.clone())
+            .execute(&CLIENT_RW.clone())
             .await?;
         Ok(result.rows_affected() == 1)
     }
@@ -691,7 +691,7 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
             .bind(trigger.id)
             .bind(trigger.claim_epoch)
             .bind(TriggerStatus::Processing)
-            .execute(&CLIENT.clone())
+            .execute(&CLIENT_RW.clone())
             .await?;
         Ok(result.rows_affected() == 1)
     }
@@ -723,7 +723,7 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
         report_timeout: i64,
         module: Option<TriggerModule>,
     ) -> Result<Vec<Trigger>> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RW.clone();
 
         let now = now_micros();
         let report_max_time = now
@@ -872,7 +872,7 @@ WHERE org = $1 AND module = $2 AND module_key = $3;"#;
     /// Background job that frequently (30 secs interval) cleans "Completed" jobs or jobs with
     /// retries >= threshold set through environment
     async fn clean_complete(&self) -> Result<()> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RW.clone();
         log::debug!("[SCHEDULER] cleaning completed jobs");
         let (include_max, mut max_retries) = get_scheduler_max_retries();
         if include_max {
@@ -899,7 +899,7 @@ WHERE org = $1 AND module = $2 AND module_key = $3;"#;
     /// - Lock candidates in id order, skipping rows being handled by another transaction
     /// - Update their status back to "Waiting" and increase their "retries" by 1
     async fn watch_timeout(&self) -> Result<()> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RW.clone();
         DB_QUERY_NUMS
             .with_label_values(&["update", "scheduled_jobs"])
             .inc();
@@ -946,7 +946,7 @@ SELECT COUNT(*)::BIGINT AS num FROM scheduled_jobs;"#,
     }
 
     async fn clear(&self) -> Result<()> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RW.clone();
         log::debug!("[SCHEDULER] clearing scheduled_jobs table");
         DB_QUERY_NUMS
             .with_label_values(&["delete", "scheduled_jobs"])

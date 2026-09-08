@@ -25,12 +25,9 @@ use sea_orm::{
 };
 use serde::{Deserialize, Serialize};
 
-use super::{
-    entity::org_ingestion_tokens::{ActiveModel, Column, Entity, Model},
-    get_lock,
-};
+use super::entity::org_ingestion_tokens::{ActiveModel, Column, Entity, Model};
 use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{get_orm_client_ro, get_orm_client_rw},
     errors::{self, DbError, Error},
 };
 
@@ -82,7 +79,7 @@ pub async fn find_default_enabled(
         return Ok(entry.0.clone());
     }
 
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let record = Entity::find()
         .filter(Column::OrgId.eq(org_id))
         .filter(Column::Enabled.eq(true))
@@ -150,7 +147,7 @@ pub fn generate_token() -> String {
 pub async fn find_enabled_token_global(
     token: &str,
 ) -> Result<Option<OrgIngestionTokenRecord>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let record = Entity::find()
         .filter(Column::Token.eq(token))
         .filter(Column::Enabled.eq(true))
@@ -162,7 +159,6 @@ pub async fn find_enabled_token_global(
 
 /// Insert a new org ingestion token row.
 pub async fn add(record: &OrgIngestionTokenRecord) -> Result<(), errors::Error> {
-    let _lock = get_lock().await;
     let now = chrono::Utc::now().timestamp_micros();
     let model = ActiveModel {
         id: Set(record.id.clone()),
@@ -177,7 +173,7 @@ pub async fn add(record: &OrgIngestionTokenRecord) -> Result<(), errors::Error> 
         updated_at: Set(now),
     };
 
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     match Entity::insert(model).exec(client).await {
         Ok(_) => {
             // A new token can be the org default, so the cached pick is stale.
@@ -202,7 +198,6 @@ pub async fn add(record: &OrgIngestionTokenRecord) -> Result<(), errors::Error> 
 /// on the originating cluster, preserving timestamps. On conflict on `id` the
 /// mutable columns are overwritten.
 pub async fn upsert(record: &OrgIngestionTokenRecord) -> Result<(), errors::Error> {
-    let _lock = get_lock().await;
     let model = ActiveModel {
         id: Set(record.id.clone()),
         org_id: Set(record.org_id.clone()),
@@ -216,7 +211,7 @@ pub async fn upsert(record: &OrgIngestionTokenRecord) -> Result<(), errors::Erro
         updated_at: Set(record.updated_at),
     };
 
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::insert(model)
         .on_conflict(
             OnConflict::column(Column::Id)
@@ -243,7 +238,7 @@ pub async fn find_enabled_token(
     org_id: &str,
     token: &str,
 ) -> Result<Option<OrgIngestionTokenRecord>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let record = Entity::find()
         .filter(Column::OrgId.eq(org_id))
         .filter(Column::Token.eq(token))
@@ -257,7 +252,7 @@ pub async fn find_enabled_token(
 
 /// List all tokens for an org (token values masked).
 pub async fn list_by_org(org_id: &str) -> Result<Vec<OrgIngestionTokenListRecord>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let records = Entity::find()
         .filter(Column::OrgId.eq(org_id))
         .order_by(Column::IsDefault, Order::Desc)
@@ -283,7 +278,7 @@ pub async fn get_by_name(
     org_id: &str,
     name: &str,
 ) -> Result<Option<OrgIngestionTokenRecord>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let record = Entity::find()
         .filter(Column::OrgId.eq(org_id))
         .filter(Column::Name.eq(name))
@@ -296,10 +291,9 @@ pub async fn get_by_name(
 
 /// Rotate (regenerate) a token's value. Returns the new token.
 pub async fn rotate_token(org_id: &str, name: &str) -> Result<String, errors::Error> {
-    let _lock = get_lock().await;
     let new_token = generate_token();
     let now = chrono::Utc::now().timestamp_micros();
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
 
     Entity::update_many()
         .col_expr(Column::Token, Expr::value(new_token.clone()))
@@ -316,8 +310,7 @@ pub async fn rotate_token(org_id: &str, name: &str) -> Result<String, errors::Er
 
 /// Delete all tokens for an org (cascade on org deletion).
 pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
-    let _lock = get_lock().await;
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
 
     Entity::delete_many()
         .filter(Column::OrgId.eq(org_id))
@@ -334,8 +327,7 @@ pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
 /// Used by super-cluster sync to remove a token (e.g. the old value after a
 /// rotation) on a receiving cluster.
 pub async fn remove_by_token(org_id: &str, token: &str) -> Result<(), errors::Error> {
-    let _lock = get_lock().await;
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
 
     Entity::delete_many()
         .filter(Column::OrgId.eq(org_id))
@@ -350,7 +342,7 @@ pub async fn remove_by_token(org_id: &str, token: &str) -> Result<(), errors::Er
 
 /// Count tokens for an org.
 pub async fn count_by_org(org_id: &str) -> Result<u64, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let count = Entity::find()
         .filter(Column::OrgId.eq(org_id))
         .count(client)
@@ -362,9 +354,8 @@ pub async fn count_by_org(org_id: &str) -> Result<u64, errors::Error> {
 
 /// Enable or disable a token by org_id and name.
 pub async fn set_enabled(org_id: &str, name: &str, enabled: bool) -> Result<(), errors::Error> {
-    let _lock = get_lock().await;
     let now = chrono::Utc::now().timestamp_micros();
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
 
     Entity::update_many()
         .col_expr(Column::Enabled, Expr::value(enabled))
@@ -381,7 +372,7 @@ pub async fn set_enabled(org_id: &str, name: &str, enabled: bool) -> Result<(), 
 
 /// List all enabled tokens (for cache bootstrapping). Returns (org_id, token, name) tuples.
 pub async fn list_all_enabled() -> Result<Vec<(String, String, String)>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let records = Entity::find()
         .filter(Column::Enabled.eq(true))
         .select_only()

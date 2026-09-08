@@ -31,7 +31,7 @@ use sqlx::{
         SqliteSynchronous,
     },
 };
-use tokio::sync::{Mutex, OnceCell, RwLock, mpsc};
+use tokio::sync::{OnceCell, RwLock, mpsc};
 
 use super::{DBIndex, IndexStatement};
 use crate::{
@@ -39,12 +39,9 @@ use crate::{
     errors::*,
 };
 
-pub static CLIENT_RO: Lazy<Pool<Sqlite>> = Lazy::new(connect_ro);
-/// Same pool as [`CLIENT_RW`], cloneable without taking the mutex — so the ORM
-/// can be lazily initialized while `table::get_lock()` is held.
-pub static CLIENT_RW_POOL: Lazy<Pool<Sqlite>> = Lazy::new(connect_rw);
-pub static CLIENT_RW: Lazy<Arc<Mutex<Pool<Sqlite>>>> =
-    Lazy::new(|| Arc::new(Mutex::new(CLIENT_RW_POOL.clone())));
+pub(crate) static CLIENT_RO: Lazy<Pool<Sqlite>> = Lazy::new(connect_ro);
+/// Holds a single connection, so every writer serializes on it.
+pub(crate) static CLIENT_RW: Lazy<Pool<Sqlite>> = Lazy::new(connect_rw);
 static INDICES: OnceCell<HashSet<DBIndex>> = OnceCell::const_new();
 
 pub static CHANNEL: Lazy<SqliteDbChannel> = Lazy::new(SqliteDbChannel::new);
@@ -75,9 +72,12 @@ fn connect_rw() -> Pool<Sqlite> {
         .busy_timeout(Duration::from_secs(acquire_timeout))
         .create_if_missing(true);
 
+    // SQLite has one writer anyway. A second write connection only lets a
+    // deferred transaction upgrade onto a moved snapshot, which fails as
+    // SQLITE_BUSY_SNAPSHOT (517) without ever consulting busy_timeout.
     SqlitePoolOptions::new()
-        .min_connections(cfg.limit.sql_db_connections_min)
-        .max_connections(cfg.limit.sql_db_connections_max)
+        .min_connections(1)
+        .max_connections(1)
         .acquire_timeout(Duration::from_secs(acquire_timeout))
         .idle_timeout(Some(Duration::from_secs(idle_timeout)))
         .max_lifetime(Some(Duration::from_secs(max_lifetime)))
@@ -264,7 +264,6 @@ impl super::Db for SqliteDb {
         let (module, key1, key2) = super::parse_key(key);
         let local_start_dt = start_dt.unwrap_or_default();
         let client = CLIENT_RW.clone();
-        let client = client.lock().await;
         let mut tx = client.begin().await?;
         if let Err(e) = sqlx::query(
             r#"INSERT OR IGNORE INTO meta (module, key1, key2, start_dt, value) VALUES ($1, $2, $3, $4, '');"#
@@ -339,7 +338,6 @@ impl super::Db for SqliteDb {
     ) -> Result<()> {
         let (module, key1, key2) = super::parse_key(key);
         let client = CLIENT_RW.clone();
-        let client = client.lock().await;
         let mut tx = client.begin().await?;
         let mut need_watch_dt = 0;
         let row = if let Some(start_dt) = start_dt {
@@ -529,7 +527,6 @@ impl super::Db for SqliteDb {
 
         let (module, key1, key2) = super::parse_key(key);
         let client = CLIENT_RW.clone();
-        let client = client.lock().await;
 
         if with_prefix {
             if key1.is_empty() {
@@ -538,12 +535,12 @@ impl super::Db for SqliteDb {
                     sqlx::query("DELETE FROM meta WHERE module = $1 AND start_dt = $2")
                         .bind(&module)
                         .bind(dt)
-                        .execute(&*client)
+                        .execute(&client)
                         .await?;
                 } else {
                     sqlx::query("DELETE FROM meta WHERE module = $1")
                         .bind(&module)
-                        .execute(&*client)
+                        .execute(&client)
                         .await?;
                 }
             } else if key2.is_empty() {
@@ -555,13 +552,13 @@ impl super::Db for SqliteDb {
                     .bind(&module)
                     .bind(&key1)
                     .bind(dt)
-                    .execute(&*client)
+                    .execute(&client)
                     .await?;
                 } else {
                     sqlx::query("DELETE FROM meta WHERE module = $1 AND key1 = $2")
                         .bind(&module)
                         .bind(&key1)
-                        .execute(&*client)
+                        .execute(&client)
                         .await?;
                 }
             } else {
@@ -573,7 +570,7 @@ impl super::Db for SqliteDb {
                         .bind(&key2)
                         .bind(format!("{}/%", key2))
                         .bind(dt)
-                        .execute(&*client)
+                        .execute(&client)
                         .await?;
                 } else {
                     sqlx::query("DELETE FROM meta WHERE module = $1 AND key1 = $2 AND (key2 = $3 OR key2 LIKE $4)")
@@ -581,7 +578,7 @@ impl super::Db for SqliteDb {
                         .bind(&key1)
                         .bind(&key2)
                         .bind(format!("{}/%", key2))
-                        .execute(&*client)
+                        .execute(&client)
                         .await?;
                 }
             }
@@ -593,14 +590,14 @@ impl super::Db for SqliteDb {
                     .bind(&key1)
                     .bind(&key2)
                     .bind(dt)
-                    .execute(&*client)
+                    .execute(&client)
                     .await?;
             } else {
                 sqlx::query("DELETE FROM meta WHERE module = $1 AND key1 = $2 AND key2 = $3")
                     .bind(&module)
                     .bind(&key1)
                     .bind(&key2)
-                    .execute(&*client)
+                    .execute(&client)
                     .await?;
             }
         }
@@ -781,7 +778,6 @@ impl super::Db for SqliteDb {
 
 async fn create_table() -> Result<()> {
     let client = CLIENT_RW.clone();
-    let client = client.lock().await;
     // create table
     sqlx::query(
         r#"
@@ -796,7 +792,7 @@ CREATE TABLE IF NOT EXISTS meta
 );
         "#,
     )
-    .execute(&*client)
+    .execute(&client)
     .await?;
     drop(client);
 
@@ -831,7 +827,6 @@ CREATE TABLE IF NOT EXISTS meta
 
 async fn add_start_dt_column() -> Result<()> {
     let client = CLIENT_RW.clone();
-    let client = client.lock().await;
 
     add_column(&client, "meta", "start_dt", "INTEGER NOT NULL DEFAULT 0").await?;
     drop(client);
@@ -850,7 +845,6 @@ async fn add_start_dt_column() -> Result<()> {
 
 async fn create_meta_backup() -> Result<()> {
     let client = CLIENT_RW.clone();
-    let client = client.lock().await;
     let mut tx = client.begin().await?;
     if let Err(e) =
         sqlx::query(r#"CREATE TABLE IF NOT EXISTS meta_backup_20240330 AS SELECT * FROM meta;"#)
@@ -871,7 +865,6 @@ async fn create_meta_backup() -> Result<()> {
 
 pub async fn create_index(index: IndexStatement<'_>) -> Result<()> {
     let client = CLIENT_RW.clone();
-    let client = client.lock().await;
     let indices = INDICES.get_or_init(cache_indices).await;
     if indices.contains(&DBIndex {
         name: index.idx_name.into(),
@@ -892,14 +885,13 @@ pub async fn create_index(index: IndexStatement<'_>) -> Result<()> {
         index.table,
         index.fields.join(",")
     );
-    sqlx::query(&sql).execute(&*client).await?;
+    sqlx::query(&sql).execute(&client).await?;
     log::info!("[SQLITE] index {} created successfully", index.idx_name);
     Ok(())
 }
 
 pub async fn delete_index(idx_name: &str, table: &str) -> Result<()> {
     let client = CLIENT_RW.clone();
-    let client = client.lock().await;
     let indices = INDICES.get_or_init(cache_indices).await;
     if !indices.contains(&DBIndex {
         name: idx_name.into(),
@@ -909,7 +901,7 @@ pub async fn delete_index(idx_name: &str, table: &str) -> Result<()> {
     }
     log::info!("[SQLITE] deleting index {idx_name} on table {table}");
     let sql = format!("DROP INDEX IF EXISTS {idx_name};");
-    sqlx::query(&sql).execute(&*client).await?;
+    sqlx::query(&sql).execute(&client).await?;
     log::info!("[SQLITE] index {idx_name} deleted successfully");
     Ok(())
 }

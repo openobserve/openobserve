@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="configureDedupForAlert"
           data-test="context-menu-configure-dedup"
         >
-          <OIcon name="tune" size="sm" class="mr-2" />
+          <OIcon name="tune" size="sm" class="me-2" />
           <span>{{ t("alerts.insights.actions.configureDedup") }}</span>
         </div>
         <div
@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="editAlert"
           data-test="context-menu-edit-alert"
         >
-          <OIcon name="edit" size="sm" class="mr-2" />
+          <OIcon name="edit" size="sm" class="me-2" />
           <span>{{ t("alerts.insights.actions.editAlert") }}</span>
         </div>
         <div
@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="viewAlertHistory"
           data-test="context-menu-view-history"
         >
-          <OIcon name="history" size="sm" class="mr-2" />
+          <OIcon name="history" size="sm" class="me-2" />
           <span>{{ t("alerts.insights.actions.viewAlertHistory") }}</span>
         </div>
       </div>
@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="$emit('close')"
           data-test="context-menu-cancel"
         >
-          <OIcon name="close" size="sm" class="mr-2" />
+          <OIcon name="close" size="sm" class="me-2" />
           <span>{{ t("common.cancel") }}</span>
         </div>
       </div>

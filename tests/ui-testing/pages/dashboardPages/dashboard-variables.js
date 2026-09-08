@@ -18,6 +18,8 @@ export default class DashboardVariables {
     this.variableOptionByValue = (name, value) => page.locator(`[data-test="variable-selector-${name}-inner-option"][data-test-value="${value}"]`);
     this.variablePopover = (name) => page.locator(`[data-test="variable-selector-${name}-inner-popover"]`);
     this.variableWrapper = (name) => page.locator(`[data-test="variable-selector-${name}-inner"]`);
+    // OSpinner (role="status") shown inside a selector while its options load.
+    this.variableLoadingSpinner = (name) => page.locator(`[data-test="variable-selector-${name}"] [role="status"]`);
     // HTML panel editor (Monaco) locators
     this.htmlEditor = page.locator('[data-test="dashboard-html-editor"]');
     // Ad-hoc (dynamic) filter variable selector controls
@@ -193,11 +195,67 @@ export default class DashboardVariables {
     // if (!customValueSearch) {
     const saveBtn = this.page.locator('[data-test="dashboard-variable-save-btn"]');
     await saveBtn.waitFor({ state: "visible", timeout: 10000 });
-    await saveBtn.click();
+
+    // AddSettingVariable.vue's save button submits the form by id
+    // (type="submit" form="add-setting-variable-form"), so a click issued while
+    // that wiring is still settling silently no-ops: onSubmit never runs, no
+    // dashboard PUT goes out, and the wait below expires with the form still on
+    // screen. Gate the retry on the REQUEST rather than the row — a request that
+    // has been sent but not yet answered already proves the click landed, so a
+    // slow save can never be mistaken for a lost one and re-submitted.
+    const isVariableSaveCall = (target) =>
+      /\/api\/[^/]+\/dashboards\//.test(target.url()) &&
+      (target.method?.() ?? target.request().method()) === "PUT";
+
+    const submitAttempts = 3;
+    let saveRequest = null;
+
+    for (let attempt = 1; attempt <= submitAttempts; attempt++) {
+      const requestPromise = this.page
+        .waitForRequest(isVariableSaveCall, { timeout: 10000 })
+        .catch(() => null);
+
+      await saveBtn.click();
+
+      // Race the request against the form closing: in isFromAddPanel mode the save
+      // emits instead of calling the API, so waiting out the request timeout on
+      // every attempt would burn 30s before the row wait below ever runs.
+      saveRequest = await Promise.race([
+        requestPromise,
+        saveBtn
+          .waitFor({ state: "hidden", timeout: 10000 })
+          .then(() => null)
+          .catch(() => null),
+      ]);
+      if (saveRequest) break;
+
+      // Nothing hit the wire. If the form is gone the save landed some other
+      // way (or the drawer was torn down) — let the row wait below adjudicate.
+      if (!(await saveBtn.isVisible().catch(() => false))) break;
+    }
 
     // Wait for save to complete — variable row appears in the list once save + handleSaveVariable finished
     // This ensures: API call done → emit("save") → loadDashboard triggered → isAddVariable = false
-    await this.editVariableBtn(name).waitFor({ state: 'visible', timeout: 15000 });
+    await this.editVariableBtn(name)
+      .waitFor({ state: "visible", timeout: 15000 })
+      .catch(async (e) => {
+        // A rejected save (duplicate name, failed validation) leaves the form up
+        // and reports itself only as a toast. Surface that text instead of the
+        // opaque "waiting for dashboard-edit-variable-<name>" timeout.
+        const toast = await this.getErrorToastLocator()
+          .first()
+          .textContent({ timeout: 1000 })
+          .catch(() => null);
+        const formStillOpen = await saveBtn.isVisible().catch(() => false);
+        throw new Error(
+          `addDashboardVariable("${name}"): variable never appeared in the list after save` +
+            (!saveRequest && formStillOpen
+              ? " (form still open and no dashboard PUT reached the network — submit was rejected or lost)"
+              : "") +
+            (toast ? `; error toast: ${toast.trim()}` : "") +
+            `. ${e.message}`
+        );
+      });
 
     // Click the close button and wait for the drawer to fully close
     await this.settingsDrawerCloseBtn.waitFor({ state: 'visible', timeout: 5000 });

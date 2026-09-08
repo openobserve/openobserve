@@ -26,12 +26,9 @@ use sea_orm::{
 };
 
 use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{get_orm_client_ro, get_orm_client_rw},
     errors::Error,
-    table::{
-        entity::model_pricing::{ActiveModel, Column, Entity, Model},
-        get_lock,
-    },
+    table::entity::model_pricing::{ActiveModel, Column, Entity, Model},
 };
 
 impl TryFrom<Model> for ModelPricingDefinition {
@@ -62,8 +59,7 @@ impl TryFrom<Model> for ModelPricingDefinition {
 }
 
 pub async fn put(item: ModelPricingDefinition) -> Result<ModelPricingDefinition, Error> {
-    let _lock = get_lock().await;
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let now = chrono::Utc::now().timestamp_micros();
     let tiers_json = json::to_value(&item.tiers)?;
 
@@ -140,7 +136,7 @@ pub async fn put(item: ModelPricingDefinition) -> Result<ModelPricingDefinition,
 }
 
 pub async fn get(org_id: &str, name: &str) -> Result<Option<ModelPricingDefinition>, Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     match get_by_org_and_name(client, org_id, name).await? {
         Some(model) => Ok(Some(model.try_into()?)),
         None => Ok(None),
@@ -148,7 +144,7 @@ pub async fn get(org_id: &str, name: &str) -> Result<Option<ModelPricingDefiniti
 }
 
 pub async fn get_by_id(id: &str) -> Result<Option<ModelPricingDefinition>, Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     match Entity::find_by_id(id).one(client).await? {
         Some(model) => Ok(Some(model.try_into()?)),
         None => Ok(None),
@@ -158,7 +154,7 @@ pub async fn get_by_id(id: &str) -> Result<Option<ModelPricingDefinition>, Error
 /// Return the distinct org IDs that have at least one model pricing definition.
 /// Used for startup cache warming.
 pub async fn list_orgs() -> Result<Vec<String>, Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let rows: Vec<(String,)> = Entity::find()
         .select_only()
         .column(Column::Org)
@@ -170,7 +166,7 @@ pub async fn list_orgs() -> Result<Vec<String>, Error> {
 }
 
 pub async fn list(org_id: &str) -> Result<Vec<ModelPricingDefinition>, Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     Entity::find()
         .filter(Column::Org.eq(org_id))
         .order_by(Column::Name, sea_orm::Order::Asc)
@@ -185,8 +181,7 @@ pub async fn list(org_id: &str) -> Result<Vec<ModelPricingDefinition>, Error> {
 /// Returns `Ok(true)` if a row was deleted, `Ok(false)` if not found.
 /// Built-in entries (`source = 'built_in'`) are never deleted — returns an error.
 pub async fn delete_by_id(org_id: &str, id: &str) -> Result<bool, Error> {
-    let _lock = get_lock().await;
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     if let Some(model) = Entity::find_by_id(id)
         .filter(Column::Org.eq(org_id))
         .one(client)
@@ -207,7 +202,7 @@ pub async fn delete_by_id(org_id: &str, id: &str) -> Result<bool, Error> {
 /// Return all model names belonging to the built-in org.
 /// Used by the sync job to detect models removed from the upstream source.
 pub async fn list_built_in_names() -> Result<Vec<String>, Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let rows: Vec<(String,)> = Entity::find()
         .select_only()
         .column(Column::Name)

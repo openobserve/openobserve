@@ -147,6 +147,84 @@ pub struct PricingTierDefinition {
     /// exact for token counts < 2^53 (~9 quadrillion), well beyond practical span sizes.
     #[serde(default)]
     pub prices: HashMap<String, f64>,
+    /// Recurring UTC time-of-day windows during which this tier applies.
+    ///
+    /// Empty (the default) means the tier is not time-restricted. Providers such as
+    /// DeepSeek publish "peak" and "off-peak" rates that repeat every day, which is a
+    /// time-of-day range rather than an absolute cutover (that is what `valid_from` is
+    /// for). A tier applies when the span falls in ANY of its windows *and* its
+    /// `condition` (if set) passes, so windows compose with context-length tiering.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub utc_windows: Vec<UtcTimeWindow>,
+}
+
+/// Number of minutes in a day. Window bounds are normalized modulo this value, so
+/// `1440` (i.e. 24:00) is accepted as an end bound and normalizes to `0`.
+pub const MINUTES_PER_DAY: u32 = 1440;
+
+/// A recurring UTC time-of-day window during which a pricing tier applies.
+///
+/// Bounds are minutes since UTC midnight and the range is half-open:
+/// `[start_minute, end_minute)`. A window whose `start_minute` is greater than its
+/// `end_minute` wraps past midnight (e.g. `990 -> 30` is 16:30–00:30 UTC). Equal
+/// bounds are rejected on write — leave `utc_windows` empty for an always-on tier.
+#[derive(Clone, Debug, Serialize, Deserialize, Default, PartialEq, Eq, ToSchema)]
+#[serde(default)]
+pub struct UtcTimeWindow {
+    /// Inclusive start, minutes since UTC midnight (0–1440).
+    pub start_minute: u32,
+    /// Exclusive end, minutes since UTC midnight (0–1440).
+    pub end_minute: u32,
+}
+
+impl UtcTimeWindow {
+    /// Build a window from UTC clock times. `end` may be `(24, 0)` for end-of-day.
+    pub fn from_hm(start: (u32, u32), end: (u32, u32)) -> Self {
+        Self {
+            start_minute: start.0 * 60 + start.1,
+            end_minute: end.0 * 60 + end.1,
+        }
+    }
+
+    /// Whether `minute_of_day` (minutes since UTC midnight) falls inside this window.
+    pub fn contains(&self, minute_of_day: u32) -> bool {
+        let start = self.start_minute % MINUTES_PER_DAY;
+        let end = self.end_minute % MINUTES_PER_DAY;
+        let m = minute_of_day % MINUTES_PER_DAY;
+        if start == end {
+            // Degenerate window — treat as "all day" rather than "never", so a
+            // misconfigured entry still prices spans instead of silently dropping them.
+            true
+        } else if start < end {
+            m >= start && m < end
+        } else {
+            // Wraps past midnight.
+            m >= start || m < end
+        }
+    }
+}
+
+/// Minutes since UTC midnight for a Unix timestamp in microseconds.
+/// Uses Euclidean division so pre-epoch timestamps stay in `0..1440`.
+pub fn utc_minute_of_day(ts_micros: i64) -> u32 {
+    let secs = ts_micros.div_euclid(1_000_000);
+    (secs.rem_euclid(86_400) / 60) as u32
+}
+
+/// Whether a set of windows admits `ts_micros`. An empty window list is unrestricted.
+/// When the timestamp is unknown, a time-restricted tier never matches — the caller
+/// falls back to the unrestricted default tier.
+pub fn windows_match(windows: &[UtcTimeWindow], ts_micros: Option<i64>) -> bool {
+    if windows.is_empty() {
+        return true;
+    }
+    match ts_micros {
+        Some(ts) => {
+            let minute = utc_minute_of_day(ts);
+            windows.iter().any(|w| w.contains(minute))
+        }
+        None => false,
+    }
 }
 
 /// Condition for a pricing tier.
@@ -429,5 +507,123 @@ mod tests {
     #[test]
     fn test_default_true_returns_true() {
         assert!(default_true());
+    }
+
+    // ── UTC time windows ──────────────────────────────────────────────────
+
+    #[test]
+    fn test_utc_window_from_hm() {
+        let w = UtcTimeWindow::from_hm((1, 0), (4, 0));
+        assert_eq!(w.start_minute, 60);
+        assert_eq!(w.end_minute, 240);
+    }
+
+    #[test]
+    fn test_utc_window_contains_half_open_range() {
+        let w = UtcTimeWindow::from_hm((1, 0), (4, 0));
+        // start is inclusive, end is exclusive
+        assert!(w.contains(60));
+        assert!(w.contains(239));
+        assert!(!w.contains(240));
+        assert!(!w.contains(59));
+    }
+
+    #[test]
+    fn test_utc_window_wraps_past_midnight() {
+        // 16:30 -> 00:30 UTC
+        let w = UtcTimeWindow::from_hm((16, 30), (0, 30));
+        assert!(w.contains(990)); // 16:30
+        assert!(w.contains(1439)); // 23:59
+        assert!(w.contains(0)); // 00:00
+        assert!(w.contains(29)); // 00:29
+        assert!(!w.contains(30)); // 00:30 — exclusive end
+        assert!(!w.contains(600)); // 10:00
+    }
+
+    #[test]
+    fn test_utc_window_end_of_day_normalizes() {
+        // 22:00 -> 24:00 must cover the tail of the day, not collapse to empty.
+        let w = UtcTimeWindow::from_hm((22, 0), (24, 0));
+        assert!(w.contains(1320));
+        assert!(w.contains(1439));
+        assert!(!w.contains(0));
+        assert!(!w.contains(1319));
+    }
+
+    #[test]
+    fn test_utc_window_equal_bounds_is_all_day() {
+        let w = UtcTimeWindow {
+            start_minute: 300,
+            end_minute: 300,
+        };
+        assert!(w.contains(0));
+        assert!(w.contains(300));
+        assert!(w.contains(1439));
+    }
+
+    #[test]
+    fn test_utc_minute_of_day() {
+        // 1970-01-01T00:00:00Z
+        assert_eq!(utc_minute_of_day(0), 0);
+        // 1970-01-01T01:30:00Z
+        assert_eq!(utc_minute_of_day(5_400_000_000), 90);
+        // one full day later, same clock time
+        assert_eq!(utc_minute_of_day(86_400_000_000 + 5_400_000_000), 90);
+    }
+
+    #[test]
+    fn test_utc_minute_of_day_negative_timestamp() {
+        // One minute before the epoch is 23:59 UTC, not a negative minute.
+        assert_eq!(utc_minute_of_day(-60_000_000), 1439);
+    }
+
+    #[test]
+    fn test_windows_match_empty_is_unrestricted() {
+        assert!(windows_match(&[], None));
+        assert!(windows_match(&[], Some(0)));
+    }
+
+    #[test]
+    fn test_windows_match_any_window() {
+        // DeepSeek peak hours: 01:00-04:00 and 06:00-10:00 UTC
+        let peak = vec![
+            UtcTimeWindow::from_hm((1, 0), (4, 0)),
+            UtcTimeWindow::from_hm((6, 0), (10, 0)),
+        ];
+        let at = |h: i64, m: i64| Some((h * 3600 + m * 60) * 1_000_000);
+        assert!(windows_match(&peak, at(2, 30)));
+        assert!(windows_match(&peak, at(7, 0)));
+        assert!(!windows_match(&peak, at(5, 0)));
+        assert!(!windows_match(&peak, at(12, 0)));
+        assert!(!windows_match(&peak, at(0, 0)));
+    }
+
+    #[test]
+    fn test_windows_match_unknown_timestamp_never_matches() {
+        let peak = vec![UtcTimeWindow::from_hm((1, 0), (4, 0))];
+        assert!(!windows_match(&peak, None));
+    }
+
+    #[test]
+    fn test_pricing_tier_utc_windows_default_empty_and_omitted() {
+        let json = r#"{"name":"default"}"#;
+        let tier: PricingTierDefinition = serde_json::from_str(json).unwrap();
+        assert!(tier.utc_windows.is_empty());
+        let val = serde_json::to_value(&tier).unwrap();
+        assert!(!val.as_object().unwrap().contains_key("utc_windows"));
+    }
+
+    #[test]
+    fn test_pricing_tier_utc_windows_roundtrip() {
+        let tier = PricingTierDefinition {
+            name: "peak".to_string(),
+            utc_windows: vec![UtcTimeWindow::from_hm((1, 0), (4, 0))],
+            ..Default::default()
+        };
+        let json = serde_json::to_string(&tier).unwrap();
+        let back: PricingTierDefinition = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.utc_windows.len(), 1);
+        assert_eq!(back.utc_windows[0].start_minute, 60);
+        assert_eq!(back.utc_windows[0].end_minute, 240);
     }
 }

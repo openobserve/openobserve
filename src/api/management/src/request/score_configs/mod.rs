@@ -23,6 +23,7 @@ use openobserve_core::auth::{UserEmail, is_ofga_object_visible};
 use crate::{
     common::meta::{authz::Authz, http::HttpResponse as MetaHttpResponse},
     models::score_configs::{
+        EnsureScoreConfigRequestBody, EnsureScoreConfigResponseBody,
         ListScoreConfigVersionsResponseBody, ListScoreConfigsResponseBody, ScoreConfigRequestBody,
         ScoreConfigResponseBody, ScoreConfigUpdateRequestBody,
     },
@@ -43,6 +44,7 @@ fn score_config_error_response(value: ScoreConfigError) -> Response {
             MetaHttpResponse::conflict("Score config name already exists")
         }
         ScoreConfigError::InUseByScorer => MetaHttpResponse::conflict(value),
+        ScoreConfigError::DataTypeMismatch { .. } => MetaHttpResponse::conflict(value),
     }
 }
 
@@ -133,6 +135,48 @@ pub async fn create_score_config(
             set_ownership(&org_id, "score_configs", Authz::new(&c.entity_id)).await;
             let resp: ScoreConfigResponseBody = c.into();
             MetaHttpResponse::json(resp)
+        }
+        Err(err) => score_config_error_response(err),
+    }
+}
+
+/// EnsureScoreConfig
+#[utoipa::path(
+    put,
+    path = "/{org_id}/score_configs",
+    context_path = "/api",
+    tag = "ScoreConfigs",
+    operation_id = "EnsureScoreConfig",
+    summary = "Ensure a score config exists with these parameters",
+    description = "Creates the score config when it is absent, does nothing when every parameter \
+                   already matches, and appends a new version when a structural parameter \
+                   (range, categories, healthy threshold) differs. A different data type is \
+                   refused: changing what a dimension measures needs a different name.",
+    security(("Authorization" = [])),
+    params(("org_id" = String, Path, description = "Organization name")),
+    request_body(content = inline(EnsureScoreConfigRequestBody), description = "Declared score config parameters"),
+    responses(
+        (status = 200, body = inline(EnsureScoreConfigResponseBody)),
+        (status = 400, description = "Bad Request", body = ()),
+        (status = 409, description = "Data type differs from the existing score config", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "ScoreConfigs", "operation": "update"})),
+    ),
+)]
+pub async fn ensure_score_config(
+    Path(org_id): Path<String>,
+    axum::Json(body): axum::Json<EnsureScoreConfigRequestBody>,
+) -> Response {
+    match score_configs::ensure_score_config(&org_id, body.into()).await {
+        Ok(ensured) => {
+            set_ownership(
+                &org_id,
+                "score_configs",
+                Authz::new(&ensured.config.entity_id),
+            )
+            .await;
+            MetaHttpResponse::json(EnsureScoreConfigResponseBody::from(ensured))
         }
         Err(err) => score_config_error_response(err),
     }

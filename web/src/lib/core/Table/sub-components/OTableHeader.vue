@@ -23,6 +23,9 @@ const props = defineProps<{
   table: Table<any>;
   columnOrder: string[];
   selectionMultiple?: boolean;
+  /** Render the header select-all checkbox. The `th` is kept either way so the
+   *  body's selection gutter stays aligned. */
+  showSelectAll?: boolean;
   isAllSelected?: boolean;
   isIndeterminate?: boolean;
   expansionEnabled?: boolean;
@@ -392,7 +395,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
           {
             // Bottom divider on the cells along the header's bottom edge, since
             // the <thead> border-b doesn't paint in border-separate mode. Uses
-            // the directional border-b color so it doesn't clash with border-l.
+            // the directional border-b color so it doesn't clash with border-s.
             'border-b-table-header-border border-b': level.isLeaf || cell._isTotalHeader,
           },
           {
@@ -486,6 +489,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
         data-test="o2-table-th-select"
       >
         <OTableSelectCheckbox
+          v-if="showSelectAll !== false"
           :model-value="isAllSelected ?? false"
           :indeterminate="isIndeterminate ?? false"
           row-id="all"
@@ -602,7 +606,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
               </span>
               <span
                 v-if="headerSubLabel(header)"
-                class="text-text-muted text-2xs w-full min-w-0 truncate leading-tight font-normal normal-case"
+                class="text-text-secondary text-2xs w-full min-w-0 truncate leading-tight font-normal normal-case"
                 :data-test="`o2-table-th-sublabel-${header.id}`"
               >
                 {{ headerSubLabel(header) }}
@@ -660,7 +664,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
             </span>
             <span
               v-if="headerSubLabel(header)"
-              class="text-text-muted text-2xs w-full min-w-0 truncate leading-tight font-normal normal-case"
+              class="text-text-secondary text-2xs w-full min-w-0 truncate leading-tight font-normal normal-case"
               :data-test="`o2-table-th-sublabel-${header.id}`"
             >
               {{ headerSubLabel(header) }}
@@ -696,7 +700,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
               <button
                 type="button"
                 :data-test="`o2-table-column-filter-btn-${header.column.id}`"
-                class="rounded-default ml-0.5 inline-flex shrink-0 cursor-pointer items-center justify-center border-0 bg-transparent p-0.5"
+                class="rounded-default ms-0.5 inline-flex shrink-0 cursor-pointer items-center justify-center border-0 bg-transparent p-0.5"
                 @click.stop
               >
                 <OIcon
@@ -765,7 +769,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
             v-if="enableColumnFormat && (header.column.columnDef.meta as any)?.formattable"
             type="button"
             :data-test="`o2-table-column-format-btn-${header.column.id}`"
-            class="rounded-default ml-0.5 inline-flex shrink-0 cursor-pointer items-center justify-center border-0 bg-transparent p-0.5"
+            class="rounded-default ms-0.5 inline-flex shrink-0 cursor-pointer items-center justify-center border-0 bg-transparent p-0.5"
             :aria-label="t('components.table.formatColumnAria')"
             @click.stop="emit('format-column', header.column.id)"
           >
@@ -824,6 +828,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
         data-test="o2-table-th-select"
       >
         <OTableSelectCheckbox
+          v-if="showSelectAll !== false"
           :model-value="isAllSelected ?? false"
           :indeterminate="isIndeterminate ?? false"
           row-id="all"
@@ -930,7 +935,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
               </span>
               <span
                 v-if="headerSubLabel(header)"
-                class="text-text-muted text-2xs w-full min-w-0 truncate leading-tight font-normal normal-case"
+                class="text-text-secondary text-2xs w-full min-w-0 truncate leading-tight font-normal normal-case"
                 :data-test="`o2-table-th-sublabel-${header.id}`"
               >
                 {{ headerSubLabel(header) }}
@@ -1000,7 +1005,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
               <button
                 type="button"
                 :data-test="`o2-table-column-filter-btn-${header.column.id}`"
-                class="rounded-default ml-0.5 inline-flex shrink-0 cursor-pointer items-center justify-center border-0 bg-transparent p-0.5"
+                class="rounded-default ms-0.5 inline-flex shrink-0 cursor-pointer items-center justify-center border-0 bg-transparent p-0.5"
                 @click.stop
               >
                 <OIcon
@@ -1069,7 +1074,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
             v-if="enableColumnFormat && (header.column.columnDef.meta as any)?.formattable"
             type="button"
             :data-test="`o2-table-column-format-btn-${header.column.id}`"
-            class="rounded-default ml-0.5 inline-flex shrink-0 cursor-pointer items-center justify-center border-0 bg-transparent p-0.5"
+            class="rounded-default ms-0.5 inline-flex shrink-0 cursor-pointer items-center justify-center border-0 bg-transparent p-0.5"
             :aria-label="t('components.table.formatColumnAria')"
             @click.stop="emit('format-column', header.column.id)"
           >

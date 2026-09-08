@@ -51,15 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   from the parent they belong to.
 -->
 <template>
-  <DbmPageChrome
-    :title="t('dbm.databases.title')"
-    :subtitle="t('dbm.databases.subtitle')"
-    title-data-test="dbm-databases-title"
-    date-time-data-test="dbm-databases-date-time"
-    :tab-counts="tabCounts"
-    :range="range"
-    @date-change="onDateChange"
-  >
+  <DbmPageChrome title-data-test="dbm-databases-title" :tab-counts="tabCounts">
     <div class="flex min-h-0 flex-1 flex-col">
       <OTable
         :data="treeRows"
@@ -76,6 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :persist-columns="true"
         table-id="dbm-databases"
         :enable-column-resize="true"
+        :toolbar-bordered="false"
         :get-row-style="rowStyle"
         tree
         :get-row-warning="hasShortfall"
@@ -102,12 +95,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #toolbar-trailing>
-          <DbmRefreshButton
-            :loading="loading"
-            :last-run-at="lastRunAt"
-            data-test="dbm-databases-refresh"
-            @refresh="onRefresh"
-          />
+          <div class="flex items-center gap-1.5">
+            <DbmRefreshButton
+              mode="status"
+              :loading="loading"
+              :last-run-at="lastRunAt"
+              data-test="dbm-databases-refresh"
+            />
+            <DateTime
+              auto-apply
+              menu-align="end"
+              :default-type="range.type"
+              :default-absolute-time="{ startTime: range.startTime, endTime: range.endTime }"
+              :default-relative-time="range.relativeTimePeriod ?? undefined"
+              data-test-name="dbm-databases-date-time"
+              class="h-8"
+              @on:date-change="onDateChange"
+            />
+            <DbmRefreshButton
+              mode="button"
+              :loading="loading"
+              data-test="dbm-databases-refresh"
+              @refresh="onRefresh"
+            />
+          </div>
         </template>
 
         <template #subheader>
@@ -150,12 +161,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("dbm.breakdown.noService") }}
               </span>
               <template v-else>
-                <OIcon name="database" size="xs" class="text-text-label shrink-0" />
+                <OIcon name="database" size="xs" class="text-text-secondary shrink-0" />
                 <span class="text-text-heading text-2xs min-w-0 truncate font-semibold">
                   {{ row.name ? raw(row.name) : t("dbm.breakdown.noSchema") }}
                 </span>
               </template>
-              <span class="text-text-label text-3xs shrink-0">
+              <span class="text-text-secondary text-3xs shrink-0">
                 {{ t("dbm.breakdown.queryCount", { count: row.queryCount }, row.queryCount) }}
               </span>
             </template>
@@ -171,13 +182,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                  exists but named no host. Saying so beats a blank name line. -->
             <span
               v-else
-              class="text-text-label text-compact truncate italic"
+              class="text-text-secondary text-compact truncate italic"
               data-test="dbm-databases-unnamed-instance"
             >
               {{ t("dbm.databases.unnamedInstance") }}
               <OTooltip side="bottom" :content="t('dbm.databases.unnamedInstanceHint')" />
             </span>
-            <div class="text-text-label text-3xs flex min-w-0 items-center gap-1 truncate">
+            <div class="text-text-secondary text-3xs flex min-w-0 items-center gap-1 truncate">
               <OTag type="dbSystem" :value="row.db_system" size="xs" />
               <template v-if="row.db_namespace">
                 <span class="opacity-45">·</span>
@@ -188,7 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                    the client-vantage list cannot show by construction. -->
               <template v-if="row.trafficless">
                 <span class="opacity-45">·</span>
-                <span class="text-text-label italic" data-test="dbm-databases-no-traffic">
+                <span class="text-text-secondary italic" data-test="dbm-databases-no-traffic">
                   {{ t("dbm.instanceMetrics.noTraffic") }}
                   <OTooltip side="bottom" :content="t('dbm.instanceMetrics.noTrafficHint')" />
                 </span>
@@ -243,7 +254,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :class="
               !isBreakdownRow(row) && row.critical
                 ? 'text-status-error-text font-semibold'
-                : 'text-text-muted'
+                : noQueryFigures(row)
+                  ? 'text-text-muted'
+                  : 'text-text-secondary'
             "
           >
             <template v-if="noQueryFigures(row)">{{ raw("—") }}</template>
@@ -327,7 +340,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : formatPercent(attentionOf(row).ratio, 0)
               }}
             </span>
-            <span class="text-text-label text-3xs">{{ attentionLabel(row) }}</span>
+            <span class="text-text-secondary text-3xs">{{ attentionLabel(row) }}</span>
           </div>
         </template>
 
@@ -352,7 +365,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="text-text-heading text-compact font-mono font-medium tabular-nums">
                 {{ formatNs(row.total_time_ns) }}
               </span>
-              <span class="text-text-label text-3xs font-mono tabular-nums">
+              <span class="text-text-secondary text-3xs font-mono tabular-nums">
                 {{ formatPercent(row.share, 0) }}
               </span>
             </span>
@@ -361,11 +374,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                  vantage named reads as time the ENGINE spent, which on
                  MySQL/MariaDB would be wait time. This is span time, and it
                  includes network and pool wait the server never sees (T7). -->
-            <span
-              class="text-text-label text-3xs"
-              :title="t('dbm.detail.overlap.clientObserved', { engine: engineOf(row) ?? '' })"
-              data-test="dbm-databases-load-qualifier"
-            >
+            <span class="text-text-secondary text-3xs" data-test="dbm-databases-load-qualifier">
+              <OTooltip
+                :content="t('dbm.detail.overlap.clientObserved', { engine: engineOf(row) ?? '' })"
+              />
               {{ t("dbm.list.overlap.clientObserved") }}
             </span>
           </span>
@@ -428,6 +440,7 @@ import DbmCoverageLine from "@/components/dbm/DbmCoverageLine.vue";
 import DbmEmptyState, { type DbmEmptyCauseId } from "@/components/dbm/DbmEmptyState.vue";
 import DbmInstanceHealthCell from "@/components/dbm/DbmInstanceHealthCell.vue";
 import DbmPageChrome from "@/components/dbm/DbmPageChrome.vue";
+import DateTime from "@/components/DateTime.vue";
 import DbmRefreshButton from "@/components/dbm/DbmRefreshButton.vue";
 import DbmRowActions, { type DbmRowAction } from "@/components/dbm/DbmRowActions.vue";
 import DbmRowChips, { type DbmRowChip } from "@/components/dbm/DbmRowChips.vue";
@@ -1517,10 +1530,11 @@ const allColumns = computed<OTableColumnDef<TableRow>[]>(() => [
   },
   {
     id: "actions",
-    header: raw(""),
-    size: 72,
+    header: t("dbm.common.actions"),
+    isAction: true,
+    size: 92,
     sortable: false,
-    meta: { align: "right" },
+    meta: { align: "center", cellClass: "actions-column", actionCount: 2 },
   },
 ]);
 

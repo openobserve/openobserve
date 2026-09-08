@@ -84,6 +84,8 @@ export interface Scorer {
   produces_score_config_version?: number | null;
   template: string;
   variables?: string[];
+  referenceBased?: boolean;
+  reference_based?: boolean;
   outputSchema?: any;
   output_schema?: any;
   params?: Record<string, any>;

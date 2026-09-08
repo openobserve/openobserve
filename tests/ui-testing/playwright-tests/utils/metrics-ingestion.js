@@ -390,6 +390,38 @@ class MetricsIngestion {
     }
 
     /**
+     * Poll the PromQL query API until an ingested metric is actually queryable
+     * (WAL indexing lags the ingest ack). Best-effort: returns false on timeout
+     * so callers proceed and let the test's own data assertion fail loudly.
+     */
+    async waitForMetricQueryable(metricName, maxRetries = 30, interval = 1000) {
+        const base = this.config.endpoint.replace('/v1/metrics', '');
+        const url = `${base}/prometheus/api/v1/query?query=${encodeURIComponent(metricName)}`;
+        const headers = getAuthHeaders();
+        for (let i = 0; i < maxRetries; i++) {
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 5000);
+                const response = await fetch(url, { method: 'GET', headers, signal: controller.signal });
+                clearTimeout(timeoutId);
+                if (response.ok) {
+                    const body = await response.json();
+                    const result = body?.data?.result;
+                    if (Array.isArray(result) && result.length > 0) {
+                        testLogger.info(`Metric "${metricName}" queryable after ${i + 1} poll(s)`, { series: result.length });
+                        return true;
+                    }
+                }
+            } catch (error) {
+                testLogger.debug(`waitForMetricQueryable attempt ${i + 1} error`, { error: error.message });
+            }
+            await new Promise(resolve => setTimeout(resolve, interval));
+        }
+        testLogger.warn(`Metric "${metricName}" not queryable after ${maxRetries} polls`);
+        return false;
+    }
+
+    /**
      * Send metrics to OpenObserve using OTLP format with retry logic
      */
     async sendMetrics(metricsData, useExternal = false, maxRetries = 3) {

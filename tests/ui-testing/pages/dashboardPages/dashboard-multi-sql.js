@@ -105,15 +105,6 @@ export default class DashboardMultiSQL {
     );
   }
 
-  /**
-   * Locator for the "SQL" mode subtitle label shown in the query editor header.
-   */
-  get sqlModeSubtitle() {
-    return this.page.locator(
-      '.text-subtitle2.text-weight-bold:has-text("SQL")',
-    );
-  }
-
   // ---------------------------------------------------------------------------
   // Actions
   // ---------------------------------------------------------------------------

@@ -15,6 +15,10 @@ default = []
 # this crate — cargo rejects the package cycle outright, `optional` and feature
 # gating included. Anything both sides need lives in `config` or `infra`.
 enterprise = ["dep:o2_enterprise", "dep:o2_openfga"]
+# `infra/cloud` is needed directly: it gates `OrganizationRecord::trial_ends_at`,
+# which the trial gate reads, and this crate does not depend on openobserve-core
+# to inherit it transitively.
+cloud = ["enterprise", "infra/cloud", "o2_enterprise/cloud"]
 
 [dependencies]
 anyhow.workspace = true

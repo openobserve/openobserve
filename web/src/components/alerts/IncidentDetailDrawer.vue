@@ -24,6 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       }"
       :subtitle="t('alerts.incidents.incident')"
       title-overflow="visible"
+      tabs-below
       bleed
     >
       <!-- Incident name — click the title to rename, Enter or blur saves,
@@ -118,49 +119,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </template>
 
+      <template #header-tabs>
+        <OTabs v-model="activeTab" align="left" class="flex-1" mobile-arrows :breakpoint="0">
+          <OTab
+            name="overview"
+            :label="t('alerts.insights.tabs.overview')"
+            data-test="incident-overview-tab"
+          />
+          <OTab
+            name="activity"
+            :label="t('alerts.incidents.activityTab')"
+            data-test="incident-activity-tab"
+          />
+          <OTab
+            name="incidentAnalysis"
+            :label="t('alerts.incidents.incidentAnalysis')"
+            data-test="incident-analysis-tab"
+          />
+          <OTab
+            name="serviceGraph"
+            :label="t('alerts.incidents.alertGraph')"
+            data-test="incident-alert-graph-tab"
+          />
+          <OTab name="alertTriggers" data-test="incident-alert-triggers-tab">
+            <template #default>
+              <div class="flex items-center gap-1.5">
+                <span>{{ t("alerts.incidents.alertTriggers") }}</span>
+                <OTag type="countChip" value="neutral">{{ triggers.length }}</OTag>
+              </div>
+            </template>
+          </OTab>
+
+          <OTab name="logs" :label="t('common.logs')" data-test="incident-logs-tab" />
+          <OTab name="metrics" :label="t('search.metrics')" data-test="incident-metrics-tab" />
+          <OTab name="traces" :label="t('menu.traces')" data-test="incident-traces-tab" />
+        </OTabs>
+      </template>
+
       <!-- Content -->
       <div
         v-if="!loading && incidentDetails"
         class="bg-card-glass-bg flex min-h-0 flex-1 flex-col overflow-hidden"
       >
-        <div class="px-page-edge border-border-default flex-shrink-0 border-b">
-          <OTabs v-model="activeTab" align="left" class="flex-1" mobile-arrows :breakpoint="0">
-            <OTab
-              name="overview"
-              :label="t('alerts.insights.tabs.overview')"
-              data-test="incident-overview-tab"
-            />
-            <OTab
-              name="activity"
-              :label="t('alerts.incidents.activityTab')"
-              data-test="incident-activity-tab"
-            />
-            <OTab
-              name="incidentAnalysis"
-              :label="t('alerts.incidents.incidentAnalysis')"
-              data-test="incident-analysis-tab"
-            />
-            <OTab
-              name="serviceGraph"
-              :label="t('alerts.incidents.alertGraph')"
-              data-test="incident-alert-graph-tab"
-            />
-            <OTab name="alertTriggers" data-test="incident-alert-triggers-tab">
-              <template #default>
-                <div class="flex items-center gap-1.5">
-                  <span>{{ t("alerts.incidents.alertTriggers") }}</span>
-                  <OTag type="countChip" value="neutral">{{ triggers.length }}</OTag>
-                </div>
-              </template>
-            </OTab>
-
-            <!-- Telemetry tabs always inline -->
-            <OTab name="logs" :label="t('common.logs')" data-test="incident-logs-tab" />
-            <OTab name="metrics" :label="t('search.metrics')" data-test="incident-metrics-tab" />
-            <OTab name="traces" :label="t('menu.traces')" data-test="incident-traces-tab" />
-          </OTabs>
-        </div>
-
         <!-- Tab Content Container -->
         <div class="flex flex-1 overflow-hidden">
           <!-- Left Column: Incident Details (only show on Incident Analysis tab, HIDDEN for Overview) -->
@@ -818,7 +818,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Alert Triggers Tab Content -->
               <div v-if="activeTab === 'alertTriggers'" class="flex flex-1 overflow-hidden">
                 <!-- Left Section: Alert Triggers Table -->
-                <div class="flex flex-1 flex-col overflow-hidden pt-4 pr-2">
+                <div class="flex flex-1 flex-col overflow-hidden pe-2 pt-4">
                   <div
                     :class="[
                       'border-card-glass-border rounded-default flex flex-1 flex-col overflow-hidden border',
@@ -877,10 +877,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <div class="space-y-2">
                           <!-- Alert Name -->
                           <div class="flex flex-col gap-0.5">
-                            <span
-                              :class="'text-text-secondary'"
-                              class="text-3xs tracking-wide uppercase"
-                            >
+                            <span :class="'text-text-secondary'" class="text-3xs">
                               {{ t("alerts.incidents.alertName") }}
                             </span>
                             <span :class="'text-text-body'" class="text-sm font-medium">
@@ -893,10 +890,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             v-if="alerts[selectedAlertIndex]?.alert_type === 'composite'"
                             class="flex flex-col gap-0.5"
                           >
-                            <span
-                              :class="'text-text-secondary'"
-                              class="text-3xs tracking-wide uppercase"
-                            >
+                            <span :class="'text-text-secondary'" class="text-3xs">
                               {{ t("alerts.alertType") }}
                             </span>
                             <OTag type="alertType" :value="'composite'" class="w-fit" />
@@ -905,10 +899,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <!-- Stream Type & Name -->
                           <div v-if="!isSelectedComposite" class="grid grid-cols-2 gap-2">
                             <div class="flex flex-col gap-0.5">
-                              <span
-                                :class="'text-text-secondary'"
-                                class="text-3xs tracking-wide uppercase"
-                              >
+                              <span :class="'text-text-secondary'" class="text-3xs">
                                 {{ t("alerts.streamType") }}
                               </span>
                               <OTag
@@ -918,10 +909,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               />
                             </div>
                             <div class="flex flex-col gap-0.5">
-                              <span
-                                :class="'text-text-secondary'"
-                                class="text-3xs tracking-wide uppercase"
-                              >
+                              <span :class="'text-text-secondary'" class="text-3xs">
                                 {{ t("alerts.stream_name") }}
                               </span>
                               <span :class="'text-text-body'" class="truncate text-sm font-medium">
@@ -933,10 +921,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <!-- Threshold & Period -->
                           <div v-if="!isSelectedComposite" class="grid grid-cols-2 gap-2">
                             <div class="flex flex-col gap-0.5">
-                              <span
-                                :class="'text-text-secondary'"
-                                class="text-3xs tracking-wide uppercase"
-                              >
+                              <span :class="'text-text-secondary'" class="text-3xs">
                                 {{ t("alerts.messages.thresholdMarkLine") }}
                               </span>
                               <span :class="'text-text-body'" class="text-sm font-medium">
@@ -948,10 +933,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               </span>
                             </div>
                             <div class="flex flex-col gap-0.5">
-                              <span
-                                :class="'text-text-secondary'"
-                                class="text-3xs tracking-wide uppercase"
-                              >
+                              <span :class="'text-text-secondary'" class="text-3xs">
                                 {{ t("alerts.incidents.period") }}
                               </span>
                               <span :class="'text-text-body'" class="text-sm font-medium">
@@ -967,10 +949,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <!-- Frequency & Silence -->
                           <div v-if="!isSelectedComposite" class="grid grid-cols-2 gap-2">
                             <div class="flex flex-col gap-0.5">
-                              <span
-                                :class="'text-text-secondary'"
-                                class="text-3xs tracking-wide uppercase"
-                              >
+                              <span :class="'text-text-secondary'" class="text-3xs">
                                 {{ t("alerts.incidents.frequency") }}
                               </span>
                               <span :class="'text-text-body'" class="text-sm font-medium">
@@ -985,10 +964,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               </span>
                             </div>
                             <div class="flex flex-col gap-0.5">
-                              <span
-                                :class="'text-text-secondary'"
-                                class="text-3xs tracking-wide uppercase"
-                              >
+                              <span :class="'text-text-secondary'" class="text-3xs">
                                 {{ t("alerts.incidents.silence") }}
                               </span>
                               <span :class="'text-text-body'" class="text-sm font-medium">
@@ -1016,10 +992,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               'border-border-default',
                             ]"
                           >
-                            <span
-                              :class="'text-text-secondary'"
-                              class="text-2xs font-semibold tracking-wide uppercase"
-                            >
+                            <span :class="'text-text-secondary'" class="text-2xs font-semibold">
                               {{
                                 alerts[selectedAlertIndex]?.query_condition?.type === "sql"
                                   ? t("alerts.alertDetails.sqlQuery")
@@ -1129,7 +1102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="md"
                     @click="refreshCorrelation"
                     class="mt-3"
-                    ><OIcon name="refresh" size="sm" class="mr-1" />{{ t("common.retry") }}</OButton
+                    ><OIcon name="refresh" size="sm" class="me-1" />{{ t("common.retry") }}</OButton
                   >
                 </div>
 
@@ -1213,7 +1186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="md"
                     @click="refreshCorrelation"
                     class="mt-3"
-                    ><OIcon name="refresh" size="sm" class="mr-1" />{{ t("common.retry") }}</OButton
+                    ><OIcon name="refresh" size="sm" class="me-1" />{{ t("common.retry") }}</OButton
                   >
                 </div>
 
@@ -1314,7 +1287,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="md"
                     @click="refreshCorrelation"
                     class="mt-3"
-                    ><OIcon name="refresh" size="sm" class="mr-1" />{{ t("common.retry") }}</OButton
+                    ><OIcon name="refresh" size="sm" class="me-1" />{{ t("common.retry") }}</OButton
                   >
                 </div>
 
@@ -2603,21 +2576,6 @@ export default defineComponent({
       }
     };
 
-    const getSeverityColorHex = (severity: string) => {
-      switch (severity) {
-        case "P1":
-          return "#b91c1c"; // red-700
-        case "P2":
-          return "#c2410c"; // orange-700
-        case "P3":
-          return "#d97706"; // amber-600
-        case "P4":
-          return "#6b7280"; // gray-500
-        default:
-          return "#6b7280"; // gray-500
-      }
-    };
-
     const formatPeriod = (periodInSeconds: number | undefined) => {
       if (!periodInSeconds) return raw("N/A");
 
@@ -3104,8 +3062,8 @@ export default defineComponent({
             const classes = [
               "rca-h1 font-bold text-lg text-center mb-4 pb-2 border-b-2",
               // TODO: Discuss with team - h2 section separators with background and left border
-              // Remove 'rca-section-bg px-4 py-3 rounded-default border-l-4' if not approved
-              "rca-h2 font-bold text-lg mt-5 mb-3 rca-section-bg px-4 py-3 rounded-default border-l-4",
+              // Remove 'rca-section-bg px-4 py-3 rounded-default border-s-4' if not approved
+              "rca-h2 font-bold text-lg mt-5 mb-3 rca-section-bg px-4 py-3 rounded-default border-s-4",
               "rca-h3 font-semibold text-base mt-4 mb-2",
               "rca-h4 font-semibold text-sm mt-3 mb-2",
             ];
@@ -3121,8 +3079,8 @@ export default defineComponent({
             const body = token.items.map((item: any) => this.listitem(item)).join("");
             const tag = token.ordered ? "ol" : "ul";
             const classes = token.ordered
-              ? "rca-ol pl-5 my-3 space-y-1.5 list-decimal"
-              : "rca-ul pl-5 my-3 space-y-1.5 list-disc";
+              ? "rca-ol ps-5 my-3 space-y-1.5 list-decimal"
+              : "rca-ul ps-5 my-3 space-y-1.5 list-disc";
             return `<${tag} class="${classes}">${body}</${tag}>`;
           },
           listitem(item: any) {
@@ -3155,7 +3113,7 @@ export default defineComponent({
           },
           blockquote({ tokens }: any) {
             const text = this.parser.parse(tokens);
-            return `<blockquote class="rca-blockquote border-l-4 pl-4 py-2 my-3 italic">${text}</blockquote>`;
+            return `<blockquote class="rca-blockquote border-s-4 ps-4 py-2 my-3 italic">${text}</blockquote>`;
           },
           paragraph({ tokens }: any) {
             const text = this.parser.parseInline(tokens);
@@ -3446,7 +3404,6 @@ export default defineComponent({
       handleSeverityChange,
       handleTriggerRowClick,
       getStatusLabel,
-      getSeverityColorHex,
       formatPeriod,
       formatCustomConditions,
       formatTimestamp,

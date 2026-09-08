@@ -205,7 +205,7 @@ test.describe('Database Monitoring — flows', () => {
 
     // Either a 404 view or a redirect into the section is acceptable; a blank
     // page or a hung spinner is not. The app must still be usable.
-    const body = (await page.locator('body').textContent()) || '';
+    const body = await dbm.getBodyText();
     expect(body.trim().length, 'unknown DBM route rendered a blank page').toBeGreaterThan(0);
     testLogger.info(`unknown segment landed on ${page.url()}`);
   });
@@ -240,7 +240,7 @@ test.describe('Database Monitoring — flows', () => {
 
     // The injected markup must not have executed or been rendered as an element.
     expect(
-      await page.locator('script:has-text("alert(1)")').count(),
+      await dbm.getInjectedScriptCount(),
       'injected script tag was rendered into the page',
     ).toBe(0);
   });
@@ -299,8 +299,7 @@ test.describe('Database Monitoring — flows', () => {
     await dbm.nextPageBtn.click();
     await dbm.page.waitForTimeout(1200);
 
-    const pagerText = await dbm.page
-      .locator('[data-test*="pagination"], .q-table__bottom')
+    const pagerText = await dbm.paginationBottom
       .first()
       .innerText()
       .catch(() => '');

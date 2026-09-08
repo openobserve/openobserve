@@ -21,38 +21,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="!showImportTemplate && !showTemplateEditor"
       :title="t('alerts.header')"
       icon="shield-alert-outline"
+      :subtitle="t('alerts.subtitle')"
+      tabs-below
     >
-      <!-- Section-level title, identical on all four alerting pages, so the
-           peer tabs anchor at the same x — see AlertList.vue for the rationale.
-           Subtitle-free for the same reason. -->
       <template #header-tabs>
         <AlertSectionTabs />
       </template>
 
       <template #actions>
-        <OToggleGroup
-          :model-value="activeTab"
-          @update:model-value="
-            (v: any) => {
-              activeTab = v;
-            }
-          "
-          data-test="template-list-tabs"
-          class="mr-2"
-        >
-          <OToggleGroupItem value="all" size="sm" data-test="template-tab-all">
-            <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
-            {{ t("alert_templates.filterAll") }}
-          </OToggleGroupItem>
-          <OToggleGroupItem value="prebuilt" size="sm" data-test="template-tab-prebuilt">
-            <template #icon-left><OIcon name="auto-awesome" size="sm" /></template>
-            {{ t("alert_templates.filterPrebuilt") }}
-          </OToggleGroupItem>
-          <OToggleGroupItem value="custom" size="sm" data-test="template-tab-custom">
-            <template #icon-left><OIcon name="settings" size="sm" /></template>
-            {{ t("alert_templates.filterCustom") }}
-          </OToggleGroupItem>
-        </OToggleGroup>
         <OButton
           variant="outline"
           size="sm-action"
@@ -91,12 +67,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:selected-ids="handleSelectedIdsUpdate"
         >
           <template #toolbar>
-            <OSearchInput
-              v-model="filterQuery"
-              class="flex-1"
-              :placeholder="t('template.search')"
-              data-test="template-list-search-input"
-            />
+            <div class="flex w-full items-center gap-2">
+              <OToggleGroup
+                :model-value="activeTab"
+                @update:model-value="
+                  (v: any) => {
+                    activeTab = v;
+                  }
+                "
+                data-test="template-list-tabs"
+              >
+                <OToggleGroupItem value="all" size="sm" data-test="template-tab-all">
+                  <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
+                  {{ t("alert_templates.filterAll") }}
+                </OToggleGroupItem>
+                <OToggleGroupItem value="prebuilt" size="sm" data-test="template-tab-prebuilt">
+                  <template #icon-left><OIcon name="auto-awesome" size="sm" /></template>
+                  {{ t("alert_templates.filterPrebuilt") }}
+                </OToggleGroupItem>
+                <OToggleGroupItem value="custom" size="sm" data-test="template-tab-custom">
+                  <template #icon-left><OIcon name="settings" size="sm" /></template>
+                  {{ t("alert_templates.filterCustom") }}
+                </OToggleGroupItem>
+              </OToggleGroup>
+              <OSearchInput
+                v-model="filterQuery"
+                class="flex-1"
+                :placeholder="t('template.search')"
+                data-test="template-list-search-input"
+              />
+            </div>
           </template>
           <template #toolbar-trailing>
             <OButton
@@ -164,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #cell-actions="{ row }">
             <OButton
               :title="t('alert_templates.exportTemplate')"
-              class="ml-1"
+              class="ms-1"
               variant="ghost"
               size="icon-sm"
               @click.stop="exportTemplate(row)"
@@ -175,7 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
             <OButton
               :data-test="`alert-template-list-${row.name}-update-template`"
-              class="ml-1"
+              class="ms-1"
               variant="ghost"
               size="icon-sm"
               :title="
@@ -189,7 +189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
             <OButton
               :data-test="`alert-template-list-${row.name}-clone-template`"
-              class="ml-1"
+              class="ms-1"
               variant="ghost"
               size="icon-sm"
               :title="t('alert_templates.clone')"
@@ -200,7 +200,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
             <OButton
               :data-test="`alert-template-list-${row.name}-delete-template`"
-              class="ml-1"
+              class="ms-1"
               variant="ghost"
               size="icon-sm"
               :title="

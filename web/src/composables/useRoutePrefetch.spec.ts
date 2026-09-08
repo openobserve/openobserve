@@ -32,7 +32,6 @@ vi.mock("@/views/AppAlerts.vue", () => ({ default: {} }));
 vi.mock("@/views/Ingestion.vue", () => ({ default: {} }));
 vi.mock("@/views/IdentityAccessManagement.vue", () => ({ default: {} }));
 vi.mock("@/components/reports/ReportList.vue", () => ({ default: {} }));
-vi.mock("@/components/actionScripts/ActionScripts.vue", () => ({ default: {} }));
 vi.mock("@/components/settings/index.vue", () => ({ default: {} }));
 
 import useRoutePrefetch from "./useRoutePrefetch";

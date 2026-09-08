@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use infra::table::providers::ProviderRateLimits;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -34,6 +35,10 @@ pub struct ProviderRequestBody {
     #[serde(alias = "auth_config")]
     pub auth_config: serde_json::Value,
     #[serde(default)]
+    #[serde(alias = "rate_limits")]
+    #[schema(value_type = Object)]
+    pub rate_limits: Option<ProviderRateLimits>,
+    #[serde(default)]
     #[serde(alias = "is_default")]
     pub is_default: bool,
 }
@@ -51,6 +56,8 @@ pub struct ProviderResponseBody {
     pub available_models: Vec<String>,
     /// API key / auth config is masked in responses.
     pub auth_config_masked: bool,
+    #[schema(value_type = Object)]
+    pub rate_limits: Option<ProviderRateLimits>,
     pub is_default: bool,
     pub created_at: i64,
     pub updated_at: i64,
@@ -74,6 +81,7 @@ impl From<ProviderRequestBody> for infra::table::providers::Provider {
             default_model: value.default_model,
             available_models: value.available_models,
             auth_config: value.auth_config,
+            rate_limits: value.rate_limits,
             is_default: value.is_default,
             created_at: 0,
             updated_at: 0,
@@ -92,6 +100,7 @@ impl From<infra::table::providers::Provider> for ProviderResponseBody {
             default_model: value.default_model,
             available_models: value.available_models,
             auth_config_masked: true,
+            rate_limits: value.rate_limits,
             is_default: value.is_default,
             created_at: value.created_at,
             updated_at: value.updated_at,
@@ -122,6 +131,7 @@ mod tests {
             default_model: "gpt-4".to_string(),
             available_models: vec!["gpt-4".to_string()],
             auth_config: serde_json::json!({"api_key": "secret"}),
+            rate_limits: None,
             is_default: false,
             created_at: 1000,
             updated_at: 2000,
@@ -140,6 +150,7 @@ mod tests {
             default_model: "gpt-4".to_string(),
             available_models: vec![],
             auth_config: serde_json::json!({"api_key": "k"}),
+            rate_limits: None,
             is_default: false,
         };
         let provider = infra::table::providers::Provider::from(body);
@@ -163,7 +174,32 @@ mod tests {
         assert_eq!(body.default_model, "gpt-4o");
         assert_eq!(body.available_models, vec!["gpt-4o", "gpt-4o-mini"]);
         assert_eq!(body.auth_config, serde_json::json!({"api_key": "k"}));
+        assert!(body.rate_limits.is_none());
         assert!(body.is_default);
+    }
+
+    #[test]
+    fn test_provider_request_body_accepts_rate_limits() {
+        let body: ProviderRequestBody = serde_json::from_value(serde_json::json!({
+            "name": "Test",
+            "provider_type": "openai",
+            "auth_config": {"api_key": "k"},
+            "rate_limits": {
+                "max_concurrency": 4,
+                "requests_per_minute": 120,
+                "tokens_per_minute": 60_000
+            }
+        }))
+        .unwrap();
+
+        assert_eq!(
+            body.rate_limits,
+            Some(ProviderRateLimits {
+                max_concurrency: Some(4),
+                requests_per_minute: Some(120),
+                tokens_per_minute: Some(60_000),
+            })
+        );
     }
 
     #[test]

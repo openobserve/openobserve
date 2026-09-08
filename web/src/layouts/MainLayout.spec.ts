@@ -103,7 +103,6 @@ describe("MainLayout Methods and Functions", () => {
         zoConfig: {
           custom_docs_url: "",
           custom_slack_url: "",
-          actions_enabled: true,
           custom_hide_menus: "",
           rum: { enabled: false },
         },
@@ -265,24 +264,6 @@ describe("MainLayout Methods and Functions", () => {
 
       // Test case insensitive
       expect(filteredOrganizations("TEST")).toHaveLength(1);
-    });
-
-    it("should compute isActionsEnabled correctly", () => {
-      const isActionsEnabled = (config: any, store: any) => {
-        return (
-          (config.isEnterprise === "true" || config.isCloud === "true") &&
-          store.state.zoConfig.actions_enabled
-        );
-      };
-
-      // Test when not enterprise or cloud
-      expect(isActionsEnabled({ isEnterprise: "false", isCloud: "false" }, mockStore)).toBe(false);
-
-      // Test when enterprise
-      expect(isActionsEnabled({ isEnterprise: "true", isCloud: "false" }, mockStore)).toBe(true);
-
-      // Test when cloud
-      expect(isActionsEnabled({ isEnterprise: "false", isCloud: "true" }, mockStore)).toBe(true);
     });
 
     it("should compute getBtnLogo based on state", () => {
@@ -586,36 +567,6 @@ describe("MainLayout Methods and Functions", () => {
   });
 
   describe("Menu Management", () => {
-    it("should update actions menu when enabled", () => {
-      const updateActionsMenu = () => {
-        const linksList = [
-          { name: "home", title: "menu.home" },
-          { name: "logs", title: "menu.logs" },
-        ];
-
-        const config = { isEnterprise: "true" };
-        const store = { state: { zoConfig: { actions_enabled: true } } };
-
-        if (config.isEnterprise === "true" && store.state.zoConfig.actions_enabled) {
-          const hasActions = linksList.find((link) => link.name === "actionScripts");
-          if (!hasActions) {
-            linksList.push({
-              name: "actionScripts",
-              title: "menu.actions",
-            } as any);
-          }
-        }
-
-        return linksList;
-      };
-
-      const result = updateActionsMenu();
-      const actionLink = result.find((link) => link.name === "actionScripts");
-
-      expect(actionLink).toBeDefined();
-      expect(actionLink?.title).toBe("menu.actions");
-    });
-
     it("should filter menus based on config", () => {
       const filterMenus = () => {
         const linksList = [
@@ -715,7 +666,6 @@ describe("MainLayout Methods and Functions", () => {
         const mockConfigData = {
           version: "2.0.0",
           rum: { enabled: true },
-          actions_enabled: true,
         };
 
         mockStore.dispatch("setConfig", mockConfigData);
@@ -728,7 +678,6 @@ describe("MainLayout Methods and Functions", () => {
         expect.objectContaining({
           version: "2.0.0",
           rum: { enabled: true },
-          actions_enabled: true,
         }),
       );
     });
@@ -891,34 +840,6 @@ describe("MainLayout Methods and Functions", () => {
       const result = filterMenus();
       expect(result).toHaveLength(2);
       expect(result.map((r) => r.name)).toEqual(["home", "metrics"]);
-    });
-
-    it("should test updateActionsMenu when actions are disabled", () => {
-      const updateActionsMenu = () => {
-        const linksList = [
-          { name: "home", title: "Home" },
-          { name: "alertList", title: "Alerts" },
-        ];
-
-        const isActionsEnabled = false;
-        if (!isActionsEnabled) {
-          return linksList;
-        }
-
-        const alertIndex = linksList.findIndex((link) => link.name === "alertList");
-        if (alertIndex !== -1) {
-          linksList.splice(alertIndex + 1, 0, {
-            name: "actionScripts",
-            title: "Actions",
-          } as any);
-        }
-
-        return linksList;
-      };
-
-      const result = updateActionsMenu();
-      expect(result).toHaveLength(2);
-      expect(result.find((r) => r.name === "actionScripts")).toBeUndefined();
     });
 
     it("should test getConfig with error handling", async () => {
@@ -1861,67 +1782,6 @@ describe("MainLayout Methods and Functions", () => {
 
       const result = parseHideMenus("  logs  ,  metrics  ,  ");
       expect(result).toEqual(["logs", "metrics"]);
-    });
-
-    it("should update actions menu at correct position after alertList", () => {
-      const updateActionsMenu = (linksList: any[], isEnabled: boolean) => {
-        if (!isEnabled) return linksList;
-
-        const alertIndex = linksList.findIndex((link) => link.name === "alertList");
-
-        if (alertIndex !== -1 && !linksList.some((link) => link.name === "actionScripts")) {
-          const newList = [...linksList];
-          newList.splice(alertIndex + 1, 0, {
-            name: "actionScripts",
-            title: "menu.actions",
-            link: "/actions",
-          });
-          return newList;
-        }
-
-        return linksList;
-      };
-
-      const linksList = [
-        { name: "home", title: "Home", link: "/" },
-        { name: "alertList", title: "Alerts", link: "/alerts" },
-        { name: "dashboards", title: "Dashboards", link: "/dashboards" },
-      ];
-
-      const result = updateActionsMenu(linksList, true);
-      expect(result).toHaveLength(4);
-      expect(result[2].name).toBe("actionScripts");
-      expect(result[2].title).toBe("menu.actions");
-    });
-
-    it("should prevent duplicate actions menu insertion", () => {
-      const updateActionsMenu = (linksList: any[], isEnabled: boolean) => {
-        if (!isEnabled) return linksList;
-
-        const hasActions = linksList.some((link) => link.name === "actionScripts");
-        if (hasActions) return linksList;
-
-        const alertIndex = linksList.findIndex((link) => link.name === "alertList");
-        if (alertIndex !== -1) {
-          const newList = [...linksList];
-          newList.splice(alertIndex + 1, 0, {
-            name: "actionScripts",
-            title: "menu.actions",
-          });
-          return newList;
-        }
-
-        return linksList;
-      };
-
-      const linksListWithActions = [
-        { name: "alertList", title: "Alerts" },
-        { name: "actionScripts", title: "Actions" },
-      ];
-
-      const result = updateActionsMenu(linksListWithActions, true);
-      expect(result).toHaveLength(2); // No duplicate added
-      expect(result.filter((l) => l.name === "actionScripts")).toHaveLength(1);
     });
 
     it("should handle link.hide property in filtering", () => {

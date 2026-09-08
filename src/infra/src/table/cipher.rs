@@ -26,9 +26,9 @@ use config::{
 use sea_orm::{ColumnTrait, EntityTrait, Order, QueryFilter, QueryOrder, QuerySelect, Set, SqlErr};
 use serde::{Deserialize, Serialize};
 
-use super::{entity::cipher_keys::*, get_lock};
+use super::entity::cipher_keys::*;
 use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{get_orm_client_ro, get_orm_client_rw},
     errors,
 };
 
@@ -165,25 +165,18 @@ pub async fn add(entry: CipherEntry) -> Result<(), errors::Error> {
         is_system: Set(entry.is_system),
     };
 
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     match Entity::insert(record).exec(client).await {
         Ok(_) => {}
-        Err(e) => {
-            drop(_lock);
-            match e.sql_err() {
-                Some(SqlErr::UniqueConstraintViolation(_)) => {
-                    return Err(errors::Error::DbError(errors::DbError::UniqueViolation));
-                }
-                _ => {
-                    return Err(e.into());
-                }
+        Err(e) => match e.sql_err() {
+            Some(SqlErr::UniqueConstraintViolation(_)) => {
+                return Err(errors::Error::DbError(errors::DbError::UniqueViolation));
             }
-        }
+            _ => {
+                return Err(e.into());
+            }
+        },
     }
-    drop(_lock);
 
     Ok(())
 }
@@ -200,29 +193,20 @@ pub async fn update(entry: CipherEntry) -> Result<(), errors::Error> {
         is_system: Set(entry.is_system),
     };
 
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::update(record).exec(client).await?;
-    drop(_lock);
 
     Ok(())
 }
 
 pub async fn remove(org: &str, kind: EntryKind, name: &str) -> Result<(), errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::delete_many()
         .filter(Column::Org.eq(org))
         .filter(Column::Kind.eq(kind.to_string()))
         .filter(Column::Name.eq(name))
         .exec(client)
         .await?;
-
-    drop(_lock);
 
     Ok(())
 }
@@ -260,7 +244,7 @@ pub async fn get_data(
 }
 
 async fn get(org: &str, kind: EntryKind, name: &str) -> Result<Option<Model>, errors::DbError> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     Entity::find()
         .filter(Column::Org.eq(org))
         .filter(Column::Name.eq(name))
@@ -272,7 +256,7 @@ async fn get(org: &str, kind: EntryKind, name: &str) -> Result<Option<Model>, er
 }
 
 pub async fn list_all(limit: Option<i64>) -> Result<Vec<CipherEntry>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let mut res = Entity::find().order_by(Column::CreatedAt, Order::Desc);
     if let Some(limit) = limit {
         res = res.limit(limit as u64);
@@ -297,7 +281,7 @@ pub async fn list_filtered(
     filter: ListFilter,
     limit: Option<i64>,
 ) -> Result<Vec<CipherEntry>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let mut res = Entity::find().order_by(Column::CreatedAt, Order::Desc);
     if let Some(ref org) = filter.org {
         res = res.filter(Column::Org.eq(org));
@@ -329,10 +313,7 @@ pub async fn list_filtered(
 }
 
 pub async fn clear() -> Result<(), errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::delete_many().exec(client).await?;
 
     Ok(())
@@ -403,8 +384,7 @@ pub async fn get_dek(org: &str) -> Result<Vec<u8>, errors::Error> {
 
 /// Deletes all cipher key entries belonging to the given org.
 pub async fn delete_by_org(org: &str) -> Result<(), errors::Error> {
-    let _lock = get_lock().await;
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::delete_many()
         .filter(Column::Org.eq(org))
         .exec(client)

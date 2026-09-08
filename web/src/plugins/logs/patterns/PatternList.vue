@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`pattern-severity-chip-${sev.key}`"
           >
             <span :class="sev.colorClass">{{ sev.label }}</span>
-            <span class="ml-1 tabular-nums opacity-70">{{ sev.countLabel }}</span>
+            <span class="ms-1 tabular-nums opacity-70">{{ sev.countLabel }}</span>
           </OToggleGroupItem>
         </OToggleGroup>
       </div>
@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="border-table-header-border bg-table-header-bg flex min-w-full items-center gap-3 border-b"
       >
-        <div class="table-head w-28 flex-shrink-0 pr-1 pl-3 text-left">
+        <div class="table-head w-28 flex-shrink-0 ps-3 pe-1 text-left">
           <span class="text-table-header-text text-xs font-medium">{{
             t("search.occurrenceColumnHeader")
           }}</span>
@@ -142,7 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Left accent bar -->
         <span class="pattern-skel-pill absolute inset-y-0 left-0 w-1" aria-hidden="true" />
         <!-- Pattern column -->
-        <div class="min-w-0 flex-1 px-2 pl-3">
+        <div class="min-w-0 flex-1 px-2 ps-3">
           <span
             class="pattern-skel-pill rounded-default inline-block h-3"
             :class="skeletonWidth"
@@ -220,7 +220,7 @@ import {
   compactCount,
   type PatternSeverityKey,
 } from "./patternUtils";
-import { computed, watch } from "vue";
+import { computed, watch, onUnmounted } from "vue";
 import { DateTime } from "luxon";
 
 const SKELETON_WIDTHS = [
@@ -294,7 +294,9 @@ const openDetails = (pattern: any, index: number) => {
   emit("open-details", pattern, index, filteredPatterns.value);
 };
 
-const { hoveredToken, onPopoverEnter, onPopoverLeave } = useWildcardHover();
+const { hoveredToken, onPopoverEnter, onPopoverLeave, cleanup } = useWildcardHover();
+
+onUnmounted(() => cleanup());
 
 // The severity filter is shared through usePatternActions rather than kept
 // local: "create an alert from the visible patterns" has to know which patterns

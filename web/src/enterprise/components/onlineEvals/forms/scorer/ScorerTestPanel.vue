@@ -1,6 +1,6 @@
 <template>
   <aside
-    class="eval-form-page__side eval-form-page__side--test border-border-default max-[68.75rem]:border-border-default border-l p-0 max-[68.75rem]:border-t max-[68.75rem]:border-l-0"
+    class="eval-form-page__side eval-form-page__side--test border-border-default max-[68.75rem]:border-border-default border-s p-0 max-[68.75rem]:border-s-0 max-[68.75rem]:border-t"
   >
     <section class="eval-test-panel min-h-full p-5">
       <!-- Header -->

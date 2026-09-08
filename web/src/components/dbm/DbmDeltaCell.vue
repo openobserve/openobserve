@@ -37,8 +37,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <span
     class="text-3xs flex items-center justify-end gap-1 font-mono tabular-nums"
     :data-test="dataTest"
-    :title="hoverTitle"
   >
+    <OTooltip v-if="hoverTitle" :content="hoverTitle" />
     <!-- `words` and `was` say the change the way a person would — "5× more",
          "was 98ms", "no change" — because a signed percentage makes the reader
          do the arithmetic to know whether +567% matters. `percent` keeps the
@@ -77,6 +77,7 @@ import { computed } from "vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import type { DbmDelta } from "@/utils/dbm/insights";
 import { formatSignedPercent } from "@/utils/dbm/format";

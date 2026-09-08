@@ -68,9 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="!event.partial"
         class="border-border-subtle bg-surface-panel flex flex-col items-center justify-center gap-1 px-1 py-2 md:border-x"
       >
-        <span
-          class="text-text-label text-3xs text-center leading-tight font-semibold tracking-wide uppercase"
-        >
+        <span class="text-text-secondary text-3xs text-center leading-tight font-semibold">
           {{ t("dbm.deadlocks.detail.eachWaits") }}
         </span>
         <svg viewBox="0 0 128 68" fill="none" class="h-17 w-32" aria-hidden="true">
@@ -123,9 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ raw(objectLabel) }}
           </text>
         </svg>
-        <span
-          class="text-status-error-text text-3xs text-center leading-tight font-semibold tracking-wide uppercase"
-        >
+        <span class="text-status-error-text text-3xs text-center leading-tight font-semibold">
           {{ t("dbm.deadlocks.detail.deadlock") }}
         </span>
       </div>

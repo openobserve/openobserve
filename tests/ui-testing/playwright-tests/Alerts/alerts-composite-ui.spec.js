@@ -2,6 +2,7 @@
 
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const PageManager = require('../../pages/page-manager.js');
+const testLogger = require('../utils/test-logger.js');
 const {
   uniq, urls, api, simpleAlert, compositeAlert,
   createAlert, findAlertId, deleteAlerts, seedAlertFixtures,
@@ -13,7 +14,8 @@ test.describe('Composite alerts — UI scenarios', {
   let pm;
   let created = [];
 
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page }, testInfo) => {
+    testLogger.testStart(testInfo.title, testInfo.file);
     pm = new PageManager(page);
     created = [];
     await seedAlertFixtures(page);
@@ -58,12 +60,12 @@ test.describe('Composite alerts — UI scenarios', {
     ]);
 
     await page.goto(`/web/alerts?org_identifier=${urls().org}&folder=default`);
-    await page.locator(pm.compositeAlertsPage.locators.listCompositeTab).click();
+    await pm.compositeAlertsPage.listCompositeTab().click();
 
-    await expect(page.locator(pm.compositeAlertsPage.locators.listBadge(parent.id))).toBeVisible();
-    await expect(page.locator(pm.compositeAlertsPage.locators.listChildCount(parent.id))).toContainText('2');
-    await expect(page.locator(pm.compositeAlertsPage.locators.listReferenceCount(childComposite.id))).toContainText('1');
-    await expect(page.getByText(first.name, { exact: false })).toBeVisible();
+    await expect(pm.compositeAlertsPage.listBadge(parent.id)).toBeVisible();
+    await expect(pm.compositeAlertsPage.listChildCount(parent.id)).toContainText('2');
+    await expect(pm.compositeAlertsPage.listReferenceCount(childComposite.id)).toContainText('1');
+    await expect(pm.compositeAlertsPage.childNameCell(first.name)).toBeVisible();
   });
 
   test('child search enforces the ten-child cap and does not append to a custom expression', async ({ page }) => {
@@ -77,21 +79,21 @@ test.describe('Composite alerts — UI scenarios', {
     for (const child of children.slice(0, 2)) {
       await pm.compositeAlertsPage.searchAndSelect(child.name, child.id);
     }
-    await expect(page.locator(pm.compositeAlertsPage.locators.expressionSummary)).toContainText('AND');
+    await expect(pm.compositeAlertsPage.expressionSummary()).toContainText('AND');
 
-    await page.locator(pm.compositeAlertsPage.locators.advancedExpression).fill(
+    await pm.compositeAlertsPage.advancedExpression().fill(
       `{${children[0].id}} || ({${children[1].id}} && !{${children[2].id}})`,
     );
-    await expect(page.locator(pm.compositeAlertsPage.locators.expressionSummary)).toContainText(/OR.*\(.*AND.*NOT/s);
+    await expect(pm.compositeAlertsPage.expressionSummary()).toContainText(/OR.*\(.*AND.*NOT/s);
 
     for (const child of children.slice(2, 10)) {
       await pm.compositeAlertsPage.searchAndSelect(child.name, child.id);
     }
-    await page.locator(pm.compositeAlertsPage.locators.childSearch).fill(children[10].name);
-    await expect(page.locator(pm.compositeAlertsPage.locators.childOption(children[10].id))).toHaveAttribute('aria-disabled', 'true');
-    await expect(page.locator(pm.compositeAlertsPage.locators.childCap)).toContainText('10');
-    await expect(page.locator(pm.compositeAlertsPage.locators.expressionUnused)).toBeVisible();
-    await expect(page.locator(pm.compositeAlertsPage.locators.save)).toBeDisabled();
+    await pm.compositeAlertsPage.childSearch().fill(children[10].name);
+    await expect(pm.compositeAlertsPage.childOption(children[10].id)).toHaveAttribute('aria-disabled', 'true');
+    await expect(pm.compositeAlertsPage.childCap()).toContainText('10');
+    await expect(pm.compositeAlertsPage.expressionUnused()).toBeVisible();
+    await expect(pm.compositeAlertsPage.save()).toBeDisabled();
   });
 
   test('live preview explains Warning, stale use-last-state, disabled, and never evaluated children', async ({ page }) => {
@@ -155,8 +157,8 @@ test.describe('Composite alerts — UI scenarios', {
     });
 
     await pm.compositeAlertsPage.openEdit(composite.id);
-    await expect(page.getByText('Renamed child with a very long display name')).toBeVisible();
-    await page.locator(pm.compositeAlertsPage.locators.save).click();
+    await expect(pm.compositeAlertsPage.renamedChildText('Renamed child with a very long display name')).toBeVisible();
+    await pm.compositeAlertsPage.save().click();
 
     await expect.poll(() => submitted).toBeTruthy();
     expect(submitted.composite_condition.expression).toContain(`{${first.id}}`);
@@ -181,16 +183,16 @@ test.describe('Composite alerts — UI scenarios', {
     });
 
     await pm.compositeAlertsPage.openDetail(composite.id);
-    await expect(page.locator(pm.compositeAlertsPage.locators.detailResult)).toContainText(/critical/i);
-    await expect(page.locator(pm.compositeAlertsPage.locators.detailExpression)).toContainText(longName);
-    await expect(page.locator(pm.compositeAlertsPage.locators.detailChildren)).toBeVisible();
-    await expect(page.locator(pm.compositeAlertsPage.locators.detailChild(first.id))).toContainText(/freshness.*expired.*last.*critical/i);
-    await expect(page.locator(pm.compositeAlertsPage.locators.detailChild(first.id)).getByRole('link')).toHaveAttribute('href', new RegExp(first.id));
-    await expect(page.locator(pm.compositeAlertsPage.locators.missingJob)).toBeVisible();
+    await expect(pm.compositeAlertsPage.detailResult()).toContainText(/critical/i);
+    await expect(pm.compositeAlertsPage.detailExpression()).toContainText(longName);
+    await expect(pm.compositeAlertsPage.detailChildren()).toBeVisible();
+    await expect(pm.compositeAlertsPage.detailChild(first.id)).toContainText(/freshness.*expired.*last.*critical/i);
+    await expect(pm.compositeAlertsPage.detailChild(first.id).getByRole('link')).toHaveAttribute('href', new RegExp(first.id));
+    await expect(pm.compositeAlertsPage.missingJob()).toBeVisible();
 
     await page.evaluate(() => document.documentElement.classList.add('dark'));
-    await expect(page.locator(pm.compositeAlertsPage.locators.detailChildren)).toBeVisible();
-    expect(await page.locator('body').evaluate((body) => body.scrollWidth <= body.clientWidth)).toBeTruthy();
+    await expect(pm.compositeAlertsPage.detailChildren()).toBeVisible();
+    expect(await pm.compositeAlertsPage.bodyHasNoHorizontalOverflow()).toBeTruthy();
   });
 
   test('reference chip and delete 409 open the same navigable parent list', async ({ page }) => {
@@ -200,13 +202,13 @@ test.describe('Composite alerts — UI scenarios', {
 
     await page.goto(`/web/alerts?org_identifier=${urls().org}&folder=default`);
     await pm.alertsPage.searchAlert(first.name);
-    await page.locator(pm.compositeAlertsPage.locators.referenceChip).click();
-    await expect(page.locator(pm.compositeAlertsPage.locators.referenceParent(parent.id))).toBeVisible();
-    await expect(page.locator('[data-test="alerts-composite-reference-close"]')).toBeFocused();
+    await pm.compositeAlertsPage.referenceChip().click();
+    await expect(pm.compositeAlertsPage.referenceParent(parent.id)).toBeVisible();
+    await expect(pm.compositeAlertsPage.referenceClose()).toBeFocused();
 
     await pm.alertsPage.deleteAlertByRow(first.name);
-    await expect(page.locator(pm.compositeAlertsPage.locators.referenceConflict)).toBeVisible();
-    await page.locator(pm.compositeAlertsPage.locators.referenceParent(parent.id)).click();
+    await expect(pm.compositeAlertsPage.referenceConflict()).toBeVisible();
+    await pm.compositeAlertsPage.referenceParent(parent.id).click();
     await expect(page).toHaveURL(new RegExp(`/alerts/detail/${parent.id}`));
   });
 
@@ -218,18 +220,18 @@ test.describe('Composite alerts — UI scenarios', {
     await pm.compositeAlertsPage.searchAndSelect(first.name, first.id);
     await pm.compositeAlertsPage.searchAndSelect(second.name, second.id);
 
-    for (const selector of [
-      pm.compositeAlertsPage.locators.expressionAnd,
-      pm.compositeAlertsPage.locators.expressionOr,
-      pm.compositeAlertsPage.locators.expressionNot,
-      pm.compositeAlertsPage.locators.expressionOpenGroup,
-      pm.compositeAlertsPage.locators.expressionCloseGroup,
+    for (const control of [
+      pm.compositeAlertsPage.expressionAnd(),
+      pm.compositeAlertsPage.expressionOr(),
+      pm.compositeAlertsPage.expressionNot(),
+      pm.compositeAlertsPage.expressionOpenGroup(),
+      pm.compositeAlertsPage.expressionCloseGroup(),
     ]) {
-      await expect(page.locator(selector)).toHaveAccessibleName(/.+/);
+      await expect(control).toHaveAccessibleName(/.+/);
     }
-    await page.locator(pm.compositeAlertsPage.locators.expressionAnd).focus();
+    await pm.compositeAlertsPage.expressionAnd().focus();
     await page.keyboard.press('Tab');
-    await expect(page.locator(pm.compositeAlertsPage.locators.expressionOr)).toBeFocused();
-    await expect(page.locator(pm.compositeAlertsPage.locators.previewResult)).toHaveAttribute('aria-live', 'polite');
+    await expect(pm.compositeAlertsPage.expressionOr()).toBeFocused();
+    await expect(pm.compositeAlertsPage.previewResult()).toHaveAttribute('aria-live', 'polite');
   });
 });

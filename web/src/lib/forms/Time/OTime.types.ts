@@ -9,6 +9,13 @@ export interface TimeProps {
   modelValue?: string;
   /** Enable seconds precision (`HH:MM:SS`) */
   withSeconds?: boolean;
+  /**
+   * Force a 24-hour clock: 00–23 header, a dual-ring hour face (1–12 outer,
+   * 13–00 inner), no AM/PM toggle, and a deterministic `HH:MM` text input —
+   * the native time input's displayed format follows the OS locale, which may
+   * be 12-hour.
+   */
+  format24?: boolean;
   /** Minimum selectable time — `HH:MM` */
   min?: string;
   /** Maximum selectable time — `HH:MM` */

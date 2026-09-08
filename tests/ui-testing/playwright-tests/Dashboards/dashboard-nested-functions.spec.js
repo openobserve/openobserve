@@ -22,6 +22,12 @@ const {
 const { waitForDashboardPage } = require("../../pages/dashboardPages/dashCreation.js");
 const PageManager = require("../../pages/page-manager");
 const testLogger = require("../utils/test-logger.js");
+const {
+  getAuthHeaders,
+  getOrgIdentifier,
+  refreshCloudConfig,
+} = require("../utils/cloud-auth.js");
+const { waitForStreamData } = require("../utils/data-ingestion.js");
 
 // Test data from external file
 const testRecords = require("../../../test-data/dashboard-functions/test_records.json");
@@ -35,77 +41,87 @@ const generateTestId = () => Math.random().toString(36).substring(2, 10);
  * This ensures the correct org context is set for all API calls
  */
 const navigateToDashboards = async (page) => {
-  const dashboardUrl = `${process.env["ZO_BASE_URL"]}/web/dashboards?org_identifier=${process.env["ORGNAME"]}`;
+  const dashboardUrl = `${process.env["ZO_BASE_URL"]}/web/dashboards?org_identifier=${getOrgIdentifier()}`;
   testLogger.info(`Navigating to dashboards page with org_identifier: ${dashboardUrl}`);
   await page.goto(dashboardUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
   await page.waitForLoadState("networkidle", { timeout: 30000 }).catch(() => {});
   await page.waitForTimeout(2000);
 };
 
-const getAuthToken = async () => {
-  const basicAuthCredentials = Buffer.from(
-    `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
-  ).toString("base64");
-  return `Basic ${basicAuthCredentials}`;
+// Readiness gate for the freshly-ingested stream.
+//
+// This used to poll GET /streams with the same Basic credentials as the ingest
+// call. On cloud that endpoint rejects the org passcode (401) even though the
+// very same passcode ingests fine, so the poll silently burned its full timeout
+// on every run and reported a bogus "stream not found" while the data was
+// already queryable. page.request carries the logged-in browser context's
+// cookies, and "is the data searchable" is the condition the panels actually
+// need, so poll the search API through the page instead.
+const verifyStreamExists = async (page, streamName, maxWaitMs = 60000) => {
+  const ready = await waitForStreamData(page, streamName, 1, maxWaitMs);
+  testLogger.info(
+    ready
+      ? `Stream ${streamName} verified as searchable`
+      : `Stream ${streamName} not searchable after ${maxWaitMs}ms`
+  );
+  return ready;
 };
 
-const verifyStreamExists = async (streamName, maxWaitMs = 60000) => {
-  const orgId = process.env["ORGNAME"];
-  const baseUrl = process.env["INGESTION_URL"] || "http://localhost:5080";
-  const headers = { Authorization: await getAuthToken() };
-  const startTime = Date.now();
-
-  while (Date.now() - startTime < maxWaitMs) {
-    try {
-      const response = await fetch(`${baseUrl}/api/${orgId}/streams?type=logs`, { headers });
-      if (response.ok) {
-        const data = await response.json();
-        const streams = data.list || [];
-        if (streams.some(s => s.name === streamName)) {
-          testLogger.info(`Stream ${streamName} verified as available`);
-          return true;
-        }
+const ingestTestData = async (page, streamName, data) => {
+  // Resolve headers/org per attempt so a refreshed passcode is picked up on retry.
+  const post = () =>
+    fetch(
+      `${process.env.INGESTION_URL}/api/${getOrgIdentifier()}/${streamName}/_json`,
+      {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(data),
       }
-    } catch (e) {
-      // Ignore errors, continue polling
-    }
-    await new Promise(resolve => setTimeout(resolve, 2000));
-  }
-  testLogger.info(`Stream ${streamName} not found after ${maxWaitMs}ms`);
-  return false;
-};
+    );
 
-const ingestTestData = async (streamName, data) => {
-  const orgId = process.env["ORGNAME"];
-  const headers = {
-    "Content-Type": "application/json",
-    Authorization: await getAuthToken(),
-  };
-  const url = `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`;
-  const fetchResponse = await fetch(url, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(data),
-  });
+  const MAX_ATTEMPTS = 3;
+  let fetchResponse;
+
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    fetchResponse = await post();
+
+    // The per-org cloud passcode can be rotated mid-run by another shard sharing the
+    // org, so re-read it from the page's live session and retry rather than failing.
+    if ((fetchResponse.status === 401 || fetchResponse.status === 403) && page) {
+      testLogger.warn(
+        `Ingestion returned ${fetchResponse.status} — refreshing cloud passcode and retrying`
+      );
+      if (await refreshCloudConfig(page)) continue;
+    }
+
+    if (fetchResponse.status >= 500 && attempt < MAX_ATTEMPTS) {
+      testLogger.warn(
+        `Ingestion returned ${fetchResponse.status} — retrying (attempt ${attempt}/${MAX_ATTEMPTS})`
+      );
+      await new Promise((resolve) => setTimeout(resolve, 1000 * attempt));
+      continue;
+    }
+
+    break;
+  }
+
   if (!fetchResponse.ok) {
-    const responseText = await fetchResponse.text();
+    const responseText = await fetchResponse.text().catch(() => "");
     throw new Error(`Ingestion failed: ${fetchResponse.status} - ${responseText}`);
   }
 
   testLogger.info("Verifying stream is indexed (polling up to 60 seconds)...");
-  await verifyStreamExists(streamName, 60000);
+  await verifyStreamExists(page, streamName, 60000);
 
   return fetchResponse.json();
 };
 
 const deleteStream = async (streamName) => {
-  const orgId = process.env["ORGNAME"];
   const baseUrl = process.env["INGESTION_URL"] || "http://localhost:5080";
   try {
-    const headers = { Authorization: await getAuthToken() };
-    await fetch(`${baseUrl}/api/${orgId}/streams/${streamName}`, {
+    await fetch(`${baseUrl}/api/${getOrgIdentifier()}/streams/${streamName}`, {
       method: "DELETE",
-      headers,
+      headers: getAuthHeaders(),
     });
     return true;
   } catch {
@@ -114,13 +130,10 @@ const deleteStream = async (streamName) => {
 };
 
 const deleteDashboardByName = async (dashboardName) => {
-  const orgId = process.env["ORGNAME"];
+  const orgId = getOrgIdentifier();
   const baseUrl = process.env["INGESTION_URL"] || "http://localhost:5080";
   try {
-    const headers = {
-      "Content-Type": "application/json",
-      Authorization: await getAuthToken(),
-    };
+    const headers = getAuthHeaders();
     const listResponse = await fetch(`${baseUrl}/api/${orgId}/dashboards`, {
       method: "GET",
       headers,
@@ -185,10 +198,12 @@ test.describe("Dashboard Functions", () => {
 
     testLogger.info(`Test 1: Starting with testId=${testId}`);
 
-    // Setup: Ingest test data (includes stream verification polling)
-    await ingestTestData(STREAM_NAME, testRecords);
-
+    // Navigate first: ingestion's 401 recovery re-reads the passcode through the
+    // page's live session, which needs the page to already be on the app origin.
     await navigateToDashboards(page);
+
+    // Setup: Ingest test data (includes stream verification polling)
+    await ingestTestData(page, STREAM_NAME, testRecords);
 
     const pm = new PageManager(page);
 
@@ -302,10 +317,12 @@ test.describe("Dashboard Functions", () => {
 
     testLogger.info(`Test 2: Starting with testId=${testId}`);
 
-    // Setup: Ingest test data (includes stream verification polling)
-    await ingestTestData(STREAM_NAME, testRecords);
-
+    // Navigate first: ingestion's 401 recovery re-reads the passcode through the
+    // page's live session, which needs the page to already be on the app origin.
     await navigateToDashboards(page);
+
+    // Setup: Ingest test data (includes stream verification polling)
+    await ingestTestData(page, STREAM_NAME, testRecords);
 
     const pm = new PageManager(page);
 

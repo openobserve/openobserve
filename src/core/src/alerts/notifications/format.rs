@@ -61,21 +61,15 @@ impl ChannelFormat {
 ///
 /// Priority order (§4.3):
 /// 1. `DestinationType::Email` → `Email`; `Sns` → `Sns`
-/// 2. `Http` with `action_id` set → **always `Webhook`**, and `render_format` is IGNORED.
-/// 3. `endpoint.metadata["render_format"]` when present and not `"auto"`.
-/// 4. `endpoint.destination_type` match.
-/// 5. Everything else → `Webhook`.
+/// 2. `endpoint.metadata["render_format"]` when present and not `"auto"`.
+/// 3. `endpoint.destination_type` match.
+/// 4. Everything else → `Webhook`.
 pub fn derive_channel_format(dest_type: &DestinationType) -> ChannelFormat {
     match dest_type {
         DestinationType::Email(_) => ChannelFormat::Email,
         DestinationType::Sns(_) => ChannelFormat::Sns,
         DestinationType::Http(endpoint) => {
-            // Rule 2: action_id set always overrides to Webhook
-            if endpoint.action_id.is_some() {
-                return ChannelFormat::Webhook;
-            }
-
-            // Rule 3: render_format metadata override
+            // Rule 2: render_format metadata override
             if let Some(render_format) = endpoint.metadata.get("render_format") {
                 match render_format.as_str() {
                     "auto" => {
@@ -94,7 +88,7 @@ pub fn derive_channel_format(dest_type: &DestinationType) -> ChannelFormat {
                 }
             }
 
-            // Rule 4: destination_type match
+            // Rule 3: destination_type match
             if let Some(dest_type_str) = &endpoint.destination_type {
                 match dest_type_str.as_str() {
                     "slack" => return ChannelFormat::Slack,
@@ -150,26 +144,14 @@ mod tests {
 
     use super::*;
 
-    fn http_dest(
-        url: &str,
-        dtype: Option<&str>,
-        meta: &[(&str, &str)],
-        action: bool,
-    ) -> DestinationType {
+    fn http_dest(url: &str, dtype: Option<&str>, meta: &[(&str, &str)]) -> DestinationType {
         let mut metadata = HashMap::new();
         for (k, v) in meta {
             metadata.insert(k.to_string(), v.to_string());
         }
 
-        let action_id = if action {
-            Some("test_action".to_string())
-        } else {
-            None
-        };
-
         DestinationType::Http(Endpoint {
             url: url.to_string(),
-            action_id,
             destination_type: dtype.map(String::from),
             metadata,
             ..Default::default()
@@ -194,80 +176,68 @@ mod tests {
     }
 
     #[test]
-    fn test_action_id_overrides_render_format() {
-        // action_id set → Webhook even with render_format=slack
-        let dest = http_dest(
-            "https://x",
-            Some("slack"),
-            &[("render_format", "slack")],
-            true,
-        );
-        assert_eq!(derive_channel_format(&dest), ChannelFormat::Webhook);
-    }
-
-    #[test]
     fn test_slack_destination_type() {
-        let dest = http_dest("https://hooks.slack.com/x", Some("slack"), &[], false);
+        let dest = http_dest("https://hooks.slack.com/x", Some("slack"), &[]);
         assert_eq!(derive_channel_format(&dest), ChannelFormat::Slack);
     }
 
     #[test]
     fn test_discord_destination_type() {
-        let dest = http_dest("https://x", Some("discord"), &[], false);
+        let dest = http_dest("https://x", Some("discord"), &[]);
         assert_eq!(derive_channel_format(&dest), ChannelFormat::Discord);
     }
 
     #[test]
     fn test_pagerduty_destination_type() {
-        let dest = http_dest("https://x", Some("pagerduty"), &[], false);
+        let dest = http_dest("https://x", Some("pagerduty"), &[]);
         assert_eq!(derive_channel_format(&dest), ChannelFormat::PagerDuty);
     }
 
     #[test]
     fn test_opsgenie_destination_type() {
-        let dest = http_dest("https://x", Some("opsgenie"), &[], false);
+        let dest = http_dest("https://x", Some("opsgenie"), &[]);
         assert_eq!(derive_channel_format(&dest), ChannelFormat::Opsgenie);
     }
 
     #[test]
     fn test_servicenow_destination_type() {
-        let dest = http_dest("https://x", Some("servicenow"), &[], false);
+        let dest = http_dest("https://x", Some("servicenow"), &[]);
         assert_eq!(derive_channel_format(&dest), ChannelFormat::ServiceNow);
     }
 
     #[test]
     fn test_custom_to_webhook() {
-        let dest = http_dest("https://x", Some("custom"), &[], false);
+        let dest = http_dest("https://x", Some("custom"), &[]);
         assert_eq!(derive_channel_format(&dest), ChannelFormat::Webhook);
     }
 
     #[test]
     fn test_openobserve_to_webhook() {
-        let dest = http_dest("https://x", Some("openobserve"), &[], false);
+        let dest = http_dest("https://x", Some("openobserve"), &[]);
         assert_eq!(derive_channel_format(&dest), ChannelFormat::Webhook);
     }
 
     #[test]
     fn test_splunk_to_webhook() {
-        let dest = http_dest("https://x", Some("splunk"), &[], false);
+        let dest = http_dest("https://x", Some("splunk"), &[]);
         assert_eq!(derive_channel_format(&dest), ChannelFormat::Webhook);
     }
 
     #[test]
     fn test_elasticsearch_to_webhook() {
-        let dest = http_dest("https://x", Some("elasticsearch"), &[], false);
+        let dest = http_dest("https://x", Some("elasticsearch"), &[]);
         assert_eq!(derive_channel_format(&dest), ChannelFormat::Webhook);
     }
 
     #[test]
     fn test_unknown_type_to_webhook() {
-        let dest = http_dest("https://x", Some("zzz"), &[], false);
+        let dest = http_dest("https://x", Some("zzz"), &[]);
         assert_eq!(derive_channel_format(&dest), ChannelFormat::Webhook);
     }
 
     #[test]
     fn test_none_type_to_webhook() {
-        let dest = http_dest("https://x", None, &[], false);
+        let dest = http_dest("https://x", None, &[]);
         assert_eq!(derive_channel_format(&dest), ChannelFormat::Webhook);
     }
 
@@ -278,7 +248,6 @@ mod tests {
             "https://mattermost.corp/hook",
             Some("custom"),
             &[("render_format", "slack")],
-            false,
         );
         assert_eq!(derive_channel_format(&dest), ChannelFormat::Slack);
     }
@@ -286,35 +255,20 @@ mod tests {
     #[test]
     fn test_render_format_auto_falls_through() {
         // render_format=auto should fall through to destination_type
-        let dest = http_dest(
-            "https://x",
-            Some("slack"),
-            &[("render_format", "auto")],
-            false,
-        );
+        let dest = http_dest("https://x", Some("slack"), &[("render_format", "auto")]);
         assert_eq!(derive_channel_format(&dest), ChannelFormat::Slack);
     }
 
     #[test]
     fn test_render_format_unknown_falls_through() {
         // Unknown render_format value should fall through to destination_type
-        let dest = http_dest(
-            "https://x",
-            Some("slack"),
-            &[("render_format", "unknown")],
-            false,
-        );
+        let dest = http_dest("https://x", Some("slack"), &[("render_format", "unknown")]);
         assert_eq!(derive_channel_format(&dest), ChannelFormat::Slack);
     }
 
     #[test]
     fn test_render_format_discord() {
-        let dest = http_dest(
-            "https://x",
-            Some("custom"),
-            &[("render_format", "discord")],
-            false,
-        );
+        let dest = http_dest("https://x", Some("custom"), &[("render_format", "discord")]);
         assert_eq!(derive_channel_format(&dest), ChannelFormat::Discord);
     }
 
@@ -324,7 +278,6 @@ mod tests {
             "https://x",
             Some("custom"),
             &[("render_format", "pagerduty")],
-            false,
         );
         assert_eq!(derive_channel_format(&dest), ChannelFormat::PagerDuty);
     }
@@ -335,7 +288,6 @@ mod tests {
             "https://x",
             Some("custom"),
             &[("render_format", "opsgenie")],
-            false,
         );
         assert_eq!(derive_channel_format(&dest), ChannelFormat::Opsgenie);
     }
@@ -346,7 +298,6 @@ mod tests {
             "https://x",
             Some("custom"),
             &[("render_format", "servicenow")],
-            false,
         );
         assert_eq!(derive_channel_format(&dest), ChannelFormat::ServiceNow);
     }
@@ -357,7 +308,6 @@ mod tests {
             "https://x",
             Some("custom"),
             &[("render_format", "teams_adaptivecard")],
-            false,
         );
         assert_eq!(
             derive_channel_format(&dest),
@@ -371,7 +321,6 @@ mod tests {
             "https://x",
             Some("custom"),
             &[("render_format", "teams_messagecard")],
-            false,
         );
         assert_eq!(
             derive_channel_format(&dest),
@@ -381,12 +330,7 @@ mod tests {
 
     #[test]
     fn test_render_format_webhook() {
-        let dest = http_dest(
-            "https://x",
-            Some("custom"),
-            &[("render_format", "webhook")],
-            false,
-        );
+        let dest = http_dest("https://x", Some("custom"), &[("render_format", "webhook")]);
         assert_eq!(derive_channel_format(&dest), ChannelFormat::Webhook);
     }
 
@@ -436,7 +380,6 @@ mod tests {
             "https://teams-proxy.corp/x",
             Some("teams"),
             &[("render_format", "teams_messagecard")],
-            false,
         );
         assert_eq!(
             derive_channel_format(&dest),
@@ -446,12 +389,7 @@ mod tests {
 
     #[test]
     fn test_teams_destination_without_override() {
-        let dest = http_dest(
-            "https://outlook.office.com/webhook/x",
-            Some("teams"),
-            &[],
-            false,
-        );
+        let dest = http_dest("https://outlook.office.com/webhook/x", Some("teams"), &[]);
         assert_eq!(
             derive_channel_format(&dest),
             ChannelFormat::TeamsMessageCard
@@ -464,7 +402,6 @@ mod tests {
             "https://prod-1.westus.logic.azure.com/workflows/x",
             Some("teams"),
             &[],
-            false,
         );
         assert_eq!(
             derive_channel_format(&dest),

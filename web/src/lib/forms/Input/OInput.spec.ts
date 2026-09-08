@@ -160,3 +160,62 @@ describe("OInput", () => {
     expect(wrapper.emitted("update:modelValue")?.[0]?.[0]).toBe("12:34");
   });
 });
+
+describe("OInput — password reveal", () => {
+  const mountPassword = (props: Record<string, unknown> = {}) =>
+    mount(OInput, {
+      props: { type: "password", modelValue: "hunter2", revealable: true, ...props },
+      attrs: { "data-test": "secret" },
+    });
+
+  it("offers no toggle unless asked for", () => {
+    const wrapper = mount(OInput, { props: { type: "password", modelValue: "x" } });
+    expect(wrapper.find("[aria-pressed]").exists()).toBe(false);
+  });
+
+  it("offers no toggle on a field that is not masked to begin with", () => {
+    const wrapper = mount(OInput, {
+      props: { type: "text", modelValue: "x", revealable: true },
+    });
+    expect(wrapper.find("[aria-pressed]").exists()).toBe(false);
+  });
+
+  it("swaps the rendered type without changing what the field IS", async () => {
+    const wrapper = mountPassword();
+    const field = () => wrapper.get('[data-test="secret-field"]');
+    expect(field().attributes("type")).toBe("password");
+
+    await wrapper.get('[data-test="secret-reveal"]').trigger("click");
+    expect(field().attributes("type")).toBe("text");
+    // The prop is untouched, so the form still treats it as a password.
+    expect(wrapper.props("type")).toBe("password");
+
+    await wrapper.get('[data-test="secret-reveal"]').trigger("click");
+    expect(field().attributes("type")).toBe("password");
+  });
+
+  it("announces which way it will move", async () => {
+    const wrapper = mountPassword();
+    const toggle = () => wrapper.get('[data-test="secret-reveal"]');
+    expect(toggle().attributes("aria-pressed")).toBe("false");
+    await toggle().trigger("click");
+    expect(toggle().attributes("aria-pressed")).toBe("true");
+  });
+
+  // A type change must never leave a value on screen that the new type masks.
+  it("re-masks when the field stops being a revealable password", async () => {
+    const wrapper = mountPassword();
+    await wrapper.get('[data-test="secret-reveal"]').trigger("click");
+    expect(wrapper.get('[data-test="secret-field"]').attributes("type")).toBe("text");
+
+    await wrapper.setProps({ revealable: false });
+    expect(wrapper.get('[data-test="secret-field"]').attributes("type")).toBe("password");
+
+    await wrapper.setProps({ revealable: true });
+    expect(wrapper.get('[data-test="secret-field"]').attributes("type")).toBe("password");
+  });
+
+  it("stays out of the tab order, like the clear button", () => {
+    expect(mountPassword().get('[data-test="secret-reveal"]').attributes("tabindex")).toBe("-1");
+  });
+});

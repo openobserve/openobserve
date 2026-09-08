@@ -201,6 +201,31 @@ const builtInModel = (overrides: Partial<any> = {}) => ({
   ...overrides,
 });
 
+// Peak / off-peak model: an unrestricted off-peak tier plus a UTC-windowed peak
+// tier — the DeepSeek shape.
+const peakOffPeakModel = (overrides: Partial<any> = {}) => ({
+  id: "org-peak",
+  name: "DeepSeek V4 Pro",
+  match_pattern: "(?i)deepseek-v4-pro",
+  source: "org",
+  org_id: "test-org",
+  enabled: true,
+  tiers: [
+    { name: "Off-Peak", condition: null, prices: { input: 6.6e-7, output: 1.98e-6 } },
+    {
+      name: "Peak",
+      condition: null,
+      utc_windows: [
+        { start_minute: 60, end_minute: 240 },
+        { start_minute: 360, end_minute: 600 },
+      ],
+      prices: { input: 1.32e-6, output: 3.96e-6 },
+    },
+  ],
+  children: [],
+  ...overrides,
+});
+
 const mockModels = [orgModel(), metaOrgModel(), builtInModel()];
 
 // ── Store / i18n ─────────────────────────────────────────────────────────────
@@ -273,6 +298,11 @@ const mockI18n = createI18n({
         shadowBannerPrefix: "Shadowed by",
         shadowBannerSuffix: "rule",
         shadowedTooltip: "Shadowed by {name}",
+        timeBasedChip: "Time-based",
+        timeWindows: "Active hours (UTC)",
+        localTimeHint: "In your timezone: {range}",
+        tierAlwaysActive: "Always active (default)",
+        tierDefaultName: "Default",
       },
     },
   },
@@ -1189,6 +1219,124 @@ describe("ModelPricingList.vue", () => {
       await flushPromises();
 
       expect(modelPricingService.list).toHaveBeenCalled();
+    });
+  });
+
+  // ── Time-based (peak / off-peak) pricing ─────────────────────────────────
+
+  describe("time-based (peak / off-peak) pricing", () => {
+    // OTable keeps its loading skeleton up for a minimum real-time window, so
+    // body cells appear a beat after flushPromises — wait for them.
+    async function waitForChips(w: any, count: number) {
+      return vi.waitFor(() => {
+        const chips = w.findAll('[data-test="model-pricing-time-based-chip"]');
+        expect(chips).toHaveLength(count);
+        return chips;
+      });
+    }
+
+    it("shows the Time-based chip only for models with UTC-windowed tiers", async () => {
+      vi.mocked(modelPricingService.list).mockResolvedValue({
+        data: [orgModel(), peakOffPeakModel()],
+      } as any);
+      wrapper = mountComponent();
+      await flushPromises();
+
+      const chips = await waitForChips(wrapper, 1);
+      expect(chips[0].text()).toContain("Time-based");
+    });
+
+    it("opens the pricing drawer on the peak model when the chip is clicked", async () => {
+      vi.mocked(modelPricingService.list).mockResolvedValue({
+        data: [orgModel(), peakOffPeakModel()],
+      } as any);
+      wrapper = mountComponent();
+      await flushPromises();
+
+      const chips = await waitForChips(wrapper, 1);
+      await chips[0].trigger("click");
+      await nextTick();
+
+      expect(wrapper.vm.showPricingDialog).toBe(true);
+      expect(wrapper.vm.pricingDialogRow?.id).toBe("org-peak");
+    });
+
+    it("renders every tier in the drawer, each with its restriction caption", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+
+      wrapper.vm.openPricingDialog(peakOffPeakModel());
+      await nextTick();
+
+      const drawer = wrapper.findComponent(ODrawerStub);
+      const tierCards = drawer.findAll('[data-test^="model-pricing-drawer-tier-"]');
+      expect(tierCards).toHaveLength(2);
+      // Off-peak: unrestricted default caption. Peak: its formatted UTC hours.
+      expect(tierCards[0].text()).toContain("Off-Peak");
+      expect(tierCards[0].text()).toContain("Always active (default)");
+      expect(tierCards[1].text()).toContain("Peak");
+      expect(tierCards[1].text()).toContain("01:00–04:00, 06:00–10:00 UTC");
+    });
+
+    it("shows both tiers' prices in the drawer, not only the default tier's", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+
+      wrapper.vm.openPricingDialog(peakOffPeakModel());
+      await nextTick();
+
+      const drawer = wrapper.findComponent(ODrawerStub);
+      // 0.66 / 1.98 off-peak and 1.32 / 3.96 peak, all per 1M tokens.
+      expect(drawer.text()).toContain("$0.66");
+      expect(drawer.text()).toContain("$1.98");
+      expect(drawer.text()).toContain("$1.32");
+      expect(drawer.text()).toContain("$3.96");
+    });
+
+    it("skips the per-tier header for single-tier models in the drawer", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+
+      wrapper.vm.openPricingDialog(mockModels[0]);
+      await nextTick();
+
+      const drawer = wrapper.findComponent(ODrawerStub);
+      expect(drawer.findAll('[data-test^="model-pricing-drawer-tier-"]')).toHaveLength(1);
+      expect(drawer.text()).not.toContain("Always active (default)");
+    });
+
+    it("shows the windowed tier's hours in the user's timezone in the drawer", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      store.state.timezone = "Asia/Kolkata"; // UTC+5:30, no DST
+
+      wrapper.vm.openPricingDialog(peakOffPeakModel());
+      await nextTick();
+
+      const hint = wrapper.find('[data-test="model-pricing-drawer-tier-local-hint"]');
+      expect(hint.exists()).toBe(true);
+      expect(hint.text()).toContain("06:30–09:30, 11:30–15:30");
+    });
+
+    it("draws the 24h hours bar for windowed tiers in the drawer", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+
+      wrapper.vm.openPricingDialog(peakOffPeakModel());
+      await nextTick();
+
+      const drawer = wrapper.findComponent(ODrawerStub);
+      expect(drawer.find('[data-test="utc-hours-bar"]').exists()).toBe(true);
+      // Two windows, neither wrapping midnight → two filled segments.
+      expect(drawer.findAll('[data-test^="utc-hours-bar-segment-"]')).toHaveLength(2);
+    });
+
+    it("hasTimeBasedTiers reflects whether any tier has utc_windows", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      expect(wrapper.vm.hasTimeBasedTiers(peakOffPeakModel())).toBe(true);
+      expect(wrapper.vm.hasTimeBasedTiers(orgModel())).toBe(false);
+      expect(wrapper.vm.hasTimeBasedTiers({ tiers: [{ utc_windows: [] }] })).toBe(false);
     });
   });
 });

@@ -95,6 +95,64 @@ impl MemorySize for Pipeline {
     }
 }
 
+/// The author's own label for a node, falling back to its id. Validation errors are
+/// shown verbatim in a toast, and a raw uuid is unreadable and unmatchable against
+/// the canvas; the backend has no i18n, so an unlabelled node keeps its id.
+fn node_display_name<'a>(nodes: &'a [Node], node_id: &'a str) -> &'a str {
+    nodes
+        .iter()
+        .find(|n| n.get_node_id() == node_id)
+        .and_then(|n| n.meta.as_ref())
+        .and_then(|m| m.get("label"))
+        .map(|s| s.as_str())
+        .filter(|s| !s.is_empty())
+        .unwrap_or(node_id)
+}
+
+/// A typo'd handle is silently dropped at runtime (process_branch_node just counts it),
+/// so an unroutable edge has to be rejected at save time instead.
+fn validate_branch_handles(
+    node_id: &str,
+    branch_params: &components::BranchParams,
+    edges: &[Edge],
+    nodes: &[Node],
+) -> Result<(), anyhow::Error> {
+    let name = node_display_name(nodes, node_id);
+    let mut declared: HashSet<&str> = HashSet::new();
+    for case in &branch_params.cases {
+        if !declared.insert(case.handle.as_str()) {
+            return Err(anyhow!(
+                "BranchNode {name} has duplicate case handle \"{}\"",
+                case.handle
+            ));
+        }
+    }
+    if let Some(else_handle) = &branch_params.else_handle
+        && !declared.insert(else_handle.as_str())
+    {
+        return Err(anyhow!(
+            "BranchNode {name}'s else_handle \"{else_handle}\" collides with a case handle"
+        ));
+    }
+
+    for edge in edges.iter().filter(|edge| edge.source == node_id) {
+        let Some(handle) = &edge.source_handle else {
+            return Err(anyhow!(
+                "Edge from BranchNode {name} to {} must declare a source_handle",
+                node_display_name(nodes, &edge.target)
+            ));
+        };
+        if !declared.contains(handle.as_str()) {
+            return Err(anyhow!(
+                "Edge from BranchNode {name} to {} uses source_handle \"{handle}\", which the node does not declare",
+                node_display_name(nodes, &edge.target)
+            ));
+        }
+    }
+
+    Ok(())
+}
+
 // TODO YJDoc2: in a separate PR, use this fn in the pipeline validation below, so we have
 // same logic for pipelines and workflows as intended
 pub fn validate_nodes_edges(
@@ -102,7 +160,7 @@ pub fn validate_nodes_edges(
     edges: &[Edge],
     is_draft: bool,
 ) -> Result<(), anyhow::Error> {
-    if nodes.len() < 2 || (!is_draft && edges.is_empty()) {
+    if !is_draft && (nodes.len() < 2 || edges.is_empty()) {
         return Err(anyhow!(
             "there must be more than 1 node and at least 1 edge"
         ));
@@ -117,6 +175,26 @@ pub fn validate_nodes_edges(
             };
             if has_empty_conditions {
                 return Err(anyhow!("ConditionNode must have non-empty conditions"));
+            }
+        }
+
+        // a case-less Branch exposes no output handle, so it can never route: reject in draft too
+        if let NodeData::Branch(branch_params) = &node.data {
+            if branch_params.cases.is_empty() {
+                return Err(anyhow!("BranchNode must have at least one case"));
+            }
+            validate_branch_handles(node.get_node_id().as_str(), branch_params, edges, nodes)?;
+        }
+
+        // process_destination_node never forwards to children, so anything wired after a
+        // destination is accepted and then silently never runs. Reject it in draft too.
+        if matches!(&node.data, NodeData::Destination(_)) {
+            let id = node.get_node_id();
+            if edges.iter().any(|e| e.source == id) {
+                return Err(anyhow!(
+                    "Step \"{}\" sends to a destination, which ends the path. Remove the connection leaving it.",
+                    node_display_name(nodes, id.as_str())
+                ));
             }
         }
     }
@@ -828,6 +906,7 @@ mod tests {
                     id: "e1-2".to_string(),
                     source: "1".to_string(),
                     target: "2".to_string(),
+                    source_handle: None,
                 },
                 // Missing edge to node 3
             ],
@@ -934,6 +1013,7 @@ mod tests {
                 id: "e1-2".to_string(),
                 source: "1".to_string(),
                 target: "2".to_string(),
+                source_handle: None,
             }],
         };
 
@@ -973,6 +1053,7 @@ mod tests {
                 id: "e1-2".to_string(),
                 source: "invalid_source".to_string(), // Invalid source
                 target: "1".to_string(),
+                source_handle: None,
             }],
         };
 
@@ -1020,6 +1101,7 @@ mod tests {
                         name: "test_function".to_string(),
                         after_flatten: false,
                         num_args: 0,
+                        raw_fn: None,
                     }),
                     200.0,
                     100.0,
@@ -1031,6 +1113,7 @@ mod tests {
                         name: "test_function2".to_string(),
                         after_flatten: true,
                         num_args: 0,
+                        raw_fn: None,
                     }),
                     300.0,
                     100.0,
@@ -1065,6 +1148,7 @@ mod tests {
                         name: "test_function".to_string(),
                         after_flatten: false,
                         num_args: 0,
+                        raw_fn: None,
                     }),
                     100.0,
                     100.0,
@@ -1273,11 +1357,13 @@ mod tests {
                     id: "e1-2".to_string(),
                     source: "1".to_string(),
                     target: "2".to_string(),
+                    source_handle: None,
                 },
                 Edge {
                     id: "e2-1".to_string(),
                     source: "2".to_string(),
                     target: "1".to_string(), // Creates a cycle
+                    source_handle: None,
                 },
             ],
         };
@@ -1325,6 +1411,7 @@ mod tests {
                         name: "test_function".to_string(),
                         after_flatten: false,
                         num_args: 0,
+                        raw_fn: None,
                     }),
                     300.0,
                     100.0,
@@ -1335,6 +1422,7 @@ mod tests {
                 id: "e1-2".to_string(),
                 source: "1".to_string(),
                 target: "2".to_string(),
+                source_handle: None,
             }],
         };
 
@@ -1435,6 +1523,7 @@ mod tests {
                         name: "test_function1".to_string(),
                         after_flatten: true, // Checked
                         num_args: 0,
+                        raw_fn: None,
                     }),
                     200.0,
                     100.0,
@@ -1446,6 +1535,7 @@ mod tests {
                         name: "test_function2".to_string(),
                         after_flatten: false, // Unchecked after checked
                         num_args: 0,
+                        raw_fn: None,
                     }),
                     300.0,
                     100.0,
@@ -1468,16 +1558,19 @@ mod tests {
                     id: "e1-2".to_string(),
                     source: "1".to_string(),
                     target: "2".to_string(),
+                    source_handle: None,
                 },
                 Edge {
                     id: "e2-3".to_string(),
                     source: "2".to_string(),
                     target: "3".to_string(),
+                    source_handle: None,
                 },
                 Edge {
                     id: "e3-4".to_string(),
                     source: "3".to_string(),
                     target: "4".to_string(),
+                    source_handle: None,
                 },
             ],
         };
@@ -1523,6 +1616,7 @@ mod tests {
                 name: "fn1".to_string(),
                 after_flatten: false,
                 num_args: 0,
+                raw_fn: None,
             }),
         );
         node_map.insert(
@@ -1587,6 +1681,7 @@ mod tests {
                 name: "fn1".to_string(),
                 after_flatten: false,
                 num_args: 0,
+                raw_fn: None,
             }),
             0.0,
             0.0,
@@ -1620,6 +1715,37 @@ mod tests {
 
         // draft: same graph, no edges, is tolerated
         assert!(validate_nodes_edges(&nodes, &[], true).is_ok());
+    }
+
+    // The executor never forwards past a destination, so a chained one is accepted,
+    // published, and then silently never runs. Reject it instead of shipping a no-op.
+    #[test]
+    fn test_validate_nodes_edges_rejects_destination_with_outgoing_edge() {
+        let nodes = vec![
+            trigger_node("t1"),
+            destination_node("d1"),
+            destination_node("d2"),
+        ];
+        let edges = vec![
+            Edge::new("t1".to_string(), "d1".to_string()),
+            Edge::new("d1".to_string(), "d2".to_string()),
+        ];
+
+        let err = validate_nodes_edges(&nodes, &edges, false).unwrap_err();
+        assert!(
+            err.to_string().contains("d1"),
+            "the error must name the offending step, got: {err}"
+        );
+
+        // Rejected in draft too: the canvas exposes no source handle on a destination,
+        // so only an API/import caller can build this — never a mid-edit draft.
+        assert!(validate_nodes_edges(&nodes, &edges, true).is_err());
+
+        // A destination that actually terminates stays valid, draft or not.
+        let ok_nodes = vec![trigger_node("t1"), destination_node("d1")];
+        let ok_edges = vec![Edge::new("t1".to_string(), "d1".to_string())];
+        assert!(validate_nodes_edges(&ok_nodes, &ok_edges, false).is_ok());
+        assert!(validate_nodes_edges(&ok_nodes, &ok_edges, true).is_ok());
     }
 
     #[test]
@@ -1680,10 +1806,261 @@ mod tests {
         // partial-graph scenario - still fails validation today.
         let nodes = vec![trigger_node("t1")];
 
-        let err = validate_nodes_edges(&nodes, &[], true).unwrap_err();
-        assert!(
-            err.to_string()
+        let res = validate_nodes_edges(&nodes, &[], true);
+        assert!(res.is_ok());
+
+        let res = validate_nodes_edges(&nodes, &[], false);
+        assert!(res.is_err_and(|v| {
+            v.to_string()
                 .contains("more than 1 node and at least 1 edge")
+        }));
+    }
+
+    fn branch_node(id: &str, cases: Vec<components::BranchCase>) -> Node {
+        Node::new(
+            id.to_string(),
+            NodeData::Branch(components::BranchParams {
+                cases,
+                else_handle: None,
+            }),
+            0.0,
+            0.0,
+            "default".to_string(),
+        )
+    }
+
+    fn branch_case(handle: &str, column: &str) -> components::BranchCase {
+        components::BranchCase {
+            handle: handle.to_string(),
+            label: None,
+            conditions: Some(components::ConditionParams::V1 {
+                conditions: crate::meta::alerts::ConditionList::EndCondition(
+                    crate::meta::alerts::Condition {
+                        column: column.to_string(),
+                        operator: crate::meta::alerts::Operator::EqualTo,
+                        value: serde_json::json!("x"),
+                        ignore_case: false,
+                    },
+                ),
+            }),
+        }
+    }
+
+    #[test]
+    fn test_validate_nodes_edges_rejects_branch_with_zero_cases() {
+        let nodes = vec![
+            trigger_node("t1"),
+            branch_node("b1", vec![]),
+            destination_node("d1"),
+        ];
+        let edges = vec![
+            Edge::new("t1".to_string(), "b1".to_string()),
+            Edge::new_with_handle("b1".to_string(), "d1".to_string(), "case_0".to_string()),
+        ];
+
+        // a case-less Branch has no output handle, so it can never route: reject in draft too
+        for is_draft in [false, true] {
+            let err = validate_nodes_edges(&nodes, &edges, is_draft).unwrap_err();
+            assert!(
+                err.to_string().contains("BranchNode must have"),
+                "is_draft={is_draft}: expected zero-cases error, got {err}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_validate_nodes_edges_accepts_branch_with_cases() {
+        let nodes = vec![
+            trigger_node("t1"),
+            branch_node("b1", vec![branch_case("case_0", "severity")]),
+            destination_node("d1"),
+        ];
+        let edges = vec![
+            Edge::new("t1".to_string(), "b1".to_string()),
+            Edge::new_with_handle("b1".to_string(), "d1".to_string(), "case_0".to_string()),
+        ];
+
+        assert!(validate_nodes_edges(&nodes, &edges, false).is_ok());
+    }
+
+    fn branch_node_with_else(
+        id: &str,
+        cases: Vec<components::BranchCase>,
+        else_handle: Option<&str>,
+    ) -> Node {
+        Node::new(
+            id.to_string(),
+            NodeData::Branch(components::BranchParams {
+                cases,
+                else_handle: else_handle.map(str::to_string),
+            }),
+            0.0,
+            0.0,
+            "default".to_string(),
+        )
+    }
+
+    #[test]
+    fn test_validate_nodes_edges_rejects_branch_edge_with_unknown_handle() {
+        let nodes = vec![
+            trigger_node("t1"),
+            branch_node("b1", vec![branch_case("case_0", "severity")]),
+            destination_node("d1"),
+        ];
+        let edges = vec![
+            Edge::new("t1".to_string(), "b1".to_string()),
+            Edge::new_with_handle("b1".to_string(), "d1".to_string(), "case_typo".to_string()),
+        ];
+
+        for is_draft in [false, true] {
+            let err = validate_nodes_edges(&nodes, &edges, is_draft).unwrap_err();
+            assert!(
+                err.to_string().contains("case_typo"),
+                "is_draft={is_draft}: expected unknown-handle error, got {err}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_validate_nodes_edges_rejects_branch_edge_without_source_handle() {
+        let nodes = vec![
+            trigger_node("t1"),
+            branch_node("b1", vec![branch_case("case_0", "severity")]),
+            destination_node("d1"),
+        ];
+        let edges = vec![
+            Edge::new("t1".to_string(), "b1".to_string()),
+            Edge::new("b1".to_string(), "d1".to_string()),
+        ];
+
+        for is_draft in [false, true] {
+            let err = validate_nodes_edges(&nodes, &edges, is_draft).unwrap_err();
+            assert!(
+                err.to_string().contains("source_handle"),
+                "is_draft={is_draft}: expected missing-handle error, got {err}"
+            );
+        }
+    }
+
+    // Validation errors surface verbatim in a toast, so a raw uuid ("Edge from
+    // BranchNode 01ba56cc-aa28-…") is unreadable and unmatchable against the
+    // canvas. The node's own label travels in `meta`, so the backend can name it.
+    #[test]
+    fn branch_errors_name_nodes_by_their_label_when_set() {
+        let mut branch = branch_node("b1", vec![branch_case("case_0", "severity")]);
+        branch.meta = Some(HashMap::from([(
+            "label".to_string(),
+            "Severity split".to_string(),
+        )]));
+        let mut dest = destination_node("d1");
+        dest.meta = Some(HashMap::from([(
+            "label".to_string(),
+            "Page on-call".to_string(),
+        )]));
+        let nodes = vec![trigger_node("t1"), branch, dest];
+        let edges = vec![
+            Edge::new("t1".to_string(), "b1".to_string()),
+            Edge::new("b1".to_string(), "d1".to_string()),
+        ];
+
+        let err = validate_nodes_edges(&nodes, &edges, false)
+            .unwrap_err()
+            .to_string();
+        assert!(
+            err.contains("Severity split"),
+            "expected source label, got {err}"
         );
+        assert!(
+            err.contains("Page on-call"),
+            "expected target label, got {err}"
+        );
+        assert!(!err.contains("b1"), "raw id leaked into {err}");
+    }
+
+    // Unlabelled is the common case (the author never renamed the node), and the
+    // backend has no i18n — so it falls back to the id rather than inventing a name.
+    #[test]
+    fn branch_errors_fall_back_to_the_id_when_a_node_has_no_label() {
+        let nodes = vec![
+            trigger_node("t1"),
+            branch_node("b1", vec![branch_case("case_0", "severity")]),
+            destination_node("d1"),
+        ];
+        let edges = vec![
+            Edge::new("t1".to_string(), "b1".to_string()),
+            Edge::new("b1".to_string(), "d1".to_string()),
+        ];
+
+        let err = validate_nodes_edges(&nodes, &edges, false)
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("b1"), "expected id fallback, got {err}");
+    }
+
+    #[test]
+    fn test_validate_nodes_edges_rejects_branch_with_duplicate_case_handles() {
+        let nodes = vec![
+            trigger_node("t1"),
+            branch_node(
+                "b1",
+                vec![
+                    branch_case("case_0", "severity"),
+                    branch_case("case_0", "level"),
+                ],
+            ),
+            destination_node("d1"),
+        ];
+        let edges = vec![
+            Edge::new("t1".to_string(), "b1".to_string()),
+            Edge::new_with_handle("b1".to_string(), "d1".to_string(), "case_0".to_string()),
+        ];
+
+        for is_draft in [false, true] {
+            let err = validate_nodes_edges(&nodes, &edges, is_draft).unwrap_err();
+            assert!(
+                err.to_string().contains("duplicate"),
+                "is_draft={is_draft}: expected duplicate-handle error, got {err}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_validate_nodes_edges_rejects_else_handle_colliding_with_case_handle() {
+        let nodes = vec![
+            trigger_node("t1"),
+            branch_node_with_else(
+                "b1",
+                vec![branch_case("case_0", "severity")],
+                Some("case_0"),
+            ),
+            destination_node("d1"),
+        ];
+        let edges = vec![
+            Edge::new("t1".to_string(), "b1".to_string()),
+            Edge::new_with_handle("b1".to_string(), "d1".to_string(), "case_0".to_string()),
+        ];
+
+        for is_draft in [false, true] {
+            let err = validate_nodes_edges(&nodes, &edges, is_draft).unwrap_err();
+            assert!(
+                err.to_string().contains("else_handle"),
+                "is_draft={is_draft}: expected else-collision error, got {err}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_validate_nodes_edges_accepts_branch_edge_on_else_handle() {
+        let nodes = vec![
+            trigger_node("t1"),
+            branch_node_with_else("b1", vec![branch_case("case_0", "severity")], Some("else")),
+            destination_node("d1"),
+        ];
+        let edges = vec![
+            Edge::new("t1".to_string(), "b1".to_string()),
+            Edge::new_with_handle("b1".to_string(), "d1".to_string(), "else".to_string()),
+        ];
+
+        assert!(validate_nodes_edges(&nodes, &edges, false).is_ok());
     }
 }

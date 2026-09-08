@@ -20,10 +20,7 @@ use clap::{Arg, ArgAction, Command};
 use common::{infra::config::USERS, meta};
 use config::{DEFAULT_ORG, utils::file::set_permission};
 use db;
-use infra::{
-    db::{ORM_CLIENT, connect_to_orm},
-    file_list as infra_file_list, table,
-};
+use infra::{db::get_orm_client_rw, file_list as infra_file_list, table};
 use openobserve_core::users;
 
 use crate::{
@@ -277,7 +274,7 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                     table::dashboards::delete_all().await?;
                 }
                 "report" => {
-                    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+                    let conn = get_orm_client_rw().await;
                     db::dashboards::reports::reset(conn).await?;
                 }
                 "function" => {

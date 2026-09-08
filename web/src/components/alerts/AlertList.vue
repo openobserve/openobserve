@@ -23,23 +23,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="!showAddAlertDialog && !showImportAlertDialog"
       :title="t('alerts.header')"
       icon="shield-alert-outline"
+      :subtitle="t('alerts.subtitle')"
+      tabs-below
     >
       <!-- The header names the GROUP the four tabs form — "Alerts" — not the
-           page. The same string and the same icon on all four siblings; the
-           active tab is what says which page you are on. It deliberately reads
-           the same as the first tab, which is the price of naming the group
-           after its main page (PipelineSectionTabs makes the same trade).
-
-           That is what keeps the tab strip still. The title block is shrink-0
-           and sizes to its content, so a per-page title moved the strip
-           horizontally on every navigation, and peer tabs that jump under the
-           cursor are worse than no tabs. A constant title fixes it by
-           construction; the previous fix reserved a fixed 15rem box, which
-           bought the same stillness with 196px of dead space.
-
-           For the same reason these four pages carry NO subtitle: a subtitle is
-           usually wider than the title, so it would size the block and move the
-           strip again. -->
+           page; the active tab says which sibling you are on. Same title,
+           subtitle and icon on all four (PipelineSectionTabs makes the same
+           trade). -->
       <template #header-tabs>
         <AlertSectionTabs />
       </template>
@@ -98,14 +88,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Right: Table -->
         <div class="h-full min-w-0 flex-1">
           <div class="bg-card-glass-bg flex h-full flex-col">
-            <div class="border-border-default shrink-0 border-b px-3 py-2">
-              <AppTabs
-                :tabs="alertTabs"
-                :active-tab="activeTab"
-                size="sm"
-                @update:active-tab="onAlertTabChange"
-              />
-            </div>
             <!-- Alert List Table (shows all alert types including anomaly detection rows) -->
             <OTable
               class="min-h-0 flex-1"
@@ -145,6 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :loading="loading"
                     selectable
                     :selected-key="stateFilter"
+                    default-key="total"
                     @select="onStatSelect"
                   />
                 </div>
@@ -153,6 +136,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Toolbar: alert-type filter + search (inline folder scope) + refresh. -->
               <template #toolbar>
                 <div class="flex w-full items-center gap-2">
+                  <OToggleGroup
+                    :model-value="activeTab"
+                    data-test="alert-list-tabs"
+                    @update:model-value="(v) => onAlertTabChange(v as string)"
+                  >
+                    <OToggleGroupItem
+                      v-for="tab in alertTabs"
+                      :key="tab.value"
+                      :value="tab.value"
+                      size="sm"
+                      :icon-left="tab.icon"
+                      :data-test="`alert-list-tab-${tab.value}`"
+                    >
+                      {{ tab.label }}
+                    </OToggleGroupItem>
+                  </OToggleGroup>
                   <div class="min-w-0 flex-1">
                     <OInput
                       v-model="dynamicQueryModel"
@@ -171,7 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <OToggleGroup
                           :model-value="searchAcrossFolders ? 'all' : 'this'"
                           type="single"
-                          class="mr-1 self-center"
+                          class="me-1 self-center"
                           @update:model-value="(v) => (searchAcrossFolders = v === 'all')"
                         >
                           <OToggleGroupItem
@@ -312,6 +311,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <template #cell-owner="{ row }">
                 <OUserCell :value="row.owner" />
+              </template>
+
+              <template #cell-frequency="{ row }">
+                {{
+                  row.frequency
+                    ? row.frequency_type == "cron"
+                      ? row.frequency
+                      : t("pipeline.frequencyMins", { count: row.frequency })
+                    : "--"
+                }}
               </template>
 
               <template #cell-last_triggered_at="{ row }">
@@ -463,7 +472,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="alert-list-loading-alert"
                     v-if="alertStateLoadingMap[row.uuid]"
                     style="display: inline-block; width: 2.07125rem; height: auto"
-                    class="ml-1 flex items-center justify-center"
+                    class="ms-1 flex items-center justify-center"
                     :title="row.enabled ? t('common.turningOff') : t('common.turningOn')"
                   >
                     <OSpinner size="xs" />
@@ -472,7 +481,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-else
                     :data-row-action="row.enabled ? 'pause' : 'resume'"
                     :data-test="`alert-list-${row.name}-pause-start-alert`"
-                    class="ml-1"
+                    class="ms-1"
                     :variant="row.enabled ? 'ghost-destructive' : 'ghost-success'"
                     size="icon-sm"
                     :icon-left="row.enabled ? 'pause' : 'play-arrow'"
@@ -908,7 +917,6 @@ import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
-import AppTabs from "@/components/common/AppTabs.vue";
 import IacRegistryLinks from "@/components/common/IacRegistryLinks.vue";
 import AlertSectionTabs from "@/components/alerts/AlertSectionTabs.vue";
 import CompositeReferencesDrawer from "@/components/alerts/composite/CompositeReferencesDrawer.vue";
@@ -952,7 +960,6 @@ export default defineComponent({
     OUserCell,
     OTag,
     OStatStrip,
-    AppTabs,
     CompositeReferencesDrawer,
     ExportResourceDialog,
     IacRegistryLinks,
@@ -1226,6 +1233,7 @@ export default defineComponent({
         t("alerts.historyTimeline.error"),
         t("alerts.historyTimeline.skipped"),
         t("alerts.historyTimeline.unknown"),
+        t("alerts.historyTimeline.pending"),
       );
       return raw(at ? `${label} ${t("alerts.asOf")} ${at}` : label);
     };
@@ -1511,6 +1519,22 @@ export default defineComponent({
           size: COL.owner,
           meta: { align: "left" },
         },
+        // "frequency" — the "Check every" cadence, meaningless for real-time alerts
+        ...(activeTab.value !== "realTime"
+          ? [
+              {
+                id: "frequency",
+                accessorKey: "frequency",
+                header: t("alerts.frequency"),
+                cell: " ",
+                sortable: true,
+                resizable: true,
+                hideable: true,
+                size: COL.frequency,
+                meta: { align: "left" },
+              } as OTableColumnDef,
+            ]
+          : []),
         {
           id: "last_triggered_at",
           accessorKey: "last_triggered_at",
@@ -1664,6 +1688,11 @@ export default defineComponent({
       firing_count: anomaly.firing_count ?? "--",
       status: anomaly.status || "--",
       last_error: anomaly.last_error || null,
+      // Built field by field: anything unlisted is invisible to the table.
+      last_outcome: anomaly.last_outcome ?? null,
+      last_outcome_at: anomaly.last_outcome_at ?? null,
+      priority: anomaly.priority ?? null,
+      tags: anomaly.tags ?? [],
       selected: false,
       type: "anomaly",
       folder_name: {

@@ -16,17 +16,14 @@
 use config::ider;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set, TransactionTrait};
 
-use super::{entity::timed_annotation_panels, get_lock};
+use super::entity::timed_annotation_panels;
 use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{get_orm_client_ro, get_orm_client_rw},
     errors,
 };
 
 pub async fn get_panels(timed_annotation_id: &str) -> Result<Vec<String>, errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let panels = timed_annotation_panels::Entity::find()
         .filter(timed_annotation_panels::Column::TimedAnnotationId.eq(timed_annotation_id))
         .all(client)
@@ -45,10 +42,7 @@ pub async fn insert_many_panels(
         return Ok(());
     }
 
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let txn = client.begin().await?;
 
     for panel_id in panel_ids {
@@ -76,10 +70,7 @@ pub async fn delete_many_panels(
         return Ok(());
     }
 
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let txn = client.begin().await?;
 
     timed_annotation_panels::Entity::delete_many()

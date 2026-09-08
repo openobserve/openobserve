@@ -781,18 +781,21 @@ describe("useSearchQuery › handleMultiStream WHERE rewrite", () => {
 
     expect(result).not.toBeNull();
 
-    // buildSearch returns req with query.sql as an array for multi-stream.
-    const sqlArray = result?.query?.sql;
-    expect(Array.isArray(sqlArray)).toBe(true);
+    // buildSearch returns one UNION ALL BY NAME string for multi-stream.
+    const sql = result?.query?.sql as string;
+    expect(typeof sql).toBe("string");
+    expect(sql).toContain(" UNION ALL BY NAME ");
+
+    const arms = sql.split(" UNION ALL BY NAME ");
 
     // streamB should have "message" (the equivalent field) instead of "msg"
-    const streamBSQL = sqlArray.find((s: string) => s.includes('"streamB"'));
+    const streamBSQL = arms.find((s: string) => s.includes('"streamB"'));
     expect(streamBSQL).toBeDefined();
     expect(streamBSQL).toContain("message");
     expect(streamBSQL).not.toContain('"msg"');
 
     // streamA should keep "msg" (it has the field directly, no rewrite needed)
-    const streamASQL = sqlArray.find((s: string) => s.includes('"streamA"'));
+    const streamASQL = arms.find((s: string) => s.includes('"streamA"'));
     expect(streamASQL).toBeDefined();
     expect(streamASQL).toContain("msg");
   });

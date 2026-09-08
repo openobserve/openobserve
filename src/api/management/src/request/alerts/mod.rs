@@ -28,7 +28,7 @@ use config::meta::{
 };
 use db::scheduler;
 use hashbrown::HashMap;
-use infra::db::{ORM_CLIENT, connect_to_orm};
+use infra::db::{get_orm_client_ro, get_orm_client_rw};
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::{
     alerts::{
@@ -41,7 +41,7 @@ use openobserve_core::{
 use svix_ksuid::Ksuid;
 #[cfg(feature = "enterprise")]
 use {
-    openobserve_core::auth::check_permissions,
+    openobserve_core::auth::{check_folder_write_permissions, check_permissions},
     openobserve_core::authz::{StreamPermissionResourceType, check_stream_permissions},
 };
 
@@ -80,6 +80,8 @@ pub mod external_events;
 pub mod history;
 pub mod incident_integrations;
 pub mod incidents;
+#[cfg(feature = "cloud")]
+pub mod slack_oauth;
 pub mod templates;
 
 /// CreateAlert
@@ -96,12 +98,13 @@ pub mod templates;
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("folder" = Option<String>, Query, description = "Folder ID (Required if alert folder is not the default folder)"),
+        ("folder" = Option<String>, Query, description = "Folder ID for the alert. Authoritative: it overrides any folder_id in the body. The default folder is used when absent."),
       ),
     request_body(content = inline(CreateAlertRequestBody), description = "Alert data", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = ()),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "create"})),
@@ -116,6 +119,17 @@ pub async fn create_alert(
 ) -> Response {
     let query_str = uri.query().unwrap_or("");
     let folder_id = get_folder(query_str);
+
+    // The body folder is ignored in favour of the gated `?folder=`. Rejecting a
+    // disagreement rather than silently creating elsewhere: a client that sets
+    // only the body field would otherwise land in the default folder unnoticed.
+    if let Some(body_folder) = req_body.folder_id.as_deref().filter(|f| !f.is_empty())
+        && body_folder != folder_id
+    {
+        return MetaHttpResponse::bad_request(format!(
+            "folder_id in the body ({body_folder}) disagrees with the folder query parameter ({folder_id}); send the folder as ?folder= only"
+        ));
+    }
 
     // Anomaly detection path: delegate to anomaly config creation (enterprise only).
     #[cfg(feature = "enterprise")]
@@ -132,7 +146,7 @@ pub async fn create_alert(
     }
     alert.last_edited_by = Some(user_email.user_id);
 
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     match alert::create(client, &org_id, &folder_id, alert, overwrite).await {
         Ok(v) => MetaHttpResponse::json(
             MetaHttpResponse::message(StatusCode::OK, "Alert saved")
@@ -314,6 +328,7 @@ fn composite_input(
         tags: alert.tags,
         owner: alert.owner.or_else(|| Some(user_id.clone())),
         last_edited_by: Some(user_id),
+        pending_period_sec: alert.pending_period_sec,
     }
 }
 
@@ -335,7 +350,7 @@ async fn composite_detail_response(
     )
     .await
     .is_ok();
-    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let db = get_orm_client_ro().await;
 
     // Evaluate exactly as the scheduler would (system context, no child query).
     // Inaccessible children are masked below; a failed evaluation degrades to
@@ -472,6 +487,7 @@ async fn composite_detail_response(
         },
         "children": children,
         "evaluation": evaluation_json,
+        "pending_period_sec": definition.pending_period_sec,
     }))
 }
 
@@ -586,6 +602,9 @@ fn composite_error_response(
                 error,
             )
         }
+        CompositeServiceError::NegativePendingPeriod => {
+            composite_machine_error(StatusCode::BAD_REQUEST, "negative_pending_period", error)
+        }
     }
 }
 
@@ -693,7 +712,7 @@ pub async fn validate_composite_alert(
             inaccessible.push(id.clone());
         }
     }
-    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let db = get_orm_client_ro().await;
     // Resolve every reference in one batched query instead of per-ID round trips.
     let resolutions = infra::table::alert_composites::resolve_many(db, &org_id, &references)
         .await
@@ -835,7 +854,7 @@ pub async fn get_composite_references(
     Path((org_id, alert_id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> Response {
-    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let db = get_orm_client_ro().await;
     let subject = openobserve_core::alerts::composite::get_composite(&org_id, &alert_id)
         .await
         .ok()
@@ -950,7 +969,7 @@ pub async fn get_composite_timeline(
     Query(query): Query<HashMap<String, String>>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> Response {
-    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let db = get_orm_client_ro().await;
     let Some(composite) = openobserve_core::alerts::composite::get_composite(&org_id, &alert_id)
         .await
         .ok()
@@ -1148,12 +1167,9 @@ async fn create_anomaly_alert(
         alert_enabled: anomaly_fields.alert_enabled,
         alert_destinations: req_body.alert.destinations,
         enabled: Some(req_body.alert.enabled),
-        // Prefer explicit folder_id in JSON body; fall back to the ?folder= query param
-        // (same mechanism regular alerts use — the UI sends folder as a query param).
-        folder_id: req_body
-            .folder_id
-            .filter(|f| !f.is_empty())
-            .or_else(|| Some(query_folder_id.to_string()).filter(|f| !f.is_empty())),
+        // The route's permission gate resolves `?folder=`, so the write must use the same value — a
+        // body folder_id would create the config in an unauthorized folder.
+        folder_id: Some(query_folder_id.to_string()).filter(|f| !f.is_empty()),
         owner,
         // Feature 2: anomaly configs take the same triage metadata as
         // alerts, threaded from the shared request body.
@@ -1223,7 +1239,7 @@ pub async fn list_alert_groups(Path((org_id, alert_id)): Path<(String, String)>)
     let Ok(ksuid) = Ksuid::from_str(&alert_id) else {
         return MetaHttpResponse::not_found(format!("invalid alert id {alert_id}"));
     };
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     // Resolve through the alert itself so this endpoint inherits the same
     // org scoping and not-found behaviour as every other alert read — a raw
     // state-table query would happily serve another org's group labels, which
@@ -1329,7 +1345,7 @@ pub async fn list_alert_group_transitions(
     let Ok(ksuid) = Ksuid::from_str(&alert_id) else {
         return MetaHttpResponse::not_found(format!("invalid alert id {alert_id}"));
     };
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     if let Err(e) = alert::get_by_id(client, &org_id, ksuid).await {
         return e.into();
     }
@@ -1407,7 +1423,7 @@ pub async fn get_alert(
             return MetaHttpResponse::not_found(format!("invalid alert id {alert_id}"));
         }
     };
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     match alert::get_by_id(client, &org_id, alert_id).await {
         Ok((_, alert)) => {
             let key = alert.get_unique_key();
@@ -1488,7 +1504,7 @@ pub async fn export_alert(Path((org_id, alert_id)): Path<(String, String)>) -> R
             return MetaHttpResponse::not_found(format!("invalid alert id {alert_id}"));
         }
     };
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     match alert::get_by_id(client, &org_id, alert_id).await {
         Ok((_, alert)) => {
             let key = alert.get_unique_key();
@@ -1555,7 +1571,7 @@ pub async fn export_alert(Path((org_id, alert_id)): Path<(String, String)>) -> R
     tag = "Alerts",
     operation_id = "CloneAlert",
     summary = "Clone an alert or anomaly detection config",
-    description = "Creates a copy of an existing alert or anomaly detection config. For anomaly configs, the clone starts untrained with counters reset. Provide an optional name and folder_id in the request body.",
+    description = "Creates a copy of an existing alert or anomaly detection config. For anomaly configs, the clone starts untrained with counters reset. Provide an optional name and folder_id in the request body; a folder_id requires write access to that destination folder.",
     security(
         ("Authorization"= [])
     ),
@@ -1567,6 +1583,7 @@ pub async fn export_alert(Path((org_id, alert_id)): Path<(String, String)>) -> R
     request_body(content = inline(CloneAlertRequestBody), description = "Clone options", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = ()),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
@@ -1586,18 +1603,52 @@ pub async fn clone_alert(
             return MetaHttpResponse::not_found(format!("invalid alert id {alert_id}"));
         }
     };
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
 
     // Check if this is a regular alert first
     match alert::get_by_id(client, &org_id, alert_id).await {
         Ok((folder, mut src_alert)) => {
+            // A clone copies the whole definition, so reading the source must be
+            // authorized too — the destination check alone would let a caller
+            // lift an alert out of a folder they cannot read.
+            #[cfg(feature = "enterprise")]
+            if !check_permissions(
+                &alert_id_str,
+                &org_id,
+                &user_email.user_id,
+                "alerts",
+                "GET",
+                Some(&folder.folder_id),
+                false,
+                true,
+                false,
+            )
+            .await
+            {
+                return MetaHttpResponse::forbidden("Unauthorized Access");
+            }
             // Clone the alert: copy fields, generate new name
             let new_name = req_body
                 .name
                 .unwrap_or_else(|| format!("{}_copy", src_alert.name));
+            // Resolve the effective destination BEFORE authorizing it: an absent
+            // folder_id falls back to the source folder, which `?folder=` need
+            // not have covered.
             let dst_folder = req_body
                 .folder_id
+                .filter(|f| !f.is_empty())
                 .unwrap_or_else(|| folder.folder_id.clone());
+            #[cfg(feature = "enterprise")]
+            if !check_folder_write_permissions(
+                &org_id,
+                &user_email.user_id,
+                "alert_folders",
+                &dst_folder,
+            )
+            .await
+            {
+                return MetaHttpResponse::forbidden("Unauthorized Access");
+            }
             src_alert.name = new_name;
             // Clear the ID so a new one is assigned on insert
             src_alert.id = None;
@@ -1613,21 +1664,55 @@ pub async fn clone_alert(
                     .ok()
                     .flatten()
             {
+                // Resolved here so the folder authorized below is the one written.
+                let dst_folder = req_body
+                    .folder_id
+                    .clone()
+                    .filter(|f| !f.is_empty())
+                    .unwrap_or_else(|| _composite.definition.folder_id.clone());
                 #[cfg(feature = "enterprise")]
-                if composite_subject_unauthorized(
-                    &_composite.definition,
-                    &user_email.user_id,
-                    "GET",
-                )
-                .await
                 {
-                    return MetaHttpResponse::forbidden("Unauthorized Access");
+                    // The composite itself, not only the alerts it references.
+                    if !check_permissions(
+                        &alert_id_str,
+                        &org_id,
+                        &user_email.user_id,
+                        "alerts",
+                        "GET",
+                        Some(&_composite.definition.folder_id),
+                        false,
+                        true,
+                        false,
+                    )
+                    .await
+                    {
+                        return MetaHttpResponse::forbidden("Unauthorized Access");
+                    }
+                    if composite_subject_unauthorized(
+                        &_composite.definition,
+                        &user_email.user_id,
+                        "GET",
+                    )
+                    .await
+                    {
+                        return MetaHttpResponse::forbidden("Unauthorized Access");
+                    }
+                    if !check_folder_write_permissions(
+                        &org_id,
+                        &user_email.user_id,
+                        "alert_folders",
+                        &dst_folder,
+                    )
+                    .await
+                    {
+                        return MetaHttpResponse::forbidden("Unauthorized Access");
+                    }
                 }
                 return match openobserve_core::alerts::composite::clone_composite(
                     &org_id,
                     &alert_id_str,
                     req_body.name,
-                    req_body.folder_id,
+                    Some(dst_folder),
                     "api".to_string(),
                 )
                 .await
@@ -1646,12 +1731,62 @@ pub async fn clone_alert(
             }
             #[cfg(feature = "enterprise")]
             {
+                // Source read, then the folder the clone lands in, both resolved here.
+                let src_cfg =
+                    match openobserve_core::anomaly_detection::get_config(&org_id, &alert_id_str)
+                        .await
+                    {
+                        Ok(Some(cfg)) => cfg,
+                        Ok(None) => {
+                            return MetaHttpResponse::not_found(format!(
+                                "alert {alert_id_str} not found"
+                            ));
+                        }
+                        Err(e) => return MetaHttpResponse::internal_error(e.to_string()),
+                    };
+                let Some(src_folder) = src_cfg
+                    .get("folder_id")
+                    .and_then(|f| f.as_str())
+                    .map(str::to_string)
+                else {
+                    return MetaHttpResponse::forbidden("Unauthorized Access");
+                };
+                if !check_permissions(
+                    &alert_id_str,
+                    &org_id,
+                    &user_email.user_id,
+                    "alerts",
+                    "GET",
+                    Some(&src_folder),
+                    false,
+                    true,
+                    false,
+                )
+                .await
+                {
+                    return MetaHttpResponse::forbidden("Unauthorized Access");
+                }
+                let dst_folder = req_body
+                    .folder_id
+                    .clone()
+                    .filter(|f| !f.is_empty())
+                    .unwrap_or(src_folder);
+                if !check_folder_write_permissions(
+                    &org_id,
+                    &user_email.user_id,
+                    "alert_folders",
+                    &dst_folder,
+                )
+                .await
+                {
+                    return MetaHttpResponse::forbidden("Unauthorized Access");
+                }
                 // Fall back to anomaly detection config clone
                 match openobserve_core::anomaly_detection::clone_config(
                     &org_id,
                     &alert_id_str,
                     req_body.name,
-                    req_body.folder_id,
+                    Some(dst_folder),
                 )
                 .await
                 {
@@ -1692,6 +1827,7 @@ pub async fn clone_alert(
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = ()),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
@@ -1739,7 +1875,7 @@ pub async fn update_alert(
     alert.last_edited_by = Some(user_email.user_id.clone());
     alert.id = Some(alert_id);
 
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     match alert::update(client, &org_id, None, alert).await {
         Ok(_) => MetaHttpResponse::ok("Alert Updated"),
         Err(AlertError::AlertNotFound) => {
@@ -1773,6 +1909,13 @@ async fn build_and_run_anomaly_update(
     alert: crate::models::alerts::Alert,
 ) -> Response {
     use openobserve_core::anomaly_detection::UpdateAnomalyConfigRequest;
+
+    // A folder_id on the update is a move, and the route gate only covers `?folder=`.
+    if let Some(folder) = fields.folder_id.as_deref().filter(|f| !f.is_empty())
+        && !check_folder_write_permissions(org_id, &user_id, "alert_folders", folder).await
+    {
+        return MetaHttpResponse::forbidden("Unauthorized Access");
+    }
 
     let owner = fields
         .owner
@@ -1865,7 +2008,7 @@ pub async fn delete_alert(
             return MetaHttpResponse::not_found(format!("invalid alert id {alert_id}"));
         }
     };
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
 
     // Check whether this ID belongs to a regular alert before attempting delete.
     // delete_by_id silently returns Ok(()) when the record is not found (required
@@ -2062,7 +2205,7 @@ pub async fn delete_alert_bulk(
     let mut err = None;
     let mut conflicts = Vec::new();
 
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     for id in req.ids {
         // already checked this is valid, so ok to unwrap
         let alert_id = Ksuid::from_str(&id).unwrap();
@@ -2221,7 +2364,7 @@ pub async fn list_alert_tags(
     if let Some(folder) = query.folder.clone() {
         params = params.in_folder(&folder);
     }
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let visible_ids: Vec<String> = match alert::list_v2(client, user_id, params).await {
         Ok(list) => list
             .into_iter()
@@ -2386,7 +2529,7 @@ pub async fn list_alerts(
     // Composite definitions are fetched once here — used both to decide whether
     // the `All` filter must merge (and so drop SQL pagination) and to build the
     // merged rows below.
-    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let db = get_orm_client_ro().await;
     let composite_definitions = if matches!(
         alert_type,
         AlertTypeFilter::All | AlertTypeFilter::Composite
@@ -2436,7 +2579,7 @@ pub async fn list_alerts(
         alert_type,
         AlertTypeFilter::AnomalyDetection | AlertTypeFilter::Composite
     ) {
-        let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+        let client = get_orm_client_ro().await;
         let mut scheduled_jobs: HashMap<String, Trigger> =
             scheduler::list_by_org(&org_id, Some(TriggerModule::Alert))
                 .await
@@ -2653,7 +2796,7 @@ async fn enrich_with_composite_metadata(
     visibility: &Option<(bool, hashbrown::HashSet<String>)>,
     list: &mut [ListAlertsResponseBodyItem],
 ) {
-    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let db = get_orm_client_ro().await;
 
     // Split the page by kind and resolve everything in bulk: one child-count
     // query for composites and two reverse-reference queries, instead of a
@@ -2854,7 +2997,7 @@ pub async fn enable_alert(
         }
     };
     let should_enable = query.value;
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     match alert::enable_by_id(client, &org_id, alert_id, should_enable).await {
         Ok(_) => {
             let resp_body = EnableAlertResponseBody {
@@ -2992,7 +3135,7 @@ pub async fn enable_alert_bulk(
     let mut unsuccessful = Vec::with_capacity(req.ids.len());
     let mut err = None;
 
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     for id in req.ids {
         match alert::enable_by_id(client, &org_id, id, should_enable).await {
             Ok(_) => {
@@ -3110,7 +3253,7 @@ pub async fn trigger_alert(
             return MetaHttpResponse::not_found(format!("invalid alert id {alert_id}"));
         }
     };
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     match alert::trigger_by_id(client, &org_id, alert_id).await {
         Ok(_) => MetaHttpResponse::ok("Alert triggered"),
         Err(AlertError::AlertNotFound) => {
@@ -3204,7 +3347,7 @@ pub async fn retrain_alert(Path((org_id, alert_id)): Path<(String, String)>) -> 
             return MetaHttpResponse::not_found(format!("invalid alert id {alert_id}"));
         }
     };
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     // Check if this is a regular alert — if so, return 400
     match alert::get_by_id(client, &org_id, alert_id).await {
         Ok(_) => {
@@ -3254,6 +3397,7 @@ pub async fn retrain_alert(Path((org_id, alert_id)): Path<(String, String)>) -> 
     request_body(content = inline(MoveAlertsRequestBody), description = "Identifies alerts and the destination folder", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = ()),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
         (status = 500, description = "Failure",  content_type = "application/json", body = ()),
     ),
@@ -3267,7 +3411,7 @@ pub async fn move_alerts(
     Headers(user_email): Headers<UserEmail>,
     Json(req_body): Json<MoveAlertsRequestBody>,
 ) -> Response {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let total_ids = req_body.alert_ids.len() + req_body.anomaly_config_ids.len();
 
     // anomaly_config_ids is now a required Vec (defaults to empty), so no
@@ -3296,11 +3440,58 @@ pub async fn move_alerts(
     #[cfg(feature = "enterprise")]
     let anomaly_ids: Vec<Ksuid> = req_body.anomaly_config_ids;
 
+    // The route is bypass:true, so the destination is only authorized here — the
+    // anomaly and composite branches below have no folder check of their own.
+    #[cfg(feature = "enterprise")]
+    if !check_folder_write_permissions(
+        &org_id,
+        &user_email.user_id,
+        "alert_folders",
+        &req_body.dst_folder_id,
+    )
+    .await
+    {
+        return MetaHttpResponse::forbidden("Unauthorized Access");
+    }
+
     // Move anomaly configs first (enterprise only) so that if this fails,
     // regular alerts have not yet been relocated (reduces partial-move risk).
     #[cfg(feature = "enterprise")]
     for id in anomaly_ids {
         use openobserve_core::anomaly_detection::UpdateAnomalyConfigRequest;
+        // Source side: `update_config` performs no check of its own, so without
+        // this a caller could pull a config out of a folder they cannot reach.
+        let id_str = id.to_string();
+        // Fail closed: a read error or a config without a folder must deny, not
+        // skip the check and let the move through.
+        let src_folder = match openobserve_core::anomaly_detection::get_config(&org_id, &id_str)
+            .await
+        {
+            Ok(Some(cfg)) => cfg
+                .get("folder_id")
+                .and_then(|f| f.as_str())
+                .map(str::to_string),
+            Ok(None) => return MetaHttpResponse::not_found(format!("alert {id_str} not found")),
+            Err(e) => return MetaHttpResponse::internal_error(e.to_string()),
+        };
+        let Some(src_folder) = src_folder else {
+            return MetaHttpResponse::forbidden("Unauthorized Access");
+        };
+        if !check_permissions(
+            &id_str,
+            &org_id,
+            &user_email.user_id,
+            "alerts",
+            "PUT",
+            Some(&src_folder),
+            false,
+            true,
+            false,
+        )
+        .await
+        {
+            return MetaHttpResponse::forbidden("Unauthorized Access");
+        }
         let req = UpdateAnomalyConfigRequest {
             folder_id: Some(req_body.dst_folder_id.clone()),
             ..Default::default()
@@ -3444,6 +3635,23 @@ pub async fn generate_sql(
         ),
     );
 
+    let user_sql = match resolve_generate_sql(&query_condition) {
+        Ok(v) => v,
+        Err(e) => return e.into(),
+    };
+    if let Some(sql) = user_sql {
+        // Unparseable user SQL cannot prove a GROUP BY, so report false instead of failing.
+        let has_group_by = config::utils::sql::is_group_by_query(&sql).unwrap_or(false);
+        return MetaHttpResponse::json(GenerateSqlResponseBody {
+            sql,
+            metadata: Some(GenerateSqlMetadata {
+                has_aggregation: query_condition.aggregation.is_some(),
+                has_conditions: conditions.len().await > 0,
+                has_group_by,
+            }),
+        });
+    }
+
     // Call the existing build_sql function from service layer
     match build_sql(
         &org_id,
@@ -3488,10 +3696,38 @@ pub async fn generate_sql(
     }
 }
 
+// `None` means fall through to build_sql; families that run no SQL are refused rather
+// than silently answered with a generated `SELECT *`.
+fn resolve_generate_sql(
+    query_condition: &config::meta::alerts::QueryCondition,
+) -> Result<Option<String>, AlertError> {
+    use config::meta::alerts::QueryType;
+
+    match query_condition.query_type {
+        QueryType::Custom => Ok(None),
+        QueryType::SQL => {
+            let Some(sql) = query_condition.sql.as_ref().filter(|s| !s.is_empty()) else {
+                return Err(AlertError::SqlMissingQuery);
+            };
+            if search::sql::RE_ONLY_SELECT.is_match(sql) {
+                return Err(AlertError::SqlContainsSelectStar);
+            }
+            Ok(Some(sql.clone()))
+        }
+        QueryType::PromQL => Err(AlertError::SqlUnsupportedQueryType {
+            query_type: "PromQL",
+        }),
+        QueryType::Slo => Err(AlertError::SqlUnsupportedQueryType { query_type: "SLO" }),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use axum::{http::StatusCode, response::Response};
+    use config::meta::alerts::{QueryCondition, QueryType};
     use openobserve_core::alerts::alert::AlertError;
+
+    use super::resolve_generate_sql;
 
     fn status(err: AlertError) -> StatusCode {
         Response::from(err).status()
@@ -3739,5 +3975,72 @@ mod tests {
             )),
             StatusCode::INTERNAL_SERVER_ERROR
         );
+    }
+
+    fn query_condition(query_type: QueryType, sql: Option<&str>) -> QueryCondition {
+        QueryCondition {
+            query_type,
+            sql: sql.map(str::to_string),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn generate_sql_returns_the_users_sql_for_sql_query_type() {
+        let qc = query_condition(QueryType::SQL, Some("SELECT count(*) FROM \"logs\""));
+        let resolved = resolve_generate_sql(&qc).unwrap();
+        assert_eq!(
+            resolved,
+            Some("SELECT count(*) FROM \"logs\"".to_string()),
+            "SQL-type conditions must not be discarded in favour of SELECT *"
+        );
+    }
+
+    #[test]
+    fn generate_sql_rejects_sql_query_type_with_no_query() {
+        assert!(matches!(
+            resolve_generate_sql(&query_condition(QueryType::SQL, None)),
+            Err(AlertError::SqlMissingQuery)
+        ));
+        assert!(matches!(
+            resolve_generate_sql(&query_condition(QueryType::SQL, Some(""))),
+            Err(AlertError::SqlMissingQuery)
+        ));
+    }
+
+    #[test]
+    fn generate_sql_rejects_sql_query_type_containing_select_star() {
+        assert!(matches!(
+            resolve_generate_sql(&query_condition(
+                QueryType::SQL,
+                Some("SELECT * FROM \"logs\"")
+            )),
+            Err(AlertError::SqlContainsSelectStar)
+        ));
+    }
+
+    #[test]
+    fn generate_sql_defers_to_the_builder_for_custom_query_type() {
+        // None means "no user-supplied SQL", i.e. the caller falls through to build_sql.
+        assert_eq!(
+            resolve_generate_sql(&query_condition(QueryType::Custom, None)).unwrap(),
+            None
+        );
+    }
+
+    #[test]
+    fn generate_sql_rejects_promql_and_slo_rather_than_emitting_select_star() {
+        // A query is supplied so the rejection is provably about the TYPE, not a missing
+        // query — otherwise SqlMissingQuery would satisfy a bare is_err().
+        for ty in [QueryType::PromQL, QueryType::Slo] {
+            let err = resolve_generate_sql(&query_condition(ty, Some("SELECT 1")))
+                .expect_err("must not silently fall through to SELECT *");
+            assert_ne!(
+                err.to_string(),
+                AlertError::SqlMissingQuery.to_string(),
+                "rejected for the wrong reason"
+            );
+            assert_eq!(status(err), StatusCode::BAD_REQUEST);
+        }
     }
 }

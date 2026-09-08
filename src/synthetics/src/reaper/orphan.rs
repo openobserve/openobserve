@@ -95,13 +95,12 @@ use std::{
     time::Duration,
 };
 
-use config::{cluster::LOCAL_NODE, meta::synthetics::SyntheticFrequency};
+use config::{META_ORG_ID, cluster::LOCAL_NODE, meta::synthetics::SyntheticFrequency};
 use infra::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::get_orm_client_ro,
     table::{org_ingestion_tokens, synthetics_checks, synthetics_checks::OrphanCandidate},
 };
 
-use super::META_ORG;
 use crate::alerting::ERROR_SOURCE_ORPHAN;
 
 /// How many of a check's OWN intervals may elapse past its anchor before we call
@@ -346,7 +345,7 @@ pub async fn run() {
             continue;
         }
 
-        let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+        let db = get_orm_client_ro().await;
         detect(
             db,
             &client,
@@ -407,17 +406,19 @@ async fn detect(
         // `_meta`, not as the reporting org: ingest auth resolves the token
         // against the URL's org (`find_enabled_token(org_id, token)`), so org1's
         // token posted to `/api/_meta/...` matches no row and the write 401s.
-        let meta_token = match org_ingestion_tokens::find_default_enabled(META_ORG).await {
+        let meta_token = match org_ingestion_tokens::find_default_enabled(META_ORG_ID).await {
             Ok(Some(t)) => Some(t.token),
             Ok(None) => {
                 tracing::warn!(
-                    "[synthetics orphan] no enabled ingest token for {META_ORG} — reporting to \
+                    "[synthetics orphan] no enabled ingest token for {META_ORG_ID} — reporting to \
                      each org only"
                 );
                 None
             }
             Err(e) => {
-                tracing::error!("[synthetics orphan] {META_ORG} ingest token lookup failed: {e}");
+                tracing::error!(
+                    "[synthetics orphan] {META_ORG_ID} ingest token lookup failed: {e}"
+                );
                 None
             }
         };
@@ -581,7 +582,7 @@ async fn write_orphan_trigger(
     let delivered = post_trigger(client, &org_url, ingest_token, &trigger_record, c).await;
 
     if let Some(meta_token) = meta_token {
-        let meta_url = format!("{api_endpoint}/api/{META_ORG}/triggers/_json");
+        let meta_url = format!("{api_endpoint}/api/{META_ORG_ID}/triggers/_json");
         post_trigger(client, &meta_url, meta_token, &trigger_record, c).await;
     }
 

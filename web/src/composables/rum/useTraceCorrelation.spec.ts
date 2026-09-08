@@ -40,6 +40,14 @@ vi.mock("@/services/search", () => ({
   },
 }));
 
+// Stream discovery: defaults to the constant with no indexed range, so
+// existing tests keep their `from "default"` shape and the caller's window;
+// individual tests override to a custom stream or a real range.
+const mockResolveTraceLocation = vi.fn().mockResolvedValue({ stream: "default" });
+vi.mock("@/composables/rum/useCorrelatedTracesStream", () => ({
+  default: () => ({ resolveTraceLocation: mockResolveTraceLocation }),
+}));
+
 // Mock vuex store
 const mockStore = {
   state: {
@@ -229,6 +237,98 @@ describe("useTraceCorrelation", () => {
       // carrying only the legacy namespace — so the query targets _oo_trace_id. A stream
       // holding both spellings yields `_o2_trace_id = .. OR _oo_trace_id = ..`.
       expect(sql).toContain("_oo_trace_id = 'trace-abc-999'");
+    });
+
+    it("matches both padded and legacy zero-stripped ids in the RUM query", async () => {
+      // Legacy 31-char id as SDK 0.4.x stored it on the RUM event
+      const traceId = ref("1a034c1aabc72f78880daf6c9755cff");
+
+      mockSuccessfulSearch([], []);
+
+      const { fetchCorrelation } = useTraceCorrelation(traceId, t);
+      await fetchCorrelation();
+
+      const sql: string = vi.mocked(searchService.search).mock.calls[0][0].query.query.sql;
+      expect(sql).toContain("= '01a034c1aabc72f78880daf6c9755cff'");
+      expect(sql).toContain("= '1a034c1aabc72f78880daf6c9755cff'");
+    });
+
+    it("queries the default traces stream with the zero-padded id as page_type traces", async () => {
+      const traceId = ref("1a034c1aabc72f78880daf6c9755cff");
+
+      mockSuccessfulSearch([createMockRumEvent()], [createMockBackendSpan()]);
+
+      const { fetchCorrelation } = useTraceCorrelation(traceId, t);
+      await fetchCorrelation();
+
+      const apmCall = vi.mocked(searchService.search).mock.calls[1];
+      expect(apmCall[1]).toBe("APM");
+      expect(apmCall[0].page_type).toBe("traces");
+      const sql: string = apmCall[0].query.query.sql;
+      expect(sql).toContain('from "default"');
+      expect(sql).toContain("trace_id = '01a034c1aabc72f78880daf6c9755cff'");
+    });
+
+    it("queries the discovered stream when the trace lives outside default", async () => {
+      const traceId = ref("01a034c1aabc72f78880daf6c9755cff");
+      mockResolveTraceLocation.mockResolvedValueOnce({ stream: "payments_traces" });
+
+      mockSuccessfulSearch([createMockRumEvent()], [createMockBackendSpan()]);
+
+      const { fetchCorrelation } = useTraceCorrelation(traceId, t);
+      await fetchCorrelation();
+
+      expect(mockResolveTraceLocation).toHaveBeenCalledWith(
+        "01a034c1aabc72f78880daf6c9755cff",
+        expect.any(Number),
+        expect.any(Number),
+      );
+      const apmCall = vi.mocked(searchService.search).mock.calls[1];
+      const sql: string = apmCall[0].query.query.sql;
+      expect(sql).toContain('from "payments_traces"');
+    });
+
+    it("queries the backend spans over the trace's indexed range, padded", async () => {
+      const traceId = ref("01a034c1aabc72f78880daf6c9755cff");
+      mockResolveTraceLocation.mockResolvedValueOnce({
+        stream: "default",
+        range: { start_time: 1_700_000_000_000_000, end_time: 1_700_000_090_000_000 },
+      });
+
+      mockSuccessfulSearch([createMockRumEvent()], [createMockBackendSpan()]);
+
+      const { fetchCorrelation } = useTraceCorrelation(traceId, t);
+      await fetchCorrelation();
+
+      const apmCall = vi.mocked(searchService.search).mock.calls[1];
+      expect(apmCall[0].query.query.start_time).toBe(1_700_000_000_000_000 - 60_000_000);
+      expect(apmCall[0].query.query.end_time).toBe(1_700_000_090_000_000 + 60_000_000);
+    });
+
+    it("keeps the caller's window when the trace has no indexed range", async () => {
+      const traceId = ref("01a034c1aabc72f78880daf6c9755cff");
+      const timeRange = ref({ startTime: 5_000_000, endTime: 6_000_000 });
+      mockResolveTraceLocation.mockResolvedValueOnce({ stream: "default" });
+
+      mockSuccessfulSearch([createMockRumEvent()], [createMockBackendSpan()]);
+
+      const { fetchCorrelation } = useTraceCorrelation(traceId, t, timeRange);
+      await fetchCorrelation();
+
+      const apmCall = vi.mocked(searchService.search).mock.calls[1];
+      expect(apmCall[0].query.query.start_time).toBe(5_000_000);
+      expect(apmCall[0].query.query.end_time).toBe(6_000_000);
+    });
+
+    it("reports the canonical padded id in correlationData", async () => {
+      const traceId = ref("1a034c1aabc72f78880daf6c9755cff");
+
+      mockSuccessfulSearch([createMockRumEvent()], [createMockBackendSpan()]);
+
+      const { fetchCorrelation, correlationData } = useTraceCorrelation(traceId, t);
+      await fetchCorrelation();
+
+      expect(correlationData.value?.trace_id).toBe("01a034c1aabc72f78880daf6c9755cff");
     });
 
     it("should fetch trace data after RUM data", async () => {

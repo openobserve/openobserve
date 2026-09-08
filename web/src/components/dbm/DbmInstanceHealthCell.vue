@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ formatPercent(metrics.saturation.ratio, 0) }}
         </span>
       </div>
-      <span class="text-text-label text-3xs font-mono tabular-nums">
+      <span class="text-text-secondary text-3xs font-mono tabular-nums">
         {{ connectionsLabel }}
       </span>
     </template>
@@ -85,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ formatCount(metrics.saturation.used) }}
         </span>
       </div>
-      <span class="text-text-label text-3xs">{{ connectionsLabel }}</span>
+      <span class="text-text-secondary text-3xs">{{ connectionsLabel }}</span>
       <OTooltip side="left" :content="noLimitHint" />
     </template>
 
@@ -110,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          and a database with no deadlocks are all silence, not zeroes. -->
     <div
       v-if="secondary.length"
-      class="text-text-label text-3xs flex flex-wrap items-center justify-end gap-1.5"
+      class="text-text-secondary text-3xs flex flex-wrap items-center justify-end gap-1.5"
     >
       <span
         v-for="item in secondary"

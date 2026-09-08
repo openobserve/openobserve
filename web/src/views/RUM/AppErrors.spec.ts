@@ -146,6 +146,7 @@ vi.mock("@/plugins/traces/SyntaxGuide.vue", () => ({
 // Component import (AFTER all vi.mock() calls)
 // ---------------------------------------------------------------------------
 import AppErrors from "./AppErrors.vue";
+import ShareButton from "@/components/common/ShareButton.vue";
 import useErrorTracking from "@/composables/useErrorTracking";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 
@@ -751,6 +752,22 @@ describe("AppErrors", () => {
   // URL query parameter restore
   // ─────────────────────────────────────────────────────────────────────────
   describe("URL state restore", () => {
+    it("shares the live URL, so the link carries whatever filters the page pushed", async () => {
+      ({ wrapper, router } = await mountAppErrors({
+        routeQuery: { period: "15m", status: "new" },
+      }));
+      await flushPromises();
+
+      const shareButton = wrapper.findComponent(ShareButton);
+
+      expect(shareButton.exists()).toBe(true);
+      // Not the URL we pushed: the page rewrites it on mount, and the share link
+      // follows that rewrite rather than the stale entry query.
+      expect(shareButton.props("url")).toBe(
+        `${window.location.origin}/?period=15m&query=&status=new&org_identifier=default`,
+      );
+    });
+
     it("restores relativeTimePeriod from route query period param", async () => {
       ({ wrapper, router } = await mountAppErrors({
         routeQuery: { period: "15m" },

@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div
-    class="border-border-default border-l-sql-accent bg-surface-subtle o2-colorized-query overflow-auto border border-l-3 p-2.5"
+    class="border-border-default border-s-sql-accent bg-surface-subtle o2-colorized-query overflow-auto border border-s-3 p-2.5"
     :data-test="dataTest"
   >
     <!-- eslint-disable-next-line vue/no-v-html -- Monaco colorize output, passed through DOMPurify.sanitize in the watcher below -->

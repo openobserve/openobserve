@@ -13,8 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::str::FromStr;
-
 use ::search::{CachedQueryResponse, MultiCachedQueryResponse, QueryDelta};
 use chrono::{TimeZone, Utc};
 use common::utils::http::get_work_group;
@@ -41,7 +39,10 @@ use config::{
     },
 };
 use infra::{
-    cache::{file_data::disk::QUERY_RESULT_CACHE, meta::ResultCacheMeta},
+    cache::{
+        file_data::disk::{self, QUERY_RESULT_CACHE},
+        meta::ResultCacheMeta,
+    },
     errors::Error,
 };
 #[cfg(feature = "enterprise")]
@@ -302,6 +303,7 @@ pub async fn search(
             ),
             SearchInspectorFieldsBuilder::new()
                 .trace_id(trace_id.to_string())
+                .org_id(org_id.to_string())
                 .node_name(LOCAL_NODE.name.clone())
                 .component("summary".to_string())
                 .search_role(search_role)
@@ -457,7 +459,7 @@ pub async fn search(
             &c_resp.ts_column,
             req.query.start_time,
             req.query.end_time,
-            deep_copy_response(&res),
+            &res,
             file_path,
             is_complex_query,
             c_resp.is_descending,
@@ -528,12 +530,6 @@ pub async fn prepare_cache_response(
         query_fn = None;
     }
 
-    let action = req
-        .query
-        .action_id
-        .as_ref()
-        .and_then(|v| svix_ksuid::Ksuid::from_str(v).ok());
-
     // Parse SQL first to get metadata needed for normalization
     let query: SearchQuery = req.query.clone().into();
     let sql = match crate::Sql::new(&query, org_id, stream_type, req.search_type).await {
@@ -575,9 +571,6 @@ pub async fn prepare_cache_response(
     ];
     if let Some(vrl_function) = &query_fn {
         hash_body.push(vrl_function.to_string());
-    }
-    if let Some(action_id) = action {
-        hash_body.push(action_id.to_string());
     }
     if !req.regions.is_empty() {
         hash_body.extend(req.regions.clone());
@@ -902,28 +895,25 @@ fn sort_response(
 ///    - Check the histogram interval, if the time range is not a multiple of the histogram
 ///      interval, we need to remove the incomplete records: first & last record.
 ///
-/// 2. **Remove Records with Discard Duration**:
-///    - Removes records that are older than the configured `discard_duration`.
-///    - The `discard_duration` is the time difference between the current time and the time when
-///      the record was created.
-///    - The `discard_duration` is configured by `ZO_CACHE_DELAY_SECS`.
+/// 2. **Discard Recent Data**:
+///    - Clamps the cache end time to `now - ZO_CACHE_DELAY_SECS` so records that may still change
+///      are not cached.
 ///
-/// 3. **Skip Caching for Empty or Insufficient Hits**:
-///    - If no hits remain after removing one, caching is skipped.
-///    - Logs a message: `"No hits found for caching, skipping caching."`
+/// 3. **Discard Short Time Ranges**:
+///    - Skips caching if the cacheable time range is smaller than `ZO_CACHE_DELAY_SECS`.
 ///
-/// 4. **Discard Short Time Ranges**:
-///    - Skips caching if the difference between the first and last record timestamps is smaller
-///      than the configured `discard_duration`.
+/// 4. **Skip Covered Ranges** (unless `clear_cache`):
+///    - Skips caching when an existing cache entry already fully covers the time range.
 ///
-/// 5. **Adjust Cache Time Range**:
-///    - Adjusts the cache start and end times based on the smallest and largest timestamps:
-///      - `start_time = max(smallest_ts, req_query_start_time)`
-///      - `end_time = min(largest_ts, req_query_end_time)`
+/// 5. **Skip Caching for Empty Hits**:
+///    - If no hits remain after filtering to the cacheable time range, caching is skipped.
 ///
 /// 6. **Cache to Disk**:
 ///    - Saves the filtered response to a file named:
 ///      `"<start_time>_<end_time>_<is_aggregate>_<is_descending>.json"`.
+///
+/// 7. **Per-Key Entry Limit**:
+///    - Evicts the entries with the oldest data range beyond the per-key entry limit.
 #[tracing::instrument(name = "service:search:cache:write_results", skip_all)]
 #[allow(clippy::too_many_arguments)]
 pub async fn write_results(
@@ -931,7 +921,7 @@ pub async fn write_results(
     ts_column: &str,
     req_query_start_time: i64,
     req_query_end_time: i64,
-    mut res: config::meta::search::Response,
+    res: &config::meta::search::Response,
     file_path: String,
     is_aggregate: bool,
     is_descending: bool,
@@ -962,15 +952,49 @@ pub async fn write_results(
         }
     }
 
-    // 2. get the data time range, check if need to remove records with discard_duration
+    // 2. check if need to remove records with discard_duration
+    let delay_ts = second_micros(get_config().limit.cache_delay_secs);
+    let accept_end_time = std::cmp::min(Utc::now().timestamp_micros() - delay_ts, accept_end_time);
+
+    // 3. check if the time range is less than discard_duration
+    if (accept_end_time - accept_start_time) < delay_ts {
+        log::info!("[trace_id {trace_id}] Time range is too short for caching, skipping caching");
+        return;
+    }
+
+    // 4. the cached time range, with the end time realigned for histogram
+    let mut cache_end_time = accept_end_time;
+    if need_adjust_end_time
+        && is_aggregate
+        && let Some(interval) = res.histogram_interval
+        && interval > 0
+    {
+        cache_end_time += interval * 1000 * 1000;
+    }
+    let meta = ResultCacheMeta {
+        start_time: accept_start_time,
+        end_time: cache_end_time,
+        is_aggregate,
+        is_descending,
+    };
+
+    // 5. skip the write when an existing entry already fully covers this range;
+    // checked before the deep copy and serialization below so a covered write costs nothing
+    let query_key = file_path.replace('/', "_");
+    if !clear_cache && is_range_already_cached(&query_key, &file_path, &meta).await {
+        log::debug!(
+            "[trace_id {trace_id}] Result cache already covers {accept_start_time} - {cache_end_time}, skip caching"
+        );
+        return;
+    }
+
+    // 6. filter the records to the accept time range
     // For histogram queries with non-timestamp ORDER BY, we need to scan all hits
     // to find actual min/max timestamps, since results may not be time-ordered
+    let mut res = deep_copy_response(res);
     let is_time_ordered = !is_histogram_non_ts_order;
     let (data_start_time, data_end_time) =
         extract_timestamp_range(&res.hits, ts_column, is_time_ordered);
-    let delay_ts = second_micros(get_config().limit.cache_delay_secs);
-    let mut accept_end_time =
-        std::cmp::min(Utc::now().timestamp_micros() - delay_ts, accept_end_time);
     if data_start_time < accept_start_time || data_end_time > accept_end_time {
         res.hits.retain(|hit| {
             if let Some(hit_ts) = hit.get(ts_column)
@@ -986,38 +1010,14 @@ pub async fn write_results(
         res.total = res.hits.len();
         res.size = res.hits.len() as i64;
     }
-
-    // 3. check if the hits is empty
     if res.hits.is_empty() {
         log::info!("[trace_id {trace_id}] No hits found for caching, skipping caching");
         return;
     }
 
-    // 4. check if the time range is less than discard_duration
-    if (accept_end_time - accept_start_time) < delay_ts {
-        log::info!("[trace_id {trace_id}] Time range is too short for caching, skipping caching");
-        return;
-    }
-
-    // 5. adjust the cache time range
-    if need_adjust_end_time
-        && is_aggregate
-        && let Some(interval) = res.histogram_interval
-        && interval > 0
-    {
-        accept_end_time += interval * 1000 * 1000;
-    }
-
-    // 6. cache to disk
-    let file_name = format!(
-        "{}_{}_{}_{}.json",
-        accept_start_time,
-        accept_end_time,
-        if is_aggregate { 1 } else { 0 },
-        if is_descending { 1 } else { 0 }
-    );
+    // 7. cache to disk
+    let file_name = disk::result_cache_file_name(&meta);
     let res_cache = json::to_string(&res).unwrap();
-    let query_key = file_path.replace('/', "_");
     let trace_id = trace_id.to_string();
     tokio::spawn(async move {
         match SearchService::cache::cacher::cache_results_to_disk(
@@ -1026,26 +1026,15 @@ pub async fn write_results(
             &file_name,
             res_cache,
             clear_cache,
-            Some(accept_start_time),
-            Some(accept_end_time),
+            Some(meta.start_time),
+            Some(meta.end_time),
         )
         .await
         {
             Ok(success) => {
+                // success: false means the file already exists on disk, skip indexing
                 if success {
-                    // success: true, cache to disk success
-                    // success: false, cache to disk already exists, skipping caching
-                    QUERY_RESULT_CACHE
-                        .write()
-                        .await
-                        .entry(query_key)
-                        .or_insert_with(Vec::new)
-                        .push(ResultCacheMeta {
-                            start_time: accept_start_time,
-                            end_time: accept_end_time,
-                            is_aggregate,
-                            is_descending,
-                        });
+                    disk::add_result_cache_meta(&format!("results/{file_path}/{file_name}")).await;
                 }
             }
             Err(e) => {
@@ -1053,6 +1042,36 @@ pub async fn write_results(
             }
         }
     });
+}
+
+async fn is_range_already_cached(query_key: &str, file_path: &str, meta: &ResultCacheMeta) -> bool {
+    let covering = {
+        let r = QUERY_RESULT_CACHE.read().await;
+        r.get(query_key).map_or(Vec::new(), |metas| {
+            metas
+                .iter()
+                .filter(|m| {
+                    m.is_aggregate == meta.is_aggregate
+                        && m.is_descending == meta.is_descending
+                        && m.start_time <= meta.start_time
+                        && m.end_time >= meta.end_time
+                })
+                .cloned()
+                .collect()
+        })
+    };
+    for m in covering {
+        let file_name = disk::result_cache_file_name(&m);
+        // a covering meta only counts while its file is still indexed on disk
+        if disk::indexed_file_guard(&format!("results/{file_path}/{file_name}"))
+            .await
+            .is_some()
+        {
+            return true;
+        }
+        cacher::remove_stale_cache_meta(file_path, &file_name, query_key, &m).await;
+    }
+    false
 }
 
 pub fn apply_vrl_to_response(
@@ -1295,5 +1314,54 @@ mod tests {
     fn test_is_result_array_skip_vrl_no_marker() {
         let query_fn = "just a normal query";
         assert!(!is_result_array_skip_vrl(query_fn));
+    }
+
+    #[tokio::test]
+    async fn test_is_range_already_cached() {
+        let file_path = "test_org_covered/logs/test_stream/hash_covered";
+        let query_key = file_path.replace('/', "_");
+        let cached = ResultCacheMeta {
+            start_time: 1000,
+            end_time: 5000,
+            is_aggregate: false,
+            is_descending: true,
+        };
+        QUERY_RESULT_CACHE
+            .write()
+            .await
+            .insert(query_key.clone(), vec![cached.clone()]);
+        let covering_file = format!(
+            "results/{file_path}/{}",
+            infra::cache::file_data::disk::result_cache_file_name(&cached)
+        );
+        infra::cache::file_data::disk::set_size(&covering_file, 1)
+            .await
+            .unwrap();
+
+        let inner = ResultCacheMeta {
+            start_time: 2000,
+            end_time: 4000,
+            ..cached.clone()
+        };
+        assert!(is_range_already_cached(&query_key, file_path, &inner).await);
+
+        let wider = ResultCacheMeta {
+            end_time: 6000,
+            ..inner.clone()
+        };
+        assert!(!is_range_already_cached(&query_key, file_path, &wider).await);
+
+        let ascending = ResultCacheMeta {
+            is_descending: false,
+            ..inner.clone()
+        };
+        assert!(!is_range_already_cached(&query_key, file_path, &ascending).await);
+
+        // a covering meta whose file left the disk index no longer counts and is pruned
+        infra::cache::file_data::disk::remove(&covering_file)
+            .await
+            .unwrap();
+        assert!(!is_range_already_cached(&query_key, file_path, &inner).await);
+        assert!(!QUERY_RESULT_CACHE.read().await.contains_key(&query_key));
     }
 }

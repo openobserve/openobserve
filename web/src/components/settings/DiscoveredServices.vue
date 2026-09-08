@@ -306,7 +306,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Bottom -->
             <template #bottom>
               <div class="flex h-9 w-full items-center justify-between">
-                <div class="mr-md w-[15.625rem] text-xs font-normal">
+                <div class="w-[15.625rem] text-xs font-normal">
                   {{
                     t("settings.correlation.serviceCountSingular", {
                       count: filteredGroupCount,

@@ -27,7 +27,7 @@ pub fn run() -> Option<tokio::task::JoinHandle<()>> {
 
     Some(spawn_pausable_job!(
         "promql_metrics_leader",
-        config::get_config().limit.metrics_leader_push_interval,
+        config::get_config().prom.leader_push_interval,
         {
             // only update if there's a change
             let map = METRIC_CLUSTER_LEADER.read().await.clone();
@@ -48,6 +48,6 @@ pub fn run() -> Option<tokio::task::JoinHandle<()>> {
                 }
             }
         },
-        pause_if: config::get_config().limit.metrics_leader_push_interval == 0 || !config::get_config().common.metrics_dedup_enabled
+        pause_if: config::get_config().prom.leader_push_interval == 0 || !config::get_config().prom.dedup_enabled
     ))
 }

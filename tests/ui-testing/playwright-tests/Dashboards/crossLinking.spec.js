@@ -1,9 +1,11 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
-const { ingestTestData: _ingestData } = require('../utils/data-ingestion.js');
+const { ingestTestData: _ingestData, waitForStreamData } = require('../utils/data-ingestion.js');
 
-const STREAM_NAME = "e2e_automate";
+// Cross-link settings are one whole-object PUT per stream, so each parallel worker owns its own stream and concurrent tests can never clobber one another.
+const WORKER_SLOT = process.env.TEST_PARALLEL_INDEX || '0';
+const STREAM_NAME = `e2e_crosslink_w${WORKER_SLOT}_s`;
 
 test.describe("Cross-Linking testcases", () => {
     test.describe.configure({ mode: 'default' });
@@ -19,7 +21,9 @@ test.describe("Cross-Linking testcases", () => {
         // Ingest data once on first test, skip on subsequent tests
         if (!dataIngested) {
             await _ingestData(page, STREAM_NAME);
-            await page.waitForTimeout(1000);
+            // This stream is created only here, so nothing else masks the lag before it is queryable and listed.
+            expect(await waitForStreamData(page, STREAM_NAME, 1, 30000),
+                `stream ${STREAM_NAME} never became queryable within 30s of ingestion`).toBe(true);
             dataIngested = true;
             testLogger.info('Test data ingested');
         }

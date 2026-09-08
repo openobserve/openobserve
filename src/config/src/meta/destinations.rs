@@ -116,8 +116,6 @@ pub struct Endpoint {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub headers: Option<HashMap<String, String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub action_id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub output_format: Option<HTTPOutputFormat>,
     /// Destination type (e.g., "openobserve", "splunk", "elasticsearch", "custom")
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -416,7 +414,6 @@ mod tests {
             method: HTTPType::POST,
             skip_tls_verify: false,
             headers: Some(headers.clone()),
-            action_id: Some("action_123".to_string()),
             output_format: Some(HTTPOutputFormat::JSON),
             destination_type: Some("custom".to_string()),
             metadata: HashMap::new(),
@@ -426,7 +423,6 @@ mod tests {
         assert_eq!(endpoint.method, HTTPType::POST);
         assert!(!endpoint.skip_tls_verify);
         assert_eq!(endpoint.headers, Some(headers));
-        assert_eq!(endpoint.action_id, Some("action_123".to_string()));
         assert_eq!(endpoint.output_format, Some(HTTPOutputFormat::JSON));
         assert_eq!(endpoint.destination_type, Some("custom".to_string()));
     }
@@ -496,7 +492,6 @@ mod tests {
             method: HTTPType::POST,
             skip_tls_verify: true,
             headers: None,
-            action_id: None,
             output_format: None,
             destination_type: Some("openobserve".to_string()),
             metadata: HashMap::new(),
@@ -556,7 +551,6 @@ mod tests {
             method: HTTPType::PUT,
             skip_tls_verify: false,
             headers: None,
-            action_id: None,
             output_format: None,
             destination_type: Some("splunk".to_string()),
             metadata: HashMap::new(),
@@ -802,7 +796,6 @@ mod tests {
             method: HTTPType::POST,
             skip_tls_verify: false,
             headers: None,
-            action_id: None,
             output_format: None,
             destination_type: None,
             metadata: HashMap::new(),
@@ -810,7 +803,6 @@ mod tests {
         let json = serde_json::to_value(&ep).unwrap();
         let obj = json.as_object().unwrap();
         assert!(!obj.contains_key("headers"));
-        assert!(!obj.contains_key("action_id"));
         assert!(!obj.contains_key("output_format"));
         assert!(!obj.contains_key("destination_type"));
     }
@@ -824,7 +816,6 @@ mod tests {
             method: HTTPType::GET,
             skip_tls_verify: false,
             headers: Some(headers),
-            action_id: Some("act1".to_string()),
             output_format: Some(HTTPOutputFormat::JSON),
             destination_type: Some("custom".to_string()),
             metadata: HashMap::new(),
@@ -832,7 +823,6 @@ mod tests {
         let json = serde_json::to_value(&ep).unwrap();
         let obj = json.as_object().unwrap();
         assert!(obj.contains_key("headers"));
-        assert!(obj.contains_key("action_id"));
         assert!(obj.contains_key("output_format"));
         assert!(obj.contains_key("destination_type"));
     }

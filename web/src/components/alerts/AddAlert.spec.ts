@@ -124,6 +124,8 @@ const stubs = {
   // Custom stub exposing validate() so the template ref (anomalyStep2Ref) the
   // orchestrator calls during saveAnomalyDetection resolves truthy.
   AnomalyDetectionConfig: {
+    name: "AnomalyDetectionConfigStub",
+    props: ["previewSql"],
     template: "<div />",
     methods: {
       async validate() {
@@ -133,7 +135,7 @@ const stubs = {
   },
   AnomalyAlerting: true,
   AnomalySummary: true,
-  QueryEditor: true,
+  AnomalyDataPreview: true,
   JsonEditor: true,
   InlineSelectFolderDropdown: true,
   OPageHeader: true,
@@ -642,6 +644,7 @@ describe("AddAlert (OForm owner)", () => {
           "trigger_condition",
           "updatedAt",
           "workflows",
+          "pending_period_sec",
         ].sort(),
       );
 
@@ -739,6 +742,45 @@ describe("AddAlert (OForm owner)", () => {
       // update path stamps lastEditedBy + updatedAt
       expect(payload.lastEditedBy).toBe(store.state.userInfo.email);
       expect(payload.updatedAt).toBeDefined();
+    });
+  });
+
+  // The right rail's Preview card holds the DATA preview for every non-composite
+  // alert type; anomaly used to put its generated SQL there instead.
+  describe("right-rail Preview card", () => {
+    it("renders the anomaly data preview for an anomaly alert", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+
+      wrapper.vm.form.setFieldValue("is_real_time", "anomaly");
+      await flushPromises();
+
+      expect(wrapper.findComponent({ name: "AnomalyDataPreview" }).exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "PreviewAlert" }).exists()).toBe(false);
+    });
+
+    it("hands the generated SQL to the detection-config step, not the rail", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+
+      wrapper.vm.form.setFieldValue("is_real_time", "anomaly");
+      wrapper.vm.form.setFieldValue("stream_name", "_rundata");
+      await flushPromises();
+
+      const step = wrapper.findComponent({ name: "AnomalyDetectionConfigStub" });
+      expect(step.props("previewSql")).toContain("time_bucket");
+    });
+
+    it("renders the scheduled data preview for a scheduled alert", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+
+      wrapper.vm.form.setFieldValue("is_real_time", "false");
+      wrapper.vm.form.setFieldValue("stream_name", "_rundata");
+      await flushPromises();
+
+      expect(wrapper.findComponent({ name: "PreviewAlert" }).exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "AnomalyDataPreview" }).exists()).toBe(false);
     });
   });
 

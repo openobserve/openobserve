@@ -66,7 +66,6 @@ const SEARCH_REMOVED_FIELD_PATHS: &[&str] = &[
     "/properties/request_body/properties/search_event_context",
     // Query object (Query struct) — internal performance / streaming fields
     "/properties/request_body/properties/query/properties/quick_mode",
-    "/properties/request_body/properties/query/properties/action_id",
     "/properties/request_body/properties/query/properties/histogram_interval",
     "/properties/request_body/properties/query/properties/streaming_id",
     "/properties/request_body/properties/query/properties/streaming_output",

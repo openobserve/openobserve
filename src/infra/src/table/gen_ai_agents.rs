@@ -19,9 +19,8 @@ use sea_orm::{
     ActiveModelTrait, ColumnTrait, EntityTrait, Order, PaginatorTrait, QueryFilter, QueryOrder, Set,
 };
 
-use super::get_lock;
 use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{get_orm_client_ro, get_orm_client_rw},
     errors,
     table::entity::gen_ai_agents::{ActiveModel, Column, Entity, Model},
 };
@@ -79,7 +78,7 @@ pub async fn existing_keys(
         return Ok(HashSet::new());
     }
 
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let rows = Entity::find()
         .filter(Column::OrgId.eq(org_id))
         .filter(Column::AgentKey.is_in(agent_keys.to_vec()))
@@ -90,7 +89,7 @@ pub async fn existing_keys(
 }
 
 pub async fn count_by_org(org_id: &str) -> Result<u64, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     Ok(Entity::find()
         .filter(Column::OrgId.eq(org_id))
         .count(client)
@@ -102,8 +101,7 @@ pub async fn upsert_many(records: Vec<AgentRecord>) -> Result<usize, errors::Err
         return Ok(0);
     }
 
-    let _lock = get_lock().await;
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let mut stored = 0;
 
     for record in records {
@@ -138,7 +136,7 @@ pub async fn upsert_many(records: Vec<AgentRecord>) -> Result<usize, errors::Err
 }
 
 pub async fn list(org_id: &str, filter: &AgentListFilter) -> Result<Vec<Model>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let mut query = Entity::find().filter(Column::OrgId.eq(org_id));
 
     if let Some(end_time) = filter.end_time {
@@ -170,8 +168,7 @@ pub async fn delete(
     source_stream: Option<&str>,
     source_stream_type: Option<&str>,
 ) -> Result<u64, errors::Error> {
-    let _lock = get_lock().await;
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let mut query = Entity::delete_many().filter(Column::OrgId.eq(org_id));
 
     if let Some(source_stream) = source_stream {

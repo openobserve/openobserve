@@ -92,6 +92,17 @@ describe("llmDatasetsService.listItems", () => {
     });
   });
 
+  it("preserves a missing expected output as absence", async () => {
+    mockGet.mockResolvedValue({
+      data: { list: [itemRow({ expectedOutput: null })] },
+    });
+
+    const [item] = (await llmDatasetsService.listItems("acme", "dataset-1")).items;
+
+    expect(item.expectedOutput).toBeNull();
+    expect(item.rawExpectedOutput).toBeNull();
+  });
+
   it("flattens a structured input for display but keeps the original value", async () => {
     const input = [{ role: "user", content: "hello" }];
     mockGet.mockResolvedValue({ data: { list: [itemRow({ input })] } });
@@ -192,6 +203,24 @@ describe("llmDatasetsService item writes", () => {
     expect(item.id).toBe("item-1");
   });
 
+  it("omits expectedOutput when adding a reference-free item", async () => {
+    mockPost.mockResolvedValue({
+      data: { created: true, item: itemRow({ expectedOutput: null }) },
+    });
+
+    const item = await llmDatasetsService.addItem("acme", "dataset-1", {
+      input: "question",
+    });
+
+    expect(mockPost).toHaveBeenCalledWith("/api/acme/datasets/dataset-1/items", {
+      entryPoint: "manual",
+      input: "question",
+      metadata: null,
+      tags: [],
+    });
+    expect(item.expectedOutput).toBeNull();
+  });
+
   it("updates an item by its LOGICAL id and sends tags", async () => {
     mockPut.mockResolvedValue({ data: itemRow({ globalVersion: 8 }) });
 
@@ -232,6 +261,27 @@ describe("llmDatasetsService item writes", () => {
   });
 });
 
+describe("llmDatasetsService.importItems", () => {
+  it("uploads the CSV in the backend's multipart file field", async () => {
+    mockPost.mockResolvedValue({
+      data: { filename: "goldens.csv", imported_count: 2, skipped_count: 1 },
+    });
+    const file = new File(["input,expected_output\nquestion,answer"], "goldens.csv", {
+      type: "text/csv",
+    });
+
+    const result = await llmDatasetsService.importItems("acme", "dataset-1", file);
+
+    expect(mockPost).toHaveBeenCalledWith(
+      "/api/acme/datasets/dataset-1/items/import",
+      expect.any(FormData),
+      { headers: { "Content-Type": "multipart/form-data" } },
+    );
+    expect((mockPost.mock.calls[0][1] as FormData).get("file")).toBe(file);
+    expect(result).toEqual({ filename: "goldens.csv", importedCount: 2, skippedCount: 1 });
+  });
+});
+
 describe("llmDatasetsService.getItemVersions", () => {
   it("returns every immutable version of one logical item", async () => {
     mockGet.mockResolvedValue({
@@ -250,6 +300,45 @@ describe("llmDatasetsService.getItemVersions", () => {
       { rowId: "row-v1", id: "item-1", version: 1 },
       { rowId: "row-v2", id: "item-1", version: 3 },
     ]);
+  });
+});
+
+describe("llmDatasetsService.list", () => {
+  it("carries the server-derived aggregates through onto each row", async () => {
+    mockGet.mockResolvedValue({
+      data: {
+        list: [
+          {
+            id: "dataset-1",
+            orgId: "acme",
+            name: "Goldens",
+            description: null,
+            tags: ["rag"],
+            // 46 stored revisions collapse to 29 live items server-side, so the
+            // count is deliberately unrelated to the version.
+            globalVersion: 46,
+            itemCount: 29,
+            sources: { trace: 4, annotation: 5, manual: 20 },
+          },
+        ],
+      },
+    });
+
+    const [dataset] = await llmDatasetsService.list("acme");
+
+    expect(mockGet).toHaveBeenCalledWith("/api/acme/datasets");
+    expect(dataset.itemCount).toBe(29);
+    expect(dataset.sources).toEqual({ trace: 4, annotation: 5, manual: 20 });
+    expect(dataset.globalVersion).toBe(46);
+  });
+
+  it("shows zeroes rather than blanks when a row omits the aggregates", async () => {
+    mockGet.mockResolvedValue({ data: { list: [{ id: "dataset-1", name: "Goldens" }] } });
+
+    const [dataset] = await llmDatasetsService.list("acme");
+
+    expect(dataset.itemCount).toBe(0);
+    expect(dataset.sources).toEqual({ trace: 0, annotation: 0, manual: 0 });
   });
 });
 

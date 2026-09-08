@@ -16,8 +16,6 @@
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QuerySelect, Set, entity::prelude::*};
 use serde::{Deserialize, Serialize};
 
-use super::get_lock;
-
 // Status constants for enrichment table URL jobs
 const STATUS_PROCESSING: i16 = 1;
 // Re-export the entity for convenience
@@ -25,7 +23,7 @@ pub use crate::table::entity::enrichment_table_urls::{
     ActiveModel, Column, Entity, Model, Relation,
 };
 use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{get_orm_client_ro, get_orm_client_rw},
     errors,
 };
 
@@ -78,9 +76,7 @@ impl From<Model> for EnrichmentTableUrlRecord {
 /// # Returns
 /// * `Result<(), errors::Error>` - Success or error
 pub async fn put(record: EnrichmentTableUrlRecord) -> Result<(), errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = get_lock().await;
+    let client = get_orm_client_rw().await;
 
     // Try to find existing record by ID
     let existing = Entity::find()
@@ -140,7 +136,7 @@ pub async fn get(
     org: &str,
     table_name: &str,
 ) -> Result<Option<EnrichmentTableUrlRecord>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let record = Entity::find()
         .filter(Column::Org.eq(org))
         .filter(Column::Name.eq(table_name))
@@ -159,9 +155,7 @@ pub async fn get(
 /// # Returns
 /// * `Result<(), errors::Error>` - Success or error
 pub async fn delete(org: &str, table_name: &str) -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
+    let client = get_orm_client_rw().await;
 
     Entity::delete_many()
         .filter(Column::Org.eq(org))
@@ -180,7 +174,7 @@ pub async fn delete(org: &str, table_name: &str) -> Result<(), errors::Error> {
 /// # Returns
 /// * `Result<Vec<EnrichmentTableUrlRecord>, errors::Error>` - List of records or error
 pub async fn list_by_org(org: &str) -> Result<Vec<EnrichmentTableUrlRecord>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let records = Entity::find()
         .filter(Column::Org.eq(org))
         .all(client)
@@ -203,7 +197,7 @@ pub async fn get_all_for_table(
 ) -> Result<Vec<EnrichmentTableUrlRecord>, errors::Error> {
     use sea_orm::QueryOrder;
 
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let records = Entity::find()
         .filter(Column::Org.eq(org))
         .filter(Column::Name.eq(table_name))
@@ -222,7 +216,7 @@ pub async fn get_all_for_table(
 /// # Returns
 /// * `Result<Option<EnrichmentTableUrlRecord>, errors::Error>` - The record or None
 pub async fn get_by_id(job_id: &str) -> Result<Option<EnrichmentTableUrlRecord>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let record = Entity::find()
         .filter(Column::Id.eq(job_id))
         .one(client)
@@ -239,8 +233,7 @@ pub async fn get_by_id(job_id: &str) -> Result<Option<EnrichmentTableUrlRecord>,
 /// # Returns
 /// * `Result<(), errors::Error>` - Success or error
 pub async fn delete_by_id(job_id: &str) -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = get_lock().await;
+    let client = get_orm_client_rw().await;
 
     Entity::delete_many()
         .filter(Column::Id.eq(job_id))
@@ -259,7 +252,7 @@ pub async fn delete_by_id(job_id: &str) -> Result<(), errors::Error> {
 /// # Returns
 /// * `Result<bool, errors::Error>` - true if any job is processing
 pub async fn has_processing_jobs(org: &str, table_name: &str) -> Result<bool, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
 
     let count = Entity::find()
         .filter(Column::Org.eq(org))
@@ -280,8 +273,7 @@ pub async fn has_processing_jobs(org: &str, table_name: &str) -> Result<bool, er
 /// # Returns
 /// * `Result<(), errors::Error>` - Success or error
 pub async fn delete_all_for_table(org: &str, table_name: &str) -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = get_lock().await;
+    let client = get_orm_client_rw().await;
 
     Entity::delete_many()
         .filter(Column::Org.eq(org))
@@ -300,10 +292,9 @@ pub async fn delete_all_for_table(org: &str, table_name: &str) -> Result<(), err
 /// # How it works
 ///
 /// ## SQLite (single-node)
-/// 1. Uses `get_lock()` for process-level synchronization
-/// 2. Finds up to `limit` stale jobs using Sea-ORM queries
-/// 3. Updates each job to Pending status sequentially
-/// 4. Returns the updated jobs
+/// 1. Finds up to `limit` stale jobs using Sea-ORM queries
+/// 2. Updates each job to Pending status sequentially
+/// 3. Returns the updated jobs
 ///
 /// Since SQLite is single-node, only one ingester exists, so no distributed coordination needed.
 ///
@@ -331,13 +322,12 @@ pub async fn claim_stale_jobs(
 ) -> Result<Vec<EnrichmentTableUrlRecord>, errors::Error> {
     use sea_orm::{ConnectionTrait, Statement};
 
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let backend = client.get_database_backend();
-    let _lock = get_lock().await;
     let now = chrono::Utc::now().timestamp_micros();
 
-    // For SQLite (single-node), use simple Sea-ORM API since get_lock() provides sufficient
-    // protection
+    // SQLite serializes writers on the single write connection, so the plain
+    // Sea-ORM path is enough here; postgres needs the locking query below.
     if backend == sea_orm::DatabaseBackend::Sqlite {
         // Find stale jobs (only local region jobs)
         let stale_jobs: Vec<Model> = Entity::find()
@@ -405,8 +395,7 @@ pub async fn claim_stale_jobs(
 
 /// Deletes all enrichment table URL entries belonging to the given org.
 pub async fn delete_by_org(org: &str) -> Result<(), errors::Error> {
-    let _lock = get_lock().await;
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::delete_many()
         .filter(Column::Org.eq(org))
         .exec(client)

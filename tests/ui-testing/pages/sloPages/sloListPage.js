@@ -40,6 +40,11 @@ export class SloListPage {
   toggleButton(name) { return `[data-test="slos-slolist-toggle-${name}"]`; }
   typeFilterOption(value) { return `[data-test="slos-slolist-type-filter-${value}"]`; }
 
+  // ------------------------------------------------------------- element getters
+
+  getTable() { return this.page.locator(this.locators.table); }
+  getToggle(name) { return this.page.locator(this.toggleButton(name)); }
+
   // ---------------------------------------------------------------- navigation
 
   async goto(orgId) {

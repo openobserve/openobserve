@@ -28,11 +28,6 @@ use config::{
 };
 use infra::errors::{Error, ErrorCodes, Result};
 use itertools::Itertools;
-#[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::actions::{
-    action_manager::trigger_action,
-    meta::{ActionTriggerResult, TriggerSource},
-};
 use proto::cluster_rpc::SearchQuery;
 use vector_enrichment::TableRegistry;
 
@@ -60,9 +55,6 @@ pub async fn search(
     // execution
     let use_query_fn = query.uses_zo_fn;
     let query_fn = query.query_fn.clone();
-    #[cfg(feature = "enterprise")]
-    let action_id = query.action_id.clone();
-
     let ret = search_inner(
         req,
         query,
@@ -203,30 +195,6 @@ pub async fn search(
                     .collect(),
             }
         };
-
-        #[cfg(feature = "enterprise")]
-        if !action_id.is_empty() {
-            let resp = trigger_action(
-                &trace_id,
-                &sql.org_id,
-                &action_id,
-                sources,
-                TriggerSource::Search,
-            )
-            .await
-            .map_err(|err| Error::Message(err.to_string()))?;
-            match resp.result {
-                ActionTriggerResult::Success(new_sources) => {
-                    sources = new_sources;
-                }
-                ActionTriggerResult::Failure(err_msg) => {
-                    log::error!(
-                        "[trace_id {trace_id}] search->action: action_id: {action_id}, err: {err_msg}"
-                    );
-                    return Err(Error::Message(err_msg));
-                }
-            }
-        }
 
         // handle query type: json, metrics, table
         if query_type == "table" {

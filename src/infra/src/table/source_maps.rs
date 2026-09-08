@@ -19,9 +19,9 @@ use sea_orm::{
 };
 use serde::{Deserialize, Serialize};
 
-use super::{entity::source_maps::*, get_lock};
+use super::entity::source_maps::*;
 use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{get_orm_client_ro, get_orm_client_rw},
     errors,
 };
 
@@ -154,8 +154,7 @@ pub async fn add_many(entries: Vec<SourceMap>) -> Result<(), errors::Error> {
         })
         .collect::<Vec<_>>();
 
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = get_lock().await;
+    let client = get_orm_client_rw().await;
 
     let txn = client.begin().await?;
 
@@ -186,8 +185,7 @@ pub async fn delete_group(
     env: Option<String>,
     version: Option<String>,
 ) -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = get_lock().await;
+    let client = get_orm_client_rw().await;
 
     let mut stmt = Entity::delete_many().filter(Column::Org.eq(org));
 
@@ -220,8 +218,7 @@ pub async fn get_sourcemap_file(
     env: &Option<String>,
     version: &Option<String>,
 ) -> Result<Option<SourceMap>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = get_lock().await;
+    let client = get_orm_client_ro().await;
 
     let mut stmt = Entity::find()
         .filter(Column::Org.eq(org))
@@ -249,8 +246,7 @@ pub async fn list_files(
     env: Option<String>,
     version: Option<String>,
 ) -> Result<Vec<SourceMap>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = get_lock().await;
+    let client = get_orm_client_ro().await;
 
     let mut stmt = Entity::find().filter(Column::Org.eq(org));
 
@@ -276,8 +272,7 @@ pub async fn list_files(
 }
 
 pub async fn update_cluster(entry: SourceMap) -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = get_lock().await;
+    let client = get_orm_client_rw().await;
 
     Entity::update_many()
         .filter(Column::Org.eq(entry.org))
@@ -294,8 +289,7 @@ pub async fn get_values(
     org_id: &str,
     limit: u64,
 ) -> Result<(Vec<String>, Vec<String>, Vec<String>), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = get_lock().await;
+    let client = get_orm_client_ro().await;
 
     let services = Entity::find()
         .filter(Column::Org.eq(org_id))

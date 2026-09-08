@@ -22,11 +22,7 @@
 //! Only updates the local database for API reads. Training and detection run
 //! exclusively on the primary region (where the scheduler runs).
 
-use infra::{
-    db::{ORM_CLIENT, connect_to_orm},
-    errors::Result,
-    table::anomaly_detection::config as table,
-};
+use infra::{db::get_orm_client_rw, errors::Result, table::anomaly_detection::config as table};
 use o2_enterprise::enterprise::super_cluster::queue::{AnomalyDetectionMessage, Message};
 
 pub(crate) async fn process(msg: Message) -> Result<()> {
@@ -41,7 +37,7 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
 }
 
 pub(crate) async fn process_msg(msg: AnomalyDetectionMessage) -> Result<()> {
-    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let db = get_orm_client_rw().await;
 
     match msg {
         AnomalyDetectionMessage::ConfigCreate { config } => {

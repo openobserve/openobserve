@@ -179,7 +179,8 @@
            family has neither. It bails safely without a stream, but what it
            renders then is an empty frame that reads as "no data" — a lie about
            an alert that is evaluating perfectly well. -->
-        <OContent v-if="alert && !isSloAlertView" class="shrink-0 py-3">
+        <!-- An anomaly config has no query_condition for generate_sql to build from. -->
+        <OContent v-if="alert && !isSloAlertView && !isAnomalyAlert" class="shrink-0 py-3">
           <AlertGroupChart :alert="alert" />
         </OContent>
 
@@ -211,6 +212,17 @@
               data-test="alerts-alertdetail-tab-groups-count"
             />
           </OTab>
+          <!-- An anomaly config has no query_condition, so the evaluation chart
+             above the tabs is excluded for this family. Its charts read the
+             _anomalies stream instead, and there are three of them — too tall
+             for the shared strip, so they get the tab region's full height. -->
+          <OTab
+            v-if="isAnomalyAlert"
+            name="charts"
+            :label="t('alerts.anomaly.chartsTab')"
+            icon="bar-chart"
+            data-test="alerts-alertdetail-tab-charts"
+          />
           <OTab name="history" :label="t('alerts.history')" icon="history" />
           <OTab name="configuration" :label="t('alerts.configuration')" icon="settings" />
         </OTabs>
@@ -235,6 +247,12 @@
              "Level changes" reads the rollup row's transitions
              (group_key ""), without the Group column/filter that would
              repeat the same non-answer on every line. -->
+          <OTabPanel v-if="isAnomalyAlert" name="charts" stretch>
+            <OContent class="h-full overflow-y-auto py-4">
+              <AnomalyDetectionChart v-if="alert" :alert="alert" :anomaly-id="alertId" />
+            </OContent>
+          </OTabPanel>
+
           <OTabPanel name="history" stretch>
             <AlertGroupHistory
               v-if="isMultiAlert"
@@ -248,6 +266,8 @@
                page cannot know which mode it is in, and mounting the
                evaluations view speculatively fires its fetch even for alerts
                that turn out to be multi. -->
+            <!-- An anomaly config writes no transitions row for the toggle to show. -->
+            <AlertEvaluationHistory v-else-if="isAnomalyAlert" :alert-id="alertId" is-anomaly />
             <div v-else-if="alert" class="flex h-full min-h-0 flex-col">
               <OContent class="shrink-0 py-2">
                 <OToggleGroup
@@ -306,6 +326,7 @@ import AlertEvaluationHistory from "@/components/alerts/AlertEvaluationHistory.v
 import AlertGroupChart from "@/components/alerts/AlertGroupChart.vue";
 import AlertGroupHistory from "@/components/alerts/AlertGroupHistory.vue";
 import AlertGroupsTable from "@/components/alerts/AlertGroupsTable.vue";
+import AnomalyDetectionChart from "@/components/alerts/AnomalyDetectionChart.vue";
 import CompositeAlertDetail from "@/components/alerts/composite/CompositeAlertDetail.vue";
 import CompositeReferencesDrawer from "@/components/alerts/composite/CompositeReferencesDrawer.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -387,6 +408,8 @@ const isMultiAlert = computed(() => {
   return qc?.type === "promql" ? !!qc?.promql_multi_alert : !!qc?.aggregation?.multi_alert;
 });
 const isCompositeAlert = computed(() => alert.value?.alert_type === "composite");
+// The GET falls back to the flat anomaly config row and stamps this on it.
+const isAnomalyAlert = computed(() => alert.value?.alert_type === "anomaly_detection");
 
 const handleReferenceOpen = async (open: boolean) => {
   referenceDrawerOpen.value = open;
@@ -561,6 +584,10 @@ const fetchAlert = async () => {
     const res = await alertsService.get_by_alert_id(orgId.value, alertId.value);
     alert.value = res.data;
     notFound.value = !res.data;
+    // Same tick as the assignment, not down in onMounted: setting alert.value
+    // queues the render, so any await before this one lets the default History
+    // tab mount and fire a fetch for a page that is about to switch away.
+    if (isAnomalyAlert.value) activeTab.value = "charts";
   } catch {
     alert.value = null;
     notFound.value = true;
@@ -638,6 +665,21 @@ const editAlert = () => {
     toast({ variant: "error", message: t("alerts.sloAlertUnplaceable") });
     return;
   }
+  // Anomaly configs are edited on their own page. The generic editor takes its
+  // anomaly prefill from the `anomaly_id` route param, so without this it opens
+  // blank — no stream, no schedule — and saving would write a different alert.
+  // Same discriminator the GET handler stamps on the config it falls back to.
+  if (alert.value?.alert_type === "anomaly_detection") {
+    router.push({
+      name: "editAnomalyDetection",
+      params: { anomaly_id: alertId.value },
+      query: {
+        org_identifier: orgId.value,
+        folder: route.query.folder || "default",
+      },
+    });
+    return;
+  }
   router.push({
     name: "editAlert",
     params: { alert_id: alertId.value },
@@ -663,6 +705,8 @@ onMounted(async () => {
     activeTab.value = "groups";
     await fetchGroups();
   }
+  // Anomaly configs never write to the transitions table.
+  if (isAnomalyAlert.value) return;
   await fetchTransitions();
 });
 </script>

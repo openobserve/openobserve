@@ -72,8 +72,11 @@ const sloAlert = (sloCondition: Record<string, any> = {}) => ({
 
 /** A missing i18n key makes t() echo the key back, which turns any
  *  `rendered === t(key)` assertion into a tautology. */
-const translated = (key: string, params?: Record<string, any>) => {
-  const out = i18n.global.t(key, params ?? {});
+const translated = (key: string, params?: Record<string, any>, plural?: number) => {
+  const out =
+    plural === undefined
+      ? i18n.global.t(key, params ?? {})
+      : i18n.global.t(key, params ?? {}, plural);
   expect(out, `i18n key "${key}" is not translated`).not.toBe(key);
   return out;
 };
@@ -234,8 +237,163 @@ describe("AlertConfigSummary — SLO alerts", () => {
 
     // Anchored, so this cannot pass by virtue of the SLO branch not existing.
     expect(field(wrapper, "slo-kind").exists()).toBe(true);
-    expect(value(wrapper, "frequency")).toBe("1");
-    expect(value(wrapper, "silence")).toBe("30");
+    expect(value(wrapper, "frequency")).toBe("1 min");
+    expect(value(wrapper, "silence")).toBe("30 min");
     expect(value(wrapper, "destinations")).toBe("pagerduty");
+  });
+});
+
+/** The flat config row the GET falls back to: no `query_condition`, no
+ *  `trigger_condition`, no `destinations` — every field the generic branch
+ *  reads is absent (src/api/management/src/request/alerts/mod.rs). */
+const anomalyConfig = (overrides: Record<string, any> = {}) => ({
+  anomaly_id: "3AqVqADDbGyRpAPWYuDJ2vD9eFv",
+  alert_type: "anomaly_detection",
+  name: "checkout-latency-anomaly",
+  stream_name: "default",
+  stream_type: "logs",
+  enabled: true,
+  query_mode: "filters",
+  detection_function: "avg(took)",
+  filters: [{ field: "service", operator: "=", value: "checkout" }],
+  custom_sql: null,
+  histogram_interval: "5m",
+  schedule_interval: "1h",
+  detection_window_seconds: 3600,
+  training_window_days: 14,
+  retrain_interval_days: 7,
+  threshold: 97,
+  is_trained: true,
+  training_completed_at: 1788134400000000,
+  current_model_version: 3,
+  last_error: null,
+  status: "ready",
+  alert_enabled: true,
+  alert_destinations: ["pagerduty"],
+  ...overrides,
+});
+
+describe("AlertConfigSummary — anomaly detection configs", () => {
+  it("describes what the config watches instead of five em dashes", () => {
+    const wrapper = mountSummary(anomalyConfig());
+
+    expect(value(wrapper, "stream")).toBe("default");
+    expect(value(wrapper, "stream-type")).toBe("logs");
+    expect(value(wrapper, "query-mode")).toBe(translated("alerts.anomaly.filters"));
+    expect(value(wrapper, "detection-function")).toBe("avg(took)");
+    expect(value(wrapper, "filters")).toBe("service = 'checkout'");
+    // 97 is the percentile scored against; the form shows its complement.
+    expect(value(wrapper, "sensitivity")).toBe(
+      translated("alerts.anomaly.summaryThresholdRate", { rate: 3 }),
+    );
+  });
+
+  it("renders the anomaly schedule, which lives on the config row, not trigger_condition", () => {
+    const wrapper = mountSummary(anomalyConfig());
+
+    expect(value(wrapper, "schedule-interval")).toBe("1h");
+    expect(value(wrapper, "histogram-interval")).toBe("5m");
+    expect(value(wrapper, "detection-window")).toBe("1h");
+    expect(value(wrapper, "training-window")).toBe(
+      translated("alerts.anomaly.nDays", { days: 14 }, 14),
+    );
+    expect(value(wrapper, "retrain-interval")).toBe(
+      translated("alerts.anomaly.nDays", { days: 7 }, 7),
+    );
+    expect(value(wrapper, "notifications")).toBe(translated("alerts.anomaly.enabled"));
+    // The generic branch reads `destinations`, absent from this payload.
+    expect(value(wrapper, "destinations")).toBe("pagerduty");
+    // The generic branch's rows must not leak in.
+    expect(field(wrapper, "period").exists()).toBe(false);
+    expect(field(wrapper, "evaluation-mode").exists()).toBe(false);
+  });
+
+  it("reports the model state", () => {
+    const wrapper = mountSummary(anomalyConfig());
+
+    // The same badge the alert list renders, so one status cannot read two
+    // ways — and so it is localized rather than showing the wire token.
+    expect(value(wrapper, "status")).toBe(translated("components.badge.alertStatus.ready"));
+    expect(value(wrapper, "model-version")).toBe("3");
+    expect(value(wrapper, "last-trained")).toBe("2026-08-31 00:00:00");
+    // A permanent empty row would imply a slot worth watching.
+    expect(field(wrapper, "last-error").exists()).toBe(false);
+  });
+
+  it("surfaces the training error when there is one", () => {
+    const wrapper = mountSummary(
+      anomalyConfig({ status: "failed", last_error: "not enough data points" }),
+    );
+
+    expect(value(wrapper, "last-error")).toBe("not enough data points");
+  });
+
+  // "waiting" is the status every anomaly config carries until its first model
+  // trains, and it was the one the badge group had no entry for.
+  it("localizes the status an untrained config actually reports", () => {
+    const wrapper = mountSummary(anomalyConfig({ status: "waiting", is_trained: false }));
+
+    expect(value(wrapper, "status")).toBe(translated("components.badge.alertStatus.waiting"));
+  });
+
+  it("shows a never-trained config as never trained rather than as epoch zero", () => {
+    const wrapper = mountSummary(
+      anomalyConfig({
+        is_trained: false,
+        training_completed_at: null,
+        status: "waiting",
+        current_model_version: 0,
+      }),
+    );
+
+    expect(value(wrapper, "last-trained")).toBe("—");
+    // `current_model_version` is NOT NULL and created as 0 — a version number
+    // on a config that has no model.
+    expect(value(wrapper, "model-version")).toBe("—");
+  });
+
+  // 0 is the stored value for "train once and keep", not "unset".
+  it("distinguishes retrain-never from an unset retrain interval", () => {
+    expect(
+      value(mountSummary(anomalyConfig({ retrain_interval_days: 0 })), "retrain-interval"),
+    ).toBe(translated("alerts.anomaly.retrainNever"));
+    expect(
+      value(mountSummary(anomalyConfig({ retrain_interval_days: null })), "retrain-interval"),
+    ).toBe("—");
+    // "1 days" is the reason this key is pluralized.
+    expect(
+      value(mountSummary(anomalyConfig({ retrain_interval_days: 1 })), "retrain-interval"),
+    ).toBe(translated("alerts.anomaly.nDays", { days: 1 }, 1));
+  });
+
+  // The query builder drops a row whose operator needs a value it does not have;
+  // the summary must not claim a condition the detection query never applies.
+  it("ignores a half-filled filter row, as the query builder does", () => {
+    const wrapper = mountSummary(
+      anomalyConfig({
+        filters: [
+          { field: "service", operator: "=", value: "checkout" },
+          { field: "code", operator: "=", value: "" },
+          { field: "trace_id", operator: "Is Not Null", value: "" },
+        ],
+      }),
+    );
+
+    expect(value(wrapper, "filters")).toBe("service = 'checkout' AND trace_id IS NOT NULL");
+  });
+
+  it("shows the SQL rather than the filter rows in custom SQL mode", () => {
+    const wrapper = mountSummary(
+      anomalyConfig({
+        query_mode: "custom_sql",
+        custom_sql: "SELECT histogram(_timestamp, '5m'), count(*) FROM default",
+      }),
+    );
+
+    expect(value(wrapper, "query-mode")).toBe(translated("alerts.customSql"));
+    expect(value(wrapper, "custom-sql")).toContain("FROM default");
+    // The modes are exclusive: the unused one's dash reads as a missing setting.
+    expect(field(wrapper, "detection-function").exists()).toBe(false);
+    expect(field(wrapper, "filters").exists()).toBe(false);
   });
 });

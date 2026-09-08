@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{io::Cursor, ops::Range, sync::Arc};
+use std::{collections::HashMap, io::Cursor, ops::Range, sync::Arc};
 
 use arrow::{
     array::{Array, BooleanArray, RecordBatch, UInt32Array},
@@ -25,11 +25,18 @@ use datafusion::{
     physical_plan::PhysicalExpr,
 };
 
-use crate::layout::METRICS_INDEX_ROW_COUNT;
+use crate::layout::{
+    METRICS_INDEX_PARENT_RECORDS_KEY, METRICS_INDEX_ROW_COUNT, METRICS_INDEX_ROW_GROUP_SIZE_KEY,
+    METRICS_INDEX_VERSION, METRICS_INDEX_VERSION_KEY,
+};
 
 pub(super) struct MetricsIndexData {
     pub(super) schema: SchemaRef,
     pub(super) batches: Vec<RecordBatch>,
+    /// Rows of the data file this index was written for, absent in v1 files without metadata.
+    pub(super) parent_records: Option<usize>,
+    /// Parquet row-group size of the data file, absent for Vortex and older indexes.
+    pub(super) row_group_size: Option<u32>,
 }
 
 pub(super) async fn load_metrics_index_file(
@@ -61,6 +68,22 @@ pub(super) fn decode_metrics_index(
     let file_schema = ArrowFileReaderBuilder::new()
         .build(Cursor::new(bytes.clone()))?
         .schema();
+    let metadata = file_schema.metadata();
+    if let Some(version) = parse_metadata::<u32>(metadata, METRICS_INDEX_VERSION_KEY, path)?
+        && version > METRICS_INDEX_VERSION
+    {
+        return Err(DataFusionError::Execution(format!(
+            "metrics index {path} has version {version}, this build reads up to {METRICS_INDEX_VERSION}"
+        )));
+    }
+    let parent_records = parse_metadata(metadata, METRICS_INDEX_PARENT_RECORDS_KEY, path)?;
+    let row_group_size = parse_metadata(metadata, METRICS_INDEX_ROW_GROUP_SIZE_KEY, path)?;
+    // the access plan divides by it; a corrupt 0 must fail here, not panic there
+    if row_group_size == Some(0) {
+        return Err(DataFusionError::Execution(format!(
+            "metrics index {path} has a row group size of 0"
+        )));
+    }
     let mut projection = vec![file_schema.index_of(METRICS_INDEX_ROW_COUNT)?];
     for label in labels {
         match file_schema.index_of(label) {
@@ -79,7 +102,29 @@ pub(super) fn decode_metrics_index(
         .first()
         .map(RecordBatch::schema)
         .unwrap_or(reader_schema);
-    Ok(MetricsIndexData { schema, batches })
+    Ok(MetricsIndexData {
+        schema,
+        batches,
+        parent_records,
+        row_group_size,
+    })
+}
+
+fn parse_metadata<T: std::str::FromStr>(
+    metadata: &HashMap<String, String>,
+    key: &str,
+    path: &str,
+) -> Result<Option<T>> {
+    metadata
+        .get(key)
+        .map(|value| {
+            value.parse::<T>().map_err(|_| {
+                DataFusionError::Execution(format!(
+                    "metrics index {path} has an invalid {key}: {value}"
+                ))
+            })
+        })
+        .transpose()
 }
 
 /// Evaluate `filter` over the run rows and collect the selected physical row
@@ -90,6 +135,13 @@ pub(super) fn evaluate_metrics_index(
     filter: Option<&dyn PhysicalExpr>,
     expected_rows: usize,
 ) -> Result<Vec<Range<usize>>> {
+    if let Some(parent_records) = data.parent_records
+        && parent_records != expected_rows
+    {
+        return Err(DataFusionError::Execution(format!(
+            "metrics-index was written for {parent_records} rows, but the parent file contains {expected_rows} records"
+        )));
+    }
     let count_index = data.schema.index_of(METRICS_INDEX_ROW_COUNT)?;
     let mut ranges: Vec<Range<usize>> = Vec::new();
     let mut next_row: usize = 0;

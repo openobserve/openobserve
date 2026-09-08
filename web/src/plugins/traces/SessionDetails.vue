@@ -42,6 +42,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="copySessionId"
           />
         </span>
+        <span
+          v-if="detail?.userId"
+          class="rounded-default border-border-default bg-surface-base text-text-body inline-flex min-w-0 items-center gap-1.5 border px-2 py-1"
+          data-test="session-detail-user-id"
+        >
+          <OIcon name="person" size="xs" class="text-text-secondary flex-shrink-0" />
+          <span class="max-w-64 truncate text-sm">{{ detail.userId }}</span>
+        </span>
       </template>
 
       <template #actions>
@@ -239,7 +247,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OIcon
                       name="info"
                       size="xs"
-                      class="text-text-muted ml-[0.15rem] cursor-default"
+                      class="text-text-muted ms-[0.15rem] cursor-default"
                     />
                     <OTooltip max-width="17.5rem">
                       <template #content>
@@ -619,7 +627,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             </span>
                             <div class="flex-1"></div>
                             <OButton variant="outline" size="sm" @click="openTrace(trace.traceId)">
-                              <OIcon name="open-in-new" size="xs" class="mr-1" />
+                              <OIcon name="open-in-new" size="xs" class="me-1" />
                               {{ t("traces.sessionDetail.openInTraceExplorer") }}
                             </OButton>
                           </div>

@@ -34,9 +34,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div v-if="statement" class="flex min-w-0 items-center gap-1.5" :data-test="dataTest">
     <code
       class="bg-surface-subtle text-text-code rounded-default text-2xs min-w-0 truncate px-1.5 py-0.5 font-mono"
-      :title="statement"
       :data-test="`${dataTest}-statement`"
     >
+      <OTooltip :content="raw(statement)" />
       {{ raw(statement) }}
     </code>
     <OButton
