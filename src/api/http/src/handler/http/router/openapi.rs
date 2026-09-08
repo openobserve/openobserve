@@ -578,6 +578,31 @@ pub struct ApiDoc;
     openobserve_api_management::request::remote_tasks::activate_remote_task_signing_candidate,
     openobserve_api_management::request::remote_tasks::end_remote_task_signing_grace,
     openobserve_api_management::request::remote_tasks::revoke_remote_task_signing_secret,
+    openobserve_api_management::request::anomaly_detection::list_configs,
+    openobserve_api_management::request::anomaly_detection::get_config,
+    openobserve_api_management::request::anomaly_detection::create_config,
+    openobserve_api_management::request::anomaly_detection::update_config,
+    openobserve_api_management::request::anomaly_detection::delete_config,
+    openobserve_api_management::request::anomaly_detection::train_model,
+    openobserve_api_management::request::anomaly_detection::cancel_training,
+    openobserve_api_management::request::anomaly_detection::detect_anomalies,
+    openobserve_api_management::request::anomaly_detection::get_detection_history,
+    openobserve_api_management::request::workflows::save_workflow,
+    openobserve_api_management::request::workflows::list_workflows,
+    openobserve_api_management::request::workflows::delete_workflows,
+    openobserve_api_management::request::workflows::update_workflows,
+    openobserve_api_management::request::workflows::test_workflow,
+    openobserve_api_management::request::workflows::trigger_workflow,
+    openobserve_api_management::request::workflows::get_workflow_errors,
+    openobserve_api_management::request::workflows::retry_workflow,
+    openobserve_api_management::request::workflows::enable_workflow,
+    openobserve_api_management::request::workflows::get_workflow_history,
+    openobserve_api_management::request::workflows::promote_draft,
+    openobserve_api_management::request::raman::config::get_raman_config,
+    openobserve_api_management::request::raman::config::update_raman_config,
+    openobserve_api_management::request::raman::digests::list_raman_digests,
+    openobserve_api_management::request::raman::digests::get_raman_digest,
+    openobserve_api_management::request::raman::digests::run_raman_digest,
 ))]
 #[openapi(components(schemas(
     openobserve_api_management::models::experiments::ExperimentResultRowSortBody,
@@ -733,6 +758,73 @@ mod tests {
 
     use super::ApiDoc;
 
+    /// Every route of the four enterprise-gated management modules, as the merged spec spells it.
+    #[cfg(feature = "enterprise")]
+    const ENTERPRISE_MODULE_ROUTES: &[(&str, &str)] = &[
+        ("/api/v2/{org_id}/raman/config", "get"),
+        ("/api/v2/{org_id}/raman/config", "put"),
+        ("/api/v2/{org_id}/raman/digests", "get"),
+        ("/api/v2/{org_id}/raman/digests/run", "post"),
+        ("/api/v2/{org_id}/raman/digests/{digest_id}", "get"),
+        ("/api/{org_id}/anomaly_detection", "get"),
+        ("/api/{org_id}/anomaly_detection", "post"),
+        ("/api/{org_id}/anomaly_detection/{anomaly_id}", "get"),
+        ("/api/{org_id}/anomaly_detection/{anomaly_id}", "put"),
+        ("/api/{org_id}/anomaly_detection/{anomaly_id}", "delete"),
+        ("/api/{org_id}/anomaly_detection/{anomaly_id}/train", "post"),
+        (
+            "/api/{org_id}/anomaly_detection/{anomaly_id}/train",
+            "delete",
+        ),
+        (
+            "/api/{org_id}/anomaly_detection/{anomaly_id}/detect",
+            "post",
+        ),
+        (
+            "/api/{org_id}/anomaly_detection/{anomaly_id}/history",
+            "get",
+        ),
+        ("/api/{org_id}/workflows", "get"),
+        ("/api/{org_id}/workflows", "post"),
+        ("/api/{org_id}/workflows/test", "post"),
+        ("/api/{org_id}/workflows/{id}", "put"),
+        ("/api/{org_id}/workflows/{id}", "delete"),
+        ("/api/{org_id}/workflows/{id}/trigger", "post"),
+        ("/api/{org_id}/workflows/{id}/errors/{run_id}", "get"),
+        ("/api/{org_id}/workflows/{id}/retry", "post"),
+        ("/api/{org_id}/workflows/{id}/enable", "put"),
+        ("/api/{org_id}/workflows/{id}/history", "get"),
+        ("/api/{org_id}/workflows/promote/{id}", "post"),
+        ("/api/{org_id}/tasks", "get"),
+        ("/api/{org_id}/tasks", "post"),
+        ("/api/{org_id}/tasks/test", "post"),
+        ("/api/{org_id}/tasks/{entity_id}", "get"),
+        ("/api/{org_id}/tasks/{entity_id}", "put"),
+        ("/api/{org_id}/tasks/{entity_id}", "delete"),
+        ("/api/{org_id}/tasks/{entity_id}/auth", "put"),
+        ("/api/{org_id}/tasks/{entity_id}/auth", "delete"),
+        (
+            "/api/{org_id}/tasks/{entity_id}/headers/{header_name}/secret",
+            "put",
+        ),
+        (
+            "/api/{org_id}/tasks/{entity_id}/headers/{header_name}/secret",
+            "delete",
+        ),
+        ("/api/{org_id}/tasks/{entity_id}/signing", "get"),
+        ("/api/{org_id}/tasks/{entity_id}/signing", "delete"),
+        ("/api/{org_id}/tasks/{entity_id}/signing/rotate", "post"),
+        ("/api/{org_id}/tasks/{entity_id}/signing/test", "post"),
+        ("/api/{org_id}/tasks/{entity_id}/signing/activate", "post"),
+        ("/api/{org_id}/tasks/{entity_id}/signing/end_grace", "post"),
+        ("/api/{org_id}/tasks/{entity_id}/versions", "get"),
+        ("/api/{org_id}/tasks/{entity_id}/stats", "get"),
+        ("/api/{org_id}/tasks/{entity_id}/draft", "get"),
+        ("/api/{org_id}/tasks/{entity_id}/draft", "delete"),
+        ("/api/{org_id}/tasks/{entity_id}/test_connection", "post"),
+        ("/api/{org_id}/tasks/{entity_id}/test_run", "post"),
+    ];
+
     // Handlers that gained a folder-destination authorization check must
     // advertise the 403 it returns, or clients cannot distinguish it from a bug.
     // The /{org}/anomaly_detection pair is annotated but enterprise-gated, so it
@@ -766,6 +858,32 @@ mod tests {
             };
             if item.get("responses").and_then(|r| r.get("403")).is_none() {
                 missing.push(format!("{method} {path}: no 403 documented"));
+            }
+        }
+        assert!(missing.is_empty(), "{missing:#?}");
+    }
+
+    /// These modules reach the spec only via `SecurityAddon`, so the merged doc is the real
+    /// surface.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn enterprise_gated_modules_are_published_in_the_openapi_surface() {
+        let spec = ApiDoc::openapi();
+        let mut missing = Vec::new();
+        for (path, method) in ENTERPRISE_MODULE_ROUTES {
+            let Some(item) = spec.paths.paths.get(*path) else {
+                missing.push(format!("{method} {path}: path absent from the spec"));
+                continue;
+            };
+            let published = match *method {
+                "get" => item.get.is_some(),
+                "post" => item.post.is_some(),
+                "put" => item.put.is_some(),
+                "delete" => item.delete.is_some(),
+                other => panic!("{other} is not a method this table covers"),
+            };
+            if !published {
+                missing.push(format!("{method} {path}: path present but method absent"));
             }
         }
         assert!(missing.is_empty(), "{missing:#?}");
