@@ -192,6 +192,7 @@ mod m20260912_000001_add_anomaly_alert_budget;
 mod m20260912_000002_add_anomaly_last_recovery_notified_at;
 mod m20260915_000001_add_profiles_streams_to_service_streams;
 mod m20260916_000001_add_folder_id_to_workflow_drafts;
+mod m20260908_000001_create_synthetics_refs;
 mod m20260917_000001_add_env_to_synthetics_jobs;
 mod m20260917_000001_create_llm_experiment_slot_retries;
 mod m20260917_000001_create_synthetics_shared_variables;
@@ -475,6 +476,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260917_000001_create_llm_experiment_slot_retries::Migration),
             Box::new(m20260917_000001_create_synthetics_shared_variables::Migration),
             Box::new(m20260917_000001_add_env_to_synthetics_jobs::Migration),
+            Box::new(m20260908_000001_create_synthetics_refs::Migration),
         ]
     }
 }

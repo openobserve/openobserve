@@ -400,7 +400,15 @@ pub async fn insert_row<C: ConnectionTrait>(
     am.owner = Set(check.owner.clone());
 
     let model = am.insert(conn).await?.try_into_model()?;
-    Synthetic::try_from(model)
+    let result = Synthetic::try_from(model)?;
+    super::synthetics_refs::replace_for_parent(
+        conn,
+        org_id,
+        &result.id,
+        &super::synthetics_refs::refs_of(&result),
+    )
+    .await?;
+    Ok(result)
 }
 
 pub async fn update<C: TransactionTrait>(
@@ -432,7 +440,15 @@ pub async fn update_row<C: ConnectionTrait>(
     am.updated_at = Set(config::utils::time::now_micros());
 
     let model = am.update(conn).await?.try_into_model()?;
-    Synthetic::try_from(model)
+    let result = Synthetic::try_from(model)?;
+    super::synthetics_refs::replace_for_parent(
+        conn,
+        org_id,
+        &result.id,
+        &super::synthetics_refs::refs_of(&result),
+    )
+    .await?;
+    Ok(result)
 }
 
 pub async fn put<C: TransactionTrait>(
@@ -464,6 +480,13 @@ pub async fn put<C: TransactionTrait>(
         }
     };
 
+    super::synthetics_refs::replace_for_parent(
+        &txn,
+        org_id,
+        &result.id,
+        &super::synthetics_refs::refs_of(&result),
+    )
+    .await?;
     txn.commit().await?;
     invalidate_and_publish(&result.org_id, &result.id).await;
     Ok(result)
