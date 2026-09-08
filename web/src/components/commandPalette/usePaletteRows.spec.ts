@@ -20,23 +20,26 @@ import { usePaletteRows } from "./usePaletteRows";
 import type { PaletteItem, PaletteScope } from "./types";
 
 const t = raw as any;
-const page = (id: string, label: string): PaletteItem => ({
+const page = (id: string, label: string, group: string): PaletteItem => ({
   id,
   type: "page",
   label,
   icon: "search",
+  group,
 });
-const action = (id: string, label: string): PaletteItem => ({
+const action = (id: string, label: string, group?: string): PaletteItem => ({
   id,
   type: "action",
   label,
   icon: "add",
+  group,
 });
 const dash = (id: string, label: string): PaletteItem => ({
   id,
   type: "dashboard",
   label,
   icon: "dashboard",
+  group: "dashboards",
 });
 const ids = (rows: { kind: string; item?: PaletteItem; label?: string }[]) =>
   rows.map((r) => (r.kind === "header" ? r.label : r.item!.id));
@@ -44,8 +47,11 @@ const ids = (rows: { kind: string; item?: PaletteItem; label?: string }[]) =>
 const base = (over: Partial<Parameters<typeof usePaletteRows>[0]> = {}) => ({
   query: ref(""),
   scopes: ref<PaletteScope[]>([]),
-  pages: ref<PaletteItem[]>([page("page:logs", "Logs"), page("page:metrics", "Metrics")]),
-  actions: ref<PaletteItem[]>([action("action:newAlert", "New alert")]),
+  pages: ref<PaletteItem[]>([
+    page("page:logs", "Logs", "logs"),
+    page("page:metrics", "Metrics", "metrics"),
+  ]),
+  actions: ref<PaletteItem[]>([action("action:newAlert", "New alert", "reliability")]),
   entities: ref<PaletteItem[]>([]),
   fallback: () => null,
   frecency: () => new Map<string, number>(),
@@ -86,33 +92,34 @@ describe("usePaletteRows", () => {
     expect(itemIndexes.value).toEqual([0]);
   });
 
-  it("narrows to the scope and pins its create verb first on an empty query", () => {
+  it("narrows to rail categories and pins their create verbs first on an empty query", () => {
     const entities = ref([dash("dashboard:b", "Beta"), dash("dashboard:a", "Alpha")]);
     const actions = ref([
-      action("action:newDashboard", "New dashboard"),
-      action("action:newAlert", "New alert"),
+      action("action:newDashboard", "New dashboard", "dashboards"),
+      action("action:newAlert", "New alert", "reliability"),
+      action("action:toggleTheme", "Theme"),
     ]);
-    const scopes = ref<PaletteScope[]>(["dashboard"]);
+    const scopes = ref<PaletteScope[]>(["dashboards"]);
     const { rows } = usePaletteRows(
       base({ scopes, actions, entities, frecency: () => new Map([["dashboard:b", 1]]) }),
     );
     expect(ids(rows.value)).toEqual(["action:newDashboard", "dashboard:b", "dashboard:a"]);
-    scopes.value = ["pages"];
-    expect(ids(rows.value)).toEqual(["page:logs", "page:metrics"]);
-    scopes.value = ["pages", "dashboard"];
+    scopes.value = ["logs"];
+    expect(ids(rows.value)).toEqual(["page:logs"]);
+    scopes.value = ["logs", "dashboards"];
     expect(ids(rows.value)).toEqual([
       "action:newDashboard",
       "dashboard:b",
       "dashboard:a",
       "page:logs",
-      "page:metrics",
     ]);
   });
 
-  it("keeps the scope filter while ranking a typed query", () => {
+  it("keeps the category filter while ranking a typed query and hides ungrouped rows", () => {
     const entities = ref([dash("dashboard:logs-overview", "Logs overview")]);
+    const actions = ref([action("action:toggleTheme", "Logs theme")]);
     const { rows } = usePaletteRows(
-      base({ query: ref("log"), scopes: ref<PaletteScope[]>(["dashboard"]), entities }),
+      base({ query: ref("log"), scopes: ref<PaletteScope[]>(["dashboards"]), entities, actions }),
     );
     expect(ids(rows.value)).toEqual(["dashboard:logs-overview"]);
   });

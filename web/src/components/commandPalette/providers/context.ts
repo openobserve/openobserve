@@ -28,10 +28,17 @@ export interface EntityProviderContext {
   hasRoute(name: string): boolean;
   /** Names of the rail links currently shown; the rail already applied role and config gates. */
   navNames: Set<string>;
+  /** Rail category keys currently shown (group tiles and standalone links), in rail order. */
+  railKeys: string[];
   /** Keyword search for one stream type; created inside a component setup because useStreams needs the store. */
   searchStreams(
     type: string,
     query: string,
     limit: number,
   ): Promise<{ list?: StreamSearchRow[]; total?: number }>;
+}
+
+/** First rail key present among the candidates, so an entity lands in whatever tile the rail shows. */
+export function resolveGroup(railKeys: string[], ...candidates: string[]): string | undefined {
+  return candidates.find((c) => railKeys.includes(c));
 }

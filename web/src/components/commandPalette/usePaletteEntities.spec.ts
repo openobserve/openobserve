@@ -31,10 +31,10 @@ const item = (id: string, type: PaletteItem["type"] = "dashboard"): PaletteItem 
 
 function provider(
   id: string,
-  scope: PaletteScope,
+  group: PaletteScope,
   impl: Partial<EntityProvider> = {},
 ): EntityProvider {
-  return { id, scope, enabled: () => true, ...impl };
+  return { id, groups: [group], enabled: () => true, ...impl };
 }
 
 const flush = async () => {
@@ -90,8 +90,8 @@ describe("usePaletteEntities", () => {
       scopes,
       org: ref("org1"),
       providers: ref([
-        provider("streams", "stream", { search }),
-        provider("alerts", "alert", { search: other }),
+        provider("streams", "logs", { search }),
+        provider("alerts", "reliability", { search: other }),
       ]),
     });
     query.value = "x";
@@ -105,7 +105,7 @@ describe("usePaletteEntities", () => {
     expect(search).toHaveBeenCalledTimes(1);
     expect(search.mock.calls[0][0]).toBe("xy");
     expect(entities.value.map((i) => i.id).sort()).toEqual(["alert:y", "stream:x"]);
-    scopes.value = ["stream"];
+    scopes.value = ["logs"];
     await flush();
     vi.advanceTimersByTime(120);
     await flush();

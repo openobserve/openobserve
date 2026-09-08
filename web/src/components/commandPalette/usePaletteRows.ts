@@ -17,8 +17,7 @@ import { computed, type ComputedRef, type Ref } from "vue";
 import type { TranslateFn } from "@/types/i18n";
 import { byFoldedLabel, fold, rankItems } from "./rank";
 import {
-  SCOPE_CREATE_ACTION,
-  scopeOfType,
+  SCOPE_CREATE_ACTIONS,
   type PaletteItem,
   type PaletteRow,
   type PaletteScope,
@@ -72,10 +71,7 @@ export function usePaletteRows({
   const inScope = computed(() =>
     scopes.value.length === 0
       ? all.value
-      : all.value.filter((i) => {
-          const s = scopeOfType(i.type);
-          return s !== null && scopes.value.includes(s);
-        }),
+      : all.value.filter((i) => !!i.group && scopes.value.includes(i.group)),
   );
 
   const emptyStateRows = (scores: Map<string, number>): PaletteRow[] => {
@@ -92,11 +88,9 @@ export function usePaletteRows({
     ];
   };
 
-  // Scoped empty state: each scope's create verb first, then items by frecency then label.
+  // Scoped empty state: each category's create verbs first, then its rows by frecency then label.
   const scopedEmptyRows = (selected: PaletteScope[], scores: Map<string, number>): PaletteRow[] => {
-    const createIds = selected
-      .map((sc) => SCOPE_CREATE_ACTION[sc])
-      .filter((id): id is string => !!id);
+    const createIds = selected.flatMap((sc) => SCOPE_CREATE_ACTIONS[sc] ?? []);
     const creates = createIds
       .map((id) => actions.value.find((a) => a.id === id))
       .filter((a): a is PaletteItem => !!a);

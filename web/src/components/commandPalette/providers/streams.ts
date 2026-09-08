@@ -15,7 +15,7 @@
 
 import type { EntityProvider } from "../usePaletteEntities";
 import type { PaletteItem } from "../types";
-import type { EntityProviderContext } from "./context";
+import { resolveGroup, type EntityProviderContext } from "./context";
 
 export type SearchableStreamType = "logs" | "metrics" | "traces";
 export const STREAM_TYPES: SearchableStreamType[] = ["logs", "metrics", "traces"];
@@ -41,7 +41,7 @@ function iconFor(type: string): string {
   return "window";
 }
 
-export function streamToItem(row: StreamRow, typeLabel: string): PaletteItem {
+export function streamToItem(row: StreamRow, typeLabel: string, group?: string): PaletteItem {
   return {
     id: `stream:${row.stream_type}/${row.name}`,
     type: "stream",
@@ -49,6 +49,7 @@ export function streamToItem(row: StreamRow, typeLabel: string): PaletteItem {
     subtitle: typeLabel,
     icon: iconFor(row.stream_type),
     keywords: [row.stream_type],
+    group,
     route: routeFor(row.stream_type, row.name),
   };
 }
@@ -59,12 +60,14 @@ export function createStreamsProvider(ctx: EntityProviderContext): EntityProvide
   const cached = (type: SearchableStreamType): StreamRow[] | null =>
     ctx.store.state.streams?.[type]?.list ?? null;
   const oversized = new Set<SearchableStreamType>();
+  // A stream lives under its explorer's tile: logs, metrics or traces.
+  const groupFor = (type: SearchableStreamType) => resolveGroup(ctx.railKeys, type, "data");
   const toItems = (type: SearchableStreamType, rows: StreamRow[]) =>
-    rows.map((row) => streamToItem({ ...row, stream_type: type }, typeLabel(type)));
+    rows.map((row) => streamToItem({ ...row, stream_type: type }, typeLabel(type), groupFor(type)));
 
   return {
     id: "streams",
-    scope: "stream",
+    groups: STREAM_TYPES.map(groupFor).filter((g): g is string => !!g),
     enabled: () => ctx.hasRoute("logs"),
     list: async () => {
       const perType = await Promise.all(

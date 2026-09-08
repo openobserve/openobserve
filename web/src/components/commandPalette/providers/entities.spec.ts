@@ -39,9 +39,21 @@ import { syntheticToItem } from "./synthetics";
 import syntheticsService from "@/services/synthetics";
 import usersService from "@/services/users";
 
-const ctx = (over: Partial<{ routes: string[]; state: any; nav: string[] }> = {}) => ({
+const ctx = (
+  over: Partial<{ routes: string[]; state: any; nav: string[]; rail: string[] }> = {},
+) => ({
   store: { state: over.state ?? {} },
   navNames: new Set(over.nav ?? []),
+  railKeys: over.rail ?? [
+    "home",
+    "logs",
+    "metrics",
+    "traces",
+    "dashboards",
+    "reliability",
+    "data",
+    "iam",
+  ],
   t: raw as any,
   org: "org1",
   hasRoute: (n: string) =>
@@ -289,5 +301,25 @@ describe("createEntityProviders", () => {
       "all",
       expect.any(AbortSignal),
     );
+  });
+
+  it("places entity rows under the rail tile that shows them", () => {
+    const flat = createEntityProviders(
+      ctx({ rail: ["home", "logs", "alertList", "pipeline", "dashboards"] }),
+    );
+    const g1 = Object.fromEntries(flat.map((p) => [p.id, p.groups]));
+    expect(g1.dashboards).toEqual(["dashboards"]);
+    expect(g1.alerts).toEqual(["alertList"]);
+    expect(g1.pipelines).toEqual(["pipeline"]);
+    expect(g1.streams).toEqual(["logs"]);
+    expect(g1.users).toEqual([]);
+    const grouped = createEntityProviders(
+      ctx({ rail: ["reliability", "data", "iam", "experience"] }),
+    );
+    const g2 = Object.fromEntries(grouped.map((p) => [p.id, p.groups]));
+    expect(g2.alerts).toEqual(["reliability"]);
+    expect(g2.functions).toEqual(["data"]);
+    expect(g2.synthetics).toEqual(["experience"]);
+    expect(g2.serviceAccounts).toEqual(["iam"]);
   });
 });

@@ -32,47 +32,16 @@ export type PaletteItemType =
   | "synthetic"
   | "ai";
 
-/** A chip the user can narrow the list to; each maps to one or more item types. */
-export type PaletteScope =
-  "actions" | "pages" | "dashboard" | "alert" | "stream" | "savedView" | "function" | "pipeline";
+/** A scope is a left-rail category key (e.g. "logs", "reliability", "data"); chips mirror the rail. */
+export type PaletteScope = string;
 
-// Fixed order mirroring the left rail; a filter bar must look the same on every open.
-export const SCOPE_ORDER: PaletteScope[] = [
-  "pages",
-  "dashboard",
-  "alert",
-  "stream",
-  "pipeline",
-  "function",
-  "savedView",
-  "synthetic",
-  "user",
-  "actions",
-];
-
-export function scopeOfType(type: PaletteItemType): PaletteScope | null {
-  switch (type) {
-    case "action":
-    case "external":
-    case "org":
-      return "actions";
-    case "page":
-      return "pages";
-    case "serviceAccount":
-      return "user";
-    case "ai":
-      return null;
-    default:
-      return type;
-  }
-}
-
-/** The create verb pinned first when a scope is selected with an empty query. */
-export const SCOPE_CREATE_ACTION: Partial<Record<PaletteScope, string>> = {
-  dashboard: "action:newDashboard",
-  alert: "action:newAlert",
-  function: "action:newFunction",
-  pipeline: "action:newPipeline",
+/** Rail category that pins a create verb first when selected with an empty query. */
+export const SCOPE_CREATE_ACTIONS: Record<string, string[]> = {
+  dashboards: ["action:newDashboard", "action:importDashboard"],
+  reliability: ["action:newAlert"],
+  alertList: ["action:newAlert"],
+  data: ["action:newPipeline", "action:newFunction"],
+  pipeline: ["action:newPipeline", "action:newFunction"],
 };
 
 export interface PaletteTrailing {
@@ -90,6 +59,8 @@ export interface PaletteItem {
   trailing?: PaletteTrailing;
   /** Extra match terms (route name, group, aliases). */
   keywords?: string[];
+  /** Left-rail category the row belongs to; rows without one show only when no scope is selected. */
+  group?: string;
   /** org_identifier is injected at navigation time, never stored here. */
   route?: RouteLocationRaw;
   href?: string;

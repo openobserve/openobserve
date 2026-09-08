@@ -27,7 +27,7 @@ vi.mock("./providers/entities", () => ({
   createEntityProviders: () => [
     {
       id: "dashboards",
-      scope: "dashboard",
+      groups: ["dashboards"],
       enabled: () => true,
       list: async () => [
         {
@@ -36,6 +36,7 @@ vi.mock("./providers/entities", () => ({
           label: "Payments overview",
           subtitle: "default",
           icon: "dashboard",
+          group: "dashboards",
           route: { path: "/dashboards/view", query: { dashboard: "d1", folder: "default" } },
         },
       ],
@@ -110,6 +111,7 @@ const navLinks = [
   { name: "home", link: "/", title: raw("Home"), icon: "home" },
   { name: "logs", link: "/logs", title: raw("Logs"), icon: "search" },
   { name: "alertList", link: "/alerts", title: raw("Alerts"), icon: "shield" },
+  { name: "dashboards", link: "/dashboards", title: raw("Dashboards"), icon: "dashboard" },
 ];
 
 describe("CommandPalette", () => {
@@ -214,15 +216,15 @@ describe("CommandPalette", () => {
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab" }));
     await flushPromises();
     expect(wrapper.find('[data-test="command-palette-scopes"]').exists()).toBe(true);
-    await wrapper.find('[data-test="command-palette-scope-dashboard"]').trigger("click");
+    await wrapper.find('[data-test="command-palette-scope-dashboards"]').trigger("click");
     await flushPromises();
-    expect(rowIds()).toEqual(["action:newDashboard", "dashboard:default/d1"]);
+    expect(rowIds()).toEqual(["action:newDashboard", "page:dashboards", "dashboard:default/d1"]);
     const pressed = () =>
       wrapper
         .findAll('[data-test^="command-palette-scope-"][aria-pressed="true"]')
         .map((c) => c.attributes("data-test"));
-    expect(pressed()).toEqual(["command-palette-scope-dashboard"]);
-    await wrapper.find('[data-test="command-palette-scope-pages"]').trigger("click");
+    expect(pressed()).toEqual(["command-palette-scope-dashboards"]);
+    await wrapper.find('[data-test="command-palette-scope-logs"]').trigger("click");
     await flushPromises();
     expect(pressed()).toHaveLength(2);
     expect(rowIds()).toContain("page:logs");
@@ -230,7 +232,7 @@ describe("CommandPalette", () => {
     expect(rowIds()).not.toContain("action:newAlert");
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "Backspace" }));
     await flushPromises();
-    expect(pressed()).toEqual(["command-palette-scope-dashboard"]);
+    expect(pressed()).toEqual(["command-palette-scope-dashboards"]);
     expect(rowIds()).not.toContain("page:logs");
     await wrapper.find('[data-test="command-palette-scope-clear"]').trigger("click");
     await flushPromises();
@@ -262,12 +264,12 @@ describe("CommandPalette", () => {
     expect(wrapper.findAll('[data-test^="command-palette-scope-"].ring-2')).toHaveLength(0);
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight" }));
     await flushPromises();
-    expect(wrapper.find('[data-test="command-palette-scope-pages"]').classes()).toContain("ring-2");
+    expect(wrapper.find('[data-test="command-palette-scope-home"]').classes()).toContain("ring-2");
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight" }));
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }));
     await flushPromises();
     expect(
-      wrapper.find('[data-test="command-palette-scope-dashboard"]').attributes("aria-pressed"),
+      wrapper.find('[data-test="command-palette-scope-logs"]').attributes("aria-pressed"),
     ).toBe("true");
     expect(wrapper.emitted("update:open")).toBeUndefined();
   });
@@ -281,12 +283,13 @@ describe("CommandPalette", () => {
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab" }));
     await flushPromises();
     const before = chips();
-    expect(before.slice(0, 2)).toEqual([
-      "command-palette-scope-pages",
-      "command-palette-scope-dashboard",
+    expect(before).toEqual([
+      "command-palette-scope-home",
+      "command-palette-scope-logs",
+      "command-palette-scope-reliability",
+      "command-palette-scope-dashboards",
     ]);
-    expect(before.at(-1)).toBe("command-palette-scope-actions");
-    await wrapper.find('[data-test="command-palette-scope-dashboard"]').trigger("click");
+    await wrapper.find('[data-test="command-palette-scope-dashboards"]').trigger("click");
     await flushPromises();
     expect(chips()).toEqual(before);
     await wrapper.setProps({ open: false });

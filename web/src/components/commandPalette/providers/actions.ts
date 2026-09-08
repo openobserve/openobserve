@@ -28,6 +28,8 @@ export interface ActionsProviderInput {
   handlers: ActionHandlers;
   hasRoute(name: string): boolean;
   isDark: boolean;
+  /** Rail category keys currently shown, so create verbs land in the tile that owns them. */
+  railKeys?: string[];
 }
 
 const DOCS_URL = "https://openobserve.ai/docs";
@@ -38,7 +40,9 @@ export function buildActionItems({
   handlers,
   hasRoute,
   isDark,
+  railKeys = [],
 }: ActionsProviderInput): PaletteItem[] {
+  const groupOf = (...c: string[]) => c.find((k) => railKeys.includes(k));
   const items: Array<PaletteItem & { requires?: string }> = [
     {
       id: "action:newDashboard",
@@ -47,6 +51,7 @@ export function buildActionItems({
       icon: "add",
       route: { name: "dashboards", query: { action: "add" } },
       requires: "dashboards",
+      group: groupOf("dashboards"),
       keywords: ["create", "dashboard"],
     },
     {
@@ -56,6 +61,7 @@ export function buildActionItems({
       icon: "add",
       route: { name: "importDashboard" },
       requires: "importDashboard",
+      group: groupOf("dashboards"),
       keywords: ["dashboard", "json"],
     },
     {
@@ -65,6 +71,7 @@ export function buildActionItems({
       icon: "add",
       route: { name: "alertList", query: { action: "add" } },
       requires: "alertList",
+      group: groupOf("reliability", "alertList"),
       keywords: ["create", "alert", "monitor"],
     },
     {
@@ -74,6 +81,7 @@ export function buildActionItems({
       icon: "add",
       route: { name: "createPipeline" },
       requires: "createPipeline",
+      group: groupOf("data", "pipeline"),
       keywords: ["create", "pipeline", "etl"],
     },
     {
@@ -83,6 +91,7 @@ export function buildActionItems({
       icon: "add",
       route: { name: "functionList", query: { action: "add" } },
       requires: "functionList",
+      group: groupOf("data", "pipeline"),
       keywords: ["create", "function", "vrl"],
     },
     {

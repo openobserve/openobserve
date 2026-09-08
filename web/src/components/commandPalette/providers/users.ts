@@ -17,7 +17,7 @@ import usersService from "@/services/users";
 import serviceAccountsService from "@/services/service_accounts";
 import type { EntityProvider } from "../usePaletteEntities";
 import type { PaletteItem } from "../types";
-import type { EntityProviderContext } from "./context";
+import { resolveGroup, type EntityProviderContext } from "./context";
 
 interface UserRow {
   email: string;
@@ -31,7 +31,7 @@ function displayName(row: UserRow): string {
   return name || row.email;
 }
 
-export function userToItem(row: UserRow, roleLabel: string): PaletteItem {
+export function userToItem(row: UserRow, roleLabel: string, group?: string): PaletteItem {
   const name = displayName(row);
   return {
     id: `user:${row.email}`,
@@ -40,11 +40,12 @@ export function userToItem(row: UserRow, roleLabel: string): PaletteItem {
     subtitle: [name === row.email ? "" : row.email, roleLabel].filter(Boolean).join(" · "),
     icon: "person",
     keywords: [row.email, row.role ?? ""].filter(Boolean),
+    group,
     route: { name: "users", query: { action: "update", email: row.email } },
   };
 }
 
-export function serviceAccountToItem(row: UserRow, subtitle: string): PaletteItem {
+export function serviceAccountToItem(row: UserRow, subtitle: string, group?: string): PaletteItem {
   return {
     id: `serviceAccount:${row.email}`,
     type: "serviceAccount",
@@ -52,6 +53,7 @@ export function serviceAccountToItem(row: UserRow, subtitle: string): PaletteIte
     subtitle,
     icon: "smart-toy",
     keywords: [row.email, "token", "api key"],
+    group,
     route: { name: "serviceAccounts", query: { action: "update", email: row.email } },
   };
 }
@@ -60,30 +62,34 @@ export function serviceAccountToItem(row: UserRow, subtitle: string): PaletteIte
 const canSeeIam = (ctx: EntityProviderContext) => ctx.navNames.has("iam");
 
 export function createUsersProvider(ctx: EntityProviderContext): EntityProvider {
+  const group = resolveGroup(ctx.railKeys, "iam");
   return {
     id: "users",
-    scope: "user",
+    groups: group ? [group] : [],
     enabled: () => ctx.hasRoute("users") && canSeeIam(ctx),
     list: async (signal) => {
       const res = await usersService.orgUsers(ctx.org, signal);
       const rows: UserRow[] = res?.data?.data ?? [];
       return rows
         .filter((r) => r.email)
-        .map((r) => userToItem(r, r.role ? String(ctx.t(`palette.roles.${r.role}`, r.role)) : ""));
+        .map((r) =>
+          userToItem(r, r.role ? String(ctx.t(`palette.roles.${r.role}`, r.role)) : "", group),
+        );
     },
   };
 }
 
 export function createServiceAccountsProvider(ctx: EntityProviderContext): EntityProvider {
+  const group = resolveGroup(ctx.railKeys, "iam");
   return {
     id: "serviceAccounts",
-    scope: "user",
+    groups: group ? [group] : [],
     enabled: () => ctx.hasRoute("serviceAccounts") && canSeeIam(ctx),
     list: async (signal) => {
       const res = await serviceAccountsService.list(ctx.org, signal);
       const rows: UserRow[] = res?.data?.data ?? [];
       const subtitle = String(ctx.t("palette.serviceAccount"));
-      return rows.filter((r) => r.email).map((r) => serviceAccountToItem(r, subtitle));
+      return rows.filter((r) => r.email).map((r) => serviceAccountToItem(r, subtitle, group));
     },
   };
 }

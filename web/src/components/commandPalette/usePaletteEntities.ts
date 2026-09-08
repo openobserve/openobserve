@@ -18,7 +18,8 @@ import type { PaletteItem, PaletteScope } from "./types";
 
 export interface EntityProvider {
   id: string;
-  scope: PaletteScope;
+  /** Rail categories this source's rows belong to; empty when the rail shows none of them. */
+  groups: PaletteScope[];
   enabled(): boolean;
   /** Full list, fetched when the palette opens and cached for LIST_TTL_MS. */
   list?(signal: AbortSignal): Promise<PaletteItem[]>;
@@ -101,7 +102,8 @@ export function usePaletteEntities({ open, query, scopes, org, providers }: Pale
     searchController = new AbortController();
     const { signal } = searchController;
     const targets = active().filter(
-      (p) => p.search && (scopes.value.length === 0 || scopes.value.includes(p.scope)),
+      (p) =>
+        p.search && (scopes.value.length === 0 || p.groups.some((g) => scopes.value.includes(g))),
     );
     const results = await Promise.all(
       targets.map(async (p) => {

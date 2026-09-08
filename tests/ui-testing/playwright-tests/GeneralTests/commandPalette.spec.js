@@ -53,17 +53,17 @@ test.describe('Command palette', () => {
     await pm.commandPalettePage.close();
   });
 
-  test('narrows to dashboards with a scope chip and opens one', {
+  test('narrows to the Dashboards rail category and opens one', {
     tag: ['@commandPalette', '@general', '@P1', '@all'],
   }, async () => {
     await pm.commandPalettePage.openWithKeyboard();
-    await pm.commandPalettePage.selectScope('dashboard');
+    await pm.commandPalettePage.selectScope('dashboards');
     await pm.commandPalettePage.expectFirstRow('action:newDashboard');
     await pm.commandPalettePage.expectRowsOfType('dashboard');
-    await pm.commandPalettePage.selectScope('alert');
+    await pm.commandPalettePage.selectScope('reliability');
     await pm.commandPalettePage.expectRowsOfType('alert');
     await pm.commandPalettePage.expectRowsOfType('dashboard');
-    await pm.commandPalettePage.deselectScope('alert');
+    await pm.commandPalettePage.deselectScope('reliability');
     const id = await pm.commandPalettePage.clickFirstRowOfType('dashboard');
     await pm.commandPalettePage.expectClosed();
     await pm.commandPalettePage.expectUrl(/\/web\/dashboards\/view\?/, ORG);

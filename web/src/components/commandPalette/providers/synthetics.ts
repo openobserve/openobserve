@@ -17,7 +17,7 @@ import syntheticsService from "@/services/synthetics";
 import { syntheticsResultsRoute } from "@/utils/synthetics/routes";
 import type { EntityProvider } from "../usePaletteEntities";
 import type { PaletteItem } from "../types";
-import type { EntityProviderContext } from "./context";
+import { resolveGroup, type EntityProviderContext } from "./context";
 
 interface CheckRow {
   id: string | number;
@@ -29,7 +29,7 @@ interface CheckRow {
   tags?: string[];
 }
 
-export function syntheticToItem(row: CheckRow, org: string): PaletteItem {
+export function syntheticToItem(row: CheckRow, org: string, group?: string): PaletteItem {
   const id = String(row.id);
   const folder = row.folder_id || "default";
   const parts = [row.type?.toUpperCase(), row.target, row.enabled === false ? "paused" : ""];
@@ -40,21 +40,25 @@ export function syntheticToItem(row: CheckRow, org: string): PaletteItem {
     subtitle: parts.filter(Boolean).join(" · "),
     icon: "radar",
     keywords: [id, row.target ?? "", row.type ?? "", ...(row.tags ?? [])].filter(Boolean),
+    group,
     route: syntheticsResultsRoute({ orgIdentifier: org, folderId: folder }, id, { name: row.name }),
   };
 }
 
 /** Synthetic checks across all folders; the route exists only when synthetics is enabled. */
 export function createSyntheticsProvider(ctx: EntityProviderContext): EntityProvider {
+  const group = resolveGroup(ctx.railKeys, "experience", "synthetics");
   return {
     id: "synthetics",
-    scope: "synthetic",
+    groups: group ? [group] : [],
     enabled: () => ctx.hasRoute("synthetic-monitor-results"),
     list: async (signal) => {
       const res = await syntheticsService.listByFolderId(ctx.org, "all", signal);
       const data = res?.data ?? {};
       const rows: CheckRow[] = data.checks ?? data.monitors ?? [];
-      return rows.filter((r) => r.id != null && r.name).map((r) => syntheticToItem(r, ctx.org));
+      return rows
+        .filter((r) => r.id != null && r.name)
+        .map((r) => syntheticToItem(r, ctx.org, group));
     },
   };
 }

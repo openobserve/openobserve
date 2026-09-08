@@ -31,14 +31,14 @@ import { switchThemeMode } from "@/utils/theme";
 import { focusSearchInput } from "@/utils/keyboardShortcuts";
 import PaletteRow from "./PaletteRow.vue";
 import PaletteScopeChips from "./PaletteScopeChips.vue";
-import { buildPageItems } from "./providers/pages";
+import { buildPageItems, railCategories } from "./providers/pages";
 import { buildActionItems } from "./providers/actions";
 import { createEntityProviders } from "./providers/entities";
 import { usePaletteEntities } from "./usePaletteEntities";
 import { usePaletteRows } from "./usePaletteRows";
 import { useFrecency } from "./useFrecency";
 import { usePaletteTelemetry, type PaletteOpenSource } from "./usePaletteTelemetry";
-import { SCOPE_ORDER, type PaletteItem, type PaletteScope } from "./types";
+import type { PaletteItem, PaletteScope } from "./types";
 
 const SEARCH_DATA_TEST = "command-palette-search";
 
@@ -134,11 +134,16 @@ const actions = computed(() => [
     handlers,
     hasRoute: (name) => router.hasRoute(name),
     isDark: isDark.value,
+    railKeys: railKeys.value,
   }),
   ...orgRows.value,
 ]);
 
 const { getPaginatedStreams } = useStreams(t);
+// The chip row is the left rail: same tiles, same order, same labels.
+const categories = computed(() => railCategories(props.navLinks, gateContext.value, router, t));
+const railKeys = computed(() => categories.value.map((c) => c.key));
+
 const providers = computed(() =>
   createEntityProviders({
     store,
@@ -146,6 +151,7 @@ const providers = computed(() =>
     org: orgId.value,
     hasRoute: (name) => router.hasRoute(name),
     navNames: new Set(props.navLinks.map((l) => l.name)),
+    railKeys: railKeys.value,
     searchStreams: (type, q, limit) =>
       getPaginatedStreams(type, false, false, 0, limit, q) as Promise<{
         list?: { name: string }[];
@@ -183,15 +189,7 @@ const { rows, itemIndexes } = usePaletteRows({
   t,
 });
 
-// Chips: one per scope that has at least one enabled source, in rail order.
-const scopeList = computed(() => {
-  const available = new Set<PaletteScope>(["actions", "pages"]);
-  for (const p of providers.value) if (p.enabled()) available.add(p.scope);
-  return SCOPE_ORDER.filter((s) => available.has(s)).map((id) => ({
-    id,
-    label: String(t(`palette.scopes.${id}`)),
-  }));
-});
+const scopeList = computed(() => categories.value.map((c) => ({ id: c.key, label: c.label })));
 const scopeLabels = computed(() =>
   scopes.value.map((id) => ({ id, label: scopeList.value.find((s) => s.id === id)?.label ?? id })),
 );

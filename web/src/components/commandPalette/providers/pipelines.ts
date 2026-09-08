@@ -16,7 +16,7 @@
 import pipelinesService from "@/services/pipelines";
 import type { EntityProvider } from "../usePaletteEntities";
 import type { PaletteItem } from "../types";
-import type { EntityProviderContext } from "./context";
+import { resolveGroup, type EntityProviderContext } from "./context";
 
 interface PipelineRow {
   pipeline_id: string;
@@ -25,7 +25,7 @@ interface PipelineRow {
   source?: { source_type?: string; stream_name?: string; stream_type?: string };
 }
 
-export function pipelineToItem(row: PipelineRow): PaletteItem {
+export function pipelineToItem(row: PipelineRow, group?: string): PaletteItem {
   const parts = [
     row.source?.source_type,
     row.source?.stream_name,
@@ -43,19 +43,21 @@ export function pipelineToItem(row: PipelineRow): PaletteItem {
       row.source?.source_type ?? "",
       "etl",
     ].filter(Boolean),
+    group,
     route: { name: "pipelineEditor", query: { id: row.pipeline_id, name: row.name } },
   };
 }
 
 export function createPipelinesProvider(ctx: EntityProviderContext): EntityProvider {
+  const group = resolveGroup(ctx.railKeys, "data", "pipeline");
   return {
     id: "pipelines",
-    scope: "pipeline",
+    groups: group ? [group] : [],
     enabled: () => ctx.hasRoute("pipelineEditor"),
     list: async (signal) => {
       const res = await pipelinesService.getPipelines(ctx.org, signal);
       const rows: PipelineRow[] = res?.data?.list ?? [];
-      return rows.filter((r) => r.pipeline_id && r.name).map(pipelineToItem);
+      return rows.filter((r) => r.pipeline_id && r.name).map((r) => pipelineToItem(r, group));
     },
   };
 }

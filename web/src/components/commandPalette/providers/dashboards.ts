@@ -16,7 +16,7 @@
 import dashboardService from "@/services/dashboards";
 import type { EntityProvider } from "../usePaletteEntities";
 import type { PaletteItem } from "../types";
-import type { EntityProviderContext } from "./context";
+import { resolveGroup, type EntityProviderContext } from "./context";
 
 interface DashboardRow {
   dashboard_id: string;
@@ -26,7 +26,7 @@ interface DashboardRow {
   description?: string;
 }
 
-export function dashboardToItem(row: DashboardRow): PaletteItem {
+export function dashboardToItem(row: DashboardRow, group?: string): PaletteItem {
   const folder = row.folder_id || "default";
   return {
     id: `dashboard:${folder}/${row.dashboard_id}`,
@@ -35,20 +35,22 @@ export function dashboardToItem(row: DashboardRow): PaletteItem {
     subtitle: row.folder_name || folder,
     icon: "dashboard",
     keywords: [row.dashboard_id, row.folder_name ?? "", row.description ?? ""].filter(Boolean),
+    group,
     route: { path: "/dashboards/view", query: { dashboard: row.dashboard_id, folder } },
   };
 }
 
 /** One cross-folder call: an empty folder id lists every dashboard the user can see. */
 export function createDashboardsProvider(ctx: EntityProviderContext): EntityProvider {
+  const group = resolveGroup(ctx.railKeys, "dashboards");
   return {
     id: "dashboards",
-    scope: "dashboard",
+    groups: group ? [group] : [],
     enabled: () => ctx.hasRoute("dashboards"),
     list: async (signal) => {
       const res = await dashboardService.list(0, 1000, "name", false, "", ctx.org, "", "", signal);
       const rows: DashboardRow[] = res?.data?.dashboards ?? [];
-      return rows.filter((r) => r.dashboard_id && r.title).map(dashboardToItem);
+      return rows.filter((r) => r.dashboard_id && r.title).map((r) => dashboardToItem(r, group));
     },
   };
 }

@@ -16,7 +16,7 @@
 import alertsService from "@/services/alerts";
 import type { EntityProvider } from "../usePaletteEntities";
 import type { PaletteItem } from "../types";
-import type { EntityProviderContext } from "./context";
+import { resolveGroup, type EntityProviderContext } from "./context";
 
 interface AlertRow {
   alert_id: string;
@@ -28,7 +28,7 @@ interface AlertRow {
   description?: string;
 }
 
-export function alertToItem(row: AlertRow): PaletteItem {
+export function alertToItem(row: AlertRow, group?: string): PaletteItem {
   const folder = row.folder_id || "default";
   const state = row.enabled === false ? "paused" : "";
   return {
@@ -43,15 +43,17 @@ export function alertToItem(row: AlertRow): PaletteItem {
       row.alert_type ?? "",
       row.description ?? "",
     ].filter(Boolean),
+    group,
     route: { name: "alertDetail", params: { alert_id: row.alert_id }, query: { folder } },
   };
 }
 
 /** v2 list without a folder returns every alert with its folder attached. */
 export function createAlertsProvider(ctx: EntityProviderContext): EntityProvider {
+  const group = resolveGroup(ctx.railKeys, "reliability", "alertList");
   return {
     id: "alerts",
-    scope: "alert",
+    groups: group ? [group] : [],
     enabled: () => ctx.hasRoute("alertDetail"),
     list: async (signal) => {
       const res = await alertsService.listByFolderId(
@@ -68,7 +70,7 @@ export function createAlertsProvider(ctx: EntityProviderContext): EntityProvider
         signal,
       );
       const rows: AlertRow[] = res?.data?.list ?? [];
-      return rows.filter((r) => r.alert_id && r.name).map(alertToItem);
+      return rows.filter((r) => r.alert_id && r.name).map((r) => alertToItem(r, group));
     },
   };
 }

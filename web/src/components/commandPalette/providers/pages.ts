@@ -44,7 +44,12 @@ function safeResolve(
   }
 }
 
-function fromLink(item: NavItem, router: PageRouter, group?: string): PaletteItem | null {
+function fromLink(
+  item: NavItem,
+  router: PageRouter,
+  groupKey: string,
+  group?: string,
+): PaletteItem | null {
   const resolved = safeResolve(router, { path: item.link });
   if (!resolved) return null;
   const name = resolved.name ?? item.name;
@@ -56,12 +61,14 @@ function fromLink(item: NavItem, router: PageRouter, group?: string): PaletteIte
     icon: item.icon,
     trailing: { kind: "path", value: item.link },
     keywords: [item.name, name, ...(group ? [group] : [])],
+    group: groupKey,
     route: { path: item.link },
   };
 }
 
 function fromChild(
   child: SubnavChild,
+  groupKey: string,
   group: string,
   router: PageRouter,
   t: TranslateFn,
@@ -98,19 +105,51 @@ export function buildPageItems({ navLinks, ctx, router, t }: PagesProviderInput)
   };
   for (const entry of groupNavLinks(visibleLinks, t)) {
     if (entry.type === "link") {
-      push(fromLink(entry.item, router));
+      push(fromLink(entry.item, router, entry.item.name));
       continue;
     }
+    const groupKey = entry.type === "linkGroup" ? entry.item.name : entry.key;
     const group = entry.type === "linkGroup" ? String(entry.item.title) : String(entry.title);
     // A NAV_GROUPS tile only fronts its children; a NAV_SUBNAV parent is a page of its own.
     if (entry.type === "linkGroup" && !isNavGroup.has(entry.item.name)) {
-      push(fromLink(entry.item, router));
+      push(fromLink(entry.item, router, groupKey));
     }
     for (const child of entry.children) {
       if (child.defaultForRoute) continue;
       if (!isNavChildVisible(child, ctx, router)) continue;
-      push(fromChild(child, group, router, t));
+      push(fromChild(child, groupKey, group, router, t));
     }
   }
   return items;
+}
+
+export interface RailCategory {
+  key: string;
+  label: string;
+  icon: string;
+}
+
+/** The rail's tiles, in rail order and gated as the rail gates them: the chip row mirrors this. */
+export function railCategories(
+  navLinks: NavItem[],
+  ctx: NavGateContext,
+  router: PageRouter,
+  t: TranslateFn,
+): RailCategory[] {
+  const visibleLinks = navLinks.filter((l) => l.display !== false && !l.hide);
+  const out: RailCategory[] = [];
+  for (const entry of groupNavLinks(visibleLinks, t)) {
+    if (entry.type === "link") {
+      out.push({ key: entry.item.name, label: String(entry.item.title), icon: entry.item.icon });
+      continue;
+    }
+    // A tile whose children are all gated away never renders in the rail either.
+    if (!entry.children.some((c) => isNavChildVisible(c, ctx, router))) continue;
+    out.push(
+      entry.type === "linkGroup"
+        ? { key: entry.item.name, label: String(entry.item.title), icon: entry.item.icon }
+        : { key: entry.key, label: String(entry.title), icon: entry.icon },
+    );
+  }
+  return out;
 }

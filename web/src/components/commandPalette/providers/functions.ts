@@ -16,14 +16,14 @@
 import transformService from "@/services/jstransform";
 import type { EntityProvider } from "../usePaletteEntities";
 import type { PaletteItem } from "../types";
-import type { EntityProviderContext } from "./context";
+import { resolveGroup, type EntityProviderContext } from "./context";
 
 interface FunctionRow {
   name: string;
   function?: string;
 }
 
-export function functionToItem(row: FunctionRow, subtitle: string): PaletteItem {
+export function functionToItem(row: FunctionRow, subtitle: string, group?: string): PaletteItem {
   return {
     id: `function:${row.name}`,
     type: "function",
@@ -31,24 +31,26 @@ export function functionToItem(row: FunctionRow, subtitle: string): PaletteItem 
     subtitle,
     icon: "function",
     keywords: ["vrl"],
+    group,
     route: { name: "functionList", query: { action: "update", name: row.name } },
   };
 }
 
 /** Warm from the store when the functions page already loaded them; otherwise one list call. */
 export function createFunctionsProvider(ctx: EntityProviderContext): EntityProvider {
+  const group = resolveGroup(ctx.railKeys, "data", "pipeline");
   return {
     id: "functions",
-    scope: "function",
+    groups: group ? [group] : [],
     enabled: () => ctx.hasRoute("functionList"),
     list: async (signal) => {
       const subtitle = String(ctx.t("palette.scopes.function"));
       const warm: FunctionRow[] = ctx.store.state.organizationData?.functions ?? [];
       if (warm.length > 0)
-        return warm.filter((r) => r.name).map((r) => functionToItem(r, subtitle));
+        return warm.filter((r) => r.name).map((r) => functionToItem(r, subtitle, group));
       const res = await transformService.list(1, 1000, "name", false, "", ctx.org, signal);
       const rows: FunctionRow[] = res?.data?.list ?? [];
-      return rows.filter((r) => r.name).map((r) => functionToItem(r, subtitle));
+      return rows.filter((r) => r.name).map((r) => functionToItem(r, subtitle, group));
     },
   };
 }

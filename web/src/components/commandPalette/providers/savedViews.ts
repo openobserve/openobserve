@@ -16,14 +16,14 @@
 import savedviewsService from "@/services/saved_views";
 import type { EntityProvider } from "../usePaletteEntities";
 import type { PaletteItem } from "../types";
-import type { EntityProviderContext } from "./context";
+import { resolveGroup, type EntityProviderContext } from "./context";
 
 interface SavedViewRow {
   view_id: string;
   view_name: string;
 }
 
-export function savedViewToItem(row: SavedViewRow, subtitle: string): PaletteItem {
+export function savedViewToItem(row: SavedViewRow, subtitle: string, group?: string): PaletteItem {
   return {
     id: `savedView:${row.view_id}`,
     type: "savedView",
@@ -31,20 +31,24 @@ export function savedViewToItem(row: SavedViewRow, subtitle: string): PaletteIte
     subtitle,
     icon: "bookmark",
     keywords: [row.view_id],
+    group,
     route: { name: "logs", query: { view_id: row.view_id } },
   };
 }
 
 export function createSavedViewsProvider(ctx: EntityProviderContext): EntityProvider {
+  const group = resolveGroup(ctx.railKeys, "logs");
   return {
     id: "savedViews",
-    scope: "savedView",
+    groups: group ? [group] : [],
     enabled: () => ctx.hasRoute("logs"),
     list: async (signal) => {
       const res = await savedviewsService.get(ctx.org, signal);
       const rows: SavedViewRow[] = res?.data?.views ?? [];
       const subtitle = String(ctx.t("palette.scopes.savedView"));
-      return rows.filter((r) => r.view_id && r.view_name).map((r) => savedViewToItem(r, subtitle));
+      return rows
+        .filter((r) => r.view_id && r.view_name)
+        .map((r) => savedViewToItem(r, subtitle, group));
     },
   };
 }
