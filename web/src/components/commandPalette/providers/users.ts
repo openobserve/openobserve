@@ -56,12 +56,14 @@ export function serviceAccountToItem(row: UserRow, subtitle: string): PaletteIte
   };
 }
 
-/** Admin-only: the list endpoint itself is restricted, and the IAM rail entry hides for others. */
+// Mirrors the rail: IAM is offered only to admins, and that decision already lives in navLinks.
+const canSeeIam = (ctx: EntityProviderContext) => ctx.navNames.has("iam");
+
 export function createUsersProvider(ctx: EntityProviderContext): EntityProvider {
   return {
     id: "users",
     scope: "user",
-    enabled: () => ctx.hasRoute("users") && ctx.store.state.currentuser?.role === "admin",
+    enabled: () => ctx.hasRoute("users") && canSeeIam(ctx),
     list: async () => {
       const res = await usersService.orgUsers(ctx.org);
       const rows: UserRow[] = res?.data?.data ?? [];
@@ -76,7 +78,7 @@ export function createServiceAccountsProvider(ctx: EntityProviderContext): Entit
   return {
     id: "serviceAccounts",
     scope: "user",
-    enabled: () => ctx.hasRoute("serviceAccounts") && ctx.store.state.currentuser?.role === "admin",
+    enabled: () => ctx.hasRoute("serviceAccounts") && canSeeIam(ctx),
     list: async () => {
       const res = await serviceAccountsService.list(ctx.org);
       const rows: UserRow[] = res?.data?.data ?? [];

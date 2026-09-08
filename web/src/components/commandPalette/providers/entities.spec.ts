@@ -39,8 +39,9 @@ import { syntheticToItem } from "./synthetics";
 import syntheticsService from "@/services/synthetics";
 import usersService from "@/services/users";
 
-const ctx = (over: Partial<{ routes: string[]; state: any }> = {}) => ({
+const ctx = (over: Partial<{ routes: string[]; state: any; nav: string[] }> = {}) => ({
   store: { state: over.state ?? {} },
+  navNames: new Set(over.nav ?? []),
   t: raw as any,
   org: "org1",
   hasRoute: (n: string) =>
@@ -198,7 +199,7 @@ describe("createEntityProviders", () => {
     ]);
   });
 
-  it("maps people rows and gates them on the admin role", async () => {
+  it("maps people rows and gates them on the IAM rail link", async () => {
     expect(
       userToItem({ email: "a@x.io", first_name: "Ada", last_name: "L", role: "admin" }, "Admin"),
     ).toMatchObject({
@@ -215,11 +216,9 @@ describe("createEntityProviders", () => {
       query: { action: "update", email: "svc@x.io" },
     });
     const routes = ["users", "serviceAccounts"];
-    const member = createEntityProviders(
-      ctx({ routes, state: { currentuser: { role: "member" } } }),
-    );
+    const member = createEntityProviders(ctx({ routes, nav: ["logs"] }));
     expect(member.find((p) => p.id === "users")!.enabled()).toBe(false);
-    const admin = createEntityProviders(ctx({ routes, state: { currentuser: { role: "admin" } } }));
+    const admin = createEntityProviders(ctx({ routes, nav: ["logs", "iam"] }));
     expect(admin.find((p) => p.id === "users")!.enabled()).toBe(true);
     (usersService.orgUsers as any).mockResolvedValue({
       data: { data: [{ email: "a@x.io", role: "admin" }] },

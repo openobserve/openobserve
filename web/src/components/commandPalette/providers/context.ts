@@ -26,6 +26,8 @@ export interface EntityProviderContext {
   t: TranslateFn;
   org: string;
   hasRoute(name: string): boolean;
+  /** Names of the rail links currently shown; the rail already applied role and config gates. */
+  navNames: Set<string>;
   /** Keyword search for one stream type; created inside a component setup because useStreams needs the store. */
   searchStreams(type: string, query: string, limit: number): Promise<{ list?: StreamSearchRow[] }>;
 }

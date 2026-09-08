@@ -145,6 +145,7 @@ const providers = computed(() =>
     t,
     org: orgId.value,
     hasRoute: (name) => router.hasRoute(name),
+    navNames: new Set(props.navLinks.map((l) => l.name)),
     searchStreams: (type, q, limit) =>
       getPaginatedStreams(type, false, false, 0, limit, q) as Promise<{
         list?: { name: string }[];
