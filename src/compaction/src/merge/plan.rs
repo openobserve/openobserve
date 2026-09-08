@@ -30,6 +30,9 @@ pub(super) struct BatchLimits<'a> {
     pub strategy: &'a MergeStrategy,
     pub max_file_size: usize,
     pub max_group_files: usize,
+    /// Pending ingester files an open metrics-index hour needs before they all merge into
+    /// indexed files; 0 keeps the size-bounded hash-sorted grouping.
+    pub metrics_fan_in: usize,
     /// The hour is still open: an unfilled trailing group waits for more files.
     pub is_incremental: bool,
     /// The classic merge query's cap: larger files are at their target size.
@@ -56,6 +59,10 @@ pub(super) fn plan_batches(
     if mode.merges_whole_batch() {
         if !mode_files.is_empty() {
             batches.push((mode_files, mode.clone()));
+        }
+    } else if mode.merges_by_fan_in() && limits.metrics_fan_in > 0 {
+        if let Some(pending) = pending_ingester_files(mode_files, limits.metrics_fan_in) {
+            batches.push((pending, MergeMode::MetricsIndexed));
         }
     } else {
         batches.extend(
@@ -106,6 +113,19 @@ fn indexed_hour_scope(
             files
         }
     }
+}
+
+/// The open hour's pending ingester files, once `fan_in` of them have piled up: they merge
+/// into hash-range-split indexed files exactly as a closed hour does, so each round leaves one
+/// chain, and the compactor's own outputs never merge again before the hour closes. Original
+/// size is no measure here: hash order compresses metrics tens of times, so the size-bounded
+/// groups sealed one flush each.
+fn pending_ingester_files(files: Vec<FileKey>, fan_in: usize) -> Option<Vec<FileKey>> {
+    let pending: Vec<FileKey> = files
+        .into_iter()
+        .filter(|f| MetricsFileLayout::of(&f.key) == Some(MetricsFileLayout::HashSorted))
+        .collect();
+    (pending.len() >= fan_in.max(2)).then_some(pending)
 }
 
 /// Size-bounded merge groups in the planner's file order.
@@ -181,6 +201,7 @@ mod tests {
             strategy,
             max_file_size: 1000,
             max_group_files,
+            metrics_fan_in: 0,
             is_incremental,
             merge_max_original_size: 950,
         }
@@ -291,6 +312,48 @@ mod tests {
         assert_eq!(batches.len(), 1, "{batches:?}");
         assert!(matches!(batches[0].1, MergeMode::Classic));
         assert_eq!(names(&batches[0].0), ["7.parquet", "8.parquet"]);
+    }
+
+    fn hash_file(name: &str, compressed_size: i64) -> FileKey {
+        let mut file = metrics_file(name, compressed_size * 40);
+        file.meta.compressed_size = compressed_size;
+        file
+    }
+
+    /// The open metrics-index hour merges every pending ingester file into indexed files once
+    /// enough have piled up; earlier round outputs and legacy files stay out of that batch.
+    #[test]
+    fn test_plan_batches_open_metrics_hour_merges_pending_files_as_indexed() {
+        let mut files: Vec<FileKey> = (1..=5)
+            .map(|i| hash_file(&format!("hash-sorted-v1-{i}.parquet"), 30))
+            .collect();
+        files.push(hash_file("indexed-v1-round1.parquet", 400));
+        files.push(metrics_file("legacy.parquet", 100));
+        let strategy = MergeStrategy::FileTime;
+        let mut limits = limits(&strategy, 0, true);
+        limits.metrics_fan_in = 3;
+        let batches = plan_batches(files.clone(), &MergeMode::MetricsHashSorted, &limits, "s");
+        assert_eq!(batches.len(), 1, "{batches:?}");
+        assert!(
+            matches!(batches[0].1, MergeMode::MetricsIndexed),
+            "{}",
+            batches[0].1
+        );
+        assert_eq!(
+            names(&batches[0].0),
+            [
+                "hash-sorted-v1-1.parquet",
+                "hash-sorted-v1-2.parquet",
+                "hash-sorted-v1-3.parquet",
+                "hash-sorted-v1-4.parquet",
+                "hash-sorted-v1-5.parquet"
+            ]
+        );
+        limits.metrics_fan_in = 6;
+        assert!(
+            plan_batches(files, &MergeMode::MetricsHashSorted, &limits, "s").is_empty(),
+            "fewer pending files than the fan-in wait for more"
+        );
     }
 
     #[test]

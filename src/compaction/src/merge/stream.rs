@@ -106,7 +106,7 @@ pub async fn merge_by_stream(
     );
     // a whole-hour merge needs every file of the hour, even those already
     // above the size target that a normal merge would leave alone
-    let max_original_size = if mode.merges_whole_batch() {
+    let max_original_size = if mode.merges_whole_batch() || mode.merges_by_fan_in() {
         i64::MAX
     } else {
         infra_file_list::merge_max_original_size()
@@ -173,6 +173,7 @@ pub async fn merge_by_stream(
                 strategy: &job_strategy,
                 max_file_size: cfg.compact.max_file_size,
                 max_group_files: cfg.compact.max_group_files,
+                metrics_fan_in: cfg.compact.metrics_merge_fan_in,
                 is_incremental,
                 merge_max_original_size: infra_file_list::merge_max_original_size(),
             };
@@ -217,7 +218,7 @@ pub async fn merge_by_stream(
             let mut check_guard = HashSet::with_capacity(batch_groups.len());
             let mut orphan_blooms = Vec::new();
             for ret in worker_results {
-                let (batch_id, new_files) = match ret {
+                let (batch_id, new_files, merged_inputs) = match ret {
                     Ok(v) => v,
                     Err(e) => {
                         log::error!("[COMPACTOR] merge files failed: {e}");
@@ -234,8 +235,9 @@ pub async fn merge_by_stream(
                 }
                 check_guard.insert(batch_id);
 
-                // delete small files keys & write big files keys, use transaction
-                let delete_file_list = batch_groups.get(batch_id).unwrap().files.as_slice();
+                // retire exactly the inputs the merge consumed: a merge may take fewer files
+                // than the planned batch, and the rest must stay live
+                let delete_file_list = merged_inputs.as_slice();
                 let mut events = Vec::with_capacity(new_files.len() + delete_file_list.len());
                 for new_file in new_files {
                     if !new_file.key.is_empty() {

@@ -47,6 +47,21 @@ use infra::cluster::get_cached_online_ingester_nodes;
 /// key: `org/stream_type/stream` -> (data partition hour in micros, files seen this hour)
 static PENDING_FILES: LazyLock<RwAHashMap<String, (i64, usize)>> = LazyLock::new(Default::default);
 
+/// Files one ingester uploads before it enqueues a merge of the open hour: a fan-in tier's
+/// worth for a metrics-index stream, otherwise three times the files a full-size group needs.
+fn pending_files_threshold(
+    metrics_index: bool,
+    fan_in: usize,
+    files_per_group: usize,
+    ingester_num: usize,
+) -> usize {
+    let ingester_num = ingester_num.max(1);
+    if metrics_index && fan_in > 0 {
+        return (fan_in / ingester_num).max(1);
+    }
+    (files_per_group / ingester_num).max(1) * 3
+}
+
 /// Record that one new file was uploaded for `(org, stream_type, stream)` whose data
 /// falls in the hour containing `min_ts`. When the per-hour count crosses the configured
 /// threshold, enqueue an incremental merge job for that hour and reset the counter.
@@ -61,9 +76,12 @@ pub async fn incr_pending_file(
         .await
         .map(|nodes| nodes.len())
         .unwrap_or(1);
-    // must wait for at least 3 times of needed files
-    let threshold =
-        (cfg.compact.max_file_size / cfg.limit.max_file_size_in_memory / ingester_num).max(1) * 3;
+    let threshold = pending_files_threshold(
+        stream_type == StreamType::Metrics && cfg.compact.metrics_index_enabled,
+        cfg.compact.metrics_merge_fan_in,
+        cfg.compact.max_file_size / cfg.limit.max_file_size_in_memory,
+        ingester_num,
+    );
 
     let hour = min_ts - min_ts % hour_micros(1);
     let key = format!("{org_id}/{stream_type}/{stream_name}");
@@ -96,6 +114,24 @@ pub async fn incr_pending_file(
     } else {
         log::debug!(
             "[COMPACTOR:INCREMENTAL] enqueued incremental merge for [{org_id}/{stream_type}/{stream_name}] hour {hour}"
+        );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_pending_files_threshold() {
+        assert_eq!(pending_files_threshold(false, 16, 4, 1), 12);
+        assert_eq!(pending_files_threshold(false, 16, 4, 2), 6);
+        assert_eq!(pending_files_threshold(true, 16, 4, 1), 16);
+        assert_eq!(pending_files_threshold(true, 16, 4, 20), 1);
+        assert_eq!(
+            pending_files_threshold(true, 0, 4, 1),
+            12,
+            "fan-in off keeps the size rule"
         );
     }
 }

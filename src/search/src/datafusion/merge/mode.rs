@@ -130,6 +130,12 @@ impl MergeMode {
     }
 
     /// Metrics-specific layout of the file(s) the merge writes.
+    /// The open metrics-index hour merges every pending ingester file at once into indexed
+    /// files, so its listing must not be capped by size.
+    pub fn merges_by_fan_in(&self) -> bool {
+        matches!(self, Self::MetricsHashSorted)
+    }
+
     pub fn metrics_file_layout(&self) -> Option<MetricsFileLayout> {
         match self {
             Self::MetricsHashSorted => Some(MetricsFileLayout::HashSorted),

@@ -39,7 +39,8 @@ pub struct MergeResult {
     pub new_file: FileKey,
 }
 
-pub type MergeSender = mpsc::Sender<Result<(usize, Vec<FileKey>), anyhow::Error>>;
+/// `(batch id, new files, the input files the merge consumed)`.
+pub type MergeSender = mpsc::Sender<Result<(usize, Vec<FileKey>, Vec<FileKey>), anyhow::Error>>;
 
 #[derive(Clone)]
 pub struct MergeJob {
@@ -219,8 +220,10 @@ impl MergeWorker {
                             )
                             .await
                             {
-                                Ok((new_files, _)) => {
-                                    if let Err(e) = tx.send(Ok((msg.batch_id, new_files))).await {
+                                Ok((new_files, merged)) => {
+                                    if let Err(e) =
+                                        tx.send(Ok((msg.batch_id, new_files, merged))).await
+                                    {
                                         log::error!(
                                             "[COMPACTOR:WORKER:{thread_id}] Error sending file to merge_job: {e}"
                                         );
