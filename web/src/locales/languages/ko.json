@@ -384,7 +384,9 @@
     "patternWildcardSampleValues": "샘플 값",
     "wildcardSampleValues": "샘플 값",
     "patternZScore": "Z-점수: {z점수} (평균 주파수: {평균 주파수})",
-    "createAlertFromPattern": "이 패턴으로 알림 생성"
+    "createAlertFromPattern": "이 패턴으로 알림 생성",
+    "pinToToolbar": "도구 모음에 고정",
+    "unpinFromToolbar": "도구 모음에서 고정 해제"
   },
   "menu": {
     "home": "홈",

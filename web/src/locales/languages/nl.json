@@ -384,7 +384,9 @@
     "patternWildcardSampleValues": "Voorbeeldwaarden",
     "wildcardSampleValues": "Voorbeeldwaarden",
     "patternZScore": "Z-score: {zScore} (gemiddelde frequentie: {avgFrequency})",
-    "createAlertFromPattern": "Creëer een waarschuwing op basis van dit patroon"
+    "createAlertFromPattern": "Creëer een waarschuwing op basis van dit patroon",
+    "pinToToolbar": "Aan de werkbalk vastmaken",
+    "unpinFromToolbar": "Van de werkbalk loskoppelen"
   },
   "menu": {
     "home": "Home",
