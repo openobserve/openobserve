@@ -15717,7 +15717,6 @@
       "reservation": "Reservation",
       "sliType": "SLI type",
       "owner": "Owner",
-      "folder": "Folder",
       "streamPlaceholder": "Select a stream"
     },
     "empty": {
@@ -15747,7 +15746,6 @@
       "sourceHint": "Uptime is the fraction of measured time this alert was not firing. Time it did not evaluate — paused, silenced, or failing — is unmeasured, and never counted as uptime.",
       "loadFailed": "Could not load the eligible alerts",
       "noneEligible": "No alert in this organization can be used as a source yet.",
-      "eligibilityInfo": "An alert can be an SLI source when it is scheduled (not real-time), ungrouped, on a fixed interval rather than a cron, with no silence period, and evaluated at least once per slice. Alerts that miss any of these are listed with the reason under their name.",
       "ineligible": {
         "notScheduled": "Not scheduled",
         "grouped": "Grouped",
@@ -15866,7 +15864,6 @@
       "describeBudget": "Error budget consumed > {critical}%"
     },
     "validation": {
-      "summary": "Fix the highlighted fields before saving",
       "nameRequired": "SLO name is required",
       "nameTooLong": "SLO name must be 256 characters or fewer",
       "targetRequired": "Target is required",

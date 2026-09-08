@@ -35,7 +35,9 @@ export class SloFormPage {
       sliceNote: '[data-test="slos-addslo-slice-note"]',
       groupBy: '[data-test="slos-addslo-group-by"]',
       save: '[data-test="slos-addslo-save"]',
-      error: '[data-test="slos-addslo-error"]',
+      // Save errors are toasts, the same surface the alert form uses — the
+      // page-level banner pushed the whole form down to say one sentence.
+      error: '[data-test="o-toast-message"]',
       regenWarning: '[data-test="slos-addslo-regen-warning"]',
 
       // Count SLI
@@ -473,9 +475,11 @@ export class SloFormPage {
   // -------------------------------------------------------------- assertions
 
   async expectError(pattern) {
-    const err = this.page.locator(this.locators.error);
-    await expect(err).toBeVisible({ timeout: 15000 });
-    if (pattern) await expect(err).toContainText(pattern);
+    // Several toasts can be on screen at once (a stale success, say), so the
+    // assertion is over the set rather than over the first one.
+    const toasts = this.page.locator(this.locators.error);
+    await expect(toasts.first()).toBeVisible({ timeout: 15000 });
+    if (pattern) await expect(toasts.filter({ hasText: pattern })).not.toHaveCount(0);
   }
 
   /**
@@ -727,6 +731,12 @@ export class SloFormPage {
     // The chip is short; the sentence is the tooltip behind it.
     const chip = option.locator('span[title]').first();
     await expect(chip, 'an ineligible option must say which rule it failed').toBeVisible();
+
+    // The chip MUST be hoverable. A disabled row sets `pointer-events-none`, so
+    // the one element carrying the explanation was unreachable — the tooltip
+    // existed in the DOM and could never be shown. Hovering is the assertion;
+    // `toBeVisible` above would pass either way.
+    await chip.hover({ timeout: 5000 });
     expect(
       (await chip.innerText()).length,
       'the chip is a label, not the explanation',
@@ -740,14 +750,6 @@ export class SloFormPage {
     expect(box.height, 'an option row must stay a single line').toBeLessThan(40);
 
     await this.page.keyboard.press('Escape');
-  }
-
-  /** The field's info tooltip explaining what makes an alert eligible. */
-  async expectAlertSourceEligibilityInfo() {
-    await expect(
-      this.page.locator('[data-test="slos-addslo-alert-source-info"]'),
-      'the picker must explain what makes an alert eligible',
-    ).toBeVisible({ timeout: 15000 });
   }
 
   async expectAlertSourceHintVisible() {

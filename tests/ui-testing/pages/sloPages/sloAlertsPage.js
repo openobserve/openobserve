@@ -37,7 +37,7 @@ export class SloAlertsPage {
       silence: '[data-test="slo-alert-form-silence"]',
       submit: '[data-test="slo-alert-form-submit"]',
       cancel: '[data-test="slo-alert-form-cancel"]',
-      formError: '[data-test="slo-alert-form-error"]',
+      formError: '[data-test="o-toast-message"]',
 
       // Condition
       conditionCritical: '[data-test="slos-sloalertcondition-critical"]',
@@ -300,7 +300,7 @@ export class SloAlertsPage {
   /**
    * The NAME field's inline error.
    *
-   * A blank name never produces the `slo-alert-form-error` banner: `submit()`
+   * A blank name never produces a save toast: `submit()`
    * does `if (nameError.value) return;` before any request, so the only signal
    * is the OInput's own `-error` node. Asserting the banner here would demand
    * behaviour the form does not have.
@@ -311,11 +311,11 @@ export class SloAlertsPage {
     if (pattern) await expect(err).toContainText(pattern);
   }
 
-  /** The banner shown for a SERVER rejection (saveError). */
+  /** The toast raised for a refused save — the same surface the alert form uses. */
   async expectFormError(pattern = null) {
-    const err = this.page.locator(this.locators.formError);
-    await expect(err).toBeVisible({ timeout: 20000 });
-    if (pattern) await expect(err).toContainText(pattern);
+    const toasts = this.page.locator(this.locators.formError);
+    await expect(toasts.first()).toBeVisible({ timeout: 20000 });
+    if (pattern) await expect(toasts.filter({ hasText: pattern })).not.toHaveCount(0);
   }
 
   /** A field carries its own inline validation message. */

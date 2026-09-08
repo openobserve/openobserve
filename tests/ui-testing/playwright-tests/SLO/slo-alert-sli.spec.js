@@ -84,9 +84,6 @@ test.describe('SLO alert SLI', { tag: ['@slo', '@sloAlertSli', '@all'] }, () => 
       pm.sloFormPage.page.locator(pm.sloFormPage.locators.alertSource),
     ).toBeVisible({ timeout: 20000 });
     await pm.sloFormPage.expectAlertSourceHintVisible();
-    // "No alert can be used as a source yet" is a dead end on its own; the
-    // eligibility rules have to be reachable from the field.
-    await pm.sloFormPage.expectAlertSourceEligibilityInfo();
   });
 
   /**

@@ -12,7 +12,7 @@
  *      the field after a 422 looks identical on screen.
  *   2. SERVER — anything the form cannot know (a duplicate name, a malformed
  *      predicate) still comes back and is rendered verbatim into
- *      `slos-addslo-error`.
+ *      an error toast, the same surface the alert form uses.
  *
  * The exact messages are asserted deliberately — they are user-facing copy, and
  * the backend's budget/target rejections carry arithmetic the user needs.

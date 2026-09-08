@@ -48,10 +48,6 @@
       </OButton>
     </template>
 
-    <OBanner v-if="error" variant="error" class="mb-3" data-test="slos-addslo-error">
-      {{ error }}
-    </OBanner>
-
     <!-- A regeneration is not a normal edit: it discards every measurement
          taken under the old definition. Warned before saving, not after. -->
     <OBanner
@@ -82,13 +78,16 @@
           <!-- One row: folder, name, tags — in that order. The folder column
                is fixed-width so the name (the field people actually type in)
                takes the slack; tags get their own share. Wraps to a column on
-               narrow screens rather than crushing three controls. -->
-          <div class="grid grid-cols-1 items-end gap-3 md:grid-cols-[14rem_1fr_1fr]">
+               narrow screens rather than crushing three controls.
+               `items-start`, not `items-end`: OTagInput is taller than an
+               OInput, and bottom-aligning the cells lifted its label clear of
+               the other two so the row read as three unrelated fields. -->
+          <div class="grid grid-cols-1 items-start gap-3 md:grid-cols-[14rem_1fr_1fr]">
             <div>
-              <label class="text-text-secondary mb-1 block text-xs">
-                {{ t("slos.field.folder") }}
-              </label>
-              <!-- type="alerts": SLOs live in alert folders (there is no SLO
+              <!-- No label here: SelectFolderDropDown renders its own, and a
+                   second one above it left this column a row taller than the
+                   two beside it.
+                   type="alerts": SLOs live in alert folders (there is no SLO
                    folder type), so this offers the same folders the Alerts
                    page does. -->
               <SelectFolderDropDown
@@ -390,11 +389,7 @@
               :error-message="fieldError('config.alert_id') || undefined"
               data-test="slos-addslo-alert-source"
               @update:model-value="onAlertSourceChange"
-            >
-              <template #tooltip>
-                <OTooltip :content="t('slos.alertSli.eligibilityInfo')" />
-              </template>
-            </OSelect>
+            />
             <p class="text-text-secondary mt-1 text-xs" data-test="slos-addslo-alert-source-hint">
               {{ t("slos.alertSli.sourceHint") }}
             </p>
@@ -618,7 +613,6 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import useStreams from "@/composables/useStreams";
 import useSqlSuggestions from "@/composables/useSuggestions";
 import OTagInput from "@/lib/forms/TagInput/OTagInput.vue";
@@ -637,7 +631,6 @@ const router = useRouter();
 const store = useStore();
 
 const saving = ref(false);
-const error = ref<string | null>(null);
 const original = ref<string>("");
 
 const sloId = computed(() => String(route.params.slo_id || ""));
@@ -1236,7 +1229,7 @@ function payload() {
 /// left blank — with nothing marking which field.
 ///
 /// These checks pre-empt the server rather than replace it: the API remains the
-/// authority, and anything it rejects still surfaces in `slos-addslo-error`.
+/// authority, and anything it rejects still surfaces as an error toast.
 /// What they add is naming the field, at the field.
 const attemptedSave = ref(false);
 
@@ -1279,8 +1272,6 @@ const fieldError = (path: string): I18nText =>
   attemptedSave.value ? (validationIssues.value[path] ?? NO_ERROR) : NO_ERROR;
 
 async function save() {
-  error.value = null;
-
   // Block the request outright. Sending a knowingly-invalid definition just to
   // read the server's rejection is what produced "Request failed with status
   // code 422" with no indication of which field was at fault.
@@ -1289,7 +1280,7 @@ async function save() {
     // On a form this long the offending field is usually scrolled out of view,
     // so a banner alone still leaves the user hunting for it.
     await scrollToFirstError();
-    error.value = t("slos.validation.summary");
+    toast({ variant: "error", message: t("alerts.messages.fixHighlightedFields") });
     return;
   }
 
@@ -1305,7 +1296,10 @@ async function save() {
   } catch (e: any) {
     // The backend's budget rejection carries its arithmetic (§6b.4d); show it
     // verbatim rather than replacing it with a generic message.
-    error.value = e?.response?.data?.message || e?.message || t("slos.saveFailed");
+    toast({
+      variant: "error",
+      message: e?.response?.data?.message || e?.message || t("slos.saveFailed"),
+    });
   } finally {
     saving.value = false;
   }

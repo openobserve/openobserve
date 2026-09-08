@@ -83,10 +83,6 @@
       @refresh="loadDestinations"
     />
 
-    <OBanner v-if="saveError" variant="error" data-test="slo-alert-form-error">
-      {{ saveError }}
-    </OBanner>
-
     <div class="flex justify-end gap-2">
       <OButton
         variant="outline"
@@ -111,8 +107,8 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { makeSloAlertSchema } from "./SloAlertForm.schema";
 import { scrollToFirstError } from "@/lib/forms/Form/scrollToFirstError";
 
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import AlertDestinationsField from "@/components/alerts/AlertDestinationsField.vue";
 import SloAlertCondition from "@/components/slos/SloAlertCondition.vue";
@@ -134,7 +130,6 @@ const store = useStore();
 
 const org = computed(() => store.state.selectedOrganization?.identifier);
 const saving = ref(false);
-const saveError = ref("");
 const destinationOptions = ref<string[]>([]);
 
 /** The stored alert when editing. Held so the PUT can carry every field this
@@ -249,7 +244,6 @@ const conditionFieldErrors = computed(() => ({
 }));
 
 const submit = async () => {
-  saveError.value = "";
   attemptedSubmit.value = true;
 
   // Refuse to send a knowingly-invalid alert. Previously only the name was
@@ -257,7 +251,7 @@ const submit = async () => {
   // rejected name looked exactly like nothing happening.
   if (!validation.value.success) {
     await scrollToFirstError();
-    saveError.value = t("slos.validation.summary");
+    toast({ variant: "error", message: t("alerts.messages.fixHighlightedFields") });
     return;
   }
 
@@ -271,7 +265,10 @@ const submit = async () => {
     }
     emit("saved");
   } catch (e: any) {
-    saveError.value = e?.response?.data?.message || t("alerts.saveFailed");
+    toast({
+      variant: "error",
+      message: e?.response?.data?.message || t("alerts.saveFailed"),
+    });
   } finally {
     saving.value = false;
   }

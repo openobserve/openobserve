@@ -93,11 +93,12 @@ test.describe('SLO required fields', { tag: ['@slo', '@sloForm', '@all'] }, () =
   });
 
   /**
-   * The banner is the "something is wrong" cue for a field scrolled out of
-   * view; the field markers are the detail. Both are needed — a banner alone
-   * repeats the old, useless experience.
+   * The toast is the "something is wrong" cue for a field scrolled out of view;
+   * the field markers are the detail. Both are needed — a toast alone repeats
+   * the old, useless experience, and a marker alone is invisible from the
+   * bottom of a long form.
    */
-  test('a blocked save explains itself in the page banner too', {
+  test('a blocked save also raises the error toast', {
     tag: ['@P1', '@validation'],
   }, async () => {
     await pm.sloFormPage.saveExpectingClientRejection();
