@@ -411,7 +411,6 @@ const pageSizeOptions = [20, 50, DATASET_ITEMS_MAX_PAGE_SIZE];
  *  item detail drawer. */
 const versionLabel = (version: number) => raw(`v${version}`);
 
-// Real browser back when there's history to pop.
 const { goBack: backToDatasets } = useSmartBack(() => ({
   name: "aiDatasets",
   query: { org_identifier: orgId.value },
@@ -527,9 +526,10 @@ function onBaselineChanged(experiment: LlmExperiment, previousBaselineId: string
 
 async function refreshExperiments() {
   try {
-    experiments.value = (
-      await llmExperimentsService.list(orgId.value, { includeSummary: true })
-    ).filter((experiment) => experiment.datasetId === datasetId.value);
+    experiments.value = await llmExperimentsService.list(orgId.value, {
+      includeSummary: true,
+      datasetId: datasetId.value,
+    });
   } catch {
     experiments.value = [];
   }

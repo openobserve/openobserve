@@ -17,13 +17,18 @@ use axum::{extract::Path, response::Response};
 #[cfg(feature = "enterprise")]
 use openobserve_api_common::extractors::Headers;
 #[cfg(feature = "enterprise")]
-use openobserve_core::auth::UserEmail;
+use openobserve_core::auth::{UserEmail, is_ofga_object_visible};
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
-    models::providers::{ListProvidersResponseBody, ProviderRequestBody, ProviderResponseBody},
+    models::providers::{
+        ListProvidersResponseBody, ProviderRequestBody, ProviderResponseBody,
+        ProviderTestRequestBody,
+    },
     service::providers::{self, ProviderError},
 };
+
+const PROVIDER_TEST_FAILURE_MESSAGE: &str = "Provider connection test failed";
 
 /// ListProviders
 #[utoipa::path(
@@ -225,7 +230,7 @@ pub async fn delete_provider(Path((org_id, provider_id)): Path<(String, String)>
     description = "Tests connectivity using the submitted provider configuration directly, without persisting it — useful for validating settings before creating or updating the provider.",
     security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization name")),
-    request_body(content = inline(ProviderRequestBody), description = "Provider configuration to test"),
+    request_body(content = inline(ProviderTestRequestBody), description = "Provider configuration to test"),
     responses(
         (status = 200, description = "Connection succeeded", body = inline(MetaHttpResponse)),
         (status = 400, description = "Invalid configuration or connection failed", body = inline(MetaHttpResponse)),
@@ -235,14 +240,75 @@ pub async fn delete_provider(Path((org_id, provider_id)): Path<(String, String)>
     ),
 )]
 pub async fn test_provider_config(
-    Path(_org_id): Path<String>,
-    axum::Json(body): axum::Json<ProviderRequestBody>,
+    Path(org_id): Path<String>,
+    #[cfg(feature = "enterprise")] Headers(user): Headers<UserEmail>,
+    axum::Json(body): axum::Json<ProviderTestRequestBody>,
 ) -> Response {
-    let provider: infra::table::providers::Provider = body.into();
+    let ProviderTestRequestBody {
+        provider: body,
+        provider_id,
+    } = body;
+    let provider_id = provider_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|id| !id.is_empty());
+
+    #[cfg(feature = "enterprise")]
+    if let Some(provider_id) = provider_id
+        && let Err(response) =
+            require_provider_visibility(&org_id, provider_id, &user.user_id).await
+    {
+        return response;
+    }
+
+    let mut provider: infra::table::providers::Provider = body.into();
+    if provider_auth_is_blank(&provider.auth_config)
+        && let Some(provider_id) = provider_id
+    {
+        provider.auth_config = match providers::get_provider(&org_id, provider_id).await {
+            Ok(stored) => stored.auth_config,
+            Err(error) => return provider_test_error_response(error),
+        };
+    }
     match test_provider_connection_config(provider).await {
         Ok(msg) => MetaHttpResponse::ok(msg),
-        Err(err) => err.into(),
+        Err(error) => provider_test_error_response(error),
     }
+}
+
+#[cfg(feature = "enterprise")]
+async fn require_provider_visibility(
+    org_id: &str,
+    provider_id: &str,
+    user_id: &str,
+) -> Result<(), Response> {
+    let permitted = openobserve_api_common::auth::validator::list_objects_for_user(
+        org_id, user_id, "GET", "provider",
+    )
+    .await
+    .map_err(|error| {
+        log::warn!("[Provider] failed to load provider permissions: {error}");
+        MetaHttpResponse::forbidden("Not allowed to use this provider")
+    })?;
+    if is_ofga_object_visible(org_id, "provider", provider_id, permitted.as_deref()) {
+        Ok(())
+    } else {
+        Err(MetaHttpResponse::forbidden(
+            "Not allowed to use this provider",
+        ))
+    }
+}
+
+fn provider_auth_is_blank(auth_config: &serde_json::Value) -> bool {
+    auth_config
+        .get("api_key")
+        .and_then(serde_json::Value::as_str)
+        .is_none_or(|key| key.trim().is_empty())
+}
+
+fn provider_test_error_response(error: ProviderError) -> Response {
+    log::warn!("[Provider] connection test failed: {error}");
+    MetaHttpResponse::bad_request(PROVIDER_TEST_FAILURE_MESSAGE)
 }
 
 async fn test_provider_connection_config(
@@ -273,7 +339,7 @@ mod tests {
 
     #[cfg(feature = "enterprise")]
     #[tokio::test]
-    async fn test_inline_provider_rejects_missing_credentials() {
+    async fn test_inline_provider_hides_missing_credentials_error() {
         let body: ProviderRequestBody = serde_json::from_value(serde_json::json!({
             "name": "Test provider",
             "providerType": "openai",
@@ -281,14 +347,30 @@ mod tests {
         }))
         .unwrap();
 
-        let response = test_provider_config(Path("test-org".to_string()), axum::Json(body)).await;
+        let provider: infra::table::providers::Provider = body.into();
+        let error = test_provider_connection_config(provider).await.unwrap_err();
+        let response = provider_test_error_response(error);
 
         assert_eq!(response.status().as_u16(), 400);
         let bytes = axum::body::to_bytes(response.into_body(), 4096)
             .await
             .unwrap();
         let body: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
-        assert!(body["message"].as_str().unwrap().contains("No API key"));
+        assert_eq!(
+            body["message"].as_str(),
+            Some(PROVIDER_TEST_FAILURE_MESSAGE)
+        );
+    }
+
+    #[test]
+    fn test_provider_auth_blank_detection() {
+        assert!(provider_auth_is_blank(
+            &serde_json::json!({"api_key": "  "})
+        ));
+        assert!(provider_auth_is_blank(&serde_json::json!({})));
+        assert!(!provider_auth_is_blank(
+            &serde_json::json!({"api_key": "sk-test"})
+        ));
     }
 
     #[test]

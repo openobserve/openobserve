@@ -94,6 +94,59 @@ pub struct ExperimentResultRowPageResponseBody {
     pub pagination: ExperimentResultRowPaginationBody,
 }
 
+#[derive(Clone, Debug, Default, Deserialize, IntoParams)]
+#[serde(rename_all = "camelCase")]
+pub struct ExperimentPreviewQuery {
+    pub sample_size: Option<usize>,
+}
+
+#[derive(Debug, Clone, Deserialize, IntoParams)]
+#[serde(rename_all = "camelCase")]
+pub struct ExperimentListQuery {
+    pub include_summary: Option<bool>,
+    pub dataset_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, IntoParams)]
+#[serde(rename_all = "camelCase")]
+pub struct ExperimentDetailQuery {
+    pub sample_size: Option<usize>,
+    pub result_page: Option<usize>,
+    pub result_page_size: Option<usize>,
+}
+
+#[derive(Clone, Copy, Debug, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ExperimentSummaryStatusBody {
+    Pending,
+    Running,
+    Scoring,
+    Completed,
+    Cancelled,
+    ExecutionFailed,
+    ScoringFailed,
+}
+
+#[derive(Clone, Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ExperimentSummaryResponseBody {
+    pub status: Option<ExperimentSummaryStatusBody>,
+    #[schema(value_type = Option<String>)]
+    pub scoring_status: Option<ScoringStatus>,
+    pub execution_progress: Option<ExperimentProgressBody>,
+    pub scoring_progress: Option<ExperimentProgressBody>,
+    pub score_summaries: Option<Vec<ExperimentScoreSummaryBody>>,
+    pub aggregate_summary: Option<ExperimentAggregateSummaryBody>,
+}
+
+#[derive(Clone, Debug, Serialize, ToSchema)]
+pub struct ExperimentViewResponseBody {
+    #[serde(flatten)]
+    pub experiment: ExperimentResponseBody,
+    #[serde(flatten)]
+    pub summary: Option<ExperimentSummaryResponseBody>,
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum DatasetItemSourceBody {
@@ -635,26 +688,6 @@ impl From<RecordBatchResult> for SubmitExperimentRecordsResponseBody {
     }
 }
 
-#[derive(Clone, Debug, Default, Deserialize, IntoParams)]
-#[serde(rename_all = "camelCase")]
-pub struct ExperimentPreviewQuery {
-    pub sample_size: Option<usize>,
-}
-
-#[derive(Debug, Clone, Deserialize, IntoParams)]
-#[serde(rename_all = "camelCase")]
-pub struct ExperimentListQuery {
-    pub include_summary: Option<bool>,
-}
-
-#[derive(Debug, Clone, Deserialize, IntoParams)]
-#[serde(rename_all = "camelCase")]
-pub struct ExperimentDetailQuery {
-    pub sample_size: Option<usize>,
-    pub result_page: Option<usize>,
-    pub result_page_size: Option<usize>,
-}
-
 #[derive(Clone, Debug, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PinnedExperimentScorerBody {
@@ -975,18 +1008,6 @@ impl From<Experiment> for ExperimentResponseBody {
     }
 }
 
-#[derive(Clone, Copy, Debug, Serialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum ExperimentSummaryStatusBody {
-    Pending,
-    Running,
-    Scoring,
-    Completed,
-    Cancelled,
-    ExecutionFailed,
-    ScoringFailed,
-}
-
 impl From<ExperimentSummaryStatus> for ExperimentSummaryStatusBody {
     fn from(value: ExperimentSummaryStatus) -> Self {
         match value {
@@ -999,26 +1020,6 @@ impl From<ExperimentSummaryStatus> for ExperimentSummaryStatusBody {
             ExperimentSummaryStatus::ScoringFailed => Self::ScoringFailed,
         }
     }
-}
-
-#[derive(Clone, Debug, Serialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct ExperimentSummaryResponseBody {
-    pub status: Option<ExperimentSummaryStatusBody>,
-    #[schema(value_type = Option<String>)]
-    pub scoring_status: Option<ScoringStatus>,
-    pub execution_progress: Option<ExperimentProgressBody>,
-    pub scoring_progress: Option<ExperimentProgressBody>,
-    pub score_summaries: Option<Vec<ExperimentScoreSummaryBody>>,
-    pub aggregate_summary: Option<ExperimentAggregateSummaryBody>,
-}
-
-#[derive(Clone, Debug, Serialize, ToSchema)]
-pub struct ExperimentViewResponseBody {
-    #[serde(flatten)]
-    pub experiment: ExperimentResponseBody,
-    #[serde(flatten)]
-    pub summary: Option<ExperimentSummaryResponseBody>,
 }
 
 /// The result of a Baseline change, naming both ends of the move.
@@ -1739,12 +1740,17 @@ mod tests {
 
     #[test]
     fn list_summary_is_an_explicit_camel_case_opt_in() {
-        let enabled: ExperimentListQuery =
-            serde_json::from_value(serde_json::json!({"includeSummary": true})).unwrap();
+        let enabled: ExperimentListQuery = serde_json::from_value(serde_json::json!({
+            "includeSummary": true,
+            "datasetId": "dataset-1"
+        }))
+        .unwrap();
         let omitted: ExperimentListQuery = serde_json::from_value(serde_json::json!({})).unwrap();
 
         assert_eq!(enabled.include_summary, Some(true));
+        assert_eq!(enabled.dataset_id.as_deref(), Some("dataset-1"));
         assert_eq!(omitted.include_summary, None);
+        assert_eq!(omitted.dataset_id, None);
     }
 
     #[test]

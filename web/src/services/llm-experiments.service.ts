@@ -898,9 +898,16 @@ const llmExperimentsService = {
    * same call — the alternative is a detail fetch per experiment, which is
    * an N+1 fan-out for a page that just needs a few summary numbers per row.
    */
-  async list(orgId: string, options: { includeSummary?: boolean } = {}): Promise<LlmExperiment[]> {
+  async list(
+    orgId: string,
+    options: { includeSummary?: boolean; datasetId?: string } = {},
+  ): Promise<LlmExperiment[]> {
+    const params = {
+      ...(options.includeSummary ? { includeSummary: true } : {}),
+      ...(options.datasetId ? { datasetId: options.datasetId } : {}),
+    };
     const response = await http().get(base(orgId), {
-      params: options.includeSummary ? { includeSummary: true } : undefined,
+      params: Object.keys(params).length ? params : undefined,
     });
     const rows = Array.isArray(response.data) ? response.data : (response.data?.list ?? []);
     return rows.map(normalizeExperiment);

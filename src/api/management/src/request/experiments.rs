@@ -562,7 +562,12 @@ pub async fn list_experiments(
                 .collect()
         })
         .unwrap_or_default();
-    let experiments = match experiments::list(&org_id).await {
+    let dataset_id = query
+        .dataset_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|id| !id.is_empty());
+    let experiments = match experiments::list(&org_id, dataset_id).await {
         Ok(experiments) => experiments
             .into_iter()
             .filter(|experiment| {
@@ -672,85 +677,99 @@ pub async fn get_experiment(
         }
     };
     let spans = NormalizationSpans::from_configs(&score_configs);
-    let results = match openobserve_core::llm_evaluations::experiments::runner::results_page(
-        &experiment,
-        result_page,
-        result_page_size,
-    )
-    .await
-    {
-        Ok(results) => {
-            let executions = results.executions;
-            let scores = results.scores;
-            let summary_executions = results.summary_executions;
-            let summary_scores = results.summary_scores;
-            let scorers = experiment.scorers.clone();
-            let summary = results::result_summary(
-                &preview.applicability,
-                &scorers,
-                &summary_executions,
-                &summary_scores,
-            );
-            // Measured over the whole Experiment, then narrowed to this page:
-            // a case's trials can straddle a page boundary, and half a case's
-            // trials would understate how much it disagreed with itself.
-            let dispersions = dispersion::row_dispersions(
-                &results.summary_rows,
-                &summary_scores,
-                &scorers,
-                &spans,
-            );
-            let dispersion_summary = ExperimentDispersionSummaryBody {
-                high_dispersion_row_count: dispersion::high_dispersion_row_count(&dispersions),
-                threshold: dispersion::HIGH_DISPERSION_THRESHOLD,
-            };
-            let page_rows = results
-                .slots
-                .iter()
-                .map(|slot| slot.row_id.clone())
-                .collect::<HashSet<_>>();
-            let row_dispersions = dispersions
-                .into_iter()
-                .filter(|row| page_rows.contains(&row.row_id))
-                .map(Into::into)
-                .collect();
-            let slots = results::result_slots(results.slots, &executions, &scores, &scorers);
-            ExperimentResultsResponseBody {
-                executions: executions
+    let (results, summary_evidence) =
+        match openobserve_core::llm_evaluations::experiments::runner::results_page(
+            &experiment,
+            result_page,
+            result_page_size,
+        )
+        .await
+        {
+            Ok(results) => {
+                let executions = results.executions;
+                let scores = results.scores;
+                let summary_executions = results
+                    .summary_evidence
+                    .executions
+                    .as_deref()
+                    .unwrap_or_default();
+                let summary_scores = results
+                    .summary_evidence
+                    .scores
+                    .as_deref()
+                    .unwrap_or_default();
+                let scorers = experiment.scorers.clone();
+                let summary = results::result_summary(
+                    &preview.applicability,
+                    &scorers,
+                    summary_executions,
+                    summary_scores,
+                );
+                // Measured over the whole Experiment, then narrowed to this page:
+                // a case's trials can straddle a page boundary, and half a case's
+                // trials would understate how much it disagreed with itself.
+                let dispersions = dispersion::row_dispersions(
+                    &results.summary_rows,
+                    summary_scores,
+                    &scorers,
+                    &spans,
+                );
+                let dispersion_summary = ExperimentDispersionSummaryBody {
+                    high_dispersion_row_count: dispersion::high_dispersion_row_count(&dispersions),
+                    threshold: dispersion::HIGH_DISPERSION_THRESHOLD,
+                };
+                let page_rows = results
+                    .slots
+                    .iter()
+                    .map(|slot| slot.row_id.clone())
+                    .collect::<HashSet<_>>();
+                let row_dispersions = dispersions
                     .into_iter()
-                    .filter_map(|record| serde_json::to_value(record).ok())
-                    .collect(),
-                scores: scores
-                    .into_iter()
-                    .filter_map(|record| serde_json::to_value(record).ok())
-                    .collect(),
-                slots: slots.into_iter().map(Into::into).collect(),
-                pagination: ExperimentResultPaginationBody {
-                    page: results.page,
-                    page_size: results.page_size,
-                    total_slots: results.total_slots,
-                    has_more: results.has_more,
-                },
-                skip_summary: summary.skip_summary.into(),
-                client_score_summaries: summary
-                    .client_score_summaries
-                    .into_iter()
+                    .filter(|row| page_rows.contains(&row.row_id))
                     .map(Into::into)
-                    .collect(),
-                row_dispersions,
-                dispersion_summary,
+                    .collect();
+                let slots = results::result_slots(results.slots, &executions, &scores, &scorers);
+                let body = ExperimentResultsResponseBody {
+                    executions: executions
+                        .into_iter()
+                        .filter_map(|record| serde_json::to_value(record).ok())
+                        .collect(),
+                    scores: scores
+                        .into_iter()
+                        .filter_map(|record| serde_json::to_value(record).ok())
+                        .collect(),
+                    slots: slots.into_iter().map(Into::into).collect(),
+                    pagination: ExperimentResultPaginationBody {
+                        page: results.page,
+                        page_size: results.page_size,
+                        total_slots: results.total_slots,
+                        has_more: results.has_more,
+                    },
+                    skip_summary: summary.skip_summary.into(),
+                    client_score_summaries: summary
+                        .client_score_summaries
+                        .into_iter()
+                        .map(Into::into)
+                        .collect(),
+                    row_dispersions,
+                    dispersion_summary,
+                };
+                (body, results.summary_evidence)
             }
-        }
-        Err(error) => {
-            log::error!("[Experiment] failed to load results for {experiment_id}: {error}");
-            return MetaHttpResponse::internal_error("Failed to load Experiment results");
-        }
-    };
+            Err(error) => {
+                log::error!("[Experiment] failed to load results for {experiment_id}: {error}");
+                return MetaHttpResponse::internal_error("Failed to load Experiment results");
+            }
+        };
     let dataset_name = datasets::get(&org_id, &experiment.dataset_id)
         .await
         .ok()
         .map(|dataset| dataset.name);
-    let mut summaries = summary::load(std::slice::from_ref(&experiment)).await;
+    let mut summaries = summary::load_with_evidence(
+        std::slice::from_ref(&experiment),
+        HashMap::from([(experiment.id.clone(), summary_evidence)]),
+    )
+    .await;
     let summary = experiment_summary_body(
         summaries.remove(&experiment.id).unwrap_or_default(),
         &score_configs,

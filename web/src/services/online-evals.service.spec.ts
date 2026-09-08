@@ -113,6 +113,25 @@ describe("URL construction", () => {
     expect(result).toBe("Connected");
   });
 
+  it("includes the stored provider ID when requested", async () => {
+    const payload = {
+      name: "Test provider",
+      providerType: "openai",
+      defaultModel: "gpt-4o-mini",
+      availableModels: ["gpt-4o-mini"],
+      authConfig: { api_key: "" },
+      isDefault: false,
+    };
+    mockPost.mockResolvedValue({ data: { code: 200, message: "Connected" } });
+
+    await onlineEvalsService.providers.testConfig("acme", payload, "provider-1");
+
+    expect(mockPost).toHaveBeenCalledWith("/api/acme/providers/test", {
+      ...payload,
+      providerId: "provider-1",
+    });
+  });
+
   it("providers.list hits /api/{orgId}/providers", async () => {
     mockGet.mockResolvedValue({ data: [] });
     await onlineEvalsService.providers.list("acme");

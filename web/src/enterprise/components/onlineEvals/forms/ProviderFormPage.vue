@@ -348,7 +348,11 @@ async function testConnection() {
   testMessage.value = null;
   const value = formValues.value;
   try {
-    const message = await onlineEvalsService.providers.testConfig(props.orgId, buildPayload(value));
+    const message = await onlineEvalsService.providers.testConfig(
+      props.orgId,
+      buildPayload(value),
+      props.mode === "edit" ? props.row?.id : undefined,
+    );
     testState.value = "passed";
     testMessage.value = raw(message);
   } catch (err: any) {

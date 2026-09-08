@@ -28,6 +28,7 @@ const mockUpdateItem = vi.fn();
 const mockAddItem = vi.fn();
 const mockImportItems = vi.fn();
 const mockRemoveItem = vi.fn();
+const mockListExperiments = vi.fn();
 const mockToast = vi.fn();
 const mockConfirm = vi.fn();
 const mockRouterPush = vi.fn();
@@ -47,7 +48,7 @@ vi.mock("@/services/llm-datasets.service", () => ({
 }));
 
 vi.mock("@/services/llm-experiments.service", () => ({
-  default: { list: vi.fn().mockResolvedValue([]), get: vi.fn() },
+  default: { list: (...args: any[]) => mockListExperiments(...args), get: vi.fn() },
 }));
 
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
@@ -157,6 +158,7 @@ beforeEach(() => {
     .mockReset()
     .mockResolvedValue({ filename: "goldens.csv", importedCount: 2, skippedCount: 1 });
   mockRemoveItem.mockReset().mockResolvedValue(undefined);
+  mockListExperiments.mockReset().mockResolvedValue([]);
   mockToast.mockReset();
   mockConfirm.mockReset().mockResolvedValue(true);
 });
@@ -172,6 +174,17 @@ describe("DatasetDetailPage navigation", () => {
     expect(mockRouterBack).toHaveBeenCalledTimes(1);
     expect(mockRouterPush).not.toHaveBeenCalled();
     window.history.replaceState(null, "");
+  });
+});
+
+describe("DatasetDetailPage experiments", () => {
+  it("requests summarized experiments for this dataset", async () => {
+    await mountPage();
+
+    expect(mockListExperiments).toHaveBeenCalledWith("test-org", {
+      includeSummary: true,
+      datasetId: "dataset-1",
+    });
   });
 });
 

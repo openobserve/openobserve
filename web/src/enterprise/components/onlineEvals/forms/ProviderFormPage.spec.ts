@@ -204,6 +204,7 @@ describe("ProviderFormPage", () => {
       expect(onlineEvalsService.providers.testConfig).toHaveBeenCalledWith(
         "test-org",
         expect.objectContaining({ name: "Prod OpenAI", authConfig: { api_key: "sk-secret" } }),
+        undefined,
       );
       expect(onlineEvalsService.providers.create).not.toHaveBeenCalled();
     });
@@ -250,6 +251,7 @@ describe("ProviderFormPage", () => {
             endpoint: "https://proxy.example.com/v1/messages",
             authConfig: { api_key: "" },
           }),
+          "prov-1",
         );
         expect(onlineEvalsService.providers.update).not.toHaveBeenCalled();
       });
@@ -263,6 +265,7 @@ describe("ProviderFormPage", () => {
         expect(onlineEvalsService.providers.testConfig).toHaveBeenCalledWith(
           "test-org",
           expect.objectContaining({ authConfig: { api_key: "sk-new-secret" } }),
+          "prov-1",
         );
       });
     });

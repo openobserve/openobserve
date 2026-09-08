@@ -33,6 +33,19 @@ beforeEach(() => {
   mockClient.get.mockResolvedValue({ data: {} });
 });
 
+describe("list()", () => {
+  it("sends the dataset filter with the summary request", async () => {
+    await llmExperimentsService.list("acme", {
+      includeSummary: true,
+      datasetId: "dataset-1",
+    });
+
+    expect(mockClient.get).toHaveBeenCalledWith("/api/acme/experiments", {
+      params: { includeSummary: true, datasetId: "dataset-1" },
+    });
+  });
+});
+
 describe("llm-experiments compare()", () => {
   it.each([{ ids: ["cost", "latency"] }, { ids: [] }])(
     "sends explicit column selections, including none: $ids",
