@@ -338,7 +338,20 @@ describe("PipelinesDestinationList", () => {
   // ── editor toggle ──────────────────────────────────────────────────────────
 
   describe("editor toggle", () => {
-    it.skip("toggleDestinationEditor toggles showDestinationEditor", async () => {
+    // Registers the route (normally added by useManagementRoutes at app setup, not run in this isolated mount) so router.push updates currentRoute for real instead of throwing "No match for".
+    beforeEach(() => {
+      router.addRoute({
+        name: "pipelineDestinations",
+        path: "/test-pipeline-destinations",
+        component: { template: "<div />" },
+      });
+    });
+
+    afterEach(() => {
+      router.removeRoute("pipelineDestinations");
+    });
+
+    it("toggleDestinationEditor toggles showDestinationEditor", async () => {
       wrapper = mountComponent();
       await flushPromises();
 
@@ -349,7 +362,7 @@ describe("PipelinesDestinationList", () => {
       expect((wrapper.vm as any).showDestinationEditor).toBe(false);
     });
 
-    it.skip("editDestination(null) sets showDestinationEditor to true", async () => {
+    it("editDestination(null) sets showDestinationEditor to true", async () => {
       wrapper = mountComponent();
       await flushPromises();
       (wrapper.vm as any).editDestination(null);
@@ -357,7 +370,7 @@ describe("PipelinesDestinationList", () => {
       expect((wrapper.vm as any).showDestinationEditor).toBe(true);
     });
 
-    it.skip("editDestination with existing dest stores editingDestination", async () => {
+    it("editDestination with existing dest stores editingDestination", async () => {
       wrapper = mountComponent();
       await flushPromises();
       const dest = (wrapper.vm as any).destinations[0];
@@ -366,7 +379,7 @@ describe("PipelinesDestinationList", () => {
       expect((wrapper.vm as any).editingDestination).toEqual(dest);
     });
 
-    it.skip("clones destination so original is not mutated", async () => {
+    it("clones destination so original is not mutated", async () => {
       wrapper = mountComponent();
       await flushPromises();
       const original = { name: "orig", url: "http://x.com" };
@@ -376,27 +389,13 @@ describe("PipelinesDestinationList", () => {
     });
 
     it("a stale getDestinations() resolving after Add must not close the editor (regression)", async () => {
-      // onBeforeMount kicks off getDestinations(); defer its resolution so we can
-      // open the editor (simulating the user's Add click) while it's still in flight,
-      // then resolve it afterwards — reproducing the real-world race where the API
-      // round-trip lands after the user has already clicked Add.
+      // Defers destinationService.list() so editDestination(null) (the Add click) can run while onBeforeMount's call is still in flight, then resolves it to reproduce the late-API-response race.
       let resolveList!: (v: any) => void;
       (destinationService.list as any).mockReturnValueOnce(
         new Promise((resolve) => {
           resolveList = resolve;
         }),
       );
-      // The "pipelineDestinations" route is registered by useManagementRoutes at app
-      // setup, which this isolated mount doesn't run — router.push would otherwise throw
-      // "No match for" (why the other editDestination tests in this file are skipped).
-      // Register it for real (rather than stubbing push) so router.currentRoute.value.query
-      // actually updates — the race this test guards against depends on updateRoute()
-      // reading the real post-navigation query.
-      router.addRoute({
-        name: "pipelineDestinations",
-        path: "/test-pipeline-destinations",
-        component: { template: "<div />" },
-      });
 
       wrapper = mountComponent();
       (wrapper.vm as any).editDestination(null);
@@ -408,7 +407,6 @@ describe("PipelinesDestinationList", () => {
       await flushPromises();
 
       expect((wrapper.vm as any).showDestinationEditor).toBe(true);
-      router.removeRoute("pipelineDestinations");
     });
 
     it("shows PipelineDestinationEditor when showDestinationEditor is true", async () => {

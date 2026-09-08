@@ -379,11 +379,7 @@ export default defineComponent({
     const updateRoute = () => {
       const action = router.currentRoute.value.query.action;
       const name = router.currentRoute.value.query.name as string;
-      // Only run when the editor doesn't already match the route: updateRoute is also
-      // called from getDestinations().then() (onBeforeMount kicks it off, and it can
-      // resolve after the user has already opened the editor via the Add/Edit button).
-      // Without this guard, that late resolution re-invokes editDestination(), whose
-      // toggleDestinationEditor() flips the just-opened editor closed again.
+      // No-op when the editor already matches the route; a stale getDestinations().then() resolution re-invokes editDestination() and flips the just-opened editor closed.
       if (action === "add" && !showDestinationEditor.value) {
         editDestination(null);
       } else if (
