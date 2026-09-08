@@ -135,7 +135,7 @@
       >
         <div
           v-if="testState !== 'idle'"
-          class="mr-auto flex min-w-0 items-center gap-2"
+          class="me-auto flex min-w-0 items-center gap-2"
           data-test="provider-form-test-result"
         >
           <span v-if="testState === 'running'" class="text-text-secondary text-xs">
