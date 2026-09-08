@@ -112,7 +112,7 @@ pub async fn merge_files(
     if !deleted_files.is_empty() {
         new_file_list.retain(|f| !deleted_files.contains(&f.key));
     }
-    if new_file_list.len() <= 1 && !merge_whole_batch {
+    if new_file_list.is_empty() || (new_file_list.len() == 1 && !merge_whole_batch) {
         return Ok((Vec::new(), retain_file_list));
     }
 
@@ -437,20 +437,13 @@ async fn cache_remote_files(files: &[FileKey]) -> Result<Vec<String>, anyhow::Er
             // must have been deleted by some external entity, and hence we
             // should remove the entry from file_list table.
             let file_name = match ret {
-                Ok(data_len) => {
-                    if data_len > 0 && data_len != file_size {
-                        log::warn!(
-                            "[COMPACT] download file {file_name} found size mismatch, expected: {file_size}, actual: {data_len}, will skip it",
-                        );
-                        // skip this file for compact
-                        Some(file_name)
-                    } else {
-                        None
-                    }
-                }
+                // The downloader validates files with mismatched sizes and corrects
+                // file_list. Keep them even if this batch still has the old size.
+                Ok(_) => None,
                 Err(e) => {
                     if e.to_string().to_lowercase().contains("not found")
                         || e.to_string().to_lowercase().contains("data size is zero")
+                        || e.to_string().to_lowercase().contains("is corrupted")
                     {
                         // delete file from file list
                         log::error!("[COMPACT] found invalid file: {file_name}, will delete it");

@@ -234,6 +234,12 @@ pub async fn merge_by_stream(
                 }
                 check_guard.insert(batch_id);
 
+                // A storage check can leave too few files to merge. Keep the
+                // surviving source files when no replacement was produced.
+                if new_files.is_empty() {
+                    continue;
+                }
+
                 // delete small files keys & write big files keys, use transaction
                 let delete_file_list = batch_groups.get(batch_id).unwrap().files.as_slice();
                 let mut events = Vec::with_capacity(new_files.len() + delete_file_list.len());
