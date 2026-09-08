@@ -24,12 +24,15 @@ use axum::{
 use common::meta::http::HttpResponse as MetaHttpResponse;
 use o2_enterprise::enterprise::raman_service::{self, DigestQuery};
 
-use super::error_response;
+use super::{deployment_disabled, error_response};
 
 pub async fn list_raman_digests(
     Path(org_id): Path<String>,
     Query(query): Query<DigestQuery>,
 ) -> Response {
+    if let Some(disabled) = deployment_disabled() {
+        return disabled;
+    }
     match raman_service::list_digests(&org_id, query).await {
         Ok(list) => MetaHttpResponse::json(list),
         Err(error) => error_response(&error),
@@ -37,14 +40,20 @@ pub async fn list_raman_digests(
 }
 
 pub async fn get_raman_digest(Path((org_id, digest_id)): Path<(String, String)>) -> Response {
+    if let Some(disabled) = deployment_disabled() {
+        return disabled;
+    }
     match raman_service::get_digest(&org_id, &digest_id).await {
         Ok(digest) => MetaHttpResponse::json(digest),
         Err(error) => error_response(&error),
     }
 }
 
-/// Answers 202: the run is only enqueued here, and the scheduler produces the digest.
+/// Answers 202, not 200: the run is only enqueued here, and the scheduler produces the digest.
 pub async fn run_raman_digest(Path(org_id): Path<String>) -> Response {
+    if let Some(disabled) = deployment_disabled() {
+        return disabled;
+    }
     match raman_service::request_run(&org_id).await {
         Ok(accepted) => (StatusCode::ACCEPTED, Json(accepted)).into_response(),
         Err(error) => error_response(&error),

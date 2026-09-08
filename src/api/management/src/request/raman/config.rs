@@ -19,9 +19,12 @@ use axum::{Json, extract::Path, response::Response};
 use common::meta::http::HttpResponse as MetaHttpResponse;
 use o2_enterprise::enterprise::raman_service::{self, UpdateRamanConfig};
 
-use super::error_response;
+use super::{deployment_disabled, error_response};
 
 pub async fn get_raman_config(Path(org_id): Path<String>) -> Response {
+    if let Some(disabled) = deployment_disabled() {
+        return disabled;
+    }
     match raman_service::get_config(&org_id).await {
         Ok(config) => MetaHttpResponse::json(config),
         Err(error) => error_response(&error),
@@ -32,6 +35,9 @@ pub async fn update_raman_config(
     Path(org_id): Path<String>,
     Json(update): Json<UpdateRamanConfig>,
 ) -> Response {
+    if let Some(disabled) = deployment_disabled() {
+        return disabled;
+    }
     match raman_service::update_config(&org_id, update).await {
         Ok(config) => MetaHttpResponse::json(config),
         Err(error) => error_response(&error),

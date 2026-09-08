@@ -5912,8 +5912,9 @@ async fn handle_raman_triggers(
 ) -> Result<(), anyhow::Error> {
     let started_at = now_micros();
     let config = raman_config(&trigger.org, &trigger.module_key).await;
+    let window_minutes = raman_run_window_minutes(config.as_ref(), get_config().raman.enabled);
     let mut error = None;
-    if raman_run_window_minutes(config.as_ref()).is_some() {
+    if window_minutes.is_some() {
         log::warn!(
             "[raman] config {} is enabled but hygiene analysis is an enterprise feature; \
              re-arming without a digest",
@@ -5947,18 +5948,16 @@ async fn handle_raman_triggers(
 ) -> Result<(), anyhow::Error> {
     let started_at = now_micros();
     let config = raman_config(&trigger.org, &trigger.module_key).await;
-    let window_minutes = raman_run_window_minutes(config.as_ref());
-    let mut error = None;
-    if let Some(window_minutes) = window_minutes
-        && let Err(e) = run_raman_digest(&trigger.org, &trigger.module_key, window_minutes).await
-    {
-        log::error!(
-            "[raman] digest run failed for {} org={}: {e}",
-            trigger.module_key,
-            trigger.org
-        );
-        error = Some(e.to_string());
-    }
+    let (window_minutes, error) = raman_run_outcome(
+        &trigger.org,
+        &trigger.module_key,
+        config.as_ref(),
+        get_config().raman.enabled,
+        |org, config_id, window_minutes| async move {
+            run_raman_digest(&org, &config_id, window_minutes).await
+        },
+    )
+    .await;
     let next_run_at = raman_next_run_at(now_micros(), config.as_ref());
     publish_triggers_usage(raman_trigger_data(
         &trigger,
@@ -5970,6 +5969,31 @@ async fn handle_raman_triggers(
         trace_id,
     ));
     finalize_raman_trigger(trigger, next_run_at, trace_id).await
+}
+
+/// The run decision and its dispatch, over an injected runner so a test can assert the
+/// digest a deployment switch permits, and the one it never starts.
+#[cfg(feature = "enterprise")]
+async fn raman_run_outcome<F, Fut>(
+    org: &str,
+    config_id: &str,
+    config: Option<&infra::table::entity::raman_configs::Model>,
+    raman_enabled: bool,
+    run: F,
+) -> (Option<i64>, Option<String>)
+where
+    F: FnOnce(String, String, i64) -> Fut,
+    Fut: std::future::Future<Output = Result<(), anyhow::Error>>,
+{
+    let window_minutes = raman_run_window_minutes(config, raman_enabled);
+    let mut error = None;
+    if let Some(window_minutes) = window_minutes
+        && let Err(e) = run(org.to_string(), config_id.to_string(), window_minutes).await
+    {
+        log::error!("[raman] digest run failed for {config_id} org={org}: {e}");
+        error = Some(e.to_string());
+    }
+    (window_minutes, error)
 }
 
 /// Collect, judge, store, then project. The table is the system of record and the
@@ -6090,10 +6114,14 @@ fn raman_next_run_at(now: i64, config: Option<&infra::table::entity::raman_confi
     now.saturating_add(minutes.saturating_mul(60).saturating_mul(1_000_000))
 }
 
-/// The window an enabled config may analyse; a disabled or absent one may not run at all.
+/// Both the deployment switch and the org's own config must allow the run.
 fn raman_run_window_minutes(
     config: Option<&infra::table::entity::raman_configs::Model>,
+    raman_enabled: bool,
 ) -> Option<i64> {
+    if !raman_enabled {
+        return None;
+    }
     config
         .filter(|config| config.enabled)
         .map(|config| i64::from(config.window_minutes))
@@ -7563,12 +7591,55 @@ mod tests {
     /// are the only parts a test can execute: the handler's analysing arm is
     /// `#[cfg(feature = "enterprise")]`, so neither CI runs it.
     mod raman {
+        #[cfg(feature = "enterprise")]
+        use std::sync::{Arc, Mutex};
+
         use infra::table::entity::{raman_configs, raman_digests};
 
         use super::*;
 
         const NOW: i64 = 1_760_000_000_000_000;
         const MINUTE: i64 = 60 * 1_000_000;
+        /// Both decision inputs as one fragment, so a scan catches an arm that drops the
+        /// switch as surely as one that never asks.
+        const RUN_DECISION: &str = "config.as_ref(), get_config().raman.enabled";
+        const OSS_ARM: &str = "#[cfg(not(feature = \"enterprise\"))]";
+        const ENTERPRISE_ARM: &str = "#[cfg(feature = \"enterprise\")]";
+
+        /// Comments and whitespace dropped: no wrap or commented-out line moves a count.
+        fn scannable(source: &str) -> String {
+            let mut without_blocks = String::with_capacity(source.len());
+            let mut rest = source;
+            while let Some(open) = rest.find("/*") {
+                without_blocks.push_str(&rest[..open]);
+                let after_open = &rest[open + 2..];
+                rest = match after_open.find("*/") {
+                    Some(close) => &after_open[close + 2..],
+                    None => "",
+                };
+            }
+            without_blocks.push_str(rest);
+            without_blocks
+                .lines()
+                .map(|line| line.split_once("//").map_or(line, |(code, _)| code))
+                .flat_map(|line| line.chars().filter(|c| !c.is_whitespace()))
+                .collect::<String>()
+                .replace(",)", ")")
+        }
+
+        /// One `#[cfg]` arm alone: a whole-region count hides one arm reading twice and one never.
+        fn handler_arm(cfg_attribute: &str) -> String {
+            let source = live_source(HANDLERS_SOURCE);
+            let signature = format!("{cfg_attribute}\nasync fn handle_raman_triggers(");
+            let start = source
+                .find(&signature)
+                .unwrap_or_else(|| panic!("handle_raman_triggers has no `{cfg_attribute}` arm"));
+            let arm = &source[start..];
+            let end = arm
+                .find("\n}\n")
+                .expect("the arm must be a complete function");
+            scannable(&arm[..end])
+        }
 
         fn config(
             enabled: bool,
@@ -7584,6 +7655,18 @@ mod tests {
                 rule_overrides: None,
                 created_at: Some(NOW),
                 updated_at: Some(NOW),
+            }
+        }
+
+        /// Records what the arm dispatched, so a test asserts the run and not the return.
+        #[cfg(feature = "enterprise")]
+        fn recorder(
+            runs: Arc<Mutex<Vec<(String, String, i64)>>>,
+        ) -> impl FnOnce(String, String, i64) -> std::future::Ready<Result<(), anyhow::Error>>
+        {
+            move |org, config_id, window_minutes| {
+                runs.lock().unwrap().push((org, config_id, window_minutes));
+                std::future::ready(Ok(()))
             }
         }
 
@@ -7651,20 +7734,112 @@ mod tests {
 
         #[test]
         fn a_disabled_config_may_not_run_analysis() {
-            assert_eq!(raman_run_window_minutes(Some(&config(false, 30, 60))), None);
+            assert_eq!(
+                raman_run_window_minutes(Some(&config(false, 30, 60)), true),
+                None
+            );
         }
 
         #[test]
         fn a_missing_config_may_not_run_analysis() {
-            assert_eq!(raman_run_window_minutes(None), None);
+            assert_eq!(raman_run_window_minutes(None, true), None);
         }
 
         #[test]
         fn an_enabled_config_is_analysed_over_the_window_it_declares() {
             assert_eq!(
-                raman_run_window_minutes(Some(&config(true, 1440, 43200))),
+                raman_run_window_minutes(Some(&config(true, 1440, 43200)), true),
                 Some(43200)
             );
+        }
+
+        /// The deployment switch outranks the org's own: an operator turning raman off
+        /// must stop every org, not only the ones that had not opted in.
+        #[test]
+        fn the_deployment_switch_off_declines_even_an_enabled_config() {
+            for row in [
+                None,
+                Some(config(true, 1440, 43200)),
+                Some(config(false, 30, 60)),
+            ] {
+                assert_eq!(raman_run_window_minutes(row.as_ref(), false), None);
+            }
+        }
+
+        /// The gate is asserted on the dispatch, not on the text of the decision: a run
+        /// started with the switch off is the whole failure this guard exists to prevent.
+        #[cfg(feature = "enterprise")]
+        #[tokio::test]
+        async fn the_deployment_switch_off_starts_no_digest_at_all() {
+            let runs = Arc::new(Mutex::new(Vec::new()));
+            let (window_minutes, error) = raman_run_outcome(
+                "default",
+                "cfg1",
+                Some(&config(true, 1440, 43200)),
+                false,
+                recorder(runs.clone()),
+            )
+            .await;
+            assert_eq!(window_minutes, None);
+            assert_eq!(error, None);
+            assert!(
+                runs.lock().unwrap().is_empty(),
+                "an operator turning raman off must stop the digest, not only the reporting"
+            );
+        }
+
+        #[cfg(feature = "enterprise")]
+        #[tokio::test]
+        async fn a_disabled_org_config_starts_no_digest_even_with_the_switch_on() {
+            let runs = Arc::new(Mutex::new(Vec::new()));
+            let (window_minutes, error) = raman_run_outcome(
+                "default",
+                "cfg1",
+                Some(&config(false, 1440, 43200)),
+                true,
+                recorder(runs.clone()),
+            )
+            .await;
+            assert_eq!(window_minutes, None);
+            assert_eq!(error, None);
+            assert!(runs.lock().unwrap().is_empty());
+        }
+
+        /// The window comes off the org's own row, so a hardcoded span is caught here.
+        #[cfg(feature = "enterprise")]
+        #[tokio::test]
+        async fn an_enabled_deployment_starts_one_digest_over_the_window_the_config_declares() {
+            let runs = Arc::new(Mutex::new(Vec::new()));
+            let (window_minutes, error) = raman_run_outcome(
+                "default",
+                "cfg1",
+                Some(&config(true, 1440, 7200)),
+                true,
+                recorder(runs.clone()),
+            )
+            .await;
+            assert_eq!(window_minutes, Some(7200));
+            assert_eq!(error, None);
+            assert_eq!(
+                *runs.lock().unwrap(),
+                vec![("default".to_string(), "cfg1".to_string(), 7200)]
+            );
+        }
+
+        /// A failed run is reported and not propagated, or the row would stay `Processing`.
+        #[cfg(feature = "enterprise")]
+        #[tokio::test]
+        async fn a_failed_digest_is_reported_on_the_row_rather_than_returned() {
+            let (window_minutes, error) = raman_run_outcome(
+                "default",
+                "cfg1",
+                Some(&config(true, 1440, 43200)),
+                true,
+                |_, _, _| std::future::ready(Err(anyhow::anyhow!("collector unreachable"))),
+            )
+            .await;
+            assert_eq!(window_minutes, Some(43200));
+            assert_eq!(error.as_deref(), Some("collector unreachable"));
         }
 
         #[test]
@@ -7839,12 +8014,64 @@ mod tests {
         /// a source scan is the only check that reaches the enterprise one.
         #[test]
         fn every_arm_of_the_handler_publishes_its_row() {
+            let needle = scannable("publish_triggers_usage(raman_trigger_data(");
+            for arm in [OSS_ARM, ENTERPRISE_ARM] {
+                assert_eq!(
+                    handler_arm(arm).matches(&needle).count(),
+                    1,
+                    "the {arm} arm of handle_raman_triggers must publish exactly one row"
+                );
+            }
+        }
+
+        /// Neither arm is reachable from a test, so a source scan is the only check that
+        /// reaches the enterprise one.
+        #[test]
+        fn every_arm_of_the_handler_consults_the_deployment_switch() {
+            let needle = scannable(RUN_DECISION);
+            for arm in [OSS_ARM, ENTERPRISE_ARM] {
+                assert_eq!(
+                    handler_arm(arm).matches(&needle).count(),
+                    1,
+                    "the {arm} arm of handle_raman_triggers must ask the deployment \
+                     switch exactly once"
+                );
+            }
+        }
+
+        /// Disabling must stay reversible: the switch may not reach the re-arm or the
+        /// delete path, or turning raman off would cost every org its schedule.
+        #[test]
+        fn the_deployment_switch_is_read_nowhere_but_the_two_run_decisions() {
+            for arm in [OSS_ARM, ENTERPRISE_ARM] {
+                assert_eq!(
+                    handler_arm(arm).matches("raman.enabled").count(),
+                    1,
+                    "the {arm} arm reads the deployment switch somewhere other than \
+                     its own run decision"
+                );
+            }
             assert_eq!(
-                live_source(HANDLERS_SOURCE)
-                    .matches("publish_triggers_usage(raman_trigger_data(")
+                scannable(live_source(HANDLERS_SOURCE))
+                    .matches("raman.enabled")
                     .count(),
                 2,
-                "handle_raman_triggers has two feature arms and each must publish a row"
+                "the deployment switch reached a path other than the decision to run"
+            );
+        }
+
+        #[test]
+        fn a_commented_out_run_decision_is_not_read_as_a_consultation() {
+            let needle = scannable(RUN_DECISION);
+            assert!(!scannable(&format!("// let w = {RUN_DECISION};")).contains(&needle));
+            assert!(!scannable(&format!("/* let w = {RUN_DECISION}; */")).contains(&needle));
+        }
+
+        #[test]
+        fn a_wrapped_run_decision_scans_as_the_same_call_as_a_single_line_one() {
+            assert!(
+                scannable("raman_run_window_minutes(\n    config.as_ref(),\n    get_config().raman.enabled,\n)")
+                    .contains(&scannable(RUN_DECISION))
             );
         }
 

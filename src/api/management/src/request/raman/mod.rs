@@ -13,8 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! The raman REST surface: each handler is a delegation into the enterprise
-//! service layer, which owns every status this module can return.
+//! The raman REST surface: a well-formed request meets the deployment-switch guard first.
 
 #[cfg(feature = "enterprise")]
 pub mod config;
@@ -27,6 +26,20 @@ use {
     common::meta::http::HttpResponse as MetaHttpResponse,
     o2_enterprise::enterprise::raman_service::RamanServiceError,
 };
+
+#[cfg(feature = "enterprise")]
+const DISABLED_MESSAGE: &str = "Alert hygiene (Raman) is disabled (ZO_RAMAN_ENABLED=false)";
+
+/// The whole REST surface behind one predicate: no route reads or writes a raman row while off.
+#[cfg(feature = "enterprise")]
+fn deployment_disabled() -> Option<Response> {
+    (!::config::get_config().raman.enabled).then(disabled_response)
+}
+
+#[cfg(feature = "enterprise")]
+fn disabled_response() -> Response {
+    MetaHttpResponse::not_found(DISABLED_MESSAGE)
+}
 
 #[cfg(feature = "enterprise")]
 fn error_response(error: &RamanServiceError) -> Response {
@@ -43,6 +56,15 @@ mod tests {
     use super::*;
 
     const ROUTER: &str = include_str!("../../../../http/src/handler/http/router/mod.rs");
+    const CONFIG_SOURCE: &str = include_str!("config.rs");
+    const DIGESTS_SOURCE: &str = include_str!("digests.rs");
+    /// Hot-reloadable, so the guard is a first statement and not route registration.
+    const GUARDED_SIGNATURE: &str =
+        "-> Response { if let Some(disabled) = deployment_disabled() { return disabled; }";
+
+    /// Env vars are process-global, so both polarities must be driven under one lock.
+    #[cfg(feature = "enterprise")]
+    static SWITCH_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
     /// Scans `service_routes()` alone, comments stripped: a moved or disabled route never matches.
     fn route_call(path: &str) -> String {
@@ -91,6 +113,22 @@ mod tests {
             .filter(|c| !c.is_whitespace())
             .collect::<String>()
             .replace(",)", ")")
+    }
+
+    /// Drives the real `get_config()` read, so a guard that stops consulting it is caught.
+    #[cfg(feature = "enterprise")]
+    fn with_switch<T>(enabled: bool, f: impl FnOnce() -> T) -> T {
+        let _guard = SWITCH_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let previous = std::env::var("ZO_RAMAN_ENABLED").ok();
+        unsafe { std::env::set_var("ZO_RAMAN_ENABLED", enabled.to_string()) };
+        ::config::refresh_config().expect("config refresh");
+        let out = f();
+        match previous {
+            Some(value) => unsafe { std::env::set_var("ZO_RAMAN_ENABLED", value) },
+            None => unsafe { std::env::remove_var("ZO_RAMAN_ENABLED") },
+        }
+        ::config::refresh_config().expect("config refresh");
+        out
     }
 
     /// Restated here rather than read off `http_status()`, so the mapping is asserted, not echoed.
@@ -147,6 +185,64 @@ mod tests {
     fn a_commented_out_route_is_not_read_as_a_registration() {
         assert_eq!(strip_comments("a\n// .route(\"/x\", get(h))\nb"), "a\n\nb");
         assert_eq!(strip_comments("a/* .route(\"/x\") */b"), "ab");
+    }
+
+    /// Five handlers, one predicate: a handler that skips it answers while ZO_RAMAN_ENABLED is off.
+    #[test]
+    fn every_raman_handler_opens_with_the_deployment_guard() {
+        let guard = normalize(GUARDED_SIGNATURE);
+        let mut handlers = 0;
+        for (file, source) in [("config.rs", CONFIG_SOURCE), ("digests.rs", DIGESTS_SOURCE)] {
+            for body in strip_comments(source).split("pub async fn ").skip(1) {
+                handlers += 1;
+                let name = body.split('(').next().unwrap_or(body).trim();
+                assert!(
+                    normalize(body).contains(&guard),
+                    "{file}'s {name} must open with `{GUARDED_SIGNATURE}` - a handler \
+                     that skips the guard serves, and mutates, while the deployment \
+                     switch is off"
+                );
+            }
+        }
+        assert_eq!(handlers, 5, "the raman surface is five handlers");
+    }
+
+    #[test]
+    fn a_commented_out_guard_does_not_count_as_a_guard() {
+        assert!(
+            !normalize(&strip_comments(&format!("// {GUARDED_SIGNATURE}")))
+                .contains(&normalize(GUARDED_SIGNATURE))
+        );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn the_disabled_surface_answers_404_naming_the_env_var() {
+        let response = disabled_response();
+        assert_eq!(response.status().as_u16(), 404);
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body = String::from_utf8(body.to_vec()).unwrap();
+        assert!(
+            body.contains("ZO_RAMAN_ENABLED"),
+            "an operator must be able to read the switch's name off the response: {body}"
+        );
+    }
+
+    /// Both polarities against a forced switch: a guard that always answers, or never
+    /// answers, fails one of them.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn the_guard_answers_only_while_the_deployment_switch_is_off() {
+        assert!(
+            with_switch(false, deployment_disabled).is_some(),
+            "ZO_RAMAN_ENABLED=false must turn the whole surface into a 404"
+        );
+        assert!(
+            with_switch(true, deployment_disabled).is_none(),
+            "ZO_RAMAN_ENABLED=true must let every request through to the service layer"
+        );
     }
 
     #[cfg(feature = "enterprise")]

@@ -946,6 +946,7 @@ pub struct Config {
     pub synthetics: Synthetics,
     pub alert_composite: AlertComposite,
     pub db_monitoring: DatabaseMonitoring,
+    pub raman: Raman,
 }
 
 /// Database Monitoring (design: `db-monitoring/dbm-design-doc.md` §8) —
@@ -970,6 +971,17 @@ pub struct DatabaseMonitoring {
         help = "Rollup window and job cadence in seconds. This is also the freshness floor: rolled-up data is up to one interval stale, and the read path covers the remainder with a live delta query over un-rolled-up spans. Lowering it shrinks that delta (cheaper reads, fresher pages) at the cost of a more frequent rollup job and more `_o2_db_stats` rows."
     )]
     pub rollup_interval_secs: u64,
+}
+
+/// The deployment switch over alert hygiene, second-gated by each org's own config row.
+#[derive(Debug, Serialize, EnvConfig, Default)]
+pub struct Raman {
+    #[env_config(
+        name = "ZO_RAMAN_ENABLED",
+        default = false,
+        help = "Master switch for alert hygiene (Raman). Off by default; while it is off no org's hygiene pass runs and every well-formed request to /v2/{org_id}/raman/* answers 404, whatever each org's own config says."
+    )]
+    pub enabled: bool,
 }
 
 /// Synthetic monitoring. Lives here rather than in `o2_enterprise` because the
@@ -5708,6 +5720,13 @@ mod tests {
              field on the /config payload — the per-signal flags were removed \
              when the config collapsed to a single switch"
         );
+    }
+
+    /// A raman pass is a per-org query over a 30-day window on a daily cadence, so a
+    /// deployment that never asked for one must never pay for one.
+    #[test]
+    fn test_raman_is_off_by_default() {
+        assert!(!Config::init().unwrap().raman.enabled);
     }
 
     #[test]

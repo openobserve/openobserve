@@ -234,6 +234,8 @@ struct ConfigResponse<'a> {
     /// the UI never has to distinguish "feed switched off here" from "collector
     /// not reporting".
     database_monitoring_enabled: bool,
+    /// Alert hygiene (`ZO_RAMAN_ENABLED`): false on OSS, where what it gates is enterprise-only.
+    raman_enabled: bool,
     enable_cross_linking: bool,
     show_fts_field_values: bool,
     search_inspector_enabled: bool,
@@ -488,6 +490,7 @@ pub async fn zo_config(
     let synthetics_private_locations_enabled = enterprise_value!(false, cfg.synthetics.enabled);
     let synthetics_recorder_extension_url = &cfg.synthetics.recorder_extension_url;
     let oncall_enabled = enterprise_value!(false, o2cfg.oncall.enabled);
+    let raman_enabled = enterprise_value!(false, cfg.raman.enabled);
 
     #[cfg(feature = "cloud")]
     let build_type = "cloud";
@@ -605,6 +608,7 @@ pub async fn zo_config(
         synthetics_private_locations_enabled,
         synthetics_recorder_extension_url: synthetics_recorder_extension_url.to_string(),
         database_monitoring_enabled: cfg.db_monitoring.enabled,
+        raman_enabled,
         enable_cross_linking: cfg.common.enable_cross_linking,
         show_fts_field_values: cfg.common.show_fts_field_values,
         search_inspector_enabled,
@@ -1838,6 +1842,14 @@ mod tests {
 
     use super::*;
 
+    /// Test code names the very needles below, so scanning it would match itself.
+    fn live_source(source: &str) -> &str {
+        match source.find("#[cfg(test)]") {
+            Some(end) => &source[..end],
+            None => source,
+        }
+    }
+
     #[test]
     fn test_healthz_response_different_status() {
         let response = HealthzResponse {
@@ -2253,5 +2265,44 @@ mod tests {
         assert!(!rum.version.is_empty());
         assert!(!rum.organization_identifier.is_empty());
         assert!(!rum.api_version.is_empty());
+    }
+
+    /// A literal at the construction site reports `false` to the UI on an enterprise
+    /// deployment that has the switch on, and no OSS run can see it.
+    #[test]
+    fn the_raman_flag_on_the_config_payload_is_fed_from_the_deployment_switch() {
+        let source = live_source(include_str!("mod.rs"));
+        for needle in [
+            "\n    raman_enabled: bool,\n",
+            "\n    let raman_enabled = enterprise_value!(false, cfg.raman.enabled);\n",
+            "\n        raman_enabled,\n",
+        ] {
+            assert!(
+                source.contains(needle),
+                "the /config payload must declare, bind and construct raman_enabled \
+                 verbatim, and construct it by shorthand: {needle:?}"
+            );
+        }
+        assert_eq!(
+            source.matches("raman_enabled").count(),
+            3,
+            "raman_enabled must be the ONLY raman_* field on the /config payload, \
+             declared once, bound once and constructed once"
+        );
+    }
+
+    /// The key is on the payload and reads false, because nothing in an OSS build
+    /// implements what it gates.
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn the_oss_config_payload_carries_raman_enabled_as_false() {
+        let response = zo_config(Path("default".to_string()), None)
+            .await
+            .into_response();
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let payload: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(payload["raman_enabled"], serde_json::json!(false));
     }
 }
