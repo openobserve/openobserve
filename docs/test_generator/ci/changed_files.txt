@@ -1,0 +1,2 @@
+web/src/components/alerts/PipelinesDestinationList.spec.ts
+web/src/components/alerts/PipelinesDestinationList.vue

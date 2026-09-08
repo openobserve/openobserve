@@ -1543,6 +1543,44 @@ class APICleanup {
     }
 
     /**
+     * Create a pipeline destination (module=pipeline) via API.
+     * Used to seed rows for the edit/delete/bulk-delete tests. Payload mirrors
+     * the CreateDestinationForm submit shape (type=http, lowercase method,
+     * string output_format, destination_type_name).
+     * @param {string} name - Unique destination name
+     * @param {object} [opts] - url, method, output_format, destination_type_name
+     * @returns {Promise<Object>} Create result with code and ok flag
+     */
+    async createPipelineDestination(name, opts = {}) {
+        const payload = {
+            name,
+            url: opts.url || 'https://example.com',
+            method: opts.method || 'post',
+            skip_tls_verify: false,
+            template: '',
+            headers: opts.headers || {},
+            type: 'http',
+            output_format: opts.output_format || 'json',
+            destination_type_name: opts.destination_type_name || 'custom',
+        };
+        try {
+            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/alerts/destinations?module=pipeline`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            });
+
+            return { code: response.status, ok: response.ok };
+        } catch (error) {
+            testLogger.error('Failed to create pipeline destination', { name, error: error.message });
+            return { code: 500, message: error.message };
+        }
+    }
+
+    /**
      * Delete a pipeline destination
      * @param {string} name - Name of the destination to delete
      * @returns {Promise<Object>} Delete result with code and message

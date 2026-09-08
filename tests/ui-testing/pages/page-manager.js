@@ -43,6 +43,7 @@ import { AlertTemplatesPage } from "./alertsPages/alertTemplatesPage.js";
 import { AlertDestinationsPage } from "./alertsPages/alertDestinationsPage.js";
 import { PipelinesPage } from "./pipelinesPages/pipelinesPage.js";
 import { PipelinesFormValidationPage } from "./pipelinesPages/pipelinesFormValidationPage.js";
+import { PipelineDestinations } from "./pipelinesPages/pipelineDestinations.js";
 import { LoginPage } from "./generalPages/loginPage.js";
 import { IngestionPage } from "./generalPages/ingestionPage.js";
 import { CloudLoginPage } from "./cloudPages/cloudLoginPage.js";
@@ -183,6 +184,7 @@ class PageManager {
     this.alertDestinationsPage = new AlertDestinationsPage(page);
     this.pipelinesPage = new PipelinesPage(page);
     this.pipelinesFormValidation = new PipelinesFormValidationPage(page);
+    this.pipelineDestinations = new PipelineDestinations(page);
     this.loginPage = isCloudEnvironment() ? new CloudLoginPage(page) : new LoginPage(page);
     this.ingestionPage = new IngestionPage(page);
     this.ingestionConfigPage = new IngestionConfigPage(page);

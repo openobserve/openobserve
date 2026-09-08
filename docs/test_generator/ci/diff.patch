@@ -1,0 +1,113 @@
+===== COMPLETE LIST OF CHANGED FILES (2 files) =====
+# AUTHORITATIVE: this list is never truncated. The diff BODY below may be trimmed for
+# very large PRs, so decide WHICH files/areas changed (e.g. web/src frontend) from THIS list.
+web/src/components/alerts/PipelinesDestinationList.spec.ts
+web/src/components/alerts/PipelinesDestinationList.vue
+===== END CHANGED FILES =====
+
+diff --git a/web/src/components/alerts/PipelinesDestinationList.spec.ts b/web/src/components/alerts/PipelinesDestinationList.spec.ts
+index d5a77c9aa6d..361c841a5a0 100644
+--- a/web/src/components/alerts/PipelinesDestinationList.spec.ts
++++ b/web/src/components/alerts/PipelinesDestinationList.spec.ts
+@@ -338,7 +338,20 @@ describe("PipelinesDestinationList", () => {
+   // ── editor toggle ──────────────────────────────────────────────────────────
+ 
+   describe("editor toggle", () => {
+-    it.skip("toggleDestinationEditor toggles showDestinationEditor", async () => {
++    // Registers the route (normally added by useManagementRoutes at app setup, not run in this isolated mount) so router.push updates currentRoute for real instead of throwing "No match for".
++    beforeEach(() => {
++      router.addRoute({
++        name: "pipelineDestinations",
++        path: "/test-pipeline-destinations",
++        component: { template: "<div />" },
++      });
++    });
++
++    afterEach(() => {
++      router.removeRoute("pipelineDestinations");
++    });
++
++    it("toggleDestinationEditor toggles showDestinationEditor", async () => {
+       wrapper = mountComponent();
+       await flushPromises();
+ 
+@@ -349,7 +362,7 @@ describe("PipelinesDestinationList", () => {
+       expect((wrapper.vm as any).showDestinationEditor).toBe(false);
+     });
+ 
+-    it.skip("editDestination(null) sets showDestinationEditor to true", async () => {
++    it("editDestination(null) sets showDestinationEditor to true", async () => {
+       wrapper = mountComponent();
+       await flushPromises();
+       (wrapper.vm as any).editDestination(null);
+@@ -357,7 +370,7 @@ describe("PipelinesDestinationList", () => {
+       expect((wrapper.vm as any).showDestinationEditor).toBe(true);
+     });
+ 
+-    it.skip("editDestination with existing dest stores editingDestination", async () => {
++    it("editDestination with existing dest stores editingDestination", async () => {
+       wrapper = mountComponent();
+       await flushPromises();
+       const dest = (wrapper.vm as any).destinations[0];
+@@ -366,7 +379,7 @@ describe("PipelinesDestinationList", () => {
+       expect((wrapper.vm as any).editingDestination).toEqual(dest);
+     });
+ 
+-    it.skip("clones destination so original is not mutated", async () => {
++    it("clones destination so original is not mutated", async () => {
+       wrapper = mountComponent();
+       await flushPromises();
+       const original = { name: "orig", url: "http://x.com" };
+@@ -375,6 +388,27 @@ describe("PipelinesDestinationList", () => {
+       expect(original.name).toBe("orig");
+     });
+ 
++    it("a stale getDestinations() resolving after Add must not close the editor (regression)", async () => {
++      // Defers destinationService.list() so editDestination(null) (the Add click) can run while onBeforeMount's call is still in flight, then resolves it to reproduce the late-API-response race.
++      let resolveList!: (v: any) => void;
++      (destinationService.list as any).mockReturnValueOnce(
++        new Promise((resolve) => {
++          resolveList = resolve;
++        }),
++      );
++
++      wrapper = mountComponent();
++      (wrapper.vm as any).editDestination(null);
++      await flushPromises();
++      expect(router.currentRoute.value.query.action).toBe("add");
++      expect((wrapper.vm as any).showDestinationEditor).toBe(true);
++
++      resolveList({ data: [] });
++      await flushPromises();
++
++      expect((wrapper.vm as any).showDestinationEditor).toBe(true);
++    });
++
+     it("shows PipelineDestinationEditor when showDestinationEditor is true", async () => {
+       wrapper = mountComponent();
+       await flushPromises();
+diff --git a/web/src/components/alerts/PipelinesDestinationList.vue b/web/src/components/alerts/PipelinesDestinationList.vue
+index 42236c8a330..759c1ef6f4d 100644
+--- a/web/src/components/alerts/PipelinesDestinationList.vue
++++ b/web/src/components/alerts/PipelinesDestinationList.vue
+@@ -377,9 +377,17 @@ export default defineComponent({
+         .then((res) => (templates.value = res.data));
+     };
+     const updateRoute = () => {
+-      if (router.currentRoute.value.query.action === "add") editDestination(null);
+-      if (router.currentRoute.value.query.action === "update")
+-        editDestination(getDestinationByName(router.currentRoute.value.query.name as string));
++      const action = router.currentRoute.value.query.action;
++      const name = router.currentRoute.value.query.name as string;
++      // No-op when the editor already matches the route; a stale getDestinations().then() resolution re-invokes editDestination() and flips the just-opened editor closed.
++      if (action === "add" && !showDestinationEditor.value) {
++        editDestination(null);
++      } else if (
++        action === "update" &&
++        !(showDestinationEditor.value && editingDestination.value?.name === name)
++      ) {
++        editDestination(getDestinationByName(name));
++      }
+     };
+     const getDestinationByName = (name: string) => {
+       return destinations.value.find((destination) => destination.name === name);

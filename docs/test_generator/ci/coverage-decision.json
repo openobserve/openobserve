@@ -1,0 +1,12 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/Alerts/alerts-pipeline-destination-editor.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Pipelines/pipelineImport.spec.js",
+    "tests/ui-testing/playwright-tests/Alerts/alerts-destinations-prebuilt.spec.js",
+    "tests/ui-testing/playwright-tests/RegressionSet/Pipelines/pipeline-regression.spec.js",
+    "tests/ui-testing/playwright-tests/GeneralTests/landingPage.spec.js"
+  ],
+  "needs_registration": true,
+  "rationale": "No E2E spec exercises the pipeline destination editor itself. pipelineImport.spec.js only calls PipelineDestinations.addDestination() as a helper to seed a scheduled-pipeline target; pipeline-regression.spec.js and landingPage.spec.js only assert the tab/route exists. alerts-destinations-prebuilt.spec.js covers alert destinations (module=alert), a different list than this feature's module=pipeline list. The changed component web/src/components/alerts/PipelinesDestinationList.vue has no dedicated E2E, and the diff's only test file is a Vitest unit test (not E2E). This is a new Alerts-area spec; register it in ci_matrix.json Alerts run_files."
+}

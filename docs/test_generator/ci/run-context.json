@@ -1,0 +1,17 @@
+{
+  "feature_slug": "pipeline-destination-editor",
+  "feature_title": "Pipeline Destination Editor",
+  "area": "Alerts",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "alerts-pipeline-destination-editor.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Alerts/alerts-pipeline-destination-editor.spec.js",
+  "playwright_group": "Alerts",
+  "source_files": [
+    "web/src/components/alerts/PipelinesDestinationList.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": ""
+}

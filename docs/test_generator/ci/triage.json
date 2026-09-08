@@ -1,0 +1,25 @@
+{
+  "feature_slug": "pipeline-destination-editor",
+  "feature_title": "Pipeline Destination Editor",
+  "area": "Alerts",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "alerts-pipeline-destination-editor.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Alerts/alerts-pipeline-destination-editor.spec.js",
+  "playwright_group": "Alerts",
+  "source_files": [
+    "web/src/components/alerts/PipelinesDestinationList.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "The authoritative changed-files list contains only web/src/... paths (web/src/components/alerts/PipelinesDestinationList.vue and its .spec.ts). No enterprise-owned paths (enterprise/, o2_enterprise/, src/enterprise/) are touched and no enterprise keywords (cipher/SSO/SAML/RBAC/SDR/etc.) appear in the paths or symbols, so this is an open-source change.",
+    "skip": "Not skipped. There is no explicit opt-out (no tests-added label and the trigger comment is empty), and the change alters a user-exercisable UI flow (the pipeline destination editor open/close behavior), so it is user-facing.",
+    "e2e": "E2E is warranted because the fix changes a user-facing UI interaction: the destination editor must remain open when adding/editing a destination even if a late getDestinations() response arrives, and the route query action must correctly map to add/update.",
+    "area": "The changed component lives in web/src/components/alerts/, and sibling destination specs (e.g. alerts-destinations-prebuilt.spec.js) live under the Alerts testfolder, so the Alerts area fits.",
+    "group": "The Alerts testfolder shard exists across the ci-matrix files and already carries destination-related specs (alerts-destinations-prebuilt.spec.js, alerts-e2e-flow.spec.js), making it the closest existing shard for this spec.",
+    "existing_tests": "No Playwright E2E specs in the diff. The only changed test file (web/src/components/alerts/PipelinesDestinationList.spec.ts) is a Vitest unit test, which is not E2E coverage and does not set existing_tests_in_diff."
+  }
+}

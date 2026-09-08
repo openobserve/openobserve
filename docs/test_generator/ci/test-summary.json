@@ -1,0 +1,11 @@
+[
+  { "title": "Add via URL ?action=add opens the editor and stays open after the list resolves (regression)", "action": "new", "verifies": "the editor opens on the add route and the guard keeps it open after the late list response resolves" },
+  { "title": "Edit via URL ?action=update&name=X opens prefilled with a locked name (regression)", "action": "new", "verifies": "the update route opens the editor for an existing destination with the name field locked" },
+  { "title": "Create destination via the Add button", "action": "new", "verifies": "the two-step add wizard creates a pipeline destination that appears in the list" },
+  { "title": "Edit via row button keeps the name locked and persists a URL update", "action": "new", "verifies": "row edit locks the name and a URL change is persisted on re-open" },
+  { "title": "Cancel from the add editor returns to the list and clears the action", "action": "new", "verifies": "cancelling the editor restores the list and hides the editor title" },
+  { "title": "Delete a single destination via the row button and confirm dialog", "action": "new", "verifies": "confirming the delete dialog removes the destination row" },
+  { "title": "Bulk delete multiple destinations via multi-select", "action": "new", "verifies": "selecting two rows and confirming bulk delete removes both destinations" },
+  { "title": "Form validation blocks submit on required fields and a trailing-slash URL", "action": "new", "verifies": "empty name/url show field errors and a trailing-slash URL triggers the trailing-slash rule" },
+  { "title": "Custom type shows the HTTP method select and enables the endpoint input", "action": "new", "verifies": "the custom type reveals the method select and enables the endpoint input" }
+]

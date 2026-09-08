@@ -158,7 +158,8 @@ test.describe("Pre-Test Cleanup", () => {
 
     // Clean up pipeline destinations matching test patterns
     await pm.apiCleanup.cleanupPipelineDestinations([
-      /^destination\d{1,3}$/  // destination4, destination44, destination444, etc.
+      /^destination\d{1,3}$/,  // destination4, destination44, destination444, etc.
+      /^destE2E/               // alerts-pipeline-destination-editor.spec.js (per-test seeded destinations)
     ]);
 
     // Clean up functions matching test patterns
