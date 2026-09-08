@@ -218,6 +218,8 @@ struct ConfigResponse<'a> {
     /// UI hides the private-locations views, the agent-setup drawer and the
     /// public/private selector on this rather than on `synthetics_enabled`.
     synthetics_private_locations_enabled: bool,
+    /// False under super-cluster regardless of the flag — §5.9 parity with composites.
+    synthetics_composition_enabled: bool,
     /// Chrome Web Store URL of the OpenObserve Recorder extension
     /// (`ZO_SYNTHETICS_RECORDER_EXTENSION_URL`) — the browser-test setup UI
     /// links its install button here.
@@ -475,6 +477,8 @@ pub async fn zo_config(
     // is not running super-cluster mode (§18, §19.2).
     let composite_alerts_available =
         config::get_config().alert_composite.writes_enabled && !super_cluster_enabled;
+    let synthetics_composition_enabled =
+        cfg.synthetics.composition_enabled && !super_cluster_enabled;
     let online_evals_enabled = enterprise_value!(false, o2cfg.llm_eval_config.enabled);
     // Read straight from the config in every build: synthetics is OSS now, and
     // reporting `false` here is what hid the whole feature from the UI.
@@ -599,6 +603,7 @@ pub async fn zo_config(
         composite_alerts_available,
         synthetics_enabled,
         synthetics_private_locations_enabled,
+        synthetics_composition_enabled,
         synthetics_recorder_extension_url: synthetics_recorder_extension_url.to_string(),
         database_monitoring_enabled: cfg.db_monitoring.enabled,
         enable_cross_linking: cfg.common.enable_cross_linking,

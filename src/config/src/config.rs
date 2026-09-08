@@ -418,6 +418,10 @@ pub const SYNTHETICS_RELOAD_CLASSES: &[(&str, SyntheticsReloadClass)] = &[
         "ZO_SYNTHETICS_ENABLED",
         SyntheticsReloadClass::RestartRequired,
     ),
+    (
+        "ZO_SYNTHETICS_COMPOSITION_ENABLED",
+        SyntheticsReloadClass::Hot,
+    ),
     ("ZO_SYNTHETICS_LAMBDA_BROWSER", SyntheticsReloadClass::Hot),
     ("ZO_SYNTHETICS_LAMBDA_NET", SyntheticsReloadClass::Hot),
     ("ZO_SYNTHETICS_API_ENDPOINT", SyntheticsReloadClass::Hot),
@@ -472,6 +476,7 @@ pub(crate) fn synthetics_restart_required_changes(
     // compiling here until someone decides whether a reload can carry it.
     let Synthetics {
         enabled,
+        composition_enabled: _,
         status_page_rebuild_interval,
         status_page_domain_verify_interval,
         status_page_public_rpm,
@@ -929,6 +934,13 @@ pub struct Synthetics {
         help = "Master switch for synthetic monitoring. Off by default; the background workers and HTTP routes only exist when this is true."
     )]
     pub enabled: bool,
+    /// Off by default so no composed check can exist until an org opts in.
+    #[env_config(
+        name = "ZO_SYNTHETICS_COMPOSITION_ENABLED",
+        default = false,
+        help = "Enables subtest references in browser checks. Off by default; while false the server refuses composition writes and the UI hides Insert subtest."
+    )]
+    pub composition_enabled: bool,
     /// Seconds between status-page snapshot rebuild ticks.
     #[env_config(
         name = "ZO_STATUS_PAGE_REBUILD_INTERVAL",
@@ -4684,6 +4696,7 @@ mod tests {
     /// `synthetics_restart_required_changes`.
     const ALL_SYNTHETICS_ENV_VARS: &[&str] = &[
         "ZO_SYNTHETICS_ENABLED",
+        "ZO_SYNTHETICS_COMPOSITION_ENABLED",
         "ZO_SYNTHETICS_LAMBDA_BROWSER",
         "ZO_SYNTHETICS_LAMBDA_NET",
         "ZO_SYNTHETICS_API_ENDPOINT",
@@ -4787,6 +4800,15 @@ mod tests {
             synthetics_restart_required_changes(&old, &new),
             vec!["ZO_SYNTHETICS_ENABLED"],
             "the warning has to name the env var, not just say 'synthetics changed'"
+        );
+    }
+
+    #[test]
+    fn composition_is_off_by_default() {
+        let cfg = Config::init().unwrap();
+        assert!(
+            !cfg.synthetics.composition_enabled,
+            "composition must ship dark: a fresh deployment must refuse subtest writes"
         );
     }
 
