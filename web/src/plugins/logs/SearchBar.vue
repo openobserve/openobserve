@@ -157,6 +157,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-tooltip>
           </q-toggle>
         </div>
+        <div
+          v-if="!shouldMoveSqlToggleToMenu && searchObj.meta.quickModePinned"
+          class="toolbar-toggle-container element-box-shadow"
+        >
+          <q-toggle
+            data-test="logs-search-bar-quick-mode-pinned-toggle-btn"
+            v-model="searchObj.meta.quickMode"
+            class="o2-toggle-button-xs"
+            size="xs"
+            flat
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-toggle-button-xs-dark'
+                : 'o2-toggle-button-xs-light'
+            "
+            @update:model-value="handleQuickModePinnedUpdate"
+          >
+            <img :src="quickModeIcon" alt="Quick Mode" class="toolbar-icon" />
+            <q-tooltip>
+              {{ t("search.quickModeLabel") }}
+            </q-tooltip>
+          </q-toggle>
+        </div>
         <q-btn-group
           v-if="!shouldMoveSavedViewToMenu"
           class="q-ml-xs q-pa-none element-box-shadow el-border"
@@ -566,6 +589,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                     {{ t("search.quickModeLabel") }}
                   </q-item-label>
+                </q-item-section>
+                <q-item-section side>
+                  <q-btn
+                    data-test="logs-search-bar-quick-mode-pin-btn"
+                    flat
+                    round
+                    dense
+                    size="xs"
+                    icon="push_pin"
+                    :color="
+                      searchObj.meta.quickModePinned ? 'primary' : 'grey-6'
+                    "
+                    @click.stop="toggleQuickModePin"
+                  >
+                    <q-tooltip>
+                      {{
+                        searchObj.meta.quickModePinned
+                          ? t("search.unpinFromToolbar")
+                          : t("search.pinToToolbar")
+                      }}
+                    </q-tooltip>
+                  </q-btn>
                 </q-item-section>
               </q-item>
 
@@ -2309,6 +2354,7 @@ import {
   getImageURL,
   useLocalInterestingFields,
   useLocalSavedView,
+  useLocalQuickModePin,
   queryIndexSplit,
   timestampToTimezoneDate,
   b64EncodeUnicode,
@@ -4734,6 +4780,15 @@ export default defineComponent({
       emit("handleQuickModeChange");
     };
 
+    const toggleQuickModePin = () => {
+      searchObj.meta.quickModePinned = !searchObj.meta.quickModePinned;
+      useLocalQuickModePin(String(searchObj.meta.quickModePinned));
+    };
+
+    const handleQuickModePinnedUpdate = () => {
+      emit("handleQuickModeChange");
+    };
+
     const handleHistogramMode = () => {};
 
     const handleRunQueryFn = (clear_cache = false) => {
@@ -5320,6 +5375,8 @@ export default defineComponent({
       config,
       handleRegionsSelection,
       handleQuickMode,
+      toggleQuickModePin,
+      handleQuickModePinnedUpdate,
       handleHistogramMode,
       regionFilterMethod,
       regionFilterRef,

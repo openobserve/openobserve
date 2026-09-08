@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { useLocalWrapContent } from "@/utils/zincutils";
+import { useLocalWrapContent, useLocalQuickModePin } from "@/utils/zincutils";
 import { TimePeriodUnit } from "@/ts/interfaces";
 
 /**
@@ -124,6 +124,7 @@ export const DEFAULT_LOGS_CONFIG = {
     sqlModeManualTrigger: false,
     nlpMode: false,
     quickMode: false,
+    quickModePinned: useLocalQuickModePin() === "true",
     queryEditorPlaceholderFlag: true,
     functionEditorPlaceholderFlag: true,
     resultGrid: {
