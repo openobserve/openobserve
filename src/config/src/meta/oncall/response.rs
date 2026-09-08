@@ -816,7 +816,11 @@ pub fn page_decision(latest: Option<&Response>, now: i64, dampening_micros: i64)
     let Some(record) = latest else {
         return PageDecision::Page;
     };
-    if !record.state.is_terminal() {
+    // `closed_at` outranks the state. A record carrying a close instant with a
+    // non-terminal state is torn — a writer raced the close — and answering
+    // `AlreadyOpen` on it silences this source's every future firing, for ever,
+    // with no way back. Treating it as closed costs at worst one duplicate page.
+    if !record.state.is_terminal() && record.closed_at.is_none() {
         return PageDecision::AlreadyOpen;
     }
     if dampening_micros <= 0 {
@@ -2191,6 +2195,28 @@ mod tests {
                 page_decision(Some(&open), 10_000_000, WINDOW),
                 PageDecision::AlreadyOpen,
                 "{state:?}"
+            );
+        }
+    }
+
+    /// A torn row — closed, but with a state a racing writer put back — must not
+    /// answer `AlreadyOpen`. It used to, and because nothing ever clears the
+    /// state again that silenced the source's every later firing permanently.
+    #[test]
+    fn test_a_closed_record_never_reports_open_whatever_its_state() {
+        for state in [
+            ResponseState::Triggered,
+            ResponseState::Triaged,
+            ResponseState::Acknowledged,
+        ] {
+            let torn = Response {
+                state,
+                ..sample(None, Some(1_000))
+            };
+            assert_ne!(
+                page_decision(Some(&torn), 1_000 + WINDOW + 1, WINDOW),
+                PageDecision::AlreadyOpen,
+                "{state:?} with closed_at set must not suppress the next firing"
             );
         }
     }

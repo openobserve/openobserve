@@ -626,18 +626,51 @@ async fn hand_over(
     // What a handoff does to a record is a decision, and it is made in one
     // place: `Response::handed_over`. This only writes down what it decided.
     let next = current.handed_over(to_team_id, now);
-    let mut model: oncall_responses::ActiveModel = existing.into();
-    model.team_id = Set(next.team_id.clone());
-    model.state = Set(next.state.to_i32());
-    model.acked_by = Set(next.acked_by.clone());
-    model.acked_at = Set(next.acked_at);
-    model.snoozed_until = Set(next.snoozed_until);
-    model.ladder_anchor = Set(next.ladder_anchor);
-    model.ladder_run = Set(next.ladder_run);
-    // Cleared by `handed_over` because the new run has rungs left. Written
-    // here, or the decision would be made and then thrown away.
-    model.exhausted_at = Set(next.exhausted_at);
-    Ok(to_response(model.update(client).await?))
+    // Conditional for the same reason `acknowledge` is: the read above is a
+    // snapshot, and a `resolve` landing between it and this write would be
+    // overwritten back to `Triggered` while keeping its `closed_at`. That torn
+    // row escalates for ever and `resolve` refuses to close it twice.
+    oncall_responses::Entity::update_many()
+        .col_expr(
+            oncall_responses::Column::TeamId,
+            Expr::value(next.team_id.clone()),
+        )
+        .col_expr(
+            oncall_responses::Column::State,
+            Expr::value(next.state.to_i32()),
+        )
+        .col_expr(
+            oncall_responses::Column::AckedBy,
+            Expr::value(next.acked_by.clone()),
+        )
+        .col_expr(oncall_responses::Column::AckedAt, Expr::value(next.acked_at))
+        .col_expr(
+            oncall_responses::Column::SnoozedUntil,
+            Expr::value(next.snoozed_until),
+        )
+        .col_expr(
+            oncall_responses::Column::LadderAnchor,
+            Expr::value(next.ladder_anchor),
+        )
+        .col_expr(
+            oncall_responses::Column::LadderRun,
+            Expr::value(next.ladder_run),
+        )
+        // Cleared by `handed_over` because the new run has rungs left. Written
+        // here, or the decision would be made and then thrown away.
+        .col_expr(
+            oncall_responses::Column::ExhaustedAt,
+            Expr::value(next.exhausted_at),
+        )
+        .filter(oncall_responses::Column::Id.eq(id))
+        .filter(oncall_responses::Column::OrgId.eq(org_id))
+        .filter(oncall_responses::Column::ClosedAt.is_null())
+        .filter(oncall_responses::Column::State.ne(ResponseState::Resolved.to_i32()))
+        .exec(client)
+        .await?;
+    // Read back rather than trusting the snapshot: after a lost race the answer
+    // is the closed record, which is what the caller must act on.
+    get(org_id, id).await
 }
 
 /// Records opened because `origin_id` fired — the impacted teams.
@@ -677,6 +710,36 @@ pub async fn latest_open_for_source(
         .one(client)
         .await?
         .and_then(to_response))
+}
+
+/// The still-open records a fan-out opened for one source.
+///
+/// A firing that spans several teams stores one record per team under
+/// `<source>:group:<team>`, which `latest_open_for_source`'s `<source>#` prefix
+/// cannot match. Recovery has to close these too: an unclosed record makes
+/// `page_decision` answer `AlreadyOpen` on that team's key for ever, so the
+/// alert silently stops paging the very teams it fanned out to.
+pub async fn open_group_records_for_source(
+    org_id: &str,
+    subject_type: SubjectType,
+    source_id: &str,
+) -> Result<Vec<Response>, errors::Error> {
+    let client = get_orm_client_rw().await;
+    Ok(oncall_responses::Entity::find()
+        .filter(oncall_responses::Column::OrgId.eq(org_id))
+        .filter(oncall_responses::Column::SubjectType.eq(subject_type.to_i32()))
+        .filter(oncall_responses::Column::SubjectId.starts_with(format!("{source_id}:group:")))
+        .filter(oncall_responses::Column::State.is_in([
+            ResponseState::Triggered.to_i32(),
+            ResponseState::Triaged.to_i32(),
+            ResponseState::Acknowledged.to_i32(),
+        ]))
+        .order_by_desc(oncall_responses::Column::OpenedAt)
+        .all(client)
+        .await?
+        .into_iter()
+        .filter_map(to_response)
+        .collect())
 }
 
 /// Every past firing of the same source, newest first — the "this fired
