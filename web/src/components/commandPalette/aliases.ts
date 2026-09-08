@@ -113,7 +113,7 @@ function minLenFor(entry: AliasEntry): number {
   return entry.minLen ?? Math.min(3, entry.trigger.length);
 }
 
-/** Item ids whose alias trigger starts with the folded query (or equals it). */
+/** Item ids whose trigger and the folded query share a prefix, in either direction. */
 export function matchAliases(folded: string, aliases: AliasEntry[] = PALETTE_ALIASES): Set<string> {
   const hits = new Set<string>();
   if (!folded) return hits;

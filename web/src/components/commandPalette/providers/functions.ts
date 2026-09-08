@@ -46,7 +46,7 @@ export function createFunctionsProvider(ctx: EntityProviderContext): EntityProvi
       const warm: FunctionRow[] = ctx.store.state.organizationData?.functions ?? [];
       if (warm.length > 0)
         return warm.filter((r) => r.name).map((r) => functionToItem(r, subtitle));
-      const res = await transformService.list(1, 100000, "name", false, "", ctx.org);
+      const res = await transformService.list(1, 1000, "name", false, "", ctx.org);
       const rows: FunctionRow[] = res?.data?.list ?? [];
       return rows.filter((r) => r.name).map((r) => functionToItem(r, subtitle));
     },
