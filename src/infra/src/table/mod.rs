@@ -42,6 +42,7 @@ pub mod gen_ai_agents;
 pub mod incident_events;
 pub mod incident_integrations;
 pub mod kv_store;
+pub mod llm_evaluations;
 pub mod llm_secrets;
 mod migration;
 pub mod model_pricing;
@@ -60,6 +61,8 @@ pub mod org_ai_toolsets;
 pub mod org_cleanup_tasks;
 pub mod org_ingestion_tokens;
 pub mod org_storage_providers;
+#[cfg(test)]
+mod org_sweep_contract_tests;
 pub mod org_users;
 pub mod organizations;
 pub mod providers;

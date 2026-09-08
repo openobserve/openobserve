@@ -19,8 +19,9 @@
 //! Each job acks via `increment_jobs_done`; when `jobs_done = job_count` the run is
 //! complete and `completed_at` is set.
 
-use sea_orm::{ConnectionTrait, Statement, Value};
+use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, Statement, Value};
 
+use super::entity::synthetics_runs::{Column, Entity};
 use crate::errors;
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -330,6 +331,17 @@ pub async fn increment_jobs_done<C: ConnectionTrait>(
         }
         None => Ok(None),
     }
+}
+
+pub async fn delete_by_org<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+) -> Result<(), errors::Error> {
+    Entity::delete_many()
+        .filter(Column::OrgId.eq(org_id))
+        .exec(conn)
+        .await?;
+    Ok(())
 }
 
 #[cfg(test)]

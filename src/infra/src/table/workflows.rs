@@ -15,8 +15,8 @@
 
 use config::meta::pipeline::components::{Edge, Node};
 use sea_orm::{
-    ColumnTrait, Condition, EntityTrait, PaginatorTrait, QueryFilter, QuerySelect, Set,
-    TransactionTrait, prelude::Expr, sea_query::Func,
+    ColumnTrait, Condition, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter,
+    QuerySelect, Set, TransactionTrait, prelude::Expr, sea_query::Func,
 };
 use serde::{Deserialize, Serialize};
 
@@ -852,5 +852,35 @@ pub async fn promote_draft_to_workflow(org_id: &str, draft: Workflow) -> Result<
         return Err(anyhow::anyhow!(e));
     }
 
+    Ok(())
+}
+
+/// Removes every row the org owns across all five workflow tables.
+pub async fn delete_by_org(db: &DatabaseConnection, org_id: &str) -> Result<(), anyhow::Error> {
+    let txn = db.begin().await?;
+
+    // No FKs are declared between these tables, so the child-first order is by reference only.
+    workflow_errors::Entity::delete_many()
+        .filter(workflow_errors::Column::OrgId.eq(org_id))
+        .exec(&txn)
+        .await?;
+    workflow_run_data::Entity::delete_many()
+        .filter(workflow_run_data::Column::OrgId.eq(org_id))
+        .exec(&txn)
+        .await?;
+    workflow_associations::Entity::delete_many()
+        .filter(workflow_associations::Column::OrgId.eq(org_id))
+        .exec(&txn)
+        .await?;
+    workflow_drafts::Entity::delete_many()
+        .filter(workflow_drafts::Column::OrgId.eq(org_id))
+        .exec(&txn)
+        .await?;
+    workflows::Entity::delete_many()
+        .filter(workflows::Column::OrgId.eq(org_id))
+        .exec(&txn)
+        .await?;
+
+    txn.commit().await?;
     Ok(())
 }

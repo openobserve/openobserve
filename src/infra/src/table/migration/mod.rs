@@ -291,6 +291,24 @@ pub(crate) async fn create_slo_tables_for_test(
         .await
 }
 
+/// The real synthetics table, so a test sees the actual `synthetics_folder_fk`
+/// rather than a hand-written copy of it. The `folders` parent it references is
+/// built from its entity by the caller: replaying the 2024 folders migration
+/// would give the pre-KSUID integer `id` the entity no longer matches.
+#[cfg(test)]
+pub(crate) async fn create_synthetics_for_test(
+    db: &sea_orm::DatabaseConnection,
+) -> Result<(), DbErr> {
+    use sea_orm_migration::MigrationTrait;
+    let manager = SchemaManager::new(db);
+    m20260707_000001_create_synthetics_monitors::Migration
+        .up(&manager)
+        .await?;
+    m20260730_000001_add_alert_state_to_synthetics_monitors::Migration
+        .up(&manager)
+        .await
+}
+
 #[cfg(test)]
 pub(crate) async fn create_raman_tables_for_test(
     db: &sea_orm::DatabaseConnection,

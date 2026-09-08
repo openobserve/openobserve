@@ -209,6 +209,16 @@ pub async fn delete_expired_retired<C: ConnectionTrait>(
         .rows_affected)
 }
 
+/// Removes every secret row for an org during teardown.
+pub async fn delete_by_org<C: ConnectionTrait>(db: &C, org_id: &str) -> Result<(), errors::Error> {
+    Entity::delete_many()
+        .filter(Column::OrgId.eq(org_id))
+        .exec(db)
+        .await?;
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use base64::{Engine, prelude::BASE64_STANDARD};

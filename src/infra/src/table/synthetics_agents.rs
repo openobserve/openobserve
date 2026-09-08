@@ -26,7 +26,8 @@ use std::{
 
 use config::RwHashMap;
 use sea_orm::{
-    ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Set, sea_query::Expr,
+    ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Set,
+    sea_query::Expr,
 };
 
 use super::entity::synthetics_agents::{ActiveModel, Column, Entity, Model};
@@ -275,4 +276,17 @@ pub async fn get(agent_id: &str) -> Result<Option<SyntheticsAgentRecord>, errors
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
     Ok(row.map(Into::into))
+}
+
+pub async fn delete_by_org<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+) -> Result<(), errors::Error> {
+    Entity::delete_many()
+        .filter(Column::OrgId.eq(org_id))
+        .exec(conn)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    AGENT_CACHE.clear();
+    Ok(())
 }

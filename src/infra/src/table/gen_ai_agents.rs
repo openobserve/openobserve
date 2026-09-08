@@ -16,7 +16,8 @@
 use std::collections::HashSet;
 
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, EntityTrait, Order, PaginatorTrait, QueryFilter, QueryOrder, Set,
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, Order, PaginatorTrait,
+    QueryFilter, QueryOrder, Set,
 };
 
 use crate::{
@@ -187,6 +188,14 @@ pub async fn delete_for_stream(
     source_stream_type: &str,
 ) -> Result<u64, errors::Error> {
     delete(org_id, Some(source_stream), Some(source_stream_type)).await
+}
+
+pub async fn delete_by_org(db: &DatabaseConnection, org_id: &str) -> Result<(), errors::Error> {
+    Entity::delete_many()
+        .filter(Column::OrgId.eq(org_id))
+        .exec(db)
+        .await?;
+    Ok(())
 }
 
 #[cfg(test)]

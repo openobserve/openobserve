@@ -23,14 +23,16 @@
 use std::collections::HashSet;
 
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, PaginatorTrait,
-    QueryFilter, QueryOrder, QuerySelect, prelude::Expr,
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait,
+    IntoActiveModel, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, TransactionTrait,
+    prelude::Expr,
 };
 
 use super::entity::{
-    status_page_check_snoozes, status_page_component_checks, status_page_components,
-    status_page_custom_domains, status_page_notice_components, status_page_notice_updates,
-    status_page_notices, status_page_snapshots, status_pages, synthetics_checks,
+    status_page_audit_log, status_page_check_snoozes, status_page_component_checks,
+    status_page_components, status_page_custom_domains, status_page_notice_components,
+    status_page_notice_updates, status_page_notices, status_page_snapshots, status_pages,
+    synthetics_checks,
 };
 use crate::{
     db::{get_orm_client_ro, get_orm_client_rw},
@@ -509,6 +511,55 @@ pub async fn delete_page(org_id: &str, id: &str) -> Result<bool, errors::Error> 
         .exec(conn)
         .await?;
     Ok(res.rows_affected > 0)
+}
+
+/// Removes every status-page row an org owns, freeing its deployment-wide-unique slugs.
+pub async fn delete_by_org(db: &DatabaseConnection, org_id: &str) -> Result<(), errors::Error> {
+    let txn = db.begin().await?;
+    // No DB-level FKs exist here, and SQLite enforces none anyway, so each table is explicit.
+    status_page_component_checks::Entity::delete_many()
+        .filter(status_page_component_checks::Column::OrgId.eq(org_id))
+        .exec(&txn)
+        .await?;
+    status_page_notice_components::Entity::delete_many()
+        .filter(status_page_notice_components::Column::OrgId.eq(org_id))
+        .exec(&txn)
+        .await?;
+    status_page_notice_updates::Entity::delete_many()
+        .filter(status_page_notice_updates::Column::OrgId.eq(org_id))
+        .exec(&txn)
+        .await?;
+    status_page_notices::Entity::delete_many()
+        .filter(status_page_notices::Column::OrgId.eq(org_id))
+        .exec(&txn)
+        .await?;
+    status_page_components::Entity::delete_many()
+        .filter(status_page_components::Column::OrgId.eq(org_id))
+        .exec(&txn)
+        .await?;
+    status_page_snapshots::Entity::delete_many()
+        .filter(status_page_snapshots::Column::OrgId.eq(org_id))
+        .exec(&txn)
+        .await?;
+    // Hard-deleted, not tombstoned: a dead org must not keep blocking a domain re-claim.
+    status_page_custom_domains::Entity::delete_many()
+        .filter(status_page_custom_domains::Column::OrgId.eq(org_id))
+        .exec(&txn)
+        .await?;
+    status_page_check_snoozes::Entity::delete_many()
+        .filter(status_page_check_snoozes::Column::OrgId.eq(org_id))
+        .exec(&txn)
+        .await?;
+    status_page_audit_log::Entity::delete_many()
+        .filter(status_page_audit_log::Column::OrgId.eq(org_id))
+        .exec(&txn)
+        .await?;
+    status_pages::Entity::delete_many()
+        .filter(status_pages::Column::OrgId.eq(org_id))
+        .exec(&txn)
+        .await?;
+    txn.commit().await?;
+    Ok(())
 }
 
 /// A page's components with each one's mapped check ids, for the admin detail

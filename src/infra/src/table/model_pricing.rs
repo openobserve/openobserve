@@ -199,6 +199,18 @@ pub async fn delete_by_id(org_id: &str, id: &str) -> Result<bool, Error> {
     }
 }
 
+/// Skips the built-in catalog org, whose rows are shared rather than owned by one org.
+pub async fn delete_by_org(db: &DatabaseConnection, org_id: &str) -> Result<(), Error> {
+    if org_id == config::meta::model_pricing::BUILT_IN_ORG {
+        return Ok(());
+    }
+    Entity::delete_many()
+        .filter(Column::Org.eq(org_id))
+        .exec(db)
+        .await?;
+    Ok(())
+}
+
 /// Return all model names belonging to the built-in org.
 /// Used by the sync job to detect models removed from the upstream source.
 pub async fn list_built_in_names() -> Result<Vec<String>, Error> {

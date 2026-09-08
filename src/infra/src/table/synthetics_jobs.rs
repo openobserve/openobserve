@@ -882,6 +882,17 @@ pub async fn prune_stale<C: ConnectionTrait>(conn: &C, now_us: i64) -> Result<u6
     Ok(res.rows_affected())
 }
 
+pub async fn delete_by_org<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+) -> Result<(), errors::Error> {
+    Entity::delete_many()
+        .filter(Column::OrgId.eq(org_id))
+        .exec(conn)
+        .await?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

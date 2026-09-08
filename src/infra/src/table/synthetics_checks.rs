@@ -442,6 +442,19 @@ pub async fn delete<C: ConnectionTrait>(
     Ok(res.rows_affected > 0)
 }
 
+/// Must run before the org's folders: `synthetics_folder_fk` has no ON DELETE action.
+pub async fn delete_by_org<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+) -> Result<(), errors::Error> {
+    Entity::delete_many()
+        .filter(Column::OrgId.eq(org_id))
+        .exec(conn)
+        .await?;
+    invalidate_all_cache();
+    Ok(())
+}
+
 /// Moves a batch of checks to a different folder.
 pub async fn move_to_folder<C: ConnectionTrait>(
     conn: &C,

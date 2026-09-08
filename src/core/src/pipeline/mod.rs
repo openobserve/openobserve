@@ -381,6 +381,12 @@ pub async fn delete_pipeline(pipeline_id: &str) -> Result<(), PipelineError> {
     }
 
     pipeline::delete(pipeline_id).await?;
+
+    // pipeline_last_errors has no FK to pipelines, so its row outlives the pipeline unless swept.
+    if let Err(error) = crate::db::pipeline_errors::delete(pipeline_id).await {
+        log::error!("[PIPELINE] Failed to delete last error for pipeline {pipeline_id}: {error}");
+    }
+
     remove_ownership(
         &existing_pipeline.org,
         "pipelines",

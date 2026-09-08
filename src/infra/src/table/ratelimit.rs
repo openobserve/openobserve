@@ -20,8 +20,8 @@ use config::{
     utils::time::now,
 };
 use sea_orm::{
-    ActiveModelTrait, ActiveValue::Set, ColumnTrait, EntityTrait, QueryFilter, QueryOrder,
-    QuerySelect, TransactionTrait,
+    ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter,
+    QueryOrder, QuerySelect, TransactionTrait,
 };
 use serde::{Deserialize, Serialize};
 
@@ -519,6 +519,16 @@ pub async fn delete(rule_id: String) -> Result<(), anyhow::Error> {
             Err(anyhow::anyhow!(e.to_string()))
         }
     }
+}
+
+pub async fn delete_by_org(db: &DatabaseConnection, org_id: &str) -> Result<(), anyhow::Error> {
+    Entity::delete_many()
+        .filter(Column::Org.eq(org_id))
+        .exec(db)
+        .await
+        .map_err(|e| anyhow!("DbError# Delete ratelimit rules for org error: {e}"))?;
+
+    Ok(())
 }
 
 pub async fn list(

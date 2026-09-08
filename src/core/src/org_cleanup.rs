@@ -449,11 +449,15 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     // under #[cfg(not(feature = "enterprise"))] above. Importing it twice would
     // collide on the OSS build.
     use infra::table::{
-        alert_incidents, backfill_jobs, compactor_manual_jobs, dashboards, destinations,
-        distinct_values, enrichment_table_urls, enrichment_tables, folders, incident_events,
-        kv_store, org_storage_providers, raman, re_pattern, re_pattern_stream_map, reports,
-        search_queue, short_urls, slo, slo_backfill_jobs, slo_budget, slos, system_settings,
-        templates, timed_annotations,
+        alert_incidents, anomaly_detection, backfill_jobs, compactor_manual_jobs, dashboards,
+        destinations, distinct_values, enrichment_table_urls, enrichment_tables, folders,
+        gen_ai_agents, incident_events, incident_integrations, kv_store, llm_evaluations,
+        llm_secrets, model_pricing, online_eval_jobs, org_ai_toolsets, org_storage_providers,
+        providers, raman, ratelimit, re_pattern, re_pattern_stream_map, reports, score_configs,
+        scorers, search_queue, short_urls, slo, slo_backfill_jobs, slo_budget, slos, source_maps,
+        status_pages, synthetics_agents, synthetics_checks, synthetics_jobs, synthetics_locations,
+        synthetics_probe_tokens, synthetics_runs, system_settings, templates, timed_annotations,
+        workflows,
     };
 
     // FK-constrained children must be deleted before their parents.
@@ -507,7 +511,35 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     reports::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/reports: {e}"))?;
-    // folders safe to delete after dashboards, timed_annotations, and reports are gone
+    let conn = get_orm_client_rw().await;
+    // Workflows and drafts both hold a RESTRICT foreign key on folders.id.
+    workflows::delete_by_org(conn, org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/workflows: {e}"))?;
+    // The cascades from checks are unusable: SQLite enforces no FK unless sea-orm sets a pragma.
+    synthetics_jobs::delete_by_org(conn, org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/synthetics_jobs: {e}"))?;
+    synthetics_runs::delete_by_org(conn, org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/synthetics_runs: {e}"))?;
+    synthetics_checks::delete_by_org(conn, org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/synthetics_checks: {e}"))?;
+    synthetics_agents::delete_by_org(conn, org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/synthetics_agents: {e}"))?;
+    // Public locations carry a NULL org_id and are shared, so they are left alone.
+    synthetics_locations::delete_by_org(conn, org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/synthetics_locations: {e}"))?;
+    synthetics_probe_tokens::delete_by_org(conn, org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/synthetics_probe_tokens: {e}"))?;
+    anomaly_detection::delete_by_org(conn, org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/anomaly_detection_config: {e}"))?;
+    // Folders are safe after every RESTRICT child above is gone.
     folders::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/folders: {e}"))?;
@@ -637,6 +669,58 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     infra::table::search_job::search_jobs::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/search_jobs: {e}"))?;
+
+    // status_pages_slug_idx is UNIQUE deployment-wide, so a leftover page burns its public slug.
+    status_pages::delete_by_org(conn, org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/status_pages: {e}"))?;
+    // First: the enterprise path reads these rows to find which secrets to revoke.
+    #[cfg(feature = "enterprise")]
+    o2_enterprise::enterprise::llm_evaluations::remote_tasks::delete_all_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/llm_remote_tasks: {e}"))?;
+    // Before score_configs: fk_llm_queue_bindings_score_config_row is ON DELETE RESTRICT.
+    llm_evaluations::delete_by_org(conn, org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/llm_evaluations: {e}"))?;
+    llm_secrets::delete_by_org(conn, org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/llm_secrets: {e}"))?;
+    scorers::delete_all_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/scorers: {e}"))?;
+    score_configs::delete_all_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/score_configs: {e}"))?;
+    online_eval_jobs::delete_all_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/online_eval_jobs: {e}"))?;
+    providers::delete_all_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/providers: {e}"))?;
+    gen_ai_agents::delete_by_org(conn, org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/gen_ai_agents: {e}"))?;
+    model_pricing::delete_by_org(conn, org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/model_pricing: {e}"))?;
+    org_ai_toolsets::delete_by_org(conn, org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/org_ai_toolsets: {e}"))?;
+    // Also sweeps external_alerts and incident_integration_senders, which carry no org column.
+    incident_integrations::delete_by_org(conn, org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/incident_integrations: {e}"))?;
+    source_maps::delete_by_org(conn, org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/source_maps: {e}"))?;
+    ratelimit::delete_by_org(conn, org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/rate_limit_rules: {e}"))?;
+    // pipeline_last_errors has no FK to pipelines, so the per-pipeline delete above can miss rows.
+    crate::db::pipeline_errors::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/pipeline_last_errors: {e}"))?;
 
     // Cloud-only resources: pending org invites, billing-group invites, and
     // billing-group memberships. The enterprise crate owns the ordering/error
@@ -1307,5 +1391,368 @@ mod tests {
         for call in RAMAN_DELETES {
             position_of(call);
         }
+    }
+
+    // ===================== Completeness ===================================
+    //
+    // Every block above pins calls it NAMES. None of them can fail because a
+    // table was never listed, which is how 44 org-scoped tables came to be
+    // swept by nothing at all. This block inverts that: it enumerates the
+    // org-scoped tables from the entity modules themselves and requires each
+    // one to name either a sweep or a reason it needs none. A new org-scoped
+    // entity fails here on the day it is added.
+
+    /// Where an org-scoped table's rows go during teardown.
+    enum Sweep {
+        /// Text that must appear in this file outside the tests.
+        Call(&'static str),
+        /// Why this table needs no sweep of its own.
+        Exempt(&'static str),
+    }
+
+    const ENTITY_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../infra/src/table/entity");
+
+    const ALERTS: &str = "delete_org_alerts(org_id)";
+    const INCIDENT_INTEGRATIONS: &str = "incident_integrations::delete_by_org(conn, org_id)";
+    const LLM_EVALUATIONS: &str = "llm_evaluations::delete_by_org(conn, org_id)";
+    const RAMAN: &str = "raman::delete_by_org(raman_conn, org_id)";
+    const STATUS_PAGES: &str = "status_pages::delete_by_org(conn, org_id)";
+    const WORKFLOWS: &str = "workflows::delete_by_org(conn, org_id)";
+
+    const ENTITY_SWEEPS: [(&str, Sweep); 76] = [
+        (
+            "alert_composites",
+            Sweep::Call("alert_composites::delete_by_org(conn, org_id)"),
+        ),
+        (
+            "alert_dedup_state",
+            Sweep::Exempt("fk_alert_dedup_alert cascades from the alert row"),
+        ),
+        (
+            "alert_eval_intervals",
+            Sweep::Exempt("delete_by_alert runs in the per-alert teardown loop"),
+        ),
+        (
+            "alert_incidents",
+            Sweep::Call("alert_incidents::delete_by_org(org_id)"),
+        ),
+        ("alerts", Sweep::Call(ALERTS)),
+        (
+            "anomaly_detection_config",
+            Sweep::Call("anomaly_detection::delete_by_org(conn, org_id)"),
+        ),
+        (
+            "backfill_jobs",
+            Sweep::Call("backfill_jobs::delete_by_org(org_id)"),
+        ),
+        ("cipher_keys", Sweep::Call("delete_org_cipher_keys(org_id)")),
+        (
+            "destinations",
+            Sweep::Call("destinations::delete_by_org(org_id)"),
+        ),
+        (
+            "distinct_value_fields",
+            Sweep::Call("distinct_values::delete_by_org(org_id)"),
+        ),
+        (
+            "enrichment_table_urls",
+            Sweep::Call("enrichment_table_urls::delete_by_org(org_id)"),
+        ),
+        (
+            "enrichment_tables",
+            Sweep::Call("enrichment_tables::delete_by_org(org_id)"),
+        ),
+        ("external_alerts", Sweep::Call(INCIDENT_INTEGRATIONS)),
+        ("folders", Sweep::Call("folders::delete_by_org(org_id)")),
+        (
+            "gen_ai_agents",
+            Sweep::Call("gen_ai_agents::delete_by_org(conn, org_id)"),
+        ),
+        (
+            "incident_events",
+            Sweep::Call("incident_events::delete_by_org(org_id)"),
+        ),
+        ("incident_integrations", Sweep::Call(INCIDENT_INTEGRATIONS)),
+        ("kv_store", Sweep::Call("kv_store::delete_by_org(org_id)")),
+        (
+            "llm_annotation_queue_bindings",
+            Sweep::Call(LLM_EVALUATIONS),
+        ),
+        ("llm_annotation_queue_items", Sweep::Call(LLM_EVALUATIONS)),
+        ("llm_annotation_queues", Sweep::Call(LLM_EVALUATIONS)),
+        ("llm_dataset_items", Sweep::Call(LLM_EVALUATIONS)),
+        ("llm_datasets", Sweep::Call(LLM_EVALUATIONS)),
+        ("llm_experiments", Sweep::Call(LLM_EVALUATIONS)),
+        ("llm_idempotency_records", Sweep::Call(LLM_EVALUATIONS)),
+        ("llm_playground_snapshots", Sweep::Call(LLM_EVALUATIONS)),
+        ("llm_remote_tasks", Sweep::Call(LLM_EVALUATIONS)),
+        (
+            "llm_secrets",
+            Sweep::Call("llm_secrets::delete_by_org(conn, org_id)"),
+        ),
+        (
+            "model_pricing",
+            Sweep::Call("model_pricing::delete_by_org(conn, org_id)"),
+        ),
+        (
+            "online_eval_jobs",
+            Sweep::Call("online_eval_jobs::delete_all_by_org(org_id)"),
+        ),
+        (
+            "org_ai_toolsets",
+            Sweep::Call("org_ai_toolsets::delete_by_org(conn, org_id)"),
+        ),
+        (
+            "org_cleanup_tasks",
+            Sweep::Call("org_cleanup_tasks::delete_by_org(org_id)"),
+        ),
+        (
+            "org_ingestion_tokens",
+            Sweep::Call("org_ingestion_tokens::delete_by_org(org_id)"),
+        ),
+        (
+            "org_storage_providers",
+            Sweep::Call("org_storage_providers::delete_by_org(org_id)"),
+        ),
+        (
+            "org_users",
+            Sweep::Call("org_users::remove(org_id, &member.email)"),
+        ),
+        (
+            "organizations",
+            Sweep::Call("crate::organization::remove_org(org_id)"),
+        ),
+        (
+            "pipeline_last_errors",
+            Sweep::Call("pipeline_errors::delete_by_org(org_id)"),
+        ),
+        (
+            "providers",
+            Sweep::Call("providers::delete_all_by_org(org_id)"),
+        ),
+        ("raman_configs", Sweep::Call(RAMAN)),
+        ("raman_digests", Sweep::Call(RAMAN)),
+        (
+            "rate_limit_rules",
+            Sweep::Call("ratelimit::delete_by_org(conn, org_id)"),
+        ),
+        (
+            "re_pattern_stream_map",
+            Sweep::Call("re_pattern_stream_map::delete_by_org(org_id)"),
+        ),
+        (
+            "re_patterns",
+            Sweep::Call("re_pattern::delete_by_org(org_id)"),
+        ),
+        ("reports", Sweep::Call("reports::delete_by_org(org_id)")),
+        (
+            "score_configs",
+            Sweep::Call("score_configs::delete_all_by_org(org_id)"),
+        ),
+        ("scorers", Sweep::Call("scorers::delete_all_by_org(org_id)")),
+        (
+            "search_jobs",
+            Sweep::Call("search_jobs::delete_by_org(org_id)"),
+        ),
+        (
+            "search_queue",
+            Sweep::Call("search_queue::delete_by_org(org_id)"),
+        ),
+        (
+            "slo_budget",
+            Sweep::Call("slo_budget::delete_by_org(slo_conn, org_id)"),
+        ),
+        (
+            "slo_budget_charges",
+            Sweep::Exempt("deleted in-transaction by slo_budget::delete_by_org"),
+        ),
+        ("slos", Sweep::Call("slos::delete_by_org(slo_conn, org_id)")),
+        (
+            "source_maps",
+            Sweep::Call("source_maps::delete_by_org(conn, org_id)"),
+        ),
+        ("status_page_audit_log", Sweep::Call(STATUS_PAGES)),
+        ("status_page_check_snoozes", Sweep::Call(STATUS_PAGES)),
+        ("status_page_component_checks", Sweep::Call(STATUS_PAGES)),
+        ("status_page_components", Sweep::Call(STATUS_PAGES)),
+        ("status_page_custom_domains", Sweep::Call(STATUS_PAGES)),
+        ("status_page_notice_components", Sweep::Call(STATUS_PAGES)),
+        ("status_page_notice_updates", Sweep::Call(STATUS_PAGES)),
+        ("status_page_notices", Sweep::Call(STATUS_PAGES)),
+        ("status_page_snapshots", Sweep::Call(STATUS_PAGES)),
+        ("status_pages", Sweep::Call(STATUS_PAGES)),
+        (
+            "synthetics_agents",
+            Sweep::Call("synthetics_agents::delete_by_org(conn, org_id)"),
+        ),
+        (
+            "synthetics_checks",
+            Sweep::Call("synthetics_checks::delete_by_org(conn, org_id)"),
+        ),
+        (
+            "synthetics_jobs",
+            Sweep::Call("synthetics_jobs::delete_by_org(conn, org_id)"),
+        ),
+        (
+            "synthetics_locations",
+            Sweep::Call("synthetics_locations::delete_by_org(conn, org_id)"),
+        ),
+        (
+            "synthetics_probe_tokens",
+            Sweep::Call("synthetics_probe_tokens::delete_by_org(conn, org_id)"),
+        ),
+        (
+            "synthetics_runs",
+            Sweep::Call("synthetics_runs::delete_by_org(conn, org_id)"),
+        ),
+        (
+            "system_settings",
+            Sweep::Call("system_settings::delete_org_settings(org_id)"),
+        ),
+        ("templates", Sweep::Call("templates::delete_by_org(org_id)")),
+        (
+            "trial_quota_usage",
+            Sweep::Call("trial_quota_usage::delete_by_org(org_id)"),
+        ),
+        ("workflow_associations", Sweep::Call(WORKFLOWS)),
+        ("workflow_drafts", Sweep::Call(WORKFLOWS)),
+        ("workflow_errors", Sweep::Call(WORKFLOWS)),
+        ("workflow_run_data", Sweep::Call(WORKFLOWS)),
+        ("workflows", Sweep::Call(WORKFLOWS)),
+    ];
+
+    /// Everything in this file except its tests, so a call cannot be satisfied
+    /// by the very list that is supposed to be checking it.
+    fn sweep_region() -> &'static str {
+        let end = SOURCE
+            .find("\n#[cfg(test)]\nmod tests {")
+            .expect("the tests module is the last item in this file");
+        &SOURCE[..end]
+    }
+
+    /// The org-scoped entity modules, read from the entity directory rather than
+    /// from a list, so nothing can be omitted by forgetting to add it here.
+    fn org_scoped_entities() -> Vec<String> {
+        let mut found = Vec::new();
+        for entry in std::fs::read_dir(ENTITY_DIR).expect("the entity directory is readable") {
+            let path = entry.expect("a readable directory entry").path();
+            let Some(name) = path.file_stem().and_then(|s| s.to_str()) else {
+                continue;
+            };
+            if path.extension().and_then(|s| s.to_str()) != Some("rs")
+                || name == "mod"
+                || name == "prelude"
+            {
+                continue;
+            }
+            let source = std::fs::read_to_string(&path).expect("a readable entity module");
+            // `org_name` is the org identifier on distinct_value_fields, not a display name.
+            if source.contains("    pub org: ")
+                || source.contains("    pub org_id: ")
+                || source.contains("    pub org_name: ")
+            {
+                found.push(name.to_string());
+            }
+        }
+        found.sort();
+        found
+    }
+
+    #[test]
+    fn test_every_org_scoped_table_is_swept_or_exempt() {
+        let mut missing = Vec::new();
+        for entity in org_scoped_entities() {
+            let Some((_, sweep)) = ENTITY_SWEEPS.iter().find(|(name, _)| *name == entity) else {
+                missing.push(entity);
+                continue;
+            };
+            match sweep {
+                Sweep::Call(call) => assert!(
+                    sweep_region().contains(call),
+                    "{entity} is listed as swept by `{call}`, which this file never calls"
+                ),
+                // An exemption without a stated reason is how a gap gets blessed.
+                Sweep::Exempt(reason) => {
+                    assert!(
+                        !reason.is_empty(),
+                        "{entity} is exempt with no reason given"
+                    )
+                }
+            }
+        }
+        assert!(
+            missing.is_empty(),
+            "org-scoped tables with neither a sweep nor a named exemption: {missing:?}"
+        );
+    }
+
+    #[test]
+    fn test_no_sweep_entry_is_stale() {
+        let entities = org_scoped_entities();
+        let stale: Vec<&str> = ENTITY_SWEEPS
+            .iter()
+            .map(|(name, _)| *name)
+            .filter(|name| !entities.iter().any(|e| e == name))
+            .collect();
+        assert!(
+            stale.is_empty(),
+            "listed tables that are no longer org-scoped entities: {stale:?}"
+        );
+    }
+
+    // ===================== Ordering the FKs force ==========================
+    //
+    // Completeness above says the call exists; these say it runs early enough.
+    // Both folders children hold a RESTRICT foreign key, so getting this wrong
+    // is not a leak — `folders::delete_by_org` fails and the org never deletes.
+
+    /// The workflow, synthetics, and anomaly tables reference
+    /// `folders.id` with no ON DELETE action.
+    const FOLDER_CHILD_DELETES: [&str; 3] = [
+        // workflows_folder_fk and workflow_drafts_folder_fk.
+        WORKFLOWS,
+        // synthetics_folder_fk.
+        "synthetics_checks::delete_by_org(conn, org_id)",
+        "anomaly_detection::delete_by_org(conn, org_id)",
+    ];
+
+    #[test]
+    fn test_folder_children_are_deleted_before_folders() {
+        let folders = position_of("folders::delete_by_org(org_id)");
+        for call in FOLDER_CHILD_DELETES {
+            assert!(
+                position_of(call) < folders,
+                "{call} must run before folders::delete_by_org"
+            );
+        }
+    }
+
+    #[test]
+    fn test_annotation_queue_bindings_are_deleted_before_their_score_configs() {
+        // fk_llm_queue_bindings_score_config_row is ON DELETE RESTRICT.
+        assert!(
+            position_of(LLM_EVALUATIONS) < position_of("score_configs::delete_all_by_org(org_id)"),
+            "the binding rows must go before the score configs they reference"
+        );
+    }
+
+    #[test]
+    fn test_synthetics_children_are_deleted_before_their_checks() {
+        // Runs cascade from checks and jobs from runs, but SQLite enforces no
+        // foreign key unless PRAGMA foreign_keys is on, which sea-orm never sets.
+        let checks = position_of("synthetics_checks::delete_by_org(conn, org_id)");
+        assert!(position_of("synthetics_runs::delete_by_org(conn, org_id)") < checks);
+        assert!(position_of("synthetics_jobs::delete_by_org(conn, org_id)") < checks);
+    }
+
+    /// The enterprise path reads the remote-task rows to find which secrets to
+    /// revoke, so wiping the rows first would strand that ciphertext.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_remote_task_secrets_are_revoked_before_the_rows_are_swept() {
+        assert!(
+            position_of("remote_tasks::delete_all_by_org(org_id)") < position_of(LLM_EVALUATIONS),
+            "the enterprise remote-task teardown must run before the table sweep"
+        );
     }
 }

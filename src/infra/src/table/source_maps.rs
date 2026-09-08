@@ -14,8 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use sea_orm::{
-    ColumnTrait, Condition, EntityTrait, FromQueryResult, QueryFilter, QuerySelect, Set, SqlErr,
-    TransactionTrait, prelude::Expr,
+    ColumnTrait, Condition, DatabaseConnection, EntityTrait, FromQueryResult, QueryFilter,
+    QuerySelect, Set, SqlErr, TransactionTrait, prelude::Expr,
 };
 use serde::{Deserialize, Serialize};
 
@@ -213,6 +213,14 @@ pub async fn delete_group(
     txn.commit().await?;
 
     Ok(rows.into_iter().map(|model| model.into()).collect())
+}
+
+pub async fn delete_by_org(db: &DatabaseConnection, org_id: &str) -> Result<(), errors::Error> {
+    Entity::delete_many()
+        .filter(Column::Org.eq(org_id))
+        .exec(db)
+        .await?;
+    Ok(())
 }
 
 pub async fn get_sourcemap_file(

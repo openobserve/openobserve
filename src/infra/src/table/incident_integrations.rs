@@ -20,9 +20,13 @@
 //! the incident events ingestion endpoint. `incident_integration_senders`
 //! tracks distinct upstream senders observed per integration for visibility.
 
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set, SqlErr, sea_query::Expr};
+use sea_orm::{
+    ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QuerySelect, Set, SqlErr,
+    TransactionTrait, sea_query::Expr,
+};
 
 use super::entity::{
+    external_alerts::{Column as ExternalAlertColumn, Entity as ExternalAlertEntity},
     incident_integration_senders::{
         ActiveModel as SenderActiveModel, Column as SenderColumn, Entity as SenderEntity,
         Model as SenderModel,
@@ -466,6 +470,44 @@ pub async fn delete(org_id: &str, id: &str) -> Result<bool, errors::Error> {
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
 
     Ok(true)
+}
+
+/// Removes an org's integrations with every sender and external alert hanging off them.
+pub async fn delete_by_org(db: &DatabaseConnection, org_id: &str) -> Result<(), errors::Error> {
+    let txn = db.begin().await?;
+
+    // Senders carry no org column, so their only route back to an org is the integration id.
+    let integration_ids: Vec<String> = Entity::find()
+        .select_only()
+        .column(Column::Id)
+        .filter(Column::OrgId.eq(org_id))
+        .into_tuple::<String>()
+        .all(&txn)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+
+    if !integration_ids.is_empty() {
+        SenderEntity::delete_many()
+            .filter(SenderColumn::IntegrationId.is_in(integration_ids))
+            .exec(&txn)
+            .await
+            .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    }
+
+    ExternalAlertEntity::delete_many()
+        .filter(ExternalAlertColumn::OrgId.eq(org_id))
+        .exec(&txn)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+
+    Entity::delete_many()
+        .filter(Column::OrgId.eq(org_id))
+        .exec(&txn)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+
+    txn.commit().await?;
+    Ok(())
 }
 
 /// List all observed senders for an integration.

@@ -20,8 +20,8 @@
 //! org's per-org DEK via [`cipher::get_dek`].
 
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, EntityTrait, Order, QueryFilter, QueryOrder, QuerySelect, Set,
-    SqlErr,
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, Order, QueryFilter, QueryOrder,
+    QuerySelect, Set, SqlErr,
 };
 use svix_ksuid::{Ksuid, KsuidLike};
 
@@ -256,6 +256,15 @@ pub async fn remove(org: &str, id: &str) -> Result<(), errors::Error> {
         .filter(Column::Org.eq(org))
         .filter(Column::Id.eq(id))
         .exec(client)
+        .await?;
+    Ok(())
+}
+
+/// Delete every toolset owned by an org.
+pub async fn delete_by_org(db: &DatabaseConnection, org_id: &str) -> Result<(), errors::Error> {
+    Entity::delete_many()
+        .filter(Column::Org.eq(org_id))
+        .exec(db)
         .await?;
     Ok(())
 }

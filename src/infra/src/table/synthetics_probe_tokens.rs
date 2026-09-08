@@ -26,7 +26,8 @@ use std::{
 
 use config::RwHashMap;
 use sea_orm::{
-    ColumnTrait, EntityTrait, QueryFilter, Set, SqlErr, TransactionTrait, sea_query::Expr,
+    ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, Set, SqlErr, TransactionTrait,
+    sea_query::Expr,
 };
 
 use super::entity::synthetics_probe_tokens::{ActiveModel, Column, Entity, Model};
@@ -332,4 +333,17 @@ pub async fn create_for_org(
     };
     add(&record).await?;
     Ok(record)
+}
+
+pub async fn delete_by_org<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+) -> Result<(), errors::Error> {
+    Entity::delete_many()
+        .filter(Column::OrgId.eq(org_id))
+        .exec(conn)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    invalidate_and_publish(org_id).await;
+    Ok(())
 }

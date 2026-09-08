@@ -22,12 +22,12 @@
 
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel,
-    JsonValue as Json, QueryFilter, QueryOrder, Set, TransactionTrait,
+    JsonValue as Json, QueryFilter, QueryOrder, QuerySelect, Set, TransactionTrait,
 };
 
 use crate::{
     errors::{self, Error},
-    table::entity::{anomaly_detection_config, folders},
+    table::entity::{anomaly_detection_config, anomaly_detection_models, folders},
 };
 
 type Model = anomaly_detection_config::Model;
@@ -232,6 +232,41 @@ pub async fn delete<C: ConnectionTrait>(conn: &C, org_id: &str, anomaly_id: &str
         .exec(conn)
         .await
         .map_err(|e| Error::DbError(errors::DbError::SeaORMError(e.to_string())))?;
+    Ok(())
+}
+
+/// Deletes every config an org owns together with the trained-model rows they own.
+pub async fn delete_by_org<C: TransactionTrait + ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+) -> Result<()> {
+    let txn = conn.begin().await?;
+
+    let anomaly_ids: Vec<String> = anomaly_detection_config::Entity::find()
+        .select_only()
+        .column(anomaly_detection_config::Column::AnomalyId)
+        .filter(anomaly_detection_config::Column::OrgId.eq(org_id))
+        .into_tuple()
+        .all(&txn)
+        .await
+        .map_err(|e| Error::DbError(errors::DbError::SeaORMError(e.to_string())))?;
+
+    // The models FK cascades, but sqlite ignores FKs without `PRAGMA foreign_keys=ON`.
+    if !anomaly_ids.is_empty() {
+        anomaly_detection_models::Entity::delete_many()
+            .filter(anomaly_detection_models::Column::AnomalyId.is_in(anomaly_ids))
+            .exec(&txn)
+            .await
+            .map_err(|e| Error::DbError(errors::DbError::SeaORMError(e.to_string())))?;
+    }
+
+    anomaly_detection_config::Entity::delete_many()
+        .filter(anomaly_detection_config::Column::OrgId.eq(org_id))
+        .exec(&txn)
+        .await
+        .map_err(|e| Error::DbError(errors::DbError::SeaORMError(e.to_string())))?;
+
+    txn.commit().await?;
     Ok(())
 }
 

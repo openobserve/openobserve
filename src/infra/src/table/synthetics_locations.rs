@@ -25,7 +25,9 @@ use std::{
     time::{Duration, Instant},
 };
 
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder, Set, sea_query::Expr};
+use sea_orm::{
+    ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, Set, sea_query::Expr,
+};
 use tokio::sync::RwLock;
 
 use super::entity::synthetics_locations::{ActiveModel, Column, Entity, Model};
@@ -253,6 +255,20 @@ pub async fn remove(id: &str) -> Result<(), errors::Error> {
     let client = get_orm_client_rw().await;
     Entity::delete_by_id(id)
         .exec(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    invalidate_and_publish().await;
+    Ok(())
+}
+
+/// Removes an org's private locations; shared public rows carry a NULL `org_id` and survive.
+pub async fn delete_by_org<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+) -> Result<(), errors::Error> {
+    Entity::delete_many()
+        .filter(Column::OrgId.eq(org_id))
+        .exec(conn)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
     invalidate_and_publish().await;
