@@ -51,6 +51,8 @@ const ENUMERABLE_LABELS = new Set([
 
 export interface StreamStats {
   doc_time_max?: number;
+  doc_num?: number;
+  created_at?: number;
   [key: string]: unknown;
 }
 
@@ -114,6 +116,8 @@ export interface ResolvedPanel {
   resolvedFields: Record<string, string>;
   missingStreams: MissingStreamInfo[];
   unresolvedConcepts: { groupId: string; display: string }[];
+  /** Hidden only because its schema read is still in flight — never reportable as absent. */
+  pending?: boolean;
 }
 
 export interface ResolvedPicker {
@@ -176,6 +180,13 @@ export interface ResolveArgs {
    * failure, and reporting every id as missing would bury it (§5.6).
    */
   dictionaryUnavailable?: boolean;
+  /**
+   * The schema tier is still in flight, so an unfetched schema is "not yet
+   * known" rather than "unavailable". Suppresses the first-spelling guess and
+   * its warning, leaving schema-dependent concepts unresolved: only rung-1
+   * overrides resolve, and the caller must NOT settle what this leaves hidden.
+   */
+  schemasPending?: boolean;
 }
 
 export interface Violation {
@@ -218,6 +229,7 @@ export function resolveManifest(args: ResolveArgs): CuratedResolution {
     lastSeenUs,
     probeVerdicts,
     dictionaryUnavailable,
+    schemasPending,
   } = args;
 
   const byId = new Map(semanticGroups.map((group) => [group.id, group]));
@@ -250,10 +262,21 @@ export function resolveManifest(args: ResolveArgs): CuratedResolution {
 
   // Grace stops a healthy stream being BADGED; it has no business widening a liveness gate.
   const livenessFloor = Math.min(range.start, now - STALENESS_24H_US);
+
+  // A zero-doc stream older than this stopped being "not yet" and is simply dead.
+  const neverIngested = (entry: StreamListEntry | undefined): boolean => {
+    const stats = entry?.stats;
+    if (typeof stats?.doc_num !== "number" || stats.doc_num > 0) return false;
+    // An unknown creation date can never newly HIDE a panel, so it stays "not yet".
+    const createdAt = stats.created_at;
+    if (typeof createdAt !== "number" || createdAt <= 0) return false;
+    return createdAt < now - STALENESS_24H_US;
+  };
+
   const isLive = (entry: StreamListEntry | undefined): boolean => {
     const seen = docTimeMax(entry);
     // A never-ingested stream serializes all-zero stats — "not yet", not dead.
-    if (seen === undefined || seen === 0) return true;
+    if (seen === undefined || seen === 0) return !neverIngested(entry);
     return seen >= livenessFloor;
   };
 
@@ -277,7 +300,7 @@ export function resolveManifest(args: ResolveArgs): CuratedResolution {
     schemaFields: Set<string> | undefined,
     schemaStream: string | undefined,
     schemaWasFetched: boolean,
-  ): { field?: string; display: string } => {
+  ): { field?: string; display: string; pending?: boolean } => {
     const dictEntry = byId.get(gid);
     const display = dictEntry?.display ?? gid;
 
@@ -287,6 +310,14 @@ export function resolveManifest(args: ResolveArgs): CuratedResolution {
     // Every rung past 1 consults the dictionary and the panel's own schema.
     needsSemanticGroups = true;
     if (schemaStream) schemasNeeded.add(schemaStream);
+
+    // A read still in flight is not a failed read, so no spelling is guessed off it yet.
+    // An EMPTY set counts as unfetched here: the stream list serializes `schema: []`
+    // for every entry (getStreams forces schema=false), which is indistinguishable
+    // from a real schema-less stream until the tier-2 read actually lands.
+    if (schemasPending && !(schemaFields && schemaFields.size > 0)) {
+      return { display, pending: true };
+    }
 
     if (!schemaWasFetched) {
       // A transport failure is not evidence of a missing field, so resolve to the group's first spelling and render.
@@ -356,6 +387,25 @@ export function resolveManifest(args: ResolveArgs): CuratedResolution {
     }
     return { furthest };
   };
+
+  /**
+   * A picker whose own concept is still pending resolves to nothing yet, so a
+   * panel scoping by it would query fleet-wide now and re-scope on the next
+   * build. Decided here, off the picker's own source stream, so pass 1 can hold
+   * those panels back in the same sweep it resolves everything else.
+   */
+  const pendingPickerNames = new Set<string>();
+  if (schemasPending) {
+    for (const picker of manifest.scopePickers) {
+      if (pins?.[picker.group]) continue;
+      const source = picker.valuesFrom;
+      const group = groupById.get(source.groupId);
+      if (!group) continue;
+      if (group.fieldOverrides?.[picker.group]) continue;
+      const fields = schemaFieldsOf(source.streamType, source.stream);
+      if (!fields || fields.size === 0) pendingPickerNames.add(picker.name);
+    }
+  }
 
   const probeCandidates = new Map<string, { stream?: string; furthest?: string }>();
   for (const group of manifest.groups) {
@@ -446,7 +496,7 @@ export function resolveManifest(args: ResolveArgs): CuratedResolution {
     let unresolved = false;
     const { required, optional } = conceptsUsedBy(base.selectedVariant!);
     for (const gid of required) {
-      const { field, display } = resolveConcept(
+      const { field, display, pending } = resolveConcept(
         gid,
         group,
         anchorFields,
@@ -455,6 +505,10 @@ export function resolveManifest(args: ResolveArgs): CuratedResolution {
       );
       if (field) {
         base.resolvedFields[gid] = field;
+      } else if (pending) {
+        // Withheld, not missing: it must not warn, and the strip must not name it.
+        unresolved = true;
+        base.pending = true;
       } else {
         unresolved = true;
         base.unresolvedConcepts.push({ groupId: gid, display });
@@ -467,6 +521,17 @@ export function resolveManifest(args: ResolveArgs): CuratedResolution {
     for (const gid of optional) {
       const { field } = resolveConcept(gid, group, anchorFields, schemaStream, schemaWasFetched);
       if (field) base.resolvedFields[gid] = field;
+    }
+
+    if (
+      !base.pending &&
+      pendingPickerNames.size > 0 &&
+      base.selectedVariant.queries.some((query) =>
+        tokensIn(query.query, "scope").some((name) => pendingPickerNames.has(name)),
+      )
+    ) {
+      unresolved = true;
+      base.pending = true;
     }
 
     base.hidden = unresolved;
@@ -482,7 +547,9 @@ export function resolveManifest(args: ResolveArgs): CuratedResolution {
   for (const group of manifest.groups) {
     const panels = resolvedPanels.filter((panel) => panel.groupId === group.id);
     const visible = panels.filter((panel) => !panel.hidden);
-    const hiddenPanels = panels.filter((panel) => panel.hidden);
+    // A pending panel is unknown, not absent, so it feeds neither the partial list nor the strip.
+    const hiddenPanels = panels.filter((panel) => panel.hidden && !panel.pending);
+    const pendingHere = panels.some((panel) => panel.pending);
     const verdict = group.probe ? probeVerdicts?.[group.id] : undefined;
 
     const unresolvedHere = dedupeConcepts(
@@ -513,6 +580,8 @@ export function resolveManifest(args: ResolveArgs): CuratedResolution {
 
     // A probe group with an unsettled ladder is neither present nor reportable.
     if (group.probe && !verdict) continue;
+    // Nothing rendered yet only because the schema tier has not answered — absence is not yet decidable.
+    if (pendingHere) continue;
 
     const unresolvedConcepts = unresolvedHere;
     const reason: HiddenGroupInfo["reason"] = group.probe
@@ -627,7 +696,10 @@ export function resolveManifest(args: ResolveArgs): CuratedResolution {
     pickers.push({ def: picker, field, label: display, ...(parentField ? { parentField } : {}) });
   }
 
-  const overviewSectionId = manifest.sections[0]?.id;
+  // By id, not by position: the strip explains absent data behind the OVERVIEW
+  // panel set, and reordering sections must not silently retarget it elsewhere.
+  const overviewSectionId =
+    manifest.sections.find((section) => section.id === "overview")?.id ?? manifest.sections[0]?.id;
   const stripAutoExpand = hiddenGroups.some((hidden) =>
     resolvedPanels.some(
       (panel) => panel.groupId === hidden.group.id && panel.sectionId === overviewSectionId,
@@ -1032,6 +1104,8 @@ function buildPanel(
     // The KEY, not the copy: buildDashboard is pure and i18n-free, so the view translates this (§5.5, §8.2).
     title: panel.def.titleKey,
     description: "",
+    // Emitted RAW: substituteQuery ends in tidyMatchers, which is PromQL brace surgery and turns `option = {}` into a syntax error.
+    ...(panel.def.customChartContent ? { customChartContent: panel.def.customChartContent } : {}),
     config,
     queryType: variant.queryType,
     queries: queries.map((built) => ({

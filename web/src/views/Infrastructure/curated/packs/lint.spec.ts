@@ -17,9 +17,12 @@
 // a pack IS opting into every generic invariant (design §9). Assertions call
 // `lintManifest` from resolve.ts so the same rules are runnable outside vitest.
 
+import * as acorn from "acorn";
+import * as walk from "acorn-walk";
 import { describe, it, expect } from "vitest";
 import type { FieldAlias } from "@/services/service_streams";
 import { lintManifest } from "../resolve";
+import { validateUserCode } from "@/utils/dashboard/convertCustomChartData";
 import { curatedPacks } from "./index";
 import defaultSemanticGroups from "./__fixtures__/semanticGroups.default.json";
 import enLocale from "@/locales/languages/en-US.json";
@@ -59,7 +62,10 @@ const COLLECTOR_TOKENS = ["kubeletstats", "kube-state", "cluster receiver", "kub
 const GOLDEN_NAMES: Record<string, { pickers: string[]; sections: string[] }> = {
   kubernetes: {
     pickers: ["cluster", "namespace", "pod"],
-    sections: ["overview", "health", "utilization", "nodes", "workloads"],
+    // "summary" leads deliberately: the landing tab is tabs[0]
+    // (CuratedPageView.vue:151-164) and the fleet roll-up is the page's answer to
+    // "which cluster should I look at" before any single one is worth opening.
+    sections: ["summary", "overview", "health", "utilization", "nodes", "workloads"],
   },
   hosts: { pickers: ["host"], sections: ["host"] },
 };
@@ -467,6 +473,95 @@ describe.each(packs)("generic invariants — %s pack", (packId, manifest) => {
         required.has(picker.valuesFrom.stream),
         `${picker.name} → ${picker.valuesFrom.stream}`,
       ).toBe(true);
+    }
+  });
+});
+
+// A `custom_chart` panel's author JS is the one part of a pack that NOTHING else
+// checks. The curated render path passes `type` straight through (resolve.ts:1031)
+// with no allowlist; panelValidation.ts and CUSTOM_QUERY_CHART_TYPES are panel-
+// editor only and never run here; and validateUserCode fires at RENDER time, inside
+// a sandboxed iframe, where its verdict reaches a console rather than CI. So an
+// unsafe or misshapen string ships green and fails silently in the browser. These
+// four rules move that verdict into the suite.
+describe.each(packs)("author JS (custom_chart) — %s pack", (_packId, manifest) => {
+  const chartPanels = panelsOf(manifest).filter((p) => p.type === "custom_chart");
+
+  const parse = (code: string): acorn.Node =>
+    acorn.parse(code, { ecmaVersion: 2020 }) as acorn.Node;
+
+  /** Every `data[<literal>]` index the code reads. */
+  const dataIndices = (code: string): number[] => {
+    const out: number[] = [];
+    walk.simple(parse(code), {
+      MemberExpression(node: any) {
+        if (
+          node.computed &&
+          node.object?.type === "Identifier" &&
+          node.object.name === "data" &&
+          node.property?.type === "Literal" &&
+          typeof node.property.value === "number"
+        ) {
+          out.push(node.property.value);
+        }
+      },
+    });
+    return out;
+  };
+
+  it("every custom_chart panel declares a non-empty customChartContent", () => {
+    // convertPanelData.ts:226 reads `panelSchema.customChartContent` — the panel
+    // object, never `config`. A missing or misplaced string renders an empty chart
+    // with no error anywhere.
+    for (const panel of chartPanels) {
+      expect(typeof panel.customChartContent, `${panel.id} customChartContent`).toBe("string");
+      expect(String(panel.customChartContent).trim().length, panel.id).toBeGreaterThan(0);
+    }
+  });
+
+  it("every customChartContent passes validateUserCode", () => {
+    // The same function convertCustomChartData.ts:55 runs before execution, so a
+    // hit here is a panel that would refuse to render at all.
+    for (const panel of chartPanels) {
+      expect(validateUserCode(String(panel.customChartContent)), panel.id).toBeNull();
+    }
+  });
+
+  it("every customChartContent assigns a BARE `option`", () => {
+    // The sandbox runs the code as `(function(data, echarts) { <userCode> })` and
+    // then reads a FREE `option` identifier from the enclosing scope
+    // (convertCustomChartData.ts:151). `const option = ...` binds inside the IIFE,
+    // so the postMessage throws ReferenceError and the panel paints nothing.
+    for (const panel of chartPanels) {
+      const ast = parse(String(panel.customChartContent));
+      let declared = false;
+      let assigned = false;
+      walk.simple(ast, {
+        VariableDeclarator(node: any) {
+          if (node.id?.type === "Identifier" && node.id.name === "option") declared = true;
+        },
+        AssignmentExpression(node: any) {
+          if (node.left?.type === "Identifier" && node.left.name === "option") assigned = true;
+        },
+      });
+      expect(assigned, `${panel.id} never assigns \`option\``).toBe(true);
+      expect(declared, `${panel.id} DECLARES \`option\`, which the sandbox cannot read`).toBe(
+        false,
+      );
+    }
+  });
+
+  it("no customChartContent reads a data index past its own query count", () => {
+    // data[i] is query i's result (usePanelPromQLExecutor.ts:101,242). Reading past
+    // the end yields undefined and the next property access throws inside the
+    // sandbox — surfacing as a bare execution error that names no cause.
+    for (const panel of chartPanels) {
+      const limit = queriesOf(panel).length;
+      for (const index of dataIndices(String(panel.customChartContent))) {
+        expect(index, `${panel.id} reads data[${index}] with only ${limit} queries`).toBeLessThan(
+          limit,
+        );
+      }
     }
   });
 });

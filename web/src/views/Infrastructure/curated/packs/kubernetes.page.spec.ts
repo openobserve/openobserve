@@ -43,7 +43,7 @@ const queriesOf = (id: string): string[] =>
   panel(id).variants.flatMap((v: any) => v.queries.map((q: any) => q.query as string));
 
 describe("kubernetes pack — shape", () => {
-  it("declares 3 groups, 3 pickers, 5 sections and 47 panels", () => {
+  it("declares 3 groups, 3 pickers, 6 sections and 48 panels", () => {
     expect(kubernetesPage.id).toBe("kubernetes");
     expect(kubernetesPage.groups.map((g: any) => g.id)).toEqual([
       "kubelet-node",
@@ -56,13 +56,16 @@ describe("kubernetes pack — shape", () => {
       "pod",
     ]);
     expect(kubernetesPage.sections.map((s: any) => s.id)).toEqual([
+      // The fleet quadrant is the landing tab (tabs[0], CuratedPageView.vue:151-164):
+      // which cluster to open is the question that precedes opening one.
+      "summary",
       "overview",
       "health",
       "utilization",
       "nodes",
       "workloads",
     ]);
-    expect(allPanels()).toHaveLength(47);
+    expect(allPanels()).toHaveLength(48);
   });
 
   it("pins the 24h staleness threshold like every v1 pack (§5.3)", () => {
@@ -107,9 +110,37 @@ describe("kube-state fieldOverrides — keyed by the REAL group ids", () => {
   });
 });
 
+describe("the Inventory node pair reads ONE collector", () => {
+  it("the Nodes total and the Nodes-ready count both come from kube-state", () => {
+    // A NotReady node stops emitting kubeletstats but keeps emitting kube-state, so
+    // a kubeletstats total shrinks toward the ready count and the pair reads 30/30
+    // at the exact moment a node has failed. Same collector, or the tile lies.
+    for (const id of ["k8s_ov_nodes", "k8s_ov_nodes_ready"]) {
+      expect(panel(id).groupId, id).toBe("kube-state");
+      expect(sectionOf(id)!.id, id).toBe("overview");
+    }
+    for (const query of queriesOf("k8s_ov_nodes")) {
+      expect(query).toContain("kube_node_status_allocatable");
+      // Asserted negatively so a well-meaning revert to the kubeletstats spelling fails here.
+      expect(query).not.toContain("k8s_node_cpu");
+    }
+    expect(panel("k8s_ov_nodes").variants).toHaveLength(1);
+    expect(panel("k8s_ov_nodes").variants[0].requiresStreams).toEqual([
+      "kube_node_status_allocatable",
+    ]);
+  });
+
+  it("the Nodes total counts NODES, not the resource rows allocatable emits per node", () => {
+    // kube_node_status_allocatable carries one series per (node, resource); a bare
+    // count() would report cpu+memory+pods+… and multiply the fleet.
+    const [query] = queriesOf("k8s_ov_nodes");
+    expect(query).toMatch(/count\(count by \(\$\{f:k8s-node-name\}\)/);
+  });
+});
+
 describe("drift variants (§10 pass-1 finding 1)", () => {
   it("node CPU and node memory each carry exactly 2 variants of the right families", () => {
-    for (const id of ["k8s_nd_cpu", "k8s_ov_node_cpu_top", "k8s_ov_nodes"]) {
+    for (const id of ["k8s_nd_cpu", "k8s_ov_node_cpu_top"]) {
       expect(panel(id).variants, id).toHaveLength(2);
       expect(panel(id).variants[0].requiresStreams, id).toEqual(["k8s_node_cpu_utilization"]);
       expect(panel(id).variants[1].requiresStreams, id).toEqual(["k8s_node_cpu_usage"]);
@@ -514,7 +545,8 @@ describe("every instant panel states its window in the title", () => {
 
   it("the overview note tells the reader the tiles and the table share one instant", () => {
     let node: any = enLocale;
-    for (const segment of kubernetesPage.sections[0].noteKey!.split(".")) node = node?.[segment];
+    const overview = kubernetesPage.sections.find((s: any) => s.id === "overview");
+    for (const segment of overview!.noteKey!.split(".")) node = node?.[segment];
     expect(String(node).toLowerCase()).toContain("now");
   });
 });

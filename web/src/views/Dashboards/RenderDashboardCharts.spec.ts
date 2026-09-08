@@ -494,6 +494,29 @@ describe("RenderDashboardCharts", () => {
       wrapper = createWrapper({ showTabs: true });
       expect(wrapper.exists()).toBe(true);
     });
+
+    // Variables scope the ACTIVE tab, so rendering them above the strip made them
+    // read as page chrome and moved the tab bar whenever their height changed.
+    it("renders the global variables strip BELOW the tab list, not above it", () => {
+      wrapper = createWrapper({
+        showTabs: true,
+        dashboardData: {
+          ...defaultProps.dashboardData,
+          variables: {
+            showDynamicFilters: true,
+            list: [{ name: "cluster", type: "query_values", scope: "global", value: [] }],
+          },
+        },
+      });
+
+      const html = wrapper.html();
+      const tabsAt = html.indexOf("tab-list");
+      const varsAt = html.indexOf("global-variables-selector");
+
+      expect(tabsAt).toBeGreaterThan(-1);
+      expect(varsAt).toBeGreaterThan(-1);
+      expect(tabsAt).toBeLessThan(varsAt);
+    });
   });
 
   describe("Print Mode & Loading Tests", () => {

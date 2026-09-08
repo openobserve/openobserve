@@ -26,7 +26,7 @@ import CuratedPageView from "./CuratedPageView.vue";
 import VariablesValueSelector from "@/components/dashboards/VariablesValueSelector.vue";
 import { useVariablesManager } from "@/composables/dashboard/useVariablesManager";
 import { b64DecodeUnicodeSafe } from "@/utils/formatters";
-import { kubernetesPage } from "./packs/kubernetes.page";
+import { kubernetesPage, FLEET_DRILLDOWN_EVENT } from "./packs/kubernetes.page";
 import i18n from "@/locales";
 
 const { useCuratedPageMock } = vi.hoisted(() => ({ useCuratedPageMock: vi.fn() }));
@@ -176,7 +176,11 @@ describe("CuratedPageView", () => {
   let wrapper: VueWrapper<any>;
   let router: any;
 
-  const mountView = async (props: Record<string, any> = {}, over: Record<string, any> = {}) => {
+  const mountView = async (
+    props: Record<string, any> = {},
+    over: Record<string, any> = {},
+    query: Record<string, string> = {},
+  ) => {
     state = makeState(over);
     useCuratedPageMock.mockReturnValue(state);
     // A real mutation, not a plain-object assignment: mutating store.state
@@ -200,7 +204,7 @@ describe("CuratedPageView", () => {
         { path: "/dashboards", name: "dashboards", component: { template: "<div />" } },
       ],
     });
-    await router.push("/infra/kubernetes");
+    await router.push({ path: "/infra/kubernetes", query });
     await router.isReady();
     vi.spyOn(router, "push");
     const w = mount(CuratedPageView, {
@@ -363,6 +367,27 @@ describe("CuratedPageView", () => {
     it("provides selectedTabId seeded with the FIRST visible section", async () => {
       wrapper = await mountView({}, { dashboard: ref(dashboardFixture(["nodes", "workloads"])) });
       expect(injectedTabIds[0]).toBe("nodes");
+    });
+
+    it("?tab= outranks the tabs[0] default, so a cross-tab drilldown lands where it aimed", async () => {
+      // The fleet-quadrant bubble drilldown navigates to ?tab=health&var-cluster=…
+      // (kubernetes.page.ts o2_events.click). Nothing else reads ?tab= on this
+      // route, so without this seeding the drilldown silently lands on tabs[0].
+      wrapper = await mountView(
+        {},
+        { dashboard: ref(dashboardFixture(["summary", "health"])) },
+        { tab: "health" },
+      );
+      expect(injectedTabIds[0]).toBe("health");
+    });
+
+    it("a ?tab= naming no visible section falls back to the first, never to a blank page", async () => {
+      wrapper = await mountView(
+        {},
+        { dashboard: ref(dashboardFixture(["summary", "health"])) },
+        { tab: "utilization" },
+      );
+      expect(injectedTabIds[0]).toBe("summary");
     });
   });
 
@@ -1440,6 +1465,121 @@ describe("CuratedPageView", () => {
       const target: any = vi.mocked(router.push).mock.calls[0][0];
       expect(target.name).toBe("dashboards");
       expect(target.query.period ?? target.query.from).toBeTruthy();
+    });
+  });
+
+  // ── Fleet-quadrant drilldown ─────────────────────────────────────────────
+
+  describe("fleet-quadrant drilldown", () => {
+    // The sandboxed chart JS cannot see the router, so it dispatches a DOM event
+    // and this view routes it. The handler used to call `location.assign`, which
+    // is a document navigation: the whole SPA was torn down and rebuilt, every
+    // panel refetched, and the user watched a multi-second white flash. These
+    // pin the SPA path, and the URL invariants that moved here with it.
+    const drill = async (cluster: unknown) => {
+      document.dispatchEvent(
+        new CustomEvent(FLEET_DRILLDOWN_EVENT, { detail: { cluster }, bubbles: true }),
+      );
+      await flushPromises();
+    };
+
+    const query = () => router.currentRoute.value.query;
+
+    it("routes through the router, never through a document navigation", async () => {
+      // router.push is the ONLY assertion that separates this from the bug: a
+      // reload reaches the same URL, and only the mechanism tells them apart.
+      wrapper = await mountView({}, { dashboard: ref(dashboardFixture(["summary", "health"])) });
+      await drill("prod-eu");
+      expect(router.push).toHaveBeenCalledTimes(1);
+      expect(query()["var-cluster"]).toBe("prod-eu");
+      expect(query().tab).toBe("health");
+    });
+
+    it("switches the tab on a view that never remounts", async () => {
+      // The tab watcher only re-seeds off ?tab= when the tab LIST changes, which a
+      // reload did for free and an in-app push does not. Without an explicit
+      // switch the URL says health and the page still shows summary.
+      wrapper = await mountView({}, { dashboard: ref(dashboardFixture(["summary", "health"])) });
+      expect(injectedTabIds[injectedTabIds.length - 1]).toBe("summary");
+      await drill("prod-eu");
+      expect(injectedTabIds[injectedTabIds.length - 1]).toBe("health");
+    });
+
+    it("replaces a stale cluster scope instead of appending a second one", async () => {
+      // Two var-cluster params is a coin flip over which the manager reads, so a
+      // second click would silently keep showing the first cluster.
+      wrapper = await mountView(
+        {},
+        { dashboard: ref(dashboardFixture(["summary", "health"])) },
+        { "var-cluster": "prod-eu", tab: "health" },
+      );
+      await drill("prod-us");
+      expect(query()["var-cluster"]).toBe("prod-us");
+    });
+
+    it("preserves the other query params it does not own", async () => {
+      wrapper = await mountView(
+        {},
+        { dashboard: ref(dashboardFixture(["summary", "health"])) },
+        { org_identifier: "acme", period: "15m" },
+      );
+      await drill("prod-eu");
+      expect(query().org_identifier).toBe("acme");
+      expect(query().period).toBe("15m");
+    });
+
+    it("a cluster name full of query-string metacharacters survives intact", async () => {
+      // The name rides a structured `detail` and the router encodes it, so the
+      // round trip has to be checked rather than the escaping.
+      wrapper = await mountView({}, { dashboard: ref(dashboardFixture(["summary", "health"])) });
+      await drill("eu&west=1");
+      expect(query()["var-cluster"]).toBe("eu&west=1");
+    });
+
+    it("ignores an event carrying no cluster, rather than scoping to nothing", async () => {
+      wrapper = await mountView({}, { dashboard: ref(dashboardFixture(["summary", "health"])) });
+      await drill(undefined);
+      expect(router.push).not.toHaveBeenCalled();
+      expect(query()["var-cluster"]).toBeUndefined();
+    });
+
+    it("does not switch to a tab the manifest is not currently showing", async () => {
+      // A hidden health section must not leave the page on a tab that renders nothing.
+      wrapper = await mountView({}, { dashboard: ref(dashboardFixture(["summary", "nodes"])) });
+      await drill("prod-eu");
+      expect(injectedTabIds[injectedTabIds.length - 1]).toBe("summary");
+    });
+
+    it("stops listening once unmounted — a stray click must not route a dead view", async () => {
+      wrapper = await mountView({}, { dashboard: ref(dashboardFixture(["summary", "health"])) });
+      wrapper.unmount();
+      (router.push as any).mockClear();
+      await drill("prod-eu");
+      expect(router.push).not.toHaveBeenCalled();
+    });
+
+    it("registers exactly ONE listener, so a click routes once", async () => {
+      // The sandbox re-executes and re-binds often; a listener added per render
+      // would push the same route several times per click.
+      wrapper = await mountView({}, { dashboard: ref(dashboardFixture(["summary", "health"])) });
+      state.dashboard.value = dashboardFixture(["summary", "health"]);
+      await flushPromises();
+      (router.push as any).mockClear();
+      await drill("prod-eu");
+      expect(router.push).toHaveBeenCalledTimes(1);
+    });
+
+    it("Back returns to the tab the reader came from", async () => {
+      // A reload made Back a fresh mount that re-read the URL. In-app, nothing
+      // re-reads it, so Back would leave the URL on summary and the page on health.
+      wrapper = await mountView({}, { dashboard: ref(dashboardFixture(["summary", "health"])) });
+      await drill("prod-eu");
+      expect(injectedTabIds[injectedTabIds.length - 1]).toBe("health");
+
+      router.back();
+      await flushPromises();
+      expect(query()["var-cluster"]).toBeUndefined();
+      expect(injectedTabIds[injectedTabIds.length - 1]).toBe("summary");
     });
   });
 

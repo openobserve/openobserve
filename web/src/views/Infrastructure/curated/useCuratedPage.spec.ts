@@ -23,7 +23,7 @@ import { mount, flushPromises } from "@vue/test-utils";
 import { createStore } from "vuex";
 import type { FieldAlias } from "@/services/service_streams";
 import defaultSemanticGroups from "./packs/__fixtures__/semanticGroups.default.json";
-import { useCuratedPage, PROBE_TIMEOUT_MS } from "./useCuratedPage";
+import { useCuratedPage, PROBE_TIMEOUT_MS, __resetSchemaReadsForTest } from "./useCuratedPage";
 import { GROUP } from "./types";
 import { kubernetesPage } from "./packs/kubernetes.page";
 import { hostsPage } from "./packs/hosts.page";
@@ -261,6 +261,7 @@ describe("useCuratedPage", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    __resetSchemaReadsForTest();
     primeStreams({ metrics: K8S_METRICS, logs: [] });
     getStreamMock.mockImplementation(async (name: string) => streamEntry(name, KUBE_SCHEMA));
     loadSemanticGroupsMock.mockResolvedValue(K8S_DICT);
@@ -1326,6 +1327,204 @@ describe("useCuratedPage", () => {
       const hidden = h.page.hiddenGroups.value.find((g: any) => g.group.id === "kubelet-node");
       expect(hidden.missingStreams.every((m: any) => m.state === "stale")).toBe(true);
       expect(hidden.missingStreams.every((m: any) => m.lastSeenUs === dead)).toBe(true);
+    });
+  });
+  // ── Tiered first paint: rung-1 panels do not wait on the schema tier ──────
+
+  describe("early resolve", () => {
+    /**
+     * Hold every schema read open so the gap between the dictionary and the
+     * schemas is observable. The lists are stripped to NAMES first: getStreams
+     * forces schema=false in the real app, so a fixture that carries schemas
+     * inline would resolve rung 2 off the list and never exercise the gap.
+     */
+    const holdSchemas = (metrics: any[] = K8S_METRICS) => {
+      // The live API serializes `schema: []` on every list entry (getStreams forces
+      // schema=false), so that — not a missing key — is the real pre-tier-2 shape.
+      primeStreams({ metrics: metrics.map((entry) => ({ ...entry, schema: [] })), logs: [] });
+      const gate = deferred();
+      getStreamMock.mockImplementation(async (name: string) => {
+        await gate.promise;
+        const source = metrics.find((s) => s.name === name);
+        return { ...streamEntry(name), schema: source?.schema ?? [] };
+      });
+      return gate;
+    };
+
+    it("paints rung-1 panels BEFORE any schema read resolves", async () => {
+      const gate = holdSchemas();
+      const h = withCuratedPage();
+      wrapper = h.wrapper;
+      const run = h.page.refresh(refreshArgs);
+      await flushPromises();
+
+      // kube-state overrides all four of its concepts, so it owes the schema tier nothing.
+      expect(h.page.dashboard.value).not.toBeNull();
+      expect(h.page.presentGroupIds.value).toContain("kube-state");
+      expect(h.page.face.value).toBe("ready");
+
+      gate.resolve(undefined);
+      await run;
+      await flushPromises();
+    });
+
+    it("shows NO absent face for a schema-dependent group during the gap", async () => {
+      const gate = holdSchemas();
+      const h = withCuratedPage();
+      wrapper = h.wrapper;
+      const run = h.page.refresh(refreshArgs);
+      await flushPromises();
+
+      // The kubeletstats groups resolve off the dictionary+schema, so mid-gap they are UNKNOWN, not missing.
+      expect(h.page.hiddenGroups.value).toEqual([]);
+      expect(h.page.warnings.value.some((w: any) => w.kind === "schema")).toBe(false);
+
+      gate.resolve(undefined);
+      await run;
+      await flushPromises();
+      // And the settled pass still reports them as present rather than absent.
+      expect(h.page.presentGroupIds.value).toContain("kubelet-pod");
+    });
+
+    it("reports NO schema warning mid-gap — a read in flight is not a failed read", async () => {
+      const gate = holdSchemas();
+      const h = withCuratedPage();
+      wrapper = h.wrapper;
+      const run = h.page.refresh(refreshArgs);
+      await flushPromises();
+      // The `schema unavailable` fallback guesses a spelling; mid-gap there is nothing to guess from yet.
+      expect(h.page.warnings.value.some((w: any) => w.kind === "schema")).toBe(false);
+      expect(h.page.warnings.value.some((w: any) => w.kind === "field-unresolved")).toBe(false);
+      gate.resolve(undefined);
+      await run;
+      await flushPromises();
+    });
+
+    it("a group whose panels are ALL pending is reported neither present nor absent", async () => {
+      // Only the kubeletstats streams: every kube-state panel is gone, so the
+      // groups left owe the schema tier every concept they have and none of
+      // them can render — the one shape that reaches the all-pending branch.
+      const gate = holdSchemas(K8S_METRICS.filter((s) => !s.name.startsWith("kube_")));
+      const h = withCuratedPage();
+      wrapper = h.wrapper;
+      const run = h.page.refresh(refreshArgs);
+      await flushPromises();
+      expect(h.page.hiddenGroups.value.map((g: any) => g.group.id)).not.toContain("kubelet-pod");
+      expect(h.page.hiddenGroups.value.map((g: any) => g.group.id)).not.toContain("kubelet-node");
+
+      gate.resolve(undefined);
+      await run;
+      await flushPromises();
+      expect(h.page.presentGroupIds.value).toContain("kubelet-pod");
+    });
+
+    it("a superseded early resolve never writes over a newer generation", async () => {
+      const gate = holdSchemas();
+      const h = withCuratedPage();
+      wrapper = h.wrapper;
+      const first = h.page.refresh(refreshArgs);
+      await flushPromises();
+
+      primeStreams({
+        metrics: K8S_METRICS.filter((s) => s.name.startsWith("kube_")).map((entry) => ({
+          ...entry,
+          schema: [],
+        })),
+        logs: [],
+      });
+      getStreamMock.mockImplementation(async (name: string) => streamEntry(name, KUBE_SCHEMA));
+      await h.page.refresh({ ...refreshArgs, force: true });
+      await flushPromises();
+      gate.resolve(undefined);
+      await first;
+      await flushPromises();
+
+      // The stale run's kubeletstats groups must not reappear behind the newer, kube-state-only list.
+      expect(h.page.presentGroupIds.value).not.toContain("kubelet-node");
+    });
+  });
+
+  // ── The schema cache outlives the mount ───────────────────────────────────
+
+  describe("schema cache persistence", () => {
+    it("a REMOUNT re-fires ZERO getStream calls", async () => {
+      const first = withCuratedPage();
+      await first.page.refresh(refreshArgs);
+      await flushPromises();
+      expect(getStreamMock.mock.calls.length).toBeGreaterThan(0);
+      first.wrapper.unmount();
+
+      getStreamMock.mockClear();
+      const second = withCuratedPage();
+      wrapper = second.wrapper;
+      await second.page.refresh(refreshArgs);
+      await flushPromises();
+      expect(getStreamMock).not.toHaveBeenCalled();
+      expect(second.page.presentGroupIds.value).toContain("kubelet-pod");
+    });
+
+    it("force:true re-fires them even on a remount — Refresh must defeat the cache", async () => {
+      const first = withCuratedPage();
+      await first.page.refresh(refreshArgs);
+      await flushPromises();
+      first.wrapper.unmount();
+
+      getStreamMock.mockClear();
+      const second = withCuratedPage();
+      wrapper = second.wrapper;
+      await second.page.refresh({ ...refreshArgs, force: true });
+      await flushPromises();
+      expect(getStreamMock.mock.calls.length).toBeGreaterThan(0);
+    });
+
+    it("an EXPIRED entry re-fires; a fresh one does not", async () => {
+      const first = withCuratedPage();
+      await first.page.refresh(refreshArgs);
+      await flushPromises();
+      first.wrapper.unmount();
+
+      const realNow = Date.now;
+      // Past the 5-minute TTL, so a genuinely changed schema is picked up without a hard reload.
+      Date.now = () => realNow() + 6 * 60 * 1000;
+      try {
+        getStreamMock.mockClear();
+        const second = withCuratedPage();
+        wrapper = second.wrapper;
+        await second.page.refresh(refreshArgs);
+        await flushPromises();
+        expect(getStreamMock.mock.calls.length).toBeGreaterThan(0);
+      } finally {
+        Date.now = realNow;
+      }
+    });
+
+    it("another ORG's entries survive this org's force clear", async () => {
+      const h = withCuratedPage();
+      wrapper = h.wrapper;
+      await h.page.refresh({ ...refreshArgs, orgId: "org-a" });
+      await flushPromises();
+      await h.page.refresh({ ...refreshArgs, orgId: "org-b" });
+      await flushPromises();
+      await h.page.refresh({ ...refreshArgs, orgId: "org-b", force: true });
+      await flushPromises();
+
+      // org-b's force evicted org-b only, so coming back to org-a must still cost nothing.
+      getStreamMock.mockClear();
+      const back = withCuratedPage();
+      back.wrapper.unmount();
+      await h.page.refresh({ ...refreshArgs, orgId: "org-a" });
+      await flushPromises();
+      expect(getStreamMock).not.toHaveBeenCalled();
+    });
+
+    it("walkCandidates still shares the cache — a probe walk adds no second read", async () => {
+      const h = withCuratedPage();
+      wrapper = h.wrapper;
+      await h.page.refresh(refreshArgs);
+      await flushPromises();
+      const names = getStreamMock.mock.calls.map((c: any[]) => c[0]);
+      // One read per stream: the sequential walk must never re-request what loadSchemas already holds.
+      expect(names.length).toBe(new Set(names).size);
     });
   });
 });
