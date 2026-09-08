@@ -121,7 +121,6 @@ const FunctionsFormValidationPage = require("./functionsPages/functionsFormValid
 
 // ===== ANOMALY DETECTION PAGE OBJECTS =====
 const { AnomalyDetectionPage } = require("./anomalyPages/anomalyDetectionPage.js");
-const { AnomalyFormValidationPage } = require("./anomalyPages/anomalyFormValidationPage.js");
 
 class PageManager {
   /**
@@ -255,7 +254,6 @@ class PageManager {
 
     // ===== ANOMALY DETECTION PAGE OBJECTS =====
     this.anomalyDetectionPage = new AnomalyDetectionPage(page, this.commonActions);
-    this.anomalyFormValidation = new AnomalyFormValidationPage(page);
     this.aiToolsetsFormValidation = new AiToolsetsFormValidationPage(page);
 
     // ===== RUM PAGE OBJECTS =====

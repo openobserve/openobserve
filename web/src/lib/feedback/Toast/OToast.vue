@@ -283,6 +283,7 @@ onUnmounted(() => {
           title ? 'self-start' : 'self-center',
         ]"
         :aria-label="t('components.toast.dismissNotification')"
+        data-test="o-toast-dismiss"
       >
         <OIcon name="close" size="sm" class="size-4" aria-hidden="true" />
       </ToastClose>

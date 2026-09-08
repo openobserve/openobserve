@@ -161,8 +161,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OTag>
             <OButton
               v-else
-              variant="primary"
-              size="sm"
+              variant="outline"
+              size="sm-toolbar"
               icon-left="play-arrow"
               data-test="ai-queues-review-btn"
               @click.stop="startReviewing(row)"
@@ -475,7 +475,7 @@ const columns = computed<OTableColumnDef[]>(() => [
   },
   {
     id: "actions",
-    header: raw(""),
+    header: t("aiObservability.queues.columns.actions"),
     accessorKey: "actions",
     sortable: false,
     isAction: true,
