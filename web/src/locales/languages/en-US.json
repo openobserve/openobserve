@@ -17155,6 +17155,7 @@
     "title": "Command palette",
     "placeholder": "Search pages, dashboards, alerts, streams and more…",
     "placeholderScoped": "Search within {scope}…",
+    "placeholderScopedMore": "Search within {scope} and {n} more…",
     "trigger": "Search or jump to…",
     "askAi": "Ask O2 AI about \"{q}\"",
     "clearScopes": "Clear",

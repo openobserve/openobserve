@@ -172,17 +172,17 @@ const scopeList = computed(() => {
 const scopeLabels = computed(() =>
   scopes.value.map((id) => ({ id, label: scopeList.value.find((s) => s.id === id)?.label ?? id })),
 );
-// Two names then "+N" so eight selected scopes still leave room to type.
-const scopeSummary = computed(() => {
+// Selecting every scope is no filter, so the plain placeholder is shown; long lists become "…and N more".
+const placeholder = computed(() => {
   const labels = scopeLabels.value.map((s) => s.label);
-  const shown = labels.slice(0, 2).join(", ");
-  return labels.length > 2 ? `${shown} +${labels.length - 2}` : shown;
+  if (labels.length === 0 || labels.length === scopeList.value.length)
+    return t("palette.placeholder");
+  if (labels.length <= 3) return t("palette.placeholderScoped", { scope: labels.join(", ") });
+  return t("palette.placeholderScopedMore", {
+    scope: labels.slice(0, 2).join(", "),
+    n: labels.length - 2,
+  });
 });
-const placeholder = computed(() =>
-  scopes.value.length > 0
-    ? t("palette.placeholderScoped", { scope: scopeSummary.value })
-    : t("palette.placeholder"),
-);
 
 function clearScopes(): void {
   scopes.value = [];

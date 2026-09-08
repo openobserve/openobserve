@@ -62,7 +62,7 @@ const ODialogStub = {
 };
 const OSearchInputStub = {
   inheritAttrs: false,
-  props: ["modelValue"],
+  props: ["modelValue", "placeholder"],
   emits: ["update:modelValue"],
   setup(
     props: { modelValue: string },
@@ -71,6 +71,7 @@ const OSearchInputStub = {
     return () =>
       h("input", {
         "data-test": "command-palette-search-field",
+        placeholder: props.placeholder,
         value: props.modelValue,
         onInput: (e: Event) => emit("update:modelValue", (e.target as HTMLInputElement).value),
       });
@@ -231,6 +232,24 @@ describe("CommandPalette", () => {
     await flushPromises();
     expect(pressed()).toEqual([]);
     expect(wrapper.find('[data-test="command-palette-scope-clear"]').exists()).toBe(false);
+  });
+
+  it("summarises the selected scopes in the placeholder and drops it when all are selected", async () => {
+    const placeholder = () =>
+      wrapper.find('[data-test="command-palette-search-field"]').attributes("placeholder");
+    const initial = placeholder();
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab" }));
+    await flushPromises();
+    const chips = wrapper
+      .findAll('[data-test^="command-palette-scope-"]')
+      .filter((c) => !c.attributes("data-test")!.endsWith("-clear"));
+    await chips[0].trigger("click");
+    await flushPromises();
+    expect(placeholder()).not.toBe(initial);
+    expect(placeholder()).not.toContain("+");
+    for (const chip of chips.slice(1)) await chip.trigger("click");
+    await flushPromises();
+    expect(placeholder()).toBe(initial);
   });
 
   it("moves along the chip row with the arrows and toggles with Enter", async () => {
