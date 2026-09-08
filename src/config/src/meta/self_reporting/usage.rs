@@ -348,6 +348,13 @@ pub struct TriggerData {
     /// fetch hit its cap, §7.5) — history renders "≥ N". Absent = exact.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub value_is_lower_bound: Option<bool>,
+    /// Which failure produced this row. The three synthetics failure paths share
+    /// one stream and one `status`, so only this separates them for an alert rule.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub synthetics_error_source: Option<String>,
+    /// The venue the failed synthetics slot was scheduled for.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub synthetics_location: Option<String>,
 }
 
 impl Default for TriggerData {
@@ -385,6 +392,8 @@ impl Default for TriggerData {
             level: None,
             group_label: None,
             value_is_lower_bound: None,
+            synthetics_error_source: None,
+            synthetics_location: None,
         }
     }
 }
@@ -433,6 +442,8 @@ impl TriggerData {
             level: Some(0),
             group_label: Some(String::new()),
             value_is_lower_bound: Some(false),
+            synthetics_error_source: Some(String::new()),
+            synthetics_location: Some(String::new()),
         }
     }
 
@@ -659,12 +670,6 @@ pub enum UsageEvent {
     /// Separate from the browser event because only `event` is part of
     /// [`GroupKey`]: a shared event with a type field would be first-row-wins.
     SyntheticsProtocolSteps,
-    /// Browser-check steps executed against the free pool. `size` carries the
-    /// same executed-step count as `SyntheticsBrowserSteps`; never billed.
-    SyntheticsFreeBrowserSteps,
-    /// Protocol-check steps executed against the free pool. `size` carries the
-    /// same executed-step count as `SyntheticsProtocolSteps`; never billed.
-    SyntheticsFreeProtocolSteps,
     /// Steps the journey DEFINES (`configured × combos`). `size` carries that
     /// product. Reported, never billed — the leading `_` is the non-billable
     /// marker, matching `MeteringEventName::_AiChat` and friends. Separate event
@@ -701,8 +706,6 @@ impl std::fmt::Display for UsageEvent {
             UsageEvent::AiFreeCredits => write!(f, "AiFreeCredits"),
             UsageEvent::SyntheticsBrowserSteps => write!(f, "SyntheticsBrowserSteps"),
             UsageEvent::SyntheticsProtocolSteps => write!(f, "SyntheticsProtocolSteps"),
-            UsageEvent::SyntheticsFreeBrowserSteps => write!(f, "SyntheticsFreeBrowserSteps"),
-            UsageEvent::SyntheticsFreeProtocolSteps => write!(f, "SyntheticsFreeProtocolSteps"),
             UsageEvent::_SyntheticsStepsDefined => write!(f, "_SyntheticsStepsDefined"),
             UsageEvent::_SyntheticsBrowserMs => write!(f, "_SyntheticsBrowserMs"),
             UsageEvent::Other => write!(f, "Other"),
@@ -1756,6 +1759,8 @@ mod tests {
             level: None,
             group_label: None,
             value_is_lower_bound: None,
+            synthetics_error_source: None,
+            synthetics_location: None,
         };
 
         let json = serde_json::to_string(&trigger_data).unwrap();
@@ -2463,14 +2468,6 @@ mod tests {
             "SyntheticsProtocolSteps"
         );
         assert_eq!(
-            UsageEvent::SyntheticsFreeBrowserSteps.to_string(),
-            "SyntheticsFreeBrowserSteps"
-        );
-        assert_eq!(
-            UsageEvent::SyntheticsFreeProtocolSteps.to_string(),
-            "SyntheticsFreeProtocolSteps"
-        );
-        assert_eq!(
             UsageEvent::_SyntheticsStepsDefined.to_string(),
             "_SyntheticsStepsDefined"
         );
@@ -2490,14 +2487,6 @@ mod tests {
             (
                 UsageEvent::SyntheticsProtocolSteps,
                 "\"SyntheticsProtocolSteps\"",
-            ),
-            (
-                UsageEvent::SyntheticsFreeBrowserSteps,
-                "\"SyntheticsFreeBrowserSteps\"",
-            ),
-            (
-                UsageEvent::SyntheticsFreeProtocolSteps,
-                "\"SyntheticsFreeProtocolSteps\"",
             ),
             (
                 UsageEvent::_SyntheticsStepsDefined,
@@ -2528,8 +2517,6 @@ mod tests {
             UsageEvent::AiFreeCredits,
             UsageEvent::SyntheticsBrowserSteps,
             UsageEvent::SyntheticsProtocolSteps,
-            UsageEvent::SyntheticsFreeBrowserSteps,
-            UsageEvent::SyntheticsFreeProtocolSteps,
             UsageEvent::_SyntheticsStepsDefined,
             UsageEvent::_SyntheticsBrowserMs,
             UsageEvent::Other,
@@ -2547,10 +2534,23 @@ mod tests {
         }
     }
 
+    /// Nothing decides free from billable now, so an old row naming one must land on `Other`.
+    #[test]
+    fn usage_event_has_no_free_synthetics_variants() {
+        for wire in ["SyntheticsFreeBrowserSteps", "SyntheticsFreeProtocolSteps"] {
+            let decoded: UsageEvent = serde_json::from_str(&format!("\"{wire}\""))
+                .unwrap_or_else(|e| panic!("a row written before this deploy must decode: {e}"));
+            assert_eq!(
+                decoded,
+                UsageEvent::Other,
+                "`{wire}` must read back as the non-billable Other"
+            );
+            assert_eq!(decoded.to_string(), "Other");
+        }
+    }
+
     /// o2-enterprise (`MeteringEventName::is_billable`) keys off the naming
-    /// convention this side owns: a leading `_` marks reported-but-never-billed,
-    /// `Free` marks free-pool consumption. Exactly two synthetics events — the
-    /// browser and protocol billable pair — carry neither.
+    /// convention this side owns: a leading `_` marks reported-but-never-billed.
     #[test]
     fn test_synthetics_event_naming_convention_marks_non_billable() {
         for event in [
@@ -2562,22 +2562,16 @@ mod tests {
                 !billable.starts_with('_'),
                 "billable `{billable}` must not carry the `_` non-billable marker"
             );
-            assert!(
-                !billable.contains("Free"),
-                "billable `{billable}` must not carry the `Free` marker"
-            );
         }
 
         for event in [
-            UsageEvent::SyntheticsFreeBrowserSteps,
-            UsageEvent::SyntheticsFreeProtocolSteps,
             UsageEvent::_SyntheticsStepsDefined,
             UsageEvent::_SyntheticsBrowserMs,
         ] {
             let name = event.to_string();
             assert!(
-                name.starts_with('_') || name.contains("Free"),
-                "non-billable `{name}` must carry the `_` or `Free` marker"
+                name.starts_with('_'),
+                "non-billable `{name}` must carry the `_` marker"
             );
         }
     }
@@ -2603,8 +2597,6 @@ mod tests {
         let keys: HashSet<GroupKey> = [
             UsageEvent::SyntheticsBrowserSteps,
             UsageEvent::SyntheticsProtocolSteps,
-            UsageEvent::SyntheticsFreeBrowserSteps,
-            UsageEvent::SyntheticsFreeProtocolSteps,
             UsageEvent::_SyntheticsStepsDefined,
             UsageEvent::_SyntheticsBrowserMs,
         ]
@@ -2614,7 +2606,7 @@ mod tests {
 
         assert_eq!(
             keys.len(),
-            6,
+            4,
             "each synthetics event must aggregate into its own bucket"
         );
         // Same event => one bucket. (`GroupKey` has no `Debug`, so `assert!`
@@ -2679,6 +2671,48 @@ mod tests {
             .collect::<Result<Vec<_>, _>>()
             .expect("one unknown row must not abort the cycle for every other org");
         assert_eq!(collected.len(), 4);
+    }
+
+    /// Every `TriggerData` writer shares one inferred schema, so an unset field must stay ABSENT.
+    #[test]
+    fn trigger_data_synthetics_fields_round_trip_and_omit_when_none() {
+        let bare = TriggerData::default();
+        assert_eq!(bare.synthetics_error_source, None);
+        assert_eq!(bare.synthetics_location, None);
+
+        let json = serde_json::to_value(&bare).expect("TriggerData must serialize");
+        assert!(json.get("synthetics_error_source").is_none());
+        assert!(json.get("synthetics_location").is_none());
+
+        let tagged = TriggerData {
+            synthetics_error_source: Some("quota".to_string()),
+            synthetics_location: Some("aws-us-east-1".to_string()),
+            ..TriggerData::default()
+        };
+        let json = serde_json::to_value(&tagged).expect("TriggerData must serialize");
+        assert_eq!(json["synthetics_error_source"], "quota");
+        assert_eq!(json["synthetics_location"], "aws-us-east-1");
+
+        let back: TriggerData =
+            serde_json::from_value(json).expect("a tagged row must read back unchanged");
+        assert_eq!(back, tagged);
+
+        let untagged: TriggerData = serde_json::from_value(
+            serde_json::to_value(&bare).expect("TriggerData must serialize"),
+        )
+        .expect("a row written before these fields existed must still deserialize");
+        assert_eq!(untagged.synthetics_error_source, None);
+        assert_eq!(untagged.synthetics_location, None);
+
+        let names = TriggerData::get_field_names();
+        for field in ["synthetics_error_source", "synthetics_location"] {
+            assert!(
+                names.contains(&field.to_string()),
+                "`skip_serializing_if` keeps `{field}` out of the reflection sample unless \
+                 `init_for_reflection` sets it, and a `triggers` schema without the column is a \
+                 column the quota alert rule can never fire on"
+            );
+        }
     }
 }
 
