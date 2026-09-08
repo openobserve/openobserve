@@ -9663,6 +9663,8 @@
       "outputTokens": "Output Tokens",
       "out": "Out",
       "totalCost": "Total Cost",
+      "scores": "Scores",
+      "notScoredYet": "Not scored yet",
       "preview": "Preview",
       "input": "Input",
       "output": "Output",
@@ -11823,6 +11825,12 @@
   },
   "onlineEvals": {
     "versionPrefix": "v",
+    "traceScoreChip": {
+      "reasoning": "Why",
+      "scoredAt": "Scored {time}",
+      "moreCount": "+{count} more",
+      "allScores": "All scores ({count})"
+    },
     "importNameRequired": "Name *",
     "importNewNameRequired": "New Name *",
     "importDataTypeRequired": "Data Type *",
