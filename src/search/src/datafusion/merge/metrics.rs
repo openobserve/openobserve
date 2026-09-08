@@ -27,7 +27,7 @@ use datafusion::{
     arrow::datatypes::Schema,
     error::{DataFusionError, Result},
 };
-use metrics_index::MetricsIndexWriter;
+use metrics_index::{MetricsFileLayout, MetricsIndexWriter};
 use parquet::arrow::AsyncArrowWriter;
 use tokio::io::AsyncWriteExt;
 use vortex::{
@@ -43,15 +43,31 @@ use vortex::{
 use super::{MergedFile, append_metadata};
 use crate::datafusion::vortex::{VORTEX_RUNTIME, vortex_write_strategy};
 
-/// Write a globally hash-sorted metrics stream into size-bounded files.
-/// Rotation happens between input record batches. File and row-group
-/// boundaries deliberately remain independent of metrics series boundaries.
+/// The files a hash-ordered merge is written into: their format, size bound and layout.
+#[derive(Debug, Clone, Copy)]
+pub(super) struct MetricsOutput {
+    pub file_format: FileFormat,
+    pub max_file_size: usize,
+    pub layout: MetricsFileLayout,
+}
+
+/// The per-file rotation rule derived from a [`MetricsOutput`] and the schema.
+#[derive(Debug, Clone, Copy)]
+struct FileSplit {
+    max_file_size: i64,
+    timestamp_index: usize,
+    /// Indexed files carry a `.midx`; hash-merged files do not.
+    with_index: bool,
+}
+
+/// Write a globally hash-sorted metrics stream into size-bounded files of the output's
+/// layout. Rotation happens between input record batches. File and row-group boundaries
+/// deliberately remain independent of metrics series boundaries.
 pub(super) async fn write_files(
     schema: &Arc<Schema>,
     bloom_filter_fields: &[String],
     metadata: &FileMeta,
-    file_format: FileFormat,
-    max_file_size: usize,
+    output: MetricsOutput,
     rx: tokio::sync::mpsc::Receiver<RecordBatch>,
     read_task: tokio::task::JoinHandle<Result<()>>,
 ) -> Result<Vec<MergedFile>> {
@@ -60,35 +76,24 @@ pub(super) async fn write_files(
             "indexed metrics layout requires {TIMESTAMP_COL_NAME}: {e}"
         ))
     })?;
-    let max_file_size = i64::try_from(max_file_size).unwrap_or(i64::MAX).max(1);
-    let files = match file_format {
+    let split = FileSplit {
+        max_file_size: i64::try_from(output.max_file_size)
+            .unwrap_or(i64::MAX)
+            .max(1),
+        timestamp_index,
+        with_index: output.layout == MetricsFileLayout::Indexed,
+    };
+    let files = match output.file_format {
         FileFormat::Parquet => {
-            write_parquet(
-                schema,
-                bloom_filter_fields,
-                metadata,
-                max_file_size,
-                timestamp_index,
-                rx,
-                read_task,
-            )
-            .await?
+            write_parquet(schema, bloom_filter_fields, metadata, split, rx, read_task).await?
         }
         FileFormat::Vortex => {
-            write_vortex(
-                Arc::clone(schema),
-                metadata.clone(),
-                max_file_size,
-                timestamp_index,
-                rx,
-                read_task,
-            )
-            .await?
+            write_vortex(Arc::clone(schema), metadata.clone(), split, rx, read_task).await?
         }
     };
     if files.is_empty() {
         return Err(DataFusionError::Execution(
-            "indexed metrics merge produced no rows".to_string(),
+            "metrics merge produced no rows".to_string(),
         ));
     }
 
@@ -99,11 +104,15 @@ async fn write_parquet(
     schema: &Arc<Schema>,
     bloom_filter_fields: &[String],
     metadata: &FileMeta,
-    max_file_size: i64,
-    timestamp_index: usize,
+    split: FileSplit,
     mut rx: tokio::sync::mpsc::Receiver<RecordBatch>,
     read_task: tokio::task::JoinHandle<Result<()>>,
 ) -> Result<Vec<MergedFile>> {
+    let FileSplit {
+        max_file_size,
+        timestamp_index,
+        with_index,
+    } = split;
     let mut active: Option<ActiveIndexedParquetWriter> = None;
     let mut files = Vec::new();
 
@@ -123,6 +132,7 @@ async fn write_parquet(
                 bloom_filter_fields,
                 metadata,
                 timestamp_index,
+                with_index,
             )?),
         };
         writer.write(&batch).await?;
@@ -138,11 +148,15 @@ async fn write_parquet(
 async fn write_vortex(
     schema: Arc<Schema>,
     metadata: FileMeta,
-    max_file_size: i64,
-    timestamp_index: usize,
+    split: FileSplit,
     mut rx: tokio::sync::mpsc::Receiver<RecordBatch>,
     read_task: tokio::task::JoinHandle<Result<()>>,
 ) -> Result<Vec<MergedFile>> {
+    let FileSplit {
+        max_file_size,
+        timestamp_index,
+        with_index,
+    } = split;
     let writer_task = VORTEX_RUNTIME.spawn_blocking(move || {
         VORTEX_RUNTIME.block_on(async move {
             let session = VortexSession::default().with_tokio();
@@ -169,6 +183,7 @@ async fn write_vortex(
                         active.insert(ActiveIndexedVortexWriter::try_new(
                             &schema,
                             timestamp_index,
+                            with_index,
                             write_options,
                             dtype.clone(),
                         )?)
@@ -200,9 +215,10 @@ async fn await_read_task(read_task: tokio::task::JoinHandle<Result<()>>) -> Resu
         .map_err(|e| DataFusionError::External(Box::new(e)))?
 }
 
-/// Format-independent `.midx` state and exact metadata for one active file.
+/// Format-independent `.midx` state (indexed files only) and exact metadata for one active
+/// file.
 struct IndexedMetricsFileState {
-    metrics_index: MetricsIndexWriter,
+    metrics_index: Option<MetricsIndexWriter>,
     file_meta: FileMeta,
     timestamp_index: usize,
     row_group_size: Option<usize>,
@@ -213,9 +229,12 @@ impl IndexedMetricsFileState {
         schema: &Arc<Schema>,
         timestamp_index: usize,
         row_group_size: Option<usize>,
+        with_index: bool,
     ) -> Result<Self> {
         Ok(Self {
-            metrics_index: MetricsIndexWriter::try_new(schema)?,
+            metrics_index: with_index
+                .then(|| MetricsIndexWriter::try_new(schema))
+                .transpose()?,
             file_meta: FileMeta::default(),
             timestamp_index,
             row_group_size,
@@ -225,7 +244,9 @@ impl IndexedMetricsFileState {
     /// Append one (hash, ts)-ordered batch to the data file, its runs to the
     /// metrics index and its rows / time range to the file meta.
     fn write(&mut self, batch: &RecordBatch) -> Result<()> {
-        self.metrics_index.write(batch)?;
+        if let Some(metrics_index) = self.metrics_index.as_mut() {
+            metrics_index.write(batch)?;
+        }
 
         let timestamps = batch
             .column(self.timestamp_index)
@@ -249,7 +270,11 @@ impl IndexedMetricsFileState {
         Ok(())
     }
 
-    fn finish(self, source_meta: &FileMeta, max_file_size: i64) -> Result<(Vec<u8>, FileMeta)> {
+    fn finish(
+        self,
+        source_meta: &FileMeta,
+        max_file_size: i64,
+    ) -> Result<(Option<Vec<u8>>, FileMeta)> {
         let Self {
             metrics_index,
             mut file_meta,
@@ -260,10 +285,10 @@ impl IndexedMetricsFileState {
         // below the target so an indexed file never advertises >= max_file_size
         file_meta.original_size =
             proportional_original_size(source_meta, file_meta.records).min(max_file_size - 1);
-        Ok((
-            metrics_index.finish(file_meta.records, row_group_size)?,
-            file_meta,
-        ))
+        let metrics_index = metrics_index
+            .map(|index| index.finish(file_meta.records, row_group_size))
+            .transpose()?;
+        Ok((metrics_index, file_meta))
     }
 }
 
@@ -279,6 +304,7 @@ impl ActiveIndexedParquetWriter {
         bloom_filter_fields: &[String],
         metadata: &FileMeta,
         timestamp_index: usize,
+        with_index: bool,
     ) -> Result<Self> {
         let (file, data_path) = new_temp_file()?;
         let writer = new_parquet_writer(file, schema, bloom_filter_fields, metadata, false, None);
@@ -289,6 +315,7 @@ impl ActiveIndexedParquetWriter {
                 schema,
                 timestamp_index,
                 Some(PARQUET_MAX_ROW_GROUP_SIZE),
+                with_index,
             )?,
         })
     }
@@ -303,11 +330,7 @@ impl ActiveIndexedParquetWriter {
         append_metadata(&mut self.writer, &file_meta)?;
         self.writer.finish().await?;
         drop(self.writer.into_inner());
-        Ok(MergedFile::MetricsIndexed {
-            data_path: self.data_path,
-            metrics_index_path: write_temp_file(metrics_index).await?,
-            meta: file_meta,
-        })
+        merged_file(self.data_path, metrics_index, file_meta).await
     }
 }
 
@@ -321,6 +344,7 @@ impl ActiveIndexedVortexWriter {
     fn try_new(
         schema: &Arc<Schema>,
         timestamp_index: usize,
+        with_index: bool,
         write_options: VortexWriteOptions,
         dtype: DType,
     ) -> Result<Self> {
@@ -328,7 +352,7 @@ impl ActiveIndexedVortexWriter {
         Ok(Self {
             writer: write_options.writer(file, dtype),
             data_path,
-            state: IndexedMetricsFileState::try_new(schema, timestamp_index, None)?,
+            state: IndexedMetricsFileState::try_new(schema, timestamp_index, None, with_index)?,
         })
     }
 
@@ -346,12 +370,24 @@ impl ActiveIndexedVortexWriter {
     ) -> anyhow::Result<MergedFile> {
         let (metrics_index, file_meta) = self.state.finish(source_meta, max_file_size)?;
         self.writer.finish().await?;
-        Ok(MergedFile::MetricsIndexed {
-            data_path: self.data_path,
-            metrics_index_path: write_temp_file(metrics_index).await?,
-            meta: file_meta,
-        })
+        Ok(merged_file(self.data_path, metrics_index, file_meta).await?)
     }
+}
+
+/// The finished output: indexed with its `.midx` spooled next to it, or hash-merged.
+async fn merged_file(
+    data_path: tempfile::TempPath,
+    metrics_index: Option<Vec<u8>>,
+    meta: FileMeta,
+) -> Result<MergedFile> {
+    Ok(match metrics_index {
+        Some(metrics_index) => MergedFile::MetricsIndexed {
+            data_path,
+            metrics_index_path: write_temp_file(metrics_index).await?,
+            meta,
+        },
+        None => MergedFile::MetricsHashMerged { data_path, meta },
+    })
 }
 
 fn new_temp_file() -> Result<(tokio::fs::File, tempfile::TempPath)> {
@@ -388,6 +424,72 @@ mod tests {
     use vortex::file::OpenOptionsSessionExt;
 
     use super::*;
+
+    /// An open-hour round writes the same size-split, hash-ordered files without a `.midx`.
+    #[tokio::test]
+    async fn test_size_split_hash_merged_files_carry_no_index() {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new(HASH_LABEL, DataType::UInt64, false),
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+            Field::new(VALUE_LABEL, DataType::Float64, false),
+        ]));
+        let batch = |hashes: Vec<u64>, times: Vec<i64>| {
+            RecordBatch::try_new(
+                Arc::clone(&schema),
+                vec![
+                    Arc::new(UInt64Array::from(hashes)),
+                    Arc::new(Int64Array::from(times.clone())),
+                    Arc::new(Float64Array::from(vec![1.0; times.len()])),
+                ],
+            )
+            .unwrap()
+        };
+        let metadata = FileMeta {
+            min_ts: 10,
+            max_ts: 40,
+            records: 4,
+            original_size: 400,
+            compressed_size: 200,
+            ..Default::default()
+        };
+        let (tx, rx) = tokio::sync::mpsc::channel(2);
+        tx.send(batch(vec![1, 1], vec![10, 20])).await.unwrap();
+        tx.send(batch(vec![2, 3], vec![30, 40])).await.unwrap();
+        drop(tx);
+        let files = write_files(
+            &schema,
+            &[],
+            &metadata,
+            MetricsOutput {
+                file_format: FileFormat::Parquet,
+                max_file_size: 200,
+                layout: MetricsFileLayout::HashMerged,
+            },
+            rx,
+            tokio::spawn(async { Ok(()) }),
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            files.len(),
+            2,
+            "rotates once the first file reaches the size"
+        );
+        let mut records = 0;
+        for file in &files {
+            let MergedFile::MetricsHashMerged { data_path, meta } = file else {
+                panic!("hash-merged output expected");
+            };
+            assert!(data_path.is_file());
+            assert!(meta.original_size < 200);
+            records += meta.records;
+            assert_eq!(
+                file.file_name("1", FileFormat::Parquet),
+                "hash-merged-v1-1.parquet"
+            );
+        }
+        assert_eq!(records, 4);
+    }
 
     #[tokio::test]
     async fn test_size_split_metrics_rotates_at_batch_boundary() {
@@ -452,8 +554,11 @@ mod tests {
             &schema,
             &[],
             &metadata,
-            file_format,
-            max_file_size,
+            MetricsOutput {
+                file_format,
+                max_file_size,
+                layout: MetricsFileLayout::Indexed,
+            },
             rx,
             tokio::spawn(async { Ok(()) }),
         )

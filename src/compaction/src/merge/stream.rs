@@ -106,7 +106,7 @@ pub async fn merge_by_stream(
     );
     // a whole-hour merge needs every file of the hour, even those already
     // above the size target that a normal merge would leave alone
-    let max_original_size = if mode.merges_whole_batch() || mode.merges_open_hour_pending() {
+    let max_original_size = if mode.merges_whole_batch() {
         i64::MAX
     } else {
         infra_file_list::merge_max_original_size()

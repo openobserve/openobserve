@@ -59,13 +59,18 @@ pub async fn merge_parquet_files(
         run_merge_query(&sql, mode.output_sort_order(), schema, tables).await?;
 
     let files = match mode {
-        MergeMode::MetricsIndexed => {
+        MergeMode::MetricsIndexed | MergeMode::MetricsHashMerged => {
             metrics::write_files(
                 &schema,
                 bloom_filter_fields,
                 &metadata,
-                output.file_format,
-                get_config().compact.max_file_size,
+                metrics::MetricsOutput {
+                    file_format: output.file_format,
+                    max_file_size: get_config().compact.max_file_size,
+                    layout: mode
+                        .metrics_file_layout()
+                        .expect("metrics merge modes name their layout"),
+                },
                 rx,
                 read_task,
             )
@@ -228,14 +233,26 @@ mod tests {
         };
         assert_eq!(
             metrics.file_name("1", FileFormat::Parquet),
-            "hash-merged-v1-1.parquet"
+            "hash-sorted-v1-1.parquet"
         );
         assert_eq!(
             metrics.file_name("1", FileFormat::Vortex),
-            "hash-merged-v1-1.vortex"
+            "hash-sorted-v1-1.vortex"
         );
         assert_eq!(
             metrics.mark_file_key("files/o/metrics/s/1.parquet"),
+            "files/o/metrics/s/hash-sorted-v1-1.parquet"
+        );
+        let merged = MergedFile::MetricsHashMerged {
+            data_path: tempfile::NamedTempFile::new().unwrap().into_temp_path(),
+            meta: FileMeta::default(),
+        };
+        assert_eq!(
+            merged.file_name("1", FileFormat::Parquet),
+            "hash-merged-v1-1.parquet"
+        );
+        assert_eq!(
+            merged.mark_file_key("files/o/metrics/s/1.parquet"),
             "files/o/metrics/s/hash-merged-v1-1.parquet"
         );
     }

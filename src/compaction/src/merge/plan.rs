@@ -55,13 +55,14 @@ pub(super) fn plan_batches(
         .collect();
 
     let mode_files = indexed_hour_scope(mode_files, mode, limits.max_file_size, stream);
-    if mode.merges_whole_batch() {
-        if !mode_files.is_empty() {
-            batches.push((mode_files, mode.clone()));
-        }
-    } else if mode.merges_open_hour_pending() {
+    // the open-hour round is a whole batch too, but only of the pending ingester files
+    if mode.merges_open_hour_pending() {
         if let Some(pending) = pending_ingester_files(mode_files, limits.open_hour_min_files) {
             batches.push((pending, mode.clone()));
+        }
+    } else if mode.merges_whole_batch() {
+        if !mode_files.is_empty() {
+            batches.push((mode_files, mode.clone()));
         }
     } else {
         batches.extend(
@@ -263,7 +264,7 @@ mod tests {
         files.push(metrics_file("hash-sorted-v1-6.parquet", 300));
         let batches = plan_batches(
             files,
-            &MergeMode::MetricsHashSorted,
+            &MergeMode::MetricsHashMerged,
             &limits(&MergeStrategy::FileTime, 0, true),
             "test",
         );
@@ -331,10 +332,10 @@ mod tests {
         let strategy = MergeStrategy::FileTime;
         let mut limits = limits(&strategy, 0, true);
         limits.open_hour_min_files = 3;
-        let batches = plan_batches(files.clone(), &MergeMode::MetricsHashSorted, &limits, "s");
+        let batches = plan_batches(files.clone(), &MergeMode::MetricsHashMerged, &limits, "s");
         assert_eq!(batches.len(), 1, "{batches:?}");
         assert!(
-            matches!(batches[0].1, MergeMode::MetricsHashSorted),
+            matches!(batches[0].1, MergeMode::MetricsHashMerged),
             "{}",
             batches[0].1
         );
@@ -350,7 +351,7 @@ mod tests {
         );
         limits.open_hour_min_files = 6;
         assert!(
-            plan_batches(files, &MergeMode::MetricsHashSorted, &limits, "s").is_empty(),
+            plan_batches(files, &MergeMode::MetricsHashMerged, &limits, "s").is_empty(),
             "fewer pending files than the minimum wait for more"
         );
     }
