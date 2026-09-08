@@ -14,14 +14,15 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 //! Caches range reads in fixed-size blocks, so concurrent requests for the same block share one
-//! Moka initializer. The caller checks the whole-file memory and disk caches first, so this cache
-//! sits directly in front of object storage. A cold multi-block range costs one fetch, because the
+//! fetch. The caller checks the whole-file memory and disk caches first, so this cache sits
+//! directly in front of object storage. A cold multi-block range costs one fetch, because the
 //! first missing block pulls the whole remaining span and stores the siblings. Each request reads
 //! live settings, so reloads change behavior.
 
 use std::{
     future::Future,
     ops::Range,
+    sync::Arc,
     time::{Duration, Instant},
 };
 
@@ -31,8 +32,11 @@ use config::metrics::{
     QUERY_BLOCK_CACHE_RANGE_REQUESTS, QUERY_BLOCK_CACHE_REQUESTS_BYPASSED,
     QUERY_BLOCK_CACHE_USED_BYTES,
 };
-use moka::{future::Cache, policy::Expiry};
+use hashbrown::HashMap;
+use hashlink::lru_cache::LruCache;
 use once_cell::sync::Lazy;
+use parking_lot::Mutex;
+use tokio::sync::watch;
 
 const DEFAULT_BLOCK_SIZE: u64 = 1024 * 1024;
 const DEFAULT_RETENTION: Duration = Duration::from_secs(15);
@@ -63,27 +67,132 @@ impl Settings {
     }
 }
 
-struct BlockExpiry;
+/// Result of one fetch, which the leader publishes to every waiter of the same key.
+type Fetched<E> = Option<Result<Bytes, Arc<E>>>;
 
-impl Expiry<BlockKey, Bytes> for BlockExpiry {
-    fn expire_after_create(
-        &self,
-        _key: &BlockKey,
-        _value: &Bytes,
-        _created_at: Instant,
-    ) -> Option<Duration> {
-        Some(retention(config::get_config().block_cache.retention))
+struct Block {
+    bytes: Bytes,
+    expires_at: Instant,
+}
+
+struct State<E> {
+    blocks: LruCache<BlockKey, Block>,
+    /// Keys with a fetch in flight.
+    fetches: HashMap<BlockKey, watch::Sender<Fetched<E>>>,
+    size: u64,
+}
+
+/// LRU of blocks, bounded by total bytes, with one fetch in flight per key. `E` is the fetch
+/// error type.
+struct BlockCache<E> {
+    state: Mutex<State<E>>,
+    max_size: u64,
+}
+
+/// Clears the in-flight record, also if the leader stops before it publishes. Waiters then see a
+/// closed channel and retry.
+struct Lease<'a, E> {
+    cache: &'a BlockCache<E>,
+    key: BlockKey,
+}
+
+impl<E> Drop for Lease<'_, E> {
+    fn drop(&mut self) {
+        self.cache.state.lock().fetches.remove(&self.key);
     }
 }
 
-static BLOCKS: Lazy<Cache<BlockKey, Bytes>> = Lazy::new(|| {
-    let max_size = config::get_config().block_cache.max_size as u64;
-    Cache::builder()
-        .max_capacity(max_size)
-        .weigher(|_, bytes: &Bytes| u32::try_from(bytes.len()).unwrap_or(u32::MAX))
-        .expire_after(BlockExpiry)
-        .build()
-});
+impl<E> BlockCache<E> {
+    fn new(max_size: u64) -> Self {
+        Self {
+            state: Mutex::new(State {
+                blocks: LruCache::new_unbounded(),
+                fetches: HashMap::new(),
+                size: 0,
+            }),
+            max_size,
+        }
+    }
+
+    /// Bytes of the stored blocks. An expired block counts until a read or an eviction drops it.
+    fn size(&self) -> u64 {
+        self.state.lock().size
+    }
+
+    fn get(&self, key: &BlockKey) -> Option<Bytes> {
+        let mut state = self.state.lock();
+        let block = state.blocks.get(key)?;
+        if block.expires_at > Instant::now() {
+            return Some(block.bytes.clone());
+        }
+        let size = block.bytes.len() as u64;
+        state.blocks.remove(key);
+        state.size -= size;
+        None
+    }
+
+    fn insert(&self, key: BlockKey, bytes: Bytes) {
+        let size = bytes.len() as u64;
+        let expires_at = Instant::now() + retention(config::get_config().block_cache.retention);
+        let mut state = self.state.lock();
+        state.size += size;
+        if let Some(old) = state.blocks.insert(key, Block { bytes, expires_at }) {
+            state.size -= old.bytes.len() as u64;
+        }
+        while state.size > self.max_size {
+            let Some((_, evicted)) = state.blocks.remove_lru() else {
+                break;
+            };
+            state.size -= evicted.bytes.len() as u64;
+        }
+    }
+
+    /// Returns the stored block, or awaits `init` and stores the result. Concurrent callers of one
+    /// key share the result of a single `init`. Errors are not stored.
+    async fn get_or_fetch<Fut>(&self, key: BlockKey, init: Fut) -> Result<Bytes, Arc<E>>
+    where
+        Fut: Future<Output = Result<Bytes, E>>,
+    {
+        let sender = loop {
+            if let Some(bytes) = self.get(&key) {
+                return Ok(bytes);
+            }
+            let mut receiver = {
+                let mut state = self.state.lock();
+                match state.fetches.get(&key) {
+                    Some(sender) => sender.subscribe(),
+                    None => {
+                        let (sender, _) = watch::channel(None);
+                        state.fetches.insert(key.clone(), sender.clone());
+                        break sender;
+                    }
+                }
+            };
+            loop {
+                if let Some(result) = (*receiver.borrow_and_update()).clone() {
+                    return result;
+                }
+                if receiver.changed().await.is_err() {
+                    break;
+                }
+            }
+        };
+
+        let _lease = Lease {
+            cache: self,
+            key: key.clone(),
+        };
+        let result = init.await.map_err(Arc::new);
+        if let Ok(bytes) = &result {
+            self.insert(key, bytes.clone());
+        }
+        sender.send_replace(Some(result.clone()));
+        result
+    }
+}
+
+static BLOCKS: Lazy<BlockCache<object_store::Error>> =
+    Lazy::new(|| BlockCache::new(config::get_config().block_cache.max_size as u64));
 
 fn retention(seconds: u64) -> Duration {
     if seconds == 0 {
@@ -112,20 +221,20 @@ where
 }
 
 async fn get_range_with_cache<F, Fut, E>(
-    cache: &Cache<BlockKey, Bytes>,
+    cache: &BlockCache<E>,
     account: &str,
     file: &str,
     range: Range<u64>,
     settings: Settings,
     fetch: F,
-) -> Result<Bytes, std::sync::Arc<E>>
+) -> Result<Bytes, Arc<E>>
 where
     F: Fn(Range<u64>) -> Fut,
     Fut: Future<Output = Result<Bytes, E>>,
     E: Send + Sync + 'static,
 {
     if !settings.enabled || range.is_empty() {
-        return fetch(range).await.map_err(std::sync::Arc::new);
+        return fetch(range).await.map_err(Arc::new);
     }
 
     let range_len = range.end - range.start;
@@ -133,7 +242,7 @@ where
         QUERY_BLOCK_CACHE_REQUESTS_BYPASSED
             .with_label_values(&[] as &[&str])
             .inc();
-        return fetch(range).await.map_err(std::sync::Arc::new);
+        return fetch(range).await.map_err(Arc::new);
     }
 
     // Counted after the bypass check, so this is the denominator for the blob-call reduction:
@@ -165,7 +274,7 @@ where
         let block_start = block_index * block_size;
         let block_end = block_start.saturating_add(block_size);
         let block = cache
-            .try_get_with(key_of(block_index), async {
+            .get_or_fetch(key_of(block_index), async {
                 QUERY_BLOCK_CACHE_BLOCKS_FETCHED
                     .with_label_values(&[] as &[&str])
                     .inc();
@@ -178,7 +287,7 @@ where
                         break;
                     }
                     let end = offset.saturating_add(block_size as usize).min(span.len());
-                    cache.insert(key_of(sibling), span.slice(offset..end)).await;
+                    cache.insert(key_of(sibling), span.slice(offset..end));
                 }
                 Ok(span.slice(0..(block_size as usize).min(span.len())))
             })
@@ -190,11 +299,11 @@ where
         }
     }
 
-    // moka updates weighted_size during housekeeping, so this gauge lags a write by up to one
-    // maintenance cycle.
+    // An expired block stays in the total until a read or an eviction drops it, so this gauge can
+    // overstate the live bytes.
     QUERY_BLOCK_CACHE_USED_BYTES
         .with_label_values(&[] as &[&str])
-        .set(cache.weighted_size() as i64);
+        .set(cache.size() as i64);
 
     Ok(Bytes::from(result))
 }
@@ -216,8 +325,8 @@ mod tests {
         }
     }
 
-    fn cache() -> Cache<BlockKey, Bytes> {
-        Cache::new(1024 * 1024)
+    fn cache() -> Arc<BlockCache<&'static str>> {
+        Arc::new(BlockCache::new(1024 * 1024))
     }
 
     #[tokio::test]
@@ -429,6 +538,36 @@ mod tests {
         assert_eq!(fetches.load(Ordering::SeqCst), 2);
     }
 
+    /// A leader that stops before it publishes must not block the waiters.
+    #[tokio::test]
+    async fn block_cache_recovers_from_a_cancelled_fetch() {
+        let cache = cache();
+        let key = BlockKey {
+            account: "default".to_owned(),
+            file: "file".to_owned(),
+            block_size: 4,
+            block_index: 0,
+        };
+        let mut leader = Box::pin(cache.get_or_fetch(key.clone(), std::future::pending()));
+        assert!(futures::poll!(&mut leader).is_pending(), "leader must lead");
+
+        let waiter = tokio::spawn({
+            let cache = cache.clone();
+            let key = key.clone();
+            async move {
+                cache
+                    .get_or_fetch(key, async { Ok(Bytes::from_static(b"ok")) })
+                    .await
+            }
+        });
+        while cache.state.lock().fetches[&key].receiver_count() == 0 {
+            tokio::task::yield_now().await;
+        }
+        drop(leader);
+
+        assert_eq!(waiter.await.unwrap().unwrap(), Bytes::from_static(b"ok"));
+    }
+
     #[tokio::test]
     async fn block_cache_fetches_a_cold_multi_block_range_once() {
         let cache = cache();
@@ -468,15 +607,12 @@ mod tests {
         assert_eq!(fetches.load(Ordering::SeqCst), 1, "warm read fetches nothing");
     }
 
-    /// The gauge is fed from `weighted_size`, so this covers both the reported value and the
-    /// capacity bound. The gauge itself is a process-wide static that every other test in this
-    /// module also writes, so asserting on it here would be racy.
+    /// The gauge is fed from `size`, so this covers both the reported value and the capacity
+    /// bound. The gauge itself is a process-wide static that every other test in this module also
+    /// writes, so asserting on it here would be racy.
     #[tokio::test]
     async fn block_cache_stays_within_capacity() {
-        let cache: Cache<BlockKey, Bytes> = Cache::builder()
-            .max_capacity(8)
-            .weigher(|_, bytes: &Bytes| u32::try_from(bytes.len()).unwrap_or(u32::MAX))
-            .build();
+        let cache: BlockCache<&'static str> = BlockCache::new(8);
 
         for file in 0..8 {
             get_range_with_cache(
@@ -490,10 +626,9 @@ mod tests {
             .await
             .unwrap();
         }
-        cache.run_pending_tasks().await;
 
-        assert!(cache.weighted_size() > 0);
-        assert!(cache.weighted_size() <= 8);
+        assert!(cache.size() > 0);
+        assert!(cache.size() <= 8);
     }
 
     #[test]
