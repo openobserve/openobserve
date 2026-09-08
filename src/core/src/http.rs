@@ -219,6 +219,7 @@ impl From<ReportError> for Response {
             | ReportError::NameIsEmpty
             | ReportError::NameContainsForwardSlash
             | ReportError::CreateReportNameAlreadyUsed
+            | ReportError::OrgMismatch
             | ReportError::NoDashboards
             | ReportError::InlineAttachmentTypeNotSupportedForPdf
             | ReportError::NoDashboardTabs
