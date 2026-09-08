@@ -35,7 +35,9 @@ export class SloFormPage {
       sliceNote: '[data-test="slos-addslo-slice-note"]',
       groupBy: '[data-test="slos-addslo-group-by"]',
       save: '[data-test="slos-addslo-save"]',
-      error: '[data-test="slos-addslo-error"]',
+      // Save errors are toasts, the same surface the alert form uses — the
+      // page-level banner pushed the whole form down to say one sentence.
+      error: '[data-test="o-toast-message"]',
       regenWarning: '[data-test="slos-addslo-regen-warning"]',
 
       // Count SLI
@@ -460,9 +462,54 @@ export class SloFormPage {
   // -------------------------------------------------------------- assertions
 
   async expectError(pattern) {
-    const err = this.page.locator(this.locators.error);
+    // Several toasts can be on screen at once (a stale success, say), so the
+    // assertion is over the set rather than over the first one.
+    const toasts = this.page.locator(this.locators.error);
+    await expect(toasts.first()).toBeVisible({ timeout: 15000 });
+    if (pattern) await expect(toasts.filter({ hasText: pattern })).not.toHaveCount(0);
+  }
+
+  /**
+   * A field is flagged with its own inline validation message.
+   *
+   * OInput/OSelect render the message at `<field>-error`; SloExpressionField
+   * (the Monaco wrapper) now does the same, so one helper covers every field.
+   */
+  async expectFieldError(fieldSelector, pattern = null) {
+    const err = this.page.locator(`${fieldSelector} [data-test$="-error"]`).first();
     await expect(err).toBeVisible({ timeout: 15000 });
     if (pattern) await expect(err).toContainText(pattern);
+  }
+
+  /** No inline error on this field. */
+  async expectNoFieldError(fieldSelector) {
+    await expect(
+      this.page.locator(`${fieldSelector} [data-test$="-error"]`),
+    ).toHaveCount(0);
+  }
+
+  /**
+   * The form refused to submit at all.
+   *
+   * Counts requests to /slos while saving: client-side validation must stop the
+   * request, not merely decorate the field after the server rejects it. This is
+   * the assertion that would have caught the original defect.
+   */
+  async saveExpectingClientRejection() {
+    let posted = 0;
+    const count = (req) => {
+      if (/\/slos(\?|$)/.test(req.url()) && ['POST', 'PUT'].includes(req.method())) posted += 1;
+    };
+    this.page.on('request', count);
+    await this.page.locator(this.locators.save).click();
+    await this.page.waitForTimeout(1500);
+    this.page.off('request', count);
+
+    await expect(
+      this.page.locator(this.locators.title),
+      'an invalid form must stay open',
+    ).toBeVisible();
+    expect(posted, 'an invalid form must not reach the server').toBe(0);
   }
 
   async expectRegenWarningVisible() {
@@ -490,6 +537,13 @@ export class SloFormPage {
   }
 
   /** The 1-minute slice is pinned off for grouped SLOs (D30, form + API). */
+  /** The slice bar reports its selection through OToggleGroupItem's data-state. */
+  async expectSliceSelected(secs) {
+    await expect(
+      this.page.locator(`[data-test="slos-addslo-slice-${secs}"]`),
+    ).toHaveAttribute('data-state', 'on', { timeout: 10000 });
+  }
+
   async expectSliceOptionDisabled(secs) {
     const item = this.page.locator(`[data-test="slos-addslo-slice-${secs}"]`);
     await expect(item).toBeDisabled({ timeout: 10000 });
@@ -632,6 +686,56 @@ export class SloFormPage {
       disabled !== null || ariaDisabled === 'true',
       'an ineligible source must be offered but not selectable',
     ).toBe(true);
+    await this.page.keyboard.press('Escape');
+  }
+
+  /**
+   * An ineligible option is ONE line: the alert name, a chip naming the rule it
+   * failed, and the full sentence only on hover.
+   *
+   * The row's height is the assertion that matters — the reason is a paragraph,
+   * and rendering it inline is what made a twenty-alert picker unusable. A
+   * `title` carrying the sentence proves nothing was lost in the process.
+   */
+  async expectAlertSourceOptionReason(alertId, alertName) {
+    await openOSelectDropdown(this.page, this.page.locator(this.locators.alertSource));
+    const search = this.page.locator('[data-test="slos-addslo-alert-source-search"]');
+    if (await search.count() > 0) {
+      await search.fill(alertName);
+      await this.page.waitForTimeout(400);
+    }
+    const option = this.page
+      .locator(`[data-test="slos-addslo-alert-source-option"][data-test-value="${alertId}"]`)
+      .first();
+    await option.waitFor({ state: 'visible', timeout: 15000 });
+
+    // `data-test-label` mirrors the option's `label` exactly, so this fails the
+    // moment the reason is concatenated back into it.
+    await expect(
+      option, 'the option label must be the alert name alone',
+    ).toHaveAttribute('data-test-label', alertName);
+
+    // The chip is short; the sentence is the tooltip behind it.
+    const chip = option.locator('span[title]').first();
+    await expect(chip, 'an ineligible option must say which rule it failed').toBeVisible();
+
+    // The chip MUST be hoverable. A disabled row sets `pointer-events-none`, so
+    // the one element carrying the explanation was unreachable — the tooltip
+    // existed in the DOM and could never be shown. Hovering is the assertion;
+    // `toBeVisible` above would pass either way.
+    await chip.hover({ timeout: 5000 });
+    expect(
+      (await chip.innerText()).length,
+      'the chip is a label, not the explanation',
+    ).toBeLessThan(30);
+    await expect(chip).toHaveAttribute(
+      'title', /silence|cadence|cron|grouped|real-?time|slice/i,
+    );
+
+    // One line. Two would mean the paragraph is back in the row.
+    const box = await option.boundingBox();
+    expect(box.height, 'an option row must stay a single line').toBeLessThan(40);
+
     await this.page.keyboard.press('Escape');
   }
 

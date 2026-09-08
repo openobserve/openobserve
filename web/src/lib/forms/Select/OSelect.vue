@@ -1561,8 +1561,19 @@ const fieldWidthClass = computed(() => {
                                 >
                                 <span
                                   v-if="filteredOptions[vRow.index].badge"
-                                  class="rounded-default text-status-positive border-status-positive shrink-0 border border-solid"
+                                  class="rounded-default shrink-0 border border-solid"
                                   :class="[
+                                    // A badge on a row that cannot be chosen is
+                                    // naming a limitation, so it must not read
+                                    // as the positive marker it is elsewhere.
+                                    // `pointer-events-auto` is what makes its
+                                    // tooltip reachable at all: a disabled row
+                                    // sets `pointer-events-none`, so the badge
+                                    // explaining WHY the row is disabled was the
+                                    // one thing on it that could never be hovered.
+                                    filteredOptions[vRow.index].disabled
+                                      ? 'text-text-secondary border-border-default pointer-events-auto'
+                                      : 'text-status-positive border-status-positive',
                                     filteredOptions[vRow.index].badgeTitle
                                       ? 'cursor-help'
                                       : undefined,
