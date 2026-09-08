@@ -59,6 +59,26 @@ export class CommandPalettePage {
     await expect(this.rows.first()).toHaveAttribute('data-item-id', itemId, { timeout: 5000 });
   }
 
+  // Frecency is per user and accumulates across parallel workers and runs, so the
+  // Recent group's ORDER is not stable; membership between its header and the next one is.
+  async expectInRecent(itemId) {
+    await expect(this.recentGroup).toBeVisible({ timeout: 5000 });
+    await expect
+      .poll(
+        () =>
+          this.list.evaluate((list, id) => {
+            const children = Array.from(list.children);
+            const start = children.findIndex((el) => el.dataset.test === 'command-palette-group-h:recent');
+            const end = children.findIndex((el, i) => i > start && el.dataset.test && el.dataset.test.startsWith('command-palette-group-'));
+            return children
+              .slice(start + 1, end === -1 ? undefined : end)
+              .some((el) => el.getAttribute('data-item-id') === id);
+          }, itemId),
+        { timeout: 5000 },
+      )
+      .toBe(true);
+  }
+
   async pressEnter() {
     await this.page.keyboard.press('Enter');
   }

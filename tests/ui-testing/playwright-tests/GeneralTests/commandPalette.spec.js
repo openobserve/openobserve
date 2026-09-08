@@ -49,8 +49,7 @@ test.describe('Command palette', () => {
     await pm.commandPalettePage.pressEnter();
     await pm.commandPalettePage.expectUrl(/\/web\/dashboards/, ORG);
     await pm.commandPalettePage.openWithKeyboard();
-    await expect(pm.commandPalettePage.recentGroup).toBeVisible();
-    await pm.commandPalettePage.expectFirstRow('page:dashboards');
+    await pm.commandPalettePage.expectInRecent('page:dashboards');
     await pm.commandPalettePage.close();
   });
 
