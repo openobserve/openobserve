@@ -97,6 +97,10 @@ const store = createStore({
     zoConfig: {},
     organizationData: {},
     selectedOrganization: { identifier: "org1" },
+    organizations: [
+      { identifier: "org1", name: "Org One" },
+      { identifier: "org2", name: "Org Two" },
+    ],
     userInfo: { email: "me@example.com" },
   }),
   actions: { appTheme: vi.fn() },
@@ -302,5 +306,13 @@ describe("CommandPalette", () => {
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }));
     await flushPromises();
     expect(wrapper.emitted("ask-ai")).toEqual([["zzqxv"]]);
+  });
+
+  it("offers a switch row for every other organisation", async () => {
+    await wrapper.find('[data-test="command-palette-search-field"]').setValue("org two");
+    expect(rowIds()).toEqual(["org:org2"]);
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }));
+    await flushPromises();
+    expect(wrapper.emitted("switch-org")).toEqual([["org2"]]);
   });
 });

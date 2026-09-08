@@ -294,6 +294,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </ODropdownItem>
               <ODropdownSeparator />
 
+              <!-- Command palette -->
+              <ODropdownItem
+                data-test="menu-link-palette-item"
+                shortcut-id="commandPalette"
+                @select="openPalette('help')"
+              >
+                {{ t("palette.menuEntry") }}
+              </ODropdownItem>
+              <ODropdownSeparator />
+
               <!-- Keyboard shortcuts -->
               <ODropdownItem
                 data-test="menu-link-shortcuts-item"
@@ -647,8 +657,8 @@ export default defineComponent({
       emit("openShortcuts");
     };
 
-    const openPalette = () => {
-      emit("openPalette");
+    const openPalette = (source: "header" | "help" = "header") => {
+      emit("openPalette", source);
     };
 
     const signout = () => {

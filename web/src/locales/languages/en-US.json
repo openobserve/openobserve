@@ -17157,6 +17157,7 @@
     "placeholderScoped": "Search within {scope}…",
     "placeholderScopedMore": "Search within {scope} and {n} more…",
     "trigger": "Search or jump to…",
+    "menuEntry": "Search & jump to…",
     "askAi": "Ask O2 AI about \"{q}\"",
     "clearScopes": "Clear",
     "scopes": {
@@ -17167,8 +17168,19 @@
       "stream": "Streams",
       "savedView": "Saved views",
       "function": "Functions",
-      "pipeline": "Pipelines"
+      "pipeline": "Pipelines",
+      "user": "Users"
     },
+    "roles": {
+      "admin": "Admin",
+      "member": "Member",
+      "root": "Root",
+      "viewer": "Viewer",
+      "editor": "Editor",
+      "user": "User"
+    },
+    "serviceAccount": "Service account",
+    "switchOrg": "Switch to {name}",
     "streamTypes": {
       "logs": "Logs stream",
       "metrics": "Metrics stream",

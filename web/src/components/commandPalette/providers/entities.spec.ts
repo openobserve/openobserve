@@ -21,6 +21,8 @@ vi.mock("@/services/alerts", () => ({ default: { listByFolderId: vi.fn() } }));
 vi.mock("@/services/saved_views", () => ({ default: { get: vi.fn() } }));
 vi.mock("@/services/jstransform", () => ({ default: { list: vi.fn() } }));
 vi.mock("@/services/pipelines", () => ({ default: { getPipelines: vi.fn() } }));
+vi.mock("@/services/users", () => ({ default: { orgUsers: vi.fn() } }));
+vi.mock("@/services/service_accounts", () => ({ default: { list: vi.fn() } }));
 const searchStreams = vi.fn();
 
 import dashboardService from "@/services/dashboards";
@@ -31,6 +33,8 @@ import { dashboardToItem } from "./dashboards";
 import { alertToItem } from "./alerts";
 import { streamToItem } from "./streams";
 import { pipelineToItem } from "./pipelines";
+import { serviceAccountToItem, userToItem } from "./users";
+import usersService from "@/services/users";
 
 const ctx = (over: Partial<{ routes: string[]; state: any }> = {}) => ({
   store: { state: over.state ?? {} },
@@ -117,6 +121,8 @@ describe("createEntityProviders", () => {
       ["savedViews", true],
       ["functions", false],
       ["pipelines", false],
+      ["users", false],
+      ["serviceAccounts", false],
     ]);
   });
 
@@ -184,5 +190,35 @@ describe("createEntityProviders", () => {
       "stream:metrics/x",
       "stream:traces/x",
     ]);
+  });
+
+  it("maps people rows and gates them on the admin role", async () => {
+    expect(
+      userToItem({ email: "a@x.io", first_name: "Ada", last_name: "L", role: "admin" }, "Admin"),
+    ).toMatchObject({
+      id: "user:a@x.io",
+      label: "Ada L",
+      subtitle: "a@x.io · Admin",
+      route: { name: "users", query: { action: "update", email: "a@x.io" } },
+    });
+    expect(userToItem({ email: "b@x.io" }, "").label).toBe("b@x.io");
+    expect(
+      serviceAccountToItem({ email: "svc@x.io", first_name: "CI" }, "Service account").route,
+    ).toEqual({
+      name: "serviceAccounts",
+      query: { action: "update", email: "svc@x.io" },
+    });
+    const routes = ["users", "serviceAccounts"];
+    const member = createEntityProviders(
+      ctx({ routes, state: { currentuser: { role: "member" } } }),
+    );
+    expect(member.find((p) => p.id === "users")!.enabled()).toBe(false);
+    const admin = createEntityProviders(ctx({ routes, state: { currentuser: { role: "admin" } } }));
+    expect(admin.find((p) => p.id === "users")!.enabled()).toBe(true);
+    (usersService.orgUsers as any).mockResolvedValue({
+      data: { data: [{ email: "a@x.io", role: "admin" }] },
+    });
+    const items = await admin.find((p) => p.id === "users")!.list!(new AbortController().signal);
+    expect(items.map((i) => i.id)).toEqual(["user:a@x.io"]);
   });
 });

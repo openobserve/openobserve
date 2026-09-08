@@ -37,6 +37,7 @@ import { createEntityProviders } from "./providers/entities";
 import { usePaletteEntities } from "./usePaletteEntities";
 import { usePaletteRows } from "./usePaletteRows";
 import { useFrecency } from "./useFrecency";
+import { usePaletteTelemetry, type PaletteOpenSource } from "./usePaletteTelemetry";
 import { SCOPE_ORDER, type PaletteItem, type PaletteScope } from "./types";
 
 const SEARCH_DATA_TEST = "command-palette-search";
@@ -45,6 +46,8 @@ const props = defineProps<{
   open: boolean;
   navLinks: NavItem[];
   aiEnabled?: boolean;
+  /** How the current open was triggered; reported once per open. */
+  openSource?: PaletteOpenSource;
 }>();
 
 const emit = defineEmits<{
@@ -53,6 +56,7 @@ const emit = defineEmits<{
   (e: "open-docs"): void;
   (e: "open-slack"): void;
   (e: "ask-ai", query: string): void;
+  (e: "switch-org", identifier: string): void;
 }>();
 
 const store = useStore();
@@ -61,6 +65,7 @@ const { t } = useI18nTyped();
 const gateContext = useNavGateContext();
 const { isDark } = useTheme();
 const frecency = useFrecency();
+const telemetry = usePaletteTelemetry(store);
 
 const query = ref("");
 const scopes = ref<PaletteScope[]>([]);
@@ -103,17 +108,35 @@ const handlers = {
   openSlack: () => emit("open-slack"),
 };
 
+// One row per other organisation; switching goes through MainLayout's selector path.
+const orgRows = computed<PaletteItem[]>(() => {
+  const orgs: Array<{ identifier: string; name: string }> = store.state.organizations ?? [];
+  if (orgs.length < 2) return [];
+  return orgs
+    .filter((o) => o.identifier && o.identifier !== orgId.value)
+    .map((o) => ({
+      id: `org:${o.identifier}`,
+      type: "org",
+      label: String(t("palette.switchOrg", { name: o.name || o.identifier })),
+      subtitle: o.identifier,
+      icon: "domain",
+      keywords: ["org", "organization", "switch", o.identifier],
+      run: () => emit("switch-org", o.identifier),
+    }));
+});
+
 const pages = computed(() =>
   buildPageItems({ navLinks: props.navLinks, ctx: gateContext.value, router, t }),
 );
-const actions = computed(() =>
-  buildActionItems({
+const actions = computed(() => [
+  ...buildActionItems({
     t,
     handlers,
     hasRoute: (name) => router.hasRoute(name),
     isDark: isDark.value,
   }),
-);
+  ...orgRows.value,
+]);
 
 const { getPaginatedStreams } = useStreams(t);
 const providers = computed(() =>
@@ -222,6 +245,12 @@ function withOrg(route: RouteLocationRaw): RouteLocationRaw {
 
 async function select(item: PaletteItem, newTab = false): Promise<void> {
   if (item.type !== "ai") frecency.record("palette_item", item.id);
+  telemetry.trackSelect({
+    type: item.type,
+    position: itemIndexes.value.indexOf(activeIndex.value),
+    queryLength: query.value.length,
+    scopes: scopes.value,
+  });
   emit("update:open", false);
   if (item.run) {
     await item.run();
@@ -312,6 +341,7 @@ watch(
       showScopes.value = false;
       chipCursor.value = null;
       itemScores.value = frecency.scores("palette_item");
+      telemetry.trackOpen(props.openSource ?? "shortcut");
       resetActive();
       window.addEventListener("keydown", onKeydown, true);
       void nextTick(() => setTimeout(() => focusSearchInput(SEARCH_DATA_TEST), 0));

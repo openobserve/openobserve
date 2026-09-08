@@ -21,6 +21,7 @@ import { createFunctionsProvider } from "./functions";
 import { createPipelinesProvider } from "./pipelines";
 import { createSavedViewsProvider } from "./savedViews";
 import { createStreamsProvider } from "./streams";
+import { createServiceAccountsProvider, createUsersProvider } from "./users";
 
 /** Every entity source the palette can search, in scope-chip order. */
 export function createEntityProviders(ctx: EntityProviderContext): EntityProvider[] {
@@ -31,5 +32,7 @@ export function createEntityProviders(ctx: EntityProviderContext): EntityProvide
     createSavedViewsProvider(ctx),
     createFunctionsProvider(ctx),
     createPipelinesProvider(ctx),
+    createUsersProvider(ctx),
+    createServiceAccountsProvider(ctx),
   ];
 }

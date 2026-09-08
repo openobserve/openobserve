@@ -26,6 +26,9 @@ export type PaletteItemType =
   | "savedView"
   | "function"
   | "pipeline"
+  | "user"
+  | "serviceAccount"
+  | "org"
   | "ai";
 
 /** A chip the user can narrow the list to; each maps to one or more item types. */
@@ -41,6 +44,7 @@ export const SCOPE_ORDER: PaletteScope[] = [
   "pipeline",
   "function",
   "savedView",
+  "user",
   "actions",
 ];
 
@@ -48,9 +52,12 @@ export function scopeOfType(type: PaletteItemType): PaletteScope | null {
   switch (type) {
     case "action":
     case "external":
+    case "org":
       return "actions";
     case "page":
       return "pages";
+    case "serviceAccount":
+      return "user";
     case "ai":
       return null;
     default:

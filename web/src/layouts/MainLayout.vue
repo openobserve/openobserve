@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @change-language="changeLanguage"
         @open-predefined-themes="openPredefinedThemes"
         @open-shortcuts="openShortcutsList"
-        @open-palette="showPalette = true"
+        @open-palette="openPalette($event || 'header')"
         @signout="signout"
       />
     </header>
@@ -169,11 +169,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <CommandPalette
       v-model:open="showPalette"
       :nav-links="navLinks"
+      :open-source="paletteSource"
       :ai-enabled="config.isEnterprise == 'true' && !!store.state.zoConfig?.ai_enabled"
       @open-shortcuts="openShortcutsList"
       @open-docs="navigateToDocs"
       @open-slack="openSlack"
       @ask-ai="sendToAiChat($event, false, true)"
+      @switch-org="switchOrganization"
     />
   </div>
 </template>
@@ -1379,13 +1381,26 @@ export default defineComponent({
       useShortcuts([{ id: "aiChatToggle", handler: () => toggleAIChat() }]);
     }
 
-    // Command palette (⌘K / Ctrl+K) is available on every build; the dialog lands in Phase 1.
+    // Command palette (⌘K / Ctrl+K) is available on every build.
     const showPalette = ref(false);
+    const paletteSource = ref<"shortcut" | "header" | "help">("shortcut");
+    const openPalette = (source: "shortcut" | "header" | "help") => {
+      paletteSource.value = source;
+      showPalette.value = true;
+    };
+    const switchOrganization = (identifier: string) => {
+      const option = orgOptions.value.find((o) => o.identifier === identifier);
+      if (!option) return;
+      selectedOrg.value = option;
+      userClickedOrg.value = option;
+      void updateOrganization();
+    };
     useShortcuts([
       {
         id: "commandPalette",
         handler: () => {
-          showPalette.value = !showPalette.value;
+          if (showPalette.value) showPalette.value = false;
+          else openPalette("shortcut");
         },
       },
     ]);
@@ -1397,6 +1412,9 @@ export default defineComponent({
       store,
       config,
       showPalette,
+      paletteSource,
+      openPalette,
+      switchOrganization,
       announcementBarRef,
       langList,
       selectedLanguage,
