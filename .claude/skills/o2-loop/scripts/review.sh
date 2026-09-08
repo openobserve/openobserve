@@ -55,7 +55,8 @@ every file write except the worktree's git metadata, temp directories, and claud
 under ~/.claude (settings, skills, agents and hooks stay read-only); the worktree is verified unchanged
 after each process. Without sandbox-exec the claude backend refuses to run unless --unsandboxed is
 passed, and then the reviewer gets no Bash, no ledger access and no pre-run: the harness's own
-working-directory confinement of Read/Grep/Glob is the only wall, and the patches are inlined instead.
+working-directory confinement of Read/Grep/Glob is the only wall, and the patches are inlined instead
+(200 KB per patch, 600 KB per prompt in total).
   auto    (default) codex when the CLI is found, otherwise claude with a loud warning: a Claude
           reviewer is a weaker second opinion than a different vendor's model.
   both    codex and claude review the same commit in parallel; their verdicts are merged into one
@@ -467,10 +468,11 @@ gather_candidates() {
     || die "round budget \$$MAX_BUDGET_USD exhausted by the pre-run (\$$cost); raise --max-budget-usd or use --no-candidates"
 }
 
-# Inlined patches are capped so a large round cannot push the prompt past the model's context.
+# Inlined patches share one budget per prompt (INLINE_REMAINING), so however many are inlined the total stays bounded.
 inline_patch() {
-  local title="$1" file="$2" limit=200000 size
+  local title="$1" file="$2" size limit
   size=$(wc -c < "$file" | tr -d ' ')
+  limit=$((INLINE_REMAINING < 200000 ? INLINE_REMAINING : 200000))
   echo "### $title"
   echo '```diff'
   if [ "$size" -gt "$limit" ]; then
@@ -481,6 +483,7 @@ inline_patch() {
     cat "$file"
   fi
   echo '```'
+  INLINE_REMAINING=$((INLINE_REMAINING - (size < limit ? size : limit)))
 }
 
 write_prompt() {
@@ -522,7 +525,13 @@ write_prompt() {
       echo "- Disposable checkout (read-only): ${ALSO_REVIEW_DIRS[$i]}"
       echo "- Commit under review: $(cat "$dir/commit") (merge-base $(cat "$dir/merge-base"))"
       if [ "$backend" = "claude" ] && [ "$NO_SANDBOX" -eq 1 ]; then
-        echo "- Full patch and delta: inlined at the end of this prompt"
+        if [ "$ROUND" -gt 1 ] && [ -s "$dir/delta.patch" ]; then
+          echo "- Full patch and delta: inlined at the end of this prompt"
+        elif [ -s "$dir/diff.patch" ]; then
+          echo "- Full patch: inlined at the end of this prompt"
+        else
+          echo "- No changes in this checkout"
+        fi
       else
         echo "- Full patch: \`$dir/diff.patch\`, or run \`git -C ${ALSO_REVIEW_DIRS[$i]} diff $(cat "$dir/merge-base") $(cat "$dir/commit")\`"
       fi
@@ -585,7 +594,8 @@ write_prompt() {
     fi
     if [ "$backend" = "claude" ] && [ "$NO_SANDBOX" -eq 1 ]; then
       echo
-      echo "## Patches (inline, because ledger files are not readable in this mode)"
+      echo "## Patches (inline, because ledger files are not readable in this mode; at most 600 KB in total)"
+      INLINE_REMAINING=600000
       inline_patch "Full patch of the primary checkout" "$ROUND_DIR/diff.patch"
       [ "$ROUND" -le 1 ] || inline_patch "Delta since the previous round" "$ROUND_DIR/delta.patch"
       for name in "$ROUND_DIR"/also/*/; do
