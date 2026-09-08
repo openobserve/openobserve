@@ -384,13 +384,13 @@ run_with_timeout() {
   fi
 }
 
-# Containment is the seatbelt (nothing under --unsandboxed); the allow list only spares approval prompts, and python3/bash may reach the network (accepted).
+# Sandboxed: the seatbelt contains writes and the allow list only spares approval prompts (python3/bash may reach the network, accepted). Unsandboxed: no Bash at all.
 claude_common_args() {
   printf '%s\n' --restricted --strict-mcp-config --mcp-config '{"mcpServers":{}}' --model "$MODEL" \
     --max-budget-usd "$1"
-  # Without a seatbelt the harness's working-directory confinement is the only wall, so the ledger is not opened; paired worktrees are read-only anyway.
+  # Without a seatbelt the ledger stays closed and Bash is withheld; paired worktrees are read-only for a process without Bash, Write or Edit.
   [ "$NO_SANDBOX" -eq 1 ] || printf '%s\n' --add-dir "$ROUND_DIR"
-  printf '%s\n' ${ALSO_REVIEW_DIRS[@]+"${ALSO_REVIEW_DIRS[@]/#/--add-dir=}"}
+  [ -z "${ALSO_REVIEW_DIRS[*]+x}" ] || printf '%s\n' "${ALSO_REVIEW_DIRS[@]/#/--add-dir=}"
   printf '%s\n' \
     --disallowedTools "Write" "Edit" "NotebookEdit" "WebFetch" "WebSearch" \
     --allowedTools "Bash(git diff:*)" "Bash(git log:*)" "Bash(git show:*)" "Bash(git status:*)" "Bash(git rev-parse:*)" "Bash(git merge-base:*)" \
@@ -423,10 +423,7 @@ gather_candidates() {
   REVIEWER_TIMEOUT="$TIMEOUT_SECS"
   [ "$CANDIDATES" -eq 1 ] || return 0
   [ "$DRY_RUN" -eq 0 ] || return 0
-  if [ "$NO_SANDBOX" -eq 1 ]; then
-    echo "(no sandbox; pre-run skipped)" > "$out/candidates.md"
-    return 0
-  fi
+  [ "$NO_SANDBOX" -eq 0 ] || return 0
   local range="$MERGE_BASE..$COMMIT" from="$MERGE_BASE"
   if [ "$ROUND" -gt 1 ]; then
     range="$PREV_COMMIT..$COMMIT"
@@ -503,7 +500,11 @@ write_prompt() {
     echo "- Your working directory is a disposable checkout of the commit under review; the real checkout is elsewhere and not yours to touch."
     echo "- Base branch: $BASE (merge-base $MERGE_BASE)"
     echo "- Commit under review: $COMMIT (this is HEAD; the working tree is clean and identical to it)"
-    echo "- Full patch: \`$ROUND_DIR/diff.patch\` (absolute path, outside your checkout), or run \`git diff $MERGE_BASE $COMMIT\`"
+    if [ "$backend" = "claude" ] && [ "$NO_SANDBOX" -eq 1 ]; then
+      echo "- Full patch: inlined at the end of this prompt"
+    else
+      echo "- Full patch: \`$ROUND_DIR/diff.patch\` (absolute path, outside your checkout), or run \`git diff $MERGE_BASE $COMMIT\`"
+    fi
     if [ -n "$CHANGED_FILES" ]; then
       echo "- Changed files:"
       echo "$CHANGED_FILES" | sed 's/^/  - /'
@@ -520,7 +521,11 @@ write_prompt() {
       echo "- Repository name: $name (use it as the \`repo\` of findings in this checkout)"
       echo "- Disposable checkout (read-only): ${ALSO_REVIEW_DIRS[$i]}"
       echo "- Commit under review: $(cat "$dir/commit") (merge-base $(cat "$dir/merge-base"))"
-      echo "- Full patch: \`$dir/diff.patch\`, or run \`git -C ${ALSO_REVIEW_DIRS[$i]} diff $(cat "$dir/merge-base") $(cat "$dir/commit")\`"
+      if [ "$backend" = "claude" ] && [ "$NO_SANDBOX" -eq 1 ]; then
+        echo "- Full patch and delta: inlined at the end of this prompt"
+      else
+        echo "- Full patch: \`$dir/diff.patch\`, or run \`git -C ${ALSO_REVIEW_DIRS[$i]} diff $(cat "$dir/merge-base") $(cat "$dir/commit")\`"
+      fi
       echo "- Changed files:"
       git -C "${ALSO_REPOS[$i]}" diff --name-only "$(cat "$dir/merge-base")" "$(cat "$dir/commit")" | sed 's/^/  - /'
       if [ -s "$dir/evidence.md" ]; then
@@ -528,7 +533,7 @@ write_prompt() {
         echo "### Evidence from the $name coder (round $ROUND)"
         cat "$dir/evidence.md"
       fi
-      if [ "$ROUND" -gt 1 ] && [ -s "$dir/delta.patch" ]; then
+      if [ "$ROUND" -gt 1 ] && [ -s "$dir/delta.patch" ] && ! { [ "$backend" = "claude" ] && [ "$NO_SANDBOX" -eq 1 ]; }; then
         echo "- Delta since the previous round: \`$dir/delta.patch\` ($(wc -l < "$dir/delta.patch" | tr -d ' ') lines)"
       fi
     done
@@ -572,7 +577,11 @@ write_prompt() {
       echo
       echo "## Delta since the previous round"
       echo "- Previous round commit: $PREV_COMMIT"
-      echo "- Delta: \`$ROUND_DIR/delta.patch\` ($(wc -l < "$ROUND_DIR/delta.patch" | tr -d ' ') lines), or run \`git diff $PREV_COMMIT $COMMIT\`"
+      if [ "$backend" = "claude" ] && [ "$NO_SANDBOX" -eq 1 ]; then
+        echo "- Delta: inlined at the end of this prompt ($(wc -l < "$ROUND_DIR/delta.patch" | tr -d ' ') lines)"
+      else
+        echo "- Delta: \`$ROUND_DIR/delta.patch\` ($(wc -l < "$ROUND_DIR/delta.patch" | tr -d ' ') lines), or run \`git diff $PREV_COMMIT $COMMIT\`"
+      fi
     fi
     if [ "$backend" = "claude" ] && [ "$NO_SANDBOX" -eq 1 ]; then
       echo
@@ -580,9 +589,9 @@ write_prompt() {
       inline_patch "Full patch of the primary checkout" "$ROUND_DIR/diff.patch"
       [ "$ROUND" -le 1 ] || inline_patch "Delta since the previous round" "$ROUND_DIR/delta.patch"
       for name in "$ROUND_DIR"/also/*/; do
-        [ -s "$name/diff.patch" ] || continue
-        inline_patch "Full patch of the paired repository $(basename "$name")" "$name/diff.patch"
-        [ "$ROUND" -le 1 ] || [ ! -f "$name/delta.patch" ] || inline_patch "Delta of the paired repository $(basename "$name") since the previous round" "$name/delta.patch"
+        [ -d "$name" ] || continue
+        [ ! -s "$name/diff.patch" ] || inline_patch "Full patch of the paired repository $(basename "$name")" "$name/diff.patch"
+        [ "$ROUND" -le 1 ] || [ ! -s "$name/delta.patch" ] || inline_patch "Delta of the paired repository $(basename "$name") since the previous round" "$name/delta.patch"
       done
     fi
     if [ "$backend" = "claude" ] && [ "$CANDIDATES" -eq 1 ] && [ "$DRY_RUN" -eq 0 ] && [ -s "$out/candidates.md" ]; then
