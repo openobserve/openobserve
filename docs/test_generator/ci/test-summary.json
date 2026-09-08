@@ -1,0 +1,17 @@
+[
+  {
+    "title": "should normalize legacy object-format colOrder to an array on apply",
+    "action": "new",
+    "verifies": "a legacy object-format colOrder is normalized to an array and columns render in the encoded order with the timestamp pinned first"
+  },
+  {
+    "title": "should preserve array-format colOrder order when applying a saved view",
+    "action": "new",
+    "verifies": "an array-format colOrder survives the mergeDeep apply and columns render in the exact saved order"
+  },
+  {
+    "title": "should fall back to stored selectedFields order when colOrder is absent",
+    "action": "new",
+    "verifies": "a saved view without a colOrder key restores columns from the stored selectedFields order"
+  }
+]

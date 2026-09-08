@@ -1,0 +1,26 @@
+{
+  "feature_slug": "saved-view-column-order",
+  "feature_title": "Logs Saved View Column Order Normalization",
+  "area": "Logs",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "savedViewColOrder.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Logs/savedViewColOrder.spec.js",
+  "playwright_group": "Logs-Core",
+  "source_files": [
+    "web/src/plugins/logs/SearchBar.vue",
+    "web/src/utils/zincutils.ts"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "All three changed files live under web/src/ (web/src/plugins/logs/SearchBar.vue, web/src/utils/zincutils.ts, web/src/utils/zincutils.spec.ts). None are under enterprise-owned paths (enterprise/, o2_enterprise/, src/enterprise/), and no enterprise keywords (cipher/SSO/SAML/RBAC/SDR) appear in the changed paths or symbols, so this is an OSS change.",
+    "skip": "Not skipped. The change alters user-facing Logs search behavior (how saved-view column order is restored in SearchBar.vue). The trigger comment is empty and no tests-added/opt-out label was provided, so there is no explicit skip marker and the change is not docs/CI/comment-only.",
+    "e2e": "E2E is warranted because the change fixes a user-visible bug in the Logs search UI: saved views whose column order was persisted as an object are now restored as a proper array, which changes the columns shown to the user. This needs UI verification (save a view, reload, confirm the column order restores correctly).",
+    "area": "The bulk of the UI change lives in web/src/plugins/logs/SearchBar.vue, and the workflow maps the Logs-Core/Logs-Queries shards to the Logs test folder, so Logs is the correct area.",
+    "group": "Logs-Core is the closest existing matrix shard: it holds the Logs search/table specs (logspage.spec.js, logstable.spec.js, shareLink.spec.js) that exercise the search-bar and results-table views this change touches.",
+    "existing_tests": "No Playwright E2E specs (tests/ui-testing/playwright-tests/) are changed in the diff. The only test file touched is web/src/utils/zincutils.spec.ts, a Vitest unit test, which is not E2E coverage — so there are no E2E specs in the diff."
+  }
+}

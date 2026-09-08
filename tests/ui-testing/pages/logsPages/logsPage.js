@@ -84,6 +84,7 @@ export class LogsPage {
         this.errorMessage = '[data-test="logs-search-error-message"]';
         this.warningElement = 'text=warning Query execution';
         this.logsTable = '[data-test="logs-search-result-logs-table"]';
+        this.columnHeaderPrefix = '[data-test^="log-search-result-table-th-"]';
         // Additional locators for multistream functionality
         this.logsSearchIndexList = '[data-test="logs-search-index-list"]';
         this.notificationErrorMessage = '.q-notification__message:has-text("error")';
@@ -3452,6 +3453,41 @@ export class LogsPage {
     async expectFieldNotInTableHeader(fieldName) {
         // When field is removed, the source column should be visible again
         return await expect(this.page.locator('[data-test="log-search-result-table-th-source"]').getByText('source')).toBeVisible();
+    }
+
+    /**
+     * Read all visible column headers in DOM order.
+     * Column ids are encoded in the header's data-test suffix
+     * (e.g. `log-search-result-table-th-_timestamp` → `_timestamp`).
+     * @returns {Promise<string[]>} Array of column ids in DOM order.
+     */
+    async getColumnOrder() {
+        const headers = this.page.locator(this.columnHeaderPrefix);
+        await headers.first().waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
+        return await headers.evaluateAll((els) =>
+            els.map((el) =>
+                el.getAttribute('data-test').replace('log-search-result-table-th-', ''),
+            ),
+        );
+    }
+
+    /**
+     * Assert the visible column order equals the expected sequence.
+     * Polls until the table stabilises after a saved view is applied
+     * (the table re-renders on a delayed `extractFields()` call).
+     * @param {string[]} expectedOrder - Full order including the pinned `_timestamp` first.
+     */
+    async expectColumnOrder(expectedOrder) {
+        await expect
+            .poll(
+                async () => await this.getColumnOrder(),
+                {
+                    message: `Column order should equal ${JSON.stringify(expectedOrder)}`,
+                    timeout: 30000,
+                    intervals: [500, 1000, 1500],
+                },
+            )
+            .toEqual(expectedOrder);
     }
 
     // New POM methods for PR tests

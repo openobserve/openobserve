@@ -2143,6 +2143,102 @@ class APICleanup {
     }
 
     /**
+     * Create a saved view with the given searchObj payload.
+     * @param {Object} data - The full searchObj payload to store in the view.
+     * @param {string} viewName - Unique view name (must be unique per org).
+     * @returns {Promise<Object>} { view_id, view_name } on success; throws on failure.
+     */
+    async createSavedView(data, viewName) {
+        const response = await this._fetch(`${this.baseUrl}/api/${this.org}/savedviews`, {
+            method: 'POST',
+            headers: {
+                'Authorization': this.authHeader,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ data, view_name: viewName })
+        });
+
+        if (!response.ok) {
+            const body = await response.text().catch(() => '');
+            throw new Error(`createSavedView: HTTP ${response.status} — ${body}`);
+        }
+
+        const result = await response.json();
+        testLogger.info('Created saved view', { view_id: result.view_id, view_name: viewName });
+        return { view_id: result.view_id, view_name: result.view_name || viewName };
+    }
+
+    /**
+     * Fetch the full payload of a single saved view.
+     * @param {string} viewId
+     * @returns {Promise<Object>} The saved view object { org_id, data, view_id, view_name }
+     *                            where `data` is the stored searchObj.
+     */
+    async getSavedView(viewId) {
+        const response = await this._fetch(`${this.baseUrl}/api/${this.org}/savedviews/${viewId}`, {
+            method: 'GET',
+            headers: {
+                'Authorization': this.authHeader,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            const body = await response.text().catch(() => '');
+            throw new Error(`getSavedView: HTTP ${response.status} — ${body}`);
+        }
+
+        return await response.json();
+    }
+
+    /**
+     * Update a saved view's payload and name.
+     * @param {string} viewId
+     * @param {Object} data - The full searchObj payload.
+     * @param {string} viewName
+     * @returns {Promise<Object>} The updated view object.
+     */
+    async updateSavedView(viewId, data, viewName) {
+        const response = await this._fetch(`${this.baseUrl}/api/${this.org}/savedviews/${viewId}`, {
+            method: 'PUT',
+            headers: {
+                'Authorization': this.authHeader,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ data, view_name: viewName })
+        });
+
+        if (!response.ok) {
+            const body = await response.text().catch(() => '');
+            throw new Error(`updateSavedView: HTTP ${response.status} — ${body}`);
+        }
+
+        return await response.json();
+    }
+
+    /**
+     * Find a saved view's view_id by name, polling until it appears.
+     * View creation via the UI is async, so the list may not include the new
+     * view immediately.
+     * @param {string} viewName
+     * @param {number} timeoutMs
+     * @returns {Promise<string|null>} view_id or null if not found in time.
+     */
+    async getSavedViewIdByName(viewName, timeoutMs = 15000) {
+        const start = Date.now();
+        while (Date.now() - start < timeoutMs) {
+            const views = await this.fetchSavedViews();
+            const match = views.find((view) => view.view_name === viewName);
+            if (match && match.view_id) {
+                return match.view_id;
+            }
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+        }
+        testLogger.warn('Saved view not found by name within timeout', { viewName });
+        return null;
+    }
+
+    /**
      * Clean up all saved views matching test patterns
      * Deletes saved views starting with "streamslog" or "multistream_view_"
      */

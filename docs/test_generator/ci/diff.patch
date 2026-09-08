@@ -1,0 +1,113 @@
+diff --git a/web/src/plugins/logs/SearchBar.vue b/web/src/plugins/logs/SearchBar.vue
+index d8a65074681..595d2af9784 100644
+--- a/web/src/plugins/logs/SearchBar.vue
++++ b/web/src/plugins/logs/SearchBar.vue
+@@ -4107,20 +4107,29 @@ export default defineComponent({
+               }
+             }, 1000);
+ 
+-            if (
+-              extractedObj.data.resultGrid.colOrder &&
+-              extractedObj.data.resultGrid.colOrder.hasOwnProperty(
+-                searchObj.data.stream.selectedStream,
+-              )
+-            ) {
+-              searchObj.data.stream.selectedFields =
+-                extractedObj.data.resultGrid.colOrder[
+-                  searchObj.data.stream.selectedStream
+-                ].filter(
+-                  (_field) =>
+-                    _field !==
+-                    (store?.state?.zoConfig?.timestamp_column || "_timestamp"),
+-                );
++            // Older views store colOrder as `{0:"level",...}`; normalise it and
++            // write the array back so the next save doesn't re-persist it.
++            const savedColOrder =
++              extractedObj.data.resultGrid.colOrder?.[
++                searchObj.data.stream.selectedStream
++              ];
++            const savedColOrderList: string[] | null = Array.isArray(
++              savedColOrder,
++            )
++              ? savedColOrder
++              : savedColOrder && typeof savedColOrder === "object"
++                ? (Object.values(savedColOrder) as string[])
++                : null;
++
++            if (savedColOrderList) {
++              searchObj.data.resultGrid.colOrder[
++                searchObj.data.stream.selectedStream
++              ] = [...savedColOrderList];
++              searchObj.data.stream.selectedFields = savedColOrderList.filter(
++                (_field) =>
++                  _field !==
++                  (store?.state?.zoConfig?.timestamp_column || "_timestamp"),
++              );
+             } else {
+               searchObj.data.stream.selectedFields =
+                 extractedObj.data.stream.selectedFields;
+diff --git a/web/src/utils/zincutils.spec.ts b/web/src/utils/zincutils.spec.ts
+index 29568d6c783..2602e90c88a 100644
+--- a/web/src/utils/zincutils.spec.ts
++++ b/web/src/utils/zincutils.spec.ts
+@@ -678,6 +678,43 @@ if .severity == "error" {
+         expect(mergeDeep(null, { a: 1 })).toBeNull();
+         expect(mergeDeep({ a: 1 }, null)).toEqual({ a: 1 });
+       });
++
++      // Regression: saved-view colOrder arrays were rebuilt as {0:"a",1:"b"}.
++      it("should keep arrays as arrays when the target has no entry", () => {
++        const target: any = { colOrder: {} };
++        const source = { colOrder: { my_stream: ["level", "message"] } };
++
++        const result = mergeDeep(target, source);
++
++        expect(Array.isArray(result.colOrder.my_stream)).toBe(true);
++        expect(result.colOrder.my_stream).toEqual(["level", "message"]);
++      });
++
++      it("should replace arrays instead of leaving stale trailing entries", () => {
++        const target = { selectedFields: ["a", "b", "c", "d"] };
++        const source = { selectedFields: ["x", "y"] };
++
++        expect(mergeDeep(target, source)).toEqual({ selectedFields: ["x", "y"] });
++      });
++
++      it("should copy arrays rather than share the source reference", () => {
++        const source = { list: [{ name: "a" }] };
++        const result = mergeDeep({}, source);
++
++        expect(result.list).not.toBe(source.list);
++        expect(result.list[0]).not.toBe(source.list[0]);
++        expect(result.list).toEqual([{ name: "a" }]);
++      });
++
++      it("should repair an already-corrupted array-shaped target", () => {
++        const target: any = { colOrder: { my_stream: { 0: "a", 1: "b" } } };
++        const source = { colOrder: { my_stream: ["level", "message"] } };
++
++        const result = mergeDeep(target, source);
++
++        expect(Array.isArray(result.colOrder.my_stream)).toBe(true);
++        expect(result.colOrder.my_stream).toEqual(["level", "message"]);
++      });
+     });
+ 
+     describe("deepCopy", () => {
+diff --git a/web/src/utils/zincutils.ts b/web/src/utils/zincutils.ts
+index eb72f122fde..29d9fd1b33a 100644
+--- a/web/src/utils/zincutils.ts
++++ b/web/src/utils/zincutils.ts
+@@ -842,7 +842,11 @@ export const mergeDeep = (target: any, source: any) => {
+         isValidKey(key) &&
+         Object.prototype.hasOwnProperty.call(source, key)
+       ) {
+-        if (isObject(source[key])) {
++        if (Array.isArray(source[key])) {
++          // Replace arrays: merging them index-by-index rebuilds them as
++          // `{0:"a",1:"b"}` and leaves stale trailing items behind.
++          target[key] = mergeDeep([], source[key]);
++        } else if (isObject(source[key])) {
+           if (!target[key]) target[key] = {};
+           mergeDeep(target[key], source[key]);
+         } else {

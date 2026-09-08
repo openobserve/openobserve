@@ -1,0 +1,12 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/Logs/savedViewColOrder.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Streams/multiselect-stream.spec.js",
+    "tests/ui-testing/playwright-tests/RegressionSet/logs-regression-bugs.spec.js",
+    "tests/ui-testing/playwright-tests/GeneralTests/sanity.spec.js"
+  ],
+  "needs_registration": true,
+  "registration_notes": "Add \"savedViewColOrder.spec.js\" to the Logs-Core run_files list in .github/workflows/playwright.yml (Logs-Core maps to the Logs/ folder).",
+  "rationale": "Existing saved-view tests cover CRUD and apply lifecycle only (create/apply/delete in multiselect-stream.spec.js, createBuilderSavedView/applySavedViewByName helpers in logs-regression-bugs.spec.js, createAndDeleteSavedSearch in sanity.spec.js). None of them assert column ORDER after applying a saved view, which is the entire subject of this change (colOrder normalization + mergeDeep array fix). No Logs spec exists for column-order normalization, so a new spec is required. Reusable page object pm.logsPage already owns the saved-view flow (clickSavedViewsExpand/clickSavedViewByTitle/clickDeleteSavedViewButton, expectFieldInTableHeader) plus the logs table selector, so the new spec can lean on it."
+}
