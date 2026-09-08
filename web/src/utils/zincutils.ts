@@ -842,7 +842,11 @@ export const mergeDeep = (target: any, source: any) => {
         isValidKey(key) &&
         Object.prototype.hasOwnProperty.call(source, key)
       ) {
-        if (isObject(source[key])) {
+        if (Array.isArray(source[key])) {
+          // Replace arrays: merging them index-by-index rebuilds them as
+          // `{0:"a",1:"b"}` and leaves stale trailing items behind.
+          target[key] = mergeDeep([], source[key]);
+        } else if (isObject(source[key])) {
           if (!target[key]) target[key] = {};
           mergeDeep(target[key], source[key]);
         } else {

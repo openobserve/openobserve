@@ -4107,20 +4107,29 @@ export default defineComponent({
               }
             }, 1000);
 
-            if (
-              extractedObj.data.resultGrid.colOrder &&
-              extractedObj.data.resultGrid.colOrder.hasOwnProperty(
-                searchObj.data.stream.selectedStream,
-              )
-            ) {
-              searchObj.data.stream.selectedFields =
-                extractedObj.data.resultGrid.colOrder[
-                  searchObj.data.stream.selectedStream
-                ].filter(
-                  (_field) =>
-                    _field !==
-                    (store?.state?.zoConfig?.timestamp_column || "_timestamp"),
-                );
+            // Older views store colOrder as `{0:"level",...}`; normalise it and
+            // write the array back so the next save doesn't re-persist it.
+            const savedColOrder =
+              extractedObj.data.resultGrid.colOrder?.[
+                searchObj.data.stream.selectedStream
+              ];
+            const savedColOrderList: string[] | null = Array.isArray(
+              savedColOrder,
+            )
+              ? savedColOrder
+              : savedColOrder && typeof savedColOrder === "object"
+                ? (Object.values(savedColOrder) as string[])
+                : null;
+
+            if (savedColOrderList) {
+              searchObj.data.resultGrid.colOrder[
+                searchObj.data.stream.selectedStream
+              ] = [...savedColOrderList];
+              searchObj.data.stream.selectedFields = savedColOrderList.filter(
+                (_field) =>
+                  _field !==
+                  (store?.state?.zoConfig?.timestamp_column || "_timestamp"),
+              );
             } else {
               searchObj.data.stream.selectedFields =
                 extractedObj.data.stream.selectedFields;

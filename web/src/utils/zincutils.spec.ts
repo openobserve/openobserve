@@ -678,6 +678,43 @@ if .severity == "error" {
         expect(mergeDeep(null, { a: 1 })).toBeNull();
         expect(mergeDeep({ a: 1 }, null)).toEqual({ a: 1 });
       });
+
+      // Regression: saved-view colOrder arrays were rebuilt as {0:"a",1:"b"}.
+      it("should keep arrays as arrays when the target has no entry", () => {
+        const target: any = { colOrder: {} };
+        const source = { colOrder: { my_stream: ["level", "message"] } };
+
+        const result = mergeDeep(target, source);
+
+        expect(Array.isArray(result.colOrder.my_stream)).toBe(true);
+        expect(result.colOrder.my_stream).toEqual(["level", "message"]);
+      });
+
+      it("should replace arrays instead of leaving stale trailing entries", () => {
+        const target = { selectedFields: ["a", "b", "c", "d"] };
+        const source = { selectedFields: ["x", "y"] };
+
+        expect(mergeDeep(target, source)).toEqual({ selectedFields: ["x", "y"] });
+      });
+
+      it("should copy arrays rather than share the source reference", () => {
+        const source = { list: [{ name: "a" }] };
+        const result = mergeDeep({}, source);
+
+        expect(result.list).not.toBe(source.list);
+        expect(result.list[0]).not.toBe(source.list[0]);
+        expect(result.list).toEqual([{ name: "a" }]);
+      });
+
+      it("should repair an already-corrupted array-shaped target", () => {
+        const target: any = { colOrder: { my_stream: { 0: "a", 1: "b" } } };
+        const source = { colOrder: { my_stream: ["level", "message"] } };
+
+        const result = mergeDeep(target, source);
+
+        expect(Array.isArray(result.colOrder.my_stream)).toBe(true);
+        expect(result.colOrder.my_stream).toEqual(["level", "message"]);
+      });
     });
 
     describe("deepCopy", () => {
