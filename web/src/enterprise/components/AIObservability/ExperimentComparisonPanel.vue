@@ -292,7 +292,6 @@ const thresholdTooltip = computed(() =>
 const selectedDimensions = computed(
   () => props.outcomeDimensions ?? comparison.value.outcomeDimensions,
 );
-
 const outcomeOptions = computed(() =>
   comparison.value.dimensions.map((dimension) => {
     const label =
