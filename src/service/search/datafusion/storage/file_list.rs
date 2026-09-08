@@ -93,7 +93,46 @@ pub fn clear(trace_id: &str) {
 
 pub fn get_segment_ids(file_key: &str) -> Option<Arc<BitVec>> {
     let (trace_id, filename) = file_key.split_once("/$$/")?;
+    // `set` keys segment data by the bare `file.key`; strip the account prefix
+    let filename = filename
+        .split_once("/::/")
+        .map_or(filename, |(_, filename)| filename);
     let r = SEGMENTS.read();
     let data = r.get(trace_id)?;
     data.get(filename).cloned()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_get_segment_ids_strips_account_prefix() {
+        let trace_id = "trace_segment_ids_account";
+        let bits = Arc::new(BitVec::from_iter([true, false, true]));
+        let file_key = "files/default/logs/a/1.parquet";
+        let mut file = FileKey::new(
+            0,
+            "acc1".to_string(),
+            file_key.to_string(),
+            Default::default(),
+            false,
+        );
+        file.segment_ids = Some(bits.clone());
+        set(trace_id, "schema", "parquet", vec![file]).await;
+
+        let location = get(&format!("{trace_id}/schema=schema/format=parquet")).unwrap()[0]
+            .location
+            .to_string();
+        assert!(location.contains("/acc1/::/"));
+        assert_eq!(get_segment_ids(&location).as_deref(), Some(&*bits));
+        assert_eq!(
+            get_segment_ids(&format!(
+                "{trace_id}/schema=schema/format=parquet/$$/{file_key}"
+            ))
+            .as_deref(),
+            Some(&*bits)
+        );
+        clear(trace_id);
+    }
 }
