@@ -69,6 +69,7 @@ struct PendingMigrations {
     stream_names: bool,
     oncall: bool,
     raman: bool,
+    ownership_backfill: bool,
     annotation_queues_datasets: bool,
     llm_workbench: bool,
     workflow_folders: bool,
@@ -508,6 +509,14 @@ fn all_org_ownership_keys(pending: &PendingMigrations) -> Vec<&'static str> {
     if pending.raman {
         keys.push("raman");
     }
+    if pending.ownership_backfill {
+        keys.extend([
+            "db_monitoring",
+            "search_inspector",
+            "status_page",
+            "playground",
+        ]);
+    }
     if pending.annotation_queues_datasets {
         keys.extend(["annotation_queues", "datasets"]);
     }
@@ -547,7 +556,7 @@ fn pending_migrations(latest: &str, existing: &str) -> PendingMigrations {
     let v0_0_37 = version_compare::Version::from("0.0.37").unwrap();
     let v0_0_38 = version_compare::Version::from("0.0.38").unwrap();
     let v0_0_39 = version_compare::Version::from("0.0.39").unwrap();
-    let v0_0_42 = version_compare::Version::from("0.0.42").unwrap();
+    let v0_0_43 = version_compare::Version::from("0.0.43").unwrap();
     let v0_0_46 = version_compare::Version::from("0.0.46").unwrap();
     let v0_0_47 = version_compare::Version::from("0.0.47").unwrap();
 
@@ -634,7 +643,7 @@ fn pending_migrations(latest: &str, existing: &str) -> PendingMigrations {
         log::info!("[OFGA:Local] annotation queues and datasets permissions migration needed");
         pending.annotation_queues_datasets = true;
     }
-    if existing_model_version < v0_0_42 {
+    if existing_model_version < v0_0_43 {
         log::info!("[OFGA:Local] LLM workbench permissions migration needed");
         pending.llm_workbench = true;
     }
@@ -647,6 +656,8 @@ fn pending_migrations(latest: &str, existing: &str) -> PendingMigrations {
         pending.oncall = true;
         log::info!("[OFGA:Local] raman permissions migration needed");
         pending.raman = true;
+        log::info!("[OFGA:Local] ownership backfill migration needed");
+        pending.ownership_backfill = true;
     }
     if existing_model_version < v0_0_47 {
         log::info!("[OFGA:Local] workflow folders permissions migration needed");
@@ -687,6 +698,50 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(all_org_ownership_keys(&pending), vec!["raman"]);
+    }
+
+    #[test]
+    fn llm_workbench_migration_covers_every_org_below_the_playground_version() {
+        for version in ["0.0.1", "0.0.39", "0.0.41", "0.0.42"] {
+            assert!(
+                pending_migrations("0.0.46", version).llm_workbench,
+                "playground first shipped in OFGA model 0.0.43, so an org at {version} lacks its tuple"
+            );
+        }
+    }
+
+    #[test]
+    fn llm_workbench_migration_is_skipped_at_or_above_the_playground_version() {
+        for version in ["0.0.43", "0.0.44", "0.1.0"] {
+            assert!(!pending_migrations("0.0.46", version).llm_workbench);
+        }
+    }
+
+    #[test]
+    fn ownership_backfill_covers_the_resources_omitted_by_earlier_models() {
+        let pending = PendingMigrations {
+            ownership_backfill: true,
+            ..Default::default()
+        };
+        assert_eq!(
+            all_org_ownership_keys(&pending),
+            vec![
+                "db_monitoring",
+                "search_inspector",
+                "status_page",
+                "playground"
+            ]
+        );
+    }
+
+    #[test]
+    fn ownership_backfill_is_gated_by_the_shipped_model_version() {
+        for version in ["0.0.1", "0.0.39", "0.0.40", "0.0.42", "0.0.45"] {
+            assert!(pending_migrations("0.0.46", version).ownership_backfill);
+        }
+        for version in ["0.0.46", "0.0.47", "0.1.0"] {
+            assert!(!pending_migrations("0.0.46", version).ownership_backfill);
+        }
     }
 
     #[tokio::test]
