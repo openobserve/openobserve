@@ -32,6 +32,7 @@ pub enum SystemJobType {
     SelfReporting,
     InternalGrpc,
     AnomalyDetection,
+    RamanDigest,
 }
 
 impl SystemJobType {
@@ -43,6 +44,7 @@ impl SystemJobType {
             SystemJobType::SelfReporting => "self_reporting",
             SystemJobType::InternalGrpc => "internal_grpc",
             SystemJobType::AnomalyDetection => "anomaly_detection",
+            SystemJobType::RamanDigest => "raman_digest",
         }
     }
 }
@@ -976,6 +978,51 @@ mod tests {
         assert_eq!(
             SystemJobType::AnomalyDetection.as_email_local(),
             "anomaly_detection"
+        );
+    }
+
+    #[test]
+    fn test_raman_digest_job_has_its_own_email_local_part() {
+        assert_eq!(
+            SystemJobType::RamanDigest.as_email_local(),
+            "raman_digest",
+            "digest writes must not be attributed to another subsystem"
+        );
+    }
+
+    #[test]
+    fn test_raman_digest_email_local_part_is_unique_across_system_jobs() {
+        let all = [
+            SystemJobType::SelfMetricsPromql,
+            SystemJobType::ServiceGraph,
+            SystemJobType::SelfReporting,
+            SystemJobType::InternalGrpc,
+            SystemJobType::AnomalyDetection,
+            SystemJobType::RamanDigest,
+        ];
+        let mut locals: Vec<&str> = all.iter().map(|j| j.as_email_local()).collect();
+        locals.sort_unstable();
+        let before = locals.len();
+        locals.dedup();
+        assert_eq!(
+            locals.len(),
+            before,
+            "two system jobs share an email local part, so the audit trail cannot tell them apart"
+        );
+    }
+
+    #[test]
+    fn test_raman_digest_ingest_user_renders_a_system_local_email() {
+        let user = IngestUser::SystemJob(SystemJobType::RamanDigest);
+        assert_eq!(user.to_email(), "raman_digest@system.local");
+    }
+
+    #[test]
+    fn test_raman_digest_ingest_user_is_a_system_job_not_a_user() {
+        let user = IngestUser::SystemJob(SystemJobType::RamanDigest);
+        assert!(
+            !matches!(user, IngestUser::User(_)),
+            "the _o2_ rollup write guard rejects IngestUser::User, so a digest writer must never be one"
         );
     }
 
