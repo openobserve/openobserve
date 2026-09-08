@@ -1612,7 +1612,12 @@ export default defineComponent({
     watch(
       () => searchObj.data.stream.selectedStream,
       (streams: string[]) => {
-        if (store.state.zoConfig?.auto_query_enabled && Array.isArray(streams) && streams.length) {
+        if (
+          store.state.zoConfig?.auto_query_enabled &&
+          searchObj.data.stream.streamType === "logs" &&
+          Array.isArray(streams) &&
+          streams.length
+        ) {
           saveLogsStream(store.state.selectedOrganization.identifier, streams);
         }
       },
