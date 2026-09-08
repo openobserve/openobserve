@@ -270,6 +270,8 @@ const {
 const urlType = typeof route.query.type === "string" ? route.query.type : "";
 const urlStream = typeof route.query.stream === "string" ? route.query.stream : "";
 const urlAgentName = typeof route.query.agent === "string" ? route.query.agent : "";
+const urlEnv = typeof route.query.env === "string" ? route.query.env : "";
+const urlVersion = typeof route.query.version === "string" ? route.query.version : "";
 
 const activeStream = ref<string>(
   urlStream || localStorage.getItem(STREAM_LS_KEY) || props.streamName || "",
@@ -282,23 +284,33 @@ const { availableStreams, streamsLoaded, ensureStreamsLoaded } = useLlmTraceStre
   t,
 );
 const MODE_LS_KEY = "sessionsList_filterMode";
-// Persists the RESOLVED agent NAME of the cascade selection (was the old single
-// `activeAgent` key). On reload we re-seed the cascade from it (see
-// `pendingAgentName` + `selectAgentByName`), so the last-picked agent is
-// remembered exactly as before — just via the cascade, not the retired
-// `activeAgent` ref.
+// Persists the RESOLVED agent NAME/env/version of the cascade selection (was
+// the old single `activeAgent` key). On reload we re-seed the cascade from
+// them (see `pendingAgentName`/`pendingEnv`/`pendingVersion` +
+// `selectAgentByScope`), so the last-picked agent is remembered exactly as
+// before — just via the cascade, not the retired `activeAgent` ref.
 const AGENT_LS_KEY = "sessionsList_agentFilter";
+const ENV_LS_KEY = "sessionsList_envFilter";
+const VERSION_LS_KEY = "sessionsList_versionFilter";
 // Default scope is ALWAYS "agent" — every AI page lands on Agent for consistency.
 // Only an explicit `?type=stream` URL param overrides it (a stale saved
 // preference must not silently land on Stream).
 const filterMode = ref<"stream" | "agent">(urlType === "stream" ? "stream" : "agent");
 // `agents` / `agentsLoaded` are module-scoped (see useSessions) so the agent
 // picker keeps its options — and stays off its skeleton — across a remount.
-// Agent NAME to seed the cascade with once the list loads: the URL `?agent=`
-// deep-link first, else the persisted last selection. Resolved into
-// selectedEnv/AgentName/Version via `selectAgentByName`, then cleared.
+// Env/name/version to seed the cascade with once the list is available: the
+// URL deep-link first, else the persisted last selection. Resolved into
+// selectedEnv/AgentName/Version via `selectAgentByScope` (falls back to
+// `selectAgentByName` when the exact env+version no longer exists), then
+// cleared.
 const pendingAgentName = ref<string | null>(
   filterMode.value === "agent" ? urlAgentName || localStorage.getItem(AGENT_LS_KEY) || null : null,
+);
+const pendingEnv = ref<string | null>(
+  filterMode.value === "agent" ? urlEnv || localStorage.getItem(ENV_LS_KEY) || null : null,
+);
+const pendingVersion = ref<string | null>(
+  filterMode.value === "agent" ? urlVersion || localStorage.getItem(VERSION_LS_KEY) || null : null,
 );
 
 // Server-side pagination (1-indexed). OTable owns the footer controls in
@@ -333,6 +345,7 @@ const {
   selectedAgentName,
   selectedVersion,
   selectAgentByName,
+  selectAgentByScope,
 } = useAgentScope({
   filterMode,
   activeStream,
@@ -345,6 +358,31 @@ const {
   cascade: true,
   t,
 });
+
+// Pins the cascade from the carried-over env/name/version (URL deep-link,
+// else the persisted last selection) when a match is possible: the exact
+// triple when both env and version are known, else by name alone. One-shot —
+// clears the pending state whether or not `agents` was ready to resolve it.
+function seedPendingCascade() {
+  if (!pendingAgentName.value || agents.value.length === 0) return;
+  if (pendingEnv.value && pendingVersion.value) {
+    selectAgentByScope(pendingEnv.value, pendingAgentName.value, pendingVersion.value);
+  } else {
+    selectAgentByName(pendingAgentName.value);
+  }
+  pendingAgentName.value = null;
+  pendingEnv.value = null;
+  pendingVersion.value = null;
+}
+
+// `agents` can already be populated here on a back-navigation remount (it's
+// module-scoped and survives the unmount) — seed the cascade NOW,
+// synchronously at setup, before the `selectedAgent`-identity watch below
+// exists to react to it, and before `loadSessions()`'s cache-hit guard would
+// otherwise skip this same seed call entirely. A fresh mount has no agents
+// yet, so this is a no-op here; `loadSessions()` calls it again once
+// `loadAgents()` populates the list for the first time.
+seedPendingCascade();
 
 const agentFilterClause = computed(() =>
   buildAgentSessionFilter(effectiveAgent.value, effectiveStream.value),
@@ -514,10 +552,19 @@ function syncFilterUrl() {
   const query: Record<string, any> = { ...route.query, type: filterMode.value };
   if (filterMode.value === "agent") {
     delete query.stream;
-    if (selectedAgent.value?.name) query.agent = selectedAgent.value.name;
-    else delete query.agent;
+    if (selectedAgent.value?.name) {
+      query.agent = selectedAgent.value.name;
+      query.env = selectedEnv.value;
+      query.version = selectedVersion.value;
+    } else {
+      delete query.agent;
+      delete query.env;
+      delete query.version;
+    }
   } else {
     delete query.agent;
+    delete query.env;
+    delete query.version;
     if (activeStream.value) query.stream = activeStream.value;
     else delete query.stream;
   }
@@ -561,23 +608,22 @@ async function loadSessions(startTime?: number, endTime?: number, force = false)
   // Agents API is only relevant in Agent mode — don't touch it in Stream mode.
   if (filterMode.value === "agent") {
     await loadAgents(start, end);
-    // Seed the cascade from a carried-over agent NAME (URL `?agent=` deep-link,
-    // else the persisted last selection) now that the list exists. On a match
-    // this pins env→name→version so `selectedAgent` resolves; then it's a
-    // one-shot, so clear it.
-    if (pendingAgentName.value) {
-      selectAgentByName(pendingAgentName.value);
-      pendingAgentName.value = null;
-    }
+    // Seeds the cascade now that the list exists (a no-op if the setup-time
+    // call above already resolved it — see seedPendingCascade's own comment).
+    seedPendingCascade();
     // Fall back to the first agent when nothing valid is selected (fresh entry,
     // or the previously-picked agent is gone for this window). Seeding by name
     // resolves the whole cascade.
     if (!selectedAgent.value && agents.value.length > 0) {
       selectAgentByName(agents.value[0].name);
     }
-    // Persist the resolved agent NAME so a reload restores the same selection.
+    // Persist the resolved agent NAME + env + version so a reload restores
+    // the exact same selection, not just a same-named agent under a
+    // different env/version.
     if (selectedAgent.value?.name) {
       localStorage.setItem(AGENT_LS_KEY, selectedAgent.value.name);
+      localStorage.setItem(ENV_LS_KEY, selectedEnv.value);
+      localStorage.setItem(VERSION_LS_KEY, selectedVersion.value);
     }
   } else {
     localStorage.setItem(STREAM_LS_KEY, activeStream.value);
