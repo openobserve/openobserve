@@ -30,8 +30,14 @@ const anomaly_detection = {
   },
 
   // POST /api/v2/{org}/alerts — delegates to anomaly config creation when alert_type is "anomaly_detection"
-  create: (org_identifier: string, data: object) => {
-    return http().post(`/api/v2/${org_identifier}/alerts`, data);
+  // The folder travels as ?folder=: it is what the permission gate authorizes,
+  // so the body copy alone would create the config in the default folder.
+  create: (org_identifier: string, data: object, folder_id?: string) => {
+    let url = `/api/v2/${org_identifier}/alerts`;
+    if (folder_id) {
+      url += `?folder=${encodeURIComponent(folder_id)}`;
+    }
+    return http().post(url, data);
   },
 
   // PUT /api/v2/{org}/alerts/{id} — delegates to anomaly config update when alert_type is "anomaly_detection"

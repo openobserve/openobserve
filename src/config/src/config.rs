@@ -1554,6 +1554,18 @@ pub struct Search {
     )]
     pub feature_metrics_streaming_agg_enabled: bool,
     #[env_config(
+        name = "ZO_METRICS_INDEX_SELECTION_CACHE_ENABLED",
+        default = false,
+        help = "Cache the row ranges a PromQL query selected from each `.midx` metrics index, keyed by file and matchers, so a repeated query skips decoding and evaluating the index."
+    )]
+    pub metrics_index_selection_cache_enabled: bool,
+    #[env_config(
+        name = "ZO_METRICS_INDEX_SELECTION_CACHE_MAX_SIZE",
+        default = 256,
+        help = "Maximum memory size in MB of the metrics index selection cache."
+    )]
+    pub metrics_index_selection_cache_max_size: usize,
+    #[env_config(
         name = "ZO_FEATURE_DYNAMIC_PUSHDOWN_FILTER_ENABLED",
         default = true,
         help = "Enable dynamic pushdown filter"
@@ -2270,8 +2282,12 @@ pub struct Limit {
     pub query_thread_num: usize,
     #[env_config(name = "ZO_FILE_DOWNLOAD_THREAD_NUM", default = 0)]
     pub file_download_thread_num: usize,
-    #[env_config(name = "ZO_FILE_DOWNLOAD_MIN_RECORDS", default = 100)]
-    pub file_download_min_records: i64,
+    #[env_config(
+        name = "ZO_FILE_DOWNLOAD_SYNC_MAX_SIZE",
+        default = 1,
+        help = "Files up to this size in MB are downloaded into the cache before a search reads them instead of being range-read from object storage, 0 disables"
+    )]
+    pub file_download_sync_max_size: usize,
     #[env_config(name = "ZO_FILE_DOWNLOAD_PRIORITY_QUEUE_THREAD_NUM", default = 0)]
     pub file_download_priority_queue_thread_num: usize,
     #[env_config(name = "ZO_FILE_DOWNLOAD_PRIORITY_QUEUE_WINDOW_SECS", default = 3600)]
@@ -3638,6 +3654,7 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     } else {
         cfg.limit.max_file_size_in_memory *= 1024 * 1024;
     }
+    cfg.limit.file_download_sync_max_size *= 1024 * 1024;
 
     // check for metrics limit
     if cfg.limit.metrics_max_points_per_series == 0 {

@@ -53,6 +53,7 @@ enum FileType {
     Parquet,
     Ttv,
     Vortex,
+    Midx,
 }
 
 impl CacheStrategy {
@@ -230,6 +231,21 @@ async fn validate_file(bytes: &[u8], ftype: FileType) -> Result<(), anyhow::Erro
                 return Err(anyhow::anyhow!("vortex magic bytes mismatch"));
             }
         }
+        FileType::Midx => {
+            // Arrow IPC file: 8-byte leading magic, footer, i32 footer length, 6-byte magic
+            const ARROW_MAGIC: &[u8; 6] = b"ARROW1";
+            if bytes.len() < 18 {
+                return Err(anyhow::anyhow!("invalid metrics index file"));
+            }
+            if &bytes[..6] != ARROW_MAGIC || &bytes[bytes.len() - 6..] != ARROW_MAGIC {
+                return Err(anyhow::anyhow!("arrow ipc magic bytes mismatch"));
+            }
+            let footer_len =
+                i32::from_le_bytes(bytes[bytes.len() - 10..bytes.len() - 6].try_into().unwrap());
+            if footer_len < 0 || 8 + footer_len as usize + 10 > bytes.len() {
+                return Err(anyhow::anyhow!("arrow ipc footer size mismatch"));
+            }
+        }
     }
     Ok(())
 }
@@ -299,7 +315,8 @@ async fn download_from_storage(
                 // so we check if the footer is valid. If it is, then the db entry is invalid
                 // and we reset it. If footer is invalid, the store has a corrupted file
                 // so we mark it as deleted, and return error.
-                // data files (parquet/vortex) are tracked in file_list, ttv index files are not
+                // data files (parquet/vortex) are tracked in file_list, ttv/midx index files are
+                // not
                 let is_data_file = file.ends_with(".parquet") || file.ends_with(".vortex");
                 let valid_parquet = file.ends_with(".parquet")
                     && validate_file(&data_bytes, FileType::Parquet).await.is_ok();
@@ -307,7 +324,9 @@ async fn download_from_storage(
                     && validate_file(&data_bytes, FileType::Vortex).await.is_ok();
                 let valid_ttv = file.ends_with(".ttv")
                     && validate_file(&data_bytes, FileType::Ttv).await.is_ok();
-                if valid_parquet || valid_vortex || valid_ttv {
+                let valid_midx = file.ends_with(".midx")
+                    && validate_file(&data_bytes, FileType::Midx).await.is_ok();
+                if valid_parquet || valid_vortex || valid_ttv || valid_midx {
                     log::warn!(
                         "download file {file} found size mismatch, remote : {expected_blob_size}, db: {size}, correcting db as valid file",
                     );
@@ -391,6 +410,10 @@ pub async fn get_opts(
         path: file.to_string(),
         source: Box::new(std::io::Error::other(file)),
     })
+}
+
+pub async fn exist(file: &str) -> bool {
+    memory::exist(file).await || disk::exist(file).await
 }
 
 pub async fn get_size(account: &str, file: &str) -> object_store::Result<usize> {
@@ -508,6 +531,46 @@ fn get_file_time(file: &str) -> Option<u64> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn validate_midx_checks_arrow_ipc_magic_and_footer() {
+        use arrow::{
+            array::{RecordBatch, UInt32Array},
+            datatypes::{DataType, Field, Schema},
+            ipc::writer::FileWriter,
+        };
+        let schema = std::sync::Arc::new(Schema::new(vec![Field::new(
+            "__oo_midx_row_count",
+            DataType::UInt32,
+            false,
+        )]));
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![std::sync::Arc::new(UInt32Array::from(vec![3, 2]))],
+        )
+        .unwrap();
+        let mut writer = FileWriter::try_new(Vec::new(), &schema).unwrap();
+        writer.write(&batch).unwrap();
+        let bytes = writer.into_inner().unwrap();
+
+        assert!(validate_file(&bytes, FileType::Midx).await.is_ok());
+        // truncated: trailing magic gone
+        assert!(
+            validate_file(&bytes[..bytes.len() - 3], FileType::Midx)
+                .await
+                .is_err()
+        );
+        // footer length claims more bytes than the file has
+        let mut oversized = bytes.clone();
+        let len = oversized.len();
+        oversized[len - 10..len - 6].copy_from_slice(&i32::MAX.to_le_bytes());
+        assert!(validate_file(&oversized, FileType::Midx).await.is_err());
+        assert!(
+            validate_file(b"not an arrow file", FileType::Midx)
+                .await
+                .is_err()
+        );
+    }
 
     #[test]
     fn test_file_data_lru_cache_miss() {
