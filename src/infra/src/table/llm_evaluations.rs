@@ -30,7 +30,7 @@ use crate::{
 pub async fn delete_by_org(db: &DatabaseConnection, org_id: &str) -> Result<(), errors::Error> {
     let txn = db.begin().await?;
 
-    // No cascade fires on SQLite: sea-orm never sets `PRAGMA foreign_keys=ON`.
+    // Nothing cascades here: the one FK among these tables is RESTRICT, so each child is explicit.
     llm_annotation_queue_bindings::Entity::delete_many()
         .filter(llm_annotation_queue_bindings::Column::OrgId.eq(org_id))
         .exec(&txn)

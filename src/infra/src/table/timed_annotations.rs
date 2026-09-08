@@ -250,8 +250,7 @@ pub async fn delete_many(
 
 /// Delete all timed annotations (and their panels) for every dashboard in the given org.
 /// The path is: folders.org → dashboards.folder_id → timed_annotations.dashboard_id.
-/// timed_annotation_panels are deleted first because SQLite does not enforce FK cascades
-/// unless `PRAGMA foreign_keys = ON` is set.
+/// timed_annotation_panels already cascade from timed_annotations; this is belt and braces.
 pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
     let client = get_orm_client_rw().await;
 

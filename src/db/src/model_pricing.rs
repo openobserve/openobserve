@@ -512,6 +512,17 @@ pub async fn delete_by_id(org_id: &str, id: &str) -> Result<bool, anyhow::Error>
     Ok(deleted)
 }
 
+fn org_event_key(org_id: &str) -> String {
+    format!("{WATCHER_PREFIX}{org_id}/")
+}
+
+/// Reloads every node's cache for one org after a bulk delete that emits no per-row events.
+pub async fn emit_org_reload_event(org_id: &str) -> Result<(), anyhow::Error> {
+    // A put always emits an event; deleting a key nothing ever wrote need not.
+    infra::coordinator::model_pricing::emit_put_event(&org_event_key(org_id)).await?;
+    Ok(())
+}
+
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -909,6 +920,12 @@ mod tests {
         );
         assert_eq!(parse_org_from_key("/model_pricing/"), None);
         assert_eq!(parse_org_from_key("/other/myorg/id"), None);
+    }
+
+    #[test]
+    fn test_org_reload_event_key_parses_back_to_its_org() {
+        // The watcher reloads nothing if the org-scope key does not parse.
+        assert_eq!(parse_org_from_key(&org_event_key("myorg")), Some("myorg"));
     }
 
     #[test]

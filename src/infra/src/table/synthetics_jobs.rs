@@ -958,12 +958,11 @@ mod tests {
         let db = Database::connect(opts).await.unwrap();
         let backend = db.get_database_backend();
         let schema = Schema::new(backend);
+        // The entity declares no FK to synthetics_runs, and no parent table exists here.
         db.execute(backend.build(&schema.create_table_from_entity(Entity)))
             .await
             .unwrap();
-        // sqlite rejects `enqueue`'s ON CONFLICT target without a matching
-        // unique index. The FK to `synthetics_runs` is deliberately absent:
-        // sqlite ignores FKs without `PRAGMA foreign_keys=ON`.
+        // sqlite rejects `enqueue`'s ON CONFLICT target without a matching unique index.
         db.execute_unprepared(
             "CREATE UNIQUE INDEX synthetics_jobs_dedup_uq \
              ON synthetics_jobs (synthetics_id, location, scheduled_ts)",

@@ -29,7 +29,7 @@ const ORG: &str = "acme";
 const OTHER_ORG: &str = "globex";
 const FOLDER: &str = "folder-1";
 
-/// SQLite ignores foreign keys unless this pragma is on, and sea-orm never sets it.
+/// Sets the foreign-key pragma explicitly, though sqlx already defaults it on per connection.
 async fn db() -> DatabaseConnection {
     let db = Database::connect("sqlite::memory:").await.unwrap();
     db.execute(Statement::from_string(

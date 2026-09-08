@@ -516,7 +516,7 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     workflows::delete_by_org(conn, org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/workflows: {e}"))?;
-    // The cascades from checks are unusable: SQLite enforces no FK unless sea-orm sets a pragma.
+    // Runs and jobs already cascade from checks; deleting them outright is belt and braces.
     synthetics_jobs::delete_by_org(conn, org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/synthetics_jobs: {e}"))?;
@@ -573,12 +573,13 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     search_queue::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/search_queue: {e}"))?;
-    re_pattern::delete_by_org(org_id)
-        .await
-        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/re_pattern: {e}"))?;
+    // pattern_id holds a RESTRICT FK on re_patterns.id: a survivor stalls teardown, not just leaks.
     re_pattern_stream_map::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/re_pattern_stream_map: {e}"))?;
+    re_pattern::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/re_pattern: {e}"))?;
     org_storage_providers::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/org_storage_providers: {e}"))?;
@@ -704,6 +705,10 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     model_pricing::delete_by_org(conn, org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/model_pricing: {e}"))?;
+    // The pricing cache has no TTL: a reused org identifier would inherit the dead org's rates.
+    if let Err(e) = crate::db::model_pricing::emit_org_reload_event(org_id).await {
+        log::warn!("[OrgCleanup] model_pricing: reload event failed for org '{org_id}': {e}");
+    }
     org_ai_toolsets::delete_by_org(conn, org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/org_ai_toolsets: {e}"))?;
@@ -1411,6 +1416,7 @@ mod tests {
     }
 
     const ENTITY_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../infra/src/table/entity");
+    const TABLE_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../infra/src/table");
 
     const ALERTS: &str = "delete_org_alerts(org_id)";
     const INCIDENT_INTEGRATIONS: &str = "incident_integrations::delete_by_org(conn, org_id)";
@@ -1630,6 +1636,30 @@ mod tests {
         &SOURCE[..end]
     }
 
+    /// Every `.rs` file under the table layer, concatenated.
+    fn table_layer_source() -> String {
+        let mut source = String::new();
+        let mut stack = vec![std::path::PathBuf::from(TABLE_DIR)];
+        while let Some(dir) = stack.pop() {
+            for entry in std::fs::read_dir(&dir).expect("the table directory is readable") {
+                let path = entry.expect("a readable directory entry").path();
+                if path.is_dir() {
+                    stack.push(path);
+                } else if path.extension().and_then(|s| s.to_str()) == Some("rs") {
+                    source.push_str(&std::fs::read_to_string(&path).expect("a readable module"));
+                }
+            }
+        }
+        source
+    }
+
+    /// True when the reason names a snake_case mechanism the table layer actually defines.
+    fn names_a_mechanism(reason: &str, table_source: &str) -> bool {
+        reason
+            .split(|c: char| !c.is_ascii_alphanumeric() && c != '_')
+            .any(|token| token.contains('_') && table_source.contains(token))
+    }
+
     /// The org-scoped entity modules, read from the entity directory rather than
     /// from a list, so nothing can be omitted by forgetting to add it here.
     fn org_scoped_entities() -> Vec<String> {
@@ -1646,7 +1676,7 @@ mod tests {
                 continue;
             }
             let source = std::fs::read_to_string(&path).expect("a readable entity module");
-            // `org_name` is the org identifier on distinct_value_fields, not a display name.
+            // Only distinct_value_fields keys on org_name; elsewhere it is a display name.
             if source.contains("    pub org: ")
                 || source.contains("    pub org_id: ")
                 || source.contains("    pub org_name: ")
@@ -1660,6 +1690,7 @@ mod tests {
 
     #[test]
     fn test_every_org_scoped_table_is_swept_or_exempt() {
+        let table_source = table_layer_source();
         let mut missing = Vec::new();
         for entity in org_scoped_entities() {
             let Some((_, sweep)) = ENTITY_SWEEPS.iter().find(|(name, _)| *name == entity) else {
@@ -1671,13 +1702,11 @@ mod tests {
                     sweep_region().contains(call),
                     "{entity} is listed as swept by `{call}`, which this file never calls"
                 ),
-                // An exemption without a stated reason is how a gap gets blessed.
-                Sweep::Exempt(reason) => {
-                    assert!(
-                        !reason.is_empty(),
-                        "{entity} is exempt with no reason given"
-                    )
-                }
+                // A reason nobody can check is how a gap gets blessed, so it must name real code.
+                Sweep::Exempt(reason) => assert!(
+                    names_a_mechanism(reason, &table_source),
+                    "{entity} is exempt for a reason naming no table-layer mechanism: {reason:?}"
+                ),
             }
         }
         assert!(
@@ -1703,16 +1732,22 @@ mod tests {
     // ===================== Ordering the FKs force ==========================
     //
     // Completeness above says the call exists; these say it runs early enough.
-    // Both folders children hold a RESTRICT foreign key, so getting this wrong
+    // Every folders child holds a RESTRICT foreign key, so getting this wrong
     // is not a leak — `folders::delete_by_org` fails and the org never deletes.
 
-    /// The workflow, synthetics, and anomaly tables reference
-    /// `folders.id` with no ON DELETE action.
-    const FOLDER_CHILD_DELETES: [&str; 3] = [
+    /// The tables whose foreign key to `folders.id` declares no ON DELETE action.
+    const FOLDER_CHILD_DELETES: [&str; 6] = [
+        // alerts_folders_fk_2.
+        ALERTS,
+        // dashboards_folders_fk_2.
+        "dashboards::delete_by_org(org_id)",
+        // reports_folders_fk.
+        "reports::delete_by_org(org_id)",
         // workflows_folder_fk and workflow_drafts_folder_fk.
         WORKFLOWS,
         // synthetics_folder_fk.
         "synthetics_checks::delete_by_org(conn, org_id)",
+        // fk_anomaly_config_folder_id, added on Postgres only.
         "anomaly_detection::delete_by_org(conn, org_id)",
     ];
 
@@ -1728,6 +1763,26 @@ mod tests {
     }
 
     #[test]
+    fn test_pattern_stream_map_is_deleted_before_its_patterns() {
+        // re_pattern_stream_map_fk has no ON DELETE, so a surviving mapping stalls teardown.
+        assert!(
+            position_of("re_pattern_stream_map::delete_by_org(org_id)")
+                < position_of("re_pattern::delete_by_org(org_id)"),
+            "the stream mappings must go before the patterns they reference"
+        );
+    }
+
+    #[test]
+    fn test_model_pricing_cache_is_evicted_after_its_sweep() {
+        // The per-org pricing cache has no TTL, so only a coordinator event evicts it.
+        assert!(
+            position_of("model_pricing::delete_by_org(conn, org_id)")
+                < position_of("model_pricing::emit_org_reload_event(org_id)"),
+            "the cluster-wide cache eviction must follow the table sweep"
+        );
+    }
+
+    #[test]
     fn test_annotation_queue_bindings_are_deleted_before_their_score_configs() {
         // fk_llm_queue_bindings_score_config_row is ON DELETE RESTRICT.
         assert!(
@@ -1738,8 +1793,7 @@ mod tests {
 
     #[test]
     fn test_synthetics_children_are_deleted_before_their_checks() {
-        // Runs cascade from checks and jobs from runs, but SQLite enforces no
-        // foreign key unless PRAGMA foreign_keys is on, which sea-orm never sets.
+        // Runs cascade from checks and jobs from runs, so this order is belt and braces.
         let checks = position_of("synthetics_checks::delete_by_org(conn, org_id)");
         assert!(position_of("synthetics_runs::delete_by_org(conn, org_id)") < checks);
         assert!(position_of("synthetics_jobs::delete_by_org(conn, org_id)") < checks);

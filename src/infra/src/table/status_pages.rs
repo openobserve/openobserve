@@ -516,7 +516,7 @@ pub async fn delete_page(org_id: &str, id: &str) -> Result<bool, errors::Error> 
 /// Removes every status-page row an org owns, freeing its deployment-wide-unique slugs.
 pub async fn delete_by_org(db: &DatabaseConnection, org_id: &str) -> Result<(), errors::Error> {
     let txn = db.begin().await?;
-    // No DB-level FKs exist here, and SQLite enforces none anyway, so each table is explicit.
+    // No DB-level FKs exist on these tables, so nothing cascades and each one must be explicit.
     status_page_component_checks::Entity::delete_many()
         .filter(status_page_component_checks::Column::OrgId.eq(org_id))
         .exec(&txn)

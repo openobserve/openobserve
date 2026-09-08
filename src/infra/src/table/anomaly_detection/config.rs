@@ -251,7 +251,7 @@ pub async fn delete_by_org<C: TransactionTrait + ConnectionTrait>(
         .await
         .map_err(|e| Error::DbError(errors::DbError::SeaORMError(e.to_string())))?;
 
-    // The models FK cascades, but sqlite ignores FKs without `PRAGMA foreign_keys=ON`.
+    // fk_anomaly_models_config already cascades on both backends; this is belt and braces.
     if !anomaly_ids.is_empty() {
         anomaly_detection_models::Entity::delete_many()
             .filter(anomaly_detection_models::Column::AnomalyId.is_in(anomaly_ids))
