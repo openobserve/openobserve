@@ -4694,8 +4694,8 @@ pub async fn promote_to_incident(
         // Link the alert in, so the incident screen shows what it was made of.
         // Best effort: an incident that exists and is attached is worth more
         // than one rolled back because a display join failed.
-        if record.subject.subject_type == config::meta::oncall::SubjectType::Alert {
-            if let Err(e) = infra::table::alert_incidents::add_alert_to_incident(
+        if record.subject.subject_type == config::meta::oncall::SubjectType::Alert
+            && let Err(e) = infra::table::alert_incidents::add_alert_to_incident(
                 &incident.id,
                 &record.subject.source_id,
                 record.title.as_deref().unwrap_or(&record.subject.source_id),
@@ -4704,9 +4704,8 @@ pub async fn promote_to_incident(
                 "promoted from an on-call page",
             )
             .await
-            {
-                tracing::warn!("[oncall] promote link alert: {e}");
-            }
+        {
+            tracing::warn!("[oncall] promote link alert: {e}");
         }
 
         // Carry the page's own record across.

@@ -1732,7 +1732,7 @@ async fn page_for_alert_firing(
                 .as_ref()
                 .and_then(|a| a.group_by.clone())
                 .unwrap_or_default();
-            config::meta::alerts::dispatch::rows_by_group_key(&rows, &group_by)
+            config::meta::alerts::dispatch::rows_by_group_key(rows, &group_by)
                 .values()
                 .map(|row| {
                     o2_enterprise::enterprise::oncall::routing::dimensions_for_alert(

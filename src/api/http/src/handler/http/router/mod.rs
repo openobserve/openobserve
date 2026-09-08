@@ -396,7 +396,7 @@ fn is_remote_task_secret_write(method: &Method, path: &str) -> bool {
         return false;
     };
     let task_path = &segments[tasks + 1..];
-    (method == Method::POST && (task_path.is_empty() || task_path == &["test"]))
+    (method == Method::POST && (task_path.is_empty() || task_path == ["test"]))
         || task_path
             .iter()
             .any(|segment| matches!(*segment, "auth" | "headers" | "signing"))
