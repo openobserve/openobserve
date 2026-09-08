@@ -216,6 +216,11 @@ pub async fn all_organizations(
         })
         .collect();
 
+    let quota = openobserve_core::trial_quota::synthetics_quota_for_orgs(
+        all_orgs.iter().map(|org| org.identifier.clone()).collect(),
+    )
+    .await;
+
     let mut id = 1;
     for org in all_orgs {
         let billing_info = all_billing_info.get(&org.identifier);
@@ -229,6 +234,7 @@ pub async fn all_organizations(
         let settings = db::organization::get_org_setting(&org.identifier)
             .await
             .unwrap_or_default();
+        let synthetics = quota.get(&org.identifier).copied().unwrap_or_default();
         let org = AllOrgListDetails {
             id,
             identifier: org.identifier.clone(),
@@ -239,22 +245,10 @@ pub async fn all_organizations(
                 .unwrap_or_default(),
             credits_used: openobserve_core::trial_quota::get_used(&org.identifier),
             credits_limit: openobserve_core::trial_quota::get_limit(&org.identifier),
-            browser_steps_used: openobserve_core::trial_quota::get_used_for_pool(
-                &org.identifier,
-                openobserve_core::trial_quota::TrialQuotaPool::SyntheticsBrowserSteps,
-            ),
-            browser_steps_limit: openobserve_core::trial_quota::get_limit_for_pool(
-                &org.identifier,
-                openobserve_core::trial_quota::TrialQuotaPool::SyntheticsBrowserSteps,
-            ),
-            protocol_steps_used: openobserve_core::trial_quota::get_used_for_pool(
-                &org.identifier,
-                openobserve_core::trial_quota::TrialQuotaPool::SyntheticsProtocolSteps,
-            ),
-            protocol_steps_limit: openobserve_core::trial_quota::get_limit_for_pool(
-                &org.identifier,
-                openobserve_core::trial_quota::TrialQuotaPool::SyntheticsProtocolSteps,
-            ),
+            browser_steps_used: synthetics.browser_used,
+            browser_steps_limit: synthetics.browser_limit,
+            protocol_steps_used: synthetics.protocol_used,
+            protocol_steps_limit: synthetics.protocol_limit,
             created_at: org.created_at,
             updated_at: org.updated_at,
             trial_expires_at: Some(org.trial_ends_at),
@@ -672,11 +666,11 @@ async fn set_pool_limit(
     context_path = "/api",
     tag = "Organizations",
     operation_id = "SetQuotaUsageLimit",
-    summary = "Set an organization's lifetime allowance for one quota pool",
+    summary = "Set an organization's allowance for one quota pool",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Must be _meta"),
-        ("pool" = String, Path, description = "ai_credits | synthetics_steps"),
+        ("pool" = String, Path, description = "ai_credits | synthetics_browser_steps | synthetics_protocol_steps (the pre-split key `synthetics_steps` is accepted as an alias for the protocol pool)"),
     ),
     request_body(content = inline(SetQuotaUsageLimitRequest), content_type = "application/json"),
     responses(
@@ -695,12 +689,7 @@ pub async fn set_quota_usage_limit(
 
     // Rejected rather than defaulted: a fallback would credit the wrong pool.
     let Some(pool) = TrialQuotaPool::from_key(&pool) else {
-        return MetaHttpResponse::bad_request(format!(
-            "unknown quota pool '{pool}' (expected one of: {}, {}, {})",
-            TrialQuotaPool::AiCredits.key(),
-            TrialQuotaPool::SyntheticsBrowserSteps.key(),
-            TrialQuotaPool::SyntheticsProtocolSteps.key(),
-        ));
+        return MetaHttpResponse::bad_request(unknown_quota_pool_message(&pool));
     };
 
     match set_pool_limit(&org_id, &req.org_id, pool, req.limit).await {
@@ -1562,4 +1551,45 @@ async fn get_super_cluster_info(regions: &[String]) -> Result<ClusterInfoRespons
     }
 
     Ok(response)
+}
+
+/// The 400 body for an unrecognised pool, listed from `ALL_POOLS` so none is left out.
+#[cfg(feature = "cloud")]
+fn unknown_quota_pool_message(pool: &str) -> String {
+    let expected = openobserve_core::trial_quota::TrialQuotaPool::ALL_POOLS
+        .iter()
+        .map(|pool| pool.key())
+        .collect::<Vec<_>>()
+        .join(", ");
+    format!("unknown quota pool '{pool}' (expected one of: {expected})")
+}
+
+#[cfg(test)]
+mod tests {
+    #[cfg(feature = "cloud")]
+    use openobserve_core::trial_quota::TrialQuotaPool;
+
+    #[cfg(feature = "cloud")]
+    use super::unknown_quota_pool_message;
+
+    /// The route accepts every key in `ALL_POOLS`, so a hand-written list leaves an admin who
+    /// typos the pool they want reading a 400 that never names it.
+    #[cfg(feature = "cloud")]
+    #[test]
+    fn the_unknown_pool_message_names_every_accepted_pool() {
+        let message = unknown_quota_pool_message("synthetics_stpes");
+        assert!(message.contains("synthetics_stpes"), "{message}");
+        for pool in TrialQuotaPool::ALL_POOLS {
+            assert!(
+                message.contains(pool.key()),
+                "`{}` is accepted by the route but missing from its own 400: {message}",
+                pool.key(),
+            );
+            assert_eq!(
+                TrialQuotaPool::from_key(pool.key()),
+                Some(*pool),
+                "the message lists a key the route would itself reject",
+            );
+        }
+    }
 }

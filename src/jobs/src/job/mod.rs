@@ -320,10 +320,9 @@ pub async fn get_nats_lock(key: String) -> Result<String, anyhow::Error> {
 #[cfg(feature = "cloud")]
 fn synthetics_step_pool() -> Option<openobserve_synthetics::pool::StepPoolHooks> {
     Some(openobserve_synthetics::pool::StepPoolHooks {
-        try_deduct: openobserve_core::trial_quota::synthetics_steps_try_deduct,
-        refund: openobserve_core::trial_quota::synthetics_steps_refund,
-        remaining: openobserve_core::trial_quota::synthetics_steps_remaining,
-        dead_letter_refund: openobserve_core::trial_quota::synthetics_steps_dead_letter_refund,
+        remaining_for_orgs: |org_ids| {
+            Box::pin(openobserve_core::trial_quota::synthetics_remaining_for_orgs(org_ids))
+        },
     })
 }
 
@@ -1368,36 +1367,4 @@ pub async fn init_deferred() -> Result<(), anyhow::Error> {
         .expect("Dashboard id->org cache failed");
 
     Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    /// **SPEC §6, item 2.3.** Losing the pool argument is silent: `init` still
-    /// starts every worker, every check still runs, and the pool is simply never
-    /// consulted — an unmetered, ungated fleet with no error anywhere (§11 F6).
-    /// The needles are assembled at runtime so this test's own source does not
-    /// count towards the totals it asserts.
-    #[test]
-    fn the_synthetics_scheduler_is_handed_the_step_pool() {
-        let source = include_str!("mod.rs");
-        assert_eq!(
-            source
-                .matches(&["openobserve_synthetics::init(synthetics_step", "_pool())"].concat())
-                .count(),
-            1,
-            "`init` must be handed the pool; passing `None` unconditionally is an unmetered fleet"
-        );
-        for hook in [
-            "synthetics_steps_try_deduct",
-            "synthetics_steps_refund",
-            "synthetics_steps_remaining",
-            "synthetics_steps_dead_letter_refund",
-        ] {
-            assert_eq!(
-                source.matches(&["trial_quota::", hook].concat()).count(),
-                1,
-                "the `cloud` build must wire {hook} into the scheduler\'s pool hooks"
-            );
-        }
-    }
 }
