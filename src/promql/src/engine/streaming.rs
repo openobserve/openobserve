@@ -38,11 +38,11 @@ use super::{
 };
 use crate::{functions, fused, micros};
 
-static EMPTY_MATCHERS: std::sync::LazyLock<Matchers> = std::sync::LazyLock::new(Matchers::empty);
-
 /// A selector with its contexts created, ready for either streaming consumer.
 struct StreamingTarget {
     selector: VectorSelector,
+    /// The matchers the scan still applies; an exact index selection already applied them.
+    scan_matchers: Matchers,
     offset: i64,
     label_selector: hashbrown::HashSet<String>,
     ctxs: SelectorContexts,
@@ -67,11 +67,11 @@ impl Engine {
         };
         let timeout = self.ctx.query_ctx.timeout;
         // a second context would split series and evaluate rate windows on partial data
-        if let [(ctx, schema, scan_stats, keep_filters)] = target.ctxs.as_slice() {
+        if let [(ctx, schema, scan_stats, _)] = target.ctxs.as_slice() {
             let run = fused::stream::fused_agg(
                 ctx,
                 schema,
-                target.streaming_selector(*keep_filters),
+                target.streaming_selector(),
                 fused::stream::FusedShape {
                     op,
                     func: func.clone(),
@@ -103,33 +103,69 @@ impl Engine {
             .map(Some)
     }
 
-    /// Streams a range function over a plain matrix selector, emitting each series whole; when
-    /// the layout cannot stream, the generic evaluator runs on the contexts already created.
-    /// `None` only when the query shape rules the streaming path out up front.
+    /// Streams `range_func(selector[range])`, bare or under `histogram_quantile(phi, ...)`, and
+    /// otherwise evaluates it generically on the same contexts; `None` only when the query shape
+    /// rules the streaming path out up front.
     pub(super) async fn try_streaming_range_func(
         &mut self,
         vs: &VectorSelector,
         range: Duration,
         func: Arc<dyn functions::RangeFunc>,
+        quantile: Option<f64>,
     ) -> Result<Option<Value>> {
         let Some(target) = self.streaming_target(vs, range).await? else {
             return Ok(None);
         };
         let timeout = self.ctx.query_ctx.timeout;
-        if let [(ctx, schema, scan_stats, keep_filters)] = target.ctxs.as_slice() {
-            let run = fused::stream::range_series(
-                ctx,
-                schema,
-                target.streaming_selector(*keep_filters),
-                func.clone(),
-                range,
-                fused::stream::SeriesLabels {
-                    selector: &target.label_selector,
-                    skip: self.skip_labels,
-                },
-                &self.eval_ctx,
-            );
-            if let Some(value) = self.run_cancellable(run, timeout).await? {
+        if let [(ctx, schema, scan_stats, _)] = target.ctxs.as_slice() {
+            let labels = fused::stream::SeriesLabels {
+                selector: &target.label_selector,
+                skip: self.skip_labels,
+            };
+            let eval_ctx = &self.eval_ctx;
+            let eval = Arc::new(fused::SeriesEval::new(func.clone(), range, eval_ctx));
+            // the generic path evaluates an empty selector to None, not to an empty matrix
+            let value = match quantile {
+                None => {
+                    let run = fused::stream::range_series(
+                        ctx,
+                        schema,
+                        target.streaming_selector(),
+                        eval,
+                        labels,
+                        fused::row_series,
+                    );
+                    self.run_cancellable(run, timeout)
+                        .await?
+                        .map(|(series, scanned)| match scanned {
+                            0 => Value::None,
+                            _ => Value::Matrix(series),
+                        })
+                }
+                Some(phi) => {
+                    let run = fused::stream::range_series(
+                        ctx,
+                        schema,
+                        target.streaming_selector(),
+                        eval,
+                        labels,
+                        fused::column_series,
+                    );
+                    match self.run_cancellable(run, timeout).await? {
+                        None => None,
+                        Some((_, 0)) => {
+                            Some(functions::histogram_quantile(phi, Value::None, eval_ctx)?)
+                        }
+                        Some((series, _)) => Some(functions::histogram_quantile_columnar(
+                            phi,
+                            &eval_ctx.timestamps(),
+                            series,
+                            eval_ctx,
+                        )?),
+                    }
+                }
+            };
+            if let Some(value) = value {
                 self.ctx.scan_stats.write().await.add(scan_stats);
                 if self.result_type.is_none() {
                     self.result_type = Some("matrix".to_string());
@@ -138,7 +174,7 @@ impl Engine {
             }
         }
 
-        // the layout cannot stream: evaluate the generic function on the contexts already created
+        // the layout cannot stream: evaluate the generic functions on the contexts already created
         let matrix = self
             .eval_matrix_selector(&target.selector, range, Some(target.ctxs))
             .await?;
@@ -147,64 +183,15 @@ impl Engine {
         } else {
             Value::Matrix(matrix)
         };
-        functions::eval_range(input, func, &self.eval_ctx).map(Some)
+        let value = functions::eval_range(input, func, &self.eval_ctx)?;
+        match quantile {
+            None => Ok(Some(value)),
+            Some(phi) => functions::histogram_quantile(phi, value, &self.eval_ctx).map(Some),
+        }
     }
 
     /// Normalizes the selector and creates its contexts; `None` when a query-level gate rules
     /// the streaming path out before any context exists.
-    /// Streams `histogram_quantile(phi, range_func(selector[range]))`: the range function emits
-    /// columns and the quantile consumes them directly; `None` only when the query shape rules
-    /// the streaming path out up front.
-    pub(super) async fn try_streaming_histogram_quantile(
-        &mut self,
-        phi: f64,
-        vs: &VectorSelector,
-        range: Duration,
-        func: Arc<dyn functions::RangeFunc>,
-    ) -> Result<Option<Value>> {
-        let Some(target) = self.streaming_target(vs, range).await? else {
-            return Ok(None);
-        };
-        let timeout = self.ctx.query_ctx.timeout;
-        if let [(ctx, schema, scan_stats, keep_filters)] = target.ctxs.as_slice() {
-            let run = fused::stream::range_series_columnar(
-                ctx,
-                schema,
-                target.streaming_selector(*keep_filters),
-                func.clone(),
-                range,
-                fused::stream::SeriesLabels {
-                    selector: &target.label_selector,
-                    skip: self.skip_labels,
-                },
-                &self.eval_ctx,
-            );
-            if let Some((matrix, series_count)) = self.run_cancellable(run, timeout).await? {
-                self.ctx.scan_stats.write().await.add(scan_stats);
-                if self.result_type.is_none() {
-                    self.result_type = Some("matrix".to_string());
-                }
-                // the generic path evaluates an empty selector to None
-                let value = if series_count == 0 {
-                    functions::histogram_quantile(phi, Value::None, &self.eval_ctx)?
-                } else {
-                    functions::histogram_quantile_columnar(phi, matrix, &self.eval_ctx)?
-                };
-                return Ok(Some(value));
-            }
-        }
-        let matrix = self
-            .eval_matrix_selector(&target.selector, range, Some(target.ctxs))
-            .await?;
-        let input = if matrix.is_empty() {
-            Value::None
-        } else {
-            Value::Matrix(matrix)
-        };
-        let input = functions::eval_range(input, func, &self.eval_ctx)?;
-        functions::histogram_quantile(phi, input, &self.eval_ctx).map(Some)
-    }
-
     async fn streaming_target(
         &mut self,
         vs: &VectorSelector,
@@ -244,8 +231,13 @@ impl Engine {
                 &mut filters,
             )
             .await?;
+        let scan_matchers = match ctxs.as_slice() {
+            [(_, _, _, false)] => Matchers::empty(),
+            _ => selector.matchers.clone(),
+        };
         Ok(Some(StreamingTarget {
             selector,
+            scan_matchers,
             offset,
             label_selector,
             ctxs,
@@ -296,15 +288,10 @@ impl Engine {
 }
 
 impl StreamingTarget {
-    /// The scan selector; an exact index selection already applied the matchers.
-    fn streaming_selector(&self, keep_filters: bool) -> fused::stream::StreamingSelector<'_> {
+    fn streaming_selector(&self) -> fused::stream::StreamingSelector<'_> {
         fused::stream::StreamingSelector {
             table_name: self.selector.name.as_deref().unwrap_or_default(),
-            matchers: if keep_filters {
-                &self.selector.matchers
-            } else {
-                &EMPTY_MATCHERS
-            },
+            matchers: &self.scan_matchers,
             offset: self.offset,
         }
     }

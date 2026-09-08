@@ -13,10 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! One shared timestamp axis and a dense value column per series, for consumers that keep the
-//! whole matrix: half the bytes of `Vec<RangeValue>`, and one contiguous slice per series.
-
-use std::sync::Arc;
+//! A dense value column per series on the evaluation's timestamp axis, for consumers that keep
+//! the whole matrix: half the bytes of `Vec<RangeValue>`, and one contiguous slice per series.
 
 use config::meta::promql::value::Labels;
 
@@ -29,11 +27,6 @@ pub(crate) struct ColumnarSeries {
     pub labels: Labels,
     /// One value per timestamp, `MISSING` where the function produced none.
     pub values: Vec<f64>,
-}
-
-pub(crate) struct ColumnarMatrix {
-    pub timestamps: Arc<[i64]>,
-    pub series: Vec<ColumnarSeries>,
 }
 
 pub(crate) fn is_missing(value: f64) -> bool {

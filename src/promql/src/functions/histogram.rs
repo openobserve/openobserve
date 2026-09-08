@@ -23,7 +23,7 @@ use config::{
 use datafusion::error::{DataFusionError, Result};
 use hashbrown::HashMap;
 
-use crate::fused::columnar::{ColumnarMatrix, ColumnarSeries, is_missing};
+use crate::fused::columnar::{ColumnarSeries, is_missing};
 
 // https://github.com/prometheus/prometheus/blob/cf1bea344a3c390a90c35ea8764c4a468b345d5e/promql/quantile.go#L33
 #[derive(Debug, Clone, PartialEq)]
@@ -147,19 +147,20 @@ pub(crate) fn histogram_quantile(phi: f64, data: Value, eval_ctx: &EvalContext) 
 /// without a value at a step contributes its first value, as the row path does.
 pub(crate) fn histogram_quantile_columnar(
     phi: f64,
-    matrix: ColumnarMatrix,
+    timestamps: &[i64],
+    series: Vec<ColumnarSeries>,
     eval_ctx: &EvalContext,
 ) -> Result<Value> {
     let start = std::time::Instant::now();
     let trace_id = &eval_ctx.trace_id;
     log::info!(
         "[trace_id: {trace_id}] [PromQL Timing] histogram_quantile({phi}) started with {} columnar series and {} time points",
-        matrix.series.len(),
-        matrix.timestamps.len()
+        series.len(),
+        timestamps.len()
     );
 
     let mut metrics_by_sig: HashMap<u64, Vec<(f64, ColumnarSeries)>> = HashMap::default();
-    for series in matrix.series {
+    for series in series {
         let Ok(upper_bound) = series.labels.get_value(BUCKET_LABEL).parse::<f64>() else {
             continue;
         };
@@ -188,8 +189,8 @@ pub(crate) fn histogram_quantile_columnar(
             })
             .collect();
 
-        let mut samples = Vec::with_capacity(matrix.timestamps.len());
-        for (slot, &eval_ts) in matrix.timestamps.iter().enumerate() {
+        let mut samples = Vec::with_capacity(timestamps.len());
+        for (slot, &eval_ts) in timestamps.iter().enumerate() {
             let mut buckets = Vec::with_capacity(bucket_series.len());
             for ((upper_bound, series), first) in bucket_series.iter().zip(&first_values) {
                 let value = series.values[slot];
@@ -399,19 +400,16 @@ mod tests {
                 })
                 .collect(),
         );
-        let columns = ColumnarMatrix {
-            timestamps: Arc::from([1i64, 2, 3, 4]),
-            series: data
-                .iter()
-                .map(|(path, le, values)| ColumnarSeries {
-                    labels: labels(path, le),
-                    values: values
-                        .iter()
-                        .map(|value| value.unwrap_or(crate::fused::columnar::MISSING))
-                        .collect(),
-                })
-                .collect(),
-        };
+        let columns: Vec<ColumnarSeries> = data
+            .iter()
+            .map(|(path, le, values)| ColumnarSeries {
+                labels: labels(path, le),
+                values: values
+                    .iter()
+                    .map(|value| value.unwrap_or(crate::fused::columnar::MISSING))
+                    .collect(),
+            })
+            .collect();
         let flatten = |value: Value| -> Vec<(String, Vec<(i64, u64)>)> {
             let Value::Matrix(mut series) = value else {
                 panic!("expected matrix");
@@ -435,7 +433,8 @@ mod tests {
                 .collect()
         };
         let expected = flatten(histogram_quantile(0.9, rows, &eval_ctx).unwrap());
-        let actual = flatten(histogram_quantile_columnar(0.9, columns, &eval_ctx).unwrap());
+        let actual =
+            flatten(histogram_quantile_columnar(0.9, &[1, 2, 3, 4], columns, &eval_ctx).unwrap());
         assert_eq!(expected.len(), 2);
         assert_eq!(actual, expected);
     }

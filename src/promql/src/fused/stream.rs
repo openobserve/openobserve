@@ -34,14 +34,10 @@ use datafusion::{
     execution::SendableRecordBatchStream,
     prelude::SessionContext,
 };
-use futures::{FutureExt, future::BoxFuture};
 use hashbrown::HashSet;
 use promql_parser::{label::Matchers, parser::LabelModifier};
 
-use super::{
-    columnar::ColumnarMatrix,
-    fold::{FoldParams, SeriesEval, emit_sources, emit_sources_columnar, fold_sources},
-};
+use super::fold::{FoldParams, SeriesEmitter, SeriesEval, emit_sources, fold_sources};
 use crate::{
     functions::{KEEP_METRIC_NAME_FUNC, RangeFunc},
     fused::FusedAggOp,
@@ -130,129 +126,53 @@ pub(crate) async fn fused_agg(
     Ok(Some(value))
 }
 
-/// Evaluates `func` over every series of the hash-sorted table and returns them whole; `None`
-/// when the layout cannot stream. The caller bounds it like the fold.
-pub(crate) async fn range_series(
+/// Evaluates the series of the hash-sorted table with `eval` and returns what `emit` makes of
+/// each, with the number of series scanned; `None` when the layout cannot stream. The caller
+/// bounds it like the fold.
+pub(crate) async fn range_series<T: Send + 'static>(
     ctx: &SessionContext,
     schema: &Schema,
     selector: StreamingSelector<'_>,
-    func: Arc<dyn RangeFunc>,
-    range: Duration,
+    eval: Arc<SeriesEval>,
     labels: SeriesLabels<'_>,
-    eval_ctx: &EvalContext,
-) -> Result<Option<Value>> {
+    emit: SeriesEmitter<T>,
+) -> Result<Option<(Vec<T>, usize)>> {
     let start_time = std::time::Instant::now();
-    let Some((sources, eval)) = range_sources(
-        ctx,
-        schema,
-        &selector,
-        func.clone(),
-        range,
-        &labels,
-        eval_ctx,
-    )
-    .await?
-    else {
-        return Ok(None);
-    };
-    let (series, series_count) = emit_sources(sources, eval).await?;
+    let func_name = eval.func.name();
+    let trace_id = eval.eval_ctx.trace_id.clone();
 
-    log::info!(
-        "[trace_id: {}] [PromQL Timing] streaming {}() execution took: {:?}, emitted {} of {series_count} series",
-        eval_ctx.trace_id,
-        func.name(),
-        start_time.elapsed(),
-        series.len(),
-    );
-    // the generic path evaluates an empty selector to None and a matrix with no values to []
-    Ok(Some(if series_count == 0 {
-        Value::None
-    } else {
-        Value::Matrix(series)
-    }))
-}
-
-/// Like `range_series`, but the series come back as columns on the shared timestamp axis, with
-/// the number of series scanned; `None` when the layout cannot stream.
-pub(crate) async fn range_series_columnar(
-    ctx: &SessionContext,
-    schema: &Schema,
-    selector: StreamingSelector<'_>,
-    func: Arc<dyn RangeFunc>,
-    range: Duration,
-    labels: SeriesLabels<'_>,
-    eval_ctx: &EvalContext,
-) -> Result<Option<(ColumnarMatrix, usize)>> {
-    let start_time = std::time::Instant::now();
-    let Some((sources, eval)) = range_sources(
-        ctx,
-        schema,
-        &selector,
-        func.clone(),
-        range,
-        &labels,
-        eval_ctx,
-    )
-    .await?
-    else {
-        return Ok(None);
-    };
-    let (matrix, series_count) = emit_sources_columnar(sources, eval).await?;
-
-    log::info!(
-        "[trace_id: {}] [PromQL Timing] streaming {}() execution took: {:?}, emitted {} of {series_count} series as columns",
-        eval_ctx.trace_id,
-        func.name(),
-        start_time.elapsed(),
-        matrix.series.len(),
-    );
-    Ok(Some((matrix, series_count)))
-}
-
-/// The per-shard sources carrying the series labels, and the evaluator of `func`; `None` when
-/// the layout cannot stream.
-async fn range_sources(
-    ctx: &SessionContext,
-    schema: &Schema,
-    selector: &StreamingSelector<'_>,
-    func: Arc<dyn RangeFunc>,
-    range: Duration,
-    labels: &SeriesLabels<'_>,
-    eval_ctx: &EvalContext,
-) -> Result<
-    Option<(
-        Vec<BoxFuture<'static, Result<MergeSeriesStream>>>,
-        Arc<SeriesEval>,
-    )>,
-> {
     if schema
         .field_with_name(HASH_LABEL)
         .is_ok_and(|field| field.data_type() != &DataType::UInt64)
     {
         return Ok(None);
     }
-    let label_cols = series_label_columns(schema, labels, func.name());
+    let label_cols = series_label_columns(schema, &labels, func_name);
     let mut columns = vec![TIMESTAMP_COL_NAME, HASH_LABEL, VALUE_LABEL];
     columns.extend(label_cols.iter().map(String::as_str));
 
-    let Some(shard_inputs) = shard_inputs(ctx, selector, micros(range), &columns, eval_ctx).await?
+    let Some(shard_inputs) =
+        shard_inputs(ctx, &selector, micros(eval.range), &columns, &eval.eval_ctx).await?
     else {
         return Ok(None);
     };
     log::info!(
-        "[trace_id: {}] [PromQL Timing] streaming {}() started with {} shards",
-        eval_ctx.trace_id,
-        func.name(),
+        "[trace_id: {trace_id}] [PromQL Timing] streaming {func_name}() started with {} shards",
         shard_inputs.len(),
     );
-    let eval = Arc::new(SeriesEval::new(func, range, eval_ctx));
     let label_cols = Arc::new(label_cols);
-    let offset = selector.offset;
     let sources = shard_inputs
         .into_iter()
-        .map(|streams| MergeSeriesStream::start(streams, label_cols.clone(), offset).boxed())
+        .map(|streams| MergeSeriesStream::start(streams, label_cols.clone(), selector.offset))
         .collect();
-    Ok(Some((sources, eval)))
+    let (series, series_count) = emit_sources(sources, eval, emit).await?;
+
+    log::info!(
+        "[trace_id: {trace_id}] [PromQL Timing] streaming {func_name}() execution took: {:?}, emitted {} of {series_count} series",
+        start_time.elapsed(),
+        series.len(),
+    );
+    Ok(Some((series, series_count)))
 }
 
 /// The per-shard ordered streams of the selector's hash-sorted table projected to `columns`;
@@ -635,7 +555,7 @@ mod tests {
                 &eval_ctx,
             )
             .unwrap();
-            let actual = range_series(
+            let (actual, _) = range_series(
                 &ctx,
                 &arrow_schema(),
                 StreamingSelector {
@@ -643,20 +563,19 @@ mod tests {
                     matchers: &Matchers::empty(),
                     offset: 0,
                 },
-                func,
-                range,
+                Arc::new(SeriesEval::new(func, range, &eval_ctx)),
                 SeriesLabels {
                     selector: &all_labels,
                     skip: false,
                 },
-                &eval_ctx,
+                super::super::row_series,
             )
             .await
             .unwrap()
             .expect("the sorted table streams");
             assert_matrix_close(
                 canonical_matrix(expected),
-                canonical_matrix(actual),
+                canonical_matrix(Value::Matrix(actual)),
                 &format!("streaming {func_name}()"),
             );
         }
