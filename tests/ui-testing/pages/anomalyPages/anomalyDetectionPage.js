@@ -1,12 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
-//
-// Anomaly Detection — page object.
-//
-// Anomaly detection is not a standalone module: it is an alert *type* that
-// lives on the Alerts list behind the `anomalyDetection` tab, and its editor is
-// the AddAlert wizard with two extra tabs (anomaly-config, anomaly-alerting).
-// So every list-level action reuses the shared `alert-list-*` hooks and only the
-// wizard body carries `anomaly-*` hooks.
+
+/** Anomaly detection is an alert TYPE, not a module: list actions reuse the shared `alert-list-*` hooks and only the wizard body carries `anomaly-*` ones. */
 
 const { expect } = require('@playwright/test');
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
@@ -24,7 +18,7 @@ class AnomalyDetectionPage {
         this.monaco = new MonacoEditorHelper(page);
 
         this.selectors = {
-            // ── Navigation ──────────────────────────────────────────────────
+            // Navigation
             alertsMenuLink: '[data-test="menu-link-\\/alerts-item"]',
             // OToggleGroupItem in AlertList.vue renders `alert-list-tab-<value>`.
             // The tab is only in `alertTabs` when zoConfig.anomaly_detection_enabled
@@ -37,7 +31,7 @@ class AnomalyDetectionPage {
             addBtn: '[data-test="alert-list-add-alert-btn"]',
             searchInput: '[data-test="alert-list-search-input"]',
 
-            // ── Wizard topbar ───────────────────────────────────────────────
+            // Wizard topbar
             // OFormInlineEdit: click -trigger to reveal -input; -error carries
             // the validation message.
             nameTrigger: '[data-test="add-anomaly-name-input-trigger"]',
@@ -47,13 +41,13 @@ class AnomalyDetectionPage {
             streamTypeSelect: '[data-test="add-alert-stream-type-select-dropdown"]',
             streamNameSelect: '[data-test="add-alert-stream-name-select-dropdown"]',
 
-            // ── Wizard chrome ───────────────────────────────────────────────
+            // Wizard chrome
             saveBtn: '[data-test="add-alert-submit-btn"]',
             cancelBtn: '[data-test="add-alert-cancel-btn"]',
             configTab: '[data-test="add-alert-tab-anomaly-config"]',
             alertingTab: '[data-test="add-alert-tab-anomaly-alerting"]',
 
-            // ── Detection config step ───────────────────────────────────────
+            // Detection config step
             queryTabs: '[data-test="anomaly-query-tabs"]',
             filterRow: '[data-test="anomaly-filter-row"]',
             filterRowRemove: '[data-test="anomaly-filter-row-remove"]',
@@ -80,7 +74,7 @@ class AnomalyDetectionPage {
             sensitivityHint: '[data-test="anomaly-sensitivity-hint"]',
             sqlPreview: '[data-test="anomaly-sql-preview"]',
 
-            // ── Alerting step ───────────────────────────────────────────────
+            // Alerting step
             prioritySelect: '[data-test="anomaly-priority-select"]',
             tagsInput: '[data-test="anomaly-tags-input"]',
             alertEnabled: '[data-test="anomaly-alert-enabled"]',
@@ -88,19 +82,19 @@ class AnomalyDetectionPage {
             destinationError: '[data-test="anomaly-destination-error"]',
             refreshDestinations: '[data-test="anomaly-refresh-destinations"]',
 
-            // ── Right rail ──────────────────────────────────────────────────
+            // Right rail
             dataPreviewChart: '[data-test="anomaly-data-preview-chart"]',
             dataPreviewEmpty: '[data-test="anomaly-data-preview-empty"]',
             summaryScrollBtn: '[data-test="anomaly-summary-scroll-btn"]',
 
-            // ── Detection charts (AlertDetail) ──────────────────────────────
+            // Detection charts (AlertDetail)
             detectionCharts: '[data-test="alerts-anomalydetectionchart"]',
             detectionChartsRange: '[data-test="alerts-anomalydetectionchart-range"]',
 
             toast: '[data-test="o-toast-message"]',
             toastDismiss: '[data-test="o-toast-dismiss"]',
 
-            // ── Row-scoped hooks (shared alert-list family) ─────────────────
+            // Row-scoped hooks (shared alert-list family)
             rowName: (name) => `[data-test="alert-list-${name}-name-cell"]`,
             rowEdit: (name) => `[data-test="alert-list-${name}-update-alert"]`,
             rowDelete: (name) => `[data-test="alert-list-${name}-delete-alert"]`,
@@ -122,9 +116,7 @@ class AnomalyDetectionPage {
         };
     }
 
-    // ══════════════════════════════════════════════════════════════════════
     // Navigation & feature availability
-    // ══════════════════════════════════════════════════════════════════════
 
     /**
      * True when the build/backend exposes anomaly detection.
@@ -171,9 +163,7 @@ class AnomalyDetectionPage {
         testLogger.info('Add Anomaly wizard opened');
     }
 
-    // ══════════════════════════════════════════════════════════════════════
     // Shared O2 control drivers
-    // ══════════════════════════════════════════════════════════════════════
 
     /**
      * Narrow a just-opened OSelect popover to `term`.
@@ -239,9 +229,7 @@ class AnomalyDetectionPage {
         return this.page.locator(`${selector} [data-test$="-field"]`).first().inputValue();
     }
 
-    // ══════════════════════════════════════════════════════════════════════
     // Wizard topbar
-    // ══════════════════════════════════════════════════════════════════════
 
     /** OFormInlineEdit renders as text until its trigger is clicked. */
     async fillAnomalyName(name) {
@@ -276,9 +264,7 @@ class AnomalyDetectionPage {
         await this.fillAnomalyName(name);
     }
 
-    // ══════════════════════════════════════════════════════════════════════
     // Wizard tabs
-    // ══════════════════════════════════════════════════════════════════════
 
     async openConfigTab() {
         await this.page.locator(this.selectors.configTab).click();
@@ -290,9 +276,7 @@ class AnomalyDetectionPage {
         await this.page.locator(this.selectors.alertEnabled).waitFor({ state: 'visible', timeout: 10000 });
     }
 
-    // ══════════════════════════════════════════════════════════════════════
     // Detection config
-    // ══════════════════════════════════════════════════════════════════════
 
     /**
      * Select the query mode.
@@ -383,6 +367,11 @@ class AnomalyDetectionPage {
         await this.selectOptionByValue(this.selectors.detectionWindowUnit, unit);
     }
 
+    /** Blank the resolution field, to exercise a mid-edit invalid interval. */
+    async clearHistogramInterval() {
+        await this.fillFormInput(this.selectors.histogramIntervalValue, '');
+    }
+
     async setTrainingWindow(days) {
         await this.fillFormInput(this.selectors.trainingWindow, days);
     }
@@ -392,7 +381,7 @@ class AnomalyDetectionPage {
         await this.selectOptionByValue(this.selectors.retrainInterval, days);
     }
 
-    // ── Filters ────────────────────────────────────────────────────────────
+    // Filters
 
     getFilterRows() {
         return this.page.locator(this.selectors.filterRow);
@@ -422,7 +411,7 @@ class AnomalyDetectionPage {
         await this.page.locator(this.selectors.filterRowRemove).nth(index).click();
     }
 
-    // ── Sensitivity ────────────────────────────────────────────────────────
+    // Sensitivity
 
     /**
      * Pick a sensitivity tier.
@@ -475,9 +464,7 @@ class AnomalyDetectionPage {
         return this.page.locator(this.selectors.sensitivityError);
     }
 
-    // ══════════════════════════════════════════════════════════════════════
     // Alerting step
-    // ══════════════════════════════════════════════════════════════════════
 
     /** @param {1|2|3|4|5} priority */
     async selectPriority(priority) {
@@ -545,9 +532,7 @@ class AnomalyDetectionPage {
         return this.page.locator(this.selectors.destinationError);
     }
 
-    // ══════════════════════════════════════════════════════════════════════
     // Save / cancel
-    // ══════════════════════════════════════════════════════════════════════
 
     async save() {
         await this.page.locator(this.selectors.saveBtn).click();
@@ -614,6 +599,26 @@ class AnomalyDetectionPage {
         await btn.click({ force: true });
     }
 
+    getStreamTypeSelectLocator() { return this.page.locator(this.selectors.streamTypeSelect); }
+    getListTableLocator() { return this.page.locator(this.selectors.listTable); }
+    getCustomSqlTimestampErrorLocator() { return this.page.locator(this.selectors.customSqlTimestampError); }
+    getCustomSqlRequiredErrorLocator() { return this.page.locator(this.selectors.customSqlRequiredError); }
+    getDetectionFunctionFieldLocator() { return this.page.locator(this.selectors.detectionFunctionField); }
+    getSqlPreviewLocator() { return this.page.locator(this.selectors.sqlPreview); }
+    getTagsInputLocator() { return this.page.locator(this.selectors.tagsInput); }
+    getDestinationLocator() { return this.page.locator(this.selectors.destination); }
+    getNameValueLocator() { return this.page.locator(this.selectors.nameValue); }
+
+    /** The OSelect trigger, which carries the selected label. */
+    getPriorityTriggerLocator() {
+        return this.page.locator(`${this.selectors.prioritySelect} [data-test$="-trigger"]`);
+    }
+
+    /** @param {'1h'|'6h'|'24h'} range */
+    getChartRangeItemLocator(range) {
+        return this.page.locator(this.selectors.chartRangeItem(range));
+    }
+
     getSaveBtnLocator() {
         return this.page.locator(this.selectors.saveBtn);
     }
@@ -632,9 +637,7 @@ class AnomalyDetectionPage {
         return this.page.locator(this.selectors.toast).filter({ hasText });
     }
 
-    // ══════════════════════════════════════════════════════════════════════
     // Right rail — data preview & summary
-    // ══════════════════════════════════════════════════════════════════════
 
     getDataPreviewChartLocator() {
         return this.page.locator(this.selectors.dataPreviewChart);
@@ -649,9 +652,7 @@ class AnomalyDetectionPage {
         await this.getDataPreviewChartLocator().waitFor({ state: 'visible', timeout });
     }
 
-    // ══════════════════════════════════════════════════════════════════════
     // List row actions
-    // ══════════════════════════════════════════════════════════════════════
 
     getRow(name) {
         return this.page.locator(this.selectors.rowName(name));
@@ -697,9 +698,7 @@ class AnomalyDetectionPage {
         await confirm.click();
     }
 
-    // ══════════════════════════════════════════════════════════════════════
     // Detection charts (AlertDetail)
-    // ══════════════════════════════════════════════════════════════════════
 
     getDetectionChartsLocator() {
         return this.page.locator(this.selectors.detectionCharts);
@@ -726,9 +725,7 @@ class AnomalyDetectionPage {
         await this.page.locator(this.selectors.chartRangeItem(value)).click();
     }
 
-    // ══════════════════════════════════════════════════════════════════════
     // Cleanup
-    // ══════════════════════════════════════════════════════════════════════
 
     /**
      * Delete every anomaly whose name contains `pattern`, via the API.

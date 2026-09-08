@@ -110,7 +110,7 @@ test.describe('Anomaly Detection', () => {
       tag: ['@anomaly', '@P0', '@smoke', '@all'],
     }, async ({ page }) => {
       await pm.anomalyDetectionPage.openAddAnomalyWizard();
-      await expect(page.locator(pm.anomalyDetectionPage.selectors.streamTypeSelect)).toBeVisible();
+      await expect(pm.anomalyDetectionPage.getStreamTypeSelectLocator()).toBeVisible();
       await pm.anomalyDetectionPage.cancel();
     });
 
@@ -119,7 +119,7 @@ test.describe('Anomaly Detection', () => {
     }, async ({ page }) => {
       await pm.anomalyDetectionPage.openAddAnomalyWizard();
       await pm.anomalyDetectionPage.cancel();
-      await expect(page.locator(pm.anomalyDetectionPage.selectors.listTable)).toBeVisible();
+      await expect(pm.anomalyDetectionPage.getListTableLocator()).toBeVisible();
     });
 
     test('destination is required once notifications are enabled', {
@@ -149,7 +149,7 @@ test.describe('Anomaly Detection', () => {
 
       // Bare-Monaco errors only render after the first submit attempt.
       await expect(
-        page.locator(pm.anomalyDetectionPage.selectors.customSqlTimestampError),
+        pm.anomalyDetectionPage.getCustomSqlTimestampErrorLocator(),
       ).toBeVisible();
       await pm.anomalyDetectionPage.cancel();
     });
@@ -167,7 +167,7 @@ test.describe('Anomaly Detection', () => {
       await pm.anomalyDetectionPage.save();
 
       await expect(
-        page.locator(pm.anomalyDetectionPage.selectors.customSqlRequiredError),
+        pm.anomalyDetectionPage.getCustomSqlRequiredErrorLocator(),
       ).toBeVisible();
       await pm.anomalyDetectionPage.cancel();
     });
@@ -277,7 +277,7 @@ test.describe('Anomaly Detection', () => {
     test('the detection-function field appears only for non-count functions', {
       tag: ['@anomaly', '@P1', '@functional', '@all'],
     }, async ({ page }) => {
-      const fieldSelect = page.locator(pm.anomalyDetectionPage.selectors.detectionFunctionField);
+      const fieldSelect = pm.anomalyDetectionPage.getDetectionFunctionFieldLocator();
       await expect(fieldSelect).toBeHidden();
 
       await pm.anomalyDetectionPage.selectDetectionFunction('avg');
@@ -316,9 +316,9 @@ test.describe('Anomaly Detection', () => {
     test('the SQL preview is hidden in custom_sql mode', {
       tag: ['@anomaly', '@P2', '@functional', '@all'],
     }, async ({ page }) => {
-      await expect(page.locator(pm.anomalyDetectionPage.selectors.sqlPreview)).toBeVisible();
+      await expect(pm.anomalyDetectionPage.getSqlPreviewLocator()).toBeVisible();
       await pm.anomalyDetectionPage.selectQueryMode('custom_sql');
-      await expect(page.locator(pm.anomalyDetectionPage.selectors.sqlPreview)).toBeHidden();
+      await expect(pm.anomalyDetectionPage.getSqlPreviewLocator()).toBeHidden();
     });
   });
 
@@ -350,10 +350,7 @@ test.describe('Anomaly Detection', () => {
       await pm.anomalyDetectionPage.waitForDataPreview();
 
       await pm.anomalyDetectionPage.openConfigTab();
-      await pm.anomalyDetectionPage.fillFormInput(
-        pm.anomalyDetectionPage.selectors.histogramIntervalValue,
-        '',
-      );
+      await pm.anomalyDetectionPage.clearHistogramInterval();
 
       // canPreview goes false, which blocks the query but must not tear the
       // chart down — the empty state means "nothing to preview", not "invalid".
@@ -386,17 +383,17 @@ test.describe('Anomaly Detection', () => {
       // that attribute only from its searchable trigger, and priority is a
       // non-searchable select rendered by the reka SelectTrigger branch.
       await expect(
-        page.locator(`${pm.anomalyDetectionPage.selectors.prioritySelect} [data-test$="-trigger"]`),
+        pm.anomalyDetectionPage.getPriorityTriggerLocator(),
       ).toContainText('P2');
 
       await pm.anomalyDetectionPage.addTags(['team-platform']);
-      await expect(page.locator(pm.anomalyDetectionPage.selectors.tagsInput)).toContainText('team-platform');
+      await expect(pm.anomalyDetectionPage.getTagsInputLocator()).toContainText('team-platform');
     });
 
     test('the destination picker appears only when notifications are on', {
       tag: ['@anomaly', '@P1', '@functional', '@all'],
     }, async ({ page }) => {
-      const destination = page.locator(pm.anomalyDetectionPage.selectors.destination);
+      const destination = pm.anomalyDetectionPage.getDestinationLocator();
       await pm.anomalyDetectionPage.toggleNotifications(false);
       await expect(destination).toBeHidden();
 
@@ -409,7 +406,7 @@ test.describe('Anomaly Detection', () => {
     }, async ({ page }) => {
       await pm.anomalyDetectionPage.toggleNotifications(true);
       await pm.anomalyDetectionPage.refreshDestinations();
-      await expect(page.locator(pm.anomalyDetectionPage.selectors.destination)).toBeVisible();
+      await expect(pm.anomalyDetectionPage.getDestinationLocator()).toBeVisible();
     });
   });
 
@@ -527,7 +524,7 @@ test.describe('Anomaly Detection', () => {
         await pm.anomalyDetectionPage.openEdit(name);
 
         // The name is readonly in edit mode, so it renders as plain text.
-        await expect(page.locator(pm.anomalyDetectionPage.selectors.nameValue)).toContainText(name);
+        await expect(pm.anomalyDetectionPage.getNameValueLocator()).toContainText(name);
 
         await pm.anomalyDetectionPage.openConfigTab();
         // The percentile readback only exists where the tier controls do; on
@@ -629,7 +626,7 @@ test.describe('Anomaly Detection', () => {
         for (const range of ['1h', '6h', '24h']) {
           await pm.anomalyDetectionPage.selectChartRange(range);
           await expect(
-            page.locator(pm.anomalyDetectionPage.selectors.chartRangeItem(range)),
+            pm.anomalyDetectionPage.getChartRangeItemLocator(range),
           ).toHaveAttribute('data-state', 'on');
         }
       });
@@ -772,7 +769,9 @@ test.describe('Anomaly Detection', () => {
       // either of these, detection still "succeeds" and no alert is ever sent —
       // a silent hole this suite would otherwise not notice.
       expect(created.alert_enabled, 'alert_enabled must persist from the wizard').toBe(true);
-      expect(created.alert_destinations).toContain(prerequisiteDestinationName);
+      expect(created.alert_destinations).toContain(
+        deliveryAssertable ? sinkName : prerequisiteDestinationName,
+      );
 
       // Training and detection have no UI trigger that reports completion, so
       // they are driven through the API; the assertions below are on the result.
