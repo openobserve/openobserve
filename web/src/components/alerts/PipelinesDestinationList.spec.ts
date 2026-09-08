@@ -375,6 +375,42 @@ describe("PipelinesDestinationList", () => {
       expect(original.name).toBe("orig");
     });
 
+    it("a stale getDestinations() resolving after Add must not close the editor (regression)", async () => {
+      // onBeforeMount kicks off getDestinations(); defer its resolution so we can
+      // open the editor (simulating the user's Add click) while it's still in flight,
+      // then resolve it afterwards — reproducing the real-world race where the API
+      // round-trip lands after the user has already clicked Add.
+      let resolveList!: (v: any) => void;
+      (destinationService.list as any).mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveList = resolve;
+        }),
+      );
+      // The "pipelineDestinations" route is registered by useManagementRoutes at app
+      // setup, which this isolated mount doesn't run — router.push would otherwise throw
+      // "No match for" (why the other editDestination tests in this file are skipped).
+      // Register it for real (rather than stubbing push) so router.currentRoute.value.query
+      // actually updates — the race this test guards against depends on updateRoute()
+      // reading the real post-navigation query.
+      router.addRoute({
+        name: "pipelineDestinations",
+        path: "/test-pipeline-destinations",
+        component: { template: "<div />" },
+      });
+
+      wrapper = mountComponent();
+      (wrapper.vm as any).editDestination(null);
+      await flushPromises();
+      expect(router.currentRoute.value.query.action).toBe("add");
+      expect((wrapper.vm as any).showDestinationEditor).toBe(true);
+
+      resolveList({ data: [] });
+      await flushPromises();
+
+      expect((wrapper.vm as any).showDestinationEditor).toBe(true);
+      router.removeRoute("pipelineDestinations");
+    });
+
     it("shows PipelineDestinationEditor when showDestinationEditor is true", async () => {
       wrapper = mountComponent();
       await flushPromises();

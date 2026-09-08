@@ -377,9 +377,21 @@ export default defineComponent({
         .then((res) => (templates.value = res.data));
     };
     const updateRoute = () => {
-      if (router.currentRoute.value.query.action === "add") editDestination(null);
-      if (router.currentRoute.value.query.action === "update")
-        editDestination(getDestinationByName(router.currentRoute.value.query.name as string));
+      const action = router.currentRoute.value.query.action;
+      const name = router.currentRoute.value.query.name as string;
+      // Only run when the editor doesn't already match the route: updateRoute is also
+      // called from getDestinations().then() (onBeforeMount kicks it off, and it can
+      // resolve after the user has already opened the editor via the Add/Edit button).
+      // Without this guard, that late resolution re-invokes editDestination(), whose
+      // toggleDestinationEditor() flips the just-opened editor closed again.
+      if (action === "add" && !showDestinationEditor.value) {
+        editDestination(null);
+      } else if (
+        action === "update" &&
+        !(showDestinationEditor.value && editingDestination.value?.name === name)
+      ) {
+        editDestination(getDestinationByName(name));
+      }
     };
     const getDestinationByName = (name: string) => {
       return destinations.value.find((destination) => destination.name === name);
