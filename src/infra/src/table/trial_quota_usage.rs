@@ -15,7 +15,7 @@
 
 use sea_orm::{
     ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QuerySelect, TransactionTrait,
-    sea_query::{Expr, Func, OnConflict},
+    sea_query::{CaseStatement, Expr, Func, OnConflict},
 };
 
 use crate::{
@@ -25,11 +25,17 @@ use crate::{
 
 pub const SYNTHETICS_BROWSER_FEATURE: &str = "synthetics_browser_steps";
 pub const SYNTHETICS_PROTOCOL_FEATURE: &str = "synthetics_protocol_steps";
+pub const SYNTHETICS_STATUS_FEATURE: &str = "synthetics_status_protocol";
 
-/// One settled window's free steps per pool.
+/// The `YYYYMM` a lifetime row carries, meaning the count belongs to no month.
+pub const LIFETIME_PERIOD: i32 = 0;
+
+/// One settled window's free steps per pool. `month` scopes the status pool alone.
 pub struct SyntheticsDeltas {
     pub browser: i64,
     pub protocol: i64,
+    pub status: i64,
+    pub month: i32,
 }
 
 /// Additively upsert one `(org_id, feature, delta)` triple per record.
@@ -172,6 +178,8 @@ async fn set_usage_limit_for_org_in<C: ConnectionTrait + TransactionTrait>(
         usage_limit: sea_orm::ActiveValue::Set(Some(usage_limit)),
         updated_at: sea_orm::ActiveValue::Set(now),
         notified_checkpoint: sea_orm::ActiveValue::Set(0),
+        // A raised limit belongs to no month; the monthly row keeps its own period.
+        period: sea_orm::ActiveValue::Set(LIFETIME_PERIOD),
     };
 
     trial_quota_usage::Entity::insert(active_model)
@@ -383,6 +391,67 @@ pub async fn apply_synthetics_deltas_in<C: ConnectionTrait>(
             increment_lifetime_row(txn, org_id, feature, delta, now).await?;
         }
     }
+    if deltas.status != 0 {
+        increment_monthly_row(txn, org_id, deltas.status, deltas.month, now).await?;
+    }
+    Ok(())
+}
+
+/// The `YYYYMM` of a microsecond timestamp, UTC. One encoding, or `period` compares against itself.
+pub fn month_of(micros: i64) -> i32 {
+    let at = chrono::DateTime::from_timestamp_micros(micros).unwrap_or_default();
+    at.format("%Y%m")
+        .to_string()
+        .parse()
+        .unwrap_or(LIFETIME_PERIOD)
+}
+
+/// The reset rides the increment, so no pass adds to a month and a later one zeroes it.
+///
+/// A row from an older month starts the new month at this window's draw. A row from a NEWER month
+/// only accumulates: a late replay of an old window must never rewind the period it settled into.
+async fn increment_monthly_row<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    delta: i64,
+    month: i32,
+    now: i64,
+) -> Result<(), sea_orm::DbErr> {
+    let period = Expr::col((trial_quota_usage::Entity, trial_quota_usage::Column::Period));
+    let stale = period.clone().lt(month);
+    let count = CaseStatement::new().case(stale.clone(), delta).finally(
+        Expr::col((
+            trial_quota_usage::Entity,
+            trial_quota_usage::Column::UsageCount,
+        ))
+        .add(delta),
+    );
+    // Stands in for `GREATEST`, which SQLite lacks and Postgres spells as an aggregate.
+    let advance = CaseStatement::new().case(stale, month).finally(period);
+
+    let active_model = trial_quota_usage::ActiveModel {
+        org_id: sea_orm::ActiveValue::Set(org_id.to_string()),
+        feature: sea_orm::ActiveValue::Set(SYNTHETICS_STATUS_FEATURE.to_string()),
+        usage_count: sea_orm::ActiveValue::Set(delta),
+        usage_limit: sea_orm::ActiveValue::NotSet,
+        updated_at: sea_orm::ActiveValue::Set(now),
+        notified_checkpoint: sea_orm::ActiveValue::Set(0),
+        period: sea_orm::ActiveValue::Set(month),
+    };
+
+    trial_quota_usage::Entity::insert(active_model)
+        .on_conflict(
+            OnConflict::columns([
+                trial_quota_usage::Column::OrgId,
+                trial_quota_usage::Column::Feature,
+            ])
+            .value(trial_quota_usage::Column::UsageCount, count)
+            .value(trial_quota_usage::Column::Period, advance)
+            .value(trial_quota_usage::Column::UpdatedAt, Expr::value(now))
+            .to_owned(),
+        )
+        .exec(conn)
+        .await?;
     Ok(())
 }
 
@@ -400,6 +469,7 @@ async fn increment_lifetime_row<C: ConnectionTrait>(
         usage_limit: sea_orm::ActiveValue::NotSet,
         updated_at: sea_orm::ActiveValue::Set(now),
         notified_checkpoint: sea_orm::ActiveValue::Set(0),
+        period: sea_orm::ActiveValue::Set(LIFETIME_PERIOD),
     };
 
     trial_quota_usage::Entity::insert(active_model)
@@ -433,6 +503,8 @@ mod tests {
 
     use super::*;
 
+    const ORG: &str = "acme";
+    const STATUS: &str = SYNTHETICS_STATUS_FEATURE;
     const AI: &str = "ai_chat";
     const BROWSER: &str = "synthetics_browser_steps";
     const PROTOCOL: &str = "synthetics_protocol_steps";
@@ -473,6 +545,7 @@ mod tests {
             usage_limit: ActiveValue::Set(usage_limit),
             updated_at: ActiveValue::Set(0),
             notified_checkpoint: ActiveValue::Set(notified_checkpoint),
+            period: ActiveValue::Set(LIFETIME_PERIOD),
         }
     }
 
@@ -502,11 +575,31 @@ mod tests {
     }
 
     fn deltas(browser: i64, protocol: i64) -> SyntheticsDeltas {
-        SyntheticsDeltas { browser, protocol }
+        SyntheticsDeltas {
+            browser,
+            protocol,
+            status: 0,
+            month: LIFETIME_PERIOD,
+        }
+    }
+
+    fn status_deltas(status: i64, month: i32) -> SyntheticsDeltas {
+        SyntheticsDeltas {
+            browser: 0,
+            protocol: 0,
+            status,
+            month,
+        }
     }
 
     async fn apply(db: &DatabaseConnection, org_id: &str, d: SyntheticsDeltas, now: i64) {
         apply_synthetics_deltas_in(db, org_id, &d, now)
+            .await
+            .unwrap();
+    }
+
+    async fn apply_status(db: &DatabaseConnection, org_id: &str, status: i64, month: i32) {
+        apply_synthetics_deltas_in(db, org_id, &status_deltas(status, month), 0)
             .await
             .unwrap();
     }
@@ -866,5 +959,92 @@ mod tests {
 
         assert!(has_no_row(&db, "acme", BROWSER).await, "browser");
         assert!(has_no_row(&db, "acme", PROTOCOL).await, "protocol");
+    }
+
+    #[tokio::test]
+    async fn status_upsert_inserts_with_the_month() {
+        let db = db().await;
+        apply_status(&db, ORG, 40, 202610).await;
+
+        let row = row_of(&db, ORG, STATUS).await;
+        assert_eq!((row.usage_count, row.period), (40, 202610));
+    }
+
+    #[tokio::test]
+    async fn status_upsert_adds_within_month() {
+        let db = db().await;
+        apply_status(&db, ORG, 12_480, 202609).await;
+        apply_status(&db, ORG, 410, 202609).await;
+
+        let row = row_of(&db, ORG, STATUS).await;
+        assert_eq!((row.usage_count, row.period), (12_890, 202609));
+    }
+
+    #[tokio::test]
+    async fn status_upsert_resets_on_a_newer_month() {
+        let db = db().await;
+        apply_status(&db, ORG, 12_890, 202609).await;
+        apply_status(&db, ORG, 90, 202610).await;
+
+        let row = row_of(&db, ORG, STATUS).await;
+        assert_eq!(
+            (row.usage_count, row.period),
+            (90, 202610),
+            "a new month starts the count again instead of adding to the old one",
+        );
+    }
+
+    #[tokio::test]
+    async fn status_upsert_ignores_an_older_month() {
+        let db = db().await;
+        apply_status(&db, ORG, 90, 202610).await;
+        apply_status(&db, ORG, 5, 202609).await;
+
+        let row = row_of(&db, ORG, STATUS).await;
+        assert_eq!(
+            (row.usage_count, row.period),
+            (95, 202610),
+            "a late replay must not rewind the period it settled into",
+        );
+    }
+
+    #[tokio::test]
+    async fn status_upsert_never_touches_usage_limit() {
+        let db = db().await;
+        seed_row(&db, ORG, STATUS, 0, Some(1_000)).await;
+
+        for (draw, month) in [(40, 202609), (10, 202609), (7, 202610), (1, 202608)] {
+            apply_status(&db, ORG, draw, month).await;
+            assert_eq!(
+                row_of(&db, ORG, STATUS).await.usage_limit,
+                Some(1_000),
+                "an administrator override outlives every reset",
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn lifetime_rows_keep_period_at_zero() {
+        let db = db().await;
+        apply(&db, ORG, deltas(10, 20), 0).await;
+        apply(&db, ORG, deltas(5, 5), 1).await;
+
+        for feature in [BROWSER, PROTOCOL] {
+            assert_eq!(row_of(&db, ORG, feature).await.period, LIFETIME_PERIOD);
+        }
+    }
+
+    #[tokio::test]
+    async fn a_zero_status_delta_writes_no_row() {
+        let db = db().await;
+        apply_status(&db, ORG, 0, 202609).await;
+
+        assert!(has_no_row(&db, ORG, STATUS).await);
+    }
+
+    #[test]
+    fn month_of_reads_the_utc_month() {
+        assert_eq!(month_of(1_788_800_853_300_917), 202609);
+        assert_eq!(month_of(0), 197001);
     }
 }
