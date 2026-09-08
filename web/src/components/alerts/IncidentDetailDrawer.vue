@@ -1338,7 +1338,7 @@ import {
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
-import { useRouter } from "vue-router";
+import { useRouter, useRoute } from "vue-router";
 import { formatToReadable } from "@/utils/date";
 import incidentsService, {
   Incident,
@@ -1401,6 +1401,7 @@ export default defineComponent({
     const { t } = useI18nTyped();
     const store = useStore();
     const router = useRouter();
+    const route = useRoute();
     const { confirm } = useConfirmDialog();
 
     // Copy to clipboard state
@@ -2433,10 +2434,11 @@ export default defineComponent({
       contextRegistry.setActive("");
       contextRegistry.unregister("incidents");
 
-      // Navigate back to incident list
+      // Navigate back to incident list, carrying over this route's own query (e.g. page) instead of dropping it.
       router.push({
         name: "incidentList",
         query: {
+          ...route.query,
           org_identifier: store.state.selectedOrganization.identifier,
         },
       });
