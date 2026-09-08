@@ -1,0 +1,486 @@
+#!/usr/bin/env bash
+# Runs one reviewer round for the claude-codex-loop skill and writes the result into the ledger.
+set -euo pipefail
+
+SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+BASE="main"
+ROUND=""
+LEDGER=""
+BACKEND="auto"
+EFFORT=""
+MODEL=""
+TIMEOUT_SECS=1800
+MAX_BUDGET_USD=""
+CANDIDATES=1
+DRY_RUN=0
+UNSANDBOXED=0
+
+usage() {
+  cat <<'USAGE'
+Usage: codex-review.sh --round N [--ledger DIR] [--base BRANCH] [--backend auto|codex|claude]
+                       [--effort low|medium|high] [--model MODEL] [--timeout SECS]
+                       [--max-budget-usd N] [--no-candidates] [--unsandboxed] [--dry-run]
+
+Each round first records the working tree as a local WIP commit ("wip(codex-loop): round N"),
+so the reviewer sees an immutable snapshot and the caller can prove nothing changed afterwards by
+checking that HEAD still equals DIR/round-N/commit and `git status --porcelain` is empty.
+Round 1 reviews the whole change set against BASE. Round N>1 verifies earlier findings against
+Claude's responses and reviews the delta between round N-1's commit and round N's commit.
+
+DIR defaults to ~/.claude/codex-loop/<repo name>/<branch with / replaced by ->. It must be outside
+the checkout, otherwise it would be swept into the WIP commit.
+
+Backends:
+  codex   `codex exec` in its read-only sandbox. --effort sets model_reasoning_effort (default high).
+  claude  a fresh `claude -p --restricted` process with Read/Grep/Glob and read-only git only.
+          --model defaults to opus; pick a model different from the one that wrote the code.
+          --max-budget-usd caps the whole round (default 15): unless --no-candidates, a separate
+          `claude -p "/code-review high <range>"` pre-run supplies candidate findings using at most
+          half of it, and the reviewer gets exactly what remains; the pre-run gets at most half of
+          --timeout and the reviewer gets the remaining seconds.
+          Neither process has MCP servers, Write/Edit, or web access; the pre-run keeps Skill and
+          Agent so /code-review can run its verification pass.
+Every reviewer process runs inside a disposable `git worktree` of the reviewed commit that is removed
+afterwards. The claude processes are additionally wrapped in a macOS seatbelt (sandbox-exec) that denies
+every file write except the worktree's git metadata, temp directories, and claude's own session state
+under ~/.claude (settings, skills, agents and hooks stay read-only); the worktree is verified unchanged
+after each process. Without sandbox-exec the claude backend refuses to run unless --unsandboxed is passed.
+  auto    (default) codex when the CLI is found, otherwise claude with a loud warning: a Claude
+          reviewer is a weaker second opinion than a different vendor's model.
+A flag that does not apply to the selected backend is rejected.
+
+Inputs the caller must prepare before running:
+  DIR/round-N/evidence.md              build, clippy, and test results for this round
+  DIR/round-(N-1)/codex.json           previous reviewer result (round > 1, written by this script)
+  DIR/round-(N-1)/claude-response.json Claude's per-finding response (round > 1)
+
+Outputs written into DIR/round-N/:
+  commit         sha of the WIP commit the reviewer saw
+  backend        which backend reviewed this round
+  prompt.md      the exact prompt sent to the reviewer
+  diff.patch     git diff merge-base(BASE, HEAD)..commit
+  delta.patch    git diff <previous commit>..<commit> (round > 1)
+  candidates.md  code-review pre-run output (claude backend only), candidates.cost its spend
+  progress.log   one timestamped line per reviewer action, written live; tail -f it to watch
+  events.jsonl   raw reviewer event stream
+  codex.json     structured review result
+  codex.err      reviewer stderr
+
+--dry-run does everything except invoke the backend. It never touches an existing codex.json.
+Exit code: 0 verdict approve, 10 verdict request_changes, 1 on any error.
+USAGE
+}
+
+log() { echo "$*" >&2; }
+
+# Appending the error line (never truncating) is what lets a watcher on progress.log end, even on a refused rerun.
+die() {
+  log "$*"
+  [ ! -d "${ROUND_DIR:-/nonexistent}" ] || echo "$(date +%H:%M:%S) error: $*" >> "$ROUND_DIR/progress.log"
+  exit 1
+}
+
+parse_args() {
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --ledger) LEDGER="$2"; shift 2 ;;
+      --round) ROUND="$2"; shift 2 ;;
+      --base) BASE="$2"; shift 2 ;;
+      --backend) BACKEND="$2"; shift 2 ;;
+      --effort) EFFORT="$2"; shift 2 ;;
+      --model) MODEL="$2"; shift 2 ;;
+      --timeout) TIMEOUT_SECS="$2"; shift 2 ;;
+      --max-budget-usd) MAX_BUDGET_USD="$2"; shift 2 ;;
+      --no-candidates) CANDIDATES=0; shift ;;
+      --unsandboxed) UNSANDBOXED=1; shift ;;
+      --dry-run) DRY_RUN=1; shift ;;
+      -h|--help) usage; exit 0 ;;
+      *) usage >&2; die "unknown argument: $1" ;;
+    esac
+  done
+  [ -n "$ROUND" ] || { usage >&2; exit 1; }
+  [[ "$ROUND" =~ ^[0-9]+$ ]] && [ "$ROUND" -ge 1 ] || die "--round must be a positive integer"
+}
+
+find_codex() {
+  if command -v codex >/dev/null 2>&1; then
+    command -v codex
+    return
+  fi
+  local bundled="/Applications/ChatGPT.app/Contents/Resources/codex"
+  [ -x "$bundled" ] && echo "$bundled"
+}
+
+select_backend() {
+  CODEX="$(find_codex || true)"
+  case "$BACKEND" in
+    auto)
+      if [ -n "$CODEX" ]; then
+        BACKEND="codex"
+      else
+        BACKEND="claude"
+        log "WARNING: codex CLI not found, falling back to the claude backend; this round is Claude reviewing Claude"
+      fi ;;
+    codex)
+      [ -n "$CODEX" ] || die "codex CLI not found: install it (npm i -g @openai/codex) or install the ChatGPT desktop app" ;;
+    claude) ;;
+    *) die "unknown backend: $BACKEND" ;;
+  esac
+  if [ "$BACKEND" = "claude" ]; then
+    command -v claude >/dev/null 2>&1 || die "claude CLI not found on PATH"
+    if ! command -v sandbox-exec >/dev/null 2>&1 && [ "$UNSANDBOXED" -eq 0 ] && [ "$DRY_RUN" -eq 0 ]; then
+      die "sandbox-exec not found: the claude backend needs a filesystem sandbox; pass --unsandboxed to run without one"
+    fi
+    [ -z "$EFFORT" ] || die "--effort applies to the codex backend only"
+    MAX_BUDGET_USD="${MAX_BUDGET_USD:-15}"
+    MODEL="${MODEL:-opus}"
+  else
+    [ -z "$MAX_BUDGET_USD" ] || die "--max-budget-usd applies to the claude backend only"
+    EFFORT="${EFFORT:-high}"
+  fi
+}
+
+check_json() {
+  python3 - "$1" "$2" <<'PY'
+import json, sys
+path, keys = sys.argv[1], sys.argv[2].split(",")
+try:
+    with open(path) as f:
+        doc = json.load(f)
+except (OSError, ValueError) as e:
+    sys.exit(f"{path}: invalid JSON ({e})")
+missing = [k for k in keys if k not in doc]
+if not isinstance(doc, dict) or missing:
+    sys.exit(f"{path}: missing keys {missing}")
+PY
+}
+
+resolve_paths() {
+  REPO="$(git rev-parse --show-toplevel)"
+  cd "$REPO"
+  git rev-parse --verify --quiet "$BASE" >/dev/null || die "base branch not found: $BASE"
+  # --git-common-dir resolves to the main checkout even inside a worktree, so all worktrees share one repo name.
+  if [ -z "$LEDGER" ]; then
+    local repo_name branch_slug
+    repo_name="$(basename "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")")"
+    branch_slug="$(git rev-parse --abbrev-ref HEAD | tr '/' '-')"
+    LEDGER="$HOME/.claude/codex-loop/$repo_name/$branch_slug"
+  fi
+  LEDGER="$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$LEDGER")"
+  case "$LEDGER/" in
+    "$REPO"/*) die "ledger $LEDGER is inside the checkout; it would be swept into the WIP commit. Use a path outside the repo." ;;
+  esac
+  MERGE_BASE="$(git merge-base "$BASE" HEAD)"
+  ROUND_DIR="$LEDGER/round-$ROUND"
+  PREV_DIR="$LEDGER/round-$((ROUND - 1))"
+  mkdir -p "$ROUND_DIR"
+  [ ! -e "$ROUND_DIR/codex.json" ] || die "round $ROUND already has a verdict in $ROUND_DIR/codex.json; use the next round number, or delete the round directory to redo it"
+  : > "$ROUND_DIR/progress.log"
+  rm -f "$ROUND_DIR/candidates.md" "$ROUND_DIR/candidates.cost" "$ROUND_DIR/candidates.err"
+}
+
+check_inputs() {
+  [ -s "$ROUND_DIR/evidence.md" ] || die "missing $ROUND_DIR/evidence.md: write build, clippy, and test results there first"
+  [ "$ROUND" -gt 1 ] || return 0
+  local r f
+  for r in $(seq 1 $((ROUND - 1))); do
+    for f in codex.json claude-response.json commit; do
+      [ -r "$LEDGER/round-$r/$f" ] && [ -s "$LEDGER/round-$r/$f" ] || die "missing or empty $LEDGER/round-$r/$f, required for round $ROUND"
+    done
+    check_json "$LEDGER/round-$r/codex.json" "verdict,findings,prior_findings"
+    check_json "$LEDGER/round-$r/claude-response.json" "round,responses"
+  done
+}
+
+snapshot() {
+  # The WIP commit freezes what the reviewer sees; the ledger lives outside the repo so it never lands in it.
+  if [ -n "$(git status --porcelain)" ]; then
+    git add -A
+    git commit --quiet --no-verify -m "wip(codex-loop): round $ROUND"
+  fi
+  COMMIT="$(git rev-parse HEAD)"
+  echo "$COMMIT" > "$ROUND_DIR/commit"
+  git diff "$MERGE_BASE" "$COMMIT" > "$ROUND_DIR/diff.patch"
+  CHANGED_FILES="$(git diff --name-only "$MERGE_BASE" "$COMMIT")"
+  [ -n "$CHANGED_FILES" ] || die "no changes vs $BASE ($MERGE_BASE); nothing to review"
+  PREV_COMMIT=""
+  if [ "$ROUND" -gt 1 ]; then
+    PREV_COMMIT="$(cat "$PREV_DIR/commit")"
+    git cat-file -e "$PREV_COMMIT^{commit}" 2>/dev/null || die "previous round commit $PREV_COMMIT is not in this repo"
+    git diff "$PREV_COMMIT" "$COMMIT" > "$ROUND_DIR/delta.patch"
+    [ "$PREV_COMMIT" != "$COMMIT" ] || log "warning: round $ROUND reviews the same commit as round $((ROUND - 1)); only responses changed"
+  fi
+}
+
+# The reviewer works in a throwaway checkout of the commit, so nothing it does can touch the real checkout.
+realpath_of() { python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$1"; }
+
+make_review_worktree() {
+  REVIEW_DIR="$(mktemp -d "${TMPDIR:-/tmp}/codex-loop-review.XXXXXX")"
+  rmdir "$REVIEW_DIR"
+  git worktree add --quiet --detach "$REVIEW_DIR" "$COMMIT"
+  # Seatbelt matches canonical paths, so symlinked or doubled-slash paths would silently miss the rules.
+  REVIEW_DIR="$(realpath_of "$REVIEW_DIR")"
+  trap remove_review_worktree EXIT
+}
+
+# The reviewed tree must still equal COMMIT after each reviewer process; drift means something wrote into it.
+check_review_worktree() {
+  local who="$1"
+  if [ "$(git -C "$REVIEW_DIR" rev-parse HEAD)" != "$COMMIT" ] || [ -n "$(git -C "$REVIEW_DIR" status --porcelain --ignored)" ]; then
+    die "the reviewed tree changed during the $who; verdict discarded"
+  fi
+}
+
+# Deny all writes, then allow only git metadata, temp dirs and claude's own state (list mirrors CLI 2.1.x; revisit if a round fails only sandboxed).
+sandbox_profile() {
+  local review_gitdir home
+  review_gitdir="$(realpath_of "$(git -C "$REVIEW_DIR" rev-parse --path-format=absolute --git-dir)")"
+  home="$(realpath_of "$HOME")"
+  printf '(version 1)(allow default)(deny file-write*)'
+  printf '(allow file-write* (subpath "%s"))' "$review_gitdir" "$(realpath_of "${TMPDIR:-/tmp}")" /private/tmp /dev \
+    "$home/.claude/projects" "$home/.claude/shell-snapshots" "$home/.claude/debug" "$home/.claude/todos" \
+    "$home/.claude/statsig" "$home/.claude/cache" "$home/.claude/sessions" "$home/.claude/session-env" \
+    "$home/.claude/plans" "$home/.claude/file-history" "$home/.claude/paste-cache" "$home/.claude/tasks" \
+    "$home/.claude/backups" "$home/.claude/plugins/cache" "$home/.claude/ide" "$home/Library/Caches/claude-cli-nodejs"
+  printf '(allow file-write* (literal "%s"))' "$home/.claude.json" "$home/.claude.json.backup" "$home/.claude.json.lock"
+  # Denied last so they win even under the temp dirs; the worktree's gitdir sits under the main repo's .git, hence the final re-allow.
+  printf '(deny file-write* (subpath "%s"))' "$REVIEW_DIR" "$LEDGER" "$(realpath_of "$REPO")" \
+    "$(realpath_of "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")")"
+  printf '(allow file-write* (subpath "%s"))' "$review_gitdir"
+}
+
+# No die() here: this runs as a pipeline stage, where an exit would only end the subshell. select_backend gates it.
+run_claude_sandboxed() {
+  local secs="$1"
+  shift
+  if command -v sandbox-exec >/dev/null 2>&1; then
+    run_with_timeout "$secs" sandbox-exec -p "$(sandbox_profile)" claude "$@"
+  else
+    run_with_timeout "$secs" claude "$@"
+  fi
+}
+
+remove_review_worktree() {
+  [ -n "${REVIEW_DIR:-}" ] || return 0
+  git -C "$REPO" worktree remove --force "$REVIEW_DIR" 2>/dev/null || true
+  git -C "$REPO" worktree prune 2>/dev/null || true
+}
+
+run_with_timeout() {
+  local secs="$1"
+  shift
+  if command -v timeout >/dev/null 2>&1; then
+    timeout "$secs" "$@"
+  else
+    perl -e 'alarm shift; exec @ARGV' "$secs" "$@"
+  fi
+}
+
+# Containment comes from the worktree and seatbelt; --allowedTools only pre-approves read-only commands so the reviewer is not blocked.
+claude_common_args() {
+  printf '%s\n' --restricted --strict-mcp-config --mcp-config '{"mcpServers":{}}' --model "$MODEL" \
+    --max-budget-usd "$1" --add-dir "$ROUND_DIR" \
+    --disallowedTools "Write" "Edit" "NotebookEdit" "WebFetch" "WebSearch" \
+    --allowedTools "Bash(git diff:*)" "Bash(git log:*)" "Bash(git show:*)" "Bash(git status:*)" "Bash(git rev-parse:*)" "Bash(git merge-base:*)" \
+      "Bash(head:*)" "Bash(tail:*)" "Bash(cat:*)" "Bash(ls:*)" "Bash(wc:*)" "Bash(nl:*)"
+}
+
+claude_reviewer_args() {
+  claude_common_args "$1"
+  printf '%s\n' --tools "Read,Grep,Glob,Bash"
+}
+
+# Skill and Agent let /code-review run its verification pass; ReportFindings is how it submits typed findings.
+claude_prerun_args() {
+  claude_common_args "$1"
+  printf '%s\n' --tools "Skill,Agent,Read,Grep,Glob,Bash,ReportFindings"
+}
+
+gather_candidates() {
+  REVIEWER_BUDGET="$MAX_BUDGET_USD"
+  REVIEWER_TIMEOUT="$TIMEOUT_SECS"
+  [ "$BACKEND" = "claude" ] && [ "$CANDIDATES" -eq 1 ] || return 0
+  [ "$DRY_RUN" -eq 0 ] || return 0
+  local range="$MERGE_BASE..$COMMIT"
+  [ "$ROUND" -gt 1 ] && range="$PREV_COMMIT..$COMMIT"
+  # The pre-run gets half the budget and half the timeout; the reviewer gets what the budget leaves.
+  local prerun_budget
+  prerun_budget="$(python3 -c 'print(round(float(__import__("sys").argv[1]) / 2, 2))' "$MAX_BUDGET_USD")"
+  local started=$SECONDS
+  log "candidates: running /code-review high $range in $REVIEW_DIR (budget \$$prerun_budget, output $ROUND_DIR/candidates.md)"
+  local args=()
+  while IFS= read -r a; do args+=("$a"); done < <(claude_prerun_args "$prerun_budget")
+  set +e
+  ( cd "$REVIEW_DIR" && printf '%s' "/code-review high $range" \
+      | run_claude_sandboxed $((TIMEOUT_SECS / 2)) -p "${args[@]}" --output-format stream-json --verbose 2> "$ROUND_DIR/candidates.err" \
+      | python3 "$SKILL_DIR/scripts/candidates.py" "$ROUND_DIR/candidates.md" "$ROUND_DIR/candidates.cost"
+  )
+  local status=$?
+  set -e
+  check_review_worktree "pre-run"
+  REVIEWER_TIMEOUT=$((TIMEOUT_SECS - (SECONDS - started)))
+  [ "$REVIEWER_TIMEOUT" -ge 60 ] || die "round timeout ${TIMEOUT_SECS}s exhausted by the pre-run; raise --timeout or use --no-candidates"
+  local cost
+  cost="$(cat "$ROUND_DIR/candidates.cost" 2>/dev/null || true)"
+  # A pre-run that died without a result event is charged its whole cap, so the round can never exceed the budget.
+  cost="${cost:-$prerun_budget}"
+  REVIEWER_BUDGET="$(python3 -c 'print(max(0.0, round(float(__import__("sys").argv[1]) - float(__import__("sys").argv[2]), 2)))' "$MAX_BUDGET_USD" "$cost")" \
+    || die "could not compute the reviewer budget from pre-run cost '$cost'"
+  if [ "$status" -ne 0 ] || [ ! -s "$ROUND_DIR/candidates.md" ]; then
+    log "warning: code-review pre-run failed (exit $status, cost \$$cost); the reviewer proceeds without candidates"
+    echo "(code-review pre-run produced no output, exit $status)" > "$ROUND_DIR/candidates.md"
+  else
+    log "candidates: done, cost \$$cost, reviewer budget \$$REVIEWER_BUDGET"
+  fi
+  python3 -c 'import sys; sys.exit(0 if float(sys.argv[1]) >= 1 else 1)' "$REVIEWER_BUDGET" \
+    || die "round budget \$$MAX_BUDGET_USD exhausted by the pre-run (\$$cost); raise --max-budget-usd or use --no-candidates"
+}
+
+write_prompt() {
+  PROMPT="$ROUND_DIR/prompt.md"
+  {
+    if [ "$ROUND" -eq 1 ]; then cat "$SKILL_DIR/prompts/review.md"; else cat "$SKILL_DIR/prompts/verify.md"; fi
+    if [ "$BACKEND" = "claude" ]; then
+      echo
+      cat "$SKILL_DIR/prompts/claude-backend.md"
+    fi
+    echo
+    echo "## Change set"
+    echo "- Your working directory is a disposable checkout of the commit under review; the real checkout is elsewhere and not yours to touch."
+    echo "- Base branch: $BASE (merge-base $MERGE_BASE)"
+    echo "- Commit under review: $COMMIT (this is HEAD; the working tree is clean and identical to it)"
+    echo "- Full patch: \`$ROUND_DIR/diff.patch\` (absolute path, outside your checkout), or run \`git diff $MERGE_BASE $COMMIT\`"
+    echo "- Changed files:"
+    echo "$CHANGED_FILES" | sed 's/^/  - /'
+    echo
+    echo "## Evidence from Claude (round $ROUND)"
+    echo "File: \`$ROUND_DIR/evidence.md\` (content inline below)"
+    echo
+    cat "$ROUND_DIR/evidence.md"
+    if [ "$ROUND" -gt 1 ]; then
+      local r
+      for r in $(seq 1 $((ROUND - 1))); do
+        echo
+        echo "## Round $r reviewer findings"
+        echo '```json'
+        cat "$LEDGER/round-$r/codex.json"
+        echo
+        echo '```'
+        echo
+        echo "## Round $r Claude response"
+        echo '```json'
+        cat "$LEDGER/round-$r/claude-response.json"
+        echo
+        echo '```'
+      done
+      echo
+      echo "## Delta since the previous round"
+      echo "- Previous round commit: $PREV_COMMIT"
+      echo "- Delta: \`$ROUND_DIR/delta.patch\` ($(wc -l < "$ROUND_DIR/delta.patch" | tr -d ' ') lines), or run \`git diff $PREV_COMMIT $COMMIT\`"
+    fi
+    if [ "$BACKEND" = "claude" ] && [ "$CANDIDATES" -eq 1 ] && [ "$DRY_RUN" -eq 0 ] && [ -s "$ROUND_DIR/candidates.md" ]; then
+      echo
+      echo "## Candidate findings from a separate code-review pre-run"
+      echo "Verify each against the code before adopting it; drop what you cannot confirm."
+      echo
+      cat "$ROUND_DIR/candidates.md"
+    fi
+  } > "$PROMPT"
+}
+
+build_command() {
+  if [ "$BACKEND" = "codex" ]; then
+    CMD=(run_with_timeout "$REVIEWER_TIMEOUT" "$CODEX" exec --sandbox read-only --ephemeral --json -C "$REVIEW_DIR"
+         --output-schema "$SKILL_DIR/schema/review.json"
+         -o "$ROUND_DIR/codex.json"
+         -c "model_reasoning_effort=\"$EFFORT\"")
+    [ -z "$MODEL" ] || CMD+=(-m "$MODEL")
+    CMD+=(-)
+  else
+    local args=()
+    while IFS= read -r a; do args+=("$a"); done < <(claude_reviewer_args "$REVIEWER_BUDGET")
+    # stream-json is the only output mode that both streams progress and honours --json-schema.
+    CMD=(run_claude_sandboxed "$REVIEWER_TIMEOUT" -p "${args[@]}" --output-format stream-json --verbose
+         --json-schema "$(cat "$SKILL_DIR/schema/review.json")")
+  fi
+}
+
+run_reviewer() {
+  echo "$BACKEND" > "$ROUND_DIR/backend"
+  local settings="effort $EFFORT"
+  [ "$BACKEND" = "codex" ] || settings="model $MODEL, reviewer budget \$$REVIEWER_BUDGET of \$$MAX_BUDGET_USD"
+  log "backend: $BACKEND${CODEX:+ (codex at $CODEX)}"
+  log "round $ROUND, $settings, base $BASE, commit $COMMIT"
+  log "review checkout $REVIEW_DIR (removed on exit)"
+  log "ledger $ROUND_DIR (tail -f progress.log to watch)"
+  if [ "$DRY_RUN" -eq 1 ]; then
+    log "dry run: prompt written to $PROMPT, $BACKEND not invoked"
+    exit 0
+  fi
+  rm -f "$ROUND_DIR/codex.json" "$ROUND_DIR/events.jsonl"
+  # Both backends need the prompt on stdin; stderr gets its own file so it can never corrupt the parsed stream.
+  set +e
+  ( cd "$REVIEW_DIR" && "${CMD[@]}" < "$PROMPT" 2> "$ROUND_DIR/codex.err" ) \
+    | python3 -u "$SKILL_DIR/scripts/progress.py" "$BACKEND" "$ROUND_DIR/events.jsonl" "$ROUND_DIR/progress.log" "$ROUND_DIR/codex.json" >&2
+  STATUS=${PIPESTATUS[0]}
+  set -e
+  if [ "$STATUS" -ne 0 ] || [ ! -s "$ROUND_DIR/codex.json" ]; then
+    tail -20 "$ROUND_DIR/codex.err" >&2
+    die "$BACKEND failed (exit $STATUS); see $ROUND_DIR/codex.err and progress.log"
+  fi
+  # Tracked drift only: the real checkout legitimately holds ignored files, and the seatbelt already denies writes to it.
+  if [ "$(git rev-parse HEAD)" != "$COMMIT" ] || [ -n "$(git status --porcelain)" ]; then
+    mv "$ROUND_DIR/codex.json" "$ROUND_DIR/codex.json.discarded"
+    die "checkout changed while $BACKEND was reviewing (HEAD or working tree differs from $COMMIT); verdict discarded"
+  fi
+  if [ "$(git -C "$REVIEW_DIR" rev-parse HEAD)" != "$COMMIT" ] || [ -n "$(git -C "$REVIEW_DIR" status --porcelain --ignored)" ]; then
+    mv "$ROUND_DIR/codex.json" "$ROUND_DIR/codex.json.discarded"
+    die "the reviewed tree changed during the review; verdict discarded"
+  fi
+}
+
+summarize() {
+  python3 - "$ROUND_DIR/codex.json" <<'PY'
+import json, sys
+path = sys.argv[1]
+with open(path) as f:
+    r = json.load(f)
+sev = {}
+for x in r["findings"]:
+    sev[x["severity"]] = sev.get(x["severity"], 0) + 1
+prior = {}
+for x in r["prior_findings"]:
+    prior[x["status"]] = prior.get(x["status"], 0) + 1
+print(f"verdict: {r['verdict']}")
+print(f"summary: {r['summary']}")
+print(f"new findings: {len(r['findings'])} {sev}")
+if prior:
+    print(f"prior findings: {prior}")
+for x in r["findings"]:
+    print(f"  [{x['severity']}] {x['id']} {x['file']}:{x['line']} {x['title']}")
+for x in r["prior_findings"]:
+    print(f"  prior {x['id']} -> {x['status']}: {x['note'][:120]}")
+no_line = [x["id"] for x in r["findings"] if x["line"] is None and x["severity"] != "low"]
+if no_line:
+    print(f"warning: findings without a line number above low severity: {no_line}")
+sys.exit(0 if r["verdict"] == "approve" else 10)
+PY
+}
+
+main() {
+  parse_args "$@"
+  resolve_paths
+  select_backend
+  check_inputs
+  snapshot
+  make_review_worktree
+  gather_candidates
+  write_prompt
+  build_command
+  run_reviewer
+  summarize
+}
+
+# exit on the same line: bash would otherwise read the next command from the file after main returns.
+main "$@"; exit
