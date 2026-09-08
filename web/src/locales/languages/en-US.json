@@ -2858,8 +2858,8 @@
       "runToView": "Run A Test To View This Data.",
       "noBranchItems": "No Items On This Branch.",
       "forwardedCount": "{out} of {total} record forwarded | {out} of {total} records forwarded",
-      "noMatchForwarded": "No match — 0 of {total} record forwarded | No match — 0 of {total} records forwarded",
-      "branchDropped": "{count} record matched no path — dropped | {count} records matched no path — dropped",
+      "noMatchForwarded": "No match \u2014 0 of {total} record forwarded | No match \u2014 0 of {total} records forwarded",
+      "branchDropped": "{count} record matched no path \u2014 dropped | {count} records matched no path \u2014 dropped",
       "noUpstream": "No Upstream Steps.",
       "noRunYet": "No Run Yet.",
       "runLabel": "Run",
@@ -15753,7 +15753,16 @@
         "cron": "Cron schedule",
         "tooInfrequent": "Runs too rarely",
         "silenced": "Has silence",
-        "other": "Not eligible"
+        "other": "Not eligible",
+        "why": {
+          "notScheduled": "Real-time alerts don't keep the run history an SLO needs. Use a scheduled alert instead.",
+          "grouped": "This alert is split by group, and a run doesn't record which groups it checked. Remove its group-by to use it here.",
+          "notReferenceable": "SLO and composite alerts can't be sources. Pick a plain scheduled alert.",
+          "cron": "This alert runs on a cron schedule, so its checks aren't evenly spaced and uptime can't be worked out. Change it to a fixed interval.",
+          "tooInfrequent": "This alert runs every {frequency}. It needs to run at least every {slice} so no time goes unchecked.",
+          "silenced": "After firing, this alert stops checking for a while — and that gap always lands on a bad patch, which would flatter the SLO. Set its silence period to 0."
+        },
+        "noFixedInterval": "no fixed interval"
       },
       "groupingLocked": "An alert-based SLI cannot be grouped: the availability ledger records one run per alert, not per group, so there is no per-group coverage to stand on.",
       "sourceLink": "Source alert",
@@ -15892,6 +15901,12 @@
       "longWindowRequired": "Long window is required",
       "shortWindowRequired": "Short window is required",
       "shortInsideLong": "Short window must be shorter than the long window"
+    },
+    "duration": {
+      "seconds": "{count} second | {count} seconds",
+      "minutes": "{count} minute | {count} minutes",
+      "hours": "{count} hour | {count} hours",
+      "days": "{count} day | {count} days"
     }
   },
   "promql": {

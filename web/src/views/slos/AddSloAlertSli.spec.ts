@@ -230,13 +230,15 @@ describe("AddSlo — alert SLI", () => {
     // The name is the whole label, so the list stays scannable.
     expect(cron?.label).toBe("weekly report");
     expect(cron?.badge).toBe("Cron schedule");
-    // Nothing is lost — the full sentence is the hover.
-    expect(cron?.badgeTitle).toContain("cron-scheduled alert cannot be an SLI source");
+    // The hover says what to CHANGE. The server's own sentence explains the
+    // measurement theory behind the rule, which is the right level for an API
+    // error and the wrong one for someone picking from a list.
+    expect(cron?.badgeTitle).toContain("Change it to a fixed interval");
 
     const silenced = options.find((o) => o.value === "alert-silenced");
     expect(silenced?.disabled).toBe(true);
     expect(silenced?.badge).toBe("Has silence");
-    expect(silenced?.badgeTitle).toContain("silence to 0");
+    expect(silenced?.badgeTitle).toContain("Set its silence period to 0");
   });
 
   // A code the frontend does not know about must still mark the row: an
@@ -261,8 +263,11 @@ describe("AddSlo — alert SLI", () => {
     const options = byTest(wrapper, OSelect, "slos-addslo-alert-source").props("options") as {
       value: string;
       badge?: string;
+      badgeTitle?: string;
     }[];
-    expect(options.find((o) => o.value === "alert-future")?.badge).toBe("Not eligible");
+    const future = options.find((o) => o.value === "alert-future");
+    expect(future?.badge).toBe("Not eligible");
+    expect(future?.badgeTitle).toBe("something the UI has not been taught yet");
   });
 
   // A source evaluating slower than 300s cannot be used at all — 300 is the
@@ -280,7 +285,10 @@ describe("AddSlo — alert SLI", () => {
     const slow = options.find((o) => o.value === "alert-slow");
     expect(slow?.disabled).toBe(true);
     expect(slow?.badge).toBe("Runs too rarely");
-    expect(slow?.badgeTitle).toContain("once per slice");
+    // The cadence is named in the units a person would say it in, and the
+    // requirement is stated as a number they can act on.
+    expect(slow?.badgeTitle).toContain("runs every 10 minutes");
+    expect(slow?.badgeTitle).toContain("at least every 5 minutes");
   });
 
   it("defaults the slice to 60 for a one-minute source", async () => {

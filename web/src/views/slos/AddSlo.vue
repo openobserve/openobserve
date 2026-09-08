@@ -973,14 +973,56 @@ const hasEligibleAlert = computed(() => alertSources.value.some((a) => a.eligibl
 //
 // Keyed off `reason_code`, never off the sentence: the copy is the validator's
 // and is free to change.
-const INELIGIBILITY_BADGES: Record<string, I18nKey> = {
-  not_scheduled: "slos.alertSli.ineligible.notScheduled",
-  grouped: "slos.alertSli.ineligible.grouped",
-  not_referenceable: "slos.alertSli.ineligible.notReferenceable",
-  cron: "slos.alertSli.ineligible.cron",
-  too_infrequent: "slos.alertSli.ineligible.tooInfrequent",
-  silenced: "slos.alertSli.ineligible.silenced",
-};
+/// The picker judges every alert against the COARSEST slice there is, because
+/// no SLO exists yet to supply a narrower grid — same constant the server uses.
+const SLICE_CEILING_SECS = 300;
+
+const INELIGIBILITY_CODES = [
+  "not_scheduled",
+  "grouped",
+  "not_referenceable",
+  "cron",
+  "too_infrequent",
+  "silenced",
+] as const;
+
+/** `snake_case` code -> the `camelCase` half of its two locale keys. */
+const INELIGIBILITY_KEYS: Record<string, string> = Object.fromEntries(
+  INELIGIBILITY_CODES.map((code) => [
+    code,
+    code.replace(/_(.)/g, (_, c: string) => c.toUpperCase()),
+  ]),
+);
+
+/** A cadence in the units a person would say it in, not always minutes. */
+function formatDuration(secs: number): string {
+  if (secs <= 0) return t("slos.alertSli.ineligible.noFixedInterval");
+  // The third argument is the plural INDEX — vue-i18n picks the branch of a
+  // `one | many` message from it, not from the named `count`.
+  const plural = (key: string, count: number) => t(key, { count }, count);
+  if (secs % 86400 === 0) return plural("slos.duration.days", secs / 86400);
+  if (secs % 3600 === 0) return plural("slos.duration.hours", secs / 3600);
+  if (secs % 60 === 0) return plural("slos.duration.minutes", secs / 60);
+  return plural("slos.duration.seconds", secs);
+}
+
+/// What to change, in the reader's words.
+///
+/// The server's own sentence explains the measurement theory — why an
+/// unmeasured gap biases an SLI upward — which is the right level for an API
+/// error and the wrong one for someone picking an alert from a list. These say
+/// what is wrong and what to do about it instead; the original stays on the
+/// API for anyone debugging.
+function ineligibilityReason(a: SloEligibleAlert): string | undefined {
+  const key = INELIGIBILITY_KEYS[a.reason_code ?? ""];
+  // No key means a rule this build has not been taught. The server's sentence
+  // is denser than we would like but it is accurate, so it beats saying nothing.
+  if (!key) return a.reason ?? undefined;
+  return t(`slos.alertSli.ineligible.why.${key}`, {
+    frequency: formatDuration(a.frequency_secs),
+    slice: formatDuration(SLICE_CEILING_SECS),
+  });
+}
 
 const alertSourceOptions = computed(() =>
   alertSources.value.map((a) => ({
@@ -991,8 +1033,12 @@ const alertSourceOptions = computed(() =>
     // marker reads as a rendering bug rather than as a rule.
     badge: a.eligible
       ? undefined
-      : t(INELIGIBILITY_BADGES[a.reason_code ?? ""] ?? "slos.alertSli.ineligible.other"),
-    badgeTitle: a.eligible ? undefined : (a.reason ?? undefined),
+      : t(
+          (INELIGIBILITY_KEYS[a.reason_code ?? ""]
+            ? `slos.alertSli.ineligible.${INELIGIBILITY_KEYS[a.reason_code ?? ""]}`
+            : "slos.alertSli.ineligible.other") as I18nKey,
+        ),
+    badgeTitle: a.eligible ? undefined : ineligibilityReason(a),
   })),
 );
 
