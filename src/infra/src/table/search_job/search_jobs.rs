@@ -395,7 +395,7 @@ pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
 // 6. commit the transaction
 // NOTE: this function can ensure,
 // 1. for finished job, it reset all partition job's status, result_path, error_message
-// 2. for failed job, it reset faild job and all pending job's status, result_path, error_message
+// 2. for failed job, it reset failed job and all pending job's status, result_path, error_message
 pub async fn retry_search_job(
     job_id: &str,
     new_trace_id: &str,

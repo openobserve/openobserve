@@ -2234,7 +2234,7 @@ async fn handle_alert_triggers(
                     }
                     #[allow(clippy::collapsible_match)]
                     (Some(RunOutcome::Pending), Some(last)) => {
-                        // last state was pending, so check if the the pending state exists for more
+                        // last state was pending, so check if the pending state exists for more
                         // than pending seconds or not.
                         if now - last < alert.pending_period_sec.saturating_mul(1_000_000) {
                             trigger_data_stream.status = RunOutcome::Pending;

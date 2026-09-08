@@ -15,7 +15,7 @@ use thiserror::Error;
 pub struct Error(#[from] InnerError);
 
 impl Error {
-    /// Returns the path where the error occured if it applies,
+    /// Returns the path where the error occurred if it applies,
     /// for instance during IO operations.
     pub fn path(&self) -> Option<&Path> {
         let InnerError::Io { ref path, .. } = self.0;
@@ -52,9 +52,9 @@ impl From<Error> for io::Error {
 #[derive(Debug, Error)]
 pub enum InnerError {
     #[error("IO error at '{path}': {source}")]
-    /// A error produced during an IO operation.
+    /// An error produced during an IO operation.
     Io {
-        /// The path in the directory tree where the IO error occured.
+        /// The path in the directory tree where the IO error occurred.
         path: PathBuf,
         /// The IO error.
         source: io::Error,
