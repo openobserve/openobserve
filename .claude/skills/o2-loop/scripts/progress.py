@@ -78,9 +78,21 @@ def claude_line(e: dict, out_json):
     return None
 
 
+def tag(line: str, prefix):
+    if not prefix:
+        return line
+    if line.startswith("done: "):
+        line = "finished: " + line[len("done: "):]
+    elif line.startswith("error: "):
+        line = "failed: " + line[len("error: "):]
+    return f"{prefix} | {line}"
+
+
 def main():
     backend, events_path, progress_path = sys.argv[1:4]
     out_json = sys.argv[4] if len(sys.argv) > 4 else None
+    # With a prefix, this stream is one of two: its end is "finished", and only the caller writes the final "done".
+    prefix = sys.argv[5] if len(sys.argv) > 5 and sys.argv[5] else None
     finished = False
     with open(events_path, "a") as events, open(progress_path, "a") as progress:
         for raw in sys.stdin:
@@ -94,12 +106,12 @@ def main():
             if line:
                 finished = finished or line.startswith("done: ")
                 for part in line.split("\n"):
-                    stamped = stamp(part)
+                    stamped = stamp(tag(part, prefix))
                     progress.write(stamped + "\n")
                     progress.flush()
                     print(stamped, flush=True)
         if not finished:
-            stamped = stamp("error: stream ended without a result")
+            stamped = stamp(tag("error: stream ended without a result", prefix))
             progress.write(stamped + "\n")
             progress.flush()
             print(stamped, flush=True)

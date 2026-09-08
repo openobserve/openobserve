@@ -19,7 +19,7 @@ The orchestrator does not edit code and does not review code. If it finds itself
 ## Preconditions
 
 - The plan was discussed with the user and confirmed.
-- A reviewer backend is reachable. `review.sh` picks one (`--backend auto`, the default): Codex when its CLI is present (`codex` on PATH or bundled in ChatGPT.app), otherwise a sandboxed `claude -p` with a loud warning. Pass `--backend claude` only when the user asks. The Claude backend needs macOS `sandbox-exec`; `--unsandboxed` overrides only when the user says so. If no backend exists, stop and tell the user.
+- A reviewer backend is reachable. `review.sh` picks one (`--backend auto`, the default): Codex when its CLI is present (`codex` on PATH or bundled in ChatGPT.app), otherwise a sandboxed `claude -p` with a loud warning. Pass `--backend claude` only when the user asks. `--backend both` runs Codex and Claude on the same commit in parallel and merges their verdicts: request_changes if either says so, findings numbered `CX<round>-<n>` and `CL<round>-<n>` (near-duplicates merged and marked with both sources), and every finding goes to both reviewers in the next round so each verifies the other's. Use it when the user asks for a cross-check or when the change is risky enough to pay for two reviews (roughly the cost of a Claude round plus a Codex round, wall time of the slower one). The Claude backend needs macOS `sandbox-exec`; `--unsandboxed` overrides only when the user says so. If no backend exists, stop and tell the user.
 - The ledger lives outside the repo at `~/.claude/o2-loop/<repo>/<branch-slug>/`; the scripts derive it. Nothing from it is ever committed.
 
 ## Ledger layout
@@ -35,12 +35,13 @@ The orchestrator does not edit code and does not review code. If it finds itself
   round-N/coder-response.json    coder: fix / dispute / partial / defer per finding
   round-N/also/<repo name>/      review.sh and that repository's coder: commit, path, diff.patch, delta.patch, evidence.md, coder.log, coder-response.json
   round-N/prompt.md, diff.patch, delta.patch, candidates.md, events.jsonl, reviewer.err   review.sh
+  round-N/codex/, round-N/claude/  review.sh (--backend both): each reviewer's own prompt, events, verdict and stderr; round-N/verdict.json is the merge
   report.md                      orchestrator: written when the loop ends
 ```
 
 Scripts, all under `<skill dir>/scripts/` (this SKILL.md's directory):
 
-- `review.sh --round N [--backend ...] [--also <checkout> ...]`: freezes the tree (and every `--also` checkout) as `wip(o2-loop): round N`, runs one reviewer round in disposable worktrees, writes `verdict.json`. Exit 0 approve, 10 request_changes, 1 failure. `--help` lists every flag.
+- `review.sh --round N [--backend auto|codex|claude|both] [--also <checkout> ...]`: freezes the tree (and every `--also` checkout) as `wip(o2-loop): round N`, runs one reviewer round in disposable worktrees (two reviewers in parallel with `both`), writes `verdict.json`. Exit 0 approve, 10 request_changes, 1 failure. `--help` lists every flag.
 - `loop-state.py [--cap 5]`: reads the ledger and prints `ACTION:` with the single next step. Run it after every step; do not decide the next step yourself.
 
 ## Procedure
@@ -61,7 +62,7 @@ tail -n 0 -f <ledger>/round-N/progress.log | while IFS= read -r line; do echo "$
 ```
 then run `review.sh --round N` in the background, adding `--also <checkout>` for every paired repository so one reviewer sees all sides and can report contract mismatches (the schema's `repo` field on each finding says which side it belongs to). Tell the user round N started and which backend. Relay the monitor lines as they come, in the user's language. On exit 1, read `progress.log` and `reviewer.err`, fix the cause if it is ours (missing evidence, no changes vs base, auth), rerun once, else stop and report.
 
-**3. Relay the verdict before anything else.** As soon as `review.sh` returns, post: backend, verdict, every finding as one line (id, severity, file:line, title), and each prior finding's status. The user sees what the reviewer said before seeing what the coder does about it.
+**3. Relay the verdict before anything else.** As soon as `review.sh` returns, post: backend, verdict, every finding as one line (id, severity, file:line, title, and with `both` which reviewers reported it), and each prior finding's status. With `both`, say when the two reviewers disagreed on a prior finding; the merge keeps it open if either did. The user sees what the reviewer said before seeing what the coder does about it.
 
 **4. Hand the findings to the coder.** Run `loop-state.py`; it should say `respond`. `SendMessage` to the same coder agent: the path of `round-N/verdict.json`, "round N+1", and, only if the verdict is `approve` and the remaining findings are low, "defer the lows". With paired repositories, message every coder; each answers the findings whose `repo` is its own and ignores the rest, and `loop-state.py` merges the responses. Start a `Monitor` on `round-(N+1)/coder.log` first. When the coder reports, post its per-finding decisions to the user (id, action, reason).
 
