@@ -84,6 +84,20 @@ test.describe('Command palette', () => {
     expect(new URL(page.url()).searchParams.get('stream')).toBe('e2e_automate');
   });
 
+  test('finds an admin user and opens their IAM entry from the Help menu entry', {
+    tag: ['@commandPalette', '@general', '@P2', '@all'],
+  }, async ({ page }) => {
+    await page.locator('[data-test="menu-link-help-item"]').click();
+    await page.locator('[data-test="menu-link-palette-item"]').click();
+    await pm.commandPalettePage.expectOpen();
+    await pm.commandPalettePage.type(process.env['ZO_ROOT_USER_EMAIL'] || 'root@example.com');
+    await pm.commandPalettePage.expectRowsOfType('user');
+    await pm.commandPalettePage.list.locator('[role="option"][data-test="command-palette-row-user"]').first().click();
+    await pm.commandPalettePage.expectClosed();
+    await pm.commandPalettePage.expectUrl(/\/web\/iam\/users/, ORG);
+    expect(new URL(page.url()).searchParams.get('action')).toBe('update');
+  });
+
   test('shows the empty state for a query with no matches', {
     tag: ['@commandPalette', '@general', '@P2', '@all'],
   }, async () => {
