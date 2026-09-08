@@ -49,7 +49,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :style="dotGridStyle"
     />
 
-    <div :class="['relative flex flex-col items-center text-center', sizeClass.stack]">
+    <div
+      :class="[
+        'relative flex w-full min-w-0 flex-col items-center text-center',
+        sizeClass.stack,
+      ]"
+    >
       <!-- illustration (hero/block) — preset/illustration prop or slot -->
       <div v-if="hasIllustration" class="shrink-0">
         <slot name="illustration">
