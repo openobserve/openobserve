@@ -176,6 +176,69 @@ async function waitForStream(page, streamName, timeoutMs = 60000) {
   throw new Error(`Stream ${streamName} did not appear within ${timeoutMs}ms`);
 }
 
+/**
+ * Create an anomaly config directly, for tests that need one to ACT on rather
+ * than to create. Driving the wizard costs ~15s and couples every test to the
+ * creation path; this is ~1s and lets them run in parallel, each owning its own
+ * record instead of sharing one through a serial chain.
+ *
+ * @returns {Promise<string>} the new anomaly_id
+ */
+async function createAnomalyViaApi(page, name, opts = {}) {
+  const org = getOrgName();
+  const {
+    streamName = 'e2e_automate',
+    destinations = [],
+    threshold = 97,
+    histogramInterval = '5m',
+  } = opts;
+  const res = await apiCall(page, 'POST', `/api/v2/${org}/alerts?folder=default`, {
+    alert_type: 'anomaly_detection',
+    name,
+    stream_name: streamName,
+    stream_type: 'logs',
+    enabled: true,
+    folder_id: 'default',
+    alert_destinations: destinations,
+    tags: [],
+    anomaly_config: {
+      query_mode: 'filters',
+      filters: [],
+      custom_sql: null,
+      detection_function: 'count(*)',
+      histogram_interval: histogramInterval,
+      schedule_interval: '10m',
+      detection_window_seconds: 3600,
+      training_window_days: 1,
+      retrain_interval_days: 0,
+      threshold,
+      alert_enabled: destinations.length > 0,
+    },
+  });
+  if (res.status !== 200) {
+    throw new Error(`createAnomalyViaApi(${name}) failed ${res.status}: ${JSON.stringify(res.data)}`);
+  }
+  testLogger.info('Created anomaly via API', { name });
+  return res.data.anomaly_id || res.data.id;
+}
+
+/**
+ * Wait until a config is visible to the LIST endpoint.
+ *
+ * Creation returns before the record is queryable, so reloading the UI straight
+ * after it can still render a list that does not contain it. Settling on the
+ * API first separates backend consistency from the page's own caching.
+ */
+async function waitForAnomalyListed(page, name, timeoutMs = 30000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const rows = await listAnomalyDetections(page);
+    if (rows.some((r) => r.name === name)) return true;
+    await page.waitForTimeout(1000);
+  }
+  throw new Error(`Anomaly ${name} was not listed by the API within ${timeoutMs}ms`);
+}
+
 /** Kick off model training for an anomaly config. */
 async function triggerAnomalyTraining(page, anomalyId) {
   const org = getOrgName();
@@ -290,6 +353,8 @@ module.exports = {
   deleteTemplate,
   destinationExists,
   searchSql,
+  createAnomalyViaApi,
+  waitForAnomalyListed,
   seedAnomalyStream,
   waitForStream,
   triggerAnomalyTraining,

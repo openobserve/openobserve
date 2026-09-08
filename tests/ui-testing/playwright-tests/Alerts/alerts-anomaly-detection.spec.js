@@ -17,23 +17,29 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
-const { listAnomalyDetections, triggerAnomalyDetection, getAnomalyHistory, deleteDestination, deleteTemplate, createMockDestination, destinationExists, searchSql, seedAnomalyStream, waitForStream,
+const { listAnomalyDetections, triggerAnomalyDetection, getAnomalyHistory, deleteDestination, deleteTemplate, createAnomalyViaApi, waitForAnomalyListed, createMockDestination, destinationExists, searchSql, seedAnomalyStream, waitForStream,
   triggerAnomalyTraining, waitForAnomalyTrained } = require('../utils/api-helper.js');
 
 test.describe('Anomaly Detection', () => {
   let pm;
   // One value per run so the lifecycle chain can hand names between tests.
-  const randomValue = Date.now().toString().slice(-6);
+  // Timestamp ALONE is not unique per worker: workers start within the same
+  // millisecond window and Date.now().slice(-6) then collides, so two of them
+  // share template/destination/anomaly names — the create 500s on a duplicate
+  // key and one worker's cleanup deletes the other's fixtures. The random
+  // suffix is what actually makes the run id unique.
+  const randomValue = `${Date.now().toString().slice(-6)}${Math.random().toString(36).slice(2, 8)}`;
   const testStreamName = 'e2e_automate';
-  const anomalyName = (suffix) => `E2E_Anomaly_${suffix}_${randomValue}`;
+  // Unique per call: tests own their own records now, and two parallel tests
+  // asking for the same suffix must not collide on one name.
+  let seq = 0;
+  const anomalyName = (suffix) => `E2E_Anomaly_${suffix}${++seq}_${randomValue}`;
 
   // The Add button is disabled while the org has no destination, so both must
   // exist before any wizard test can open.
   const prerequisiteTemplateName = `e2e_anomaly_template_${randomValue}`;
   const prerequisiteDestinationName = `e2e_anomaly_dest_${randomValue}`;
 
-  const builderAnomaly = anomalyName('builder');
-  const sqlAnomaly = anomalyName('sql');
 
   test.beforeEach(async ({ page }, testInfo) => {
     testLogger.testStart(testInfo.title, testInfo.file);
@@ -416,14 +422,44 @@ test.describe('Anomaly Detection', () => {
   // ════════════════════════════════════════════════════════════════════════
 
   test.describe('Lifecycle and detection charts', () => {
-    test.describe.configure({ mode: 'serial' });
+    // Parallel, not serial. Only the two "creates ..." tests exercise the
+    // wizard's creation path; the rest need a config to ACT on, so each makes
+    // its own through the API (~1s versus ~15s of wizard) and owns it outright.
+    // Sharing one record forced serial ordering, which made a single flake
+    // retry the whole block — 11 tests retried three times on one CI run.
+    test.describe.configure({ mode: 'parallel' });
+
+    /**
+     * A config for this test alone, so nothing it does can disturb another.
+     *
+     * Reloads after creating: the list is fetched when the tab mounts, and
+     * beforeEach has already mounted it, so a record created through the API
+     * afterwards is simply absent until the page refetches.
+     */
+    const ownAnomaly = async (page, suffix, opts) => {
+      const name = anomalyName(suffix);
+      await createAnomalyViaApi(page, name, opts);
+      // Settle the backend before touching the UI: creation returns before the
+      // record is queryable, so a reload can still render a list without it.
+      await waitForAnomalyListed(page, name);
+      await page.reload();
+      await page.waitForLoadState('domcontentloaded', { timeout: 30000 }).catch(() => {});
+      await pm.anomalyDetectionPage.navigateToAnomalyTab();
+      await pm.anomalyDetectionPage.searchAnomaly(name);
+      await expect(
+        pm.anomalyDetectionPage.getRow(name),
+        `${name} was created via the API but never appeared in the list`,
+      ).toBeVisible({ timeout: 20000 });
+      return name;
+    };
 
     test.describe('Lifecycle', () => {
       test('creates an anomaly in builder mode', {
         tag: ['@anomaly', '@P0', '@smoke', '@all'],
       }, async () => {
+        const name = anomalyName('builder');
         await pm.anomalyDetectionPage.openAddAnomalyWizard();
-        await pm.anomalyDetectionPage.fillBasicSetup(builderAnomaly, 'logs', testStreamName);
+        await pm.anomalyDetectionPage.fillBasicSetup(name, 'logs', testStreamName);
 
         await pm.anomalyDetectionPage.openConfigTab();
         await pm.anomalyDetectionPage.selectDetectionFunction('count');
@@ -441,15 +477,16 @@ test.describe('Anomaly Detection', () => {
         await pm.anomalyDetectionPage.saveAndExpectSuccess();
 
         await pm.anomalyDetectionPage.navigateToAnomalyTab();
-        await pm.anomalyDetectionPage.searchAnomaly(builderAnomaly);
-        await expect(pm.anomalyDetectionPage.getRow(builderAnomaly)).toBeVisible();
+        await pm.anomalyDetectionPage.searchAnomaly(name);
+        await expect(pm.anomalyDetectionPage.getRow(name)).toBeVisible();
       });
 
       test('creates an anomaly in SQL mode', {
         tag: ['@anomaly', '@P1', '@functional', '@all'],
       }, async () => {
+        const name = anomalyName('sql');
         await pm.anomalyDetectionPage.openAddAnomalyWizard();
-        await pm.anomalyDetectionPage.fillBasicSetup(sqlAnomaly, 'logs', testStreamName);
+        await pm.anomalyDetectionPage.fillBasicSetup(name, 'logs', testStreamName);
 
         await pm.anomalyDetectionPage.openConfigTab();
         await pm.anomalyDetectionPage.selectQueryMode('custom_sql');
@@ -464,18 +501,32 @@ test.describe('Anomaly Detection', () => {
         await pm.anomalyDetectionPage.saveAndExpectSuccess();
 
         await pm.anomalyDetectionPage.navigateToAnomalyTab();
-        await pm.anomalyDetectionPage.searchAnomaly(sqlAnomaly);
-        await expect(pm.anomalyDetectionPage.getRow(sqlAnomaly)).toBeVisible();
+        await pm.anomalyDetectionPage.searchAnomaly(name);
+        await expect(pm.anomalyDetectionPage.getRow(name)).toBeVisible();
       });
 
+      // The only non-creation test that still builds its fixture through the
+      // wizard. Its whole point is that a config SAVED BY THE FORM round-trips
+      // back into the form; an API-created record would only prove "API write →
+      // UI read", which is not the regression worth guarding.
       test('edit mode loads the saved configuration', {
         tag: ['@anomaly', '@P1', '@functional', '@all'],
       }, async ({ page }) => {
-        await pm.anomalyDetectionPage.searchAnomaly(builderAnomaly);
-        await pm.anomalyDetectionPage.openEdit(builderAnomaly);
+        const name = anomalyName('edit');
+        await pm.anomalyDetectionPage.openAddAnomalyWizard();
+        await pm.anomalyDetectionPage.fillBasicSetup(name, 'logs', testStreamName);
+        await pm.anomalyDetectionPage.openConfigTab();
+        await pm.anomalyDetectionPage.selectSensitivityTier(97);
+        await pm.anomalyDetectionPage.openAlertingTab();
+        await pm.anomalyDetectionPage.toggleNotifications(false);
+        await pm.anomalyDetectionPage.saveAndExpectSuccess();
+
+        await pm.anomalyDetectionPage.navigateToAnomalyTab();
+        await pm.anomalyDetectionPage.searchAnomaly(name);
+        await pm.anomalyDetectionPage.openEdit(name);
 
         // The name is readonly in edit mode, so it renders as plain text.
-        await expect(page.locator(pm.anomalyDetectionPage.selectors.nameValue)).toContainText(builderAnomaly);
+        await expect(page.locator(pm.anomalyDetectionPage.selectors.nameValue)).toContainText(name);
 
         await pm.anomalyDetectionPage.openConfigTab();
         // The percentile readback only exists where the tier controls do; on
@@ -489,31 +540,29 @@ test.describe('Anomaly Detection', () => {
 
       test('pause and resume toggle the anomaly', {
         tag: ['@anomaly', '@P1', '@functional', '@all'],
-      }, async () => {
-        await pm.anomalyDetectionPage.searchAnomaly(builderAnomaly);
-        await pm.anomalyDetectionPage.togglePause(builderAnomaly);
+      }, async ({ page }) => {
+        const name = await ownAnomaly(page, 'pause');
+        await pm.anomalyDetectionPage.togglePause(name);
         await expect(pm.anomalyDetectionPage.getToastLocator(/success/i)).toBeVisible();
 
-        await pm.anomalyDetectionPage.togglePause(builderAnomaly);
-        await expect(pm.anomalyDetectionPage.getRow(builderAnomaly)).toBeVisible();
+        await pm.anomalyDetectionPage.togglePause(name);
+        await expect(pm.anomalyDetectionPage.getRow(name)).toBeVisible();
       });
 
       test('detection can be triggered from the row menu', {
         tag: ['@anomaly', '@P2', '@functional', '@all'],
-      }, async () => {
-        await pm.anomalyDetectionPage.searchAnomaly(builderAnomaly);
-        await pm.anomalyDetectionPage.triggerDetection(builderAnomaly);
+      }, async ({ page }) => {
+        const name = await ownAnomaly(page, 'trigger');
+        await pm.anomalyDetectionPage.triggerDetection(name);
         await expect(pm.anomalyDetectionPage.getToastLocator(/detection|triggered/i)).toBeVisible();
       });
 
       test('detection can be triggered via the API and lands in history', {
         tag: ['@anomaly', '@P2', '@api', '@all'],
       }, async ({ page }) => {
-        const anomalies = await listAnomalyDetections(page);
-        const target = anomalies.find((a) => a.name === builderAnomaly);
-        expect(target, `anomaly ${builderAnomaly} should be listed by the API`).toBeTruthy();
+        const name = anomalyName('apitrigger');
+        const id = await createAnomalyViaApi(page, name);
 
-        const id = target.anomaly_id || target.id;
         const triggered = await triggerAnomalyDetection(page, id);
 
         // A config created seconds ago has no trained model yet, so a detection
@@ -543,10 +592,10 @@ test.describe('Anomaly Detection', () => {
 
       test('deletes an anomaly', {
         tag: ['@anomaly', '@P0', '@smoke', '@all'],
-      }, async () => {
-        await pm.anomalyDetectionPage.searchAnomaly(sqlAnomaly);
-        await pm.anomalyDetectionPage.deleteAnomaly(sqlAnomaly);
-        await expect(pm.anomalyDetectionPage.getRow(sqlAnomaly)).toBeHidden();
+      }, async ({ page }) => {
+        const name = await ownAnomaly(page, 'delete');
+        await pm.anomalyDetectionPage.deleteAnomaly(name);
+        await expect(pm.anomalyDetectionPage.getRow(name)).toBeHidden();
       });
     });
 
@@ -557,9 +606,9 @@ test.describe('Anomaly Detection', () => {
     test.describe('Detection charts', () => {
       test('the detail page renders all three panels behind one range picker', {
         tag: ['@anomaly', '@P1', '@functional', '@all'],
-      }, async () => {
-        await pm.anomalyDetectionPage.searchAnomaly(builderAnomaly);
-        await pm.anomalyDetectionPage.openDetail(builderAnomaly);
+      }, async ({ page }) => {
+        const name = await ownAnomaly(page, 'charts');
+        await pm.anomalyDetectionPage.openDetail(name);
 
         await expect(pm.anomalyDetectionPage.getDetectionChartsLocator()).toBeVisible();
         for (const key of ['metric', 'score', 'deviation']) {
@@ -570,8 +619,8 @@ test.describe('Anomaly Detection', () => {
       test('the shared range picker drives every panel', {
         tag: ['@anomaly', '@P2', '@functional', '@all'],
       }, async ({ page }) => {
-        await pm.anomalyDetectionPage.searchAnomaly(builderAnomaly);
-        await pm.anomalyDetectionPage.openDetail(builderAnomaly);
+        const name = await ownAnomaly(page, 'range');
+        await pm.anomalyDetectionPage.openDetail(name);
         await expect(pm.anomalyDetectionPage.getDetectionChartsLocator()).toBeVisible();
 
         // One picker for all three: separate pickers would let the panels
@@ -586,9 +635,9 @@ test.describe('Anomaly Detection', () => {
 
       test('a panel with no model data shows its unavailable state, not a broken chart', {
         tag: ['@anomaly', '@P2', '@functional', '@all'],
-      }, async () => {
-        await pm.anomalyDetectionPage.searchAnomaly(builderAnomaly);
-        await pm.anomalyDetectionPage.openDetail(builderAnomaly);
+      }, async ({ page }) => {
+        const name = await ownAnomaly(page, 'emptychart');
+        await pm.anomalyDetectionPage.openDetail(name);
 
         // A freshly created anomaly has not trained, so each panel is either a
         // rendered chart or the explicit unavailable state — never neither.
@@ -618,7 +667,6 @@ test.describe('Anomaly Detection', () => {
   // ════════════════════════════════════════════════════════════════════════
 
   test.describe('End to end detection', () => {
-    test.describe.configure({ mode: 'serial' });
 
     const firingName = anomalyName('fire');
     const seededStream = `anomaly_e2e_${randomValue}`;
