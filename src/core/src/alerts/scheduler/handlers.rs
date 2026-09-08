@@ -5910,15 +5910,28 @@ async fn handle_raman_triggers(
     trace_id: &str,
     trigger: db::scheduler::Trigger,
 ) -> Result<(), anyhow::Error> {
+    let started_at = now_micros();
     let config = raman_config(&trigger.org, &trigger.module_key).await;
+    let mut error = None;
     if raman_run_window_minutes(config.as_ref()).is_some() {
         log::warn!(
             "[raman] config {} is enabled but hygiene analysis is an enterprise feature; \
              re-arming without a digest",
             trigger.module_key
         );
+        error = Some("hygiene analysis is an enterprise feature".to_string());
     }
     let next_run_at = raman_next_run_at(now_micros(), config.as_ref());
+    // No window: OSS analyses nothing, so the row must not claim it did.
+    publish_triggers_usage(raman_trigger_data(
+        &trigger,
+        next_run_at,
+        None,
+        error,
+        started_at,
+        now_micros(),
+        trace_id,
+    ));
     finalize_raman_trigger(trigger, next_run_at, trace_id).await
 }
 
@@ -5932,8 +5945,11 @@ async fn handle_raman_triggers(
     trace_id: &str,
     trigger: db::scheduler::Trigger,
 ) -> Result<(), anyhow::Error> {
+    let started_at = now_micros();
     let config = raman_config(&trigger.org, &trigger.module_key).await;
-    if let Some(window_minutes) = raman_run_window_minutes(config.as_ref())
+    let window_minutes = raman_run_window_minutes(config.as_ref());
+    let mut error = None;
+    if let Some(window_minutes) = window_minutes
         && let Err(e) = run_raman_digest(&trigger.org, &trigger.module_key, window_minutes).await
     {
         log::error!(
@@ -5941,8 +5957,18 @@ async fn handle_raman_triggers(
             trigger.module_key,
             trigger.org
         );
+        error = Some(e.to_string());
     }
     let next_run_at = raman_next_run_at(now_micros(), config.as_ref());
+    publish_triggers_usage(raman_trigger_data(
+        &trigger,
+        next_run_at,
+        window_minutes,
+        error,
+        started_at,
+        now_micros(),
+        trace_id,
+    ));
     finalize_raman_trigger(trigger, next_run_at, trace_id).await
 }
 
@@ -6071,6 +6097,55 @@ fn raman_run_window_minutes(
     config
         .filter(|config| config.enabled)
         .map(|config| i64::from(config.window_minutes))
+}
+
+/// The `triggers` row for one hygiene pass, built outside the handler so the
+/// enterprise arm — which runs in no test suite — reports what a test can check.
+/// `window_minutes` is `Some` only when a pass was actually attempted: that is what
+/// separates a skipped run from a successful one.
+fn raman_trigger_data(
+    trigger: &db::scheduler::Trigger,
+    next_run_at: i64,
+    window_minutes: Option<i64>,
+    error: Option<String>,
+    started_at: i64,
+    finished_at: i64,
+    scheduler_trace_id: &str,
+) -> TriggerData {
+    // A pass that never ran is neither a success nor a failure, whatever it logged.
+    let status = match (window_minutes, error.is_some()) {
+        (None, _) => RunOutcome::Skipped,
+        (Some(_), true) => RunOutcome::Error,
+        (Some(_), false) => RunOutcome::Succeeded,
+    };
+    let window_start = window_minutes.map_or(started_at, |minutes| {
+        started_at.saturating_sub(minutes.saturating_mul(60).saturating_mul(1_000_000))
+    });
+    TriggerData {
+        _timestamp: finished_at,
+        org: trigger.org.clone(),
+        module: TriggerDataType::Raman,
+        // Parseable by the collector's last-slash split, though `alert` is the only
+        // module it analyses, so a raman row can never feed its own digest.
+        key: format!("raman/{}", trigger.module_key),
+        next_run_at,
+        is_realtime: trigger.is_realtime,
+        is_silenced: trigger.is_silenced,
+        status,
+        start_time: window_start,
+        end_time: started_at,
+        retries: trigger.retries,
+        error,
+        delay_in_secs: Some(Duration::microseconds(started_at - trigger.next_run_at).num_seconds()),
+        evaluation_took_in_secs: Some((finished_at - started_at) as f64 / 1_000_000.0),
+        source_node: Some(LOCAL_NODE.name.clone()),
+        scheduler_trace_id: Some(scheduler_trace_id.to_string()),
+        time_in_queue_ms: Some(
+            Duration::microseconds(started_at - trigger.start_time.unwrap_or_default())
+                .num_milliseconds(),
+        ),
+        ..Default::default()
+    }
 }
 
 /// Empty outside a super-cluster, matching `raman_digests.cluster`: the column is part
@@ -7484,8 +7559,8 @@ mod tests {
         }
     }
 
-    /// The raman hygiene job's schedule and projection decisions. These are the
-    /// only parts of the handler a test can execute: the handler itself is
+    /// The raman hygiene job's schedule, projection and reporting decisions. These
+    /// are the only parts a test can execute: the handler's analysing arm is
     /// `#[cfg(feature = "enterprise")]`, so neither CI runs it.
     mod raman {
         use infra::table::entity::{raman_configs, raman_digests};
@@ -7655,6 +7730,135 @@ mod tests {
             ]))));
             assert_eq!(records.len(), 1);
             assert_eq!(records[0]["rule_id"], "noise");
+        }
+
+        // ── The observability row ───────────────────────────────────────────
+
+        const STARTED: i64 = NOW;
+        const FINISHED: i64 = NOW + 3 * 1_000_000;
+
+        fn trigger() -> db::scheduler::Trigger {
+            db::scheduler::Trigger {
+                org: "default".to_string(),
+                module: db::scheduler::TriggerModule::Raman,
+                module_key: "cfg1".to_string(),
+                next_run_at: NOW - 5 * MINUTE,
+                retries: 2,
+                start_time: Some(NOW - MINUTE),
+                ..Default::default()
+            }
+        }
+
+        fn row(window_minutes: Option<i64>, error: Option<String>) -> TriggerData {
+            raman_trigger_data(
+                &trigger(),
+                NOW + 30 * MINUTE,
+                window_minutes,
+                error,
+                STARTED,
+                FINISHED,
+                "trace-1",
+            )
+        }
+
+        #[test]
+        fn a_pass_that_analysed_its_window_is_published_as_a_succeeded_run() {
+            let published = row(Some(60), None);
+            assert_eq!(published.status, RunOutcome::Succeeded);
+            assert_eq!(published.error, None);
+        }
+
+        /// A digest that blew up must not read as a clean run: that is the whole
+        /// point of publishing the row.
+        #[test]
+        fn a_failed_pass_is_published_as_an_error_run_carrying_the_reason() {
+            let published = row(Some(60), Some("search timed out".to_string()));
+            assert_eq!(published.status, RunOutcome::Error);
+            assert_eq!(published.error.as_deref(), Some("search timed out"));
+        }
+
+        /// A disabled or unreadable config means no pass was made at all, which is
+        /// neither a success nor a failure.
+        #[test]
+        fn a_pass_that_never_ran_is_published_as_skipped_and_not_as_succeeded() {
+            let published = row(None, None);
+            assert_eq!(published.status, RunOutcome::Skipped);
+
+            let unsupported = row(None, Some("enterprise only".to_string()));
+            assert_eq!(unsupported.status, RunOutcome::Skipped);
+            assert_eq!(unsupported.error.as_deref(), Some("enterprise only"));
+        }
+
+        #[test]
+        fn the_published_row_names_the_raman_module() {
+            assert_eq!(row(Some(60), None).module, TriggerDataType::Raman);
+        }
+
+        /// The collector splits a key on its LAST slash and reads the tail as an id,
+        /// so the config id has to survive that round trip.
+        #[test]
+        fn the_published_key_names_the_config_and_survives_the_collector_split() {
+            let key = row(Some(60), None).key;
+            assert_eq!(key, "raman/cfg1");
+            let (name, id) = key.rsplit_once('/').expect("key is splittable");
+            assert_eq!(name, "raman");
+            assert_eq!(id, "cfg1");
+            assert_ne!(id, "default");
+        }
+
+        #[test]
+        fn the_published_window_is_the_one_the_pass_asked_for() {
+            let published = row(Some(60), None);
+            assert_eq!(published.start_time, STARTED - 60 * MINUTE);
+            assert_eq!(published.end_time, STARTED);
+        }
+
+        /// A run that analysed nothing must not claim a window it never read.
+        #[test]
+        fn a_skipped_run_claims_no_analysed_window() {
+            let published = row(None, None);
+            assert_eq!(published.start_time, STARTED);
+            assert_eq!(published.end_time, STARTED);
+        }
+
+        #[test]
+        fn the_row_carries_the_scheduler_timing_fields_its_siblings_publish() {
+            let published = row(Some(60), None);
+            assert_eq!(published.org, "default");
+            assert_eq!(published.next_run_at, NOW + 30 * MINUTE);
+            assert_eq!(published.retries, 2);
+            assert_eq!(published._timestamp, FINISHED);
+            assert_eq!(published.delay_in_secs, Some(300));
+            assert_eq!(published.time_in_queue_ms, Some(60_000));
+            assert_eq!(published.evaluation_took_in_secs, Some(3.0));
+            assert_eq!(published.scheduler_trace_id.as_deref(), Some("trace-1"));
+            assert!(published.source_node.is_some());
+        }
+
+        /// Both feature arms have to publish, and neither is reachable from a test —
+        /// a source scan is the only check that reaches the enterprise one.
+        #[test]
+        fn every_arm_of_the_handler_publishes_its_row() {
+            assert_eq!(
+                live_source(HANDLERS_SOURCE)
+                    .matches("publish_triggers_usage(raman_trigger_data(")
+                    .count(),
+                2,
+                "handle_raman_triggers has two feature arms and each must publish a row"
+            );
+        }
+
+        /// The hygiene job analyses `alert` rows only. A raman row that read as one
+        /// would make the job analyse its own failures.
+        #[test]
+        fn a_raman_row_cannot_be_mistaken_for_an_alert_row() {
+            let module = row(Some(60), None).module;
+            assert!(!module.is_condition_bearing());
+            assert_eq!(serde_json::to_string(&module).unwrap(), "\"raman\"");
+            assert_ne!(
+                serde_json::to_string(&module).unwrap(),
+                serde_json::to_string(&TriggerDataType::Alert).unwrap()
+            );
         }
     }
 }

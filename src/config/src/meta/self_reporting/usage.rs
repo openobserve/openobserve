@@ -213,6 +213,11 @@ pub enum TriggerDataType {
     SloBackfill,
     #[serde(rename = "composite")]
     CompositeAlert,
+    /// The per-org alerting-hygiene job. Persisted by serde name — this enum has
+    /// no discriminant form — so the wire name, not the position, is what a stored
+    /// row depends on.
+    #[serde(rename = "raman")]
+    Raman,
 }
 
 impl TriggerDataType {
@@ -1148,6 +1153,52 @@ mod run_outcome_tests {
         assert!(!TriggerDataType::Synthetics.is_condition_bearing());
         assert!(!TriggerDataType::Backfill.is_condition_bearing());
         assert!(!TriggerDataType::AnomalyDetectionTraining.is_condition_bearing());
+    }
+
+    // ── Raman: the hygiene job's own observability row ──────────────────────
+
+    /// Raman evaluates no alert condition, so it can never be "firing"; a run
+    /// that completed is [`RunOutcome::Succeeded`].
+    #[test]
+    fn raman_is_not_condition_bearing() {
+        assert!(!TriggerDataType::Raman.is_condition_bearing());
+    }
+
+    /// The variant is persisted by serde name only — there is no `from_i32` for
+    /// this enum — so the wire name is the compatibility surface.
+    #[test]
+    fn raman_serialises_under_its_own_wire_name() {
+        assert_eq!(
+            serde_json::to_string(&TriggerDataType::Raman).unwrap(),
+            "\"raman\""
+        );
+        assert_eq!(
+            serde_json::from_str::<TriggerDataType>("\"raman\"").unwrap(),
+            TriggerDataType::Raman
+        );
+    }
+
+    /// A legacy `completed` row for a non-condition module normalises to
+    /// `Succeeded`, never `Firing`.
+    #[test]
+    fn a_legacy_completed_raman_row_normalises_to_succeeded() {
+        assert_eq!(
+            normalize_outcome("completed", &TriggerDataType::Raman, None),
+            Some(RunOutcome::Succeeded)
+        );
+    }
+
+    /// `normalize_legacy_outcome` rewrites only condition-bearing modules, so a
+    /// raman `Succeeded` must survive it untouched.
+    #[test]
+    fn normalize_legacy_outcome_leaves_a_raman_success_alone() {
+        let mut data = TriggerData {
+            module: TriggerDataType::Raman,
+            status: RunOutcome::Succeeded,
+            ..Default::default()
+        };
+        data.normalize_legacy_outcome();
+        assert_eq!(data.status, RunOutcome::Succeeded);
     }
 
     // ── normalize_outcome: the read-side migration (Part III) ───────────────
