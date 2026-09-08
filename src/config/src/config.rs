@@ -2833,12 +2833,6 @@ pub struct Compact {
     #[env_config(name = "ZO_COMPACT_MAX_GROUP_FILES", default = 10000)]
     pub max_group_files: usize,
     #[env_config(
-        name = "ZO_COMPACT_METRICS_MERGE_FAN_IN",
-        default = 16,
-        help = "Open metrics-index hour: once this many hash-sorted ingester files are pending, merge them all into one hash-merged file; earlier round outputs wait for the hour-end merge, which takes every file of the hour once. 0 keeps the size-bounded grouping"
-    )]
-    pub metrics_merge_fan_in: usize,
-    #[env_config(
         name = "ZO_COMPACT_RETENTION_ALLOWED_HOURS",
         default = "",
         help = "Comma-separated list of hours (0-23) when retention can run. Empty means run at all hours. Example: 5,6,8"

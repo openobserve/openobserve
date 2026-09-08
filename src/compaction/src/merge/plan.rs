@@ -30,9 +30,8 @@ pub(super) struct BatchLimits<'a> {
     pub strategy: &'a MergeStrategy,
     pub max_file_size: usize,
     pub max_group_files: usize,
-    /// Pending ingester files an open metrics-index hour needs before they all merge into
-    /// indexed files; 0 keeps the size-bounded hash-sorted grouping.
-    pub metrics_fan_in: usize,
+    /// Pending ingester files an open metrics-index hour holds before they all merge.
+    pub open_hour_min_files: usize,
     /// The hour is still open: an unfilled trailing group waits for more files.
     pub is_incremental: bool,
     /// The classic merge query's cap: larger files are at their target size.
@@ -60,8 +59,8 @@ pub(super) fn plan_batches(
         if !mode_files.is_empty() {
             batches.push((mode_files, mode.clone()));
         }
-    } else if mode.merges_by_fan_in() && limits.metrics_fan_in > 0 {
-        if let Some(pending) = pending_ingester_files(mode_files, limits.metrics_fan_in) {
+    } else if mode.merges_open_hour_pending() {
+        if let Some(pending) = pending_ingester_files(mode_files, limits.open_hour_min_files) {
             batches.push((pending, mode.clone()));
         }
     } else {
@@ -115,17 +114,17 @@ fn indexed_hour_scope(
     }
 }
 
-/// The open hour's pending ingester files, once `fan_in` of them have piled up: they merge
+/// The open hour's pending ingester files, once `min_files` of them have piled up: they merge
 /// into one hash-merged file, so each round leaves one chain, and a round's output never
 /// merges again before the hour-end merge takes everything once. Original size is no measure
 /// here: hash order compresses metrics tens of times, so the size-bounded groups sealed one
 /// flush each.
-fn pending_ingester_files(files: Vec<FileKey>, fan_in: usize) -> Option<Vec<FileKey>> {
+fn pending_ingester_files(files: Vec<FileKey>, min_files: usize) -> Option<Vec<FileKey>> {
     let pending: Vec<FileKey> = files
         .into_iter()
         .filter(|f| MetricsFileLayout::of(&f.key) == Some(MetricsFileLayout::HashSorted))
         .collect();
-    (pending.len() >= fan_in.max(2)).then_some(pending)
+    (pending.len() >= min_files.max(2)).then_some(pending)
 }
 
 /// Size-bounded merge groups in the planner's file order.
@@ -201,7 +200,7 @@ mod tests {
             strategy,
             max_file_size: 1000,
             max_group_files,
-            metrics_fan_in: 0,
+            open_hour_min_files: 3,
             is_incremental,
             merge_max_original_size: 950,
         }
@@ -331,7 +330,7 @@ mod tests {
         files.push(metrics_file("legacy.parquet", 100));
         let strategy = MergeStrategy::FileTime;
         let mut limits = limits(&strategy, 0, true);
-        limits.metrics_fan_in = 3;
+        limits.open_hour_min_files = 3;
         let batches = plan_batches(files.clone(), &MergeMode::MetricsHashSorted, &limits, "s");
         assert_eq!(batches.len(), 1, "{batches:?}");
         assert!(
@@ -349,10 +348,10 @@ mod tests {
                 "hash-sorted-v1-5.parquet"
             ]
         );
-        limits.metrics_fan_in = 6;
+        limits.open_hour_min_files = 6;
         assert!(
             plan_batches(files, &MergeMode::MetricsHashSorted, &limits, "s").is_empty(),
-            "fewer pending files than the fan-in wait for more"
+            "fewer pending files than the minimum wait for more"
         );
     }
 

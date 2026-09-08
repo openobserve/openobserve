@@ -106,7 +106,7 @@ pub async fn merge_by_stream(
     );
     // a whole-hour merge needs every file of the hour, even those already
     // above the size target that a normal merge would leave alone
-    let max_original_size = if mode.merges_whole_batch() || mode.merges_by_fan_in() {
+    let max_original_size = if mode.merges_whole_batch() || mode.merges_open_hour_pending() {
         i64::MAX
     } else {
         infra_file_list::merge_max_original_size()
@@ -173,7 +173,7 @@ pub async fn merge_by_stream(
                 strategy: &job_strategy,
                 max_file_size: cfg.compact.max_file_size,
                 max_group_files: cfg.compact.max_group_files,
-                metrics_fan_in: cfg.compact.metrics_merge_fan_in,
+                open_hour_min_files: crate::incremental::open_hour_merge_files(),
                 is_incremental,
                 merge_max_original_size: infra_file_list::merge_max_original_size(),
             };

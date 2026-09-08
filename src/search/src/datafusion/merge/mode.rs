@@ -132,7 +132,7 @@ impl MergeMode {
     /// Metrics-specific layout of the file(s) the merge writes.
     /// The open metrics-index hour merges every pending ingester file at once, so its
     /// listing must not be capped by size and its batch must not be cut by size.
-    pub fn merges_by_fan_in(&self) -> bool {
+    pub fn merges_open_hour_pending(&self) -> bool {
         matches!(self, Self::MetricsHashSorted)
     }
 
