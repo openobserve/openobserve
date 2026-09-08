@@ -52,7 +52,7 @@ Scripts, all under `<skill dir>/scripts/` (this SKILL.md's directory):
 
 **1. Spawn the coder.** `Agent` with `subagent_type: o2-coder`, `run_in_background: true`. The brief is only: the ledger path, "round 1", and "read spec.md". Agent definitions load at session start, so if the harness answers that `o2-coder` is not found, spawn `general-purpose` instead with the body of `.claude/agents/o2-coder.md` prepended to the same brief; the rules are identical, only the packaging differs. Do not paste the discussion; the spec is the contract. Before spawning, start a `Monitor` on `<ledger>/round-1/coder.log` (create it with `touch` first) so the coder's steps land in the chat:
 ```bash
-tail -n 0 -f <ledger>/round-N/coder.log | while IFS= read -r line; do echo "$line"; case "$line" in *" question: "*|*" done"*) break ;; esac; done
+tail -n 0 -f <ledger>/round-N/coder.log | while IFS= read -r line; do echo "$line"; case "$line" in *" question: "*|*" done"*) break ;; esac; done; pkill -f "tail -n 0 -f <ledger>/round-N/coder.log"
 ```
 When the coder reports back, post its summary to the user in one short paragraph. If it wrote a `question:` line, take the question to the user, answer it via `SendMessage` to the coder, and continue.
 
@@ -60,9 +60,9 @@ When the coder reports back, post its summary to the user in one short paragraph
 
 **2. Review.** Run `loop-state.py`; it should say `review`. Start a `Monitor` on `<ledger>/round-N/progress.log` (touch it first):
 ```bash
-tail -n 0 -f <ledger>/round-N/progress.log | while IFS= read -r line; do echo "$line"; case "$line" in *" done: "*|*" error: "*) break ;; esac; done
+tail -n 0 -f <ledger>/round-N/progress.log | while IFS= read -r line; do echo "$line"; case "$line" in *" done: "*|*" error: "*) break ;; esac; done; pkill -f "tail -n 0 -f <ledger>/round-N/progress.log"
 ```
-then run `review.sh --round N` in the background, adding `--also <checkout>` for every paired repository so one reviewer sees all sides and can report contract mismatches (the schema's `repo` field on each finding says which side it belongs to). Tell the user round N started and which backend. Relay the monitor lines as they come, in the user's language. On exit 1, read `progress.log` and `reviewer.err`, fix the cause if it is ours (missing evidence, no changes vs base, auth), rerun once, else stop and report.
+then run `review.sh --round N` in the background (the trailing `pkill` matters: after the final line nothing else is written, so without it `tail` would stay alive until the Monitor times out), adding `--also <checkout>` for every paired repository so one reviewer sees all sides and can report contract mismatches (the schema's `repo` field on each finding says which side it belongs to). Tell the user round N started and which backend. Relay the monitor lines as they come, in the user's language. On exit 1, read `progress.log` and `reviewer.err`, fix the cause if it is ours (missing evidence, no changes vs base, auth), rerun once, else stop and report.
 
 **3. Relay the verdict before anything else.** As soon as `review.sh` returns, post: backend, verdict, every finding as one line (id, severity, file:line, title, and with `both` which reviewers reported it), and each prior finding's status. With `both`, say when the two reviewers disagreed on a prior finding; the merge keeps it open if either did. The user sees what the reviewer said before seeing what the coder does about it.
 
