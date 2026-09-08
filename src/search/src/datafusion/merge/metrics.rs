@@ -77,9 +77,7 @@ pub(super) async fn write_files(
         ))
     })?;
     let split = FileSplit {
-        max_file_size: i64::try_from(output.max_file_size)
-            .unwrap_or(i64::MAX)
-            .max(1),
+        max_file_size: i64::try_from(output.max_file_size).unwrap(),
         timestamp_index,
         with_index: output.layout == MetricsFileLayout::Indexed,
     };
@@ -113,7 +111,7 @@ async fn write_parquet(
         timestamp_index,
         with_index,
     } = split;
-    let mut active: Option<ActiveIndexedParquetWriter> = None;
+    let mut active: Option<ActiveMetricsParquetWriter> = None;
     let mut files = Vec::new();
 
     while let Some(batch) = rx.recv().await {
@@ -127,7 +125,7 @@ async fn write_parquet(
         }
         let writer = match active.as_mut() {
             Some(writer) => writer,
-            None => active.insert(ActiveIndexedParquetWriter::try_new(
+            None => active.insert(ActiveMetricsParquetWriter::try_new(
                 schema,
                 bloom_filter_fields,
                 metadata,
@@ -162,7 +160,7 @@ async fn write_vortex(
             let session = VortexSession::default().with_tokio();
             let dtype = DType::from_arrow(schema.as_ref());
             let strategy = vortex_write_strategy();
-            let mut active: Option<ActiveIndexedVortexWriter> = None;
+            let mut active: Option<ActiveMetricsVortexWriter> = None;
             let mut files = Vec::new();
 
             while let Some(batch) = rx.recv().await {
@@ -180,7 +178,7 @@ async fn write_vortex(
                     None => {
                         let write_options = VortexWriteOptions::new(session.clone())
                             .with_strategy(strategy.clone());
-                        active.insert(ActiveIndexedVortexWriter::try_new(
+                        active.insert(ActiveMetricsVortexWriter::try_new(
                             &schema,
                             timestamp_index,
                             with_index,
@@ -215,16 +213,15 @@ async fn await_read_task(read_task: tokio::task::JoinHandle<Result<()>>) -> Resu
         .map_err(|e| DataFusionError::External(Box::new(e)))?
 }
 
-/// Format-independent `.midx` state (indexed files only) and exact metadata for one active
-/// file.
-struct IndexedMetricsFileState {
+/// Format-independent exact metadata of one active file, plus its `.midx` state when indexed.
+struct MetricsFileState {
     metrics_index: Option<MetricsIndexWriter>,
     file_meta: FileMeta,
     timestamp_index: usize,
     row_group_size: Option<usize>,
 }
 
-impl IndexedMetricsFileState {
+impl MetricsFileState {
     fn try_new(
         schema: &Arc<Schema>,
         timestamp_index: usize,
@@ -292,13 +289,13 @@ impl IndexedMetricsFileState {
     }
 }
 
-struct ActiveIndexedParquetWriter {
+struct ActiveMetricsParquetWriter {
     writer: AsyncArrowWriter<tokio::fs::File>,
     data_path: tempfile::TempPath,
-    state: IndexedMetricsFileState,
+    state: MetricsFileState,
 }
 
-impl ActiveIndexedParquetWriter {
+impl ActiveMetricsParquetWriter {
     fn try_new(
         schema: &Arc<Schema>,
         bloom_filter_fields: &[String],
@@ -311,7 +308,7 @@ impl ActiveIndexedParquetWriter {
         Ok(Self {
             writer,
             data_path,
-            state: IndexedMetricsFileState::try_new(
+            state: MetricsFileState::try_new(
                 schema,
                 timestamp_index,
                 Some(PARQUET_MAX_ROW_GROUP_SIZE),
@@ -334,13 +331,13 @@ impl ActiveIndexedParquetWriter {
     }
 }
 
-struct ActiveIndexedVortexWriter {
+struct ActiveMetricsVortexWriter {
     writer: VortexWriter<'static>,
     data_path: tempfile::TempPath,
-    state: IndexedMetricsFileState,
+    state: MetricsFileState,
 }
 
-impl ActiveIndexedVortexWriter {
+impl ActiveMetricsVortexWriter {
     fn try_new(
         schema: &Arc<Schema>,
         timestamp_index: usize,
@@ -352,7 +349,7 @@ impl ActiveIndexedVortexWriter {
         Ok(Self {
             writer: write_options.writer(file, dtype),
             data_path,
-            state: IndexedMetricsFileState::try_new(schema, timestamp_index, None, with_index)?,
+            state: MetricsFileState::try_new(schema, timestamp_index, None, with_index)?,
         })
     }
 
