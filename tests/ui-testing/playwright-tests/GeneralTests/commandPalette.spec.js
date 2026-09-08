@@ -53,6 +53,33 @@ test.describe('Command palette', () => {
     await pm.commandPalettePage.close();
   });
 
+  test('narrows to dashboards with a scope chip and opens one', {
+    tag: ['@commandPalette', '@general', '@P1', '@all'],
+  }, async ({ page }) => {
+    await pm.commandPalettePage.openWithKeyboard();
+    await pm.commandPalettePage.selectScope('dashboard');
+    await pm.commandPalettePage.expectFirstRow('action:newDashboard');
+    await pm.commandPalettePage.expectRowsOfType('dashboard');
+    const first = pm.commandPalettePage.list.locator('[role="option"][data-test="command-palette-row-dashboard"]').first();
+    const id = await first.getAttribute('data-item-id');
+    await first.click();
+    await pm.commandPalettePage.expectClosed();
+    await pm.commandPalettePage.expectUrl(/\/web\/dashboards\/view\?/, ORG);
+    expect(page.url()).toContain(`dashboard=${id.split('/').pop()}`);
+  });
+
+  test('finds a stream by name and opens it in the logs explorer', {
+    tag: ['@commandPalette', '@general', '@P1', '@all'],
+  }, async ({ page }) => {
+    await pm.commandPalettePage.openWithKeyboard();
+    await pm.commandPalettePage.type('e2e_automate');
+    await pm.commandPalettePage.expectRowsOfType('stream');
+    await pm.commandPalettePage.list.locator('[role="option"][data-item-id="stream:logs/e2e_automate"]').click();
+    await pm.commandPalettePage.expectClosed();
+    await pm.commandPalettePage.expectUrl(/\/web\/logs/, ORG);
+    expect(new URL(page.url()).searchParams.get('stream')).toBe('e2e_automate');
+  });
+
   test('shows the empty state for a query with no matches', {
     tag: ['@commandPalette', '@general', '@P2', '@all'],
   }, async () => {

@@ -79,6 +79,26 @@ export class CommandPalettePage {
       .toBe(true);
   }
 
+  scopeChip(scope) {
+    return this.page.locator(`[data-test="command-palette-scope-${scope}"]`);
+  }
+
+  async toggleScopes() {
+    await this.page.keyboard.press('Tab');
+  }
+
+  async selectScope(scope) {
+    await this.toggleScopes();
+    await this.scopeChip(scope).click();
+    await expect(this.page.locator('[data-test="command-palette-scope-pill"]')).toBeVisible({ timeout: 5000 });
+  }
+
+  async expectRowsOfType(type, min = 1) {
+    await expect
+      .poll(() => this.list.locator(`[role="option"][data-test="command-palette-row-${type}"]`).count(), { timeout: 15000 })
+      .toBeGreaterThanOrEqual(min);
+  }
+
   async pressEnter() {
     await this.page.keyboard.press('Enter');
   }
