@@ -134,12 +134,12 @@ impl MergeMode {
         }
     }
 
-    /// Metrics-specific layout of the file(s) the merge writes.
     /// The open-hour round over a metrics-index stream's pending ingester files.
     pub fn merges_open_hour_pending(&self) -> bool {
         matches!(self, Self::MetricsHashMerged)
     }
 
+    /// Metrics-specific layout of the file(s) the merge writes.
     pub fn metrics_file_layout(&self) -> Option<MetricsFileLayout> {
         match self {
             Self::MetricsHashSorted => Some(MetricsFileLayout::HashSorted),

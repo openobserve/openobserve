@@ -54,7 +54,7 @@ use tokio::sync::Semaphore;
 // - mode: what the merge produces (decided by the scheduler)
 // returns:
 // - new_files: the files that are merged
-// - retain_file_list: the files that are not merged
+// - merged_inputs: the input files the merge consumed, the ones to retire
 pub async fn merge_files(
     thread_id: usize,
     org_id: &str,
@@ -100,8 +100,6 @@ pub async fn merge_files(
         return Ok((Vec::new(), Vec::new()));
     }
 
-    let retain_file_list = new_file_list.clone();
-
     // cache parquet files
     let deleted_files = cache_remote_files(&new_file_list).await?;
     log::info!(
@@ -109,11 +107,12 @@ pub async fn merge_files(
         new_file_list.len(),
         start.elapsed().as_millis()
     );
-    if !deleted_files.is_empty() {
-        new_file_list.retain(|f| !deleted_files.contains(&f.key));
-    }
-    if new_file_list.len() <= 1 && !merge_whole_batch {
-        return Ok((Vec::new(), retain_file_list));
+    // a file the storage check skipped is never merged, so it is never retired here either:
+    // a missing one is already gone from the file list, a mismatched one keeps its data
+    let new_file_list = merged_inputs(new_file_list, &deleted_files);
+    // even a whole batch has nothing to merge once the storage check skipped every file
+    if new_file_list.is_empty() || (new_file_list.len() == 1 && !merge_whole_batch) {
+        return Ok((Vec::new(), Vec::new()));
     }
 
     // get time range and stats for these files in a single iteration
@@ -259,7 +258,10 @@ pub async fn merge_files(
     // clear session data
     search::datafusion::storage::file_list::clear(&trace_id);
 
-    let files = new_file_list.into_iter().map(|f| f.key).collect::<Vec<_>>();
+    let files = new_file_list
+        .iter()
+        .map(|f| f.key.clone())
+        .collect::<Vec<_>>();
     let buf = match merge_result {
         Ok(v) => v,
         Err(e) => {
@@ -349,7 +351,7 @@ pub async fn merge_files(
                 &new_file_key,
                 &full_text_search_fields,
                 &index_fields,
-                &retain_file_list,
+                &new_file_list,
                 &mut new_file_meta,
                 latest_schema.clone(),
                 buf,
@@ -361,7 +363,7 @@ pub async fn merge_files(
     }
     log::info!(
         "[COMPACTOR:WORKER:{thread_id}] merged {} files into {} new file(s): {:?}, original_size: {}, compressed_size: {}, took: {} ms",
-        retain_file_list.len(),
+        new_file_list.len(),
         new_files.len(),
         new_files.iter().map(|f| f.key.as_str()).collect::<Vec<_>>(),
         new_files.iter().map(|f| f.meta.original_size).sum::<i64>(),
@@ -372,7 +374,18 @@ pub async fn merge_files(
         start.elapsed().as_millis(),
     );
 
-    Ok((new_files, retain_file_list))
+    Ok((new_files, new_file_list))
+}
+
+/// The inputs a merge consumes: the planned files minus the ones the storage check skipped.
+fn merged_inputs(files: Vec<FileKey>, skipped: &[String]) -> Vec<FileKey> {
+    if skipped.is_empty() {
+        return files;
+    }
+    files
+        .into_iter()
+        .filter(|f| !skipped.contains(&f.key))
+        .collect()
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -490,4 +503,32 @@ async fn cache_remote_files(files: &[FileKey]) -> Result<Vec<String>, anyhow::Er
     }
 
     Ok(delete_files)
+}
+
+#[cfg(test)]
+mod tests {
+    use config::meta::stream::FileMeta;
+
+    use super::*;
+
+    fn file(key: &str) -> FileKey {
+        FileKey::new(
+            0,
+            "".to_string(),
+            key.to_string(),
+            FileMeta::default(),
+            false,
+        )
+    }
+
+    #[test]
+    fn test_merged_inputs_drop_only_the_skipped_files() {
+        let files = vec![file("a.parquet"), file("b.parquet"), file("c.parquet")];
+        let kept = merged_inputs(files.clone(), &["b.parquet".to_string()]);
+        assert_eq!(
+            kept.iter().map(|f| f.key.as_str()).collect::<Vec<_>>(),
+            ["a.parquet", "c.parquet"]
+        );
+        assert_eq!(merged_inputs(files, &[]).len(), 3);
+    }
 }

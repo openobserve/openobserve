@@ -44,11 +44,11 @@ use std::sync::LazyLock;
 use config::{RwAHashMap, get_config, meta::stream::StreamType, utils::time::hour_micros};
 use infra::cluster::get_cached_online_ingester_nodes;
 
-/// key: `org/stream_type/stream` -> (data partition hour in micros, files seen this hour)
 /// Pending ingester files an open metrics-index hour holds before they all merge; one round
 /// per this many flushes keeps the hour at a few merge chains at any ingester count.
 pub const OPEN_HOUR_MERGE_FILES: usize = 12;
 
+/// key: `org/stream_type/stream` -> (data partition hour in micros, files seen this hour)
 static PENDING_FILES: LazyLock<RwAHashMap<String, (i64, usize)>> = LazyLock::new(Default::default);
 
 /// Record that one new file was uploaded for `(org, stream_type, stream)` whose data
