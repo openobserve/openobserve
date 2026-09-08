@@ -16,7 +16,7 @@
 use config::ider;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set, TransactionTrait};
 
-use super::entity::timed_annotation_panels;
+use super::entity::{dashboards, timed_annotation_panels, timed_annotations};
 use crate::{
     db::{get_orm_client_ro, get_orm_client_rw},
     errors,
@@ -62,6 +62,8 @@ pub async fn insert_many_panels(
     Ok(())
 }
 
+/// Unscoped: only for replaying a delete the originating cluster already authorized. Callers
+/// serving a user request must use [`delete_many_panels_in_dashboard`].
 pub async fn delete_many_panels(
     timed_annotation_id: &str,
     panel_ids: Vec<String>,
@@ -82,4 +84,39 @@ pub async fn delete_many_panels(
     txn.commit().await?;
 
     Ok(())
+}
+
+/// Removes panel associations only when the annotation belongs to the given dashboard.
+pub async fn delete_many_panels_in_dashboard(
+    dashboard_id: &str,
+    timed_annotation_id: &str,
+    panel_ids: Vec<String>,
+) -> Result<(), errors::Error> {
+    if panel_ids.is_empty() {
+        return Ok(());
+    }
+
+    let client = get_orm_client_rw().await;
+    let dashboard_record = dashboards::Entity::find()
+        .filter(dashboards::Column::DashboardId.eq(dashboard_id))
+        .one(client)
+        .await?
+        .ok_or_else(|| {
+            errors::Error::DbError(errors::DbError::KeyNotExists(format!(
+                "Dashboard '{dashboard_id}' not found"
+            )))
+        })?;
+
+    timed_annotations::Entity::find()
+        .filter(timed_annotations::Column::Id.eq(timed_annotation_id))
+        .filter(timed_annotations::Column::DashboardId.eq(dashboard_record.id))
+        .one(client)
+        .await?
+        .ok_or_else(|| {
+            errors::Error::DbError(errors::DbError::KeyNotExists(format!(
+                "TimedAnnotation with ID {timed_annotation_id} not found in dashboard {dashboard_id}"
+            )))
+        })?;
+
+    delete_many_panels(timed_annotation_id, panel_ids).await
 }
