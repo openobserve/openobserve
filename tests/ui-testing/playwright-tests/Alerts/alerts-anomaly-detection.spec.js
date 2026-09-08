@@ -785,10 +785,14 @@ test.describe('Anomaly Detection', () => {
 
       // Delivery. The notification is sent inline by the detection run, so a
       // regression that stops it would otherwise pass every assertion above.
-      // Where the webhook points back at this instance's own ingest endpoint
-      // the alert becomes a queryable receipt; that only works where loopback
-      // is allowlisted (ZO_SSRF_ALLOW_LOOPBACK), so an external webhook is
-      // simply not readable and the check is skipped rather than faked.
+      //
+      // Readable only when the destination points back at this instance's own
+      // ingest endpoint, which turns a delivered alert into a queryable row.
+      // That needs loopback allowlisted (ZO_SSRF_ALLOW_LOOPBACK), so it is a
+      // CI-only enhancement: the default destination is example.com, which the
+      // SSRF guard accepts everywhere but nothing can read back. Skipped rather
+      // than faked there — no other spec asserts webhook delivery at all, and a
+      // green check that proves nothing would be worse than an honest gap.
       const webhook = process.env.MOCK_WEBHOOK_URL || '';
       const receiptStream = webhook.match(/\/api\/[^/]+\/([^/]+)\/_json/)?.[1];
       if (/localhost|127\.0\.0\.1/.test(webhook) && receiptStream) {

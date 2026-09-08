@@ -58,8 +58,8 @@ function getOrgName() {
 /**
  * Create a test destination via API (useful for CI/CD testing)
  *
- * Uses MOCK_WEBHOOK_URL env var if set, otherwise falls back to httpbin.org/post
- * which requires outbound internet connectivity.
+ * Uses MOCK_WEBHOOK_URL if set, else example.com/webhook — a public, reserved
+ * host that satisfies the SSRF guard without any third-party dependency.
  *
  * @param {import('@playwright/test').Page} page - Playwright page instance
  * @param {string} name - Destination name
@@ -68,8 +68,17 @@ function getOrgName() {
  */
 async function createMockDestination(page, name, template = 'Slack') {
   const org = getOrgName();
-  // Use MOCK_WEBHOOK_URL if set, otherwise fall back to httpbin.org
-  const finalUrl = process.env.MOCK_WEBHOOK_URL || 'https://httpbin.org/post';
+  // Defaults to example.com, matching the convention documented in
+  // alerts-advanced.spec.js: it is IANA-reserved, resolves to a PUBLIC ip so
+  // the SSRF guard accepts it, and is never actually delivered to — no
+  // third-party dependency and no rate limit. Pointing at this instance's own
+  // ingest instead fails on cloud/alpha, where the base URL is a private IP the
+  // guard rejects, leaving the destination form open forever.
+  //
+  // MOCK_WEBHOOK_URL overrides it where loopback is allowlisted
+  // (ZO_SSRF_ALLOW_LOOPBACK in CI); a self-ingest URL there turns a delivered
+  // alert into a queryable receipt, which is what makes delivery assertable.
+  const finalUrl = process.env.MOCK_WEBHOOK_URL || 'https://example.com/webhook';
   const payload = {
     name,
     template,
