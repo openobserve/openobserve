@@ -292,8 +292,8 @@ async fn raman_defaults_apply_when_the_writer_omits_the_columns() {
         .unwrap()
         .unwrap();
     assert!(!stored.enabled);
-    assert_eq!(stored.frequency_minutes, 60);
-    assert_eq!(stored.window_minutes, 1440);
+    assert_eq!(stored.frequency_minutes, 1440);
+    assert_eq!(stored.window_minutes, 43200);
     assert_eq!(stored.rule_overrides, None);
     assert_eq!(stored.created_at, None);
     assert_eq!(stored.updated_at, None);

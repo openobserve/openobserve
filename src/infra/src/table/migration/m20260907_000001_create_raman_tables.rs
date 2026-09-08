@@ -76,13 +76,13 @@ pub(super) fn configs_statement() -> TableCreateStatement {
             ColumnDef::new(RamanConfigs::FrequencyMinutes)
                 .integer()
                 .not_null()
-                .default(60),
+                .default(1440),
         )
         .col(
             ColumnDef::new(RamanConfigs::WindowMinutes)
                 .integer()
                 .not_null()
-                .default(1440),
+                .default(43200),
         )
         .col(ColumnDef::new(RamanConfigs::RuleOverrides).json().null())
         .col(ColumnDef::new(RamanConfigs::CreatedAt).big_integer().null())
