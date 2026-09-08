@@ -388,8 +388,9 @@ run_with_timeout() {
 claude_common_args() {
   printf '%s\n' --restricted --strict-mcp-config --mcp-config '{"mcpServers":{}}' --model "$MODEL" \
     --max-budget-usd "$1"
-  # Without a seatbelt the harness's working-directory confinement is the only wall, so the ledger is not opened.
-  [ "$NO_SANDBOX" -eq 1 ] || printf '%s\n' --add-dir "$ROUND_DIR" ${ALSO_REVIEW_DIRS[@]+"${ALSO_REVIEW_DIRS[@]/#/--add-dir=}"}
+  # Without a seatbelt the harness's working-directory confinement is the only wall, so the ledger is not opened; paired worktrees are read-only anyway.
+  [ "$NO_SANDBOX" -eq 1 ] || printf '%s\n' --add-dir "$ROUND_DIR"
+  printf '%s\n' ${ALSO_REVIEW_DIRS[@]+"${ALSO_REVIEW_DIRS[@]/#/--add-dir=}"}
   printf '%s\n' \
     --disallowedTools "Write" "Edit" "NotebookEdit" "WebFetch" "WebSearch" \
     --allowedTools "Bash(git diff:*)" "Bash(git log:*)" "Bash(git show:*)" "Bash(git status:*)" "Bash(git rev-parse:*)" "Bash(git merge-base:*)" \
@@ -469,13 +470,33 @@ gather_candidates() {
     || die "round budget \$$MAX_BUDGET_USD exhausted by the pre-run (\$$cost); raise --max-budget-usd or use --no-candidates"
 }
 
+# Inlined patches are capped so a large round cannot push the prompt past the model's context.
+inline_patch() {
+  local title="$1" file="$2" limit=200000 size
+  size=$(wc -c < "$file" | tr -d ' ')
+  echo "### $title"
+  echo '```diff'
+  if [ "$size" -gt "$limit" ]; then
+    head -c "$limit" "$file"
+    echo
+    echo "[truncated: $((size - limit)) of $size bytes omitted; run the loop on a host with sandbox-exec to review the rest]"
+  else
+    cat "$file"
+  fi
+  echo '```'
+}
+
 write_prompt() {
   local backend="$1" out="$2"
   PROMPT="$out/prompt.md"
   {
     if [ "$ROUND" -eq 1 ]; then cat "$SKILL_DIR/prompts/review.md"; else cat "$SKILL_DIR/prompts/verify.md"; fi
     echo
-    cat "$SKILL_DIR/prompts/backend-$backend.md"
+    if [ "$backend" = "claude" ] && [ "$NO_SANDBOX" -eq 1 ]; then
+      cat "$SKILL_DIR/prompts/backend-claude-nosandbox.md"
+    else
+      cat "$SKILL_DIR/prompts/backend-$backend.md"
+    fi
     echo
     echo "## Change set"
     echo "- Repository name: $REPO_NAME (use it as the \`repo\` of every finding in this checkout)"
@@ -556,22 +577,12 @@ write_prompt() {
     if [ "$backend" = "claude" ] && [ "$NO_SANDBOX" -eq 1 ]; then
       echo
       echo "## Patches (inline, because ledger files are not readable in this mode)"
-      echo "### Full patch of the primary checkout"
-      echo '```diff'
-      cat "$ROUND_DIR/diff.patch"
-      echo '```'
-      if [ "$ROUND" -gt 1 ]; then
-        echo "### Delta since the previous round"
-        echo '```diff'
-        cat "$ROUND_DIR/delta.patch"
-        echo '```'
-      fi
+      inline_patch "Full patch of the primary checkout" "$ROUND_DIR/diff.patch"
+      [ "$ROUND" -le 1 ] || inline_patch "Delta since the previous round" "$ROUND_DIR/delta.patch"
       for name in "$ROUND_DIR"/also/*/; do
         [ -s "$name/diff.patch" ] || continue
-        echo "### Full patch of the paired repository $(basename "$name")"
-        echo '```diff'
-        cat "$name/diff.patch"
-        echo '```'
+        inline_patch "Full patch of the paired repository $(basename "$name")" "$name/diff.patch"
+        [ "$ROUND" -le 1 ] || [ ! -f "$name/delta.patch" ] || inline_patch "Delta of the paired repository $(basename "$name") since the previous round" "$name/delta.patch"
       done
     fi
     if [ "$backend" = "claude" ] && [ "$CANDIDATES" -eq 1 ] && [ "$DRY_RUN" -eq 0 ] && [ -s "$out/candidates.md" ]; then
