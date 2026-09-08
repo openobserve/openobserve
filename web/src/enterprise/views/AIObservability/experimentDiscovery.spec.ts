@@ -13,20 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { beforeEach, describe, expect, it } from "vitest";
-import {
-  comparisonEligibility,
-  experimentEvidence,
-  groupExperiments,
-  readExperimentBaselines,
-  writeExperimentBaselines,
-} from "./experimentDiscovery";
+import { describe, expect, it } from "vitest";
+import { comparisonEligibility, experimentEvidence, groupExperiments } from "./experimentDiscovery";
 import { makeExperiment } from "./experimentTestFixtures";
 
 const experiment = (id: string, datasetId: string, createdAt: number) =>
   makeExperiment({ id, name: id, datasetId, createdAt });
-
-beforeEach(() => localStorage.clear());
 
 describe("experiment discovery", () => {
   it("reads cost straight off the row's aggregate summary", () => {
@@ -48,22 +40,22 @@ describe("experiment discovery", () => {
 
   it("groups by dataset, keeps filters independent, and pins the baseline first", () => {
     const rows = [
-      experiment("old", "dataset-a", 1),
       experiment("new", "dataset-a", 2),
+      makeExperiment({
+        id: "old",
+        name: "old",
+        datasetId: "dataset-a",
+        createdAt: 1,
+        isBaseline: true,
+      }),
       experiment("other", "dataset-b", 3),
     ];
-    const groups = groupExperiments(
-      rows,
-      new Map([["dataset-a", "Dataset A"]]),
-      { "dataset-a": "old" },
-      "dataset-a",
-      "",
-    );
+    const groups = groupExperiments(rows, new Map([["dataset-a", "Dataset A"]]), "dataset-a", "");
 
     expect(groups).toHaveLength(1);
     expect(groups[0].datasetName).toBe("Dataset A");
     expect(groups[0].experiments.map(({ id }) => id)).toEqual(["old", "new"]);
-    expect(groupExperiments(rows, new Map(), {}, "", "oth")[0].experiments[0].id).toBe("other");
+    expect(groupExperiments(rows, new Map(), "", "oth")[0].experiments[0].id).toBe("other");
   });
 
   it("reports why cross-dataset comparison is unavailable", () => {
@@ -146,12 +138,5 @@ describe("experiment discovery", () => {
         },
       ],
     });
-  });
-
-  it("persists one baseline per dataset and tolerates malformed storage", () => {
-    writeExperimentBaselines("acme", { one: "experiment-a" });
-    expect(readExperimentBaselines("acme")).toEqual({ one: "experiment-a" });
-    localStorage.setItem("o2_experiment_baselines_acme", "not-json");
-    expect(readExperimentBaselines("acme")).toEqual({});
   });
 });

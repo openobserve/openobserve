@@ -159,7 +159,9 @@
             class="flex min-w-0 items-center gap-2"
             :data-test="`ai-experiment-row-${experiment.id}`"
           >
-            <span class="text-text-heading min-w-0 truncate font-medium">{{ experiment.name }}</span>
+            <span class="text-text-heading min-w-0 truncate font-medium">{{
+              experiment.name
+            }}</span>
             <OTag v-if="isBaseline(experiment)" size="sm" variant="blue-soft">
               {{ t("aiObservability.experiments.baseline") }}
             </OTag>

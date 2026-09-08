@@ -54,7 +54,8 @@ export function experimentScoreSummaryValue(value: unknown, trialCount?: number)
       if (trialCount === 1) {
         return entries.find(([, count]) => Number(count) > 0)?.[0] ?? EMPTY_SCORE;
       }
-      return entries.sort((left, right) => Number(right[1]) - Number(left[1]))
+      return entries
+        .sort((left, right) => Number(right[1]) - Number(left[1]))
         .map(([category, count]) => `${category} × ${Number(count)}`)
         .join(" · ");
     }

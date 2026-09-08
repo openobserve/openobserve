@@ -738,6 +738,7 @@ const backRoute = computed(() =>
 const { goBack: backToParent } = useSmartBack(() => backRoute.value.to);
 const backTarget = computed(() => ({
   label: backRoute.value.label,
+  to: backRoute.value.to,
   onClick: backToParent,
 }));
 const items = ref<LlmQueueItem[]>([]);

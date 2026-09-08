@@ -412,7 +412,10 @@ describe("ExperimentDetailPage", () => {
     await flushPromises();
 
     expect(
-      wrapper.findAll("tbody tr")[2].findAll("td").map((cell) => cell.text()),
+      wrapper
+        .findAll("tbody tr")[2]
+        .findAll("td")
+        .map((cell) => cell.text()),
     ).toEqual(expect.arrayContaining(["0.718", "false", "safe"]));
     // Text labels keep row status accessible without relying on color.
     const chipText = taskStatuses.map((_, index) =>

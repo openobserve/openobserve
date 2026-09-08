@@ -336,10 +336,14 @@ async function inspectRow(row: ExperimentComparisonRow, siblings?: ExperimentCom
 }
 
 watch(orgId, () => void loadExperiments(), { immediate: true });
-watch([orgId, baselineId, candidateId], () => {
-  comparison.value = null;
-  outcomeDimensions.value = undefined;
-  rowDrawerOpen.value = false;
-  void loadComparison();
-}, { immediate: true });
+watch(
+  [orgId, baselineId, candidateId],
+  () => {
+    comparison.value = null;
+    outcomeDimensions.value = undefined;
+    rowDrawerOpen.value = false;
+    void loadComparison();
+  },
+  { immediate: true },
+);
 </script>

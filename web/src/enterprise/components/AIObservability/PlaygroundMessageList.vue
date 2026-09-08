@@ -183,7 +183,7 @@
             class="bg-dropdown-bg border-dropdown-border rounded-default absolute bottom-full left-0 z-10 mb-1 max-w-72 border px-2 py-1.5 shadow-md"
             :data-test="`ai-playground-var-value-${message.id}`"
           >
-            <span class="text-accent font-mono text-2xs font-semibold">{{
+            <span class="text-accent text-2xs font-mono font-semibold">{{
               tokenFor(caretToken.name)
             }}</span>
             <span class="text-text-secondary block text-xs wrap-break-word">{{

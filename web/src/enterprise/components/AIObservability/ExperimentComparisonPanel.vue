@@ -49,7 +49,9 @@
                   <OSelect
                     :model-value="selectedDimensions"
                     :options="outcomeOptions"
-                    :aria-label="t('aiObservability.experiments.comparePage.panel.outcomeDimensions')"
+                    :aria-label="
+                      t('aiObservability.experiments.comparePage.panel.outcomeDimensions')
+                    "
                     :disabled="loading"
                     :searchable="true"
                     multiple
@@ -286,22 +288,29 @@ const thresholdTooltip = computed(() =>
   }),
 );
 
-const selectedDimensions = computed(() => props.outcomeDimensions ?? comparison.value.outcomeDimensions);
+const selectedDimensions = computed(
+  () => props.outcomeDimensions ?? comparison.value.outcomeDimensions,
+);
 
-const outcomeOptions = computed(() => comparison.value.dimensions.map((dimension) => {
-  const label = dimension.kind === "cost"
-    ? t("aiObservability.experiments.comparePage.panel.tileCost")
-    : dimension.kind === "latency"
-      ? t("aiObservability.experiments.comparePage.panel.tileLatency")
-      : dimensionLabel(dimension);
-  return {
-    value: dimension.id,
-    label: dimension.canAffectOutcome
-      ? label
-      : t("aiObservability.experiments.comparePage.panel.outcomeDimensionUnavailable", { name: label }),
-    disabled: !dimension.canAffectOutcome,
-  };
-}));
+const outcomeOptions = computed(() =>
+  comparison.value.dimensions.map((dimension) => {
+    const label =
+      dimension.kind === "cost"
+        ? t("aiObservability.experiments.comparePage.panel.tileCost")
+        : dimension.kind === "latency"
+          ? t("aiObservability.experiments.comparePage.panel.tileLatency")
+          : dimensionLabel(dimension);
+    return {
+      value: dimension.id,
+      label: dimension.canAffectOutcome
+        ? label
+        : t("aiObservability.experiments.comparePage.panel.outcomeDimensionUnavailable", {
+            name: label,
+          }),
+      disabled: !dimension.canAffectOutcome,
+    };
+  }),
+);
 
 const selectionLabel = computed(() => {
   const count = selectedDimensions.value.length;

@@ -32,9 +32,15 @@ vi.mock("vue-router", () => ({
 }));
 
 const cloneExperiment = vi.fn();
+const setBaseline = vi.fn();
+const clearBaseline = vi.fn();
 const toast = vi.fn();
 vi.mock("@/services/llm-experiments.service", () => ({
-  default: { clone: (...a: any[]) => cloneExperiment(...a) },
+  default: {
+    clone: (...a: any[]) => cloneExperiment(...a),
+    setBaseline: (...a: any[]) => setBaseline(...a),
+    clearBaseline: (...a: any[]) => clearBaseline(...a),
+  },
 }));
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: (...a: any[]) => toast(...a) }));
 
@@ -140,6 +146,8 @@ beforeEach(() => {
   route.query = {};
   replace.mockReset();
   push.mockReset();
+  setBaseline.mockReset();
+  clearBaseline.mockReset();
   localStorage.clear();
 });
 
@@ -316,42 +324,40 @@ describe("ExperimentBrowser", () => {
     expect(wrapper.find("button input, button button").exists()).toBe(false);
   });
 
-  it("clears the baseline when the pin is clicked again", async () => {
+  it("calls clearBaseline when the pin is clicked on the current baseline", async () => {
+    const cleared = makeExperiment({ id: "old", isBaseline: false });
+    clearBaseline.mockResolvedValue(cleared);
     const wrapper = mount(ExperimentBrowser, {
       props: {
         orgId: "acme",
-        experiments: [experiment("new", "dataset-a", 2), experiment("old", "dataset-a", 1)],
+        experiments: [
+          experiment("new", "dataset-a", 2),
+          makeExperiment({
+            id: "old",
+            name: "old",
+            datasetId: "dataset-a",
+            createdAt: 1,
+            isBaseline: true,
+          }),
+        ],
         datasets: [{ id: "dataset-a", name: "Dataset A" }] as any,
       },
       global: { stubs },
     });
 
-    const pin = () => wrapper.get('[data-test="ai-experiment-baseline-old"]');
-    await pin().trigger("click");
-    expect(JSON.parse(localStorage.getItem("o2_experiment_baselines_acme") ?? "{}")).toEqual({
-      "dataset-a": "old",
-    });
+    await wrapper.get('[data-test="ai-experiment-baseline-old"]').trigger("click");
+    await flushPromises();
 
-    // The pin renders filled once set, so it reads as a toggle — before this it
-    // could only ever re-pin the row to itself, stranding the baseline forever.
-    await pin().trigger("click");
-    expect(JSON.parse(localStorage.getItem("o2_experiment_baselines_acme") ?? "{}")).toEqual({});
-
-    // The dataset key is DELETED, not blanked: an empty string left behind still
-    // reads as a configured baseline everywhere the id is looked up.
-    expect(
-      Object.prototype.hasOwnProperty.call(
-        JSON.parse(localStorage.getItem("o2_experiment_baselines_acme") ?? "{}"),
-        "dataset-a",
-      ),
-    ).toBe(false);
+    expect(clearBaseline).toHaveBeenCalledWith("acme", "old");
+    expect(setBaseline).not.toHaveBeenCalled();
+    expect(wrapper.emitted("baseline-changed")?.[0]).toEqual([cleared, null]);
   });
 
-  it("leaves another dataset's baseline alone when one is cleared", async () => {
-    localStorage.setItem(
-      "o2_experiment_baselines_acme",
-      JSON.stringify({ "dataset-a": "old", "dataset-b": "other" }),
-    );
+  it("calls setBaseline when the pin is clicked on a non-baseline row", async () => {
+    setBaseline.mockResolvedValue({
+      experiment: makeExperiment({ id: "old", isBaseline: true }),
+      previousBaselineId: null,
+    });
     const wrapper = mount(ExperimentBrowser, {
       props: {
         orgId: "acme",
@@ -362,27 +368,31 @@ describe("ExperimentBrowser", () => {
     });
 
     await wrapper.get('[data-test="ai-experiment-baseline-old"]').trigger("click");
+    await flushPromises();
 
-    expect(JSON.parse(localStorage.getItem("o2_experiment_baselines_acme") ?? "{}")).toEqual({
-      "dataset-b": "other",
-    });
+    expect(setBaseline).toHaveBeenCalledWith("acme", "old");
+    expect(clearBaseline).not.toHaveBeenCalled();
   });
 
-  it("persists the selected baseline and orders it first", async () => {
+  it("pins the baseline first regardless of creation order", async () => {
     const wrapper = mount(ExperimentBrowser, {
       props: {
         orgId: "acme",
-        experiments: [experiment("new", "dataset-a", 2), experiment("old", "dataset-a", 1)],
+        experiments: [
+          experiment("new", "dataset-a", 2),
+          makeExperiment({
+            id: "old",
+            name: "old",
+            datasetId: "dataset-a",
+            createdAt: 1,
+            isBaseline: true,
+          }),
+        ],
         datasets: [{ id: "dataset-a", name: "Dataset A" }] as any,
       },
       global: { stubs },
     });
 
-    await wrapper.get('[data-test="ai-experiment-baseline-old"]').trigger("click");
-
-    expect(JSON.parse(localStorage.getItem("o2_experiment_baselines_acme") ?? "{}")).toEqual({
-      "dataset-a": "old",
-    });
     const rows = wrapper.findAll('[data-test^="ai-experiment-row-"]');
     expect(rows.map((row) => row.attributes("data-test"))).toEqual([
       "ai-experiment-row-old",
@@ -391,11 +401,19 @@ describe("ExperimentBrowser", () => {
   });
 
   it("uses the baseline as the default peer and opens the compare screen", async () => {
-    localStorage.setItem("o2_experiment_baselines_acme", JSON.stringify({ "dataset-a": "old" }));
     const wrapper = mount(ExperimentBrowser, {
       props: {
         orgId: "acme",
-        experiments: [experiment("new", "dataset-a", 2), experiment("old", "dataset-a", 1)],
+        experiments: [
+          experiment("new", "dataset-a", 2),
+          makeExperiment({
+            id: "old",
+            name: "old",
+            datasetId: "dataset-a",
+            createdAt: 1,
+            isBaseline: true,
+          }),
+        ],
         datasets: [{ id: "dataset-a", name: "Dataset A" }] as any,
         syncUrl: true,
       },
@@ -443,7 +461,10 @@ describe("ExperimentBrowser", () => {
   it("gives each scorer its own column instead of one joined score label", () => {
     const row = experiment("scored", "dataset-a", 1);
     row.scoreSummaries = [
-      makeScoreSummary({ name: "approved", value: { kind: "boolean", trueCount: 1, falseCount: 0 } }),
+      makeScoreSummary({
+        name: "approved",
+        value: { kind: "boolean", trueCount: 1, falseCount: 0 },
+      }),
       makeScoreSummary({
         name: "label",
         value: { kind: "categorical", counts: { good: 1 } },
@@ -464,7 +485,9 @@ describe("ExperimentBrowser", () => {
 
   it("keeps score columns scoped to their dataset group", () => {
     const first = experiment("first", "dataset-a", 1);
-    first.scoreSummaries = [makeScoreSummary({ name: "quality", value: { kind: "numeric", mean: 0.8 } })];
+    first.scoreSummaries = [
+      makeScoreSummary({ name: "quality", value: { kind: "numeric", mean: 0.8 } }),
+    ];
     const second = experiment("second", "dataset-b", 2);
     second.scoreSummaries = [
       makeScoreSummary({ name: "safety", value: { kind: "boolean", trueCount: 1, falseCount: 0 } }),

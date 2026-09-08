@@ -828,7 +828,9 @@ function normalizeComparisonDimension(input: any): ExperimentComparisonDimension
     delta: value(input, "delta", "delta", null),
     orientedDelta: value(input, "orientedDelta", "oriented_delta", null),
     gating: Boolean(value(input, "gating", "gating", false)),
-    canAffectOutcome: Boolean(value(input, "canAffectOutcome", "can_affect_outcome", input?.gating ?? false)),
+    canAffectOutcome: Boolean(
+      value(input, "canAffectOutcome", "can_affect_outcome", input?.gating ?? false),
+    ),
     normalized: Boolean(value(input, "normalized", "normalized", false)),
     baselineSampleCount: Number(value(input, "baselineSampleCount", "baseline_sample_count", 0)),
     candidateSampleCount: Number(value(input, "candidateSampleCount", "candidate_sample_count", 0)),
@@ -962,7 +964,9 @@ const llmExperimentsService = {
       params: {
         baselineId,
         candidateId,
-        ...(outcomeDimensions === undefined ? {} : { outcomeDimensions: outcomeDimensions.join(",") }),
+        ...(outcomeDimensions === undefined
+          ? {}
+          : { outcomeDimensions: outcomeDimensions.join(",") }),
         ...(threshold === undefined ? {} : { threshold }),
       },
     });

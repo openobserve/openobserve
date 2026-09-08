@@ -205,7 +205,9 @@ describe("ExperimentComparisonPanel", () => {
         { ...comparison.dimensions[0], id: "descriptive", gating: false, canAffectOutcome: false },
       ],
     });
-    const select = wrapper.getComponent('[data-test="ai-experiment-comparison-outcome-dimensions"]');
+    const select = wrapper.getComponent(
+      '[data-test="ai-experiment-comparison-outcome-dimensions"]',
+    );
     expect(select.props("options")).toEqual([
       expect.objectContaining({ value: "quality", disabled: false }),
       expect.objectContaining({ value: "latency_ms", disabled: false }),
@@ -313,7 +315,13 @@ describe("ExperimentComparisonPanel", () => {
     const descriptive = {
       ...comparison,
       dimensions: [
-        { ...comparison.dimensions[0], name: "tone", scoreConfigName: "tone", gating: false, canAffectOutcome: false },
+        {
+          ...comparison.dimensions[0],
+          name: "tone",
+          scoreConfigName: "tone",
+          gating: false,
+          canAffectOutcome: false,
+        },
       ],
       rows: [
         {

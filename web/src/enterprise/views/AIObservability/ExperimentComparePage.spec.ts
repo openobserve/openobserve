@@ -77,15 +77,17 @@ function mountPage(realPanel = false) {
           props: ["modelValue", "options"],
           template: `<button :data-options="options.map((o) => o.value).join(',')"></button>`,
         },
-        ExperimentComparisonPanel: realPanel ? false : {
-          props: ["comparison"],
-          template: `<div>
+        ExperimentComparisonPanel: realPanel
+          ? false
+          : {
+              props: ["comparison"],
+              template: `<div>
             <button data-test="inspect-comparison" @click="$emit('inspect', comparison.rows[0])">Inspect</button>
             <button data-test="pick-threshold" @click="$emit('apply-threshold', 0.15)">Threshold</button>
             <button data-test="select-columns" @click="$emit('select-outcome-dimensions', ['cost'])">Select</button>
             <button data-test="clear-columns" @click="$emit('select-outcome-dimensions', [])">Clear</button>
           </div>`,
-        },
+            },
         ExperimentComparisonRowDrawer: true,
       },
     },
@@ -143,7 +145,9 @@ describe("ExperimentComparePage", () => {
     await flushPromises();
     const initial = await compare.mock.results[0].value;
     compare.mockImplementation(async (_org, _baseline, _candidate, threshold, dimensions) => ({
-      ...initial, threshold, outcomeDimensions: dimensions ?? initial.outcomeDimensions,
+      ...initial,
+      threshold,
+      outcomeDimensions: dimensions ?? initial.outcomeDimensions,
     }));
 
     await wrapper.get('[data-test="pick-threshold"]').trigger("click");
@@ -164,7 +168,9 @@ describe("ExperimentComparePage", () => {
   it("restores the rendered selection after a failed request", async () => {
     const wrapper = mountPage(true);
     await flushPromises();
-    const selector = wrapper.getComponent('[data-test="ai-experiment-comparison-outcome-dimensions"]');
+    const selector = wrapper.getComponent(
+      '[data-test="ai-experiment-comparison-outcome-dimensions"]',
+    );
     expect(selector.props("modelValue")).toEqual(["cost", "latency"]);
     compare.mockRejectedValueOnce(new Error("Comparison unavailable"));
     selector.vm.$emit("update:modelValue", ["cost"]);
@@ -178,9 +184,16 @@ describe("ExperimentComparePage", () => {
     const wrapper = mountPage(true);
     await flushPromises();
     const initial = await compare.mock.results[0].value;
-    const selector = wrapper.getComponent('[data-test="ai-experiment-comparison-outcome-dimensions"]');
+    const selector = wrapper.getComponent(
+      '[data-test="ai-experiment-comparison-outcome-dimensions"]',
+    );
     let resolveEarlier!: (value: unknown) => void;
-    compare.mockImplementationOnce(() => new Promise((resolve) => { resolveEarlier = resolve; }));
+    compare.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveEarlier = resolve;
+        }),
+    );
     selector.vm.$emit("update:modelValue", ["cost"]);
     await flushPromises();
 
