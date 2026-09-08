@@ -374,7 +374,7 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown, true));
         <div
           v-if="row.kind === 'header'"
           role="presentation"
-          class="text-3xs text-text-secondary px-2 pt-3 pb-1 font-semibold tracking-wider uppercase first:pt-0"
+          class="text-accent border-border-default mt-3 border-t px-2 pt-3 pb-1.5 text-xs font-semibold tracking-wide first:mt-0 first:border-t-0 first:pt-0"
           :data-test="`command-palette-group-${row.key}`"
         >
           {{ row.label }}
