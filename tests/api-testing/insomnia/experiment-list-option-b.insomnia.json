@@ -1,0 +1,119 @@
+{
+  "_type": "export",
+  "__export_format": 4,
+  "__export_date": "2026-09-07T10:45:00.000Z",
+  "__export_source": "codex",
+  "resources": [
+    {
+      "_id": "wrk_openobserve_experiment_list_option_b",
+      "parentId": null,
+      "modified": 1788777900000,
+      "created": 1788777900000,
+      "name": "OpenObserve Experiment List Option B",
+      "description": "Requests for reviewing the enriched experiment-list API contract.",
+      "scope": "collection",
+      "_type": "workspace"
+    },
+    {
+      "_id": "env_openobserve_experiment_list_option_b",
+      "parentId": "wrk_openobserve_experiment_list_option_b",
+      "modified": 1788777900000,
+      "created": 1788777900000,
+      "name": "Base Environment",
+      "data": {
+        "base_url": "http://fix-ai-issues-4.localhost:15080",
+        "org_id": "default",
+        "username": "",
+        "password": ""
+      },
+      "dataPropertyOrder": {
+        "&": [
+          "base_url",
+          "org_id",
+          "username",
+          "password"
+        ]
+      },
+      "color": null,
+      "isPrivate": false,
+      "metaSortKey": 1788777900000,
+      "_type": "environment"
+    },
+    {
+      "_id": "fld_openobserve_experiments",
+      "parentId": "wrk_openobserve_experiment_list_option_b",
+      "modified": 1788777900000,
+      "created": 1788777900000,
+      "name": "Experiments",
+      "description": "Experiment management API requests.",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": -1788777900000,
+      "_type": "request_group"
+    },
+    {
+      "_id": "req_list_experiments_with_summary",
+      "parentId": "fld_openobserve_experiments",
+      "modified": 1788777900000,
+      "created": 1788777900000,
+      "url": "{{ _.base_url }}/api/{{ _.org_id }}/experiments",
+      "name": "List Experiments (with summary)",
+      "description": "Returns authorized experiments with consolidated status, execution and scoring progress, score summaries, and aggregate cost. Disable includeSummary to review the metadata-only response.",
+      "method": "GET",
+      "body": {},
+      "parameters": [
+        {
+          "id": "pair_include_summary",
+          "name": "includeSummary",
+          "value": "true",
+          "description": "Opt in to derived experiment summaries.",
+          "disabled": false
+        }
+      ],
+      "headers": [
+        {
+          "name": "Accept",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {
+        "type": "basic",
+        "useISO88591": false,
+        "disabled": false,
+        "username": "{{ _.username }}",
+        "password": "{{ _.password }}"
+      },
+      "metaSortKey": -1788777900000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "res_list_experiments_with_summary_200",
+      "parentId": "req_list_experiments_with_summary",
+      "modified": 1788777900000,
+      "created": 1788777900000,
+      "url": "{{ _.base_url }}/api/{{ _.org_id }}/experiments?includeSummary=true",
+      "name": "200 - Enriched experiment list",
+      "status": "OK",
+      "statusCode": 200,
+      "mimeType": "application/json",
+      "httpVersion": "HTTP/1.1",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": "{\n  \"list\": [\n    {\n      \"id\": \"experiment-1\",\n      \"orgId\": \"default\",\n      \"name\": \"RAG quality baseline\",\n      \"description\": null,\n      \"datasetId\": \"dataset-1\",\n      \"datasetName\": \"RAG golden set\",\n      \"datasetVersion\": 3,\n      \"datasetFilter\": null,\n      \"task\": {\n        \"type\": \"sdk\",\n        \"taskFingerprint\": \"sha256:example\",\n        \"config\": {}\n      },\n      \"scorers\": [],\n      \"trialCount\": 1,\n      \"metadata\": null,\n      \"executionStatus\": \"completed\",\n      \"executionStatusReason\": null,\n      \"deadlineAt\": 1788781500000,\n      \"executionCompletedAt\": 1788777960000,\n      \"lifecycleVersion\": 2,\n      \"retryCount\": 0,\n      \"idempotencyKey\": null,\n      \"isBaseline\": true,\n      \"createdBy\": \"reviewer@example.com\",\n      \"createdAt\": 1788777900000,\n      \"status\": \"completed\",\n      \"scoringStatus\": \"completed\",\n      \"executionProgress\": {\n        \"completed\": 4,\n        \"total\": 4,\n        \"skipped\": 0\n      },\n      \"scoringProgress\": {\n        \"completed\": 0,\n        \"total\": 0,\n        \"skipped\": 0\n      },\n      \"scoreSummaries\": [],\n      \"aggregateSummary\": {\n        \"p50LatencyMs\": 4511,\n        \"totalCost\": 0.0406,\n        \"taskCost\": 0.0406,\n        \"scoringCost\": 0.0,\n        \"costIncomplete\": false,\n        \"incomplete\": false,\n        \"incompleteTaskSlots\": 0,\n        \"incompleteScoreDimensions\": 0,\n        \"errorTaskSlots\": 0\n      }\n    }\n  ]\n}",
+      "cookies": [],
+      "metaSortKey": -1788777900000,
+      "_type": "response"
+    }
+  ]
+}

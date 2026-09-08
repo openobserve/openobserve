@@ -47,6 +47,7 @@
           <PlaygroundVariantConfig
             :variant="variant"
             :var-names="varNames"
+            :vars="vars"
             @change="(next) => emit('change', next)"
           />
         </div>
