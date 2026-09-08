@@ -95,14 +95,9 @@ pub struct DeadLetteredRow {
     pub synthetics_name: String,
     pub org_id: String,
     pub location: String,
-    /// The SLOT this job was scheduled for, not the wall clock it died at, and
-    /// the third component of the free step pool's idempotency key
-    /// `(synthetics_id, location, scheduled_ts, job_id)`. A reaped job never
-    /// acks, so the reaper must return its enqueue reservation under the SAME
-    /// key the ack would have used, or the one-time grant is refunded twice.
+    /// The SLOT this job was scheduled for, not the wall clock it died at.
     pub scheduled_ts: i64,
-    /// Steps frozen at enqueue — what the reservation was computed from. See
-    /// `scheduled_ts` for why the reaper needs it.
+    /// Steps frozen at enqueue — the definition this job was dispatched against.
     pub steps_configured: i32,
     /// Engine+device combos frozen onto this job (`None` for protocol checks) —
     /// the other half of `configured x combos`.
@@ -601,12 +596,7 @@ pub async fn dead_letter_expired<C: ConnectionTrait>(
                     org_id: row.try_get("", "org_id").ok()?,
                     location: row.try_get("", "location").ok()?,
                     scheduled_ts: row.try_get("", "scheduled_ts").ok()?,
-                    // The two BILLING columns degrade instead of dropping the
-                    // row: the identity fields above make a row unaccountable if
-                    // missing, these two only size a refund. `steps_configured`
-                    // is NOT NULL with a DEFAULT 50 backfill so 0 is unreachable;
-                    // if reached, `enqueue_reservation` floors it at 1 — the
-                    // refund is short, never inverted.
+                    // Degradable: a dead-lettered job never acks, so nothing bills off these two.
                     steps_configured: row.try_get("", "steps_configured").unwrap_or_default(),
                     browser_devices: row.try_get("", "browser_devices").unwrap_or_default(),
                     dispatch_attempts,
@@ -896,60 +886,6 @@ pub async fn prune_stale<C: ConnectionTrait>(conn: &C, now_us: i64) -> Result<u6
 mod tests {
     use super::*;
 
-    /// **One job is settled by exactly one of the two paths.** An acked job is
-    /// reconciled by the ack, a reaped one refunded by the reaper; both firing
-    /// for one job means a double refund, or a refund on top of an ack, against
-    /// a one-time grant. Only these two compare-and-swaps enforce it:
-    /// `ack_complete` applies only from `status = 1` and returns `Ok(None)`
-    /// otherwise, and `dead_letter_expired` re-checks the status its SELECT saw
-    /// and returns only rows whose UPDATE matched. Pinned over source text
-    /// because neither guard is reachable without a database.
-    #[test]
-    fn an_ack_and_a_dead_letter_cannot_both_settle_one_job() {
-        let src = include_str!("synthetics_jobs.rs");
-
-        assert!(
-            src.contains("WHERE id = $4 AND status = 1{owner_clause}"),
-            "`ack_complete` must only apply to a job that is still Claimed",
-        );
-        assert!(
-            src.contains("if applied.rows_affected() == 0 {\n        return Ok(None);"),
-            "an ack that did not apply must report `None`, or the caller bills a job it lost",
-        );
-
-        assert!(
-            src.contains("\"UPDATE synthetics_jobs SET status = 2 WHERE id = $1 AND status = $2\""),
-            "the dead letter must re-check the status its SELECT saw",
-        );
-        assert!(
-            src.contains("if res.rows_affected() == 1 {\n            dead.push(row);"),
-            "only a row this call actually transitioned may be returned to the caller",
-        );
-    }
-
-    /// The four columns the pool's idempotency key is built from must all leave
-    /// this function, or the reaper keys its refund differently from the ack's
-    /// reconcile and one job can be paid back twice.
-    #[test]
-    fn a_dead_lettered_row_carries_everything_the_pool_key_needs() {
-        let src = include_str!("synthetics_jobs.rs");
-        let at = src
-            .find("pub async fn dead_letter_expired")
-            .expect("dead_letter_expired moved");
-        let body = &src[at..];
-        for column in ["scheduled_ts", "steps_configured", "browser_devices"] {
-            assert!(
-                body.contains(&format!("row.try_get(\"\", \"{column}\")")),
-                "`dead_letter_expired` must read {column} — the refund is sized and keyed on it",
-            );
-        }
-        // `id`, `synthetics_id` and `location` are the rest of the key and were
-        // always on the row; pinned so a tidy-up cannot drop one silently.
-        for column in ["id", "synthetics_id", "location"] {
-            assert!(body.contains(&format!("\"{column}\"")));
-        }
-    }
-
     #[test]
     fn test_enqueue_params_fields() {
         let p = EnqueueParams {
@@ -1068,14 +1004,12 @@ mod tests {
         );
     }
 
-    /// **The missed-SELECT-column catcher for the reaper's refund.** A reaped
-    /// job never acks, so nothing else returns its enqueue reservation. Sizing
-    /// and keying it needs `steps_configured` and `browser_devices` (for
-    /// `configured x combos`) plus `scheduled_ts` (the slot, third component of
-    /// the idempotency key); omitting any from the raw SELECT fails only in
-    /// production, as a permanent hold on a one-time grant.
+    /// **The missed-SELECT-column catcher, run against a real database.** The
+    /// source scan above cannot tell a column read from the row apart from one
+    /// the SELECT list never asked for, and a reaped job never acks, so nothing
+    /// else ever reads these values back.
     #[tokio::test]
-    async fn dead_letter_expired_carries_what_the_pool_refund_is_keyed_and_sized_on() {
+    async fn dead_letter_expired_returns_a_fully_populated_row_once_per_job() {
         let db = jobs_db().await;
         let mut p = browser_params(14);
         // Pending and already past its window: nothing ever leased it.
@@ -1088,7 +1022,7 @@ mod tests {
         assert_eq!(row.id, job_id);
         assert_eq!(
             row.scheduled_ts, SCHEDULED_TS,
-            "the refund is keyed on the SLOT, and the slot is this column",
+            "this must be the SLOT the job was scheduled for, not the wall clock it died at",
         );
         assert_eq!(row.steps_configured, 14);
         assert!(
@@ -1097,7 +1031,7 @@ mod tests {
         );
         assert_eq!(row.reason, DeadLetterReason::NeverDispatched);
 
-        // The CAS: a second pass finds nothing, so one refund per job however
+        // The CAS: a second pass finds nothing, so one accounting per job however
         // many reaper nodes run.
         assert!(
             dead_letter_expired(&db, SCHEDULED_TS + 1, 3)
@@ -1111,9 +1045,9 @@ mod tests {
     /// **A job that acked normally is never handed to the reaper.** Not a check
     /// in the reaper: its row is simply no longer in a status
     /// `dead_letter_expired`'s compare-and-swap will claim. The ack already
-    /// reconciled the pool; a refund on top would credit work already billed.
+    /// accounted for the job; a dead letter on top would count it twice.
     #[tokio::test]
-    async fn a_job_that_acked_is_never_dead_lettered_and_so_never_refunded() {
+    async fn a_job_that_acked_is_never_dead_lettered() {
         let db = jobs_db().await;
         let mut p = browser_params(14);
         p.valid_until = SCHEDULED_TS + 1;
@@ -1146,13 +1080,13 @@ mod tests {
                 .await
                 .unwrap()
                 .is_empty(),
-            "a completed job must never reach the reaper's refund",
+            "a completed job must never reach the reaper",
         );
     }
 
     /// The other order: once the reaper has claimed a job, a late ack applies
-    /// nothing — `ack_complete` returns `None`, read as "touch no run accounting
-    /// and no pool". So neither path can move the grant twice.
+    /// nothing — `ack_complete` returns `None`, read as "touch no run
+    /// accounting". So neither path can settle the job twice.
     #[tokio::test]
     async fn a_late_ack_for_a_dead_lettered_job_applies_nothing() {
         let db = jobs_db().await;
