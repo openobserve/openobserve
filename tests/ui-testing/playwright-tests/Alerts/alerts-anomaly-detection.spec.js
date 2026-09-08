@@ -716,6 +716,24 @@ test.describe('Anomaly Detection', () => {
       });
       expect(seed.status, `seeding ${seededStream} failed: ${JSON.stringify(seed.data)}`).toBe(200);
       await waitForStream(page, seededStream);
+
+      // Aim a destination at the in-test receiver BEFORE the wizard mounts: it
+      // fetches destinations once, on mount, so one created later is missing
+      // from the picker and refreshing it is a race. The SSRF guard refuses a
+      // private ip unless loopback is allowlisted, so where it is not, fall
+      // back to the shared destination and leave delivery unasserted.
+      received.length = 0;
+      const sinkName = `e2e_anomaly_sink_${randomValue}`;
+      const sink = await createMockDestination(page, sinkName, prerequisiteTemplateName, {
+        url: `http://127.0.0.1:${receiverPort}/anomaly`,
+      });
+      const deliveryAssertable = sink.status === 200;
+      if (!deliveryAssertable) {
+        testLogger.info('Loopback destination refused; delivery will not be asserted', {
+          status: sink.status,
+          body: JSON.stringify(sink.data),
+        });
+      }
       // The app caches its stream list from page load, which happened before
       // the seed — without a reload the new stream is absent from the picker
       // even though the API already lists it.
@@ -735,22 +753,6 @@ test.describe('Anomaly Detection', () => {
       await pm.anomalyDetectionPage.setDetectionWindow(1, 'h');
       await pm.anomalyDetectionPage.setTrainingWindow(1);
       await pm.anomalyDetectionPage.selectSensitivityTier(95);
-
-      // Prefer a destination aimed at the in-test receiver; the SSRF guard
-      // refuses a private ip unless loopback is allowlisted, so fall back to
-      // the shared destination and leave delivery unasserted where it is not.
-      received.length = 0;
-      const sinkName = `e2e_anomaly_sink_${randomValue}`;
-      const sink = await createMockDestination(page, sinkName, prerequisiteTemplateName, {
-        url: `http://127.0.0.1:${receiverPort}/anomaly`,
-      });
-      const deliveryAssertable = sink.status === 200;
-      if (!deliveryAssertable) {
-        testLogger.info('Loopback destination refused; delivery will not be asserted', {
-          status: sink.status,
-          body: JSON.stringify(sink.data),
-        });
-      }
 
       await pm.anomalyDetectionPage.openAlertingTab();
       await pm.anomalyDetectionPage.toggleNotifications(true);

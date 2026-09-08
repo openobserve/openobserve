@@ -515,17 +515,33 @@ class AnomalyDetectionPage {
         await this.page.keyboard.press('Escape');
     }
 
-    /** Falls back to the button's title on builds predating its data-test. */
+    /**
+     * Re-pull the org's destinations.
+     *
+     * The wizard fetches the list once, in the view's onBeforeMount, so a
+     * destination created after the wizard opened is invisible to the picker
+     * until this runs. Await the list response rather than the click, or the
+     * next open of the select races the refetch.
+     *
+     * Falls back to the button's title on builds predating its data-test.
+     */
     async refreshDestinations() {
         const btn = this.page.locator(this.selectors.refreshDestinations);
-        if (await btn.count()) {
-            await btn.click();
-            return;
-        }
-        await this.page
-            .locator('.step-anomaly-alerting button[title="Refresh latest Destinations"]')
-            .first()
-            .click();
+        const target = (await btn.count())
+            ? btn
+            : this.page
+                  .locator('.step-anomaly-alerting button[title="Refresh latest Destinations"]')
+                  .first();
+        await Promise.all([
+            this.page.waitForResponse(
+                (res) =>
+                    res.url().includes('/alerts/destinations') &&
+                    res.request().method() === 'GET' &&
+                    res.ok(),
+                { timeout: 15000 },
+            ),
+            target.click(),
+        ]);
     }
 
     getDestinationErrorLocator() {
@@ -659,36 +675,57 @@ class AnomalyDetectionPage {
     }
 
     /** OInput puts the real <input> behind a -field suffix; the wrapper is a div. */
+    /**
+     * Filter the list. The search debounces, so callers must not act on a row
+     * until it has settled — awaitRow below is what every row action uses.
+     */
     async searchAnomaly(name) {
         await this.fillFormInput(this.selectors.searchInput, name);
-        await this.page.waitForTimeout(1000);
+        await this.page.locator(this.selectors.listTable).waitFor({ state: 'visible', timeout: 15000 });
+    }
+
+    /**
+     * Wait for a row to actually be on screen before acting on it.
+     *
+     * The row actions are per-row data-tests, so clicking one straight after a
+     * debounced search races the filter: the locator resolves to nothing and
+     * the click times out somewhere unrelated to the real cause.
+     */
+    async awaitRow(name, timeout = 20000) {
+        await this.getRow(name).waitFor({ state: 'visible', timeout });
     }
 
     async openEdit(name) {
+        await this.awaitRow(name);
         await this.page.locator(this.selectors.rowEdit(name)).click();
         await this.page.locator(this.selectors.saveBtn).waitFor({ state: 'visible', timeout: 15000 });
     }
 
     async openDetail(name) {
+        await this.awaitRow(name);
         await this.page.locator(this.selectors.rowName(name)).click();
     }
 
     async togglePause(name) {
+        await this.awaitRow(name);
         await this.page.locator(this.selectors.rowPause(name)).click();
     }
 
     async triggerDetection(name) {
+        await this.awaitRow(name);
         await this.page.locator(this.selectors.rowMoreOptions(name)).click();
         await this.page.locator(this.selectors.rowTriggerDetection(name)).click();
     }
 
     async retrain(name) {
+        await this.awaitRow(name);
         await this.page.locator(this.selectors.rowMoreOptions(name)).click();
         await this.page.locator(this.selectors.rowRetrain(name)).click();
     }
 
     /** Delete lives in the row's overflow menu, not on the row itself. */
     async deleteAnomaly(name) {
+        await this.awaitRow(name);
         await this.page.locator(this.selectors.rowMoreOptions(name)).click();
         await this.page.locator(this.selectors.rowDelete(name)).click();
         const confirm = this.page.locator(
