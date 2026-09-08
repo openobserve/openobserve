@@ -4729,8 +4729,8 @@ mod tests {
     fn synthetics_reload_classification_is_pinned() {
         assert_eq!(
             SYNTHETICS_RELOAD_CLASSES.len(),
-            14,
-            "Synthetics has 14 keys; every one needs a reload class"
+            15,
+            "Synthetics has 15 keys; every one needs a reload class"
         );
 
         let mut classified: Vec<&str> = SYNTHETICS_RELOAD_CLASSES
@@ -4756,6 +4756,7 @@ mod tests {
                 "ZO_SYNTHETICS_AGENT_STALE_SECS",
                 "ZO_SYNTHETICS_API_ENDPOINT",
                 "ZO_SYNTHETICS_BROWSERS",
+                "ZO_SYNTHETICS_COMPOSITION_ENABLED",
                 "ZO_SYNTHETICS_DEVICES",
                 "ZO_SYNTHETICS_INSTALL_SCRIPT_URL",
                 "ZO_SYNTHETICS_JOB_LEASE_SECS",
@@ -4817,6 +4818,7 @@ mod tests {
     /// extra key cannot hide in the fields a subset forgot to touch.
     fn mutate_every_synthetics_field(cfg: &mut Synthetics) {
         cfg.enabled = !cfg.enabled;
+        cfg.composition_enabled = !cfg.composition_enabled;
         cfg.lambda_browser.push_str("-changed");
         cfg.lambda_net.push_str("-changed");
         cfg.api_endpoint = "https://example.invalid".to_string();
