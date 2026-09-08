@@ -848,7 +848,9 @@
     },
     "condition": {
       "loading": "正在加载条件...",
-      "loadError": "无法读取已保存的条件，已重置。立即保存将覆盖它。"
+      "loadError": "无法读取已保存的条件，已重置。立即保存将覆盖它。",
+      "unknownColumn": "“{column}”不在此触发器的载荷中，因此该条件可能永远无法匹配。",
+      "unknownColumnSuggestion": "你是指“{suggestion}”吗？"
     },
     "destination": {
       "createNew": "创建新目标",
@@ -2560,7 +2562,9 @@
       "title": "工作流运行",
       "edit": "编辑工作流",
       "debugInEditor": "在编辑器中调试",
-      "staleGraphWarning": "此工作流自本次运行后已被编辑 — {count} 个已执行的步骤不再存在，因此此处不显示其状态。 | 此工作流自本次运行后已被编辑 — {count} 个已执行的步骤不再存在，因此此处不显示其状态。"
+      "staleGraphWarning": "此工作流自本次运行后已被编辑 — {count} 个已执行的步骤不再存在，因此此处不显示其状态。 | 此工作流自本次运行后已被编辑 — {count} 个已执行的步骤不再存在，因此此处不显示其状态。",
+      "hideList": "隐藏运行列表",
+      "showList": "显示运行列表"
     },
     "history": {
       "button": "运行",
@@ -2576,10 +2580,21 @@
       "error": "错误",
       "success": "成功",
       "failed": "失败",
+      "testRun": "测试运行",
+      "runType": "类型",
+      "testRunTooltip": "从编辑器启动。目标步骤会真实发送。",
+      "showTestRuns": "显示 {count} 个测试运行",
+      "hideTestRuns": "隐藏测试运行",
       "open": "历史",
       "openFullView": "打开完整运行视图",
       "loadError": "加载执行时出错",
-      "loadRunError": "加载本次运行时出错"
+      "loadRunError": "加载本次运行时出错",
+      "retry": "重试",
+      "retryTooltip": "使用记录的输入重新运行此失败运行。",
+      "retryTitle": "重试此运行？",
+      "retryMessage": "这会使用失败运行记录的输入创建新运行。目标步骤将真正发送。",
+      "retryStarted": "重试已开始——它会作为新运行出现在列表中。",
+      "retryError": "无法重试此运行"
     },
     "edit": "编辑",
     "view": "查看",
@@ -2596,7 +2611,9 @@
     "triggerRequired": "需要触发器",
     "addStepRequired": "在触发器后至少添加一个步骤",
     "connectAllNodes": "保存前连接所有节点",
+    "branchPathsRequired": "请将每个分支路径连接到步骤 | 1 个分支步骤存在与其路径不匹配的连接。请打开该步骤，定义路径，然后重新连接。 | {count} 个分支步骤存在与其路径不匹配的连接。",
     "finishStepsBeforePublish": "{count} 个步骤在发布前需要设置 — 已在画布上高亮显示。 | {count} 个步骤在发布前需要设置 — 已在画布上高亮显示。",
+    "noChangesToPublish": "没有可发布的更改——此工作流已与已发布版本一致。",
     "draft": "草稿",
     "saveDraft": "保存为草稿",
     "publish": "发布",
@@ -2643,7 +2660,7 @@
     "loadError": "无法加载工作流",
     "deleteNode": "删除节点",
     "deleteNodeTitle": "删除步骤",
-    "deleteNodeConfirm": "确定要删除此步骤吗？此操作无法撤销。",
+    "deleteNodeConfirm": "确定要删除此步骤吗？你可以撤销此操作。",
     "namePlaceholder": "未命名工作流",
     "renameHint": "点击重命名此工作流",
     "editMode": "编辑工作流",
@@ -2656,11 +2673,29 @@
       "runFromBeginning": "开始（触发器）",
       "runFromNote": "仅会运行从此处向下的步骤。",
       "inputLabel": "示例输入",
+      "source": {
+        "sample": "生成的示例",
+        "run": "来自运行：{run}",
+        "edited": "由你编辑"
+      },
+      "revertInput": "还原",
+      "useRunInput": "使用运行中的输入…",
+      "lastTestRun": "上次测试运行（此标签页）",
+      "runHasNoInput": "该运行没有为此步骤存储的输入。",
       "invalidJson": "输入有效的 JSON 记录数组。",
       "resultHint": "运行后，每个步骤会在画布上显示勾选或错误图标。",
+      "rehearsalOnly": "仅通过测试运行——这是针对示例负载的演练，不能证明已发布的工作流可以正常工作。",
       "notVerified": "没有记录到达此步骤 — 上游条件将其过滤掉，或者之前的步骤出错。",
+      "notConfigured": "此步骤尚未配置，因此在此运行中未执行任何操作。请先进行配置，然后重新测试。",
+      "recordedFailure": "此步骤在上一次记录的运行中失败。",
+      "recordsUnavailable": "记录在之前的运行中——请重新运行测试以检查记录。",
+      "dirtySelf": "此步骤上次运行后配置已更改。请重新测试该步骤。",
+      "dirtyUpstream": "自其上次运行后，某个上游步骤已更改。请重新测试该步骤。",
       "run": "运行测试",
       "runError": "无法运行测试。",
+      "suppressDestinations": "不要实际发送到目标",
+      "suppressDestinationsHint": "目标步骤会解析其路由，但不会实际发送任何内容。",
+      "dispatchWarning": "测试是实时的：此运行将真正发送到 {destinations}。",
       "stepResult": {
         "viewHint": "点击查看输入 / 输出",
         "input": "输入",
@@ -2686,8 +2721,10 @@
         "status": {
           "ok": "通过",
           "error": "出错",
-          "skipped": "无记录"
-        }
+          "skipped": "无记录",
+          "noMatch": "无匹配"
+        },
+        "suppressed": "已抑制——未发送到实际目标"
       }
     },
     "linkAlerts": {
@@ -2720,6 +2757,7 @@
       "kindLogic": "逻辑",
       "kindAction": "操作",
       "condition": "条件",
+      "branch": "分支",
       "function": "函数",
       "sendToDestination": "目标",
       "configComingSoon": "{node} 配置将在后续步骤中完成",
@@ -2727,7 +2765,20 @@
       "sectionDestination": "目标",
       "stepSearchPlaceholder": "搜索步骤...",
       "stepNoMatch": "没有步骤匹配您的搜索。",
-      "conditionDesc": "基于规则分支",
+      "conditionDesc": "仅当规则匹配时才继续",
+      "branchDesc": "将每条记录路由到第一条匹配的路径",
+      "branchCaseLabel": "路径名称（可选）",
+      "branchCaseLabelPlaceholder": "例如：高严重性",
+      "branchAddCase": "添加路径",
+      "branchRemoveCase": "移除路径",
+      "branchMoveUp": "上移路径",
+      "branchMoveDown": "下移路径",
+      "branchPathNumber": "路径 {index}",
+      "branchElseTitle": "其他所有",
+      "branchElseHint": "不匹配上述任何路径的记录将在此处输出。",
+      "branchNoteTitle": "分支指南",
+      "branchNoteFirstMatch": "路径自上而下进行检查，第一个匹配项生效，因此每条记录最终只会沿一条路径离开。",
+      "branchNoteUnwired": "下游未连接任何内容的路径会直接丢弃其记录。",
       "functionDesc": "使用函数重塑数据负载",
       "destinationDesc": "发送到目标",
       "triggerBody": "当关联的告警触发时运行",
@@ -2775,11 +2826,14 @@
       "enable": "启用步骤",
       "disabledBadge": "已禁用",
       "incompleteBadge": "稍后设置",
+      "unwiredBadge": "未连接路径",
       "unsavedFnTitle": "未保存的函数更改",
       "unsavedFnMessage": "此步骤包含未保存到函数库的函数代码。请保存、放弃更改或继续编辑。",
       "unsavedFnSave": "保存函数",
       "unsavedFnDiscard": "放弃更改",
-      "unsavedFnKeep": "继续编辑"
+      "unsavedFnKeep": "继续编辑",
+      "destination": "目标",
+      "branchPathUnset": "{name} · 未设置规则"
     },
     "commonFieldsAbove": "以上为公共字段",
     "canvas": {
@@ -2803,11 +2857,15 @@
       "openStep": "打开 {name}",
       "runToView": "运行测试以查看此数据。",
       "noBranchItems": "此分支上没有条目。",
+      "forwardedCount": "已转发 {out}/{total} 条记录 | 已转发 {out}/{total} 条记录",
+      "noMatchForwarded": "无匹配 — 0/{total} 条记录已转发 | 无匹配 — 0/{total} 条记录已转发",
+      "branchDropped": "{count} 条记录未匹配任何路径 — 已丢弃 | {count} 条记录未匹配任何路径 — 已丢弃",
       "noUpstream": "没有上游步骤。",
       "noRunYet": "尚未运行。",
       "runLabel": "运行",
       "switchRun": "切换运行",
       "notInRun": "此步骤未包含在此次运行中。",
+      "noRunData": "本次运行未存储步骤数据。",
       "runTest": "运行测试",
       "noItems": "没有条目",
       "itemsCount": "{count} 个条目 | {count} 个条目",
@@ -2817,8 +2875,14 @@
       "executeStep": "运行步骤",
       "sample": "样本",
       "editStep": "编辑步骤",
+      "readOnlyRun": "您正在查看历史运行，因此无法在此处修改此步骤的配置。",
+      "readOnlyRunEdit": "在工作流中编辑",
       "testInputHint": "测试输入 — 编辑，然后运行步骤。",
-      "noRunsList": "尚无运行记录。"
+      "noRunsList": "尚无运行记录。",
+      "resetInput": "重置为示例",
+      "eventPager": "{n} / {total}",
+      "nextEvent": "下一个事件",
+      "prevEvent": "上一个事件"
     },
     "runOverlay": {
       "banner": "正在显示来自历史运行（{run}）的步骤数据。您可以自由编辑 — 此运行不会被更改。",
@@ -2845,6 +2909,8 @@
       "noConfig": "无配置",
       "functionLabel": "函数",
       "destinationLabel": "目标",
+      "branchPathsLabel": "路径",
+      "branchNoRule": "未设置规则",
       "destinationUnsupported": "不支持的类型",
       "destinationMissing": "该目标已不存在或无法读取。",
       "headersLabel": "标头",
@@ -3734,7 +3800,7 @@
       "dynamodbPipelineTitle": "流式传输 DynamoDB → Firehose",
       "dynamodbTagline": "通过 Kinesis Firehose 将 DynamoDB 数据项更改流式传输到 OpenObserve。",
       "ec2IamNote": "需要在实例上具有 ec2:DescribeTags 和 ec2:DescribeInstances 的 IAM 角色，以便代理可以读取 Name 标签并将其用作主机标识符。",
-      "enableSessionReplayDesc": "会话重放是**单独**于 RUM 配置的，**不**继承 `rumConfiguration.customEndpoint`。它也不会追加路径，因此需要下面的完整 `/replay` URL。配置错误通常是 RUM 事件到达但重放从未出现的原因。",
+      "enableSessionReplayDesc": "会话回放是**独立**于 RUM 进行配置的，并且**不会**继承 `rumConfiguration.customEndpoint`。请在下方为它提供独立的 base URL，格式与 RUM/Logs 的 base URL 相同。桥接器会自行追加 `/replay`，所以请**不要**自行添加：手动添加 `/replay` 会导致路径被重复追加，所有上传都会被 401 拒绝——这也是 RUM 事件可以到达但会话回放始终不出现的最常见原因。",
       "enableSessionReplayTitle": "启用会话重放",
       "endpointLabel": "端点",
       "externalEndpointVariant": "外部端点",
@@ -3936,18 +4002,16 @@
       "rnInitNote": "尽早初始化——提供程序必须在您要监测的屏幕之前挂载。",
       "rnInstallNote": "会话回放和导航包是可选的——如果您不需要屏幕录制或自动视图跟踪，可以删除其中任意一行。",
       "rnNavigationNote": "没有它，您仍然可以使用 `O2Rum.startView()` / `O2Rum.stopView()` 手动记录视图。",
-      "rnSessionReplayNote": "React Native 上的会话回放目前已在 Android 上验证。在 iOS 上，SDK 会在此 URL 后附加自己的路径，因此回放上传尚无法到达 OpenObserve——RUM、日志和崩溃不受影响。",
-      "rnTrouble401A": "`clientToken` 是本组织的 **RUM 令牌**，而不是摄取密码。如果它已轮换，请从此页面头部重新生成并重新构建应用。",
+      "rnSessionReplayNote": "会话回放自 SDK 0.1.2 起已在 iOS 和 Android 上验证通过。会话片段在上传前会分批处理，因此显示前会有一段短暂延迟。",
+      "rnTrouble401A": "常见原因有两个。首先，`clientToken`——它必须是此组织的 **RUM token**，而不是数据摄取密码；如果已被轮换，请从本页顶部重新生成并重新构建应用。其次，对于会话回放：手动给 `customEndpoint` 追加 `/replay` 会让路径被重复拼接（桥接器本身已经会追加），后端也会以 401 拒绝——请改为传递不带后缀的 base URL。",
       "rnTrouble401Q": "请求返回 401 或 403",
       "rnTroubleCleartextA": "Android 默认阻止明文流量。对于 `http://` 端点，请在 SDK 配置中设置 `additionalConfiguration: {config}`，并在应用的网络安全配置中允许您的主机使用明文。在本地开发之外请优先使用 HTTPS。",
       "rnTroubleCleartextQ": "Android 发布/调试版本不会通过纯 HTTP 发送任何内容",
       "rnTroubleIosBuildA": "添加包后运行 `npx pod-install`（或 `cd ios && pod install`），然后从 Xcode 或 `npx react-native run-ios` 重新构建。仅通过 Metro 重新加载不会加载新的原生模块。",
       "rnTroubleIosBuildQ": "iOS 构建失败或缺少原生模块",
-      "rnTroubleIosReplayA": "当前 React Native SDK 的已知限制：在 iOS 上，它会在会话回放 `customEndpoint` 后附加自己的路径，因此上传无法命中 OpenObserve 的 `/replay` 路由。Android 会原样使用 URL，因此可以正常工作。RUM 事件、日志和崩溃报告在两个平台上均不受影响。",
-      "rnTroubleIosReplayQ": "会话回放在 Android 上有效，但在 iOS 上无效",
       "rnTroubleMaskedA": "这是默认行为。`textAndInputPrivacyLevel`、`imagePrivacyLevel` 和 `touchPrivacyLevel` 都默认为最严格的设置（`MASK_ALL`）。仅在您的隐私政策允许的范围内放宽它们——`MASK_SENSITIVE_INPUTS` 会隐藏密码和卡号字段，同时显示其余内容。",
       "rnTroubleMaskedQ": "回放可以渲染，但所有内容都被遮盖",
-      "rnTroubleNoReplayA": "几乎总是端点的问题。会话回放是单独配置的，**不会**继承 `rumConfiguration.customEndpoint`；如果未设置，它默认为空字符串，上传内容将无处可见。请显式传入完整 URL：`customEndpoint: '{replayUrl}'`——注意末尾的 `/replay`，核心 SDK 的基本 URL 没有这个后缀。",
+      "rnTroubleNoReplayA": "几乎总是端点配置的问题。会话回放是单独配置的，**不会**继承 `rumConfiguration.customEndpoint`；若不设置，它默认为空字符串，上传不会发送到任何你能看到的位置。请显式传入 base URL：`customEndpoint: '{replayUrl}'` — 桥接器会自行追加 `/replay`（自 SDK 0.1.2 起），所以不要自己添加该后缀，否则上传会被 401 拒绝。",
       "rnTroubleNoReplayQ": "RUM 事件已到达，但没有会话回放",
       "rnTroubleNothingArrivesA": "首先检查主机——请参阅上面的修复框。`localhost` 解析为设备，而不是您的电脑：在 Android 模拟器上使用 `10.0.2.2`，在 iOS 模拟器上使用 `localhost`，在物理设备上使用您电脑的局域网 IP。",
       "rnTroubleNothingArrivesQ": "从模拟器或设备完全收不到任何数据",
@@ -6434,6 +6498,7 @@
       "firing": "触发中",
       "ok": "正常",
       "error": "错误",
+      "pending": "待触发",
       "skipped": "已跳过",
       "unknown": "未知",
       "flapping": "抖动",
@@ -6460,6 +6525,7 @@
       "templateRequired": "模板为必填项！",
       "validEmails": "请添加有效的电子邮件！",
       "silenceNonNegative": "通知静默应大于或等于 0",
+      "pendingPeriodNonNegative": "等待时长应大于或等于 0",
       "periodPositive": "周期应大于 0",
       "destinationRequired": "至少需要一个目标。",
       "thresholdPositive": "阈值应大于 0",
@@ -6470,6 +6536,7 @@
       "timestampAliasBanned": "{column} 不能用作列别名。请改用 time_bucket。",
       "credentialFieldRequired": "{field} 为必填项",
       "minimumFrequency": "最小频率应为 {minutes} 分钟",
+      "pendingPeriodNotMultiple": "不是检查频率（{minutes} 分钟）的倍数——告警最多可能需要多等一个检查周期才会触发。",
       "nameMandatoryString": "名称为必填项，且应为有效字符串",
       "orgIdMismatch": "组织 ID 应等于 {orgId}",
       "streamTypeMandatory": "流类型为必填项，且应为以下之一：logs、metrics、traces",
@@ -6675,6 +6742,9 @@
       "cooldown": "冷却时间",
       "betweenAlerts": "告警之间",
       "noCooldown": "没有冷却时间",
+      "pendingPeriod": "等待时长",
+      "beforeFiring": "{duration} 后触发",
+      "firesImmediately": "立即触发",
       "minuteCount": "{n} 分钟 | {n} 分钟",
       "hourCount": "{n} 小时 | {n} 小时",
       "timeRangeCount": "{n} 个时间范围（{ranges}） | {n} 个时间范围（{ranges}）",
@@ -6691,6 +6761,7 @@
         "conditionOther": "{threshold} 个事件（{operator}）",
         "alertMeWhenMinutes": "当 {condition} 在任何 {count} 分钟时间段内发生时提醒我",
         "alertMeWhenHours": "当 {condition} 在任何 {count} 小时时间段内发生时提醒我",
+        "pendingPeriodClause": "，等待 {duration} 后",
         "cooldownClause": "，但每 {cooldown} 至多一次",
         "defaultConditions": "满足配置条件时提醒我"
       }
@@ -7155,6 +7226,8 @@
       "writeQueryHint": "写一个查询开始吧",
       "sqlEditorHint": "使用打开的完整编辑器运行和验证",
       "checkEvery": "检查间隔",
+      "pendingPeriod": "等待时长",
+      "pendingPeriodTooltip": "触发前等待该时长，让条件持续成立，而不是仅因某一异常周期就触发。",
       "cronExpressionPlaceholder": "0 */10 * * * *",
       "timezonePlaceholder": "时区",
       "onThese": "在这些上",
@@ -10633,6 +10706,10 @@
         "success": "已添加到数据集",
         "loadError": "加载数据集失败",
         "error": "添加此项目到数据集失败"
+      },
+      "playground": {
+        "button": "在 Playground 中打开",
+        "hint": "将此调用的消息加载到 Playground 中，以进行编辑并重新运行。"
       }
     },
     "discovery": {
@@ -11000,7 +11077,10 @@
         "columns": {
           "input": "输入",
           "output": "输出",
-          "latency": "延迟"
+          "trials": "试验",
+          "dispersion": "离散度",
+          "latency": "延迟",
+          "p50Latency": "P50 延迟"
         },
         "retryFailed": "重试失败的槽位",
         "loadError": "加载实验失败",
@@ -11038,8 +11118,12 @@
         },
         "slotStatus": "状态",
         "searchPlaceholder": "搜索输入或输出",
+        "searchInputPlaceholder": "按输入搜索",
         "statusFilter": "状态",
-        "statusFilterAll": "所有状态"
+        "statusFilterAll": "所有状态",
+        "sortByDispersion": "按离散度排序",
+        "highDispersionBadge": "高",
+        "trialNumber": "试验 {n}"
       },
       "rowDetail": {
         "fallbackTitle": "实验行",
@@ -11130,10 +11214,13 @@
           "trial": "试验 {index}",
           "noContent": "未提供",
           "noOutput": "无输出",
-          "absentSide": "不在此次运行中"
+          "absentSide": "不在此次运行中",
+          "enterFullscreen": "进入全屏",
+          "exitFullscreen": "退出全屏"
         }
       },
-      "selectionCount": "{count} / 2 已选择"
+      "selectionCount": "{count} / 2 已选择",
+      "clearBaseline": "清除基线"
     },
     "datasets": {
       "listTitle": "数据集",
@@ -11202,7 +11289,7 @@
           "expectedOutput": "预期输出",
           "source": "来源",
           "tags": "标签",
-          "version": "版本",
+          "version": "数据集版本",
           "actions": "操作"
         },
         "deleteItemTitle": "删除条目",
@@ -11681,8 +11768,6 @@
       "title": "试验场",
       "runAll": "全部运行",
       "runAllTooltip": "运行所有变体",
-      "running": "正在运行… ({done}/{total})",
-      "stop": "停止",
       "recentDrafts": "最近草稿",
       "recentDraftsSection": "此浏览器 · 最近 10 个",
       "draftVersus": "对比",
@@ -11691,6 +11776,7 @@
       "fromExperiment": "克隆自实验 {name}",
       "variables": "变量",
       "noVariables": "消息中没有 {token} — 添加一个以参数化输入。",
+      "unusedSampledValue": "尚未在消息中引用：{tokens}。将其输入到某条消息中即可使用。",
       "variablePlaceholder": "{name} 的值",
       "addExpected": "+ 预期输出",
       "expectedLabel": "预期",
@@ -11705,8 +11791,9 @@
       "variant": "变体 {label}",
       "variantLimit": "试验场最多容纳 {max} 个变体。",
       "duplicateVariant": "复制变体",
+      "resetVariant": "重置基准",
       "removeVariant": "移除变体",
-      "runVariant": "运行此变体",
+      "runVariant": "运行",
       "createExperiment": "创建实验",
       "modelPlaceholder": "选择或输入模型",
       "providerUnknown": "未知提供商",
@@ -11732,6 +11819,13 @@
       "toolsEmpty": "未定义工具。",
       "toolCall": "工具调用",
       "toolCallNote": "运行到此结束 — 试验场不执行工具。",
+      "toolCallAddToMessages": "添加到消息",
+      "toolCallContinueTooltip": "将此调用添加到对话中，并打开其结果字段。",
+      "toolCallAddedToMessages": "工具调用已添加——请输入工具结果并重新运行。",
+      "toolArgumentsPlaceholder": "工具参数（JSON）",
+      "toolResultPlaceholder": "输入工具结果…",
+      "toolResultRequired": "请输入上面的工具结果以继续。",
+      "toolSetupRequired": "请选择一个工具并提供其参数以继续。",
       "toolInvalidJson": "参数必须是有效的 JSON。",
       "schema": "模式",
       "schemaOn": "模式 · 开启",
@@ -11758,6 +11852,7 @@
       "sampleDatasetPlaceholder": "选择数据集",
       "sampleSubmit": "采样",
       "sampleLoadError": "无法从该数据集加载行。",
+      "sampleApplied": "已加载第 {index} 个示例，共 {total} 个 — 在消息中使用 {token} 引用它。",
       "sampleEmpty": "该数据集还没有任何条目。",
       "noProviderTitle": "Playground 需要一个 LLM 提供商",
       "noProviderBody": "连接一个提供商以运行提示词。这大约需要一分钟。",
@@ -11770,6 +11865,8 @@
       "reset": "重置",
       "resetTitle": "重置 Playground",
       "resetMessage": "清除所有变体、行和输出并重新开始？此操作无法撤销。",
+      "resetVariantTitle": "重置测试台",
+      "resetVariantMessage": "清除此测试台的提示和输出？此操作无法撤销。",
       "scrollLeft": "向左滚动",
       "scrollRight": "向右滚动",
       "addMessage": "消息",
@@ -11785,6 +11882,7 @@
       "variantSettings": "模型设置",
       "messageToolPlaceholder": "选择工具",
       "variablesCount": "变量 · {count}",
+      "newValueTag": "新",
       "variableUsed": "被此变体引用",
       "variableUnused": "未被此变体引用 — 此处渲染为空",
       "addVariable": "添加变量",
@@ -11833,7 +11931,9 @@
       "sampleFullView": "完整视图",
       "sampleBack": "返回列表",
       "sampleInput": "输入",
-      "sampleExpected": "预期输出"
+      "sampleExpected": "预期输出",
+      "fromTrace": "来自追踪 Span {id}",
+      "openInPlaygroundFailed": "无法在 Playground 中打开此 Span"
     }
   },
   "onlineEvals": {
@@ -11866,12 +11966,14 @@
     },
     "scoreConfigLibrary": {
       "searchPlaceholder": "搜索评分配置...",
-      "scoreConfigsLabel": "{count} 个评分配置 | {count} 个评分配置"
+      "scoreConfigsLabel": "{count} 个评分配置 | {count} 个评分配置",
+      "selectedOfTotal": "已选择 {selected} 个，共 {total} 个"
     },
     "scorerLibrary": {
       "noProvidersMessage": "导入 LLM Judge 评分器之前，请先创建 Provider。",
       "searchPlaceholder": "搜索评分器...",
-      "scorerCountSuffix": "{count} 个评分器 | {count} 个评分器"
+      "scorerCountSuffix": "{count} 个评分器 | {count} 个评分器",
+      "selectedOfTotal": "已选择 {selected} 个，共 {total} 个"
     },
     "title": "评估",
     "loadError": "加载在线评估失败",
@@ -11988,7 +12090,8 @@
         "legendFalseCount": "false ({count})",
         "kpis": {
           "average": "平均值",
-          "p50p95": "P50/P95",
+          "p50": "P50",
+          "p95": "P95",
           "unhealthy": "不健康",
           "healthy": "健康",
           "trueRate": "真实率",
@@ -12097,8 +12200,6 @@
       "remoteCta": "配置端点"
     },
     "provider": {
-      "sectionStep1": "01",
-      "sectionStep2": "02",
       "backTo": "返回提供商",
       "createTitle": "创建 LLM 提供商",
       "editTitle": "编辑 LLM 提供商",
@@ -12107,7 +12208,7 @@
       "nameLabel": "姓名",
       "typeLabel": "提供商类型",
       "endpointLabel": "端点",
-      "endpointPlaceholder": "可选的自定义端点",
+      "endpointPlaceholder": "完整的 completions URL，例如 https://your-host/v1/chat/completions",
       "defaultModelLabel": "默认模型",
       "availableModelsLabel": "可用模型",
       "apiKeyLabel": "API 密钥",
@@ -13771,6 +13872,7 @@
       "error": "错误",
       "failed": "失败",
       "failedRuns": "运行失败",
+      "errorRuns": "错误运行",
       "jumpToLastRun": "跳转到上次运行",
       "jumpToLatestData": "跳转到最新数据",
       "lastRun": "最后一次运行",
@@ -13882,6 +13984,11 @@
       "stepsCount": "步骤 ({count})",
       "title": "运行详情",
       "viewFullError": "查看完整错误和堆栈跟踪",
+      "errorSourceQuota": "已达到配额限制",
+      "errorSourceQuotaDesc": "该组织包含的合成监控步骤已耗尽，因此此运行被跳过。一旦该组织订阅或提高其步骤限额，运行将自动恢复。",
+      "errorSourceDispatch": "调度错误",
+      "errorSourceQueue": "队列错误",
+      "errorSourceProbe": "探针错误",
       "viewFullErrorBtn": "查看完整错误",
       "detailUrl": "URL",
       "locatorResolution": "定位器解析",
@@ -13933,6 +14040,7 @@
       "durationByLocation": "按位置的平均持续时间",
       "flakyRate": "Flaky Rate",
       "stepsWindowTruncated": "Showing the newest {count} executions ({from} – {to}); the selected range holds more.",
+      "stepsErrorExcluded": "{count} 次执行因出错而无法运行，因此未显示在此处 — 请参阅“概览”选项卡。",
       "retryRate": "重试率",
       "statusTimeline": "状态时间线",
       "tabOverview": "概览",
