@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Runs one reviewer round for the claude-codex-loop skill and writes the result into the ledger.
+# Runs one reviewer round for the o2-loop skill and writes the result into the ledger.
 set -euo pipefail
 
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -17,17 +17,17 @@ UNSANDBOXED=0
 
 usage() {
   cat <<'USAGE'
-Usage: codex-review.sh --round N [--ledger DIR] [--base BRANCH] [--backend auto|codex|claude]
+Usage: review.sh --round N [--ledger DIR] [--base BRANCH] [--backend auto|codex|claude]
                        [--effort low|medium|high] [--model MODEL] [--timeout SECS]
                        [--max-budget-usd N] [--no-candidates] [--unsandboxed] [--dry-run]
 
-Each round first records the working tree as a local WIP commit ("wip(codex-loop): round N"),
+Each round first records the working tree as a local WIP commit ("wip(o2-loop): round N"),
 so the reviewer sees an immutable snapshot and the caller can prove nothing changed afterwards by
 checking that HEAD still equals DIR/round-N/commit and `git status --porcelain` is empty.
 Round 1 reviews the whole change set against BASE. Round N>1 verifies earlier findings against
 Claude's responses and reviews the delta between round N-1's commit and round N's commit.
 
-DIR defaults to ~/.claude/codex-loop/<repo name>/<branch with / replaced by ->. It must be outside
+DIR defaults to ~/.claude/o2-loop/<repo name>/<branch with / replaced by ->. It must be outside
 the checkout, otherwise it would be swept into the WIP commit.
 
 Backends:
@@ -50,9 +50,10 @@ after each process. Without sandbox-exec the claude backend refuses to run unles
 A flag that does not apply to the selected backend is rejected.
 
 Inputs the caller must prepare before running:
+  DIR/spec.md                          the confirmed plan (optional, embedded in the prompt when present)
   DIR/round-N/evidence.md              build, clippy, and test results for this round
-  DIR/round-(N-1)/codex.json           previous reviewer result (round > 1, written by this script)
-  DIR/round-(N-1)/claude-response.json Claude's per-finding response (round > 1)
+  DIR/round-(N-1)/verdict.json         previous reviewer result (round > 1, written by this script)
+  DIR/round-(N-1)/coder-response.json  the coder's per-finding response (round > 1)
 
 Outputs written into DIR/round-N/:
   commit         sha of the WIP commit the reviewer saw
@@ -63,10 +64,10 @@ Outputs written into DIR/round-N/:
   candidates.md  code-review pre-run output (claude backend only), candidates.cost its spend
   progress.log   one timestamped line per reviewer action, written live; tail -f it to watch
   events.jsonl   raw reviewer event stream
-  codex.json     structured review result
-  codex.err      reviewer stderr
+  verdict.json   structured review result
+  reviewer.err   reviewer stderr
 
---dry-run does everything except invoke the backend. It never touches an existing codex.json.
+--dry-run does everything except invoke the backend. It never touches an existing verdict.json.
 Exit code: 0 verdict approve, 10 verdict request_changes, 1 on any error.
 USAGE
 }
@@ -164,7 +165,7 @@ resolve_paths() {
     local repo_name branch_slug
     repo_name="$(basename "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")")"
     branch_slug="$(git rev-parse --abbrev-ref HEAD | tr '/' '-')"
-    LEDGER="$HOME/.claude/codex-loop/$repo_name/$branch_slug"
+    LEDGER="$HOME/.claude/o2-loop/$repo_name/$branch_slug"
   fi
   LEDGER="$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$LEDGER")"
   case "$LEDGER/" in
@@ -174,7 +175,7 @@ resolve_paths() {
   ROUND_DIR="$LEDGER/round-$ROUND"
   PREV_DIR="$LEDGER/round-$((ROUND - 1))"
   mkdir -p "$ROUND_DIR"
-  [ ! -e "$ROUND_DIR/codex.json" ] || die "round $ROUND already has a verdict in $ROUND_DIR/codex.json; use the next round number, or delete the round directory to redo it"
+  [ ! -e "$ROUND_DIR/verdict.json" ] || die "round $ROUND already has a verdict in $ROUND_DIR/verdict.json; use the next round number, or delete the round directory to redo it"
   : > "$ROUND_DIR/progress.log"
   rm -f "$ROUND_DIR/candidates.md" "$ROUND_DIR/candidates.cost" "$ROUND_DIR/candidates.err"
 }
@@ -184,11 +185,11 @@ check_inputs() {
   [ "$ROUND" -gt 1 ] || return 0
   local r f
   for r in $(seq 1 $((ROUND - 1))); do
-    for f in codex.json claude-response.json commit; do
+    for f in verdict.json coder-response.json commit; do
       [ -r "$LEDGER/round-$r/$f" ] && [ -s "$LEDGER/round-$r/$f" ] || die "missing or empty $LEDGER/round-$r/$f, required for round $ROUND"
     done
-    check_json "$LEDGER/round-$r/codex.json" "verdict,findings,prior_findings"
-    check_json "$LEDGER/round-$r/claude-response.json" "round,responses"
+    check_json "$LEDGER/round-$r/verdict.json" "verdict,findings,prior_findings"
+    check_json "$LEDGER/round-$r/coder-response.json" "round,responses"
   done
 }
 
@@ -196,7 +197,7 @@ snapshot() {
   # The WIP commit freezes what the reviewer sees; the ledger lives outside the repo so it never lands in it.
   if [ -n "$(git status --porcelain)" ]; then
     git add -A
-    git commit --quiet --no-verify -m "wip(codex-loop): round $ROUND"
+    git commit --quiet --no-verify -m "wip(o2-loop): round $ROUND"
   fi
   COMMIT="$(git rev-parse HEAD)"
   echo "$COMMIT" > "$ROUND_DIR/commit"
@@ -216,7 +217,7 @@ snapshot() {
 realpath_of() { python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$1"; }
 
 make_review_worktree() {
-  REVIEW_DIR="$(mktemp -d "${TMPDIR:-/tmp}/codex-loop-review.XXXXXX")"
+  REVIEW_DIR="$(mktemp -d "${TMPDIR:-/tmp}/o2-loop-review.XXXXXX")"
   rmdir "$REVIEW_DIR"
   git worktree add --quiet --detach "$REVIEW_DIR" "$COMMIT"
   # Seatbelt matches canonical paths, so symlinked or doubled-slash paths would silently miss the rules.
@@ -341,10 +342,8 @@ write_prompt() {
   PROMPT="$ROUND_DIR/prompt.md"
   {
     if [ "$ROUND" -eq 1 ]; then cat "$SKILL_DIR/prompts/review.md"; else cat "$SKILL_DIR/prompts/verify.md"; fi
-    if [ "$BACKEND" = "claude" ]; then
-      echo
-      cat "$SKILL_DIR/prompts/claude-backend.md"
-    fi
+    echo
+    cat "$SKILL_DIR/prompts/backend-$BACKEND.md"
     echo
     echo "## Change set"
     echo "- Your working directory is a disposable checkout of the commit under review; the real checkout is elsewhere and not yours to touch."
@@ -353,8 +352,15 @@ write_prompt() {
     echo "- Full patch: \`$ROUND_DIR/diff.patch\` (absolute path, outside your checkout), or run \`git diff $MERGE_BASE $COMMIT\`"
     echo "- Changed files:"
     echo "$CHANGED_FILES" | sed 's/^/  - /'
+    if [ -s "$LEDGER/spec.md" ]; then
+      echo
+      echo "## Spec the change must satisfy"
+      echo "File: \`$LEDGER/spec.md\` (content inline below). A finding may be that the change does not do what the spec says, or does more."
+      echo
+      cat "$LEDGER/spec.md"
+    fi
     echo
-    echo "## Evidence from Claude (round $ROUND)"
+    echo "## Evidence from the coder (round $ROUND)"
     echo "File: \`$ROUND_DIR/evidence.md\` (content inline below)"
     echo
     cat "$ROUND_DIR/evidence.md"
@@ -364,13 +370,13 @@ write_prompt() {
         echo
         echo "## Round $r reviewer findings"
         echo '```json'
-        cat "$LEDGER/round-$r/codex.json"
+        cat "$LEDGER/round-$r/verdict.json"
         echo
         echo '```'
         echo
-        echo "## Round $r Claude response"
+        echo "## Round $r coder response"
         echo '```json'
-        cat "$LEDGER/round-$r/claude-response.json"
+        cat "$LEDGER/round-$r/coder-response.json"
         echo
         echo '```'
       done
@@ -393,7 +399,7 @@ build_command() {
   if [ "$BACKEND" = "codex" ]; then
     CMD=(run_with_timeout "$REVIEWER_TIMEOUT" "$CODEX" exec --sandbox read-only --ephemeral --json -C "$REVIEW_DIR"
          --output-schema "$SKILL_DIR/schema/review.json"
-         -o "$ROUND_DIR/codex.json"
+         -o "$ROUND_DIR/verdict.json"
          -c "model_reasoning_effort=\"$EFFORT\"")
     [ -z "$MODEL" ] || CMD+=(-m "$MODEL")
     CMD+=(-)
@@ -418,30 +424,30 @@ run_reviewer() {
     log "dry run: prompt written to $PROMPT, $BACKEND not invoked"
     exit 0
   fi
-  rm -f "$ROUND_DIR/codex.json" "$ROUND_DIR/events.jsonl"
+  rm -f "$ROUND_DIR/verdict.json" "$ROUND_DIR/events.jsonl"
   # Both backends need the prompt on stdin; stderr gets its own file so it can never corrupt the parsed stream.
   set +e
-  ( cd "$REVIEW_DIR" && "${CMD[@]}" < "$PROMPT" 2> "$ROUND_DIR/codex.err" ) \
-    | python3 -u "$SKILL_DIR/scripts/progress.py" "$BACKEND" "$ROUND_DIR/events.jsonl" "$ROUND_DIR/progress.log" "$ROUND_DIR/codex.json" >&2
+  ( cd "$REVIEW_DIR" && "${CMD[@]}" < "$PROMPT" 2> "$ROUND_DIR/reviewer.err" ) \
+    | python3 -u "$SKILL_DIR/scripts/progress.py" "$BACKEND" "$ROUND_DIR/events.jsonl" "$ROUND_DIR/progress.log" "$ROUND_DIR/verdict.json" >&2
   STATUS=${PIPESTATUS[0]}
   set -e
-  if [ "$STATUS" -ne 0 ] || [ ! -s "$ROUND_DIR/codex.json" ]; then
-    tail -20 "$ROUND_DIR/codex.err" >&2
-    die "$BACKEND failed (exit $STATUS); see $ROUND_DIR/codex.err and progress.log"
+  if [ "$STATUS" -ne 0 ] || [ ! -s "$ROUND_DIR/verdict.json" ]; then
+    tail -20 "$ROUND_DIR/reviewer.err" >&2
+    die "$BACKEND failed (exit $STATUS); see $ROUND_DIR/reviewer.err and progress.log"
   fi
   # Tracked drift only: the real checkout legitimately holds ignored files, and the seatbelt already denies writes to it.
   if [ "$(git rev-parse HEAD)" != "$COMMIT" ] || [ -n "$(git status --porcelain)" ]; then
-    mv "$ROUND_DIR/codex.json" "$ROUND_DIR/codex.json.discarded"
+    mv "$ROUND_DIR/verdict.json" "$ROUND_DIR/verdict.json.discarded"
     die "checkout changed while $BACKEND was reviewing (HEAD or working tree differs from $COMMIT); verdict discarded"
   fi
   if [ "$(git -C "$REVIEW_DIR" rev-parse HEAD)" != "$COMMIT" ] || [ -n "$(git -C "$REVIEW_DIR" status --porcelain --ignored)" ]; then
-    mv "$ROUND_DIR/codex.json" "$ROUND_DIR/codex.json.discarded"
+    mv "$ROUND_DIR/verdict.json" "$ROUND_DIR/verdict.json.discarded"
     die "the reviewed tree changed during the review; verdict discarded"
   fi
 }
 
 summarize() {
-  python3 - "$ROUND_DIR/codex.json" <<'PY'
+  python3 - "$ROUND_DIR/verdict.json" <<'PY'
 import json, sys
 path = sys.argv[1]
 with open(path) as f:

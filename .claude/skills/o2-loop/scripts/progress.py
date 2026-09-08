@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Turn a reviewer event stream (argv[1]: codex|claude) into events.jsonl, a live progress.log, and codex.json."""
+"""Turn a reviewer event stream (argv[1]: codex|claude) into events.jsonl, a live progress.log, and verdict.json."""
 import json
 import sys
 import time
