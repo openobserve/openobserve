@@ -58,8 +58,17 @@ function getOrgName() {
 /**
  * Create a test destination via API (useful for CI/CD testing)
  *
- * Uses MOCK_WEBHOOK_URL if set, else example.com/webhook — a public, reserved
- * host that satisfies the SSRF guard without any third-party dependency.
+ * Uses opts.url if given, else MOCK_WEBHOOK_URL, else example.com/webhook — a
+ * public, reserved host that satisfies the SSRF guard without any third-party
+ * dependency.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @param {string} name destination name
+ * @param {string} [template] template to bind
+ * @param {object} [opts]
+ * @param {string} [opts.url] explicit webhook URL, overriding MOCK_WEBHOOK_URL
+ *   and the fallback. Pointing it at a receiver the test owns is what makes
+ *   delivery assertable rather than merely configured.
  *
  * @param {import('@playwright/test').Page} page - Playwright page instance
  * @param {string} name - Destination name

@@ -729,10 +729,11 @@ test.describe('Anomaly Detection', () => {
       });
       const deliveryAssertable = sink.status === 200;
       if (!deliveryAssertable) {
-        testLogger.info('Loopback destination refused; delivery will not be asserted', {
-          status: sink.status,
-          body: JSON.stringify(sink.data),
-        });
+        testLogger.warn(
+          'DELIVERY NOT ASSERTED — the loopback destination was refused, so the only ' +
+            'proof an alert left the process is skipped for this run',
+          { status: sink.status, body: JSON.stringify(sink.data) },
+        );
       }
       // The app caches its stream list from page load, which happened before
       // the seed — without a reload the new stream is absent from the picker
@@ -845,7 +846,10 @@ test.describe('Anomaly Detection', () => {
         const delivered = received.map((r) => r.body).join('\n');
         expect(delivered, 'the payload must name the anomaly that fired').toContain(firingName);
       } else {
-        testLogger.info('Delivery not asserted — the backend cannot reach this runner');
+        testLogger.warn(
+          'DELIVERY NOT ASSERTED — the backend cannot reach this runner; detection and ' +
+            'charts are proven but the notification path is not',
+        );
       }
     });
   });
