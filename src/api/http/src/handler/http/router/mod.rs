@@ -57,7 +57,7 @@ use {
     openobserve_api_management::request::{
         ai, annotation_queues, annotations, anomaly_detection, datasets, discovery,
         domain_management, eval_jobs, experiments, gen_ai, keys, license, oncall, playground,
-        providers, remote_tasks, score_configs, scorers, service_streams, workflows,
+        providers, raman, remote_tasks, score_configs, scorers, service_streams, workflows,
     },
     openobserve_api_pipelines::request::re_pattern,
     openobserve_api_search::search::patterns,
@@ -1098,6 +1098,25 @@ pub fn service_routes() -> Router {
             .route("/{org_id}/anomaly_detection/{config_id}/detect", post(anomaly_detection::detect_anomalies))
             .route("/{org_id}/anomaly_detection/{config_id}/history", get(anomaly_detection::get_detection_history))
             .route("/{org_id}/anomaly_detection/history", get(alerts::history::get_all_anomaly_history));
+
+        // Raman
+        router = router
+            .route(
+                "/v2/{org_id}/raman/config",
+                get(raman::config::get_raman_config).put(raman::config::update_raman_config),
+            )
+            .route(
+                "/v2/{org_id}/raman/digests",
+                get(raman::digests::list_raman_digests),
+            )
+            .route(
+                "/v2/{org_id}/raman/digests/run",
+                post(raman::digests::run_raman_digest),
+            )
+            .route(
+                "/v2/{org_id}/raman/digests/{digest_id}",
+                get(raman::digests::get_raman_digest),
+            );
     }
 
     router = router
@@ -2997,5 +3016,56 @@ mod tests {
 
         let response = app.oneshot(req).await.unwrap();
         assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    // service_routes() answers 401 for every path, so these bindings need a minimal router.
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn a_minimal_router_dispatches_raman_by_method_and_prefers_the_literal_run_segment() {
+        let app = Router::new()
+            .route(
+                "/v2/{org_id}/raman/config",
+                get(raman::config::get_raman_config).put(raman::config::update_raman_config),
+            )
+            .route(
+                "/v2/{org_id}/raman/digests/run",
+                post(raman::digests::run_raman_digest),
+            )
+            .route(
+                "/v2/{org_id}/raman/digests/{digest_id}",
+                get(raman::digests::get_raman_digest),
+            );
+
+        let unregistered_method = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("PATCH")
+                    .uri("/v2/myorg/raman/config")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            unregistered_method.status(),
+            StatusCode::METHOD_NOT_ALLOWED,
+            "the config route must be registered, and carry only GET and PUT"
+        );
+
+        let run_under_get = app
+            .oneshot(
+                Request::builder()
+                    .uri("/v2/myorg/raman/digests/run")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            run_under_get.status(),
+            StatusCode::METHOD_NOT_ALLOWED,
+            "GET on the POST-only run route must stop there, not fall through to {{digest_id}}"
+        );
     }
 }
