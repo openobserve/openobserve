@@ -108,7 +108,7 @@ export class CommandPalettePage {
         { timeout: 10000 },
       )
       .toBe(true);
-    await expect(this.rows.filter({ hasNot: this.page.locator('[data-item-id="ai:ask"]') })).toHaveCount(0);
+    await expect(this.list.locator('[role="option"]:not([data-item-id="ai:ask"])')).toHaveCount(0);
   }
 
   async expectRowsOfType(type, min = 1) {
