@@ -478,6 +478,49 @@ export class SloFormPage {
     if (pattern) await expect(err).toContainText(pattern);
   }
 
+  /**
+   * A field is flagged with its own inline validation message.
+   *
+   * OInput/OSelect render the message at `<field>-error`; SloExpressionField
+   * (the Monaco wrapper) now does the same, so one helper covers every field.
+   */
+  async expectFieldError(fieldSelector, pattern = null) {
+    const err = this.page.locator(`${fieldSelector} [data-test$="-error"]`).first();
+    await expect(err).toBeVisible({ timeout: 15000 });
+    if (pattern) await expect(err).toContainText(pattern);
+  }
+
+  /** No inline error on this field. */
+  async expectNoFieldError(fieldSelector) {
+    await expect(
+      this.page.locator(`${fieldSelector} [data-test$="-error"]`),
+    ).toHaveCount(0);
+  }
+
+  /**
+   * The form refused to submit at all.
+   *
+   * Counts requests to /slos while saving: client-side validation must stop the
+   * request, not merely decorate the field after the server rejects it. This is
+   * the assertion that would have caught the original defect.
+   */
+  async saveExpectingClientRejection() {
+    let posted = 0;
+    const count = (req) => {
+      if (/\/slos(\?|$)/.test(req.url()) && ['POST', 'PUT'].includes(req.method())) posted += 1;
+    };
+    this.page.on('request', count);
+    await this.page.locator(this.locators.save).click();
+    await this.page.waitForTimeout(1500);
+    this.page.off('request', count);
+
+    await expect(
+      this.page.locator(this.locators.title),
+      'an invalid form must stay open',
+    ).toBeVisible();
+    expect(posted, 'an invalid form must not reach the server').toBe(0);
+  }
+
   async expectRegenWarningVisible() {
     await expect(this.page.locator(this.locators.regenWarning)).toBeVisible({ timeout: 15000 });
   }
@@ -503,6 +546,13 @@ export class SloFormPage {
   }
 
   /** The 1-minute slice is pinned off for grouped SLOs (D30, form + API). */
+  /** The slice bar reports its selection through OToggleGroupItem's data-state. */
+  async expectSliceSelected(secs) {
+    await expect(
+      this.page.locator(`[data-test="slos-addslo-slice-${secs}"]`),
+    ).toHaveAttribute('data-state', 'on', { timeout: 10000 });
+  }
+
   async expectSliceOptionDisabled(secs) {
     const item = this.page.locator(`[data-test="slos-addslo-slice-${secs}"]`);
     await expect(item).toBeDisabled({ timeout: 10000 });
@@ -646,6 +696,48 @@ export class SloFormPage {
       'an ineligible source must be offered but not selectable',
     ).toBe(true);
     await this.page.keyboard.press('Escape');
+  }
+
+  /**
+   * The option shows the alert NAME as its label and the ineligibility reason
+   * as the secondary line beneath it.
+   *
+   * Asserting the name is an exact own-text match is the point: with the two
+   * concatenated back into one label this passes only by accident of substring
+   * matching, so `toHaveText` on the label node is what pins the split.
+   */
+  async expectAlertSourceOptionReason(alertId, alertName) {
+    await openOSelectDropdown(this.page, this.page.locator(this.locators.alertSource));
+    const search = this.page.locator('[data-test="slos-addslo-alert-source-search"]');
+    if (await search.count() > 0) {
+      await search.fill(alertName);
+      await this.page.waitForTimeout(400);
+    }
+    const option = this.page
+      .locator(`[data-test="slos-addslo-alert-source-option"][data-test-value="${alertId}"]`)
+      .first();
+    await option.waitFor({ state: 'visible', timeout: 15000 });
+
+    // `data-test-label` mirrors the option's `label` exactly, so this fails the
+    // moment the reason is concatenated back into it.
+    await expect(
+      option, 'the option label must be the alert name alone',
+    ).toHaveAttribute('data-test-label', alertName);
+    // The reason lives in its own node, so the name is scannable.
+    await expect(
+      option,
+      'the ineligibility reason must still be shown',
+    ).toContainText(/silence|cadence|cron|grouped|real-?time/i);
+
+    await this.page.keyboard.press('Escape');
+  }
+
+  /** The field's info tooltip explaining what makes an alert eligible. */
+  async expectAlertSourceEligibilityInfo() {
+    await expect(
+      this.page.locator('[data-test="slos-addslo-alert-source-info"]'),
+      'the picker must explain what makes an alert eligible',
+    ).toBeVisible({ timeout: 15000 });
   }
 
   async expectAlertSourceHintVisible() {

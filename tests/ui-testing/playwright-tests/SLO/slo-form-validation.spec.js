@@ -3,15 +3,16 @@
  *
  * Plan: docs/test_generator/features/slos-test-plan.md
  *
- * The form performs NO client-side validation: there is no zod schema and the
- * Save button carries only `:loading`, never `:disabled`. Every rejection
- * therefore comes from the server, and `save()` renders
- * `e.response.data.message` **verbatim** into `slos-addslo-error`.
+ * Rejection reaches the user through two distinct paths, and this spec covers
+ * both because a regression in either is invisible in the other.
  *
- * That makes this spec the join between the API contract and what a user
- * actually sees. `slo-api-validation.spec.js` proves the server rejects the
- * input; these tests prove the reason reaches the screen instead of being
- * flattened into a generic "save failed".
+ *   1. CLIENT — `save()` runs the field computeds first and returns without
+ *      issuing a request, marking the offending field inline. Asserting "no
+ *      request was sent" is the load-bearing half: a check that merely decorates
+ *      the field after a 422 looks identical on screen.
+ *   2. SERVER — anything the form cannot know (a duplicate name, a malformed
+ *      predicate) still comes back and is rendered verbatim into
+ *      `slos-addslo-error`.
  *
  * The exact messages are asserted deliberately — they are user-facing copy, and
  * the backend's budget/target rejections carry arithmetic the user needs.
@@ -66,7 +67,7 @@ test.describe('SLO form validation', { tag: ['@slo', '@sloForm', '@all'] }, () =
 
   // ------------------------------------------------- server errors reach the UI
 
-  test('an empty name surfaces the server’s name constraint in the form', {
+  test('an empty name is blocked at the field before any request', {
     tag: ['@P0', '@validation'],
   }, async () => {
     await pm.sloFormPage.gotoNew(ORG);
@@ -76,12 +77,15 @@ test.describe('SLO form validation', { tag: ['@slo', '@sloForm', '@all'] }, () =
     await pm.sloFormPage.setExpression(
       pm.sloFormPage.locators.goodExpr, 'status_code < 500',
     );
-    await pm.sloFormPage.save();
+    await pm.sloFormPage.saveExpectingClientRejection();
 
-    await pm.sloFormPage.expectError(/name must be non empty/i);
+    await pm.sloFormPage.expectFieldError(pm.sloFormPage.locators.name, /name is required/i);
+    // Only the empty field is marked — a blanket "everything is red" is not
+    // guidance, and would hide which field actually needs attention.
+    await pm.sloFormPage.expectNoFieldError(pm.sloFormPage.locators.stream);
   });
 
-  test('an out-of-range target surfaces the reason, not a generic failure', {
+  test('an out-of-range target is marked on the target field', {
     tag: ['@P0', '@validation'],
   }, async ({}, testInfo) => {
     await pm.sloFormPage.gotoNew(ORG);
@@ -91,10 +95,12 @@ test.describe('SLO form validation', { tag: ['@slo', '@sloForm', '@all'] }, () =
       goodExpr: 'status_code < 500',
       target: 150,
     });
-    await pm.sloFormPage.save();
+    await pm.sloFormPage.saveExpectingClientRejection();
 
-    // The server explains WHY 100 is excluded; that explanation must survive.
-    await pm.sloFormPage.expectError(/greater than 0 and strictly below 100/i);
+    // The message must still explain WHY 100 is excluded, not just "invalid".
+    await pm.sloFormPage.expectFieldError(
+      pm.sloFormPage.locators.target, /greater than 0 and below 100/i,
+    );
   });
 
   test('a duplicate name surfaces the conflict', {
@@ -113,23 +119,18 @@ test.describe('SLO form validation', { tag: ['@slo', '@sloForm', '@all'] }, () =
   });
 
   /**
-   * FINDING — a blank "good when" produces an unusable error message.
+   * REGRESSION GUARD — a blank "good when" used to produce an unusable message.
    *
-   * The API has a clear message for an empty predicate
-   * ("good_expr must be exactly one boolean expression", HTTP 400), but the form
-   * never reaches it: `wireConfig()` runs the field through `pruned()`, which
-   * DROPS empty strings, so the request omits `good_expr` entirely and fails
-   * deserialization with HTTP 422. `save()` then finds no `response.data.message`
-   * on that body and falls back to `e.message` — so the user is told
-   * "Request failed with status code 422" about a field they left blank.
+   * `wireConfig()` runs the field through `pruned()`, which DROPS empty strings,
+   * so the request omitted `good_expr` entirely and failed deserialization with
+   * HTTP 422. That body carries no `message`, so the user was told "Request
+   * failed with status code 422" about a field they had left blank.
    *
-   * This pins the CURRENT behaviour (an error is shown; the form stays open and
-   * nothing is created) rather than asserting the friendly message the app does
-   * not produce. If the form gains a required-field check, or `pruned()` stops
-   * swallowing this one, the assertion below should be tightened to the 400 text.
-   * Reported in docs/test_generator/audit-reports/slos-audit-2026-08-15.md.
+   * The fix is the client check, so the assertion is that no request is made at
+   * all: leaving `pruned()` as it is but re-allowing the submit would restore
+   * the original 422 verbatim.
    */
-  test('a blank good expression is rejected and the form stays open', {
+  test('a blank good expression is blocked at the field, not at the server', {
     tag: ['@P1', '@validation'],
   }, async ({}, testInfo) => {
     const name = uniqueName(workerPrefix(testInfo));
@@ -138,10 +139,9 @@ test.describe('SLO form validation', { tag: ['@slo', '@sloForm', '@all'] }, () =
     await pm.sloFormPage.selectSliType('count');
     await pm.sloFormPage.selectStream(stream);
     // good_expr deliberately left empty: "" is a malformed predicate, not "all rows".
-    await pm.sloFormPage.save();
+    await pm.sloFormPage.saveExpectingClientRejection();
 
-    // An error IS surfaced — that much the user gets.
-    await pm.sloFormPage.expectError();
+    await pm.sloFormPage.expectFieldError(pm.sloFormPage.locators.goodExpr, /required/i);
     // And nothing was created behind it.
     await pm.sloListPage.goto(ORG);
     await pm.sloListPage.expectRowAbsent(name);
@@ -162,8 +162,8 @@ test.describe('SLO form validation', { tag: ['@slo', '@sloForm', '@all'] }, () =
     await pm.sloFormPage.fillCountSlo({
       name, stream, goodExpr: 'status_code < 500', target: 150,
     });
-    await pm.sloFormPage.save();
-    await pm.sloFormPage.expectError(/strictly below 100/i);
+    await pm.sloFormPage.saveExpectingClientRejection();
+    await pm.sloFormPage.expectFieldError(pm.sloFormPage.locators.target);
 
     // Fix the one bad field and retry. Waiting for the navigation is what
     // proves the create completed rather than merely being dispatched.
@@ -384,9 +384,9 @@ test.describe('SLO form validation', { tag: ['@slo', '@sloForm', '@all'] }, () =
     await pm.sloFormPage.setName(name);
     await pm.sloFormPage.selectSliType('count');
     // No stream picked at all.
-    await pm.sloFormPage.save();
+    await pm.sloFormPage.saveExpectingClientRejection();
 
-    await pm.sloFormPage.expectError();
+    await pm.sloFormPage.expectFieldError(pm.sloFormPage.locators.stream, /stream/i);
     await pm.sloListPage.goto(ORG);
     await pm.sloListPage.expectRowAbsent(name);
   });
@@ -425,9 +425,10 @@ test.describe('SLO form validation', { tag: ['@slo', '@sloForm', '@all'] }, () =
     await pm.sloFormPage.setExpression(
       pm.sloFormPage.locators.goodExpr, 'status_code < 500',
     );
-    await pm.sloFormPage.save();
+    await pm.sloFormPage.saveExpectingClientRejection();
 
-    await pm.sloFormPage.expectError(/less than 256 characters/i);
+    // The client bound must match the server's, which is inclusive at 256.
+    await pm.sloFormPage.expectFieldError(pm.sloFormPage.locators.name, /256/);
   });
 
   /**
@@ -461,8 +462,10 @@ test.describe('SLO form validation', { tag: ['@slo', '@sloForm', '@all'] }, () =
       goodExpr: 'status_code < 500',
       target: 100,
     });
-    await pm.sloFormPage.save();
-    await pm.sloFormPage.expectError(/strictly below 100/i);
+    await pm.sloFormPage.saveExpectingClientRejection();
+    await pm.sloFormPage.expectFieldError(
+      pm.sloFormPage.locators.target, /greater than 0 and below 100/i,
+    );
   });
 
   test('a fractional target just inside the range is accepted', {

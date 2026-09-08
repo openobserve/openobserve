@@ -140,6 +140,9 @@ export class SloAlertsPage {
   async setDescription(text) { await this.fillInput(this.locators.description, text); }
   async setFrequency(mins) { await this.fillInput(this.locators.frequency, mins); }
   async setSilence(mins) { await this.fillInput(this.locators.silence, mins); }
+  async setCritical(value) { await this.fillInput(this.locators.conditionCritical, value); }
+  async setLongWindowHours(hours) { await this.fillInput(this.locators.conditionLong, hours); }
+  async setShortWindowMinutes(mins) { await this.fillInput(this.locators.conditionShort, mins); }
 
   async selectKind(kind) {
     const item = this.page.locator(this.kindOption(kind));
@@ -313,6 +316,39 @@ export class SloAlertsPage {
     const err = this.page.locator(this.locators.formError);
     await expect(err).toBeVisible({ timeout: 20000 });
     if (pattern) await expect(err).toContainText(pattern);
+  }
+
+  /** A field carries its own inline validation message. */
+  async expectFieldError(fieldSelector, pattern = null) {
+    const err = this.page.locator(`${fieldSelector} [data-test$="-error"]`).first();
+    await expect(err).toBeVisible({ timeout: 20000 });
+    if (pattern) await expect(err).toContainText(pattern);
+  }
+
+  async expectNoFieldError(fieldSelector) {
+    await expect(
+      this.page.locator(`${fieldSelector} [data-test$="-error"]`),
+    ).toHaveCount(0);
+  }
+
+  /**
+   * The form refused to submit at all.
+   *
+   * Counts alert writes while submitting: the check has to STOP the request,
+   * not decorate the field once the server has answered.
+   */
+  async submitExpectingClientRejection() {
+    let posted = 0;
+    const count = (req) => {
+      if (/\/alerts/.test(req.url()) && ['POST', 'PUT'].includes(req.method())) posted += 1;
+    };
+    this.page.on('request', count);
+    await this.page.locator(this.locators.submit).click();
+    await this.page.waitForTimeout(1500);
+    this.page.off('request', count);
+
+    await this.expectFormStillOpen();
+    expect(posted, 'an invalid alert must not reach the server').toBe(0);
   }
 
   async expectPresetActive(key) {

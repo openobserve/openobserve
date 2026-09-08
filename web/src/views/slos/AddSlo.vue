@@ -100,6 +100,8 @@
             <OInput
               v-model="form.name"
               :label="t('slos.field.name')"
+              :error="!!fieldError('name')"
+              :error-message="fieldError('name') || undefined"
               :placeholder="t('slos.field.namePlaceholder')"
               required
               data-test="slos-addslo-name"
@@ -157,6 +159,8 @@
                 :label="t('slos.field.streamType')"
                 :options="streamTypeOptions"
                 :searchable="false"
+                :error="!!fieldError('config.stream_type')"
+                :error-message="fieldError('config.stream_type') || undefined"
                 data-test="slos-addslo-stream-type"
                 @update:model-value="onStreamTypeChange"
               />
@@ -168,6 +172,8 @@
                 :disabled="!form.config.stream_type"
                 :placeholder="t('slos.field.streamPlaceholder')"
                 required
+                :error="!!fieldError('config.stream')"
+                :error-message="fieldError('config.stream') || undefined"
                 data-test="slos-addslo-stream"
               />
             </div>
@@ -209,6 +215,7 @@
                 language="prom_ql"
                 required
                 class="mt-3"
+                :error-message="fieldError('config.good') || undefined"
                 data-test="slos-addslo-promql-good"
               />
               <SloExpressionField
@@ -219,6 +226,7 @@
                 language="prom_ql"
                 required
                 class="mt-3"
+                :error-message="fieldError('config.total') || undefined"
                 data-test="slos-addslo-promql-total"
               />
               <!-- The evaluator samples at slice ends, so a range selector that
@@ -250,6 +258,7 @@
                 :field-value-resolver="resolveFieldValues"
                 required
                 class="mt-3"
+                :error-message="fieldError('config.good_expr') || undefined"
                 data-test="slos-addslo-good-expr"
               />
             </template>
@@ -262,6 +271,8 @@
                 :label="t('slos.field.streamType')"
                 :options="streamTypeOptions"
                 :searchable="false"
+                :error="!!fieldError('config.stream_type')"
+                :error-message="fieldError('config.stream_type') || undefined"
                 data-test="slos-addslo-timeslice-stream-type"
                 @update:model-value="onStreamTypeChange"
               />
@@ -273,6 +284,8 @@
                 :disabled="!form.config.stream_type"
                 :placeholder="t('slos.field.streamPlaceholder')"
                 required
+                :error="!!fieldError('config.stream')"
+                :error-message="fieldError('config.stream') || undefined"
                 data-test="slos-addslo-timeslice-stream"
               />
             </div>
@@ -312,6 +325,7 @@
               :field-value-resolver="resolveFieldValues"
               class="mt-3"
               required
+              :error-message="fieldError('config.query') || undefined"
               data-test="slos-addslo-aggregate"
             />
             <!-- Prometheus keeps answering for a metric that stopped being
@@ -329,12 +343,16 @@
                 v-model="form.config.comparator"
                 :label="t('slos.field.comparator')"
                 :options="comparatorOptions"
+                :error="!!fieldError('config.comparator')"
+                :error-message="fieldError('config.comparator') || undefined"
                 data-test="slos-addslo-comparator"
               />
               <OInput
                 v-model.number="form.config.threshold"
                 :label="t('slos.field.threshold')"
                 type="number"
+                :error="!!fieldError('config.threshold')"
+                :error-message="fieldError('config.threshold') || undefined"
                 data-test="slos-addslo-threshold"
               />
             </div>
@@ -368,9 +386,15 @@
               :placeholder="t('slos.alertSli.sourcePlaceholder')"
               required
               class="mt-3"
+              :error="!!fieldError('config.alert_id')"
+              :error-message="fieldError('config.alert_id') || undefined"
               data-test="slos-addslo-alert-source"
               @update:model-value="onAlertSourceChange"
-            />
+            >
+              <template #tooltip>
+                <OTooltip :content="t('slos.alertSli.eligibilityInfo')" />
+              </template>
+            </OSelect>
             <p class="text-text-secondary mt-1 text-xs" data-test="slos-addslo-alert-source-hint">
               {{ t("slos.alertSli.sourceHint") }}
             </p>
@@ -402,6 +426,8 @@
               step="0.001"
               suffix="%"
               required
+              :error="!!fieldError('target')"
+              :error-message="fieldError('target') || undefined"
               data-test="slos-addslo-target"
             />
             <div class="text-compact text-text-secondary flex items-end pb-2">
@@ -470,6 +496,8 @@
             multiple
             :disabled="isAlertSli"
             :placeholder="t('slos.field.groupByPlaceholder')"
+            :error="!!fieldError('group_by')"
+            :error-message="fieldError('group_by') || undefined"
             data-test="slos-addslo-group-by"
           />
           <p
@@ -573,6 +601,8 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { makeAddSloSchema } from "./AddSlo.schema";
+import { scrollToFirstError } from "@/lib/forms/Form/scrollToFirstError";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
@@ -588,6 +618,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import useStreams from "@/composables/useStreams";
 import useSqlSuggestions from "@/composables/useSuggestions";
 import OTagInput from "@/lib/forms/TagInput/OTagInput.vue";
@@ -942,12 +973,15 @@ const alertSourceError = ref<string | null>(null);
 
 const hasEligibleAlert = computed(() => alertSources.value.some((a) => a.eligible));
 
+// The reason is a PARAGRAPH. Folded into the label it produced one truncated
+// line per row in which the alert's own name was the first casualty, so the
+// list could not be scanned at all. `subLabel` puts the name back on its own
+// line and wraps the reason underneath it.
 const alertSourceOptions = computed(() =>
   alertSources.value.map((a) => ({
     value: a.alert_id,
-    label: a.eligible
-      ? raw(a.name)
-      : t("slos.alertSli.ineligibleOption", { name: a.name, reason: a.reason ?? "" }),
+    label: raw(a.name),
+    subLabel: a.eligible ? undefined : raw(a.reason ?? ""),
     disabled: !a.eligible,
   })),
 );
@@ -1172,8 +1206,73 @@ function payload() {
   };
 }
 
+/// Per-field validation, mirroring what the API enforces.
+///
+/// The form previously had NONE: `required` on OSelect renders an asterisk and
+/// nothing else, Save was never disabled, and every rejection came back from the
+/// server. For a missing field that server answer is a deserialization 422 whose
+/// body carries no `message`, so `save()` fell through to axios's own string and
+/// the user was told "Request failed with status code 422" about a field they
+/// left blank — with nothing marking which field.
+///
+/// These checks pre-empt the server rather than replace it: the API remains the
+/// authority, and anything it rejects still surfaces in `slos-addslo-error`.
+/// What they add is naming the field, at the field.
+const attemptedSave = ref(false);
+
+/// The rules live in `AddSlo.schema.ts` — same arrangement as the alert forms,
+/// where the zod schema is a sibling file the component composes. Keeping them
+/// out of here is what makes them unit-testable per SLI shape without mounting
+/// a 1,200-line form.
+const validation = computed(() =>
+  makeAddSloSchema(t, {
+    isPromqlCount: isPromqlCount.value,
+    isPromqlTimeSlice: isPromqlTimeSlice.value,
+    isGrouped: isGrouped.value,
+  }).safeParse({ ...form, group_by: groupByList.value }),
+);
+
+/// Issues keyed by their dotted path, so a field asks for its own message.
+const validationIssues = computed<Record<string, I18nText>>(() => {
+  const result = validation.value;
+  if (result.success) return {};
+  const out: Record<string, I18nText> = {};
+  for (const issue of result.error.issues) {
+    const key = issue.path.join(".");
+    // First issue wins: the rules are ordered from "missing" to "malformed",
+    // and telling someone their blank field is not a number helps nobody.
+    if (!(key in out)) out[key] = issue.message as I18nText;
+  }
+  return out;
+});
+
+/** The "no message" value. Branded so it is assignable to `error-message`. */
+const NO_ERROR = raw("");
+
+/** Errors are shown only AFTER a save attempt.
+ *
+ *  This is `revalidateLogic({ mode: "submit", modeAfterSubmission: "change" })`,
+ *  the timing `useOForm` configures for every other form in the product: a
+ *  brand-new form is empty by definition, so surfacing every "required" on
+ *  mount would paint the page red before the user has typed anything. */
+const fieldError = (path: string): I18nText =>
+  attemptedSave.value ? (validationIssues.value[path] ?? NO_ERROR) : NO_ERROR;
+
 async function save() {
   error.value = null;
+
+  // Block the request outright. Sending a knowingly-invalid definition just to
+  // read the server's rejection is what produced "Request failed with status
+  // code 422" with no indication of which field was at fault.
+  attemptedSave.value = true;
+  if (!validation.value.success) {
+    // On a form this long the offending field is usually scrolled out of view,
+    // so a banner alone still leaves the user hunting for it.
+    await scrollToFirstError();
+    error.value = t("slos.validation.summary");
+    return;
+  }
+
   saving.value = true;
   try {
     if (isEdit.value) {

@@ -196,24 +196,34 @@ describe("AddSlo — alert SLI", () => {
 
   // Without this the picker offers alerts the server will reject, and the user
   // learns why only on save.
-  it("disables the ineligible alerts and shows why", async () => {
+  //
+  // The reason is a PARAGRAPH, so it belongs in `subLabel` — the secondary line
+  // OSelect renders UNDER the label. Concatenated into the label it produced one
+  // truncated row per alert in which the name was the first thing cut, which is
+  // why the name is asserted as the whole label here.
+  it("disables the ineligible alerts and shows why under the name", async () => {
     const wrapper = await mountForm();
     await selectAlertType(wrapper);
     const options = byTest(wrapper, OSelect, "slos-addslo-alert-source").props("options") as {
       value: string;
       label: string;
+      subLabel?: string;
       disabled?: boolean;
     }[];
 
-    expect(options.find((o) => o.value === "alert-fast")?.disabled).toBeFalsy();
+    const eligible = options.find((o) => o.value === "alert-fast");
+    expect(eligible?.disabled).toBeFalsy();
+    // An eligible alert has nothing to explain, so it carries no second line.
+    expect(eligible?.subLabel).toBeUndefined();
 
     const cron = options.find((o) => o.value === "alert-cron");
     expect(cron?.disabled).toBe(true);
-    expect(cron?.label).toContain("cron");
+    expect(cron?.label).toBe("weekly report");
+    expect(cron?.subLabel).toContain("cron");
 
     const silenced = options.find((o) => o.value === "alert-silenced");
     expect(silenced?.disabled).toBe(true);
-    expect(silenced?.label).toContain("silence to 0");
+    expect(silenced?.subLabel).toContain("silence to 0");
   });
 
   // A source evaluating slower than 300s cannot be used at all — 300 is the
@@ -224,11 +234,12 @@ describe("AddSlo — alert SLI", () => {
     const options = byTest(wrapper, OSelect, "slos-addslo-alert-source").props("options") as {
       value: string;
       label: string;
+      subLabel?: string;
       disabled?: boolean;
     }[];
     const slow = options.find((o) => o.value === "alert-slow");
     expect(slow?.disabled).toBe(true);
-    expect(slow?.label).toContain("once per slice");
+    expect(slow?.subLabel).toContain("once per slice");
   });
 
   it("defaults the slice to 60 for a one-minute source", async () => {
@@ -288,6 +299,10 @@ describe("AddSlo — alert SLI", () => {
     const wrapper = await mountForm();
     await selectAlertType(wrapper);
     await pickSource(wrapper, "alert-fast");
+    // The name is required and this test is about the config, so supplying one
+    // is setup — without it the save is refused and nothing reaches the spy.
+    await wrapper.find('[data-test="slos-addslo-name-field"]').setValue("payload-fixture");
+    await flushPromises();
     await wrapper.find('[data-test="slos-addslo-save"]').trigger("click");
     await flushPromises();
 
@@ -313,6 +328,22 @@ describe("AddSlo — time-slice SLI", () => {
   it("sends the query language required by the API", async () => {
     const wrapper = await mountForm();
     await wrapper.find('[data-test="slos-addslo-sli-type-time_slice"]').trigger("click");
+    // A time slice needs a name, a stream, an aggregate and a threshold before
+    // the form will submit at all; the subject here is only what the payload
+    // then DECLARES as its language.
+    await wrapper.find('[data-test="slos-addslo-name-field"]').setValue("payload-fixture");
+    await wrapper.find('[data-test="slos-addslo-threshold-field"]').setValue("1");
+    byTest(wrapper, OSelect, "slos-addslo-timeslice-stream").vm.$emit(
+      "update:modelValue",
+      "fixture_stream",
+    );
+    // SloExpressionField is auto-stubbed here, so it is found by its declared
+    // `dataTest` PROP rather than by an attribute.
+    wrapper
+      .findAllComponents({ name: "SloExpressionField" })
+      .find((c) => c.props("dataTest") === "slos-addslo-aggregate")!
+      .vm.$emit("update:modelValue", "avg(took)");
+    await flushPromises();
     await wrapper.find('[data-test="slos-addslo-save"]').trigger("click");
     await flushPromises();
 

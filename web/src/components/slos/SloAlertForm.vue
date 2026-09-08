@@ -42,7 +42,7 @@
     </div>
 
     <!-- The SLO is context, not a field: it comes from the page. -->
-    <SloAlertCondition v-model="form.condition" :slo="slo" />
+    <SloAlertCondition v-model="form.condition" :slo="slo" :errors="conditionFieldErrors" />
 
     <!-- Sized to their content (`width="sm"`, minutes suffix) rather than a
          half-panel column each: a two-digit interval in a 60rem input reads as
@@ -55,6 +55,8 @@
         suffix="min"
         :label="t('alerts.frequency')"
         required
+        :error="!!fieldError('frequencyMinutes')"
+        :error-message="fieldError('frequencyMinutes') || undefined"
         data-test="slo-alert-form-frequency"
       />
       <OInput
@@ -64,6 +66,8 @@
         suffix="min"
         :label="t('alerts.silence')"
         required
+        :error="!!fieldError('silenceMinutes')"
+        :error-message="fieldError('silenceMinutes') || undefined"
         data-test="slo-alert-form-silence"
       />
     </div>
@@ -74,6 +78,7 @@
       v-model:destinations="form.destinations"
       v-model:workflows="form.workflows"
       :destination-options="destinationOptions"
+      :error="fieldError('destinations') || undefined"
       data-test="slo-alert-form-targets"
       @refresh="loadDestinations"
     />
@@ -102,7 +107,9 @@
 import { computed, onMounted, reactive, ref, watch } from "vue";
 import { useStore } from "vuex";
 
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { makeSloAlertSchema } from "./SloAlertForm.schema";
+import { scrollToFirstError } from "@/lib/forms/Form/scrollToFirstError";
 
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -112,7 +119,6 @@ import SloAlertCondition from "@/components/slos/SloAlertCondition.vue";
 import alertsService from "@/services/alerts";
 import destinationService from "@/services/alert_destination";
 import type { Slo } from "@/ts/interfaces/slo";
-import { ALERT_NAME_UNSUPPORTED_CHARS } from "@/components/alerts/AddAlert.schema";
 import { buildSloAlertPayload, deriveSloAlertName } from "@/utils/alerts/sloAlertPayload";
 
 const props = defineProps<{ slo: Slo; alertId?: string | null }>();
@@ -164,16 +170,7 @@ const form = reactive({
 //
 // `alerts.nameRequired` is the key the generic alert form already uses; there
 // is no `alerts.validation.nameRequired`, and a missing key renders as the key.
-const nameError = computed(() => {
-  if (!form.name.trim()) return t("alerts.nameRequired");
-  // Whitespace and "/" are both rejected server-side, and the first check runs
-  // before anything else — so a natural-language name never reaches save.
-  if (ALERT_NAME_UNSUPPORTED_CHARS.test(form.name) || form.name.includes("/")) {
-    return t("alerts.validation.nameUnsupportedChars");
-  }
-  return raw("");
-});
-
+// The rule itself lives in SloAlertForm.schema.ts.
 /** Keep the suggested name in step with the condition until the user types
  *  their own. Two alerts on one SLO are told apart by name, so a blank or
  *  duplicated default is the failure mode worth designing out. */
@@ -196,9 +193,73 @@ watch(
   },
 );
 
+/// Only the name was checked before, so a missing destination reached the server
+/// and came back as a banner reading "Alert destination or workflows is
+/// required" — accurate, but attached to nothing the user can see is wrong.
+/// These name the field instead.
+///
+/// Shown only after a submit attempt: unlike the name, which is prefilled from
+/// the condition, these start empty on every new alert and would otherwise paint
+/// the form red before anyone has typed.
+const attemptedSubmit = ref(false);
+
+/** The "no message" value. Branded so it is assignable to `error-message`. */
+const NO_ERROR = raw("");
+
+/// Rules live in `SloAlertForm.schema.ts`, the arrangement the generic alert
+/// forms use — see the note at the top of that file for why `kind` changes the
+/// required set rather than merely relaxing it.
+const validation = computed(() =>
+  makeSloAlertSchema(t).safeParse({
+    name: form.name,
+    frequencyMinutes: form.frequencyMinutes,
+    silenceMinutes: form.silenceMinutes,
+    destinations: form.destinations,
+    workflows: form.workflows,
+    condition: form.condition,
+  }),
+);
+
+const validationIssues = computed<Record<string, I18nText>>(() => {
+  const result = validation.value;
+  if (result.success) return {};
+  const out: Record<string, I18nText> = {};
+  for (const issue of result.error.issues) {
+    const key = issue.path.join(".");
+    if (!(key in out)) out[key] = issue.message as I18nText;
+  }
+  return out;
+});
+
+/// Submit-then-change, the timing `useOForm` configures everywhere else: these
+/// fields start empty on every new alert and would otherwise paint the form red
+/// before anyone has typed. The name is the exception — it is prefilled from the
+/// condition, so it is marked as soon as it is emptied.
+const fieldError = (path: string): I18nText =>
+  attemptedSubmit.value ? (validationIssues.value[path] ?? NO_ERROR) : NO_ERROR;
+
+const nameError = computed(() => validationIssues.value["name"] ?? NO_ERROR);
+
+/// Handed to SloAlertCondition so its inputs render their own inline markers,
+/// rather than the form reporting a condition problem far from the input.
+const conditionFieldErrors = computed(() => ({
+  critical: fieldError("condition.critical"),
+  long: fieldError("condition.long_window_secs"),
+  short: fieldError("condition.short_window_secs"),
+}));
+
 const submit = async () => {
   saveError.value = "";
-  if (nameError.value) return;
+  attemptedSubmit.value = true;
+
+  // Refuse to send a knowingly-invalid alert. Previously only the name was
+  // checked, and it returned SILENTLY — no banner, no field marker — so a
+  // rejected name looked exactly like nothing happening.
+  if (!validation.value.success) {
+    await scrollToFirstError();
+    saveError.value = t("slos.validation.summary");
+    return;
+  }
 
   saving.value = true;
   try {
