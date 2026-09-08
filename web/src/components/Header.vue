@@ -129,8 +129,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <!-- end left side -->
 
-    <!-- CENTER: elastic spacer so the right-side controls stay right-aligned. -->
-    <div class="min-w-0 flex-1" />
+    <!-- CENTER: command palette trigger -->
+    <div class="flex min-w-0 flex-1 items-center justify-center px-2">
+      <OButton
+        variant="outline"
+        size="sm"
+        icon-left="search"
+        class="hidden w-full max-w-[28rem] justify-between md:flex"
+        data-test="header-command-palette-trigger"
+        @click="openPalette"
+      >
+        <span class="text-text-secondary truncate font-normal">{{ t("palette.trigger") }}</span>
+        <OShortcut id="commandPalette" />
+      </OButton>
+    </div>
 
     <!-- RIGHT SIDE: Controls -->
     <div class="flex shrink-0 items-center justify-end gap-1 pe-3">
@@ -440,6 +452,7 @@ import OrganizationSelector from "./OrganizationSelector.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OShortcut from "@/lib/core/Shortcut/OShortcut.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
@@ -457,6 +470,7 @@ export default defineComponent({
     OButton,
     OIcon,
     OTooltip,
+    OShortcut,
     ODropdown,
     ODropdownItem,
     ODropdownSeparator,
@@ -542,6 +556,7 @@ export default defineComponent({
     "changeLanguage",
     "openPredefinedThemes",
     "openShortcuts",
+    "openPalette",
     "signout",
   ],
   setup(props, { emit }) {
@@ -632,6 +647,10 @@ export default defineComponent({
       emit("openShortcuts");
     };
 
+    const openPalette = () => {
+      emit("openPalette");
+    };
+
     const signout = () => {
       emit("signout");
     };
@@ -677,6 +696,7 @@ export default defineComponent({
       changeLanguage,
       openPredefinedThemes,
       openShortcuts,
+      openPalette,
       signout,
       handleMouseEnter,
       handleMouseLeave,

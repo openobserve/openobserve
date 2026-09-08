@@ -18,6 +18,7 @@ import { getDecodedUserInfo, getPath, mergeRoutes } from "@/utils/zincutils";
 import { gt } from "@/types/i18n";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
+import { useRecentlyViewed } from "@/components/commandPalette/useRecentlyViewed";
 
 import userCloudRoutes from "@/enterprise/composables/router";
 import userRoutes from "@/composables/shared/router";
@@ -141,5 +142,11 @@ export default function (store: any) {
       next();
     }
   });
+
+  const { recordRouteVisit } = useRecentlyViewed();
+  router.afterEach((to: any) => {
+    recordRouteVisit(to);
+  });
+
   return router;
 }

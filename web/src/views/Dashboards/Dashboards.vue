@@ -870,6 +870,12 @@ export default defineComponent({
         activeFolderId.value = "default";
       }
       landingDecided = true;
+      // The command palette's "New dashboard" row lands here with ?action=add.
+      if (route.query.action === "add") {
+        showAddDashboardDialog.value = true;
+        const { action: _action, ...query } = route.query;
+        void router.replace({ query });
+      }
     });
 
     watch(

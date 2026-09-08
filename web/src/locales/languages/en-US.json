@@ -17150,5 +17150,27 @@
       "allClearTitle": "Nothing crossed a threshold",
       "allClearDescription": "Every check ran and none crossed its threshold in this time range."
     }
+  },
+  "palette": {
+    "title": "Command palette",
+    "placeholder": "Search pages, actions and more…",
+    "trigger": "Search or jump to…",
+    "groups": {
+      "recent": "Recent",
+      "actions": "Actions",
+      "pages": "Pages"
+    },
+    "actions": {
+      "newDashboard": "New dashboard",
+      "darkMode": "Switch to dark mode",
+      "lightMode": "Switch to light mode",
+      "slack": "Community Slack"
+    },
+    "hint": {
+      "navigate": "navigate",
+      "open": "open",
+      "newTab": "new tab"
+    },
+    "noResults": "No matches for \"{q}\""
   }
 }

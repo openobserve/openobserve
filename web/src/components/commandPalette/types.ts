@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import type { RouteLocationRaw } from "vue-router";
+
 /** Kind of thing a palette row points at; also the prefix of every row id. */
 export type PaletteItemType =
   | "page"
@@ -25,6 +27,30 @@ export type PaletteItemType =
   | "function"
   | "pipeline"
   | "ai";
+
+export interface PaletteTrailing {
+  kind: "path" | "url" | "shortcut";
+  value: string;
+}
+
+export interface PaletteItem {
+  /** Stable id, `<type>:<key>`; also the frecency key. */
+  id: string;
+  type: PaletteItemType;
+  label: string;
+  subtitle?: string;
+  icon: string;
+  trailing?: PaletteTrailing;
+  /** Extra match terms (route name, group, aliases). */
+  keywords?: string[];
+  /** org_identifier is injected at navigation time, never stored here. */
+  route?: RouteLocationRaw;
+  href?: string;
+  run?: () => void | Promise<void>;
+}
+
+export type PaletteRow =
+  { kind: "header"; key: string; label: string } | { kind: "item"; key: string; item: PaletteItem };
 
 export type FrecencyBucketName = "palette_item" | "palette_scope";
 

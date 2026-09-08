@@ -74,6 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @change-language="changeLanguage"
         @open-predefined-themes="openPredefinedThemes"
         @open-shortcuts="openShortcutsList"
+        @open-palette="showPalette = true"
         @signout="signout"
       />
     </header>
@@ -165,6 +166,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <CommunitySlackInvite />
     <PredefinedThemes />
     <ShortcutCheatsheet v-model:open="showShortcuts" />
+    <CommandPalette
+      v-model:open="showPalette"
+      :nav-links="navLinks"
+      @open-shortcuts="openShortcutsList"
+      @open-docs="navigateToDocs"
+      @open-slack="openSlack"
+    />
   </div>
 </template>
 
@@ -227,6 +235,7 @@ import useRoutePrefetch from "@/composables/useRoutePrefetch";
 import { toast, dismissAll } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { ShortcutCheatsheet } from "@/lib/vue-shortcut-manager";
+import CommandPalette from "@/components/commandPalette/CommandPalette.vue";
 import { useHomeDashboard } from "@/composables/useHomeDashboard";
 
 let mainLayoutMixin: any = null;
@@ -252,6 +261,7 @@ export default defineComponent({
     PredefinedThemes,
     O2AIChat,
     ShortcutCheatsheet,
+    CommandPalette,
     GetStarted,
     CommunitySlackInvite,
     ODialog,
