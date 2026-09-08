@@ -848,7 +848,9 @@
     },
     "condition": {
       "loading": "Đang tải điều kiện...",
-      "loadError": "Điều kiện đã lưu không thể đọc được và đã được đặt lại. Lưu ngay bây giờ sẽ ghi đè lên nó."
+      "loadError": "Điều kiện đã lưu không thể đọc được và đã được đặt lại. Lưu ngay bây giờ sẽ ghi đè lên nó.",
+      "unknownColumn": "\"{column}\" không nằm trong payload của trình kích hoạt này, nên điều kiện này có thể không bao giờ khớp.",
+      "unknownColumnSuggestion": "Ý bạn là \"{suggestion}\"?"
     },
     "destination": {
       "createNew": "Tạo đích mới",
@@ -2560,7 +2562,9 @@
       "title": "Lần chạy quy trình",
       "edit": "Sửa quy trình",
       "debugInEditor": "Gỡ lỗi trong trình chỉnh sửa",
-      "staleGraphWarning": "Workflow này đã được chỉnh sửa kể từ lần chạy này — {count} bước mà nó thực hiện không còn tồn tại, vì vậy trạng thái tương ứng không được hiển thị ở đây. | Workflow này đã được chỉnh sửa kể từ lần chạy này — {count} bước mà nó thực hiện không còn tồn tại, vì vậy trạng thái tương ứng không được hiển thị ở đây."
+      "staleGraphWarning": "Workflow này đã được chỉnh sửa kể từ lần chạy này — {count} bước mà nó thực hiện không còn tồn tại, vì vậy trạng thái tương ứng không được hiển thị ở đây. | Workflow này đã được chỉnh sửa kể từ lần chạy này — {count} bước mà nó thực hiện không còn tồn tại, vì vậy trạng thái tương ứng không được hiển thị ở đây.",
+      "hideList": "Ẩn danh sách các lần chạy",
+      "showList": "Hiện danh sách các lần chạy"
     },
     "history": {
       "button": "Lần chạy",
@@ -2576,10 +2580,21 @@
       "error": "Lỗi",
       "success": "Thành công",
       "failed": "Thất bại",
+      "testRun": "Lần chạy thử",
+      "runType": "Loại",
+      "testRunTooltip": "Được bắt đầu từ trình soạn thảo. Các bước đích sẽ thực sự gửi đi.",
+      "showTestRuns": "Hiện {count} lần chạy thử",
+      "hideTestRuns": "Ẩn các lần chạy thử",
       "open": "Lịch sử",
       "openFullView": "Mở chế độ xem đầy đủ các lần chạy",
       "loadError": "Lỗi khi tải các lần thực thi",
-      "loadRunError": "Lỗi khi tải lần chạy này"
+      "loadRunError": "Lỗi khi tải lần chạy này",
+      "retry": "Thử lại",
+      "retryTooltip": "Chạy lại lần chạy thất bại này từ đầu vào đã ghi nhận của nó.",
+      "retryTitle": "Thử lại lần chạy này?",
+      "retryMessage": "Thao tác này tạo một lần chạy mới từ đầu vào mà lần chạy thất bại đã ghi lại. Các bước đích sẽ thực sự gửi đi.",
+      "retryStarted": "Đã bắt đầu thử lại — lần chạy đó sẽ xuất hiện trong danh sách như một lần chạy mới.",
+      "retryError": "Không thể thử lại lần chạy này"
     },
     "edit": "Sửa",
     "view": "Xem",
@@ -2596,7 +2611,9 @@
     "triggerRequired": "Cần có một bộ kích hoạt",
     "addStepRequired": "Thêm ít nhất một bước sau bộ kích hoạt",
     "connectAllNodes": "Kết nối tất cả các nút trước khi lưu",
+    "branchPathsRequired": "Kết nối từng đường dẫn của nhánh với một bước | 1 bước Nhánh có các kết nối không khớp với các đường dẫn của nó. Hãy mở nó, xác định các đường dẫn rồi kết nối lại. | {count} bước Nhánh có các kết nối không khớp với các đường dẫn của chúng.",
     "finishStepsBeforePublish": "{count} bước cần được thiết lập trước khi xuất bản — được đánh dấu trên canvas. | {count} bước cần được thiết lập trước khi xuất bản — được đánh dấu trên canvas.",
+    "noChangesToPublish": "Không có thay đổi để xuất bản — quy trình làm việc này đã khớp với phiên bản đã xuất bản.",
     "draft": "Bản nháp",
     "saveDraft": "Lưu thành bản nháp",
     "publish": "Xuất bản",
@@ -2643,7 +2660,7 @@
     "loadError": "Không thể tải Workflow",
     "deleteNode": "Xóa Node",
     "deleteNodeTitle": "Xóa Bước",
-    "deleteNodeConfirm": "Bạn có chắc chắn muốn xóa bước này? Hành động này không thể hoàn tác.",
+    "deleteNodeConfirm": "Bạn có chắc chắn muốn xóa bước này không? Bạn có thể hoàn tác thao tác này.",
     "namePlaceholder": "Workflow chưa có tiêu đề",
     "renameHint": "Nhấp để đổi tên workflow này",
     "editMode": "Chỉnh sửa Workflow",
@@ -2656,11 +2673,29 @@
       "runFromBeginning": "Đầu (Trigger)",
       "runFromNote": "Chỉ các bước từ đây trở xuống mới chạy.",
       "inputLabel": "Đầu vào mẫu",
+      "source": {
+        "sample": "Mẫu được tạo tự động",
+        "run": "Từ lần chạy: {run}",
+        "edited": "Đã chỉnh sửa bởi bạn"
+      },
+      "revertInput": "Hoàn nguyên",
+      "useRunInput": "Dùng đầu vào từ lần chạy…",
+      "lastTestRun": "Lần chạy thử cuối (trong tab này)",
+      "runHasNoInput": "Lần chạy đó không có đầu vào nào được lưu cho bước này.",
       "invalidJson": "Nhập một mảng JSON hợp lệ của các bản ghi.",
       "resultHint": "Sau khi chạy, mỗi bước hiển thị biểu tượng kiểm tra hoặc lỗi trên canvas.",
+      "rehearsalOnly": "Mới chỉ đạt trong lần chạy thử — là buổi diễn tập với payload mẫu, không phải bằng chứng rằng quy trình làm việc đã xuất bản hoạt động.",
       "notVerified": "Không có bản ghi nào đến được bước này — một điều kiện từ bước trước đã lọc chúng ra, hoặc một bước trước đó đã gặp lỗi.",
+      "notConfigured": "Bước này chưa được thiết lập nên nó không làm gì trong lần chạy này. Hãy cấu hình rồi chạy thử lại.",
+      "recordedFailure": "Bước này đã thất bại ở lần chạy được ghi nhận gần nhất.",
+      "recordsUnavailable": "Được ghi nhận ở lần chạy trước — hãy chạy lại kiểm thử để xem các bản ghi.",
+      "dirtySelf": "Cấu hình đã thay đổi kể từ lần bước này chạy gần nhất. Hãy kiểm thử lại bước.",
+      "dirtyUpstream": "Một bước phía trước đã thay đổi kể từ khi bước này chạy. Hãy kiểm thử lại bước.",
       "run": "Chạy kiểm tra",
       "runError": "Không thể chạy kiểm tra.",
+      "suppressDestinations": "Không thực sự gửi đến các đích",
+      "suppressDestinationsHint": "Các bước đích vẫn xác định tuyến nhưng không có gì được gửi đi.",
+      "dispatchWarning": "Kiểm thử đang hoạt động thật: lần chạy này sẽ thực sự gửi tới {destinations}.",
       "stepResult": {
         "viewHint": "Nhấp để xem đầu vào / đầu ra",
         "input": "Đầu vào",
@@ -2686,8 +2721,10 @@
         "status": {
           "ok": "Đã qua",
           "error": "Có lỗi",
-          "skipped": "Không có bản ghi"
-        }
+          "skipped": "Không có bản ghi",
+          "noMatch": "Không khớp"
+        },
+        "suppressed": "Đã bỏ qua — không gửi tới đích thật"
       }
     },
     "linkAlerts": {
@@ -2720,6 +2757,7 @@
       "kindLogic": "Logic",
       "kindAction": "Hành động",
       "condition": "Điều kiện",
+      "branch": "Nhánh",
       "function": "Hàm",
       "sendToDestination": "Đích",
       "configComingSoon": "Cấu hình {node} sẽ có ở bước sau",
@@ -2727,12 +2765,41 @@
       "sectionDestination": "Đích",
       "stepSearchPlaceholder": "Tìm kiếm bước...",
       "stepNoMatch": "Không có bước nào phù hợp với tìm kiếm của bạn.",
-      "conditionDesc": "Rẽ nhánh theo quy tắc",
+      "conditionDesc": "Chỉ tiếp tục khi một quy tắc khớp",
+      "branchDesc": "Định tuyến từng bản ghi theo đường dẫn khớp đầu tiên",
+      "branchCaseLabel": "Tên đường dẫn (không bắt buộc)",
+      "branchCaseLabelPlaceholder": "Ví dụ: Mức độ nghiêm trọng cao",
+      "branchAddCase": "Thêm đường dẫn",
+      "branchRemoveCase": "Xóa đường dẫn",
+      "branchMoveUp": "Di chuyển đường dẫn lên",
+      "branchMoveDown": "Di chuyển đường dẫn xuống",
+      "branchPathNumber": "Đường dẫn {index}",
+      "branchElseTitle": "Mọi trường hợp khác",
+      "branchElseHint": "Các bản ghi không khớp với đường dẫn nào ở trên sẽ được chuyển ra tại đây.",
+      "branchNoteTitle": "Hướng dẫn về nhánh",
+      "branchNoteFirstMatch": "Các nhánh được kiểm tra từ trên xuống dưới và nhánh nào khớp ĐẦU TIÊN sẽ thắng, vì vậy mỗi bản ghi sẽ thoát theo đúng một nhánh.",
+      "branchNoteUnwired": "Một nhánh không có gì kết nối sẽ chỉ đơn giản loại bỏ các bản ghi của nó.",
       "functionDesc": "Định hình lại tải trọng bằng một hàm",
       "destinationDesc": "Gửi đến một đích",
       "triggerBody": "Chạy khi một cảnh báo liên quan kích hoạt",
       "triggerDataExampleNote": "Chỉ là ví dụ — các cột thực tế đến từ truy vấn của cảnh báo của bạn.",
       "incidentEventTypeLabel": "Loại sự kiện",
+      "incidentEventType": {
+        "created": "Đã tạo sự cố",
+        "alert": "Đã kích hoạt cảnh báo",
+        "severity_upgrade": "Đã nâng cấp mức độ nghiêm trọng",
+        "severity_override": "Đã ghi đè mức độ nghiêm trọng",
+        "acknowledged": "Đã xác nhận",
+        "resolved": "Đã giải quyết",
+        "reopened": "Đã mở lại",
+        "dimension_upgraded": "Đã nâng cấp chiều",
+        "title_changed": "Đã thay đổi tiêu đề",
+        "assignment_changed": "Đã thay đổi phân công",
+        "comment": "Đã thêm bình luận",
+        "ai_analysis_begin": "Đã bắt đầu phân tích AI",
+        "ai_analysis_complete": "Đã hoàn tất phân tích AI",
+        "ai_analysis_failed": "Phân tích AI thất bại"
+      },
       "incidentCommonTitle": "Các trường chung (Mọi sự kiện)",
       "incidentSpecificTitle": "Các trường cụ thể cho sự kiện",
       "incidentNoExtraFields": "Sự kiện này không thêm trường nào ngoài các trường chung.",
@@ -2759,11 +2826,14 @@
       "enable": "Kích hoạt bước",
       "disabledBadge": "Đã tắt",
       "incompleteBadge": "Thiết lập sau",
+      "unwiredBadge": "Nhánh chưa kết nối",
       "unsavedFnTitle": "Thay đổi hàm chưa lưu",
       "unsavedFnMessage": "Bước này có mã hàm chưa được lưu vào thư viện của bạn. Lưu nó, hủy thay đổi, hoặc tiếp tục chỉnh sửa.",
       "unsavedFnSave": "Lưu hàm",
       "unsavedFnDiscard": "Hủy thay đổi",
-      "unsavedFnKeep": "Tiếp tục chỉnh sửa"
+      "unsavedFnKeep": "Tiếp tục chỉnh sửa",
+      "destination": "Đích",
+      "branchPathUnset": "{name} · chưa thiết lập quy tắc"
     },
     "commonFieldsAbove": "các trường chung ở trên",
     "canvas": {
@@ -2787,11 +2857,15 @@
       "openStep": "Mở {name}",
       "runToView": "Chạy thử để xem dữ liệu này.",
       "noBranchItems": "Không có mục nào trên nhánh này.",
+      "forwardedCount": "{out} trong {total} bản ghi được chuyển tiếp | {out} trong {total} bản ghi được chuyển tiếp",
+      "noMatchForwarded": "Không khớp — 0 trong {total} bản ghi được chuyển tiếp | Không khớp — 0 trong {total} bản ghi được chuyển tiếp",
+      "branchDropped": "{count} bản ghi không khớp nhánh nào — đã loại bỏ | {count} bản ghi không khớp nhánh nào — đã loại bỏ",
       "noUpstream": "Không có bước thượng nguồn.",
       "noRunYet": "Chưa có lần chạy nào.",
       "runLabel": "Chạy",
       "switchRun": "Chuyển lần chạy",
       "notInRun": "Bước này không nằm trong lần chạy này.",
+      "noRunData": "Lần chạy này không lưu dữ liệu bước.",
       "runTest": "Chạy thử",
       "noItems": "Không có mục nào",
       "itemsCount": "{count} mục | {count} mục",
@@ -2801,8 +2875,14 @@
       "executeStep": "Chạy bước",
       "sample": "Mẫu",
       "editStep": "Chỉnh sửa bước",
+      "readOnlyRun": "Bạn đang xem một lần chạy trước đó, vì vậy cấu hình của bước này không thể thay đổi tại đây.",
+      "readOnlyRunEdit": "Chỉnh sửa trong quy trình làm việc",
       "testInputHint": "Đầu vào thử nghiệm — Chỉnh sửa, sau đó chạy bước.",
-      "noRunsList": "Chưa có lần chạy nào."
+      "noRunsList": "Chưa có lần chạy nào.",
+      "resetInput": "Đặt lại về mẫu",
+      "eventPager": "{n} / {total}",
+      "nextEvent": "Sự kiện tiếp theo",
+      "prevEvent": "Sự kiện trước đó"
     },
     "runOverlay": {
       "banner": "Đang hiển thị dữ liệu bước từ lần chạy trước ({run}). Bạn có thể chỉnh sửa tự do — lần chạy này sẽ không bao giờ bị thay đổi.",
@@ -2829,6 +2909,8 @@
       "noConfig": "Không có cấu hình",
       "functionLabel": "Hàm",
       "destinationLabel": "Đích",
+      "branchPathsLabel": "Nhánh",
+      "branchNoRule": "Chưa thiết lập quy tắc",
       "destinationUnsupported": "Loại không được hỗ trợ",
       "destinationMissing": "Đích này không còn tồn tại hoặc không thể đọc được.",
       "headersLabel": "Header",
@@ -3718,7 +3800,7 @@
       "dynamodbPipelineTitle": "Phát trực tiếp DynamoDB → Firehose",
       "dynamodbTagline": "Truyền các thay đổi mục DynamoDB vào OpenObserve qua Kinesis Firehose.",
       "ec2IamNote": "Yêu cầu vai trò IAM trên instance với quyền ec2:DescribeTags và ec2:DescribeInstances, để agent có thể đọc thẻ Name và sử dụng nó làm định danh máy chủ.",
-      "enableSessionReplayDesc": "Session Replay được cấu hình **riêng** khỏi RUM và **không** kế thừa `rumConfiguration.customEndpoint`. Nó cũng không thêm đường dẫn, vì vậy cần URL `/replay` đầy đủ bên dưới. Cấu hình sai đây là lý do thường gặp khiến sự kiện RUM đến nhưng replay không bao giờ đến.",
+      "enableSessionReplayDesc": "Session Replay được cấu hình **riêng biệt** với RUM và **không** kế thừa `rumConfiguration.customEndpoint`. Hãy cung cấp cho nó một base URL riêng bên dưới — cùng định dạng với base URL của RUM/Nhật ký. Bridge tự thêm `/replay`, vì vậy **đừng** tự thêm nó: nếu tự thêm `/replay`, đường dẫn sẽ bị lặp và mọi lần tải lên đều bị từ chối với mã 401 — đây là lý do thường gặp khiến các sự kiện RUM đến được nhưng bản replay thì không.",
       "enableSessionReplayTitle": "Bật Session Replay",
       "endpointLabel": "Endpoint",
       "externalEndpointVariant": "Điểm cuối Bên ngoài",
@@ -3920,18 +4002,16 @@
       "rnInitNote": "Khởi tạo càng sớm càng tốt — provider phải được mount trước các màn hình bạn muốn đo.",
       "rnInstallNote": "Các gói session-replay và navigation là tùy chọn — bỏ dòng tương ứng nếu bạn không cần ghi màn hình hoặc theo dõi chế độ xem tự động.",
       "rnNavigationNote": "Nếu không có phần này, bạn vẫn có thể ghi lại chế độ xem theo cách thủ công bằng `O2Rum.startView()` / `O2Rum.stopView()`.",
-      "rnSessionReplayNote": "Session Replay trên React Native hiện được xác minh trên Android. Trên iOS, SDK thêm đường dẫn riêng của nó vào URL này, vì vậy các bản upload replay chưa đến được OpenObserve — RUM, nhật ký và sự cố không bị ảnh hưởng.",
-      "rnTrouble401A": "`clientToken` là **token RUM** của tổ chức này, không phải mật mã ingest. Nếu nó đã được xoay vòng, hãy tạo lại từ tiêu đề của trang này và xây dựng lại ứng dụng.",
+      "rnSessionReplayNote": "Session Replay đã được xác nhận hoạt động trên cả iOS và Android kể từ SDK 0.1.2. Các phân đoạn được gộp lại trước khi tải lên, do đó sẽ có một khoảng trễ ngắn trước khi chúng xuất hiện.",
+      "rnTrouble401A": "Có hai nguyên nhân phổ biến. Thứ nhất, `clientToken` — nó phải là **token RUM** của tổ chức này, không phải passcode tiếp nhận dữ liệu; nếu nó đã được xoay vòng, hãy tạo lại từ phần tiêu đề của trang này và build lại ứng dụng. Thứ hai, riêng với Session Replay: tự thêm `/replay` vào `customEndpoint` sẽ khiến đường dẫn bị nhân đôi (bridge đã tự thêm), backend cũng từ chối với mã 401 — hãy truyền base URL gốc thay vào đó.",
       "rnTrouble401Q": "Yêu cầu trả về 401 hoặc 403",
       "rnTroubleCleartextA": "Android chặn lưu lượng văn bản rõ theo mặc định. Đối với điểm cuối `http://`, hãy đặt `additionalConfiguration: {config}` trong cấu hình SDK và cho phép văn bản rõ cho máy chủ của bạn trong cấu hình bảo mật mạng của ứng dụng. Ưu tiên HTTPS ngoài môi trường phát triển cục bộ.",
       "rnTroubleCleartextQ": "Bản dựng Android ở chế độ release/debug không gửi gì qua HTTP không mã hóa.",
       "rnTroubleIosBuildA": "Chạy `npx pod-install` (hoặc `cd ios && pod install`) sau khi thêm các gói, sau đó xây dựng lại từ Xcode hoặc `npx react-native run-ios`. Việc tải lại chỉ bằng Metro sẽ không nhận các mô-đun gốc mới.",
       "rnTroubleIosBuildQ": "Bản dựng iOS thất bại hoặc thiếu mô-đun gốc",
-      "rnTroubleIosReplayA": "Hạn chế đã biết của React Native SDK hiện tại: trên iOS, nó thêm đường dẫn riêng vào `customEndpoint` của session-replay, vì vậy các bản upload bỏ lỡ tuyến `/replay` của OpenObserve. Android sử dụng URL nguyên văn và hoạt động. Sự kiện RUM, nhật ký và báo cáo sự cố không bị ảnh hưởng trên cả hai nền tảng.",
-      "rnTroubleIosReplayQ": "Session replay hoạt động trên Android nhưng không trên iOS.",
       "rnTroubleMaskedA": "Đó là mặc định. `textAndInputPrivacyLevel`, `imagePrivacyLevel` và `touchPrivacyLevel` đều mặc định ở thiết lập nghiêm ngặt nhất (`MASK_ALL`). Chỉ nới lỏng chúng trong phạm vi chính sách quyền riêng tư của bạn cho phép — `MASK_SENSITIVE_INPUTS` giữ mật khẩu và trường thẻ ở trạng thái ẩn trong khi hiển thị phần còn lại.",
       "rnTroubleMaskedQ": "Bản phát lại hiển thị nhưng mọi thứ đều bị che",
-      "rnTroubleNoReplayA": "Gần như luôn là điểm cuối. Session Replay được cấu hình riêng và **không** kế thừa `rumConfiguration.customEndpoint`; nếu để trống, nó mặc định là chuỗi rỗng và các bản upload sẽ không đến đâu mà bạn có thể thấy. Hãy truyền URL đầy đủ một cách tường minh: `customEndpoint: '{replayUrl}'` — lưu ý `/replay` ở cuối, mà URL gốc của SDK cốt lõi không có.",
+      "rnTroubleNoReplayA": "Gần như luôn luôn là do endpoint. Session Replay được cấu hình riêng biệt và **không** kế thừa `rumConfiguration.customEndpoint`; nếu không đặt, nó sẽ mặc định là chuỗi rỗng và các lần tải lên sẽ chẳng đến đâu. Hãy truyền base URL một cách tường minh: `customEndpoint: '{replayUrl}'` — bridge tự thêm `/replay` (kể từ SDK 0.1.2), vì vậy đừng tự thêm hậu tố đó, nếu không các lần tải lên sẽ bị từ chối với mã 401.",
       "rnTroubleNoReplayQ": "Sự kiện RUM đến nhưng không có session replay",
       "rnTroubleNothingArrivesA": "Kiểm tra máy chủ trước — xem hộp sửa lỗi ở trên. `localhost` trỏ đến thiết bị, không phải máy của bạn: sử dụng `10.0.2.2` trên trình giả lập Android, `localhost` trên trình mô phỏng iOS và IP LAN của máy bạn trên thiết bị vật lý.",
       "rnTroubleNothingArrivesQ": "Không có gì đến được từ trình giả lập hoặc thiết bị",
@@ -6418,6 +6498,7 @@
       "firing": "Đang kích hoạt",
       "ok": "OK",
       "error": "Lỗi",
+      "pending": "Đang chờ",
       "skipped": "Đã bỏ qua",
       "unknown": "Không xác định",
       "flapping": "Chập chờn",
@@ -6444,6 +6525,7 @@
       "templateRequired": "Mẫu là bắt buộc!",
       "validEmails": "Thêm email hợp lệ!",
       "silenceNonNegative": "Thông báo im lặng phải lớn hơn hoặc bằng 0",
+      "pendingPeriodNonNegative": "Khoảng thời gian chờ phải lớn hơn hoặc bằng 0",
       "periodPositive": "Khoảng thời gian phải lớn hơn 0",
       "destinationRequired": "Cần ít nhất một đích đến.",
       "thresholdPositive": "Ngưỡng phải lớn hơn 0",
@@ -6454,6 +6536,7 @@
       "timestampAliasBanned": "{column} không thể được sử dụng làm bí danh cột. Hãy sử dụng time_bucket thay thế.",
       "credentialFieldRequired": "{field} là bắt buộc",
       "minimumFrequency": "Tần suất tối thiểu phải là {minutes} phút",
+      "pendingPeriodNotMultiple": "Không phải bội số của tần suất kiểm tra ({minutes} phút) — cảnh báo có thể chờ thêm tối đa một khoảng thời gian trước khi kích hoạt.",
       "nameMandatoryString": "Tên là bắt buộc và phải là một chuỗi hợp lệ",
       "orgIdMismatch": "ID tổ chức phải bằng {orgId}",
       "streamTypeMandatory": "Loại Stream là bắt buộc và phải là một trong: logs, metrics, traces",
@@ -6659,6 +6742,9 @@
       "cooldown": "Thời gian chờ",
       "betweenAlerts": "giữa các cảnh báo",
       "noCooldown": "Không có thời gian chờ",
+      "pendingPeriod": "Chờ trong",
+      "beforeFiring": "{duration} trước khi kích hoạt",
+      "firesImmediately": "Kích hoạt ngay lập tức",
       "minuteCount": "{n} phút | {n} phút",
       "hourCount": "{n} giờ | {n} giờ",
       "timeRangeCount": "{n} khoảng thời gian ({ranges}) | {n} khoảng thời gian ({ranges})",
@@ -6675,6 +6761,7 @@
         "conditionOther": "{threshold} sự kiện ({operator})",
         "alertMeWhenMinutes": "Cảnh báo tôi khi {condition} xảy ra trong bất kỳ khoảng thời gian {count} phút nào",
         "alertMeWhenHours": "Cảnh báo tôi khi {condition} xảy ra trong bất kỳ khoảng thời gian {count} giờ nào",
+        "pendingPeriodClause": ", sau khi chờ {duration}",
         "cooldownClause": ", nhưng không quá một lần mỗi {cooldown}",
         "defaultConditions": "Cảnh báo tôi khi các điều kiện đã cấu hình được đáp ứng"
       }
@@ -7139,6 +7226,8 @@
       "writeQueryHint": "Viết truy vấn để bắt đầu",
       "sqlEditorHint": "Sử dụng mở toàn bộ trình soạn thảo để chạy và xác thực",
       "checkEvery": "Kiểm tra mỗi",
+      "pendingPeriod": "Chờ trong",
+      "pendingPeriodTooltip": "Chờ khoảng thời gian này trước khi kích hoạt, để điều kiện phải được duy trì thay vì kích hoạt do một khoảng thời gian bất thường.",
       "cronExpressionPlaceholder": "0 */10 * * * *",
       "timezonePlaceholder": "múi giờ",
       "onThese": "trên các",
@@ -10617,6 +10706,10 @@
         "success": "Đã thêm vào bộ dữ liệu",
         "loadError": "Không tải được bộ dữ liệu",
         "error": "Không thêm được mục này vào bộ dữ liệu"
+      },
+      "playground": {
+        "button": "Mở trong Playground",
+        "hint": "Nạp các tin nhắn của lời gọi này vào Playground để chỉnh sửa và chạy lại."
       }
     },
     "discovery": {
@@ -10984,7 +11077,10 @@
         "columns": {
           "input": "Đầu vào",
           "output": "Đầu ra",
-          "latency": "Độ trễ"
+          "trials": "Lần thử",
+          "dispersion": "Độ phân tán",
+          "latency": "Độ trễ",
+          "p50Latency": "Độ trễ P50"
         },
         "retryFailed": "Thử lại các vị trí lỗi",
         "loadError": "Không thể tải thí nghiệm",
@@ -11022,8 +11118,12 @@
         },
         "slotStatus": "Trạng thái",
         "searchPlaceholder": "Tìm kiếm đầu vào hoặc đầu ra",
+        "searchInputPlaceholder": "Tìm theo đầu vào",
         "statusFilter": "Trạng thái",
-        "statusFilterAll": "Tất cả trạng thái"
+        "statusFilterAll": "Tất cả trạng thái",
+        "sortByDispersion": "Sắp xếp theo độ phân tán",
+        "highDispersionBadge": "Cao",
+        "trialNumber": "Lần thử {n}"
       },
       "rowDetail": {
         "fallbackTitle": "Hàng thử nghiệm",
@@ -11114,10 +11214,13 @@
           "trial": "Lần thử {index}",
           "noContent": "Không được cung cấp",
           "noOutput": "Không có đầu ra",
-          "absentSide": "Không có trong lần chạy này"
+          "absentSide": "Không có trong lần chạy này",
+          "enterFullscreen": "Vào chế độ toàn màn hình",
+          "exitFullscreen": "Thoát chế độ toàn màn hình"
         }
       },
-      "selectionCount": "{count} trên 2 được chọn"
+      "selectionCount": "{count} trên 2 được chọn",
+      "clearBaseline": "Xóa đường cơ sở"
     },
     "datasets": {
       "listTitle": "Tập dữ liệu",
@@ -11186,7 +11289,7 @@
           "expectedOutput": "Đầu ra mong đợi",
           "source": "Nguồn",
           "tags": "Thẻ",
-          "version": "Phiên bản",
+          "version": "Phiên bản bộ dữ liệu",
           "actions": "Thao tác"
         },
         "deleteItemTitle": "Xóa mục",
@@ -11200,7 +11303,7 @@
             "item": "Mục",
             "versions": "Phiên bản"
           },
-          "versionPill": "{count} phiên bản | {count} phiên bản",
+          "versionPill": "{count} Phiên bản | {count} Phiên bản",
           "sourceSection": "Nguồn",
           "sourceTrace": "Trace",
           "sourceSpan": "Span",
@@ -11665,8 +11768,6 @@
       "title": "Khu thử nghiệm",
       "runAll": "Chạy tất cả",
       "runAllTooltip": "Chạy mọi biến thể",
-      "running": "Đang chạy… ({done}/{total})",
-      "stop": "Dừng",
       "recentDrafts": "Bản nháp gần đây",
       "recentDraftsSection": "Trình duyệt này · 10 gần nhất",
       "draftVersus": "vs",
@@ -11675,6 +11776,7 @@
       "fromExperiment": "Được nhân bản từ thử nghiệm {name}",
       "variables": "Biến",
       "noVariables": "Không có {token} trong các tin nhắn — hãy thêm một để tham số hóa đầu vào.",
+      "unusedSampledValue": "Chưa được tham chiếu trong tin nhắn: {tokens}. Hãy nhập nó vào một tin nhắn để sử dụng.",
       "variablePlaceholder": "Giá trị cho {name}",
       "addExpected": "+ Đầu ra mong đợi",
       "expectedLabel": "Mong đợi",
@@ -11689,8 +11791,9 @@
       "variant": "Biến thể {label}",
       "variantLimit": "Bộ thử nghiệm chứa tối đa {max} biến thể.",
       "duplicateVariant": "Nhân bản biến thể",
+      "resetVariant": "Đặt lại Bench",
       "removeVariant": "Xóa biến thể",
-      "runVariant": "Chạy biến thể này",
+      "runVariant": "Chạy",
       "createExperiment": "Tạo thử nghiệm",
       "modelPlaceholder": "Chọn hoặc nhập mô hình",
       "providerUnknown": "Nhà cung cấp không xác định",
@@ -11716,6 +11819,13 @@
       "toolsEmpty": "Chưa xác định công cụ nào.",
       "toolCall": "Lời gọi công cụ",
       "toolCallNote": "Quá trình chạy dừng tại đây — Khu thử nghiệm không thực thi công cụ.",
+      "toolCallAddToMessages": "Thêm vào tin nhắn",
+      "toolCallContinueTooltip": "Thêm lời gọi này vào cuộc hội thoại và mở trường kết quả của nó.",
+      "toolCallAddedToMessages": "Đã thêm lời gọi công cụ — hãy nhập kết quả của công cụ và chạy lại.",
+      "toolArgumentsPlaceholder": "Tham số công cụ (JSON)",
+      "toolResultPlaceholder": "Nhập kết quả công cụ…",
+      "toolResultRequired": "Nhập kết quả công cụ ở trên để tiếp tục.",
+      "toolSetupRequired": "Chọn một công cụ và cung cấp tham số của nó để tiếp tục.",
       "toolInvalidJson": "Parameters must be valid JSON.",
       "schema": "Schema",
       "schemaOn": "Schema · Bật",
@@ -11742,6 +11852,7 @@
       "sampleDatasetPlaceholder": "Chọn một tập dữ liệu",
       "sampleSubmit": "Lấy mẫu",
       "sampleLoadError": "Không thể tải các hàng từ tập dữ liệu đó.",
+      "sampleApplied": "Đã tải mẫu {index} trên {total} — hãy tham chiếu mẫu bằng {token} trong tin nhắn.",
       "sampleEmpty": "Tập dữ liệu này chưa có mục nào.",
       "noProviderTitle": "Playground cần một nhà cung cấp LLM",
       "noProviderBody": "Kết nối một nhà cung cấp để chạy các prompt. Việc này mất khoảng một phút.",
@@ -11754,6 +11865,8 @@
       "reset": "Đặt lại",
       "resetTitle": "Đặt lại Playground",
       "resetMessage": "Xóa mọi biến thể, hàng và đầu ra rồi bắt đầu lại? Hành động này không thể hoàn tác.",
+      "resetVariantTitle": "Đặt lại Bench",
+      "resetVariantMessage": "Xóa lời nhắc và đầu ra của bench này? Thao tác này không thể hoàn tác.",
       "scrollLeft": "Cuộn sang trái",
       "scrollRight": "Cuộn sang phải",
       "addMessage": "Tin nhắn",
@@ -11769,6 +11882,7 @@
       "variantSettings": "Cài đặt mô hình",
       "messageToolPlaceholder": "Chọn công cụ",
       "variablesCount": "Biến · {count}",
+      "newValueTag": "Mới",
       "variableUsed": "Được tham chiếu bởi biến thể này",
       "variableUnused": "Không được tham chiếu bởi biến thể này — hiển thị trống ở đây",
       "addVariable": "Thêm biến",
@@ -11817,7 +11931,9 @@
       "sampleFullView": "Chế độ xem đầy đủ",
       "sampleBack": "Quay lại danh sách",
       "sampleInput": "Đầu vào",
-      "sampleExpected": "Đầu ra dự kiến"
+      "sampleExpected": "Đầu ra dự kiến",
+      "fromTrace": "Từ span {id} trong trace",
+      "openInPlaygroundFailed": "Không thể mở span này trong Playground"
     }
   },
   "onlineEvals": {
@@ -11850,12 +11966,14 @@
     },
     "scoreConfigLibrary": {
       "searchPlaceholder": "Tìm kiếm Cấu hình Điểm...",
-      "scoreConfigsLabel": "{count} cấu hình điểm | {count} cấu hình điểm"
+      "scoreConfigsLabel": "{count} cấu hình điểm | {count} cấu hình điểm",
+      "selectedOfTotal": "Đã chọn {selected} trong {total}"
     },
     "scorerLibrary": {
       "noProvidersMessage": "Trước tiên hãy tạo Nhà cung cấp trước khi nhập các bộ chấm điểm LLM Judge.",
       "searchPlaceholder": "Tìm kiếm Bộ chấm điểm...",
-      "scorerCountSuffix": "{count} bộ chấm điểm | {count} bộ chấm điểm"
+      "scorerCountSuffix": "{count} bộ chấm điểm | {count} bộ chấm điểm",
+      "selectedOfTotal": "Đã chọn {selected} trong {total}"
     },
     "title": "Đánh giá",
     "loadError": "Không thể tải đánh giá trực tuyến",
@@ -11972,7 +12090,8 @@
         "legendFalseCount": "sai ({count})",
         "kpis": {
           "average": "Trung bình",
-          "p50p95": "P50 / P95",
+          "p50": "P50",
+          "p95": "P95",
           "unhealthy": "Không khỏe mạnh",
           "healthy": "Khỏe mạnh",
           "trueRate": "Tỷ lệ đúng",
@@ -12081,8 +12200,6 @@
       "remoteCta": "Cấu hình điểm cuối"
     },
     "provider": {
-      "sectionStep1": "01",
-      "sectionStep2": "02",
       "backTo": "Quay lại Nhà cung cấp",
       "createTitle": "Tạo nhà cung cấp LLM",
       "editTitle": "Chỉnh sửa nhà cung cấp LLM",
@@ -12091,7 +12208,7 @@
       "nameLabel": "Tên",
       "typeLabel": "Loại nhà cung cấp",
       "endpointLabel": "Điểm cuối",
-      "endpointPlaceholder": "Điểm cuối tùy chỉnh (tùy chọn)",
+      "endpointPlaceholder": "URL completions đầy đủ, ví dụ: https://your-host/v1/chat/completions",
       "defaultModelLabel": "Mô hình mặc định",
       "availableModelsLabel": "Mô hình có sẵn",
       "apiKeyLabel": "Khóa API",
@@ -13755,6 +13872,7 @@
       "error": "Lỗi",
       "failed": "Thất bại",
       "failedRuns": "Các lần chạy thất bại",
+      "errorRuns": "Lượt chạy lỗi",
       "jumpToLastRun": "Chuyển đến lần chạy cuối",
       "jumpToLatestData": "Chuyển đến dữ liệu mới nhất",
       "lastRun": "Lần chạy cuối",
@@ -13866,6 +13984,11 @@
       "stepsCount": "Bước ({count})",
       "title": "Chi tiết lần chạy",
       "viewFullError": "Xem lỗi đầy đủ và dấu vết ngăn xếp",
+      "errorSourceQuota": "Đã đạt hạn mức",
+      "errorSourceQuotaDesc": "Tổ chức đã dùng hết các bước synthetics đi kèm, vì vậy lượt chạy này đã bị bỏ qua. Quá trình sẽ tự động tiếp tục khi tổ chức đăng ký hoặc giới hạn bước được nâng lên.",
+      "errorSourceDispatch": "Lỗi điều phối",
+      "errorSourceQueue": "Lỗi hàng đợi",
+      "errorSourceProbe": "Lỗi probe",
       "viewFullErrorBtn": "Xem lỗi đầy đủ",
       "detailUrl": "URL",
       "locatorResolution": "Phân giải locator",
@@ -13917,6 +14040,7 @@
       "durationByLocation": "Thời lượng theo vị trí (Trung bình)",
       "flakyRate": "Flaky Rate",
       "stepsWindowTruncated": "Showing the newest {count} executions ({from} – {to}); the selected range holds more.",
+      "stepsErrorExcluded": "{count} lượt thực thi không thể chạy (lỗi) và không được hiển thị ở đây — hãy xem tab Tổng quan.",
       "retryRate": "Tỷ lệ thử lại",
       "statusTimeline": "Dòng thời gian trạng thái",
       "tabOverview": "Tổng quan",

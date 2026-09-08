@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Tree connector -->
       <span
         data-test="query-plan-node-tree-connector"
-        class="text-text-muted pr-1 font-bold select-none"
+        class="text-text-muted pe-1 font-bold select-none"
         >{{ connector }}</span
       >
 
@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Operator name -->
       <span
         data-test="query-plan-node-operator-name"
-        class="text-text-heading pl-1 font-semibold"
+        class="text-text-heading ps-1 font-semibold"
         >{{ node.name }}</span
       >
 

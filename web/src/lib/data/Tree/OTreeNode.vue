@@ -139,7 +139,7 @@ function onTickChange(newVal: CheckboxModelValue) {
 
       <!-- Leaf connector — └ elbow anchored under the chevron center -->
       <!--
-        The children <ul> has pl-5 (1.25rem = 20px) indentation, so the
+        The children <ul> has ps-5 (1.25rem = 20px) indentation, so the
         connector span starts 20px to the RIGHT of the parent row.
         The parent's chevron (size-4 = 16px) is centered at +8px from the
         parent flex start, so relative to the connector span start:
@@ -160,7 +160,7 @@ function onTickChange(newVal: CheckboxModelValue) {
              that survives extraction. Verified against the compiled stylesheet. -->
         <!-- eslint-disable local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom -->
         <span
-          class="rounded-bl-default absolute top-0 left-[calc(-0.75rem_-_0.5px)] h-[calc(50%_-_-0.5px)] w-[calc(1.75rem_-_-0.5px)] border-b border-l"
+          class="rounded-bl-default absolute top-0 left-[calc(-0.75rem_-_0.5px)] h-[calc(50%_-_-0.5px)] w-[calc(1.75rem_-_-0.5px)] border-s border-b"
         />
         <!-- eslint-enable local/no-hardcoded-px -->
       </span>
@@ -190,7 +190,7 @@ function onTickChange(newVal: CheckboxModelValue) {
       class="grid overflow-hidden transition-[grid-template-rows] duration-200 ease-in-out"
       :style="{ gridTemplateRows: isExpanded ? '1fr' : '0fr' }"
     >
-      <ul role="group" class="m-0 min-h-0 list-none overflow-hidden p-0 pl-5">
+      <ul role="group" class="m-0 min-h-0 list-none overflow-hidden p-0 ps-5">
         <template v-if="isExpanded">
           <OTreeNode
             v-for="child in node.children"

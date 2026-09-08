@@ -30,15 +30,18 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 }));
 
 const mockTestWorkflow = vi.fn();
+const mockHistory = vi.fn().mockResolvedValue({ data: [] });
+const mockGetRun = vi.fn().mockResolvedValue({ data: {} });
 vi.mock("@/services/workflows", () => ({
   default: {
     testWorkflow: (...a: any[]) => mockTestWorkflow(...a),
-    getWorkflowRun: vi.fn(),
+    getWorkflowHistory: (...a: any[]) => mockHistory(...a),
+    getWorkflowRun: (...a: any[]) => mockGetRun(...a),
   },
 }));
 
 import WorkflowTestDialog from "./WorkflowTestDialog.vue";
-import { workflowObj } from "@/plugins/workflows/useWorkflowCanvas";
+import { workflowObj, LAST_TEST_RUN } from "@/plugins/workflows/useWorkflowCanvas";
 import { buildTestSampleText } from "@/plugins/workflows/testSample";
 
 // ── stubs ────────────────────────────────────────────────────────────────────
@@ -92,6 +95,20 @@ const CodeQueryEditorStub = {
   template: `<div class="code-editor" :data-readonly="String(!!readOnly)">{{ query }}</div>`,
 };
 
+const OSwitchStub = {
+  name: "OSwitch",
+  props: ["modelValue", "label", "labelPosition"],
+  emits: ["update:modelValue"],
+  template: `<button class="o-switch" :data-value="String(modelValue)"
+    @click="$emit('update:modelValue', !modelValue)">{{ label }}</button>`,
+};
+
+const OBannerStub = {
+  name: "OBanner",
+  props: ["variant", "content", "icon", "dense", "dataTest"],
+  template: `<div class="o-banner" :data-variant="variant" :data-test="dataTest"><slot />{{ content }}</div>`,
+};
+
 const globalConfig = {
   plugins: [i18n, store],
   stubs: {
@@ -99,6 +116,8 @@ const globalConfig = {
     OSelect: OSelectStub,
     OButton: OButtonStub,
     OText: OTextStub,
+    OSwitch: OSwitchStub,
+    OBanner: OBannerStub,
     CodeQueryEditor: CodeQueryEditorStub,
   },
 };
@@ -449,5 +468,289 @@ describe("WorkflowTestDialog", () => {
       await nextTick();
       expect(wrapper.findComponent(ODrawerStub as any).props("open")).toBe(false);
     });
+  });
+});
+
+// Tuning a workflow means re-running the payload that actually reached it. The
+// author opens Test with NOTHING loaded, so the dialog must let them PICK a past
+// run from a labelled dropdown — and must show up front which runs are usable,
+// rather than accepting a pick and then reporting it has no input.
+describe("picking a previous run as the test input", () => {
+  const runPicker = (w: any) =>
+    w.findAllComponents(OSelectStub as any).find((c: any) => c.props("options")?.[0]?.isRunOption);
+
+  beforeEach(() => {
+    mockHistory.mockClear();
+    mockHistory.mockResolvedValue({ data: [] });
+    mockGetRun.mockClear();
+    workflowObj.currentSelectedWorkflow = {
+      id: "wf",
+      name: "w",
+      nodes: [{ id: "t1", data: { node_type: "workflow_trigger" }, position: { x: 0, y: 0 } }],
+      edges: [],
+    } as any;
+    workflowObj.testRun.input = "";
+    workflowObj.testRun.fromNode = "";
+    workflowObj.testRun.result = null;
+    workflowObj.runsHistory.list = [];
+  });
+
+  const realRun = {
+    run_id: "r1",
+    start_time: 1,
+    end_time: 2,
+    event_type: "AlertFired",
+    error: null,
+  };
+  const testRunRow = { run_id: "r2", start_time: 3, end_time: 4, event_type: "Test", error: null };
+
+  it("fetches the run list when the dialog opens", async () => {
+    mountDialog();
+    await flushPromises();
+    expect(mockHistory).toHaveBeenCalled();
+  });
+
+  it("renders a dropdown of previous runs", async () => {
+    mockHistory.mockResolvedValue({ data: [realRun] });
+    const w = mountDialog();
+    await flushPromises();
+    expect(runPicker(w)).toBeTruthy();
+  });
+
+  it("hides the dropdown when the workflow has never run", async () => {
+    const w = mountDialog();
+    await flushPromises();
+    expect(runPicker(w)).toBeFalsy();
+  });
+
+  // A test run has no server-side payload, and the ONE test run we can replay is
+  // already offered as "Last test run" from local state. Listing the rest as dead
+  // greyed rows is just noise the author cannot act on, so they are not listed.
+  it("never lists an unpickable test run", async () => {
+    mockHistory.mockResolvedValue({ data: [realRun, testRunRow] });
+    const w = mountDialog();
+    await flushPromises();
+    const opts = runPicker(w).props("options");
+    expect(opts.some((o: any) => o.value === "r2")).toBe(false);
+    expect(opts.every((o: any) => !o.disabled)).toBe(true);
+  });
+
+  // ...and it must not appear twice: once greyed, once as the local entry.
+  it("does not duplicate the last test run as a dead row", async () => {
+    workflowObj.testRun.result = { inputs: { t1: [{ a: 1 }] } } as any;
+    mockHistory.mockResolvedValue({ data: [testRunRow] });
+    const w = mountDialog();
+    await flushPromises();
+    const opts = runPicker(w).props("options");
+    expect(opts.filter((o: any) => o.disabled).length).toBe(0);
+    expect(opts.some((o: any) => o.value === LAST_TEST_RUN)).toBe(true);
+  });
+
+  // ONE fetch for the whole run, then slice the node we need out of its input_map.
+  it("loads the chosen run and seeds the input from it", async () => {
+    mockHistory.mockResolvedValue({ data: [realRun] });
+    mockGetRun.mockResolvedValue({
+      data: { data: { input_map: { t1: [{ meta: { alert_count: 5000 } }] } }, errors: null },
+    });
+    const w = mountDialog();
+    await flushPromises();
+    await runPicker(w).vm.$emit("update:modelValue", "r1");
+    await flushPromises();
+    expect(mockGetRun).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(workflowObj.testRun.input)).toEqual([{ meta: { alert_count: 5000 } }]);
+  });
+});
+
+// The last test run IS available client-side (sessionStorage keeps its per-node
+// inputs), so refusing to offer it while offering server-side runs is arbitrary —
+// re-running your own last test is the commonest case of all.
+describe("the last test run is pickable from local state", () => {
+  const runPicker = (w: any) =>
+    w.findAllComponents(OSelectStub as any).find((c: any) => c.props("options")?.[0]?.isRunOption);
+
+  beforeEach(() => {
+    mockHistory.mockClear();
+    mockHistory.mockResolvedValue({ data: [] });
+    mockGetRun.mockClear();
+    workflowObj.currentSelectedWorkflow = {
+      id: "wf",
+      name: "w",
+      nodes: [{ id: "t1", data: { node_type: "workflow_trigger" }, position: { x: 0, y: 0 } }],
+      edges: [],
+    } as any;
+    workflowObj.testRun.input = "";
+    workflowObj.testRun.fromNode = "";
+    workflowObj.runsHistory.list = [];
+    workflowObj.testRun.result = null;
+  });
+
+  it("offers the in-memory test run even when no server run exists", async () => {
+    workflowObj.testRun.result = { inputs: { t1: [{ meta: { alert_count: 5000 } }] } } as any;
+    const w = mountDialog();
+    await flushPromises();
+    const opts = runPicker(w)?.props("options") || [];
+    expect(opts.some((o: any) => o.value === LAST_TEST_RUN)).toBe(true);
+  });
+
+  // Seeding from local state must NOT hit the network — the data is already here.
+  it("seeds from it without fetching a run", async () => {
+    workflowObj.testRun.result = { inputs: { t1: [{ meta: { alert_count: 5000 } }] } } as any;
+    const w = mountDialog();
+    await flushPromises();
+    await runPicker(w).vm.$emit("update:modelValue", LAST_TEST_RUN);
+    await flushPromises();
+    expect(mockGetRun).not.toHaveBeenCalled();
+    expect(JSON.parse(workflowObj.testRun.input)).toEqual([{ meta: { alert_count: 5000 } }]);
+  });
+
+  it("is absent when no test run has happened", async () => {
+    const w = mountDialog();
+    await flushPromises();
+    expect(runPicker(w)).toBeFalsy();
+  });
+});
+
+// Gap: the input pane labelled every payload "Sample Input" — a hand-tampered
+// payload, a payload seeded from a real run, and the generated sample were
+// indistinguishable, so an author could publish believing they tested real data.
+describe("test input provenance", () => {
+  const runPicker = (w: any) =>
+    w.findAllComponents(OSelectStub as any).find((c: any) => c.props("options")?.[0]?.isRunOption);
+  const provenance = (w: any) => w.find('[data-test="workflow-test-input-source"]');
+  const revert = (w: any) => w.find('[data-test="workflow-test-revert-input"]');
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetState();
+    mockHistory.mockResolvedValue({ data: [] });
+    workflowObj.testRun.inputSource = "sample";
+    workflowObj.testRun.inputRunLabel = "";
+  });
+
+  it("labels the generated sample as generated, with no revert offered", async () => {
+    const wrapper = mountDialog();
+    await nextTick();
+    expect(provenance(wrapper).text()).toContain(i18n.global.t("workflow.test.source.sample"));
+    expect(revert(wrapper).exists()).toBe(false);
+  });
+
+  it("marks the payload edited the moment the author types in the editor", async () => {
+    const wrapper = mountDialog();
+    await nextTick();
+    editorVm(wrapper).vm.$emit("update:query", '[{"meta":{"alert_name":"TAMPERED"}}]');
+    await nextTick();
+    expect(workflowObj.testRun.inputSource).toBe("edited");
+    expect(provenance(wrapper).text()).toContain(i18n.global.t("workflow.test.source.edited"));
+  });
+
+  it("offers a revert once edited, and reverting restores the generated sample", async () => {
+    const wrapper = mountDialog();
+    await nextTick();
+    editorVm(wrapper).vm.$emit("update:query", "tampered");
+    await nextTick();
+    expect(revert(wrapper).exists()).toBe(true);
+    await revert(wrapper).trigger("click");
+    expect(workflowObj.testRun.input).toBe(buildTestSampleText());
+    expect(workflowObj.testRun.inputSource).toBe("sample");
+  });
+
+  // Reset is the seeding control; it must also clear the edited provenance, or the
+  // label keeps claiming "edited" over a freshly generated sample.
+  it("Reset clears the edited provenance", async () => {
+    workflowObj.testRun.inputSource = "edited";
+    const wrapper = mountDialog();
+    await wrapper.find('[data-test="workflow-test-reset-sample"]').trigger("click");
+    await nextTick();
+    expect(workflowObj.testRun.inputSource).toBe("sample");
+  });
+
+  // Re-seeding the exact same text is not an edit — the editor emits on mount and a
+  // no-op emit must not silently relabel an untouched sample as hand-edited.
+  it("does not mark an identical re-emit as an edit", async () => {
+    const wrapper = mountDialog();
+    await nextTick();
+    editorVm(wrapper).vm.$emit("update:query", workflowObj.testRun.input);
+    await nextTick();
+    expect(workflowObj.testRun.inputSource).toBe("sample");
+  });
+
+  it("names the run a payload was seeded from, and reverting drops back to the sample", async () => {
+    workflowObj.testRun.result = { inputs: { t1: [{ meta: { alert_count: 5000 } }] } } as any;
+    const wrapper = mountDialog();
+    await flushPromises();
+    await runPicker(wrapper).vm.$emit("update:modelValue", LAST_TEST_RUN);
+    await flushPromises();
+    expect(workflowObj.testRun.inputSource).toBe("run");
+    expect(provenance(wrapper).text()).toContain(i18n.global.t("workflow.test.lastTestRun"));
+    // A run-seeded payload is also non-generated data, so it stays revertible.
+    expect(revert(wrapper).exists()).toBe(true);
+  });
+
+  it("marks a run-seeded payload edited once the author changes it", async () => {
+    workflowObj.testRun.result = { inputs: { t1: [{ meta: { alert_count: 5000 } }] } } as any;
+    const wrapper = mountDialog();
+    await flushPromises();
+    await runPicker(wrapper).vm.$emit("update:modelValue", LAST_TEST_RUN);
+    await flushPromises();
+    editorVm(wrapper).vm.$emit("update:query", "hand edited");
+    await nextTick();
+    expect(workflowObj.testRun.inputSource).toBe("edited");
+    expect(provenance(wrapper).text()).toContain(i18n.global.t("workflow.test.source.edited"));
+  });
+});
+
+describe("destination suppression (P0 safety)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetState();
+  });
+
+  const suppressToggle = (w: any) => w.find('[data-test="workflow-test-suppress-destinations"]');
+  const warning = (w: any) => w.find('[data-test="workflow-test-dispatch-warning"]');
+
+  it("defaults the suppress-destinations toggle ON so a Test cannot page on-call", async () => {
+    const wrapper = mountDialog();
+    await nextTick();
+    expect(workflowObj.testRun.suppressDestinations).toBe(true);
+    expect(suppressToggle(wrapper).attributes("data-value")).toBe("true");
+  });
+
+  it("sends suppress_destinations=true to the backend by default", async () => {
+    mockTestWorkflow.mockResolvedValue({ data: { errors: {} } });
+    workflowObj.testRun.input = VALID_INPUT;
+    const wrapper = mountDialog();
+    await primary(wrapper).trigger("click");
+    await flushPromises();
+    expect(mockTestWorkflow.mock.calls[0][0].suppress_destinations).toBe(true);
+  });
+
+  it("hides the live-dispatch warning while suppression is on", async () => {
+    const wrapper = mountDialog();
+    await nextTick();
+    expect(warning(wrapper).exists()).toBe(false);
+  });
+
+  it("warns and names the destinations that will fire once suppression is switched off", async () => {
+    const wrapper = mountDialog();
+    await nextTick();
+    await suppressToggle(wrapper).trigger("click");
+    await nextTick();
+    expect(workflowObj.testRun.suppressDestinations).toBe(false);
+    const w = warning(wrapper);
+    expect(w.exists()).toBe(true);
+    expect(w.attributes("data-variant")).toBe("warning");
+    // the warning must NAME the destination, not just say "destinations"
+    expect(w.text()).toContain("sink-a");
+  });
+
+  it("sends suppress_destinations=false once the author opts into a live dispatch", async () => {
+    mockTestWorkflow.mockResolvedValue({ data: { errors: {} } });
+    workflowObj.testRun.input = VALID_INPUT;
+    const wrapper = mountDialog();
+    await nextTick();
+    await suppressToggle(wrapper).trigger("click");
+    await primary(wrapper).trigger("click");
+    await flushPromises();
+    expect(mockTestWorkflow.mock.calls[0][0].suppress_destinations).toBe(false);
   });
 });

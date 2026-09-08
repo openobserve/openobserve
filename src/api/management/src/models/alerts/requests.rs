@@ -52,9 +52,11 @@ use super::{Alert, QueryCondition, StreamType};
 /// ```
 #[derive(Clone, Debug, Deserialize, ToSchema)]
 pub struct CreateAlertRequestBody {
-    /// Optional folder ID indicating the folder in which to create the alert.
-    /// If omitted the alert will be created in the default folder.
-    #[schema(example = "default")]
+    /// Deprecated. The destination folder is taken from the `folder` query
+    /// parameter, which is what the permission check authorizes; the default
+    /// folder is used when it is absent. A value here that disagrees with the
+    /// query parameter is rejected with 400 rather than silently ignored.
+    #[schema(deprecated, example = "default")]
     pub folder_id: Option<String>,
 
     /// Discriminates the alert type. Defaults to scheduled alert when absent.
@@ -344,6 +346,8 @@ pub struct UpdateAnomalyAlertFields {
     pub percentile: Option<f64>,
     pub alert_enabled: Option<bool>,
     pub enabled: Option<bool>,
+    /// Moves the config to this folder. Naming a folder you cannot write to
+    /// returns 403; omit it to leave the config where it is.
     pub folder_id: Option<String>,
     pub owner: Option<String>,
 }

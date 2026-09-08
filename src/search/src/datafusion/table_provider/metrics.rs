@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Metrics band scans: the `__hash__` interval a band filter pushes down,
+//! Metrics shard scans: the `__hash__` interval a shard filter pushes down,
 //! the file pruning it allows, and the scan rebuilt over the fewest ordered
 //! chains of the surviving files.
 
@@ -100,8 +100,8 @@ fn prune_groups_by_hash_range(
     pruned
 }
 
-/// A metrics band scan keeps only the files whose `__hash__` statistics
-/// intersect the band and chains them into the fewest ordered chains; one
+/// A metrics shard scan keeps only the files whose `__hash__` statistics
+/// intersect the shard and chains them into the fewest ordered chains; one
 /// task merges them all, so the scan is never repartitioned.
 pub(super) fn handler_metrics_scan(
     trace_id: &str,
@@ -116,19 +116,19 @@ pub(super) fn handler_metrics_scan(
     let schema = config.file_source().table_schema().table_schema();
     let mut file_groups = prune_groups_by_hash_range(&config.file_groups, schema, hash_range);
 
-    // an all-pruned band keeps its single empty group: a scan needs a partition
+    // an all-pruned shard keeps its single empty group: a scan needs a partition
     if file_groups.iter().any(|group| !group.is_empty()) {
         match sort_order.physical_ordering(schema) {
             Some(ordering) => {
                 match FileScanConfig::split_groups_by_statistics(schema, &file_groups, &ordering) {
                     Ok(chains) => file_groups = chains,
                     Err(e) => log::warn!(
-                        "[trace_id {trace_id}] failed to chain band files by statistics for {sort_order}: {e}, keeping file groups as is"
+                        "[trace_id {trace_id}] failed to chain shard files by statistics for {sort_order}: {e}, keeping file groups as is"
                     ),
                 }
             }
             None => log::warn!(
-                "[trace_id {trace_id}] sort columns of {sort_order} not found in schema, skipping band chaining"
+                "[trace_id {trace_id}] sort columns of {sort_order} not found in schema, skipping shard chaining"
             ),
         }
     }

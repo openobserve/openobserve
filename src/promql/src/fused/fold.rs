@@ -24,34 +24,77 @@ use config::meta::promql::value::{
 };
 use datafusion::error::{DataFusionError, Result};
 use hashbrown::{HashMap, hash_map::Entry};
-use infra::errors::{Error, ErrorCodes};
+use tokio::task::JoinSet;
 
 use super::{accumulator::FusedAccumulator, op::FusedAggOp};
 use crate::{
     functions::{RangeFunc, advance_sample_window},
     micros,
-    series_stream::SeriesSource,
+    series_source::SeriesSource,
 };
 
 pub(super) type GroupAccs = HashMap<u64, GroupEntry>;
-
-pub(super) struct FoldParams {
-    pub(super) op: FusedAggOp,
-    pub(super) func: Arc<dyn RangeFunc>,
-    pub(super) counter_kind: Option<ExtrapolationKind>,
-    pub(super) range: Duration,
-    pub(super) eval_ctx: EvalContext,
-    pub(super) timestamps: Vec<i64>,
-}
 
 pub(super) struct GroupEntry {
     labels: Labels,
     acc: FusedAccumulator,
 }
 
-/// Folds one partition's series into its group accumulators, dropping each
-/// series as soon as it is folded.
-pub(super) async fn fold_partition<S: SeriesSource>(
+pub(super) struct FoldParams {
+    op: FusedAggOp,
+    func: Arc<dyn RangeFunc>,
+    counter_kind: Option<ExtrapolationKind>,
+    range: Duration,
+    eval_ctx: EvalContext,
+    timestamps: Vec<i64>,
+}
+
+impl FoldParams {
+    pub(super) fn new(
+        op: FusedAggOp,
+        func: Arc<dyn RangeFunc>,
+        range: Duration,
+        eval_ctx: &EvalContext,
+    ) -> Arc<Self> {
+        Arc::new(Self {
+            op,
+            counter_kind: func.counter_extrapolation(),
+            func,
+            range,
+            eval_ctx: eval_ctx.clone(),
+            timestamps: eval_ctx.timestamps(),
+        })
+    }
+}
+
+/// Folds all partitions concurrently and merges their groups; each source opens inside its own
+/// task, and dropping the future aborts them all.
+pub(super) async fn fold_sources<F, S>(
+    sources: Vec<F>,
+    params: Arc<FoldParams>,
+) -> Result<(Value, usize)>
+where
+    F: Future<Output = Result<S>> + Send + 'static,
+    S: SeriesSource + 'static,
+{
+    let folds = sources
+        .into_iter()
+        .map(|source| {
+            let params = params.clone();
+            async move { fold_partition(source.await?, params).await }
+        })
+        .collect();
+    let folds = run_folds(folds).await?;
+    let series_count = folds.iter().map(|(_, series)| series).sum();
+    let value = merge_folds(
+        folds.into_iter().map(|(groups, _)| groups).collect(),
+        &params.timestamps,
+    );
+    Ok((value, series_count))
+}
+
+/// Folds one partition's series into its group accumulators, dropping each as it goes.
+async fn fold_partition<S: SeriesSource>(
     mut source: S,
     params: Arc<FoldParams>,
 ) -> Result<(GroupAccs, usize)> {
@@ -76,12 +119,13 @@ pub(super) async fn fold_partition<S: SeriesSource>(
             &params.timestamps,
         );
         series_count += 1;
+        // the fold is pure CPU: give the runtime a chance to time out or abort it
+        tokio::task::consume_budget().await;
     }
     Ok((groups, series_count))
 }
 
-/// Evaluates `func` over one series' time-ordered samples and pushes each
-/// produced value into `acc` at its evaluation slot.
+/// Evaluates `func` over one series and pushes each value into `acc` at its evaluation slot.
 fn fold_series(
     acc: &mut FusedAccumulator,
     samples: &[Sample],
@@ -117,43 +161,30 @@ fn fold_series(
     }
 }
 
-/// Aborts the partition folds when `timeout` elapses before they all finish.
-pub(super) async fn run_folds<Fut>(folds: Vec<Fut>, timeout: u64) -> Result<Vec<(GroupAccs, usize)>>
+/// The first failed partition fails the fold; dropping the set aborts the rest.
+async fn run_folds<Fut>(folds: Vec<Fut>) -> Result<Vec<(GroupAccs, usize)>>
 where
     Fut: Future<Output = Result<(GroupAccs, usize)>> + Send + 'static,
 {
-    let mut tasks = Vec::with_capacity(folds.len());
-    let mut abort_handles = Vec::with_capacity(folds.len());
-    for fold in folds {
-        let task = tokio::task::spawn(fold);
-        abort_handles.push(task.abort_handle());
-        tasks.push(task);
+    let mut results: Vec<Option<(GroupAccs, usize)>> = folds.iter().map(|_| None).collect();
+    let mut tasks = JoinSet::new();
+    for (index, fold) in folds.into_iter().enumerate() {
+        tasks.spawn(async move { (index, fold.await) });
     }
-    tokio::select! {
-        joined = futures::future::try_join_all(tasks) => {
-            joined
-                .map_err(|e| DataFusionError::Execution(e.to_string()))?
-                .into_iter()
-                .collect()
-        }
-        _ = tokio::time::sleep(Duration::from_secs(timeout)) => {
-            for handle in abort_handles {
-                handle.abort();
-            }
-            Err(DataFusionError::Plan(
-                Error::ErrorCode(ErrorCodes::SearchTimeout(
-                    "[PromQL] fused agg timeout".to_string(),
-                ))
-                .to_string(),
-            ))
-        }
+    // folds finish in any order; the merge needs them in partition order
+    while let Some(joined) = tasks.join_next().await {
+        let (index, fold) = joined.map_err(|e| DataFusionError::Execution(e.to_string()))?;
+        results[index] = Some(fold?);
     }
+    Ok(results
+        .into_iter()
+        .map(|fold| fold.expect("every partition joined"))
+        .collect())
 }
 
-/// Merges the partition-local groups in partition order and materializes the
-/// result; groups whose accumulator produced no samples are dropped like the
-/// generic path drops no-output series.
-pub(super) fn merge_folds(folds: Vec<GroupAccs>, timestamps: &[i64]) -> Value {
+/// Merges the partition groups in partition order; groups without output are dropped like the
+/// generic path.
+fn merge_folds(folds: Vec<GroupAccs>, timestamps: &[i64]) -> Value {
     let mut folds = folds.into_iter();
     let Some(mut merged) = folds.next() else {
         return Value::None;
@@ -187,5 +218,99 @@ pub(super) fn merge_folds(folds: Vec<GroupAccs>, timestamps: &[i64]) -> Value {
         Value::None
     } else {
         Value::Matrix(results)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{
+        sync::{
+            Arc,
+            atomic::{AtomicBool, Ordering},
+        },
+        time::Duration,
+    };
+
+    use config::meta::promql::value::{Labels, Sample};
+
+    use super::*;
+    use crate::functions;
+
+    /// Errors on its first series.
+    struct FailingSource;
+
+    impl SeriesSource for FailingSource {
+        async fn advance(&mut self) -> Result<Option<u64>> {
+            Err(DataFusionError::Execution("partition failed".into()))
+        }
+        fn labels(&self) -> Labels {
+            Labels::default()
+        }
+        async fn consume(&mut self) -> Result<&[Sample]> {
+            Ok(&[])
+        }
+    }
+
+    /// Yields series forever; `finished` records whether it ever returned.
+    struct EndlessSource {
+        samples: Vec<Sample>,
+        finished: Arc<AtomicBool>,
+    }
+
+    impl SeriesSource for EndlessSource {
+        async fn advance(&mut self) -> Result<Option<u64>> {
+            Ok(Some(1))
+        }
+        fn labels(&self) -> Labels {
+            Labels::default()
+        }
+        async fn consume(&mut self) -> Result<&[Sample]> {
+            Ok(&self.samples)
+        }
+    }
+
+    impl Drop for EndlessSource {
+        fn drop(&mut self) {
+            self.finished.store(true, Ordering::SeqCst);
+        }
+    }
+
+    fn params() -> Arc<FoldParams> {
+        let func: Arc<dyn RangeFunc> = Arc::from(functions::fusable_range_func("rate").unwrap());
+        let eval_ctx = EvalContext::new(1_000_000, 2_000_000, 1_000_000, "test".into());
+        FoldParams::new(FusedAggOp::Sum, func, Duration::from_secs(60), &eval_ctx)
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_run_folds_fails_fast_and_aborts_the_rest() {
+        let params = params();
+        let dropped = Arc::new(AtomicBool::new(false));
+        let endless = EndlessSource {
+            samples: vec![Sample::new(1_500_000, 1.0)],
+            finished: dropped.clone(),
+        };
+        let failing = FailingSource;
+        let folds = vec![
+            Box::pin(fold_partition(endless, params.clone()))
+                as std::pin::Pin<Box<dyn Future<Output = Result<(GroupAccs, usize)>> + Send>>,
+            Box::pin(fold_partition(failing, params)),
+        ];
+
+        let start = std::time::Instant::now();
+        let result = run_folds(folds).await;
+        assert!(result.is_err(), "the failed partition must fail the fold");
+        assert!(
+            start.elapsed() < Duration::from_secs(5),
+            "must not wait for the endless partition"
+        );
+
+        // the aborted task drops its source at its next yield point
+        for _ in 0..100 {
+            if dropped.load(Ordering::SeqCst) {
+                return;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+        panic!("the endless partition was not aborted");
     }
 }

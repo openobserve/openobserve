@@ -95,13 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </ODropdownItem>
       </ODropdown>
       <!-- new dashboard button -->
-      <OButton
-        variant="primary"
-        size="sm"
-        icon-left="add"
-        data-test="dashboard-new"
-        @click="addDashboard"
-      >
+      <OButton variant="primary" size="sm" data-test="dashboard-new" @click="addDashboard">
         {{ t(`dashboard.add`) }}
       </OButton>
     </template>
@@ -165,7 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OToggleGroup
                         :model-value="searchAcrossFolders ? 'all' : 'this'"
                         type="single"
-                        class="mr-1 self-center"
+                        class="me-1 self-center"
                         @update:model-value="(v) => (searchAcrossFolders = v === 'all')"
                       >
                         <OToggleGroupItem
@@ -358,7 +352,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ resultTotal || 0 }} {{ t("dashboard.header") }}
                 </div>
                 <div v-if="selectedIds.length > 0" class="bulk-action-bar flex items-center gap-2">
-                  <span class="text-text-body mr-1 text-sm">{{
+                  <span class="text-text-body me-1 text-sm">{{
                     t("dashboard.dashboards.selected", { count: selectedIds.length })
                   }}</span>
                   <OButton

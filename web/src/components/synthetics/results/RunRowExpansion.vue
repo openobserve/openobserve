@@ -251,7 +251,7 @@ function failedAtStep(steps: StepResult[]): string {
               {{ statusLabel(group.status) }}
             </span>
             <span class="text-text-muted">{{ fmtDuration(group.durationMs) }}</span>
-            <span class="text-text-muted ml-auto">
+            <span class="text-text-muted ms-auto">
               {{ t("synthetics.runRowExpansion.executions", { count: group.execs.length }) }}
             </span>
           </OButton>

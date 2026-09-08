@@ -86,7 +86,7 @@
         />
         <span
           v-if="selectedConfig?.version"
-          class="qpd-version text-2xs text-text-secondary ml-1.5 [font-variant-numeric:tabular-nums]"
+          class="qpd-version text-2xs text-text-secondary ms-1.5 [font-variant-numeric:tabular-nums]"
           data-test="quality-detail-version-badge"
           >{{ t("onlineEvals.versionPrefix") }}{{ selectedConfig.version }}</span
         >

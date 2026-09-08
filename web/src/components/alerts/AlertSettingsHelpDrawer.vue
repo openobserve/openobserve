@@ -457,7 +457,7 @@ defineExpose({ applyTemplate, previewTemplate });
           </p>
           <div class="flex flex-col gap-3">
             <div
-              class="rounded-surface border-border-default border-l-warning-500 flex flex-col gap-1.5 border border-l-2 p-3"
+              class="rounded-surface border-border-default border-s-warning-500 flex flex-col gap-1.5 border border-s-2 p-3"
             >
               <span class="text-text-secondary text-2xs font-semibold">{{
                 t("alerts.alertSettings.helpWhyWithoutLabel")
@@ -471,7 +471,7 @@ defineExpose({ applyTemplate, previewTemplate });
                 >{{ SAMPLE.whyWithout }}</pre>
             </div>
             <div
-              class="rounded-surface border-border-default border-l-primary-500 flex flex-col gap-1.5 border border-l-2 p-3"
+              class="rounded-surface border-border-default border-s-primary-500 flex flex-col gap-1.5 border border-s-2 p-3"
             >
               <span class="text-text-secondary text-2xs font-semibold">{{
                 t("alerts.alertSettings.helpWhyWithLabel")
@@ -506,7 +506,7 @@ defineExpose({ applyTemplate, previewTemplate });
           }}</span>
           <pre
             data-test="help-preview-box"
-            class="rounded-surface border-border-default bg-surface-subtle text-text-body border-l-primary-500 m-0 border border-l-2 p-3 font-mono text-xs leading-[1.6] break-words whitespace-pre-wrap"
+            class="rounded-surface border-border-default bg-surface-subtle text-text-body border-s-primary-500 m-0 border border-s-2 p-3 font-mono text-xs leading-[1.6] break-words whitespace-pre-wrap"
             >{{ SAMPLE.variablesResult }}</pre>
         </section>
 
@@ -626,7 +626,7 @@ defineExpose({ applyTemplate, previewTemplate });
             }}</span>
             <pre
               data-test="help-preview-box"
-              class="rounded-surface border-border-default bg-surface-subtle text-text-body border-l-primary-500 m-0 border border-l-2 p-3 font-mono text-xs leading-[1.6] break-words whitespace-pre-wrap"
+              class="rounded-surface border-border-default bg-surface-subtle text-text-body border-s-primary-500 m-0 border border-s-2 p-3 font-mono text-xs leading-[1.6] break-words whitespace-pre-wrap"
               >{{ SAMPLE.rowTemplateResult }}</pre>
           </div>
         </section>

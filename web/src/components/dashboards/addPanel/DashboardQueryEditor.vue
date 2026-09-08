@@ -156,7 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTag
           v-if="multiQueryWarning"
           type="warningNote"
-          class="dashboard-multi-query-warning mr-2 h-8"
+          class="dashboard-multi-query-warning me-2 h-8"
         >
           {{ multiQueryWarning }}
         </OTag>
@@ -260,7 +260,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
                         .vrlFunctionQuery && functionEditorPlaceholderFlag
                     "
-                    class="pointer-events-none absolute top-0 right-0 bottom-0 left-0 z-1 flex items-start pt-0.75 pr-2 pb-0 pl-[2.15rem] select-none"
+                    class="pointer-events-none absolute top-0 right-0 bottom-0 left-0 z-1 flex items-start ps-[2.15rem] pe-2 pt-0.75 pb-0 select-none"
                   >
                     <span
                       class="text-text-placeholder overflow-hidden font-mono [line-height:1.3125rem] text-ellipsis whitespace-nowrap text-[var(--text-sm)]"

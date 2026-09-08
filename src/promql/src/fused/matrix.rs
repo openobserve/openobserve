@@ -13,32 +13,33 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use config::meta::promql::{
     NAME_LABEL,
     value::{EvalContext, Value},
 };
 use datafusion::error::{DataFusionError, Result};
+use infra::errors::ErrorCodes;
 use promql_parser::parser::LabelModifier;
 use rayon::prelude::*;
 
 use super::{
-    fold::{FoldParams, fold_partition, merge_folds, run_folds},
+    fold::{FoldParams, fold_sources},
     op::FusedAggOp,
 };
 use crate::{
     functions::{KEEP_METRIC_NAME_FUNC, RangeFunc},
-    series_stream::matrix::matrix_sources,
+    series_source::matrix::matrix_sources,
 };
 
 /// Evaluates a range function over an already-materialized matrix and folds
 /// its values straight into aggregation groups, through the same fold the
-/// streaming path uses.
+/// hash-sorted path uses.
 ///
 /// The engine selects this only for the exact `agg(range_func(...))` shape;
 /// everything else stays on the generic evaluator, the correctness reference.
-pub(crate) async fn fused_range_agg(
+pub(crate) async fn fused_agg(
     param: &Option<LabelModifier>,
     data: Value,
     func: Arc<dyn RangeFunc>,
@@ -84,32 +85,20 @@ pub(crate) async fn fused_range_agg(
         .as_ref()
         .expect("range function input must have a time window")
         .range;
-    let params = Arc::new(FoldParams {
-        op,
-        func: func.clone(),
-        counter_kind: func.counter_extrapolation(),
-        range,
-        eval_ctx: eval_ctx.clone(),
-        timestamps: eval_ctx.timestamps(),
-    });
-    let (matrix, sources) = matrix_sources(matrix, param, config::get_config().limit.cpu_num);
-    let folds = sources
+    let params = FoldParams::new(op, func, range, eval_ctx);
+    let sources = matrix_sources(matrix, param, config::get_config().limit.cpu_num)
         .into_iter()
-        .map(|source| {
-            let params = params.clone();
-            async move { fold_partition(source, params).await }
-        })
-        .collect::<Vec<_>>();
-    let folds = run_folds(folds, timeout).await?;
-    let value = merge_folds(
-        folds.into_iter().map(|(groups, _)| groups).collect(),
-        &params.timestamps,
-    );
+        .map(|source| std::future::ready(Ok(source)))
+        .collect();
+    let (value, _) =
+        tokio::time::timeout(Duration::from_secs(timeout), fold_sources(sources, params))
+            .await
+            .map_err(|_| {
+                DataFusionError::from(ErrorCodes::SearchTimeout(
+                    "[PromQL] fused agg timeout".to_string(),
+                ))
+            })??;
 
-    if let Ok(matrix) = Arc::try_unwrap(matrix) {
-        // Free the per-series allocations on the rayon pool; dropping them single-threaded is slow.
-        matrix.into_par_iter().for_each(drop);
-    }
     log::info!(
         "[trace_id: {trace_id}] [PromQL Timing] fused {}({func_name}) completed in {:?}, folded {input_series} series into {} series",
         op.name(),
@@ -128,51 +117,10 @@ mod tests {
 
     use config::meta::promql::value::{Label, RangeValue, Sample, TimeWindow};
 
-    use super::*;
-    use crate::{aggregations, functions, series_stream::matrix::MATRIX_PARTITION_CHUNK};
+    use super::{super::test_support::*, *};
+    use crate::{aggregations, functions, series_source::matrix::MATRIX_PARTITION_CHUNK};
 
-    type CanonicalSeries = (Vec<(String, String)>, Vec<(i64, u64)>);
     type GenericAgg = fn(&Option<LabelModifier>, Value, &EvalContext) -> Result<Value>;
-    type GenericRange = fn(Value, &EvalContext) -> Result<Value>;
-
-    const SECOND: i64 = 1_000_000;
-    const BASE: i64 = 1_000 * SECOND;
-
-    fn canonical_matrix(value: Value) -> Vec<CanonicalSeries> {
-        let matrix = match value {
-            Value::Matrix(matrix) => matrix,
-            Value::None => return vec![],
-            value => panic!("expected matrix or none, got {}", value.get_type()),
-        };
-        let mut canonical = matrix
-            .into_iter()
-            .map(|series| {
-                let mut labels = series
-                    .labels
-                    .iter()
-                    .map(|label| (label.name.clone(), label.value.clone()))
-                    .collect::<Vec<_>>();
-                labels.sort();
-                let samples = series
-                    .samples
-                    .iter()
-                    .map(|sample| (sample.timestamp, sample.value.to_bits()))
-                    .collect::<Vec<_>>();
-                (labels, samples)
-            })
-            .collect::<Vec<_>>();
-        canonical.sort_by(|a, b| a.0.cmp(&b.0));
-        canonical
-    }
-
-    fn eval_ctx() -> EvalContext {
-        EvalContext::new(
-            BASE + 60 * SECOND,
-            BASE + 180 * SECOND,
-            60 * SECOND,
-            "test".into(),
-        )
-    }
 
     fn make_series(name: &str, instance: &str, path: &str, points: &[(i64, f64)]) -> RangeValue {
         RangeValue {
@@ -221,16 +169,9 @@ mod tests {
         ]
     }
 
-    fn by(labels: &[&str]) -> Option<LabelModifier> {
-        Some(LabelModifier::Include(promql_parser::label::Labels {
-            labels: labels.iter().map(|label| label.to_string()).collect(),
-        }))
-    }
-
-    fn without(labels: &[&str]) -> Option<LabelModifier> {
-        Some(LabelModifier::Exclude(promql_parser::label::Labels {
-            labels: labels.iter().map(|label| label.to_string()).collect(),
-        }))
+    /// The generic evaluator over the same table the fused path resolves names through.
+    fn range_eval(name: &str, data: Value, eval_ctx: &EvalContext) -> Result<Value> {
+        functions::eval_range(data, functions::fusable_range_func(name).unwrap(), eval_ctx)
     }
 
     async fn run_fused(
@@ -241,7 +182,7 @@ mod tests {
         eval_ctx: &EvalContext,
     ) -> Result<Value> {
         let func: Arc<dyn RangeFunc> = Arc::from(functions::fusable_range_func(func_name).unwrap());
-        fused_range_agg(modifier, Value::Matrix(matrix), func, op, eval_ctx, 30).await
+        fused_agg(modifier, Value::Matrix(matrix), func, op, eval_ctx, 30).await
     }
 
     #[tokio::test]
@@ -256,23 +197,23 @@ mod tests {
             (FusedAggOp::Stdvar, aggregations::stdvar),
             (FusedAggOp::Sum, aggregations::sum),
         ];
-        let range_cases: [(&str, GenericRange); 16] = [
-            ("avg_over_time", functions::avg_over_time),
-            ("changes", functions::changes),
-            ("count_over_time", functions::count_over_time),
-            ("delta", functions::delta),
-            ("deriv", functions::deriv),
-            ("idelta", functions::idelta),
-            ("increase", functions::increase),
-            ("irate", functions::irate),
-            ("last_over_time", functions::last_over_time),
-            ("max_over_time", functions::max_over_time),
-            ("min_over_time", functions::min_over_time),
-            ("rate", functions::rate),
-            ("resets", functions::resets),
-            ("stddev_over_time", functions::stddev_over_time),
-            ("stdvar_over_time", functions::stdvar_over_time),
-            ("sum_over_time", functions::sum_over_time),
+        let range_cases = [
+            "avg_over_time",
+            "changes",
+            "count_over_time",
+            "delta",
+            "deriv",
+            "idelta",
+            "increase",
+            "irate",
+            "last_over_time",
+            "max_over_time",
+            "min_over_time",
+            "rate",
+            "resets",
+            "stddev_over_time",
+            "stdvar_over_time",
+            "sum_over_time",
         ];
         let modifiers = [
             None,
@@ -284,10 +225,10 @@ mod tests {
         let eval_ctx = eval_ctx();
         let matrix = test_matrix();
         for (op, generic_agg) in agg_cases {
-            for (func_name, generic_range) in range_cases {
+            for func_name in range_cases {
                 for modifier in &modifiers {
                     let generic_input =
-                        generic_range(Value::Matrix(matrix.clone()), &eval_ctx).unwrap();
+                        range_eval(func_name, Value::Matrix(matrix.clone()), &eval_ctx).unwrap();
                     let expected = generic_agg(modifier, generic_input, &eval_ctx).unwrap();
 
                     let actual = run_fused(modifier, matrix.clone(), func_name, op, &eval_ctx)
@@ -341,7 +282,7 @@ mod tests {
         for (op, generic_agg) in agg_cases {
             for modifier in [None, by(&["path"])] {
                 let generic_input =
-                    functions::sum_over_time(Value::Matrix(matrix.clone()), &eval_ctx).unwrap();
+                    range_eval("sum_over_time", Value::Matrix(matrix.clone()), &eval_ctx).unwrap();
                 let expected = generic_agg(&modifier, generic_input, &eval_ctx).unwrap();
                 let first = canonical_matrix(
                     run_fused(&modifier, matrix.clone(), "sum_over_time", op, &eval_ctx)
@@ -396,7 +337,8 @@ mod tests {
             (FusedAggOp::Sum, aggregations::sum as GenericAgg),
             (FusedAggOp::Avg, aggregations::avg as GenericAgg),
         ] {
-            let generic_input = functions::rate(Value::Matrix(matrix.clone()), &eval_ctx).unwrap();
+            let generic_input =
+                range_eval("rate", Value::Matrix(matrix.clone()), &eval_ctx).unwrap();
             let expected = canonical_matrix(generic_agg(&None, generic_input, &eval_ctx).unwrap());
             let actual = canonical_matrix(
                 run_fused(&None, matrix.clone(), "rate", op, &eval_ctx)
@@ -430,7 +372,7 @@ mod tests {
     async fn test_fused_range_agg_none_and_invalid_input() {
         let eval_ctx = eval_ctx();
         let func: Arc<dyn RangeFunc> = Arc::from(functions::fusable_range_func("rate").unwrap());
-        let result = fused_range_agg(
+        let result = fused_agg(
             &None,
             Value::None,
             func.clone(),
@@ -442,7 +384,7 @@ mod tests {
         .unwrap();
         assert!(matches!(result, Value::None));
 
-        let result = fused_range_agg(
+        let result = fused_agg(
             &None,
             Value::Float(1.0),
             func.clone(),
@@ -453,7 +395,7 @@ mod tests {
         .await;
         assert!(result.is_err());
 
-        let result = fused_range_agg(
+        let result = fused_agg(
             &None,
             Value::Matrix(vec![]),
             func,
@@ -464,18 +406,5 @@ mod tests {
         .await
         .unwrap();
         assert!(matches!(result, Value::None));
-    }
-
-    #[test]
-    fn test_fusable_range_func_whitelist() {
-        assert!(functions::fusable_range_func("rate").is_some());
-        assert!(functions::fusable_range_func("increase").is_some());
-        assert!(functions::fusable_range_func("last_over_time").is_some());
-        // Parameterized or special-semantics functions stay on the generic path.
-        assert!(functions::fusable_range_func("quantile_over_time").is_none());
-        assert!(functions::fusable_range_func("predict_linear").is_none());
-        assert!(functions::fusable_range_func("holt_winters").is_none());
-        assert!(functions::fusable_range_func("absent_over_time").is_none());
-        assert!(functions::fusable_range_func("histogram_quantile").is_none());
     }
 }

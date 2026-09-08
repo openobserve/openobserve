@@ -16,6 +16,7 @@
 use std::{
     collections::VecDeque,
     sync::{Arc, LazyLock as Lazy},
+    time::Duration,
 };
 
 use config::{
@@ -38,26 +39,46 @@ use crate::{cache::file_data, cluster};
 
 /// (trace_id, file_id, account, file, size, cache_type)
 type FileInfo = (String, i64, String, String, usize, file_data::CacheType);
+/// (file_id, account, file, size, max_ts)
+pub type DownloadFile = (i64, String, String, i64, i64);
 
 mod processing_files {
-    use hashbrown::HashSet;
+    use hashbrown::HashMap;
     use parking_lot::RwLock;
+    use tokio::sync::Semaphore;
 
     use super::*;
 
-    static PROCESSING_FILES: Lazy<RwLock<HashSet<String>>> =
-        Lazy::new(|| RwLock::new(HashSet::new()));
+    // a closed zero-permit semaphore is a terminal done signal every waiter observes, unlike Notify
+    static PROCESSING_FILES: Lazy<RwLock<HashMap<String, Arc<Semaphore>>>> =
+        Lazy::new(|| RwLock::new(HashMap::new()));
 
     pub fn is_processing(file_name: &str) -> bool {
-        PROCESSING_FILES.read().contains(file_name)
+        PROCESSING_FILES.read().contains_key(file_name)
     }
 
-    pub fn add(file_name: &str) {
-        PROCESSING_FILES.write().insert(file_name.to_string());
+    /// Returns false when the file is already being downloaded by another task.
+    pub fn add(file_name: &str) -> bool {
+        let mut files = PROCESSING_FILES.write();
+        if files.contains_key(file_name) {
+            return false;
+        }
+        files.insert(file_name.to_string(), Arc::new(Semaphore::new(0)));
+        true
     }
 
     pub fn remove(file_name: &str) {
-        PROCESSING_FILES.write().remove(file_name);
+        if let Some(done) = PROCESSING_FILES.write().remove(file_name) {
+            done.close();
+        }
+    }
+
+    /// Waits until the in-flight download of the file has finished.
+    pub async fn wait(file_name: &str) {
+        let Some(done) = PROCESSING_FILES.read().get(file_name).cloned() else {
+            return;
+        };
+        let _ = done.acquire().await;
     }
 }
 
@@ -138,6 +159,8 @@ impl PriorityDownloadQueue {
 }
 
 const FILE_DOWNLOAD_QUEUE_SIZE: usize = 10000;
+// caps how long a search waits on another task's download before falling back to range reads
+const SYNC_DOWNLOAD_WAIT_TIMEOUT: Duration = Duration::from_secs(30);
 static FILE_DOWNLOAD_CHANNEL: Lazy<DownloadQueue> = Lazy::new(|| {
     let (tx, rx) = tokio::sync::mpsc::channel::<FileInfo>(FILE_DOWNLOAD_QUEUE_SIZE);
     DownloadQueue::new(tx, Arc::new(Mutex::new(rx)))
@@ -164,7 +187,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
                         queued_files::remove(&file);
 
                         // check if the file is already being downloaded
-                        if processing_files::is_processing(&file) {
+                        if !processing_files::add(&file) {
                             log::warn!(
                                 "[trace_id {trace_id}] [thread {thread}] search->storage: file {file} is already being downloaded, will skip it"
                             );
@@ -174,9 +197,6 @@ pub async fn run() -> Result<(), anyhow::Error> {
                                 .dec();
                             continue;
                         }
-
-                        // add the file to processing set
-                        processing_files::add(&file);
 
                         // download the file
                         match download_file(
@@ -222,7 +242,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
                 queued_files::remove(&file);
 
                 // check if the file is already being downloaded
-                if processing_files::is_processing(&file) {
+                if !processing_files::add(&file) {
                     log::warn!(
                         "[trace_id {trace_id}] [thread {thread}] search->storage: file {file} is already being downloaded, will skip it"
                     );
@@ -231,9 +251,6 @@ pub async fn run() -> Result<(), anyhow::Error> {
                         .dec();
                     continue;
                 }
-
-                // add the file to processing set
-                processing_files::add(&file);
 
                 // download the file
                 match download_file(thread, &trace_id, id, &account, &file, file_size, cache).await
@@ -318,6 +335,45 @@ async fn download_file(
     ret
 }
 
+// downloads one file whose in-flight mark the caller already holds, then clears the mark
+async fn download_file_sync(
+    trace_id: &str,
+    file_id: i64,
+    account: &str,
+    file_name: &str,
+    file_size: usize,
+    cache_type: file_data::CacheType,
+) -> bool {
+    let ret = download_file(
+        0, trace_id, file_id, account, file_name, file_size, cache_type,
+    )
+    .await;
+    processing_files::remove(file_name);
+    ret.inspect_err(|e| {
+        log::warn!(
+            "[FILE_CACHE_DOWNLOAD:SYNC] [trace_id {trace_id}] download file {file_name} to cache {cache_type:?} err: {e}"
+        )
+    })
+    .is_ok()
+}
+
+// waits for another task's download of the file and reports whether it landed in the cache
+async fn wait_for_download(trace_id: &str, file_name: &str) -> bool {
+    if tokio::time::timeout(
+        SYNC_DOWNLOAD_WAIT_TIMEOUT,
+        processing_files::wait(file_name),
+    )
+    .await
+    .is_err()
+    {
+        log::warn!(
+            "[FILE_CACHE_DOWNLOAD:SYNC] [trace_id {trace_id}] waited {}s for file {file_name} downloaded by another task, giving up",
+            SYNC_DOWNLOAD_WAIT_TIMEOUT.as_secs()
+        );
+    }
+    file_data::exist(file_name).await
+}
+
 async fn download_file_with_consistent_hash(
     file_id: i64,
     account: &str,
@@ -362,11 +418,10 @@ async fn download_file_with_consistent_hash(
 }
 
 // download files from node and return download failed files
-// file: (account, file, size, ts)
 pub async fn download_from_node(
     addr: &str,
-    files: &[(i64, String, String, i64, i64)],
-) -> Result<Vec<(i64, String, String, i64, i64)>, anyhow::Error> {
+    files: &[DownloadFile],
+) -> Result<Vec<DownloadFile>, anyhow::Error> {
     let start = std::time::Instant::now();
     let cfg = get_config();
     log::debug!(
@@ -566,12 +621,52 @@ pub async fn queue_download(
     Ok(())
 }
 
-/// Returns true when the record count is unknown or the file contains enough
-/// records to be worth downloading into the cache.
-pub fn should_download(records: i64) -> bool {
-    // A zero value can mean the record count was not populated by an older
-    // gRPC sender. Treat it as unknown rather than as an undersized file.
-    records == 0 || records >= get_config().limit.file_download_min_records
+/// Downloads the files into the cache before returning and reports how many are cached afterwards.
+pub async fn download_sync(
+    trace_id: &str,
+    files: Vec<DownloadFile>,
+    cache_type: file_data::CacheType,
+    concurrency: usize,
+) -> usize {
+    let semaphore = Arc::new(tokio::sync::Semaphore::new(concurrency.max(1)));
+    let mut tasks = Vec::with_capacity(files.len());
+    let mut in_flight = Vec::new();
+    for (id, account, file, size, ts) in files {
+        if exceeds_cache_max_age(ts, cache_type) {
+            continue;
+        }
+        let permit = semaphore
+            .clone()
+            .acquire_owned()
+            .await
+            .expect("sync download semaphore is never closed");
+        // ownership is claimed under the permit; a file another task owns is awaited without one
+        if !processing_files::add(&file) {
+            drop(permit);
+            in_flight.push(file);
+            continue;
+        }
+        let trace_id = trace_id.to_string();
+        // spawned so a cancelled search still finishes the download and clears the in-flight mark
+        tasks.push(tokio::spawn(async move {
+            let _permit = permit;
+            download_file_sync(&trace_id, id, &account, &file, size as usize, cache_type).await
+        }));
+    }
+    let waited = in_flight
+        .iter()
+        .map(|file| wait_for_download(trace_id, file));
+    let mut cached = futures::future::join_all(waited)
+        .await
+        .into_iter()
+        .filter(|ok| *ok)
+        .count();
+    for task in tasks {
+        if task.await.unwrap_or(false) {
+            cached += 1;
+        }
+    }
+    cached
 }
 
 // if the file timestamp is in the past window, it should be prioritized
@@ -607,16 +702,62 @@ mod tests {
     use config::utils::time::{day_micros, hour_micros, now_micros};
 
     use super::{
-        FileInfo, PriorityDownloadQueue, exceeds_max_age, file_data, processing_files,
-        queued_files, should_download,
+        Duration, FileInfo, PriorityDownloadQueue, exceeds_max_age, file_data, processing_files,
+        queued_files,
     };
 
     #[test]
-    fn test_should_download() {
-        assert!(should_download(0));
-        assert!(!should_download(99));
-        assert!(should_download(100));
-        assert!(should_download(101));
+    fn test_add_rejects_in_flight_file() {
+        let name = "test_add_dup_file_dup111.parquet";
+        assert!(processing_files::add(name));
+        assert!(!processing_files::add(name));
+        processing_files::remove(name);
+        assert!(processing_files::add(name));
+        processing_files::remove(name);
+    }
+
+    #[tokio::test]
+    async fn test_wait_returns_when_download_finishes() {
+        let name = "test_wait_file_wait222.parquet";
+        processing_files::wait(name).await;
+        assert!(processing_files::add(name));
+        let waiter = tokio::spawn(async move { processing_files::wait(name).await });
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        assert!(!waiter.is_finished());
+        processing_files::remove(name);
+        tokio::time::timeout(Duration::from_secs(5), waiter)
+            .await
+            .expect("waiter should finish once the download is removed")
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_download_sync_waits_for_file_owned_by_another_task() {
+        let name = "test_download_sync_wait_file_333.parquet";
+        assert!(processing_files::add(name));
+        tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(100)).await;
+            processing_files::remove(name);
+        });
+        let files = vec![(1, "default".to_string(), name.to_string(), 1024, 0)];
+        let cached = tokio::time::timeout(
+            Duration::from_secs(5),
+            super::download_sync("trace", files, file_data::CacheType::None, 1),
+        )
+        .await
+        .expect("download_sync should return once the other download finishes");
+        assert_eq!(cached, 0);
+        assert!(!processing_files::is_processing(name));
+    }
+
+    #[tokio::test]
+    async fn test_download_sync_clears_in_flight_mark() {
+        let name = "test_download_sync_owned_file_444.parquet";
+        let files = vec![(1, "default".to_string(), name.to_string(), 1024, 0)];
+        // CacheType::None makes download_file a no-op success, so no storage is touched
+        let cached = super::download_sync("trace", files, file_data::CacheType::None, 1).await;
+        assert_eq!(cached, 1);
+        assert!(!processing_files::is_processing(name));
     }
 
     #[test]

@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="-mx-dialog-content-px -my-dialog-content-py grid h-[calc(86vh-9.375rem)] grid-cols-[16.5rem_minmax(0,1fr)_22.5rem] overflow-hidden max-[56.25rem]:grid-cols-[13.75rem_minmax(0,1fr)]"
     >
       <!-- Left: add-field dropdown + list of added fields -->
-      <div class="border-border-strong/18 flex min-w-0 flex-col gap-2.5 border-r p-3">
+      <div class="border-border-strong/18 flex min-w-0 flex-col gap-2.5 border-e p-3">
         <ODropdown
           v-model:open="addOpenLeft"
           align="start"
@@ -81,8 +81,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             role="button"
             tabindex="0"
             :data-test="`override-config-row-${idx}`"
-            class="group rounded-default hover:bg-border-strong/5 relative flex w-full cursor-pointer items-center gap-2 border-l-[0.1875rem] border-transparent py-2 pr-1.5 pl-2.25 transition-colors outline-none"
-            :class="idx === selectedIdx ? 'border-l-primary-600! bg-accent/6' : ''"
+            class="group rounded-default hover:bg-border-strong/5 relative flex w-full cursor-pointer items-center gap-2 border-s-[0.1875rem] border-transparent py-2 ps-2.25 pe-1.5 transition-colors outline-none"
+            :class="idx === selectedIdx ? 'border-s-primary-600! bg-accent/6' : ''"
             @click="selectedIdx = idx"
             @keydown.enter.prevent="selectedIdx = idx"
             @keydown.space.prevent="selectedIdx = idx"
@@ -94,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ isNumericColumn(col) ? t("dashboard.typeNumeric") : t("dashboard.typeText") }}
             </span>
             <span
-              class="min-w-0 flex-1 overflow-hidden text-sm font-semibold text-ellipsis whitespace-nowrap group-hover:pr-7"
+              class="min-w-0 flex-1 overflow-hidden text-sm font-semibold text-ellipsis whitespace-nowrap group-hover:pe-7"
             >
               {{ getFieldLabel(col.field) || t("dashboard.columnFormattingPick") }}
             </span>
@@ -129,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <ColumnFormatControls :col="selectedCol" :is-numeric="isNumericColumn(selectedCol)" />
         </div>
         <div
-          class="border-border-strong/18 flex min-w-0 flex-col gap-2 overflow-y-auto border-l p-3"
+          class="border-border-strong/18 flex min-w-0 flex-col gap-2 overflow-y-auto border-s p-3"
         >
           <div
             class="text-3xs text-text-secondary flex items-center gap-1.25 font-bold tracking-[0.06em] uppercase"

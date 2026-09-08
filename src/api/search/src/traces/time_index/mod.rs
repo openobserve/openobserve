@@ -17,7 +17,11 @@ mod scan;
 
 use std::{
     collections::HashSet,
-    sync::atomic::{AtomicBool, Ordering},
+    ops::Range,
+    sync::{
+        LazyLock as Lazy,
+        atomic::{AtomicBool, Ordering},
+    },
     time::Duration,
 };
 
@@ -28,7 +32,7 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use config::{
-    get_config,
+    RwHashMap, get_config,
     meta::{
         search::{Query, Request, RequestEncoding, SearchEventType},
         stream::StreamType,
@@ -58,6 +62,9 @@ const EXPAND_WINDOW: i64 = DAY_MICROS;
 const SESSION_EXPAND_WINDOW: i64 = 7 * DAY_MICROS;
 const MAX_LOOKUP_KEYS: usize = 100;
 const LOOKUP_CONCURRENCY: usize = 8;
+const AFFINITY_STREAMS: usize = 2;
+
+static STREAM_AFFINITY: Lazy<RwHashMap<String, Vec<String>>> = Lazy::new(Default::default);
 
 /// What the lookup key identifies. The timer algorithm is shared; the kind
 /// selects the index column and the completeness assumption (expand window):
@@ -229,20 +236,89 @@ struct LookupOutcome {
     timed_out: bool,
 }
 
-/// Inputs for one stream's batch scan over all keys. The key-derived fields
-/// are built once per request and shared by every stream's scan.
 struct ScanParams<'a> {
-    org_id: &'a str,
+    run: &'a LookupRun<'a>,
     stream_index: usize,
-    stream_name: &'a str,
+}
+
+impl ScanParams<'_> {
+    fn stream_name(&self) -> &str {
+        &self.run.streams[self.stream_index]
+    }
+}
+
+/// `resolved` carries the cross-stream pruning across stages.
+struct LookupRun<'a> {
+    org_id: &'a str,
+    streams: &'a [String],
     kind: TimeIndexKind,
     keys: &'a [String],
-    key_indexes: &'a HashMap<&'a str, usize>,
-    key_uuid_ts: &'a [Option<i64>],
+    key_indexes: HashMap<&'a str, usize>,
+    key_uuid_ts: Vec<Option<i64>>,
     hint_ts: Option<i64>,
     bounds: Option<TraceTimeRange>,
     deadline: Instant,
-    resolved: &'a [AtomicBool],
+    resolved: Vec<AtomicBool>,
+}
+
+impl<'a> LookupRun<'a> {
+    fn new(
+        org_id: &'a str,
+        streams: &'a [String],
+        kind: TimeIndexKind,
+        keys: &'a [String],
+        hint_ts: Option<i64>,
+        bounds: Option<TraceTimeRange>,
+    ) -> Self {
+        Self {
+            org_id,
+            streams,
+            kind,
+            keys,
+            key_indexes: keys
+                .iter()
+                .enumerate()
+                .map(|(index, key)| (key.as_str(), index))
+                .collect(),
+            key_uuid_ts: keys
+                .iter()
+                .map(|key| config::ider::get_start_time_from_trace_id(key))
+                .collect(),
+            hint_ts,
+            bounds,
+            deadline: default_deadline(),
+            resolved: (0..keys.len()).map(|_| AtomicBool::new(false)).collect(),
+        }
+    }
+
+    fn all_resolved(&self) -> bool {
+        self.resolved
+            .iter()
+            .all(|flag| flag.load(Ordering::Relaxed))
+    }
+
+    /// The bool reports whether any scanned stream lacked index coverage.
+    async fn scan(&self, stage: Range<usize>) -> Result<(Vec<LookupOutcome>, bool)> {
+        let scans = futures::stream::iter(stage.map(move |stream_index| async move {
+            scan_stream(&ScanParams {
+                run: self,
+                stream_index,
+            })
+            .await
+        }))
+        .buffer_unordered(LOOKUP_CONCURRENCY)
+        .try_collect::<Vec<Option<Vec<LookupOutcome>>>>()
+        .await?;
+        let mut coverage_missing = false;
+        let mut outcomes = Vec::new();
+        for scan in scans {
+            match scan {
+                Some(scan) => outcomes.extend(scan),
+                None => coverage_missing = true,
+            }
+        }
+        Ok((outcomes, coverage_missing))
+    }
 }
 
 /// One window's worth of index rows: the merged overall range drives the
@@ -401,10 +477,10 @@ async fn query_batch_window(
     if start_time >= end_time || active.is_empty() {
         return Ok(Some(Vec::new()));
     }
-    let column = params.kind.column();
+    let column = params.run.kind.column();
     let predicate = key_in_predicate(
         column,
-        active.iter().map(|&index| params.keys[index].as_str()),
+        active.iter().map(|&index| params.run.keys[index].as_str()),
     );
     let sql = format!(
         "SELECT {}, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts FROM {} WHERE {predicate} GROUP BY {}",
@@ -412,8 +488,14 @@ async fn query_batch_window(
         quote_identifier(index_stream),
         quote_identifier(column),
     );
-    let Some(hits) =
-        search_index_window(params.org_id, sql, start_time, end_time, params.deadline).await?
+    let Some(hits) = search_index_window(
+        params.run.org_id,
+        sql,
+        start_time,
+        end_time,
+        params.run.deadline,
+    )
+    .await?
     else {
         return Ok(None);
     };
@@ -422,7 +504,7 @@ async fn query_batch_window(
         let Some((key, range)) = parse_hit_range(hit, column) else {
             continue;
         };
-        if let Some(&index) = params.key_indexes.get(key.as_str()) {
+        if let Some(&index) = params.run.key_indexes.get(key.as_str()) {
             rows.push((index, range));
         }
     }
@@ -676,63 +758,122 @@ async fn query_inner(
     Ok(Some(SessionTimeIndexResult { range, traces }))
 }
 
-/// Runs one batch scan per stream under one shared deadline. A trace or
-/// session id lives in exactly one stream, so a key seen by one stream's scan
-/// is skipped by the others. The bool reports whether any stream lacked index
-/// coverage.
-async fn run_lookups(
+/// Skipping the second stage is safe: it only happens when every key was found.
+async fn run_staged_lookups(
+    run: &LookupRun<'_>,
+    stage_one: usize,
+) -> Result<(Vec<LookupOutcome>, bool)> {
+    let (mut outcomes, mut coverage_missing) = run.scan(0..stage_one).await?;
+    if !run.all_resolved() {
+        let (rest, missing) = run.scan(stage_one..run.streams.len()).await?;
+        outcomes.extend(rest);
+        coverage_missing |= missing;
+    }
+    Ok((outcomes, coverage_missing))
+}
+
+/// Step order matters: the affinity must not learn a stream the caller was denied.
+async fn run_org_lookups(
     org_id: &str,
-    streams: &[String],
-    kind: TimeIndexKind,
-    keys: &[String],
-    hint_ts: Option<i64>,
-    bounds: Option<TraceTimeRange>,
+    user_id: &str,
+    streams: &mut [String],
+    request: &LookupRequest,
 ) -> Result<(Vec<TimeRangeResult>, bool)> {
-    let deadline = default_deadline();
-    let resolved: Vec<AtomicBool> = (0..keys.len()).map(|_| AtomicBool::new(false)).collect();
-    let resolved = &resolved;
-    let key_indexes: HashMap<&str, usize> = keys
-        .iter()
-        .enumerate()
-        .map(|(index, key)| (key.as_str(), index))
-        .collect();
-    let key_indexes = &key_indexes;
-    let key_uuid_ts: Vec<Option<i64>> = keys
-        .iter()
-        .map(|key| config::ider::get_start_time_from_trace_id(key))
-        .collect();
-    let key_uuid_ts = &key_uuid_ts;
-    let scans = futures::stream::iter((0..streams.len()).map(|stream_index| async move {
-        scan_stream(&ScanParams {
-            org_id,
-            stream_index,
-            stream_name: &streams[stream_index],
-            kind,
-            keys,
-            key_indexes,
-            key_uuid_ts,
-            hint_ts,
-            bounds,
-            deadline,
-            resolved,
-        })
-        .await
-    }))
-    .buffer_unordered(LOOKUP_CONCURRENCY)
-    .try_collect::<Vec<Option<Vec<LookupOutcome>>>>()
-    .await?;
-    let mut coverage_missing = false;
-    let mut outcomes = Vec::new();
-    for scan in scans {
-        match scan {
-            Some(scan) => outcomes.extend(scan),
-            None => coverage_missing = true,
+    let stage_one = order_by_affinity(org_id, request.kind, streams);
+    let run = LookupRun::new(
+        org_id,
+        streams,
+        request.kind,
+        &request.keys,
+        request.hint_ts,
+        request.bounds,
+    );
+    let (outcomes, coverage_missing) = run_staged_lookups(&run, stage_one).await?;
+    let (outcomes, denied) = drop_unpermitted(org_id, user_id, streams, outcomes).await;
+    remember_streams(org_id, request.kind, streams, &outcomes);
+    Ok((
+        aggregate_outcomes(streams, request.kind, &request.keys, outcomes),
+        coverage_missing || denied,
+    ))
+}
+
+fn answering_streams(outcomes: &[LookupOutcome]) -> Vec<usize> {
+    let mut answered = Vec::new();
+    for outcome in outcomes {
+        if outcome.range.is_some() && !answered.contains(&outcome.stream_index) {
+            answered.push(outcome.stream_index);
         }
     }
-    Ok((
-        aggregate_outcomes(streams, kind, keys, outcomes),
-        coverage_missing,
+    answered
+}
+
+/// Returns how many of the reordered prefix the first stage should scan.
+fn order_by_affinity(org_id: &str, kind: TimeIndexKind, streams: &mut [String]) -> usize {
+    let Some(remembered) = STREAM_AFFINITY.get(&affinity_key(org_id, kind)) else {
+        return 0;
+    };
+    let mut front = 0;
+    for name in remembered.iter() {
+        if let Some(offset) = streams[front..].iter().position(|stream| stream == name) {
+            streams.swap(front, front + offset);
+            front += 1;
+        }
+    }
+    front
+}
+
+fn remember_streams(
+    org_id: &str,
+    kind: TimeIndexKind,
+    streams: &[String],
+    outcomes: &[LookupOutcome],
+) {
+    let hits = answering_streams(outcomes);
+    if hits.is_empty() {
+        return;
+    }
+    let mut remembered = STREAM_AFFINITY
+        .entry(affinity_key(org_id, kind))
+        .or_default();
+    let names: Vec<String> = hits
+        .into_iter()
+        .map(|index| streams[index].clone())
+        .collect();
+    remembered.retain(|stream| !names.contains(stream));
+    remembered.splice(..0, names);
+    remembered.truncate(AFFINITY_STREAMS);
+}
+
+fn affinity_key(org_id: &str, kind: TimeIndexKind) -> String {
+    format!("{org_id}/{}", kind.label())
+}
+
+/// A denied stream is reported as missing coverage, never named or ranged.
+async fn drop_unpermitted(
+    org_id: &str,
+    user_id: &str,
+    streams: &[String],
+    outcomes: Vec<LookupOutcome>,
+) -> (Vec<LookupOutcome>, bool) {
+    let denied: Vec<usize> = futures::stream::iter(answering_streams(&outcomes).into_iter().map(
+        |index| async move {
+            super::check_stream_permissions(org_id, &streams[index], user_id)
+                .await
+                .map(|_| index)
+        },
     ))
+    .buffered(LOOKUP_CONCURRENCY)
+    .filter_map(|denied| async move { denied })
+    .collect()
+    .await;
+    if denied.is_empty() {
+        return (outcomes, false);
+    }
+    let kept = outcomes
+        .into_iter()
+        .filter(|outcome| !denied.contains(&outcome.stream_index))
+        .collect();
+    (kept, true)
 }
 
 /// Drives one stream's [`BatchScanner`]: asks it for windows, runs them, and
@@ -743,7 +884,7 @@ async fn scan_stream(params: &ScanParams<'_>) -> Result<Option<Vec<LookupOutcome
     let result = scan_stream_inner(params).await;
     if result.is_err() {
         config::metrics::TRACE_TIME_INDEX_OPERATIONS
-            .with_label_values(&[params.org_id, params.kind.operation(), "error"])
+            .with_label_values(&[params.run.org_id, params.run.kind.operation(), "error"])
             .inc();
     }
     result
@@ -751,37 +892,27 @@ async fn scan_stream(params: &ScanParams<'_>) -> Result<Option<Vec<LookupOutcome
 
 async fn scan_stream_inner(params: &ScanParams<'_>) -> Result<Option<Vec<LookupOutcome>>> {
     let started = std::time::Instant::now();
-    let kind = params.kind;
-    let floor = session_uuid_floor(kind, params.key_uuid_ts);
-    let Some(bounds) = resolve_scan_bounds(
-        params.org_id,
-        params.stream_name,
-        kind,
-        params.bounds,
-        floor,
-    )
-    .await?
+    let run = params.run;
+    let kind = run.kind;
+    let floor = session_uuid_floor(kind, &run.key_uuid_ts);
+    let Some(bounds) =
+        resolve_scan_bounds(run.org_id, params.stream_name(), kind, run.bounds, floor).await?
     else {
         return Ok(None);
     };
-    let index_stream = get_trace_time_index_stream_name(params.stream_name);
-    let mut scanner = BatchScanner::new(
-        kind,
-        params.keys.len(),
-        bounds,
-        params.hint_ts,
-        params.key_uuid_ts,
-    );
+    let index_stream = get_trace_time_index_stream_name(params.stream_name());
+    let mut scanner =
+        BatchScanner::new(kind, run.keys.len(), bounds, run.hint_ts, &run.key_uuid_ts);
     let mut windows = 0u64;
     loop {
-        if params
+        if run
             .deadline
             .saturating_duration_since(Instant::now())
             .is_zero()
         {
             break;
         }
-        for (key, flag) in params.resolved.iter().enumerate() {
+        for (key, flag) in run.resolved.iter().enumerate() {
             if flag.load(Ordering::Relaxed) {
                 scanner.skip_key(key);
             }
@@ -796,7 +927,7 @@ async fn scan_stream_inner(params: &ScanParams<'_>) -> Result<Option<Vec<LookupO
             break;
         };
         for key in scanner.ingest(rows) {
-            params.resolved[key].store(true, Ordering::Relaxed);
+            run.resolved[key].store(true, Ordering::Relaxed);
         }
     }
     let outcomes = collect_scan_outcomes(params.stream_index, scanner.finish());
@@ -875,8 +1006,8 @@ fn record_scan_metrics(
     outcomes: &[LookupOutcome],
     elapsed: std::time::Duration,
 ) {
-    let org_id = params.org_id;
-    let kind = params.kind;
+    let org_id = params.run.org_id;
+    let kind = params.run.kind;
     // Same per-key accounting the per-key path emits: hit/miss verdicts, plus
     // a timeout marker whenever the scan gave up on that key. Scan duration
     // has no per-lookup status, so only the log line carries it.
@@ -903,9 +1034,9 @@ fn record_scan_metrics(
         .observe(windows as f64);
     log::info!(
         "[trace_time_index] batch scan org_id={org_id:?} stream={:?} kind={} keys={} windows={windows} hits={hits} misses={} timeouts={timeouts} took={} ms",
-        params.stream_name,
+        params.stream_name(),
         kind.label(),
-        params.keys.len(),
+        params.run.keys.len(),
         outcomes.len() as u64 - hits,
         elapsed.as_millis(),
     );
@@ -1138,38 +1269,26 @@ async fn index_stream_exists(org_id: &str, stream_name: &str) -> bool {
     .await
 }
 
-/// Trace streams of the org the caller may search and that have a time index,
-/// optionally narrowed to `filter`. The bool reports whether any candidate
-/// stream had to be skipped (partial coverage).
-async fn resolve_org_streams(
-    org_id: &str,
-    user_id: &str,
-    filter: &[String],
-) -> Result<(Vec<String>, bool)> {
+/// The bool reports whether any candidate was skipped for lacking an index.
+async fn resolve_org_streams(org_id: &str, filter: &[String]) -> Result<(Vec<String>, bool)> {
     if !get_config().common.trace_time_index_enabled {
         return Ok((Vec::new(), true));
     }
     let stream_list = db::schema::list(org_id, Some(StreamType::Traces), false)
         .await
         .map_err(|e| Error::Message(format!("list trace streams: {e}")))?;
-    let candidates = stream_list
-        .into_iter()
-        .map(|stream| stream.stream_name)
-        .filter(|name| filter.is_empty() || filter.contains(name));
-    let checks = futures::stream::iter(candidates.map(|name| async move {
-        let searchable = super::check_stream_permissions(org_id, &name, user_id)
+    let indexes: HashSet<String> =
+        db::schema::list_streams_from_cache(org_id, StreamType::Metadata)
             .await
-            .is_none()
-            && index_stream_exists(org_id, &name).await;
-        (name, searchable)
-    }))
-    .buffered(LOOKUP_CONCURRENCY)
-    .collect::<Vec<_>>()
-    .await;
+            .into_iter()
+            .collect();
     let mut streams = Vec::new();
     let mut partial = false;
-    for (name, searchable) in checks {
-        if searchable {
+    for name in stream_list.into_iter().map(|stream| stream.stream_name) {
+        if !filter.is_empty() && !filter.contains(&name) {
+            continue;
+        }
+        if indexes.contains(&get_trace_time_index_stream_name(&name)) {
             streams.push(name);
         } else {
             partial = true;
@@ -1221,16 +1340,19 @@ pub async fn get_trace_time_range(
     };
     let request_trace_id = get_or_create_trace_id(&headers, &tracing::Span::none());
     let streams = std::slice::from_ref(&stream_name);
-    let (results, coverage_missing) = match run_lookups(
-        &org_id,
-        streams,
-        request.kind,
-        &request.keys,
-        request.hint_ts,
-        request.bounds,
-    )
-    .await
-    {
+    // Scoped so the run's borrow of `stream_name` ends before the response moves it.
+    let lookup = {
+        let run = LookupRun::new(
+            &org_id,
+            streams,
+            request.kind,
+            &request.keys,
+            request.hint_ts,
+            request.bounds,
+        );
+        run_staged_lookups(&run, streams.len()).await
+    };
+    let (outcomes, coverage_missing) = match lookup {
         Ok(outcome) => outcome,
         Err(e) => {
             log::error!(
@@ -1239,6 +1361,7 @@ pub async fn get_trace_time_range(
             return MetaHttpResponse::internal_error("Failed to query trace time index");
         }
     };
+    let results = aggregate_outcomes(streams, request.kind, &request.keys, outcomes);
     let single = (request.keys.len() == 1).then(|| results.first()).flatten();
     let (trace_id, session_id, range) = match single {
         Some(single) => (
@@ -1304,13 +1427,7 @@ pub async fn get_org_trace_time_range(
     };
     let request_trace_id = get_or_create_trace_id(&headers, &tracing::Span::none());
     let stream_filter = parse_id_list(params.get("streams"));
-    let (streams, partial_streams) = match resolve_org_streams(
-        &org_id,
-        &user_email.user_id,
-        &stream_filter,
-    )
-    .await
-    {
+    let (mut streams, partial_streams) = match resolve_org_streams(&org_id, &stream_filter).await {
         Ok(resolved) => resolved,
         Err(e) => {
             log::error!(
@@ -1319,24 +1436,16 @@ pub async fn get_org_trace_time_range(
             return MetaHttpResponse::internal_error("Failed to query trace time index");
         }
     };
-    let (results, coverage_missing) = match run_lookups(
-        &org_id,
-        &streams,
-        request.kind,
-        &request.keys,
-        request.hint_ts,
-        request.bounds,
-    )
-    .await
-    {
-        Ok(outcome) => outcome,
-        Err(e) => {
-            log::error!(
-                "[trace_id {request_trace_id}] trace time index query failed for {org_id}: {e}"
-            );
-            return MetaHttpResponse::internal_error("Failed to query trace time index");
-        }
-    };
+    let (results, coverage_missing) =
+        match run_org_lookups(&org_id, &user_email.user_id, &mut streams, &request).await {
+            Ok(outcome) => outcome,
+            Err(e) => {
+                log::error!(
+                    "[trace_id {request_trace_id}] trace time index query failed for {org_id}: {e}"
+                );
+                return MetaHttpResponse::internal_error("Failed to query trace time index");
+            }
+        };
     Json(OrgTraceTimeRangeResponse {
         results,
         searched_range: effective_searched_range(request.kind, request.bounds).await,
@@ -1616,5 +1725,93 @@ mod tests {
         );
         assert_eq!(union_ranges(Some(caller), None), Some(caller));
         assert_eq!(union_ranges(None, None), None);
+    }
+
+    fn outcome(stream_index: usize) -> LookupOutcome {
+        LookupOutcome {
+            key_index: 0,
+            stream_index,
+            range: Some(TraceTimeRange {
+                start_time: 1,
+                end_time: 2,
+            }),
+            timed_out: false,
+        }
+    }
+
+    #[test]
+    fn affinity_is_empty_until_a_stream_answers() {
+        let mut streams = vec!["a".to_string(), "b".to_string()];
+        assert_eq!(
+            order_by_affinity("unseen-org", TimeIndexKind::Trace, &mut streams),
+            0
+        );
+        assert_eq!(streams, vec!["a".to_string(), "b".to_string()]);
+    }
+
+    #[test]
+    fn affinity_moves_the_answering_stream_to_the_front() {
+        let org = "affinity-front-org";
+        let streams = vec!["a".to_string(), "b".to_string(), "c".to_string()];
+        remember_streams(org, TimeIndexKind::Trace, &streams, &[outcome(2)]);
+        let mut next = vec!["a".to_string(), "b".to_string(), "c".to_string()];
+        assert_eq!(order_by_affinity(org, TimeIndexKind::Trace, &mut next), 1);
+        assert_eq!(next[0], "c");
+    }
+
+    #[test]
+    fn affinity_is_capped_and_most_recent_first() {
+        let org = "affinity-cap-org";
+        let streams = vec!["a".to_string(), "b".to_string(), "c".to_string()];
+        for index in 0..streams.len() {
+            remember_streams(org, TimeIndexKind::Trace, &streams, &[outcome(index)]);
+        }
+        let mut next = streams.clone();
+        assert_eq!(
+            order_by_affinity(org, TimeIndexKind::Trace, &mut next),
+            AFFINITY_STREAMS
+        );
+        assert_eq!(next[0], "c");
+        assert_eq!(next[1], "b");
+    }
+
+    #[test]
+    fn affinity_skips_streams_that_are_no_longer_candidates() {
+        let org = "affinity-gone-org";
+        let streams = vec!["a".to_string(), "gone".to_string()];
+        remember_streams(org, TimeIndexKind::Trace, &streams, &[outcome(1)]);
+        let mut next = vec!["a".to_string()];
+        assert_eq!(order_by_affinity(org, TimeIndexKind::Trace, &mut next), 0);
+        assert_eq!(next, vec!["a".to_string()]);
+    }
+
+    #[test]
+    fn affinity_is_kept_per_kind() {
+        let org = "affinity-kind-org";
+        let streams = vec!["a".to_string(), "b".to_string()];
+        remember_streams(org, TimeIndexKind::Trace, &streams, &[outcome(1)]);
+        let mut next = streams.clone();
+        assert_eq!(order_by_affinity(org, TimeIndexKind::Session, &mut next), 0);
+        assert_eq!(order_by_affinity(org, TimeIndexKind::Trace, &mut next), 1);
+        assert_eq!(next[0], "b");
+    }
+
+    #[test]
+    fn a_missing_stream_is_not_remembered() {
+        let org = "affinity-miss-org";
+        let streams = vec!["a".to_string()];
+        remember_streams(
+            org,
+            TimeIndexKind::Trace,
+            &streams,
+            &[LookupOutcome {
+                key_index: 0,
+                stream_index: 0,
+                range: None,
+                timed_out: false,
+            }],
+        );
+        let mut next = streams.clone();
+        assert_eq!(order_by_affinity(org, TimeIndexKind::Trace, &mut next), 0);
     }
 }

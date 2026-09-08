@@ -282,6 +282,24 @@ describe("WorkflowsList", () => {
       expect(rows(wrapper)[0].trigger).toBe("—");
     });
 
+    // Sorting the rendered string orders "9:54 AM" after "1:19 PM" — the Updated
+    // column is the one users click most, so it has to sort chronologically.
+    it("sorts Updated by the raw timestamp, not the formatted string", async () => {
+      wrapper = mountList();
+      await flushPromises();
+      const col = table(wrapper)
+        .props("columns")
+        .find((c: any) => c.id === "updated_at");
+      expect(col.accessorKey).toBe("updated_at");
+
+      const morning = new Date("2026-09-01T09:54:00Z").getTime() * 1000;
+      const afternoon = new Date("2026-09-01T13:19:00Z").getTime() * 1000;
+      const sorted = [{ updated_at: afternoon }, { updated_at: morning }].sort(
+        (a: any, b: any) => a[col.accessorKey] - b[col.accessorKey],
+      );
+      expect(sorted[0].updated_at).toBe(morning);
+    });
+
     it("formats a microsecond updated_at timestamp", async () => {
       wrapper = mountList();
       await flushPromises();

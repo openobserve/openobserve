@@ -42,7 +42,7 @@ vi.mock("@/components/flow/forms/FunctionPicker.vue", () => ({
       initialName: {},
       initialRawFn: {},
       initialAfterFlatten: {},
-      sampleEvents: {},
+      sampleEvents: { type: Array },
       language: {},
       defaultCode: {},
       optional: { type: Boolean, default: false },
@@ -145,8 +145,8 @@ describe("WorkflowFunction", () => {
       seedTrigger("alert_fired");
       const wrapper = createWrapper();
       const events = picker(wrapper).props("sampleEvents");
-      expect(events).toEqual(buildTestSample());
-      // the envelope the trigger emits: { meta: {...}, data: [ row ] }
+      // One element holding the single event `row` is bound to; the wire builder keeps
+      // its own batch array (pinned in testSample.spec.ts).
       expect(events[0]).toHaveProperty("meta.alert_name");
       expect(Array.isArray(events[0].data)).toBe(true);
     });
@@ -155,7 +155,6 @@ describe("WorkflowFunction", () => {
       seedTrigger("incident_event");
       const wrapper = createWrapper();
       const events = picker(wrapper).props("sampleEvents");
-      expect(events).toEqual(buildIncidentSample());
       expect(events[0]).toHaveProperty("meta.incident_id");
       expect(events[0]).toHaveProperty("meta.event_type");
     });
@@ -277,6 +276,60 @@ describe("WorkflowFunction", () => {
         after_flatten: false,
       });
       expect(workflowObj.currentSelectedNodeData.meta?.incomplete).toBeUndefined();
+    });
+  });
+
+  // F8b(a): `row` inside a workflow function is ONE event, not the batch array —
+  // the seed comment says so (`row.meta.processed = true`). The Events panel must
+  // show that same single event, or authors write `row[0].dummy` to match what
+  // they see. Display only: the wire format stays a batch array.
+  describe("Events panel shows the single event `row` is bound to", () => {
+    // The prop stays an ARRAY: TestFunction gates on `.length` and falls back to a
+    // generic log sample for a non-array, silently discarding the payload. One element,
+    // so the panel shows the single event `row` is bound to.
+    it("hands the picker a one-element array holding the single event", () => {
+      seedTrigger("alert_fired");
+      const wrapper = createWrapper();
+      const events = picker(wrapper).props("sampleEvents");
+
+      expect(Array.isArray(events)).toBe(true);
+      expect(events).toHaveLength(1);
+      expect(events[0]).toEqual(buildTestSample()[0]);
+    });
+
+    it("shows the alert event's own meta/data at the top level", () => {
+      seedTrigger("alert_fired");
+      const events = picker(createWrapper()).props("sampleEvents");
+
+      expect(events[0]).toHaveProperty("meta.alert_name");
+      // the inner data[] is the real query rows — it stays
+      expect(Array.isArray(events[0].data)).toBe(true);
+      expect(events[0].data.length).toBeGreaterThan(0);
+    });
+
+    it("hands the picker a one-element array for an incident trigger", () => {
+      seedTrigger("incident_event");
+      const events = picker(createWrapper()).props("sampleEvents");
+
+      expect(events).toHaveLength(1);
+      expect(events[0]).toHaveProperty("meta.incident_id");
+      expect(events[0]).toHaveProperty("meta.event_type");
+    });
+
+    // F8b(c): incidents always send `&[]` as data (src/core/src/incidents.rs:211), so
+    // an always-empty `data: []` in the panel is pure noise that invites `row.data[0]`.
+    it("drops the always-empty data[] from the displayed incident event", () => {
+      seedTrigger("incident_event");
+      const events = picker(createWrapper()).props("sampleEvents");
+
+      expect(events[0]).not.toHaveProperty("data");
+      expect(Object.keys(events[0])).toEqual(["meta"]);
+    });
+
+    it("still seeds nothing when the workflow has no trigger", () => {
+      workflowObj.currentSelectedWorkflow.nodes = [];
+      const events = picker(createWrapper()).props("sampleEvents");
+      expect(events == null || (Array.isArray(events) && events.length === 0)).toBe(true);
     });
   });
 });

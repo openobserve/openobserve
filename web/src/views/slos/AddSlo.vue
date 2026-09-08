@@ -1127,6 +1127,9 @@ async function load() {
     name: body.name,
     description: body.description ?? "",
     tags: body.tags ?? [],
+    // Without this the seeded default is sent back on every edit, which reads
+    // as a move out of the SLO's real folder.
+    folder_id: body.folder_id || form.folder_id,
     sli_type: body.sli_type,
     config: { stream_type: countStreamType, ...flat },
     target: body.target,

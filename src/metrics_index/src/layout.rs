@@ -20,10 +20,22 @@
 use arrow_schema::{DataType, Schema};
 use config::{
     FileFormat, get_config,
-    meta::{promql::HASH_LABEL, stream::StreamType},
+    meta::{
+        promql::HASH_LABEL,
+        stream::{FileKey, StreamType},
+    },
 };
 
 pub const METRICS_INDEX_ROW_COUNT: &str = "__oo_midx_row_count";
+/// Format version a writer stamps into the `.midx` schema; readers reject newer ones.
+pub const METRICS_INDEX_VERSION: u32 = 1;
+pub const METRICS_INDEX_VERSION_KEY: &str = "o2:midx_version";
+/// Row count of the data file the sidecar was written for; readers refuse a mismatch.
+pub const METRICS_INDEX_PARENT_RECORDS_KEY: &str = "o2:parent_records";
+/// Parquet only; absent for Vortex data files, whose access plan needs no row groups.
+pub const METRICS_INDEX_ROW_GROUP_SIZE_KEY: &str = "o2:row_group_size";
+/// Comma-joined `METRICS_HASH_EXCLUDED_LABELS` at write time; informational, readers ignore it.
+pub const METRICS_INDEX_EXCLUDED_LABELS_KEY: &str = "o2:excluded_labels";
 
 /// [`metrics_index_enabled`] narrowed to one stream: the layout also
 /// needs a `__hash__` column of type `UInt64` (remote-write / OTLP metrics).
@@ -38,10 +50,7 @@ pub fn metrics_index_stream(stream_type: StreamType, schema: &Schema) -> bool {
 /// (`ZO_METRICS_INDEX_ENABLED`): metrics files ordered by
 /// `(__hash__, _timestamp)`, so readers must not assume a `_timestamp` order.
 pub fn metrics_index_enabled(stream_type: StreamType) -> bool {
-    if stream_type != StreamType::Metrics {
-        return false;
-    }
-    get_config().compact.metrics_index_enabled
+    stream_type == StreamType::Metrics && get_config().compact.metrics_index_enabled
 }
 
 /// Metrics-specific physical layout encoded in a file-name prefix so readers
@@ -82,6 +91,16 @@ impl MetricsFileLayout {
             }
         }
         None
+    }
+
+    /// Whether `path` names a `(__hash__, _timestamp)` ordered metrics file.
+    pub fn is_hash_ordered(path: &str) -> bool {
+        Self::of(path).is_some()
+    }
+
+    /// Whether every file is hash-ordered; one legacy file voids the ordering guarantee.
+    pub fn all_hash_ordered(files: &[FileKey]) -> bool {
+        files.iter().all(|file| Self::is_hash_ordered(&file.key))
     }
 
     fn prefix(self) -> &'static str {

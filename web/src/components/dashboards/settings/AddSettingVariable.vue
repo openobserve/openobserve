@@ -319,13 +319,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="w-6 pt-3.5">{{ index + 1 }}</span>
               <OFormInput
                 :name="`options[${index}].label`"
-                class="mr-2 flex-1"
+                class="me-2 flex-1"
                 :data-test="`dashboard-custom-variable-${index}-label`"
                 :placeholder="t('dashboard.addSettingVariable.labelPlaceholder', { n: index + 1 })"
               />
               <OFormInput
                 :name="`options[${index}].value`"
-                class="mr-2 flex-1"
+                class="me-2 flex-1"
                 :data-test="`dashboard-custom-variable-${index}-value`"
                 :placeholder="t('dashboard.addSettingVariable.valuePlaceholder', { n: index + 1 })"
               />
@@ -412,7 +412,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :key="index"
                 class="mt-3 flex-wrap"
               >
-                <div class="mr-2 flex w-1/2">
+                <div class="me-2 flex w-1/2">
                   <OFormInput
                     :name="`customMultiSelectValue[${index}]`"
                     :placeholder="t('dashboard.addSettingVariable.enterValue')"
