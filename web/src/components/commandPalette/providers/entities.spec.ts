@@ -21,8 +21,7 @@ vi.mock("@/services/alerts", () => ({ default: { listByFolderId: vi.fn() } }));
 vi.mock("@/services/saved_views", () => ({ default: { get: vi.fn() } }));
 vi.mock("@/services/jstransform", () => ({ default: { list: vi.fn() } }));
 vi.mock("@/services/pipelines", () => ({ default: { getPipelines: vi.fn() } }));
-const getPaginatedStreams = vi.fn();
-vi.mock("@/composables/useStreams", () => ({ default: () => ({ getPaginatedStreams }) }));
+const searchStreams = vi.fn();
 
 import dashboardService from "@/services/dashboards";
 import alertsService from "@/services/alerts";
@@ -41,6 +40,7 @@ const ctx = (over: Partial<{ routes: string[]; state: any }> = {}) => ({
     (
       over.routes ?? ["dashboards", "alertDetail", "logs", "functionList", "pipelineEditor"]
     ).includes(n),
+  searchStreams,
 });
 
 describe("entity mappers", () => {
@@ -175,10 +175,10 @@ describe("createEntityProviders", () => {
     expect((await p.list!(new AbortController().signal)).map((i) => i.id)).toEqual([
       "stream:logs/l",
     ]);
-    getPaginatedStreams.mockResolvedValue({ list: [{ name: "x" }] });
+    searchStreams.mockResolvedValue({ list: [{ name: "x" }] });
     const found = await p.search!("x", new AbortController().signal);
-    expect(getPaginatedStreams).toHaveBeenCalledTimes(3);
-    expect(getPaginatedStreams).toHaveBeenCalledWith("logs", false, false, 0, 20, "x");
+    expect(searchStreams).toHaveBeenCalledTimes(3);
+    expect(searchStreams).toHaveBeenCalledWith("logs", "x", 20);
     expect(found.map((i) => i.id).sort()).toEqual([
       "stream:logs/x",
       "stream:metrics/x",

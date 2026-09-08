@@ -20,25 +20,29 @@ import type { PaletteScope } from "./types";
 
 defineProps<{
   scopes: Array<{ id: PaletteScope; label: string }>;
-  selected: PaletteScope | null;
+  selected: PaletteScope[];
+  /** Index of the chip the keyboard is on, or null when the keyboard is in the list. */
+  cursor: number | null;
 }>();
 
 const emit = defineEmits<{
-  (e: "select", scope: PaletteScope | null): void;
+  (e: "toggle", scope: PaletteScope): void;
 }>();
 </script>
 
 <template>
   <div class="flex flex-wrap items-center gap-1.5" role="group" data-test="command-palette-scopes">
     <OButton
-      v-for="s in scopes"
+      v-for="(s, i) in scopes"
       :key="s.id"
       variant="outline"
       size="chip"
-      :active="selected === s.id"
+      :active="selected.includes(s.id)"
+      :class="cursor === i ? 'ring-focus-ring-accent ring-2' : ''"
+      :aria-pressed="selected.includes(s.id)"
       :data-test="`command-palette-scope-${s.id}`"
       @mousedown.prevent
-      @click="emit('select', selected === s.id ? null : s.id)"
+      @click="emit('toggle', s.id)"
     >
       {{ s.label }}
     </OButton>

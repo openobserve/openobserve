@@ -87,10 +87,27 @@ export class CommandPalettePage {
     await this.page.keyboard.press('Tab');
   }
 
+  scopePill(scope) {
+    return this.page.locator(`[data-test="command-palette-scope-pill-${scope}"]`);
+  }
+
   async selectScope(scope) {
-    await this.toggleScopes();
+    if (!(await this.page.locator('[data-test="command-palette-scopes"]').isVisible())) await this.toggleScopes();
     await this.scopeChip(scope).click();
-    await expect(this.page.locator('[data-test="command-palette-scope-pill"]')).toBeVisible({ timeout: 5000 });
+    await expect(this.scopePill(scope)).toBeVisible({ timeout: 5000 });
+  }
+
+  // Enterprise builds replace the empty state with an "Ask O2 AI" row; either is a valid no-match state.
+  async expectNoMatches() {
+    await expect
+      .poll(
+        async () =>
+          (await this.emptyState.isVisible()) ||
+          (await this.list.locator('[role="option"][data-item-id="ai:ask"]').count()) === 1,
+        { timeout: 10000 },
+      )
+      .toBe(true);
+    await expect(this.rows.filter({ hasNot: this.page.locator('[data-item-id="ai:ask"]') })).toHaveCount(0);
   }
 
   async expectRowsOfType(type, min = 1) {

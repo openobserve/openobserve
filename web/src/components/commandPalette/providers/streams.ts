@@ -13,7 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import useStreams from "@/composables/useStreams";
 import type { EntityProvider } from "../usePaletteEntities";
 import type { PaletteItem } from "../types";
 import type { EntityProviderContext } from "./context";
@@ -33,18 +32,19 @@ function routeFor(type: string, name: string): PaletteItem["route"] {
   return { name: "logs", query: { stream: name, stream_type: "logs", type: "stream_explorer" } };
 }
 
+function iconFor(type: string): string {
+  if (type === "metrics") return "bar-chart";
+  if (type === "traces") return "account-tree";
+  return "window";
+}
+
 export function streamToItem(row: StreamRow, typeLabel: string): PaletteItem {
   return {
     id: `stream:${row.stream_type}/${row.name}`,
     type: "stream",
     label: row.name,
     subtitle: typeLabel,
-    icon:
-      row.stream_type === "metrics"
-        ? "bar-chart"
-        : row.stream_type === "traces"
-          ? "account-tree"
-          : "window",
+    icon: iconFor(row.stream_type),
     keywords: [row.stream_type],
     route: routeFor(row.stream_type, row.name),
   };
@@ -62,19 +62,9 @@ export function createStreamsProvider(ctx: EntityProviderContext): EntityProvide
     list: async () =>
       STREAM_TYPES.flatMap((type) => cached(type).map((row) => streamToItem(row, typeLabel(type)))),
     search: async (query) => {
-      const streams = useStreams(ctx.t);
       const results = await Promise.all(
         STREAM_TYPES.map(async (type) => {
-          const res = (await streams.getPaginatedStreams(
-            type,
-            false,
-            false,
-            0,
-            SEARCH_LIMIT,
-            query,
-          )) as {
-            list?: StreamRow[];
-          };
+          const res = await ctx.searchStreams(type, query, SEARCH_LIMIT);
           return (res?.list ?? []).map((row) =>
             streamToItem({ ...row, stream_type: type }, typeLabel(type)),
           );

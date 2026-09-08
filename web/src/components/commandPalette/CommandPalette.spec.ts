@@ -43,6 +43,10 @@ vi.mock("./providers/entities", () => ({
   ],
 }));
 
+vi.mock("@/composables/useStreams", () => ({
+  default: () => ({ getPaginatedStreams: vi.fn().mockResolvedValue({ list: [] }) }),
+}));
+
 vi.mock("@/services/settings", () => ({
   default: {
     getSetting: vi.fn().mockRejectedValue({}),
@@ -200,7 +204,7 @@ describe("CommandPalette", () => {
     expect(rowIds()).toEqual(["dashboard:default/d1"]);
   });
 
-  it("toggles scope chips with Tab and narrows the list to a scope", async () => {
+  it("toggles scope chips with Tab, supports multi-select, and Backspace pops the last scope", async () => {
     expect(wrapper.find('[data-test="command-palette-scopes"]').exists()).toBe(false);
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab" }));
     await flushPromises();
@@ -208,10 +212,47 @@ describe("CommandPalette", () => {
     await wrapper.find('[data-test="command-palette-scope-dashboard"]').trigger("click");
     await flushPromises();
     expect(rowIds()).toEqual(["action:newDashboard", "dashboard:default/d1"]);
-    expect(wrapper.find('[data-test="command-palette-scope-pill"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="command-palette-scope-pill-dashboard"]').exists()).toBe(true);
+    await wrapper.find('[data-test="command-palette-scope-pages"]').trigger("click");
+    await flushPromises();
+    expect(wrapper.findAll("[data-scope-pill]")).toHaveLength(2);
+    expect(rowIds()).toContain("page:logs");
+    expect(rowIds()).toContain("dashboard:default/d1");
+    expect(rowIds()).not.toContain("action:newAlert");
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "Backspace" }));
     await flushPromises();
-    expect(wrapper.find('[data-test="command-palette-scope-pill"]').exists()).toBe(false);
+    expect(wrapper.findAll("[data-scope-pill]")).toHaveLength(1);
+    expect(rowIds()).not.toContain("page:logs");
+  });
+
+  it("moves along the chip row with the arrows and toggles with Enter", async () => {
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab" }));
+    await flushPromises();
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight" }));
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }));
+    await flushPromises();
+    expect(wrapper.find('[data-test="command-palette-scope-pill-pages"]').exists()).toBe(true);
+    expect(wrapper.emitted("update:open")).toBeUndefined();
+  });
+
+  it("keeps chip order fixed while open and reorders only on the next open", async () => {
+    const chips = () =>
+      wrapper
+        .findAll('[data-test^="command-palette-scope-"]')
+        .map((c) => c.attributes("data-test"));
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab" }));
+    await flushPromises();
+    const before = chips();
+    expect(before[0]).toBe("command-palette-scope-actions");
+    await wrapper.find('[data-test="command-palette-scope-dashboard"]').trigger("click");
+    await flushPromises();
+    expect(chips().filter((c) => !c.startsWith("command-palette-scope-pill"))).toEqual(before);
+    await wrapper.setProps({ open: false });
+    await wrapper.setProps({ open: true });
+    await flushPromises();
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab" }));
+    await flushPromises();
+    expect(chips()[0]).toBe("command-palette-scope-dashboard");
   });
 
   it("offers the AI hand-off only when enabled and nothing matches", async () => {

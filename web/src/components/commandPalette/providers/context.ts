@@ -15,10 +15,17 @@
 
 import type { TranslateFn } from "@/types/i18n";
 
+export interface StreamSearchRow {
+  name: string;
+  stream_type?: string;
+}
+
 /** What every entity provider needs; kept narrow so providers stay unit-testable. */
 export interface EntityProviderContext {
   store: { state: any };
   t: TranslateFn;
   org: string;
   hasRoute(name: string): boolean;
+  /** Keyword search for one stream type; created inside a component setup because useStreams needs the store. */
+  searchStreams(type: string, query: string, limit: number): Promise<{ list?: StreamSearchRow[] }>;
 }

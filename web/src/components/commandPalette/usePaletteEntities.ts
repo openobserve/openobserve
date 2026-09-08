@@ -29,7 +29,7 @@ export interface EntityProvider {
 export interface PaletteEntitiesInput {
   open: Ref<boolean>;
   query: Ref<string>;
-  scope: Ref<PaletteScope | null>;
+  scopes: Ref<PaletteScope[]>;
   org: Ref<string>;
   providers: Ref<EntityProvider[]>;
 }
@@ -55,7 +55,7 @@ function dedupe(items: PaletteItem[]): PaletteItem[] {
   return items.filter((i) => (seen.has(i.id) ? false : (seen.add(i.id), true)));
 }
 
-export function usePaletteEntities({ open, query, scope, org, providers }: PaletteEntitiesInput): {
+export function usePaletteEntities({ open, query, scopes, org, providers }: PaletteEntitiesInput): {
   entities: ComputedRef<PaletteItem[]>;
   loading: Ref<boolean>;
   refresh: () => Promise<void>;
@@ -100,7 +100,9 @@ export function usePaletteEntities({ open, query, scope, org, providers }: Palet
     searchController?.abort();
     searchController = new AbortController();
     const { signal } = searchController;
-    const targets = active().filter((p) => p.search && (!scope.value || p.scope === scope.value));
+    const targets = active().filter(
+      (p) => p.search && (scopes.value.length === 0 || scopes.value.includes(p.scope)),
+    );
     const results = await Promise.all(
       targets.map(async (p) => {
         try {
@@ -130,7 +132,7 @@ export function usePaletteEntities({ open, query, scope, org, providers }: Palet
     { immediate: true },
   );
 
-  watch([query, scope], ([q]) => {
+  watch([query, scopes], ([q]) => {
     if (searchTimer) clearTimeout(searchTimer);
     const trimmed = q.trim();
     if (!open.value || trimmed === "") {

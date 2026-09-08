@@ -60,6 +60,11 @@ test.describe('Command palette', () => {
     await pm.commandPalettePage.selectScope('dashboard');
     await pm.commandPalettePage.expectFirstRow('action:newDashboard');
     await pm.commandPalettePage.expectRowsOfType('dashboard');
+    await pm.commandPalettePage.selectScope('alert');
+    await pm.commandPalettePage.expectRowsOfType('alert');
+    await pm.commandPalettePage.expectRowsOfType('dashboard');
+    await pm.commandPalettePage.scopePill('alert').click();
+    await expect(pm.commandPalettePage.scopePill('alert')).toBeHidden();
     const first = pm.commandPalettePage.list.locator('[role="option"][data-test="command-palette-row-dashboard"]').first();
     const id = await first.getAttribute('data-item-id');
     await first.click();
@@ -85,8 +90,7 @@ test.describe('Command palette', () => {
   }, async () => {
     await pm.commandPalettePage.openWithKeyboard();
     await pm.commandPalettePage.type('zzqxv');
-    await expect(pm.commandPalettePage.emptyState).toBeVisible();
-    await expect(pm.commandPalettePage.rows).toHaveCount(0);
+    await pm.commandPalettePage.expectNoMatches();
     await pm.commandPalettePage.close();
   });
 });

@@ -27,6 +27,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import { useNavGateContext } from "@/lib/core/Navbar/useNavGateContext";
 import type { NavItem } from "@/lib/core/Navbar/ONavbar.types";
 import { useTheme } from "@/composables/useTheme";
+import useStreams from "@/composables/useStreams";
 import { switchThemeMode } from "@/utils/theme";
 import { focusSearchInput } from "@/utils/keyboardShortcuts";
 import PaletteRow from "./PaletteRow.vue";
@@ -63,8 +64,13 @@ const { isDark } = useTheme();
 const frecency = useFrecency();
 
 const query = ref("");
-const scope = ref<PaletteScope | null>(null);
+const scopes = ref<PaletteScope[]>([]);
 const showScopes = ref(false);
+// Keyboard position on the chip row; null means the keyboard is in the list.
+const chipCursor = ref<number | null>(null);
+// Frecency is read once per open so rows and chips never reorder under the pointer.
+const itemScores = ref(new Map<string, number>());
+const scopeScores = ref(new Map<string, number>());
 const activeIndex = ref(0);
 const listRef = ref<HTMLElement | null>(null);
 const isOpen = computed(() => props.open);
@@ -111,13 +117,23 @@ const actions = computed(() =>
   }),
 );
 
+const { getPaginatedStreams } = useStreams(t);
 const providers = computed(() =>
-  createEntityProviders({ store, t, org: orgId.value, hasRoute: (name) => router.hasRoute(name) }),
+  createEntityProviders({
+    store,
+    t,
+    org: orgId.value,
+    hasRoute: (name) => router.hasRoute(name),
+    searchStreams: (type, q, limit) =>
+      getPaginatedStreams(type, false, false, 0, limit, q) as Promise<{
+        list?: { name: string }[];
+      }>,
+  }),
 );
 const { entities, loading } = usePaletteEntities({
   open: isOpen,
   query,
-  scope,
+  scopes,
   org: orgId,
   providers,
 });
@@ -136,43 +152,41 @@ const fallback = (q: string): PaletteItem | null =>
 
 const { rows, itemIndexes } = usePaletteRows({
   query,
-  scope,
+  scopes,
   pages,
   actions,
   entities,
   fallback,
-  frecency: () => frecency.scores("palette_item"),
+  frecency: () => itemScores.value,
   t,
 });
 
 // Chips: one per scope that has at least one enabled source, ordered by how often each was used.
-const scopes = computed(() => {
+const scopeList = computed(() => {
   const available = new Set<PaletteScope>(["actions", "pages"]);
   for (const p of providers.value) if (p.enabled()) available.add(p.scope);
-  const scores = frecency.scores("palette_scope");
+  const scores = scopeScores.value;
   return SCOPE_ORDER.filter((s) => available.has(s))
     .sort((a, b) => (scores.get(b) ?? 0) - (scores.get(a) ?? 0))
     .map((id) => ({ id, label: String(t(`palette.scopes.${id}`)) }));
 });
-const scopeLabel = computed(() => scopes.value.find((s) => s.id === scope.value)?.label ?? "");
+const scopeLabels = computed(() =>
+  scopes.value.map((id) => ({ id, label: scopeList.value.find((s) => s.id === id)?.label ?? id })),
+);
 const placeholder = computed(() =>
-  scope.value
-    ? t("palette.placeholderScoped", { scope: scopeLabel.value })
+  scopes.value.length > 0
+    ? t("palette.placeholderScoped", { scope: scopeLabels.value.map((s) => s.label).join(", ") })
     : t("palette.placeholder"),
 );
 
-function selectScope(next: PaletteScope | null): void {
-  scope.value = next;
-  if (next) frecency.record("palette_scope", next);
+function toggleScope(id: PaletteScope): void {
+  if (scopes.value.includes(id)) {
+    scopes.value = scopes.value.filter((s) => s !== id);
+  } else {
+    scopes.value = [...scopes.value, id];
+    frecency.record("palette_scope", id);
+  }
   void nextTick(() => focusSearchInput(SEARCH_DATA_TEST));
-}
-
-function cycleScope(delta: number): void {
-  const ids = scopes.value.map((s) => s.id);
-  if (ids.length === 0) return;
-  const pos = scope.value ? ids.indexOf(scope.value) : -1;
-  const next = (pos + delta + ids.length + 1) % (ids.length + 1);
-  selectScope(next === ids.length ? null : ids[next]);
 }
 
 const activeOptionId = computed(() => `command-palette-option-${activeIndex.value}`);
@@ -230,29 +244,42 @@ function onKeydown(e: KeyboardEvent): void {
     case "ArrowDown":
     case "ArrowUp":
       consume(e);
+      chipCursor.value = null;
       moveActive(e.key === "ArrowDown" ? 1 : -1);
       return;
     case "Tab":
       consume(e);
       showScopes.value = !showScopes.value;
+      chipCursor.value = showScopes.value ? 0 : null;
       return;
     case "ArrowLeft":
-    case "ArrowRight":
-      if (!showScopes.value) return;
+    case "ArrowRight": {
+      if (chipCursor.value === null || scopeList.value.length === 0) return;
       consume(e);
-      cycleScope(e.key === "ArrowRight" ? 1 : -1);
+      const n = scopeList.value.length;
+      chipCursor.value = (chipCursor.value + (e.key === "ArrowRight" ? 1 : -1) + n) % n;
       return;
+    }
     case "Backspace":
-      if (query.value !== "" || !scope.value) return;
+      if (query.value !== "" || scopes.value.length === 0) return;
       consume(e);
-      selectScope(null);
+      scopes.value = scopes.value.slice(0, -1);
       return;
     case "Enter": {
+      if (chipCursor.value !== null) {
+        consume(e);
+        const chip = scopeList.value[chipCursor.value];
+        if (chip) toggleScope(chip.id);
+        return;
+      }
       const row = rows.value[activeIndex.value];
       if (row?.kind !== "item") return;
       consume(e);
       void select(row.item, e.metaKey || e.ctrlKey);
+      return;
     }
+    default:
+      if (e.key.length === 1) chipCursor.value = null;
   }
 }
 
@@ -267,8 +294,11 @@ watch(
   (open) => {
     if (open) {
       query.value = "";
-      scope.value = null;
+      scopes.value = [];
       showScopes.value = false;
+      chipCursor.value = null;
+      itemScores.value = frecency.scores("palette_item");
+      scopeScores.value = frecency.scores("palette_scope");
       resetActive();
       window.addEventListener("keydown", onKeydown, true);
       void nextTick(() => setTimeout(() => focusSearchInput(SEARCH_DATA_TEST), 0));
@@ -297,15 +327,17 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown, true));
       <div class="flex flex-col gap-2">
         <div class="flex items-center gap-2">
           <OButton
-            v-if="scope"
+            v-for="s in scopeLabels"
+            :key="s.id"
             variant="outline"
             size="chip"
             icon-right="close"
-            data-test="command-palette-scope-pill"
+            :data-test="`command-palette-scope-pill-${s.id}`"
+            data-scope-pill
             @mousedown.prevent
-            @click="selectScope(null)"
+            @click="toggleScope(s.id)"
           >
-            {{ scopeLabel }}
+            {{ s.label }}
           </OButton>
           <OSearchInput
             v-model="query"
@@ -318,10 +350,11 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown, true));
           <OShortcut keys="esc" />
         </div>
         <PaletteScopeChips
-          v-if="showScopes || scope"
-          :scopes="scopes"
-          :selected="scope"
-          @select="selectScope"
+          v-if="showScopes || scopes.length > 0"
+          :scopes="scopeList"
+          :selected="scopes"
+          :cursor="chipCursor"
+          @toggle="toggleScope"
         />
       </div>
     </template>

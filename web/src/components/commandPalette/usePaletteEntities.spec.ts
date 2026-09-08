@@ -57,7 +57,7 @@ describe("usePaletteEntities", () => {
     const { entities } = usePaletteEntities({
       open,
       query: ref(""),
-      scope: ref(null),
+      scopes: ref([]),
       org,
       providers: ref([provider("dashboards", "dashboard", { list })]),
     });
@@ -83,11 +83,11 @@ describe("usePaletteEntities", () => {
     const other = vi.fn().mockResolvedValue([item("alert:y", "alert")]);
     const open = ref(true);
     const query = ref("");
-    const scope = ref<PaletteScope | null>(null);
+    const scopes = ref<PaletteScope[]>([]);
     const { entities } = usePaletteEntities({
       open,
       query,
-      scope,
+      scopes,
       org: ref("org1"),
       providers: ref([
         provider("streams", "stream", { search }),
@@ -105,7 +105,7 @@ describe("usePaletteEntities", () => {
     expect(search).toHaveBeenCalledTimes(1);
     expect(search.mock.calls[0][0]).toBe("xy");
     expect(entities.value.map((i) => i.id).sort()).toEqual(["alert:y", "stream:x"]);
-    scope.value = "stream";
+    scopes.value = ["stream"];
     await flush();
     vi.advanceTimersByTime(120);
     await flush();
@@ -124,7 +124,7 @@ describe("usePaletteEntities", () => {
     const { entities } = usePaletteEntities({
       open: ref(true),
       query: ref(""),
-      scope: ref(null),
+      scopes: ref([]),
       org: ref("org1"),
       providers: ref([
         provider("functions", "function", { list: ok }),

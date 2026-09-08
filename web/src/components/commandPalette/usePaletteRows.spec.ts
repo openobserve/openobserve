@@ -43,7 +43,7 @@ const ids = (rows: { kind: string; item?: PaletteItem; label?: string }[]) =>
 
 const base = (over: Partial<Parameters<typeof usePaletteRows>[0]> = {}) => ({
   query: ref(""),
-  scope: ref<PaletteScope | null>(null),
+  scopes: ref<PaletteScope[]>([]),
   pages: ref<PaletteItem[]>([page("page:logs", "Logs"), page("page:metrics", "Metrics")]),
   actions: ref<PaletteItem[]>([action("action:newAlert", "New alert")]),
   entities: ref<PaletteItem[]>([]),
@@ -92,19 +92,27 @@ describe("usePaletteRows", () => {
       action("action:newDashboard", "New dashboard"),
       action("action:newAlert", "New alert"),
     ]);
-    const scope = ref<PaletteScope | null>("dashboard");
+    const scopes = ref<PaletteScope[]>(["dashboard"]);
     const { rows } = usePaletteRows(
-      base({ scope, actions, entities, frecency: () => new Map([["dashboard:b", 1]]) }),
+      base({ scopes, actions, entities, frecency: () => new Map([["dashboard:b", 1]]) }),
     );
     expect(ids(rows.value)).toEqual(["action:newDashboard", "dashboard:b", "dashboard:a"]);
-    scope.value = "pages";
+    scopes.value = ["pages"];
     expect(ids(rows.value)).toEqual(["page:logs", "page:metrics"]);
+    scopes.value = ["pages", "dashboard"];
+    expect(ids(rows.value)).toEqual([
+      "action:newDashboard",
+      "dashboard:b",
+      "dashboard:a",
+      "page:logs",
+      "page:metrics",
+    ]);
   });
 
   it("keeps the scope filter while ranking a typed query", () => {
     const entities = ref([dash("dashboard:logs-overview", "Logs overview")]);
     const { rows } = usePaletteRows(
-      base({ query: ref("log"), scope: ref<PaletteScope | null>("dashboard"), entities }),
+      base({ query: ref("log"), scopes: ref<PaletteScope[]>(["dashboard"]), entities }),
     );
     expect(ids(rows.value)).toEqual(["dashboard:logs-overview"]);
   });

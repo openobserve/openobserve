@@ -11,7 +11,7 @@ import {
 
 export interface PaletteRowsInput {
   query: Ref<string>;
-  scope: Ref<PaletteScope | null>;
+  scopes: Ref<PaletteScope[]>;
   pages: Ref<PaletteItem[]>;
   actions: Ref<PaletteItem[]>;
   entities: Ref<PaletteItem[]>;
@@ -41,7 +41,7 @@ function toRows(items: PaletteItem[]): PaletteRow[] {
 /** Rows for the list: sectioned when the query is empty, one ranked list otherwise. */
 export function usePaletteRows({
   query,
-  scope,
+  scopes,
   pages,
   actions,
   entities,
@@ -55,7 +55,12 @@ export function usePaletteRows({
   const all = computed(() => [...actions.value, ...pages.value, ...entities.value]);
 
   const inScope = computed(() =>
-    scope.value ? all.value.filter((i) => scopeOfType(i.type) === scope.value) : all.value,
+    scopes.value.length === 0
+      ? all.value
+      : all.value.filter((i) => {
+          const s = scopeOfType(i.type);
+          return s !== null && scopes.value.includes(s);
+        }),
   );
 
   const emptyStateRows = (scores: Map<string, number>): PaletteRow[] => {
@@ -72,25 +77,32 @@ export function usePaletteRows({
     ];
   };
 
-  // Scoped empty state: the scope's create verb first, then its items by frecency then label.
-  const scopedEmptyRows = (current: PaletteScope, scores: Map<string, number>): PaletteRow[] => {
-    const createId = SCOPE_CREATE_ACTION[current];
-    const create = createId ? actions.value.find((a) => a.id === createId) : undefined;
+  // Scoped empty state: each scope's create verb first, then items by frecency then label.
+  const scopedEmptyRows = (selected: PaletteScope[], scores: Map<string, number>): PaletteRow[] => {
+    const createIds = selected
+      .map((sc) => SCOPE_CREATE_ACTION[sc])
+      .filter((id): id is string => !!id);
+    const creates = createIds
+      .map((id) => actions.value.find((a) => a.id === id))
+      .filter((a): a is PaletteItem => !!a);
     const items = inScope.value
-      .filter((i) => i.id !== createId)
+      .filter((i) => !createIds.includes(i.id))
       .sort(
         (a, b) =>
           (scores.get(b.id) ?? 0) - (scores.get(a.id) ?? 0) || a.label.localeCompare(b.label),
       )
       .slice(0, SCOPE_LIMIT);
-    return toRows(create ? [create, ...items] : items);
+    return toRows([...creates, ...items]);
   };
 
   const rows = computed<PaletteRow[]>(() => {
     const scores = frecency();
     const q = fold(query.value);
-    if (q === "")
-      return scope.value ? scopedEmptyRows(scope.value, scores) : emptyStateRows(scores);
+    if (q === "") {
+      return scopes.value.length > 0
+        ? scopedEmptyRows(scopes.value, scores)
+        : emptyStateRows(scores);
+    }
     const ranked = rankItems(inScope.value, query.value, { frecency: scores });
     if (ranked.length === 0 && q.length >= FALLBACK_MIN_QUERY) {
       const row = fallback(query.value);
