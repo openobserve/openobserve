@@ -87,14 +87,15 @@ export class CommandPalettePage {
     await this.page.keyboard.press('Tab');
   }
 
-  scopePill(scope) {
-    return this.page.locator(`[data-test="command-palette-scope-pill-${scope}"]`);
-  }
-
   async selectScope(scope) {
     if (!(await this.page.locator('[data-test="command-palette-scopes"]').isVisible())) await this.toggleScopes();
     await this.scopeChip(scope).click();
-    await expect(this.scopePill(scope)).toBeVisible({ timeout: 5000 });
+    await expect(this.scopeChip(scope)).toHaveAttribute('aria-pressed', 'true', { timeout: 5000 });
+  }
+
+  async deselectScope(scope) {
+    await this.scopeChip(scope).click();
+    await expect(this.scopeChip(scope)).toHaveAttribute('aria-pressed', 'false', { timeout: 5000 });
   }
 
   // Enterprise builds replace the empty state with an "Ask O2 AI" row; either is a valid no-match state.

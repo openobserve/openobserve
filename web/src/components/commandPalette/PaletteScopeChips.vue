@@ -16,6 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import OButton from "@/lib/core/Button/OButton.vue";
+import { useI18nTyped } from "@/types/i18n";
 import type { PaletteScope } from "./types";
 
 defineProps<{
@@ -27,7 +28,10 @@ defineProps<{
 
 const emit = defineEmits<{
   (e: "toggle", scope: PaletteScope): void;
+  (e: "clear"): void;
 }>();
+
+const { t } = useI18nTyped();
 </script>
 
 <template>
@@ -45,6 +49,17 @@ const emit = defineEmits<{
       @click="emit('toggle', s.id)"
     >
       {{ s.label }}
+    </OButton>
+    <OButton
+      v-if="selected.length > 0"
+      variant="ghost"
+      size="chip"
+      icon-left="close"
+      data-test="command-palette-scope-clear"
+      @mousedown.prevent
+      @click="emit('clear')"
+    >
+      {{ t("palette.clearScopes") }}
     </OButton>
   </div>
 </template>

@@ -212,17 +212,25 @@ describe("CommandPalette", () => {
     await wrapper.find('[data-test="command-palette-scope-dashboard"]').trigger("click");
     await flushPromises();
     expect(rowIds()).toEqual(["action:newDashboard", "dashboard:default/d1"]);
-    expect(wrapper.find('[data-test="command-palette-scope-pill-dashboard"]').exists()).toBe(true);
+    const pressed = () =>
+      wrapper
+        .findAll('[data-test^="command-palette-scope-"][aria-pressed="true"]')
+        .map((c) => c.attributes("data-test"));
+    expect(pressed()).toEqual(["command-palette-scope-dashboard"]);
     await wrapper.find('[data-test="command-palette-scope-pages"]').trigger("click");
     await flushPromises();
-    expect(wrapper.findAll("[data-scope-pill]")).toHaveLength(2);
+    expect(pressed()).toHaveLength(2);
     expect(rowIds()).toContain("page:logs");
     expect(rowIds()).toContain("dashboard:default/d1");
     expect(rowIds()).not.toContain("action:newAlert");
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "Backspace" }));
     await flushPromises();
-    expect(wrapper.findAll("[data-scope-pill]")).toHaveLength(1);
+    expect(pressed()).toEqual(["command-palette-scope-dashboard"]);
     expect(rowIds()).not.toContain("page:logs");
+    await wrapper.find('[data-test="command-palette-scope-clear"]').trigger("click");
+    await flushPromises();
+    expect(pressed()).toEqual([]);
+    expect(wrapper.find('[data-test="command-palette-scope-clear"]').exists()).toBe(false);
   });
 
   it("moves along the chip row with the arrows and toggles with Enter", async () => {
@@ -231,7 +239,9 @@ describe("CommandPalette", () => {
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight" }));
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }));
     await flushPromises();
-    expect(wrapper.find('[data-test="command-palette-scope-pill-pages"]').exists()).toBe(true);
+    expect(
+      wrapper.find('[data-test="command-palette-scope-pages"]').attributes("aria-pressed"),
+    ).toBe("true");
     expect(wrapper.emitted("update:open")).toBeUndefined();
   });
 
@@ -246,7 +256,7 @@ describe("CommandPalette", () => {
     expect(before[0]).toBe("command-palette-scope-actions");
     await wrapper.find('[data-test="command-palette-scope-dashboard"]').trigger("click");
     await flushPromises();
-    expect(chips().filter((c) => !c.startsWith("command-palette-scope-pill"))).toEqual(before);
+    expect(chips().filter((c) => c !== "command-palette-scope-clear")).toEqual(before);
     await wrapper.setProps({ open: false });
     await wrapper.setProps({ open: true });
     await flushPromises();

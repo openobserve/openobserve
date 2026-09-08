@@ -17157,6 +17157,7 @@
     "placeholderScoped": "Search within {scope}…",
     "trigger": "Search or jump to…",
     "askAi": "Ask O2 AI about \"{q}\"",
+    "clearScopes": "Clear",
     "scopes": {
       "actions": "Actions",
       "pages": "Pages",

@@ -23,7 +23,6 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OShortcut from "@/lib/core/Shortcut/OShortcut.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OButton from "@/lib/core/Button/OButton.vue";
 import { useNavGateContext } from "@/lib/core/Navbar/useNavGateContext";
 import type { NavItem } from "@/lib/core/Navbar/ONavbar.types";
 import { useTheme } from "@/composables/useTheme";
@@ -173,11 +172,22 @@ const scopeList = computed(() => {
 const scopeLabels = computed(() =>
   scopes.value.map((id) => ({ id, label: scopeList.value.find((s) => s.id === id)?.label ?? id })),
 );
+// Two names then "+N" so eight selected scopes still leave room to type.
+const scopeSummary = computed(() => {
+  const labels = scopeLabels.value.map((s) => s.label);
+  const shown = labels.slice(0, 2).join(", ");
+  return labels.length > 2 ? `${shown} +${labels.length - 2}` : shown;
+});
 const placeholder = computed(() =>
   scopes.value.length > 0
-    ? t("palette.placeholderScoped", { scope: scopeLabels.value.map((s) => s.label).join(", ") })
+    ? t("palette.placeholderScoped", { scope: scopeSummary.value })
     : t("palette.placeholder"),
 );
+
+function clearScopes(): void {
+  scopes.value = [];
+  void nextTick(() => focusSearchInput(SEARCH_DATA_TEST));
+}
 
 function toggleScope(id: PaletteScope): void {
   if (scopes.value.includes(id)) {
@@ -326,19 +336,6 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown, true));
     <template #header>
       <div class="flex flex-col gap-2">
         <div class="flex items-center gap-2">
-          <OButton
-            v-for="s in scopeLabels"
-            :key="s.id"
-            variant="outline"
-            size="chip"
-            icon-right="close"
-            :data-test="`command-palette-scope-pill-${s.id}`"
-            data-scope-pill
-            @mousedown.prevent
-            @click="toggleScope(s.id)"
-          >
-            {{ s.label }}
-          </OButton>
           <OSearchInput
             v-model="query"
             size="md"
@@ -355,6 +352,7 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown, true));
           :selected="scopes"
           :cursor="chipCursor"
           @toggle="toggleScope"
+          @clear="clearScopes"
         />
       </div>
     </template>

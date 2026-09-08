@@ -63,8 +63,7 @@ test.describe('Command palette', () => {
     await pm.commandPalettePage.selectScope('alert');
     await pm.commandPalettePage.expectRowsOfType('alert');
     await pm.commandPalettePage.expectRowsOfType('dashboard');
-    await pm.commandPalettePage.scopePill('alert').click();
-    await expect(pm.commandPalettePage.scopePill('alert')).toBeHidden();
+    await pm.commandPalettePage.deselectScope('alert');
     const first = pm.commandPalettePage.list.locator('[role="option"][data-test="command-palette-row-dashboard"]').first();
     const id = await first.getAttribute('data-item-id');
     await first.click();
