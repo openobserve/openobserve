@@ -32,15 +32,16 @@ export type PaletteItemType =
 export type PaletteScope =
   "actions" | "pages" | "dashboard" | "alert" | "stream" | "savedView" | "function" | "pipeline";
 
+// Fixed order mirroring the left rail; a filter bar must look the same on every open.
 export const SCOPE_ORDER: PaletteScope[] = [
-  "actions",
   "pages",
   "dashboard",
   "alert",
   "stream",
-  "savedView",
-  "function",
   "pipeline",
+  "function",
+  "savedView",
+  "actions",
 ];
 
 export function scopeOfType(type: PaletteItemType): PaletteScope | null {

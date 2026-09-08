@@ -67,9 +67,8 @@ const scopes = ref<PaletteScope[]>([]);
 const showScopes = ref(false);
 // Keyboard position on the chip row; null means the keyboard is in the list.
 const chipCursor = ref<number | null>(null);
-// Frecency is read once per open so rows and chips never reorder under the pointer.
+// Frecency is read once per open so rows never reorder under the pointer.
 const itemScores = ref(new Map<string, number>());
-const scopeScores = ref(new Map<string, number>());
 const activeIndex = ref(0);
 const listRef = ref<HTMLElement | null>(null);
 const isOpen = computed(() => props.open);
@@ -160,14 +159,14 @@ const { rows, itemIndexes } = usePaletteRows({
   t,
 });
 
-// Chips: one per scope that has at least one enabled source, ordered by how often each was used.
+// Chips: one per scope that has at least one enabled source, in rail order.
 const scopeList = computed(() => {
   const available = new Set<PaletteScope>(["actions", "pages"]);
   for (const p of providers.value) if (p.enabled()) available.add(p.scope);
-  const scores = scopeScores.value;
-  return SCOPE_ORDER.filter((s) => available.has(s))
-    .sort((a, b) => (scores.get(b) ?? 0) - (scores.get(a) ?? 0))
-    .map((id) => ({ id, label: String(t(`palette.scopes.${id}`)) }));
+  return SCOPE_ORDER.filter((s) => available.has(s)).map((id) => ({
+    id,
+    label: String(t(`palette.scopes.${id}`)),
+  }));
 });
 const scopeLabels = computed(() =>
   scopes.value.map((id) => ({ id, label: scopeList.value.find((s) => s.id === id)?.label ?? id })),
@@ -194,7 +193,6 @@ function toggleScope(id: PaletteScope): void {
     scopes.value = scopes.value.filter((s) => s !== id);
   } else {
     scopes.value = [...scopes.value, id];
-    frecency.record("palette_scope", id);
   }
   void nextTick(() => focusSearchInput(SEARCH_DATA_TEST));
 }
@@ -308,7 +306,6 @@ watch(
       showScopes.value = false;
       chipCursor.value = null;
       itemScores.value = frecency.scores("palette_item");
-      scopeScores.value = frecency.scores("palette_scope");
       resetActive();
       window.addEventListener("keydown", onKeydown, true);
       void nextTick(() => setTimeout(() => focusSearchInput(SEARCH_DATA_TEST), 0));

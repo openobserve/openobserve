@@ -259,29 +259,34 @@ describe("CommandPalette", () => {
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }));
     await flushPromises();
     expect(
-      wrapper.find('[data-test="command-palette-scope-pages"]').attributes("aria-pressed"),
+      wrapper.find('[data-test="command-palette-scope-dashboard"]').attributes("aria-pressed"),
     ).toBe("true");
     expect(wrapper.emitted("update:open")).toBeUndefined();
   });
 
-  it("keeps chip order fixed while open and reorders only on the next open", async () => {
+  it("keeps the chip row in rail order regardless of use", async () => {
     const chips = () =>
       wrapper
         .findAll('[data-test^="command-palette-scope-"]')
-        .map((c) => c.attributes("data-test"));
+        .map((c) => c.attributes("data-test"))
+        .filter((c) => c !== "command-palette-scope-clear");
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab" }));
     await flushPromises();
     const before = chips();
-    expect(before[0]).toBe("command-palette-scope-actions");
+    expect(before.slice(0, 2)).toEqual([
+      "command-palette-scope-pages",
+      "command-palette-scope-dashboard",
+    ]);
+    expect(before.at(-1)).toBe("command-palette-scope-actions");
     await wrapper.find('[data-test="command-palette-scope-dashboard"]').trigger("click");
     await flushPromises();
-    expect(chips().filter((c) => c !== "command-palette-scope-clear")).toEqual(before);
+    expect(chips()).toEqual(before);
     await wrapper.setProps({ open: false });
     await wrapper.setProps({ open: true });
     await flushPromises();
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab" }));
     await flushPromises();
-    expect(chips()[0]).toBe("command-palette-scope-dashboard");
+    expect(chips()).toEqual(before);
   });
 
   it("offers the AI hand-off only when enabled and nothing matches", async () => {
