@@ -949,6 +949,19 @@ pub async fn list_events(response_id: &str) -> Result<Vec<ResponseEvent>, errors
         .collect())
 }
 
+/// The story **and** the ledger, in one list and one read.
+///
+/// For the callers that need both halves: anything answering "who did this rung
+/// actually reach" reads the ledger, and anything rendering the rung reads the
+/// story. Asking [`list_events`] alone for a `Delivery` row returns nothing by
+/// construction — it is defined by excluding them — so a caller that needs both
+/// and takes only the first silently concludes nobody was ever reached.
+pub async fn list_events_and_deliveries(
+    response_id: &str,
+) -> Result<Vec<ResponseEvent>, errors::Error> {
+    all_events(response_id).await
+}
+
 /// Every page this record actually attempted, per person and per channel.
 ///
 /// The ledger the engine replays against, and the honest answer to "did the
