@@ -21,6 +21,7 @@ use metrics_index::MetricsFileLayout;
 use search::datafusion::merge::MergeMode;
 
 use super::metrics::{MetricsIndexMergeScope, metrics_index_merge_scope};
+use crate::incremental::OPEN_HOUR_MERGE_FILES;
 
 /// One planned merge: the files and the mode they merge in.
 type PlannedBatch = (Vec<FileKey>, MergeMode);
@@ -30,8 +31,6 @@ pub(super) struct BatchLimits<'a> {
     pub strategy: &'a MergeStrategy,
     pub max_file_size: usize,
     pub max_group_files: usize,
-    /// Pending ingester files an open metrics-index hour holds before they all merge.
-    pub open_hour_min_files: usize,
     /// The hour is still open: an unfilled trailing group waits for more files.
     pub is_incremental: bool,
     /// The classic merge query's cap: larger files are at their target size.
@@ -57,7 +56,7 @@ pub(super) fn plan_batches(
     let mode_files = indexed_hour_scope(mode_files, mode, limits.max_file_size, stream);
     // the open-hour round is a whole batch too, but only of the pending ingester files
     if mode.merges_open_hour_pending() {
-        if let Some(pending) = pending_ingester_files(mode_files, limits.open_hour_min_files) {
+        if let Some(pending) = pending_ingester_files(mode_files) {
             batches.push((pending, mode.clone()));
         }
     } else if mode.merges_whole_batch() {
@@ -115,17 +114,17 @@ fn indexed_hour_scope(
     }
 }
 
-/// The open hour's pending ingester files, once `min_files` of them have piled up: they merge
+/// The open hour's pending ingester files, once enough of them have piled up: they merge
 /// into one hash-merged file, so each round leaves one chain, and a round's output never
 /// merges again before the hour-end merge takes everything once. Original size is no measure
 /// here: hash order compresses metrics tens of times, so the size-bounded groups sealed one
 /// flush each.
-fn pending_ingester_files(files: Vec<FileKey>, min_files: usize) -> Option<Vec<FileKey>> {
+fn pending_ingester_files(files: Vec<FileKey>) -> Option<Vec<FileKey>> {
     let pending: Vec<FileKey> = files
         .into_iter()
         .filter(|f| MetricsFileLayout::of(&f.key) == Some(MetricsFileLayout::HashSorted))
         .collect();
-    (pending.len() >= min_files.max(2)).then_some(pending)
+    (pending.len() >= OPEN_HOUR_MERGE_FILES).then_some(pending)
 }
 
 /// Size-bounded merge groups in the planner's file order.
@@ -201,7 +200,6 @@ mod tests {
             strategy,
             max_file_size: 1000,
             max_group_files,
-            open_hour_min_files: 3,
             is_incremental,
             merge_max_original_size: 950,
         }
@@ -324,14 +322,13 @@ mod tests {
     /// up; earlier round outputs and legacy files stay out of that batch.
     #[test]
     fn test_plan_batches_open_metrics_hour_merges_pending_files() {
-        let mut files: Vec<FileKey> = (1..=5)
-            .map(|i| hash_file(&format!("hash-sorted-v1-{i}.parquet"), 30))
+        let mut files: Vec<FileKey> = (1..=OPEN_HOUR_MERGE_FILES)
+            .map(|i| hash_file(&format!("hash-sorted-v1-{i:02}.parquet"), 30))
             .collect();
         files.push(hash_file("hash-merged-v1-round1.parquet", 400));
         files.push(metrics_file("legacy.parquet", 100));
         let strategy = MergeStrategy::FileTime;
-        let mut limits = limits(&strategy, 0, true);
-        limits.open_hour_min_files = 3;
+        let limits = limits(&strategy, 0, true);
         let batches = plan_batches(files.clone(), &MergeMode::MetricsHashMerged, &limits, "s");
         assert_eq!(batches.len(), 1, "{batches:?}");
         assert!(
@@ -339,17 +336,14 @@ mod tests {
             "{}",
             batches[0].1
         );
-        assert_eq!(
-            names(&batches[0].0),
-            [
-                "hash-sorted-v1-1.parquet",
-                "hash-sorted-v1-2.parquet",
-                "hash-sorted-v1-3.parquet",
-                "hash-sorted-v1-4.parquet",
-                "hash-sorted-v1-5.parquet"
-            ]
+        assert_eq!(batches[0].0.len(), OPEN_HOUR_MERGE_FILES);
+        assert!(
+            batches[0]
+                .0
+                .iter()
+                .all(|f| f.key.contains("/hash-sorted-v1-"))
         );
-        limits.open_hour_min_files = 6;
+        files.retain(|f| !f.key.ends_with("hash-sorted-v1-01.parquet"));
         assert!(
             plan_batches(files, &MergeMode::MetricsHashMerged, &limits, "s").is_empty(),
             "fewer pending files than the minimum wait for more"

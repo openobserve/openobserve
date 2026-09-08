@@ -173,7 +173,6 @@ pub async fn merge_by_stream(
                 strategy: &job_strategy,
                 max_file_size: cfg.compact.max_file_size,
                 max_group_files: cfg.compact.max_group_files,
-                open_hour_min_files: crate::incremental::OPEN_HOUR_MERGE_FILES,
                 is_incremental,
                 merge_max_original_size: infra_file_list::merge_max_original_size(),
             };
