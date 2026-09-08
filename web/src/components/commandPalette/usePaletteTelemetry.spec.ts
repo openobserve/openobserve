@@ -19,7 +19,7 @@ const reoTrack = vi.fn();
 vi.mock("@/services/reodotdev_analytics", () => ({ useReo: () => ({ track: reoTrack }) }));
 vi.mock("@/services/segment_analytics", () => ({ default: { track: vi.fn() } }));
 vi.mock("@/aws-exports", () => ({
-  default: { enableAnalytics: "true", isEnterprise: "false", isCloud: "false" },
+  default: { enableAnalytics: "true", isEnterprise: "false", isCloud: "true" },
 }));
 
 import segment from "@/services/segment_analytics";
@@ -34,7 +34,7 @@ describe("usePaletteTelemetry", () => {
 
   it("sends the open event with its source to both sinks", () => {
     usePaletteTelemetry(store).trackOpen("header");
-    const expected = { source: "header", user_org: "org1", user_id: "me@example.com" };
+    const expected = { source: "header", user_org: "org1" };
     expect(reoTrack).toHaveBeenCalledWith("Command Palette Open", expected);
     expect(segment.track).toHaveBeenCalledWith("Command Palette Open", expected);
   });
@@ -53,8 +53,8 @@ describe("usePaletteTelemetry", () => {
       query_length: 5,
       scopes: "dashboard,alert",
       user_org: "org1",
-      user_id: "me@example.com",
     });
+    expect(JSON.stringify(payload)).not.toContain("example.com");
     expect(JSON.stringify(payload)).not.toContain('query":');
   });
 });

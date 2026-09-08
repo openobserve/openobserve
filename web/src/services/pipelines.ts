@@ -1,9 +1,9 @@
 import http from "./http";
 
 const pipelines = {
-  getPipelines: (org_identifier: string) => {
+  getPipelines: (org_identifier: string, signal?: AbortSignal) => {
     const url = `/api/${org_identifier}/pipelines`;
-    return http().get(url);
+    return signal ? http().get(url, { signal }) : http().get(url);
   },
 
   getPipeline: ({ name, org_identifier }: { name: string; org_identifier: string }) => {

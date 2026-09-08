@@ -52,8 +52,8 @@ export function createPipelinesProvider(ctx: EntityProviderContext): EntityProvi
     id: "pipelines",
     scope: "pipeline",
     enabled: () => ctx.hasRoute("pipelineEditor"),
-    list: async () => {
-      const res = await pipelinesService.getPipelines(ctx.org);
+    list: async (signal) => {
+      const res = await pipelinesService.getPipelines(ctx.org, signal);
       const rows: PipelineRow[] = res?.data?.list ?? [];
       return rows.filter((r) => r.pipeline_id && r.name).map(pipelineToItem);
     },

@@ -50,7 +50,7 @@ const trailingKeys = computed(() =>
     :data-item-id="item.id"
     class="rounded-default flex h-10 shrink-0 cursor-pointer items-center gap-3 px-2 transition-colors duration-100"
     :class="active ? 'bg-accent/12 text-text-heading' : 'text-text-body'"
-    @mousemove="emit('hover')"
+    @mouseenter="emit('hover')"
     @click="emit('select', $event.metaKey || $event.ctrlKey)"
   >
     <OIcon

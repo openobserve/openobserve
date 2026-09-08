@@ -53,8 +53,20 @@ export function createAlertsProvider(ctx: EntityProviderContext): EntityProvider
     id: "alerts",
     scope: "alert",
     enabled: () => ctx.hasRoute("alertDetail"),
-    list: async () => {
-      const res = await alertsService.listByFolderId(0, 1000, "name", false, "", ctx.org);
+    list: async (signal) => {
+      const res = await alertsService.listByFolderId(
+        0,
+        1000,
+        "name",
+        false,
+        "",
+        ctx.org,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        signal,
+      );
       const rows: AlertRow[] = res?.data?.list ?? [];
       return rows.filter((r) => r.alert_id && r.name).map(alertToItem);
     },

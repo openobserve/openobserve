@@ -85,6 +85,13 @@ function matchScore(item: PaletteItem, q: string, aliasHits: Set<string>): numbe
   return 0;
 }
 
+/** Codepoint order on the cached folded label: no collation work per comparison. */
+export function byFoldedLabel(a: PaletteItem, b: PaletteItem): number {
+  const x = folded(a).label;
+  const y = folded(b).label;
+  return x < y ? -1 : x > y ? 1 : 0;
+}
+
 /** 0 when the item does not match; otherwise match strength + frecency boost + type bias. */
 export function scoreItem(item: PaletteItem, q: string, opts: RankOptions = {}): number {
   const aliasHits = matchAliases(q, opts.aliases);
@@ -116,6 +123,6 @@ export function rankItems(
       score: base + frecency * FRECENCY_BOOST_MAX + (TYPE_BIAS[item.type] ?? 0),
     });
   }
-  scored.sort((a, b) => b.score - a.score || a.item.label.localeCompare(b.item.label));
+  scored.sort((a, b) => b.score - a.score || byFoldedLabel(a.item, b.item));
   return scored.slice(0, opts.limit ?? DEFAULT_LIMIT).map((s) => s.item);
 }

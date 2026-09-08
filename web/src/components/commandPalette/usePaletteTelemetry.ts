@@ -30,18 +30,16 @@ export interface PaletteSelectEvent {
 const OPEN_EVENT = "Command Palette Open";
 const SELECT_EVENT = "Command Palette Select";
 
-/** Both analytics sinks, never the query text. Must be created inside a component setup. */
+/** Both analytics sinks, cloud only, never the query text or the user. Created inside a component setup. */
 export function usePaletteTelemetry(store: { state: any }) {
   const { track } = useReo();
-  // Reo guards itself; the segment SDK does not, so every call site checks the flag.
+  // Reo guards itself on analytics + cloud; the segment SDK does not, so mirror that gate here.
   const sendSegment = (event: string, payload: Record<string, unknown>) => {
-    if (config.enableAnalytics == "true") segment.track(event, payload);
+    if (config.enableAnalytics == "true" && config.isCloud == "true") segment.track(event, payload);
   };
 
-  const context = () => ({
-    user_org: store.state.selectedOrganization?.identifier,
-    user_id: store.state.userInfo?.email,
-  });
+  // Org only: no email or query text ever leaves the browser for the palette.
+  const context = () => ({ user_org: store.state.selectedOrganization?.identifier });
 
   const trackOpen = (source: PaletteOpenSource): void => {
     const payload = { source, ...context() };

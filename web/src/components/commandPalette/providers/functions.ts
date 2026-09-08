@@ -41,12 +41,12 @@ export function createFunctionsProvider(ctx: EntityProviderContext): EntityProvi
     id: "functions",
     scope: "function",
     enabled: () => ctx.hasRoute("functionList"),
-    list: async () => {
+    list: async (signal) => {
       const subtitle = String(ctx.t("palette.scopes.function"));
       const warm: FunctionRow[] = ctx.store.state.organizationData?.functions ?? [];
       if (warm.length > 0)
         return warm.filter((r) => r.name).map((r) => functionToItem(r, subtitle));
-      const res = await transformService.list(1, 1000, "name", false, "", ctx.org);
+      const res = await transformService.list(1, 1000, "name", false, "", ctx.org, signal);
       const rows: FunctionRow[] = res?.data?.list ?? [];
       return rows.filter((r) => r.name).map((r) => functionToItem(r, subtitle));
     },

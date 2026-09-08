@@ -50,8 +50,8 @@ export function createSyntheticsProvider(ctx: EntityProviderContext): EntityProv
     id: "synthetics",
     scope: "synthetic",
     enabled: () => ctx.hasRoute("synthetic-monitor-results"),
-    list: async () => {
-      const res = await syntheticsService.listByFolderId(ctx.org, "all");
+    list: async (signal) => {
+      const res = await syntheticsService.listByFolderId(ctx.org, "all", signal);
       const data = res?.data ?? {};
       const rows: CheckRow[] = data.checks ?? data.monitors ?? [];
       return rows.filter((r) => r.id != null && r.name).map((r) => syntheticToItem(r, ctx.org));

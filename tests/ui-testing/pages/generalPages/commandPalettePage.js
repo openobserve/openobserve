@@ -11,6 +11,26 @@ export class CommandPalettePage {
     this.recentGroup = page.locator('[data-test="command-palette-group-h:recent"]');
     this.emptyState = page.locator('[data-test="command-palette-empty"]');
     this.headerTrigger = page.locator('[data-test="header-command-palette-trigger"]');
+    this.scopesRow = page.locator('[data-test="command-palette-scopes"]');
+    this.aiRow = page.locator('[data-test="command-palette-list"] [role="option"][data-item-id="ai:ask"]');
+    this.helpMenu = page.locator('[data-test="menu-link-help-item"]');
+    this.helpPaletteItem = page.locator('[data-test="menu-link-palette-item"]');
+    this.logsQueryEditor = page.locator('[data-test="logs-search-bar-query-editor"]');
+  }
+
+  async gotoLogs(orgId) {
+    await this.page.goto(`${process.env['ZO_BASE_URL']}/web/logs?org_identifier=${orgId}`);
+    await this.page.waitForLoadState('domcontentloaded');
+  }
+
+  async focusLogsQueryEditor() {
+    await this.logsQueryEditor.click();
+  }
+
+  async openFromHelpMenu() {
+    await this.helpMenu.click();
+    await this.helpPaletteItem.click();
+    await this.expectOpen();
   }
 
   // Mirrors the app's isMacOS(): the test config forces a Windows user agent, so the app
@@ -88,7 +108,7 @@ export class CommandPalettePage {
   }
 
   async selectScope(scope) {
-    if (!(await this.page.locator('[data-test="command-palette-scopes"]').isVisible())) await this.toggleScopes();
+    if (!(await this.scopesRow.isVisible())) await this.toggleScopes();
     await this.scopeChip(scope).click();
     await expect(this.scopeChip(scope)).toHaveAttribute('aria-pressed', 'true', { timeout: 5000 });
   }
@@ -104,7 +124,7 @@ export class CommandPalettePage {
       .poll(
         async () =>
           (await this.emptyState.isVisible()) ||
-          (await this.list.locator('[role="option"][data-item-id="ai:ask"]').count()) === 1,
+          (await this.aiRow.count()) === 1,
         { timeout: 10000 },
       )
       .toBe(true);
@@ -112,9 +132,29 @@ export class CommandPalettePage {
   }
 
   async expectRowsOfType(type, min = 1) {
+    await expect.poll(() => this.rowsOfType(type).count(), { timeout: 15000 }).toBeGreaterThanOrEqual(min);
+  }
+
+  rowsOfType(type) {
+    return this.list.locator(`[role="option"][data-test="command-palette-row-${type}"]`);
+  }
+
+  /** Clicks the first row of a type and returns its item id. */
+  async clickFirstRowOfType(type) {
+    const first = this.rowsOfType(type).first();
+    const id = await first.getAttribute('data-item-id');
+    await first.click();
+    return id;
+  }
+
+  async clickRow(itemId) {
+    await this.row(itemId).click();
+  }
+
+  async expectQueryParam(name, value) {
     await expect
-      .poll(() => this.list.locator(`[role="option"][data-test="command-palette-row-${type}"]`).count(), { timeout: 15000 })
-      .toBeGreaterThanOrEqual(min);
+      .poll(() => new URL(this.page.url()).searchParams.get(name), { timeout: 10000 })
+      .toBe(value);
   }
 
   async pressEnter() {

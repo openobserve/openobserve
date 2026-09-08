@@ -45,8 +45,8 @@ export function createDashboardsProvider(ctx: EntityProviderContext): EntityProv
     id: "dashboards",
     scope: "dashboard",
     enabled: () => ctx.hasRoute("dashboards"),
-    list: async () => {
-      const res = await dashboardService.list(0, 1000, "name", false, "", ctx.org, "", "");
+    list: async (signal) => {
+      const res = await dashboardService.list(0, 1000, "name", false, "", ctx.org, "", "", signal);
       const rows: DashboardRow[] = res?.data?.dashboards ?? [];
       return rows.filter((r) => r.dashboard_id && r.title).map(dashboardToItem);
     },

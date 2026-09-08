@@ -144,7 +144,17 @@ describe("createEntityProviders", () => {
     });
     const p = createEntityProviders(ctx()).find((x) => x.id === "dashboards")!;
     const items = await p.list!(new AbortController().signal);
-    expect(dashboardService.list).toHaveBeenCalledWith(0, 1000, "name", false, "", "org1", "", "");
+    expect(dashboardService.list).toHaveBeenCalledWith(
+      0,
+      1000,
+      "name",
+      false,
+      "",
+      "org1",
+      "",
+      "",
+      expect.any(AbortSignal),
+    );
     expect(items.map((i) => i.id)).toEqual(["dashboard:f/d1"]);
   });
 
@@ -154,7 +164,19 @@ describe("createEntityProviders", () => {
     });
     const p = createEntityProviders(ctx()).find((x) => x.id === "alerts")!;
     expect((await p.list!(new AbortController().signal)).map((i) => i.id)).toEqual(["alert:a"]);
-    expect(alertsService.listByFolderId).toHaveBeenCalledWith(0, 1000, "name", false, "", "org1");
+    expect(alertsService.listByFolderId).toHaveBeenCalledWith(
+      0,
+      1000,
+      "name",
+      false,
+      "",
+      "org1",
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      expect.any(AbortSignal),
+    );
   });
 
   it("uses the warm store for functions and falls back to the API", async () => {
@@ -262,6 +284,10 @@ describe("createEntityProviders", () => {
     expect((await on.list!(new AbortController().signal)).map((i) => i.id)).toEqual([
       "synthetic:1",
     ]);
-    expect(syntheticsService.listByFolderId).toHaveBeenCalledWith("org1", "all");
+    expect(syntheticsService.listByFolderId).toHaveBeenCalledWith(
+      "org1",
+      "all",
+      expect.any(AbortSignal),
+    );
   });
 });

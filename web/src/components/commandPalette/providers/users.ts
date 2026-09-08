@@ -64,8 +64,8 @@ export function createUsersProvider(ctx: EntityProviderContext): EntityProvider 
     id: "users",
     scope: "user",
     enabled: () => ctx.hasRoute("users") && canSeeIam(ctx),
-    list: async () => {
-      const res = await usersService.orgUsers(ctx.org);
+    list: async (signal) => {
+      const res = await usersService.orgUsers(ctx.org, signal);
       const rows: UserRow[] = res?.data?.data ?? [];
       return rows
         .filter((r) => r.email)
@@ -79,8 +79,8 @@ export function createServiceAccountsProvider(ctx: EntityProviderContext): Entit
     id: "serviceAccounts",
     scope: "user",
     enabled: () => ctx.hasRoute("serviceAccounts") && canSeeIam(ctx),
-    list: async () => {
-      const res = await serviceAccountsService.list(ctx.org);
+    list: async (signal) => {
+      const res = await serviceAccountsService.list(ctx.org, signal);
       const rows: UserRow[] = res?.data?.data ?? [];
       const subtitle = String(ctx.t("palette.serviceAccount"));
       return rows.filter((r) => r.email).map((r) => serviceAccountToItem(r, subtitle));

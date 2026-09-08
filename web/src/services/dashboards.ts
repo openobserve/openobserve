@@ -25,6 +25,7 @@ const dashboards = {
     organization: string,
     folderId: string,
     title: string,
+    signal?: AbortSignal,
   ) => {
     const params: any = {
       page_num,
@@ -40,7 +41,7 @@ const dashboards = {
     if (title) {
       params.title = title;
     }
-    return http().get(`/api/${organization}/dashboards`, { params });
+    return http().get(`/api/${organization}/dashboards`, signal ? { params, signal } : { params });
   },
   create: (organization: string, data: any, folderId?: string) => {
     return http().post(`/api/${organization}/dashboards?folder=${folderId ?? "default"}`, data, {

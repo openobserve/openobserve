@@ -40,8 +40,8 @@ export function createSavedViewsProvider(ctx: EntityProviderContext): EntityProv
     id: "savedViews",
     scope: "savedView",
     enabled: () => ctx.hasRoute("logs"),
-    list: async () => {
-      const res = await savedviewsService.get(ctx.org);
+    list: async (signal) => {
+      const res = await savedviewsService.get(ctx.org, signal);
       const rows: SavedViewRow[] = res?.data?.views ?? [];
       const subtitle = String(ctx.t("palette.scopes.savedView"));
       return rows.filter((r) => r.view_id && r.view_name).map((r) => savedViewToItem(r, subtitle));

@@ -15,7 +15,7 @@
 
 import { computed, type ComputedRef, type Ref } from "vue";
 import type { TranslateFn } from "@/types/i18n";
-import { fold, rankItems } from "./rank";
+import { byFoldedLabel, fold, rankItems } from "./rank";
 import {
   SCOPE_CREATE_ACTION,
   scopeOfType,
@@ -102,10 +102,7 @@ export function usePaletteRows({
       .filter((a): a is PaletteItem => !!a);
     const items = inScope.value
       .filter((i) => !createIds.includes(i.id))
-      .sort(
-        (a, b) =>
-          (scores.get(b.id) ?? 0) - (scores.get(a.id) ?? 0) || a.label.localeCompare(b.label),
-      )
+      .sort((a, b) => (scores.get(b.id) ?? 0) - (scores.get(a.id) ?? 0) || byFoldedLabel(a, b))
       .slice(0, SCOPE_LIMIT);
     return toRows([...creates, ...items]);
   };
