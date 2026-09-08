@@ -68,6 +68,7 @@ struct PendingMigrations {
     synthetics: bool,
     stream_names: bool,
     oncall: bool,
+    raman: bool,
     annotation_queues_datasets: bool,
     llm_workbench: bool,
     workflow_folders: bool,
@@ -504,6 +505,9 @@ fn all_org_ownership_keys(pending: &PendingMigrations) -> Vec<&'static str> {
     if pending.oncall {
         keys.extend(["oncall", "oncall_responses"]);
     }
+    if pending.raman {
+        keys.push("raman");
+    }
     if pending.annotation_queues_datasets {
         keys.extend(["annotation_queues", "datasets"]);
     }
@@ -641,6 +645,8 @@ fn pending_migrations(latest: &str, existing: &str) -> PendingMigrations {
     if existing_model_version < v0_0_46 {
         log::info!("[OFGA:Local] on-call permissions migration needed");
         pending.oncall = true;
+        log::info!("[OFGA:Local] raman permissions migration needed");
+        pending.raman = true;
     }
     if existing_model_version < v0_0_47 {
         log::info!("[OFGA:Local] workflow folders permissions migration needed");
@@ -648,4 +654,47 @@ fn pending_migrations(latest: &str, existing: &str) -> PendingMigrations {
     }
 
     pending
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn raman_migration_is_needed_below_the_model_version() {
+        for version in ["0.0.1", "0.0.39", "0.0.42", "0.0.45"] {
+            assert!(
+                pending_migrations("0.0.46", version).raman,
+                "an org recorded at {version} predates raman and must be migrated"
+            );
+        }
+    }
+
+    #[test]
+    fn raman_migration_is_skipped_at_or_above_the_model_version() {
+        for version in ["0.0.46", "0.0.47", "0.1.0"] {
+            assert!(
+                !pending_migrations("0.0.46", version).raman,
+                "an org recorded at {version} already owns the raman tuple"
+            );
+        }
+    }
+
+    #[test]
+    fn raman_migration_uses_the_shared_org_ownership_path() {
+        let pending = PendingMigrations {
+            raman: true,
+            ..Default::default()
+        };
+        assert_eq!(all_org_ownership_keys(&pending), vec!["raman"]);
+    }
+
+    #[tokio::test]
+    async fn raman_migration_version_matches_the_shipped_model() {
+        let model = o2_openfga::model::read_ofga_model().await;
+        assert_eq!(
+            model.version, "0.0.46",
+            "raman shipped in ofga model 0.0.46; a model bump needs its own migration arm"
+        );
+    }
 }
