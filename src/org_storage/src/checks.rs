@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use infra::table::org_storage_providers::{
-    AwsCredentials, AwsRoleArn, AzureCredentials, GcpCredentials, ProviderType,
+    AwsCredentials, AwsRoleArn, AzureCredentials, GcpServiceAccount, ProviderType,
 };
 
 pub struct StorageProviderPolicy<'a> {
@@ -67,8 +67,8 @@ pub fn enforce_checks(
             }
             Ok(serde_json::to_string(&creds)?)
         }
-        ProviderType::GcpCredentials => {
-            let creds: GcpCredentials = serde_json::from_str(&data)?;
+        ProviderType::GcpServiceAccount => {
+            let creds: GcpServiceAccount = serde_json::from_str(&data)?;
             // for gcp we do not allow specifying the server url or region
             // so nothing to enforce here, we simply do a parse check to
             // make sure the shape is ok
@@ -112,13 +112,13 @@ mod tests {
     #[test]
     fn rejects_provider_outside_allowlist() {
         let error = enforce_checks(
-            ProviderType::GcpCredentials,
+            ProviderType::GcpServiceAccount,
             "{}".to_string(),
             &policy("AwsCredentials"),
         )
         .unwrap_err();
 
-        assert!(error.to_string().contains("provider GcpCredentials"));
+        assert!(error.to_string().contains("provider GcpServiceAccount"));
     }
 
     #[test]

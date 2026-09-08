@@ -21,7 +21,7 @@ use std::{
     time::Duration,
 };
 
-use infra::table::org_storage_providers::GcpCredentials;
+use infra::table::org_storage_providers::GcpServiceAccount;
 use object_store::gcp::GcpCredential;
 use serde::Deserialize;
 use tokio::sync::RwLock;
@@ -176,7 +176,7 @@ async fn get_sa_credentials(
 
 pub async fn get_gcp_from_service_account(
     org_id: &str,
-    config: GcpCredentials,
+    config: GcpServiceAccount,
 ) -> object_store::Result<object_store::gcp::GoogleCloudStorage> {
     let opts = object_store::ClientOptions::default()
         .with_connect_timeout(std::time::Duration::from_secs(30))

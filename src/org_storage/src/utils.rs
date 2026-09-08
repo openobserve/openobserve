@@ -18,7 +18,7 @@ use std::time::Duration;
 use bytes::Bytes;
 use config::get_config;
 use infra::table::org_storage_providers::{
-    AwsCredentials, AwsRoleArn, AzureCredentials, GcpCredentials,
+    AwsCredentials, AwsRoleArn, AzureCredentials, GcpServiceAccount,
 };
 use object_store::{ObjectStore, ObjectStoreExt};
 
@@ -124,8 +124,8 @@ pub fn _merge_aws_credentials(existing: &str, new: &str) -> Result<String, anyho
 }
 
 pub fn _merge_gcp_credentials(existing: &str, new: &str) -> Result<String, anyhow::Error> {
-    let mut existing: GcpCredentials = serde_json::from_str(existing)?;
-    let new: GcpCredentials = serde_json::from_str(new)?;
+    let mut existing: GcpServiceAccount = serde_json::from_str(existing)?;
+    let new: GcpServiceAccount = serde_json::from_str(new)?;
     if !new.service_account_name.is_empty() {
         existing.service_account_name = new.service_account_name;
     }
