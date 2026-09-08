@@ -5902,21 +5902,212 @@ async fn handle_slo_backfill_triggers(
     Ok(())
 }
 
+/// OSS runs no hygiene analysis, but it still pulls raman rows, so it must re-arm
+/// them: a handler that returns without finalizing leaves the row `Processing`
+/// forever and the lane silently stops draining.
 #[cfg(not(feature = "enterprise"))]
 async fn handle_raman_triggers(
-    _trace_id: &str,
-    _trigger: db::scheduler::Trigger,
+    trace_id: &str,
+    trigger: db::scheduler::Trigger,
 ) -> Result<(), anyhow::Error> {
+    let config = raman_config(&trigger.org, &trigger.module_key).await;
+    if raman_run_window_minutes(config.as_ref()).is_some() {
+        log::warn!(
+            "[raman] config {} is enabled but hygiene analysis is an enterprise feature; \
+             re-arming without a digest",
+            trigger.module_key
+        );
+    }
+    let next_run_at = raman_next_run_at(now_micros(), config.as_ref());
+    finalize_raman_trigger(trigger, next_run_at, trace_id).await
+}
+
+/// One hygiene pass over the org's own alerting history.
+///
+/// A run's failure is logged and not propagated: `handle_trigger` only logs what a
+/// handler returns, so an early return would leave the row `Processing` until the
+/// watcher reclaimed it, over and over, with nothing in the queue ever completing.
+#[cfg(feature = "enterprise")]
+async fn handle_raman_triggers(
+    trace_id: &str,
+    trigger: db::scheduler::Trigger,
+) -> Result<(), anyhow::Error> {
+    let config = raman_config(&trigger.org, &trigger.module_key).await;
+    if let Some(window_minutes) = raman_run_window_minutes(config.as_ref())
+        && let Err(e) = run_raman_digest(&trigger.org, &trigger.module_key, window_minutes).await
+    {
+        log::error!(
+            "[raman] digest run failed for {} org={}: {e}",
+            trigger.module_key,
+            trigger.org
+        );
+    }
+    let next_run_at = raman_next_run_at(now_micros(), config.as_ref());
+    finalize_raman_trigger(trigger, next_run_at, trace_id).await
+}
+
+/// Collect, judge, store, then project. The table is the system of record and the
+/// stream copy is governed by ordinary retention, so a failed projection must not
+/// cost the digest.
+#[cfg(feature = "enterprise")]
+async fn run_raman_digest(
+    org: &str,
+    config_id: &str,
+    window_minutes: i64,
+) -> Result<(), anyhow::Error> {
+    use o2_enterprise::enterprise::{
+        raman_collect::{
+            collector::{CollectionPlan, RamanCollector},
+            digest::{DigestKey, digest_row_now},
+            window::{effective_max_query_range_hours, window_ending_now},
+        },
+        raman_rules::engine::{default_rules, run},
+    };
+
+    let cluster = raman_cluster(
+        o2_enterprise::enterprise::common::config::get_config()
+            .super_cluster
+            .enabled,
+    );
+    // No per-stream override is consulted: the clamp is the only bound the search path has.
+    let plan =
+        CollectionPlan::new(org, window_ending_now(window_minutes)).with_max_query_range_hours(
+            effective_max_query_range_hours(0, get_config().limit.default_max_query_range_days),
+        );
+    let collection = crate::alerts::raman::RamanSearchAdapter
+        .collect(&plan)
+        .await
+        .map_err(|e| anyhow::anyhow!("{e}"))?;
+
+    let report = run(&default_rules(), &collection.context);
+    let row = digest_row_now(
+        DigestKey {
+            org,
+            config_id,
+            cluster: &cluster,
+            // The granted window, so a clamped run cannot claim the span it asked for.
+            window: collection.context.window,
+        },
+        &report,
+        &collection.coverage,
+    )?;
+
+    let digest = infra::table::raman::upsert_digest(
+        get_orm_client_rw().await,
+        infra::table::raman::NewDigest {
+            org: org.to_string(),
+            config_id: config_id.to_string(),
+            cluster,
+            window_start: row.window_start,
+            window_end: row.window_end,
+            generated_at: row.generated_at,
+            finding_count: row.finding_count as i32,
+            findings: json::from_str(&row.findings)?,
+            coverage_gap: row.coverage_gap,
+        },
+    )
+    .await
+    .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+
+    let records = raman_digest_records(&digest);
+    // The sink carries no branch of its own, so the empty guard lives here where a test runs.
+    if records.is_empty() {
+        return Ok(());
+    }
+    crate::alerts::raman::sink::write_digest_records(org, records).await
+}
+
+/// A read failure is reported as absence, never propagated: the scheduler only logs
+/// what a handler returns, so an unreadable config would strand the row in `Processing`
+/// instead of retrying it once the database answers again.
+async fn raman_config(
+    org: &str,
+    config_id: &str,
+) -> Option<infra::table::entity::raman_configs::Model> {
+    match infra::table::raman::get_by_id(get_orm_client_ro().await, org, config_id).await {
+        Ok(config) => config,
+        Err(e) => {
+            log::error!("[raman] could not read config {config_id} for org={org}: {e}");
+            None
+        }
+    }
+}
+
+/// `Waiting`, never `Completed`: the hygiene job is periodic and the row has to be
+/// re-claimable on its next due date.
+async fn finalize_raman_trigger(
+    mut trigger: db::scheduler::Trigger,
+    next_run_at: i64,
+    trace_id: &str,
+) -> Result<(), anyhow::Error> {
+    trigger.next_run_at = next_run_at;
+    trigger.status = db::scheduler::TriggerStatus::Waiting;
+    db::scheduler::update_trigger(trigger, true, trace_id).await?;
     Ok(())
 }
 
-// STUB: digest generation lands in a later step; wired now so no raman job is silently dropped.
-#[cfg(feature = "enterprise")]
-async fn handle_raman_triggers(
-    _trace_id: &str,
-    _trigger: db::scheduler::Trigger,
-) -> Result<(), anyhow::Error> {
-    Ok(())
+/// Measured from the end of the run, not its start, so a pass that overruns its own
+/// cadence re-arms one interval out instead of immediately.
+fn raman_next_run_at(now: i64, config: Option<&infra::table::entity::raman_configs::Model>) -> i64 {
+    const DEFAULT_FREQUENCY_MINUTES: i64 = 1440;
+    const RESYNC_SECS: i64 = 60;
+
+    // Absent means unsynced or unreadable, never deleted: a deletion takes the trigger too.
+    let Some(config) = config else {
+        return now.saturating_add(second_micros(RESYNC_SECS));
+    };
+    let minutes = if config.frequency_minutes > 0 {
+        i64::from(config.frequency_minutes)
+    } else {
+        DEFAULT_FREQUENCY_MINUTES
+    };
+    now.saturating_add(minutes.saturating_mul(60).saturating_mul(1_000_000))
+}
+
+/// The window an enabled config may analyse; a disabled or absent one may not run at all.
+fn raman_run_window_minutes(
+    config: Option<&infra::table::entity::raman_configs::Model>,
+) -> Option<i64> {
+    config
+        .filter(|config| config.enabled)
+        .map(|config| i64::from(config.window_minutes))
+}
+
+/// Empty outside a super-cluster, matching `raman_digests.cluster`: the column is part
+/// of the per-window unique key, so a renamed single cluster must not fork its digests.
+#[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
+fn raman_cluster(super_cluster_enabled: bool) -> String {
+    if super_cluster_enabled {
+        config::get_cluster_name()
+    } else {
+        String::new()
+    }
+}
+
+/// One stream record per finding, stamped at the analysed window's end.
+#[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
+fn raman_digest_records(digest: &infra::table::entity::raman_digests::Model) -> Vec<json::Value> {
+    let Some(findings) = digest.findings.get("findings").and_then(|v| v.as_array()) else {
+        return Vec::new();
+    };
+    findings
+        .iter()
+        .filter_map(|finding| finding.as_object())
+        .map(|finding| {
+            let mut record = finding.clone();
+            // Written last so the stored row's identity wins any collision with a finding field.
+            record.insert("_timestamp".to_string(), digest.window_end.into());
+            record.insert("digest_id".to_string(), digest.id.clone().into());
+            record.insert("org".to_string(), digest.org.clone().into());
+            record.insert("config_id".to_string(), digest.config_id.clone().into());
+            record.insert("cluster".to_string(), digest.cluster.clone().into());
+            record.insert("window_start".to_string(), digest.window_start.into());
+            record.insert("window_end".to_string(), digest.window_end.into());
+            record.insert("generated_at".to_string(), digest.generated_at.into());
+            record.insert("coverage_gap".to_string(), digest.coverage_gap.into());
+            json::Value::Object(record)
+        })
+        .collect()
 }
 
 fn publish_slo_pass(
@@ -7290,6 +7481,180 @@ mod tests {
                 composite_delivery_retry(0, -1, 1_000),
                 CompositeDelivery::GiveUp
             );
+        }
+    }
+
+    /// The raman hygiene job's schedule and projection decisions. These are the
+    /// only parts of the handler a test can execute: the handler itself is
+    /// `#[cfg(feature = "enterprise")]`, so neither CI runs it.
+    mod raman {
+        use infra::table::entity::{raman_configs, raman_digests};
+
+        use super::*;
+
+        const NOW: i64 = 1_760_000_000_000_000;
+        const MINUTE: i64 = 60 * 1_000_000;
+
+        fn config(
+            enabled: bool,
+            frequency_minutes: i32,
+            window_minutes: i32,
+        ) -> raman_configs::Model {
+            raman_configs::Model {
+                id: "cfg1".to_string(),
+                org: "default".to_string(),
+                enabled,
+                frequency_minutes,
+                window_minutes,
+                rule_overrides: None,
+                created_at: Some(NOW),
+                updated_at: Some(NOW),
+            }
+        }
+
+        fn digest(findings: serde_json::Value) -> raman_digests::Model {
+            raman_digests::Model {
+                id: "dig1".to_string(),
+                org: "default".to_string(),
+                config_id: "cfg1".to_string(),
+                cluster: String::new(),
+                window_start: NOW - 60 * MINUTE,
+                window_end: NOW,
+                generated_at: NOW + 1,
+                finding_count: 0,
+                findings,
+                coverage_gap: true,
+            }
+        }
+
+        fn payload(findings: serde_json::Value) -> serde_json::Value {
+            serde_json::json!({ "version": 1, "findings": findings, "skips": [] })
+        }
+
+        #[test]
+        fn the_cadence_comes_from_the_config_row_and_not_from_a_constant() {
+            assert_eq!(
+                raman_next_run_at(NOW, Some(&config(true, 30, 60))),
+                NOW + 30 * MINUTE
+            );
+            assert_eq!(
+                raman_next_run_at(NOW, Some(&config(true, 1440, 60))),
+                NOW + 1440 * MINUTE
+            );
+        }
+
+        #[test]
+        fn a_disabled_config_is_still_re_armed_at_its_own_cadence() {
+            assert_eq!(
+                raman_next_run_at(NOW, Some(&config(false, 30, 60))),
+                NOW + 30 * MINUTE
+            );
+        }
+
+        #[test]
+        fn a_config_the_region_cannot_see_yet_is_retried_a_minute_out() {
+            assert_eq!(raman_next_run_at(NOW, None), NOW + MINUTE);
+        }
+
+        #[test]
+        fn a_non_positive_cadence_falls_back_to_the_daily_column_default() {
+            for frequency in [0, -1, i32::MIN] {
+                assert_eq!(
+                    raman_next_run_at(NOW, Some(&config(true, frequency, 60))),
+                    NOW + 1440 * MINUTE,
+                    "a corrupt cadence of {frequency} must not re-arm in the past"
+                );
+            }
+        }
+
+        #[test]
+        fn every_re_armed_trigger_is_scheduled_strictly_in_the_future() {
+            for row in [None, Some(config(true, 5, 60)), Some(config(false, 0, 60))] {
+                assert!(raman_next_run_at(NOW, row.as_ref()) > NOW);
+            }
+        }
+
+        #[test]
+        fn a_disabled_config_may_not_run_analysis() {
+            assert_eq!(raman_run_window_minutes(Some(&config(false, 30, 60))), None);
+        }
+
+        #[test]
+        fn a_missing_config_may_not_run_analysis() {
+            assert_eq!(raman_run_window_minutes(None), None);
+        }
+
+        #[test]
+        fn an_enabled_config_is_analysed_over_the_window_it_declares() {
+            assert_eq!(
+                raman_run_window_minutes(Some(&config(true, 1440, 43200))),
+                Some(43200)
+            );
+        }
+
+        #[test]
+        fn a_single_cluster_deployment_keys_its_digests_on_an_empty_cluster() {
+            assert_eq!(raman_cluster(false), "");
+        }
+
+        #[test]
+        fn a_digest_with_no_findings_projects_no_records() {
+            assert!(raman_digest_records(&digest(payload(serde_json::json!([])))).is_empty());
+        }
+
+        #[test]
+        fn a_payload_without_a_findings_array_projects_no_records() {
+            assert!(raman_digest_records(&digest(serde_json::json!({ "version": 1 }))).is_empty());
+            assert!(raman_digest_records(&digest(serde_json::json!("corrupt"))).is_empty());
+        }
+
+        #[test]
+        fn one_record_is_projected_for_every_finding() {
+            let records = raman_digest_records(&digest(payload(serde_json::json!([
+                { "rule_id": "silent", "title": "a" },
+                { "rule_id": "noise", "title": "b" },
+            ]))));
+            assert_eq!(records.len(), 2);
+            assert_eq!(records[0]["rule_id"], "silent");
+            assert_eq!(records[1]["title"], "b");
+        }
+
+        #[test]
+        fn every_projected_record_carries_the_digest_row_identity() {
+            let records = raman_digest_records(&digest(payload(serde_json::json!([
+                { "rule_id": "silent" }
+            ]))));
+            let record = &records[0];
+            assert_eq!(record["digest_id"], "dig1");
+            assert_eq!(record["org"], "default");
+            assert_eq!(record["config_id"], "cfg1");
+            assert_eq!(record["cluster"], "");
+            assert_eq!(record["window_start"], NOW - 60 * MINUTE);
+            assert_eq!(record["window_end"], NOW);
+            assert_eq!(record["generated_at"], NOW + 1);
+            assert_eq!(record["coverage_gap"], true);
+            assert_eq!(record["_timestamp"], NOW);
+        }
+
+        /// The stored row is the system of record, so its identity must win over a
+        /// same-named field a future rule could put in a finding.
+        #[test]
+        fn the_digest_identity_overrides_a_colliding_finding_field() {
+            let records = raman_digest_records(&digest(payload(serde_json::json!([
+                { "rule_id": "silent", "org": "spoofed", "_timestamp": 1 }
+            ]))));
+            assert_eq!(records[0]["org"], "default");
+            assert_eq!(records[0]["_timestamp"], NOW);
+        }
+
+        #[test]
+        fn a_finding_that_is_not_an_object_is_dropped_rather_than_projected() {
+            let records = raman_digest_records(&digest(payload(serde_json::json!([
+                "not an object",
+                { "rule_id": "noise" },
+            ]))));
+            assert_eq!(records.len(), 1);
+            assert_eq!(records[0]["rule_id"], "noise");
         }
     }
 }

@@ -17,8 +17,9 @@
 //!
 //! Self-ingests already-shaped digest records into the per-org
 //! `_o2_raman_digests` stream, mirroring
-//! `traces::agent_signals::aggregator::write_agent_signals`. Record shaping
-//! lives in the enterprise crate and this file holds no branch on purpose:
+//! `traces::agent_signals::aggregator::write_agent_signals`. Record shaping is
+//! `raman_digest_records` in the scheduler handler — ungated, so a test can run
+//! it. This file holds no branch on purpose:
 //! `alerts::raman` is enterprise-gated, so everything here is compiled by
 //! enterprise CI but exercised by no test suite in either edition.
 
