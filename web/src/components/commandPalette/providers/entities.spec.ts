@@ -176,7 +176,7 @@ describe("createEntityProviders", () => {
     ).toEqual(["function:f2"]);
   });
 
-  it("lists streams from the store when warm and searches each type by keyword", async () => {
+  it("lists streams once on open and only searches types too large to list", async () => {
     const state = {
       streams: {
         logs: { list: [{ name: "l", stream_type: "logs" }] },
@@ -185,18 +185,27 @@ describe("createEntityProviders", () => {
       },
     };
     const p = createEntityProviders(ctx({ state })).find((x) => x.id === "streams")!;
-    expect((await p.list!(new AbortController().signal)).map((i) => i.id)).toEqual([
+    searchStreams.mockImplementation(async (type: string) =>
+      type === "metrics"
+        ? { list: [{ name: "m" }], total: 5000 }
+        : { list: [{ name: "t" }], total: 1 },
+    );
+    const listed = await p.list!(new AbortController().signal);
+    expect(listed.map((i) => i.id).sort()).toEqual([
       "stream:logs/l",
+      "stream:metrics/m",
+      "stream:traces/t",
     ]);
-    searchStreams.mockResolvedValue({ list: [{ name: "x" }] });
-    const found = await p.search!("x", new AbortController().signal);
-    expect(searchStreams).toHaveBeenCalledTimes(3);
-    expect(searchStreams).toHaveBeenCalledWith("logs", "x", 20);
-    expect(found.map((i) => i.id).sort()).toEqual([
-      "stream:logs/x",
-      "stream:metrics/x",
-      "stream:traces/x",
-    ]);
+    expect(searchStreams).toHaveBeenCalledTimes(2);
+    expect(searchStreams).toHaveBeenCalledWith("metrics", "", 1000);
+    searchStreams.mockClear();
+    expect(await p.search!("x", new AbortController().signal)).toEqual([]);
+    expect(searchStreams).not.toHaveBeenCalled();
+    searchStreams.mockResolvedValue({ list: [{ name: "xm" }] });
+    const found = await p.search!("xm", new AbortController().signal);
+    expect(searchStreams).toHaveBeenCalledTimes(1);
+    expect(searchStreams).toHaveBeenCalledWith("metrics", "xm", 20);
+    expect(found.map((i) => i.id)).toEqual(["stream:metrics/xm"]);
   });
 
   it("maps people rows and gates them on the IAM rail link", async () => {

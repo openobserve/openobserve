@@ -19,7 +19,10 @@ import type { EntityProviderContext } from "./context";
 
 export type SearchableStreamType = "logs" | "metrics" | "traces";
 export const STREAM_TYPES: SearchableStreamType[] = ["logs", "metrics", "traces"];
+// One page per type on open; only a type with more streams than this needs live search.
+export const LIST_PAGE = 1000;
 const SEARCH_LIMIT = 20;
+const MIN_SEARCH_LENGTH = 2;
 
 interface StreamRow {
   name: string;
@@ -50,24 +53,38 @@ export function streamToItem(row: StreamRow, typeLabel: string): PaletteItem {
   };
 }
 
-/** Warm from the streams store when it is populated; otherwise keyword search per type. */
+/** Lists every stream once on open; live keyword search runs only for types too large to list. */
 export function createStreamsProvider(ctx: EntityProviderContext): EntityProvider {
   const typeLabel = (type: SearchableStreamType) => String(ctx.t(`palette.streamTypes.${type}`));
-  const cached = (type: SearchableStreamType): StreamRow[] =>
-    ctx.store.state.streams?.[type]?.list ?? [];
+  const cached = (type: SearchableStreamType): StreamRow[] | null =>
+    ctx.store.state.streams?.[type]?.list ?? null;
+  const oversized = new Set<SearchableStreamType>();
+  const toItems = (type: SearchableStreamType, rows: StreamRow[]) =>
+    rows.map((row) => streamToItem({ ...row, stream_type: type }, typeLabel(type)));
+
   return {
     id: "streams",
     scope: "stream",
     enabled: () => ctx.hasRoute("logs"),
-    list: async () =>
-      STREAM_TYPES.flatMap((type) => cached(type).map((row) => streamToItem(row, typeLabel(type)))),
-    search: async (query) => {
-      const results = await Promise.all(
+    list: async () => {
+      const perType = await Promise.all(
         STREAM_TYPES.map(async (type) => {
+          const warm = cached(type);
+          if (warm) return toItems(type, warm);
+          const res = await ctx.searchStreams(type, "", LIST_PAGE);
+          const rows = res?.list ?? [];
+          if ((res?.total ?? rows.length) > rows.length) oversized.add(type);
+          return toItems(type, rows);
+        }),
+      );
+      return perType.flat();
+    },
+    search: async (query) => {
+      if (oversized.size === 0 || query.length < MIN_SEARCH_LENGTH) return [];
+      const results = await Promise.all(
+        [...oversized].map(async (type) => {
           const res = await ctx.searchStreams(type, query, SEARCH_LIMIT);
-          return (res?.list ?? []).map((row) =>
-            streamToItem({ ...row, stream_type: type }, typeLabel(type)),
-          );
+          return toItems(type, res?.list ?? []);
         }),
       );
       return results.flat();

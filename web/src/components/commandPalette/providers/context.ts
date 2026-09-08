@@ -29,5 +29,9 @@ export interface EntityProviderContext {
   /** Names of the rail links currently shown; the rail already applied role and config gates. */
   navNames: Set<string>;
   /** Keyword search for one stream type; created inside a component setup because useStreams needs the store. */
-  searchStreams(type: string, query: string, limit: number): Promise<{ list?: StreamSearchRow[] }>;
+  searchStreams(
+    type: string,
+    query: string,
+    limit: number,
+  ): Promise<{ list?: StreamSearchRow[]; total?: number }>;
 }
