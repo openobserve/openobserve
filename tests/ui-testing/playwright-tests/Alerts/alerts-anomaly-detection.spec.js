@@ -14,6 +14,7 @@
 // rejects a spec listed in both the base and the overlay — and registered in
 // o2-enterprise's ci_matrix.ent.json under `append.Alerts` instead.
 
+const http = require('http');
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
@@ -667,6 +668,35 @@ test.describe('Anomaly Detection', () => {
   // ════════════════════════════════════════════════════════════════════════
 
   test.describe('End to end detection', () => {
+    // A receiver the test owns, so delivery is proved from the wire rather than
+    // inferred. Mirrors alerts-content-templates.spec.js. Needs the backend to
+    // reach 127.0.0.1 of this runner AND loopback allowlisted
+    // (ZO_SSRF_ALLOW_LOOPBACK) — true in CI, false against a remote env, where
+    // the destination create is refused and the delivery check stands down.
+    let receiver;
+    let receiverPort;
+    let received;
+
+    test.beforeAll(async () => {
+      received = [];
+      receiver = http.createServer((req, res) => {
+        let body = '';
+        req.on('data', (c) => { body += c; });
+        req.on('end', () => {
+          received.push({ url: req.url, body });
+          res.writeHead(200, { 'Content-Type': 'text/plain' });
+          res.end('ok');
+        });
+      });
+      await new Promise((resolve) => receiver.listen(0, '127.0.0.1', resolve));
+      receiverPort = receiver.address().port;
+      testLogger.info('Started in-test HTTP receiver', { receiverPort });
+    });
+
+    test.afterAll(async () => {
+      if (receiver) await new Promise((resolve) => receiver.close(resolve));
+    });
+
 
     const firingName = anomalyName('fire');
     const seededStream = `anomaly_e2e_${randomValue}`;
@@ -709,9 +739,27 @@ test.describe('Anomaly Detection', () => {
       await pm.anomalyDetectionPage.setTrainingWindow(1);
       await pm.anomalyDetectionPage.selectSensitivityTier(95);
 
+      // Prefer a destination aimed at the in-test receiver; the SSRF guard
+      // refuses a private ip unless loopback is allowlisted, so fall back to
+      // the shared destination and leave delivery unasserted where it is not.
+      received.length = 0;
+      const sinkName = `e2e_anomaly_sink_${randomValue}`;
+      const sink = await createMockDestination(page, sinkName, prerequisiteTemplateName, {
+        url: `http://127.0.0.1:${receiverPort}/anomaly`,
+      });
+      const deliveryAssertable = sink.status === 200;
+      if (!deliveryAssertable) {
+        testLogger.info('Loopback destination refused; delivery will not be asserted', {
+          status: sink.status,
+          body: JSON.stringify(sink.data),
+        });
+      }
+
       await pm.anomalyDetectionPage.openAlertingTab();
       await pm.anomalyDetectionPage.toggleNotifications(true);
-      await pm.anomalyDetectionPage.selectDestinations([prerequisiteDestinationName]);
+      await pm.anomalyDetectionPage.selectDestinations([
+        deliveryAssertable ? sinkName : prerequisiteDestinationName,
+      ]);
       await pm.anomalyDetectionPage.saveAndExpectSuccess();
 
       const configs = await listAnomalyDetections(page);
@@ -784,29 +832,19 @@ test.describe('Anomaly Detection', () => {
       expect(Math.max(...flagged.map((r) => r.anomaly_value))).toBe(120);
 
       // Delivery. The notification is sent inline by the detection run, so a
-      // regression that stops it would otherwise pass every assertion above.
-      //
-      // Readable only when the destination points back at this instance's own
-      // ingest endpoint, which turns a delivered alert into a queryable row.
-      // That needs loopback allowlisted (ZO_SSRF_ALLOW_LOOPBACK), so it is a
-      // CI-only enhancement: the default destination is example.com, which the
-      // SSRF guard accepts everywhere but nothing can read back. Skipped rather
-      // than faked there — no other spec asserts webhook delivery at all, and a
-      // green check that proves nothing would be worse than an honest gap.
-      const webhook = process.env.MOCK_WEBHOOK_URL || '';
-      const receiptStream = webhook.match(/\/api\/[^/]+\/([^/]+)\/_json/)?.[1];
-      if (/localhost|127\.0\.0\.1/.test(webhook) && receiptStream) {
+      // regression that stops it would pass every assertion above. Asserting it
+      // from the wire is the only way to know it actually left the process.
+      if (deliveryAssertable) {
         await expect
-          .poll(
-            async () =>
-              (await searchSql(page, `SELECT * FROM "${receiptStream}"`, 3600)).filter((r) =>
-                JSON.stringify(r).includes(firingName),
-              ).length,
-            { timeout: 60000, message: `no webhook receipt for ${firingName} in ${receiptStream}` },
-          )
+          .poll(() => received.length, {
+            timeout: 60000,
+            message: `no webhook delivered to the in-test receiver for ${firingName}`,
+          })
           .toBeGreaterThan(0);
+        const delivered = received.map((r) => r.body).join('\n');
+        expect(delivered, 'the payload must name the anomaly that fired').toContain(firingName);
       } else {
-        testLogger.info('Skipping delivery receipt — webhook is not a loopback ingest URL', { webhook });
+        testLogger.info('Delivery not asserted — the backend cannot reach this runner');
       }
     });
   });

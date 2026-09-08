@@ -66,7 +66,7 @@ function getOrgName() {
  * @param {string} [template='Slack'] - Template type
  * @returns {Promise<{status: number, data: any}>}
  */
-async function createMockDestination(page, name, template = 'Slack') {
+async function createMockDestination(page, name, template = 'Slack', opts = {}) {
   const org = getOrgName();
   // Defaults to example.com, matching the convention documented in
   // alerts-advanced.spec.js: it is IANA-reserved, resolves to a PUBLIC ip so
@@ -78,7 +78,7 @@ async function createMockDestination(page, name, template = 'Slack') {
   // MOCK_WEBHOOK_URL overrides it where loopback is allowlisted
   // (ZO_SSRF_ALLOW_LOOPBACK in CI); a self-ingest URL there turns a delivered
   // alert into a queryable receipt, which is what makes delivery assertable.
-  const finalUrl = process.env.MOCK_WEBHOOK_URL || 'https://example.com/webhook';
+  const finalUrl = opts.url || process.env.MOCK_WEBHOOK_URL || 'https://example.com/webhook';
   const payload = {
     name,
     template,
