@@ -37,7 +37,7 @@ use config::{
         stream::StreamType,
     },
     utils::{
-        base64,
+        base64, flatten,
         json::{Map, Value},
     },
 };
@@ -180,6 +180,11 @@ pub enum AlertError {
 
     #[error("Stream {stream_name} not found")]
     StreamNotFound { stream_name: String },
+
+    #[error(
+        "Condition column `{column}` can never match: ingestion stores that field as `{stored_as}`"
+    )]
+    ConditionColumnNeverStored { column: String, stored_as: String },
 
     /// Feature 5 (SA-3 … SA-19). Rendered from the inner error, which names
     /// its own bound so the 400 is actionable.
@@ -387,6 +392,32 @@ fn validate_multi_alert_config(alert: &Alert) -> Result<(), AlertError> {
         return Err(AlertError::InvalidMultiAlert(
             config::meta::alerts::grouping::MultiAlertError::NotificationGroupingUnsupported,
         ));
+    }
+    Ok(())
+}
+
+/// Refuse a Custom condition on a column ingestion could never store under
+/// that name: `flatten::format_key` rewrites every ingested field name, so the
+/// alert would fail (scheduled) or stay silent (realtime) on every evaluation.
+// Sync like `validate_multi_alert_config`, so `result_large_err` needs the same allow.
+#[allow(clippy::result_large_err)]
+fn validate_condition_columns(alert: &Alert) -> Result<(), AlertError> {
+    let Some(conditions) = alert.query_condition.conditions.as_ref() else {
+        return Ok(());
+    };
+    for column in conditions.columns() {
+        // Empty is the draft-workflow placeholder `evaluate` treats as always true.
+        if column.is_empty() {
+            continue;
+        }
+        let mut stored_as = column.to_owned();
+        flatten::format_key(&mut stored_as);
+        if stored_as != column {
+            return Err(AlertError::ConditionColumnNeverStored {
+                column: column.to_owned(),
+                stored_as,
+            });
+        }
     }
     Ok(())
 }
@@ -842,6 +873,7 @@ async fn prepare_alert(
         {
             return Err(AlertError::PromqlMissingQuery);
         }
+        QueryType::Custom => validate_condition_columns(alert)?,
         _ => {}
     }
 
@@ -5601,6 +5633,96 @@ mod tests {
         assert_eq!(arr[1]["user"], "Bob");
     }
 
+    // ── Condition columns as `prepare_alert` checks them ───────────────────
+    // Same scope caveat as the per-group rules above: these pin the rule
+    // through the production function, not that `prepare_alert` calls it.
+
+    use super::validate_condition_columns;
+
+    /// A Custom alert whose v1 condition list names the given columns.
+    fn custom_alert_on(columns: &[&str]) -> Alert {
+        let mut alert = Alert::default();
+        alert.query_condition.query_type = config::meta::alerts::QueryType::Custom;
+        alert.query_condition.conditions = Some(config::meta::alerts::AlertConditionParams::V1(
+            config::meta::alerts::ConditionList::LegacyConditions(
+                columns
+                    .iter()
+                    .map(|column| config::meta::alerts::Condition {
+                        column: column.to_string(),
+                        operator: config::meta::alerts::Operator::EqualTo,
+                        value: json!("4624"),
+                        ignore_case: false,
+                    })
+                    .collect(),
+            ),
+        ));
+        alert
+    }
+
+    #[test]
+    fn test_condition_columns_ingestion_keeps_as_written_pass() {
+        let alert = custom_alert_on(&["eventid", "k8s_pod_name", "_timestamp"]);
+        assert!(validate_condition_columns(&alert).is_ok());
+    }
+
+    #[test]
+    fn test_condition_columns_absent_pass() {
+        assert!(validate_condition_columns(&Alert::default()).is_ok());
+    }
+
+    /// The spelling from openobserve#14131: QRadar sends `EventID`, ingestion
+    /// stores `eventid`, and the alert never matched a single row.
+    #[test]
+    fn test_condition_column_ingestion_would_rewrite_is_rejected_with_the_stored_name() {
+        let err =
+            validate_condition_columns(&custom_alert_on(&["eventid", "EventID"])).unwrap_err();
+        assert!(
+            matches!(
+                &err,
+                AlertError::ConditionColumnNeverStored { column, stored_as }
+                    if column.as_str() == "EventID" && stored_as.as_str() == "eventid"
+            ),
+            "got: {err}"
+        );
+    }
+
+    #[test]
+    fn test_condition_column_in_a_nested_v2_group_is_checked() {
+        let condition = |column: &str| {
+            config::meta::alerts::ConditionItem::Condition(
+                config::meta::alerts::ConditionItemCondition {
+                    column: column.to_string(),
+                    operator: config::meta::alerts::Operator::EqualTo,
+                    value: json!("x"),
+                    ignore_case: None,
+                    logical_operator: config::meta::alerts::LogicalOperator::And,
+                },
+            )
+        };
+        let mut alert = Alert::default();
+        alert.query_condition.conditions = Some(config::meta::alerts::AlertConditionParams::V2(
+            config::meta::alerts::ConditionGroup {
+                filter_type: "group".to_string(),
+                logical_operator: config::meta::alerts::LogicalOperator::And,
+                conditions: vec![
+                    condition("level"),
+                    config::meta::alerts::ConditionItem::Group {
+                        logical_operator: config::meta::alerts::LogicalOperator::Or,
+                        conditions: vec![condition("trace.id")],
+                    },
+                ],
+            },
+        ));
+        let err = validate_condition_columns(&alert).unwrap_err();
+        assert!(err.to_string().contains("`trace_id`"), "got: {err}");
+    }
+
+    /// Empty is the draft-workflow placeholder, which `evaluate` accepts.
+    #[test]
+    fn test_empty_condition_column_is_not_rejected_here() {
+        assert!(validate_condition_columns(&custom_alert_on(&[""])).is_ok());
+    }
+
     // ── update_cron_expression ──────────────────────────────────────────────
 
     #[test]
@@ -5966,6 +6088,15 @@ mod tests {
             stream_name: "my_stream".to_string(),
         };
         assert_eq!(e.to_string(), "Stream my_stream not found");
+
+        let e = AlertError::ConditionColumnNeverStored {
+            column: "EventID".to_string(),
+            stored_as: "eventid".to_string(),
+        };
+        assert_eq!(
+            e.to_string(),
+            "Condition column `EventID` can never match: ingestion stores that field as `eventid`"
+        );
 
         let e = AlertError::AlertTemplateNotFound {
             template: "default_tpl".to_string(),

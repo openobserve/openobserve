@@ -683,6 +683,19 @@ impl ConditionList {
             ConditionList::EndCondition(_) => true,
         }
     }
+
+    /// Every column the tree references, in evaluation order, duplicates kept.
+    pub fn columns(&self) -> Vec<&str> {
+        match self {
+            ConditionList::OrNode { or } => or.iter().flat_map(ConditionList::columns).collect(),
+            ConditionList::AndNode { and } => and.iter().flat_map(ConditionList::columns).collect(),
+            ConditionList::NotNode { not } => not.columns(),
+            ConditionList::LegacyConditions(conditions) => {
+                conditions.iter().map(|c| c.column.as_str()).collect()
+            }
+            ConditionList::EndCondition(condition) => vec![condition.column.as_str()],
+        }
+    }
 }
 
 // Define a separate iterator struct for ConditionList
@@ -1008,6 +1021,15 @@ impl ConditionItem {
             } => logical_operator,
         }
     }
+
+    pub fn columns(&self) -> Vec<&str> {
+        match self {
+            ConditionItem::Condition(v) => vec![v.column.as_str()],
+            ConditionItem::Group { conditions, .. } => {
+                conditions.iter().flat_map(ConditionItem::columns).collect()
+            }
+        }
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize, ToSchema)]
@@ -1031,6 +1053,13 @@ impl ConditionGroup {
     /// Checks if the condition group has conditions
     pub fn has_conditions(&self) -> bool {
         !self.conditions.is_empty()
+    }
+
+    pub fn columns(&self) -> Vec<&str> {
+        self.conditions
+            .iter()
+            .flat_map(ConditionItem::columns)
+            .collect()
     }
 
     /// Validates the condition group structure
@@ -1057,6 +1086,15 @@ pub enum AlertConditionParams {
     V1(ConditionList),
     /// v2 format: Linear ConditionGroup (version: 2)
     V2(ConditionGroup),
+}
+
+impl AlertConditionParams {
+    pub fn columns(&self) -> Vec<&str> {
+        match self {
+            AlertConditionParams::V1(conditions) => conditions.columns(),
+            AlertConditionParams::V2(group) => group.columns(),
+        }
+    }
 }
 
 impl MemorySize for AlertConditionParams {
@@ -2680,6 +2718,61 @@ mod test {
             })],
         };
         assert!(group.validate().is_ok());
+    }
+
+    #[test]
+    fn test_condition_list_columns_walks_every_node_kind() {
+        let condition = |column: &str| Condition {
+            column: column.to_string(),
+            operator: Operator::EqualTo,
+            value: serde_json::Value::String("x".to_string()),
+            ignore_case: false,
+        };
+        let tree = ConditionList::AndNode {
+            and: vec![
+                ConditionList::EndCondition(condition("a")),
+                ConditionList::NotNode {
+                    not: Box::new(ConditionList::OrNode {
+                        or: vec![
+                            ConditionList::EndCondition(condition("b")),
+                            ConditionList::LegacyConditions(vec![condition("c"), condition("a")]),
+                        ],
+                    }),
+                },
+            ],
+        };
+        assert_eq!(
+            AlertConditionParams::V1(tree).columns(),
+            vec!["a", "b", "c", "a"]
+        );
+    }
+
+    #[test]
+    fn test_condition_group_columns_walks_nested_groups() {
+        let condition = |column: &str| {
+            ConditionItem::Condition(ConditionItemCondition {
+                column: column.to_string(),
+                operator: Operator::EqualTo,
+                value: serde_json::Value::String("x".to_string()),
+                ignore_case: None,
+                logical_operator: LogicalOperator::And,
+            })
+        };
+        let group = ConditionGroup {
+            filter_type: "group".to_string(),
+            logical_operator: LogicalOperator::And,
+            conditions: vec![
+                condition("a"),
+                ConditionItem::Group {
+                    logical_operator: LogicalOperator::Or,
+                    conditions: vec![condition("b"), condition("c")],
+                },
+            ],
+        };
+        assert_eq!(
+            AlertConditionParams::V2(group).columns(),
+            vec!["a", "b", "c"]
+        );
     }
 
     #[test]

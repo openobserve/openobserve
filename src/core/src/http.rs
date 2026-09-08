@@ -91,6 +91,7 @@ impl From<AlertError> for Response {
             | AlertError::AlertIdMissing
             | AlertError::PendingPeriodOnRealtimeAlert
             | AlertError::NegativePendingPeriod
+            | AlertError::ConditionColumnNeverStored { .. }
             | AlertError::MultiAlertGroupingError(_) => MetaHttpResponse::bad_request(value),
             // S-16 PR 4. A conflict, not a bad request: the alert being sent is
             // fine on its own terms — it is the SLOs that already exist and
