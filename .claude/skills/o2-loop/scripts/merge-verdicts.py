@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""Merge a codex and a claude verdict for one round into a single verdict on stdout: argv = <round> <codex.json> <claude.json>."""
+"""Merge a codex and a claude verdict for one round into one verdict on stdout: argv = <round> <codex.json> <claude.json> [<ledger>]."""
 import json
+import os
 import sys
 
 SEVERITY_RANK = {"critical": 0, "high": 1, "medium": 2, "low": 3}
@@ -57,12 +58,27 @@ def merge_findings(codex, claude):
     return merged
 
 
-def merge_prior(codex, claude):
+def alias_map(ledger, rnd):
+    """also_reported_as -> canonical id, from every earlier round's merged verdict in the ledger."""
+    aliases = {}
+    if not ledger:
+        return aliases
+    for r in range(1, rnd):
+        path = os.path.join(ledger, f"round-{r}", "verdict.json")
+        if not os.path.exists(path):
+            continue
+        for f in load(path).get("findings", []):
+            if f.get("also_reported_as"):
+                aliases[f["also_reported_as"]] = f["id"]
+    return aliases
+
+
+def merge_prior(codex, claude, aliases):
     """A prior finding closes only when both reviewers examined it and neither still sees it; one vote keeps it open."""
     by_id = {}
     for backend, items in (("codex", codex), ("claude", claude)):
         for p in items:
-            by_id.setdefault(p["id"], {})[backend] = p
+            by_id.setdefault(aliases.get(p["id"], p["id"]), {})[backend] = p
     out = []
     for fid, votes in by_id.items():
         statuses = {v["status"] for v in votes.values()}
@@ -84,7 +100,8 @@ def main():
     rnd = int(sys.argv[1])
     codex, claude = load(sys.argv[2]), load(sys.argv[3])
     findings = merge_findings(renumber(codex["findings"], "codex", rnd), renumber(claude["findings"], "claude", rnd))
-    prior = merge_prior(codex["prior_findings"], claude["prior_findings"])
+    ledger = sys.argv[4] if len(sys.argv) > 4 else None
+    prior = merge_prior(codex["prior_findings"], claude["prior_findings"], alias_map(ledger, rnd))
     verdict = "approve" if codex["verdict"] == "approve" and claude["verdict"] == "approve" else "request_changes"
     out = {
         "verdict": verdict,

@@ -21,6 +21,7 @@ The orchestrator does not edit code and does not review code. If it finds itself
 - The plan was discussed with the user and confirmed.
 - A reviewer backend is reachable. `review.sh` picks one (`--backend auto`, the default): Codex when its CLI is present (`codex` on PATH or bundled in ChatGPT.app), otherwise a sandboxed `claude -p` with a loud warning. Pass `--backend claude` only when the user asks. `--backend both` runs Codex and Claude on the same commit in parallel and merges their verdicts: request_changes if either says so, findings numbered `CX<round>-<n>` and `CL<round>-<n>` (near-duplicates merged and marked with both sources), and every finding goes to both reviewers in the next round so each verifies the other's. Use it when the user asks for a cross-check or when the change is risky enough to pay for two reviews (roughly the cost of a Claude round plus a Codex round, wall time of the slower one). The Claude backend needs macOS `sandbox-exec`; `--unsandboxed` overrides only when the user says so. If no backend exists, stop and tell the user.
 - The ledger lives outside the repo at `~/.claude/o2-loop/<repo>/<branch-slug>/`; the scripts derive it. Nothing from it is ever committed.
+- One loop per checkout and branch at a time. Two sessions working on the same repository each use their own `git worktree`; the loop does not lock anything.
 
 ## Ledger layout
 
@@ -43,6 +44,7 @@ Scripts, all under `<skill dir>/scripts/` (this SKILL.md's directory):
 
 - `review.sh --round N [--backend auto|codex|claude|both] [--also <checkout> ...]`: freezes the tree (and every `--also` checkout) as `wip(o2-loop): round N`, runs one reviewer round in disposable worktrees (two reviewers in parallel with `both`), writes `verdict.json`. Exit 0 approve, 10 request_changes, 1 failure. `--help` lists every flag.
 - `loop-state.py [--cap 5]`: reads the ledger and prints `ACTION:` with the single next step. Run it after every step; do not decide the next step yourself.
+- `selftest.py`: regression cases for the state machine and the verdict merge; run it after editing either script.
 
 ## Procedure
 
@@ -96,7 +98,7 @@ git reset --soft <merge-base> && git commit
 
 - The orchestrator never edits the change and never reviews it; the coder never commits; the reviewer never writes. Each role's value comes from not doing the others' work.
 - The reviewer sees only the ledger and the frozen commit. Never paste the discussion or this session's reasoning into evidence, spec, or responses to steer it.
-- The Claude backend runs inside a disposable worktree under a deny-by-default seatbelt (no MCP servers, no Write/Edit, no web, read-only git and file commands), with candidates from a separate `code-review` pre-run that the reviewer must confirm before adopting. Codex is preferred because it is a different vendor's model; when the Claude backend reviews, say so in the report and pass `--model` so the reviewer differs from the coder's model.
+- The Claude backend runs inside a disposable worktree under a deny-by-default seatbelt (no MCP servers, no Write/Edit, no web tools), with candidates from a separate `code-review` pre-run that the reviewer must confirm before adopting. Its pre-approved Bash commands include git, grep, sed, awk, find, python3 and bash; the seatbelt, not the allow list, is what keeps writes inside temp directories, and `--unsandboxed` removes that containment entirely. Codex is preferred because it is a different vendor's model; when the Claude backend reviews, say so in the report and pass `--model` so the reviewer differs from the coder's model.
 - Never lower the reviewer's effort or budget to get an approve. The defaults (Codex `high`, Claude 15 dollars per round) are the loop; the flags exist for debugging.
 - A round that already has a `verdict.json` cannot be rerun; a redo takes the next round number.
 - Never amend, reset, or rebase a WIP commit while the loop runs; later rounds diff against them.

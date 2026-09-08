@@ -194,6 +194,7 @@ resolve_paths() {
     branch_slug="$(git rev-parse --abbrev-ref HEAD | tr '/' '-')"
     LEDGER="$HOME/.claude/o2-loop/$REPO_NAME/$branch_slug"
   fi
+  LEDGER="$(realpath_of "$LEDGER")"
   local also
   for also in ${ALSO_REPOS[@]+"${ALSO_REPOS[@]}"}; do
     git -C "$also" rev-parse --show-toplevel >/dev/null 2>&1 || die "--also $also is not a git checkout"
@@ -203,7 +204,6 @@ resolve_paths() {
       "$(realpath_of "$(git -C "$also" rev-parse --show-toplevel)")"/*) die "ledger $LEDGER is inside the paired checkout $also; it would be swept into its WIP commit" ;;
     esac
   done
-  LEDGER="$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$LEDGER")"
   case "$LEDGER/" in
     "$REPO"/*) die "ledger $LEDGER is inside the checkout; it would be swept into the WIP commit. Use a path outside the repo." ;;
   esac
@@ -378,7 +378,7 @@ run_with_timeout() {
   fi
 }
 
-# Containment is the worktree plus seatbelt; the pre-approved commands can write only to temp dirs, and python3/bash may reach the network (accepted).
+# Containment is the seatbelt (nothing under --unsandboxed); the allow list only spares approval prompts, and python3/bash may reach the network (accepted).
 claude_common_args() {
   printf '%s\n' --restricted --strict-mcp-config --mcp-config '{"mcpServers":{}}' --model "$MODEL" \
     --max-budget-usd "$1" --add-dir "$ROUND_DIR" \
@@ -410,6 +410,11 @@ gather_candidates() {
   REVIEWER_TIMEOUT="$TIMEOUT_SECS"
   [ "$CANDIDATES" -eq 1 ] || return 0
   [ "$DRY_RUN" -eq 0 ] || return 0
+  if [ -z "$CHANGED_FILES" ]; then
+    log "candidates: primary checkout has no diff; skipping the code-review pre-run"
+    echo "(no changes in the primary checkout; pre-run skipped)" > "$out/candidates.md"
+    return 0
+  fi
   local range="$MERGE_BASE..$COMMIT"
   [ "$ROUND" -gt 1 ] && range="$PREV_COMMIT..$COMMIT"
   # The pre-run gets half the budget and half the timeout; the reviewer gets what the budget leaves.
@@ -459,8 +464,12 @@ write_prompt() {
     echo "- Base branch: $BASE (merge-base $MERGE_BASE)"
     echo "- Commit under review: $COMMIT (this is HEAD; the working tree is clean and identical to it)"
     echo "- Full patch: \`$ROUND_DIR/diff.patch\` (absolute path, outside your checkout), or run \`git diff $MERGE_BASE $COMMIT\`"
-    echo "- Changed files:"
-    echo "$CHANGED_FILES" | sed 's/^/  - /'
+    if [ -n "$CHANGED_FILES" ]; then
+      echo "- Changed files:"
+      echo "$CHANGED_FILES" | sed 's/^/  - /'
+    else
+      echo "- Changed files: none in this checkout; the change lives in the paired repository below"
+    fi
     local i name dir
     for i in ${ALSO_REPOS[@]+"${!ALSO_REPOS[@]}"}; do
       name="$(repo_name_of "${ALSO_REPOS[$i]}")"
@@ -641,7 +650,7 @@ run_reviewers() {
   [ "$s_codex" -eq 0 ] && [ "$s_claude" -eq 0 ] || die "both mode needs both reviewers to finish (codex exit $s_codex, claude exit $s_claude); see $ROUND_DIR/*/reviewer.err"
   check_drift
   # Merge into a scratch file first so a failed merge never leaves an empty verdict.json behind.
-  python3 "$SKILL_DIR/scripts/merge-verdicts.py" "$ROUND" "$ROUND_DIR/codex/verdict.json" "$ROUND_DIR/claude/verdict.json" > "$ROUND_DIR/verdict.merging" \
+  python3 "$SKILL_DIR/scripts/merge-verdicts.py" "$ROUND" "$ROUND_DIR/codex/verdict.json" "$ROUND_DIR/claude/verdict.json" "$LEDGER" > "$ROUND_DIR/verdict.merging" \
     || { rm -f "$ROUND_DIR/verdict.merging"; die "could not merge the two verdicts; the per-backend verdicts are in $ROUND_DIR/codex and $ROUND_DIR/claude"; }
   mv "$ROUND_DIR/verdict.merging" "$ROUND_DIR/verdict.json"
   echo "$(date +%H:%M:%S) done: both reviewers finished, verdicts merged" >> "$ROUND_DIR/progress.log"
