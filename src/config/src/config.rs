@@ -1544,15 +1544,27 @@ pub struct Search {
     #[env_config(
         name = "ZO_FEATURE_METRICS_FUSED_AGG_ENABLED",
         default = true,
-        help = "Fold PromQL agg(range_func(...)) queries incrementally instead of materializing the range function output; disable to fall back to the generic evaluator"
+        help = "Fold PromQL agg(range_func(...)) queries incrementally instead of materializing the range function output"
     )]
     pub feature_metrics_fused_agg_enabled: bool,
     #[env_config(
         name = "ZO_FEATURE_METRICS_STREAMING_AGG_ENABLED",
-        default = false,
-        help = "Evaluate fused PromQL agg(range_func(...)) queries as a stream over hash-sorted metrics files, series by series, instead of materializing all samples; falls back to the fused evaluator when the file layout or query shape does not allow it"
+        default = true,
+        help = "Evaluate fused PromQL agg(range_func(...)) queries as a stream over hash-sorted metrics files, series by series"
     )]
     pub feature_metrics_streaming_agg_enabled: bool,
+    #[env_config(
+        name = "ZO_METRICS_INDEX_SELECTION_CACHE_ENABLED",
+        default = false,
+        help = "Cache the row ranges a PromQL query selected from each `.midx` metrics index, keyed by file and matchers, so a repeated query skips decoding and evaluating the index."
+    )]
+    pub metrics_index_selection_cache_enabled: bool,
+    #[env_config(
+        name = "ZO_METRICS_INDEX_SELECTION_CACHE_MAX_SIZE",
+        default = 256,
+        help = "Maximum memory size in MB of the metrics index selection cache."
+    )]
+    pub metrics_index_selection_cache_max_size: usize,
     #[env_config(
         name = "ZO_FEATURE_DYNAMIC_PUSHDOWN_FILTER_ENABLED",
         default = true,
@@ -2201,6 +2213,9 @@ pub struct Limit {
     pub disk_free: usize,
     #[env_config(name = "ZO_PAYLOAD_LIMIT", default = 209715200)]
     pub req_payload_limit: usize,
+    #[env_config(name = "ZO_JS_FUNCTION_MAX_EXECUTION_TIME_SECS", default = 5)]
+    // 0 falls back to default
+    pub js_function_max_execution_time_secs: u64,
     #[env_config(name = "ZO_MAX_FILE_RETENTION_TIME", default = 600)] // seconds
     pub max_file_retention_time: u64,
     // MB, per log file size limit on disk
@@ -2267,8 +2282,12 @@ pub struct Limit {
     pub query_thread_num: usize,
     #[env_config(name = "ZO_FILE_DOWNLOAD_THREAD_NUM", default = 0)]
     pub file_download_thread_num: usize,
-    #[env_config(name = "ZO_FILE_DOWNLOAD_MIN_RECORDS", default = 100)]
-    pub file_download_min_records: i64,
+    #[env_config(
+        name = "ZO_FILE_DOWNLOAD_SYNC_MAX_SIZE",
+        default = 1,
+        help = "Files up to this size in MB are downloaded into the cache before a search reads them instead of being range-read from object storage, 0 disables"
+    )]
+    pub file_download_sync_max_size: usize,
     #[env_config(name = "ZO_FILE_DOWNLOAD_PRIORITY_QUEUE_THREAD_NUM", default = 0)]
     pub file_download_priority_queue_thread_num: usize,
     #[env_config(name = "ZO_FILE_DOWNLOAD_PRIORITY_QUEUE_WINDOW_SECS", default = 3600)]
@@ -3635,6 +3654,7 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     } else {
         cfg.limit.max_file_size_in_memory *= 1024 * 1024;
     }
+    cfg.limit.file_download_sync_max_size *= 1024 * 1024;
 
     // check for metrics limit
     if cfg.limit.metrics_max_points_per_series == 0 {

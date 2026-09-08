@@ -258,6 +258,8 @@ test.describe('Alerts — priority, tags & additional variables', {
         await pm.alertDetailPage.open(id);
         await pm.alertsPage.expectAlertDetailsHistorySectionVisible();
 
+        // The per-alert history fetch is single-shot on page load; re-fetch until the row lands.
+        await pm.alertsPage.waitForEvaluationHistoryRow();
         await pm.alertsPage.expectEvaluationHistoryRetriesColumn();
         await pm.alertsPage.expectEvaluationHistoryRetriesValue(0);
         testLogger.info('Retries column renders a numeric value in evaluation history');

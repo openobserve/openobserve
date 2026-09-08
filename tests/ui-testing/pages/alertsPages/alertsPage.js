@@ -1415,6 +1415,15 @@ export class AlertsPage {
         testLogger.info('Evaluation history Retries column and cells present');
     }
 
+    /** Reload the detail page until the evaluation-history table has >=1 data row — its fetch is single-shot on load, so a lagging row leaves headers but no cells. */
+    async waitForEvaluationHistoryRow({ attempts = 6 } = {}) {
+        const row = this.getAlertHistoryRowsLocator().first();
+        for (let i = 0; i < attempts; i++) {
+            if (await row.isVisible({ timeout: 5000 }).catch(() => false)) return;
+            await this.page.reload({ waitUntil: 'networkidle' }).catch(() => {});
+        }
+    }
+
     /**
      * Assert the newest evaluation's retries cell renders the given integer (0 for a clean
      * self-delivery). Newest-first row ordering means `.first()` is the latest run.
@@ -3593,6 +3602,20 @@ export class AlertsPage {
     async clickBackButton() {
         await this.page.locator(this.locators.alertBackButton).first().click({ timeout: 15000 });
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    }
+
+    // The submit button only renders once AddAlertView stops redirecting to the list, so wait on it before touching the header.
+    async expectAddAlertFormVisible() {
+        await expect(this.page.locator(this.locators.alertSubmitButton)).toBeVisible({ timeout: 15000 });
+    }
+
+    // goBackToAlertsList pushes a fresh query string, so assert on parsed searchParams rather than an exact URL match.
+    async expectBackRedirectPreservesOrg(org, folder) {
+        await this.clickBackButton();
+        await expect(this.page).toHaveURL(/\/web\/alerts\/?\?/, { timeout: 15000 });
+        const params = new URL(this.page.url()).searchParams;
+        expect(params.get('org_identifier')).toBe(org);
+        expect(params.get('folder')).toBe(folder);
     }
 
     /**

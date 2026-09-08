@@ -15,7 +15,6 @@
 
 use config::meta::promql::value::{EvalContext, RangeValue, Value};
 use datafusion::error::{DataFusionError, Result};
-use hashbrown::HashSet;
 use promql_parser::parser::LabelModifier;
 use rayon::prelude::*;
 
@@ -51,7 +50,7 @@ pub fn bottomk(
 
     // For bottomk, we select the bottom k series at each timestamp
     // We need to preserve the original series structure
-    let eval_timestamps: HashSet<i64> = eval_ctx.timestamps().iter().cloned().collect();
+    let eval_timestamps = eval_ctx.timestamps();
 
     // Group series by label modifier
     let grouped_series = super::group_series_by_labels(&matrix, modifier);

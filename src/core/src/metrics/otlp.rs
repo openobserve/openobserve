@@ -30,7 +30,7 @@ use config::{
     meta::{
         alerts::alert,
         otlp::OtlpRequestType,
-        promql::*,
+        promql::{METRICS_HASH_EXCLUDED_LABELS, *},
         self_reporting::usage::UsageType,
         stream::{StreamParams, StreamPartition, StreamType},
     },
@@ -64,7 +64,6 @@ use crate::{
         grpc::{get_exemplar_val, get_metric_val, get_val},
         write_file,
     },
-    metrics::get_exclude_labels,
     pipeline::batch_execution::ExecutablePipeline,
 };
 
@@ -778,7 +777,7 @@ fn process_gauge(
             continue;
         }
         let val_map = dp_rec.as_object_mut().unwrap();
-        let hash = super::signature_without_labels(val_map, get_exclude_labels());
+        let hash = super::signature_without_labels(val_map, METRICS_HASH_EXCLUDED_LABELS);
         val_map.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
         records.push(dp_rec);
     }
@@ -807,7 +806,7 @@ fn process_sum(
             continue;
         }
         let val_map = dp_rec.as_object_mut().unwrap();
-        let hash = super::signature_without_labels(val_map, get_exclude_labels());
+        let hash = super::signature_without_labels(val_map, METRICS_HASH_EXCLUDED_LABELS);
         val_map.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
         records.push(dp_rec);
     }
@@ -833,7 +832,7 @@ fn process_histogram(
         let mut dp_rec = rec.clone();
         for mut bucket_rec in process_hist_data_point(&mut dp_rec, data_point) {
             let val_map = bucket_rec.as_object_mut().unwrap();
-            let hash = super::signature_without_labels(val_map, get_exclude_labels());
+            let hash = super::signature_without_labels(val_map, METRICS_HASH_EXCLUDED_LABELS);
             val_map.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
             records.push(bucket_rec);
         }
@@ -859,7 +858,7 @@ fn process_exponential_histogram(
         let mut dp_rec = rec.clone();
         for mut bucket_rec in process_exp_hist_data_point(&mut dp_rec, data_point) {
             let val_map = bucket_rec.as_object_mut().unwrap();
-            let hash = super::signature_without_labels(val_map, get_exclude_labels());
+            let hash = super::signature_without_labels(val_map, METRICS_HASH_EXCLUDED_LABELS);
             val_map.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
             records.push(bucket_rec);
         }
@@ -885,7 +884,7 @@ fn process_summary(
         let mut dp_rec = rec.clone();
         for mut bucket_rec in process_summary_data_point(&mut dp_rec, data_point) {
             let val_map = bucket_rec.as_object_mut().unwrap();
-            let hash = super::signature_without_labels(val_map, get_exclude_labels());
+            let hash = super::signature_without_labels(val_map, METRICS_HASH_EXCLUDED_LABELS);
             val_map.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
             records.push(bucket_rec);
         }

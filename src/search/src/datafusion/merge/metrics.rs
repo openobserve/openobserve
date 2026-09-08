@@ -20,7 +20,8 @@ use arrow::{
     compute::{max, min},
 };
 use config::{
-    FileFormat, TIMESTAMP_COL_NAME, meta::stream::FileMeta, utils::parquet::new_parquet_writer,
+    FileFormat, PARQUET_MAX_ROW_GROUP_SIZE, TIMESTAMP_COL_NAME, meta::stream::FileMeta,
+    utils::parquet::new_parquet_writer,
 };
 use datafusion::{
     arrow::datatypes::Schema,
@@ -204,14 +205,20 @@ struct IndexedMetricsFileState {
     metrics_index: MetricsIndexWriter,
     file_meta: FileMeta,
     timestamp_index: usize,
+    row_group_size: Option<usize>,
 }
 
 impl IndexedMetricsFileState {
-    fn try_new(schema: &Arc<Schema>, timestamp_index: usize) -> Result<Self> {
+    fn try_new(
+        schema: &Arc<Schema>,
+        timestamp_index: usize,
+        row_group_size: Option<usize>,
+    ) -> Result<Self> {
         Ok(Self {
             metrics_index: MetricsIndexWriter::try_new(schema)?,
             file_meta: FileMeta::default(),
             timestamp_index,
+            row_group_size,
         })
     }
 
@@ -246,13 +253,17 @@ impl IndexedMetricsFileState {
         let Self {
             metrics_index,
             mut file_meta,
+            row_group_size,
             ..
         } = self;
 
         // below the target so an indexed file never advertises >= max_file_size
         file_meta.original_size =
             proportional_original_size(source_meta, file_meta.records).min(max_file_size - 1);
-        Ok((metrics_index.finish()?, file_meta))
+        Ok((
+            metrics_index.finish(file_meta.records, row_group_size)?,
+            file_meta,
+        ))
     }
 }
 
@@ -274,7 +285,11 @@ impl ActiveIndexedParquetWriter {
         Ok(Self {
             writer,
             data_path,
-            state: IndexedMetricsFileState::try_new(schema, timestamp_index)?,
+            state: IndexedMetricsFileState::try_new(
+                schema,
+                timestamp_index,
+                Some(PARQUET_MAX_ROW_GROUP_SIZE),
+            )?,
         })
     }
 
@@ -313,7 +328,7 @@ impl ActiveIndexedVortexWriter {
         Ok(Self {
             writer: write_options.writer(file, dtype),
             data_path,
-            state: IndexedMetricsFileState::try_new(schema, timestamp_index)?,
+            state: IndexedMetricsFileState::try_new(schema, timestamp_index, None)?,
         })
     }
 
