@@ -366,6 +366,13 @@ pub async fn create<C: TransactionTrait>(
 
     let model = am.insert(&txn).await?.try_into_model()?;
     let result = Synthetic::try_from(model)?;
+    super::synthetics_refs::replace_for_parent(
+        &txn,
+        org_id,
+        &result.id,
+        &super::synthetics_refs::refs_of(&result),
+    )
+    .await?;
     txn.commit().await?;
     invalidate_and_publish(&result.org_id, &result.id).await;
     Ok(result)
@@ -389,6 +396,13 @@ pub async fn update<C: TransactionTrait>(
 
     let model = am.update(&txn).await?.try_into_model()?;
     let result = Synthetic::try_from(model)?;
+    super::synthetics_refs::replace_for_parent(
+        &txn,
+        org_id,
+        &result.id,
+        &super::synthetics_refs::refs_of(&result),
+    )
+    .await?;
     txn.commit().await?;
     invalidate_and_publish(&result.org_id, &result.id).await;
     Ok(result)
@@ -423,6 +437,13 @@ pub async fn put<C: TransactionTrait>(
         }
     };
 
+    super::synthetics_refs::replace_for_parent(
+        &txn,
+        org_id,
+        &result.id,
+        &super::synthetics_refs::refs_of(&result),
+    )
+    .await?;
     txn.commit().await?;
     invalidate_and_publish(&result.org_id, &result.id).await;
     Ok(result)

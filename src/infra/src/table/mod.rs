@@ -75,6 +75,7 @@ pub mod synthetics_checks;
 pub mod synthetics_jobs;
 pub mod synthetics_locations;
 pub mod synthetics_probe_tokens;
+pub mod synthetics_refs;
 pub mod synthetics_runs;
 pub mod system_prompts;
 pub mod system_settings;
