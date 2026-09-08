@@ -2858,8 +2858,8 @@
       "runToView": "Run A Test To View This Data.",
       "noBranchItems": "No Items On This Branch.",
       "forwardedCount": "{out} of {total} record forwarded | {out} of {total} records forwarded",
-      "noMatchForwarded": "No match \u2014 0 of {total} record forwarded | No match \u2014 0 of {total} records forwarded",
-      "branchDropped": "{count} record matched no path \u2014 dropped | {count} records matched no path \u2014 dropped",
+      "noMatchForwarded": "No match — 0 of {total} record forwarded | No match — 0 of {total} records forwarded",
+      "branchDropped": "{count} record matched no path — dropped | {count} records matched no path — dropped",
       "noUpstream": "No Upstream Steps.",
       "noRunYet": "No Run Yet.",
       "runLabel": "Run",
@@ -15748,6 +15748,15 @@
       "loadFailed": "Could not load the eligible alerts",
       "noneEligible": "No alert in this organization can be used as a source yet.",
       "eligibilityInfo": "An alert can be an SLI source when it is scheduled (not real-time), ungrouped, on a fixed interval rather than a cron, with no silence period, and evaluated at least once per slice. Alerts that miss any of these are listed with the reason under their name.",
+      "ineligible": {
+        "notScheduled": "Not scheduled",
+        "grouped": "Grouped",
+        "notReferenceable": "Not usable",
+        "cron": "Cron schedule",
+        "tooInfrequent": "Runs too rarely",
+        "silenced": "Has silence",
+        "other": "Not eligible"
+      },
       "groupingLocked": "An alert-based SLI cannot be grouped: the availability ledger records one run per alert, not per group, so there is no per-group coverage to stand on.",
       "sourceLink": "Source alert",
       "preview": {

@@ -64,6 +64,7 @@ const row = (over: Partial<EligibleRow> = {}): EligibleRow => ({
   frequency_secs: 60,
   eligible: true,
   reason: null,
+  reason_code: null,
   ...over,
 });
 
@@ -76,6 +77,7 @@ const ELIGIBLE = [
     frequency_secs: 604800,
     eligible: false,
     reason: "a cron-scheduled alert cannot be an SLI source",
+    reason_code: "cron",
   }),
   row({
     alert_id: "alert-silenced",
@@ -83,6 +85,7 @@ const ELIGIBLE = [
     frequency_secs: 60,
     eligible: false,
     reason: "set the source's silence to 0 or give it a warning threshold",
+    reason_code: "silenced",
   }),
   // Scheduled, ungrouped and not cron — refused purely on cadence, because
   // 300 is the coarsest supported slice.
@@ -92,6 +95,7 @@ const ELIGIBLE = [
     frequency_secs: 600,
     eligible: false,
     reason: "an alert-based SLI needs a source that evaluates at least once per slice",
+    reason_code: "too_infrequent",
   }),
 ];
 
@@ -197,33 +201,68 @@ describe("AddSlo — alert SLI", () => {
   // Without this the picker offers alerts the server will reject, and the user
   // learns why only on save.
   //
-  // The reason is a PARAGRAPH, so it belongs in `subLabel` — the secondary line
-  // OSelect renders UNDER the label. Concatenated into the label it produced one
-  // truncated row per alert in which the name was the first thing cut, which is
-  // why the name is asserted as the whole label here.
-  it("disables the ineligible alerts and shows why under the name", async () => {
+  // The reason is a PARAGRAPH. In the label it truncated the name; under it, it
+  // cost three lines per row and a twenty-alert org got an unreadable list. So
+  // the row keeps one line: the name, a chip naming the rule it failed, and the
+  // sentence on hover.
+  //
+  // The chip comes from `reason_code`, never from the sentence — the copy is the
+  // validator's and is free to change.
+  it("disables the ineligible alerts and names the rule on a chip", async () => {
     const wrapper = await mountForm();
     await selectAlertType(wrapper);
     const options = byTest(wrapper, OSelect, "slos-addslo-alert-source").props("options") as {
       value: string;
       label: string;
-      subLabel?: string;
+      badge?: string;
+      badgeTitle?: string;
       disabled?: boolean;
     }[];
 
     const eligible = options.find((o) => o.value === "alert-fast");
     expect(eligible?.disabled).toBeFalsy();
-    // An eligible alert has nothing to explain, so it carries no second line.
-    expect(eligible?.subLabel).toBeUndefined();
+    // An eligible alert has nothing to explain, so it carries no chip.
+    expect(eligible?.badge).toBeUndefined();
+    expect(eligible?.badgeTitle).toBeUndefined();
 
     const cron = options.find((o) => o.value === "alert-cron");
     expect(cron?.disabled).toBe(true);
+    // The name is the whole label, so the list stays scannable.
     expect(cron?.label).toBe("weekly report");
-    expect(cron?.subLabel).toContain("cron");
+    expect(cron?.badge).toBe("Cron schedule");
+    // Nothing is lost — the full sentence is the hover.
+    expect(cron?.badgeTitle).toContain("cron-scheduled alert cannot be an SLI source");
 
     const silenced = options.find((o) => o.value === "alert-silenced");
     expect(silenced?.disabled).toBe(true);
-    expect(silenced?.subLabel).toContain("silence to 0");
+    expect(silenced?.badge).toBe("Has silence");
+    expect(silenced?.badgeTitle).toContain("silence to 0");
+  });
+
+  // A code the frontend does not know about must still mark the row: an
+  // ineligible option with no chip reads as a rendering bug, not as a rule.
+  it("falls back to a generic chip for an unrecognised reason", async () => {
+    vi.mocked(sloService.eligibleAlerts).mockResolvedValueOnce({
+      data: {
+        list: [
+          row({
+            alert_id: "alert-future",
+            name: "future rule",
+            eligible: false,
+            reason: "something the UI has not been taught yet",
+            reason_code: "a_rule_added_later",
+          }),
+        ],
+      },
+    } as any);
+
+    const wrapper = await mountForm();
+    await selectAlertType(wrapper);
+    const options = byTest(wrapper, OSelect, "slos-addslo-alert-source").props("options") as {
+      value: string;
+      badge?: string;
+    }[];
+    expect(options.find((o) => o.value === "alert-future")?.badge).toBe("Not eligible");
   });
 
   // A source evaluating slower than 300s cannot be used at all — 300 is the
@@ -234,12 +273,14 @@ describe("AddSlo — alert SLI", () => {
     const options = byTest(wrapper, OSelect, "slos-addslo-alert-source").props("options") as {
       value: string;
       label: string;
-      subLabel?: string;
+      badge?: string;
+      badgeTitle?: string;
       disabled?: boolean;
     }[];
     const slow = options.find((o) => o.value === "alert-slow");
     expect(slow?.disabled).toBe(true);
-    expect(slow?.subLabel).toContain("once per slice");
+    expect(slow?.badge).toBe("Runs too rarely");
+    expect(slow?.badgeTitle).toContain("once per slice");
   });
 
   it("defaults the slice to 60 for a one-minute source", async () => {

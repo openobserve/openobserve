@@ -699,12 +699,12 @@ export class SloFormPage {
   }
 
   /**
-   * The option shows the alert NAME as its label and the ineligibility reason
-   * as the secondary line beneath it.
+   * An ineligible option is ONE line: the alert name, a chip naming the rule it
+   * failed, and the full sentence only on hover.
    *
-   * Asserting the name is an exact own-text match is the point: with the two
-   * concatenated back into one label this passes only by accident of substring
-   * matching, so `toHaveText` on the label node is what pins the split.
+   * The row's height is the assertion that matters — the reason is a paragraph,
+   * and rendering it inline is what made a twenty-alert picker unusable. A
+   * `title` carrying the sentence proves nothing was lost in the process.
    */
   async expectAlertSourceOptionReason(alertId, alertName) {
     await openOSelectDropdown(this.page, this.page.locator(this.locators.alertSource));
@@ -723,11 +723,21 @@ export class SloFormPage {
     await expect(
       option, 'the option label must be the alert name alone',
     ).toHaveAttribute('data-test-label', alertName);
-    // The reason lives in its own node, so the name is scannable.
-    await expect(
-      option,
-      'the ineligibility reason must still be shown',
-    ).toContainText(/silence|cadence|cron|grouped|real-?time/i);
+
+    // The chip is short; the sentence is the tooltip behind it.
+    const chip = option.locator('span[title]').first();
+    await expect(chip, 'an ineligible option must say which rule it failed').toBeVisible();
+    expect(
+      (await chip.innerText()).length,
+      'the chip is a label, not the explanation',
+    ).toBeLessThan(30);
+    await expect(chip).toHaveAttribute(
+      'title', /silence|cadence|cron|grouped|real-?time|slice/i,
+    );
+
+    // One line. Two would mean the paragraph is back in the row.
+    const box = await option.boundingBox();
+    expect(box.height, 'an option row must stay a single line').toBeLessThan(40);
 
     await this.page.keyboard.press('Escape');
   }

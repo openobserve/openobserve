@@ -1561,8 +1561,14 @@ const fieldWidthClass = computed(() => {
                                 >
                                 <span
                                   v-if="filteredOptions[vRow.index].badge"
-                                  class="rounded-default text-status-positive border-status-positive shrink-0 border border-solid"
+                                  class="rounded-default shrink-0 border border-solid"
                                   :class="[
+                                    // A badge on a row that cannot be chosen is
+                                    // naming a limitation, so it must not read
+                                    // as the positive marker it is elsewhere.
+                                    filteredOptions[vRow.index].disabled
+                                      ? 'text-text-secondary border-border-default'
+                                      : 'text-status-positive border-status-positive',
                                     filteredOptions[vRow.index].badgeTitle
                                       ? 'cursor-help'
                                       : undefined,

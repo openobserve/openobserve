@@ -600,7 +600,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from "vue";
-import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import { makeAddSloSchema } from "./AddSlo.schema";
 import { scrollToFirstError } from "@/lib/forms/Form/scrollToFirstError";
 import { useRoute, useRouter } from "vue-router";
@@ -973,16 +973,33 @@ const alertSourceError = ref<string | null>(null);
 
 const hasEligibleAlert = computed(() => alertSources.value.some((a) => a.eligible));
 
-// The reason is a PARAGRAPH. Folded into the label it produced one truncated
-// line per row in which the alert's own name was the first casualty, so the
-// list could not be scanned at all. `subLabel` puts the name back on its own
-// line and wraps the reason underneath it.
+// The reason is a PARAGRAPH, and every row that carries one costs three lines
+// — at twenty alerts the list stops being a list. So the row states WHICH rule
+// it failed as a chip and keeps the sentence for the hover, which is the same
+// trade the panel field list makes with its type badges.
+//
+// Keyed off `reason_code`, never off the sentence: the copy is the validator's
+// and is free to change.
+const INELIGIBILITY_BADGES: Record<string, I18nKey> = {
+  not_scheduled: "slos.alertSli.ineligible.notScheduled",
+  grouped: "slos.alertSli.ineligible.grouped",
+  not_referenceable: "slos.alertSli.ineligible.notReferenceable",
+  cron: "slos.alertSli.ineligible.cron",
+  too_infrequent: "slos.alertSli.ineligible.tooInfrequent",
+  silenced: "slos.alertSli.ineligible.silenced",
+};
+
 const alertSourceOptions = computed(() =>
   alertSources.value.map((a) => ({
     value: a.alert_id,
     label: raw(a.name),
-    subLabel: a.eligible ? undefined : raw(a.reason ?? ""),
     disabled: !a.eligible,
+    // An unrecognised code still gets a chip — an ineligible row with no
+    // marker reads as a rendering bug rather than as a rule.
+    badge: a.eligible
+      ? undefined
+      : t(INELIGIBILITY_BADGES[a.reason_code ?? ""] ?? "slos.alertSli.ineligible.other"),
+    badgeTitle: a.eligible ? undefined : (a.reason ?? undefined),
   })),
 );
 
