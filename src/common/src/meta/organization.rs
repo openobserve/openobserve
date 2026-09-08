@@ -184,8 +184,8 @@ pub struct AllOrgListDetails {
     pub credits_used: u64,
     #[cfg(feature = "cloud")]
     pub credits_limit: u64,
-    /// Separate allowances from the AI pool, in a different unit. Browser and
-    /// protocol hold independent grants — a browser step costs ~52x a protocol one.
+    /// Separate allowances from the AI pool, in a different unit: browser and protocol hold
+    /// independent one-time grants.
     #[cfg(feature = "cloud")]
     pub browser_steps_used: u64,
     #[cfg(feature = "cloud")]
