@@ -17160,7 +17160,7 @@
     "askAi": "Ask O2 AI about \"{q}\"",
     "clearScopes": "Clear",
     "scopes": {
-      "actions": "Actions",
+      "actions": "Commands",
       "pages": "Pages",
       "dashboard": "Dashboards",
       "alert": "Alerts",
@@ -17176,7 +17176,7 @@
     },
     "groups": {
       "recent": "Recent",
-      "actions": "Actions",
+      "actions": "Commands",
       "pages": "Pages"
     },
     "actions": {
