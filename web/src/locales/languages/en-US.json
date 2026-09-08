@@ -17188,7 +17188,7 @@
     "hint": {
       "navigate": "navigate",
       "open": "open",
-      "newTab": "new tab",
+      "newTab": "open in new tab",
       "showScopes": "filter by type",
       "hideScopes": "hide filters"
     },
