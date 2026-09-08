@@ -16,6 +16,7 @@ DRY_RUN=0
 UNSANDBOXED=0
 ALSO_REPOS=()
 PROGRESS_PREFIX=""
+NO_SANDBOX=0
 
 usage() {
   cat <<'USAGE'
@@ -52,7 +53,9 @@ Every reviewer process runs inside a disposable `git worktree` of the reviewed c
 afterwards. The claude processes are additionally wrapped in a macOS seatbelt (sandbox-exec) that denies
 every file write except the worktree's git metadata, temp directories, and claude's own session state
 under ~/.claude (settings, skills, agents and hooks stay read-only); the worktree is verified unchanged
-after each process. Without sandbox-exec the claude backend refuses to run unless --unsandboxed is passed.
+after each process. Without sandbox-exec the claude backend refuses to run unless --unsandboxed is
+passed, and then the reviewer gets no Bash, no ledger access and no pre-run: the harness's own
+working-directory confinement of Read/Grep/Glob is the only wall, and the patches are inlined instead.
   auto    (default) codex when the CLI is found, otherwise claude with a loud warning: a Claude
           reviewer is a weaker second opinion than a different vendor's model.
   both    codex and claude review the same commit in parallel; their verdicts are merged into one
@@ -155,8 +158,11 @@ select_backend() {
   esac
   if [ "$BACKEND" = "claude" ] || [ "$BACKEND" = "both" ]; then
     command -v claude >/dev/null 2>&1 || die "claude CLI not found on PATH"
-    if ! command -v sandbox-exec >/dev/null 2>&1 && [ "$UNSANDBOXED" -eq 0 ] && [ "$DRY_RUN" -eq 0 ]; then
-      die "sandbox-exec not found: the claude backend needs a filesystem sandbox; pass --unsandboxed to run without one"
+    NO_SANDBOX=0
+    if ! command -v sandbox-exec >/dev/null 2>&1; then
+      [ "$UNSANDBOXED" -eq 1 ] || [ "$DRY_RUN" -eq 1 ] || die "sandbox-exec not found: the claude backend needs a filesystem sandbox; pass --unsandboxed to run without one"
+      NO_SANDBOX=1
+      log "WARNING: no sandbox-exec; the claude reviewer runs without Bash, without ledger access, and without the code-review pre-run"
     fi
     MAX_BUDGET_USD="${MAX_BUDGET_USD:-15}"
     MODEL="${MODEL:-opus}"
@@ -381,20 +387,26 @@ run_with_timeout() {
 # Containment is the seatbelt (nothing under --unsandboxed); the allow list only spares approval prompts, and python3/bash may reach the network (accepted).
 claude_common_args() {
   printf '%s\n' --restricted --strict-mcp-config --mcp-config '{"mcpServers":{}}' --model "$MODEL" \
-    --max-budget-usd "$1" --add-dir "$ROUND_DIR" \
-    ${ALSO_REVIEW_DIRS[@]+"${ALSO_REVIEW_DIRS[@]/#/--add-dir=}"} \
+    --max-budget-usd "$1"
+  # Without a seatbelt the harness's working-directory confinement is the only wall, so the ledger is not opened.
+  [ "$NO_SANDBOX" -eq 1 ] || printf '%s\n' --add-dir "$ROUND_DIR" ${ALSO_REVIEW_DIRS[@]+"${ALSO_REVIEW_DIRS[@]/#/--add-dir=}"}
+  printf '%s\n' \
     --disallowedTools "Write" "Edit" "NotebookEdit" "WebFetch" "WebSearch" \
     --allowedTools "Bash(git diff:*)" "Bash(git log:*)" "Bash(git show:*)" "Bash(git status:*)" "Bash(git rev-parse:*)" "Bash(git merge-base:*)" \
       "Bash(git grep:*)" "Bash(git ls-files:*)" "Bash(git blame:*)" \
       "Bash(head:*)" "Bash(tail:*)" "Bash(cat:*)" "Bash(ls:*)" "Bash(wc:*)" "Bash(nl:*)" \
       "Bash(grep:*)" "Bash(sed:*)" "Bash(awk:*)" "Bash(find:*)" "Bash(diff:*)" "Bash(sort:*)" "Bash(uniq:*)" \
       "Bash(cut:*)" "Bash(tr:*)" "Bash(xargs:*)" "Bash(stat:*)" "Bash(file:*)" "Bash(echo:*)" "Bash(printf:*)" \
-      "Bash(python3:*)" "Bash(bash:*)" "Bash(sh:*)"
+      "Bash(python3:*)" "Bash(bash:*)" "Bash(sh:*)" "Bash(cd:*)"
 }
 
 claude_reviewer_args() {
   claude_common_args "$1"
-  printf '%s\n' --tools "Read,Grep,Glob,Bash"
+  if [ "$NO_SANDBOX" -eq 1 ]; then
+    printf '%s\n' --tools "Read,Grep,Glob"
+  else
+    printf '%s\n' --tools "Read,Grep,Glob,Bash"
+  fi
 }
 
 # Skill and Agent let /code-review run its verification pass; ReportFindings is how it submits typed findings.
@@ -410,13 +422,20 @@ gather_candidates() {
   REVIEWER_TIMEOUT="$TIMEOUT_SECS"
   [ "$CANDIDATES" -eq 1 ] || return 0
   [ "$DRY_RUN" -eq 0 ] || return 0
-  if [ -z "$CHANGED_FILES" ]; then
-    log "candidates: primary checkout has no diff; skipping the code-review pre-run"
-    echo "(no changes in the primary checkout; pre-run skipped)" > "$out/candidates.md"
+  if [ "$NO_SANDBOX" -eq 1 ]; then
+    echo "(no sandbox; pre-run skipped)" > "$out/candidates.md"
     return 0
   fi
-  local range="$MERGE_BASE..$COMMIT"
-  [ "$ROUND" -gt 1 ] && range="$PREV_COMMIT..$COMMIT"
+  local range="$MERGE_BASE..$COMMIT" from="$MERGE_BASE"
+  if [ "$ROUND" -gt 1 ]; then
+    range="$PREV_COMMIT..$COMMIT"
+    from="$PREV_COMMIT"
+  fi
+  if [ -z "$(git diff --name-only "$from" "$COMMIT")" ]; then
+    log "candidates: the primary checkout has no diff in $range; skipping the code-review pre-run"
+    echo "(no changes in the primary checkout for $range; pre-run skipped)" > "$out/candidates.md"
+    return 0
+  fi
   # The pre-run gets half the budget and half the timeout; the reviewer gets what the budget leaves.
   local prerun_budget
   prerun_budget="$(python3 -c 'print(round(float(__import__("sys").argv[1]) / 2, 2))' "$MAX_BUDGET_USD")"
@@ -533,6 +552,27 @@ write_prompt() {
       echo "## Delta since the previous round"
       echo "- Previous round commit: $PREV_COMMIT"
       echo "- Delta: \`$ROUND_DIR/delta.patch\` ($(wc -l < "$ROUND_DIR/delta.patch" | tr -d ' ') lines), or run \`git diff $PREV_COMMIT $COMMIT\`"
+    fi
+    if [ "$backend" = "claude" ] && [ "$NO_SANDBOX" -eq 1 ]; then
+      echo
+      echo "## Patches (inline, because ledger files are not readable in this mode)"
+      echo "### Full patch of the primary checkout"
+      echo '```diff'
+      cat "$ROUND_DIR/diff.patch"
+      echo '```'
+      if [ "$ROUND" -gt 1 ]; then
+        echo "### Delta since the previous round"
+        echo '```diff'
+        cat "$ROUND_DIR/delta.patch"
+        echo '```'
+      fi
+      for name in "$ROUND_DIR"/also/*/; do
+        [ -s "$name/diff.patch" ] || continue
+        echo "### Full patch of the paired repository $(basename "$name")"
+        echo '```diff'
+        cat "$name/diff.patch"
+        echo '```'
+      done
     fi
     if [ "$backend" = "claude" ] && [ "$CANDIDATES" -eq 1 ] && [ "$DRY_RUN" -eq 0 ] && [ -s "$out/candidates.md" ]; then
       echo

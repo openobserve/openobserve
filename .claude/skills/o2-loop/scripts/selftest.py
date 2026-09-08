@@ -83,6 +83,13 @@ def test_merge():
     check("still_open wins over resolved", disagree[0]["status"], "still_open")
     closed = MV.merge_prior([{"id": "CX1-1", "status": "withdrawn", "note": ""}], [{"id": "CX1-1", "status": "withdrawn", "note": ""}], {})
     check("both withdrawn stays withdrawn", closed[0]["status"], "withdrawn")
+    al = {"CL1-1": "CX1-1"}
+    other = [{"id": "CX1-1", "status": "resolved", "note": ""}]
+    a1 = [{"id": "CX1-1", "status": "still_open", "note": ""}, {"id": "CL1-1", "status": "resolved", "note": ""}]
+    a2 = list(reversed(a1))
+    check("canonical still_open then alias resolved stays open", MV.merge_prior(a1, other, al)[0]["status"], "still_open")
+    check("alias resolved then canonical still_open stays open", MV.merge_prior(a2, other, al)[0]["status"], "still_open")
+    check("votes on both ids that agree close the finding", MV.merge_prior([{"id": "CX1-1", "status": "resolved", "note": ""}, {"id": "CL1-1", "status": "resolved", "note": ""}], other, al)[0]["status"], "resolved")
 
 
 if __name__ == "__main__":

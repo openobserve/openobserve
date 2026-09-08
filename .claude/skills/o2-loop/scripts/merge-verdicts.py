@@ -73,26 +73,31 @@ def alias_map(ledger, rnd):
     return aliases
 
 
+STATUS_RANK = {"still_open": 0, "resolved": 1, "withdrawn": 2}
+
+
 def merge_prior(codex, claude, aliases):
-    """A prior finding closes only when both reviewers examined it and neither still sees it; one vote keeps it open."""
+    """A prior finding closes only when both reviewers examined it and none of their votes says still_open."""
     by_id = {}
     for backend, items in (("codex", codex), ("claude", claude)):
         for p in items:
-            by_id.setdefault(aliases.get(p["id"], p["id"]), {})[backend] = p
+            by_id.setdefault(aliases.get(p["id"], p["id"]), {}).setdefault(backend, []).append(p)
     out = []
     for fid, votes in by_id.items():
-        statuses = {v["status"] for v in votes.values()}
-        missing = [b for b in ("codex", "claude") if b not in votes]
+        # A reviewer that voted on both the canonical id and its alias gets its most severe vote; order never matters.
+        per_backend = {b: min(vs, key=lambda v: STATUS_RANK[v["status"]]) for b, vs in votes.items()}
+        statuses = {v["status"] for v in per_backend.values()}
+        missing = [b for b in ("codex", "claude") if b not in per_backend]
         if "still_open" in statuses or missing:
             status = "still_open"
         elif "resolved" in statuses:
             status = "resolved"
         else:
             status = "withdrawn"
-        note = " | ".join(f"{b}: {v['note']}" for b, v in votes.items())
+        note = " | ".join(f"{b}: {v['note']}" for b, v in per_backend.items())
         if missing:
             note += f" | not verified by {', '.join(missing)}; stays open"
-        out.append({"id": fid, "status": status, "note": note, "sources": sorted(votes)})
+        out.append({"id": fid, "status": status, "note": note, "sources": sorted(per_backend)})
     return out
 
 
