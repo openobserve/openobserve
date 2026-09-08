@@ -64,6 +64,11 @@ def test_state_machine():
     check("coder open_items block agreement", action([rnd(1, ap, open_items)]), "next")
     r2 = {"verdict": "approve", "summary": "", "findings": [], "prior_findings": [{"id": "CL1-1", "status": "resolved", "note": ""}]}
     check("prior status via alias closes the canonical finding", action([rnd(1, rc, resp_alias), rnd(2, r2, {"responses": [], "open_items": []}, commit="c2")], head="c2"), "agreed")
+    check("approve with no findings needs no coder response", action([rnd(1, rc, resp_alias), rnd(2, r2, commit="c2")], head="c2"), "agreed")
+    r2_open = {"verdict": "request_changes", "summary": "", "findings": [], "prior_findings": [{"id": "CX1-1", "status": "still_open", "note": ""}]}
+    check("no new findings but a still_open prior needs a response", action([rnd(1, rc, resp_alias), rnd(2, r2_open, commit="c2")], head="c2"), "respond")
+    r2_rc = {"verdict": "request_changes", "summary": "", "findings": [], "prior_findings": [{"id": "CL1-1", "status": "resolved", "note": ""}]}
+    check("request_changes with nothing open is not agreed", action([rnd(1, rc, resp_alias), rnd(2, r2_rc, commit="c2")], head="c2"), "next")
 
 
 def test_merge():

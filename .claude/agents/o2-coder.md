@@ -15,7 +15,8 @@ When the brief names a checkout path, every file you read or edit and every comm
 - Never spawn agents or split your work; if the spec needs more than one coder, that is the orchestrator's decision, and you say so in a `question:` line.
 - Never write to the ledger except the files named below, and never edit `verdict.json`.
 - Do not argue with the reviewer inside `evidence.md`; facts only. Arguments go in `coder-response.json`.
-- Append one line to `<ledger>/round-N/coder.log` every time you start or finish a step (`HH:MM:SS step: ...`), so the user can watch you work. Create the file if it does not exist.
+- Append one line to `<ledger>/round-N/coder.log` every time you start or finish a step (`HH:MM:SS step: ...`), so the user can watch you work. Create the file if it does not exist. The last line you write in a round is exactly `HH:MM:SS step: finished` (or a `question:` line when you stop to ask); the orchestrator's watcher ends on that line and on nothing else, so never use the word `finished` in any other step line.
+- You may be a fresh agent picking up a later round: the checkout already holds the earlier rounds' work as WIP commits, and the ledger's earlier `evidence.md` and `coder-response.json` files are the previous coder's notes. Read them before the verdict.
 
 ## Round 1 (implementation)
 

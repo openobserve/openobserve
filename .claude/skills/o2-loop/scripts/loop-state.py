@@ -128,15 +128,19 @@ def decide(rounds, reg, cap, head, clean):
     open_ids = [i for i, f in reg.items() if f["status"] in ("open", "still_open")]
     blocking = [i for i in open_ids if reg[i]["severity"] in BLOCKING]
     verdict = last["verdict"]["verdict"]
-    answered = {a["id"] for a in (last["response"] or {}).get("responses", [])}
+    response = last["response"]
+    # A verdict that names nothing new and leaves nothing open has nothing for the coder to answer.
+    if response is None and not last["verdict"].get("findings") and not open_ids:
+        response = {"responses": [], "open_items": []}
+    answered = {a["id"] for a in (response or {}).get("responses", [])}
     unanswered = [i for i in open_ids if i not in answered and not (set(reg[i].get("aliases", [])) & answered)]
-    if not last["response"] or unanswered:
+    if not response or unanswered:
         if n >= cap and (verdict != "approve" or blocking):
             return "cap", f"round cap {cap} reached with the round-{n} verdict {verdict} and open findings {open_ids}; write the interim report and ask the user before any more coding"
-        what = "coder-response.json missing" if not last["response"] else f"findings without a response: {unanswered}"
+        what = "coder-response.json missing" if not response else f"findings without a response: {unanswered}"
         return "respond", f"round {n}: verdict present, {what}; hand the findings to the coder"
     low_not_deferred = [i for i in open_ids if reg[i]["severity"] == "low" and reg[i].get("action") != "defer"]
-    open_items = last["response"].get("open_items") or []
+    open_items = response.get("open_items") or []
     drift = head != last["commit"] or not clean
     for name, path, commit in last["paired"]:
         if not path or sh("git", "-C", path, "rev-parse", "HEAD") != commit or sh("git", "-C", path, "status", "--porcelain") != "":
