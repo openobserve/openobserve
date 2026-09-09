@@ -1,0 +1,67 @@
+===== COMPLETE LIST OF CHANGED FILES (2 files) =====
+# AUTHORITATIVE: this list is never truncated. The diff BODY below may be trimmed for
+# very large PRs, so decide WHICH files/areas changed (e.g. web/src frontend) from THIS list.
+web/src/components/dashboards/panels/ChartRenderer.vue
+web/src/views/Dashboards/RenderDashboardCharts.vue
+===== END CHANGED FILES =====
+
+diff --git a/web/src/components/dashboards/panels/ChartRenderer.vue b/web/src/components/dashboards/panels/ChartRenderer.vue
+index 81ce896ccb1..645c08696b8 100644
+--- a/web/src/components/dashboards/panels/ChartRenderer.vue
++++ b/web/src/components/dashboards/panels/ChartRenderer.vue
+@@ -203,11 +203,21 @@ export default defineComponent({
+         await nextTick();
+         await nextTick();
+         chart?.resize();
++        applySvgPrintViewBox();
+       } catch (e) {
+         console.error("Error during resizing", e);
+       }
+     };
+ 
++    // print-only: viewBox lets print CSS scale the SVG to the narrower page instead of clipping it (ECharts' SVG renderer omits it)
++    const applySvgPrintViewBox = () => {
++      if (!store.state.printMode || props.renderType !== "svg") return;
++      const svg = chartRef.value?.querySelector("svg");
++      const w = Number(svg?.getAttribute("width"));
++      const h = Number(svg?.getAttribute("height"));
++      if (svg && w > 0 && h > 0) svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
++    };
++
+     // currently hovered series state
+     const hoveredSeriesState: any = inject("hoveredSeriesState", null);
+ 
+@@ -491,6 +501,8 @@ export default defineComponent({
+         key: "dataZoomSelect",
+         dataZoomSelectActive: true,
+       });
++
++      applySvgPrintViewBox();
+     };
+ 
+     // dispatch tooltip action for all charts
+@@ -767,6 +779,7 @@ export default defineComponent({
+         try {
+           await nextTick();
+           chart?.resize();
++          applySvgPrintViewBox();
+         } catch (e) {
+           console.error("Error while resizing", e);
+         }
+diff --git a/web/src/views/Dashboards/RenderDashboardCharts.vue b/web/src/views/Dashboards/RenderDashboardCharts.vue
+index c538ddb1aba..9b5f0d5a5ee 100644
+--- a/web/src/views/Dashboards/RenderDashboardCharts.vue
++++ b/web/src/views/Dashboards/RenderDashboardCharts.vue
+@@ -1880,11 +1880,8 @@ export default defineComponent({
+     break-inside: avoid;
+   }
+ 
+-  /* Overflow must stay visible here: `hidden` clips each panel to its
+-   * grid-cell rectangle which, paired with print pagination, prevents
+-   * browsers from honouring panel heights. */
+   .displayDiv :deep(.grid-stack-item-content) {
+-    overflow: visible !important;
++    overflow: hidden !important;
+   }
+ }
+ 

@@ -1,0 +1,22 @@
+[
+  {
+    "title": "should add a print viewBox to a metric panel SVG when print mode is enabled",
+    "action": "new",
+    "verifies": "a metric panel's SVG has no viewBox before print and gains a `0 0 w h` viewBox after the print toolbar toggle"
+  },
+  {
+    "title": "should apply a print viewBox when the dashboard loads directly with ?print=true",
+    "action": "new",
+    "verifies": "loading the dashboard view with `?print=true` applies the SVG viewBox on mount without clicking the button"
+  },
+  {
+    "title": "should keep a non-metric panel on canvas and never add an SVG viewBox in print mode",
+    "action": "new",
+    "verifies": "a line (canvas) panel stays a `<canvas>` and gains no `<svg>`/viewBox when print mode is entered"
+  },
+  {
+    "title": "should give each of multiple metric panels its own print viewBox",
+    "action": "new",
+    "verifies": "each of two metric panels receives its own `0 0 w h` viewBox in print mode"
+  }
+]

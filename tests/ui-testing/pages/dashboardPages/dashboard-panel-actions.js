@@ -18,6 +18,8 @@ export default class DashboardactionPage {
     this.chartRenderer = page.locator('[data-test="dashboard-panel-table"], [data-test="chart-renderer"]');
     this.chartRendererCanvas = page.locator('[data-test="chart-renderer"]');
     this.chartRendererCanvasEl = page.locator('[data-test="chart-renderer"] canvas');
+    this.chartRendererSvg = page.locator('[data-test="chart-renderer"] svg');
+    this.printBtn = page.locator('[data-test="dashboard-print-btn"]');
     this.noDataElement = page.locator('[data-test="no-data"]');
     this.dashboardSearchInput = page.locator('[data-test="dashboard-search"]');
     this.discardPanelBtn = page.locator('[data-test="dashboard-panel-discard"]');
@@ -116,6 +118,29 @@ export default class DashboardactionPage {
   // Get the inner <canvas> element inside the chart-renderer
   getChartRendererCanvasElement() {
     return this.chartRendererCanvasEl;
+  }
+
+  // Get the inner <svg> element inside chart-renderer (metric panels only)
+  getChartRendererSvg() {
+    return this.chartRendererSvg;
+  }
+
+  // Get the print toggle button in the dashboard toolbar
+  getPrintBtn() {
+    return this.printBtn;
+  }
+
+  // Enter print mode via the toolbar toggle. Wait for the button to be visible
+  // and actionable first so the click is not swallowed while the header re-renders.
+  async enterPrintMode() {
+    await this.printBtn.waitFor({ state: "visible", timeout: 15000 });
+    await this.printBtn.click();
+  }
+
+  // Exit print mode (the button stays visible in print mode, flipping to "close").
+  async exitPrintMode() {
+    await this.printBtn.waitFor({ state: "visible", timeout: 15000 });
+    await this.printBtn.click();
   }
 
   // Get dashboard-error locator

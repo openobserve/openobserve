@@ -1,0 +1,26 @@
+{
+  "feature_slug": "dashboard-chart-print-svg",
+  "feature_title": "Dashboard Chart Print SVG Scaling",
+  "area": "Dashboards",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "dashboard-chart-print-svg.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Dashboards/dashboard-chart-print-svg.spec.js",
+  "playwright_group": "Dashboards-Charts",
+  "source_files": [
+    "web/src/components/dashboards/panels/ChartRenderer.vue",
+    "web/src/views/Dashboards/RenderDashboardCharts.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "Both changed files live under web/src/** (web/src/components/dashboards/panels/ChartRenderer.vue and web/src/views/Dashboards/RenderDashboardCharts.vue). No paths fall under enterprise/, o2_enterprise/, or src/enterprise/, and no enterprise-only keywords (cipher/SSO/SAML/RBAC/SDR/logo-management) appear in the paths. This is a plain open-source frontend change.",
+    "skip": "Not skipped. The change is user-facing: it alters dashboard chart rendering (SVG viewBox for print scaling in ChartRenderer) and panel overflow behavior (visible to hidden in RenderDashboardCharts) during print/export. No tests-added label or skip comment was present in the empty trigger comment, and the diff adds no E2E specs.",
+    "e2e": "E2E is warranted. A dashboard's printed/exported output is a user-exercisable UI flow: with SVG-rendered charts, the new viewBox must prevent clipping, and the overflow change must not clip panels. This is a visible behavior change in web/src dashboard chart rendering, so a regression test is appropriate.",
+    "area": "Area is Dashboards. Both files are dashboard-scoped: ChartRenderer renders dashboard chart panels and RenderDashboardCharts lays out the dashboard grid; sibling specs live under tests/ui-testing/playwright-tests/Dashboards/.",
+    "group": "playwright_group Dashboards-Charts is the closest existing matrix shard. It holds chart-rendering specs (custom-charts.spec.js, dashboard-html-chart.spec.js) in ci_matrix_cloud.json with actual_folder Dashboards, matching this chart-rendering/print change better than Dashboards-Core or Dashboards-Settings.",
+    "existing_tests": "No E2E specs in the diff. The changed files are application source (.vue) under web/src, not Playwright specs under tests/ui-testing/playwright-tests/, so there is no existing E2E coverage to extend or reconcile."
+  }
+}

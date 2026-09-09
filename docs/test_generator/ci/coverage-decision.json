@@ -1,0 +1,13 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/Dashboards/dashboard-chart-print-svg.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Dashboards/dashboard-metric-camelcase.spec.js",
+    "tests/ui-testing/playwright-tests/Dashboards/dashboardtype.spec.js",
+    "tests/ui-testing/playwright-tests/Dashboards/dashboard.spec.js"
+  ],
+  "needs_registration": true,
+  "registration_group": "Dashboards-Charts",
+  "registration_file": "tests/ui-testing/ci-matrix/ci_matrix.json",
+  "rationale": "No existing spec exercises print mode, the print button, or the SVG viewBox. The closest matches (dashboard-metric-camelcase.spec.js for metric/SVG panels, dashboardtype.spec.js for canvas panels) only assert that a chart renders with data and never touch print. The feature is a self-contained behavior (print-mode SVG scaling) with its own spec_path and playwright_group (Dashboards-Charts) already assigned in run-context, so a brand-new spec is the correct, non-duplicative action. It must be registered into ci_matrix.json under Dashboards-Charts."
+}
