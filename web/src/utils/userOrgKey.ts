@@ -13,14 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-/**
- * Compute an opaque SHA-256 hash of "email:orgIdentifier".
- * Falls back to a synchronous djb2 hash in environments without crypto.subtle.
- *
- * Shared scoping identity for any per-user, per-org browser-local storage
- * (IndexedDB records, localStorage keys) — a shared org otherwise leaks one
- * user's data to the next login on the same browser profile.
- */
+/** Hash of "email:org" (djb2 without crypto.subtle); an org-only key leaks one user's data to the next login. */
 export const computeUserOrgKey = async (
   userEmail: string,
   orgIdentifier: string,

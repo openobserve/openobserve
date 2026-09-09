@@ -1,22 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 //
-// Validation schema for ScoreConfigDialog.vue (online-evals score-config drawer).
-// Client-side validation: (1) name — required + a create-only lowercase-slug
-// pattern; (2) min/max — each must be a non-empty number, and Min must be
-// strictly less than Max, but ONLY when the data type is numeric (the inputs
-// are hidden and the values are dropped from the payload for
-// categorical/boolean, so a blank must not block Save there — the check is
-// gated on dataType in superRefine). There is NO "≥1 category" rule.
-//
-// The component owns <OForm>: it creates the form with `useOForm` and reads it
-// reactively through `form.useStore` (single source of truth, no mirror ref, no
-// `v-model`). That read view (`formValues`) drives the `dataType`/
-// `healthyDirection`/`categories` `v-if` branches. The real text/number inputs
-// (name/description/min/max/healthy values) are plain form-owned `name=` fields.
-// The bespoke choice grids (dataType radio-cards, healthy-threshold
-// radios/checkboxes — several embed inline number inputs, so they have no OForm*
-// representation) plus the categories tag-entry write directly into the form via
-// `form.setFieldValue` from each control's own `@change`/`@click` handler.
+// min/max are validated only for numeric configs; categorical/boolean hide and drop them, so no "≥1 category" rule.
 
 import { z } from "zod";
 import type { ScoreDataType } from "@/services/online-evals.service";
@@ -91,10 +75,7 @@ export const makeScoreConfigSchema = (
           message: t("onlineEvals.scoreConfig.validation.maxRequired"),
         });
       }
-      // An inverted or zero-width range (min >= max) corrupts every downstream
-      // normalization that divides by (max - min) — reject it here rather than
-      // at the point of division. Only checked once both sides are usable
-      // numbers so this never masks the required-field messages above.
+      // min >= max corrupts every normalization dividing by (max - min); checked only once both parse.
       if (
         !isBlankNumber(val.min) &&
         !isBlankNumber(val.max) &&

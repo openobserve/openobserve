@@ -14,19 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!-- No error text, ever — a transient search failure degrades to the empty
-     state below, not a broken widget. A brief skeleton while a real score
-     might still land, so the chips popping in doesn't read as a layout jump.
-     A metric-chip badge per scorer, styled to match the other header badges
-     (Service/Duration/...) on this same toolbar row. A bare number doesn't
-     say what it measures or why the judge landed there, so every chip
-     carries that on hover.
-
-     A span can carry far more scores than this row has room for — an eval
-     job pinning a dozen scorers, not just the two or three a manual
-     evaluation adds — so only the first few render as chips; the rest live
-     behind one "+N more" chip that opens the full list on click instead of
-     scattering the header. -->
+<!-- A failed search degrades to the empty state, and only the first few scores render; the rest fold behind "+N more". -->
 <template>
   <template v-if="loading && chips.length === 0">
     <OSkeleton
@@ -117,9 +105,7 @@ import TraceScoreDetail from "./TraceScoreDetail.vue";
 import { useTraceScoreChips } from "./composables/useTraceScoreChips";
 import type { TraceScoreScope } from "./utils/traceScoreSql";
 
-/** Chips shown directly on the header before folding the rest behind
- *  "+N more" — enough to be useful at a glance without crowding the row
- *  every other badge (Service/Duration/...) shares. */
+/** Chips shown before folding the rest behind "+N more", so the row shared with other badges stays readable. */
 const MAX_VISIBLE_CHIPS = 2;
 
 const { t } = useI18nTyped();
@@ -127,9 +113,7 @@ const { t } = useI18nTyped();
 const props = defineProps<{
   scope: TraceScoreScope;
   targetId: string;
-  /** Trace/span start time in microseconds — the lower bound of the search
-   *  window. Scores are written by an eval job well after the trace lands,
-   *  so the upper bound is always "now", not the trace's own end time. */
+  /** Lower bound of the search window; the upper bound is "now", since scores land well after the trace. */
   startTimeUs: number;
 }>();
 
@@ -146,9 +130,7 @@ watch(
   { immediate: true },
 );
 
-/** Re-runs the same query — for a caller that just recorded a new score
- *  (e.g. a manual annotation) and wants the chip row to reflect it without
- *  waiting for props to change. */
+/** Lets a caller that just recorded a score refresh the chips without waiting for props to change. */
 function refresh() {
   void load(props.scope, props.targetId, props.startTimeUs);
 }

@@ -45,8 +45,7 @@ const stubs = {
   },
   OIcon: { template: `<i />` },
   OTooltip: { template: `<span><slot /><slot name="content" /></span>` },
-  // A real, self-contained toggle rather than a static passthrough — the
-  // overflow behaviour hinges on the panel actually opening on click.
+  // A real toggle, not a passthrough: the overflow behaviour hinges on the panel opening on click.
   ODropdown: {
     data() {
       return { isOpen: false };

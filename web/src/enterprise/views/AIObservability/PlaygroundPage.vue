@@ -469,11 +469,9 @@ function cellFor(variantId: string, rowKey: string): PlaygroundCell | undefined 
 // ── loading ───────────────────────────────────────────────────────
 
 onMounted(async () => {
-  // Drop the old org-only (pre-user-scoping) keys so a stale prior user's
-  // drafts/session can never resurface for whoever logs in next.
+  // Drop the old org-only keys so a prior user's drafts never resurface for the next login.
   removeLegacyStorage();
-  // First, and before anything that can fail or take a round trip: the bench
-  // is the work, and it must be on screen as soon as possible.
+  // Before anything that can fail or take a round trip: the bench must be on screen first.
   await restoreSession();
   applyHandoff();
   await Promise.all([loadProviders(), loadDatasets(), loadScorers()]);
@@ -1152,11 +1150,7 @@ const recentDrafts = ref<RecentDraftEntry[]>([]);
 /** Identifies the draft being worked on now; a new one starts on Reset. */
 const draftSessionId = ref(playgroundId("draft"));
 
-// Same identity hash O2AIChat's history uses (computeUserOrgKey) — an org-only
-// key leaks one user's drafts/session to the next login on a shared browser
-// profile, so scoping must fold in the user too. Cached on the raw "email:org"
-// pair so an org/user switch recomputes it, and everything else keeps reusing
-// the resolved value without re-hashing on every read/write.
+// Same hash O2AIChat uses; an org-only key leaks one user's drafts to the next login on a shared profile.
 let cachedUserOrgRaw = "";
 let cachedUserOrgKeyPromise: Promise<string> | null = null;
 

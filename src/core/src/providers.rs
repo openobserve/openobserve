@@ -70,13 +70,7 @@ fn validate_provider_config(provider: &table::providers::Provider) -> Result<(),
         .map_err(|e| ProviderError::InvalidConfig(e.to_string()))
 }
 
-/// Rewrites a submitted endpoint into the complete URL model execution will
-/// call, so storage holds the resolved URL rather than the base URL it may have
-/// been entered as.
-///
-/// A blank endpoint stays `None` rather than being materialized into the row:
-/// the provider default is then resolved on every read, so changing a default
-/// still reaches every provider that never configured one.
+/// A blank endpoint stays `None` so a changed default still reaches providers that never set one.
 #[cfg(feature = "enterprise")]
 fn normalize_provider_endpoint(
     provider: &mut table::providers::Provider,
