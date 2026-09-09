@@ -260,6 +260,11 @@ pub(crate) fn fusable_range_func(name: &str) -> Option<Box<dyn RangeFunc>> {
     name.parse::<Func>().ok()?.range_func()
 }
 
+/// The range function a bare instant selector streams as; it keeps the metric name.
+pub(crate) fn instant_lookback_func() -> std::sync::Arc<dyn RangeFunc> {
+    std::sync::Arc::new(last_over_time::LastOverTimeFunc::new())
+}
+
 pub(crate) fn eval_range<F>(data: Value, func: F, eval_ctx: &EvalContext) -> Result<Value>
 where
     F: RangeFunc,
