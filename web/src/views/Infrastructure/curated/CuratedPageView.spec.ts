@@ -392,6 +392,107 @@ describe("CuratedPageView", () => {
     });
   });
 
+  // ── Tab ↔ URL sync ───────────────────────────────────────────────────────
+
+  // The tab used to live only in memory: clicking one left the URL untouched, so
+  // it could not be shared or bookmarked and a reload always landed on tabs[0].
+  // These pin BOTH directions and the guard that stops them ping-ponging.
+  describe("tab ↔ URL sync", () => {
+    const query = () => router.currentRoute.value.query;
+
+    /** TabList only mutates the injected ref; the page owns the URL, so that is what a click looks like here. */
+    const switchTabTo = async (tabId: string) => {
+      const render = wrapper.findComponent({ name: "RenderDashboardCharts" });
+      const injected = (render.vm as any).$.provides["selectedTabId"] as Ref<string | null>;
+      injected.value = tabId;
+      await flushPromises();
+    };
+
+    it("a tab switch writes ?tab= so the section can be shared and bookmarked", async () => {
+      wrapper = await mountView({}, { dashboard: ref(dashboardFixture(["summary", "health"])) });
+      await switchTabTo("health");
+      expect(query().tab).toBe("health");
+    });
+
+    it("the landing default is written too, so a URL is shareable before any click", async () => {
+      wrapper = await mountView({}, { dashboard: ref(dashboardFixture(["summary", "health"])) });
+      expect(query().tab).toBe("summary");
+    });
+
+    it("keeps the params it does not own — an org-scoped share must stay org-scoped", async () => {
+      wrapper = await mountView(
+        {},
+        { dashboard: ref(dashboardFixture(["summary", "health"])) },
+        { org_identifier: "acme", period: "15m", "var-cluster": "prod-eu" },
+      );
+      await switchTabTo("health");
+      expect(query().org_identifier).toBe("acme");
+      expect(query().period).toBe("15m");
+      expect(query()["var-cluster"]).toBe("prod-eu");
+    });
+
+    it("REPLACES rather than pushes, so Back leaves the page instead of walking every tab", async () => {
+      wrapper = await mountView({}, { dashboard: ref(dashboardFixture(["summary", "health"])) });
+      (router.push as any).mockClear();
+      await switchTabTo("health");
+      expect(router.push).not.toHaveBeenCalled();
+      expect(query().tab).toBe("health");
+    });
+
+    it("a URL change selects the tab — Back and Forward move the page, not just the address bar", async () => {
+      wrapper = await mountView({}, { dashboard: ref(dashboardFixture(["summary", "health"])) });
+      await router.replace({ path: "/infra/kubernetes", query: { tab: "health" } });
+      await flushPromises();
+      expect(injectedTabIds[injectedTabIds.length - 1]).toBe("health");
+    });
+
+    it("never writes a null tab while the dashboard is still resolving", async () => {
+      // selectedTabId starts null, and ?tab=null|undefined is a URL nobody can reopen.
+      wrapper = await mountView({}, { dashboard: ref(null) });
+      expect(query().tab).toBeUndefined();
+    });
+
+    it("a stale bookmark's unknown tab is CORRECTED in the URL, never persisted", async () => {
+      // Landing rewrites the bogus value to the tab actually shown, so re-sharing
+      // the address bar hands the next reader the same page this one sees.
+      wrapper = await mountView(
+        {},
+        { dashboard: ref(dashboardFixture(["summary", "health"])) },
+        { tab: "utilization" },
+      );
+      expect(injectedTabIds[0]).toBe("summary");
+      expect(query().tab).toBe("summary");
+    });
+
+    it("adds no second navigation on top of a drilldown that already carries the tab", async () => {
+      // The drilldown pushes ?tab=health itself. The writer then sees the tab
+      // change and would replace the identical URL — a redundant navigation on
+      // every bubble click, and one more entry for Back to unwind.
+      wrapper = await mountView({}, { dashboard: ref(dashboardFixture(["summary", "health"])) });
+      const replaceSpy = vi.spyOn(router, "replace");
+      document.dispatchEvent(
+        new CustomEvent(FLEET_DRILLDOWN_EVENT, {
+          detail: { cluster: "prod-eu" },
+          bubbles: true,
+        }),
+      );
+      await flushPromises();
+      expect(query().tab).toBe("health");
+      expect(replaceSpy).not.toHaveBeenCalled();
+    });
+
+    it("writes ONCE per switch — the echo must not turn into a second navigation", async () => {
+      // The write wakes the URL→tab watcher, which re-seeds the tab the write
+      // just set. Only a call count catches a second replace riding that echo.
+      wrapper = await mountView({}, { dashboard: ref(dashboardFixture(["summary", "health"])) });
+      const replaceSpy = vi.spyOn(router, "replace");
+      await switchTabTo("health");
+      await flushPromises();
+      expect(replaceSpy).toHaveBeenCalledTimes(1);
+      expect(query().tab).toBe("health");
+    });
+  });
+
   // ── Refresh triggers (§6, §6.1) ──────────────────────────────────────────
 
   describe("refresh triggers", () => {
@@ -1447,6 +1548,58 @@ describe("CuratedPageView", () => {
       expect(manager.getVariable("namespace", "global")?.value).toEqual(["argocd"]);
       // ...and the page must have pushed it through to what panels read.
       expect(committedValue(manager, "namespace")).toEqual(["argocd"]);
+    });
+
+    it("a tab switch does not reset the cluster picker the reader chose", async () => {
+      // Writing ?tab= wakes the drilldown watcher, whose second half resets
+      // `cluster` whenever ?var-cluster= is absent — and a tab write never adds
+      // it. Unguarded, every tab click throws away a cluster picked by hand:
+      // the "filters reset on tab switch" bug, re-entering through the URL sync.
+      const dashboardData = {
+        ...dashboardFixture(["overview", "workloads"]),
+        variables: {
+          showDynamicFilters: false,
+          list: [
+            {
+              name: "cluster",
+              label: "Cluster",
+              type: "query_values",
+              multiSelect: false,
+              scope: "global",
+              value: "prod-eu",
+              options: [
+                { label: "prod-eu", value: "prod-eu" },
+                { label: "prod-us", value: "prod-us" },
+              ],
+              query_data: {
+                stream: "k8s_pod_memory_usage",
+                stream_type: "metrics",
+                field: "k8s_cluster",
+                max_record_size: 100,
+                filter: [],
+              },
+            },
+          ],
+        },
+      };
+      wrapper = await mountView({}, { dashboard: ref(dashboardData) });
+
+      const manager = await readyManager(dashboardData);
+      wrapper
+        .findComponent({ name: "RenderDashboardCharts" })
+        .vm.$emit("variablesManagerReady", manager);
+      await flushPromises();
+
+      manager.updateVariableValue("cluster", "global", undefined, undefined, "prod-us");
+      await flushPromises();
+
+      const render = wrapper.findComponent({ name: "RenderDashboardCharts" });
+      const injected = (render.vm as any).$.provides["selectedTabId"] as Ref<string | null>;
+      injected.value = dashboardData.tabs[1].tabId;
+      await flushPromises();
+
+      expect(router.currentRoute.value.query.tab).toBe(dashboardData.tabs[1].tabId);
+      expect(manager.getVariable("cluster", "global")?.value).toBe("prod-us");
     });
 
     it("a picker change does NOT re-resolve — only the selection moved", async () => {

@@ -156,6 +156,16 @@ const showTabs = computed(() => visibleTabs.value.length > 1);
 
 const selectedTabId = ref<string | null>(null);
 provide("selectedTabId", selectedTabId);
+
+/** True while WE are writing ?tab=, so the URL→tab watcher below ignores our own echo. */
+const isInternalUrlUpdate = ref(false);
+
+/** The tab the URL asks for, or null when it names nothing currently rendered. */
+const requestedTabId = (tabs: any[]) => {
+  const requested = route.query.tab;
+  return tabs.some((tab) => tab.tabId === requested) ? (requested as string) : null;
+};
+
 watch(
   visibleTabs,
   (tabs) => {
@@ -165,11 +175,34 @@ watch(
     }
     if (!tabs.some((tab) => tab.tabId === selectedTabId.value)) {
       // A cross-tab drilldown lands with ?tab=, which must outrank the tabs[0] default.
-      const requested = route.query.tab;
-      const landing = tabs.some((tab) => tab.tabId === requested) ? (requested as string) : null;
-      selectedTabId.value = landing ?? tabs[0].tabId;
+      selectedTabId.value = requestedTabId(tabs) ?? tabs[0].tabId;
     }
   },
+  { immediate: true },
+);
+
+/**
+ * The tab is shareable only if it is IN the URL, so the resolved selection is
+ * written back — including the seeded default, which is what makes a plain
+ * landing URL copyable without the reader first clicking something.
+ *
+ * `replace`, never `push` (ViewDashboard :1487): a tab is a view of one page,
+ * so Back should leave the page rather than walk every tab the reader opened.
+ */
+watch(
+  selectedTabId,
+  (tabId) => {
+    // Pre-resolution null would write ?tab=undefined and then have to take it back.
+    if (tabId === null) return;
+    // The drilldown's own push already carries this tab; re-writing it would duplicate the navigation.
+    if (route.query.tab === tabId) return;
+    isInternalUrlUpdate.value = true;
+    void router
+      .replace({ query: { ...route.query, tab: tabId } })
+      .finally(() => (isInternalUrlUpdate.value = false));
+  },
+  // The seeding watcher above resolves the default during setup, BEFORE this one exists; without
+  // immediate it would never see that first value and a landing URL would stay unshareable.
   { immediate: true },
 );
 
@@ -340,19 +373,20 @@ onBeforeUnmount(() => document.removeEventListener(FLEET_DRILLDOWN_EVENT, onClus
  * is re-entered instead, so the drilldown's own two params are applied here.
  * Covers Back and Forward too, which restore a query and nothing else.
  *
- * Keyed on those two ALONE: a manual tab click never writes ?tab=, so reacting
- * to the whole query would snap the tab back on unrelated param churn.
+ * Keyed on those two ALONE: reacting to the whole query would snap the tab back
+ * on unrelated param churn.
  */
 watch(
   () => [route.query.tab, route.query["var-cluster"]] as const,
   () => {
+    // Our own ?tab= write echoes back here, and it never carries var-cluster — re-entering
+    // would hit the reset below and drop a hand-picked cluster on every tab click.
+    if (isInternalUrlUpdate.value) return;
     const query = route.query;
     const tabs = visibleTabs.value;
     if (tabs.length > 0) {
       // Falls back exactly as the seeding watcher does, so a Back to a tab-less URL lands on the default rather than sticking.
-      const requested = query.tab;
-      const landing = tabs.some((tab) => tab.tabId === requested) ? (requested as string) : null;
-      selectedTabId.value = landing ?? tabs[0].tabId;
+      selectedTabId.value = requestedTabId(tabs) ?? tabs[0].tabId;
     }
     const manager = variablesManager.value;
     if (!manager) return;
