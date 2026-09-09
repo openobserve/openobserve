@@ -209,13 +209,19 @@ export class TracesPage {
   }
 
   async navigateToTraces() {
-    await this.tracesMenuItem.click();
     // Cloud: sidebar click may silently fail — verify URL and fallback to direct navigation
     if (isCloudEnvironment()) {
+      await this.tracesMenuItem.click();
       await this.page.waitForURL('**/traces**', { timeout: 5000 }).catch(async () => {
         await this.navigateToTracesUrl();
       });
+      return;
     }
+    // The sidebar click can be swallowed by the nav flyout under load, so retry until the traces route loads.
+    await expect(async () => {
+      await this.tracesMenuItem.click();
+      await this.page.waitForURL('**/traces**', { timeout: 5000 });
+    }).toPass({ timeout: 30000, intervals: [500, 1000, 2000] });
   }
 
   async validateTracesPage() {

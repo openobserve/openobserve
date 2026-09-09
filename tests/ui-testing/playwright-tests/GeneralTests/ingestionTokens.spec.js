@@ -182,6 +182,9 @@ test.describe("Org-Level Ingestion Tokens", () => {
         await pageManager.ingestionTokensPage.fillTokenName(uniqueName);
         await pageManager.ingestionTokensPage.clickCreate();
 
+        // Gate on create success before reloading — reload cancels the in-flight POST if the token hasn't persisted yet.
+        await pageManager.ingestionTokensPage.verifySuccessMessage('Token created successfully.');
+
         // Reload page to dismiss all dialogs cleanly (avoids overlay race conditions)
         await page.reload();
         await pageManager.ingestionTokensPage.titleHeading.waitFor({ state: 'visible', timeout: 10000 });

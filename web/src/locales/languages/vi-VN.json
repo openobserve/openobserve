@@ -9794,6 +9794,8 @@
       "outputTokens": "Token đầu ra",
       "out": "Ra",
       "totalCost": "Tổng chi phí",
+      "scores": "Điểm số",
+      "notScoredYet": "Chưa được chấm điểm",
       "preview": "Xem trước",
       "input": "Đầu vào",
       "output": "Đầu ra",
@@ -11108,6 +11110,10 @@
         "runSummary": "{trials} · {scorers}",
         "progress": "Tiến độ tác vụ",
         "scoring": "Chấm điểm",
+        "tasks": "Tác vụ",
+        "scores": "Điểm số",
+        "taskDistribution": "{succeeded} thành công · {failed} thất bại · {pending} đang chờ · {skipped} bỏ qua",
+        "scoreOutcomeDistribution": "{scored} đã chấm điểm · {failed} thất bại · {pending} đang chờ · {skipped} bỏ qua · {unscored} chưa chấm điểm",
         "scoringDistribution": "{success} thành công · {failed} thất bại · {pending} đang chờ · {skipped} bỏ qua",
         "compare": "So sánh",
         "comparePicker": {
@@ -11851,6 +11857,8 @@
       "schemaInvalidJson": "Schema phải là JSON hợp lệ.",
       "schemaIgnored": "Lược đồ · Bị nhà cung cấp này bỏ qua",
       "schemaUnsupported": "Nhà cung cấp này không có trường đầu ra có cấu trúc. Lược đồ vẫn được giữ trong cột này nhưng không được gửi, và mô hình trả lời bằng văn bản thuần.",
+      "schemaApproximated": "Schema · Được xấp xỉ bởi nhà cung cấp này",
+      "schemaApproximatedHelp": "Nhà cung cấp này chỉ hỗ trợ chế độ JSON, không hỗ trợ JSON schema. Yêu cầu được gửi ở chế độ JSON với schema được nhắc lại trong prompt, do đó kết quả trả về là JSON nhưng cấu trúc của nó không được đảm bảo.",
       "outputPlaceholder": "Đầu ra sẽ xuất hiện tại đây — nhấn Chạy.",
       "outputNotRun": "Chưa chạy",
       "retry": "Thử lại",
@@ -11954,6 +11962,12 @@
   },
   "onlineEvals": {
     "versionPrefix": "v",
+    "traceScoreChip": {
+      "reasoning": "Tại sao",
+      "scoredAt": "Đã chấm điểm lúc {time}",
+      "moreCount": "+{count} nữa",
+      "allScores": "Tất cả điểm số ({count})"
+    },
     "importNameRequired": "Tên *",
     "importNewNameRequired": "Tên mới *",
     "importDataTypeRequired": "Loại dữ liệu *",
@@ -12224,8 +12238,10 @@
       "sectionTitle": "Nhà cung cấp",
       "nameLabel": "Tên",
       "typeLabel": "Loại nhà cung cấp",
-      "endpointLabel": "Điểm cuối",
-      "endpointPlaceholder": "URL completions đầy đủ, ví dụ: https://your-host/v1/chat/completions",
+      "endpointLabel": "URL gốc",
+      "endpointPlaceholder": "URL gốc, ví dụ: https://your-host/v1",
+      "endpointHelpDefault": "Để trống để sử dụng mặc định: {url}",
+      "endpointHelpRequired": "Bắt buộc — nhà cung cấp này không có URL gốc mặc định.",
       "defaultModelLabel": "Mô hình mặc định",
       "availableModelsLabel": "Mô hình có sẵn",
       "apiKeyLabel": "Khóa API",
@@ -12234,7 +12250,6 @@
       "authSection": "Xác thực",
       "authEditNote": "Thông tin xác thực không thể đọc lại. Để kiểm tra nhà cung cấp yêu cầu xác thực, hãy nhập khóa API của nó.",
       "cannotRename": "Không thể đổi tên sau khi tạo.",
-      "availableModelsHelp": "Tùy chọn. Danh sách các mô hình được phân cách bằng dấu phẩy có sẵn trên Nhà cung cấp này.",
       "saveError": "Không lưu được nhà cung cấp",
       "nameRequired": "Tên nhà cung cấp là bắt buộc",
       "typeRequired": "Loại nhà cung cấp là bắt buộc",
@@ -12341,7 +12356,8 @@
         "nameRequired": "Tên là bắt buộc",
         "nameFormat": "Chỉ sử dụng chữ thường, số và gạch dưới",
         "minRequired": "Tối thiểu là bắt buộc",
-        "maxRequired": "Tối đa là bắt buộc"
+        "maxRequired": "Tối đa là bắt buộc",
+        "maxNotGreaterThanMin": "Max phải lớn hơn Min"
       },
       "import": {
         "title": "Nhập cấu hình điểm số",
@@ -12912,7 +12928,7 @@
     },
     "empty": {
       "title": "Chưa có nhà cung cấp LLM",
-      "description": "Nhà cung cấp LLM lưu trữ thông tin kết nối (điểm cuối + thông tin xác thực) cho các mô hình ngôn ngữ mà người chấm điểm LLM Judge gọi. Thêm một nhà cung cấp để bắt đầu chạy đánh giá dựa trên thẩm phán."
+      "description": "Các nhà cung cấp LLM lưu trữ chi tiết kết nối (URL gốc + thông tin xác thực) cho các mô hình ngôn ngữ mà các bộ chấm điểm LLM Judge của bạn gọi đến. Thêm một nhà cung cấp để bắt đầu chạy các đánh giá dựa trên LLM Judge."
     }
   },
   "logs": {
@@ -16000,6 +16016,12 @@
     "aiQueueDetail": "Hàng đợi",
     "aiQueueReview": "Xem xét hàng đợi",
     "aiDatasetDetail": "Tập dữ liệu",
+    "aiExperimentCreate": "Thử nghiệm mới",
+    "aiExperimentCompare": "So sánh các thử nghiệm",
+    "aiExperimentDetail": "Thử nghiệm",
+    "aiRemoteTaskCreate": "Tác vụ từ xa mới",
+    "aiRemoteTaskEdit": "Chỉnh sửa tác vụ từ xa",
+    "aiRemoteTaskDetail": "Tác vụ từ xa",
     "notFound": "404 - Không tìm thấy",
     "createReport": "Tạo báo cáo",
     "addCheck": "Thêm kiểm tra",

@@ -41,6 +41,7 @@ use crate::{
     load_series::{LoadedMetrics, PartitionedMetrics, selector_load_data_from_datafusion},
     micros,
     promql::rewrite::remove_filter_all,
+    utils::metric_name,
 };
 
 /// One context per selected schema with its scan stats and whether the matchers still apply.
@@ -54,6 +55,7 @@ impl Engine {
     pub(super) async fn eval_vector_selector(
         &mut self,
         selector: &VectorSelector,
+        ctxs: Option<SelectorContexts>,
     ) -> Result<Vec<RangeValue>> {
         if self.result_type.is_none() {
             self.result_type = Some("vector".to_string());
@@ -61,7 +63,7 @@ impl Engine {
 
         let selector = named_selector(selector.clone(), "VectorSelector")?;
 
-        let data = self.selector_load_data_owned(&selector, None, None).await?;
+        let data = self.selector_load_data_owned(&selector, None, ctxs).await?;
 
         let metrics_cache = match data.get_range_values() {
             Some(v) => v,
@@ -499,12 +501,7 @@ pub(super) fn named_selector(mut selector: VectorSelector, kind: &str) -> Result
     if selector.name.is_some() {
         return Ok(selector);
     }
-    let Some(name) = selector
-        .matchers
-        .find_matchers(NAME_LABEL)
-        .first()
-        .map(|mat| mat.value.clone())
-    else {
+    let Some(name) = metric_name(&selector) else {
         return Err(DataFusionError::Plan(format!(
             "{kind}: metric name is required"
         )));
@@ -688,7 +685,7 @@ mod tests {
             at: None,
         };
 
-        engine.eval_vector_selector(&selector).await.unwrap();
+        engine.eval_vector_selector(&selector, None).await.unwrap();
 
         let matchers = captured.lock().unwrap().take().unwrap();
         assert!(matchers.matchers.iter().all(|m| m.name != NAME_LABEL));
@@ -726,7 +723,7 @@ mod tests {
             at: None,
         };
 
-        let result = engine.eval_vector_selector(&selector).await;
+        let result = engine.eval_vector_selector(&selector, None).await;
         assert!(result.is_ok());
         let values = result.unwrap();
         assert_eq!(values.len(), 0); // Mock provider returns empty data
@@ -762,7 +759,7 @@ mod tests {
             at: None,
         };
 
-        let result = engine.eval_vector_selector(&selector).await;
+        let result = engine.eval_vector_selector(&selector, None).await;
         assert!(result.is_ok());
         let values = result.unwrap();
         assert_eq!(values.len(), 0); // Mock provider returns empty data
@@ -798,7 +795,7 @@ mod tests {
             at: None,
         };
 
-        let result = engine.eval_vector_selector(&selector).await;
+        let result = engine.eval_vector_selector(&selector, None).await;
         assert!(result.is_ok());
         let values = result.unwrap();
         assert_eq!(values.len(), 0); // Mock provider returns empty data
@@ -871,7 +868,7 @@ mod tests {
             at: None,
         };
 
-        let result = engine.eval_vector_selector(&selector).await;
+        let result = engine.eval_vector_selector(&selector, None).await;
 
         assert!(result.is_err(), "expected an error, not a panic");
         assert!(
