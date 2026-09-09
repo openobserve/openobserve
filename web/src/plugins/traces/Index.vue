@@ -437,14 +437,8 @@ let currentSearchTraceId: string | null = null;
 let currentCountTraceId: string | null = null;
 // The processed WHERE clause from the last buildSearch() call — used for the count query
 let builtWhereClause = "";
-/**
- * Tracks per-request streaming partition state.
- * Each backend partition emits a search_response_metadata event; each chunk
- * within that partition emits a search_response_hits event.
- * We decide replace vs append using the same pattern as useSearchResponseHandler.
- */
-const tracesPartitionMap: Record<string, { partition: number; chunks: Record<number, number> }> =
-  {};
+// A page's stream can open with an empty batch, so only an actual write may end the replace phase.
+const tracesRequestState: Record<string, { hasWritten: boolean }> = {};
 
 const selectedStreamName = computed(() => searchObj.data.stream.selectedStream.value);
 
@@ -840,7 +834,7 @@ async function getQueryData(isPagination: boolean = false, isSort: boolean = fal
 
     // Cancel any in-flight stream before starting a new one
     if (currentSearchTraceId) {
-      if (tracesPartitionMap[currentSearchTraceId]) delete tracesPartitionMap[currentSearchTraceId];
+      if (tracesRequestState[currentSearchTraceId]) delete tracesRequestState[currentSearchTraceId];
 
       cancelStreamQueryBasedOnRequestId({
         trace_id: currentSearchTraceId,
@@ -852,7 +846,7 @@ async function getQueryData(isPagination: boolean = false, isSort: boolean = fal
     // Generate a unique ID for this search request
     const searchTraceId = getUUID().replace(/-/g, "");
     currentSearchTraceId = searchTraceId;
-    tracesPartitionMap[searchTraceId] = { partition: 0, chunks: {} };
+    tracesRequestState[searchTraceId] = { hasWritten: false };
 
     const isSpansMode = searchObj.meta.searchMode === "spans";
     const sortCol = searchObj.meta.resultGrid.sortBy || "start_time";
@@ -914,21 +908,13 @@ async function getQueryData(isPagination: boolean = false, isSort: boolean = fal
       },
       {
         data: (_payload: any, response: any) => {
-          // Each metadata event signals a new backend partition — advance the counter
-          if (response.type === "search_response_metadata") {
-            tracesPartitionMap[searchTraceId].partition++;
-          }
-
           if (
             response.type === "search_response_metadata" ||
             response.type === "search_response_hits"
           ) {
-            // Track individual hit chunks within the current partition
-            if (response.type === "search_response_hits") {
-              const p = tracesPartitionMap[searchTraceId].partition;
-              tracesPartitionMap[searchTraceId].chunks[p] =
-                (tracesPartitionMap[searchTraceId].chunks[p] ?? 0) + 1;
-            }
+            // A missing entry means a newer request owns the grid now.
+            const requestState = tracesRequestState[searchTraceId];
+            if (!requestState) return;
 
             const rawHits: any[] = response.content?.results?.hits || [];
             if (rawHits.length === 0) return;
@@ -953,12 +939,7 @@ async function getQueryData(isPagination: boolean = false, isSort: boolean = fal
             //   }
             // }
 
-            const partition = tracesPartitionMap[searchTraceId]?.partition ?? 1;
-            const chunkCount = tracesPartitionMap[searchTraceId]?.chunks[partition] ?? 0;
-            const isChunkedHits = chunkCount > 1;
-            // appendResult: true when on a later partition or a later chunk within
-            // the current partition (mirrors useSearchResponseHandler logic)
-            const appendResult = partition > 1 || isChunkedHits;
+            const isFirstWrite = !requestState.hasWritten;
 
             const formattedHits =
               searchObj.meta.searchMode === "traces" ? formatTracesMetaData(rawHits) : rawHits;
@@ -968,12 +949,10 @@ async function getQueryData(isPagination: boolean = false, isSort: boolean = fal
             }
 
             isLLMSpanPresent.value =
-              (!appendResult ? false : isLLMSpanPresent.value) ||
+              (isFirstWrite ? false : isLLMSpanPresent.value) ||
               formattedHits.some((hit: any) => isLLMTrace(hit));
 
-            // Replace hits on the first partition of a pagination fetch (clears the
-            // previous page) or on the very first data chunk of a fresh search
-            if ((isPagination && partition === 1) || !appendResult) {
+            if (isFirstWrite) {
               searchObj.data.queryResults.hits = formattedHits;
             } else {
               searchObj.data.queryResults.hits = [
@@ -981,6 +960,7 @@ async function getQueryData(isPagination: boolean = false, isSort: boolean = fal
                 ...formattedHits,
               ];
             }
+            requestState.hasWritten = true;
             searchObj.data.queryResults.from = queryReq.query.from;
 
             updateFieldValues(rawHits);
@@ -1027,12 +1007,18 @@ async function getQueryData(isPagination: boolean = false, isSort: boolean = fal
           });
 
           currentSearchTraceId = null;
-          delete tracesPartitionMap[searchTraceId];
+          // Logs keeps the last rows under an error banner, so a failed page must not blank here.
+          delete tracesRequestState[searchTraceId];
         },
         complete: (_payload: any) => {
           searchObj.loading = false;
           currentSearchTraceId = null;
-          delete tracesPartitionMap[searchTraceId];
+          // An exhausted page must not leave the previous page under the new page number.
+          if (tracesRequestState[searchTraceId]?.hasWritten === false) {
+            searchObj.data.queryResults.hits = [];
+            isLLMSpanPresent.value = false;
+          }
+          delete tracesRequestState[searchTraceId];
           if (!isPagination) {
             fetchTracesCount();
           }
@@ -1082,6 +1068,8 @@ const cancelSearch = () => {
     trace_id: currentSearchTraceId,
     org_id: searchObj.organizationIdentifier,
   });
+  // Cancelling tears down the listeners, so no terminal event will release this entry.
+  delete tracesRequestState[currentSearchTraceId];
   currentSearchTraceId = null;
   searchObj.loading = false;
 };
