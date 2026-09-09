@@ -199,17 +199,6 @@ async fn process_org_tasks(
             continue;
         }
 
-        if task.status == "failed" && task.attempts >= MAX_ATTEMPTS {
-            log::error!(
-                "[org_cleanup] org={} step={} permanently failed after {} attempts",
-                task.org_id,
-                task.step,
-                task.attempts
-            );
-            emit_failed_alert(&task.org_id, &task.step).await;
-            continue;
-        }
-
         match org_cleanup_tasks::mark_running(&task.id).await {
             Ok(true) => {}
             Ok(false) => {
@@ -273,29 +262,6 @@ async fn process_org_tasks(
                 }
             }
         }
-    }
-}
-
-async fn emit_failed_alert(org_id: &str, _step: &str) {
-    #[cfg(feature = "cloud")]
-    {
-        use crate::self_reporting::cloud_events::{CloudEvent, EventType, enqueue_cloud_event};
-        enqueue_cloud_event(CloudEvent {
-            event: EventType::OrgCleanupFailed,
-            org_id: org_id.to_string(),
-            org_name: org_id.to_string(),
-            org_type: String::new(),
-            user: None,
-            subscription_type: None,
-            stream_name: None,
-        })
-        .await;
-    }
-    #[cfg(not(feature = "cloud"))]
-    {
-        log::error!(
-            "[org_cleanup] org={org_id} permanently failed (alert not available in this build)"
-        );
     }
 }
 
