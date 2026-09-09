@@ -31,6 +31,13 @@ use config::{
     utils::json::{Map, Value},
 };
 
+/// What `extract_service_name` returns when it finds no service.
+///
+/// Named because it is a sentinel and not a name. Routing must refuse it: an
+/// alert nobody can identify belongs in the unrouted queue, where somebody sees
+/// it, rather than on the pager of whichever team happens to own this string.
+const UNKNOWN_SERVICE: &str = "unknown";
+
 /// Service Discovery correlation result
 struct ServiceDiscoveryResult {
     group_values: HashMap<String, String>,
@@ -272,8 +279,8 @@ fn extract_service_name_parallel(
     }
 
     // Priority 3: Default fallback
-    log::debug!("[incidents] No service name found in labels, using 'unknown'");
-    "unknown".to_string()
+    log::debug!("[incidents] No service name found in labels, using '{UNKNOWN_SERVICE}'");
+    UNKNOWN_SERVICE.to_string()
 }
 
 /// Collect the union of notification destinations from all alerts correlated to an incident.
@@ -695,11 +702,25 @@ pub async fn correlate_alert_to_incident(
         // ...and only when it names a service. Discovery's last resort is the
         // stream a record arrived in, so the registry legitimately holds
         // `node_cpu_seconds`; routing on that is routing on a table name.
+        //
+        // `is_some_and`, not `is_none_or`: no discovery answer at all is not
+        // evidence that the name is a service. Read the other way, an org whose
+        // registry answered nothing routed every unidentifiable alert on the
+        // literal `unknown` that `extract_service_name` returns as its
+        // not-found value, and every one of them landed on whichever team owns
+        // that phantom name.
         let names_a_service = parallel_result
             .service_discovery
             .as_ref()
-            .is_none_or(|sd| !sd.service_name_from_stream);
-        if dimensions.is_empty() && names_a_service && !service_name.trim().is_empty() {
+            .is_some_and(|sd| !sd.service_name_from_stream);
+        // A sentinel is not an identity. Belt and braces beside the check
+        // above, because the not-found value is a plain `String` and nothing in
+        // the type stops it reaching a routing decision.
+        if dimensions.is_empty()
+            && names_a_service
+            && !service_name.trim().is_empty()
+            && service_name != UNKNOWN_SERVICE
+        {
             dimensions.insert(
                 config::meta::oncall::SERVICE_DIMENSION.to_string(),
                 service_name.clone(),
@@ -2966,6 +2987,45 @@ mod tests {
     #[test]
     fn test_extract_service_name_defaults_to_unknown() {
         let name = extract_service_name_parallel(&HashMap::new(), &None);
-        assert_eq!(name, "unknown");
+        assert_eq!(name, UNKNOWN_SERVICE);
+    }
+
+    /// The not-found value is a sentinel, and routing must never treat it as a
+    /// service. It used to: an org whose registry answered nothing routed every
+    /// unidentifiable alert on this literal, so all of them landed on whichever
+    /// team owned the phantom name `unknown`.
+    ///
+    /// This pins the two halves of the guard that stop it. `names_a_service`
+    /// asks `is_some_and`, so no discovery answer means no service. The
+    /// comparison against `UNKNOWN_SERVICE` catches the case where discovery
+    /// answered and still found nothing.
+    #[test]
+    fn test_the_not_found_service_never_becomes_a_routing_dimension() {
+        let absent: Option<ServiceDiscoveryResult> = None;
+        assert!(
+            !absent
+                .as_ref()
+                .is_some_and(|sd| !sd.service_name_from_stream),
+            "no discovery answer must not read as naming a service"
+        );
+
+        let from_stream = Some(ServiceDiscoveryResult {
+            group_values: HashMap::new(),
+            key_type: config::meta::alerts::incidents::KeyType::Primary,
+            service_name: "app_logs".to_string(),
+            service_name_from_stream: true,
+        });
+        assert!(
+            !from_stream
+                .as_ref()
+                .is_some_and(|sd| !sd.service_name_from_stream),
+            "a stream name is a table name, not a service"
+        );
+
+        assert_eq!(
+            extract_service_name_parallel(&HashMap::new(), &None),
+            UNKNOWN_SERVICE,
+            "the guard compares against this exact value, so the two must agree"
+        );
     }
 }
