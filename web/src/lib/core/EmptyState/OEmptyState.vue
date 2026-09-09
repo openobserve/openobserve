@@ -34,8 +34,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     :class="[
-      // Scrolls, not clips: on a phone the hero stack outgrows its pane; safe centering keeps the top reachable.
-      'o2-empty-state relative flex flex-col items-center justify-center-safe overflow-x-hidden overflow-y-auto',
+      // < lg the hero stack outgrows its pane, so it scrolls there instead of clipping; safe centering keeps the top reachable.
+      'o2-empty-state relative flex flex-col items-center justify-center overflow-hidden',
+      'max-lg:justify-center-safe max-lg:overflow-x-hidden max-lg:overflow-y-auto',
       '[--empty-dot:var(--color-grey-300)] dark:[--empty-dot:var(--color-grey-800)]',
       sizeClass.root,
       { 'o2-empty-state--hero': size === 'hero' },

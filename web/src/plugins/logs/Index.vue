@@ -113,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         searchObj.data.stream.streamLists.length == 0 &&
                         searchObj.loading == false
                       "
-                      class="h-full overflow-y-auto"
+                      class="h-full max-lg:overflow-y-auto"
                     >
                       <LogsNoDataState
                         :ai-enabled="isAiEnabled"
@@ -137,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         searchObj.data.stream.streamLists.length > 0 &&
                         searchObj.data.stream.selectedStream.length == 0
                       "
-                      class="h-full overflow-y-auto"
+                      class="h-full max-lg:overflow-y-auto"
                     >
                       <LogsNoStreamState
                         :org-id="store.state.selectedOrganization.identifier"
