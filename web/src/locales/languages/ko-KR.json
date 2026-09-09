@@ -10793,7 +10793,8 @@
         "scoreConfigs": "점수 구성",
         "targetDataset": "대상 데이터셋",
         "progress": "진행 상황",
-        "updated": "업데이트됨"
+        "updated": "업데이트됨",
+        "actions": "작업"
       },
       "create": {
         "title": "새 큐",
@@ -10847,7 +10848,8 @@
           "refType": "참조",
           "refId": "참조",
           "added": "추가됨",
-          "status": "상태"
+          "status": "상태",
+          "actions": "작업"
         },
         "status": {
           "pending": "대기 중",
@@ -10959,6 +10961,8 @@
       "viewAll": "실험 보기",
       "baseline": "베이스라인",
       "setBaseline": "베이스라인 설정",
+      "baselineRequiresCompleted": "완료된 실행만 기준선으로 설정할 수 있습니다.",
+      "baselineError": "기준선을 업데이트하지 못했습니다.",
       "selectForComparison": "비교를 위해 선택",
       "progress": "슬롯 {total}개 중 {done}개",
       "noScores": "집계 점수 없음",
@@ -11069,8 +11073,10 @@
       "addToDataset": "추가",
       "detail": {
         "by": "{user} 작성",
-        "p50Latency": "P50 지연 시간",
+        "p50Latency": "P50 태스크 지연 시간",
         "totalCost": "총 비용",
+        "costBreakdown": "태스크 {task} · 스코어링 {scoring}",
+        "partialCostBreakdown": "태스크 {task} · 스코어링 {scoring} · 부분",
         "highDispersion": "고분산 케이스",
         "highDispersionHint": "시도가 일치하지 않는 행",
         "scoredRows": "{scored}/{total}개 행 채점됨",
@@ -11100,7 +11106,7 @@
           "run": "실행"
         },
         "runSummary": "{trials} · {scorers}",
-        "progress": "진행률",
+        "progress": "태스크 진행률",
         "scoring": "채점",
         "scoringDistribution": "{success} 성공 · {failed} 실패 · {pending} 대기 · {skipped} 건너뜀",
         "compare": "비교",
@@ -11193,6 +11199,16 @@
           "typeCategorical": "범주형",
           "typeBoolean": "불리언",
           "threshold": "임계값",
+          "thresholdTooltip": "기준선 값과 후보 값이 서로 {percent} 이내이면 저하 또는 개선이 아닌 변경 없음으로 처리됩니다.",
+          "outcomeDimensions": "결과 기준",
+          "outcomeTooltipNone": "선택된 열이 없습니다 — 비교 가능한 모든 행이 비교 안 됨으로 표시됩니다.",
+          "outcomeTooltipAll": "적격한 모든 열이 각 행의 결과를 결정합니다.",
+          "outcomeTooltipPartial": "{names}만 각 행의 결과를 결정합니다. 다른 열은 표시되지만 결과에 영향을 미치지 않습니다.",
+          "allOutcomeDimensions": "적격한 모든 열",
+          "noOutcomeDimensions": "열 없음",
+          "selectedOutcomeDimensions": "{count}개 열 | {count}개 열",
+          "outcomeDimensionUnavailable": "{name} (비교 정책 없음)",
+          "dimensionExcludedHint": "이 열은 결과 산정에서 제외됩니다. 포함하려면 결과 기준에서 선택하세요.",
           "measurePerRow": "행당 평균 (시행 전체)",
           "dimensionImproved": "{count} 행 개선됨 | {count} 행 개선됨",
           "dimensionUnchanged": "{count} 행 변경 없음 | {count} 행 변경 없음",
@@ -11274,8 +11290,8 @@
         },
         "searchPlaceholder": "항목 검색...",
         "csvImport": {
-          "button": "CSV 업로드",
-          "title": "데이터셋 항목 업로드",
+          "button": "항목 가져오기",
+          "title": "데이터셋 항목 가져오기",
           "description": "CSV 파일에서 데이터셋 항목을 가져옵니다.",
           "fileLabel": "CSV 파일",
           "placeholder": "CSV 파일 선택",
@@ -12187,7 +12203,8 @@
       "remove": "제거",
       "save": "저장",
       "saveAsDraft": "초안으로 저장",
-      "createAndActivate": "저장 및 활성화"
+      "createAndActivate": "저장 및 활성화",
+      "testConnection": "연결 테스트"
     },
     "scorerTypeDialog": {
       "title": "새 채점자 생성",
@@ -12213,15 +12230,19 @@
       "availableModelsLabel": "사용 가능한 모델",
       "apiKeyLabel": "API 키",
       "apiKeyPlaceholder": "API 키 입력",
-      "apiKeyHelp": "저장 시 암호화되어 저장되며 다시 읽을 수 없습니다. 기존 키를 유지하려면 편집 시 비워 두세요.",
+      "apiKeyHelp": "암호화되어 저장되며 다시 조회되지 않습니다. 기존 키를 유지하려면 편집 내용을 저장할 때 입력란을 비워 두세요.",
       "authSection": "인증",
-      "authEditNote": "자격 증명은 다시 읽을 수 없습니다. 교체하려는 경우에만 API 키를 다시 입력하세요.",
+      "authEditNote": "인증 정보는 다시 조회할 수 없습니다. 인증이 필요한 공급자를 테스트하려면 API 키를 입력하세요.",
       "cannotRename": "생성 후에는 이름을 변경할 수 없습니다.",
       "availableModelsHelp": "선택 사항. 이 공급자에서 사용할 수 있는 모델의 쉼표로 구분된 목록입니다.",
       "saveError": "공급자를 저장하지 못했습니다.",
       "nameRequired": "Provider name is required",
       "typeRequired": "Provider type is required",
-      "defaultModelRequired": "Default model is required"
+      "defaultModelRequired": "Default model is required",
+      "testRunning": "연결 테스트 중...",
+      "testPassed": "연결됨",
+      "testFailed": "연결 실패",
+      "testError": "연결 테스트에 실패했습니다."
     },
     "scoreConfig": {
       "gteSymbol": "≥",
@@ -15696,7 +15717,6 @@
       "reservation": "예약",
       "sliType": "SLI 유형",
       "owner": "소유자",
-      "folder": "폴더",
       "streamPlaceholder": "스트림 선택"
     },
     "empty": {
@@ -15726,7 +15746,24 @@
       "sourceHint": "가동 시간은 이 알림이 발생하지 않았던 측정 시간의 비율입니다. 일시 중지, 음소거 또는 실패로 평가되지 않은 시간은 측정되지 않으며 가동 시간으로 계산되지 않습니다.",
       "loadFailed": "적격 알림을 불러올 수 없습니다",
       "noneEligible": "이 조직에는 아직 소스로 사용할 수 있는 알림이 없습니다.",
-      "ineligibleOption": "{name} — {reason}",
+      "ineligible": {
+        "notScheduled": "스케줄 없음",
+        "grouped": "그룹화됨",
+        "notReferenceable": "사용할 수 없음",
+        "cron": "Cron 스케줄",
+        "tooInfrequent": "너무 드물게 실행됨",
+        "silenced": "무음 있음",
+        "other": "부적격",
+        "why": {
+          "notScheduled": "실시간 알림은 SLO에 필요한 실행 기록을 보관하지 않습니다. 대신 스케줄 알림을 사용하세요.",
+          "grouped": "이 알림은 그룹별로 분할되고, 실행에서 어떤 그룹을 확인했는지 기록되지 않습니다. 여기에서 사용하려면 그룹별 분할을 제거하세요.",
+          "notReferenceable": "SLO 및 복합 알림은 소스로 사용할 수 없습니다. 일반 스케줄 알림을 선택하세요.",
+          "cron": "이 알림은 Cron 스케줄로 실행되므로 검사 간격이 일정하지 않아 가동 시간을 계산할 수 없습니다. 고정 간격으로 변경하세요.",
+          "tooInfrequent": "이 알림은 {frequency}마다 실행됩니다. 점검되지 않는 시간이 없도록 최소 {slice}마다 실행되어야 합니다.",
+          "silenced": "알림이 트리거된 후 이 알림은 한동안 확인을 중지합니다. 그 공백은 항상 장애 구간과 겹쳐 SLO가 실제보다 좋아 보입니다. 무음 기간을 0으로 설정하세요."
+        },
+        "noFixedInterval": "고정 간격 없음"
+      },
       "groupingLocked": "알림 기반 SLI는 그룹화할 수 없습니다: 가용성 원장은 그룹별이 아닌 알림별로 한 번의 실행을 기록하므로, 의지할 그룹별 적용 범위가 없습니다.",
       "sourceLink": "소스 알림",
       "preview": {
@@ -15834,6 +15871,42 @@
       "editTargetMissing": "그 알림은 더 이상 이 SLO에 없습니다.",
       "describeBurn": "소진율 > {critical} ({long} 및 {short} 동안)",
       "describeBudget": "오류 예산 소비 > {critical}%"
+    },
+    "validation": {
+      "nameRequired": "SLO 이름은 필수입니다.",
+      "nameTooLong": "SLO 이름은 256자 이하여야 합니다.",
+      "targetRequired": "목표값은 필수입니다.",
+      "targetRange": "목표값은 0보다 크고 100보다 작아야 합니다.",
+      "targetPrecision": "목표값은 소수점 이하 최대 3자리까지 지원합니다.",
+      "streamTypeRequired": "스트림 유형은 필수입니다.",
+      "streamRequired": "스트림은 필수입니다.",
+      "goodExprRequired": "'정상일 때'는 필수입니다.",
+      "promqlGoodRequired": "정상 쿼리는 필수입니다.",
+      "promqlTotalRequired": "총 쿼리는 필수입니다",
+      "aggregateRequired": "집계 표현식은 필수입니다",
+      "comparatorRequired": "비교 연산자는 필수입니다",
+      "thresholdRequired": "임계값은 필수입니다",
+      "thresholdNumber": "임계값은 숫자여야 합니다",
+      "alertSourceRequired": "소스 알림은 필수입니다",
+      "groupedSlice": "그룹화된 SLO는 5분 슬라이스를 사용해야 합니다",
+      "alertCannotGroup": "알림 기반 SLI는 그룹화할 수 없습니다",
+      "frequencyRequired": "주기는 필수입니다",
+      "frequencyPositive": "주기는 최소 1분 이상이어야 합니다",
+      "silenceRequired": "음소거 기간은 필수입니다",
+      "silenceNonNegative": "음소거 기간은 음수일 수 없습니다",
+      "targetsRequired": "수신처 또는 워크플로우를 하나 이상 선택해야 합니다",
+      "criticalRequired": "임계값은 필수입니다",
+      "criticalPositive": "임계값은 0보다 커야 합니다",
+      "budgetRange": "소비된 예산은 100% 이하여야 합니다",
+      "longWindowRequired": "긴 기간은 필수입니다",
+      "shortWindowRequired": "짧은 기간은 필수입니다",
+      "shortInsideLong": "짧은 기간은 긴 기간보다 짧아야 합니다"
+    },
+    "duration": {
+      "seconds": "{count}초 | {count}초",
+      "minutes": "{count}분 | {count}분",
+      "hours": "{count}시간 | {count}시간",
+      "days": "{count}일 | {count}일"
     }
   },
   "promql": {
