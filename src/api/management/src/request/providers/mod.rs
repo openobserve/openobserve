@@ -333,7 +333,6 @@ async fn test_provider_connection_config(
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
