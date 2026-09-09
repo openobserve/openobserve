@@ -549,5 +549,89 @@ describe("DateTime Component", () => {
       expect(wrapper.vm.relativeValue).toBe(2);
       expect(wrapper.emitted("on:date-change")).toBeTruthy();
     });
+
+    it("should shift the range forward across midnight with shiftTimeRange('next')", () => {
+      wrapper = createWrapper();
+      store.state.savedViewFlag = false;
+
+      wrapper.vm.selectedType = "absolute";
+      wrapper.vm.selectedDate = { from: "2026/09/07", to: "2026/09/07" };
+      wrapper.vm.selectedTime = { startTime: "22:00:00", endTime: "23:00:00" };
+
+      wrapper.vm.shiftTimeRange("next");
+
+      // The window advances by its own duration (1h); the end must roll into the
+      // next day rather than wrapping back to "00:00:00" on the same date.
+      expect(wrapper.vm.selectedDate).toEqual({ from: "2026/09/07", to: "2026/09/08" });
+      expect(wrapper.vm.selectedTime).toEqual({ startTime: "23:00:00", endTime: "00:00:00" });
+      expect(wrapper.vm.selectedType).toBe("absolute");
+    });
+
+    it("should shift the range backward across midnight with shiftTimeRange('prev')", () => {
+      wrapper = createWrapper();
+      store.state.savedViewFlag = false;
+
+      wrapper.vm.selectedType = "absolute";
+      wrapper.vm.selectedDate = { from: "2026/09/08", to: "2026/09/08" };
+      wrapper.vm.selectedTime = { startTime: "00:00:00", endTime: "01:00:00" };
+
+      wrapper.vm.shiftTimeRange("prev");
+
+      expect(wrapper.vm.selectedDate).toEqual({ from: "2026/09/07", to: "2026/09/08" });
+      expect(wrapper.vm.selectedTime).toEqual({ startTime: "23:00:00", endTime: "00:00:00" });
+      expect(wrapper.vm.selectedType).toBe("absolute");
+    });
+
+    it("should shift the range forward within the same day", () => {
+      wrapper = createWrapper();
+      store.state.savedViewFlag = false;
+
+      wrapper.vm.selectedType = "absolute";
+      wrapper.vm.selectedDate = { from: "2026/09/07", to: "2026/09/07" };
+      wrapper.vm.selectedTime = { startTime: "10:00:00", endTime: "11:00:00" };
+
+      wrapper.vm.shiftTimeRange("next");
+
+      expect(wrapper.vm.selectedDate).toEqual({ from: "2026/09/07", to: "2026/09/07" });
+      expect(wrapper.vm.selectedTime).toEqual({ startTime: "11:00:00", endTime: "12:00:00" });
+    });
+
+    it("should promote a relative picker to absolute after shifting", () => {
+      wrapper = createWrapper();
+      store.state.savedViewFlag = false;
+
+      wrapper.vm.selectedType = "relative";
+      wrapper.vm.relativePeriod = "h";
+      wrapper.vm.relativeValue = 1;
+
+      wrapper.vm.shiftTimeRange("next");
+
+      // A relative picker carries no concrete window, so shifting must resolve it
+      // to an explicit absolute range instead of silently keeping Relative active.
+      expect(wrapper.vm.selectedType).toBe("absolute");
+      expect(wrapper.vm.selectedDate.from).toBeDefined();
+      expect(wrapper.vm.selectedDate.to).toBeDefined();
+      expect(wrapper.vm.selectedTime.startTime).toBeDefined();
+      expect(wrapper.vm.selectedTime.endTime).toBeDefined();
+    });
+
+    it("should emit a user-driven date change when shifting without autoApply", async () => {
+      wrapper = createWrapper({ autoApply: false });
+      // Let the mount-time programmatic flag reset back to user-initiated.
+      await wrapper.vm.$nextTick();
+      store.state.savedViewFlag = false;
+
+      wrapper.vm.selectedType = "absolute";
+      wrapper.vm.selectedDate = { from: "2026/09/07", to: "2026/09/07" };
+      wrapper.vm.selectedTime = { startTime: "10:00:00", endTime: "11:00:00" };
+
+      wrapper.vm.shiftTimeRange("next");
+      await wrapper.vm.$nextTick();
+
+      const events = wrapper.emitted("on:date-change");
+      expect(events).toBeTruthy();
+      const lastPayload = events[events.length - 1][0];
+      expect(lastPayload.userChangedValue).toBe(true);
+    });
   });
 });
