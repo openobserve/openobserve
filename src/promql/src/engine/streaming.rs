@@ -13,8 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Streaming entries (agg, range func, instant selector); each falls back on the same contexts.
-
 use std::{sync::Arc, time::Duration};
 
 use config::meta::promql::value::*;
@@ -139,7 +137,6 @@ impl Engine {
         functions::eval_range(input, func, &self.eval_ctx).map(Some)
     }
 
-    /// Streams `last_over_time(m[lookback])` or selects on the same contexts; `None` when gated.
     pub(super) async fn try_streaming_instant_selector(
         &mut self,
         vs: &VectorSelector,
@@ -171,7 +168,6 @@ impl Engine {
             .map(Some)
     }
 
-    /// Streams the range function over the single context; `None` when the layout cannot stream.
     async fn stream_range_func(
         &self,
         scan: &SelectorScan,
@@ -693,7 +689,6 @@ mod tests {
         ));
     }
 
-    /// `m` streams as `last_over_time(m[lookback])` and must match the generic path either way.
     #[tokio::test]
     async fn test_instant_selector_matches_generic_streaming_and_materialized() {
         for selector in ["m", "m offset 30s", "m{instance=\"a\"}"] {
