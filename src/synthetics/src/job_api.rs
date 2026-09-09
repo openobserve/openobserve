@@ -379,7 +379,8 @@ pub(crate) mod billing {
         // logging is deferred, because a queue-errored ack always carries
         // `steps_executed = 0` and would otherwise fire the zero-fallback warning
         // — "an un-upgraded probe is in the fleet", which A3 pages on.
-        if i.error_source == "queue" {
+        // "config" never ran either: expansion failed before a browser was involved.
+        if i.error_source == "queue" || i.error_source == crate::alerting::ERROR_SOURCE_CONFIG {
             return Vec::new();
         }
 
@@ -1726,6 +1727,59 @@ pub async fn ack(req: AckRequest, token_org: &str) -> anyhow::Result<AckResponse
     })
 }
 
+/// Writes the self-describing result row for a config error; the ack path completes the run
+/// separately.
+pub async fn report_config_error_result(
+    org_id: &str,
+    job_id: &str,
+    err: &ConfigError,
+) -> anyhow::Result<()> {
+    let conn = get_orm_client_ro().await;
+    let job = synthetics_jobs::get_by_id(conn, job_id)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?
+        .ok_or_else(|| anyhow::anyhow!("job not found: {job_id}"))?;
+    let Some(token) = org_ingestion_tokens::find_default_enabled(org_id)
+        .await?
+        .map(|t| t.token)
+    else {
+        tracing::warn!(
+            org_id,
+            job_id,
+            "[synthetics] no enabled ingest token — config-error result not recorded"
+        );
+        return Ok(());
+    };
+    let now_us = config::utils::time::now_micros();
+    let row = serde_json::json!([{
+        "_timestamp": now_us,
+        "job_id": job_id,
+        "run_id": job.run_id,
+        "execution_id": "",
+        "synthetics_id": job.synthetics_id,
+        "synthetics_name": job.synthetics_name,
+        "org_id": org_id,
+        "location": job.location,
+        "scheduled_ts": job.scheduled_ts,
+        "status": "error",
+        "error_source": crate::alerting::ERROR_SOURCE_CONFIG,
+        "status_reason": err.status_reason,
+        "error": err.message,
+        "response_time_ms": 0,
+        "dispatch_attempt": job.dispatch_attempts
+    }]);
+    let api_endpoint = config::meta::synthetics::api_endpoint();
+    crate::scheduler::post_json(
+        &reqwest::Client::new(),
+        &format!("{api_endpoint}/api/{org_id}/synthetics_results/_json"),
+        &token,
+        &row,
+        &job.synthetics_id,
+    )
+    .await;
+    Ok(())
+}
+
 /// Resolves the alert decision for a completed run and persists the new state.
 ///
 /// A failure to read or write the state is never allowed to fail the ack: the
@@ -2347,6 +2401,13 @@ mod tests {
                 },
             );
             assert!(events.is_empty());
+        }
+
+        #[test]
+        fn a_config_errored_ack_bills_nothing_and_does_not_take_the_zero_fallback() {
+            let mut i = browser(16, 1, 0, 0);
+            i.error_source = crate::alerting::ERROR_SOURCE_CONFIG;
+            assert!(events_for_ack(LIVE, i).is_empty());
         }
 
         #[test]
