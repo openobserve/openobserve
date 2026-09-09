@@ -50,6 +50,15 @@ vi.mock("@/lib/core/Table/OTable.vue", () => ({
   },
 }));
 
+// Named stub so both progress bars on the page can be told apart by their props.
+vi.mock("@/components/common/LoadingProgress.vue", () => ({
+  default: {
+    name: "LoadingProgress",
+    props: ["loading", "loadingProgressPercentage"],
+    template: '<div data-test="loading-progress-stub" />',
+  },
+}));
+
 describe("SearchResult Component", () => {
   let wrapper: any;
 
@@ -984,6 +993,47 @@ describe("SearchResult Component", () => {
     it("passes a loading-banner slot so OTable suppresses its default banner", async () => {
       await setState(true, hits(3));
       expect(wrapper.find('[data-test="otable-stub-has-loading-banner-slot"]').exists()).toBe(true);
+    });
+  });
+  describe("results progress bar (#14303)", () => {
+    const progressBars = () => wrapper.findAllComponents({ name: "LoadingProgress" });
+    const barsLoading = () => progressBars().filter((bar: any) => bar.props("loading") === true);
+
+    const setProgress = async (loading: boolean, percentage: number | undefined) => {
+      wrapper.vm.searchObj.loading = loading;
+      wrapper.vm.searchObj.loadingProgressPercentage = percentage;
+      wrapper.vm.searchObj.loadingHistogram = false;
+      wrapper.vm.searchObj.loadingHistogramProgressPercentage = 0;
+      await wrapper.vm.$nextTick();
+      await flushPromises();
+    };
+
+    it("binds the streaming results percentage to its own progress bar", async () => {
+      await setProgress(true, 42);
+      expect(barsLoading()).toHaveLength(1);
+      expect(barsLoading()[0].props("loadingProgressPercentage")).toBe(42);
+    });
+
+    it("falls back to 0 when no progress has been reported yet", async () => {
+      await setProgress(true, undefined);
+      expect(barsLoading()).toHaveLength(1);
+      expect(barsLoading()[0].props("loadingProgressPercentage")).toBe(0);
+    });
+
+    it("stays mounted with loading=false so it can run its own fade-out", async () => {
+      await setProgress(false, 37);
+      const settled = progressBars().filter(
+        (bar: any) => bar.props("loadingProgressPercentage") === 37,
+      );
+      expect(settled).toHaveLength(1);
+      expect(settled[0].props("loading")).toBe(false);
+    });
+
+    it("does not let the histogram bar stand in for the results bar", async () => {
+      await setProgress(true, 42);
+      expect(barsLoading()).toHaveLength(1);
+      expect(barsLoading()[0].props("loadingProgressPercentage")).toBe(42);
+      expect(wrapper.vm.searchObj.loadingHistogram).toBe(false);
     });
   });
 });
