@@ -112,6 +112,44 @@ async fn validate_oncall_team(org_id: &str, team_id: Option<&str>) -> Result<(),
     }
 }
 
+/// Advisories about who this alert will page, for a save that has succeeded.
+///
+/// Same posture as `validate_oncall_team` — say it at save, when somebody is
+/// looking — but a warning rather than a refusal: routing is not being changed,
+/// and an operator who meant it must still be able to save. An alert bound to
+/// an explicit `oncall_team` is silent here, because ownership rules never get
+/// a say in where it pages.
+async fn paging_warnings(_org_id: &str, _alert: &MetaAlert) -> Vec<String> {
+    #[cfg(feature = "enterprise")]
+    {
+        if _alert
+            .oncall_team
+            .as_deref()
+            .is_some_and(|t| !t.trim().is_empty())
+        {
+            return Vec::new();
+        }
+        let rules = match o2_enterprise::enterprise::oncall::routing::list_rules(_org_id).await {
+            Ok(rules) => rules,
+            Err(e) => {
+                // Never fails the save: the alert is already stored, and an
+                // advisory that cannot be computed is not an error the caller
+                // can act on.
+                log::error!("[alerts] reading ownership rules for save-time warnings: {e}");
+                return Vec::new();
+            }
+        };
+        let semantic_groups = db::system_settings::get_semantic_field_groups(_org_id).await;
+        o2_enterprise::enterprise::oncall::routing::paging_warnings(
+            &semantic_groups,
+            &_alert.query_condition,
+            &rules,
+        )
+    }
+    #[cfg(not(feature = "enterprise"))]
+    Vec::new()
+}
+
 /// Reject a `runbook_url` that is not a link.
 ///
 /// Same posture as `validate_oncall_team`: refuse it at save, when somebody is
@@ -200,11 +238,15 @@ pub async fn create_alert(
 
     let client = get_orm_client_rw().await;
     match alert::create(client, &org_id, &folder_id, alert, overwrite).await {
-        Ok(v) => MetaHttpResponse::json(
-            MetaHttpResponse::message(StatusCode::OK, "Alert saved")
-                .with_id(v.id.map(|id| id.to_string()).unwrap_or_default())
-                .with_name(v.name),
-        ),
+        Ok(v) => {
+            let warnings = paging_warnings(&org_id, &v).await;
+            MetaHttpResponse::json(
+                MetaHttpResponse::message(StatusCode::OK, "Alert saved")
+                    .with_id(v.id.map(|id| id.to_string()).unwrap_or_default())
+                    .with_name(v.name)
+                    .with_warnings(warnings),
+            )
+        }
         Err(e) => e.into(),
     }
 }
@@ -1950,7 +1992,10 @@ pub async fn update_alert(
 
     let client = get_orm_client_rw().await;
     match alert::update(client, &org_id, None, alert).await {
-        Ok(_) => MetaHttpResponse::ok("Alert Updated"),
+        Ok(v) => MetaHttpResponse::json(
+            MetaHttpResponse::message(StatusCode::OK, "Alert Updated")
+                .with_warnings(paging_warnings(&org_id, &v).await),
+        ),
         Err(AlertError::AlertNotFound) => {
             #[cfg(not(feature = "enterprise"))]
             {
