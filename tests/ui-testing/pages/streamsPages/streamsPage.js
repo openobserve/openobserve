@@ -182,6 +182,17 @@ export class StreamsPage {
             .waitFor({ state: 'visible', timeout: 30000 });
     }
 
+    async selectStreamTypeTab(streamType) {
+        const tab = this.page.locator(`[data-test="log-stream-table"] [data-otoggle-value="${streamType}"]`).first();
+        await expect(tab).toBeVisible({ timeout: 10000 });
+        await tab.click();
+        // Guard the toggle: the OToggleGroupItem flips data-state to "on" only once the
+        // requested type is actually active, so a swallowed click can't yield a false green.
+        await expect(tab).toHaveAttribute('data-state', 'on', { timeout: 10000 });
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        testLogger.info(`Selected "${streamType}" stream-type tab`);
+    }
+
     async searchStream(streamName) {
         const searchInput = this.page.locator('[data-test="streams-search-stream-input-field"]');
         // Defensive wait so a still-loading streams page yields a clear failure

@@ -1,0 +1,12 @@
+[
+  {
+    "title": "should not retain the metrics stream name after switching back to logs, leaving Home and reloading",
+    "action": "new",
+    "verifies": "the logs-type stream dropdown and localStorage bucket no longer retain the metrics stream name after a switch-back + reload"
+  },
+  {
+    "title": "should persist stream type \"logs\" and clear the selection after switching back from a direct metrics URL",
+    "action": "new",
+    "verifies": "arriving at Logs via a direct metrics URL and switching back to logs persists type \"logs\" and clears the metric selection"
+  }
+]

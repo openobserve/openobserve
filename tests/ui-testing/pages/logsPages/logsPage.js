@@ -59,6 +59,8 @@ export class LogsPage {
         this.indexDropDownTrigger = '[data-test="log-search-index-list-select-stream-trigger"]';
         this.indexDropDownPopover = '[data-test="log-search-index-list-select-stream-popover"]';
         this.indexDropDownSearch = '[data-test="log-search-index-list-select-stream-search"]';
+        // "Switch back to logs" — shown only when streamType !== 'logs' (IndexList.vue v-if).
+        this.backToLogsBtn = '[data-test="log-search-index-list-back-to-logs-btn"]';
         // Quick Pick (no-stream-selected sidebar state) locators
         this.quickPickContainer = '[data-test="logs-search-stream-quick-pick"]';
         this.quickPickButton = (streamName) => `[data-test="logs-search-stream-quick-pick-${streamName}"]`;
@@ -9798,6 +9800,35 @@ export class LogsPage {
         await expect(trigger).toBeVisible({ timeout: 10000 });
         await expect(trigger).toContainText(text, { timeout: 10000 });
         testLogger.info(`Stream selector contains text: "${text}"`);
+    }
+
+    /**
+     * Expect the stream selector trigger to NOT contain the given text.
+     */
+    async expectStreamSelectorNotContainsText(text) {
+        const trigger = this.page.locator(this.indexDropDownTrigger).first();
+        await expect(trigger).not.toContainText(text, { timeout: 10000 });
+        testLogger.info(`Stream selector does not contain text: "${text}"`);
+    }
+
+    async expectBackToLogsButtonVisible() {
+        await expect(this.page.locator(this.backToLogsBtn)).toBeVisible({ timeout: 10000 });
+        testLogger.info('Back-to-logs button is visible');
+    }
+
+    async expectBackToLogsButtonHidden() {
+        // v-if-gated: the button unmounts after the reactive streamType update, but a
+        // transient stale render can linger — .not.toBeVisible() tolerates that settle.
+        await expect(this.page.locator(this.backToLogsBtn)).not.toBeVisible({ timeout: 10000 });
+        testLogger.info('Back-to-logs button is hidden');
+    }
+
+    async clickBackToLogs() {
+        const btn = this.page.locator(this.backToLogsBtn);
+        await expect(btn).toBeVisible({ timeout: 10000 });
+        await btn.click();
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        testLogger.info('Clicked back-to-logs button');
     }
 
     /**

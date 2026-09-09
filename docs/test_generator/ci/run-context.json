@@ -1,0 +1,20 @@
+{
+  "feature_slug": "streams-logs-type-persistence",
+  "feature_title": "Logs Stream Type Persistence",
+  "area": "Logs",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "streamsExploreLogsTypePersistence.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Logs/streamsExploreLogsTypePersistence.spec.js",
+  "playwright_group": "Logs-Core",
+  "source_files": [
+    "web/src/plugins/logs/Index.vue",
+    "web/src/plugins/logs/IndexList.vue",
+    "web/src/utils/streamPersist.ts",
+    "web/src/lib/core/EmptyState/OEmptyState.vue"
+  ],
+  "existing_tests_in_diff": true,
+  "skip": false,
+  "skip_reason": ""
+}

@@ -27,6 +27,7 @@ const METRIC_STREAM = 'cpu_usage';
 // ===========================================================================
 
 test.describe('Streams explore → Logs stream-type persistence', () => {
+  test.describe.configure({ mode: 'parallel' });
   let pm;
 
   test.beforeEach(async ({ page }, testInfo) => {
@@ -42,8 +43,7 @@ test.describe('Streams explore → Logs stream-type persistence', () => {
     // 1. Streams page: filter to the Metrics tab and open the metric via the
     //    action column's search/explore icon.
     await pm.streamsPage.navigateToStreamExplorer();
-    await page.locator('[data-test="log-stream-table"] [data-otoggle-value="metrics"]').click();
-    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    await pm.streamsPage.selectStreamTypeTab('metrics');
     await pm.streamsPage.searchStream(METRIC_STREAM);
     await pm.streamsPage.verifyStreamNameVisibility(METRIC_STREAM);
     await pm.streamsPage.exploreStream();
@@ -53,11 +53,9 @@ test.describe('Streams explore → Logs stream-type persistence', () => {
     await pm.logsPage.expectStreamSelectorContainsText(METRIC_STREAM);
 
     // 3. Click "switch back to logs" beside the stream dropdown.
-    const backToLogsBtn = page.locator('[data-test="log-search-index-list-back-to-logs-btn"]');
-    await expect(backToLogsBtn).toBeVisible();
-    await backToLogsBtn.click();
-    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-    await expect(backToLogsBtn).not.toBeVisible();
+    await pm.logsPage.expectBackToLogsButtonVisible();
+    await pm.logsPage.clickBackToLogs();
+    await pm.logsPage.expectBackToLogsButtonHidden();
 
     // 4. Go to Home.
     await navigateToBase(page);
@@ -70,9 +68,8 @@ test.describe('Streams explore → Logs stream-type persistence', () => {
     // Bug repro assertions: stream type must genuinely be "logs" (back-to-logs
     // button hidden) AND the stream dropdown must NOT still show the metrics
     // stream name left over from before the switch-back.
-    await expect(backToLogsBtn).not.toBeVisible();
-    await expect(page.locator('[data-test="log-search-index-list-select-stream-trigger"]'))
-      .not.toContainText(METRIC_STREAM);
+    await pm.logsPage.expectBackToLogsButtonHidden();
+    await pm.logsPage.expectStreamSelectorNotContainsText(METRIC_STREAM);
 
     // Confirm at the persistence layer too: the logs-type localStorage bucket
     // must not carry the metrics stream name across the reload.
@@ -85,5 +82,42 @@ test.describe('Streams explore → Logs stream-type persistence', () => {
     }
 
     testLogger.info('Logs stream type/name stayed consistent after switch-back + reload');
+  });
+
+  test('should persist stream type "logs" and clear the selection after switching back from a direct metrics URL', {
+    tag: ['@streams-logs-persistence', '@all', '@logs', '@P1']
+  }, async ({ page }) => {
+    // 1. Direct-URL arrival with stream_type=metrics & stream=cpu_usage — a
+    //    different wiring path (resetStreamData reads router query) than the
+    //    exploreStream() router.push exercised by the P0 test.
+    const logsUrlWithMetrics = `${process.env.ZO_BASE_URL}/web/logs?org_identifier=${getOrgIdentifier()}&stream_type=metrics&stream=${METRIC_STREAM}`;
+    await page.goto(logsUrlWithMetrics);
+    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+
+    // 2. Logs page hydrates in metrics type — the back-to-logs button is shown.
+    await expect(page).toHaveURL(/stream_type=metrics/);
+    await pm.logsPage.expectBackToLogsButtonVisible();
+
+    // 3. Switch back to logs; wait for the reactive update to settle.
+    await pm.logsPage.clickBackToLogs();
+    await pm.logsPage.expectBackToLogsButtonHidden();
+
+    // 4. Persisted stream type is "logs" (unconditional on the switch-back path).
+    const persistedType = await page.evaluate(
+      (orgId) => localStorage.getItem(`oo_logs_stream_type_${orgId}`),
+      getOrgIdentifier(),
+    );
+    expect(persistedType).toBe('logs');
+
+    // 5. The logs-type stream bucket no longer retains the metric name.
+    const persistedLogsStream = await page.evaluate(
+      (orgId) => localStorage.getItem(`oo_selected_stream_logs_${orgId}`),
+      getOrgIdentifier(),
+    );
+    if (persistedLogsStream) {
+      expect(JSON.parse(persistedLogsStream)).not.toContain(METRIC_STREAM);
+    }
+
+    testLogger.info('Direct-URL metrics arrival switched back to logs persisted type and cleared selection');
   });
 });

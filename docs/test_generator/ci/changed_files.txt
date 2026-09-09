@@ -1,0 +1,5 @@
+tests/ui-testing/playwright-tests/Logs/streamsExploreLogsTypePersistence.spec.js
+web/src/lib/core/EmptyState/OEmptyState.vue
+web/src/plugins/logs/Index.vue
+web/src/plugins/logs/IndexList.vue
+web/src/utils/streamPersist.ts

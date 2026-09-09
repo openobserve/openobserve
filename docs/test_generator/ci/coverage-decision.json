@@ -1,0 +1,11 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/Logs/streamsExploreLogsTypePersistence.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Logs/streamsExploreLogsTypePersistence.spec.js",
+    "tests/ui-testing/playwright-tests/Logs/logspage.spec.js",
+    "tests/ui-testing/playwright-tests/Logs/logsQuickPick.spec.js"
+  ],
+  "needs_registration": true,
+  "rationale": "The feature is a focused bug fix (Logs stream-type persistence: a metrics stream name leaking into the logs-type dropdown/localStorage after 'switch back to logs' + reload). No pre-existing Logs spec covers this flow — logspage.spec.js and logsQuickPick.spec.js exercise stream selection but never the Streams-explore → metrics → switch-back → reload leak. The dev's diff already introduces a NEW spec file (streamsExploreLogsTypePersistence.spec.js) containing a solid P0 repro test, but that file is NOT yet registered in tests/ui-testing/ci-matrix/ci_matrix.json (Logs-Core shard run_files does not list it; grep found no reference). Therefore the Engineer must (a) register the new spec in ci_matrix.json under Logs-Core/actual_folder=Logs, and (b) add the P1 test from the plan. All headline behaviors are WIRED and the P0 is unconditional (no Live Mode needed); the only auto_query_enabled-gated behavior (restore-selection-convenience) is deferred to P2 with an explicit precondition note, not a failing test."
+}
