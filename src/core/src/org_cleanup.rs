@@ -16,7 +16,13 @@
 use std::{collections::HashSet, sync::Arc};
 
 use async_trait::async_trait;
-use config::{meta::stream::StreamType, spawn_pausable_job};
+use config::{
+    meta::{
+        stream::StreamType,
+        triggers::{Trigger, TriggerModule},
+    },
+    spawn_pausable_job,
+};
 use infra::{db::get_orm_client_rw, dist_lock, table::org_cleanup_tasks};
 
 const LOCK_KEY: &str = "/org_cleanup/worker_lock";
@@ -741,9 +747,32 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
 }
 
 async fn step_delete_scheduler_triggers(org_id: &str) -> Result<(), anyhow::Error> {
-    let triggers = infra::scheduler::list_by_org(org_id, None).await?;
-    for t in triggers {
-        infra::scheduler::delete(&t.org, t.module, &t.module_key)
+    sweep_scheduler_triggers(
+        org_id,
+        |org, module| async move { infra::scheduler::list_by_org(&org, module).await },
+        |trigger: Trigger| async move {
+            infra::scheduler::delete(&trigger.org, trigger.module, &trigger.module_key).await
+        },
+    )
+    .await
+}
+
+/// The module filter is passed in, not chosen here, so a test can assert the one teardown asks for.
+async fn sweep_scheduler_triggers<L, LFut, D, DFut>(
+    org_id: &str,
+    list: L,
+    delete: D,
+) -> Result<(), anyhow::Error>
+where
+    L: FnOnce(String, Option<TriggerModule>) -> LFut,
+    LFut: std::future::Future<Output = Result<Vec<Trigger>, infra::errors::Error>>,
+    D: Fn(Trigger) -> DFut,
+    DFut: std::future::Future<Output = Result<(), infra::errors::Error>>,
+{
+    // Every module, never one: the raman handler re-arms an orphan rather than delete it.
+    let triggers = list(org_id.to_string(), None).await?;
+    for trigger in triggers {
+        delete(trigger)
             .await
             .map_err(|e| anyhow::anyhow!("scheduler delete failed: {e}"))?;
     }
@@ -1808,5 +1837,143 @@ mod tests {
             position_of("remote_tasks::delete_all_by_org(org_id)") < position_of(LLM_EVALUATIONS),
             "the enterprise remote-task teardown must run before the table sweep"
         );
+    }
+
+    // ===================== The scheduler sweep ============================
+
+    /// The org and module filter the sweep hands its lister, recorded rather than scraped.
+    async fn listed_arguments() -> (String, Option<TriggerModule>) {
+        let asked = Arc::new(std::sync::Mutex::new(None));
+        let recorder = Arc::clone(&asked);
+        sweep_scheduler_triggers(
+            "acme",
+            move |org, module| async move {
+                *recorder.lock().expect("uncontended") = Some((org, module));
+                Ok(Vec::new())
+            },
+            |_trigger| async { Ok(()) },
+        )
+        .await
+        .expect("a sweep over no triggers succeeds");
+        let asked = asked.lock().expect("uncontended").clone();
+        asked.expect("the sweep lists exactly once")
+    }
+
+    #[tokio::test]
+    async fn test_scheduler_sweep_lists_every_module() {
+        let (_, filter) = listed_arguments().await;
+        assert!(
+            filter.is_none(),
+            "the sweep must list every module; filtering to {filter:?} strands the rest"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_scheduler_sweep_lists_the_org_being_torn_down() {
+        let (org, _) = listed_arguments().await;
+        assert_eq!(org, "acme", "the sweep must list the org it was given");
+    }
+
+    #[tokio::test]
+    async fn test_scheduler_sweep_deletes_every_trigger_it_listed() {
+        let listed = vec![
+            Trigger {
+                org: "acme".to_string(),
+                module: TriggerModule::Alert,
+                module_key: "alert-1".to_string(),
+                ..Default::default()
+            },
+            Trigger {
+                org: "acme".to_string(),
+                module: TriggerModule::Raman,
+                module_key: "config-1".to_string(),
+                ..Default::default()
+            },
+        ];
+        let deleted = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let recorder = Arc::clone(&deleted);
+        sweep_scheduler_triggers(
+            "acme",
+            move |_org, _module| async move { Ok(listed) },
+            move |trigger: Trigger| {
+                let recorder = Arc::clone(&recorder);
+                async move {
+                    recorder.lock().expect("uncontended").push((
+                        trigger.org,
+                        trigger.module,
+                        trigger.module_key,
+                    ));
+                    Ok(())
+                }
+            },
+        )
+        .await
+        .expect("the sweep succeeds");
+        let deleted = deleted.lock().expect("uncontended").clone();
+        assert_eq!(
+            deleted,
+            vec![
+                (
+                    "acme".to_string(),
+                    TriggerModule::Alert,
+                    "alert-1".to_string()
+                ),
+                (
+                    "acme".to_string(),
+                    TriggerModule::Raman,
+                    "config-1".to_string()
+                ),
+            ]
+        );
+    }
+
+    /// The body of `step_delete_scheduler_triggers`, so no neighbour can satisfy the match.
+    fn scheduler_step() -> &'static str {
+        let start = SOURCE
+            .find("async fn step_delete_scheduler_triggers")
+            .expect("step_delete_scheduler_triggers is defined in this file");
+        let body = &SOURCE[start..];
+        let end = body
+            .find("\nasync fn sweep_scheduler_triggers")
+            .expect("the step is followed by sweep_scheduler_triggers");
+        &body[..end]
+    }
+
+    fn strip_comments(source: &str) -> String {
+        let mut without_blocks = String::with_capacity(source.len());
+        let mut rest = source;
+        while let Some(open) = rest.find("/*") {
+            without_blocks.push_str(&rest[..open]);
+            let after_open = &rest[open + 2..];
+            rest = match after_open.find("*/") {
+                Some(close) => &after_open[close + 2..],
+                None => "",
+            };
+        }
+        without_blocks.push_str(rest);
+        without_blocks
+            .lines()
+            .map(|line| line.split_once("//").map_or(line, |(code, _)| code))
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    /// The tests above pin the filter passed; this pins that the lister forwards it.
+    #[test]
+    fn test_the_scheduler_step_forwards_the_filter_the_sweep_passes() {
+        assert!(
+            strip_comments(scheduler_step()).contains("list_by_org(&org, module)"),
+            "step_delete_scheduler_triggers must hand its lister's filter straight to \
+             list_by_org, or the sweep's filter is asserted and then discarded"
+        );
+    }
+
+    #[test]
+    fn test_a_commented_out_forward_does_not_count_as_one() {
+        assert_eq!(
+            strip_comments("a\n// list_by_org(&org, module)\nb"),
+            "a\n\nb"
+        );
+        assert_eq!(strip_comments("a/* list_by_org(&org, module) */b"), "ab");
     }
 }

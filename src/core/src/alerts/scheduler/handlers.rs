@@ -6102,7 +6102,7 @@ fn raman_next_run_at(now: i64, config: Option<&infra::table::entity::raman_confi
     const DEFAULT_FREQUENCY_MINUTES: i64 = 1440;
     const RESYNC_SECS: i64 = 60;
 
-    // Absent means unsynced or unreadable, never deleted: a deletion takes the trigger too.
+    // Raman configs never replicate but trigger deletes do, so absence is a peer, not a deletion.
     let Some(config) = config else {
         return now.saturating_add(second_micros(RESYNC_SECS));
     };
