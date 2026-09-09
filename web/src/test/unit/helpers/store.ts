@@ -95,6 +95,9 @@ const store = createStore({
       // written against. The specs that cover the OSS shape set it to false
       // themselves.
       synthetics_private_locations_enabled: true,
+      // Composition (subtest steps) defaults on in the fixture too, matching the
+      // enterprise-shaped default above — specs covering the flag OFF set it themselves.
+      synthetics_composition_enabled: true,
       sql_mode: false,
       sql_reserved_keywords: [
         "all",

@@ -13443,6 +13443,12 @@
       "deleteSingleTitle": "Delete Check",
       "duplicateTitle": "Duplicate Check"
     },
+    "delete": {
+      "blockedTitle": "\"{name}\" is used by other tests",
+      "blockedBulkTitle": "{count} selected tests are used by tests outside this selection",
+      "blockedBody": "Remove those references first, or delete the tests together.",
+      "hiddenReferences": "{count} tests you don't have access to"
+    },
     "empty": {
       "browserTests": "No browser tests found.",
       "checks": "No checks found. Adjust filters or create your first check."
@@ -14116,6 +14122,10 @@
       "filteringByErrorLabel": "Filtering by error:",
       "errorPatternsWindowDesc": "Normalized across {window} · click a row to filter runs"
     },
+    "save": {
+      "usedByTitle": "\"{name}\" is used by {count} other tests",
+      "usedByBody": "Your changes apply to all of them on their next run."
+    },
     "scheduleAlert": {
       "addNewDestination": "Add New Destination",
       "alertedIfFails": "Alerted if test fails",
@@ -14238,7 +14248,9 @@
       "triggering": "Triggering…",
       "type": "Type",
       "uptime": "Uptime 7d",
-      "url": "URL"
+      "url": "URL",
+      "usedBy": "Used by",
+      "usedByCount": "{count} tests"
     },
     "tabs": {
       "all": "All",
@@ -14300,7 +14312,8 @@
       "subtestFlags": "A subtest cannot be optional or always-run — its failure always fails this test",
       "runBudgetExceeded": "This check could take up to {worstCase} per run, over the {limit} limit. Remove a browser/device combo, or lower retries. ({combos} combo(s) × {attempts} attempt(s) × {perAttempt} each.)",
       "runBudgetRetriesHint": "Lowering retries brings this check back inside the {limit} run limit.",
-      "folderUnavailable": "Folder \"{folder}\" is not available in this organization — saving to the default folder."
+      "folderUnavailable": "Folder \"{folder}\" is not available in this organization — saving to the default folder.",
+      "compositionChildFailed": "\"{name}\" failed validation on save — open it to see which step needs fixing."
     },
     "privateLocations": {
       "searchPlaceholder": "Search locations...",

@@ -96,10 +96,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OBadge>
     </template>
 
-    <!-- Steps count (Browser mode) -->
+    <!-- Steps count (Browser mode) — expanded count from the server; null means
+         the journey could not be read, which is not the same as zero steps. -->
     <template #cell-steps="{ row }">
-      <span class="truncate">{{
-        (row as any).steps ? t("synthetics.table.stepsCount", { count: (row as any).steps }) : "—"
+      <span class="truncate" :data-test="`${dataTest}-cell-steps`">{{
+        (row as any).steps != null
+          ? t("synthetics.table.stepsCount", { count: (row as any).steps })
+          : "—"
+      }}</span>
+    </template>
+
+    <!-- Used-by count (Browser mode) — how many other checks reference this one
+         as a subtest. Zero reads as a dash: a check nothing references is the
+         common case, not a value worth drawing the eye to. -->
+    <template #cell-referencedBy="{ row }">
+      <span class="truncate" :data-test="`${dataTest}-cell-referencedBy`">{{
+        (row as any).referencedBy
+          ? t("synthetics.table.usedByCount", { count: (row as any).referencedBy })
+          : "—"
       }}</span>
     </template>
 
@@ -732,6 +746,16 @@ const STEPS_COL: OTableColumnDef = {
   sortable: false,
   hideable: true,
 };
+// Wider than STEPS_COL (72): "3 tests" clips at that width.
+const USED_BY_COL: OTableColumnDef = {
+  id: "referencedBy",
+  header: t("synthetics.table.usedBy"),
+  accessorKey: "referencedBy",
+  size: 90,
+  minSize: 80,
+  sortable: false,
+  hideable: true,
+};
 const ACTIONS_COL: OTableColumnDef = {
   id: "actions",
   header: raw(""),
@@ -758,6 +782,7 @@ const columns = computed<OTableColumnDef[]>(() => {
       TEST_NAME_COL,
       URL_COL,
       STEPS_COL,
+      USED_BY_COL,
       HISTORY_COL,
       PAGE_LOAD_COL,
       UPTIME_COL,
