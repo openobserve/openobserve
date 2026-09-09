@@ -34,7 +34,7 @@ use openobserve_core::{
 };
 use stream as stream_service;
 
-use super::matching::{is_candidate, is_permitted};
+use super::matching::{Permit, is_candidate};
 use crate::models::resources::{ResourceHit, ResourceType};
 
 /// Table-backed types fetch ahead of ranking so RBAC drops still leave enough rows to fill `limit`.
@@ -90,9 +90,21 @@ fn ofga_key(resource: &str) -> &str {
 
 async fn permitted_objects(
     ctx: &SourceContext<'_>,
-    resource: &str,
+    key: &str,
 ) -> anyhow::Result<Option<Vec<String>>> {
-    list_objects_for_user(ctx.org_id, ctx.user_id, "GET", ofga_key(resource)).await
+    list_objects_for_user(ctx.org_id, ctx.user_id, "GET", key).await
+}
+
+/// The same key drives both the list call and the `Permit`, so the two never disagree on the object
+/// prefix.
+async fn permit_for(ctx: &SourceContext<'_>, resource: &str) -> anyhow::Result<Permit> {
+    let key = ofga_key(resource);
+    let objects = permitted_objects(ctx, key).await?;
+    Ok(Permit::new(objects, key, ctx.org_id))
+}
+
+fn cap(limit: u64) -> usize {
+    fetch_size(limit) as usize
 }
 
 /// Same core list the Dashboards page uses, so folder and per-dashboard permissions apply
@@ -158,10 +170,11 @@ async fn alerts(ctx: &SourceContext<'_>) -> anyhow::Result<Vec<ResourceHit>> {
 
 /// Per type, because the stream permission filter only applies when a type is given.
 async fn streams(ctx: &SourceContext<'_>) -> anyhow::Result<Vec<ResourceHit>> {
+    let limit = cap(ctx.limit);
     let mut hits = Vec::new();
     for stream_type in SEARCHABLE_STREAM_TYPES {
         let key = stream_type.as_str();
-        let permitted = permitted_objects(ctx, key).await?;
+        let permitted = permitted_objects(ctx, ofga_key(key)).await?;
         let rows =
             stream_service::get_streams(ctx.org_id, Some(stream_type), false, permitted).await;
         for row in rows {
@@ -175,48 +188,48 @@ async fn streams(ctx: &SourceContext<'_>) -> anyhow::Result<Vec<ResourceHit>> {
             );
             hit.stream_type = Some(key.to_owned());
             hits.push(hit);
+            if hits.len() >= limit {
+                return Ok(hits);
+            }
         }
     }
     Ok(hits)
 }
 
 async fn saved_views(ctx: &SourceContext<'_>) -> anyhow::Result<Vec<ResourceHit>> {
-    let permitted = permitted_objects(ctx, "savedviews").await?;
+    let permit = permit_for(ctx, "savedviews").await?;
     let views = db::saved_view::get_views_list_only(ctx.org_id)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
     Ok(views
         .views
         .into_iter()
-        .filter(|v| {
-            is_permitted(permitted.as_deref(), "savedviews", &v.view_id, ctx.org_id)
-                && is_candidate(&v.view_name, &v.view_id, "", ctx.q)
-        })
+        .filter(|v| permit.allows(&v.view_id) && is_candidate(&v.view_name, &v.view_id, "", ctx.q))
+        .take(cap(ctx.limit))
         .map(|v| ResourceHit::new(ResourceType::SavedView, v.view_id, v.view_name))
         .collect())
 }
 
 async fn functions(ctx: &SourceContext<'_>) -> anyhow::Result<Vec<ResourceHit>> {
-    let permitted = permitted_objects(ctx, "function").await?;
+    let permit = permit_for(ctx, "function").await?;
     let rows = db::functions::list(ctx.org_id).await?;
     Ok(rows
         .into_iter()
-        .filter(|f| {
-            is_permitted(permitted.as_deref(), "function", &f.name, ctx.org_id)
-                && is_candidate(&f.name, "", "", ctx.q)
-        })
+        .filter(|f| permit.allows(&f.name) && is_candidate(&f.name, "", "", ctx.q))
+        .take(cap(ctx.limit))
         .map(|f| ResourceHit::new(ResourceType::Function, f.name.clone(), f.name))
         .collect())
 }
 
 async fn pipelines(ctx: &SourceContext<'_>) -> anyhow::Result<Vec<ResourceHit>> {
-    let permitted = permitted_objects(ctx, "pipelines").await?;
+    let permitted = permitted_objects(ctx, ofga_key("pipelines")).await?;
     let rows = pipeline_service::list_user_pipelines(ctx.org_id, permitted)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
     Ok(rows
         .into_iter()
         .filter(|p| is_candidate(&p.name, &p.id, &p.description, ctx.q))
+        .take(cap(ctx.limit))
         .map(|p| {
             let mut hit = ResourceHit::new(ResourceType::Pipeline, p.id, p.name);
             hit.enabled = Some(p.enabled);
@@ -296,11 +309,12 @@ async fn users(ctx: &SourceContext<'_>) -> anyhow::Result<Vec<ResourceHit>> {
         ));
     }
     hits.retain(|h| is_candidate(&h.name, &h.id, "", ctx.q));
+    hits.truncate(cap(ctx.limit));
     Ok(hits)
 }
 
 async fn service_accounts(ctx: &SourceContext<'_>) -> anyhow::Result<Vec<ResourceHit>> {
-    let permitted = permitted_objects(ctx, "service_accounts").await?;
+    let permit = permit_for(ctx, "service_accounts").await?;
     let prefix = format!("{}/", ctx.org_id);
     Ok(ORG_USERS
         .iter()
@@ -308,12 +322,7 @@ async fn service_accounts(ctx: &SourceContext<'_>) -> anyhow::Result<Vec<Resourc
             let user = entry.value();
             entry.key().starts_with(&prefix)
                 && user.role.is_service_account()
-                && is_permitted(
-                    permitted.as_deref(),
-                    "service_accounts",
-                    &user.email,
-                    ctx.org_id,
-                )
+                && permit.allows(&user.email)
         })
         .map(|entry| {
             person_hit(
@@ -323,6 +332,7 @@ async fn service_accounts(ctx: &SourceContext<'_>) -> anyhow::Result<Vec<Resourc
             )
         })
         .filter(|h| is_candidate(&h.name, &h.id, "", ctx.q))
+        .take(cap(ctx.limit))
         .collect())
 }
 
@@ -330,7 +340,7 @@ async fn synthetics(ctx: &SourceContext<'_>) -> anyhow::Result<Vec<ResourceHit>>
     if !get_config().synthetics.enabled {
         return Ok(Vec::new());
     }
-    let permitted = permitted_objects(ctx, "synthetics").await?;
+    let permit = permit_for(ctx, "synthetics").await?;
     let resp = openobserve_synthetics::service::list_synthetics(
         ctx.org_id,
         &ListSyntheticsParams::default(),
@@ -339,10 +349,8 @@ async fn synthetics(ctx: &SourceContext<'_>) -> anyhow::Result<Vec<ResourceHit>>
     Ok(resp
         .checks
         .into_iter()
-        .filter(|c| {
-            is_permitted(permitted.as_deref(), "synthetics", &c.id, ctx.org_id)
-                && is_candidate(&c.name, &c.id, &c.description, ctx.q)
-        })
+        .filter(|c| permit.allows(&c.id) && is_candidate(&c.name, &c.id, &c.description, ctx.q))
+        .take(cap(ctx.limit))
         .map(|c| {
             let mut hit = ResourceHit::new(ResourceType::Synthetic, c.id, c.name);
             hit.folder_id = Some(c.folder_id);

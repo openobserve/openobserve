@@ -37,7 +37,8 @@ pub enum ResourceType {
 #[derive(Debug, Default, Deserialize, IntoParams)]
 #[into_params(parameter_in = Query)]
 pub struct SearchResourcesQuery {
-    /// Text matched against names and ids; empty lists the alphabetical head of each type.
+    /// Text matched against names, ids and descriptions; empty lists the alphabetical head of each
+    /// type.
     #[serde(default)]
     pub q: String,
     /// Comma-separated subset of resource types; every type when absent.
@@ -46,34 +47,52 @@ pub struct SearchResourcesQuery {
     pub limit: Option<u64>,
 }
 
+/// One matched resource; only the fields relevant to its type are present.
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct ResourceHit {
+    /// Resource kind (serialized as `type`).
     #[serde(rename = "type")]
     pub kind: ResourceType,
+    /// Stable id used to open the resource (dashboard/alert/view id, `type/name` for streams,
+    /// email for people).
     pub id: String,
+    /// Display name.
     pub name: String,
+    /// Match score; higher is a closer match. Exact name 80, exact id 70, prefix 60, word-start
+    /// 40, substring 20.
     pub score: u32,
+    /// Owning folder id (dashboards, alerts, synthetic checks).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub folder_id: Option<String>,
+    /// Owning folder display name (dashboards, alerts).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub folder_name: Option<String>,
+    /// Stream type (`logs`/`metrics`/`traces`) for stream hits.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stream_type: Option<String>,
+    /// Enabled state for alerts, pipelines and synthetic checks.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub enabled: Option<bool>,
+    /// Email for user and service-account hits.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub email: Option<String>,
+    /// Role name for user and service-account hits.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub role: Option<String>,
+    /// Short description when the source has one.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
 }
 
+/// The ranked matches plus which types were capped.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct SearchResourcesResponse {
+    /// Matches across all requested types, each already cut to `limit` and sorted by score then
+    /// name.
     pub hits: Vec<ResourceHit>,
-    /// Types that matched more rows than `limit`.
+    /// Types that matched more rows than `limit`, so their list is not exhaustive.
     pub truncated: Vec<ResourceType>,
+    /// Server-side time spent gathering and ranking, in milliseconds.
     pub took_ms: u64,
 }
 

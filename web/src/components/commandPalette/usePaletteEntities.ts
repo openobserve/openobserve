@@ -36,6 +36,7 @@ export interface PaletteEntitiesInput {
 // 300ms is the app's standard search-as-you-type delay (Logs, Traces, LogStream, alerts).
 const SEARCH_DEBOUNCE_MS = 300;
 const CACHE_TTL_MS = 60_000;
+const CACHE_MAX_ENTRIES = 100;
 
 interface CacheEntry {
   at: number;
@@ -47,6 +48,19 @@ const searchCache = new Map<string, CacheEntry>();
 
 export function resetPaletteEntityCache(): void {
   searchCache.clear();
+}
+
+// Drop expired entries and, if still over the cap, the oldest ones — so a long session's
+// distinct queries do not accumulate forever.
+function evictStaleEntries(now: number): void {
+  for (const [key, entry] of searchCache) {
+    if (now - entry.at >= CACHE_TTL_MS) searchCache.delete(key);
+  }
+  while (searchCache.size >= CACHE_MAX_ENTRIES) {
+    const oldest = searchCache.keys().next().value;
+    if (oldest === undefined) break;
+    searchCache.delete(oldest);
+  }
 }
 
 function cacheKey(org: string, scopes: PaletteScope[], query: string): string {
@@ -103,7 +117,9 @@ export function usePaletteEntities({ open, query, scopes, org, providers }: Pale
     );
     if (signal.aborted) return;
     const items = dedupe(results.flat());
-    searchCache.set(key, { at: Date.now(), items });
+    const now = Date.now();
+    evictStaleEntries(now);
+    searchCache.set(key, { at: now, items });
     found.value = items;
     loading.value = false;
   };

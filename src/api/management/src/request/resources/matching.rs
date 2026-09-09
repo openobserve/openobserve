@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::collections::HashSet;
+
 use crate::models::resources::ResourceHit;
 
 const SCORE_NAME_EXACT: u32 = 80;
@@ -22,7 +24,18 @@ const SCORE_WORD_PREFIX: u32 = 40;
 const SCORE_NAME_CONTAINS: u32 = 20;
 const SCORE_OTHER_CONTAINS: u32 = 10;
 
+/// Permitted-object set for one resource type, resolved once per source.
+pub struct Permit {
+    /// `None` means unrestricted (root user, OpenFGA off, or list-only off).
+    ids: Option<HashSet<String>>,
+    /// True when the org-wide `{key}:_all_{org}` grant is present.
+    all: bool,
+}
+
 /// Lowercases and collapses whitespace, mirroring the palette's client-side fold.
+///
+/// The client additionally strips NFD diacritics; this does not, so an accented entity
+/// name matches an accented query but not its unaccented form. Diacritic parity is deferred.
 pub fn fold(value: &str) -> String {
     value
         .split_whitespace()
@@ -65,10 +78,10 @@ pub fn score(name: &str, id: &str, description: &str, q: &str) -> u32 {
 }
 
 /// Scores, drops non-matches, orders by score then name, cuts to `limit`; the flag says rows were
-/// cut.
+/// cut. Each name is folded once for the ordering rather than on every comparison.
 pub fn rank(hits: Vec<ResourceHit>, q: &str, limit: usize) -> (Vec<ResourceHit>, bool) {
-    let mut kept: Vec<ResourceHit> = if q.is_empty() {
-        hits
+    let mut scored: Vec<(String, ResourceHit)> = if q.is_empty() {
+        hits.into_iter().map(|hit| (fold(&hit.name), hit)).collect()
     } else {
         hits.into_iter()
             .filter_map(|mut hit| {
@@ -80,30 +93,50 @@ pub fn rank(hits: Vec<ResourceHit>, q: &str, limit: usize) -> (Vec<ResourceHit>,
                 );
                 (s > 0).then(|| {
                     hit.score = s;
-                    hit
+                    (fold(&hit.name), hit)
                 })
             })
             .collect()
     };
-    kept.sort_by(|a, b| {
-        b.score
-            .cmp(&a.score)
-            .then_with(|| fold(&a.name).cmp(&fold(&b.name)))
-    });
-    let truncated = kept.len() > limit;
-    kept.truncate(limit);
-    (kept, truncated)
+    scored.sort_by(|a, b| b.1.score.cmp(&a.1.score).then_with(|| a.0.cmp(&b.0)));
+    let truncated = scored.len() > limit;
+    scored.truncate(limit);
+    (scored.into_iter().map(|(_, hit)| hit).collect(), truncated)
 }
 
-/// OpenFGA list semantics: `None` is unrestricted, otherwise the object or the org-wide entry must
-/// be listed.
-pub fn is_permitted(permitted: Option<&[String]>, key: &str, id: &str, org_id: &str) -> bool {
-    match permitted {
-        None => true,
-        Some(list) => {
-            let object = format!("{key}:{id}");
-            let all = format!("{key}:_all_{org_id}");
-            list.iter().any(|o| *o == object || *o == all)
+impl Permit {
+    /// `key` is the resolved OpenFGA object key, the same one the list call was made with.
+    pub fn new(permitted: Option<Vec<String>>, key: &str, org_id: &str) -> Self {
+        let Some(list) = permitted else {
+            return Self {
+                ids: None,
+                all: true,
+            };
+        };
+        let prefix = format!("{key}:");
+        let all_object = format!("{key}:_all_{org_id}");
+        let mut all = false;
+        // Store bare ids so membership is one hash lookup with no per-row allocation.
+        let ids = list
+            .into_iter()
+            .filter_map(|object| {
+                if object == all_object {
+                    all = true;
+                    return None;
+                }
+                object.strip_prefix(&prefix).map(str::to_owned)
+            })
+            .collect();
+        Self {
+            ids: Some(ids),
+            all,
+        }
+    }
+
+    pub fn allows(&self, id: &str) -> bool {
+        match &self.ids {
+            None => true,
+            Some(ids) => self.all || ids.contains(id),
         }
     }
 }
@@ -173,13 +206,23 @@ mod tests {
     }
 
     #[test]
-    fn is_permitted_honours_none_object_and_org_wide_entries() {
-        assert!(is_permitted(None, "function", "f1", "org"));
-        let list = vec!["function:f1".to_string()];
-        assert!(is_permitted(Some(&list), "function", "f1", "org"));
-        assert!(!is_permitted(Some(&list), "function", "f2", "org"));
-        let all = vec!["function:_all_org".to_string()];
-        assert!(is_permitted(Some(&all), "function", "f2", "org"));
-        assert!(!is_permitted(Some(&[]), "function", "f1", "org"));
+    fn permit_none_is_unrestricted() {
+        assert!(Permit::new(None, "function", "org").allows("anything"));
+    }
+
+    #[test]
+    fn permit_honours_object_and_org_wide_grants() {
+        let object = Permit::new(Some(vec!["function:f1".to_string()]), "function", "org");
+        assert!(object.allows("f1"));
+        assert!(!object.allows("f2"));
+
+        let all = Permit::new(
+            Some(vec!["function:_all_org".to_string()]),
+            "function",
+            "org",
+        );
+        assert!(all.allows("f2"));
+
+        assert!(!Permit::new(Some(vec![]), "function", "org").allows("f1"));
     }
 }

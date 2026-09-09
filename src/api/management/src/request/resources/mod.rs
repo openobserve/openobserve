@@ -44,7 +44,7 @@ pub fn parse_types(types: Option<&str>) -> Vec<ResourceType> {
     out
 }
 
-/// SearchResources - Search org resources by name or id for the command palette.
+/// SearchResources - Search org resources by name, id or description for the command palette.
 #[utoipa::path(
     get,
     path = "/{org_id}/resources/_search",
@@ -52,7 +52,7 @@ pub fn parse_types(types: Option<&str>) -> Vec<ResourceType> {
     tag = "Resources",
     operation_id = "SearchResources",
     summary = "Search org resources by name",
-    description = "Finds dashboards, alerts, streams, saved views, functions, pipelines, users, service accounts and synthetic checks whose name or id matches the query. Returns at most `limit` rows per type, scored exact > id > prefix > word start > substring, with the same per-type permission filtering as the corresponding list endpoints. An empty query returns the alphabetical head of each requested type.",
+    description = "Finds dashboards, alerts, streams, saved views, functions, pipelines, users, service accounts and synthetic checks whose name, id or description matches the query. Returns at most `limit` rows per type, scored exact > id > prefix > word start > substring, with the same per-type permission filtering as the corresponding list endpoints. An empty query returns the alphabetical head of each requested type.",
     security(
         ("Authorization" = [])
     ),

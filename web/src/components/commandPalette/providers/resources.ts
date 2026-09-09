@@ -171,7 +171,7 @@ export function hitToItem(
     case "user":
       return userToItem(
         { email: hit.id, first_name: personName(hit), role: hit.role },
-        hit.role ? String(ctx.t(`palette.roles.${hit.role}`, hit.role)) : "",
+        roleLabel(ctx, hit.role),
         group,
       );
     case "service_account":
