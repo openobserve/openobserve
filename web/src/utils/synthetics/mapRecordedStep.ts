@@ -275,22 +275,35 @@ export function journeyToWireSteps(steps: BrowserStep[]): WireStep[] {
 
 /**
  * Substitute `{{ VAR_NAME }}` placeholders in wire step string fields with
- * actual variable values. Operates on all string fields that could contain
- * variable references (value, url, text, key, selector, name).
+ * actual variable values. `url`/`value`/`key` are what the probe substitutes
+ * (§5.2.1), so an unresolved placeholder there throws instead of typing an
+ * empty string; `text`/`selector`/`name` are cosmetic and stay literal.
  */
 export function substituteVariables(step: WireStep, vars: Record<string, string>): WireStep {
   const re = /\{\{\s*(\w+)\s*\}\}/g;
   const sub = (s: string | undefined): string | undefined => {
     if (s === undefined || s === null) return s;
-    return s.replace(re, (_, k: string) => vars[k] ?? "");
+    return s.replace(re, (_, k: string) => {
+      const value = vars[k];
+      // An empty substitution is indistinguishable from a working step that types nothing,
+      // so a missing variable has to stop the replay rather than quietly change it.
+      if (value === undefined) {
+        throw new Error(`unresolved variable {{${k}}}`);
+      }
+      return value;
+    });
+  };
+  const lenient = (s: string | undefined): string | undefined => {
+    if (s === undefined || s === null) return s;
+    return s.replace(re, (m, k: string) => vars[k] ?? m);
   };
   return {
     ...step,
     url: sub(step.url),
     value: sub(step.value),
-    text: sub(step.text),
     key: sub(step.key),
-    selector: sub(step.selector),
-    name: sub(step.name),
+    text: lenient(step.text),
+    selector: lenient(step.selector),
+    name: lenient(step.name),
   };
 }
