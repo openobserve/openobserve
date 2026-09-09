@@ -31,6 +31,7 @@ import type {
 } from "@/types/synthetics";
 import useSyntheticsRecorder from "@/composables/useSyntheticsRecorder";
 import { journeyToWireSteps } from "@/utils/synthetics/mapRecordedStep";
+import { expandJourney, type ChildJourney } from "@/utils/synthetics/expandJourney";
 import { computeRunBudget, formatBudgetDuration, JOB_LEASE_MS } from "@/utils/synthetics/runBudget";
 import { classifyPreflightFailure } from "@/utils/synthetics/replayFailure";
 import {
@@ -489,6 +490,32 @@ const check = ref<BrowserCheck>({
   rum: { collect: true, sessionReplay: false },
   capture: { screenshot: "on-fail" as const, trace: "on-fail" as const },
   variables: [],
+});
+
+/**
+ * The ONE cache of fetched child journeys, referenced by this check's subtest
+ * steps (§7.3). `BrowserJourney` reads and writes through this exact `Map`
+ * instance via a prop, rather than keeping a cache of its own, so a child
+ * fetched to preview a reference row is immediately visible to
+ * `executedStepCount` below and vice versa.
+ */
+const childrenCache = ref<Map<string, ChildJourney>>(new Map());
+
+/**
+ * How many steps this journey actually runs, expanding every subtest
+ * reference — the number `SubtestPicker`'s insertion warning and the
+ * server's 50-step cap are both measured in.
+ *
+ * Falls back to the authored `journey.length` until every referenced child
+ * is in `childrenCache` (a first-paint case only — the cache is loaded on
+ * mount).
+ */
+const executedStepCount = computed(() => {
+  try {
+    return expandJourney(check.value.journey, childrenCache.value).steps.length;
+  } catch {
+    return check.value.journey.length;
+  }
 });
 
 /**
@@ -1116,6 +1143,9 @@ function onClearResults() {
                     :blocked-detail="blockedDetail"
                     :field-issues="journeyFieldIssues"
                     :variables-panel-open="variablesPanelOpen"
+                    :own-check-id="check.id"
+                    :own-step-count="executedStepCount"
+                    :children-cache="childrenCache"
                     class="h-full!"
                     @toggle-variables-panel="variablesPanelOpen = !variablesPanelOpen"
                     @replay="onReplay"

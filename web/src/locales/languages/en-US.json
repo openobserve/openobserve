@@ -13674,7 +13674,17 @@
       "timeoutLabel": "Timeout (ms)",
       "valueFallback": "Value",
       "showSetupSteps": "Show setup steps",
-      "waitingForActions": "Waiting for actions in the browser…"
+      "waitingForActions": "Waiting for actions in the browser…",
+      "subtest": {
+        "pickLabel": "Test to run here",
+        "delta": "Adding \"{name}\" takes this test from {before} → {after} executed steps.",
+        "lastRun": "Its last run took {seconds}s of the {budget}s allowance.",
+        "raiseBudget": "Raise this test's run-time allowance if it starts being cut short.",
+        "stepsBadge": "{count} steps",
+        "ignoredEnv": "This test's own variables, auth and cookies are ignored here — the parent's apply.",
+        "noAccess": "You don't have access to \"{name}\", so its steps can't be shown here.",
+        "noAccessToast": "You don't have access to one of the tests this test references."
+      }
     },
     "labels": {
       "copyOf": "Copy of {name}",
