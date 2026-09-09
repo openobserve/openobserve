@@ -464,11 +464,18 @@ fn search_group_cuts(
         .filter(|&cut| cut > start && cut <= end)
         // groups evaluate on the query's own grid
         .map(|cut| start + (cut - start + step - 1) / step * step)
-        .filter(|&cut| cut <= end)
         .collect();
     cuts.sort_unstable();
-    cuts.dedup();
-    cuts
+    // a lone point evaluates as an instant vector the leader cannot merge: every piece keeps two
+    let mut kept = Vec::new();
+    let mut piece_start = start;
+    for cut in cuts {
+        if cut >= piece_start + 2 * step && cut + step <= end {
+            kept.push(cut);
+            piece_start = cut;
+        }
+    }
+    kept
 }
 
 /// Sizes the groups by memory within each piece between two cuts, so no group straddles a cut.
@@ -486,21 +493,15 @@ async fn generate_search_groups(
     let mut groups = Vec::new();
     let mut piece_start = start;
     for piece_end in cuts.iter().map(|cut| cut - step).chain([end]) {
-        if piece_start == piece_end {
-            groups.push((piece_start, piece_end));
-        } else {
-            let files = plan
-                .files
-                .iter()
-                .filter(|f| {
-                    f.meta.min_ts <= piece_end && f.meta.max_ts >= piece_start - plan.window
-                })
-                .cloned()
-                .collect();
-            groups.extend(
-                generate_search_group(memory_limit, files, piece_start, piece_end, step).await?,
-            );
-        }
+        let files = plan
+            .files
+            .iter()
+            .filter(|f| f.meta.min_ts <= piece_end && f.meta.max_ts >= piece_start - plan.window)
+            .cloned()
+            .collect();
+        groups.extend(
+            generate_search_group(memory_limit, files, piece_start, piece_end, step).await?,
+        );
         piece_start = piece_end + step;
     }
     Ok(groups)
@@ -746,22 +747,31 @@ mod tests {
             search_group_cuts(5, 3000, 30, &mixed, 2000),
             vec![1355, 2015]
         );
-        // cuts outside (start, end] are dropped, a cut on `end` stays
+        // cuts outside (start, end] are dropped
         assert_eq!(
             search_group_cuts(1400, 3000, 30, &mixed, 4000),
             Vec::<i64>::new()
         );
-        assert_eq!(
-            search_group_cuts(0, 2010, 30, &mixed, 2000),
-            vec![1350, 2010]
-        );
+        // every piece keeps at least two points: no cut on `end`, none one step after `start`
+        assert_eq!(search_group_cuts(0, 2010, 30, &mixed, 2000), vec![1350]);
         assert_eq!(search_group_cuts(0, 2005, 30, &mixed, 2000), vec![1350]);
-        // no legacy files: only the WAL floor
         let hash_only = plan(vec![], 300, None);
+        assert_eq!(search_group_cuts(0, 3000, 30, &hash_only, 2970), vec![2970]);
+        assert_eq!(
+            search_group_cuts(0, 3000, 30, &hash_only, 2980),
+            Vec::<i64>::new()
+        );
+        let at_start = plan(vec![], 0, Some(0));
+        assert_eq!(
+            search_group_cuts(0, 3000, 30, &at_start, 4000),
+            Vec::<i64>::new()
+        );
+        // no legacy files: only the WAL floor
         assert_eq!(search_group_cuts(0, 3000, 30, &hash_only, 2000), vec![2010]);
-        // coinciding cuts collapse
+        // coinciding or adjacent cuts collapse into the first
         let adjacent = plan(vec![], 300, Some(1670));
         assert_eq!(search_group_cuts(0, 3000, 30, &adjacent, 2000), vec![2010]);
+        assert_eq!(search_group_cuts(0, 3000, 30, &mixed, 1360), vec![1350]);
     }
 
     #[tokio::test]
@@ -788,12 +798,12 @@ mod tests {
                 .unwrap(),
             vec![(0, 200), (205, 295), (300, 400), (405, 430)]
         );
-        // a cut on `end` leaves a single-point group
+        // the last piece is a two-point group of its own
         assert_eq!(
-            generate_search_groups(100_000, &plan, 0, 430, 10, &[200, 430])
+            generate_search_groups(100_000, &plan, 0, 430, 10, &[200, 420])
                 .await
                 .unwrap(),
-            vec![(0, 190), (200, 420), (430, 430)]
+            vec![(0, 190), (200, 410), (420, 430)]
         );
     }
 }
