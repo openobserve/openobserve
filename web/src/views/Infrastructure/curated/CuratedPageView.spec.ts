@@ -24,6 +24,7 @@ import { createRouter, createMemoryHistory } from "vue-router";
 import { defineComponent, ref, isRef, inject, watchEffect, type Ref } from "vue";
 import CuratedPageView from "./CuratedPageView.vue";
 import VariablesValueSelector from "@/components/dashboards/VariablesValueSelector.vue";
+import RelativeTime from "@/components/common/RelativeTime.vue";
 import { useVariablesManager } from "@/composables/dashboard/useVariablesManager";
 import { b64DecodeUnicodeSafe } from "@/utils/formatters";
 import { kubernetesPage, FLEET_DRILLDOWN_EVENT } from "./packs/kubernetes.page";
@@ -408,6 +409,49 @@ describe("CuratedPageView", () => {
         expect(refreshSpy, face).toHaveBeenCalledWith(expect.objectContaining({ force: true }));
         wrapper.unmount();
       }
+    });
+
+    it("the last-refreshed indicator is fed a MILLISECOND epoch, not the µs `checkedAtUs`", async () => {
+      // `checkedAtUs` is µs (`Date.now() * 1000`); passing it to RelativeTime
+      // undivided renders "in 55000 years" instead of "now".
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date(NOW_US / 1000));
+      wrapper = await mountView();
+
+      const stamp = wrapper.find('[data-test="curated-last-refreshed"]');
+      expect(stamp.exists()).toBe(true);
+      const relative = stamp.findComponent(RelativeTime);
+      expect(relative.props("timestamp")).toBe(NOW_US / 1000);
+      // The visible string, not just the prop: a µs value formats as a far-future year.
+      expect(stamp.text()).toContain("now");
+    });
+
+    it("a manual Refresh re-stamps the last-refreshed indicator", async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date(NOW_US / 1000));
+      wrapper = await mountView();
+      const first = wrapper
+        .find('[data-test="curated-last-refreshed"]')
+        .findComponent(RelativeTime)
+        .props("timestamp");
+
+      vi.setSystemTime(new Date((NOW_US + 11 * 60 * 1_000_000) / 1000));
+      await wrapper.find('[data-test="curated-refresh"]').trigger("click");
+      await flushPromises();
+
+      const after = wrapper
+        .find('[data-test="curated-last-refreshed"]')
+        .findComponent(RelativeTime)
+        .props("timestamp");
+      expect(after).toBe((NOW_US + 11 * 60 * 1_000_000) / 1000);
+      expect(after).toBeGreaterThan(first as number);
+    });
+
+    it("an unregistered workload stamps NOTHING — it never fetched", async () => {
+      // runRefresh bails before `refresh()` when there is no pack, so claiming a
+      // refresh time there would date a request that never happened.
+      wrapper = await mountView({ workload: "unregistered" as any });
+      expect(wrapper.find('[data-test="curated-last-refreshed"]').exists()).toBe(false);
     });
 
     it("window `focus` re-checks while the SETUP face shows", async () => {
