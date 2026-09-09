@@ -41,8 +41,9 @@ use crate::{
     series_stream::merge::{StreamingSelector, series_label_columns, shard_sources},
 };
 
-/// A selector with its contexts created, ready for either streaming consumer.
-struct StreamingTarget {
+/// What scanning a selector takes: the normalized selector, its offset and label set, the
+/// matchers the scan still applies, and the contexts created for it.
+struct SelectorScan {
     selector: VectorSelector,
     /// The matchers the scan still applies; an exact index selection already applied them.
     scan_matchers: Matchers,
@@ -65,16 +66,16 @@ impl Engine {
         if matches!(modifier, Some(LabelModifier::Exclude(_))) {
             return Ok(None);
         }
-        let Some(target) = self.streaming_target(vs, range).await? else {
+        let Some(scan) = self.selector_scan(vs, range).await? else {
             return Ok(None);
         };
         let timeout = self.ctx.query_ctx.timeout;
         // a second context would split series and evaluate rate windows on partial data
-        if let [(ctx, schema, scan_stats, _)] = target.ctxs.as_slice() {
+        if let [(ctx, schema, scan_stats, _)] = scan.ctxs.as_slice() {
             let run = fused::stream::fused_agg(
                 ctx,
                 schema,
-                target.streaming_selector(),
+                scan.streaming_selector(),
                 fused::stream::FusedShape {
                     op,
                     func: func.clone(),
@@ -94,7 +95,7 @@ impl Engine {
 
         // the layout cannot stream: materialize on the contexts already created
         let matrix = self
-            .eval_matrix_selector(&target.selector, range, Some(target.ctxs))
+            .eval_matrix_selector(&scan.selector, range, Some(scan.ctxs))
             .await?;
         let input = if matrix.is_empty() {
             Value::None
@@ -115,16 +116,16 @@ impl Engine {
         range: Duration,
         func: Arc<dyn functions::RangeFunc>,
     ) -> Result<Option<Value>> {
-        let Some(target) = self.streaming_target(vs, range).await? else {
+        let Some(scan) = self.selector_scan(vs, range).await? else {
             return Ok(None);
         };
-        if let [(ctx, schema, scan_stats, _)] = target.ctxs.as_slice() {
+        if let [(ctx, schema, scan_stats, _)] = scan.ctxs.as_slice() {
             let label_cols = if self.skip_labels {
                 vec![]
             } else {
-                series_label_columns(schema, &target.label_selector, func.name())
+                series_label_columns(schema, &scan.label_selector, func.name())
             };
-            let selector = target.streaming_selector();
+            let selector = scan.streaming_selector();
             let eval = Arc::new(fused::SeriesEval::new(func.clone(), range, &self.eval_ctx));
             let run = async {
                 match shard_sources(
@@ -159,7 +160,7 @@ impl Engine {
 
         // the layout cannot stream: evaluate the generic function on the contexts already created
         let matrix = self
-            .eval_matrix_selector(&target.selector, range, Some(target.ctxs))
+            .eval_matrix_selector(&scan.selector, range, Some(scan.ctxs))
             .await?;
         let input = if matrix.is_empty() {
             Value::None
@@ -171,11 +172,11 @@ impl Engine {
 
     /// Normalizes the selector and creates its contexts; `None` when a query-level gate rules
     /// the streaming path out before any context exists.
-    async fn streaming_target(
+    async fn selector_scan(
         &mut self,
         vs: &VectorSelector,
         range: Duration,
-    ) -> Result<Option<StreamingTarget>> {
+    ) -> Result<Option<SelectorScan>> {
         let query_ctx = &self.ctx.query_ctx;
         // need_wal bails early: WAL would split series across contexts
         if !config::get_config()
@@ -214,7 +215,7 @@ impl Engine {
             [(_, _, _, false)] => Matchers::empty(),
             _ => selector.matchers.clone(),
         };
-        Ok(Some(StreamingTarget {
+        Ok(Some(SelectorScan {
             selector,
             scan_matchers,
             offset,
@@ -266,7 +267,7 @@ impl Engine {
     }
 }
 
-impl StreamingTarget {
+impl SelectorScan {
     fn streaming_selector(&self) -> StreamingSelector<'_> {
         StreamingSelector {
             table_name: self.selector.name.as_deref().unwrap_or_default(),
