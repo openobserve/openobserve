@@ -531,6 +531,8 @@ pub struct DueCheck {
     /// Steps the journey defines right now — 1 for protocol checks. The scheduler
     /// freezes it onto each job so a mid-flight edit cannot move the ack's ceiling.
     pub steps_configured: i32,
+    /// Child ids the journey references, with multiplicity; empty for every non-composed check.
+    pub subtest_refs: Vec<String>,
     pub tags: Vec<String>,
 }
 
@@ -560,18 +562,20 @@ impl TryFrom<synthetics_checks::Model> for DueCheck {
 
         // One parse, two answers: `m.config` is moved into `from_value`, so the
         // devices and the frozen step count must come out of the same call.
-        let (browser_devices, steps_configured) = if check_type == SyntheticType::Browser {
-            let cfg: BrowserConfig = serde_json::from_value(m.config).unwrap_or_default();
-            // `unwrap_or_default()` makes an unreadable config ZERO steps, and
-            // `validate_browser_config` rejects an empty journey — so a 0 means
-            // "could not read the row". A 0 ceiling bills real work as nothing,
-            // hence the floor of 1; saturating stops a negative ceiling.
-            let steps = i32::try_from(cfg.steps.len().max(1)).unwrap_or(i32::MAX);
-            (cfg.browser_devices, steps)
-        } else {
-            // §1.1: a protocol check is one step per attempt, never zero.
-            (vec![], 1)
-        };
+        let (browser_devices, steps_configured, subtest_refs) =
+            if check_type == SyntheticType::Browser {
+                let cfg: BrowserConfig = serde_json::from_value(m.config).unwrap_or_default();
+                // `unwrap_or_default()` makes an unreadable config ZERO steps, and
+                // `validate_browser_config` rejects an empty journey — so a 0 means
+                // "could not read the row". A 0 ceiling bills real work as nothing,
+                // hence the floor of 1; saturating stops a negative ceiling.
+                let steps = i32::try_from(cfg.steps.len().max(1)).unwrap_or(i32::MAX);
+                let subtest_refs = config::meta::synthetics_composition::subtest_refs(&cfg.steps);
+                (cfg.browser_devices, steps, subtest_refs)
+            } else {
+                // §1.1: a protocol check is one step per attempt, never zero.
+                (vec![], 1, Vec::new())
+            };
 
         let tags: Vec<String> = serde_json::from_value(m.tags).unwrap_or_default();
 
@@ -586,6 +590,7 @@ impl TryFrom<synthetics_checks::Model> for DueCheck {
             next_run_at: m.next_run_at,
             browser_devices,
             steps_configured,
+            subtest_refs,
             tags,
         })
     }
