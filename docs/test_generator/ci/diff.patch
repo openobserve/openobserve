@@ -1,0 +1,2496 @@
+===== COMPLETE LIST OF CHANGED FILES (30 files) =====
+# AUTHORITATIVE: this list is never truncated. The diff BODY below may be trimmed for
+# very large PRs, so decide WHICH files/areas changed (e.g. web/src frontend) from THIS list.
+web/src/components/alerts/AlertList.spec.ts
+web/src/components/alerts/AlertList.vue
+web/src/components/alerts/AlertsDestinationList.spec.ts
+web/src/components/alerts/AlertsDestinationList.vue
+web/src/components/alerts/IncidentDetailDrawer.spec.ts
+web/src/components/alerts/IncidentDetailDrawer.vue
+web/src/components/alerts/IncidentList.spec.ts
+web/src/components/alerts/IncidentList.vue
+web/src/components/alerts/TemplateList.spec.ts
+web/src/components/alerts/TemplateList.vue
+web/src/components/functions/EnrichmentTableList.spec.ts
+web/src/components/functions/EnrichmentTableList.vue
+web/src/components/functions/FunctionList.spec.ts
+web/src/components/functions/FunctionList.vue
+web/src/components/pipeline/PipelinesList.spec.ts
+web/src/components/pipeline/PipelinesList.vue
+web/src/components/workflows/WorkflowsList.spec.ts
+web/src/components/workflows/WorkflowsList.vue
+web/src/composables/useListBackNavigation.ts
+web/src/lib/core/Table/OTable.spec.ts
+web/src/lib/core/Table/composables/useTablePagination.ts
+web/src/plugins/metrics/Index.vue
+web/src/views/Dashboards/Dashboards.spec.ts
+web/src/views/Dashboards/Dashboards.vue
+web/src/views/Dashboards/ViewDashboard.vue
+web/src/views/alerts/AlertDetail.vue
+web/src/views/slos/AddSlo.vue
+web/src/views/slos/SloDetail.vue
+web/src/views/slos/SloList.vue
+web/src/views/slos/SloListPagination.spec.ts
+===== END CHANGED FILES =====
+
+diff --git a/web/src/components/alerts/AlertList.spec.ts b/web/src/components/alerts/AlertList.spec.ts
+index fcd011e7f2f..19e29aaa20e 100644
+--- a/web/src/components/alerts/AlertList.spec.ts
++++ b/web/src/components/alerts/AlertList.spec.ts
+@@ -864,6 +864,49 @@ describe("AlertList - router query behaviors", () => {
+     expect(wrapper.vm.showAddAlertDialog).toBe(true);
+     expect(pushSpy).toHaveBeenCalled();
+   });
++
++  it("hideForm drops the editor's own params but keeps the rest of the query (e.g. page)", async () => {
++    const wrapper: any = await mountAlertList();
++    await waitData(wrapper);
++    wrapper.vm.router.currentRoute.value.query = {
++      action: "update",
++      alert_id: "a1",
++      name: "Alert 1",
++      page: "3",
++    };
++    const spy = vi.spyOn(router, "push");
++    await wrapper.vm.hideForm();
++
++    const pushedQuery = spy.mock.calls[0][0].query;
++    expect(pushedQuery.page).toBe("3");
++    expect(pushedQuery.action).toBeUndefined();
++    expect(pushedQuery.alert_id).toBeUndefined();
++  });
++});
++
++describe("AlertList - pagination restoration", () => {
++  it("restores the page saved before navigating away, surviving the initial async load", async () => {
++    // Drive the real fetch path (cache-miss -> getAlertsFn) rather than waitData()'s
++    // post-mount override, which double-assigns filteredResults and would trigger a
++    // second, spurious autoResetPageIndex after the legitimate one has already settled.
++    (store.state as any).organizationData.allAlertsListByFolderId = {};
++    alertsDB = Array.from({ length: 15 }, (_, i) => makeAlert(i + 1));
++    (store.state as any).alertListFilters = {
++      searchQuery: "",
++      filterQuery: "",
++      searchAcrossFolders: false,
++      perPage: 5,
++      currentPage: 3,
++    };
++    const wrapper: any = await mountAlertList();
++    await flushPromises();
++    await wrapper.vm.$nextTick();
++    // The reassert is scheduled via setTimeout(0) to run after TanStack's own deferred auto-reset — see AlertList.vue's watch(loading, ...).
++    await new Promise((resolve) => setTimeout(resolve, 0));
++    await wrapper.vm.$nextTick();
++
++    expect(wrapper.vm.oTableRef.table.getState().pagination.pageIndex).toBe(2);
++  });
+ });
+ 
+ // 6. Search behaviors and debounce
+@@ -1038,14 +1081,19 @@ describe("AlertList - micro validations", () => {
+     expect(spy).toHaveBeenCalled();
+   });
+ 
+-  it("importAlert sets dialog and pushes route", async () => {
++  it("importAlert sets dialog and pushes route, preserving the rest of the query", async () => {
+     const wrapper: any = await mountAlertList();
+     await waitData(wrapper);
++    wrapper.vm.router.currentRoute.value.query = {
++      ...wrapper.vm.router.currentRoute.value.query,
++      page: "3",
++    };
+     const spy = vi.spyOn(router, "push");
+     wrapper.vm.importAlert();
+     await flushPromises();
+     expect(wrapper.vm.showImportAlertDialog).toBe(true);
+     expect(spy).toHaveBeenCalled();
++    expect(spy.mock.calls[0][0].query.page).toBe("3");
+   });
+ 
+   it("updateFolderIdToBeCloned updates state", async () => {
+diff --git a/web/src/components/alerts/AlertList.vue b/web/src/components/alerts/AlertList.vue
+index 05c2da52204..ecf81a78745 100644
+--- a/web/src/components/alerts/AlertList.vue
++++ b/web/src/components/alerts/AlertList.vue
+@@ -91,6 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+             <!-- Alert List Table (shows all alert types including anomaly detection rows) -->
+             <OTable
+               class="min-h-0 flex-1"
++              ref="oTableRef"
+               :frame="false"
+               v-model:selected-ids="selectedAlertIds"
+               selection="multiple"
+@@ -103,6 +104,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+               pagination="client"
+               :page-size="pageSize"
+               :page-size-options="pageSizeOptions"
++              :current-page="currentPage"
++              @update:current-page="onPageChange"
+               width="100%"
+               :show-global-filter="false"
+               :default-columns="false"
+@@ -1006,6 +1009,18 @@ export default defineComponent({
+     // Start in the loading state so the table shows the skeleton on first
+     // render instead of briefly flashing the empty state before the fetch.
+     const loading = ref(true);
++    const oTableRef: any = ref(null);
++    // The first real load lands after mount and races TanStack's own auto-reset-on-data-change, which resolves through its own deferred microtask queue — setTimeout(0) runs strictly after that queue drains, so the restored page reliably wins.
++    watch(
++      loading,
++      (isLoading) => {
++        if (isLoading) return;
++        setTimeout(() => {
++          oTableRef.value?.table?.setPageIndex(currentPage.value - 1);
++        }, 0);
++      },
++      { once: true },
++    );
+     const isSubmitting = ref(false);
+ 
+     // Compact toolbar: icon-only buttons when AI sidebar is open at narrow widths
+@@ -2260,6 +2275,11 @@ export default defineComponent({
+     };
+     const pageSize = ref<number>(savedAlertListFilters.perPage || 20);
+     const pageSizeOptions = [20, 50, 100, 250, 500];
++    // Restored the same way as pageSize above, so returning from add/edit/detail lands back on the page the user was viewing instead of resetting to page 1.
++    const currentPage = ref<number>(savedAlertListFilters.currentPage || 1);
++    const onPageChange = (page: number) => {
++      currentPage.value = page;
++    };
+     const resultTotal = computed(function () {
+       return displayedAlerts.value?.length;
+     });
+@@ -2455,9 +2475,18 @@ export default defineComponent({
+     };
+     const hideForm = async () => {
+       showAddAlertDialog.value = false;
++      // Drop the form-specific params the editor pushed, keep the rest (page included).
++      const {
++        action: _action,
++        alert_id: _alertId,
++        name: _name,
++        alert_type: _alertType,
++        ...rest
++      } = router.currentRoute.value.query;
+       await router.push({
+         name: "alertList",
+         query: {
++          ...rest,
+           org_identifier: store.state.selectedOrganization.identifier,
+           folder: activeFolderId.value,
+           tab: activeTab.value,
+@@ -2649,6 +2678,7 @@ export default defineComponent({
+       router.push({
+         name: "alertList",
+         query: {
++          ...router.currentRoute.value.query,
+           action: "import",
+           org_identifier: store.state.selectedOrganization.identifier,
+           folder: activeFolderId.value,
+@@ -2968,12 +2998,13 @@ export default defineComponent({
+       }
+     });
+     // Persist filter state to Vuex so it survives navigation to add/edit screens
+-    watch([searchQuery, filterQuery, searchAcrossFolders, pageSize], () => {
++    watch([searchQuery, filterQuery, searchAcrossFolders, pageSize, currentPage], () => {
+       store.commit("setAlertListFilters", {
+         searchQuery: searchQuery.value || "",
+         filterQuery: filterQuery.value || "",
+         searchAcrossFolders: !!searchAcrossFolders.value,
+         perPage: pageSize.value,
++        currentPage: currentPage.value,
+       });
+     });
+     watch(activeTab, async (newVal) => {
+@@ -3369,6 +3400,9 @@ export default defineComponent({
+       refreshList,
+       pageSize,
+       pageSizeOptions,
++      currentPage,
++      onPageChange,
++      oTableRef,
+       addAlert,
+       isUpdated,
+       showAddUpdateFn,
+diff --git a/web/src/components/alerts/AlertsDestinationList.spec.ts b/web/src/components/alerts/AlertsDestinationList.spec.ts
+index 787cce1ba1e..9d6c659bdc2 100644
+--- a/web/src/components/alerts/AlertsDestinationList.spec.ts
++++ b/web/src/components/alerts/AlertsDestinationList.spec.ts
+@@ -543,4 +543,114 @@ describe("AlertsDestinationList", () => {
+       expect(urlCol?.header).toBe("URL / Recipients");
+     });
+   });
++
++  // ── pagination restoration ──────────────────────────────────────────────────
++  // OTable is stubbed in this harness (see OTableStub above), so the actual
++  // TanStack pageIndex restoration (setTimeout(0) + table.setPageIndex) cannot
++  // be exercised end-to-end here. These tests cover what IS reachable: seeding
++  // currentPage from the URL, and that navigating to/from the add/edit/import
++  // views preserves the `page` query param instead of stripping it.
++
++  describe("pagination restoration", () => {
++    it("seeds currentPage from the URL's page query param", async () => {
++      (router as any).currentRoute.value.query = { page: "3" };
++      wrapper = mountComponent();
++      await flushPromises();
++
++      expect((wrapper.vm as any).currentPage).toBe(3);
++    });
++
++    it("defaults currentPage to 1 when no page query param is present", async () => {
++      wrapper = mountComponent();
++      await flushPromises();
++
++      expect((wrapper.vm as any).currentPage).toBe(1);
++    });
++
++    it("onPageChange updates currentPage and replaces the URL, preserving other query params", async () => {
++      (router as any).currentRoute.value.query = { org_identifier: "test-org" };
++      wrapper = mountComponent();
++      await flushPromises();
++      const replaceSpy = vi.spyOn(router, "replace");
++
++      (wrapper.vm as any).onPageChange(3);
++
++      expect((wrapper.vm as any).currentPage).toBe(3);
++      expect(replaceSpy).toHaveBeenCalledWith({
++        query: { org_identifier: "test-org", page: "3" },
++      });
++    });
++
++    it("onPageChange is a no-op on the URL when the page hasn't actually changed", async () => {
++      (router as any).currentRoute.value.query = { page: "1" };
++      wrapper = mountComponent();
++      await flushPromises();
++      const replaceSpy = vi.spyOn(router, "replace");
++
++      (wrapper.vm as any).onPageChange(1);
++
++      expect(replaceSpy).not.toHaveBeenCalled();
++    });
++
++    it("editDestination(null) preserves the page query param when opening the add form", async () => {
++      wrapper = mountComponent();
++      await flushPromises();
++      (router as any).currentRoute.value.query = { page: "3", org_identifier: "test-org" };
++      const pushSpy = vi.spyOn(router, "push");
++
++      (wrapper.vm as any).editDestination(null);
++
++      const pushedQuery = pushSpy.mock.calls[0][0].query;
++      expect(pushedQuery.page).toBe("3");
++      expect(pushedQuery.action).toBe("add");
++    });
++
++    it("editDestination(row) preserves the page query param when opening the edit form", async () => {
++      wrapper = mountComponent();
++      await flushPromises();
++      (router as any).currentRoute.value.query = { page: "3", org_identifier: "test-org" };
++      const pushSpy = vi.spyOn(router, "push");
++      const dest = (wrapper.vm as any).destinations[0];
++
++      (wrapper.vm as any).editDestination(dest);
++
++      const pushedQuery = pushSpy.mock.calls[0][0].query;
++      expect(pushedQuery.page).toBe("3");
++      expect(pushedQuery.action).toBe("update");
++      expect(pushedQuery.name).toBe(dest.name);
++    });
++
++    it("toggleDestinationEditor drops action/name but keeps page when closing the editor", async () => {
++      wrapper = mountComponent();
++      await flushPromises();
++      (wrapper.vm as any).showDestinationEditor = true;
++      (router as any).currentRoute.value.query = {
++        action: "update",
++        name: "destination-1",
++        page: "3",
++        org_identifier: "test-org",
++      };
++      const pushSpy = vi.spyOn(router, "push");
++
++      (wrapper.vm as any).toggleDestinationEditor();
++
++      const pushedQuery = pushSpy.mock.calls[0][0].query;
++      expect(pushedQuery.page).toBe("3");
++      expect(pushedQuery.action).toBeUndefined();
++      expect(pushedQuery.name).toBeUndefined();
++    });
++
++    it("importDestination preserves the page query param", async () => {
++      wrapper = mountComponent();
++      await flushPromises();
++      (router as any).currentRoute.value.query = { page: "3", org_identifier: "test-org" };
++      const pushSpy = vi.spyOn(router, "push");
++
++      (wrapper.vm as any).importDestination();
++
++      const pushedQuery = pushSpy.mock.calls[0][0].query;
++      expect(pushedQuery.page).toBe("3");
++      expect(pushedQuery.action).toBe("import");
++    });
++  });
+ });
+diff --git a/web/src/components/alerts/AlertsDestinationList.vue b/web/src/components/alerts/AlertsDestinationList.vue
+index 3b502461709..9cfd3873d6f 100644
+--- a/web/src/components/alerts/AlertsDestinationList.vue
++++ b/web/src/components/alerts/AlertsDestinationList.vue
+@@ -48,6 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+       </template>
+       <div class="bg-card-glass-bg min-h-0 flex-1">
+         <OTable
++          ref="oTableRef"
+           data-test="alert-destinations-list-table"
+           :data="visibleRows"
+           :columns="columns"
+@@ -58,6 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+           pagination="client"
+           :page-size="20"
+           :page-size-options="[5, 10, 20, 50, 100]"
++          :current-page="currentPage"
+           :footer-title="t('alert_destinations.header')"
+           sorting="client"
+           :default-columns="false"
+@@ -67,6 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+           show-index
+           :show-global-filter="false"
+           @update:selected-ids="handleSelectedIdsUpdate"
++          @update:current-page="onPageChange"
+         >
+           <template #toolbar>
+             <div class="flex w-full items-center gap-2">
+@@ -302,7 +305,7 @@ import destinationService from "@/services/alert_destination";
+ import templateService from "@/services/alert_templates";
+ import { useStore } from "vuex";
+ import ConfirmDialog from "../ConfirmDialog.vue";
+-import { useRouter } from "vue-router";
++import { useRouter, useRoute } from "vue-router";
+ import type { DestinationPayload } from "@/ts/interfaces";
+ import { usePrebuiltDestinations } from "@/composables/usePrebuiltDestinations";
+ import type { Template } from "@/ts/interfaces/index";
+@@ -452,9 +455,19 @@ export default defineComponent({
+     const showDestinationEditor = ref(false);
+     const showImportDestination = ref(false);
+     const router = useRouter();
++    const route = useRoute();
+     const filterQuery = ref("");
+     const resultTotal = ref(0);
+     const deletingDestinations = ref(new Set<string>());
++    const oTableRef: any = ref(null);
++
++    // URL-synced so returning from add/edit/import (Back/Update/Cancel) lands on the same page instead of resetting to page 1.
++    const currentPage = ref(Number(route.query.page) || 1);
++    const onPageChange = (page: number) => {
++      currentPage.value = page;
++      if (String(route.query.page ?? "1") === String(page)) return;
++      router.replace({ query: { ...route.query, page: String(page) } });
++    };
+ 
+     const selectedDestinationIds = computed(() =>
+       selectedDestinations.value.map((d: any) => d.name),
+@@ -516,6 +529,17 @@ export default defineComponent({
+     };
+ 
+     const loading = ref(false);
++    // The first real load lands after mount and races TanStack's own auto-reset-on-data-change, which resolves through its own deferred microtask queue — setTimeout(0) runs strictly after that queue drains, so the restored page reliably wins.
++    watch(
++      loading,
++      (isLoading) => {
++        if (isLoading) return;
++        setTimeout(() => {
++          oTableRef.value?.table?.setPageIndex(currentPage.value - 1);
++        }, 0);
++      },
++      { once: true },
++    );
+     const getDestinations = () => {
+       const dismiss = toast({
+         variant: "loading",
+@@ -585,9 +609,11 @@ export default defineComponent({
+       toggleDestinationEditor();
+       resetEditingDestination();
+       if (!destination) {
++        const { name: _name, ...restQuery } = router.currentRoute.value.query;
+         router.push({
+           name: "alertDestinations",
+           query: {
++            ...restQuery,
+             action: "add",
+             org_identifier: store.state.selectedOrganization.identifier,
+           },
+@@ -597,6 +623,7 @@ export default defineComponent({
+         router.push({
+           name: "alertDestinations",
+           query: {
++            ...router.currentRoute.value.query,
+             action: "update",
+             name: destination.name,
+             org_identifier: store.state.selectedOrganization.identifier,
+@@ -647,13 +674,16 @@ export default defineComponent({
+     };
+     const toggleDestinationEditor = () => {
+       showDestinationEditor.value = !showDestinationEditor.value;
+-      if (!showDestinationEditor.value)
++      if (!showDestinationEditor.value) {
++        const { action: _action, name: _name, ...restQuery } = router.currentRoute.value.query;
+         router.push({
+           name: "alertDestinations",
+           query: {
++            ...restQuery,
+             org_identifier: store.state.selectedOrganization.identifier,
+           },
+         });
++      }
+     };
+     const filterData = (rows: any, terms: any) => {
+       var filtered = [];
+@@ -690,9 +720,11 @@ export default defineComponent({
+     };
+     const importDestination = () => {
+       showImportDestination.value = true;
++      const { name: _name, ...restQuery } = router.currentRoute.value.query;
+       router.push({
+         name: "alertDestinations",
+         query: {
++          ...restQuery,
+           action: "import",
+           org_identifier: store.state.selectedOrganization.identifier,
+         },
+@@ -912,6 +944,9 @@ export default defineComponent({
+       getPrebuiltTypeName,
+       getCustomDestinationLabel,
+       isDefaultPrebuiltTemplate,
++      oTableRef,
++      currentPage,
++      onPageChange,
+     };
+   },
+ });
+diff --git a/web/src/components/alerts/IncidentDetailDrawer.spec.ts b/web/src/components/alerts/IncidentDetailDrawer.spec.ts
+index 42e6b4f351b..65220ba69d9 100644
+--- a/web/src/components/alerts/IncidentDetailDrawer.spec.ts
++++ b/web/src/components/alerts/IncidentDetailDrawer.spec.ts
+@@ -940,6 +940,21 @@ describe("IncidentDetailDrawer.vue", () => {
+         query: { org_identifier: "default" },
+       });
+     });
++
++    it("preserves the existing route query (e.g. page) when closing back to the list", async () => {
++      wrapper = await createWrapper();
++      router.currentRoute.value.query = { page: "3" } as any;
++      const pushSpy = vi.spyOn(router, "push");
++
++      wrapper.vm.close();
++      await nextTick();
++
++      expect(pushSpy).toHaveBeenCalledWith({
++        name: "incidentList",
++        query: { page: "3", org_identifier: "default" },
++      });
++      router.currentRoute.value.query = {};
++    });
+   });
+ 
+   describe("Organization Context", () => {
+diff --git a/web/src/components/alerts/IncidentDetailDrawer.vue b/web/src/components/alerts/IncidentDetailDrawer.vue
+index 188b2bedb1d..6f546146baf 100644
+--- a/web/src/components/alerts/IncidentDetailDrawer.vue
++++ b/web/src/components/alerts/IncidentDetailDrawer.vue
+@@ -1338,7 +1338,7 @@ import {
+ import { raw, useI18nTyped } from "@/types/i18n";
+ import { useStore } from "vuex";
+ import { useTheme } from "@/composables/useTheme";
+-import { useRouter } from "vue-router";
++import { useRouter, useRoute } from "vue-router";
+ import { formatToReadable } from "@/utils/date";
+ import incidentsService, {
+   Incident,
+@@ -1401,6 +1401,7 @@ export default defineComponent({
+     const { t } = useI18nTyped();
+     const store = useStore();
+     const router = useRouter();
++    const route = useRoute();
+     const { confirm } = useConfirmDialog();
+ 
+     // Copy to clipboard state
+@@ -2433,10 +2434,11 @@ export default defineComponent({
+       contextRegistry.setActive("");
+       contextRegistry.unregister("incidents");
+ 
+-      // Navigate back to incident list
++      // Navigate back to incident list, carrying over this route's own query (e.g. page) instead of dropping it.
+       router.push({
+         name: "incidentList",
+         query: {
++          ...route.query,
+           org_identifier: store.state.selectedOrganization.identifier,
+         },
+       });
+diff --git a/web/src/components/alerts/IncidentList.spec.ts b/web/src/components/alerts/IncidentList.spec.ts
+index 9ddd160b967..f34f01fbf2f 100644
+--- a/web/src/components/alerts/IncidentList.spec.ts
++++ b/web/src/components/alerts/IncidentList.spec.ts
+@@ -565,5 +565,89 @@ describe("IncidentList.vue", () => {
+         }),
+       );
+     });
++
++    it("preserves the existing route query (e.g. page) when navigating to detail", async () => {
++      router.currentRoute.value.query = { page: "3", foo: "bar" } as any;
++      const pushSpy = vi.spyOn(router, "push");
++      wrapper = createWrapper();
++      await flushPromises();
++
++      const incident = (wrapper.vm as any).allIncidents[0];
++      (wrapper.vm as any).viewIncident(incident);
++
++      expect(pushSpy).toHaveBeenCalledWith(
++        expect.objectContaining({
++          query: expect.objectContaining({ page: "3", foo: "bar", org_identifier: "default" }),
++        }),
++      );
++      router.currentRoute.value.query = {};
++    });
++  });
++
++  // ── Page persistence across navigation (Vuex-backed, like searchQuery/statusFilter) ──
++
++  describe("currentPage persistence", () => {
++    it("defaults currentPage to 1 when no saved state exists", () => {
++      wrapper = createWrapper();
++      expect((wrapper.vm as any).currentPage).toBe(1);
++    });
++
++    it("restores currentPage from the Vuex incidents store on mount", () => {
++      store.state.incidents = {
++        incidents: {
++          searchQuery: "",
++          statusFilter: "active",
++          pagination: { page: 4, rowsPerPage: 20 },
++          organizationIdentifier: "default",
++        },
++        cachedData: [],
++        isInitialized: true,
++        shouldRefresh: false,
++      };
++      wrapper = createWrapper();
++      expect((wrapper.vm as any).currentPage).toBe(4);
++      store.state.incidents = { incidents: {}, isInitialized: false };
++    });
++
++    it("onPageChange updates currentPage and persists the new page to the store", async () => {
++      wrapper = createWrapper();
++      await flushPromises();
++      const dispatchSpy = store.dispatch as any;
++      dispatchSpy.mockClear();
++
++      (wrapper.vm as any).onPageChange(5);
++
++      expect((wrapper.vm as any).currentPage).toBe(5);
++      expect(dispatchSpy).toHaveBeenCalledWith(
++        "incidents/setIncidents",
++        expect.objectContaining({ pagination: { page: 5, rowsPerPage: 20 } }),
++      );
++    });
++
++    it("reasserts the restored page once loading settles (TanStack auto-reset race)", async () => {
++      vi.useFakeTimers();
++      store.state.incidents = {
++        incidents: {
++          searchQuery: "",
++          statusFilter: "active",
++          pagination: { page: 3, rowsPerPage: 20 },
++          organizationIdentifier: "default",
++        },
++        cachedData: [],
++        isInitialized: true,
++        shouldRefresh: false,
++      };
++      wrapper = createWrapper();
++      const setPageIndex = vi.fn();
++      // OTable is stubbed in this suite, so plant the piece of its exposed surface the fix depends on directly onto the template ref.
++      (wrapper.vm as any).qTableRef.table = { setPageIndex };
++
++      await flushPromises();
++      vi.runAllTimers();
++
++      expect(setPageIndex).toHaveBeenCalledWith(2);
++      store.state.incidents = { incidents: {}, isInitialized: false };
++      vi.useRealTimers();
++    });
+   });
+ });
+diff --git a/web/src/components/alerts/IncidentList.vue b/web/src/components/alerts/IncidentList.vue
+index 9b09e31354f..2b44d226509 100644
+--- a/web/src/components/alerts/IncidentList.vue
++++ b/web/src/components/alerts/IncidentList.vue
+@@ -32,6 +32,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+         pagination="client"
+         :page-size="pageSize"
+         :page-size-options="[20, 50, 100, 250, 500]"
++        :current-page="currentPage"
++        @update:current-page="onPageChange"
+         sorting="client"
+         filter-mode="client"
+         :default-columns="false"
+@@ -301,7 +303,19 @@ export default defineComponent({
+     const route = useRoute();
+ 
+     const qTableRef: any = ref(null);
+-    const loading = ref(false);
++    // Starts true so the skeleton shows on first render and the once-off page-restore watch below fires on the real true→false transition.
++    const loading = ref(true);
++    // The first real load lands after mount and races TanStack's own auto-reset-on-data-change, which resolves through its own deferred microtask queue — setTimeout(0) runs strictly after that queue drains, so the restored page reliably wins.
++    watch(
++      loading,
++      (isLoading) => {
++        if (isLoading) return;
++        setTimeout(() => {
++          qTableRef.value?.table?.setPageIndex(currentPage.value - 1);
++        }, 0);
++      },
++      { once: true },
++    );
+     // The incident dataset is read-only display data replaced wholesale on every
+     // reload, so hold it in a shallowRef (and freeze each row on load — see
+     // loadIncidents). Vue then never deep-proxies the hundreds of objects, which
+@@ -321,6 +335,12 @@ export default defineComponent({
+     );
+     const isRestoringState = ref(false);
+     const pageSize = ref(20);
++    // Restored from the Vuex incidents store (same mechanism as searchQuery/statusFilter) so returning from a detail view lands back on the same page.
++    const currentPage = ref(1);
++    const onPageChange = (page: number) => {
++      currentPage.value = page;
++      savePageState();
++    };
+     // Severity facet — independent of status ("all" | "P1".."P4").
+     const severityFilter = ref("all");
+ 
+@@ -575,14 +595,15 @@ export default defineComponent({
+       store.dispatch("incidents/setIncidents", {
+         searchQuery: searchQuery.value,
+         statusFilter: statusFilter.value,
+-        pagination: { page: 1, rowsPerPage: 20 },
++        pagination: { page: currentPage.value, rowsPerPage: 20 },
+         organizationIdentifier: store.state.selectedOrganization.identifier,
+       });
+ 
++      // Spread the existing query so anything already on this route (e.g. page) survives the round trip to the detail view and back.
+       router.push({
+         name: "incidentDetail",
+         params: { id: incident.id },
+-        query: { org_identifier: store.state.selectedOrganization.identifier },
++        query: { ...route.query, org_identifier: store.state.selectedOrganization.identifier },
+       });
+     };
+ 
+@@ -591,7 +612,7 @@ export default defineComponent({
+       store.dispatch("incidents/setIncidents", {
+         searchQuery: searchQuery.value,
+         statusFilter: statusFilter.value,
+-        pagination: { page: 1, rowsPerPage: 20 },
++        pagination: { page: currentPage.value, rowsPerPage: 20 },
+         organizationIdentifier: store.state.selectedOrganization.identifier,
+       });
+     };
+@@ -760,6 +781,9 @@ export default defineComponent({
+         if (savedState.statusFilter !== undefined) {
+           statusFilter.value = savedState.statusFilter;
+         }
++        if (savedState.pagination?.page) {
++          currentPage.value = savedState.pagination.page;
++        }
+         return true;
+       }
+       return false;
+@@ -774,6 +798,9 @@ export default defineComponent({
+         if (shouldRefresh) {
+           store.dispatch("incidents/setShouldRefresh", false);
+         }
++      } else {
++        // Cached data means loadIncidents() never ran, so loading needs an explicit false here to fire the once-off page-restore watch.
++        loading.value = false;
+       }
+ 
+       if (!store.state.incidents.isInitialized) {
+@@ -784,7 +811,7 @@ export default defineComponent({
+         store.dispatch("incidents/setIncidents", {
+           searchQuery: searchQuery.value,
+           statusFilter: statusFilter.value,
+-          pagination: { page: 1, rowsPerPage: 20 },
++          pagination: { page: currentPage.value, rowsPerPage: 20 },
+           organizationIdentifier: store.state.selectedOrganization.identifier,
+         });
+       }
+@@ -829,6 +856,8 @@ export default defineComponent({
+       clearFilters,
+       columns,
+       pageSize,
++      currentPage,
++      onPageChange,
+       loadIncidents,
+       refreshIncidents,
+       viewIncident,
+diff --git a/web/src/components/alerts/TemplateList.spec.ts b/web/src/components/alerts/TemplateList.spec.ts
+index b44288ddf18..555152cf813 100644
+--- a/web/src/components/alerts/TemplateList.spec.ts
++++ b/web/src/components/alerts/TemplateList.spec.ts
+@@ -144,3 +144,146 @@ describe("Alert List", async () => {
+     });
+   });
+ });
++
++// ── pagination restoration ────────────────────────────────────────────────
++// This spec mounts the real OTable (not stubbed), so the TanStack pageIndex
++// restoration itself (setTimeout(0) + table.setPageIndex) isn't exercised
++// end-to-end here. These tests cover what IS reachable: seeding currentPage
++// from the URL, and that navigating to/from the add/edit/clone/import views
++// preserves the `page` query param instead of stripping it.
++describe("TemplateList pagination persistence", () => {
++  let wrapper: any;
++
++  const mountComponent = () =>
++    mount(TemplateList, {
++      attachTo: "#app",
++      global: {
++        provide: { store },
++        plugins: [i18n, router],
++      },
++    });
++
++  afterEach(() => {
++    wrapper?.unmount();
++    vi.clearAllMocks();
++  });
++
++  it("seeds currentPage from the URL's page query param", async () => {
++    (router as any).currentRoute.value.query = { page: "3" };
++    wrapper = mountComponent();
++    await flushPromises();
++
++    expect((wrapper.vm as any).currentPage).toBe(3);
++  });
++
++  it("defaults currentPage to 1 when no page query param is present", async () => {
++    (router as any).currentRoute.value.query = {};
++    wrapper = mountComponent();
++    await flushPromises();
++
++    expect((wrapper.vm as any).currentPage).toBe(1);
++  });
++
++  it("onPageChange updates currentPage and replaces the URL, preserving other query params", async () => {
++    (router as any).currentRoute.value.query = { org_identifier: "test-org" };
++    wrapper = mountComponent();
++    await flushPromises();
++    const replaceSpy = vi.spyOn(router, "replace");
++
++    (wrapper.vm as any).onPageChange(3);
++
++    expect((wrapper.vm as any).currentPage).toBe(3);
++    expect(replaceSpy).toHaveBeenCalledWith({
++      query: { org_identifier: "test-org", page: "3" },
++    });
++  });
++
++  it("onPageChange is a no-op on the URL when the page hasn't actually changed", async () => {
++    (router as any).currentRoute.value.query = { page: "1" };
++    wrapper = mountComponent();
++    await flushPromises();
++    const replaceSpy = vi.spyOn(router, "replace");
++
++    (wrapper.vm as any).onPageChange(1);
++
++    expect(replaceSpy).not.toHaveBeenCalled();
++  });
++
++  it("editTemplate(null) preserves the page query param when opening the add form", async () => {
++    (router as any).currentRoute.value.query = {};
++    wrapper = mountComponent();
++    await flushPromises();
++    (router as any).currentRoute.value.query = { page: "3", org_identifier: "test-org" };
++    const pushSpy = vi.spyOn(router, "push");
++
++    (wrapper.vm as any).editTemplate(null);
++
++    const pushedQuery = pushSpy.mock.calls[0][0].query;
++    expect(pushedQuery.page).toBe("3");
++    expect(pushedQuery.action).toBe("add");
++  });
++
++  it("editTemplate(row) preserves the page query param when opening the edit form", async () => {
++    (router as any).currentRoute.value.query = {};
++    wrapper = mountComponent();
++    await flushPromises();
++    (router as any).currentRoute.value.query = { page: "3", org_identifier: "test-org" };
++    const pushSpy = vi.spyOn(router, "push");
++
++    (wrapper.vm as any).editTemplate({ name: "Template2" });
++
++    const pushedQuery = pushSpy.mock.calls[0][0].query;
++    expect(pushedQuery.page).toBe("3");
++    expect(pushedQuery.action).toBe("update");
++    expect(pushedQuery.name).toBe("Template2");
++  });
++
++  it("cloneTemplate preserves the page query param", async () => {
++    (router as any).currentRoute.value.query = {};
++    wrapper = mountComponent();
++    await flushPromises();
++    (router as any).currentRoute.value.query = { page: "3", org_identifier: "test-org" };
++    const pushSpy = vi.spyOn(router, "push");
++
++    (wrapper.vm as any).cloneTemplate({ name: "Template2" });
++
++    const pushedQuery = pushSpy.mock.calls[0][0].query;
++    expect(pushedQuery.page).toBe("3");
++    expect(pushedQuery.action).toBe("add");
++  });
++
++  it("importTemplate preserves the page query param", async () => {
++    (router as any).currentRoute.value.query = {};
++    wrapper = mountComponent();
++    await flushPromises();
++    (router as any).currentRoute.value.query = { page: "3", org_identifier: "test-org" };
++    const pushSpy = vi.spyOn(router, "push");
++
++    (wrapper.vm as any).importTemplate();
++
++    const pushedQuery = pushSpy.mock.calls[0][0].query;
++    expect(pushedQuery.page).toBe("3");
++    expect(pushedQuery.action).toBe("import");
++  });
++
++  it("toggleTemplateEditor drops action/name but keeps page when closing the editor", async () => {
++    (router as any).currentRoute.value.query = {};
++    wrapper = mountComponent();
++    await flushPromises();
++    (wrapper.vm as any).showTemplateEditor = true;
++    (router as any).currentRoute.value.query = {
++      action: "update",
++      name: "Template2",
++      page: "3",
++      org_identifier: "test-org",
++    };
++    const pushSpy = vi.spyOn(router, "push");
++
++    (wrapper.vm as any).toggleTemplateEditor();
++
++    const pushedQuery = pushSpy.mock.calls[0][0].query;
++    expect(pushedQuery.page).toBe("3");
++    expect(pushedQuery.action).toBeUndefined();
++    expect(pushedQuery.name).toBeUndefined();
++  });
++});
+diff --git a/web/src/components/alerts/TemplateList.vue b/web/src/components/alerts/TemplateList.vue
+index 4c6869fb7bf..fc59307761b 100644
+--- a/web/src/components/alerts/TemplateList.vue
++++ b/web/src/components/alerts/TemplateList.vue
+@@ -46,6 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+       </template>
+       <div class="bg-card-glass-bg min-h-0 flex-1 overflow-hidden">
+         <OTable
++          ref="oTableRef"
+           :frame="false"
+           data-test="alert-templates-list-table"
+           :data="visibleRows"
+@@ -58,6 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+           pagination="client"
+           :page-size="20"
+           :page-size-options="[5, 10, 20, 50, 100]"
++          :current-page="currentPage"
+           :footer-title="t('alert_templates.header')"
+           sorting="client"
+           filter-mode="client"
+@@ -65,6 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+           show-index
+           :show-global-filter="false"
+           @update:selected-ids="handleSelectedIdsUpdate"
++          @update:current-page="onPageChange"
+         >
+           <template #toolbar>
+             <div class="flex w-full items-center gap-2">
+@@ -359,6 +362,15 @@ const filterQuery = ref("");
+ // Top-right tab filter — mirrors the alerts list pattern. "prebuilt" shows
+ // system templates (name starts with `prebuilt_`), "custom" shows the rest.
+ const activeTab = ref<"all" | "prebuilt" | "custom">("all");
++const oTableRef: any = ref(null);
++
++// URL-synced so returning from add/edit/import (Back/Update/Cancel) lands on the same page instead of resetting to page 1.
++const currentPage = ref(Number(router.currentRoute.value.query.page) || 1);
++const onPageChange = (page: number) => {
++  currentPage.value = page;
++  if (String(router.currentRoute.value.query.page ?? "1") === String(page)) return;
++  router.replace({ query: { ...router.currentRoute.value.query, page: String(page) } });
++};
+ 
+ const selectedTemplateIds = computed(() => selectedTemplates.value.map((item: any) => item.name));
+ 
+@@ -394,6 +406,17 @@ watch(
+ );
+ 
+ const loading = ref(false);
++// The first real load lands after mount and races TanStack's own auto-reset-on-data-change, which resolves through its own deferred microtask queue — setTimeout(0) runs strictly after that queue drains, so the restored page reliably wins.
++watch(
++  loading,
++  (isLoading) => {
++    if (isLoading) return;
++    setTimeout(() => {
++      oTableRef.value?.table?.setPageIndex(currentPage.value - 1);
++    }, 0);
++  },
++  { once: true },
++);
+ const getTemplates = () => {
+   const dismiss = toast({
+     variant: "loading",
+@@ -474,26 +497,24 @@ const editTemplate = (template: any = null) => {
+   cloningTemplate.value = false;
+   toggleTemplateEditor();
+ 
+-  const query: { [key: string]: string } = {
+-    action: template ? "update" : "add",
+-    org_identifier: store.state.selectedOrganization.identifier,
+-  };
+-
+-  if (template) query.name = template.name;
+-
+-  if (router.currentRoute.value.query.type)
+-    query.type = router.currentRoute.value.query.type.toString() as string;
+-
+   if (!template) {
++    // Strip a stale `name` left over from a previous "update" visit — everything
++    // else (including `page`) survives the round trip to the editor and back.
++    const { name: _name, ...restQuery } = router.currentRoute.value.query;
+     router.push({
+       name: "alertTemplates",
+-      query,
++      query: {
++        ...restQuery,
++        action: "add",
++        org_identifier: store.state.selectedOrganization.identifier,
++      },
+     });
+   } else {
+     editingTemplate.value = { ...template };
+     router.push({
+       name: "alertTemplates",
+       query: {
++        ...router.currentRoute.value.query,
+         action: "update",
+         name: template.name,
+         org_identifier: store.state.selectedOrganization.identifier,
+@@ -520,9 +541,11 @@ const cloneTemplate = (template: any) => {
+   };
+   cloningTemplate.value = true;
+   showTemplateEditor.value = true;
++  const { name: _name, ...restQuery } = router.currentRoute.value.query;
+   router.push({
+     name: "alertTemplates",
+     query: {
++      ...restQuery,
+       action: "add",
+       org_identifier: store.state.selectedOrganization.identifier,
+     },
+@@ -561,9 +584,11 @@ const deleteTemplate = () => {
+ };
+ const importTemplate = () => {
+   showImportTemplate.value = true;
++  const { name: _name, ...restQuery } = router.currentRoute.value.query;
+   router.push({
+     name: "alertTemplates",
+     query: {
++      ...restQuery,
+       action: "import",
+       org_identifier: store.state.selectedOrganization.identifier,
+     },
+@@ -579,13 +604,16 @@ const cancelDeleteTemplate = () => {
+ };
+ const toggleTemplateEditor = () => {
+   showTemplateEditor.value = !showTemplateEditor.value;
+-  if (!showTemplateEditor.value)
++  if (!showTemplateEditor.value) {
++    const { action: _action, name: _name, ...restQuery } = router.currentRoute.value.query;
+     router.push({
+       name: "alertTemplates",
+       query: {
++        ...restQuery,
+         org_identifier: store.state.selectedOrganization.identifier,
+       },
+     });
++  }
+ };
+ const filterData = (rows: any, terms: any) => {
+   var filtered = [];
+diff --git a/web/src/components/functions/EnrichmentTableList.spec.ts b/web/src/components/functions/EnrichmentTableList.spec.ts
+index 8bc3cb4ffdb..f12bcd0e29c 100644
+--- a/web/src/components/functions/EnrichmentTableList.spec.ts
++++ b/web/src/components/functions/EnrichmentTableList.spec.ts
+@@ -13,7 +13,7 @@
+ // You should have received a copy of the GNU Affero General Public License
+ // along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ 
+-import { describe, it, expect, vi, beforeEach } from "vitest";
++import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+ import { mount, flushPromises } from "@vue/test-utils";
+ import { createStore } from "vuex";
+ import i18n from "@/locales";
+@@ -495,6 +495,104 @@ describe("EnrichmentTableList", () => {
+     });
+   });
+ 
++  // ── page persistence across editor round trip (OTable pagination-reset fix) ─
++
++  describe("page persistence across editor round trip (OTable pagination-reset fix)", () => {
++    // 45 rows / pageSize 20 gives 3 pages, so page 3 is a real target to restore.
++    const manyTables = {
++      list: Array.from({ length: 45 }, (_, i) => ({
++        name: `table${i + 1}`,
++        stream_type: "enrichment_tables",
++        stats: { doc_num: 10, storage_size: 1, compressed_size: 0.5 },
++      })),
++    };
++
++    afterEach(() => {
++      vi.useRealTimers();
++    });
++
++    it("starts loading=true before the initial fetch resolves", () => {
++      mockGetStreams.mockResolvedValue(manyTables);
++      const wrapper = mountComponent();
++      expect((wrapper.vm as any).loading).toBe(true);
++    });
++
++    it("defaults currentPage to 1", async () => {
++      mockGetStreams.mockResolvedValue(manyTables);
++      const wrapper = mountComponent();
++      await flushPromises();
++      expect((wrapper.vm as any).currentPage).toBe(1);
++    });
++
++    it("onPageChange updates currentPage", async () => {
++      mockGetStreams.mockResolvedValue(manyTables);
++      const wrapper = mountComponent();
++      await flushPromises();
++      const vm = wrapper.vm as any;
++      vm.onPageChange(3);
++      expect(vm.currentPage).toBe(3);
++    });
++
++    it("restorePageIndex reasserts the page via a macrotask (setTimeout(0))", async () => {
++      mockGetStreams.mockResolvedValue(manyTables);
++      const wrapper = mountComponent();
++      await flushPromises();
++      vi.useFakeTimers();
++      const vm = wrapper.vm as any;
++      vm.currentPage = 3;
++      const setPageIndex = vi.fn();
++      vm.oTableRef = { table: { setPageIndex } };
++
++      vm.restorePageIndex();
++      expect(setPageIndex).not.toHaveBeenCalled();
++
++      vi.runAllTimers();
++      expect(setPageIndex).toHaveBeenCalledWith(2);
++    });
++
++    it("keeps the page after Cancel unmounts and remounts OTable via the AddEnrichmentTable v-if swap", async () => {
++      mockGetStreams.mockResolvedValue(manyTables);
++      const wrapper = mountComponent();
++      await flushPromises();
++      const vm = wrapper.vm as any;
++
++      vm.onPageChange(3);
++      await flushPromises();
++      expect(vm.oTableRef.table.getState().pagination.pageIndex).toBe(2);
++
++      vm.showAddJSTransformDialog = true;
++      await flushPromises();
++      expect(vm.oTableRef).toBeNull();
++
++      vm.hideForm();
++      await flushPromises();
++
++      expect(vm.oTableRef.table.getState().pagination.pageIndex).toBe(2);
++    });
++
++    it("keeps the page after Save triggers an async refetch that races TanStack's own reset", async () => {
++      mockGetStreams.mockResolvedValue(manyTables);
++      const wrapper = mountComponent();
++      await flushPromises();
++      const vm = wrapper.vm as any;
++
++      vm.onPageChange(3);
++      await flushPromises();
++      expect(vm.oTableRef.table.getState().pagination.pageIndex).toBe(2);
++
++      vm.showAddJSTransformDialog = true;
++      await flushPromises();
++
++      mockGetStreams.mockResolvedValue(manyTables);
++      vm.refreshList();
++      await flushPromises();
++      // flush the setTimeout(0) macrotask that restorePageIndex scheduled
++      await new Promise((resolve) => setTimeout(resolve, 0));
++
++      expect(vm.oTableRef.table.getState().pagination.pageIndex).toBe(2);
++    });
++  });
++
+   // ── navigation ─────────────────────────────────────────────────────────────
+ 
+   describe("navigation", () => {
+diff --git a/web/src/components/functions/EnrichmentTableList.vue b/web/src/components/functions/EnrichmentTableList.vue
+index 02b7ed9448a..ff96f8acb4a 100644
+--- a/web/src/components/functions/EnrichmentTableList.vue
++++ b/web/src/components/functions/EnrichmentTableList.vue
+@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+       <div class="min-h-0 w-full flex-1 overflow-hidden">
+         <div class="bg-card-glass-bg h-full">
+           <OTable
+-            ref="qTable"
++            ref="oTableRef"
+             :frame="false"
+             data-test="enrichment-tables-list-table"
+             :data="visibleRows"
+@@ -52,6 +52,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+             pagination="client"
+             :page-size="selectedPerPage"
+             :page-size-options="perPageOptionsList"
++            :current-page="currentPage"
++            @update:current-page="onPageChange"
+             sorting="client"
+             filter-mode="client"
+             show-index
+@@ -475,7 +477,6 @@ export default defineComponent({
+     const jsTransforms: any = ref([]);
+     const formData: any = ref({});
+     const showAddJSTransformDialog: any = ref(false);
+-    const qTable: any = ref(null);
+     const selectedDelete: any = ref(null);
+     const isUpdated: any = ref(false);
+     const confirmDelete = ref<boolean>(false);
+@@ -486,7 +487,19 @@ export default defineComponent({
+     const showUrlJobsDialogState = ref<boolean>(false);
+     const selectedTableForUrlJobs = ref<any>(null);
+     const filterQuery = ref("");
+-    const loading = ref(false);
++    const loading = ref(true);
++    // Plain ref, not URL/store-backed: only the OTable v-if branch unmounts on add/edit, not EnrichmentTableList itself.
++    const currentPage = ref(1);
++    const onPageChange = (page: number) => {
++      currentPage.value = page;
++    };
++    const oTableRef: any = ref(null);
++    // setTimeout(0) is a macrotask, so it runs after TanStack's own deferred auto-reset-on-data-change (its own microtask queue), letting the restored page win.
++    const restorePageIndex = () => {
++      setTimeout(() => {
++        oTableRef.value?.table?.setPageIndex(currentPage.value - 1);
++      }, 0);
++    };
+     const { track } = useReo();
+     const { toast } = useToast();
+     const columns: OTableColumnDef[] = [
+@@ -715,6 +728,7 @@ export default defineComponent({
+         }
+       } finally {
+         loading.value = false;
++        restorePageIndex();
+       }
+     };
+ 
+@@ -1043,7 +1057,10 @@ export default defineComponent({
+     return {
+       t,
+       raw,
+-      qTable,
++      oTableRef,
++      currentPage,
++      onPageChange,
++      restorePageIndex,
+       store,
+       router,
+       jsTransforms,
+diff --git a/web/src/components/functions/FunctionList.spec.ts b/web/src/components/functions/FunctionList.spec.ts
+index ec1bd819808..16bccd3cbff 100644
+--- a/web/src/components/functions/FunctionList.spec.ts
++++ b/web/src/components/functions/FunctionList.spec.ts
+@@ -13,7 +13,7 @@
+ // You should have received a copy of the GNU Affero General Public License
+ // along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ 
+-import { describe, it, expect, vi, beforeEach } from "vitest";
++import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+ import { mount, flushPromises } from "@vue/test-utils";
+ import FunctionList from "./FunctionList.vue";
+ import i18n from "@/locales";
+@@ -917,6 +917,110 @@ describe("FunctionList", () => {
+     });
+   });
+ 
++  describe("Page persistence across editor round trip (OTable pagination-reset fix)", () => {
++    // 45 rows / pageSize 20 gives 3 pages, so page 3 is a real target to restore.
++    const manyFunctionsData = {
++      data: {
++        list: Array.from({ length: 45 }, (_, i) => ({
++          name: `func${i + 1}`,
++          function: "identity()",
++          params: "",
++          transType: 0,
++        })),
++      },
++    };
++
++    const mountList = () =>
++      mount(FunctionList, {
++        global: { plugins: [i18n, store, router], stubs: globalStubs },
++      });
++
++    afterEach(() => {
++      vi.useRealTimers();
++    });
++
++    it("starts loading=true before the initial fetch resolves", () => {
++      mockJsTransformList.mockResolvedValue(manyFunctionsData);
++      const wrapper = mountList();
++      expect((wrapper.vm as any).loading).toBe(true);
++    });
++
++    it("defaults currentPage to 1", async () => {
++      mockJsTransformList.mockResolvedValue(manyFunctionsData);
++      const wrapper = mountList();
++      await flushPromises();
++      expect((wrapper.vm as any).currentPage).toBe(1);
++    });
++
++    it("onPageChange updates currentPage", async () => {
++      mockJsTransformList.mockResolvedValue(manyFunctionsData);
++      const wrapper = mountList();
++      await flushPromises();
++      const vm = wrapper.vm as any;
++      vm.onPageChange(3);
++      expect(vm.currentPage).toBe(3);
++    });
++
++    it("restorePageIndex reasserts the page via a macrotask (setTimeout(0))", async () => {
++      mockJsTransformList.mockResolvedValue(manyFunctionsData);
++      const wrapper = mountList();
++      await flushPromises();
++      vi.useFakeTimers();
++      const vm = wrapper.vm as any;
++      vm.currentPage = 3;
++      const setPageIndex = vi.fn();
++      vm.oTableRef = { table: { setPageIndex } };
++
++      vm.restorePageIndex();
++      expect(setPageIndex).not.toHaveBeenCalled();
++
++      vi.runAllTimers();
++      expect(setPageIndex).toHaveBeenCalledWith(2);
++    });
++
++    it("keeps the page after Cancel unmounts and remounts OTable via the AddFunction v-if swap", async () => {
++      mockJsTransformList.mockResolvedValue(manyFunctionsData);
++      const wrapper = mountList();
++      await flushPromises();
++      const vm = wrapper.vm as any;
++
++      vm.onPageChange(3);
++      await flushPromises();
++      expect(vm.oTableRef.table.getState().pagination.pageIndex).toBe(2);
++
++      vm.showAddJSTransformDialog = true;
++      await flushPromises();
++      expect(vm.oTableRef).toBeNull();
++
++      vm.hideForm();
++      await flushPromises();
++
++      expect(vm.oTableRef.table.getState().pagination.pageIndex).toBe(2);
++    });
++
++    it("keeps the page after Save triggers an async refetch that races TanStack's own reset", async () => {
++      mockJsTransformList.mockResolvedValue(manyFunctionsData);
++      const wrapper = mountList();
++      await flushPromises();
++      const vm = wrapper.vm as any;
++
++      vm.onPageChange(3);
++      await flushPromises();
++      expect(vm.oTableRef.table.getState().pagination.pageIndex).toBe(2);
++
++      vm.showAddJSTransformDialog = true;
++      await flushPromises();
++
++      mockJsTransformList.mockResolvedValue(manyFunctionsData);
++      vm.refreshList();
++      await flushPromises();
++      // flush the setTimeout(0) macrotask that restorePageIndex scheduled
++      await new Promise((resolve) => setTimeout(resolve, 0));
++
++      expect(vm.oTableRef.table.getState().pagination.pageIndex).toBe(2);
++    });
++  });
++
+   describe("Route Query Action Handling", () => {
+     it("should trigger getJSTransforms when route has action=add query param", async () => {
+       router.push({
+diff --git a/web/src/components/functions/FunctionList.vue b/web/src/components/functions/FunctionList.vue
+index d4a87c73dda..09ba5aafeb9 100644
+--- a/web/src/components/functions/FunctionList.vue
++++ b/web/src/components/functions/FunctionList.vue
+@@ -42,12 +42,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+       <div class="min-h-0 w-full flex-1 overflow-hidden">
+         <div class="h-full">
+           <OTable
++            ref="oTableRef"
+             :frame="false"
+             :data="visibleRows"
+             :columns="columns"
+             row-key="name"
+             :loading="loading"
+             pagination="client"
++            :current-page="currentPage"
++            @update:current-page="onPageChange"
+             :page-size="pageSize"
+             :page-size-options="pageSizeOptions"
+             selection="multiple"
+@@ -326,7 +329,20 @@ export default defineComponent({
+       window.open(routeUrl, "_blank");
+     };
+ 
+-    const loading = ref(false);
++    // Plain ref, not URL/store-backed: only the OTable v-if branch unmounts on add/edit, not FunctionList itself.
++    const currentPage = ref(1);
++    const onPageChange = (page: number) => {
++      currentPage.value = page;
++    };
++    const oTableRef: any = ref(null);
++    // setTimeout(0) is a macrotask, so it runs after TanStack's own deferred auto-reset-on-data-change (its own microtask queue), letting the restored page win.
++    const restorePageIndex = () => {
++      setTimeout(() => {
++        oTableRef.value?.table?.setPageIndex(currentPage.value - 1);
++      }, 0);
++    };
++
++    const loading = ref(true);
+     const getJSTransforms = () => {
+       loading.value = true;
+       // return ;
+@@ -380,6 +396,7 @@ export default defineComponent({
+         })
+         .finally(() => {
+           loading.value = false;
++          restorePageIndex();
+         });
+     };
+ 
+@@ -758,6 +775,10 @@ export default defineComponent({
+       confirmBulkDelete,
+       selectedFunctions,
+       selectedFunctionIds,
++      currentPage,
++      onPageChange,
++      oTableRef,
++      restorePageIndex,
+     };
+   },
+   computed: {
+diff --git a/web/src/components/pipeline/PipelinesList.spec.ts b/web/src/components/pipeline/PipelinesList.spec.ts
+index cc77de0d2e4..b5748fb0002 100644
+--- a/web/src/components/pipeline/PipelinesList.spec.ts
++++ b/web/src/components/pipeline/PipelinesList.spec.ts
+@@ -17,7 +17,7 @@ import { mount, flushPromises } from "@vue/test-utils";
+ import { describe, expect, it, beforeEach, afterEach, vi, type MockedFunction } from "vitest";
+ import PipelinesList from "@/components/pipeline/PipelinesList.vue";
+ import i18n from "@/locales";
+-import { nextTick } from "vue";
++import { nextTick, reactive } from "vue";
+ import pipelineService from "@/services/pipelines";
+ import { createStore } from "vuex";
+ 
+@@ -32,13 +32,13 @@ vi.mock("@/services/pipelines", () => ({
+   },
+ }));
+ 
+-// Mock router
++// Mock router — currentRoute.value is reactive() so the component's route-name watch fires on mutation, matching vue-router's real currentRoute.
+ const mockRouter = {
+   currentRoute: {
+-    value: {
++    value: reactive({
+       name: "pipelines",
+       query: {},
+-    },
++    }),
+   },
+   push: vi.fn(),
+ };
+@@ -226,6 +226,8 @@ describe("PipelinesList", () => {
+       },
+     });
+ 
++    // Reset in case a previous test navigated away (route-name watcher tests below).
++    mockRouter.currentRoute.value.name = "pipelines";
+     vi.clearAllMocks();
+ 
+     (pipelineService.getPipelines as MockedFunction<any>).mockResolvedValue({
+@@ -964,4 +966,82 @@ describe("PipelinesList", () => {
+       });
+     });
+   });
++
++  // ─────────────────────────────────────────────────────────────────────────────
++  describe("Page restoration across route navigation (OTable pagination-reset fix)", () => {
++    it("defaults currentPage to 1", () => {
++      expect(wrapper.vm.currentPage).toBe(1);
++    });
++
++    it("onPageChange updates currentPage", () => {
++      wrapper.vm.onPageChange(4);
++
++      expect(wrapper.vm.currentPage).toBe(4);
++    });
++
++    it("restorePageIndex reasserts the page via a macrotask (setTimeout(0))", () => {
++      vi.useFakeTimers();
++      wrapper.vm.currentPage = 3;
++      const setPageIndex = vi.fn();
++      // OTable is shallow-stubbed in this suite; plant the piece of its exposed surface the fix depends on directly onto the template ref.
++      wrapper.vm.oTableRef = { table: { setPageIndex } };
++
++      wrapper.vm.restorePageIndex();
++      expect(setPageIndex).not.toHaveBeenCalled();
++
++      vi.runAllTimers();
++
++      expect(setPageIndex).toHaveBeenCalledWith(2);
++      vi.useRealTimers();
++    });
++
++    it("reasserts the restored page after returning from the pipeline editor route", async () => {
++      vi.useFakeTimers();
++      wrapper.vm.currentPage = 3;
++
++      // OTable is destroyed (v-if) while the editor is open; simulate leaving and returning.
++      mockRouter.currentRoute.value.name = "pipelineEditor";
++      await nextTick();
++
++      mockRouter.currentRoute.value.name = "pipelines";
++      // Drain the whole re-fetch (OTable's `v-if` remount plus every re-render its props trigger, each of which re-binds the plain template ref) without flushPromises()/setImmediate, which fake timers would stall.
++      await nextTick();
++      await Promise.resolve();
++      await Promise.resolve();
++      await Promise.resolve();
++      await Promise.resolve();
++      await nextTick();
++      await nextTick();
++
++      // Only now, once nothing will re-render and re-bind the ref again, plant the fake — restorePageIndex() reads oTableRef.value lazily when its timer fires, so this still lands in time.
++      const setPageIndex = vi.fn();
++      wrapper.vm.oTableRef = { table: { setPageIndex } };
++
++      vi.runAllTimers();
++
++      expect(setPageIndex).toHaveBeenCalledWith(2);
++      vi.useRealTimers();
++    });
++
++    it("does not reassert the page on an unrelated route-name change (e.g. re-entering pipelines from itself)", async () => {
++      wrapper.vm.currentPage = 3;
++      const setPageIndex = vi.fn();
++      wrapper.vm.oTableRef = { table: { setPageIndex } };
++
++      // Same name twice: the watcher's guard (`newName === oldName`) must skip it.
++      mockRouter.currentRoute.value.name = "pipelines";
++      await flushPromises();
++
++      expect(setPageIndex).not.toHaveBeenCalled();
++    });
++
++    it("resets currentPage to 1 when the user explicitly switches tabs", () => {
++      wrapper.vm.currentPage = 5;
++
++      wrapper.vm.onTabChange("scheduled");
++
++      expect(wrapper.vm.currentPage).toBe(1);
++      expect(wrapper.vm.activeTab).toBe("scheduled");
++    });
++  });
+ });
+diff --git a/web/src/components/pipeline/PipelinesList.vue b/web/src/components/pipeline/PipelinesList.vue
+index 3549157abbe..8f0080419db 100644
+--- a/web/src/components/pipeline/PipelinesList.vue
++++ b/web/src/components/pipeline/PipelinesList.vue
+@@ -23,6 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+     <div class="min-h-0 w-full flex-1 overflow-hidden">
+       <div class="bg-card-glass-bg h-full">
+         <OTable
++          ref="oTableRef"
+           :frame="false"
+           :key="activeTab"
+           data-test="pipeline-list-table"
+@@ -34,6 +35,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+           :show-global-filter="false"
+           :page-size="20"
+           :page-size-options="[20, 50, 100, 250, 500]"
++          :current-page="currentPage"
++          @update:current-page="onPageChange"
+           selection="multiple"
+           :enable-column-resize="true"
+           :persist-columns="true"
+@@ -72,12 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+             <div class="flex w-full items-center gap-2">
+               <OToggleGroup
+                 :model-value="activeTab"
+-                @update:model-value="
+-                  (v) => {
+-                    activeTab = v as string;
+-                    updateActiveTab();
+-                  }
+-                "
++                @update:model-value="onTabChange"
+                 data-test="pipeline-list-tabs"
+               >
+                 <OToggleGroupItem value="all" size="sm" data-test="tab-all">
+@@ -556,13 +554,28 @@ const resumePipelineDialogMeta: any = ref({
+ 
+ const { pipelineObj } = useDragAndDrop(t);
+ 
++const oTableRef: any = ref(null);
++// Plain ref, not URL/store-backed: PipelinesList stays mounted across pipelineEditor/import/history/backfill child-route navigation, so this alone survives the round trip.
++const currentPage = ref(1);
++const onPageChange = (page: number) => {
++  currentPage.value = page;
++};
++
++// setTimeout(0) is a macrotask, so it runs after TanStack's own deferred auto-reset-on-data-change (its own microtask queue), letting the restored page win.
++const restorePageIndex = () => {
++  setTimeout(() => {
++    oTableRef.value?.table?.setPageIndex(currentPage.value - 1);
++  }, 0);
++};
++
++// Only re-fetches when landing back on the list itself; the `v-if` swap destroys and recreates OTable for the whole editor/import/history/backfill visit, so its page needs reasserting once this fetch settles.
+ watch(
+   () => router.currentRoute.value.name,
+   async (newName, oldName) => {
+-    // Only re-fetch when we land back on the list itself
+     if (newName !== "pipelines" || newName === oldName) return;
+     await getPipelines();
+     updateActiveTab();
++    restorePageIndex();
+   },
+ );
+ 
+@@ -755,6 +768,13 @@ const updateActiveTab = () => {
+ 
+   columns.value = getColumnsForActiveTab(activeTab.value);
+ };
++
++// Resets the page too: `:key="activeTab"` remounts OTable, which could otherwise land past the newly-filtered tab's last page.
++const onTabChange = (tab: any) => {
++  activeTab.value = tab as string;
++  currentPage.value = 1;
++  updateActiveTab();
++};
+ //this is the function to check whether the pipeline is enabled or not
+ //becuase if it is not enabled then we need to show the dialog to resume the pipeline from where it paused / start from now
+ //else we need to toggle the pipeline state
+@@ -929,6 +949,7 @@ columns.value = getColumnsForActiveTab(activeTab.value);
+ onMounted(async () => {
+   await getPipelines(); // Ensure pipelines are fetched before updating
+   updateActiveTab();
++  restorePageIndex();
+ });
+ 
+ // Empty-state "New pipeline" → the dedicated pipeline-builder page (not the
+diff --git a/web/src/components/workflows/WorkflowsList.spec.ts b/web/src/components/workflows/WorkflowsList.spec.ts
+index ec4c6c0db52..cc9146cef7b 100644
+--- a/web/src/components/workflows/WorkflowsList.spec.ts
++++ b/web/src/components/workflows/WorkflowsList.spec.ts
+@@ -833,4 +833,96 @@ describe("WorkflowsList", () => {
+       expect(previews[0].props("workflow").id).toBe("wf-1");
+     });
+   });
++
++  // ── page restoration across route navigation (OTable pagination-reset fix) ─
++
++  describe("page restoration across route navigation", () => {
++    afterEach(() => {
++      vi.useRealTimers();
++    });
++
++    it("defaults currentPage to 1", async () => {
++      wrapper = mountList();
++      await flushPromises();
++      expect(wrapper.vm.currentPage).toBe(1);
++    });
++
++    it("onPageChange updates currentPage", async () => {
++      wrapper = mountList();
++      await flushPromises();
++      wrapper.vm.onPageChange(4);
++      expect(wrapper.vm.currentPage).toBe(4);
++    });
++
++    it("restorePageIndex reasserts the page via a macrotask (setTimeout(0))", async () => {
++      wrapper = mountList();
++      await flushPromises();
++      vi.useFakeTimers();
++      wrapper.vm.currentPage = 3;
++      const setPageIndex = vi.fn();
++      // OTable is shallow-stubbed in this suite; plant the piece of its exposed surface the fix depends on directly onto the template ref.
++      wrapper.vm.oTableRef = { table: { setPageIndex } };
++
++      wrapper.vm.restorePageIndex();
++      expect(setPageIndex).not.toHaveBeenCalled();
++
++      vi.runAllTimers();
++      expect(setPageIndex).toHaveBeenCalledWith(2);
++    });
++
++    it("reasserts the persisted page once the initial fetch resolves on mount", async () => {
++      let resolveFetch: (v: any) => void = () => {};
++      listWorkflows.mockReturnValue(
++        new Promise((resolve) => {
++          resolveFetch = resolve;
++        }),
++      );
++      vi.useFakeTimers();
++
++      wrapper = mountList();
++      wrapper.vm.currentPage = 3;
++
++      resolveFetch({ data: [makeWorkflow(1)] });
++      await flushPromises();
++
++      // Only now, once the fetched data has re-rendered OTable and re-bound the ref, plant the fake — restorePageIndex() reads oTableRef.value lazily when its timer fires, so this still lands in time.
++      const setPageIndex = vi.fn();
++      wrapper.vm.oTableRef = { table: { setPageIndex } };
++      expect(setPageIndex).not.toHaveBeenCalled();
++
++      vi.runAllTimers();
++      expect(setPageIndex).toHaveBeenCalledWith(2);
++    });
++
++    it("reasserts the restored page when a save lands while OTable has remounted mid-fetch", async () => {
++      let resolveFetch: (v: any) => void = () => {};
++      mockRouter.currentRoute.value = { name: "workflowEditor", query: {} } as any;
++      wrapper = mountList();
++      await flushPromises();
++      wrapper.vm.currentPage = 3;
++      vi.useFakeTimers();
++
++      listWorkflows.mockReturnValue(
++        new Promise((resolve) => {
++          resolveFetch = resolve;
++        }),
++      );
++      // "saved" starts the re-fetch while still on the editor route (OTable isn't mounted yet).
++      wrapper.findComponent({ name: "FakeEditor" }).vm.$emit("saved");
++      // goBack() lands the route on "workflows" — remounting OTable — before the fetch resolves.
++      mockRouter.currentRoute.value = { name: "workflows", query: {} } as any;
++      await nextTick();
++
++      resolveFetch({ data: [makeWorkflow(1)] });
++      await flushPromises();
++
++      // Only now, once the fetched data has re-rendered OTable and re-bound the ref, plant the fake.
++      const setPageIndex = vi.fn();
++      wrapper.vm.oTableRef = { table: { setPageIndex } };
++      expect(setPageIndex).not.toHaveBeenCalled();
++
++      vi.runAllTimers();
++      expect(setPageIndex).toHaveBeenCalledWith(2);
++    });
++  });
+ });
+diff --git a/web/src/components/workflows/WorkflowsList.vue b/web/src/components/workflows/WorkflowsList.vue
+index 1af2ed4884d..0d7af403fe3 100644
+--- a/web/src/components/workflows/WorkflowsList.vue
++++ b/web/src/components/workflows/WorkflowsList.vue
+@@ -66,6 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+       <div class="min-h-0 flex-1 overflow-hidden">
+         <div class="card-container h-full">
+           <OTable
++            ref="oTableRef"
+             :frame="false"
+             data-test="workflow-list-table"
+             :data="filteredWorkflows"
+@@ -81,6 +82,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+             table-id="workflows-workflow-list"
+             width="100%"
+             class="h-full w-full"
++            :current-page="currentPage"
++            @update:current-page="onPageChange"
+             @row-click="openRuns"
+           >
+             <template #toolbar>
+@@ -227,7 +230,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+   <!-- Editor (add/edit) renders here as a child route. On a successful save it
+        emits `saved`, so this parent refreshes the list — no route watcher. -->
+   <router-view v-else v-slot="{ Component }">
+-    <component :is="Component" @saved="getWorkflows" />
++    <component :is="Component" @saved="onEditorSaved" />
+   </router-view>
+ 
+   <ConfirmDialog
+@@ -274,6 +277,19 @@ const orgId = computed(() => store.state.selectedOrganization.identifier as stri
+ const loading = ref(true);
+ const filterQuery = ref("");
+ const workflows = ref<any[]>([]);
++const oTableRef: any = ref(null);
++// Plain ref, not URL/store-backed: WorkflowsList stays mounted across create/edit/runs child-route navigation, so this alone survives the round trip.
++const currentPage = ref(1);
++const onPageChange = (page: number) => {
++  currentPage.value = page;
++};
++
++// setTimeout(0) is a macrotask, so it runs after TanStack's own deferred auto-reset-on-data-change (its own microtask queue), letting the restored page win.
++const restorePageIndex = () => {
++  setTimeout(() => {
++    oTableRef.value?.table?.setPageIndex(currentPage.value - 1);
++  }, 0);
++};
+ 
+ const filteredWorkflows = computed(() => {
+   const q = filterQuery.value.trim().toLowerCase();
+@@ -500,5 +516,14 @@ const deleteWorkflow = async () => {
+   }
+ };
+ 
+-onMounted(getWorkflows);
++// Chained (not fire-and-forget) so restorePageIndex schedules its macrotask after the fetch's data update, not before.
++const onEditorSaved = async () => {
++  await getWorkflows();
++  restorePageIndex();
++};
++
++onMounted(async () => {
++  await getWorkflows();
++  restorePageIndex();
++});
+ </script>
+diff --git a/web/src/composables/useListBackNavigation.ts b/web/src/composables/useListBackNavigation.ts
+new file mode 100644
+index 00000000000..b1955a610de
+--- /dev/null
++++ b/web/src/composables/useListBackNavigation.ts
+@@ -0,0 +1,37 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// This program is free software: you can redistribute it and/or modify
++// it under the terms of the GNU Affero General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU Affero General Public License for more details.
++//
++// You should have received a copy of the GNU Affero General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++import { useRouter, type RouteLocationRaw } from "vue-router";
++
++// Real browser back replays the listing's exact previous URL (any URL-synced state included); the fallback push is for when history.state.back isn't that listing at all (deep link, arrived from elsewhere).
++export function useListBackNavigation(options: {
++  isListPath: (path: string) => boolean;
++  fallback: () => RouteLocationRaw;
++}) {
++  const router = useRouter();
++
++  return function goBack(): void {
++    const back = (router.options?.history?.state as { back?: unknown } | undefined)?.back;
++    if (typeof back === "string") {
++      // endsWith rather than === so a deployment served under a base path still matches.
++      const path = back.split(/[?#]/)[0].replace(/\/$/, "");
++      if (options.isListPath(path)) {
++        router.back();
++        return;
++      }
++    }
++    router.push(options.fallback());
++  };
++}
+diff --git a/web/src/lib/core/Table/OTable.spec.ts b/web/src/lib/core/Table/OTable.spec.ts
+index c725995b528..0d2553355f2 100644
+--- a/web/src/lib/core/Table/OTable.spec.ts
++++ b/web/src/lib/core/Table/OTable.spec.ts
+@@ -2109,4 +2109,38 @@ describe("OTable", () => {
+       expect(emitted![emitted!.length - 1][0]).toEqual(newOrder);
+     });
+   });
++
++  // currentPage only lands if it's present at mount alongside the real data — data arriving after mount loses the race to TanStack's own deferred autoResetPageIndex, so async callers must remount (e.g. via :key) rather than update data in place.
++  describe("controlled currentPage (client mode)", () => {
++    it("restores the given page when mounted directly with data already present", async () => {
++      wrapper = mount(OTable, {
++        props: {
++          data: makeRows(20),
++          columns: makeColumns(),
++          pagination: "client",
++          pageSize: 5,
++          currentPage: 3,
++        },
++      });
++      await nextTick();
++      expect((wrapper.vm as any).table.getState().pagination.pageIndex).toBe(2);
++    });
++
++    it("does NOT restore the page if data arrives after mount (documents the race)", async () => {
++      wrapper = mount(OTable, {
++        props: {
++          data: [],
++          columns: makeColumns(),
++          pagination: "client",
++          pageSize: 5,
++          currentPage: 3,
++          loading: true,
++        },
++      });
++      await wrapper.setProps({ data: makeRows(20), loading: false });
++      await nextTick();
++      await nextTick();
++      expect((wrapper.vm as any).table.getState().pagination.pageIndex).toBe(0);
++    });
++  });
+ });
+diff --git a/web/src/lib/core/Table/composables/useTablePagination.ts b/web/src/lib/core/Table/composables/useTablePagination.ts
+index 07b17c9e44e..262b771ef2d 100644
+--- a/web/src/lib/core/Table/composables/useTablePagination.ts
++++ b/web/src/lib/core/Table/composables/useTablePagination.ts
+@@ -25,6 +25,13 @@ export function useTablePagination<TData>(
+   // In client mode, allow the parent to force a specific page by passing currentPage.
+   // This lets callers reset to page 1 on filter/search changes without relying on
+   // TanStack's autoResetPageIndex (which can't distinguish filter vs expansion changes).
++  // Immediate so a caller seeding currentPage from a persisted/URL value (e.g.
++  // restoring the page a user was on before navigating away) lands there on
++  // first render instead of always starting at TanStack's default page 0. Only
++  // safe for data that's already present at mount — TanStack's own auto-reset
++  // resolves through its own deferred microtask queue on a later data change, so
++  // a caller whose data loads asynchronously must not mount until it has data
++  // (see Dashboards.vue's key-swap) or this gets silently overwritten.
+   watch(
+     () => props.currentPage,
+     (page) => {
+@@ -32,6 +39,7 @@ export function useTablePagination<TData>(
+         table.setPageIndex(page - 1);
+       }
+     },
++    { immediate: true },
+   );
+ 
+   // Client-side: current page from TanStack state
+diff --git a/web/src/plugins/metrics/Index.vue b/web/src/plugins/metrics/Index.vue
+index df1c0e63109..45b1f48171b 100644
+--- a/web/src/plugins/metrics/Index.vue
++++ b/web/src/plugins/metrics/Index.vue
+@@ -135,6 +135,7 @@ import { PanelEditor, type PanelEditorVariablesData } from "@/components/dashboa
+ import { saveMetricsStream, restoreMetricsStream } from "@/utils/streamPersist";
+ import useDefaultPanelFields from "@/composables/dashboard/useDefaultPanelFields";
+ import { useRoute, useRouter } from "vue-router";
++import { useListBackNavigation } from "@/composables/useListBackNavigation";
+ import ShareButton from "@/components/common/ShareButton.vue";
+ import {
+   getMetricsConfig,
+@@ -561,23 +562,15 @@ export default defineComponent({
+       showAddToDashboardDialog.value = false;
+     };
+ 
+-    const goBackToExplorer = () => {
+-      const back = router.options?.history?.state?.back;
+-      if (
+-        typeof back === "string" &&
+-        back.startsWith("/metrics") &&
+-        !back.startsWith("/metrics/editor")
+-      ) {
+-        router.back();
+-        return;
+-      }
+-      router.push({
++    const goBackToExplorer = useListBackNavigation({
++      isListPath: (path) => path.startsWith("/metrics") && !path.startsWith("/metrics/editor"),
++      fallback: () => ({
+         name: "metrics",
+         query: {
+           org_identifier: store.state.selectedOrganization?.identifier,
+         },
+-      });
+-    };
++      }),
++    });
+ 
+     // [END] cancel running queries
+ 
+diff --git a/web/src/views/Dashboards/Dashboards.spec.ts b/web/src/views/Dashboards/Dashboards.spec.ts
+index 6a5489a85b9..39a5c5456ed 100644
+--- a/web/src/views/Dashboards/Dashboards.spec.ts
++++ b/web/src/views/Dashboards/Dashboards.spec.ts
+@@ -1,5 +1,5 @@
+ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+-import { shallowMount } from "@vue/test-utils";
++import { shallowMount, flushPromises } from "@vue/test-utils";
+ import { nextTick } from "vue";
+ import Dashboards from "./Dashboards.vue";
+ import { createStore } from "vuex";
+@@ -722,6 +722,20 @@ describe("Dashboards.vue", () => {
+       expect(wrapper.vm.activeFolderId).toBe("__favorites__");
+     });
+ 
++    it("restores the page from the URL and keeps it there after the landing decision's own URL sync", async () => {
++      await router.push({ path: "/dashboards", query: { folder: "default", page: "3" } });
++      wrapper = shallowMount(Dashboards, {
++        global: buildGlobalConfig(storeWithTwo(), router, i18n),
++      });
++      await settle();
++      await flushPromises();
++      await settle();
++
++      expect(wrapper.vm.currentPage).toBe(3);
++      // The folder-switch watcher rewrites the URL as part of landing — it must not drop `page` while doing so.
++      expect(router.currentRoute.value.query.page).toBe("3");
++    });
++
+     it("toggleFavorite persists the per-user setting resolved to the active folder", async () => {
+       const testStore = storeWithTwo();
+       (testStore.state.userInfo as any).email = "me@example.com";
+diff --git a/web/src/views/Dashboards/Dashboards.vue b/web/src/views/Dashboards/Dashboards.vue
+index b9bc3de913d..11fd259f203 100644
+--- a/web/src/views/Dashboards/Dashboards.vue
++++ b/web/src/views/Dashboards/Dashboards.vue
+@@ -130,6 +130,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+             :footer-title="t('dashboard.header')"
+             :page-size="20"
+             :page-size-options="[20, 50, 100, 250, 500]"
++            :current-page="currentPage"
++            @update:current-page="onPageChange"
+             selection="multiple"
+             v-model:selected-ids="selectedIds"
+             :enable-column-resize="true"
+@@ -636,6 +638,14 @@ export default defineComponent({
+     const selectedIds = ref<string[]>([]);
+     const { track } = useReo();
+ 
++    // URL-synced so returning from a dashboard (Back/Update/Cancel) lands on the same page instead of resetting to page 1.
++    const currentPage = ref(Number(route.query.page) || 1);
++    const onPageChange = (page: number) => {
++      currentPage.value = page;
++      if (String(route.query.page ?? "1") === String(page)) return;
++      router.replace({ query: { ...route.query, page: String(page) } });
++    };
++
+     const { showPositiveNotification, showErrorNotification } = useNotifications();
+ 
+     const { isHome, setHomeDashboard, clearHomeDashboard, homeDashboard } = useHomeDashboard(t);
+@@ -892,6 +902,7 @@ export default defineComponent({
+           router.push({
+             path: "/dashboards",
+             query: {
++              ...route.query,
+               org_identifier: store.state.selectedOrganization.identifier,
+               folder: activeFolderId.value,
+             },
+@@ -917,6 +928,7 @@ export default defineComponent({
+           router.push({
+             path: "/dashboards",
+             query: {
++              ...route.query,
+               org_identifier: store.state.selectedOrganization.identifier,
+               folder: activeFolderId.value,
+             },
+@@ -1131,6 +1143,17 @@ export default defineComponent({
+     // Start in the loading state so the table shows the skeleton on first
+     // render instead of briefly flashing the empty state before the fetch.
+     const loading = ref(true);
++    // The first real load lands after mount and races TanStack's own auto-reset-on-data-change, which resolves through its own deferred microtask queue — setTimeout(0) runs strictly after that queue drains, so the restored page reliably wins.
++    watch(
++      loading,
++      (isLoading) => {
++        if (isLoading) return;
++        setTimeout(() => {
++          oTableRef.value?.table?.setPageIndex(currentPage.value - 1);
++        }, 0);
++      },
++      { once: true },
++    );
+     const getDashboards = async () => {
+       const dismiss = toast({
+         variant: "loading",
+@@ -1736,6 +1759,8 @@ export default defineComponent({
+       filteredFolders,
+       updateActiveFolderId,
+       selectedIds,
++      currentPage,
++      onPageChange,
+       multipleExportDashboard,
+       moveMultipleDashboards,
+       openBulkDeleteDialog,
+diff --git a/web/src/views/Dashboards/ViewDashboard.vue b/web/src/views/Dashboards/ViewDashboard.vue
+index eedcedffc1c..61d2a61cbf2 100644
+--- a/web/src/views/Dashboards/ViewDashboard.vue
++++ b/web/src/views/Dashboards/ViewDashboard.vue
+@@ -322,6 +322,7 @@ import { useRouter } from "vue-router";
+ import { getDashboard, movePanelToAnotherTab, getFoldersList } from "../../utils/commons.ts";
+ import { parseDuration, generateDurationLabel, getConsumableRelativeTime } from "../../utils/date";
+ import { useRoute } from "vue-router";
++import { useListBackNavigation } from "@/composables/useListBackNavigation";
+ import { deletePanel } from "../../utils/commons";
+ import {
+   getPanelTimeFromURL,
+@@ -1189,36 +1190,17 @@ export default defineComponent({
+ 
+     // [END] date picker related variables
+ 
+-    // back button → the dashboards list the user actually came from.
+-    //
+-    // Prefer real history: a dashboard opened from the Favorites pseudo-folder
+-    // carries the folder it *lives in* in the URL, so rebuilding the list route
+-    // from route.query.folder would drop the user into that folder instead of
+-    // Favorites. Going back restores whichever list view they left.
+-    //
+-    // Only honour history when the previous entry is the dashboards list itself
+-    // (deep links have no previous entry; arriving via add_panel or another
+-    // module would send the "Dashboards" button somewhere it doesn't name), and
+-    // fall back to the folder-scoped push otherwise. In-view URL syncs use
+-    // router.replace, so tab/time-range changes never bury the list entry.
+-    const goBackToDashboardList = () => {
+-      const back = (router.options?.history?.state as any)?.back;
+-      if (typeof back === "string") {
+-        // endsWith rather than === so a deployment served under a base path
+-        // (getPath() can be "/web/") still matches if the base ever leaks in.
+-        const path = back.split(/[?#]/)[0].replace(/\/$/, "");
+-        if (path === "/dashboards" || path.endsWith("/dashboards")) {
+-          return router.back();
+-        }
+-      }
+-      return router.push({
++    // Fallback-only: a dashboard opened from the Favorites pseudo-folder carries the folder it lives in, so rebuilding from route.query.folder here (rather than Favorites) is only reached when there's no real history to go back to.
++    const goBackToDashboardList = useListBackNavigation({
++      isListPath: (path) => path === "/dashboards" || path.endsWith("/dashboards"),
++      fallback: () => ({
+         path: "/dashboards",
+         query: {
+           folder: route.query.folder ?? "default",
+           org_identifier: store.state.selectedOrganization.identifier,
+         },
+-      });
+-    };
++      }),
++    });
+ 
+     //add panel
+     const addPanelData = () => {
+diff --git a/web/src/views/alerts/AlertDetail.vue b/web/src/views/alerts/AlertDetail.vue
+index 669d550bd11..2834f947224 100644
+--- a/web/src/views/alerts/AlertDetail.vue
++++ b/web/src/views/alerts/AlertDetail.vue
+@@ -454,11 +454,9 @@ const backTarget = computed(() => ({
+   to: {
+     name: "alertList",
+     query: {
++      // Spread first so page/tab/search survive — folder still needs its own explicit fallback below since an absent query.folder must resolve to "default", not itself disappear.
++      ...route.query,
+       org_identifier: orgId.value,
+-      // Carry the folder the list navigated in with. Without it the list falls
+-      // back to "default" and the user lands somewhere their alert isn't —
+-      // going "back" has to mean back, not back-to-the-first-folder. Same
+-      // reasoning (and the same fallback) as editAlert below.
+       folder: route.query.folder || "default",
+     },
+   },
+diff --git a/web/src/views/slos/AddSlo.vue b/web/src/views/slos/AddSlo.vue
+index bb0bc416bc4..6c97b1cf415 100644
+--- a/web/src/views/slos/AddSlo.vue
++++ b/web/src/views/slos/AddSlo.vue
+@@ -1052,9 +1052,8 @@ function definitionKey(): string {
+ 
+ const backTarget = computed(() => ({
+   name: "sloList",
+-  // Carry the folder back, or cancelling out of a folder lands on default and
+-  // the SLO just saved looks like it vanished.
+-  query: { org_identifier: org.value, folder: form.folder_id },
++  // Spread first so page/etc. survive the round trip; folder is overridden explicitly since the form may have switched away from the one the list opened with.
++  query: { ...route.query, org_identifier: org.value, folder: form.folder_id },
+ }));
+ 
+ function onFolderSelected(folder: any) {
+diff --git a/web/src/views/slos/SloDetail.vue b/web/src/views/slos/SloDetail.vue
+index 9886d87db88..4e0ed9a3a10 100644
+--- a/web/src/views/slos/SloDetail.vue
++++ b/web/src/views/slos/SloDetail.vue
+@@ -456,10 +456,14 @@ const frozenBanner = computed(() => {
+   };
+ });
+ 
+-const backTarget = computed(() => ({
+-  name: "sloList",
+-  query: { org_identifier: org.value },
+-}));
++const backTarget = computed(() => {
++  // `edit_alert` opens this page's inline alerts panel — transient here, meaningless on the list.
++  const { edit_alert: _editAlert, ...restQuery } = route.query;
++  return {
++    name: "sloList",
++    query: { ...restQuery, org_identifier: org.value },
++  };
++});
+ 
+ const subtitle = computed(() => {
+   if (!slo.value) return raw("");
+@@ -607,10 +611,12 @@ async function loadGroups() {
+ }
+ 
+ function goToEdit() {
++  // `edit_alert` opens this page's inline alerts panel — transient here, meaningless on the editor.
++  const { edit_alert: _editAlert, ...restQuery } = route.query;
+   router.push({
+     name: "editSlo",
+     params: { slo_id: sloId.value },
+-    query: { org_identifier: org.value },
++    query: { ...restQuery, org_identifier: org.value },
+   });
+ }
+ 
+diff --git a/web/src/views/slos/SloList.vue b/web/src/views/slos/SloList.vue
+index 2c573fcd35d..05d9211adb1 100644
+--- a/web/src/views/slos/SloList.vue
++++ b/web/src/views/slos/SloList.vue
+@@ -49,6 +49,7 @@
+     </template>
+ 
+     <OTable
++      ref="oTableRef"
+       v-model:selected-ids="selectedIds"
+       selection="multiple"
+       :data="visibleRows"
+@@ -58,6 +59,7 @@
+       :error="error"
+       :page-size="25"
+       :page-size-options="[25, 50, 100]"
++      :current-page="currentPage"
+       :show-global-filter="false"
+       table-id="slos-list"
+       :persist-columns="true"
+@@ -65,6 +67,7 @@
+       :enable-column-resize="true"
+       data-test="slos-slolist-table"
+       @row-click="onRowClick"
++      @update:current-page="onPageChange"
+     >
+       <template #toolbar>
+         <div class="flex w-full items-center gap-2">
+@@ -398,7 +401,7 @@
+ </template>
+ 
+ <script setup lang="ts">
+-import { computed, onMounted, ref } from "vue";
++import { computed, onMounted, ref, watch } from "vue";
+ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+ import { useRoute, useRouter } from "vue-router";
+ import { useStore } from "vuex";
+@@ -451,7 +454,8 @@ const route = useRoute();
+ const store = useStore();
+ 
+ const rows = ref<SloListItem[]>([]);
+-const loading = ref(false);
++// Starts true: shows the skeleton instead of flashing empty on first render, and keeps the page-restore watch's `{once:true}` from firing on a spurious false→true edge before the real load ever settles.
++const loading = ref(true);
+ const error = ref<string | null>(null);
+ const search = ref("");
+ const typeFilter = ref("all");
+@@ -462,6 +466,15 @@ const selectedIds = ref<string[]>([]);
+ const moveDialog = ref(false);
+ const moveTarget = ref("");
+ const pendingMove = ref<SloListItem[]>([]);
++const oTableRef: any = ref(null);
++
++// URL-synced so returning from add/edit/detail (Back/Update/Cancel) lands on the same page instead of resetting to page 1.
++const currentPage = ref(Number(route.query.page) || 1);
++const onPageChange = (page: number) => {
++  currentPage.value = page;
++  if (String(route.query.page ?? "1") === String(page)) return;
++  router.replace({ query: { ...route.query, page: String(page) } });
++};
+ 
+ // The route is the source of truth for the active folder, so a reload or a
+ // shared link lands on the same folder the rail is showing.
+@@ -751,6 +764,18 @@ function onStatSelect(key: string | null) {
+   healthFilter.value = key === "total" ? null : key;
+ }
+ 
++// The first real load lands after mount and races TanStack's own auto-reset-on-data-change, which resolves through its own deferred microtask queue — setTimeout(0) runs strictly after that queue drains, so the restored page reliably wins.
++watch(
++  loading,
++  (isLoading) => {
++    if (isLoading) return;
++    setTimeout(() => {
++      oTableRef.value?.table?.setPageIndex(currentPage.value - 1);
++    }, 0);
++  },
++  { once: true },
++);
++
+ // Both optional: refresh calls `load()` bare and falls back to the current org
+ // and active folder — the folder-change path is the only caller that passes a
+ // folder the refs have not caught up with yet.
+@@ -819,20 +844,22 @@ async function doMove() {
+   }
+ }
+ 
++// Spreads the list's own query (page, folder, …) forward so the editor's `backTarget` has something to restore.
+ function goToNew() {
+-  router.push({ name: "addSlo", query: { org_identifier: org.value } });
++  router.push({ name: "addSlo", query: { ...route.query, org_identifier: org.value } });
+ }
+ 
+ function goToEdit(row: SloListItem) {
+   router.push({
+     name: "editSlo",
+     params: { slo_id: row.id },
+-    query: { org_identifier: org.value },
++    query: { ...route.query, org_identifier: org.value },
+   });
+ }
+ 
+ function onRowClick(row: SloListItem) {
+-  router.push(sloDetailRoute(row.id, org.value));
++  const target = sloDetailRoute(row.id, org.value);
++  router.push({ ...target, query: { ...route.query, ...target.query } });
+ }
+ 
+ async function toggleEnabled(row: SloListItem) {
+diff --git a/web/src/views/slos/SloListPagination.spec.ts b/web/src/views/slos/SloListPagination.spec.ts
+new file mode 100644
+index 00000000000..b9c7337c2f5
+--- /dev/null
++++ b/web/src/views/slos/SloListPagination.spec.ts
+@@ -0,0 +1,225 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// This program is free software: you can redistribute it and/or modify
++// it under the terms of the GNU Affero General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU Affero General Public License for more details.
++//
++// You should have received a copy of the GNU Affero General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++// Pagination survives a round trip to add/edit/detail and back — same class of bug as Dashboards/Alerts/Templates/Destinations. OTable is mounted for real, so the full TanStack restore mechanism is reachable here, not just the URL-sync half.
++
++import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
++import { mount, flushPromises } from "@vue/test-utils";
++
++vi.mock("@/services/slos", () => ({
++  default: {
++    list: vi.fn(),
++    delete: vi.fn(),
++    move: vi.fn(),
++    setEnabled: vi.fn(),
++  },
++}));
++
++vi.mock("@/services/alerts", () => ({
++  default: { list_by_slo: vi.fn() },
++}));
++
++import SloList from "@/views/slos/SloList.vue";
++import i18n from "@/locales";
++import store from "@/test/unit/helpers/store";
++import router from "@/test/unit/helpers/router";
++import sloService from "@/services/slos";
++
++const node = document.createElement("div");
++node.setAttribute("id", "app");
++document.body.appendChild(node);
++
++const sloRow = (overrides: Record<string, any> = {}) => ({
++  id: `slo-${overrides.name ?? "row"}`,
++  name: "checkout-availability",
++  enabled: true,
++  target: 99.9,
++  window_secs: 30 * 86400,
++  slice_interval_secs: 300,
++  tags: [],
++  folder_id: "default",
++  status: {
++    sli: 99.95,
++    error_budget_remaining: 0.6,
++    burn_rate: 0.4,
++    coverage: 1,
++    no_data: false,
++  },
++  ...overrides,
++});
++
++const manyRows = (count: number) =>
++  Array.from({ length: count }, (_, i) =>
++    sloRow({ id: `slo-${i}`, name: `slo-${String(i).padStart(3, "0")}` }),
++  );
++
++async function mountList() {
++  const wrapper = mount(SloList, {
++    attachTo: node,
++    global: {
++      plugins: [i18n, store, router],
++      stubs: {
++        FolderList: { template: '<div data-test="stub-folder-list"></div>' },
++        SelectFolderDropDown: true,
++      },
++    },
++  });
++  await flushPromises();
++  // Real macrotask wait: the restore runs in a setTimeout(0), after TanStack's own deferred microtask reset — flushPromises() alone only drains microtasks.
++  await new Promise((r) => setTimeout(r, 50));
++  await flushPromises();
++  return wrapper;
++}
++
++describe("SloList pagination persistence", () => {
++  let wrapper: any;
++
++  beforeEach(() => {
++    vi.clearAllMocks();
++    (router as any).currentRoute.value.query = {};
++  });
++
++  afterEach(() => {
++    wrapper?.unmount();
++    (router as any).currentRoute.value.query = {};
++    vi.restoreAllMocks();
++  });
++
++  it("seeds currentPage from the URL's page query param", async () => {
++    vi.mocked(sloService.list).mockResolvedValue({ data: { list: manyRows(30) } } as any);
++    (router as any).currentRoute.value.query = { page: "2" };
++    wrapper = await mountList();
++
++    expect((wrapper.vm as any).currentPage).toBe(2);
++  });
++
++  it("defaults currentPage to 1 when no page query param is present", async () => {
++    vi.mocked(sloService.list).mockResolvedValue({ data: { list: [sloRow()] } } as any);
++    wrapper = await mountList();
++
++    expect((wrapper.vm as any).currentPage).toBe(1);
++  });
++
++  it("restores the TanStack table's own page index once loading finishes", async () => {
++    vi.mocked(sloService.list).mockResolvedValue({ data: { list: manyRows(30) } } as any);
++    (router as any).currentRoute.value.query = { page: "2" };
++    wrapper = await mountList();
++
++    // 25 rows/page (SloList's fixed page size) × 30 rows → page 2 exists.
++    expect((wrapper.vm as any).oTableRef.table.getState().pagination.pageIndex).toBe(1);
++  });
++
++  it("onPageChange updates currentPage and replaces the URL, preserving other query params", async () => {
++    vi.mocked(sloService.list).mockResolvedValue({ data: { list: [sloRow()] } } as any);
++    (router as any).currentRoute.value.query = { org_identifier: "test-org" };
++    wrapper = await mountList();
++    const replaceSpy = vi
++      .spyOn(router, "replace")
++      .mockImplementation((() => Promise.resolve()) as any);
++    // Re-asserted: the shared router's own async effects can touch query between mount and this call.
++    (router as any).currentRoute.value.query = { org_identifier: "test-org" };
++
++    (wrapper.vm as any).onPageChange(3);
++
++    expect((wrapper.vm as any).currentPage).toBe(3);
++    expect(replaceSpy).toHaveBeenCalledWith({
++      query: { org_identifier: "test-org", page: "3" },
++    });
++  });
++
++  it("onPageChange is a no-op on the URL when the page hasn't actually changed", async () => {
++    vi.mocked(sloService.list).mockResolvedValue({ data: { list: [sloRow()] } } as any);
++    (router as any).currentRoute.value.query = { page: "1" };
++    wrapper = await mountList();
++    const replaceSpy = vi
++      .spyOn(router, "replace")
++      .mockImplementation((() => Promise.resolve()) as any);
++    // Re-asserted for the same reason as the test above.
++    (router as any).currentRoute.value.query = { page: "1" };
++
++    (wrapper.vm as any).onPageChange(1);
++
++    expect(replaceSpy).not.toHaveBeenCalled();
++  });
++
++  it("goToNew preserves the page (and other) query params when opening the add form", async () => {
++    vi.mocked(sloService.list).mockResolvedValue({ data: { list: [sloRow()] } } as any);
++    (router as any).currentRoute.value.query = { page: "3", folder: "team-a" };
++    wrapper = await mountList();
++    // No call-through: this targets a different route, and a real navigation resolving async would leave the shared router's query mutated for the next test.
++    const pushSpy = vi.spyOn(router, "push").mockImplementation((() => Promise.resolve()) as any);
++    // Re-asserted: the shared router's own async effects can touch query between mount and this call.
++    (router as any).currentRoute.value.query = { page: "3", folder: "team-a" };
++
++    (wrapper.vm as any).goToNew();
++
++    const pushed = pushSpy.mock.calls[0][0] as any;
++    expect(pushed.name).toBe("addSlo");
++    expect(pushed.query.page).toBe("3");
++    expect(pushed.query.folder).toBe("team-a");
++  });
++
++  it("goToEdit preserves the page (and other) query params when opening the edit form", async () => {
++    vi.mocked(sloService.list).mockResolvedValue({ data: { list: [sloRow()] } } as any);
++    (router as any).currentRoute.value.query = { page: "3", folder: "team-a" };
++    wrapper = await mountList();
++    // No call-through: this targets a different route, and a real navigation resolving async would leave the shared router's query mutated for the next test.
++    const pushSpy = vi.spyOn(router, "push").mockImplementation((() => Promise.resolve()) as any);
++    // Re-asserted: the shared router's own async effects can touch query between mount and this call.
++    (router as any).currentRoute.value.query = { page: "3", folder: "team-a" };
++
++    (wrapper.vm as any).goToEdit(sloRow({ id: "slo-1" }));
++
++    const pushed = pushSpy.mock.calls[0][0] as any;
++    expect(pushed.name).toBe("editSlo");
++    expect(pushed.params).toEqual({ slo_id: "slo-1" });
++    expect(pushed.query.page).toBe("3");
++    expect(pushed.query.folder).toBe("team-a");
++  });
++
++  it("onRowClick (row navigation to detail) preserves the page query param", async () => {
++    vi.mocked(sloService.list).mockResolvedValue({ data: { list: [sloRow()] } } as any);
++    (router as any).currentRoute.value.query = { page: "3", folder: "team-a" };
++    wrapper = await mountList();
++    // No call-through: this targets a different route, and a real navigation resolving async would leave the shared router's query mutated for the next test.
++    const pushSpy = vi.spyOn(router, "push").mockImplementation((() => Promise.resolve()) as any);
++    // Re-asserted: the shared router's own async effects can touch query between mount and this call.
++    (router as any).currentRoute.value.query = { page: "3", folder: "team-a" };
++
++    (wrapper.vm as any).onRowClick(sloRow({ id: "slo-1" }));
++
++    const pushed = pushSpy.mock.calls[0][0] as any;
++    expect(pushed.name).toBe("sloDetail");
++    expect(pushed.params).toEqual({ slo_id: "slo-1" });
++    expect(pushed.query.page).toBe("3");
++    expect(pushed.query.folder).toBe("team-a");
++  });
++
++  it("onFolderChange keeps carrying the page query param (already correct, guarded against regression)", async () => {
++    vi.mocked(sloService.list).mockResolvedValue({ data: { list: [sloRow()] } } as any);
++    (router as any).currentRoute.value.query = { page: "3" };
++    wrapper = await mountList();
++    // No call-through: this targets a different route, and a real navigation resolving async would leave the shared router's query mutated for the next test.
++    const pushSpy = vi.spyOn(router, "push").mockImplementation((() => Promise.resolve()) as any);
++    // Re-asserted: the shared router's own async effects can touch query between mount and this call.
++    (router as any).currentRoute.value.query = { page: "3" };
++
++    (wrapper.vm as any).onFolderChange("team-b");
++
++    const pushed = pushSpy.mock.calls[0][0] as any;
++    expect(pushed.query.page).toBe("3");
++    expect(pushed.query.folder).toBe("team-b");
++  });
++});

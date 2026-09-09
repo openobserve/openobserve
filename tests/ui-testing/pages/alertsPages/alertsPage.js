@@ -288,6 +288,16 @@ export class AlertsPage {
             alertListSplitter: '[data-test="alert-list-splitter"]',
             loadingOverlay: '.fullscreen.bg-blue',
 
+            // List pagination (store-backed restore). The OTable pagination
+            // selectors are shared/un-prefixed, so every one is scoped to the
+            // alert list table to avoid colliding with a drawer/editor table.
+            alertListPaginationInfo: '[data-test="alert-list-table"] [data-test="o2-table-pagination-info"]',
+            alertListPaginationInfoSkel: '[data-test="alert-list-table"] [data-test="o2-table-pagination-info-skel"]',
+            alertListNextPageBtn: '[data-test="alert-list-table"] [data-test="o2-table-next-page-btn"]',
+            alertListPageSizeSelect: '[data-test="alert-list-table"] [data-test="o2-table-page-size-select"]',
+            alertListNameCell: '[data-test="alert-list-table"] [data-test$="-name-cell"]',
+            appPageHeaderBackBtn: '[data-test="app-page-header-back"]',
+
             // Table locators
             tableBodyRowWithIndex: 'tbody tr[data-index]',
             tableLocator: 'table',
@@ -970,6 +980,66 @@ export class AlertsPage {
         await this.page.goBack();
         await expect(this.page.locator('[data-test="alert-list-page"]')).toBeVisible({ timeout: 10000 });
         testLogger.info('Returned from alert detail page to alert list');
+    }
+
+    // ==================== LIST PAGINATION / BACK-NAV RESTORE ====================
+
+    /**
+     * Wait until the alert list table has finished loading (pagination info
+     * skeleton gone, footer visible). Gate every page/footer assertion on this.
+     */
+    async waitForAlertListLoaded() {
+        await expect(this.page.locator(this.locators.alertListPaginationInfoSkel)).toHaveCount(0, { timeout: 30000 });
+        await expect(this.page.locator(this.locators.alertListPaginationInfo)).toBeVisible({ timeout: 30000 });
+    }
+
+    /** Click the next-page button scoped to the alert list table. */
+    async clickNextPage() {
+        await this.page.locator(this.locators.alertListNextPageBtn).click();
+    }
+
+    /** Poll the pagination footer until it contains the given range (e.g. /\b21\s*-\s*\d+/). */
+    async expectPaginationRange(regex) {
+        await this.waitForAlertListLoaded();
+        await expect(this.page.locator(this.locators.alertListPaginationInfo)).toContainText(regex, { timeout: 15000 });
+    }
+
+    /** Change the table page size; the teleported option is matched by data-test-value. */
+    async setPageSize(value) {
+        const trigger = this.page.locator(this.locators.alertListPageSizeSelect);
+        await trigger.click();
+        const option = this.page.locator(`[data-test="o2-table-page-size-select-option"][data-test-value="${value}"]`);
+        await expect(option).toBeVisible({ timeout: 5000 });
+        await option.click();
+        await expect(trigger).toContainText(String(value), { timeout: 5000 });
+    }
+
+    /** Guard: the page-size select reflects the given value. */
+    async expectPageSizeSelected(value) {
+        await expect(this.page.locator(this.locators.alertListPageSizeSelect)).toContainText(String(value), { timeout: 10000 });
+    }
+
+    /** Click the first visible alert row's name cell (navigates to the detail page). */
+    async clickFirstVisibleAlertRow() {
+        const cell = this.page.locator(this.locators.alertListNameCell).first();
+        await expect(cell).toBeVisible({ timeout: 15000 });
+        await cell.click();
+    }
+
+    /** Name of the first visible alert row (parsed from its name-cell data-test). */
+    async getFirstVisibleAlertName() {
+        const cell = this.page.locator(this.locators.alertListNameCell).first();
+        await expect(cell).toBeVisible({ timeout: 15000 });
+        const dataTest = await cell.getAttribute('data-test');
+        // The cell data-test is `alert-list-<name>-name-cell`.
+        return (dataTest || '').replace(/^alert-list-/, '').replace(/-name-cell$/, '');
+    }
+
+    /** Click the page-header back button (returns from the detail page to the list). */
+    async clickHeaderBack() {
+        const back = this.page.locator(this.locators.appPageHeaderBackBtn);
+        await expect(back).toBeVisible({ timeout: 10000 });
+        await back.click();
     }
 
     /**

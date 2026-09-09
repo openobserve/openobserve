@@ -1,0 +1,29 @@
+{
+  "feature_slug": "list-pagination-restore",
+  "feature_title": "List Pagination & Back-Navigation State Restoration",
+  "area": "Alerts",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "alerts-list-pagination-restore.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Alerts/alerts-list-pagination-restore.spec.js",
+  "playwright_group": "Alerts",
+  "source_files": [
+    "web/src/composables/useListBackNavigation.ts",
+    "web/src/lib/core/Table/composables/useTablePagination.ts",
+    "web/src/views/slos/SloList.vue",
+    "web/src/views/Dashboards/Dashboards.vue",
+    "web/src/components/alerts/AlertList.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "All 30 changed paths live under web/src/** (components/alerts, components/functions, components/pipeline, components/workflows, composables, lib/core/Table, plugins/metrics, views/Dashboards, views/alerts, views/slos). None are under enterprise-owned directories (enterprise/, o2_enterprise/, src/enterprise/), and no enterprise-only keyword or symbol (cipher/SSO/SAML/RBAC/SDR/logo-management) appears in the paths. This is a pure open-source frontend change, so edition is oss.",
+    "skip": "Not skipped. There is no explicit opt-out (no tests-added label and the trigger comment is empty), and the change is user-facing — it alters real navigation and pagination behavior across many list views, not docs/CI/comments. The only test files changed are Vitest unit specs (web/src/**/*.spec.ts), which do not trigger an auto-skip and are not E2E coverage.",
+    "e2e": "E2E is warranted. The change adds a new user-facing flow: list views (alerts, dashboards, SLOs, metrics, functions, pipelines, workflows) now persist the user's page in the URL and restore it after a round trip to add/edit/detail and back, instead of resetting to page 1. A new shared composable (useListBackNavigation) and an OTable controlled currentPage prop drive the behavior, so the back/update/cancel round-trip needs to be verified in a real browser.",
+    "area": "Alerts is the largest and most representative chunk of the change (AlertList, IncidentList, TemplateList, AlertsDestinationList, IncidentDetailDrawer, and AlertDetail.vue all modified), and the alerts list to edit/detail and back is a clean, canonical round-trip that exercises the restored pagination. Alerts also has an existing sibling spec folder and shard group. The behavior is cross-cutting, but Alerts is the best single anchor.",
+    "group": "The Alerts testfolder shard already exists in the ci_matrix (run_files like alerts-e2e-flow.spec.js, alerts-ui-operations.spec.js), so the new spec joins that group rather than creating a new shard.",
+    "existing_tests": "No E2E specs in the diff. The only test files changed are Vitest unit specs under web/src/** (AlertList.spec.ts, SloListPagination.spec.ts, OTable.spec.ts, etc.); none are Playwright specs under tests/ui-testing/playwright-tests/, so existing_tests_in_diff is false and the Architect starts from scratch rather than enhancing a dev-authored E2E spec."
+  }
+}

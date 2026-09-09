@@ -1,0 +1,17 @@
+[
+  {
+    "title": "alerts list restores page 2 after navigating to a detail page and back",
+    "action": "new",
+    "verifies": "the alerts list re-opens on page 2 (footer '21 - …') after a round trip into an alert's detail page and back"
+  },
+  {
+    "title": "alerts list restores the 50-per-page size after navigating to a detail page and back",
+    "action": "new",
+    "verifies": "a changed page size of 50 is preserved across a detail round trip (page-size select still shows 50)"
+  },
+  {
+    "title": "restored page clamps to a valid single page when the list shrinks past it",
+    "action": "new",
+    "verifies": "when the restored page no longer exists after data shrinks, the list clamps to a valid single page instead of rendering empty"
+  }
+]

@@ -1,0 +1,12 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/Alerts/alerts-list-pagination-restore.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Alerts/alerts-ui-operations.spec.js",
+    "tests/ui-testing/playwright-tests/Alerts/alerts-priority-tags.spec.js",
+    "tests/ui-testing/playwright-tests/Alerts/alerts-template-prebuilt-guard.spec.js",
+    "tests/ui-testing/playwright-tests/Alerts/alerts-multialert-ui.spec.js"
+  ],
+  "needs_registration": true,
+  "rationale": "No existing Alerts spec exercises list pagination or back-navigation state restoration. The closest matches only reference 'pagination' incidentally (prebuilt-template tab switch, 'page restored' log lines) and none assert the footer range or round-trip a detail page. This cross-cutting feature is anchored in Alerts (store-backed restore), so a new spec in the Alerts area is the correct home; it must be added to ci_matrix.json's Alerts run_files. SLO and Dashboard URL-backed variants share the pattern but belong in their own area specs and are noted as uncovered secondary areas in the test plan."
+}

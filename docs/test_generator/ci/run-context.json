@@ -1,0 +1,21 @@
+{
+  "feature_slug": "list-pagination-restore",
+  "feature_title": "List Pagination & Back-Navigation State Restoration",
+  "area": "Alerts",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "alerts-list-pagination-restore.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Alerts/alerts-list-pagination-restore.spec.js",
+  "playwright_group": "Alerts",
+  "source_files": [
+    "web/src/composables/useListBackNavigation.ts",
+    "web/src/lib/core/Table/composables/useTablePagination.ts",
+    "web/src/views/slos/SloList.vue",
+    "web/src/views/Dashboards/Dashboards.vue",
+    "web/src/components/alerts/AlertList.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": ""
+}
