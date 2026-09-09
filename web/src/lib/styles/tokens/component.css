@@ -123,8 +123,8 @@
   --color-button-warning-focus-ring: var(--color-focus-ring-warning);
 
   /* Button — destructive */
-  --color-button-destructive: var(--color-error-500);
-  --color-button-destructive-hover: var(--color-error-600);
+  --color-button-destructive: var(--color-error-600);
+  --color-button-destructive-hover: var(--color-error-700);
   --color-button-destructive-disabled: var(--color-error-300);
   --color-button-destructive-foreground: var(--color-white);
 

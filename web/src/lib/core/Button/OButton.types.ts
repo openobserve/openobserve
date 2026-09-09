@@ -30,6 +30,8 @@ export type ButtonVariant =
   // Primary-colored tall-narrow vertical rectangle — for splitter collapse/expand buttons
   | "sidebar-button"
   | "destructive"
+  // Icon-only exclude-filter toggle (≠) — lighter red than destructive; glyph-on-fill, so 3:1 non-text contrast applies
+  | "filter-exclude"
   // AI-themed gradient — purple→pink gradient background, white text (AI send/generate buttons)
   | "ai-gradient"
   // Use on dark gradient backgrounds — white background with primary text
