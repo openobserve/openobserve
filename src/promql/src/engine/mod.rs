@@ -134,8 +134,8 @@ impl Engine {
                 let return_bool = expr.return_bool();
                 let op = expr.op.is_comparison_operator();
 
-                let lhs = scalar_operand(lhs, &expr.lhs);
-                let rhs = scalar_operand(rhs, &expr.rhs);
+                let lhs = scalar_operand(lhs, &expr.lhs, &self.eval_ctx);
+                let rhs = scalar_operand(rhs, &expr.rhs, &self.eval_ctx);
                 match (lhs, rhs) {
                     (Value::Float(left), Value::Float(right)) => {
                         let value = binaries::scalar_binary_operations(
@@ -228,12 +228,13 @@ impl Engine {
     }
 }
 
-/// Folds a scalar-typed operand evaluated as a one-sample series back into a scalar.
-fn scalar_operand(value: Value, expr: &PromExpr) -> Value {
+/// Folds a scalar-typed instant operand back into a scalar without broadcasting range samples.
+fn scalar_operand(value: Value, expr: &PromExpr, eval_ctx: &EvalContext) -> Value {
     // a one-sample vector is not a scalar: it keeps its labels for matching
     match value {
         Value::Matrix(m)
-            if expr.value_type() == ValueType::Scalar
+            if eval_ctx.is_instant()
+                && expr.value_type() == ValueType::Scalar
                 && m.len() == 1
                 && m[0].samples.len() == 1 =>
         {
@@ -732,6 +733,67 @@ pub(crate) mod tests {
             let value = eval_on_empty(&query, 1).await.unwrap();
             assert_eq!(single_value(value), 3.0, "{query}");
         }
+    }
+
+    #[tokio::test]
+    async fn test_sparse_scalar_operands_preserve_timestamps() {
+        for (filter, timestamp) in [
+            ("== 1640995200", 1640995200000000),
+            (">= 1640995320", 1640995320000000),
+        ] {
+            let sparse = format!("scalar(timestamp(vector(1)) {filter})");
+            for query in [
+                format!("{sparse} + vector(1)"),
+                format!("vector(1) + {sparse}"),
+            ] {
+                let series = matrix(eval_on_empty(&query, 3).await.unwrap());
+                assert_eq!(series.len(), 1, "{query}");
+                assert_eq!(series[0].samples.len(), 1, "{query}");
+                assert_eq!(series[0].samples[0].timestamp, timestamp, "{query}");
+                assert_eq!(
+                    series[0].samples[0].value,
+                    timestamp as f64 / 1_000_000.0 + 1.0,
+                    "{query}"
+                );
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_constant_operands_preserve_range_steps() {
+        for query in [
+            "vector(2) + 1",
+            "1 + vector(2)",
+            "scalar(vector(1)) + vector(2)",
+            "vector(2) + scalar(vector(1))",
+        ] {
+            let series = matrix(eval_on_empty(query, 3).await.unwrap());
+            assert_eq!(series.len(), 1, "{query}");
+            let samples = &series[0].samples;
+            assert_eq!(samples.len(), 3, "{query}");
+            for (index, sample) in samples.iter().enumerate() {
+                assert_eq!(
+                    sample.timestamp,
+                    1640995200000000 + index as i64 * 60000000,
+                    "{query}"
+                );
+                assert_eq!(sample.value, 3.0, "{query}");
+            }
+        }
+    }
+
+    #[test]
+    fn test_scalar_operand_keeps_single_step_range_timestamp() {
+        let eval_ctx = EvalContext::new(1_000_000, 1_500_000, 1_000_000, "test".into());
+        assert_eq!(eval_ctx.timestamps(), vec![1_000_000]);
+        let expr = promql_parser::parser::parse("scalar(vector(1))").unwrap();
+        let value = Value::Matrix(vec![RangeValue {
+            samples: vec![Sample::new(1_000_000, 1.0)],
+            ..Default::default()
+        }]);
+        let series = matrix(scalar_operand(value, &expr, &eval_ctx));
+        assert_eq!(series[0].samples[0].timestamp, 1_000_000);
+        assert_eq!(series[0].samples[0].value, 1.0);
     }
 
     #[tokio::test]
