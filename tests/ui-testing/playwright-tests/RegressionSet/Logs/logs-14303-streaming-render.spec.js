@@ -45,12 +45,20 @@ test.describe("Logs Streaming Render Regression", () => {
   test("aggregate query resolves to settled rows with no skeleton or banner left behind @bug-14303 @P1 @streamingAggs @regression @logsRegression", async ({ page }) => {
     testLogger.info('Test: streaming_aggs query settles the results grid (Bug #14303)');
 
+    // sqlMode's watcher asynchronously rewrites the editor, so it must land before we write the query
     await pm.logsPage.enableSqlModeIfNeeded();
-    await pm.logsPage.setQueryEditorContent('SELECT kubernetes_pod_name, count(*) as total FROM "e2e_automate" GROUP BY kubernetes_pod_name');
+    await page.waitForTimeout(500);
+    await pm.logsPage.clearAndFillQueryEditor('SELECT kubernetes_pod_name, count(*) as total FROM "e2e_automate" GROUP BY kubernetes_pod_name');
+    await page.waitForTimeout(500);
     await pm.logsPage.runQueryAndWaitForResults();
 
     await pm.logsPage.expectResultsGridSettledWithRows();
     await pm.logsPage.expectResultsProgressBarFadedOut();
+
+    // guards against a silently un-applied query: the raw stream fills a full 50-row page, the GROUP BY does not
+    const aggregateRowCount = await page.locator(pm.logsPage.logsSearchResultTableRows).count();
+    expect(aggregateRowCount, 'grid must show the aggregate result, not a full page of raw stream rows').toBeGreaterThan(0);
+    expect(aggregateRowCount, 'grid must show the aggregate result, not a full page of raw stream rows').toBeLessThan(50);
 
     testLogger.info('✓ PASSED: aggregate query settles with rows, no skeleton, banner or progress bar');
   });
@@ -58,9 +66,16 @@ test.describe("Logs Streaming Render Regression", () => {
   test("plain non-aggregate logs query is unchanged @bug-14303 @P1 @streamingAggs @regression @logsRegression", async ({ page }) => {
     testLogger.info('Test: non-aggregate query still settles the results grid (Bug #14303)');
 
+    const plainQuery = 'SELECT * FROM "e2e_automate"';
+    // sqlMode's watcher asynchronously rewrites the editor, so it must land before we write the query
+    await pm.logsPage.enableSqlModeIfNeeded();
+    await page.waitForTimeout(500);
+    await pm.logsPage.clearAndFillQueryEditor(plainQuery);
+    await page.waitForTimeout(500);
     await pm.logsPage.runQueryAndWaitForResults();
 
     await pm.logsPage.expectResultsGridSettledWithRows();
+    await pm.logsPage.expectQueryEditorContainsText(plainQuery);
 
     testLogger.info('✓ PASSED: non-aggregate query unaffected by the streaming-aggs fix');
   });
@@ -68,8 +83,11 @@ test.describe("Logs Streaming Render Regression", () => {
   test("zero-row query still shows the no-events empty state @bug-14303 @P1 @streamingAggs @regression @logsRegression", async ({ page }) => {
     testLogger.info('Test: empty result set still renders the no-events state (Bug #14303)');
 
+    // sqlMode's watcher asynchronously rewrites the editor, so it must land before we write the query
     await pm.logsPage.enableSqlModeIfNeeded();
-    await pm.logsPage.setQueryEditorContent('SELECT * FROM "e2e_automate" WHERE kubernetes_pod_name = \'nonexistent_pod_14303_regression\'');
+    await page.waitForTimeout(500);
+    await pm.logsPage.clearAndFillQueryEditor('SELECT * FROM "e2e_automate" WHERE kubernetes_pod_name = \'nonexistent_pod_14303_regression\'');
+    await page.waitForTimeout(500);
     await pm.logsPage.runQueryAndWaitForResults();
 
     await expect(page.locator(pm.logsPage.noResultsFoundText), 'No-events empty state must render for a zero-row result').toBeVisible();
