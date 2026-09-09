@@ -139,7 +139,7 @@ impl Engine {
                 .await?
                 {
                     None => Ok(None),
-                    Some(sources) => fused::emit_sources(sources, eval).await.map(Some),
+                    Some(sources) => fused::map_sources(sources, eval).await.map(Some),
                 }
             };
             if let Some((series, scanned)) = self

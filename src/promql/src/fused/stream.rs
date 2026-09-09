@@ -140,7 +140,7 @@ mod tests {
 
     use super::{
         super::{
-            fold::{SeriesEval, emit_sources},
+            fold::{SeriesEval, map_sources},
             matrix,
             test_support::*,
         },
@@ -440,7 +440,7 @@ mod tests {
             .unwrap()
             .expect("the sorted table streams");
             let eval = Arc::new(SeriesEval::new(func, range, &eval_ctx));
-            let (actual, _) = emit_sources(sources, eval).await.unwrap();
+            let (actual, _) = map_sources(sources, eval).await.unwrap();
             assert_matrix_close(
                 canonical_matrix(expected),
                 canonical_matrix(Value::Matrix(actual)),

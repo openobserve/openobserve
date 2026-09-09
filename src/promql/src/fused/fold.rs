@@ -117,9 +117,9 @@ where
     Ok((value, series_count))
 }
 
-/// Evaluates every partition's series and returns them whole, in partition order; dropping the
-/// future aborts the partitions.
-pub(crate) async fn emit_sources<F, S>(
+/// Maps every partition's series through the function and returns them whole, in partition
+/// order; dropping the future aborts the partitions.
+pub(crate) async fn map_sources<F, S>(
     sources: Vec<F>,
     eval: Arc<SeriesEval>,
 ) -> Result<(Vec<RangeValue>, usize)>
@@ -138,22 +138,22 @@ where
         .into_iter()
         .map(|source| {
             let eval = eval.clone();
-            async move { emit_partition(source.await?, eval).await }
+            async move { map_partition(source.await?, eval).await }
         })
         .collect();
     let parts = run_partitions(parts).await?;
     let series_count: usize = parts.iter().map(|(_, series)| series).sum();
     let series: Vec<RangeValue> = parts.into_iter().flat_map(|(series, _)| series).collect();
     log::info!(
-        "[trace_id: {trace_id}] [PromQL Timing] streaming {func_name}() execution took: {:?}, emitted {} of {series_count} series",
+        "[trace_id: {trace_id}] [PromQL Timing] streaming {func_name}() execution took: {:?}, mapped {} of {series_count} series",
         start_time.elapsed(),
         series.len(),
     );
     Ok((series, series_count))
 }
 
-/// Emits one partition's series; like the generic evaluator, a series with no value is dropped.
-async fn emit_partition<S: SeriesStream>(
+/// Maps one partition's series; like the generic evaluator, a series with no value is dropped.
+async fn map_partition<S: SeriesStream>(
     mut source: S,
     eval: Arc<SeriesEval>,
 ) -> Result<(Vec<RangeValue>, usize)> {
