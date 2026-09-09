@@ -361,7 +361,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- Submenu — absolutely positioned to the left of parent dropdown -->
                 <div
                   v-if="showLanguageSubmenu"
-                  class="rounded-default bg-dropdown-bg border-dropdown-border absolute top-0 right-full z-9999 me-1 min-w-50 border py-1 shadow-lg dark:shadow-lg"
+                  class="rounded-default bg-dropdown-bg border-dropdown-border absolute end-full top-0 z-9999 me-1 min-w-50 border py-1 shadow-lg dark:shadow-lg"
                   data-test="language-dropdown-item"
                   @click.stop
                 >
@@ -370,7 +370,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :key="lang.code"
                     type="button"
                     :data-test="`language-dropdown-item-${lang.code}`"
-                    class="flex w-full cursor-pointer items-center gap-2.5 border-0 bg-transparent px-3 py-1.5 text-left text-sm leading-[1.2] text-inherit"
+                    class="flex w-full cursor-pointer items-center gap-2.5 border-0 bg-transparent px-3 py-1.5 text-start text-sm leading-[1.2] text-inherit"
                     :class="[
                       'hover:bg-dropdown-item-hover-bg',
                       { 'font-semibold': selectedLanguage.code === lang.code },

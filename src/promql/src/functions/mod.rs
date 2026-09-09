@@ -167,6 +167,20 @@ impl<T: RangeFunc + ?Sized> RangeFunc for Box<T> {
     }
 }
 
+impl<T: RangeFunc + ?Sized> RangeFunc for std::sync::Arc<T> {
+    fn name(&self) -> &'static str {
+        (**self).name()
+    }
+
+    fn exec(&self, samples: &[Sample], eval_ts: i64, range: &Duration) -> Option<f64> {
+        (**self).exec(samples, eval_ts, range)
+    }
+
+    fn counter_extrapolation(&self) -> Option<ExtrapolationKind> {
+        (**self).counter_extrapolation()
+    }
+}
+
 pub static KEEP_METRIC_NAME_FUNC: Lazy<HashSet<&str>> =
     Lazy::new(|| HashSet::from_iter(["last_over_time"]));
 
