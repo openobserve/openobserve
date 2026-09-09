@@ -52,7 +52,7 @@ import { validateExpression } from "./composite/expression";
 /** Unsupported characters in an alert name. Requiredness = min 1 AND this regex. */
 export const ALERT_NAME_UNSUPPORTED_CHARS = /[:#?\s'"%&]+/;
 
-const isBlank = (v: unknown): boolean =>
+export const isBlank = (v: unknown): boolean =>
   v === undefined || v === null || (typeof v === "string" && v.trim() === "");
 
 // Step-B field schemas (Advanced / Deduplication / CompareWithPast wizard step

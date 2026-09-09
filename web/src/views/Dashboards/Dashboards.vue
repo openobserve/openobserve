@@ -95,13 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </ODropdownItem>
       </ODropdown>
       <!-- new dashboard button -->
-      <OButton
-        variant="primary"
-        size="sm"
-        icon-left="add"
-        data-test="dashboard-new"
-        @click="addDashboard"
-      >
+      <OButton variant="primary" size="sm" data-test="dashboard-new" @click="addDashboard">
         {{ t(`dashboard.add`) }}
       </OButton>
     </template>
@@ -136,6 +130,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :footer-title="t('dashboard.header')"
             :page-size="20"
             :page-size-options="[20, 50, 100, 250, 500]"
+            :current-page="currentPage"
+            @update:current-page="onPageChange"
             selection="multiple"
             v-model:selected-ids="selectedIds"
             :enable-column-resize="true"
@@ -165,7 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OToggleGroup
                         :model-value="searchAcrossFolders ? 'all' : 'this'"
                         type="single"
-                        class="mr-1 self-center"
+                        class="me-1 self-center"
                         @update:model-value="(v) => (searchAcrossFolders = v === 'all')"
                       >
                         <OToggleGroupItem
@@ -358,7 +354,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ resultTotal || 0 }} {{ t("dashboard.header") }}
                 </div>
                 <div v-if="selectedIds.length > 0" class="bulk-action-bar flex items-center gap-2">
-                  <span class="text-text-body mr-1 text-sm">{{
+                  <span class="text-text-body me-1 text-sm">{{
                     t("dashboard.dashboards.selected", { count: selectedIds.length })
                   }}</span>
                   <OButton
@@ -642,6 +638,14 @@ export default defineComponent({
     const selectedIds = ref<string[]>([]);
     const { track } = useReo();
 
+    // URL-synced so returning from a dashboard (Back/Update/Cancel) lands on the same page instead of resetting to page 1.
+    const currentPage = ref(Number(route.query.page) || 1);
+    const onPageChange = (page: number) => {
+      currentPage.value = page;
+      if (String(route.query.page ?? "1") === String(page)) return;
+      router.replace({ query: { ...route.query, page: String(page) } });
+    };
+
     const { showPositiveNotification, showErrorNotification } = useNotifications();
 
     const { isHome, setHomeDashboard, clearHomeDashboard, homeDashboard } = useHomeDashboard(t);
@@ -898,6 +902,7 @@ export default defineComponent({
           router.push({
             path: "/dashboards",
             query: {
+              ...route.query,
               org_identifier: store.state.selectedOrganization.identifier,
               folder: activeFolderId.value,
             },
@@ -923,6 +928,7 @@ export default defineComponent({
           router.push({
             path: "/dashboards",
             query: {
+              ...route.query,
               org_identifier: store.state.selectedOrganization.identifier,
               folder: activeFolderId.value,
             },
@@ -1137,6 +1143,17 @@ export default defineComponent({
     // Start in the loading state so the table shows the skeleton on first
     // render instead of briefly flashing the empty state before the fetch.
     const loading = ref(true);
+    // The first real load lands after mount and races TanStack's own auto-reset-on-data-change, which resolves through its own deferred microtask queue — setTimeout(0) runs strictly after that queue drains, so the restored page reliably wins.
+    watch(
+      loading,
+      (isLoading) => {
+        if (isLoading) return;
+        setTimeout(() => {
+          oTableRef.value?.table?.setPageIndex(currentPage.value - 1);
+        }, 0);
+      },
+      { once: true },
+    );
     const getDashboards = async () => {
       const dismiss = toast({
         variant: "loading",
@@ -1742,6 +1759,8 @@ export default defineComponent({
       filteredFolders,
       updateActiveFolderId,
       selectedIds,
+      currentPage,
+      onPageChange,
       multipleExportDashboard,
       moveMultipleDashboards,
       openBulkDeleteDialog,

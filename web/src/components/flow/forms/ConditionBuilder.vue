@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :group="conditionGroup"
           :depth="0"
           name-prefix="conditions"
-          condition-input-width="w-[8.125rem]"
+          condition-input-width="w-[11.25rem]"
           :allow-custom-columns="allowCustomColumns"
           :indent-rem="0.625"
           :module="module"
@@ -84,6 +84,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ conditionsError }}
       </div>
 
+      <!-- Warning, never a block: runtime-only fields the static list lacks are legitimate. -->
+      <div
+        v-for="w in columnWarnings"
+        :key="w.column"
+        class="text-status-warning-text mt-1 text-xs"
+        data-test="condition-builder-unknown-column-warning"
+      >
+        {{ t("flow.condition.unknownColumn", { column: w.column }) }}
+        <template v-if="w.suggestion">
+          {{ t("flow.condition.unknownColumnSuggestion", { suggestion: w.suggestion }) }}
+        </template>
+      </div>
+
       <slot name="guidelines" />
     </OForm>
   </div>
@@ -102,6 +115,7 @@ import {
   makeConditionSchema,
   type ConditionForm,
 } from "@/components/pipeline/NodeForm/Condition.schema";
+import { findUnresolvableColumns } from "./conditionColumnCheck";
 import {
   detectConditionsVersion,
   convertV0ToV2,
@@ -232,6 +246,13 @@ const conditionGroup = computed({
 const conditionsErrors = form.useStore((s: any) => s.fieldMeta?.conditions?.errors ?? []);
 const conditionsError = computed(() =>
   conditionsErrors.value.length ? String(firstFieldError(conditionsErrors.value)) : "",
+);
+
+// Only workflow callers pass normalizeColumnNames — exactly where the payload shape is known.
+const columnWarnings = computed(() =>
+  props.normalizeColumnNames && props.fields.length
+    ? findUnresolvableColumns(conditionGroupStore.value, props.fields)
+    : [],
 );
 
 // FilterGroup edits flow through the shared alert utilities, which expect a

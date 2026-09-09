@@ -163,13 +163,7 @@ pub async fn create_without_updating_trigger<C: ConnectionTrait + TransactionTra
 }
 
 async fn create_default_reports_folder(org_id: &str) -> Result<Folder, anyhow::Error> {
-    let default_folder = Folder {
-        folder_id: DEFAULT_FOLDER.to_owned(),
-        name: "default".to_owned(),
-        description: "default".to_owned(),
-        icon: None,
-    };
-    Ok(folders::save_folder(org_id, default_folder, FolderType::Reports, true).await?)
+    Ok(folders::ensure_default_folder(org_id, FolderType::Reports).await?)
 }
 
 pub async fn update_without_updating_trigger<C: ConnectionTrait + TransactionTrait>(

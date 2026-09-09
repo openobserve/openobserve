@@ -572,6 +572,7 @@ pub enum StreamType {
     Logs,
     Metrics,
     Traces,
+    Profiles,
     #[serde(rename = "enrichment_tables")]
     EnrichmentTables,
     #[serde(rename = "file_list")]
@@ -778,6 +779,7 @@ impl From<meta_stream::StreamType> for StreamType {
             meta_stream::StreamType::Logs => Self::Logs,
             meta_stream::StreamType::Metrics => Self::Metrics,
             meta_stream::StreamType::Traces => Self::Traces,
+            meta_stream::StreamType::Profiles => Self::Profiles,
             meta_stream::StreamType::ServiceGraph => Self::Metadata, // ServiceGraph not
             // alertable, map to
             // Metadata
@@ -983,6 +985,7 @@ impl From<StreamType> for meta_stream::StreamType {
             StreamType::Logs => Self::Logs,
             StreamType::Metrics => Self::Metrics,
             StreamType::Traces => Self::Traces,
+            StreamType::Profiles => Self::Profiles,
             StreamType::EnrichmentTables => Self::EnrichmentTables,
             StreamType::Filelist => Self::Filelist,
             StreamType::Metadata => Self::Metadata,

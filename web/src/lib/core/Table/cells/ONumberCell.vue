@@ -80,6 +80,6 @@ const formatted = computed<string | null>(() => {
     emptyLabel
   }}</span>
   <span v-else class="whitespace-nowrap tabular-nums">
-    {{ formatted }}<span v-if="suffix" class="text-text-muted ml-0.5">{{ suffix }}</span>
+    {{ formatted }}<span v-if="suffix" class="text-text-muted ms-0.5">{{ suffix }}</span>
   </span>
 </template>

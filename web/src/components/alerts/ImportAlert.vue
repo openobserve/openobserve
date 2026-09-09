@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Output Section with Alert-specific Error Display -->
     <template #output-content>
-      <div class="border-border-default flex h-full w-full min-w-100 flex-col border-l">
+      <div class="border-border-default flex h-full w-full min-w-100 flex-col border-s">
         <div
           v-if="alertErrorsToDisplay.length > 0"
           class="text-text-heading shrink-0 py-3 text-center text-sm font-semibold"
@@ -574,7 +574,7 @@ export default defineComponent({
             alert_enabled: jsonObj.alert_enabled ?? true,
           },
         };
-        await anomalyDetectionService.create(org, payload);
+        await anomalyDetectionService.create(org, payload, selectedFolderId.value || "default");
         alertCreators.value.push({
           message: t("alerts.import.anomalyImportSuccess", { index, name: jsonObj.name }),
           success: true,

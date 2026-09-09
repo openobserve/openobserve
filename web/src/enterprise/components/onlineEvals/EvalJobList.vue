@@ -84,7 +84,7 @@
             v-if="selectedIds.length > 0"
             variant="outline-destructive"
             size="sm"
-            class="ml-3"
+            class="ms-3"
             icon-left="delete"
             data-test="eval-job-bulk-delete-btn"
             :loading="actionLoading"

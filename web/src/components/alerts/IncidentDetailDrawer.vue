@@ -961,7 +961,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Alert Triggers Tab Content -->
               <div v-if="activeTab === 'alertTriggers'" class="flex flex-1 overflow-hidden">
                 <!-- Left Section: Alert Triggers Table -->
-                <div class="flex flex-1 flex-col overflow-hidden pt-4 pr-2">
+                <div class="flex flex-1 flex-col overflow-hidden pe-2 pt-4">
                   <div
                     :class="[
                       'border-card-glass-border rounded-default flex flex-1 flex-col overflow-hidden border',
@@ -1245,7 +1245,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="md"
                     @click="refreshCorrelation"
                     class="mt-3"
-                    ><OIcon name="refresh" size="sm" class="mr-1" />{{ t("common.retry") }}</OButton
+                    ><OIcon name="refresh" size="sm" class="me-1" />{{ t("common.retry") }}</OButton
                   >
                 </div>
 
@@ -1329,7 +1329,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="md"
                     @click="refreshCorrelation"
                     class="mt-3"
-                    ><OIcon name="refresh" size="sm" class="mr-1" />{{ t("common.retry") }}</OButton
+                    ><OIcon name="refresh" size="sm" class="me-1" />{{ t("common.retry") }}</OButton
                   >
                 </div>
 
@@ -1430,7 +1430,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="md"
                     @click="refreshCorrelation"
                     class="mt-3"
-                    ><OIcon name="refresh" size="sm" class="mr-1" />{{ t("common.retry") }}</OButton
+                    ><OIcon name="refresh" size="sm" class="me-1" />{{ t("common.retry") }}</OButton
                   >
                 </div>
 
@@ -1481,7 +1481,7 @@ import {
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
-import { useRouter } from "vue-router";
+import { useRouter, useRoute } from "vue-router";
 import { formatToReadable } from "@/utils/date";
 import incidentsService, {
   Incident,
@@ -1550,6 +1550,7 @@ export default defineComponent({
     const { t } = useI18nTyped();
     const store = useStore();
     const router = useRouter();
+    const route = useRoute();
     const { confirm } = useConfirmDialog();
 
     // Copy to clipboard state
@@ -2644,10 +2645,11 @@ export default defineComponent({
       contextRegistry.setActive("");
       contextRegistry.unregister("incidents");
 
-      // Navigate back to incident list
+      // Navigate back to incident list, carrying over this route's own query (e.g. page) instead of dropping it.
       router.push({
         name: "incidentList",
         query: {
+          ...route.query,
           org_identifier: store.state.selectedOrganization.identifier,
         },
       });
@@ -3285,8 +3287,8 @@ export default defineComponent({
             const classes = [
               "rca-h1 font-bold text-lg text-center mb-4 pb-2 border-b-2",
               // TODO: Discuss with team - h2 section separators with background and left border
-              // Remove 'rca-section-bg px-4 py-3 rounded-default border-l-4' if not approved
-              "rca-h2 font-bold text-lg mt-5 mb-3 rca-section-bg px-4 py-3 rounded-default border-l-4",
+              // Remove 'rca-section-bg px-4 py-3 rounded-default border-s-4' if not approved
+              "rca-h2 font-bold text-lg mt-5 mb-3 rca-section-bg px-4 py-3 rounded-default border-s-4",
               "rca-h3 font-semibold text-base mt-4 mb-2",
               "rca-h4 font-semibold text-sm mt-3 mb-2",
             ];
@@ -3302,8 +3304,8 @@ export default defineComponent({
             const body = token.items.map((item: any) => this.listitem(item)).join("");
             const tag = token.ordered ? "ol" : "ul";
             const classes = token.ordered
-              ? "rca-ol pl-5 my-3 space-y-1.5 list-decimal"
-              : "rca-ul pl-5 my-3 space-y-1.5 list-disc";
+              ? "rca-ol ps-5 my-3 space-y-1.5 list-decimal"
+              : "rca-ul ps-5 my-3 space-y-1.5 list-disc";
             return `<${tag} class="${classes}">${body}</${tag}>`;
           },
           listitem(item: any) {
@@ -3336,7 +3338,7 @@ export default defineComponent({
           },
           blockquote({ tokens }: any) {
             const text = this.parser.parse(tokens);
-            return `<blockquote class="rca-blockquote border-l-4 pl-4 py-2 my-3 italic">${text}</blockquote>`;
+            return `<blockquote class="rca-blockquote border-s-4 ps-4 py-2 my-3 italic">${text}</blockquote>`;
           },
           paragraph({ tokens }: any) {
             const text = this.parser.parseInline(tokens);

@@ -119,6 +119,10 @@ class WorkflowsPage {
     this.paletteCollapseBtn = '[data-test="workflow-palette-collapse-btn"]';
     this.nodeFor = (t) => `[data-test="workflow-node-${t}"]`;
     this.nodeTestOkFor = (t) => `[data-test="workflow-node-${t}-test-ok"]`;
+    // A pass renders as the green ✓ on a draft but as the rehearsal flask on a
+    // published workflow (a test run must not read as production verification).
+    this.nodeTestPassedFor = (t) =>
+      `[data-test="workflow-node-${t}-test-ok"], [data-test="workflow-node-${t}-test-rehearsal"]`;
     this.nodeTestErrorFor = (t) => `[data-test="workflow-node-${t}-test-error"]`;
     this.listRowPrefixFor = (n) => `[data-test^="workflow-list-${n}-"]`;
     this.listRowActionFor = (n, a) => `[data-test="workflow-list-${n}-${a}"]`;
@@ -129,6 +133,7 @@ class WorkflowsPage {
     // config panel became an ODialog — so its buttons stay `o-drawer-*`.
     this.testDrawer = '[data-test="workflow-test-drawer"]';
     this.testDrawerPrimary = '[data-test="workflow-test-drawer"] [data-test="o-drawer-primary-btn"]';
+    this.testSuppressSwitch = '[data-test="workflow-test-suppress-destinations-btn"]';
     // Workflow function code editor (QuickJS/JavaScript), shared with the Functions page.
     this.functionEditor = '[data-test="logs-vrl-function-editor"]';
     // Warning toast — how a blocked Publish reports itself, since it never reaches the network.
@@ -529,9 +534,16 @@ class WorkflowsPage {
    * Open the Test drawer from the editor and run the saved graph against the (pre-filled) sample
    * payload. Per-node results paint as ✓/✗ badges on the canvas nodes afterwards.
    */
-  async testRunFromEditor() {
+  async testRunFromEditor({ liveSend = false } = {}) {
     await this.page.locator(this.testBtn).click({ timeout: DRAWER_TIMEOUT_MS });
     await this.page.locator(this.testDrawer).waitFor({ state: 'visible', timeout: DRAWER_TIMEOUT_MS });
+    if (liveSend) {
+      // Destination sends are suppressed by default; send-error tests need the real dispatch.
+      const sw = this.page.locator(this.testSuppressSwitch);
+      if ((await sw.getAttribute('aria-checked')) === 'true') {
+        await sw.click({ timeout: DRAWER_TIMEOUT_MS });
+      }
+    }
     // The Test panel is still a real ODrawer (WorkflowTestDialog.vue) — only the NODE
     // config panel became an ODialog. Its buttons stay `o-drawer-*`.
     await this.page.locator(this.testDrawerPrimary).click({ timeout: DRAWER_TIMEOUT_MS });
@@ -589,6 +601,12 @@ class WorkflowsPage {
   /** Assert a node painted a success badge after a test run. */
   async expectNodeTestOk(nodeType, timeout = 60000) {
     await expect(this.page.locator(this.nodeTestOkFor(nodeType)))
+      .toBeVisible({ timeout });
+  }
+
+  /** Assert a node passed its test run — green ✓ (draft) or rehearsal flask (published). */
+  async expectNodeTestPassed(nodeType, timeout = 60000) {
+    await expect(this.page.locator(this.nodeTestPassedFor(nodeType)).first())
       .toBeVisible({ timeout });
   }
 

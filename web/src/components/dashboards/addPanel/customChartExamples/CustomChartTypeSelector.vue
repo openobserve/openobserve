@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="searchQuery"
           :placeholder="t('dashboard.customChartTypeSelector.searchCharts')"
           clearable
-          class="ml-4 w-70 flex-[0_0_17.5rem]"
+          class="ms-4 w-70 flex-[0_0_17.5rem]"
           @clear="searchQuery = ''"
         />
         <div class="flex-1" />

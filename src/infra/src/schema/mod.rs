@@ -379,8 +379,10 @@ pub fn unwrap_stream_is_derived(schema: &Schema) -> Option<bool> {
 
 pub fn get_partition_time_level(stream_type: StreamType) -> PartitionTimeLevel {
     match stream_type {
-        // file retention is always hourly for logs, metrics, and traces
-        StreamType::Logs | StreamType::Metrics | StreamType::Traces => PartitionTimeLevel::Hourly,
+        // file retention is always hourly for logs, metrics, traces, and profiles
+        StreamType::Logs | StreamType::Metrics | StreamType::Traces | StreamType::Profiles => {
+            PartitionTimeLevel::Hourly
+        }
         // for file list dump streams, we want to compact by daily
         StreamType::Filelist => PartitionTimeLevel::Daily,
         _ => PartitionTimeLevel::default(),

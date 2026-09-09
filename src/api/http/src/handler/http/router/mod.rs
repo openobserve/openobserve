@@ -25,7 +25,7 @@ use axum::{
 };
 use config::get_config;
 use openobserve_api_common::X_O2_ASSISTANT_SESSION_ID;
-use openobserve_api_ingest::request::{clusters, logs, metrics, rum};
+use openobserve_api_ingest::request::{clusters, logs, metrics, profiles, rum};
 #[cfg(feature = "cloud")]
 use openobserve_api_management::request::cloud;
 #[cfg(feature = "profiling")]
@@ -864,6 +864,12 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/loki/api/v1/push", post(logs::loki::loki_push))
         .route("/{org_id}/v1/logs", post(logs::ingest::otlp_logs_write))
         .route("/{org_id}/v1/metrics", post(metrics::ingest::otlp_metrics_write))
+        .route("/{org_id}/v1/profiles", post(profiles::ingest::otlp_profiles_write))
+        // OTLP Profiles is still development; otlp_http exporter defaults to this path.
+        .route(
+            "/{org_id}/v1development/profiles",
+            post(profiles::ingest::otlp_profiles_write),
+        )
         .route("/{org_id}/v1/traces", post(traces::traces_write))
         .route("/{org_id}/traces", post(traces::traces_write))
         .route("/{org_id}/otel/v1/traces", post(traces::traces_write))
@@ -1300,8 +1306,8 @@ pub fn service_routes() -> Router {
 
                 // LLM Providers (Online Eval Phase 2)
                 .route("/{org_id}/providers", get(providers::list_providers).post(providers::create_provider))
+                .route("/{org_id}/providers/test", post(providers::test_provider_config))
                 .route("/{org_id}/providers/{provider_id}", get(providers::get_provider).put(providers::update_provider).delete(providers::delete_provider))
-                .route("/{org_id}/providers/{provider_id}/test", post(providers::test_provider))
 
                 // Score Configs (Online Eval Phase 2)
                 // NOTE: /{entity_id}/versions must precede /{entity_id} for routing correctness

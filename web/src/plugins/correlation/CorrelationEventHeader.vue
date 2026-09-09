@@ -144,7 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Slot for actions co-located with the chip row (e.g. wrap-text button) -->
-    <div v-if="$slots['chip-actions']" class="ml-auto shrink-0">
+    <div v-if="$slots['chip-actions']" class="ms-auto shrink-0">
       <slot name="chip-actions" />
     </div>
   </div>

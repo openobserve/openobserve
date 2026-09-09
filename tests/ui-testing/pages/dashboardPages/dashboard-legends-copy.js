@@ -140,6 +140,8 @@ export default class DashboardLegendsCopy {
    * Click the "Copy all" button
    */
   async clickCopyAll() {
+    // writeText() stays pending until the page has OS focus; under parallel CI the tab loses it and the "Copied" .then() never fires.
+    await this.page.bringToFront();
     await this.copyAllBtn.click();
     testLogger.info('Clicked Copy All legends');
   }

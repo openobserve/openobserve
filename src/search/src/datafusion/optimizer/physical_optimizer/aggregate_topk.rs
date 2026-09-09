@@ -73,9 +73,7 @@ impl PhysicalOptimizerRule for AggregateTopkRule {
         }
 
         if let Some(expr) = final_agg_plan.aggr_expr().first() {
-            if !["count", "avg", "min", "max", "sum", "approx_distinct"]
-                .contains(&expr.fun().name())
-            {
+            if !["count", "avg", "min", "max", "sum"].contains(&expr.fun().name()) {
                 return Ok(plan);
             }
             let expr_name = expr.name();
@@ -225,5 +223,69 @@ impl<'n> TreeNodeVisitor<'n> for SortLimitVisitor {
             }
         }
         Ok(TreeNodeRecursion::Continue)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use arrow_schema::{DataType, Field, Schema};
+    use datafusion::{physical_plan::displayable, prelude::SessionConfig};
+
+    use super::*;
+    use crate::datafusion::table_provider::empty_table::NewEmptyTable;
+
+    /// Pins the flag on so a local env override cannot turn the rule off.
+    fn enable_topk() {
+        static ENABLE: std::sync::Once = std::sync::Once::new();
+        ENABLE.call_once(|| {
+            unsafe { std::env::set_var("ZO_AGGREGATION_TOPK_ENABLED", "true") };
+            config::refresh_config().expect("config refresh");
+        });
+    }
+
+    /// Whether the rule inserts `AggregateTopkExec` for `agg(v)` grouped by `name`, sorted
+    /// on the aggregate and limited.
+    async fn inserts_topk(agg: &str) -> bool {
+        enable_topk();
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("name", DataType::Utf8, false),
+            Field::new("v", DataType::Int64, false),
+        ]));
+        let ctx = datafusion::prelude::SessionContext::new_with_config(
+            SessionConfig::new().with_target_partitions(2),
+        );
+        ctx.register_table("t", Arc::new(NewEmptyTable::new("t", schema)))
+            .unwrap();
+        let sql =
+            format!("SELECT name, {agg}(v) AS x FROM t GROUP BY name ORDER BY x DESC LIMIT 10");
+        let plan = ctx
+            .sql(&sql)
+            .await
+            .unwrap()
+            .create_physical_plan()
+            .await
+            .unwrap();
+        let plan = AggregateTopkRule::new(10)
+            .optimize(plan, &ConfigOptions::default())
+            .unwrap();
+        displayable(plan.as_ref())
+            .indent(true)
+            .to_string()
+            .contains("AggregateTopkExec")
+    }
+
+    #[tokio::test]
+    async fn test_topk_keeps_the_supported_aggregates() {
+        for agg in ["count", "avg", "min", "max", "sum"] {
+            assert!(inserts_topk(agg).await, "{agg} must stay eligible");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_topk_skips_approx_distinct() {
+        assert!(
+            !inserts_topk("approx_distinct").await,
+            "approx_distinct must stay on the regular aggregation path"
+        );
     }
 }

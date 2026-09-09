@@ -1755,6 +1755,21 @@ describe("TraceDetails", () => {
       routerPushSpy.mockRestore();
     });
 
+    it("uses real browser back when there's history to pop, instead of the hardcoded traces route", () => {
+      window.history.pushState({ back: "/previous" }, "", "/previous-fake-url");
+      const routerBackSpy = vi.spyOn(router, "back");
+      const routerPushSpy = vi.spyOn(router, "push");
+
+      wrapper.vm.routeToTracesList();
+
+      expect(routerBackSpy).toHaveBeenCalledTimes(1);
+      expect(routerPushSpy).not.toHaveBeenCalled();
+
+      routerBackSpy.mockRestore();
+      routerPushSpy.mockRestore();
+      window.history.replaceState(null, "");
+    });
+
     it("should not navigate when in embedded mode", () => {
       const embeddedWrapper = mount(TraceDetails, {
         attachTo: "#app",

@@ -1,7 +1,7 @@
 name: OpenObserve Metrics Re-sync (fallback)
 
 # Fallback for the LIVE per-run metrics (report_to_openobserve jobs in playwright.yml,
-# api-testing.yml, playwright_regression.yml). Those are the happy path (ingest_source="live").
+# api-testing.yml, playwright_bugfix_regression.yml). Those are the happy path (ingest_source="live").
 # This cron re-posts the last LOOKBACK_DAYS of runs tagged ingest_source="backfill" so any run
 # whose live emit was missed still lands. Dashboards dedup by run_id (latest attempt) and PREFER
 # the live doc, so a backfill row only surfaces when live genuinely missed — making the

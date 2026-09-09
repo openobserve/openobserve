@@ -2238,12 +2238,24 @@ export class LogsPage {
     }
 
     async kubernetesContainerNameJoinLimit() {
-        await this.clearAndFillQueryEditor('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a left join "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name LIMIT 10');
+        // setQueryEditorContent atomically replaces the model; clearAndFillQueryEditor's select-all no-ops under CI load, leaving stale text.
+        await this.setQueryEditorContent('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a left join "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name LIMIT 10');
         await this.waitForEditorValue('LIMIT 10');
+        // waitForEditorValue only confirms searchObj.data.query has flushed — it says
+        // nothing about searchObj.meta.sqlMode, a SEPARATE debounced auto-detect effect
+        // (SearchBar.vue's onQueryEditorUpdate) that can still be mid-flight. A LIMIT
+        // clause is invalid outside SQL mode, so callers that skip an explicit SQL-mode
+        // step (e.g. Streams/streaming.spec.js) would race the backend into rejecting it
+        // with "LIMIT is not supported without SQL mode". Force the real flag here so this
+        // query is deterministically SQL-mode regardless of caller or auto-detect timing.
+        if (!(await this._isSqlModeEnabledViaVue())) {
+            await this._setSqlModeViaVue(true);
+        }
     }
 
     async kubernetesContainerNameJoinLike() {
-        await this.clearAndFillQueryEditor('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a join "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name WHERE a.kubernetes_container_name LIKE \'%ziox%\'');
+        // setQueryEditorContent atomically replaces the model; clearAndFillQueryEditor's select-all no-ops under CI load, leaving stale text.
+        await this.setQueryEditorContent('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a join "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name WHERE a.kubernetes_container_name LIKE \'%ziox%\'');
         await this.waitForEditorValue("LIKE '%ziox%'");
     }
 
@@ -2254,12 +2266,14 @@ export class LogsPage {
     }
 
     async kubernetesContainerNameRightJoin() {
-        await this.clearAndFillQueryEditor('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a RIGHT JOIN "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name');
+        // setQueryEditorContent atomically replaces the model; clearAndFillQueryEditor's select-all no-ops under CI load, leaving the RIGHT JOIN unwritten.
+        await this.setQueryEditorContent('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a RIGHT JOIN "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name');
         await this.waitForEditorValue('RIGHT JOIN');
     }
 
     async kubernetesContainerNameFullJoin() {
-        await this.clearAndFillQueryEditor('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a FULL JOIN "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name');
+        // setQueryEditorContent atomically replaces the model; clearAndFillQueryEditor's select-all no-ops under CI load, leaving the FULL JOIN unwritten.
+        await this.setQueryEditorContent('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a FULL JOIN "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name');
         await this.waitForEditorValue('FULL JOIN');
     }
 
@@ -4767,7 +4781,13 @@ export class LogsPage {
     }
 
     async clickMenuLinkLogsItem() {
-        return await this.clickMenuLinkByType('logs');
+        await this.clickMenuLinkByType('logs');
+        // Sidebar nav is an in-SPA route change; gate on the Search toggle re-mounting before
+        // callers read persisted state. Unlike visualizeToggle, this item has no v-if guard
+        // (zoConfig.timechart_enabled, enterprise, viewport width), so it's present in every
+        // tab mode and every environment — visualizeToggle never renders when timechart_enabled
+        // is off (e.g. alpha1), which left this wait to time out every run.
+        await expect(this.page.locator(this.logsToggle)).toBeVisible({ timeout: 15000 });
     }
 
     async clickMenuLinkTracesItem() {
@@ -7801,6 +7821,18 @@ export class LogsPage {
     }
 
     /**
+     * Read the real searchObj.meta.sqlMode flag via the prod-safe `_vnode` walk.
+     * Unlike isSqlModeEnabled() (a text heuristic on the editor content), this reflects
+     * what the app will actually send as sql_mode on the next search — the app's own
+     * client-side auto-detect (query contains SELECT/FROM) is debounced, so a query typed
+     * programmatically can visibly contain "select"/"from" before searchObj.meta.sqlMode
+     * has actually flipped. Returns null if Vue state could not be located.
+     */
+    async _isSqlModeEnabledViaVue() {
+        return await this._mutateSearchObj((searchObj) => searchObj.meta.sqlMode === true);
+    }
+
+    /**
      * Read `searchObj` via the prod-safe `_vnode` walk and apply `mutate(searchObj)`
      * inside `page.evaluate`. Returns whatever the mutate fn returns (defaults to true
      * on success). Use this instead of `__vueParentComponent` walks anywhere that
@@ -8814,7 +8846,14 @@ export class LogsPage {
      * state access is unavailable.
      */
     async enableSqlModeIfNeeded() {
-        const isSQL = await this.isSqlModeEnabled();
+        // Read the real searchObj.meta.sqlMode flag rather than the editor-text heuristic
+        // (isSqlModeEnabled): when the caller has already typed a full SQL query (e.g. a
+        // join with a LIMIT clause) before calling this, the editor text contains
+        // "select"/"from" immediately, but the app's own auto-detect that flips the real
+        // flag is debounced — so the text-based check reported "already on" while the app
+        // still submitted with sql_mode=false, and the backend rejected the LIMIT clause.
+        // Checking the real flag closes that race instead of gambling on the debounce.
+        const isSQL = await this._isSqlModeEnabledViaVue();
         if (isSQL) {
             testLogger.info('enableSqlModeIfNeeded: SQL mode already on — skipping');
             return;
@@ -10036,6 +10075,27 @@ export class LogsPage {
     }
 
     /**
+     * Expect the Build tab to be the selected tab.
+     * OToggleGroupItem binds $attrs onto Reka's ToggleGroupItem, so data-test and the
+     * data-state it stamps sit on the same element. BuildQueryPage mounts only while
+     * the tab is selected, so both are checked.
+     */
+    async expectBuildTabSelected(timeout = 15000) {
+        await expect(this.page.locator(this.buildToggle)).toHaveAttribute('data-state', 'on', { timeout });
+        await expect(this.page.locator(this.buildQueryPage)).toBeVisible({ timeout });
+        testLogger.info('Build tab is the selected tab');
+    }
+
+    /**
+     * Expect the Logs tab to be the selected tab (BuildQueryPage unmounted).
+     */
+    async expectLogsTabSelected(timeout = 15000) {
+        await expect(this.page.locator(this.logsToggle)).toHaveAttribute('data-state', 'on', { timeout });
+        await expect(this.page.locator(this.buildQueryPage)).toHaveCount(0, { timeout });
+        testLogger.info('Logs tab is the selected tab');
+    }
+
+    /**
      * Expect Builder mode (Auto mode) to be active
      */
     async expectBuilderModeActive(timeout = 15000) {
@@ -10188,10 +10248,12 @@ export class LogsPage {
      * @param {string} chartId - The chart type ID (e.g., 'bar', 'line', 'metric', 'table')
      */
     async selectChartType(chartId) {
-        // Use .first() to handle multiple matching elements (e.g., from cached panels)
-        const chartItem = this.page.locator(this.chartTypeItem(chartId)).first();
+        // The Build and Visualize tabs each mount a PanelEditor, so the chart list is in
+        // the DOM twice; the cached one is zero-size and .first() would resolve to it.
+        const chartItem = this.page.locator(`${this.chartTypeItem(chartId)}:visible`).first();
 
-        // Click the chart item (tests should check visibility before calling this)
+        await chartItem.waitFor({ state: 'visible', timeout: 15000 });
+        await chartItem.scrollIntoViewIfNeeded();
         await chartItem.click();
         await this.page.waitForTimeout(500);
         testLogger.info(`Selected chart type: ${chartId}`);
@@ -10202,8 +10264,8 @@ export class LogsPage {
      * @param {string} chartId - The chart type ID
      */
     async expectChartTypeVisible(chartId) {
-        const chartItem = this.page.locator(this.chartTypeItem(chartId)).first();
-        await expect(chartItem).toBeVisible();
+        const chartItem = this.page.locator(`${this.chartTypeItem(chartId)}:visible`).first();
+        await expect(chartItem).toBeVisible({ timeout: 15000 });
         testLogger.info(`Chart type "${chartId}" is visible`);
     }
 

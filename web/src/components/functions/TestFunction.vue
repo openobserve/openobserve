@@ -29,7 +29,7 @@
             :disabled="!selectedStream.name || !inputQuery || loading.events"
             @click="getResults"
           >
-            <OIcon name="search" size="sm" class="mr-1" />
+            <OIcon name="search" size="sm" class="me-1" />
             {{ t("search.runQuery") }}
           </OButton>
         </template>
@@ -135,7 +135,7 @@
         <template #left>
           <div
             v-if="loading.events"
-            class="text-text-secondary text-compact ml-2 flex items-center font-bold"
+            class="text-text-secondary text-compact ms-2 flex items-center font-bold"
           >
             <OSpinner size="xs" />
             <div class="relative top-0.5">
@@ -163,7 +163,7 @@
             @send-to-ai-chat="sendToAiChat(JSON.stringify(inputEvents))"
             imageHeight="24"
             imageWidth="24"
-            :class="'mr-4 px-2'"
+            :class="'me-4 px-2'"
             style="
               width: 2rem !important;
               height: 2rem !important;
@@ -202,7 +202,7 @@
         <template #left>
           <div
             v-if="loading.output"
-            class="text-text-secondary text-compact ml-2 flex items-center text-sm font-bold font-medium"
+            class="text-text-secondary text-compact ms-2 flex items-center text-sm font-bold font-medium"
           >
             <OSpinner size="xs" />
             <div class="relative top-0.5">

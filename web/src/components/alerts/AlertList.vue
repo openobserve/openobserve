@@ -60,7 +60,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="alert-list-add-alert-btn"
           variant="primary"
           size="sm"
-          icon-left="add"
           :disabled="!destinations.length || !templates.length"
           :title="!destinations.length ? t('alerts.noDestinations') : ''"
           @click="
@@ -92,6 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Alert List Table (shows all alert types including anomaly detection rows) -->
             <OTable
               class="min-h-0 flex-1"
+              ref="oTableRef"
               :frame="false"
               v-model:selected-ids="selectedAlertIds"
               selection="multiple"
@@ -104,6 +104,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               pagination="client"
               :page-size="pageSize"
               :page-size-options="pageSizeOptions"
+              :current-page="currentPage"
+              @update:current-page="onPageChange"
               width="100%"
               :show-global-filter="false"
               :default-columns="false"
@@ -171,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <OToggleGroup
                           :model-value="searchAcrossFolders ? 'all' : 'this'"
                           type="single"
-                          class="mr-1 self-center"
+                          class="me-1 self-center"
                           @update:model-value="(v) => (searchAcrossFolders = v === 'all')"
                         >
                           <OToggleGroupItem
@@ -493,7 +495,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="alert-list-loading-alert"
                     v-if="alertStateLoadingMap[row.uuid]"
                     style="display: inline-block; width: 2.07125rem; height: auto"
-                    class="ml-1 flex items-center justify-center"
+                    class="ms-1 flex items-center justify-center"
                     :title="row.enabled ? t('common.turningOff') : t('common.turningOn')"
                   >
                     <OSpinner size="xs" />
@@ -502,7 +504,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-else
                     :data-row-action="row.enabled ? 'pause' : 'resume'"
                     :data-test="`alert-list-${row.name}-pause-start-alert`"
-                    class="ml-1"
+                    class="ms-1"
                     :variant="row.enabled ? 'ghost-destructive' : 'ghost-success'"
                     size="icon-sm"
                     :icon-left="row.enabled ? 'pause' : 'play-arrow'"
@@ -1052,6 +1054,18 @@ export default defineComponent({
     // Start in the loading state so the table shows the skeleton on first
     // render instead of briefly flashing the empty state before the fetch.
     const loading = ref(true);
+    const oTableRef: any = ref(null);
+    // The first real load lands after mount and races TanStack's own auto-reset-on-data-change, which resolves through its own deferred microtask queue — setTimeout(0) runs strictly after that queue drains, so the restored page reliably wins.
+    watch(
+      loading,
+      (isLoading) => {
+        if (isLoading) return;
+        setTimeout(() => {
+          oTableRef.value?.table?.setPageIndex(currentPage.value - 1);
+        }, 0);
+      },
+      { once: true },
+    );
     const isSubmitting = ref(false);
 
     // Compact toolbar: icon-only buttons when AI sidebar is open at narrow widths
@@ -2340,6 +2354,11 @@ export default defineComponent({
     };
     const pageSize = ref<number>(savedAlertListFilters.perPage || 20);
     const pageSizeOptions = [20, 50, 100, 250, 500];
+    // Restored the same way as pageSize above, so returning from add/edit/detail lands back on the page the user was viewing instead of resetting to page 1.
+    const currentPage = ref<number>(savedAlertListFilters.currentPage || 1);
+    const onPageChange = (page: number) => {
+      currentPage.value = page;
+    };
     const resultTotal = computed(function () {
       return displayedAlerts.value?.length;
     });
@@ -2535,9 +2554,18 @@ export default defineComponent({
     };
     const hideForm = async () => {
       showAddAlertDialog.value = false;
+      // Drop the form-specific params the editor pushed, keep the rest (page included).
+      const {
+        action: _action,
+        alert_id: _alertId,
+        name: _name,
+        alert_type: _alertType,
+        ...rest
+      } = router.currentRoute.value.query;
       await router.push({
         name: "alertList",
         query: {
+          ...rest,
           org_identifier: store.state.selectedOrganization.identifier,
           folder: activeFolderId.value,
           tab: activeTab.value,
@@ -2729,6 +2757,7 @@ export default defineComponent({
       router.push({
         name: "alertList",
         query: {
+          ...router.currentRoute.value.query,
           action: "import",
           org_identifier: store.state.selectedOrganization.identifier,
           folder: activeFolderId.value,
@@ -3048,12 +3077,13 @@ export default defineComponent({
       }
     });
     // Persist filter state to Vuex so it survives navigation to add/edit screens
-    watch([searchQuery, filterQuery, searchAcrossFolders, pageSize], () => {
+    watch([searchQuery, filterQuery, searchAcrossFolders, pageSize, currentPage], () => {
       store.commit("setAlertListFilters", {
         searchQuery: searchQuery.value || "",
         filterQuery: filterQuery.value || "",
         searchAcrossFolders: !!searchAcrossFolders.value,
         perPage: pageSize.value,
+        currentPage: currentPage.value,
       });
     });
     watch(activeTab, async (newVal) => {
@@ -3451,6 +3481,9 @@ export default defineComponent({
       refreshList,
       pageSize,
       pageSizeOptions,
+      currentPage,
+      onPageChange,
+      oTableRef,
       addAlert,
       isUpdated,
       showAddUpdateFn,
