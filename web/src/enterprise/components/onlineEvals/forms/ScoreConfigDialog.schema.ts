@@ -75,14 +75,16 @@ export const makeScoreConfigSchema = (
       // Save behind an invisible field (clear min on numeric → switch to
       // categorical → Save silently no-ops). Gate the check on dataType.
       if (val.dataType !== "numeric") return;
-      if (isBlankNumber(val.min)) {
+      const minIsBlank = isBlankNumber(val.min);
+      const maxIsBlank = isBlankNumber(val.max);
+      if (minIsBlank) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["min"],
           message: t("onlineEvals.scoreConfig.validation.minRequired"),
         });
       }
-      if (isBlankNumber(val.max)) {
+      if (maxIsBlank) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["max"],
