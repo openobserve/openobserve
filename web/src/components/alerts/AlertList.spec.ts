@@ -1084,7 +1084,10 @@ describe("AlertList - micro validations", () => {
   it("importAlert sets dialog and pushes route, preserving the rest of the query", async () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);
-    wrapper.vm.router.currentRoute.value.query = { ...wrapper.vm.router.currentRoute.value.query, page: "3" };
+    wrapper.vm.router.currentRoute.value.query = {
+      ...wrapper.vm.router.currentRoute.value.query,
+      page: "3",
+    };
     const spy = vi.spyOn(router, "push");
     wrapper.vm.importAlert();
     await flushPromises();
