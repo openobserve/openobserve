@@ -126,6 +126,46 @@ describe("llm-experiments compare()", () => {
 });
 
 describe("get() slot status", () => {
+  it("normalizes task and score outcome breakdowns", async () => {
+    mockClient.get.mockResolvedValue({
+      data: {
+        experiment: {
+          id: "exp-1",
+          task_outcomes: { total: 2, succeeded: 1, failed: 1, pending: 0, skipped: 0 },
+          score_outcomes: {
+            completed: 1,
+            total: 2,
+            scored: 1,
+            failed: 0,
+            pending: 0,
+            skipped: 0,
+            unscored: 1,
+          },
+        },
+        results: {},
+      },
+    });
+
+    const detail = await llmExperimentsService.get("acme", "exp-1");
+
+    expect(detail.results.taskOutcomes).toEqual({
+      total: 2,
+      succeeded: 1,
+      failed: 1,
+      pending: 0,
+      skipped: 0,
+    });
+    expect(detail.results.scoreOutcomes).toEqual({
+      completed: 1,
+      total: 2,
+      scored: 1,
+      failed: 0,
+      pending: 0,
+      skipped: 0,
+      unscored: 1,
+    });
+  });
+
   it.each([
     { total_cost: 0.1182, task_cost: 0.0406, scoring_cost: 0.0776, cost_incomplete: true },
     { totalCost: 0.1182, taskCost: 0.0406, scoringCost: 0.0776, costIncomplete: true },
@@ -193,6 +233,16 @@ describe("listRows()", () => {
             input: "question",
             trial_count: 3,
             status: "completed",
+            task_outcomes: { total: 3, succeeded: 2, failed: 1, pending: 0, skipped: 0 },
+            score_outcomes: {
+              completed: 2,
+              total: 3,
+              scored: 2,
+              failed: 0,
+              pending: 0,
+              skipped: 0,
+              unscored: 1,
+            },
             p50_latency_ms: 840,
             score_summaries: [
               {
@@ -233,6 +283,16 @@ describe("listRows()", () => {
       rowIndex: 4,
       rowId: "row-4",
       trialCount: 3,
+      taskOutcomes: { total: 3, succeeded: 2, failed: 1, pending: 0, skipped: 0 },
+      scoreOutcomes: {
+        completed: 2,
+        total: 3,
+        scored: 2,
+        failed: 0,
+        pending: 0,
+        skipped: 0,
+        unscored: 1,
+      },
       p50LatencyMs: 840,
       scoreSummaries: [{ scoreConfigName: "answer_quality" }],
       dispersion: { maxNormalized: 0.42, high: true },

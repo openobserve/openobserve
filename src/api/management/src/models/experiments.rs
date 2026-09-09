@@ -32,8 +32,9 @@ use openobserve_core::llm_evaluations::{
         results::{
             ExperimentAggregateSummary, ExperimentClientScoreSummary, ExperimentProgress,
             ExperimentResultScore, ExperimentResultScoreStatus, ExperimentResultSlot,
-            ExperimentResultTaskStatus, ExperimentScoreSummary, ExperimentSkipSummary,
-            ExperimentSlotStatus, ExperimentSummaryStatus, ScoringStatus,
+            ExperimentResultTaskStatus, ExperimentScoreOutcomes, ExperimentScoreSummary,
+            ExperimentSkipSummary, ExperimentSlotStatus, ExperimentSummaryStatus,
+            ExperimentTaskOutcomes, ScoringStatus,
         },
     },
 };
@@ -71,6 +72,8 @@ pub struct ExperimentResultRowBody {
     pub expected_output: Option<Value>,
     pub trial_count: usize,
     pub status: ExperimentSlotStatusBody,
+    pub task_outcomes: ExperimentTaskOutcomesBody,
+    pub score_outcomes: ExperimentScoreOutcomesBody,
     /// Present only for a single-trial row; multi-trial outputs belong in drill-down.
     pub output: Option<Value>,
     pub score_summaries: Vec<ExperimentScoreSummaryBody>,
@@ -135,6 +138,8 @@ pub struct ExperimentSummaryResponseBody {
     pub scoring_status: Option<ScoringStatus>,
     pub execution_progress: Option<ExperimentProgressBody>,
     pub scoring_progress: Option<ExperimentProgressBody>,
+    pub task_outcomes: Option<ExperimentTaskOutcomesBody>,
+    pub score_outcomes: Option<ExperimentScoreOutcomesBody>,
     pub score_summaries: Option<Vec<ExperimentScoreSummaryBody>>,
     pub aggregate_summary: Option<ExperimentAggregateSummaryBody>,
 }
@@ -1243,6 +1248,28 @@ pub struct ExperimentProgressBody {
 
 #[derive(Clone, Debug, Default, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
+pub struct ExperimentTaskOutcomesBody {
+    pub total: u64,
+    pub succeeded: u64,
+    pub failed: u64,
+    pub pending: u64,
+    pub skipped: u64,
+}
+
+#[derive(Clone, Debug, Default, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ExperimentScoreOutcomesBody {
+    pub completed: u64,
+    pub total: u64,
+    pub scored: u64,
+    pub failed: u64,
+    pub pending: u64,
+    pub skipped: u64,
+    pub unscored: u64,
+}
+
+#[derive(Clone, Debug, Default, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct ExperimentSkipSummaryBody {
     pub fully_skipped_slots: u64,
     pub partially_skipped_slots: u64,
@@ -1381,6 +1408,32 @@ impl From<ExperimentProgress> for ExperimentProgressBody {
             completed: value.completed,
             total: value.total,
             skipped: value.skipped,
+        }
+    }
+}
+
+impl From<ExperimentTaskOutcomes> for ExperimentTaskOutcomesBody {
+    fn from(value: ExperimentTaskOutcomes) -> Self {
+        Self {
+            total: value.total,
+            succeeded: value.succeeded,
+            failed: value.failed,
+            pending: value.pending,
+            skipped: value.skipped,
+        }
+    }
+}
+
+impl From<ExperimentScoreOutcomes> for ExperimentScoreOutcomesBody {
+    fn from(value: ExperimentScoreOutcomes) -> Self {
+        Self {
+            completed: value.completed,
+            total: value.total,
+            scored: value.scored,
+            failed: value.failed,
+            pending: value.pending,
+            skipped: value.skipped,
+            unscored: value.unscored,
         }
     }
 }
@@ -1705,6 +1758,8 @@ mod tests {
             "scoringStatus",
             "executionProgress",
             "scoringProgress",
+            "taskOutcomes",
+            "scoreOutcomes",
             "scoreSummaries",
             "aggregateSummary",
         ];
@@ -1728,6 +1783,8 @@ mod tests {
                 scoring_status: None,
                 execution_progress: None,
                 scoring_progress: None,
+                task_outcomes: None,
+                score_outcomes: None,
                 score_summaries: None,
                 aggregate_summary: None,
             }),

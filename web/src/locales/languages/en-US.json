@@ -10979,6 +10979,10 @@
         "runSummary": "{trials} · {scorers}",
         "progress": "Task Progress",
         "scoring": "Scoring",
+        "tasks": "Tasks",
+        "scores": "Scores",
+        "taskDistribution": "{succeeded} succeeded · {failed} failed · {pending} pending · {skipped} skipped",
+        "scoreOutcomeDistribution": "{scored} scored · {failed} failed · {pending} pending · {skipped} skipped · {unscored} unscored",
         "scoringDistribution": "{success} successful · {failed} failed · {pending} pending · {skipped} skipped",
         "compare": "Compare",
         "comparePicker": {
