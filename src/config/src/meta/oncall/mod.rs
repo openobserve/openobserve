@@ -38,9 +38,9 @@ pub mod team;
 pub use agent::{
     AnalysisState, AnalysisStatus, AnalysisVerdict, Confidence, GatePlan, L0Error, L0Metric,
     L0Mode, L0Modes, L0Policy, PageAction, PageRecommendation, ParsedReport, ProposedAction,
-    SeverityDecision, VerdictOutcome, analysis_status_for_start, apply_verdict, first_page_at,
-    gate_plan, metrics_for, parse_report, promotion_note, quieter_channels, ratchet,
-    severity_pages, update_channels, verdict_lines,
+    SeverityDecision, VerdictOutcome, analysis_status_for_start, apply_verdict, gate_plan,
+    metrics_for, parse_report, promotion_note, quieter_channels, ratchet, severity_pages,
+    update_channels, verdict_lines,
 };
 pub use contact::{Contact, ContactError, normalize_phone};
 pub use policy::{
@@ -58,9 +58,8 @@ pub use preset::{
 };
 pub use response::{
     DEFAULT_FLAP_DAMPENING_SECS, FIRST_LADDER_RUN, NoBlastRadius, PageDecision, ResolutionCause,
-    ResponderRole, Response, ResponseError, ResponseEvent, ResponseEventKind, ResponseState,
-    UpstreamRecovery, dependents_all_clear, flap_note, next_ladder_run, page_decision,
-    upstream_recovery,
+    ResponderRole, Response, ResponseEvent, ResponseEventKind, ResponseState, UpstreamRecovery,
+    dependents_all_clear, flap_note, next_ladder_run, page_decision, upstream_recovery,
 };
 pub use rotation::{
     AwayShift, CoverageSegment, DEFAULT_ROTATION_NAME, DEFAULT_SHIFT_RULE_NAME, GridError,

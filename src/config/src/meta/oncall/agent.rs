@@ -817,76 +817,6 @@ pub fn apply_verdict(
     }
 }
 
-/// When level 1 dispatches for this firing, or `None` if it never pages.
-///
-/// The timing invariant in one function. `analysis_status` is the status **at
-/// the firing** — what the start-time guards decided ([`analysis_status_for_start`])
-/// — and `verdict` is the verdict and the instant it landed, or `None` if none
-/// ever did. An investigation that starts and then fails mid-hold is
-/// [`apply_verdict`]'s question, not this one: this answers "given how the
-/// firing entered the ladder and when the answer came, when was somebody
-/// woken".
-///
-/// Two things it must satisfy, for every input: at P1 the answer is `fired_at`,
-/// and at a gated severity the answer is never later than
-/// `fired_at + triage_budget`.
-///
-/// A `Complete` status with no verdict is the malformed-block case and reads as
-/// `Failed`: the run finished and produced nothing the ladder can use.
-pub fn first_page_at(
-    l0: &L0Policy,
-    priority: AlertPriority,
-    fired_at: i64,
-    analysis_status: AnalysisStatus,
-    verdict: Option<(&AnalysisVerdict, i64)>,
-) -> Option<i64> {
-    let decision = ratchet(
-        priority,
-        verdict.and_then(|(v, _)| v.page_recommendation.severity_suggestion),
-        l0,
-    );
-    let promoted = matches!(decision, SeverityDecision::Promoted { .. });
-
-    match l0.mode_for(priority) {
-        // Nobody is paged at this severity. The only way anybody is woken is
-        // the firing ceasing to be a P4 — and then it is woken when the verdict
-        // that said so landed.
-        L0Mode::Only => match verdict {
-            Some((_, at)) if promoted && severity_pages(decision.applied()) => Some(at),
-            _ => None,
-        },
-        // The P1 invariant, and the teams that bought it at P2/P3: level 1
-        // dispatches inline at t=0 and no verdict, however late or however
-        // emphatic, moves it.
-        L0Mode::Parallel => Some(fired_at),
-        L0Mode::Gate => {
-            let deadline = fired_at + l0.triage_budget_micros();
-            let Some((verdict, at)) = verdict else {
-                // A run that is not going to answer is not held for one.
-                return Some(if analysis_status.may_still_answer() {
-                    deadline
-                } else {
-                    fired_at
-                });
-            };
-            if at >= deadline {
-                // The hold expired first; a late verdict cannot move the page
-                // it missed.
-                return Some(deadline);
-            }
-            if promoted {
-                return Some(at);
-            }
-            // The one branch that cuts a page, and only for a team that asked
-            // for it. Everything else ends the hold and pages now.
-            match verdict.page_recommendation.action {
-                PageAction::Suppress if l0.allow_suppress => None,
-                _ => Some(at),
-            }
-        }
-    }
-}
-
 /// Whether a severity pages a human at all under §1's table.
 ///
 /// L0's own table, not the escalation policy's ladder: a team whose policy
@@ -1327,6 +1257,15 @@ mod tests {
         }
     }
 
+    /// [`shipped`] with every opt-in turned on, so a test that means to
+    /// exercise a branch is not silently prevented from reaching it by a knob.
+    fn everything_enabled() -> L0Policy {
+        L0Policy {
+            allow_suppress: true,
+            ..shipped()
+        }
+    }
+
     fn verdict(action: PageAction, suggestion: Option<AlertPriority>) -> AnalysisVerdict {
         AnalysisVerdict {
             probable_cause: "fd leak introduced by querier v0.14.2".into(),
@@ -1445,10 +1384,6 @@ mod tests {
                 gate_plan(&p, P1, &pending(FIRED_AT), FIRED_AT),
                 GatePlan::Parallel
             );
-            assert_eq!(
-                first_page_at(&p, P1, FIRED_AT, AnalysisStatus::Pending, None),
-                Some(FIRED_AT)
-            );
         }
         assert!(
             L0Error::P1MustBeParallel(L0Mode::Gate)
@@ -1498,38 +1433,6 @@ mod tests {
         );
     }
 
-    /// A row that got past validation — replication, a migration, a hand-edit —
-    /// must not be able to produce an unbounded hold. An unbounded hold is a
-    /// page that never happens, which is the worst outcome this system has.
-    #[test]
-    fn test_a_budget_outside_the_bound_is_clamped_when_it_is_read() {
-        let cases = [
-            (90_i64, 90 * SECOND),
-            (
-                MIN_TRIAGE_BUDGET_SECONDS,
-                MIN_TRIAGE_BUDGET_SECONDS * SECOND,
-            ),
-            (
-                MAX_TRIAGE_BUDGET_SECONDS,
-                MAX_TRIAGE_BUDGET_SECONDS * SECOND,
-            ),
-            (0, MIN_TRIAGE_BUDGET_SECONDS * SECOND),
-            (-1, MIN_TRIAGE_BUDGET_SECONDS * SECOND),
-            (i64::MIN, MIN_TRIAGE_BUDGET_SECONDS * SECOND),
-            (100_000, MAX_TRIAGE_BUDGET_SECONDS * SECOND),
-            (i64::MAX, MAX_TRIAGE_BUDGET_SECONDS * SECOND),
-        ];
-        for (stored, want) in cases {
-            let mut p = shipped();
-            p.triage_budget_seconds = stored;
-            assert_eq!(
-                p.triage_budget_micros(),
-                want,
-                "a stored budget of {stored}s must read back as {want}us"
-            );
-        }
-    }
-
     /// `only` means "nobody is ever paged at this severity", which is a
     /// statement about P4 and P5 and nothing else. A stored `only` on a paging
     /// severity would silence it permanently, so it is read as the safest thing
@@ -1549,11 +1452,6 @@ mod tests {
         );
         for pr in [P1, P2, P3] {
             assert_eq!(p.mode_for(pr), L0Mode::Parallel, "{pr} still has to page");
-            assert_eq!(
-                first_page_at(&p, pr, FIRED_AT, AnalysisStatus::Pending, None),
-                Some(FIRED_AT),
-                "{pr} must not be silenced by a mode that does not apply to it"
-            );
         }
         for pr in [P4, P5] {
             assert_eq!(p.mode_for(pr), L0Mode::Only);
@@ -1602,11 +1500,6 @@ mod tests {
                 assert!(
                     !gate_plan(&p, pr, &pending(FIRED_AT), FIRED_AT).inserts_a_trigger_row(),
                     "{pr}"
-                );
-                assert_eq!(
-                    first_page_at(&p, pr, FIRED_AT, AnalysisStatus::Pending, None),
-                    None,
-                    "{pr} woke somebody"
                 );
             }
         }
@@ -1912,43 +1805,6 @@ mod tests {
         }
     }
 
-    /// §4's own worked sentence: "P3 → P1 is allowed; P4 → P1 is clamped to P2
-    /// and logged." Both levels have to survive into the decision so the
-    /// timeline can show what the agent asked for beside what it got.
-    #[test]
-    fn test_p3_to_p1_is_allowed_and_p4_to_p1_is_clamped_to_p2() {
-        let p = shipped();
-        assert_eq!(
-            ratchet(P3, Some(P1), &p),
-            SeverityDecision::Promoted {
-                from: P3,
-                to: P1,
-                requested: P1
-            },
-            "two rungs is exactly the bound, not one past it"
-        );
-        assert_eq!(
-            ratchet(P4, Some(P1), &p),
-            SeverityDecision::Promoted {
-                from: P4,
-                to: P2,
-                requested: P1
-            },
-            "clamped to the bound and applied, with the request kept"
-        );
-        assert_eq!(
-            ratchet(P5, Some(P1), &p),
-            SeverityDecision::Promoted {
-                from: P5,
-                to: P3,
-                requested: P1
-            }
-        );
-        // A clamp is not a demotion attempt: it must not move the counter that
-        // is supposed to read ~0 and mean "prompt regression".
-        assert!(!ratchet(P4, Some(P1), &p).was_demotion_attempt());
-    }
-
     /// The bound is a **number**, not a switch between "none" and "the
     /// default". Pinned only at 0 and 2, `let bound = if steps == 0 { 0 } else { 2 }`
     /// passes everything — and a team that narrowed its blast radius to one
@@ -1999,6 +1855,12 @@ mod tests {
                     requested
                 },
                 "bound {steps}: {current} asked to become {requested}"
+            );
+            // A clamp is not a demotion attempt: it must not move the counter
+            // that is supposed to read ~0 and mean "prompt regression".
+            assert!(
+                !ratchet(current, Some(requested), &p).was_demotion_attempt(),
+                "bound {steps}: {current} → {requested} was counted as a demotion"
             );
         }
         // The bound never invents a promotion that was not asked for.
@@ -2188,25 +2050,7 @@ mod tests {
                 gate_plan(&p, pr, &pending(FIRED_AT), FIRED_AT),
                 GatePlan::Parallel
             );
-            assert_eq!(
-                first_page_at(&p, pr, FIRED_AT, AnalysisStatus::Pending, None),
-                Some(FIRED_AT),
-                "{pr} in parallel mode pages at t=0"
-            );
         }
-        // And loses the suppression branch: the page has already gone out.
-        let v = verdict(PageAction::Suppress, None);
-        assert_eq!(
-            first_page_at(
-                &p,
-                P2,
-                FIRED_AT,
-                AnalysisStatus::Complete,
-                Some((&v, FIRED_AT + SECOND))
-            ),
-            Some(FIRED_AT),
-            "a Suppress verdict cannot un-send a page that already went"
-        );
     }
 
     /// §6, first row. Paging never waits for a dead agent: the gate is bypassed
@@ -2220,11 +2064,6 @@ mod tests {
                     gate_plan(&p, pr, &dead(status, FIRED_AT), FIRED_AT),
                     GatePlan::Parallel,
                     "{pr} with analysis {status:?} must not be held"
-                );
-                assert_eq!(
-                    first_page_at(&p, pr, FIRED_AT, status, None),
-                    Some(FIRED_AT),
-                    "{pr} with analysis {status:?} pages exactly as it does today"
                 );
             }
             for pr in [P4, P5] {
@@ -2246,8 +2085,8 @@ mod tests {
     /// replication, a migration, or a hand-edit — produces a `fire_at` that
     /// overflows or sits past any clock the process will ever see, and the
     /// TRIAGE row never fires. Nobody is paged, ever, and nothing logs an
-    /// error. The clamp is asserted on the accessor elsewhere; this asserts it
-    /// on the path that wakes somebody.
+    /// error. So the clamp is asserted here, on the path that wakes somebody,
+    /// rather than on the accessor.
     #[test]
     fn test_the_configured_triage_budget_is_the_one_that_gates() {
         // (stored seconds, the hold it must actually produce)
@@ -2290,11 +2129,6 @@ mod tests {
                     "{pr}: a stored budget of {stored}s must hold for {hold}us"
                 );
                 assert_eq!(
-                    first_page_at(&p, pr, FIRED_AT, AnalysisStatus::Pending, None),
-                    Some(deadline),
-                    "{pr}: a stored budget of {stored}s must page at {deadline}"
-                );
-                assert_eq!(
                     apply_verdict(&p, &pending(FIRED_AT), pr, deadline - 1),
                     VerdictOutcome::Hold { until: deadline },
                     "{pr}: {stored}s — still holding one microsecond short"
@@ -2314,19 +2148,22 @@ mod tests {
                     deadline - FIRED_AT
                 );
             }
-            // And a verdict inside the configured hold still ends it early.
-            let v = verdict(PageAction::Page, None);
+            // And a verdict inside the configured hold still ends it early —
+            // the budget is a ceiling on every team's hold, not its length.
             let early = FIRED_AT + hold / 2;
             assert_eq!(
-                first_page_at(
+                apply_verdict(
                     &p,
+                    &complete(FIRED_AT, early, verdict(PageAction::Page, None)),
                     P2,
-                    FIRED_AT,
-                    AnalysisStatus::Complete,
-                    Some((&v, early))
+                    early
                 ),
-                Some(early),
-                "{stored}s: a verdict inside the hold ends it"
+                VerdictOutcome::Page {
+                    severity: P2,
+                    promoted_from: None,
+                    quieter_channels: false
+                },
+                "{stored}s: a verdict inside the hold did not end it"
             );
         }
 
@@ -2401,246 +2238,6 @@ mod tests {
     // §1 — timing. The invariant that "is not a setting".
     // -----------------------------------------------------------------
 
-    /// The P1 invariant, measured. Level 1 dispatches at t=0 for every verdict
-    /// arrival time — including one ten minutes late, which is longer than the
-    /// entire budget — for every action the agent can recommend, including a
-    /// Suppress from a team that opted in, and for every analysis status.
-    ///
-    /// This is the one failure mode that would end the programme: a critical
-    /// page a model delayed.
-    #[test]
-    fn test_p1_dispatch_time_does_not_move_when_the_agent_is_ten_minutes_late() {
-        // Suppression and promotion both enabled, so nothing here is prevented
-        // by a knob rather than by the invariant.
-        let p = raw(
-            L0Mode::Parallel,
-            L0Mode::Gate,
-            L0Mode::Gate,
-            L0Mode::Only,
-            90,
-            true,
-            2,
-            true,
-            true,
-        );
-        let delays = [
-            0,
-            SECOND,
-            89 * SECOND,
-            90 * SECOND,
-            91 * SECOND,
-            600 * SECOND,
-        ];
-        for action in PageAction::ALL {
-            for suggestion in [None, Some(P1)] {
-                let v = verdict(action, suggestion);
-                for delay in delays {
-                    assert_eq!(
-                        first_page_at(
-                            &p,
-                            P1,
-                            FIRED_AT,
-                            AnalysisStatus::Complete,
-                            Some((&v, FIRED_AT + delay))
-                        ),
-                        Some(FIRED_AT),
-                        "P1 with a {action} verdict {delay}us late did not page at t=0"
-                    );
-                }
-            }
-        }
-        for status in AnalysisStatus::ALL {
-            assert_eq!(
-                first_page_at(&p, P1, FIRED_AT, status, None),
-                Some(FIRED_AT),
-                "P1 with analysis {status:?} and no verdict did not page at t=0"
-            );
-        }
-    }
-
-    /// The gate's ceiling, over every input that can reach it. The hold cannot
-    /// make a page late: whenever a gated firing pages at all, it pages within
-    /// the triage budget of the firing.
-    #[test]
-    fn test_a_gated_page_fires_at_most_the_triage_budget_after_the_firing() {
-        let budget = 90 * SECOND;
-        for allow_suppress in [true, false] {
-            let p = raw(
-                L0Mode::Parallel,
-                L0Mode::Gate,
-                L0Mode::Gate,
-                L0Mode::Only,
-                90,
-                true,
-                2,
-                true,
-                allow_suppress,
-            );
-            for pr in [P2, P3] {
-                for action in PageAction::ALL {
-                    for suggestion in [None, Some(P1), Some(P2), Some(P5)] {
-                        let v = verdict(action, suggestion);
-                        let arrivals = [
-                            None,
-                            Some(FIRED_AT),
-                            Some(FIRED_AT + SECOND),
-                            Some(FIRED_AT + budget - 1),
-                            Some(FIRED_AT + budget),
-                            Some(FIRED_AT + budget + 1),
-                            Some(FIRED_AT + 10 * 60 * SECOND),
-                        ];
-                        for at in arrivals {
-                            let status = if at.is_some() {
-                                AnalysisStatus::Complete
-                            } else {
-                                AnalysisStatus::Pending
-                            };
-                            let arg = at.map(|t| (&v, t));
-                            let got = first_page_at(&p, pr, FIRED_AT, status, arg);
-                            // The only way a gated firing pages nobody is a
-                            // Suppress the team opted into, landing inside the
-                            // hold, on a verdict that did not also promote.
-                            // Anything else must produce a page — otherwise
-                            // "at most the budget" is satisfied by silence.
-                            let suppressible = allow_suppress
-                                && action == PageAction::Suppress
-                                && suggestion.is_none_or(|s| !s.is_more_urgent_than(pr))
-                                && at.is_some_and(|t| t < FIRED_AT + budget);
-                            if !suppressible {
-                                assert!(
-                                    got.is_some(),
-                                    "{pr}/{action}, verdict at {at:?}, suggestion {suggestion:?}, suppress={allow_suppress}: nobody was paged at all"
-                                );
-                            }
-                            if let Some(page_at) = got {
-                                assert!(page_at >= FIRED_AT, "{pr}/{action} paged before it fired");
-                                assert!(
-                                    page_at - FIRED_AT <= budget,
-                                    "{pr}/{action}, verdict at {at:?}, suggestion {suggestion:?}: paged {}us after the firing, past the {budget}us budget",
-                                    page_at - FIRED_AT
-                                );
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    /// "90s is a ceiling, not a wait." A verdict that lands in four seconds
-    /// ends the hold in four seconds — that is the whole of §10.3, and a gate
-    /// that always waited the full budget would make L0 a latency tax rather
-    /// than a latency saving.
-    #[test]
-    fn test_a_verdict_ends_the_hold_the_moment_it_lands() {
-        let p = shipped();
-        let v = verdict(PageAction::Page, None);
-        for pr in [P2, P3] {
-            for at in [FIRED_AT, FIRED_AT + 4 * SECOND, FIRED_AT + 89 * SECOND] {
-                assert_eq!(
-                    first_page_at(&p, pr, FIRED_AT, AnalysisStatus::Complete, Some((&v, at))),
-                    Some(at),
-                    "{pr}: a verdict at {at} did not end the hold"
-                );
-            }
-        }
-        // A Downgrade ends the hold too. It is still a page — quieter channels,
-        // same instant — and treating it as "not a Page" is how a firing the
-        // agent answered in four seconds waits the full budget anyway.
-        let quiet = verdict(PageAction::Downgrade, None);
-        for allow_downgrade in [true, false] {
-            let p = raw(
-                L0Mode::Parallel,
-                L0Mode::Gate,
-                L0Mode::Gate,
-                L0Mode::Only,
-                90,
-                true,
-                2,
-                allow_downgrade,
-                false,
-            );
-            for pr in [P2, P3] {
-                assert_eq!(
-                    first_page_at(
-                        &p,
-                        pr,
-                        FIRED_AT,
-                        AnalysisStatus::Complete,
-                        Some((&quiet, FIRED_AT + 4 * SECOND))
-                    ),
-                    Some(FIRED_AT + 4 * SECOND),
-                    "{pr}: a downgrade with allow_downgrade={allow_downgrade} did not end the hold"
-                );
-            }
-        }
-        // And a Suppress a team has not opted into ends it as well: the
-        // recommendation is refused, so the page it was trying to stop happens
-        // now rather than at the budget.
-        let hushed = verdict(PageAction::Suppress, None);
-        assert_eq!(
-            first_page_at(
-                &p,
-                P3,
-                FIRED_AT,
-                AnalysisStatus::Complete,
-                Some((&hushed, FIRED_AT + 4 * SECOND))
-            ),
-            Some(FIRED_AT + 4 * SECOND)
-        );
-    }
-
-    /// The three integration cases §9 names, at the boundary. The deadline
-    /// itself belongs to the hold expiring, not to the verdict: a verdict that
-    /// lands at exactly `fired_at + budget` is racing a page that has already
-    /// been decided, and the page wins.
-    #[test]
-    fn test_a_verdict_after_the_hold_expires_does_not_delay_the_page() {
-        let p = shipped();
-        let deadline = FIRED_AT + 90 * SECOND;
-        let v = verdict(PageAction::Page, None);
-        for pr in [P2, P3] {
-            assert_eq!(
-                first_page_at(
-                    &p,
-                    pr,
-                    FIRED_AT,
-                    AnalysisStatus::Complete,
-                    Some((&v, deadline - 1))
-                ),
-                Some(deadline - 1),
-                "{pr}: a verdict one microsecond early still ends the hold early"
-            );
-            assert_eq!(
-                first_page_at(
-                    &p,
-                    pr,
-                    FIRED_AT,
-                    AnalysisStatus::Complete,
-                    Some((&v, deadline))
-                ),
-                Some(deadline),
-                "{pr}: at the deadline the page has already gone"
-            );
-            assert_eq!(
-                first_page_at(
-                    &p,
-                    pr,
-                    FIRED_AT,
-                    AnalysisStatus::Complete,
-                    Some((&v, deadline + 60 * SECOND))
-                ),
-                Some(deadline),
-                "{pr}: a late verdict must not move the page it missed"
-            );
-            assert_eq!(
-                first_page_at(&p, pr, FIRED_AT, AnalysisStatus::Pending, None),
-                Some(deadline),
-                "{pr}: no verdict at all pages at the budget"
-            );
-        }
-    }
-
     /// §7 of the required list: a P4 or P5 records its verdict, ends in
     /// `triaged`, and never inserts a trigger row or wakes anybody — for every
     /// action, including a `Page` recommendation. The agent cannot page a P4 by
@@ -2668,11 +2265,6 @@ mod tests {
                         GatePlan::L0Only,
                         "{pr}/{action} must insert no trigger row"
                     );
-                    assert_eq!(
-                        first_page_at(&p, pr, FIRED_AT, AnalysisStatus::Complete, Some((&v, at))),
-                        None,
-                        "{pr}/{action} paged somebody"
-                    );
                     let outcome = apply_verdict(&p, &complete(FIRED_AT, at, v.clone()), pr, at);
                     assert!(!outcome.pages_anyone(), "{pr}/{action} gave {outcome:?}");
                     assert_eq!(
@@ -2695,11 +2287,6 @@ mod tests {
         let at = FIRED_AT + 4 * SECOND;
         let v = verdict(PageAction::Page, Some(P2));
         assert_eq!(
-            first_page_at(&p, P4, FIRED_AT, AnalysisStatus::Complete, Some((&v, at))),
-            Some(at),
-            "a P4 the agent proved was a P2 has to reach somebody"
-        );
-        assert_eq!(
             apply_verdict(&p, &complete(FIRED_AT, at, v), P4, at),
             VerdictOutcome::Page {
                 severity: P2,
@@ -2711,14 +2298,8 @@ mod tests {
         // nobody is paged.
         let to_p5 = verdict(PageAction::Page, Some(P5));
         assert_eq!(
-            first_page_at(
-                &p,
-                P5,
-                FIRED_AT,
-                AnalysisStatus::Complete,
-                Some((&to_p5, at))
-            ),
-            None,
+            apply_verdict(&p, &complete(FIRED_AT, at, to_p5), P5, at),
+            VerdictOutcome::FollowUp { severity: P5 },
             "P5 suggested at P5 is not a promotion and pages nobody"
         );
     }
@@ -2862,17 +2443,6 @@ mod tests {
                     VerdictOutcome::Suppress,
                     "{pr}/{action}: a parallel severity cannot be suppressed — nothing to suppress"
                 );
-                assert_eq!(
-                    first_page_at(
-                        &p,
-                        pr,
-                        FIRED_AT,
-                        AnalysisStatus::Complete,
-                        Some((state.verdict.as_ref().unwrap(), at))
-                    ),
-                    Some(FIRED_AT),
-                    "{pr}/{action}: parallel means t=0, whatever the verdict says"
-                );
             }
             // And the one thing a parallel severity CAN still do: promote.
             let promoting = complete(FIRED_AT, at, verdict(PageAction::Page, Some(P1)));
@@ -2897,60 +2467,17 @@ mod tests {
         }
     }
 
-    /// The default posture, stated on its own because it is the one a team gets
-    /// without asking: until they enable it, a Suppress verdict is a
-    /// recommendation on the timeline and the page still goes out.
-    #[test]
-    fn test_a_suppress_verdict_from_a_team_that_has_not_opted_in_still_pages() {
-        let p = shipped();
-        assert!(!p.allow_suppress);
-        let at = FIRED_AT + 4 * SECOND;
-        let state = complete(FIRED_AT, at, verdict(PageAction::Suppress, None));
-        for pr in [P2, P3] {
-            let outcome = apply_verdict(&p, &state, pr, at);
-            assert!(
-                outcome.pages_anyone(),
-                "{pr} was silenced by default: {outcome:?}"
-            );
-            assert_eq!(
-                first_page_at(
-                    &p,
-                    pr,
-                    FIRED_AT,
-                    AnalysisStatus::Complete,
-                    Some((state.verdict.as_ref().unwrap(), at))
-                ),
-                Some(at),
-                "{pr}: the hold still ends when the verdict lands"
-            );
-        }
-    }
-
     /// Suppression, when it is enabled, is silent but audited — and it is a
     /// verdict about *this* firing. Nothing here is a standing mute.
     #[test]
     fn test_suppression_only_applies_to_a_gated_firing_for_an_opted_in_team() {
-        let p = raw(
-            L0Mode::Parallel,
-            L0Mode::Gate,
-            L0Mode::Gate,
-            L0Mode::Only,
-            90,
-            true,
-            2,
-            true,
-            true,
-        );
+        let p = everything_enabled();
         let at = FIRED_AT + 4 * SECOND;
         let v = verdict(PageAction::Suppress, None);
         for pr in [P2, P3] {
             assert_eq!(
                 apply_verdict(&p, &complete(FIRED_AT, at, v.clone()), pr, at),
                 VerdictOutcome::Suppress
-            );
-            assert_eq!(
-                first_page_at(&p, pr, FIRED_AT, AnalysisStatus::Complete, Some((&v, at))),
-                None
             );
         }
         // Not at P1, which is never gated by invariant.
@@ -3008,17 +2535,7 @@ mod tests {
     /// is how "the agent can never demote" becomes false by a side door.
     #[test]
     fn test_a_downgrade_never_changes_the_recorded_severity() {
-        let p = raw(
-            L0Mode::Parallel,
-            L0Mode::Gate,
-            L0Mode::Gate,
-            L0Mode::Only,
-            90,
-            true,
-            2,
-            true,
-            false,
-        );
+        let p = shipped();
         let at = FIRED_AT + 4 * SECOND;
         for pr in [P2, P3] {
             for suggestion in [None, Some(P4), Some(P5), Some(pr)] {
@@ -3048,17 +2565,7 @@ mod tests {
     /// channel set.
     #[test]
     fn test_a_promotion_outranks_a_suppress_or_downgrade_in_the_same_verdict() {
-        let p = raw(
-            L0Mode::Parallel,
-            L0Mode::Gate,
-            L0Mode::Gate,
-            L0Mode::Only,
-            90,
-            true,
-            2,
-            true,
-            true,
-        );
+        let p = everything_enabled();
         let at = FIRED_AT + 4 * SECOND;
         for action in [PageAction::Suppress, PageAction::Downgrade] {
             let state = complete(FIRED_AT, at, verdict(action, Some(P2)));
@@ -3206,13 +2713,6 @@ mod tests {
                 VerdictOutcome::FailOpen { severity: pr },
                 "{pr}: a complete run with no usable verdict is a failed one"
             );
-            // And a run already known at the firing to have produced nothing is
-            // not gated at all — there is no answer to wait for.
-            assert_eq!(
-                first_page_at(&p, pr, FIRED_AT, AnalysisStatus::Complete, None),
-                Some(FIRED_AT),
-                "{pr}: a run with nothing to say must not hold the page"
-            );
         }
         assert!(!AnalysisStatus::Failed.may_still_answer());
         assert!(!AnalysisStatus::Skipped.may_still_answer());
@@ -3250,11 +2750,6 @@ mod tests {
                 gate_plan(&p, pr, &dead(AnalysisStatus::Failed, FIRED_AT), FIRED_AT),
                 gate_plan(&p, pr, &dead(AnalysisStatus::Skipped, FIRED_AT), FIRED_AT),
                 "{pr}: failed and skipped entered the ladder differently"
-            );
-            assert_eq!(
-                first_page_at(&p, pr, FIRED_AT, AnalysisStatus::Failed, None),
-                first_page_at(&p, pr, FIRED_AT, AnalysisStatus::Skipped, None),
-                "{pr}: failed and skipped paged at different times"
             );
         }
     }
@@ -3328,16 +2823,6 @@ mod tests {
                 );
                 let skipped = dead(AnalysisStatus::Skipped, FIRED_AT);
                 for pr in ALL {
-                    let today = if severity_pages(pr) {
-                        Some(FIRED_AT)
-                    } else {
-                        None
-                    };
-                    assert_eq!(
-                        first_page_at(&p, pr, FIRED_AT, AnalysisStatus::Skipped, None),
-                        today,
-                        "{pr} without an agent must page exactly as it does today"
-                    );
                     assert_ne!(
                         gate_plan(&p, pr, &skipped, FIRED_AT),
                         GatePlan::Gate {
@@ -3444,34 +2929,9 @@ mod tests {
                 quieter_channels: false
             }
         );
-        assert_eq!(
-            first_page_at(
-                &p,
-                P3,
-                fired,
-                AnalysisStatus::Complete,
-                Some((&v, verdict_at))
-            ),
-            Some(verdict_at),
-            "the Platform primary is paged at 02:14:04, as a P2"
-        );
         assert!(
             metrics_for(&p, &complete(fired, verdict_at, v), P3, verdict_at)
                 .contains(&L0Metric::Promoted { from: P3, to: P2 })
-        );
-
-        // "Had the agent been down, the hold would have expired at 02:15:30 and
-        // the P3 would have gone to its normal destination — i.e. still nobody
-        // woken, exactly as today."
-        assert_eq!(
-            first_page_at(&p, P3, fired, AnalysisStatus::Pending, None),
-            Some(fired + 90 * SECOND),
-            "02:15:30"
-        );
-        assert_eq!(
-            first_page_at(&p, P3, fired, AnalysisStatus::Skipped, None),
-            Some(fired),
-            "and with no agent at all, exactly as today"
         );
 
         // The 90-second hold cost nothing: the verdict landed in four seconds
@@ -3586,17 +3046,7 @@ mod tests {
             false,
             false,
         );
-        let opted_in = raw(
-            L0Mode::Parallel,
-            L0Mode::Gate,
-            L0Mode::Gate,
-            L0Mode::Only,
-            90,
-            true,
-            2,
-            true,
-            true,
-        );
+        let opted_in = everything_enabled();
 
         let suppress = complete(FIRED_AT, at, verdict(PageAction::Suppress, None));
         let downgrade = complete(FIRED_AT, at, verdict(PageAction::Downgrade, None));
@@ -3665,17 +3115,7 @@ mod tests {
     /// to carry both labels for every verdict, whatever the engine then did.
     #[test]
     fn test_every_verdict_counts_its_action_and_its_confidence_band() {
-        let p = raw(
-            L0Mode::Parallel,
-            L0Mode::Gate,
-            L0Mode::Gate,
-            L0Mode::Only,
-            90,
-            true,
-            2,
-            true,
-            true,
-        );
+        let p = everything_enabled();
         let at = FIRED_AT + 4 * SECOND;
         for action in PageAction::ALL {
             for confidence in Confidence::ALL {
@@ -3785,22 +3225,11 @@ mod tests {
             ),
             ("a json array", "[1, 2, 3]"),
         ];
-        let p = shipped();
         for (name, block) in broken {
             let content = report_with(block);
             let parsed = parse_report(&content);
             assert_eq!(parsed.report, content, "{name}: the report was altered");
             assert_eq!(parsed.verdict, None, "{name}: garbage parsed as a verdict");
-            // And the firing still pages. The investigation started, so the
-            // gate was armed; it produced nothing the ladder can use, so the
-            // hold runs out and the page goes exactly as §6's budget-expiry row
-            // says — no verdict ever arrived, as far as the ladder is
-            // concerned.
-            assert_eq!(
-                first_page_at(&p, P3, FIRED_AT, AnalysisStatus::Pending, None),
-                Some(FIRED_AT + 90 * SECOND),
-                "{name}: the page was lost"
-            );
         }
     }
 

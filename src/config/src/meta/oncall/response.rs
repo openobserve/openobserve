@@ -214,15 +214,6 @@ pub enum ResponseEventKind {
     Flapped,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ResponseError {
-    /// The transition is not part of the lifecycle.
-    IllegalTransition {
-        from: ResponseState,
-        to: ResponseState,
-    },
-}
-
 impl ResponseState {
     /// Durable storage id. **Never reorder or reuse.**
     pub fn to_i32(&self) -> i32 {
@@ -272,26 +263,6 @@ impl ResponseState {
     /// owner and no ladder, and it still has to be closed by a human.
     pub fn is_unresolved(&self) -> bool {
         !self.is_terminal()
-    }
-
-    /// Lifecycle only moves forward, and every state can resolve directly.
-    ///
-    /// Forward-only matters because a record is written from several places —
-    /// the engine, an ack link, a recovery signal — and a late-arriving event
-    /// must never reopen something a human already closed.
-    pub fn can_transition_to(&self, to: Self) -> bool {
-        if self.is_terminal() {
-            return false;
-        }
-        to.to_i32() > self.to_i32()
-    }
-
-    pub fn transition_to(&self, to: Self) -> Result<Self, ResponseError> {
-        if self.can_transition_to(to) {
-            Ok(to)
-        } else {
-            Err(ResponseError::IllegalTransition { from: *self, to })
-        }
     }
 }
 
@@ -1137,18 +1108,6 @@ impl std::fmt::Display for ResponseEventKind {
     }
 }
 
-impl std::fmt::Display for ResponseError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::IllegalTransition { from, to } => {
-                write!(f, "cannot move a response from `{from}` to `{to}`")
-            }
-        }
-    }
-}
-
-impl std::error::Error for ResponseError {}
-
 #[cfg(test)]
 mod tests {
     use super::{
@@ -1261,57 +1220,17 @@ mod tests {
         assert_eq!(ResponseEventKind::from_i32(14), None);
     }
 
-    /// A late event must never reopen a record a human already closed.
+    /// A late event must never reopen a record a human already closed. Which
+    /// states may follow which is enforced where the write happens, in the
+    /// `state` filters on `oncall_responses::acknowledge` and `hand_over`, so
+    /// that two responders racing are decided by the database and not by a
+    /// stale snapshot. This pins the one fact the enum itself owns.
     #[test]
     fn test_resolved_is_terminal() {
-        for s in STATES {
-            assert!(
-                !ResponseState::Resolved.can_transition_to(s),
-                "resolved must not move to {s}"
-            );
-        }
         assert!(ResponseState::Resolved.is_terminal());
-    }
-
-    #[test]
-    fn test_lifecycle_only_moves_forward() {
-        assert!(ResponseState::Triggered.can_transition_to(ResponseState::Triaged));
-        assert!(ResponseState::Triaged.can_transition_to(ResponseState::Acknowledged));
-        assert!(ResponseState::Acknowledged.can_transition_to(ResponseState::Resolved));
-
-        assert!(!ResponseState::Acknowledged.can_transition_to(ResponseState::Triggered));
-        assert!(!ResponseState::Triaged.can_transition_to(ResponseState::Triggered));
-    }
-
-    /// Triage is optional: with the agent disabled a record goes straight
-    /// from triggered to acknowledged.
-    #[test]
-    fn test_triage_can_be_skipped() {
-        assert!(ResponseState::Triggered.can_transition_to(ResponseState::Acknowledged));
-        assert!(ResponseState::Triggered.can_transition_to(ResponseState::Resolved));
-    }
-
-    #[test]
-    fn test_no_state_transitions_to_itself() {
         for s in STATES {
-            assert!(!s.can_transition_to(s), "{s} must not self-transition");
+            assert_eq!(s.is_terminal(), s == ResponseState::Resolved);
         }
-    }
-
-    #[test]
-    fn test_transition_to_reports_the_offending_pair() {
-        let err = ResponseState::Acknowledged
-            .transition_to(ResponseState::Triggered)
-            .unwrap_err();
-        assert_eq!(
-            err,
-            ResponseError::IllegalTransition {
-                from: ResponseState::Acknowledged,
-                to: ResponseState::Triggered,
-            }
-        );
-        assert!(err.to_string().contains("acknowledged"));
-        assert!(err.to_string().contains("triggered"));
     }
 
     /// The ladder keeps escalating until somebody takes the ball; triage by
@@ -1664,10 +1583,6 @@ mod tests {
     fn test_an_exhausted_page_can_still_be_acknowledged() {
         let mut r = sample(None, None);
         r.exhausted_at = Some(9_000);
-        assert!(
-            ResponseState::Triggered.can_transition_to(ResponseState::Acknowledged),
-            "the ladder running out must not close the door on a human taking it",
-        );
         r.state = ResponseState::Acknowledged;
         assert!(!r.is_escalating());
         assert!(
