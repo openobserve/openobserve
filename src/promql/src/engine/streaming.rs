@@ -15,8 +15,8 @@
 
 use std::{sync::Arc, time::Duration};
 
-use config::meta::promql::value::*;
-use datafusion::{arrow::datatypes::Schema, error::Result, prelude::SessionContext};
+use config::meta::{promql::value::*, search::ScanStats};
+use datafusion::error::Result;
 use futures::future::pending;
 use infra::errors::ErrorCodes;
 use promql_parser::{
@@ -29,9 +29,10 @@ use super::{
     selector::{SelectorContexts, named_selector, plain_selector},
 };
 use crate::{
-    functions, micros,
+    SelectorContext, functions, micros,
     series_stream::plan::{
-        StreamingSelector, execute_partitioned, group_label_columns, series_label_columns,
+        StreamingInputs, StreamingSelector, execute_partitioned, group_label_columns,
+        series_label_columns,
     },
     streaming_eval,
 };
@@ -152,13 +153,15 @@ impl Engine {
         op: streaming_eval::FusedAggOp,
         range: Duration,
     ) -> Result<Option<Value>> {
-        self.stream_scan_guarded(scan, |ctx, schema| async move {
-            let Some(label_cols) = group_label_columns(modifier, schema, func.name()) else {
-                return Ok(None);
-            };
+        let Some(inputs) = scan.streaming_inputs() else {
+            return Ok(None);
+        };
+        let Some(label_cols) = group_label_columns(modifier, inputs.schema, func.name()) else {
+            return Ok(None);
+        };
+        let run = async {
             let Some(sources) = execute_partitioned(
-                ctx,
-                schema,
+                &inputs,
                 &scan.streaming_selector(),
                 label_cols,
                 micros(range),
@@ -172,8 +175,8 @@ impl Engine {
             streaming_eval::aggregate(sources, op, eval)
                 .await
                 .map(|(value, _)| Some(value))
-        })
-        .await
+        };
+        self.stream_scan_guarded(scan, run).await
     }
 
     async fn stream_range_func(
@@ -182,16 +185,18 @@ impl Engine {
         func: Arc<dyn functions::RangeFunc>,
         range: Duration,
     ) -> Result<Option<(Vec<RangeValue>, usize)>> {
-        self.stream_scan_guarded(scan, |ctx, schema| async move {
-            let label_cols = if self.skip_labels {
-                vec![]
-            } else {
-                series_label_columns(schema, &scan.label_selector, func.name())
-            };
-            let eval = Arc::new(streaming_eval::RangeExpr::new(func, range, &self.eval_ctx));
+        let Some(inputs) = scan.streaming_inputs() else {
+            return Ok(None);
+        };
+        let label_cols = if self.skip_labels {
+            vec![]
+        } else {
+            series_label_columns(inputs.schema, &scan.label_selector, func.name())
+        };
+        let eval = Arc::new(streaming_eval::RangeExpr::new(func, range, &self.eval_ctx));
+        let run = async {
             match execute_partitioned(
-                ctx,
-                schema,
+                &inputs,
                 &scan.streaming_selector(),
                 label_cols,
                 micros(range),
@@ -202,30 +207,22 @@ impl Engine {
                 None => Ok(None),
                 Some(sources) => streaming_eval::eval_range(sources, eval).await.map(Some),
             }
-        })
-        .await
+        };
+        self.stream_scan_guarded(scan, run).await
     }
 
-    /// Runs `run` on the scan's single context under timeout and cancel, then accounts its stats.
-    async fn stream_scan_guarded<'s, T, Fut>(
-        &'s self,
-        scan: &'s SelectorScan,
-        run: impl FnOnce(&'s SessionContext, &'s Schema) -> Fut,
-    ) -> Result<Option<T>>
-    where
-        Fut: Future<Output = Result<Option<T>>>,
-    {
-        // a second context would split series and evaluate windows on partial data
-        let [(ctx, schema, scan_stats, _)] = scan.ctxs.as_slice() else {
-            return Ok(None);
-        };
+    /// Runs `run` under timeout and cancel, then accounts the scan's stats.
+    async fn stream_scan_guarded<T>(
+        &self,
+        scan: &SelectorScan,
+        run: impl Future<Output = Result<Option<T>>>,
+    ) -> Result<Option<T>> {
         let trace_id = &self.ctx.query_ctx.trace_id;
         let mut abort_receiver = self
             .ctx
             .table_provider
             .register_cancellation(trace_id)
             .await?;
-        let run = run(ctx, schema);
         tokio::pin!(run);
         // a cancel or an expired budget wins over a fold that happens to be ready and aborts it
         let result = tokio::select! {
@@ -256,7 +253,7 @@ impl Engine {
         let Some(result) = result? else {
             return Ok(None);
         };
-        self.ctx.scan_stats.write().await.add(scan_stats);
+        self.ctx.scan_stats.write().await.add(&scan.scan_stats());
         Ok(Some(result))
     }
 
@@ -269,14 +266,12 @@ impl Engine {
         kind: &str,
     ) -> Result<Option<SelectorScan>> {
         let query_ctx = &self.ctx.query_ctx;
-        // need_wal bails early: WAL would split series across contexts
         if !config::get_config()
             .search
             .feature_metrics_streaming_agg_enabled
             || query_ctx.query_exemplars
             || query_ctx.query_data
             || query_ctx.is_super_cluster
-            || query_ctx.need_wal
         {
             return Ok(None);
         }
@@ -286,9 +281,11 @@ impl Engine {
         let ctxs = self
             .create_selector_contexts(&selector, (start, end), &label_selector)
             .await?;
-        let scan_matchers = match ctxs.as_slice() {
-            [(_, _, _, false)] => Matchers::empty(),
-            _ => selector.matchers.clone(),
+        // only the storage context can be exact; the WAL rows were filtered when fetched
+        let scan_matchers = if ctxs.iter().any(|context| !context.keep_filters) {
+            Matchers::empty()
+        } else {
+            selector.matchers.clone()
         };
         Ok(Some(SelectorScan {
             selector,
@@ -307,6 +304,40 @@ impl SelectorScan {
             matchers: &self.scan_matchers,
             offset: self.offset,
         }
+    }
+
+    /// The contexts as one ordered input set: at most one session plus the sorted WAL rows;
+    /// `None` when no context holds rows.
+    fn streaming_inputs(&self) -> Option<StreamingInputs<'_>> {
+        let mut storage: Option<&SelectorContext> = None;
+        let mut wal = None;
+        // a context without a schema holds no rows (an empty WAL window)
+        for context in &self.ctxs {
+            if context.schema.fields().is_empty() {
+                continue;
+            }
+            if context.sorted_wal.is_some() {
+                wal = Some(context);
+            } else if storage.replace(context).is_some() {
+                // a second session would split series across contexts
+                return None;
+            }
+        }
+        let lead = storage.or(wal)?;
+        Some(StreamingInputs {
+            storage: storage.map(|context| &context.ctx),
+            wal: wal.and_then(|context| context.sorted_wal.as_deref()),
+            schema: &lead.schema,
+            partitions: lead.ctx.state().config().target_partitions(),
+        })
+    }
+
+    fn scan_stats(&self) -> ScanStats {
+        let mut stats = ScanStats::default();
+        for context in &self.ctxs {
+            stats.add(&context.scan_stats);
+        }
+        stats
     }
 }
 
@@ -333,14 +364,22 @@ mod tests {
     use tokio::sync::oneshot;
 
     use super::*;
-    use crate::{engine::tests::*, exec::PromqlContext};
+    use crate::{SortedWalRows, engine::tests::*, exec::PromqlContext};
 
     const SECOND: i64 = 1_000_000;
     const BASE: i64 = 1_000 * SECOND;
 
-    /// Serves one hash-sorted context and can hand out an already-fired cancel signal.
-    struct StreamingProvider {
+    /// A WAL context: bare when its rows are sorted, a `m` table for the loader otherwise.
+    struct WalContext {
         ctx: SessionContext,
+        sorted: Option<Arc<SortedWalRows>>,
+    }
+
+    /// Serves a hash-sorted storage context, optionally a WAL one, and can hand out an
+    /// already-fired cancel signal.
+    struct StreamingProvider {
+        storage: Option<SessionContext>,
+        wal: Option<WalContext>,
         calls: Arc<AtomicUsize>,
         canceled: bool,
         // a dropped sender reads as a cancel, so a live registration keeps it
@@ -357,14 +396,23 @@ mod tests {
             _matchers: Matchers,
             _label_selector: HashSet<String>,
             _filters: &mut [(String, Vec<String>)],
-        ) -> Result<Vec<(SessionContext, Arc<Schema>, ScanStats, bool)>> {
+        ) -> Result<Vec<SelectorContext>> {
             self.calls.fetch_add(1, Ordering::SeqCst);
-            Ok(vec![(
-                self.ctx.clone(),
-                metrics_schema(),
-                ScanStats::default(),
-                true,
-            )])
+            let context = |ctx: &SessionContext, sorted_wal| SelectorContext {
+                ctx: ctx.clone(),
+                schema: metrics_schema(),
+                scan_stats: ScanStats::default(),
+                keep_filters: true,
+                sorted_wal,
+            };
+            let mut contexts = Vec::new();
+            if let Some(storage) = &self.storage {
+                contexts.push(context(storage, None));
+            }
+            if let Some(wal) = &self.wal {
+                contexts.push(context(&wal.ctx, wal.sorted.clone()));
+            }
+            Ok(contexts)
         }
 
         async fn register_cancellation(
@@ -391,15 +439,17 @@ mod tests {
         ]))
     }
 
-    /// Two counters sampled every 20 s; the hash-sorted table exists only when `streams`.
-    fn provider(streams: bool, canceled: bool) -> StreamingProvider {
+    /// Two counters sampled every 20 s over `steps`, in `(hash, timestamp)` order.
+    fn counter_rows(steps: std::ops::Range<i64>) -> RecordBatch {
         let rows: Vec<(i64, u64, f64)> = [7u64, u64::MAX / 2]
             .into_iter()
             .flat_map(|hash| {
-                (0..10).map(move |step| (BASE + step * 20 * SECOND, hash, (step * 3) as f64))
+                steps
+                    .clone()
+                    .map(move |step| (BASE + step * 20 * SECOND, hash, (step * 3) as f64))
             })
             .collect();
-        let batch = RecordBatch::try_new(
+        RecordBatch::try_new(
             metrics_schema(),
             vec![
                 Arc::new(Int64Array::from_iter_values(rows.iter().map(|row| row.0))),
@@ -411,24 +461,85 @@ mod tests {
                 Arc::new(StringArray::from_iter_values(rows.iter().map(|_| "m"))),
             ],
         )
-        .unwrap();
-        let table = || MemTable::try_new(metrics_schema(), vec![vec![batch.clone()]]).unwrap();
+        .unwrap()
+    }
+
+    fn session() -> SessionContext {
         let mut config = SessionConfig::new().with_target_partitions(3);
         config.options_mut().optimizer.prefer_existing_sort = true;
-        let ctx = SessionContext::new_with_config(config);
-        ctx.register_table("m", Arc::new(table())).unwrap();
+        SessionContext::new_with_config(config)
+    }
+
+    fn mem_table(batch: &RecordBatch) -> MemTable {
+        MemTable::try_new(metrics_schema(), vec![vec![batch.clone()]]).unwrap()
+    }
+
+    /// The `m` table the loader reads.
+    fn register_loader_table(ctx: &SessionContext, batch: &RecordBatch) {
+        ctx.register_table("m", Arc::new(mem_table(batch))).unwrap();
+    }
+
+    /// The hash-sorted table the merge reads.
+    fn register_sorted_table(ctx: &SessionContext, batch: &RecordBatch) {
+        let sorted = mem_table(batch).with_sort_order(vec![vec![
+            col(HASH_LABEL).sort(true, false),
+            col(TIMESTAMP_COL_NAME).sort(true, false),
+        ]]);
+        ctx.register_table(format!("m{HASH_SORTED_TABLE_SUFFIX}"), Arc::new(sorted))
+            .unwrap();
+    }
+
+    /// Ten steps in storage; the hash-sorted table exists only when `streams`.
+    fn provider(streams: bool, canceled: bool) -> StreamingProvider {
+        let ctx = session();
+        let rows = counter_rows(0..10);
+        register_loader_table(&ctx, &rows);
         if streams {
-            let sorted = table().with_sort_order(vec![vec![
-                col(HASH_LABEL).sort(true, false),
-                col(TIMESTAMP_COL_NAME).sort(true, false),
-            ]]);
-            ctx.register_table(format!("m{HASH_SORTED_TABLE_SUFFIX}"), Arc::new(sorted))
-                .unwrap();
+            register_sorted_table(&ctx, &rows);
         }
         StreamingProvider {
-            ctx,
+            storage: Some(ctx),
+            wal: None,
             calls: Default::default(),
             canceled,
+            cancel: Default::default(),
+        }
+    }
+
+    /// The first five steps in storage, the last five in the WAL; a sorted WAL leaves storage
+    /// without a `m` table, so only the merge can evaluate it.
+    fn split_provider(sorted: bool, canceled: bool) -> StreamingProvider {
+        let storage = session();
+        let head = counter_rows(0..5);
+        register_sorted_table(&storage, &head);
+        let wal = session();
+        let tail = counter_rows(5..10);
+        let sorted = if sorted {
+            Some(Arc::new(SortedWalRows::new(vec![tail])))
+        } else {
+            register_loader_table(&storage, &head);
+            register_loader_table(&wal, &tail);
+            None
+        };
+        StreamingProvider {
+            storage: Some(storage),
+            wal: Some(WalContext { ctx: wal, sorted }),
+            calls: Default::default(),
+            canceled,
+            cancel: Default::default(),
+        }
+    }
+
+    /// Every row in the WAL, sorted.
+    fn wal_only_provider() -> StreamingProvider {
+        StreamingProvider {
+            storage: None,
+            wal: Some(WalContext {
+                ctx: session(),
+                sorted: Some(Arc::new(SortedWalRows::new(vec![counter_rows(0..10)]))),
+            }),
+            calls: Default::default(),
+            canceled: false,
             cancel: Default::default(),
         }
     }
@@ -456,11 +567,10 @@ mod tests {
     ) -> Engine {
         enable_streaming();
         let eval_ctx = EvalContext::new(start, BASE + 180 * SECOND, step, "test_trace".into());
-        let mut ctx = PromqlContext::new(
-            create_test_query_ctx("test_trace", "test_org", timeout),
-            provider,
-            vec![],
-        );
+        // a provider serving a WAL context is the query the search planner marks `need_wal`
+        let mut query_ctx = (*create_test_query_ctx("test_trace", "test_org", timeout)).clone();
+        query_ctx.need_wal = provider.wal.is_some();
+        let mut ctx = PromqlContext::new(Arc::new(query_ctx), provider, vec![]);
         ctx.start = eval_ctx.start;
         ctx.end = eval_ctx.end;
         if let Some(lookback) = lookback {
@@ -562,6 +672,46 @@ mod tests {
                     "{context}: {v_e} vs {v_a} at {ts_e}"
                 );
             }
+        }
+    }
+
+    /// Rows past the storage cut arrive as sorted WAL rows, which join the merge; without
+    /// storage they are the whole input.
+    #[tokio::test]
+    async fn test_sorted_wal_rows_join_the_merge() {
+        let expected = eval_sum_rate(provider(true, false), 30).await.unwrap();
+        for (name, provider) in [
+            ("storage and wal", split_provider(true, false)),
+            ("wal only", wal_only_provider()),
+        ] {
+            let actual = eval_sum_rate(provider, 30).await.unwrap();
+            assert_same_matrix(expected.clone(), actual, name);
+        }
+    }
+
+    /// Unsorted WAL rows cannot join the merge, so the query materializes on both contexts.
+    #[tokio::test]
+    async fn test_unsorted_wal_rows_materialize() {
+        let expected = eval_sum_rate(provider(true, false), 30).await.unwrap();
+        let actual = eval_sum_rate(split_provider(false, false), 30)
+            .await
+            .unwrap();
+        assert_same_matrix(expected, actual, "unsorted wal");
+    }
+
+    /// Each path reports a fired cancel in its own words: a `need_wal` query with sorted WAL
+    /// rows dies in the streaming run, one with unsorted rows in the materializing loader.
+    #[tokio::test]
+    async fn test_need_wal_streams_only_sorted_wal_rows() {
+        for (sorted, message) in [
+            (true, "streaming query canceled"),
+            (false, "grpc search canceled"),
+        ] {
+            let err = eval_sum_rate(split_provider(sorted, true), 30)
+                .await
+                .unwrap_err();
+            let text = err.to_string();
+            assert!(text.contains(message), "sorted={sorted}: {text}");
         }
     }
 

@@ -43,12 +43,26 @@ mod series_stream;
 mod streaming_eval;
 pub mod utils;
 
+pub use series_stream::wal::SortedWalRows;
+
 pub const DEFAULT_LOOKBACK: Duration = Duration::from_secs(300); // 5m
 pub const MINIMAL_INTERVAL: Duration = Duration::from_secs(1); // 1s
 pub const MAX_DATA_POINTS: i64 = 256; // Width of panel: window.innerWidth / 4
 pub const DEFAULT_MAX_POINTS_PER_SERIES: usize = 30000; // Maximum number of points per series
 const DEFAULT_STEP: Duration = Duration::from_secs(15); // default step in seconds
 const MIN_TIMESERIES_POINTS_FOR_TIME_ROUNDING: i64 = 10; // Adjust this value as needed
+
+/// One context a selector scans: a session over its rows, plus those rows in hash order when
+/// they came from the WAL.
+pub struct SelectorContext {
+    pub ctx: SessionContext,
+    pub schema: Arc<Schema>,
+    pub scan_stats: ScanStats,
+    /// False once an exact index selection already applied the matchers.
+    pub keep_filters: bool,
+    /// The WAL rows in `(__hash__, _timestamp)` order, so the merge can slice them per partition.
+    pub sorted_wal: Option<Arc<SortedWalRows>>,
+}
 
 #[async_trait]
 pub trait TableProvider: Sync + Send + 'static {
@@ -60,7 +74,7 @@ pub trait TableProvider: Sync + Send + 'static {
         matchers: Matchers,
         label_selector: HashSet<String>,
         filters: &mut [(String, Vec<String>)],
-    ) -> Result<Vec<(SessionContext, Arc<Schema>, ScanStats, bool)>>;
+    ) -> Result<Vec<SelectorContext>>;
 
     /// Registers this evaluation with the host's query cancellation service.
     ///

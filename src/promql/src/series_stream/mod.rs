@@ -15,12 +15,13 @@
 
 //! Streams that deliver a query's series one at a time, so a consumer can
 //! evaluate and drop each series without materializing the full set: one over
-//! a hash-sorted scan, one over an already-materialized matrix, behind the same
-//! contract.
+//! a hash-sorted scan and sliced WAL rows, one over an already-materialized
+//! matrix, behind the same contract.
 
 pub(crate) mod hash_sorted;
 pub(crate) mod matrix;
 pub(crate) mod plan;
+pub(crate) mod wal;
 
 use config::meta::promql::value::{Labels, Sample};
 use datafusion::error::Result;
@@ -62,7 +63,7 @@ mod tests {
 
     use super::{
         hash_sorted::HashSortedSeriesStream,
-        plan::{StreamingSelector, execute_partitioned, group_label_columns},
+        plan::{StreamingInputs, StreamingSelector, execute_partitioned, group_label_columns},
     };
     use crate::{
         functions::{self, RangeFunc},
@@ -88,7 +89,7 @@ mod tests {
 
     /// The test series: counters, a counter reset, a late-only series, and a
     /// series with a null label, spread over the full hash space.
-    fn test_rows() -> Vec<Row> {
+    pub(super) fn test_rows() -> Vec<Row> {
         let dense = [10, 50, 70, 110, 130, 170];
         let series = |hash, values: [f64; 6], instance, path| {
             dense
@@ -125,7 +126,7 @@ mod tests {
         rows
     }
 
-    fn rows_to_batch(mut rows: Vec<Row>) -> RecordBatch {
+    pub(super) fn rows_to_batch(mut rows: Vec<Row>) -> RecordBatch {
         rows.sort_by_key(|row| (row.0, row.1));
         RecordBatch::try_new(
             arrow_schema(),
@@ -205,27 +206,53 @@ mod tests {
         matrix
     }
 
-    /// The sorted table's streams, projected to `label_cols`; `None` when it cannot stream.
-    pub(super) async fn sorted_table_sources(
-        ctx: &SessionContext,
+    /// The inputs' streams, projected to `label_cols`; `None` when they cannot stream.
+    pub(super) async fn input_sources(
+        inputs: &StreamingInputs<'_>,
         label_cols: Vec<String>,
         range: Duration,
-    ) -> Option<Vec<impl Future<Output = Result<HashSortedSeriesStream>> + Send + 'static>> {
+    ) -> Option<Vec<impl Future<Output = Result<HashSortedSeriesStream>> + Send + 'static + use<>>>
+    {
         let selector = StreamingSelector {
             table_name: "m",
             matchers: &Matchers::empty(),
             offset: 0,
         };
-        execute_partitioned(
-            ctx,
-            &arrow_schema(),
-            &selector,
-            label_cols,
-            micros(range),
-            &eval_ctx(),
-        )
-        .await
-        .unwrap()
+        execute_partitioned(inputs, &selector, label_cols, micros(range), &eval_ctx())
+            .await
+            .unwrap()
+    }
+
+    /// The sorted table's streams, projected to `label_cols`; `None` when it cannot stream.
+    pub(super) async fn sorted_table_sources(
+        ctx: &SessionContext,
+        label_cols: Vec<String>,
+        range: Duration,
+    ) -> Option<Vec<impl Future<Output = Result<HashSortedSeriesStream>> + Send + 'static + use<>>>
+    {
+        let schema = arrow_schema();
+        let inputs = StreamingInputs {
+            storage: Some(ctx),
+            wal: None,
+            schema: &schema,
+            partitions: 3,
+        };
+        input_sources(&inputs, label_cols, range).await
+    }
+
+    /// The aggregate over the inputs' streams; `None` when they cannot stream.
+    pub(super) async fn run_streaming_inputs(
+        inputs: &StreamingInputs<'_>,
+        modifier: &Option<LabelModifier>,
+        func_name: &str,
+        op: FusedAggOp,
+        range: Duration,
+    ) -> Option<Value> {
+        let func: Arc<dyn RangeFunc> = Arc::from(functions::fusable_range_func(func_name).unwrap());
+        let label_cols = group_label_columns(modifier, inputs.schema, func_name)?;
+        let sources = input_sources(inputs, label_cols, range).await?;
+        let eval = Arc::new(RangeExpr::new(func, range, &eval_ctx()));
+        Some(aggregate(sources, op, eval).await.unwrap().0)
     }
 
     /// The aggregate over the sorted table's streams; `None` when it cannot stream.
@@ -236,10 +263,13 @@ mod tests {
         op: FusedAggOp,
         range: Duration,
     ) -> Option<Value> {
-        let func: Arc<dyn RangeFunc> = Arc::from(functions::fusable_range_func(func_name).unwrap());
-        let label_cols = group_label_columns(modifier, &arrow_schema(), func_name)?;
-        let sources = sorted_table_sources(ctx, label_cols, range).await?;
-        let eval = Arc::new(RangeExpr::new(func, range, &eval_ctx()));
-        Some(aggregate(sources, op, eval).await.unwrap().0)
+        let schema = arrow_schema();
+        let inputs = StreamingInputs {
+            storage: Some(ctx),
+            wal: None,
+            schema: &schema,
+            partitions: 3,
+        };
+        run_streaming_inputs(&inputs, modifier, func_name, op, range).await
     }
 }

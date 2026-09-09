@@ -16,17 +16,10 @@
 //! Vector/matrix selector evaluation and data loading. Reads `ctx`,
 //! `label_selector`, and `skip_labels`; writes `result_type`.
 
-use std::{sync::Arc, time::Duration};
+use std::time::Duration;
 
-use config::meta::{
-    promql::{NAME_LABEL, value::*},
-    search::ScanStats,
-};
-use datafusion::{
-    arrow::datatypes::Schema,
-    error::{DataFusionError, Result},
-    prelude::SessionContext,
-};
+use config::meta::promql::{NAME_LABEL, value::*};
+use datafusion::error::{DataFusionError, Result};
 use futures::future::try_join_all;
 use hashbrown::HashMap;
 use infra::errors::ErrorCodes;
@@ -38,6 +31,7 @@ use rayon::iter::{IntoParallelIterator, IntoParallelRefMutIterator, ParallelIter
 
 use super::Engine;
 use crate::{
+    SelectorContext,
     ast::rewrite::remove_filter_all,
     micros,
     series_loader::{LoadedMetrics, PartitionedMetrics, selector_load_data_from_datafusion},
@@ -45,7 +39,7 @@ use crate::{
 };
 
 /// One context per selected schema with its scan stats and whether the matchers still apply.
-pub(super) type SelectorContexts = Vec<(SessionContext, Arc<Schema>, ScanStats, bool)>;
+pub(super) type SelectorContexts = Vec<SelectorContext>;
 
 impl Engine {
     pub(super) fn selector_time_range(
@@ -338,7 +332,14 @@ impl Engine {
         let skip_labels = self.skip_labels;
         let mut tasks = Vec::with_capacity(ctxs.len());
         let mut abort_handles = Vec::with_capacity(ctxs.len());
-        for (ctx, schema, scan_stats, keep_filters) in ctxs {
+        for context in ctxs {
+            let SelectorContext {
+                ctx,
+                schema,
+                scan_stats,
+                keep_filters,
+                ..
+            } = context;
             let query_ctx = self.ctx.query_ctx.clone();
             let mut selector = selector.clone();
             if !keep_filters {

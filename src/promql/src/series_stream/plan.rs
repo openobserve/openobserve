@@ -13,8 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Planning over a selector's hash-sorted table: the label columns to project, and one set of
-//! hash-ordered input streams per partition for the hash-sorted stream to consume.
+//! Planning over a selector's hash-sorted table and WAL rows: the label columns to project, and
+//! one set of hash-ordered input streams per partition for the hash-sorted stream to consume.
 
 use std::sync::Arc;
 
@@ -42,7 +42,7 @@ use datafusion::{
 use hashbrown::HashSet;
 use promql_parser::{label::Matchers, parser::LabelModifier};
 
-use super::hash_sorted::HashSortedSeriesStream;
+use super::{hash_sorted::HashSortedSeriesStream, wal::SortedWalRows};
 use crate::{
     functions::KEEP_METRIC_NAME_FUNC,
     utils::{apply_matchers, apply_time_window},
@@ -55,11 +55,21 @@ pub(crate) struct StreamingSelector<'a> {
     pub offset: i64,
 }
 
-/// One hash-sorted stream per partition over the selector's hash-sorted table, projected to the
-/// sample columns plus `label_cols`; `None` when the layout cannot stream in order.
+/// Where a selector's ordered rows come from: the session over its files and its WAL rows.
+pub(crate) struct StreamingInputs<'a> {
+    /// The session whose hash-sorted table scans the files; `None` when every row is in the WAL.
+    pub storage: Option<&'a SessionContext>,
+    pub wal: Option<&'a SortedWalRows>,
+    pub schema: &'a Schema,
+    /// The hash partitions the merge splits into; the session's target partitions.
+    pub partitions: usize,
+}
+
+/// One hash-sorted stream per partition over the selector's hash-sorted table and WAL rows,
+/// projected to the sample columns plus `label_cols`; `None` when the layout cannot stream in
+/// order.
 pub(crate) async fn execute_partitioned(
-    ctx: &SessionContext,
-    schema: &Schema,
+    inputs: &StreamingInputs<'_>,
     selector: &StreamingSelector<'_>,
     label_cols: Vec<String>,
     lookback: i64,
@@ -67,12 +77,69 @@ pub(crate) async fn execute_partitioned(
 ) -> Result<
     Option<Vec<impl Future<Output = Result<HashSortedSeriesStream>> + Send + 'static + use<>>>,
 > {
-    if schema
+    if inputs
+        .schema
         .field_with_name(HASH_LABEL)
         .is_ok_and(|field| field.data_type() != &DataType::UInt64)
     {
         return Ok(None);
     }
+    // a label column missing from the WAL rows would abort the fold: materialize instead
+    if let Some(schema) = inputs.wal.and_then(SortedWalRows::schema)
+        && label_cols
+            .iter()
+            .any(|name| schema.field_with_name(name).is_err())
+    {
+        log::info!(
+            "[trace_id: {}] [PromQL] streaming fallback: the WAL rows lack a label column of {label_cols:?}",
+            eval_ctx.trace_id
+        );
+        return Ok(None);
+    }
+    let partitions = inputs.partitions;
+    let mut partition_inputs = match inputs.storage {
+        Some(ctx) => {
+            let Some(partition_inputs) = storage_partition_inputs(
+                ctx,
+                selector,
+                &label_cols,
+                lookback,
+                partitions,
+                eval_ctx,
+            )
+            .await?
+            else {
+                return Ok(None);
+            };
+            partition_inputs
+        }
+        None => (0..partitions).map(|_| Vec::new()).collect(),
+    };
+    if let Some(wal) = inputs.wal {
+        for (streams, (lo, hi)) in partition_inputs.iter_mut().zip(hash_partitions(partitions)) {
+            streams.extend(wal.chain(lo, hi));
+        }
+    }
+    let label_cols = Arc::new(label_cols);
+    let offset = selector.offset;
+    Ok(Some(
+        partition_inputs
+            .into_iter()
+            .map(|streams| HashSortedSeriesStream::start(streams, label_cols.clone(), offset))
+            .collect(),
+    ))
+}
+
+/// Every partition's ordered chains over the session's hash-sorted table; `None` when the table
+/// is missing or a partition's plan cannot stream in order.
+async fn storage_partition_inputs(
+    ctx: &SessionContext,
+    selector: &StreamingSelector<'_>,
+    label_cols: &[String],
+    lookback: i64,
+    partitions: usize,
+    eval_ctx: &EvalContext,
+) -> Result<Option<Vec<Vec<SendableRecordBatchStream>>>> {
     let sorted_table = format!("{}{HASH_SORTED_TABLE_SUFFIX}", selector.table_name);
     let Ok(df) = ctx.table(sorted_table.as_str()).await else {
         return Ok(None);
@@ -87,20 +154,7 @@ pub(crate) async fn execute_partitioned(
     let df = apply_matchers(df, selector.matchers)?;
     let mut columns = vec![TIMESTAMP_COL_NAME, HASH_LABEL, VALUE_LABEL];
     columns.extend(label_cols.iter().map(String::as_str));
-    let partitions = ctx.state().config().target_partitions();
-    let Some(partition_inputs) =
-        build_partition_inputs(&df, &columns, partitions, &eval_ctx.trace_id).await?
-    else {
-        return Ok(None);
-    };
-    let label_cols = Arc::new(label_cols);
-    let offset = selector.offset;
-    Ok(Some(
-        partition_inputs
-            .into_iter()
-            .map(|streams| HashSortedSeriesStream::start(streams, label_cols.clone(), offset))
-            .collect(),
-    ))
+    build_partition_inputs(&df, &columns, partitions, &eval_ctx.trace_id).await
 }
 
 /// Every partition's ordered input streams; `None` (logged) means a partition's plan cannot stream
@@ -258,12 +312,17 @@ mod tests {
     use std::time::Duration;
 
     use datafusion::{
-        arrow::datatypes::Field, datasource::MemTable, physical_plan::empty::EmptyExec,
+        arrow::{array::RecordBatch, datatypes::Field},
+        datasource::MemTable,
+        physical_plan::empty::EmptyExec,
     };
     use promql_parser::label::Labels as ModifierLabels;
 
     use super::{super::tests::*, *};
-    use crate::streaming_eval::{FusedAggOp, tests::by};
+    use crate::streaming_eval::{
+        FusedAggOp,
+        tests::{assert_matrix_close, by, canonical_matrix},
+    };
 
     #[test]
     fn test_group_label_columns_resolution() {
@@ -341,6 +400,80 @@ mod tests {
                 assert_eq!(pair[0].1.wrapping_add(1), pair[1].0);
             }
         }
+    }
+
+    /// Storage holds one "file" and the WAL the other, so only the merge across both sees every
+    /// series whole; the WAL alone must fold the same as the sorted table.
+    #[tokio::test]
+    async fn test_streaming_merges_wal_rows_into_the_partitions() {
+        let range = Duration::from_secs(60);
+        let whole = session_ctx();
+        register_sorted_table(&whole);
+        let [storage_rows, wal_rows]: [Vec<RecordBatch>; 2] =
+            sorted_partitions().try_into().unwrap();
+        let storage = session_ctx();
+        let table = MemTable::try_new(arrow_schema(), vec![storage_rows])
+            .unwrap()
+            .with_sort_order(vec![vec![
+                col(HASH_LABEL).sort(true, false),
+                col(TIMESTAMP_COL_NAME).sort(true, false),
+            ]]);
+        storage
+            .register_table(format!("m{HASH_SORTED_TABLE_SUFFIX}"), Arc::new(table))
+            .unwrap();
+        let wal = SortedWalRows::new(wal_rows);
+        let all_in_wal = SortedWalRows::new(vec![rows_to_batch(test_rows())]);
+        let schema = arrow_schema();
+
+        for modifier in [None, by(&["path"]), by(&["instance", "path"])] {
+            let expected = run_streaming(&whole, &modifier, "rate", FusedAggOp::Sum, range)
+                .await
+                .unwrap();
+            let cases = [
+                ("storage and wal", Some(&storage), &wal),
+                ("wal only", None, &all_in_wal),
+            ];
+            for (name, storage, wal) in cases {
+                let inputs = StreamingInputs {
+                    storage,
+                    wal: Some(wal),
+                    schema: &schema,
+                    partitions: 3,
+                };
+                let actual =
+                    run_streaming_inputs(&inputs, &modifier, "rate", FusedAggOp::Sum, range)
+                        .await
+                        .expect("sorted WAL rows stream");
+                assert_matrix_close(
+                    canonical_matrix(expected.clone()),
+                    canonical_matrix(actual),
+                    &format!("{name} (modifier: {modifier:?})"),
+                );
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_streaming_falls_back_when_wal_rows_lack_a_group_column() {
+        let ctx = session_ctx();
+        register_sorted_table(&ctx);
+        let schema = arrow_schema();
+        let batch = rows_to_batch(test_rows());
+        let without_path = batch.project(&[0, 1, 2, 3]).unwrap();
+        let wal = SortedWalRows::new(vec![without_path]);
+        let inputs = StreamingInputs {
+            storage: Some(&ctx),
+            wal: Some(&wal),
+            schema: &schema,
+            partitions: 3,
+        };
+        let range = Duration::from_secs(60);
+        let folded =
+            run_streaming_inputs(&inputs, &by(&["path"]), "rate", FusedAggOp::Sum, range).await;
+        assert!(folded.is_none());
+        // without the missing column the same rows merge
+        let folded = run_streaming_inputs(&inputs, &None, "rate", FusedAggOp::Sum, range).await;
+        assert!(folded.is_some());
     }
 
     #[tokio::test]
