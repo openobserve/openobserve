@@ -1052,9 +1052,8 @@ function definitionKey(): string {
 
 const backTarget = computed(() => ({
   name: "sloList",
-  // Carry the folder back, or cancelling out of a folder lands on default and
-  // the SLO just saved looks like it vanished.
-  query: { org_identifier: org.value, folder: form.folder_id },
+  // Spread first so page/etc. survive the round trip; folder is overridden explicitly since the form may have switched away from the one the list opened with.
+  query: { ...route.query, org_identifier: org.value, folder: form.folder_id },
 }));
 
 function onFolderSelected(folder: any) {
