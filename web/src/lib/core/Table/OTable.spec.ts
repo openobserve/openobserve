@@ -1552,6 +1552,34 @@ describe("OTable", () => {
       });
       expect(wrapper.find('[data-test="custom-loading-banner"]').exists()).toBe(true);
     });
+
+    it("suppresses the default banner for an empty loading-banner slot but keeps the streaming bar", () => {
+      // An empty slot still counts as "provided" — consumers can opt out of the default banner entirely.
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(5),
+          columns: makeColumns(),
+          streaming: true,
+        },
+        slots: {
+          "loading-banner": "",
+        },
+      });
+      expect(wrapper.findAll('[data-test="o2-table-loading-banner"]').length).toBe(0);
+      expect(wrapper.find('[data-test="o2-table-streaming-bar"]').exists()).toBe(true);
+    });
+
+    it("renders the default banner while streaming when no loading-banner slot is supplied", () => {
+      // Pairs with the empty-slot case: together they pin the opt-out as a contract.
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(5),
+          columns: makeColumns(),
+          streaming: true,
+        },
+      });
+      expect(wrapper.find('[data-test="o2-table-loading-banner"]').exists()).toBe(true);
+    });
   });
 
   // ── Scoped Bottom Slot ─────────────────────────────────────

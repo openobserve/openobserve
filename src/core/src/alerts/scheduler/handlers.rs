@@ -943,6 +943,7 @@ async fn handle_composite_alert_trigger(
         Some(evaluated.level),
         now,
     );
+    trigger.end_time = Some(now);
 
     use sea_orm::{
         ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QuerySelect, TransactionTrait,
@@ -982,19 +983,7 @@ async fn handle_composite_alert_trigger(
 
     let mut delivery_retry_at = None;
     if evaluated.result {
-        // A composite is an alert as far as paging is concerned, so it pages
-        // through the one path an alert does — same dedup, same flap dampening,
-        // same blast radius — and, like an alert, it pages on FIRING rather
-        // than on being deliverable. Whether it has destinations, and whether
-        // its silence window is open, are questions about notifications; the
-        // record has its own dedup and must not inherit them.
-        //
-        // What a composite does NOT have is an identity. Its notification row
-        // carries the expression and which children fired, not a cluster or a
-        // service, and there is no `oncall_team` column on the definition. So
-        // unless somebody labels it, a composite routes to the org's catch-all
-        // and lands on the unrouted queue — the honest outcome for a signal
-        // nobody has claimed, and a visible one rather than silence.
+        scheduled_data.last_satisfied_at = Some(now);
         // Whether an incident took this firing. Hoisted, because correlation
         // runs inside the deliverable branch below and paging has to know the
         // answer even when that branch never runs. Gated like its only reader,
