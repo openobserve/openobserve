@@ -13,81 +13,26 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! The single fused fold: every series stream folds its series into per-group
-//! accumulators, and the sources merge in order at the end. The
-//! producers only decide how series arrive; the aggregation lives here once.
+//! The fused aggregate: every partition folds its series into per-group accumulators (partial),
+//! and the partitions merge in order at the end (final). The streams only decide how series
+//! arrive; the aggregation lives here once.
 
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
 
-use config::meta::promql::value::{
-    CounterSeries, EvalContext, ExtrapolationKind, Labels, RangeValue, Sample, TimeWindow, Value,
-};
-use datafusion::error::{DataFusionError, Result};
+use config::meta::promql::value::{Labels, RangeValue, Value};
+use datafusion::error::Result;
 use hashbrown::{HashMap, hash_map::Entry};
-use tokio::task::JoinSet;
 
-use super::{accumulator::FusedAccumulator, op::FusedAggOp};
-use crate::{
-    functions::{RangeFunc, advance_sample_window},
-    micros,
-    series_stream::SeriesStream,
+use super::{
+    accumulator::FusedAccumulator, collect_partitioned, op::FusedAggOp, range_expr::RangeExpr,
 };
+use crate::series_stream::SeriesStream;
 
 pub(super) type GroupAccs = HashMap<u64, GroupEntry>;
 
 pub(super) struct GroupEntry {
     labels: Labels,
     acc: FusedAccumulator,
-}
-
-/// How one series becomes per-step values: the range function, its window, and the slots.
-pub(crate) struct RangeExpr {
-    pub(crate) func: Arc<dyn RangeFunc>,
-    counter_kind: Option<ExtrapolationKind>,
-    pub(crate) range: Duration,
-    pub(crate) eval_ctx: EvalContext,
-    pub(crate) timestamps: Vec<i64>,
-}
-
-impl RangeExpr {
-    pub(crate) fn new(func: Arc<dyn RangeFunc>, range: Duration, eval_ctx: &EvalContext) -> Self {
-        Self {
-            counter_kind: func.counter_extrapolation(),
-            func,
-            range,
-            eval_ctx: eval_ctx.clone(),
-            timestamps: eval_ctx.timestamps(),
-        }
-    }
-
-    /// Evaluates the function over one series, handing each value to `emit` with its slot.
-    fn evaluate(&self, samples: &[Sample], mut emit: impl FnMut(usize, f64)) {
-        let range_micros = micros(self.range);
-        let mut start_index = 0;
-        let mut end_index = 0;
-        let counter =
-            CounterSeries::try_new(samples, self.counter_kind, &self.eval_ctx, range_micros);
-
-        for (slot, &eval_ts) in self.timestamps.iter().enumerate() {
-            let window_samples = advance_sample_window(
-                samples,
-                eval_ts - range_micros,
-                eval_ts,
-                &mut start_index,
-                &mut end_index,
-            );
-            if window_samples.is_empty() {
-                continue;
-            }
-            let value = match &counter {
-                Some(counter) => counter.extrapolate(start_index, end_index, eval_ts, self.range),
-                None => self.func.exec(window_samples, eval_ts, &self.range),
-            };
-            if let Some(value) = value {
-                emit(slot, value);
-            }
-        }
-    }
 }
 
 /// Aggregates every partition, partial then final; each source opens inside its own task, and
@@ -143,29 +88,6 @@ async fn aggregate_partial<S: SeriesStream>(
     Ok((groups, series_count))
 }
 
-/// Collects every partition in order; the first failure fails the whole, and dropping the set
-/// aborts the rest.
-async fn collect_partitioned<T, Fut>(parts: Vec<Fut>) -> Result<Vec<T>>
-where
-    T: Send + 'static,
-    Fut: Future<Output = Result<T>> + Send + 'static,
-{
-    let mut results: Vec<Option<T>> = parts.iter().map(|_| None).collect();
-    let mut tasks = JoinSet::new();
-    for (index, part) in parts.into_iter().enumerate() {
-        tasks.spawn(async move { (index, part.await) });
-    }
-    // sources finish in any order; the merge needs them in source order
-    while let Some(joined) = tasks.join_next().await {
-        let (index, part) = joined.map_err(|e| DataFusionError::Execution(e.to_string()))?;
-        results[index] = Some(part?);
-    }
-    Ok(results
-        .into_iter()
-        .map(|part| part.expect("every source joined"))
-        .collect())
-}
-
 /// The final aggregate: partial groups merged in partition order, groups without output dropped
 /// like the generic path.
 fn aggregate_final(folds: Vec<GroupAccs>, timestamps: &[i64]) -> Value {
@@ -205,69 +127,6 @@ fn aggregate_final(folds: Vec<GroupAccs>, timestamps: &[i64]) -> Value {
     }
 }
 
-/// Maps every source's series through the function and returns them whole, in source order;
-/// dropping the future aborts the sources.
-pub(crate) async fn map_sources<F, S>(
-    sources: Vec<F>,
-    eval: Arc<RangeExpr>,
-) -> Result<(Vec<RangeValue>, usize)>
-where
-    F: Future<Output = Result<S>> + Send + 'static,
-    S: SeriesStream + 'static,
-{
-    let start_time = std::time::Instant::now();
-    let func_name = eval.func.name();
-    let trace_id = eval.eval_ctx.trace_id.clone();
-    log::info!(
-        "[trace_id: {trace_id}] [PromQL Timing] streaming {func_name}() started with {} partitions",
-        sources.len(),
-    );
-    let parts = sources
-        .into_iter()
-        .map(|source| {
-            let eval = eval.clone();
-            async move { map_partition(source.await?, eval).await }
-        })
-        .collect();
-    let parts = collect_partitioned(parts).await?;
-    let series_count: usize = parts.iter().map(|(_, series)| series).sum();
-    let series: Vec<RangeValue> = parts.into_iter().flat_map(|(series, _)| series).collect();
-    log::info!(
-        "[trace_id: {trace_id}] [PromQL Timing] streaming {func_name}() execution took: {:?}, mapped {} of {series_count} series",
-        start_time.elapsed(),
-        series.len(),
-    );
-    Ok((series, series_count))
-}
-
-/// Maps one source's series; like the generic evaluator, a series with no value is dropped.
-async fn map_partition<S: SeriesStream>(
-    mut source: S,
-    eval: Arc<RangeExpr>,
-) -> Result<(Vec<RangeValue>, usize)> {
-    let mut series = Vec::new();
-    let mut series_count = 0;
-    while source.advance().await?.is_some() {
-        let labels = source.labels();
-        let samples = source.consume().await?;
-        let mut values = Vec::with_capacity(eval.timestamps.len());
-        eval.evaluate(samples, |slot, value| {
-            values.push(Sample::new(eval.timestamps[slot], value));
-        });
-        if !values.is_empty() {
-            series.push(RangeValue {
-                labels,
-                samples: values,
-                exemplars: None,
-                time_window: Some(TimeWindow::new(eval.range)),
-            });
-        }
-        series_count += 1;
-        tokio::task::consume_budget().await;
-    }
-    Ok((series, series_count))
-}
-
 #[cfg(test)]
 mod tests {
     use std::{
@@ -278,10 +137,11 @@ mod tests {
         time::Duration,
     };
 
-    use config::meta::promql::value::{Labels, Sample};
+    use config::meta::promql::value::{EvalContext, Labels, Sample};
+    use datafusion::error::DataFusionError;
 
     use super::*;
-    use crate::functions;
+    use crate::functions::{self, RangeFunc};
 
     /// Errors on its first series.
     struct FailingStream;

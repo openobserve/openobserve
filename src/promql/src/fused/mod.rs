@@ -18,13 +18,41 @@
 //! evaluator's intermediate per-series materialization.
 
 mod accumulator;
-mod fold;
+mod aggregate;
 pub(crate) mod matrix;
 mod op;
+mod project;
+mod range_expr;
 pub(crate) mod stream;
 
-pub(crate) use fold::{RangeExpr, map_sources};
+use datafusion::error::{DataFusionError, Result};
 pub(crate) use op::FusedAggOp;
+pub(crate) use project::project;
+pub(crate) use range_expr::RangeExpr;
+use tokio::task::JoinSet;
+
+/// Collects every partition in order; the first failure fails the whole, and dropping the set
+/// aborts the rest.
+pub(super) async fn collect_partitioned<T, Fut>(parts: Vec<Fut>) -> Result<Vec<T>>
+where
+    T: Send + 'static,
+    Fut: Future<Output = Result<T>> + Send + 'static,
+{
+    let mut results: Vec<Option<T>> = parts.iter().map(|_| None).collect();
+    let mut tasks = JoinSet::new();
+    for (index, part) in parts.into_iter().enumerate() {
+        tasks.spawn(async move { (index, part.await) });
+    }
+    // sources finish in any order; the merge needs them in source order
+    while let Some(joined) = tasks.join_next().await {
+        let (index, part) = joined.map_err(|e| DataFusionError::Execution(e.to_string()))?;
+        results[index] = Some(part?);
+    }
+    Ok(results
+        .into_iter()
+        .map(|part| part.expect("every source joined"))
+        .collect())
+}
 
 #[cfg(test)]
 mod test_support {
