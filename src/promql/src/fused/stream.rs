@@ -141,7 +141,7 @@ mod tests {
     use promql_parser::label::{Labels as ModifierLabels, Matchers};
 
     use super::{
-        super::{matrix, project::project, range_expr::RangeExpr, test_support::*},
+        super::{eval_range::eval_range, matrix, range_expr::RangeExpr, test_support::*},
         *,
     };
     use crate::{functions, series_stream::merge::series_label_columns};
@@ -438,7 +438,7 @@ mod tests {
             .unwrap()
             .expect("the sorted table streams");
             let eval = Arc::new(RangeExpr::new(func, range, &eval_ctx));
-            let (actual, _) = project(sources, eval).await.unwrap();
+            let (actual, _) = eval_range(sources, eval).await.unwrap();
             assert_matrix_close(
                 canonical_matrix(expected),
                 canonical_matrix(Value::Matrix(actual)),

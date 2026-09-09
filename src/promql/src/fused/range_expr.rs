@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 //! The range function as a physical expression: one series in, one value per evaluation slot
-//! out, shared by the aggregate and the projection.
+//! out, shared by the aggregate and `eval_range`.
 
 use std::{sync::Arc, time::Duration};
 

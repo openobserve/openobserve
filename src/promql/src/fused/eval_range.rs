@@ -13,8 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! The fused projection: a bare range function whose output is the result, so every series
-//! maps to its own values and nothing folds.
+//! The streaming `eval_range`: the range function over every series, its output kept whole
+//! because it is the result.
 
 use std::sync::Arc;
 
@@ -24,9 +24,9 @@ use datafusion::error::Result;
 use super::{collect_partitioned, range_expr::RangeExpr};
 use crate::series_stream::SeriesStream;
 
-/// Projects every partition's series through the function and returns them whole, in partition
-/// order; dropping the future aborts the partitions.
-pub(crate) async fn project<F, S>(
+/// Evaluates the range function over every partition's series and returns them whole, in
+/// partition order; dropping the future aborts the partitions.
+pub(crate) async fn eval_range<F, S>(
     sources: Vec<F>,
     eval: Arc<RangeExpr>,
 ) -> Result<(Vec<RangeValue>, usize)>
@@ -45,23 +45,23 @@ where
         .into_iter()
         .map(|source| {
             let eval = eval.clone();
-            async move { project_partition(source.await?, eval).await }
+            async move { eval_range_partition(source.await?, eval).await }
         })
         .collect();
     let parts = collect_partitioned(parts).await?;
     let series_count: usize = parts.iter().map(|(_, series)| series).sum();
     let series: Vec<RangeValue> = parts.into_iter().flat_map(|(series, _)| series).collect();
     log::info!(
-        "[trace_id: {trace_id}] [PromQL Timing] streaming {func_name}() execution took: {:?}, mapped {} of {series_count} series",
+        "[trace_id: {trace_id}] [PromQL Timing] streaming {func_name}() execution took: {:?}, evaluated {} of {series_count} series",
         start_time.elapsed(),
         series.len(),
     );
     Ok((series, series_count))
 }
 
-/// Projects one partition's series; like the generic evaluator, a series with no value is
+/// Evaluates one partition's series; like the generic evaluator, a series with no value is
 /// dropped.
-async fn project_partition<S: SeriesStream>(
+async fn eval_range_partition<S: SeriesStream>(
     mut source: S,
     eval: Arc<RangeExpr>,
 ) -> Result<(Vec<RangeValue>, usize)> {

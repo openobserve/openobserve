@@ -19,15 +19,15 @@
 
 mod accumulator;
 mod aggregate;
+mod eval_range;
 pub(crate) mod matrix;
 mod op;
-mod project;
 mod range_expr;
 pub(crate) mod stream;
 
 use datafusion::error::{DataFusionError, Result};
+pub(crate) use eval_range::eval_range;
 pub(crate) use op::FusedAggOp;
-pub(crate) use project::project;
 pub(crate) use range_expr::RangeExpr;
 use tokio::task::JoinSet;
 
