@@ -316,7 +316,7 @@ fn composite_input(
         warning_counts_as_firing: condition.warning_counts_as_firing,
         stale_child_policy: condition.stale_child_policy.storage_id(),
         destinations: alert.destinations,
-        template: alert.template,
+        template: alert.template.filter(|s| !s.is_empty()),
         context_attributes: alert
             .context_attributes
             .map(|value| serde_json::json!(value)),
