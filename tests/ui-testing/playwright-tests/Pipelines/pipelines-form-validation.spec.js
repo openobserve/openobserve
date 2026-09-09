@@ -360,39 +360,34 @@ test.describe(
             }
         });
 
-        // ── Test: empty name => name error or continue disabled ───────────────
+        // ── Test: empty name => name error or submit disabled ─────────────────
 
         test(
-            'should show name error or disable Continue when destination name is empty',
+            'should show name error or disable Save when destination name is empty',
             { tag: ['@domainFormValidation', '@P0', '@smoke'] },
             async ({ page }) => {
                 await pm.pipelinesFormValidation.navigateToAddDestination();
 
-                // Select HTTP type if available
-                const typeCard = pm.pipelinesFormValidation.getDestinationTypeCardHttpLocator();
-                if (await typeCard.isVisible({ timeout: 5000 })) {
-                    await typeCard.click();
-                }
-
-                // Attempt to continue without filling name
+                // The type step has a default selection, so Continue always advances; the name lives on step 2.
                 const continueBtn = pm.pipelinesFormValidation.getStep1ContinueBtnLocator();
                 if (await continueBtn.isVisible({ timeout: 5000 })) {
                     await continueBtn.click();
-
-                    const errorVisible = await pm.pipelinesFormValidation
-                        .getAddDestinationNameErrorLocator()
-                        .isVisible({ timeout: 3000 })
-                        .catch(() => false);
-
-                    const continueDisabled = await continueBtn.isDisabled({ timeout: 1000 }).catch(() => false);
-
-                    expect(errorVisible || continueDisabled).toBe(true);
-                } else {
-                    // Step 1 continue btn not found — check submit btn disabled state
-                    const submitBtn = pm.pipelinesFormValidation.getAddDestinationSubmitBtnLocator();
-                    const submitDisabled = await submitBtn.isDisabled({ timeout: 3000 }).catch(() => true);
-                    expect(submitDisabled).toBe(true);
                 }
+
+                // The name is validated on submit, not while typing, so Save has to be attempted.
+                const submitBtn = pm.pipelinesFormValidation.getAddDestinationSubmitBtnLocator();
+                await submitBtn.waitFor({ state: 'visible', timeout: 8000 });
+                const submitDisabled = await submitBtn.isDisabled({ timeout: 1000 }).catch(() => false);
+                if (!submitDisabled) {
+                    await submitBtn.click();
+                }
+
+                const errorVisible = await pm.pipelinesFormValidation
+                    .getAddDestinationNameErrorLocator()
+                    .isVisible({ timeout: 3000 })
+                    .catch(() => false);
+
+                expect(errorVisible || submitDisabled).toBe(true);
             }
         );
 
