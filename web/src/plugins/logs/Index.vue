@@ -883,16 +883,12 @@ export default defineComponent({
       return searchObj.meta.logsVisualizeToggle === "logs";
     }
 
-    // Arrivals that carry the whole search in the URL. Search History and the AI chat only
-    // re-apply the query into the editor; the scheduler also runs it.
+    // Search History and the AI chat only re-apply the query; the scheduler also runs it.
     const RE_APPLY_QUERY_TYPES = ["search_history_re_apply", "ai_chat_query"];
     const URL_DRIVEN_QUERY_TYPES = [...RE_APPLY_QUERY_TYPES, "search_scheduler"];
 
     const isRouteChanged = () => {
-      // Search History / Scheduler are standalone routes and /logs is not kept alive, so this
-      // is a fresh mount and the query.type watchers below never see the initial value. Unless
-      // the cached state is dropped, initialLogsState() restores the previous searchObj over
-      // the query carried in the URL and the re-applied query is silently lost (#14283).
+      // Not kept alive: this fresh mount never fires the type watchers, so the cached searchObj would bury the URL query (#14283).
       if (URL_DRIVEN_QUERY_TYPES.includes(router.currentRoute.value.query.type)) {
         store.dispatch("logs/setIsInitialized", false);
         return;
@@ -925,7 +921,7 @@ export default defineComponent({
     // Setup logic for the logs tab
     async function setupLogsTab() {
       try {
-        // restoreUrlQueryParams() strips `type` off the route, so read it before that runs.
+        // restoreUrlQueryParams() deletes a search_history_re_apply `type` off the route, so read it first.
         const arrivalType = router.currentRoute.value.query.type;
         isRouteChanged();
         if (!store.state.logs.isInitialized) {
@@ -1131,8 +1127,7 @@ export default defineComponent({
       loadLogsData();
     }
 
-    // Mirrors loadLogsData() minus getQueryData(): a re-applied query is loaded into the
-    // editor for the user to run, never run on their behalf.
+    // loadLogsData() minus getQueryData(): a re-applied query is loaded for the user to run, not run for them.
     async function applyReAppliedQuery() {
       searchObj.meta.searchApplied = false;
       await getStreamList();

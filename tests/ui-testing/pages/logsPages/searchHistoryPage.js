@@ -45,7 +45,7 @@ export class SearchHistoryPage {
   /**
    * Usage rows are published asynchronously, so refresh until the query shows up.
    */
-  async waitForQueryRow(sqlFragment, { attempts = 20, intervalMs = 5000 } = {}) {
+  async waitForQueryRow(sqlFragment, { attempts = 12, intervalMs = 5000 } = {}) {
     const row = this.rowContaining(sqlFragment);
 
     for (let attempt = 1; attempt <= attempts; attempt++) {
@@ -57,7 +57,10 @@ export class SearchHistoryPage {
       await this.page.waitForTimeout(intervalMs);
     }
 
-    throw new Error(`Search History never listed a query containing "${sqlFragment}"`);
+    throw new Error(
+      `Search History never listed a query containing "${sqlFragment}" after ${attempts} refreshes — ` +
+        'usage reporting is most likely disabled or not publishing on this environment.',
+    );
   }
 
   /** Expands the row for the given query and re-applies it on the logs page. */
