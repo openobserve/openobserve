@@ -883,7 +883,7 @@
     "queryFailed": "Query failed",
     "unknownError": "Unknown error",
     "selectedLabel": "selected",
-    "selectToFilter": "Select to filter",
+    "selectToFilter": "Select Filter",
     "clearSelection": "Clear selection",
     "includeModeHint": "Include mode (=)",
     "excludeModeHint": "Exclude mode (≠)",
