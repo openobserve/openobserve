@@ -12786,7 +12786,7 @@
     "columns": {
       "name": "Name",
       "type": "Type",
-      "endpoint": "Base URL",
+      "endpoint": "Endpoint",
       "defaultModel": "Default Model"
     },
     "empty": {

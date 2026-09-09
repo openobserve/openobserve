@@ -103,7 +103,7 @@
           </template>
 
           <template #cell-endpoint="{ row }">
-            <span class="font-mono text-xs">{{ row.endpoint || endpointFallback(row) }}</span>
+            <span class="font-mono text-xs">{{ resolvedEndpointOf(row) || "—" }}</span>
           </template>
 
           <template #cell-defaultModel="{ row }">
@@ -162,6 +162,7 @@ import onlineEvalsService, { type Provider } from "@/services/online-evals.servi
 import {
   defaultModelOf,
   providerTypeOf,
+  resolvedEndpointOf,
 } from "@/enterprise/components/onlineEvals/utils/evalEntity";
 import { showError } from "@/enterprise/components/onlineEvals/utils/evalFormat";
 import ProviderFormPage from "@/enterprise/components/onlineEvals/forms/ProviderFormPage.vue";
@@ -171,7 +172,6 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
-import { DEFAULT_PROVIDER_BASE_URLS } from "@/utils/llmProviderBaseUrls";
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -213,7 +213,7 @@ const columns = computed(() => [
   {
     id: "endpoint",
     header: t("llmProviders.columns.endpoint"),
-    accessorFn: (row: Provider) => row.endpoint || endpointFallback(row),
+    accessorFn: (row: Provider) => resolvedEndpointOf(row),
     sortable: false,
     resizable: true,
     hideable: true,
@@ -245,7 +245,7 @@ const filteredProviders = computed(() => {
   const filtered = !query
     ? providers.value
     : providers.value.filter((p) =>
-        [p.name, providerTypeOf(p), p.endpoint]
+        [p.name, providerTypeOf(p), resolvedEndpointOf(p)]
           .filter(Boolean)
           .some((v) => String(v).toLowerCase().includes(query)),
       );
@@ -272,11 +272,6 @@ async function loadProviders() {
   } finally {
     isLoading.value = false;
   }
-}
-
-function endpointFallback(provider: Provider) {
-  const type = providerTypeOf(provider).toLowerCase();
-  return DEFAULT_PROVIDER_BASE_URLS[type] ?? "—";
 }
 
 function pushRouteAction(extra: Record<string, string | undefined>) {

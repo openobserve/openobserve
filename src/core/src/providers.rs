@@ -70,6 +70,37 @@ fn validate_provider_config(provider: &table::providers::Provider) -> Result<(),
         .map_err(|e| ProviderError::InvalidConfig(e.to_string()))
 }
 
+/// Rewrites a submitted endpoint into the complete URL model execution will
+/// call, so storage holds the resolved URL rather than the base URL it may have
+/// been entered as.
+///
+/// A blank endpoint stays `None` rather than being materialized into the row:
+/// the provider default is then resolved on every read, so changing a default
+/// still reaches every provider that never configured one.
+#[cfg(feature = "enterprise")]
+fn normalize_provider_endpoint(
+    provider: &mut table::providers::Provider,
+) -> Result<(), ProviderError> {
+    let configured = provider
+        .endpoint
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty());
+    let Some(configured) = configured else {
+        provider.endpoint = None;
+        return Ok(());
+    };
+
+    let resolved =
+        o2_enterprise::enterprise::llm_evaluations::providers::resolve_endpoint_for_type(
+            &provider.provider_type,
+            Some(configured),
+        )
+        .map_err(|e| ProviderError::InvalidConfig(e.to_string()))?;
+    provider.endpoint = Some(resolved);
+    Ok(())
+}
+
 #[tracing::instrument(skip(provider))]
 pub async fn save_provider(
     org_id: &str,
@@ -84,6 +115,8 @@ pub async fn save_provider(
         provider.id = ider::generate();
     }
 
+    #[cfg(feature = "enterprise")]
+    normalize_provider_endpoint(&mut provider)?;
     #[cfg(feature = "enterprise")]
     validate_provider_config(&provider)?;
 
@@ -130,6 +163,8 @@ pub async fn update_provider(
 
     provider.id = provider_id.to_string();
     provider.created_at = existing.created_at;
+    #[cfg(feature = "enterprise")]
+    normalize_provider_endpoint(&mut provider)?;
     #[cfg(feature = "enterprise")]
     validate_provider_config(&provider)?;
     table::providers::update(&provider).await?;

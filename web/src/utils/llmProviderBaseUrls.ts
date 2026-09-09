@@ -33,6 +33,5 @@ export const DEFAULT_PROVIDER_BASE_URLS: Record<string, string> = {
  * value that would function as-is.
  */
 export const SUGGESTED_PROVIDER_BASE_URLS: Record<string, string> = {
-  azure_openai: "https://{resource}.openai.azure.com/openai/deployments/{deployment}",
   openai_compatible: "https://your-host/v1",
 };

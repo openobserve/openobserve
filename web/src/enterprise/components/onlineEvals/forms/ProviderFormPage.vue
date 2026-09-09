@@ -251,11 +251,9 @@ const providerTypeOptions = computed(() => [
   { label: raw("OpenAI"), value: "openai" },
   { label: raw("DeepSeek"), value: "deepseek" },
   { label: raw("Anthropic"), value: "anthropic" },
-  { label: raw("Azure OpenAI"), value: "azure_openai" },
   { label: raw("Ollama"), value: "ollama" },
   { label: raw("vLLM"), value: "vllm" },
   { label: raw("OpenAI-compatible"), value: "openai_compatible" },
-  { label: t("ingestion.otherLabel"), value: "other" },
 ]);
 
 const endpointPlaceholder = computed(
