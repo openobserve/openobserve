@@ -1932,7 +1932,7 @@ pub struct Common {
     #[env_config(
         name = "ZO_USAGE_REPORTING_ENABLED",
         default = false,
-        help = "Report usage (metering) and error data. Does NOT cover trigger records: alert and report execution history is published unconditionally, because it is product history rather than telemetry and several features read it."
+        help = "Report usage (metering) data. Enterprise only: the open source build never writes the usage stream. Does NOT cover error records (see ZO_USAGE_REPORTING_ERRORS_ENABLED) or trigger records, which are published unconditionally because they are product history rather than telemetry."
     )]
     pub usage_enabled: bool,
     #[env_config(
