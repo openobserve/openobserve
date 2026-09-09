@@ -31,6 +31,7 @@ use o2_enterprise::enterprise::{
     super_cluster::kv::ofga::{get_model, set_model},
 };
 use o2_openfga::{
+    TupleKey,
     authorizer::authz::{
         add_tuple_for_pipeline, get_add_user_to_org_tuples, get_org_creation_tuples,
         get_ownership_all_org_tuple, get_ownership_tuple, update_tuples,
@@ -42,6 +43,22 @@ use o2_openfga::{
 };
 
 use crate::common::infra::config::{ORG_USERS, ORGANIZATIONS, USERS};
+
+const OWNERSHIP_BACKFILL_MODEL_VERSION: &str = "0.0.48";
+
+// Mapping keys repaired by the backfill introduced at this model version.
+const OWNERSHIP_BACKFILL_RESOURCES: [&str; 10] = [
+    "mcp",
+    "model_pricing",
+    LOGS_INSIGHTS_KEY,
+    LOGS_PATTERN_KEY,
+    RESULT_LOGS_CACHE_KEY,
+    "db_monitoring",
+    "search_inspector",
+    "status_pages",
+    "playground",
+    "raman",
+];
 
 /// Which back-fills the jump from one model version to another still owes.
 #[derive(Default)]
@@ -68,7 +85,6 @@ struct PendingMigrations {
     synthetics: bool,
     stream_names: bool,
     oncall: bool,
-    raman: bool,
     ownership_backfill: bool,
     annotation_queues_datasets: bool,
     llm_workbench: bool,
@@ -403,6 +419,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
             for tuple in init_tuples {
                 tuples.push(tuple);
             }
+            dedup_tuples(&mut tuples);
 
             if tuples.is_empty() {
                 log::info!("[OFGA:Local] No orgs to update to the openfga");
@@ -506,16 +523,8 @@ fn all_org_ownership_keys(pending: &PendingMigrations) -> Vec<&'static str> {
     if pending.oncall {
         keys.extend(["oncall", "oncall_responses"]);
     }
-    if pending.raman {
-        keys.push("raman");
-    }
     if pending.ownership_backfill {
-        keys.extend([
-            "db_monitoring",
-            "search_inspector",
-            "status_page",
-            "playground",
-        ]);
+        keys.extend(OWNERSHIP_BACKFILL_RESOURCES);
     }
     if pending.annotation_queues_datasets {
         keys.extend(["annotation_queues", "datasets"]);
@@ -559,6 +568,8 @@ fn pending_migrations(latest: &str, existing: &str) -> PendingMigrations {
     let v0_0_43 = version_compare::Version::from("0.0.43").unwrap();
     let v0_0_46 = version_compare::Version::from("0.0.46").unwrap();
     let v0_0_47 = version_compare::Version::from("0.0.47").unwrap();
+    let ownership_backfill_model_version =
+        version_compare::Version::from(OWNERSHIP_BACKFILL_MODEL_VERSION).unwrap();
 
     if meta_version > v0_0_5 && existing_model_version < v0_0_6 {
         pending.pipeline = true;
@@ -654,8 +665,8 @@ fn pending_migrations(latest: &str, existing: &str) -> PendingMigrations {
     if existing_model_version < v0_0_46 {
         log::info!("[OFGA:Local] on-call permissions migration needed");
         pending.oncall = true;
-        log::info!("[OFGA:Local] raman permissions migration needed");
-        pending.raman = true;
+    }
+    if existing_model_version < ownership_backfill_model_version {
         log::info!("[OFGA:Local] ownership backfill migration needed");
         pending.ownership_backfill = true;
     }
@@ -667,38 +678,21 @@ fn pending_migrations(latest: &str, existing: &str) -> PendingMigrations {
     pending
 }
 
+// A repeated tuple key risks the whole OpenFGA write batch.
+fn dedup_tuples(tuples: &mut Vec<TupleKey>) {
+    let mut seen = HashSet::new();
+    tuples.retain(|tuple| {
+        seen.insert((
+            tuple.user.clone(),
+            tuple.relation.clone(),
+            tuple.object.clone(),
+        ))
+    });
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn raman_migration_is_needed_below_the_model_version() {
-        for version in ["0.0.1", "0.0.39", "0.0.42", "0.0.45"] {
-            assert!(
-                pending_migrations("0.0.46", version).raman,
-                "an org recorded at {version} predates raman and must be migrated"
-            );
-        }
-    }
-
-    #[test]
-    fn raman_migration_is_skipped_at_or_above_the_model_version() {
-        for version in ["0.0.46", "0.0.47", "0.1.0"] {
-            assert!(
-                !pending_migrations("0.0.46", version).raman,
-                "an org recorded at {version} already owns the raman tuple"
-            );
-        }
-    }
-
-    #[test]
-    fn raman_migration_uses_the_shared_org_ownership_path() {
-        let pending = PendingMigrations {
-            raman: true,
-            ..Default::default()
-        };
-        assert_eq!(all_org_ownership_keys(&pending), vec!["raman"]);
-    }
 
     #[test]
     fn llm_workbench_migration_covers_every_org_below_the_playground_version() {
@@ -725,31 +719,56 @@ mod tests {
         };
         assert_eq!(
             all_org_ownership_keys(&pending),
-            vec![
-                "db_monitoring",
-                "search_inspector",
-                "status_page",
-                "playground"
-            ]
+            OWNERSHIP_BACKFILL_RESOURCES.to_vec()
         );
+        assert!(OWNERSHIP_BACKFILL_RESOURCES.contains(&"raman"));
+        assert!(OWNERSHIP_BACKFILL_RESOURCES.contains(&"mcp"));
     }
 
     #[test]
     fn ownership_backfill_is_gated_by_the_shipped_model_version() {
-        for version in ["0.0.1", "0.0.39", "0.0.40", "0.0.42", "0.0.45"] {
-            assert!(pending_migrations("0.0.46", version).ownership_backfill);
+        for version in [
+            "0.0.1", "0.0.39", "0.0.40", "0.0.42", "0.0.45", "0.0.46", "0.0.47",
+        ] {
+            assert!(pending_migrations("0.0.48", version).ownership_backfill);
         }
-        for version in ["0.0.46", "0.0.47", "0.1.0"] {
-            assert!(!pending_migrations("0.0.46", version).ownership_backfill);
+        for version in ["0.0.48", "0.0.49", "0.1.0"] {
+            assert!(!pending_migrations("0.0.48", version).ownership_backfill);
         }
     }
 
+    #[test]
+    fn every_backfilled_resource_is_an_ofga_models_map_key() {
+        for resource in OWNERSHIP_BACKFILL_RESOURCES {
+            assert!(
+                OFGA_MODELS.contains_key(resource),
+                "`{resource}` is not an OFGA_MODELS key"
+            );
+        }
+    }
+
+    #[test]
+    fn dedup_tuples_drops_repeated_keys_and_preserves_first_order() {
+        let mut tuples = vec![];
+        for object in ["a:_all_x", "b:_all_x", "a:_all_x", "c:_all_x", "b:_all_x"] {
+            tuples.push(TupleKey {
+                user: "org:x".to_string(),
+                relation: "owningOrg".to_string(),
+                object: object.to_string(),
+                condition: None,
+            });
+        }
+        dedup_tuples(&mut tuples);
+        let objects: Vec<_> = tuples.iter().map(|tuple| tuple.object.as_str()).collect();
+        assert_eq!(objects, vec!["a:_all_x", "b:_all_x", "c:_all_x"]);
+    }
+
     #[tokio::test]
-    async fn raman_migration_version_matches_the_shipped_model() {
+    async fn ownership_backfill_version_matches_the_shipped_model() {
         let model = o2_openfga::model::read_ofga_model().await;
         assert_eq!(
-            model.version, "0.0.46",
-            "raman shipped in ofga model 0.0.46; a model bump needs its own migration arm"
+            model.version, OWNERSHIP_BACKFILL_MODEL_VERSION,
+            "the backfill is keyed to the shipped model; a model bump needs its own migration arm"
         );
     }
 }
