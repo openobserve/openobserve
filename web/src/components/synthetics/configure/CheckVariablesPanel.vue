@@ -44,6 +44,8 @@ const props = defineProps<{
   checkId?: string;
   /** The check as last loaded or saved; promote acts on the stored copy. */
   saved?: BrowserCheck | null;
+  /** Referenced checks' steps keyed by id; absent means a subtest step counts nothing yet. */
+  childJourneys?: Map<string, { steps: BrowserStep[] }>;
 }>();
 const emit = defineEmits<{ "update:check": [value: BrowserCheck]; promoted: [name: string] }>();
 
@@ -60,11 +62,21 @@ function stepUsesToken(step: BrowserStep, token: string): boolean {
   );
 }
 
+/** A subtest step runs no action of its own — usage inside it lives on the
+ *  referenced check's steps, not the reference row. */
+function stepsToScan(): BrowserStep[] {
+  return props.check.journey.flatMap((step) =>
+    step.action === "subtest"
+      ? (props.childJourneys?.get(step.subtest?.id ?? "")?.steps ?? [])
+      : [step],
+  );
+}
+
 function usageCount(name: string): number {
   const trimmed = name.trim();
   if (!trimmed) return 0;
   const token = `{{${trimmed}}}`;
-  return props.check.journey.filter((step) => stepUsesToken(step, token)).length;
+  return stepsToScan().filter((step) => stepUsesToken(step, token)).length;
 }
 
 const usageCounts = computed(() => variables.value.map((v) => usageCount(v.name)));

@@ -470,6 +470,35 @@ describe("CheckVariablesPanel", () => {
     });
   });
 
+  // A subtest step runs no action of its own, so usage inside the referenced check must count.
+  describe("composed usage", () => {
+    const composedCheck: BrowserCheck = checkWith(
+      [{ id: "var-pw", name: "PASSWORD", value: "", secure: true, example: "" }],
+      [
+        { id: "s1", action: "navigate", value: "https://x" },
+        { id: "s2", action: "subtest", name: "Login", subtest: { id: "login-test" } },
+      ],
+    );
+    const children = new Map<string, { steps: BrowserStep[] }>([
+      ["login-test", { steps: [{ id: "c1", action: "type", name: "pw", value: "{{PASSWORD}}" }] }],
+    ]);
+
+    it("counts a variable used only inside a referenced check", async () => {
+      wrapper = mountPanel({ check: composedCheck, childJourneys: children });
+
+      await wrapper.find(sel("-remove-0-btn")).trigger("click");
+      expect(wrapper.find(sel("-remove-dialog")).text()).toContain("referenced by 1 step");
+    });
+
+    // With no children cache supplied the count must read exactly zero, not merely "not 1".
+    it("reads as unreferenced when the child journeys have not been loaded", async () => {
+      wrapper = mountPanel({ check: composedCheck });
+
+      await wrapper.find(sel("-remove-0-btn")).trigger("click");
+      expect(wrapper.find(sel("-remove-dialog")).text()).not.toContain("referenced by");
+    });
+  });
+
   // ── Remove + undo ─────────────────────────────────────────────────────────
   describe("remove and undo", () => {
     const varThird = { id: "var-d", name: "THIRD", value: "3", secure: false, example: "" };
