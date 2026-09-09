@@ -64,7 +64,7 @@ pub fn parse_types(types: Option<&str>) -> Vec<ResourceType> {
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = SearchResourcesResponse),
         (status = 400, description = "Invalid limit", content_type = "application/json", body = ()),
-        (status = 401, description = "Unauthorized", content_type = "application/json", body = ()),
+        (status = 403, description = "Unauthorized", content_type = "application/json", body = ()),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Resources", "operation": "list"})),

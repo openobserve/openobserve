@@ -51,6 +51,7 @@ pub struct SourceContext<'a> {
     pub limit: u64,
 }
 
+/// Dispatches to the source for `kind`, returning its unranked candidate hits (the caller ranks).
 pub async fn fetch(
     ctx: &SourceContext<'_>,
     kind: ResourceType,
@@ -302,6 +303,10 @@ async fn users(ctx: &SourceContext<'_>) -> anyhow::Result<Vec<ResourceHit>> {
 }
 
 async fn service_accounts(ctx: &SourceContext<'_>) -> anyhow::Result<Vec<ResourceHit>> {
+    // Match the list endpoint: when the feature is off, service accounts are not discoverable.
+    if !get_config().auth.service_account_enabled {
+        return Ok(Vec::new());
+    }
     let permit = permit_for(ctx, "service_accounts").await?;
     let prefix = format!("{}/", ctx.org_id);
     Ok(ORG_USERS

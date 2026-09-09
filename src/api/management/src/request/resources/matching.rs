@@ -37,11 +37,20 @@ pub struct Permit {
 /// The client additionally strips NFD diacritics; this does not, so an accented entity
 /// name matches an accented query but not its unaccented form. Diacritic parity is deferred.
 pub fn fold(value: &str) -> String {
-    value
-        .split_whitespace()
-        .collect::<Vec<_>>()
-        .join(" ")
-        .to_lowercase()
+    let mut out = String::with_capacity(value.len());
+    let mut pending_space = false;
+    for ch in value.chars() {
+        if ch.is_whitespace() {
+            pending_space = !out.is_empty();
+        } else {
+            if pending_space {
+                out.push(' ');
+                pending_space = false;
+            }
+            out.extend(ch.to_lowercase());
+        }
+    }
+    out
 }
 
 /// Cheap pre-filter for in-memory sources; `q` must already be folded.
@@ -100,9 +109,19 @@ pub fn rank(hits: Vec<ResourceHit>, q: &str, limit: usize) -> (Vec<ResourceHit>,
             })
             .collect()
     };
-    scored.sort_by(|a, b| b.1.score.cmp(&a.1.score).then_with(|| a.0.cmp(&b.0)));
+    let by_rank = |a: &(String, ResourceHit), b: &(String, ResourceHit)| {
+        b.1.score.cmp(&a.1.score).then_with(|| a.0.cmp(&b.0))
+    };
     let truncated = scored.len() > limit;
-    scored.truncate(limit);
+    // Partition the top `limit` in O(n) before sorting only those, rather than sorting the whole
+    // set.
+    if truncated && limit > 0 {
+        scored.select_nth_unstable_by(limit - 1, by_rank);
+        scored.truncate(limit);
+    } else if limit == 0 {
+        scored.clear();
+    }
+    scored.sort_by(by_rank);
     (scored.into_iter().map(|(_, hit)| hit).collect(), truncated)
 }
 
@@ -135,6 +154,8 @@ impl Permit {
         }
     }
 
+    /// Unrestricted when no list was resolved; otherwise the id must be individually or org-wide
+    /// granted.
     pub fn allows(&self, id: &str) -> bool {
         match &self.ids {
             None => true,
