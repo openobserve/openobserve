@@ -65,7 +65,7 @@ fn resolve_updated_auth_config(
 
 #[cfg(feature = "enterprise")]
 fn validate_provider_config(provider: &table::providers::Provider) -> Result<(), ProviderError> {
-    o2_enterprise::enterprise::llm_evaluations::provider::PreparedProvider::parse(provider.into())
+    o2_enterprise::enterprise::llm_evaluations::providers::PreparedProvider::parse(provider.into())
         .map(|_| ())
         .map_err(|e| ProviderError::InvalidConfig(e.to_string()))
 }

@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         v-else
         :variant="variant"
-        size="sm"
+        size="sm-toolbar"
         icon-left="add"
         :loading="busy"
         :data-test="dataTest"

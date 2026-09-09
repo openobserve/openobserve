@@ -27,7 +27,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/github-auth
-      - uses: taiki-e/install-action@v2.87.0
+      - uses: taiki-e/install-action@5bf6ce016fd2e72eefc647cbca1e4213f65955b8 # v2.87.5
         env:
           GITHUB_TOKEN: ${{ github.token }}
         with:

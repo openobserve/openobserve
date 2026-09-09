@@ -29,6 +29,11 @@ body scrolls.
 - **Primary page action** (New / Add / Create) and page-level secondary actions
   (Import, an overflow `ODropdown`) go in the header's **`#actions`** slot as O2
   buttons — never in the table toolbar.
+- **The create CTA is label-only — no `icon-left="add"`.** Secondary header
+  actions keep their semantic icons (Import → `upload-file`), and in-section
+  adders inside the body keep their `+`; it is only the header's create button
+  that carries no icon. See
+  [house-rules § The header create CTA carries no icon](house-rules.md#the-header-create-cta-carries-no-icon).
 - The header owns its own chrome — don't wrap it in a bordered/padded div, but
   **do** give it horizontal padding and a bottom divider so the header aligns with
   the app frame while the table below runs flush (see the skeleton next).
@@ -68,7 +73,7 @@ while the header aligns with the app frame:
       class="shrink-0 px-4 border-b border-border-default"
     >
       <template #actions>
-        <OButton variant="primary" size="sm" icon-left="add" data-test="channels-new" @click="create">
+        <OButton variant="primary" size="sm" data-test="channels-new" @click="create">
           {{ t("channels.new") }}
         </OButton>
       </template>
@@ -323,7 +328,7 @@ form — those go in an `ODialog`/`ODrawer`; see SKILL.md § Forms):
       `card-container flex-1 min-h-0 overflow-hidden` — **no page padding**, table
       runs **flush**.
 - [ ] `OPageHeader` on top (description via **`subtitle`** prop); primary
-      **New** action in `#actions`.
+      **New** action in `#actions`, **label-only — no `icon-left="add"`**.
 - [ ] `OTable :frame="false"`; filters + **search** in `#toolbar`
       (`:show-global-filter="false"`), or the built-in global filter for a
       search-only list.

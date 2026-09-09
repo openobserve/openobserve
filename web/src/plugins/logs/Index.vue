@@ -883,7 +883,17 @@ export default defineComponent({
       return searchObj.meta.logsVisualizeToggle === "logs";
     }
 
+    // Search History and the AI chat only re-apply the query; the scheduler also runs it.
+    const RE_APPLY_QUERY_TYPES = ["search_history_re_apply", "ai_chat_query"];
+    const URL_DRIVEN_QUERY_TYPES = [...RE_APPLY_QUERY_TYPES, "search_scheduler"];
+
     const isRouteChanged = () => {
+      // Not kept alive: this fresh mount never fires the type watchers, so the cached searchObj would bury the URL query (#14283).
+      if (URL_DRIVEN_QUERY_TYPES.includes(router.currentRoute.value.query.type)) {
+        store.dispatch("logs/setIsInitialized", false);
+        return;
+      }
+
       if (
         !Object.hasOwn(router.currentRoute.value.query, "stream") ||
         !Object.hasOwn(router.currentRoute.value.query, "org_identifier")
@@ -911,6 +921,8 @@ export default defineComponent({
     // Setup logic for the logs tab
     async function setupLogsTab() {
       try {
+        // restoreUrlQueryParams() deletes a search_history_re_apply `type` off the route, so read it first.
+        const arrivalType = router.currentRoute.value.query.type;
         isRouteChanged();
         if (!store.state.logs.isInitialized) {
           searchObj.organizationIdentifier = store.state.selectedOrganization.identifier;
@@ -970,8 +982,12 @@ export default defineComponent({
           }
 
           if (isLogsTab()) {
-            searchObj.loading = true;
-            loadLogsData();
+            if (RE_APPLY_QUERY_TYPES.includes(arrivalType)) {
+              await applyReAppliedQuery();
+            } else {
+              searchObj.loading = true;
+              loadLogsData();
+            }
           } else if (searchObj.meta.logsVisualizeToggle === "patterns") {
             await loadPatternsData();
             await extractPatternsForCurrentQuery();
@@ -1109,6 +1125,16 @@ export default defineComponent({
       resetStreamData();
       await restoreUrlQueryParams(dashboardPanelData);
       loadLogsData();
+    }
+
+    // loadLogsData() minus getQueryData(): a re-applied query is loaded for the user to run, not run for them.
+    async function applyReAppliedQuery() {
+      searchObj.meta.searchApplied = false;
+      await getStreamList();
+      await getFunctions();
+      await extractFields();
+      refreshData();
+      searchObj.loading = false;
     }
 
     // Helper function for handling the stream explorer
@@ -1612,7 +1638,12 @@ export default defineComponent({
     watch(
       () => searchObj.data.stream.selectedStream,
       (streams: string[]) => {
-        if (store.state.zoConfig?.auto_query_enabled && Array.isArray(streams) && streams.length) {
+        if (
+          store.state.zoConfig?.auto_query_enabled &&
+          searchObj.data.stream.streamType === "logs" &&
+          Array.isArray(streams) &&
+          streams.length
+        ) {
           saveLogsStream(store.state.selectedOrganization.identifier, streams);
         }
       },

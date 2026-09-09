@@ -936,6 +936,21 @@ pub async fn set_enabled(org: &str, id: &str, enabled: bool) -> Result<bool, Slo
 // read path
 // ---------------------------------------------------------------------------
 
+/// The folder each named SLO currently lives in, skipping ids that do not resolve.
+///
+/// Callers authorize a move's source side with this: an SLO has no OFGA object
+/// type of its own, so it is checked as an alert parented by its folder.
+pub async fn folders_of(org: &str, ids: &[String]) -> Result<Vec<(String, String)>, SloError> {
+    let db = get_orm_client_ro().await;
+    let mut out = Vec::with_capacity(ids.len());
+    for id in ids {
+        if let Some(slo) = slos_table::get(db, org, id).await? {
+            out.push((slo.id, slo.folder_id));
+        }
+    }
+    Ok(out)
+}
+
 /// One SLO with its rollup measurement.
 pub async fn get_with_status(
     org: &str,

@@ -848,7 +848,9 @@
     },
     "condition": {
       "loading": "Bedingungen werden geladen...",
-      "loadError": "Die gespeicherte Bedingung konnte nicht gelesen werden und wurde zurückgesetzt. Wenn Sie jetzt speichern, wird sie überschrieben."
+      "loadError": "Die gespeicherte Bedingung konnte nicht gelesen werden und wurde zurückgesetzt. Wenn Sie jetzt speichern, wird sie überschrieben.",
+      "unknownColumn": "„{column}“ ist nicht im Payload dieses Triggers enthalten, daher trifft diese Bedingung möglicherweise nie zu.",
+      "unknownColumnSuggestion": "Meinten Sie „{suggestion}“?"
     },
     "destination": {
       "createNew": "Neues Ziel erstellen",
@@ -2560,7 +2562,9 @@
       "title": "Workflow-Ausführungen",
       "edit": "Workflow bearbeiten",
       "debugInEditor": "Im Editor debuggen",
-      "staleGraphWarning": "Dieser Workflow wurde seit diesem Lauf bearbeitet — der {count} Schritt, den er ausgeführt hat, existiert nicht mehr, daher wird sein Status hier nicht angezeigt. | Dieser Workflow wurde seit diesem Lauf bearbeitet — die {count} Schritte, die er ausgeführt hat, existieren nicht mehr, daher wird ihr Status hier nicht angezeigt."
+      "staleGraphWarning": "Dieser Workflow wurde seit diesem Lauf bearbeitet — der {count} Schritt, den er ausgeführt hat, existiert nicht mehr, daher wird sein Status hier nicht angezeigt. | Dieser Workflow wurde seit diesem Lauf bearbeitet — die {count} Schritte, die er ausgeführt hat, existieren nicht mehr, daher wird ihr Status hier nicht angezeigt.",
+      "hideList": "Liste der Läufe ausblenden",
+      "showList": "Liste der Läufe anzeigen"
     },
     "history": {
       "button": "Ausführungen",
@@ -2576,10 +2580,21 @@
       "error": "Fehler",
       "success": "Erfolg",
       "failed": "Fehlgeschlagen",
+      "testRun": "Testlauf",
+      "runType": "Typ",
+      "testRunTooltip": "Vom Editor aus gestartet. Destination-Schritte werden tatsächlich ausgeführt.",
+      "showTestRuns": "{count} Testlauf/-läufe anzeigen",
+      "hideTestRuns": "Testläufe ausblenden",
       "open": "Verlauf",
       "openFullView": "Vollständige Ausführungsansicht öffnen",
       "loadError": "Fehler beim Laden der Ausführungen",
-      "loadRunError": "Fehler beim Laden dieser Ausführung"
+      "loadRunError": "Fehler beim Laden dieser Ausführung",
+      "retry": "Wiederholen",
+      "retryTooltip": "Diesen fehlgeschlagenen Lauf mit den aufgezeichneten Eingaben erneut ausführen.",
+      "retryTitle": "Diesen Lauf erneut ausführen?",
+      "retryMessage": "Dadurch wird ein neuer Lauf aus den Eingaben erstellt, die der fehlgeschlagene Lauf aufgezeichnet hat. Destination-Schritte werden tatsächlich ausgeführt.",
+      "retryStarted": "Wiederholung gestartet – sie erscheint als neuer Lauf in der Liste.",
+      "retryError": "Dieser Lauf konnte nicht wiederholt werden"
     },
     "edit": "Bearbeiten",
     "view": "Anzeigen",
@@ -2596,7 +2611,9 @@
     "triggerRequired": "Ein Trigger ist erforderlich",
     "addStepRequired": "Fügen Sie mindestens einen Schritt nach dem Trigger hinzu",
     "connectAllNodes": "Verbinden Sie alle Knoten vor dem Speichern",
+    "branchPathsRequired": "Verbinden Sie jeden Verzweigungspfad mit einem Schritt | 1 Verzweigungsschritt hat Verbindungen, die nicht zu seinen Pfaden passen. Öffnen Sie ihn, definieren Sie die Pfade und schließen Sie die Verbindungen anschließend erneut an. | {count} Verzweigungsschritte haben Verbindungen, die nicht zu ihren Pfaden passen.",
     "finishStepsBeforePublish": "{count} Schritt benötigt Einrichtung vor der Veröffentlichung — auf der Arbeitsfläche hervorgehoben. | {count} Schritte benötigen Einrichtung vor der Veröffentlichung — auf der Arbeitsfläche hervorgehoben.",
+    "noChangesToPublish": "Keine Änderungen zu veröffentlichen – dieser Workflow entspricht bereits der veröffentlichten Version.",
     "draft": "Entwurf",
     "saveDraft": "Als Entwurf speichern",
     "publish": "Veröffentlichen",
@@ -2643,7 +2660,7 @@
     "loadError": "Workflow konnte nicht geladen werden",
     "deleteNode": "Knoten löschen",
     "deleteNodeTitle": "Schritt löschen",
-    "deleteNodeConfirm": "Sind Sie sicher, dass Sie diesen Schritt löschen möchten? Dies kann nicht rückgängig gemacht werden.",
+    "deleteNodeConfirm": "Möchten Sie diesen Schritt wirklich löschen? Sie können dies rückgängig machen.",
     "namePlaceholder": "Unbenannter Workflow",
     "renameHint": "Klicken Sie, um diesen Workflow umzubenennen",
     "editMode": "Workflow bearbeiten",
@@ -2656,11 +2673,29 @@
       "runFromBeginning": "Anfang (Trigger)",
       "runFromNote": "Nur Schritte von hier an werden ausgeführt.",
       "inputLabel": "Beispieleingabe",
+      "source": {
+        "sample": "Generiertes Beispiel",
+        "run": "Vom Lauf: {run}",
+        "edited": "Von Ihnen bearbeitet"
+      },
+      "revertInput": "Zurücksetzen",
+      "useRunInput": "Eingaben aus einem Lauf übernehmen…",
+      "lastTestRun": "Letzter Testlauf (in diesem Tab)",
+      "runHasNoInput": "Dieser Lauf hat keine gespeicherten Eingaben für diesen Schritt.",
       "invalidJson": "Geben Sie ein gültiges JSON-Array von Datensätzen ein.",
       "resultHint": "Nach der Ausführung zeigt jeder Schritt ein Häkchen oder ein Fehlersymbol auf der Leinwand.",
+      "rehearsalOnly": "Nur in einem Testlauf bestanden – ein Probelauf mit einem Beispiel-Payload, aber kein Nachweis, dass der veröffentlichte Workflow funktioniert.",
       "notVerified": "Keine Datensätze haben diesen Schritt erreicht — eine vorgelagerte Bedingung hat sie herausgefiltert, oder ein früherer Schritt ist fehlgeschlagen.",
+      "notConfigured": "Dieser Schritt ist nicht konfiguriert und hat in diesem Lauf nichts getan. Konfigurieren Sie ihn und testen Sie erneut.",
+      "recordedFailure": "Dieser Schritt ist im letzten aufgezeichneten Lauf fehlgeschlagen.",
+      "recordsUnavailable": "In einem früheren Lauf aufgezeichnet – führen Sie den Test erneut aus, um die Aufzeichnungen zu prüfen.",
+      "dirtySelf": "Die Konfiguration wurde geändert, seit dieser Schritt zuletzt ausgeführt wurde. Testen Sie den Schritt erneut.",
+      "dirtyUpstream": "Ein vorheriger Schritt wurde geändert, seit dieser Schritt ausgeführt wurde. Testen Sie den Schritt erneut.",
       "run": "Test ausführen",
       "runError": "Test konnte nicht ausgeführt werden.",
+      "suppressDestinations": "Keine tatsächliche Zustellung an Ziele",
+      "suppressDestinationsHint": "Destination-Schritte ermitteln ihr Routing, aber es wird nichts zugestellt.",
+      "dispatchWarning": "Der Test läuft live: Dieser Lauf sendet tatsächlich an {destinations}.",
       "stepResult": {
         "viewHint": "Klicken Sie, um Eingabe / Ausgabe anzuzeigen",
         "input": "Eingabe",
@@ -2686,8 +2721,10 @@
         "status": {
           "ok": "Bestanden",
           "error": "Fehler",
-          "skipped": "Keine Datensätze"
-        }
+          "skipped": "Keine Datensätze",
+          "noMatch": "Keine Übereinstimmung"
+        },
+        "suppressed": "Unterdrückt – nicht an das tatsächliche Ziel gesendet"
       }
     },
     "linkAlerts": {
@@ -2720,6 +2757,7 @@
       "kindLogic": "Logik",
       "kindAction": "Aktion",
       "condition": "Bedingung",
+      "branch": "Verzweigung",
       "function": "Funktion",
       "sendToDestination": "Ziel",
       "configComingSoon": "Die Konfiguration von {node} erfolgt in einem späteren Schritt",
@@ -2727,7 +2765,20 @@
       "sectionDestination": "Ziel",
       "stepSearchPlaceholder": "Schritte suchen...",
       "stepNoMatch": "Keine Schritte entsprechen Ihrer Suche.",
-      "conditionDesc": "Verzweigung nach einer Regel",
+      "conditionDesc": "Nur fortfahren, wenn eine Regel zutrifft",
+      "branchDesc": "Leitet jeden Datensatz über den ersten passenden Pfad weiter",
+      "branchCaseLabel": "Pfadname (optional)",
+      "branchCaseLabelPlaceholder": "z. B. Hoher Schweregrad",
+      "branchAddCase": "Pfad hinzufügen",
+      "branchRemoveCase": "Pfad entfernen",
+      "branchMoveUp": "Pfad nach oben verschieben",
+      "branchMoveDown": "Pfad nach unten verschieben",
+      "branchPathNumber": "Pfad {index}",
+      "branchElseTitle": "Sonstiges",
+      "branchElseHint": "Datensätze, auf die keiner der obigen Pfade zutrifft, werden hierher weitergeleitet.",
+      "branchNoteTitle": "Hinweise zur Verzweigung",
+      "branchNoteFirstMatch": "Pfade werden von oben nach unten geprüft, und der ERSTE Treffer gewinnt. Daher verlässt jeder Datensatz über genau einen Pfad.",
+      "branchNoteUnwired": "Ein Pfad ohne Verbindung verwirft seine Datensätze einfach.",
       "functionDesc": "Payload mit einer Funktion umformen",
       "destinationDesc": "An ein Ziel senden",
       "triggerBody": "Wird ausgeführt, wenn ein zugehöriger Alarm ausgelöst wird",
@@ -2775,11 +2826,14 @@
       "enable": "Schritt aktivieren",
       "disabledBadge": "Deaktiviert",
       "incompleteBadge": "Später einrichten",
+      "unwiredBadge": "Unverbundener Pfad",
       "unsavedFnTitle": "Ungespeicherte Funktionsänderungen",
       "unsavedFnMessage": "Dieser Schritt enthält Funktionscode, der nicht in Ihrer Bibliothek gespeichert ist. Speichern Sie ihn, verwerfen Sie die Änderungen oder bearbeiten Sie weiter.",
       "unsavedFnSave": "Funktion speichern",
       "unsavedFnDiscard": "Änderungen verwerfen",
-      "unsavedFnKeep": "Weiter bearbeiten"
+      "unsavedFnKeep": "Weiter bearbeiten",
+      "destination": "Ziel",
+      "branchPathUnset": "{name} · keine Regel festgelegt"
     },
     "commonFieldsAbove": "gemeinsame Felder oben",
     "canvas": {
@@ -2803,11 +2857,15 @@
       "openStep": "{name} öffnen",
       "runToView": "Führen Sie einen Test aus, um diese Daten anzuzeigen.",
       "noBranchItems": "Keine Elemente in diesem Zweig.",
+      "forwardedCount": "{out} von {total} Datensatz weitergeleitet | {out} von {total} Datensätzen weitergeleitet",
+      "noMatchForwarded": "Keine Übereinstimmung — 0 von {total} Datensatz weitergeleitet | Keine Übereinstimmung — 0 von {total} Datensätzen weitergeleitet",
+      "branchDropped": "{count} Datensatz passte zu keinem Pfad — verworfen | {count} Datensätze passten zu keinem Pfad — verworfen",
       "noUpstream": "Keine vorgelagerten Schritte.",
       "noRunYet": "Noch kein Lauf.",
       "runLabel": "Ausführen",
       "switchRun": "Lauf wechseln",
       "notInRun": "Dieser Schritt ist in diesem Lauf nicht enthalten.",
+      "noRunData": "Dieser Lauf hat keine Schrittdaten gespeichert.",
       "runTest": "Test ausführen",
       "noItems": "Keine Elemente",
       "itemsCount": "{count} Element | {count} Elemente",
@@ -2817,8 +2875,14 @@
       "executeStep": "Schritt ausführen",
       "sample": "Beispiel",
       "editStep": "Schritt bearbeiten",
+      "readOnlyRun": "Sie sehen einen früheren Lauf, daher kann die Konfiguration dieses Schritts hier nicht geändert werden.",
+      "readOnlyRunEdit": "Im Workflow bearbeiten",
       "testInputHint": "Testeingabe — Bearbeiten, dann Schritt ausführen.",
-      "noRunsList": "Noch keine Läufe."
+      "noRunsList": "Noch keine Läufe.",
+      "resetInput": "Auf Beispieldaten zurücksetzen",
+      "eventPager": "{n} von {total}",
+      "nextEvent": "Nächstes Ereignis",
+      "prevEvent": "Vorheriges Ereignis"
     },
     "runOverlay": {
       "banner": "Es werden Schrittdaten aus einem früheren Lauf ({run}) angezeigt. Sie können frei bearbeiten — dieser Lauf wird nie geändert.",
@@ -2845,6 +2909,8 @@
       "noConfig": "Keine Konfiguration",
       "functionLabel": "Funktion",
       "destinationLabel": "Ziel",
+      "branchPathsLabel": "Pfade",
+      "branchNoRule": "Keine Regel festgelegt",
       "destinationUnsupported": "Nicht unterstützter Typ",
       "destinationMissing": "Dieses Ziel existiert nicht mehr oder kann nicht gelesen werden.",
       "headersLabel": "Header",
@@ -3734,7 +3800,7 @@
       "dynamodbPipelineTitle": "DynamoDB → Firehose streamen",
       "dynamodbTagline": "Streamen Sie DynamoDB-Elementänderungen über Kinesis Firehose in OpenObserve.",
       "ec2IamNote": "Erfordert eine IAM-Rolle auf der Instanz mit ec2:DescribeTags und ec2:DescribeInstances, damit der Agent das Name-Tag lesen und als Host-Identifikator verwenden kann.",
-      "enableSessionReplayDesc": "Session Replay wird **getrennt** von RUM konfiguriert und **erbt nicht** `rumConfiguration.customEndpoint`. Außerdem wird kein Pfad angehängt, daher ist die vollständige `/replay`-URL unten erforderlich. Ein Fehler hier ist der übliche Grund, warum RUM-Events ankommen, Replays aber nie.",
+      "enableSessionReplayDesc": "Session Replay wird **getrennt** von der Echten Benutzerüberwachung konfiguriert und erbt **nicht** `rumConfiguration.customEndpoint`. Geben Sie unten eine eigene Basis-URL an — in derselben Form wie die für Echte Benutzerüberwachung/Logs. Die Bridge fügt `/replay` selbst hinzu, fügen Sie es **nicht** selbst hinzu: Ein manuell angehängtes `/replay` verdoppelt den Pfad, und jeder Upload wird mit 401 abgelehnt — das ist der übliche Grund, warum Ereignisse der Echten Benutzerüberwachung ankommen, Replays aber nie.",
       "enableSessionReplayTitle": "Session Replay aktivieren",
       "endpointLabel": "Endpunkt",
       "externalEndpointVariant": "Externer Endpoint",
@@ -3936,18 +4002,16 @@
       "rnInitNote": "Initialisieren Sie so früh wie möglich – der Provider muss gemountet werden, bevor die Screens, die Sie messen möchten, erscheinen.",
       "rnInstallNote": "Die Pakete für Session-Replay und Navigation sind optional – entfernen Sie die jeweilige Zeile, wenn Sie keine Bildschirmaufzeichnung oder automatische Ansichtsverfolgung benötigen.",
       "rnNavigationNote": "Ohne dies können Sie Ansichten weiterhin manuell mit `O2Rum.startView()` / `O2Rum.stopView()` aufzeichnen.",
-      "rnSessionReplayNote": "Session Replay auf React Native ist derzeit auf Android verifiziert. Auf iOS hängt das SDK dieser URL seinen eigenen Pfad an, sodass Replay-Uploads OpenObserve noch nicht erreichen – RUM, Logs und Abstürze sind davon nicht betroffen.",
-      "rnTrouble401A": "Der `clientToken` ist das **RUM-Token** dieser Organisation, nicht der Erfassungs-Passcode. Wenn er rotiert wurde, generieren Sie ihn aus dem Header dieser Seite neu und erstellen Sie die App neu.",
+      "rnSessionReplayNote": "Session Replay ist ab SDK 0.1.2 sowohl auf iOS als auch auf Android verifiziert. Segmente werden vor dem Upload gebündelt, rechnen Sie also mit einer kurzen Verzögerung, bis sie angezeigt werden.",
+      "rnTrouble401A": "Zwei häufige Ursachen. Erstens `clientToken`: Es muss das **Token der Echten Benutzerüberwachung** dieser Organisation sein, nicht der Passcode für die Datenerfassung; falls es rotiert wurde, generieren Sie es aus dem Header dieser Seite neu und erstellen Sie die App neu. Zweitens, speziell für Session Replay: Wenn Sie `/replay` selbst an `customEndpoint` anhängen, wird der Pfad doppelt angehängt (die Bridge tut dies bereits), was das Backend ebenfalls mit 401 ablehnt — übergeben Sie stattdessen die reine Basis-URL.",
       "rnTrouble401Q": "Anfragen geben 401 oder 403 zurück",
       "rnTroubleCleartextA": "Android blockiert Klartextverkehr standardmäßig. Für einen `http://`-Endpunkt setzen Sie `additionalConfiguration: {config}` in der SDK-Konfiguration und erlauben Sie Klartext für Ihren Host in der Netzwerksicherheitskonfiguration der App. Bevorzugen Sie HTTPS außerhalb der lokalen Entwicklung.",
       "rnTroubleCleartextQ": "Der Android-Release-/Debug-Build sendet nichts über einfaches HTTP",
       "rnTroubleIosBuildA": "Führen Sie nach dem Hinzufügen der Pakete `npx pod-install` (oder `cd ios && pod install`) aus und erstellen Sie dann aus Xcode oder mit `npx react-native run-ios` neu. Ein reines Metro-Reload wird neue native Module nicht übernehmen.",
       "rnTroubleIosBuildQ": "Der iOS-Build schlägt fehl oder das native Modul fehlt",
-      "rnTroubleIosReplayA": "Bekannte Einschränkung des aktuellen React-Native-SDK: Auf iOS hängt es der Session-Replay-`customEndpoint` ihren eigenen Pfad an, sodass Uploads die `/replay`-Route von OpenObserve verfehlen. Android verwendet die URL unverändert und funktioniert. RUM-Ereignisse, Logs und Absturzberichte sind auf beiden Plattformen nicht betroffen.",
-      "rnTroubleIosReplayQ": "Session-Replay funktioniert auf Android, aber nicht auf iOS",
       "rnTroubleMaskedA": "Das ist die Standardeinstellung. `textAndInputPrivacyLevel`, `imagePrivacyLevel` und `touchPrivacyLevel` verwenden standardmäßig ihre strengste Einstellung (`MASK_ALL`). Lockern Sie sie nur so weit, wie es Ihre Datenschutzrichtlinie erlaubt – `MASK_SENSITIVE_INPUTS` hält Passwörter und Kartenfelder verborgen, während der Rest angezeigt wird.",
       "rnTroubleMaskedQ": "Replays werden gerendert, aber alles ist maskiert",
-      "rnTroubleNoReplayA": "Fast immer ist es der Endpoint. Session Replay wird separat konfiguriert und erbt **nicht** `rumConfiguration.customEndpoint`; bleibt es ungesetzt, wird standardmäßig eine leere Zeichenfolge verwendet und Uploads gehen an keinen sichtbaren Ort. Übergeben Sie die vollständige URL explizit: `customEndpoint: '{replayUrl}'` – beachten Sie das abschließende `/replay`, das die Basis-URL des Kern-SDKs nicht enthält.",
+      "rnTroubleNoReplayA": "Fast immer der Endpunkt. Session Replay wird separat konfiguriert und erbt **nicht** `rumConfiguration.customEndpoint`; bleibt es ungesetzt, wird standardmäßig eine leere Zeichenfolge verwendet, und Uploads gehen ins Leere. Übergeben Sie die Basis-URL explizit: `customEndpoint: '{replayUrl}'` — die Bridge hängt `/replay` selbst an (ab SDK 0.1.2), fügen Sie diesen Suffix also nicht selbst hinzu, sonst werden Uploads stattdessen mit 401 abgelehnt.",
       "rnTroubleNoReplayQ": "RUM-Ereignisse kommen an, aber es gibt kein Session-Replay",
       "rnTroubleNothingArrivesA": "Prüfen Sie zuerst den Host – siehe das Korrekturfeld oben. `localhost` zeigt auf das Gerät, nicht auf Ihre Maschine: Verwenden Sie `10.0.2.2` auf dem Android-Emulator, `localhost` auf dem iOS-Simulator und die LAN-IP Ihrer Maschine auf einem physischen Gerät.",
       "rnTroubleNothingArrivesQ": "Vom Emulator oder Gerät kommt überhaupt nichts an",
@@ -6434,6 +6498,7 @@
       "firing": "Ausgelöst",
       "ok": "OK",
       "error": "Fehler",
+      "pending": "Ausstehend",
       "skipped": "Übersprungen",
       "unknown": "Unbekannt",
       "flapping": "Flattern",
@@ -6460,6 +6525,7 @@
       "templateRequired": "Vorlage ist erforderlich!",
       "validEmails": "Bitte gültige E-Mail-Adressen hinzufügen!",
       "silenceNonNegative": "Benachrichtigungsstummschaltung muss größer als oder gleich 0 sein",
+      "pendingPeriodNonNegative": "Die Wartezeit sollte größer oder gleich 0 sein.",
       "periodPositive": "Zeitraum muss größer als 0 sein",
       "destinationRequired": "Mindestens ein Ziel ist erforderlich.",
       "thresholdPositive": "Schwellenwert muss größer als 0 sein",
@@ -6470,6 +6536,7 @@
       "timestampAliasBanned": "{column} kann nicht als Spaltenalias verwendet werden. Verwenden Sie stattdessen time_bucket.",
       "credentialFieldRequired": "{field} ist erforderlich",
       "minimumFrequency": "Mindesthäufigkeit sollte {minutes} Minuten betragen",
+      "pendingPeriodNotMultiple": "Kein Vielfaches der Prüffrequenz ({minutes} Min.) – die Warnmeldung kann bis zu einem zusätzlichen Intervall warten, bevor sie ausgelöst wird.",
       "nameMandatoryString": "Name ist erforderlich und sollte ein gültiger String sein",
       "orgIdMismatch": "Organisations-ID sollte gleich {orgId} sein",
       "streamTypeMandatory": "Stream-Typ ist erforderlich und sollte einer der folgenden sein: Logs, Metriken, Traces.",
@@ -6675,6 +6742,9 @@
       "cooldown": "Abklingzeit",
       "betweenAlerts": "zwischen Alarmen",
       "noCooldown": "Keine Abklingzeit",
+      "pendingPeriod": "Wartezeit",
+      "beforeFiring": "{duration} vor dem Auslösen",
+      "firesImmediately": "Löst sofort aus",
       "minuteCount": "{n} Minute | {n} Minuten",
       "hourCount": "{n} Stunde | {n} Stunden",
       "timeRangeCount": "{n} Zeitbereich ({ranges}) | {n} Zeitbereiche ({ranges})",
@@ -6691,6 +6761,7 @@
         "conditionOther": "{threshold} Ereignisse ({operator})",
         "alertMeWhenMinutes": "Benachrichtigen Sie mich, wenn {condition} in einem beliebigen {count}-Minuten-Zeitraum auftreten.",
         "alertMeWhenHours": "Benachrichtigen Sie mich, wenn {condition} in einem beliebigen {count}-Stunden-Zeitraum auftreten.",
+        "pendingPeriodClause": ", nach einer Wartezeit von {duration}",
         "cooldownClause": ", aber höchstens einmal alle {cooldown}",
         "defaultConditions": "Mich benachrichtigen, wenn die konfigurierten Bedingungen erfüllt sind"
       }
@@ -7155,6 +7226,8 @@
       "writeQueryHint": "Schreiben Sie eine Abfrage, um loszulegen",
       "sqlEditorHint": "Verwenden Sie den Open Full Editor zum Ausführen und Validieren",
       "checkEvery": "Prüfen alle",
+      "pendingPeriod": "Wartezeit",
+      "pendingPeriodTooltip": "So lange warten, bevor ausgelöst wird, damit eine Bedingung andauern muss und nicht durch ein einzelnes schlechtes Intervall auslöst.",
       "cronExpressionPlaceholder": "0 */10 * * * *",
       "timezonePlaceholder": "Zeitzone",
       "onThese": "auf diese",
@@ -10633,6 +10706,10 @@
         "success": "Zum Dataset hinzugefügt",
         "loadError": "Fehler beim Laden der Datasets",
         "error": "Fehler beim Hinzufügen dieses Elements zum Dataset"
+      },
+      "playground": {
+        "button": "Im Playground öffnen",
+        "hint": "Laden Sie die Nachrichten dieses Aufrufs in den Playground, um sie zu bearbeiten und erneut auszuführen."
       }
     },
     "discovery": {
@@ -11000,7 +11077,10 @@
         "columns": {
           "input": "Eingabe",
           "output": "Ausgabe",
-          "latency": "Latenz"
+          "trials": "Versuche",
+          "dispersion": "Streuung",
+          "latency": "Latenz",
+          "p50Latency": "P50-Latenz"
         },
         "retryFailed": "Fehlgeschlagene Slots erneut versuchen",
         "loadError": "Das Experiment konnte nicht geladen werden",
@@ -11038,8 +11118,12 @@
         },
         "slotStatus": "Status",
         "searchPlaceholder": "Eingabe oder Ausgabe durchsuchen",
+        "searchInputPlaceholder": "Suchbegriff",
         "statusFilter": "Status",
-        "statusFilterAll": "Alle Status"
+        "statusFilterAll": "Alle Status",
+        "sortByDispersion": "Nach Streuung sortieren",
+        "highDispersionBadge": "Hoch",
+        "trialNumber": "Versuch {n}"
       },
       "rowDetail": {
         "fallbackTitle": "Experimentzeile",
@@ -11130,10 +11214,13 @@
           "trial": "Versuch {index}",
           "noContent": "Nicht angegeben",
           "noOutput": "Keine Ausgabe",
-          "absentSide": "In diesem Lauf nicht vorhanden"
+          "absentSide": "In diesem Lauf nicht vorhanden",
+          "enterFullscreen": "In Vollbild wechseln",
+          "exitFullscreen": "Vollbild verlassen"
         }
       },
-      "selectionCount": "{count} von 2 ausgewählt"
+      "selectionCount": "{count} von 2 ausgewählt",
+      "clearBaseline": "Basislinie löschen"
     },
     "datasets": {
       "listTitle": "Datensätze",
@@ -11202,7 +11289,7 @@
           "expectedOutput": "Erwartete Ausgabe",
           "source": "Quelle",
           "tags": "Tags",
-          "version": "Version",
+          "version": "Dataset-Version",
           "actions": "Aktionen"
         },
         "deleteItemTitle": "Element löschen",
@@ -11681,8 +11768,6 @@
       "title": "Playground",
       "runAll": "Alle ausführen",
       "runAllTooltip": "Jede Variante ausführen",
-      "running": "Läuft… ({done}/{total})",
-      "stop": "Stopp",
       "recentDrafts": "Letzte Entwürfe",
       "recentDraftsSection": "Dieser Browser · letzte 10",
       "draftVersus": "vs",
@@ -11691,6 +11776,7 @@
       "fromExperiment": "Geklont aus Experiment {name}",
       "variables": "Variablen",
       "noVariables": "Kein {token} in den Nachrichten — füge einen hinzu, um die Eingabe zu parametrisieren.",
+      "unusedSampledValue": "Noch nicht in einer Nachricht referenziert: {tokens}. Geben Sie es in eine Nachricht ein, um es zu verwenden.",
       "variablePlaceholder": "Wert für {name}",
       "addExpected": "+ Erwartete Ausgabe",
       "expectedLabel": "Erwartet",
@@ -11705,8 +11791,9 @@
       "variant": "Variante {label}",
       "variantLimit": "Die Testumgebung fasst höchstens {max} Varianten.",
       "duplicateVariant": "Variante duplizieren",
+      "resetVariant": "Benchmark zurücksetzen",
       "removeVariant": "Variante entfernen",
-      "runVariant": "Diese Variante ausführen",
+      "runVariant": "Ausführen",
       "createExperiment": "Experiment erstellen",
       "modelPlaceholder": "Modell auswählen oder eingeben",
       "providerUnknown": "Unbekannter Anbieter",
@@ -11732,6 +11819,13 @@
       "toolsEmpty": "Keine Tools definiert.",
       "toolCall": "Tool-Aufruf",
       "toolCallNote": "Der Lauf endet hier — der Playground führt keine Tools aus.",
+      "toolCallAddToMessages": "Zu Nachrichten hinzufügen",
+      "toolCallContinueTooltip": "Fügt diesen Aufruf zur Konversation hinzu und öffnet das Ergebnisfeld.",
+      "toolCallAddedToMessages": "Tool-Aufruf hinzugefügt — Tool-Ergebnis eingeben und erneut ausführen.",
+      "toolArgumentsPlaceholder": "Tool-Argumente (JSON)",
+      "toolResultPlaceholder": "Tool-Ergebnis eingeben…",
+      "toolResultRequired": "Geben Sie oben das Tool-Ergebnis ein, um fortzufahren.",
+      "toolSetupRequired": "Wählen Sie ein Tool aus und geben Sie dessen Argumente an, um fortzufahren.",
       "toolInvalidJson": "Parameter müssen gültiges JSON sein.",
       "schema": "Schema",
       "schemaOn": "Schema · An",
@@ -11758,6 +11852,7 @@
       "sampleDatasetPlaceholder": "Datensatz auswählen",
       "sampleSubmit": "Stichprobe",
       "sampleLoadError": "Zeilen aus diesem Datensatz konnten nicht geladen werden.",
+      "sampleApplied": "Beispiel {index} von {total} geladen – referenzieren Sie es in einer Nachricht mit {token}.",
       "sampleEmpty": "Dieser Datensatz hat noch keine Einträge.",
       "noProviderTitle": "Der Playground benötigt einen LLM-Anbieter.",
       "noProviderBody": "Verbinden Sie einen Anbieter, um Prompts auszuführen. Dies dauert etwa eine Minute.",
@@ -11770,6 +11865,8 @@
       "reset": "Zurücksetzen",
       "resetTitle": "Playground zurücksetzen",
       "resetMessage": "Jede Variante, Zeile und Ausgabe löschen und von vorne beginnen? Dies kann nicht rückgängig gemacht werden.",
+      "resetVariantTitle": "Bench zurücksetzen",
+      "resetVariantMessage": "Prompt und Ausgabe dieser Bench löschen? Dies kann nicht rückgängig gemacht werden.",
       "scrollLeft": "Nach links scrollen",
       "scrollRight": "Nach rechts scrollen",
       "addMessage": "Nachricht",
@@ -11785,6 +11882,7 @@
       "variantSettings": "Modelleinstellungen",
       "messageToolPlaceholder": "Werkzeug auswählen",
       "variablesCount": "Variablen · {count}",
+      "newValueTag": "Neu",
       "variableUsed": "Wird von dieser Variante referenziert",
       "variableUnused": "Wird von dieser Variante nicht referenziert — wird hier leer angezeigt",
       "addVariable": "Variable hinzufügen",
@@ -11833,7 +11931,9 @@
       "sampleFullView": "Vollansicht",
       "sampleBack": "Zurück zur Liste",
       "sampleInput": "Eingabe",
-      "sampleExpected": "Erwartete Ausgabe"
+      "sampleExpected": "Erwartete Ausgabe",
+      "fromTrace": "Aus Trace-Span {id}",
+      "openInPlaygroundFailed": "Dieser Span konnte nicht im Playground geöffnet werden."
     }
   },
   "onlineEvals": {
@@ -11866,12 +11966,14 @@
     },
     "scoreConfigLibrary": {
       "searchPlaceholder": "Score-Konfigurationen suchen ...",
-      "scoreConfigsLabel": "{count} Score-Konfiguration | {count} Score-Konfigurationen"
+      "scoreConfigsLabel": "{count} Score-Konfiguration | {count} Score-Konfigurationen",
+      "selectedOfTotal": "{selected} von {total} ausgewählt"
     },
     "scorerLibrary": {
       "noProvidersMessage": "Erstellen Sie zuerst einen Anbieter, bevor Sie LLM-Judge-Scorer importieren.",
       "searchPlaceholder": "Scorer suchen ...",
-      "scorerCountSuffix": "{count} Scorer | {count} Scorer"
+      "scorerCountSuffix": "{count} Scorer | {count} Scorer",
+      "selectedOfTotal": "{selected} von {total} ausgewählt"
     },
     "title": "Evaluationen",
     "loadError": "Online-Evaluierungen konnten nicht geladen werden",
@@ -11988,7 +12090,8 @@
         "legendFalseCount": "falsch ({count})",
         "kpis": {
           "average": "Durchschnittlich",
-          "p50p95": "P50/P95",
+          "p50": "P50",
+          "p95": "P95",
           "unhealthy": "Ungesund",
           "healthy": "Gesund",
           "trueRate": "Wahre Rate",
@@ -12097,8 +12200,6 @@
       "remoteCta": "Endpunkt konfigurieren"
     },
     "provider": {
-      "sectionStep1": "01",
-      "sectionStep2": "02",
       "backTo": "Zurück zu Anbietern",
       "createTitle": "LLM-Anbieter erstellen",
       "editTitle": "LLM-Anbieter bearbeiten",
@@ -12107,7 +12208,7 @@
       "nameLabel": "Name",
       "typeLabel": "Anbietertyp",
       "endpointLabel": "Endpunkt",
-      "endpointPlaceholder": "Optionaler benutzerdefinierter Endpunkt",
+      "endpointPlaceholder": "Vollständige Completions-URL, z. B. https://your-host/v1/chat/completions",
       "defaultModelLabel": "Standardmodell",
       "availableModelsLabel": "Verfügbare Modelle",
       "apiKeyLabel": "API-Schlüssel",
@@ -13771,6 +13872,7 @@
       "error": "Fehler",
       "failed": "Fehlgeschlagen",
       "failedRuns": "Fehlgeschlagene Ausführungen",
+      "errorRuns": "Fehlerläufe",
       "jumpToLastRun": "Zum letzten Lauf springen",
       "jumpToLatestData": "Zu den neuesten Daten springen",
       "lastRun": "Letzter Lauf",
@@ -13882,6 +13984,11 @@
       "stepsCount": "Schritte ({count})",
       "title": "Ausführungsdetails",
       "viewFullError": "Vollständigen Fehler & Stacktrace anzeigen",
+      "errorSourceQuota": "Kontingentlimit erreicht",
+      "errorSourceQuotaDesc": "Die enthaltenen Synthetics-Schritte der Organisation sind aufgebraucht, daher wurde dieser Testlauf übersprungen. Er wird automatisch fortgesetzt, sobald die Organisation ein Abonnement abschließt oder ihr Schrittkontingent erhöht wird.",
+      "errorSourceDispatch": "Versandfehler",
+      "errorSourceQueue": "Warteschlangenfehler",
+      "errorSourceProbe": "Probe-Fehler",
       "viewFullErrorBtn": "Vollständigen Fehler anzeigen",
       "detailUrl": "URL",
       "locatorResolution": "Locator-Auflösung",
@@ -13933,6 +14040,7 @@
       "durationByLocation": "Dauer nach Standort (Durchschnitt)",
       "flakyRate": "Flaky Rate",
       "stepsWindowTruncated": "Showing the newest {count} executions ({from} – {to}); the selected range holds more.",
+      "stepsErrorExcluded": "{count} Ausführungen konnten nicht durchgeführt werden (Fehler) und werden hier nicht angezeigt – siehe Registerkarte „Übersicht“.",
       "retryRate": "Wiederholungsrate",
       "statusTimeline": "Status-Zeitachse",
       "tabOverview": "Übersicht",
