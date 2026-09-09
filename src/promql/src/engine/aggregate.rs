@@ -34,7 +34,7 @@ struct FusedAggShape<'a> {
     /// The range function's argument to materialize; `None` for the instant shape, which has
     /// no range function and stays generic when it cannot stream.
     range_arg: Option<&'a PromExpr>,
-    /// The plain selector under the shape, when it can be planned as ordered shard streams;
+    /// The plain selector under the shape, when it can be planned as ordered partition streams;
     /// a `None` range is the instant lookback.
     selector: Option<(&'a VectorSelector, Option<Duration>)>,
 }
