@@ -152,6 +152,20 @@ describe("AddRole", () => {
       expect(wrapper.find('[data-test="add-role-start-from-section"]').exists()).toBe(true);
     });
 
+    it("offers custom, readonly and Kubernetes-viewer start-from options", () => {
+      expect(wrapper.find('[data-test="add-role-start-from-custom-radio"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="add-role-start-from-readonly-radio"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="add-role-start-from-k8s-radio"]').exists()).toBe(true);
+    });
+
+    it("labels the Kubernetes-viewer option from i18n", () => {
+      // ORadio forwards data-test onto the radio button; the label is a sibling
+      // span, so the text assertion has to be on the section.
+      expect(wrapper.find('[data-test="add-role-start-from-section"]').text()).toContain(
+        "Kubernetes viewer (read access to Kubernetes & host metrics)",
+      );
+    });
+
     it("keeps Save enabled (R3 — no disabled gate)", () => {
       const saveBtn = wrapper.find('[data-test="o-dialog-primary-btn"]');
       expect(saveBtn.attributes("disabled")).toBeUndefined();
@@ -256,6 +270,46 @@ describe("AddRole", () => {
         message: 'Role "test_role" Created Successfully!',
         variant: "success",
       });
+    });
+
+    it("emits startFrom: custom by default", async () => {
+      const { createRole } = await import("@/services/iam");
+      vi.mocked(createRole).mockResolvedValue({ data: {} } as any);
+
+      await getNameInput(wrapper).setValue("test_role");
+      await submitForm(wrapper);
+
+      expect(wrapper.emitted("added:role")[0]).toEqual([
+        { role_name: "test_role", startFrom: "custom" },
+      ]);
+    });
+
+    it("emits startFrom: k8s when the Kubernetes-viewer preset is selected", async () => {
+      const { createRole } = await import("@/services/iam");
+      vi.mocked(createRole).mockResolvedValue({ data: {} } as any);
+
+      await getNameInput(wrapper).setValue("k8s_role");
+      getForm(wrapper).vm.form.setFieldValue("startFrom", "k8s");
+      await submitForm(wrapper);
+
+      expect(getForm(wrapper).vm.form.state.isValid).toBe(true);
+      expect(wrapper.emitted("added:role")[0]).toEqual([
+        { role_name: "k8s_role", startFrom: "k8s" },
+      ]);
+    });
+
+    it("emits startFrom: k8s when the k8s radio is clicked", async () => {
+      const { createRole } = await import("@/services/iam");
+      vi.mocked(createRole).mockResolvedValue({ data: {} } as any);
+
+      await getNameInput(wrapper).setValue("k8s_click");
+      await wrapper.find('[data-test="add-role-start-from-k8s-radio"]').trigger("click");
+      await flushPromises();
+      await submitForm(wrapper);
+
+      expect(wrapper.emitted("added:role")[0]).toEqual([
+        { role_name: "k8s_click", startFrom: "k8s" },
+      ]);
     });
 
     it("shows an error toast on a non-403 failure and does not emit added:role", async () => {

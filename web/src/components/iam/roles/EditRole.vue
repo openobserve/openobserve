@@ -304,6 +304,7 @@ import {
 // entities for a wildcard relation to reach — unlike the `metrics` type node,
 // AllowGet on it grants nothing beyond the module itself.
 const DBM_MODULE_PERMS = ["AllowList", "AllowGet"] as const;
+import { K8S_VIEWER_PERMS, K8S_VIEWER_STREAMS } from "./k8sViewerPreset";
 
 const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 
@@ -523,6 +524,8 @@ const getRoleDetails = () => {
           seedReadonlyPreset();
         } else if (preset === "dbm") {
           await seedDbmViewerPreset();
+        } else if (preset === "k8s") {
+          await seedK8sViewerPreset();
         }
       }
 
@@ -1012,6 +1015,49 @@ const reportDbmViewerSeeding = (matched: number, total: number) => {
       ? { variant: "info", message: t("iam.editRole.dbmPresetSeeded", { matched, total }) }
       : { variant: "warning", message: t("iam.editRole.dbmPresetNoMatch", { total }) },
   );
+};
+
+// Seed the read permissions of K8S_VIEWER_PERMS that a metric stream row
+// actually exposes (a leaf stream hides AllowList, so only AllowGet lands) on the
+// curated Kubernetes/host streams. Stream rows are lazily loaded CHILDREN of the
+// `stream` resource, so both the `stream` node and its `metrics` child must be
+// expanded (which fetches the org's streams) before any row exists to tick.
+const seedK8sViewerPreset = async () => {
+  const streamResource = resourceMapper.value["stream"];
+  if (!streamResource) return;
+
+  // expandPermission toggles, so only call it on a node that is still collapsed.
+  if (!streamResource.expand) await expandPermission(streamResource);
+
+  const metricsEntity = streamResource.entities?.find(
+    (entity: Entity) => entity.name === "metrics",
+  );
+  if (!metricsEntity) return;
+
+  if (!metricsEntity.expand) await expandPermission(metricsEntity);
+
+  // The full row set lives in heavyResourceEntities; `metrics.entities` only ever
+  // holds the visible slice, so seeding off it would silently miss streams.
+  const rows = heavyResourceEntities.value["metrics"] ?? [];
+  const curated = new Set(K8S_VIEWER_STREAMS);
+  const changes: { row: any; permission: string; newValue: boolean }[] = [];
+
+  rows.forEach((row: Entity) => {
+    if (!curated.has(row.name)) return;
+    K8S_VIEWER_PERMS.forEach((perm) => {
+      const permDetail = row.permission?.[perm as "AllowList"];
+      if (!permDetail || !permDetail.show || permDetail.value) return;
+      changes.push({ row, permission: perm, newValue: true });
+    });
+  });
+
+  if (!changes.length) return;
+
+  handlePermissionBatchChange(changes);
+
+  // Unlike readonly (which seeds every resource), only a handful of the org's
+  // streams are seeded here — "all" would bury them in a 50-row truncated grid.
+  filter.value.permissions = "selected";
 };
 
 const handlePermissionChange = (row: any, permission: string) => {

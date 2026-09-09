@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { defineComponent } from "vue";
 import { mount, flushPromises } from "@vue/test-utils";
 import i18n from "@/locales";
@@ -1186,6 +1186,183 @@ describe("EditRole - dbm viewer preset", () => {
   it("does not seed permissions without the dbm preset", async () => {
     router.currentRoute.value.query = {};
     const wrapper = await mountEditRole();
+    expect(Object.keys(wrapper.vm.addedPermissions).length).toBe(0);
+  });
+});
+
+describe("EditRole - kubernetes viewer preset", () => {
+  beforeEach(() => {
+    metricStreamsOverride.list = [
+      { name: "cpu" },
+      { name: "mem" },
+      { name: "k8s_pod_cpu_usage" },
+      { name: "k8s_node_memory_usage" },
+    ];
+  });
+
+  afterEach(() => {
+    metricStreamsOverride.list = null;
+  });
+
+  const mountWithK8sPreset = async () => {
+    router.currentRoute.value.query = { preset: "k8s" };
+    const wrapper = await mountEditRole();
+    await flushPromises();
+    router.currentRoute.value.query = {};
+    return wrapper;
+  };
+
+  // An individual stream row is a leaf, so PermissionsTable renders no AllowList
+  // checkbox on it (`AllowList.show` is false) — seeding one would stage a change
+  // the user cannot see or untick, so only AllowGet lands per stream.
+  it("stages AllowGet on the curated metric streams present in the org", async () => {
+    const wrapper = await mountWithK8sPreset();
+
+    expect(Object.values(wrapper.vm.addedPermissions)).toEqual(
+      expect.arrayContaining([
+        { object: "metrics:k8s_pod_cpu_usage", permission: "AllowGet" },
+        { object: "metrics:k8s_node_memory_usage", permission: "AllowGet" },
+      ]),
+    );
+  });
+
+  it("stages exactly the curated streams and nothing else", async () => {
+    const wrapper = await mountWithK8sPreset();
+
+    expect(
+      Object.values(wrapper.vm.addedPermissions)
+        .map((p) => p.object)
+        .sort(),
+    ).toEqual(["metrics:k8s_node_memory_usage", "metrics:k8s_pod_cpu_usage"]);
+  });
+
+  it("does not stage a permission the table hides on a stream row", async () => {
+    const wrapper = await mountWithK8sPreset();
+
+    const rows = wrapper.vm.heavyResourceEntities.metrics || [];
+    const seeded = rows.find((r) => r.name === "k8s_pod_cpu_usage");
+    expect(seeded.permission.AllowList.show).toBe(false);
+    expect(
+      Object.values(wrapper.vm.addedPermissions).some((p) => p.permission === "AllowList"),
+    ).toBe(false);
+  });
+
+  it("does not stage unrelated metric streams", async () => {
+    const wrapper = await mountWithK8sPreset();
+
+    const objects = Object.values(wrapper.vm.addedPermissions).map((p) => p.object);
+    expect(objects).not.toContain("metrics:cpu");
+    expect(objects).not.toContain("metrics:mem");
+  });
+
+  it("only stages read permissions (never write or delete)", async () => {
+    const wrapper = await mountWithK8sPreset();
+
+    const perms = Object.values(wrapper.vm.addedPermissions).map((p) => p.permission);
+    expect(perms.length).toBeGreaterThan(0);
+    expect(perms.every((p) => p === "AllowList" || p === "AllowGet")).toBe(true);
+  });
+
+  it("skips curated streams absent from this org without throwing", async () => {
+    const wrapper = await mountWithK8sPreset();
+
+    const objects = Object.values(wrapper.vm.addedPermissions).map((p) => p.object);
+    expect(objects).not.toContain("metrics:k8s_absent_stream");
+  });
+
+  it("ticks the checkbox state on the seeded stream rows", async () => {
+    const wrapper = await mountWithK8sPreset();
+
+    const rows = wrapper.vm.heavyResourceEntities.metrics || [];
+    const seeded = rows.find((r) => r.name === "k8s_pod_cpu_usage");
+    expect(seeded).toBeDefined();
+    expect(seeded.resourceName).toBe("metrics");
+    expect(seeded.permission.AllowGet.value).toBe(true);
+
+    const untouched = rows.find((r) => r.name === "cpu");
+    expect(untouched.permission.AllowGet.value).toBe(false);
+  });
+
+  it("expands the stream + metrics nodes so the seeded rows are visible", async () => {
+    const wrapper = await mountWithK8sPreset();
+
+    const streamResource = wrapper.vm.getResourceByName(
+      wrapper.vm.permissionsState.permissions,
+      "stream",
+    );
+    expect(streamResource.expand).toBe(true);
+    const metricsNode = streamResource.entities.find((e) => e.name === "metrics");
+    expect(metricsNode).toBeDefined();
+    expect(metricsNode.expand).toBe(true);
+  });
+
+  it("switches the filter to Selected so the seeded rows are not buried", async () => {
+    const wrapper = await mountWithK8sPreset();
+    expect(wrapper.vm.filter.permissions).toBe("selected");
+  });
+
+  it("leaves the seeded stream rows visible in the table", async () => {
+    const wrapper = await mountWithK8sPreset();
+    await wrapper.vm.updateTableData();
+    await flushPromises();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const streamResource = wrapper.vm.getResourceByName(
+      wrapper.vm.permissionsState.permissions,
+      "stream",
+    );
+    const metricsNode = streamResource.entities.find((e) => e.name === "metrics");
+    const visible = metricsNode.entities.map((e) => e.name);
+    expect(visible).toContain("k8s_pod_cpu_usage");
+    expect(visible).toContain("k8s_node_memory_usage");
+    expect(visible).not.toContain("cpu");
+  });
+
+  it("writes the seeded permissions into the save payload", async () => {
+    const { updateRole } = await import("@/services/iam");
+    const wrapper = await mountWithK8sPreset();
+
+    await wrapper.vm.saveRole();
+    await flushPromises();
+
+    const payload = vi.mocked(updateRole).mock.calls[0][0].payload;
+    expect(payload.remove).toEqual([]);
+    expect(payload.add).toEqual([
+      { object: "metrics:k8s_pod_cpu_usage", permission: "AllowGet" },
+      { object: "metrics:k8s_node_memory_usage", permission: "AllowGet" },
+    ]);
+  });
+
+  it("does not seed when the role already has permissions", async () => {
+    const { getAllRolePermissions } = await import("@/services/iam");
+    vi.mocked(getAllRolePermissions).mockImplementationOnce(async () => ({
+      data: [{ object: "logs:app", permission: "AllowGet" }],
+    }));
+
+    router.currentRoute.value.query = { preset: "k8s" };
+    const wrapper = await mountEditRole();
+    await flushPromises();
+    router.currentRoute.value.query = {};
+
+    expect(wrapper.vm.selectedPermissionsHash.size).toBeGreaterThan(0);
+    expect(Object.keys(wrapper.vm.addedPermissions).length).toBe(0);
+  });
+
+  it("does not seed k8s streams for the readonly preset", async () => {
+    router.currentRoute.value.query = { preset: "readonly" };
+    const wrapper = await mountEditRole();
+    await flushPromises();
+    router.currentRoute.value.query = {};
+
+    const objects = Object.values(wrapper.vm.addedPermissions).map((p) => p.object);
+    expect(objects).not.toContain("metrics:k8s_pod_cpu_usage");
+  });
+
+  it("does not seed k8s streams with no preset at all", async () => {
+    router.currentRoute.value.query = {};
+    const wrapper = await mountEditRole();
+    await flushPromises();
+
     expect(Object.keys(wrapper.vm.addedPermissions).length).toBe(0);
   });
 });
