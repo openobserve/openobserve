@@ -126,7 +126,7 @@ impl Engine {
                 series_label_columns(schema, &scan.label_selector, func.name())
             };
             let selector = scan.streaming_selector();
-            let eval = Arc::new(fused::SeriesEval::new(func.clone(), range, &self.eval_ctx));
+            let eval = Arc::new(fused::RangeExpr::new(func.clone(), range, &self.eval_ctx));
             let run = async {
                 match MergeSeriesStream::execute_partitioned(
                     ctx,

@@ -30,7 +30,7 @@ use config::{
 use datafusion::{arrow::datatypes::Schema, error::Result, prelude::SessionContext};
 use promql_parser::parser::LabelModifier;
 
-use super::fold::{SeriesEval, aggregate};
+use super::fold::{RangeExpr, aggregate};
 use crate::{
     functions::{KEEP_METRIC_NAME_FUNC, RangeFunc},
     fused::FusedAggOp,
@@ -62,9 +62,10 @@ pub(crate) async fn fused_agg(
         return Ok(None);
     };
     let lookback = micros(shape.range);
-    let Some(sources) =
-        MergeSeriesStream::execute_partitioned(ctx, schema, &selector, group_cols, lookback, eval_ctx)
-            .await?
+    let Some(sources) = MergeSeriesStream::execute_partitioned(
+        ctx, schema, &selector, group_cols, lookback, eval_ctx,
+    )
+    .await?
     else {
         return Ok(None);
     };
@@ -74,7 +75,7 @@ pub(crate) async fn fused_agg(
         shape.func.name(),
         sources.len(),
     );
-    let eval = Arc::new(SeriesEval::new(shape.func.clone(), shape.range, eval_ctx));
+    let eval = Arc::new(RangeExpr::new(shape.func.clone(), shape.range, eval_ctx));
     let (value, series_count) = aggregate(sources, shape.op, eval).await?;
 
     log::info!(
@@ -141,7 +142,7 @@ mod tests {
 
     use super::{
         super::{
-            fold::{SeriesEval, map_sources},
+            fold::{RangeExpr, map_sources},
             matrix,
             test_support::*,
         },
@@ -440,7 +441,7 @@ mod tests {
             .await
             .unwrap()
             .expect("the sorted table streams");
-            let eval = Arc::new(SeriesEval::new(func, range, &eval_ctx));
+            let eval = Arc::new(RangeExpr::new(func, range, &eval_ctx));
             let (actual, _) = map_sources(sources, eval).await.unwrap();
             assert_matrix_close(
                 canonical_matrix(expected),

@@ -25,7 +25,7 @@ use promql_parser::parser::LabelModifier;
 use rayon::prelude::*;
 
 use super::{
-    fold::{SeriesEval, aggregate},
+    fold::{RangeExpr, aggregate},
     op::FusedAggOp,
 };
 use crate::{
@@ -85,7 +85,7 @@ pub(crate) async fn fused_agg(
         .as_ref()
         .expect("range function input must have a time window")
         .range;
-    let eval = Arc::new(SeriesEval::new(func, range, eval_ctx));
+    let eval = Arc::new(RangeExpr::new(func, range, eval_ctx));
     let sources = matrix_streams(matrix, param, config::get_config().limit.cpu_num)
         .into_iter()
         .map(|source| std::future::ready(Ok(source)))

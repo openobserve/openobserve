@@ -23,7 +23,7 @@ pub(crate) mod matrix;
 mod op;
 pub(crate) mod stream;
 
-pub(crate) use fold::{SeriesEval, map_sources};
+pub(crate) use fold::{RangeExpr, map_sources};
 pub(crate) use op::FusedAggOp;
 
 #[cfg(test)]

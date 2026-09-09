@@ -41,7 +41,7 @@ pub(super) struct GroupEntry {
 }
 
 /// How one series becomes per-step values: the range function, its window, and the slots.
-pub(crate) struct SeriesEval {
+pub(crate) struct RangeExpr {
     pub(crate) func: Arc<dyn RangeFunc>,
     counter_kind: Option<ExtrapolationKind>,
     pub(crate) range: Duration,
@@ -49,7 +49,7 @@ pub(crate) struct SeriesEval {
     pub(crate) timestamps: Vec<i64>,
 }
 
-impl SeriesEval {
+impl RangeExpr {
     pub(crate) fn new(func: Arc<dyn RangeFunc>, range: Duration, eval_ctx: &EvalContext) -> Self {
         Self {
             counter_kind: func.counter_extrapolation(),
@@ -61,7 +61,7 @@ impl SeriesEval {
     }
 
     /// Evaluates the function over one series, handing each value to `emit` with its slot.
-    fn eval_series(&self, samples: &[Sample], mut emit: impl FnMut(usize, f64)) {
+    fn evaluate(&self, samples: &[Sample], mut emit: impl FnMut(usize, f64)) {
         let range_micros = micros(self.range);
         let mut start_index = 0;
         let mut end_index = 0;
@@ -95,7 +95,7 @@ impl SeriesEval {
 pub(super) async fn aggregate<F, S>(
     sources: Vec<F>,
     op: FusedAggOp,
-    eval: Arc<SeriesEval>,
+    eval: Arc<RangeExpr>,
 ) -> Result<(Value, usize)>
 where
     F: Future<Output = Result<S>> + Send + 'static,
@@ -122,7 +122,7 @@ where
 async fn aggregate_partial<S: SeriesStream>(
     mut source: S,
     op: FusedAggOp,
-    eval: Arc<SeriesEval>,
+    eval: Arc<RangeExpr>,
 ) -> Result<(GroupAccs, usize)> {
     let mut groups = GroupAccs::new();
     let mut series_count = 0;
@@ -135,7 +135,7 @@ async fn aggregate_partial<S: SeriesStream>(
             }),
         };
         let samples = source.consume().await?;
-        eval.eval_series(samples, |slot, value| entry.acc.push(slot, value));
+        eval.evaluate(samples, |slot, value| entry.acc.push(slot, value));
         series_count += 1;
         // the fold is pure CPU: give the runtime a chance to time out or abort it
         tokio::task::consume_budget().await;
@@ -209,7 +209,7 @@ fn aggregate_final(folds: Vec<GroupAccs>, timestamps: &[i64]) -> Value {
 /// dropping the future aborts the sources.
 pub(crate) async fn map_sources<F, S>(
     sources: Vec<F>,
-    eval: Arc<SeriesEval>,
+    eval: Arc<RangeExpr>,
 ) -> Result<(Vec<RangeValue>, usize)>
 where
     F: Future<Output = Result<S>> + Send + 'static,
@@ -243,7 +243,7 @@ where
 /// Maps one source's series; like the generic evaluator, a series with no value is dropped.
 async fn map_partition<S: SeriesStream>(
     mut source: S,
-    eval: Arc<SeriesEval>,
+    eval: Arc<RangeExpr>,
 ) -> Result<(Vec<RangeValue>, usize)> {
     let mut series = Vec::new();
     let mut series_count = 0;
@@ -251,7 +251,7 @@ async fn map_partition<S: SeriesStream>(
         let labels = source.labels();
         let samples = source.consume().await?;
         let mut values = Vec::with_capacity(eval.timestamps.len());
-        eval.eval_series(samples, |slot, value| {
+        eval.evaluate(samples, |slot, value| {
             values.push(Sample::new(eval.timestamps[slot], value));
         });
         if !values.is_empty() {
@@ -322,10 +322,10 @@ mod tests {
         }
     }
 
-    fn eval() -> Arc<SeriesEval> {
+    fn eval() -> Arc<RangeExpr> {
         let func: Arc<dyn RangeFunc> = Arc::from(functions::fusable_range_func("rate").unwrap());
         let eval_ctx = EvalContext::new(1_000_000, 2_000_000, 1_000_000, "test".into());
-        Arc::new(SeriesEval::new(func, Duration::from_secs(60), &eval_ctx))
+        Arc::new(RangeExpr::new(func, Duration::from_secs(60), &eval_ctx))
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
