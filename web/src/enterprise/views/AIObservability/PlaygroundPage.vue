@@ -341,6 +341,9 @@ const router = useRouter();
 const store = useStore();
 
 const orgId = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
+// Org-only keys leak one user's drafts/session to the next login on a shared
+// browser profile — the email keeps each user's bench private within the org.
+const userKey = computed<string>(() => store.state.userInfo?.email ?? "");
 
 // ── state ─────────────────────────────────────────────────────────
 
@@ -468,6 +471,9 @@ function cellFor(variantId: string, rowKey: string): PlaygroundCell | undefined 
 // ── loading ───────────────────────────────────────────────────────
 
 onMounted(async () => {
+  // Drop the old org-only (pre-user-scoping) keys so a stale prior user's
+  // drafts/session can never resurface for whoever logs in next.
+  removeLegacyStorage();
   // First, and synchronously: the bench is the work, and it must be on screen
   // before anything that can fail or take a round trip.
   restoreSession();
@@ -1148,7 +1154,16 @@ const recentDrafts = ref<RecentDraftEntry[]>([]);
 /** Identifies the draft being worked on now; a new one starts on Reset. */
 const draftSessionId = ref(playgroundId("draft"));
 
-const storageKey = computed(() => `o2-playground-drafts:${orgId.value}`);
+const storageKey = computed(() => `o2-playground-drafts:${orgId.value}:${userKey.value}`);
+
+function removeLegacyStorage() {
+  try {
+    localStorage.removeItem(`o2-playground-drafts:${orgId.value}`);
+    localStorage.removeItem(`o2-playground-session:${orgId.value}`);
+  } catch {
+    // Nothing to do — the next save uses the new key regardless.
+  }
+}
 
 function loadRecentDrafts() {
   try {
@@ -1219,7 +1234,7 @@ interface StoredSession {
   results: PlaygroundResults;
 }
 
-const sessionKey = computed(() => `o2-playground-session:${orgId.value}`);
+const sessionKey = computed(() => `o2-playground-session:${orgId.value}:${userKey.value}`);
 
 function restoreSession() {
   try {
