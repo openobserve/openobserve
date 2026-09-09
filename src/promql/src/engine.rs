@@ -36,7 +36,10 @@ use super::{
     load_series::{LoadedMetrics, PartitionedMetrics, selector_load_data_from_datafusion},
     promql::label_usage::labels_dropped_at_root,
 };
-use crate::{aggregations, binaries, functions, fused, micros, promql::rewrite::remove_filter_all};
+use crate::{
+    aggregations, binaries, functions, fused, micros, promql::rewrite::remove_filter_all,
+    utils::metric_name,
+};
 
 pub struct Engine {
     trace_id: String,
@@ -364,13 +367,10 @@ impl Engine {
 
         let mut selector = selector.clone();
         if selector.name.is_none() {
-            let name = match selector.matchers.find_matchers(NAME_LABEL).first() {
-                Some(mat) => mat.value.clone(),
-                None => {
-                    return Err(DataFusionError::Plan(
-                        "VectorSelector: metric name is required".into(),
-                    ));
-                }
+            let Some(name) = metric_name(&selector) else {
+                return Err(DataFusionError::Plan(
+                    "VectorSelector: metric name is required".into(),
+                ));
             };
             selector.name = Some(name);
             // the matcher is fully consumed by stream selection; leaving it in
@@ -474,14 +474,11 @@ impl Engine {
 
         let mut selector = selector.clone();
         if selector.name.is_none() {
-            let name = selector
-                .matchers
-                .find_matchers(NAME_LABEL)
-                .first()
-                .unwrap()
-                .value
-                .clone();
-
+            let Some(name) = metric_name(&selector) else {
+                return Err(DataFusionError::Plan(
+                    "MatrixSelector: metric name is required".into(),
+                ));
+            };
             selector.name = Some(name);
             // see eval_vector_selector: the matcher is consumed by stream selection
             selector

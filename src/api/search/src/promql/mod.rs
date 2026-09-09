@@ -183,7 +183,17 @@ async fn query(
 
         let ast = parser::parse(&req.query.clone().unwrap()).unwrap();
         let mut visitor = promql::promql::name_visitor::MetricNameVisitor::default();
-        promql_parser::util::walk_expr(&mut visitor, &ast).unwrap();
+        if let Err(e) = promql_parser::util::walk_expr(&mut visitor, &ast) {
+            log::error!("[trace_id: {trace_id}] promql metric name error: {e}");
+            return (
+                StatusCode::BAD_REQUEST,
+                axum::Json(config::meta::promql::ApiFuncResponse::<()>::err_bad_data(
+                    e.to_string(),
+                    Some(trace_id),
+                )),
+            )
+                .into_response();
+        }
 
         if !db::user::is_root_user(user_email) {
             let stream_type_str = StreamType::Metrics.as_str();
@@ -472,7 +482,17 @@ async fn query_range(
             }
         };
         let mut visitor = promql::promql::name_visitor::MetricNameVisitor::default();
-        promql_parser::util::walk_expr(&mut visitor, &ast).unwrap();
+        if let Err(e) = promql_parser::util::walk_expr(&mut visitor, &ast) {
+            log::error!("[trace_id: {trace_id}] promql metric name error: {e}");
+            return (
+                StatusCode::BAD_REQUEST,
+                axum::Json(config::meta::promql::ApiFuncResponse::<()>::err_bad_data(
+                    e.to_string(),
+                    Some(trace_id),
+                )),
+            )
+                .into_response();
+        }
 
         if !db::user::is_root_user(user_email) {
             let stream_type_str = StreamType::Metrics.as_str();
