@@ -205,7 +205,9 @@
                     <span class="bg-status-info-text h-2 w-2 shrink-0 rounded-full" />
                     <span class="text-text-secondary">
                       {{ t("aiObservability.experiments.form.providerEndpointLabel") }}
-                      <span class="font-mono">{{ resolvedEndpointOf(selectedProvider) || "—" }}</span>
+                      <span class="font-mono">{{
+                        resolvedEndpointOf(selectedProvider) || "—"
+                      }}</span>
                     </span>
                     <span class="text-text-secondary">{{ separator }}</span>
                     <span class="text-text-secondary">
