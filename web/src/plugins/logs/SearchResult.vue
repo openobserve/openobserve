@@ -489,7 +489,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :columns="getColumns || []"
                   :data="searchObj.data.queryResults?.hits || []"
                   :wrap="searchObj.meta.toggleSourceWrap"
-                  :loading="searchObj.loading"
+                  :loading="isResultsSkeleton"
+                  :streaming="isResultsStreaming"
                   :row-key="logsRowKey"
                   :row-height="20"
                   virtual-scroll
@@ -524,6 +525,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @row-click="openLogDetailsByRow"
                   @update:expandedIds="onExpandedLogIdsChange"
                 >
+                  <!-- Empty slot opts out of OTable's default banner, which would shift the grid on every partition. -->
+                  <template #loading-banner />
+
                   <!-- FTS-highlighted cell content; falls back to the plain value. -->
                   <template
                     v-for="col in getColumns || []"
@@ -1961,6 +1965,11 @@ export default defineComponent({
       return ((searchObj.data?.resultGrid?.columns as any[]) ?? []).filter((col: any) => !!col.id);
     });
 
+    const hasResultRows = computed(() => (searchObj.data.queryResults?.hits?.length ?? 0) > 0);
+    // First paint has nothing to show, so the skeleton is right; once rows exist we switch to `streaming` so partial results stay on screen.
+    const isResultsSkeleton = computed(() => searchObj.loading && !hasResultRows.value);
+    const isResultsStreaming = computed(() => searchObj.loading && hasResultRows.value);
+
     const getPartitionPaginations = computed(() => {
       return searchObj.data.queryResults?.partitionDetail?.paginations || [];
     });
@@ -2413,6 +2422,9 @@ export default defineComponent({
       getTableWidth,
       scrollTableToTop,
       getColumns,
+      hasResultRows,
+      isResultsSkeleton,
+      isResultsStreaming,
       reorderSelectedFields,
       getPaginations,
       refreshPagination,
