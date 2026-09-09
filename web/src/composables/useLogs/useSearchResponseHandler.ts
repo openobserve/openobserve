@@ -103,7 +103,7 @@ export const useSearchResponseHandler = () => {
         : partitionState.partition > 1 || isChunkedHits;
 
       // A paginated first partition restarts the page, but not once its own later chunks arrive.
-      const resetOnPaginationStart = !(isStreamingAggs && isChunkedHits);
+      const resetOnPaginationStart = !isChunkedHits;
 
       handleStreamingHits(
         payload,
@@ -245,7 +245,7 @@ export const useSearchResponseHandler = () => {
 
     if (appendResult) {
       // Every streaming-aggs partition restates the same total; took and scan_size are per-partition.
-      if (response.content?.streaming_aggs) {
+      if (response.content?.streaming_aggs || searchObj.data.queryResults.streaming_aggs) {
         searchObj.data.queryResults.total = response.content.results.total;
       } else {
         searchObj.data.queryResults.total += response.content.results.total;

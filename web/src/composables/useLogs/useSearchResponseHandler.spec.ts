@@ -652,6 +652,29 @@ describe("useSearchResponseHandler", () => {
       ]);
     });
 
+    it("#14303 §3.1 appends later chunks of a paginated non-streaming-aggs first partition", () => {
+      const traceId = "trace-14303-paginated-plain-chunks";
+      const paginatedPayload = () => ({ ...searchPayload(traceId), isPagination: true });
+
+      responseHandler.handleSearchResponse(
+        paginatedPayload() as any,
+        metadata({ total: 5, took: 1, scan_size: 10, from: 0, hits: [] }, false) as any,
+      );
+
+      [[{ id: "ppc1" }], [{ id: "ppc2" }], [{ id: "ppc3" }]].forEach((hits) => {
+        responseHandler.handleSearchResponse(
+          paginatedPayload() as any,
+          hitsChunk(hits, false) as any,
+        );
+      });
+
+      expect(mockState.searchObj.data.queryResults.hits).toEqual([
+        { id: "ppc1" },
+        { id: "ppc2" },
+        { id: "ppc3" },
+      ]);
+    });
+
     it("appends on the non-streaming-aggs path for both later partitions and later chunks", () => {
       const traceId = "trace-14303-plain";
 
