@@ -13,8 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! The hash-sorted producer: shard plans over hash-sorted scans, and the per-shard source that
-//! merges a shard's ordered chains one series at a time.
+//! The hash-sorted producer: partition plans over hash-sorted scans, and the per-partition source
+//! that merges a partition's ordered chains one series at a time.
 
 use std::{hash::Hasher, sync::Arc};
 
@@ -23,8 +23,9 @@ use config::{
     meta::{
         plan::generate_plan_string,
         promql::{
-            HASH_LABEL, VALUE_LABEL,
-            value::{Label, Labels, Sample},
+            BUCKET_LABEL, EXEMPLARS_LABEL, HASH_LABEL, HASH_SORTED_TABLE_SUFFIX, NAME_LABEL,
+            VALUE_LABEL,
+            value::{EvalContext, Labels, Sample},
         },
     },
     utils::hash::gxhash,
@@ -32,7 +33,7 @@ use config::{
 use datafusion::{
     arrow::{
         array::{AsArray, RecordBatch},
-        datatypes::{Float64Type, Int64Type, UInt64Type},
+        datatypes::{DataType, Float64Type, Int64Type, Schema, UInt64Type},
     },
     error::{DataFusionError, Result},
     execution::{SendableRecordBatchStream, TaskContext},
@@ -41,25 +42,86 @@ use datafusion::{
         expressions::Column,
         sorts::{sort::SortExec, sort_preserving_merge::SortPreservingMergeExec},
     },
-    prelude::{DataFrame, col, lit},
+    prelude::{DataFrame, SessionContext, col, lit},
 };
 use futures::TryStreamExt;
+use hashbrown::HashSet;
+use promql_parser::label::Matchers;
 
-use super::SeriesSource;
-use crate::load_series::{LabelColumn, batch_run_len};
+use super::SeriesStream;
+use crate::{
+    functions::KEEP_METRIC_NAME_FUNC,
+    load_series::{LabelColumn, LabelInterner, apply_time_window, batch_run_len},
+    utils::apply_matchers,
+};
 
-/// One shard's series source; every chain holds one run per series, so the minimum head hash is the
-/// next series.
-pub(crate) struct StreamSource {
+/// The selector being scanned; `offset` is the `offset` modifier in microseconds.
+pub(crate) struct StreamingSelector<'a> {
+    pub table_name: &'a str,
+    pub matchers: &'a Matchers,
+    pub offset: i64,
+}
+
+/// One partition's series stream; every chain holds one run per series, so the minimum head hash is
+/// the next series.
+pub(crate) struct MergeSeriesStream {
     cursors: Vec<ChainCursor>,
     group_cols: Arc<Vec<String>>,
+    /// One interner per group column, so the emitted series share label allocations.
+    interners: Vec<LabelInterner>,
     offset: i64,
     /// Hash of the series `advance` yielded, until `consume` takes it.
     current: Option<u64>,
     samples: Vec<Sample>,
 }
 
-impl StreamSource {
+impl MergeSeriesStream {
+    /// One source per partition over the selector's hash-sorted table, projected to the sample
+    /// columns plus `label_cols`; `None` when the layout cannot stream in order.
+    pub(crate) async fn execute_partitioned(
+        ctx: &SessionContext,
+        schema: &Schema,
+        selector: &StreamingSelector<'_>,
+        label_cols: Vec<String>,
+        lookback: i64,
+        eval_ctx: &EvalContext,
+    ) -> Result<Option<Vec<impl Future<Output = Result<MergeSeriesStream>> + Send + 'static>>> {
+        if schema
+            .field_with_name(HASH_LABEL)
+            .is_ok_and(|field| field.data_type() != &DataType::UInt64)
+        {
+            return Ok(None);
+        }
+        let sorted_table = format!("{}{HASH_SORTED_TABLE_SUFFIX}", selector.table_name);
+        let Ok(df) = ctx.table(sorted_table.as_str()).await else {
+            return Ok(None);
+        };
+        let df = apply_time_window(
+            df,
+            eval_ctx.start - selector.offset,
+            eval_ctx.end - selector.offset,
+            eval_ctx.step,
+            lookback,
+        )?;
+        let df = apply_matchers(df, selector.matchers)?;
+        let mut columns = vec![TIMESTAMP_COL_NAME, HASH_LABEL, VALUE_LABEL];
+        columns.extend(label_cols.iter().map(String::as_str));
+        let partitions = ctx.state().config().target_partitions();
+        let Some(partition_inputs) =
+            build_partition_inputs(&df, &columns, partitions, &eval_ctx.trace_id).await?
+        else {
+            return Ok(None);
+        };
+        let label_cols = Arc::new(label_cols);
+        let offset = selector.offset;
+        Ok(Some(
+            partition_inputs
+                .into_iter()
+                .map(|streams| MergeSeriesStream::start(streams, label_cols.clone(), offset))
+                .collect(),
+        ))
+    }
+
     pub(crate) async fn start(
         streams: Vec<SendableRecordBatchStream>,
         group_cols: Arc<Vec<String>>,
@@ -69,9 +131,14 @@ impl StreamSource {
         for stream in streams {
             cursors.push(ChainCursor::start(stream).await?);
         }
+        let interners = group_cols
+            .iter()
+            .map(|name| LabelInterner::new(name.clone()))
+            .collect();
         Ok(Self {
             cursors,
             group_cols,
+            interners,
             offset,
             current: None,
             samples: Vec::new(),
@@ -104,7 +171,7 @@ impl StreamSource {
     }
 }
 
-impl SeriesSource for StreamSource {
+impl SeriesStream for MergeSeriesStream {
     async fn advance(&mut self) -> Result<Option<u64>> {
         let Some(hash) = self.cursors.iter().filter_map(ChainCursor::head_hash).min() else {
             self.current = None;
@@ -123,15 +190,16 @@ impl SeriesSource for StreamSource {
         Ok(Some(hasher.finish()))
     }
 
-    fn labels(&self) -> Labels {
+    fn labels(&mut self) -> Labels {
         let (batch, row) = self.head();
+        let batch = batch.clone();
         let cols = self
-            .label_columns(batch)
+            .label_columns(&batch)
             .expect("advance validated the group columns");
         cols.iter()
-            .zip(self.group_cols.iter())
+            .zip(self.interners.iter_mut())
             .filter(|(values, _)| !values.is_null(row))
-            .map(|(values, name)| Arc::new(Label::new(name.as_str(), values.value(row))))
+            .map(|(values, interner)| interner.intern(values.value(row)))
             .collect()
     }
 
@@ -221,17 +289,43 @@ impl ChainCursor {
     }
 }
 
-/// Every shard's ordered input streams; `None` (logged) means a shard's plan cannot stream in
-/// order.
-pub(crate) async fn build_shard_inputs(
+/// The label columns an emitted series carries, in the sorted order the materializing loader
+/// uses: string columns other than the hash and exemplars, narrowed by the label selector
+/// (which always keeps `le`), without the metric name unless the function keeps it.
+pub(crate) fn series_label_columns(
+    schema: &Schema,
+    label_selector: &HashSet<String>,
+    func_name: &str,
+) -> Vec<String> {
+    let mut cols: Vec<String> = schema
+        .fields()
+        .iter()
+        .filter(|field| matches!(field.data_type(), DataType::Utf8 | DataType::Utf8View))
+        .map(|field| field.name().clone())
+        .filter(|name| {
+            name != HASH_LABEL
+                && name != EXEMPLARS_LABEL
+                && (label_selector.is_empty()
+                    || label_selector.contains(name)
+                    || name == BUCKET_LABEL)
+                && (name != NAME_LABEL || KEEP_METRIC_NAME_FUNC.contains(func_name))
+        })
+        .collect();
+    cols.sort();
+    cols
+}
+
+/// Every partition's ordered input streams; `None` (logged) means a partition's plan cannot stream
+/// in order.
+async fn build_partition_inputs(
     df: &DataFrame,
     columns: &[&str],
-    shards: usize,
+    partitions: usize,
     trace_id: &str,
 ) -> Result<Option<Vec<Vec<SendableRecordBatchStream>>>> {
-    let mut shard_inputs = Vec::with_capacity(shards);
-    for (shard, (lo, hi)) in hash_shards(shards).into_iter().enumerate() {
-        let shard_df = df
+    let mut partition_inputs = Vec::with_capacity(partitions);
+    for (partition, (lo, hi)) in hash_partitions(partitions).into_iter().enumerate() {
+        let partition_df = df
             .clone()
             .filter(
                 col(HASH_LABEL)
@@ -239,50 +333,50 @@ pub(crate) async fn build_shard_inputs(
                     .and(col(HASH_LABEL).lt_eq(lit(hi))),
             )?
             .select_columns(columns)?
-            // planning-only: proves the scan partitions hash-ordered; the shard source merges, not the SPM
+            // planning-only: proves the scan partitions hash-ordered; the partition stream merges, not the SPM
             .sort(vec![col(HASH_LABEL).sort(true, false)])?;
-        let task_ctx = Arc::new(shard_df.task_ctx());
-        let plan = shard_df.create_physical_plan().await?;
+        let task_ctx = Arc::new(partition_df.task_ctx());
+        let plan = partition_df.create_physical_plan().await?;
 
-        // the shards only differ in their hash interval, so one plan speaks for all
-        if shard == 0 && config::get_config().common.print_key_sql {
+        // the partitions only differ in their hash interval, so one plan speaks for all
+        if partition == 0 && config::get_config().common.print_key_sql {
             log::info!("{}", generate_plan_string(trace_id, plan.as_ref()));
         }
 
-        let Some(streams) = shard_streams(plan.clone(), task_ctx)? else {
+        let Some(streams) = partition_streams(plan.clone(), task_ctx)? else {
             log::info!(
-                "[trace_id: {trace_id}] [PromQL] streaming fused agg fallback: shard {shard} plan cannot stream in order:\n{}",
+                "[trace_id: {trace_id}] [PromQL] streaming fused agg fallback: partition {partition} plan cannot stream in order:\n{}",
                 generate_plan_string(trace_id, plan.as_ref())
             );
             return Ok(None);
         };
-        shard_inputs.push(streams);
+        partition_inputs.push(streams);
     }
-    Ok(Some(shard_inputs))
+    Ok(Some(partition_inputs))
 }
 
 /// Uniform partition of the u64 hash space into `count` inclusive ranges.
-fn hash_shards(count: usize) -> Vec<(u64, u64)> {
+fn hash_partitions(count: usize) -> Vec<(u64, u64)> {
     let count = count.max(1) as u128;
     let span = (u64::MAX as u128) + 1;
     (0..count)
-        .map(|shard| {
-            let lo = (span * shard / count) as u64;
-            let hi = (span * (shard + 1) / count - 1) as u64;
+        .map(|partition| {
+            let lo = (span * partition / count) as u64;
+            let hi = (span * (partition + 1) / count - 1) as u64;
             (lo, hi)
         })
         .collect()
 }
 
 /// The merge node's own child partitions, so the row-level merge itself is never executed.
-fn shard_streams(
+fn partition_streams(
     plan: Arc<dyn ExecutionPlan>,
     task_ctx: Arc<TaskContext>,
 ) -> Result<Option<Vec<SendableRecordBatchStream>>> {
     if plan_contains_sort(&plan) {
         return Ok(None);
     }
-    // a shard whose pruning dropped every file scans nothing: zero chains
+    // a partition whose pruning dropped every file scans nothing: zero chains
     if plan.properties().output_partitioning().partition_count() == 0 {
         return Ok(Some(vec![]));
     }
@@ -319,12 +413,38 @@ fn hash_ordered(plan: &Arc<dyn ExecutionPlan>) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use datafusion::{
-        arrow::datatypes::{DataType, Field, Schema},
-        physical_plan::empty::EmptyExec,
-    };
+    use datafusion::{arrow::datatypes::Field, physical_plan::empty::EmptyExec};
 
     use super::*;
+
+    #[test]
+    fn test_series_label_columns_follow_the_loader() {
+        let schema = Schema::new(vec![
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+            Field::new(HASH_LABEL, DataType::UInt64, false),
+            Field::new(VALUE_LABEL, DataType::Float64, false),
+            Field::new("path", DataType::Utf8View, true),
+            Field::new(NAME_LABEL, DataType::Utf8, true),
+            Field::new(BUCKET_LABEL, DataType::Utf8, true),
+            Field::new("instance", DataType::Utf8, true),
+            Field::new(EXEMPLARS_LABEL, DataType::Utf8, true),
+        ]);
+        let all = HashSet::new();
+        assert_eq!(
+            series_label_columns(&schema, &all, "rate"),
+            ["instance", "le", "path"]
+        );
+        // last_over_time keeps the metric name, like an offset would
+        assert_eq!(
+            series_label_columns(&schema, &all, "last_over_time"),
+            [NAME_LABEL, "instance", "le", "path"]
+        );
+        let selected: HashSet<String> = ["path".to_string()].into_iter().collect();
+        assert_eq!(
+            series_label_columns(&schema, &selected, "rate"),
+            ["le", "path"]
+        );
+    }
 
     #[test]
     fn test_shard_streams_empty_scan_yields_zero_chains() {
@@ -334,18 +454,18 @@ mod tests {
             false,
         )]));
         let plan = Arc::new(EmptyExec::new(schema).with_partitions(0));
-        let streams = shard_streams(plan, Arc::new(TaskContext::default())).unwrap();
+        let streams = partition_streams(plan, Arc::new(TaskContext::default())).unwrap();
         assert_eq!(streams.map(|streams| streams.len()), Some(0));
     }
 
     #[test]
     fn test_hash_shards_cover_the_full_space_contiguously() {
         for count in [1, 3, 7, 16] {
-            let shards = hash_shards(count);
-            assert_eq!(shards.len(), count);
-            assert_eq!(shards[0].0, 0);
-            assert_eq!(shards[count - 1].1, u64::MAX);
-            for pair in shards.windows(2) {
+            let partitions = hash_partitions(count);
+            assert_eq!(partitions.len(), count);
+            assert_eq!(partitions[0].0, 0);
+            assert_eq!(partitions[count - 1].1, u64::MAX);
+            for pair in partitions.windows(2) {
                 assert_eq!(pair[0].1.wrapping_add(1), pair[1].0);
             }
         }

@@ -16,12 +16,12 @@
 //! PromQL function-call dispatch and argument helpers. Touches only
 //! `eval_ctx` besides recursing through `exec_expr`.
 
-use std::str::FromStr;
+use std::{str::FromStr, sync::Arc};
 
 use config::meta::promql::value::*;
 use datafusion::error::{DataFusionError, Result};
 use hashbrown::HashSet;
-use promql_parser::parser::{Expr as PromExpr, Function, FunctionArgs};
+use promql_parser::parser::{Expr as PromExpr, Function, FunctionArgs, MatrixSelector};
 
 use super::Engine;
 use crate::functions::{self, Func};
@@ -35,6 +35,17 @@ impl Engine {
         let func_name = Func::from_str(func.name).map_err(|_| {
             DataFusionError::NotImplemented(format!("Unsupported function: {}", func.name))
         })?;
+
+        // a range function over a plain matrix selector streams its series one at a time
+        if let Some(range_func) = func_name.range_func()
+            && let [arg] = args.args.as_slice()
+            && let PromExpr::MatrixSelector(MatrixSelector { vs, range }) = arg.as_ref()
+            && let Some(value) = self
+                .try_streaming_range_func(vs, *range, Arc::from(range_func))
+                .await?
+        {
+            return Ok(value);
+        }
 
         // There are a few functions which need no arguments for e.g. time()
         let functions_without_args: HashSet<&str> = HashSet::from_iter(vec![

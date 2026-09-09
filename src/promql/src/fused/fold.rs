@@ -13,14 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! The single fused fold: every series source partition folds its series into
-//! per-group accumulators, and the partitions merge in order at the end. The
+//! The single fused fold: every series stream folds its series into per-group
+//! accumulators, and the sources merge in order at the end. The
 //! producers only decide how series arrive; the aggregation lives here once.
 
 use std::{sync::Arc, time::Duration};
 
 use config::meta::promql::value::{
-    CounterSeries, EvalContext, ExtrapolationKind, Labels, RangeValue, Sample, Value,
+    CounterSeries, EvalContext, ExtrapolationKind, Labels, RangeValue, Sample, TimeWindow, Value,
 };
 use datafusion::error::{DataFusionError, Result};
 use hashbrown::{HashMap, hash_map::Entry};
@@ -30,7 +30,7 @@ use super::{accumulator::FusedAccumulator, op::FusedAggOp};
 use crate::{
     functions::{RangeFunc, advance_sample_window},
     micros,
-    series_source::SeriesSource,
+    series_stream::SeriesStream,
 };
 
 pub(super) type GroupAccs = HashMap<u64, GroupEntry>;
@@ -40,63 +40,89 @@ pub(super) struct GroupEntry {
     acc: FusedAccumulator,
 }
 
-pub(super) struct FoldParams {
-    op: FusedAggOp,
-    func: Arc<dyn RangeFunc>,
+/// How one series becomes per-step values: the range function, its window, and the slots.
+pub(crate) struct RangeExpr {
+    pub(crate) func: Arc<dyn RangeFunc>,
     counter_kind: Option<ExtrapolationKind>,
-    range: Duration,
-    eval_ctx: EvalContext,
-    timestamps: Vec<i64>,
+    pub(crate) range: Duration,
+    pub(crate) eval_ctx: EvalContext,
+    pub(crate) timestamps: Vec<i64>,
 }
 
-impl FoldParams {
-    pub(super) fn new(
-        op: FusedAggOp,
-        func: Arc<dyn RangeFunc>,
-        range: Duration,
-        eval_ctx: &EvalContext,
-    ) -> Arc<Self> {
-        Arc::new(Self {
-            op,
+impl RangeExpr {
+    pub(crate) fn new(func: Arc<dyn RangeFunc>, range: Duration, eval_ctx: &EvalContext) -> Self {
+        Self {
             counter_kind: func.counter_extrapolation(),
             func,
             range,
             eval_ctx: eval_ctx.clone(),
             timestamps: eval_ctx.timestamps(),
-        })
+        }
+    }
+
+    /// Evaluates the function over one series, handing each value to `emit` with its slot.
+    fn evaluate(&self, samples: &[Sample], mut emit: impl FnMut(usize, f64)) {
+        let range_micros = micros(self.range);
+        let mut start_index = 0;
+        let mut end_index = 0;
+        let counter =
+            CounterSeries::try_new(samples, self.counter_kind, &self.eval_ctx, range_micros);
+
+        for (slot, &eval_ts) in self.timestamps.iter().enumerate() {
+            let window_samples = advance_sample_window(
+                samples,
+                eval_ts - range_micros,
+                eval_ts,
+                &mut start_index,
+                &mut end_index,
+            );
+            if window_samples.is_empty() {
+                continue;
+            }
+            let value = match &counter {
+                Some(counter) => counter.extrapolate(start_index, end_index, eval_ts, self.range),
+                None => self.func.exec(window_samples, eval_ts, &self.range),
+            };
+            if let Some(value) = value {
+                emit(slot, value);
+            }
+        }
     }
 }
 
-/// Folds all partitions concurrently and merges their groups; each source opens inside its own
-/// task, and dropping the future aborts them all.
-pub(super) async fn fold_sources<F, S>(
+/// Aggregates every partition, partial then final; each source opens inside its own task, and
+/// dropping the future aborts them all.
+pub(super) async fn aggregate<F, S>(
     sources: Vec<F>,
-    params: Arc<FoldParams>,
+    op: FusedAggOp,
+    eval: Arc<RangeExpr>,
 ) -> Result<(Value, usize)>
 where
     F: Future<Output = Result<S>> + Send + 'static,
-    S: SeriesSource + 'static,
+    S: SeriesStream + 'static,
 {
     let folds = sources
         .into_iter()
         .map(|source| {
-            let params = params.clone();
-            async move { fold_partition(source.await?, params).await }
+            let eval = eval.clone();
+            async move { aggregate_partial(source.await?, op, eval).await }
         })
         .collect();
-    let folds = run_folds(folds).await?;
+    let folds = collect_partitioned(folds).await?;
     let series_count = folds.iter().map(|(_, series)| series).sum();
-    let value = merge_folds(
+    let value = aggregate_final(
         folds.into_iter().map(|(groups, _)| groups).collect(),
-        &params.timestamps,
+        &eval.timestamps,
     );
     Ok((value, series_count))
 }
 
-/// Folds one partition's series into its group accumulators, dropping each as it goes.
-async fn fold_partition<S: SeriesSource>(
+/// The partial aggregate of one partition: its series folded into group accumulators, each
+/// dropped as it goes.
+async fn aggregate_partial<S: SeriesStream>(
     mut source: S,
-    params: Arc<FoldParams>,
+    op: FusedAggOp,
+    eval: Arc<RangeExpr>,
 ) -> Result<(GroupAccs, usize)> {
     let mut groups = GroupAccs::new();
     let mut series_count = 0;
@@ -105,19 +131,11 @@ async fn fold_partition<S: SeriesSource>(
             Entry::Occupied(entry) => entry.into_mut(),
             Entry::Vacant(entry) => entry.insert(GroupEntry {
                 labels: source.labels(),
-                acc: FusedAccumulator::new(params.op, params.timestamps.len()),
+                acc: FusedAccumulator::new(op, eval.timestamps.len()),
             }),
         };
         let samples = source.consume().await?;
-        fold_series(
-            &mut entry.acc,
-            samples,
-            params.range,
-            params.func.as_ref(),
-            params.counter_kind,
-            &params.eval_ctx,
-            &params.timestamps,
-        );
+        eval.evaluate(samples, |slot, value| entry.acc.push(slot, value));
         series_count += 1;
         // the fold is pure CPU: give the runtime a chance to time out or abort it
         tokio::task::consume_budget().await;
@@ -125,66 +143,32 @@ async fn fold_partition<S: SeriesSource>(
     Ok((groups, series_count))
 }
 
-/// Evaluates `func` over one series and pushes each value into `acc` at its evaluation slot.
-fn fold_series(
-    acc: &mut FusedAccumulator,
-    samples: &[Sample],
-    range: Duration,
-    func: &dyn RangeFunc,
-    counter_kind: Option<ExtrapolationKind>,
-    eval_ctx: &EvalContext,
-    timestamps: &[i64],
-) {
-    let range_micros = micros(range);
-    let mut start_index = 0;
-    let mut end_index = 0;
-    let counter = CounterSeries::try_new(samples, counter_kind, eval_ctx, range_micros);
-
-    for (slot, &eval_ts) in timestamps.iter().enumerate() {
-        let window_samples = advance_sample_window(
-            samples,
-            eval_ts - range_micros,
-            eval_ts,
-            &mut start_index,
-            &mut end_index,
-        );
-        if window_samples.is_empty() {
-            continue;
-        }
-        let value = match &counter {
-            Some(counter) => counter.extrapolate(start_index, end_index, eval_ts, range),
-            None => func.exec(window_samples, eval_ts, &range),
-        };
-        if let Some(value) = value {
-            acc.push(slot, value);
-        }
-    }
-}
-
-/// The first failed partition fails the fold; dropping the set aborts the rest.
-async fn run_folds<Fut>(folds: Vec<Fut>) -> Result<Vec<(GroupAccs, usize)>>
+/// Collects every partition in order; the first failure fails the whole, and dropping the set
+/// aborts the rest.
+async fn collect_partitioned<T, Fut>(parts: Vec<Fut>) -> Result<Vec<T>>
 where
-    Fut: Future<Output = Result<(GroupAccs, usize)>> + Send + 'static,
+    T: Send + 'static,
+    Fut: Future<Output = Result<T>> + Send + 'static,
 {
-    let mut results: Vec<Option<(GroupAccs, usize)>> = folds.iter().map(|_| None).collect();
+    let mut results: Vec<Option<T>> = parts.iter().map(|_| None).collect();
     let mut tasks = JoinSet::new();
-    for (index, fold) in folds.into_iter().enumerate() {
-        tasks.spawn(async move { (index, fold.await) });
+    for (index, part) in parts.into_iter().enumerate() {
+        tasks.spawn(async move { (index, part.await) });
     }
-    // folds finish in any order; the merge needs them in partition order
+    // sources finish in any order; the merge needs them in source order
     while let Some(joined) = tasks.join_next().await {
-        let (index, fold) = joined.map_err(|e| DataFusionError::Execution(e.to_string()))?;
-        results[index] = Some(fold?);
+        let (index, part) = joined.map_err(|e| DataFusionError::Execution(e.to_string()))?;
+        results[index] = Some(part?);
     }
     Ok(results
         .into_iter()
-        .map(|fold| fold.expect("every partition joined"))
+        .map(|part| part.expect("every source joined"))
         .collect())
 }
 
-/// Merges the partition groups in partition order; groups without output are dropped like the
-/// generic path.
-fn merge_folds(folds: Vec<GroupAccs>, timestamps: &[i64]) -> Value {
+/// The final aggregate: partial groups merged in partition order, groups without output dropped
+/// like the generic path.
+fn aggregate_final(folds: Vec<GroupAccs>, timestamps: &[i64]) -> Value {
     let mut folds = folds.into_iter();
     let Some(mut merged) = folds.next() else {
         return Value::None;
@@ -221,6 +205,69 @@ fn merge_folds(folds: Vec<GroupAccs>, timestamps: &[i64]) -> Value {
     }
 }
 
+/// Maps every source's series through the function and returns them whole, in source order;
+/// dropping the future aborts the sources.
+pub(crate) async fn map_sources<F, S>(
+    sources: Vec<F>,
+    eval: Arc<RangeExpr>,
+) -> Result<(Vec<RangeValue>, usize)>
+where
+    F: Future<Output = Result<S>> + Send + 'static,
+    S: SeriesStream + 'static,
+{
+    let start_time = std::time::Instant::now();
+    let func_name = eval.func.name();
+    let trace_id = eval.eval_ctx.trace_id.clone();
+    log::info!(
+        "[trace_id: {trace_id}] [PromQL Timing] streaming {func_name}() started with {} partitions",
+        sources.len(),
+    );
+    let parts = sources
+        .into_iter()
+        .map(|source| {
+            let eval = eval.clone();
+            async move { map_partition(source.await?, eval).await }
+        })
+        .collect();
+    let parts = collect_partitioned(parts).await?;
+    let series_count: usize = parts.iter().map(|(_, series)| series).sum();
+    let series: Vec<RangeValue> = parts.into_iter().flat_map(|(series, _)| series).collect();
+    log::info!(
+        "[trace_id: {trace_id}] [PromQL Timing] streaming {func_name}() execution took: {:?}, mapped {} of {series_count} series",
+        start_time.elapsed(),
+        series.len(),
+    );
+    Ok((series, series_count))
+}
+
+/// Maps one source's series; like the generic evaluator, a series with no value is dropped.
+async fn map_partition<S: SeriesStream>(
+    mut source: S,
+    eval: Arc<RangeExpr>,
+) -> Result<(Vec<RangeValue>, usize)> {
+    let mut series = Vec::new();
+    let mut series_count = 0;
+    while source.advance().await?.is_some() {
+        let labels = source.labels();
+        let samples = source.consume().await?;
+        let mut values = Vec::with_capacity(eval.timestamps.len());
+        eval.evaluate(samples, |slot, value| {
+            values.push(Sample::new(eval.timestamps[slot], value));
+        });
+        if !values.is_empty() {
+            series.push(RangeValue {
+                labels,
+                samples: values,
+                exemplars: None,
+                time_window: Some(TimeWindow::new(eval.range)),
+            });
+        }
+        series_count += 1;
+        tokio::task::consume_budget().await;
+    }
+    Ok((series, series_count))
+}
+
 #[cfg(test)]
 mod tests {
     use std::{
@@ -237,13 +284,13 @@ mod tests {
     use crate::functions;
 
     /// Errors on its first series.
-    struct FailingSource;
+    struct FailingStream;
 
-    impl SeriesSource for FailingSource {
+    impl SeriesStream for FailingStream {
         async fn advance(&mut self) -> Result<Option<u64>> {
-            Err(DataFusionError::Execution("partition failed".into()))
+            Err(DataFusionError::Execution("source failed".into()))
         }
-        fn labels(&self) -> Labels {
+        fn labels(&mut self) -> Labels {
             Labels::default()
         }
         async fn consume(&mut self) -> Result<&[Sample]> {
@@ -252,16 +299,16 @@ mod tests {
     }
 
     /// Yields series forever; `finished` records whether it ever returned.
-    struct EndlessSource {
+    struct EndlessStream {
         samples: Vec<Sample>,
         finished: Arc<AtomicBool>,
     }
 
-    impl SeriesSource for EndlessSource {
+    impl SeriesStream for EndlessStream {
         async fn advance(&mut self) -> Result<Option<u64>> {
             Ok(Some(1))
         }
-        fn labels(&self) -> Labels {
+        fn labels(&mut self) -> Labels {
             Labels::default()
         }
         async fn consume(&mut self) -> Result<&[Sample]> {
@@ -269,39 +316,39 @@ mod tests {
         }
     }
 
-    impl Drop for EndlessSource {
+    impl Drop for EndlessStream {
         fn drop(&mut self) {
             self.finished.store(true, Ordering::SeqCst);
         }
     }
 
-    fn params() -> Arc<FoldParams> {
+    fn eval() -> Arc<RangeExpr> {
         let func: Arc<dyn RangeFunc> = Arc::from(functions::fusable_range_func("rate").unwrap());
         let eval_ctx = EvalContext::new(1_000_000, 2_000_000, 1_000_000, "test".into());
-        FoldParams::new(FusedAggOp::Sum, func, Duration::from_secs(60), &eval_ctx)
+        Arc::new(RangeExpr::new(func, Duration::from_secs(60), &eval_ctx))
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    async fn test_run_folds_fails_fast_and_aborts_the_rest() {
-        let params = params();
+    async fn test_collect_partitioned_fails_fast_and_aborts_the_rest() {
+        let eval = eval();
         let dropped = Arc::new(AtomicBool::new(false));
-        let endless = EndlessSource {
+        let endless = EndlessStream {
             samples: vec![Sample::new(1_500_000, 1.0)],
             finished: dropped.clone(),
         };
-        let failing = FailingSource;
+        let failing = FailingStream;
         let folds = vec![
-            Box::pin(fold_partition(endless, params.clone()))
+            Box::pin(aggregate_partial(endless, FusedAggOp::Sum, eval.clone()))
                 as std::pin::Pin<Box<dyn Future<Output = Result<(GroupAccs, usize)>> + Send>>,
-            Box::pin(fold_partition(failing, params)),
+            Box::pin(aggregate_partial(failing, FusedAggOp::Sum, eval)),
         ];
 
         let start = std::time::Instant::now();
-        let result = run_folds(folds).await;
-        assert!(result.is_err(), "the failed partition must fail the fold");
+        let result = collect_partitioned(folds).await;
+        assert!(result.is_err(), "the failed source must fail the fold");
         assert!(
             start.elapsed() < Duration::from_secs(5),
-            "must not wait for the endless partition"
+            "must not wait for the endless source"
         );
 
         // the aborted task drops its source at its next yield point
@@ -311,6 +358,6 @@ mod tests {
             }
             tokio::time::sleep(Duration::from_millis(20)).await;
         }
-        panic!("the endless partition was not aborted");
+        panic!("the endless source was not aborted");
     }
 }
