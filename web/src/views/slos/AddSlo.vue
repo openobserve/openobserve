@@ -385,8 +385,8 @@
               :placeholder="t('slos.alertSli.sourcePlaceholder')"
               required
               class="mt-3"
-              :error="!!fieldError('config.alert_id')"
-              :error-message="fieldError('config.alert_id') || undefined"
+              :error="!!sourceError"
+              :error-message="sourceError || undefined"
               data-test="slos-addslo-alert-source"
               @update:model-value="onAlertSourceChange"
             />
@@ -394,15 +394,7 @@
               {{ t("slos.alertSli.sourceHint") }}
             </p>
             <OBanner
-              v-if="alertSourceError"
-              variant="error"
-              class="mt-3"
-              data-test="slos-addslo-alert-source-error"
-            >
-              {{ alertSourceError }}
-            </OBanner>
-            <OBanner
-              v-else-if="!isFetchingAlertSources && !hasEligibleAlert"
+              v-if="!isFetchingAlertSources && !hasEligibleAlert && !alertSourceError"
               variant="info"
               class="mt-3"
               data-test="slos-addslo-alert-source-empty"
@@ -962,9 +954,18 @@ watch(isGrouped, (grouped) => {
 // the server's own reason attached rather than being filtered away.
 const alertSources = ref<SloEligibleAlert[]>([]);
 const isFetchingAlertSources = ref(false);
-const alertSourceError = ref<string | null>(null);
+const alertSourceError = ref<I18nText | null>(null);
 
 const hasEligibleAlert = computed(() => alertSources.value.some((a) => a.eligible));
+
+/// One message for one field.
+///
+/// A failed load outranks "required" (#14279 vs the required-field check): with
+/// no list to pick from, telling the user the field is required is advice they
+/// cannot act on, and the load error names the actual problem.
+const sourceError = computed<I18nText>(
+  () => alertSourceError.value ?? fieldError("config.alert_id"),
+);
 
 // The reason is a PARAGRAPH, and every row that carries one costs three lines
 // — at twenty alerts the list stops being a list. So the row states WHICH rule
@@ -1049,9 +1050,9 @@ async function loadAlertSources() {
   try {
     const res = await sloService.eligibleAlerts(org.value);
     alertSources.value = res.data?.list ?? [];
-  } catch {
+  } catch (e: any) {
     alertSources.value = [];
-    alertSourceError.value = t("slos.alertSli.loadFailed");
+    alertSourceError.value = raw(e?.response?.data?.message) || t("slos.alertSli.loadFailed");
   } finally {
     isFetchingAlertSources.value = false;
   }
@@ -1338,10 +1339,17 @@ async function save() {
     router.push(backTarget.value);
   } catch (e: any) {
     // The backend's budget rejection carries its arithmetic (§6b.4d); show it
-    // verbatim rather than replacing it with a generic message.
+    // verbatim rather than replacing it with a generic message. A rejected
+    // JSON body (missing/mistyped field) comes back as a plain-text response,
+    // not `{message}`, so that shape has to be read directly too (#14279).
+    const body = e?.response?.data;
     toast({
       variant: "error",
-      message: e?.response?.data?.message || e?.message || t("slos.saveFailed"),
+      message:
+        body?.message ||
+        (typeof body === "string" && body.trim()) ||
+        e?.message ||
+        t("slos.saveFailed"),
     });
   } finally {
     saving.value = false;
