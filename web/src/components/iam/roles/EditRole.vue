@@ -516,9 +516,7 @@ const getRoleDetails = () => {
       if (selectedPermissionsHash.value.size === 0) {
         filter.value.permissions = "all";
 
-        // The Add Role dialog's preset seeds read permissions so evaluators get a
-        // safe, non-empty starting point. These land as pending "added"
-        // permissions the user can still tweak before saving.
+        // A preset only stages PENDING "added" permissions, so the user can still tweak them before saving.
         const preset = router.currentRoute.value.query.preset;
         if (preset === "readonly") {
           seedReadonlyPreset();
@@ -949,7 +947,7 @@ const seedReadonlyPreset = () => {
   });
 };
 
-const collectVisibleDbmReadGrants = (row: Entity, perms: readonly (keyof Entity["permission"])[]) =>
+const collectVisibleReadGrants = (row: Entity, perms: readonly (keyof Entity["permission"])[]) =>
   perms
     .filter((perm) => {
       const permDetail = row.permission?.[perm];
@@ -967,7 +965,7 @@ const seedDbmViewerPreset = async () => {
 
   const dbMonitoringResource = resourceMapper.value[DBM_MODULE_RESOURCE];
   if (dbMonitoringResource) {
-    changes.push(...collectVisibleDbmReadGrants(dbMonitoringResource, DBM_MODULE_PERMS));
+    changes.push(...collectVisibleReadGrants(dbMonitoringResource, DBM_MODULE_PERMS));
   }
 
   const streamResource = resourceMapper.value["stream"];
@@ -988,13 +986,13 @@ const seedDbmViewerPreset = async () => {
       matched = matchedRows.length;
       changes.push(
         ...matchedRows.flatMap((row: Entity) =>
-          collectVisibleDbmReadGrants(row, DBM_VIEWER_STREAM_ROW_PERMS),
+          collectVisibleReadGrants(row, DBM_VIEWER_STREAM_ROW_PERMS),
         ),
       );
 
       // GET /{org}/streams is checked against `metrics:_all_<org>`, never the per-stream objects, and FGA's LIST relation does not accept ALLOW_GET; ALLOW_GET here would instead wildcard every metric stream in the org, so the type node is LIST-only.
       if (matchedRows.length) {
-        changes.push(...collectVisibleDbmReadGrants(metricsEntity, DBM_VIEWER_TYPE_NODE_PERMS));
+        changes.push(...collectVisibleReadGrants(metricsEntity, DBM_VIEWER_TYPE_NODE_PERMS));
       }
     }
   }
@@ -1036,28 +1034,32 @@ const seedK8sViewerPreset = async () => {
 
   if (!metricsEntity.expand) await expandPermission(metricsEntity);
 
-  // The full row set lives in heavyResourceEntities; `metrics.entities` only ever
-  // holds the visible slice, so seeding off it would silently miss streams.
+  // `metrics.entities` only ever holds the visible slice, so seeding off it would silently miss streams.
   const rows = heavyResourceEntities.value["metrics"] ?? [];
   const curated = new Set(K8S_VIEWER_STREAMS);
-  const changes: { row: any; permission: string; newValue: boolean }[] = [];
+  const matched = rows.filter((row: Entity) => curated.has(row.name));
+  const changes = matched.flatMap((row: Entity) =>
+    collectVisibleReadGrants(row, K8S_VIEWER_PERMS),
+  );
 
-  rows.forEach((row: Entity) => {
-    if (!curated.has(row.name)) return;
-    K8S_VIEWER_PERMS.forEach((perm) => {
-      const permDetail = row.permission?.[perm as "AllowList"];
-      if (!permDetail || !permDetail.show || permDetail.value) return;
-      changes.push({ row, permission: perm, newValue: true });
-    });
-  });
+  // GET /{org}/streams is checked against `metrics:_all_<org>`, never the per-stream objects, and FGA's LIST relation does not accept ALLOW_GET — without this the curated pages cannot load their stream list at all.
+  if (matched.length) changes.push(...collectVisibleReadGrants(metricsEntity, K8S_VIEWER_PERMS));
 
-  if (!changes.length) return;
+  if (changes.length) {
+    handlePermissionBatchChange(changes);
+    // Unlike readonly (which seeds every resource), only a handful of the org's streams are seeded here — "all" would bury them in a 50-row truncated grid.
+    filter.value.permissions = "selected";
+  }
 
-  handlePermissionBatchChange(changes);
+  reportK8sViewerSeeding(matched.length, K8S_VIEWER_STREAMS.length);
+};
 
-  // Unlike readonly (which seeds every resource), only a handful of the org's
-  // streams are seeded here — "all" would bury them in a 50-row truncated grid.
-  filter.value.permissions = "selected";
+const reportK8sViewerSeeding = (matched: number, total: number) => {
+  toast(
+    matched
+      ? { variant: "info", message: t("iam.editRole.k8sPresetSeeded", { matched, total }) }
+      : { variant: "warning", message: t("iam.editRole.k8sPresetNoMatch", { total }) },
+  );
 };
 
 const handlePermissionChange = (row: any, permission: string) => {

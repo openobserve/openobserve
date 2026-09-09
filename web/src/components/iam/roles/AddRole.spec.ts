@@ -159,10 +159,9 @@ describe("AddRole", () => {
     });
 
     it("labels the Kubernetes-viewer option from i18n", () => {
-      // ORadio forwards data-test onto the radio button; the label is a sibling
-      // span, so the text assertion has to be on the section.
+      // ORadio forwards data-test onto the radio button, so the label text sits on the section.
       expect(wrapper.find('[data-test="add-role-start-from-section"]').text()).toContain(
-        "Kubernetes viewer (read access to Kubernetes & host metrics)",
+        i18n.global.t("iam.role.startFrom.k8s"),
       );
     });
 
