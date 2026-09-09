@@ -124,7 +124,7 @@ export const DEFAULT_LOGS_CONFIG = {
     sqlModeManualTrigger: false,
     nlpMode: false,
     quickMode: false,
-    quickModePinned: useLocalQuickModePin() === "true",
+    quickModePinned: useLocalQuickModePin() !== "false",
     queryEditorPlaceholderFlag: true,
     functionEditorPlaceholderFlag: true,
     resultGrid: {
