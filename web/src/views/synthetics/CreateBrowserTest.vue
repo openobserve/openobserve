@@ -36,7 +36,7 @@ import type {
   ReplayResponse,
 } from "@/types/synthetics";
 import useSyntheticsRecorder from "@/composables/useSyntheticsRecorder";
-import { journeyToWireSteps } from "@/utils/synthetics/mapRecordedStep";
+import { journeyToWireSteps, mapWireSteps } from "@/utils/synthetics/mapRecordedStep";
 import type { WireStep } from "@/types/synthetics";
 import { buildResolvedGrouped } from "@/components/synthetics/variables/resolved";
 import {
@@ -45,7 +45,12 @@ import {
   sharedPlainValues,
 } from "@/components/synthetics/variables/replayInputs";
 import { useSharedVariables } from "@/components/synthetics/variables/useSharedVariables";
-import { expandJourney, type ChildJourney } from "@/utils/synthetics/expandJourney";
+import {
+  expandJourney,
+  loadChildren,
+  type ChildJourney,
+  type ExpansionMap,
+} from "@/utils/synthetics/expandJourney";
 import { computeRunBudget, formatBudgetDuration, JOB_LEASE_MS } from "@/utils/synthetics/runBudget";
 import { classifyPreflightFailure } from "@/utils/synthetics/replayFailure";
 import {
@@ -519,6 +524,13 @@ const check = ref<BrowserCheck>({
 const childrenCache = ref<Map<string, ChildJourney>>(new Map());
 
 /**
+ * Composed-child-id → authored-row map for the run currently on screen — set by
+ * `runReplay` before it ships the expanded journey, so `BrowserJourney` can fold a
+ * child's replay result back onto the reference row it belongs to (§7.3).
+ */
+const expansionMap = ref<ExpansionMap | undefined>(undefined);
+
+/**
  * How many steps this journey actually runs, expanding every subtest
  * reference — the number `SubtestPicker`'s insertion warning and the
  * server's 50-step cap are both measured in.
@@ -983,8 +995,25 @@ const knownVariableNames = computed(() => {
   );
 });
 
-function runReplay(journey: BrowserStep[]) {
-  const steps = journeyToWireSteps(journey);
+/**
+ * Expand subtest references before shipping the journey to the extension, so the
+ * runner never sees a `subtest` step — it sees the child's own steps, spliced in
+ * (§7.3). `expansionMap` is what lets `BrowserJourney` fold their results back
+ * onto the reference row afterwards.
+ */
+async function runReplay(journey: BrowserStep[]) {
+  let expanded = journey;
+  expansionMap.value = undefined;
+  try {
+    const children = await loadChildren(journey, fetchChildJourney);
+    const result = expandJourney(journey, children);
+    expanded = result.steps;
+    expansionMap.value = result.map;
+  } catch (err) {
+    recorder.error.value = err instanceof Error ? err.message : String(err);
+    return;
+  }
+  const steps = journeyToWireSteps(expanded);
   if (steps.length === 0) return;
   startReplay(steps);
 }
@@ -996,6 +1025,20 @@ function startReplay(steps: WireStep[]) {
     .catch((err) => {
       recorder.error.value = err instanceof Error ? err.message : String(err);
     });
+}
+
+/** Reuses the shared cache before hitting the network — see `childrenCache` doc. */
+async function fetchChildJourney(id: string): Promise<ChildJourney> {
+  const cached = childrenCache.value.get(id);
+  if (cached) return cached;
+  const res = await syntheticsService.get(orgIdentifier.value, id);
+  const child: ChildJourney = {
+    id,
+    name: res.data.name ?? "",
+    steps: mapWireSteps(res.data.config?.steps ?? []),
+  };
+  childrenCache.value.set(id, child);
+  return child;
 }
 
 function onStopReplay() {
@@ -1221,6 +1264,7 @@ function onClearResults() {
                     :own-check-id="check.id"
                     :own-step-count="executedStepCount"
                     :children-cache="childrenCache"
+                    :expansion-map="expansionMap"
                     class="h-full!"
                     @toggle-variables-panel="variablesPanelOpen = !variablesPanelOpen"
                     @replay="onReplay"
