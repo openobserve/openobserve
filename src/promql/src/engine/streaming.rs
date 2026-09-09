@@ -13,11 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! The streaming entries for fused aggregations, bare range functions and instant selectors:
-//! each attempts the ordered partition streams over the selector's contexts and falls back to
-//! the materializing evaluation on the same contexts.
-//!
-//! Reads `ctx`, `eval_ctx`, `label_selector`; writes `result_type` on success.
+//! Streaming entries (agg, range func, instant selector); each falls back on the same contexts.
 
 use std::{sync::Arc, time::Duration};
 
@@ -143,9 +139,7 @@ impl Engine {
         functions::eval_range(input, func, &self.eval_ctx).map(Some)
     }
 
-    /// Streams an instant selector as `last_over_time` over the lookback window, and otherwise
-    /// selects on the same contexts; `None` only when the query shape rules the streaming path
-    /// out up front.
+    /// Streams `last_over_time(m[lookback])` or selects on the same contexts; `None` when gated.
     pub(super) async fn try_streaming_instant_selector(
         &mut self,
         vs: &VectorSelector,
@@ -177,8 +171,7 @@ impl Engine {
             .map(Some)
     }
 
-    /// Runs the range function over the ordered partition streams of the scan's single context;
-    /// `None` when the layout cannot stream.
+    /// Streams the range function over the single context; `None` when the layout cannot stream.
     async fn stream_range_func(
         &self,
         scan: &SelectorScan,
@@ -700,8 +693,7 @@ mod tests {
         ));
     }
 
-    /// A bare instant selector streams as `last_over_time(m[lookback])` and must match the
-    /// generic instant path, both when it streams and when it selects on the same context.
+    /// `m` streams as `last_over_time(m[lookback])` and must match the generic path either way.
     #[tokio::test]
     async fn test_instant_selector_matches_generic_streaming_and_materialized() {
         for selector in ["m", "m offset 30s", "m{instance=\"a\"}"] {
