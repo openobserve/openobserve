@@ -23,11 +23,14 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import type { I18nKey } from "@/types/i18n";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import DateTime from "@/components/DateTime.vue";
+import RelativeTime from "@/components/common/RelativeTime.vue";
 import DataSourceSetupCard from "@/components/ingestion/setupCard/DataSourceSetupCard.vue";
 import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue";
 import type { useVariablesManager } from "@/composables/dashboard/useVariablesManager";
@@ -89,6 +92,11 @@ const selectedWindow = ref<CuratedWindow>({
 
 const range = ref(materialize(selectedWindow.value));
 const checkedAtUs = ref<number | null>(null);
+
+// RelativeTime reads a ms epoch; handing it the µs value dates the refresh to the year 57000.
+const checkedAtMs = computed(() =>
+  checkedAtUs.value === null ? null : Math.floor(checkedAtUs.value / 1000),
+);
 
 // MICROSECOND epoch, undivided: usePanelDataLoader reads these back with
 // `new Date(start_time.toISOString()).getTime()` and hands the result to
@@ -455,6 +463,26 @@ watch(
           data-test-name="curated-date-time"
           @on:date-change="onDateChange"
         />
+        <!-- The SAME indicator the dashboard panel bar carries — one staleness vocabulary app-wide. -->
+        <span
+          v-if="checkedAtMs !== null"
+          class="text-text-secondary flex items-center gap-1"
+          data-test="curated-last-refreshed"
+        >
+          <OIcon name="schedule" size="xs" />
+          <OText variant="meta" as="span">
+            <RelativeTime
+              :timestamp="checkedAtMs"
+              :full-time-prefix="t('dashboard.panelErrorButtons.lastRefreshedAt')"
+            />
+          </OText>
+          <OTooltip side="bottom" align="end">
+            <template #content>
+              {{ t("dashboard.panelErrorButtons.lastRefreshed")
+              }}<RelativeTime :timestamp="checkedAtMs" />
+            </template>
+          </OTooltip>
+        </span>
         <OButton
           variant="outline"
           size="sm-action"
