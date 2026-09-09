@@ -137,8 +137,13 @@ impl Engine {
                 // This is a very special case, as we treat the float also a
                 // `Value::Matrix(vec![element])` therefore, better convert it
                 // back to its representation.
+                // a set operator needs a vector on both sides, so its right side is never folded
                 let rhs = match rhs {
-                    Value::Matrix(m) if m.len() == 1 && m[0].samples.len() == 1 => {
+                    Value::Matrix(m)
+                        if !expr.op.is_set_operator()
+                            && m.len() == 1
+                            && m[0].samples.len() == 1 =>
+                    {
                         Value::Float(m[0].samples[0].value)
                     }
                     _ => rhs,
@@ -681,6 +686,14 @@ pub(crate) mod tests {
 
         let value = eval("vector(0) and up").await.unwrap();
         assert!(matches!(value, Value::Matrix(series) if series.is_empty()));
+
+        // a right side filtered down to one sample must stay a vector for the set operator
+        let sparse = r#"vector(0) or label_replace(timestamp(vector(1)) >= 1640995320, "source", "sparse", "", "")"#;
+        let Value::Matrix(series) = eval(sparse).await.unwrap() else {
+            panic!("`or` must keep a single-sample right side");
+        };
+        assert_eq!(series.len(), 2);
+        assert_eq!(series.iter().map(|s| s.samples.len()).sum::<usize>(), 4);
     }
 
     #[tokio::test]
