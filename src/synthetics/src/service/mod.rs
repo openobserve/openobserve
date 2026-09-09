@@ -24,18 +24,18 @@
 //! refuses to create a private location rather than creating one that no agent
 //! can ever serve.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use config::meta::{
     folder::{DEFAULT_FOLDER, Folder, FolderType},
     synthetics::{
-        ListSyntheticsParams, Synthetic, SyntheticAuth, SyntheticListItem, SyntheticListResponse,
-        for_each_string_at_path, take_strings_at_path,
+        BrowserConfig, ListSyntheticsParams, Synthetic, SyntheticAuth, SyntheticListItem,
+        SyntheticListResponse, SyntheticType, for_each_string_at_path, take_strings_at_path,
     },
 };
 use infra::table::{
     cipher, folders, synthetics_agents, synthetics_checks, synthetics_jobs, synthetics_locations,
-    synthetics_runs,
+    synthetics_refs, synthetics_runs,
 };
 // ── OpenFGA ───────────────────────────────────────────────────────────────────
 //

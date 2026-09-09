@@ -332,6 +332,186 @@ pub async fn list_synthetics(
     }
 }
 
+/// References `incoming` has that `stored` did not — the only ones a save must gate (§5.7).
+///
+/// `cfg` matches its only caller, which is enterprise-gated, plus `test` so the rule stays
+/// testable in a default-feature build. Without the `cfg` this is dead code in an OSS build and
+/// `clippy -D warnings` fails the task.
+#[cfg(any(feature = "enterprise", test))]
+fn added_references(stored: &[String], incoming: &[String]) -> Vec<String> {
+    let had: std::collections::HashSet<&str> = stored.iter().map(String::as_str).collect();
+    let mut added: Vec<String> = incoming
+        .iter()
+        .filter(|id| !had.contains(id.as_str()))
+        .cloned()
+        .collect::<std::collections::HashSet<_>>()
+        .into_iter()
+        .collect();
+    added.sort();
+    added
+}
+
+/// §5.7: ADDING a reference is a "use" of the child, so the caller needs read on it.
+///
+/// Returns the first child the caller cannot read, or `None`. `existing_id` is the check being
+/// updated; references it already holds are not re-checked.
+#[cfg(feature = "enterprise")]
+async fn caller_can_read_children(
+    org_id: &str,
+    user_id: &str,
+    body: &config::meta::synthetics::Synthetic,
+    existing_id: Option<&str>,
+) -> Result<Option<String>, anyhow::Error> {
+    let incoming = infra::table::synthetics_refs::refs_of(body);
+    // §5.7, settled 2026-09-09: only a reference the save ADDS is gated. Gating an unchanged
+    // set would lock an author out of editing a test they own, with deleting the reference as
+    // the only way to save.
+    let stored = match existing_id {
+        Some(id) => openobserve_synthetics::service::get_synthetic(org_id, id)
+            .await?
+            .map(|c| infra::table::synthetics_refs::refs_of(&c))
+            .unwrap_or_default(),
+        None => Vec::new(),
+    };
+    for child_id in added_references(&stored, &incoming) {
+        let Some(child) = openobserve_synthetics::service::get_synthetic(org_id, &child_id).await?
+        else {
+            return Ok(Some(child_id));
+        };
+        if !check_permissions(
+            &child_id,
+            org_id,
+            user_id,
+            "synthetics",
+            "GET",
+            Some(&child.folder_id),
+            false,
+            true,
+            false,
+        )
+        .await
+        {
+            return Ok(Some(child_id));
+        }
+    }
+    Ok(None)
+}
+
+/// Parents the caller may see by name; the rest are counted, never named (§5.3 redaction).
+async fn readable_parents(
+    org_id: &str,
+    user_id: &str,
+    parents: Vec<infra::table::synthetics_refs::ParentRef>,
+) -> (Vec<serde_json::Value>, usize) {
+    #[cfg(not(feature = "enterprise"))]
+    let _ = (org_id, user_id);
+    let mut references = Vec::new();
+    #[cfg(feature = "enterprise")]
+    let mut hidden = 0;
+    #[cfg(not(feature = "enterprise"))]
+    let hidden = 0;
+    for parent in parents {
+        #[cfg(feature = "enterprise")]
+        if !check_permissions(
+            &parent.id,
+            org_id,
+            user_id,
+            "synthetics",
+            "GET",
+            Some(&parent.folder_id),
+            false,
+            true,
+            false,
+        )
+        .await
+        {
+            hidden += 1;
+            continue;
+        }
+        references.push(serde_json::json!({
+            "id": parent.id,
+            "name": parent.name,
+            "folder_id": parent.folder_id,
+        }));
+    }
+    (references, hidden)
+}
+
+fn composition_conflict(
+    code: &str,
+    message: &str,
+    references: Vec<serde_json::Value>,
+    hidden: usize,
+) -> Response {
+    (
+        StatusCode::CONFLICT,
+        Json(serde_json::json!({
+            "code": code,
+            "message": message,
+            "references": references,
+            "hidden_reference_count": hidden,
+        })),
+    )
+        .into_response()
+}
+
+/// Maps a composition failure to HTTP, or returns the error back when it is not one.
+async fn composition_error_response(
+    org_id: &str,
+    user_id: &str,
+    e: anyhow::Error,
+) -> Result<Response, anyhow::Error> {
+    use openobserve_synthetics::service::composition::CompositionError as CE;
+    let Some(ce) = e.downcast_ref::<CE>() else {
+        return Err(e);
+    };
+    Ok(match ce {
+        CE::WritesDisabled => (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(serde_json::json!({
+                "code": "composition_writes_disabled",
+                "message": ce.to_string(),
+            })),
+        )
+            .into_response(),
+        CE::SuperClusterUnsupported => (
+            StatusCode::CONFLICT,
+            Json(serde_json::json!({
+                "code": "composition_super_cluster_unsupported",
+                "message": ce.to_string(),
+            })),
+        )
+            .into_response(),
+        CE::Invalid(msg) => MetaHttpResponse::bad_request(format!("validation: {msg}")),
+        CE::Lock(_) => (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(serde_json::json!({
+                "code": "composition_lock_unavailable",
+                "message": ce.to_string(),
+            })),
+        )
+            .into_response(),
+        CE::ReferencedBy(parents) => {
+            let (references, hidden) = readable_parents(org_id, user_id, parents.clone()).await;
+            composition_conflict(
+                "child_referenced",
+                "this check is referenced by other checks; remove those references first",
+                references,
+                hidden,
+            )
+        }
+        CE::ReferencedCannotHoldSubtest(parents) => {
+            let (references, hidden) = readable_parents(org_id, user_id, parents.clone()).await;
+            composition_conflict(
+                "referenced_check_cannot_hold_subtest",
+                "this check is used as a subtest, so it cannot contain a subtest of its own",
+                references,
+                hidden,
+            )
+        }
+    })
+}
+
 #[utoipa::path(
     post,
     path = "/{org_id}/synthetics",
@@ -370,10 +550,31 @@ pub async fn create_synthetic(
         .filter(|f| !f.is_empty())
         .unwrap_or_else(|| config::meta::folder::DEFAULT_FOLDER.to_string());
 
+    #[cfg(feature = "enterprise")]
+    match caller_can_read_children(&org_id, &user_email.user_id, &body, None).await {
+        Ok(None) => {}
+        Ok(Some(child)) => {
+            return MetaHttpResponse::forbidden(format!(
+                "you do not have read access to check {child}"
+            ));
+        }
+        Err(e) => {
+            return MetaHttpResponse::error(
+                StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
+                e.to_string(),
+            )
+            .into_response();
+        }
+    }
+
     let created_by = user_email.user_id.as_str();
     match openobserve_synthetics::service::create_synthetic(&org_id, body, created_by).await {
         Ok(check) => MetaHttpResponse::json(check),
         Err(e) => {
+            let e = match composition_error_response(&org_id, &user_email.user_id, e).await {
+                Ok(resp) => return resp,
+                Err(e) => e,
+            };
             let msg = e.to_string();
             if msg.starts_with("validation: ") {
                 return MetaHttpResponse::bad_request(msg);
@@ -500,9 +701,35 @@ pub async fn update_synthetic(
         }
     }
 
+    #[cfg(feature = "enterprise")]
+    match caller_can_read_children(&org_id, &user_email.user_id, &body, Some(id.as_str())).await {
+        Ok(None) => {}
+        Ok(Some(child)) => {
+            return MetaHttpResponse::forbidden(format!(
+                "you do not have read access to check {child}"
+            ));
+        }
+        Err(e) => {
+            return MetaHttpResponse::error(
+                StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
+                e.to_string(),
+            )
+            .into_response();
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    let user_id = user_email.user_id.as_str();
+    #[cfg(not(feature = "enterprise"))]
+    let user_id = "";
+
     match openobserve_synthetics::service::update_synthetic(&org_id, &id, body).await {
         Ok(check) => MetaHttpResponse::json(check),
         Err(e) => {
+            let e = match composition_error_response(&org_id, user_id, e).await {
+                Ok(resp) => return resp,
+                Err(e) => e,
+            };
             let msg = e.to_string();
             if msg.starts_with("validation: ") {
                 return MetaHttpResponse::bad_request(msg);
@@ -556,10 +783,19 @@ pub async fn delete_synthetic(
     {
         return MetaHttpResponse::forbidden("Forbidden");
     }
+    #[cfg(feature = "enterprise")]
+    let user_id = user_email.user_id.as_str();
+    #[cfg(not(feature = "enterprise"))]
+    let user_id = "";
+
     match openobserve_synthetics::service::delete_synthetic(&org_id, &id).await {
         Ok(true) => MetaHttpResponse::ok("check deleted"),
         Ok(false) => MetaHttpResponse::not_found("check not found"),
         Err(e) => {
+            let e = match composition_error_response(&org_id, user_id, e).await {
+                Ok(resp) => return resp,
+                Err(e) => e,
+            };
             tracing::error!("[synthetics] delete_synthetic: {e}");
             MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
                 .into_response()
@@ -588,8 +824,15 @@ pub async fn delete_synthetic(
 pub async fn delete_synthetics_bulk(
     Path(org_id): Path<String>,
     Query(_folder_query): Query<FolderQuery>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    #[cfg(not(feature = "enterprise"))] Headers(_user_email): Headers<UserEmail>,
     Json(body): Json<BulkDeleteSyntheticsRequestBody>,
 ) -> Response {
+    #[cfg(feature = "enterprise")]
+    let user_id = user_email.user_id.as_str();
+    #[cfg(not(feature = "enterprise"))]
+    let user_id = "";
+
     match openobserve_synthetics::service::delete_synthetics_bulk(
         &org_id,
         &body.ids,
@@ -599,6 +842,10 @@ pub async fn delete_synthetics_bulk(
     {
         Ok(_) => MetaHttpResponse::ok("checks deleted"),
         Err(e) => {
+            let e = match composition_error_response(&org_id, user_id, e).await {
+                Ok(resp) => return resp,
+                Err(e) => e,
+            };
             tracing::error!("[synthetics] delete_synthetics_bulk: {e}");
             MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
                 .into_response()
@@ -790,6 +1037,47 @@ pub async fn run_synthetic_now(
             }
             tracing::error!("[synthetics] run_synthetic_now: {e}");
             MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), msg).into_response()
+        }
+    }
+}
+
+#[utoipa::path(
+    get,
+    path = "/{org_id}/synthetics/{id}/referenced-by",
+    context_path = "/api",
+    tag = "Synthetics",
+    operation_id = "GetSyntheticReferencedBy",
+    summary = "Checks that embed this check as a subtest, redacted to those the caller can read",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("id" = String, Path, description = "Check ID"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 500, description = "Error", content_type = "application/json", body = Object),
+    ),
+)]
+pub async fn get_referenced_by(
+    Path((org_id, id)): Path<(String, String)>,
+    Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    let conn = infra::db::get_orm_client_ro().await;
+    match infra::table::synthetics_refs::list_parents(conn, &org_id, &id).await {
+        Ok(parents) => {
+            // Slugs, not KSUIDs — the UI links to `?folder=<slug>` like every other surface.
+            let parents =
+                openobserve_synthetics::service::composition::to_public_refs(parents).await;
+            let (references, hidden) =
+                readable_parents(&org_id, &user_email.user_id, parents).await;
+            MetaHttpResponse::json(
+                serde_json::json!({ "references": references, "hidden_reference_count": hidden }),
+            )
+        }
+        Err(e) => {
+            tracing::error!("[synthetics] get_referenced_by: {e}");
+            MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
+                .into_response()
         }
     }
 }
@@ -1699,6 +1987,27 @@ pub async fn list_locations(Path(_org_id): Path<String>) -> Response {
 mod tests {
     use config::meta::self_reporting::usage::{UsageData, UsageEvent};
     use openobserve_synthetics::job_api::{AckResponse, AlertDecision};
+
+    use super::added_references;
+
+    /// §5.7, settled 2026-09-09: only an ADDED reference is gated. An unchanged set must not be,
+    /// or an author who cannot read the child is locked out of editing a test they own.
+    #[test]
+    fn only_newly_added_references_are_permission_checked() {
+        let stored = ["login".to_string(), "goto".to_string()];
+        let incoming = [
+            "login".to_string(),
+            "goto".to_string(),
+            "checkout".to_string(),
+        ];
+        assert_eq!(
+            added_references(&stored, &incoming),
+            vec!["checkout".to_string()]
+        );
+        assert!(added_references(&stored, &stored).is_empty());
+        // Removing one is not an addition, so it is not gated either.
+        assert!(added_references(&stored, &["login".to_string()]).is_empty());
+    }
 
     fn ack_response(usage_events: Vec<UsageData>) -> AckResponse {
         AckResponse {
