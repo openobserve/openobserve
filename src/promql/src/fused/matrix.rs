@@ -25,7 +25,7 @@ use promql_parser::parser::LabelModifier;
 use rayon::prelude::*;
 
 use super::{
-    fold::{FoldParams, fold_sources},
+    fold::{SeriesEval, fold_sources},
     op::FusedAggOp,
 };
 use crate::{
@@ -85,19 +85,21 @@ pub(crate) async fn fused_agg(
         .as_ref()
         .expect("range function input must have a time window")
         .range;
-    let params = FoldParams::new(op, func, range, eval_ctx);
+    let eval = Arc::new(SeriesEval::new(func, range, eval_ctx));
     let sources = matrix_streams(matrix, param, config::get_config().limit.cpu_num)
         .into_iter()
         .map(|source| std::future::ready(Ok(source)))
         .collect();
-    let (value, _) =
-        tokio::time::timeout(Duration::from_secs(timeout), fold_sources(sources, params))
-            .await
-            .map_err(|_| {
-                DataFusionError::from(ErrorCodes::SearchTimeout(
-                    "[PromQL] fused agg timeout".to_string(),
-                ))
-            })??;
+    let (value, _) = tokio::time::timeout(
+        Duration::from_secs(timeout),
+        fold_sources(sources, op, eval),
+    )
+    .await
+    .map_err(|_| {
+        DataFusionError::from(ErrorCodes::SearchTimeout(
+            "[PromQL] fused agg timeout".to_string(),
+        ))
+    })??;
 
     log::info!(
         "[trace_id: {trace_id}] [PromQL Timing] fused {}({func_name}) completed in {:?}, folded {input_series} series into {} series",

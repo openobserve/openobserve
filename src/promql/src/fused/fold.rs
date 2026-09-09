@@ -49,11 +49,6 @@ pub(crate) struct SeriesEval {
     pub(crate) timestamps: Vec<i64>,
 }
 
-pub(super) struct FoldParams {
-    op: FusedAggOp,
-    eval: SeriesEval,
-}
-
 impl SeriesEval {
     pub(crate) fn new(func: Arc<dyn RangeFunc>, range: Duration, eval_ctx: &EvalContext) -> Self {
         Self {
@@ -95,25 +90,12 @@ impl SeriesEval {
     }
 }
 
-impl FoldParams {
-    pub(super) fn new(
-        op: FusedAggOp,
-        func: Arc<dyn RangeFunc>,
-        range: Duration,
-        eval_ctx: &EvalContext,
-    ) -> Arc<Self> {
-        Arc::new(Self {
-            op,
-            eval: SeriesEval::new(func, range, eval_ctx),
-        })
-    }
-}
-
 /// Folds all partitions concurrently and merges their groups; each source opens inside its own
 /// task, and dropping the future aborts them all.
 pub(super) async fn fold_sources<F, S>(
     sources: Vec<F>,
-    params: Arc<FoldParams>,
+    op: FusedAggOp,
+    eval: Arc<SeriesEval>,
 ) -> Result<(Value, usize)>
 where
     F: Future<Output = Result<S>> + Send + 'static,
@@ -122,15 +104,15 @@ where
     let folds = sources
         .into_iter()
         .map(|source| {
-            let params = params.clone();
-            async move { fold_partition(source.await?, params).await }
+            let eval = eval.clone();
+            async move { fold_partition(source.await?, op, eval).await }
         })
         .collect();
     let folds = run_partitions(folds).await?;
     let series_count = folds.iter().map(|(_, series)| series).sum();
     let value = merge_folds(
         folds.into_iter().map(|(groups, _)| groups).collect(),
-        &params.eval.timestamps,
+        &eval.timestamps,
     );
     Ok((value, series_count))
 }
@@ -201,7 +183,8 @@ async fn emit_partition<S: SeriesStream>(
 /// Folds one partition's series into its group accumulators, dropping each as it goes.
 async fn fold_partition<S: SeriesStream>(
     mut source: S,
-    params: Arc<FoldParams>,
+    op: FusedAggOp,
+    eval: Arc<SeriesEval>,
 ) -> Result<(GroupAccs, usize)> {
     let mut groups = GroupAccs::new();
     let mut series_count = 0;
@@ -210,13 +193,11 @@ async fn fold_partition<S: SeriesStream>(
             Entry::Occupied(entry) => entry.into_mut(),
             Entry::Vacant(entry) => entry.insert(GroupEntry {
                 labels: source.labels(),
-                acc: FusedAccumulator::new(params.op, params.eval.timestamps.len()),
+                acc: FusedAccumulator::new(op, eval.timestamps.len()),
             }),
         };
         let samples = source.consume().await?;
-        params
-            .eval
-            .eval_series(samples, |slot, value| entry.acc.push(slot, value));
+        eval.eval_series(samples, |slot, value| entry.acc.push(slot, value));
         series_count += 1;
         // the fold is pure CPU: give the runtime a chance to time out or abort it
         tokio::task::consume_budget().await;
@@ -339,15 +320,15 @@ mod tests {
         }
     }
 
-    fn params() -> Arc<FoldParams> {
+    fn eval() -> Arc<SeriesEval> {
         let func: Arc<dyn RangeFunc> = Arc::from(functions::fusable_range_func("rate").unwrap());
         let eval_ctx = EvalContext::new(1_000_000, 2_000_000, 1_000_000, "test".into());
-        FoldParams::new(FusedAggOp::Sum, func, Duration::from_secs(60), &eval_ctx)
+        Arc::new(SeriesEval::new(func, Duration::from_secs(60), &eval_ctx))
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn test_run_folds_fails_fast_and_aborts_the_rest() {
-        let params = params();
+        let eval = eval();
         let dropped = Arc::new(AtomicBool::new(false));
         let endless = EndlessStream {
             samples: vec![Sample::new(1_500_000, 1.0)],
@@ -355,9 +336,9 @@ mod tests {
         };
         let failing = FailingStream;
         let folds = vec![
-            Box::pin(fold_partition(endless, params.clone()))
+            Box::pin(fold_partition(endless, FusedAggOp::Sum, eval.clone()))
                 as std::pin::Pin<Box<dyn Future<Output = Result<(GroupAccs, usize)>> + Send>>,
-            Box::pin(fold_partition(failing, params)),
+            Box::pin(fold_partition(failing, FusedAggOp::Sum, eval)),
         ];
 
         let start = std::time::Instant::now();

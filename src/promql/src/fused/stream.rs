@@ -30,7 +30,7 @@ use config::{
 use datafusion::{arrow::datatypes::Schema, error::Result, prelude::SessionContext};
 use promql_parser::parser::LabelModifier;
 
-use super::fold::{FoldParams, fold_sources};
+use super::fold::{SeriesEval, fold_sources};
 use crate::{
     functions::{KEEP_METRIC_NAME_FUNC, RangeFunc},
     fused::FusedAggOp,
@@ -73,8 +73,8 @@ pub(crate) async fn fused_agg(
         shape.func.name(),
         sources.len(),
     );
-    let params = FoldParams::new(shape.op, shape.func.clone(), shape.range, eval_ctx);
-    let (value, series_count) = fold_sources(sources, params).await?;
+    let eval = Arc::new(SeriesEval::new(shape.func.clone(), shape.range, eval_ctx));
+    let (value, series_count) = fold_sources(sources, shape.op, eval).await?;
 
     log::info!(
         "[trace_id: {trace_id}] [PromQL Timing] streaming fused {}({}) execution took: {:?}, folded {series_count} series into {} series",
