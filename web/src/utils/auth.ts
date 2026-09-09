@@ -24,6 +24,9 @@ const normalizePath = (path: string) =>
 
 export const trialPeriodAllowedPath = ["iam", "users", "organizations", "invitations"];
 
+// Kept out of the empty-data guard; "settings" only redirects on to general.
+export const trialPaywallAllowedPath = [...trialPeriodAllowedPath, "settings", "general"];
+
 export const getUserInfo = (loginString: string) => {
   try {
     let decToken = null;
@@ -106,23 +109,35 @@ export const getDueDays = (microTimestamp: number): number => {
   return dueDays;
 };
 
+// Absent/empty/zero expiry means no trial is tracked, not a lapsed one.
+export const isTrialExpired = (expiry: unknown): boolean => {
+  if (expiry === undefined || expiry === null || expiry === "") return false;
+  const expiryMicros = Number(expiry);
+  if (!Number.isFinite(expiryMicros) || expiryMicros === 0) return false;
+  return getDueDays(expiryMicros) <= 0;
+};
+
+// Only cloud builds populate free_trial_expiry, so no other edition can paywall.
+export const shouldPaywallRoute = (expiry: unknown, routeName: unknown): boolean =>
+  config.isCloud === "true" &&
+  isTrialExpired(expiry) &&
+  trialPaywallAllowedPath.indexOf(routeName as string) === -1;
+
 export const routeGuard = async (to: any, from: any, next: any) => {
   const store = useStore();
-  if (config.isCloud) {
-    if (store.state.organizationData?.organizationSettings?.free_trial_expiry !== "") {
-      const trialDueDays = getDueDays(
-        store.state.organizationData?.organizationSettings?.free_trial_expiry,
-      );
-      if (trialDueDays <= 0 && trialPeriodAllowedPath.indexOf(to.name) === -1) {
-        next({
-          name: "plans",
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        });
-        return;
-      }
-    }
+  if (
+    shouldPaywallRoute(
+      store.state.organizationData?.organizationSettings?.free_trial_expiry,
+      to.name,
+    )
+  ) {
+    next({
+      name: "plans",
+      query: {
+        org_identifier: store.state.selectedOrganization.identifier,
+      },
+    });
+    return;
   }
 
   if (
