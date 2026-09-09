@@ -885,7 +885,7 @@
     "queryFailed": "Query mislukt",
     "unknownError": "Onbekende fout",
     "selectedLabel": "geselecteerd",
-    "selectToFilter": "Selecteer om te filteren",
+    "selectToFilter": "Selecteer filter",
     "clearSelection": "Selectie wissen",
     "includeModeHint": "Inclusief modus (=)",
     "excludeModeHint": "Uitsluitmodus (≠)",
@@ -6314,7 +6314,7 @@
       "frequencyPositiveNumber": "Alert - {index}: Frequentie moet een positief getal groter dan 0 zijn en moet een getal zijn.",
       "cronExpressionString": "Alert - {index}: Cron-expressie moet een string zijn.",
       "thresholdPositiveNumber": "Alert - {index}: Drempelwaarde moet een positief getal groter dan 0 zijn en moet een getal zijn.",
-      "silenceNonNegativeNumber": "Alert - {index}: Stilte moet een positief getal groter dan of gelijk aan 0 zijn en moet een getal zijn.",
+      "silenceNonNegativeNumber": "Alert - {index}: De afkoelingsperiode moet een positief getal groter dan of gelijk aan 0 zijn en moet een getal zijn.",
       "frequencyTypeInvalid": "Alert - {index}: Frequentie Type moet 'minutes' of 'cron' zijn en moet een string zijn.",
       "cronExpressionInvalid": "Alert - {index}: Cron-expressie moet een geldige cron-expressie zijn."
     },
@@ -6524,7 +6524,7 @@
       "nameInvalidChars": "Tekens zoals :, ?, /, # en spaties zijn niet toegestaan.",
       "templateRequired": "Sjabloon is vereist!",
       "validEmails": "Voeg geldige e-mailadressen toe!",
-      "silenceNonNegative": "Meldingsdemping moet groter dan of gelijk aan 0 zijn",
+      "silenceNonNegative": "De afkoelingsperiode moet groter dan of gelijk aan 0 zijn",
       "pendingPeriodNonNegative": "De wachtperiode moet groter dan of gelijk aan 0 zijn.",
       "periodPositive": "Periode moet groter dan 0 zijn",
       "destinationRequired": "Ten minste één bestemming is vereist.",
@@ -10793,7 +10793,8 @@
         "scoreConfigs": "Scoreconfiguraties",
         "targetDataset": "Doeldataset",
         "progress": "Voortgang",
-        "updated": "Bijgewerkt"
+        "updated": "Bijgewerkt",
+        "actions": "Acties"
       },
       "create": {
         "title": "Nieuwe wachtrij",
@@ -10847,7 +10848,8 @@
           "refType": "Ref",
           "refId": "Referentie",
           "added": "Toegevoegd",
-          "status": "Status"
+          "status": "Status",
+          "actions": "Acties"
         },
         "status": {
           "pending": "In afwachting",
@@ -10959,6 +10961,8 @@
       "viewAll": "Experimenten bekijken",
       "baseline": "Basislijn",
       "setBaseline": "Basislijn instellen",
+      "baselineRequiresCompleted": "Alleen een voltooide run kan als baseline worden ingesteld.",
+      "baselineError": "Baseline bijwerken is mislukt.",
       "selectForComparison": "Selecteer voor vergelijking",
       "progress": "{done} van {total} slots",
       "noScores": "Geen geaggregeerde scores",
@@ -11069,8 +11073,10 @@
       "addToDataset": "Toevoegen",
       "detail": {
         "by": "door {user}",
-        "p50Latency": "P50-latentie",
+        "p50Latency": "P50-taaklatentie",
         "totalCost": "Totale kosten",
+        "costBreakdown": "Taak {task} · Scoring {scoring}",
+        "partialCostBreakdown": "Taak {task} · Scoring {scoring} · Gedeeltelijk",
         "highDispersion": "Gevallen met hoge spreiding",
         "highDispersionHint": "Rijen waarin proeven verschillen",
         "scoredRows": "{scored}/{total} rijen gescoord",
@@ -11100,7 +11106,7 @@
           "run": "Run"
         },
         "runSummary": "{trials} · {scorers}",
-        "progress": "Voortgang",
+        "progress": "Taakvoortgang",
         "scoring": "Scoren",
         "scoringDistribution": "{success} geslaagd · {failed} mislukt · {pending} in behandeling · {skipped} overgeslagen",
         "compare": "Vergelijken",
@@ -11193,6 +11199,16 @@
           "typeCategorical": "Categorisch",
           "typeBoolean": "Booleaans",
           "threshold": "Drempelwaarde",
+          "thresholdTooltip": "Baseline- en kandidaatwaarden die binnen {percent} van elkaar liggen, tellen als ongewijzigd, niet als verslechterd of verbeterd.",
+          "outcomeDimensions": "Uitkomstcriteria",
+          "outcomeTooltipNone": "Er zijn geen kolommen geselecteerd — elke vergelijkbare rij wordt weergegeven als Niet vergeleken.",
+          "outcomeTooltipAll": "Alle in aanmerking komende kolommen bepalen de uitkomst van elke rij.",
+          "outcomeTooltipPartial": "Alleen {names} bepalen de uitkomst van elke rij. Andere kolommen worden weergegeven, maar hebben er geen invloed op.",
+          "allOutcomeDimensions": "Alle in aanmerking komende kolommen",
+          "noOutcomeDimensions": "Geen kolommen",
+          "selectedOutcomeDimensions": "{count} kolom | {count} kolommen",
+          "outcomeDimensionUnavailable": "{name} (geen vergelijkingsbeleid)",
+          "dimensionExcludedHint": "Deze kolom is uitgesloten van de uitkomsten. Selecteer deze onder Uitkomstcriteria om hem op te nemen.",
           "measurePerRow": "Gemiddelde per rij, over trials",
           "dimensionImproved": "{count} rij verbeterd | {count} rijen verbeterd",
           "dimensionUnchanged": "{count} rij ongewijzigd | {count} rijen ongewijzigd",
@@ -11274,8 +11290,8 @@
         },
         "searchPlaceholder": "Zoek items...",
         "csvImport": {
-          "button": "CSV uploaden",
-          "title": "Datasetitems uploaden",
+          "button": "Items importeren",
+          "title": "Dataset-items importeren",
           "description": "Importeer datasetitems uit een CSV-bestand.",
           "fileLabel": "CSV-bestand",
           "placeholder": "Kies een CSV-bestand",
@@ -12187,7 +12203,8 @@
       "remove": "Verwijderen",
       "save": "Opslaan",
       "saveAsDraft": "Opslaan als concept",
-      "createAndActivate": "Opslaan en activeren"
+      "createAndActivate": "Opslaan en activeren",
+      "testConnection": "Verbinding testen"
     },
     "scorerTypeDialog": {
       "title": "Maak een nieuwe scorer",
@@ -12213,15 +12230,19 @@
       "availableModelsLabel": "Beschikbare modellen",
       "apiKeyLabel": "API-sleutel",
       "apiKeyPlaceholder": "Voer API-sleutel in",
-      "apiKeyHelp": "Wordt versleuteld opgeslagen en nooit teruggelezen. Laat leeg bij het bewerken om de bestaande sleutel te behouden.",
+      "apiKeyHelp": "Versleuteld opgeslagen en nooit teruggelezen. Laat dit veld leeg bij het opslaan van wijzigingen om de bestaande sleutel te behouden.",
       "authSection": "Authenticatie",
-      "authEditNote": "Inloggegevens kunnen niet worden teruggelezen. Voer de API-sleutel alleen opnieuw in als je deze wilt roteren.",
+      "authEditNote": "Inloggegevens kunnen niet worden teruggelezen. Om een provider te testen die authenticatie vereist, voer je de API-sleutel in.",
       "cannotRename": "Kan na het aanmaken niet worden hernoemd.",
       "availableModelsHelp": "Optioneel. Door komma's gescheiden lijst van modellen die beschikbaar zijn op deze provider.",
       "saveError": "Het opslaan van de provider is mislukt",
       "nameRequired": "Provider name is required",
       "typeRequired": "Provider type is required",
-      "defaultModelRequired": "Default model is required"
+      "defaultModelRequired": "Default model is required",
+      "testRunning": "Verbinding wordt getest...",
+      "testPassed": "Verbonden",
+      "testFailed": "Verbinding mislukt",
+      "testError": "Kan de verbinding niet testen."
     },
     "scoreConfig": {
       "gteSymbol": "≥",
@@ -15696,7 +15717,6 @@
       "reservation": "Reservering",
       "sliType": "SLI-type",
       "owner": "Eigenaar",
-      "folder": "Map",
       "streamPlaceholder": "Selecteer een stream"
     },
     "empty": {
@@ -15726,7 +15746,24 @@
       "sourceHint": "Uptime is het deel van de gemeten tijd dat deze alert niet actief was. Tijd dat hij niet evalueerde — gepauzeerd, gedempt of falend — is ongemeten en telt nooit mee als uptime.",
       "loadFailed": "Kon de in aanmerking komende alerts niet laden",
       "noneEligible": "Nog geen enkele alert in deze organisatie kan als bron worden gebruikt.",
-      "ineligibleOption": "{name} — {reason}",
+      "ineligible": {
+        "notScheduled": "Niet gepland",
+        "grouped": "Gegroepeerd",
+        "notReferenceable": "Niet bruikbaar",
+        "cron": "Cron-schema",
+        "tooInfrequent": "Draait te zelden",
+        "silenced": "Heeft stilte",
+        "other": "Niet in aanmerking",
+        "why": {
+          "notScheduled": "Realtime-alarmen bewaren de rungeschiedenis die een SLO nodig heeft niet. Gebruik in plaats daarvan een gepland alarm.",
+          "grouped": "Dit alarm is opgesplitst per groep, en een run registreert niet welke groepen deze heeft gecontroleerd. Verwijder de group-by om dit alarm hier te gebruiken.",
+          "notReferenceable": "SLO- en samengestelde alarmen kunnen geen bron zijn. Kies een gewoon gepland alarm.",
+          "cron": "Dit alarm draait op een cron-schema, waardoor de controles niet gelijkmatig zijn en de uptime niet kan worden bepaald. Verander dit naar een vast interval.",
+          "tooInfrequent": "Dit alarm draait elke {frequency}. Het moet minstens elke {slice} draaien, zodat er geen tijd ongecontroleerd blijft.",
+          "silenced": "Na het afgaan stopt dit alarm een tijdje met controleren — en die onderbreking valt altijd in een slechte periode, waardoor de SLO er beter uitziet dan hij is. Stel de stilteperiode in op 0."
+        },
+        "noFixedInterval": "geen vast interval"
+      },
       "groupingLocked": "Een op alerts gebaseerde SLI kan niet worden gegroepeerd: het beschikbaarheidslogboek registreert één run per alert, niet per groep, dus er is geen dekking per groep om op te bouwen.",
       "sourceLink": "Bron-alert",
       "preview": {
@@ -15834,6 +15871,42 @@
       "editTargetMissing": "Die melding staat niet meer op deze SLO.",
       "describeBurn": "Verbrandingssnelheid > {critical} over {long} en {short}",
       "describeBudget": "Foutbudget verbruikt > {critical}%"
+    },
+    "validation": {
+      "nameRequired": "SLO-naam is verplicht",
+      "nameTooLong": "SLO-naam mag maximaal 256 tekens bevatten",
+      "targetRequired": "Doel is verplicht",
+      "targetRange": "Doel moet groter dan 0 en kleiner dan 100 zijn",
+      "targetPrecision": "Doel ondersteunt maximaal 3 decimalen",
+      "streamTypeRequired": "Streamtype is verplicht",
+      "streamRequired": "Stream is verplicht",
+      "goodExprRequired": "\"Goed wanneer\" is verplicht",
+      "promqlGoodRequired": "Goede query is verplicht",
+      "promqlTotalRequired": "Totale query is vereist",
+      "aggregateRequired": "Aggregatie-expressie is vereist",
+      "comparatorRequired": "Vergelijker is vereist",
+      "thresholdRequired": "Drempelwaarde is vereist",
+      "thresholdNumber": "Drempelwaarde moet een getal zijn",
+      "alertSourceRequired": "Bronalarm is vereist",
+      "groupedSlice": "Gegroepeerde SLO's moeten een 5-minuten-slice gebruiken",
+      "alertCannotGroup": "Een alarmgebaseerde SLI kan niet worden gegroepeerd",
+      "frequencyRequired": "Frequentie is vereist",
+      "frequencyPositive": "Frequentie moet ten minste 1 minuut zijn",
+      "silenceRequired": "Stilteperiode is vereist",
+      "silenceNonNegative": "Stilteperiode mag niet negatief zijn",
+      "targetsRequired": "Selecteer ten minste één bestemming of workflow",
+      "criticalRequired": "Drempelwaarde is vereist",
+      "criticalPositive": "Drempelwaarde moet groter zijn dan 0",
+      "budgetRange": "Verbruikt budget moet 100% of minder zijn",
+      "longWindowRequired": "Lang venster is vereist",
+      "shortWindowRequired": "Kort venster is vereist",
+      "shortInsideLong": "Kort venster moet korter zijn dan het lange venster"
+    },
+    "duration": {
+      "seconds": "{count} seconde | {count} seconden",
+      "minutes": "{count} minuut | {count} minuten",
+      "hours": "{count} uur | {count} uur",
+      "days": "{count} dag | {count} dagen"
     }
   },
   "promql": {

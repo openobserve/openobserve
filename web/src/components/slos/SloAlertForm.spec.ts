@@ -19,6 +19,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import SloAlertForm from "./SloAlertForm.vue";
+import AlertDestinationsField from "@/components/alerts/AlertDestinationsField.vue";
 
 const createSpy = vi.fn().mockResolvedValue({ data: { code: 200 } });
 const updateSpy = vi.fn().mockResolvedValue({ data: { code: 200 } });
@@ -60,6 +61,22 @@ const mountForm = async (props: Record<string, any> = {}) => {
   return wrapper;
 };
 
+/**
+ * Mount a form that is actually submittable.
+ *
+ * A new alert form has no destination and no threshold — `critical` starts null
+ * on purpose so the suggested cards are a choice rather than a default. The
+ * schema refuses both, so a test about the PAYLOAD has to satisfy them first or
+ * it only re-tests the required-field rules.
+ */
+const mountSubmittable = async (props: Record<string, any> = {}) => {
+  const wrapper = await mountForm(props);
+  await wrapper.find('[data-test="slos-sloalertcondition-preset-fast"]').trigger("click");
+  wrapper.findComponent(AlertDestinationsField).vm.$emit("update:destinations", ["dest1"]);
+  await flushPromises();
+  return wrapper;
+};
+
 describe("SloAlertForm", () => {
   beforeEach(() => {
     createSpy.mockClear();
@@ -93,7 +110,7 @@ describe("SloAlertForm", () => {
   });
 
   it("creates through the API with an SLO-shaped payload", async () => {
-    const wrapper = await mountForm();
+    const wrapper = await mountSubmittable();
     await wrapper.find('[data-test="slo-alert-form-submit"]').trigger("click");
     await flushPromises();
 
@@ -109,7 +126,7 @@ describe("SloAlertForm", () => {
   });
 
   it("emits saved so the page can refresh its list", async () => {
-    const wrapper = await mountForm();
+    const wrapper = await mountSubmittable();
     await wrapper.find('[data-test="slo-alert-form-submit"]').trigger("click");
     await flushPromises();
     expect(wrapper.emitted("saved")).toBeTruthy();

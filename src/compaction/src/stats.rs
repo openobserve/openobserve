@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::HashSet;
+use std::{collections::HashSet, time::Duration};
 
 use config::{
     cluster::LOCAL_NODE,
@@ -24,6 +24,9 @@ use config::{
 };
 use db;
 use infra::{cluster::get_node_by_uuid, dist_lock, file_list as infra_file_list};
+
+const STATS_SCAN_MAX_ATTEMPTS: u32 = 3;
+const STATS_SCAN_RETRY_DELAY: Duration = Duration::from_secs(2);
 
 pub async fn update_stats_from_file_list() -> Result<(), anyhow::Error> {
     let latest_updated_at = infra_file_list::get_max_update_at()
@@ -89,7 +92,6 @@ pub async fn update_stats_from_file_list() -> Result<(), anyhow::Error> {
                 continue;
             }
             total_streams += streams.len();
-            let stream_type_str = stream_type.to_string();
             for stream_name in streams {
                 let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
                 if !updated_streams.is_empty() && !updated_streams.contains(&stream_key) {
@@ -101,37 +103,14 @@ pub async fn update_stats_from_file_list() -> Result<(), anyhow::Error> {
                     if !is_recent && no_need_update_old_stats {
                         continue;
                     }
-                    let start = std::time::Instant::now();
-                    let result = update_stats_from_file_list_for_stream(
+                    update_stream_stats_with_retry(
                         &org_id,
                         stream_type,
                         &stream_name,
                         date_range.clone(),
                         *is_recent,
                     )
-                    .await;
-
-                    // Record metrics
-                    let duration = start.elapsed().as_secs_f64();
-                    let scan_type = if *is_recent { "recent" } else { "historical" }.to_string();
-                    metrics::STREAM_STATS_SCAN_DURATION
-                        .with_label_values(&[&org_id, &stream_type_str, &scan_type])
-                        .observe(duration);
-
-                    metrics::STREAM_STATS_SCAN_TOTAL
-                        .with_label_values(&[&org_id, &stream_type_str, &scan_type])
-                        .inc();
-
-                    if let Err(e) = result {
-                        metrics::STREAM_STATS_SCAN_ERRORS_TOTAL
-                            .with_label_values(&[&org_id, &stream_type_str, &scan_type])
-                            .inc();
-
-                        log::error!(
-                            "[STATS] update stats for {org_id}/{stream_type}/{stream_name} error: {e}"
-                        );
-                        return Err(e);
-                    }
+                    .await?;
                 }
 
                 log::info!(
@@ -205,6 +184,55 @@ async fn update_stats_lock_node() -> Result<Option<i64>, anyhow::Error> {
         Err(e)
     } else {
         Ok(Some(offset))
+    }
+}
+
+// Transient metastore errors must not abort the whole run, which would restart it from scratch
+async fn update_stream_stats_with_retry(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    date_range: (String, String),
+    is_recent: bool,
+) -> Result<(), anyhow::Error> {
+    let stream_type_str = stream_type.to_string();
+    let scan_type = if is_recent { "recent" } else { "historical" };
+    let labels = [org_id, stream_type_str.as_str(), scan_type];
+    let mut attempt = 1;
+    loop {
+        let start = std::time::Instant::now();
+        let result = update_stats_from_file_list_for_stream(
+            org_id,
+            stream_type,
+            stream_name,
+            date_range.clone(),
+            is_recent,
+        )
+        .await;
+        metrics::STREAM_STATS_SCAN_DURATION
+            .with_label_values(&labels)
+            .observe(start.elapsed().as_secs_f64());
+        metrics::STREAM_STATS_SCAN_TOTAL
+            .with_label_values(&labels)
+            .inc();
+        let Err(e) = result else {
+            return Ok(());
+        };
+        metrics::STREAM_STATS_SCAN_ERRORS_TOTAL
+            .with_label_values(&labels)
+            .inc();
+        if attempt >= STATS_SCAN_MAX_ATTEMPTS {
+            log::error!(
+                "[STATS] update stats for {org_id}/{stream_type}/{stream_name} failed after {attempt} attempts: {e}"
+            );
+            return Err(e);
+        }
+        let delay = STATS_SCAN_RETRY_DELAY * attempt;
+        log::warn!(
+            "[STATS] update stats for {org_id}/{stream_type}/{stream_name} attempt {attempt} error: {e}, retry in {delay:?}"
+        );
+        tokio::time::sleep(delay).await;
+        attempt += 1;
     }
 }
 
