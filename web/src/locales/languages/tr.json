@@ -384,7 +384,9 @@
     "patternWildcardSampleValues": "Örnek değerler",
     "wildcardSampleValues": "Örnek değerler",
     "patternZScore": "Z puanı: {zScore} (ortalama frekans: {avgFrequency})",
-    "createAlertFromPattern": "Bu modelden uyarı oluştur"
+    "createAlertFromPattern": "Bu modelden uyarı oluştur",
+    "pinToToolbar": "Araç çubuğuna sabitleyin",
+    "unpinFromToolbar": "Araç çubuğundan sabitlemeyi kaldırın"
   },
   "menu": {
     "home": "Ana Sayfa",

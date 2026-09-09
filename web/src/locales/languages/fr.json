@@ -384,7 +384,9 @@
     "patternNavNext": "Suivant",
     "patternWildcardSampleValues": "Exemples de valeurs",
     "wildcardSampleValues": "Exemples de valeurs",
-    "patternZScore": "Score Z : {zScore} (fréquence moyenne : {AVGFrequency})"
+    "patternZScore": "Score Z : {zScore} (fréquence moyenne : {AVGFrequency})",
+    "pinToToolbar": "Ajouter à la barre d'outils",
+    "unpinFromToolbar": "Détacher de la barre d'outils"
   },
   "menu": {
     "home": "Accueil",

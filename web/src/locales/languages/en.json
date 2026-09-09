@@ -197,6 +197,8 @@
     "sqlModeLabel": "SQL Mode",
     "nlpModeLabel": "Natural Language Mode",
     "quickModeLabel": "Quick Mode",
+    "pinToToolbar": "Pin to toolbar",
+    "unpinFromToolbar": "Unpin from toolbar",
     "toggleFunctionLabel": "Function",
     "labelWrap": "Wrap Content",
     "messageWrapContent": "Wrap Table Content",

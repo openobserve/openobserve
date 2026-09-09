@@ -384,7 +384,9 @@
     "patternNavNext": "[次へ]",
     "patternWildcardSampleValues": "サンプル値",
     "wildcardSampleValues": "サンプル値",
-    "patternZScore": "Z スコア:{スコア} (平均周波数:{平均周波数})"
+    "patternZScore": "Z スコア:{スコア} (平均周波数:{平均周波数})",
+    "pinToToolbar": "ツールバーに固定",
+    "unpinFromToolbar": "ツールバーからピン留め解除"
   },
   "menu": {
     "home": "ホーム",

@@ -384,7 +384,9 @@
     "patternNavNext": "Próxima",
     "patternWildcardSampleValues": "Valores de muestra",
     "wildcardSampleValues": "Valores de muestra",
-    "patternZScore": "Puntuación Z: {zScore} (frecuencia promedio: {AvgFrequency})"
+    "patternZScore": "Puntuación Z: {zScore} (frecuencia promedio: {AvgFrequency})",
+    "pinToToolbar": "Fijar a la barra de herramientas",
+    "unpinFromToolbar": "Desanclar de la barra de herramientas"
   },
   "menu": {
     "home": "Inicio",

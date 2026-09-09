@@ -354,6 +354,15 @@ export const useLocalWrapContent = (val = "", isDelete = false) => {
   return wrapcontent.value;
 };
 
+export const useLocalQuickModePin = (val = "", isDelete = false) => {
+  const quickModePinned: any = useLocalStorage(
+    "logsQuickModePinned",
+    val,
+    isDelete,
+  );
+  return quickModePinned.value;
+};
+
 export const deleteSessionStorageVal = (key: string) => {
   try {
     return sessionStorage.removeItem(key);

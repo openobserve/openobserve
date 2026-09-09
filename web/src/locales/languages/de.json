@@ -384,7 +384,9 @@
     "patternNavNext": "Weiter",
     "patternWildcardSampleValues": "Beispielwerte",
     "wildcardSampleValues": "Beispielwerte",
-    "patternZScore": "Z-Score: {zScore} (durchschnittliche Häufigkeit: {avgFrequency})"
+    "patternZScore": "Z-Score: {zScore} (durchschnittliche Häufigkeit: {avgFrequency})",
+    "pinToToolbar": "An Werkzeugleiste anheften",
+    "unpinFromToolbar": "Von der Werkzeugleiste lösen"
   },
   "menu": {
     "home": "Startseite",
