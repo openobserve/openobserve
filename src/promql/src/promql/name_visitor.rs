@@ -50,8 +50,7 @@ impl ExprVisitor for MetricNameVisitor {
             Expr::MatrixSelector(matrix_selector) => &matrix_selector.vs,
             _ => return Ok(true),
         };
-        // callers authorize and file-list these names, so a nameless selector must fail
-        // rather than degrade to "" — the engine rejects it in `named_selector` anyway
+        // callers authorize and file-list these names, so a nameless selector must fail, not be ""
         self.name
             .insert(metric_name(selector).ok_or("metric name is required")?);
         Ok(true)
@@ -119,6 +118,34 @@ mod tests {
             visitor.into_names()
         };
         assert_eq!(names(bare), names(labelled));
+    }
+
+    #[test]
+    fn test_name_visitor_rejects_non_equality_name_matchers() {
+        // A regex or negated `__name__` would authorize `metrics:node_.*`, a stream no one has
+        // a lone negative matcher does not parse, so those two carry a companion matcher
+        for promql in [
+            r#"{__name__=~"node_.*"}"#,
+            r#"{__name__!="http_requests_total", job="test"}"#,
+            r#"{__name__!~"node_.*", job="test"}"#,
+        ] {
+            let ast = parser::parse(promql).unwrap();
+            let mut visitor = MetricNameVisitor::new();
+            assert!(
+                promql_parser::util::walk_expr(&mut visitor, &ast).is_err(),
+                "{promql} should not resolve to a stream name"
+            );
+        }
+    }
+
+    #[test]
+    fn test_name_visitor_picks_the_equality_matcher_among_several() {
+        let promql = r#"{__name__="http_requests_total", __name__!="other"}"#;
+        let ast = parser::parse(promql).unwrap();
+        let mut visitor = MetricNameVisitor::new();
+        promql_parser::util::walk_expr(&mut visitor, &ast).unwrap();
+        assert!(visitor.name.contains("http_requests_total"));
+        assert_eq!(visitor.name.len(), 1);
     }
 
     #[test]

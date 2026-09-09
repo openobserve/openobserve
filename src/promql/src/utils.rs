@@ -33,18 +33,19 @@ use promql_parser::{
     parser::VectorSelector,
 };
 
-/// The stream a selector reads from: the bare metric name, else the `__name__` matcher.
-/// `None` means the selector names no stream, which every caller must reject rather than
-/// fall back to an empty name.
+/// The stream a selector reads from: the bare metric name, else an `__name__` equality matcher.
 pub fn metric_name(selector: &VectorSelector) -> Option<String> {
     if let Some(name) = selector.name.as_ref() {
         return Some(name.clone());
     }
+    // only `=` resolves to one stream; a regex or negated `__name__` names a set the engine
+    // cannot read, so it must fail rather than authorize a stream no one has
     selector
         .matchers
         .find_matchers(NAME_LABEL)
-        .first()
-        .map(|mat| mat.value.clone())
+        .into_iter()
+        .find(|mat| matches!(mat.op, MatchOp::Equal))
+        .map(|mat| mat.value)
 }
 
 /// The schema field a residual matcher filters on; `None` when
