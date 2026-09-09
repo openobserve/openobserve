@@ -37,6 +37,28 @@ use utoipa::ToSchema;
 
 use crate::{alerts::destinations, common::meta::authz::Authz};
 
+/// G4. Words that name an error subset rather than a population, matched as whole tokens so
+/// an unrelated stream cannot be caught by a substring.
+const ERROR_VOCABULARY: [&str; 6] = ["error", "errors", "fatal", "critical", "5xx", "50x"];
+
+/// G4. The 5xx band, half-open. 4xx is deliberately outside it: structurally the same fault,
+/// but it has legitimate standalone uses and no measured failure behind it.
+const SERVER_ERROR_BAND: std::ops::Range<i64> = 500..600;
+
+/// G5. A baseline within this of zero cannot be scored against: any non-zero bucket is an
+/// effectively infinite relative excursion, so the config sits stuck open.
+const NEAR_ZERO_BASELINE: f64 = 0.001;
+
+/// G5. Hour-of-week slots in the profile: 7 days x 24 hours.
+const HOURS_PER_WEEK: usize = 168;
+
+/// G5. Below this many distinct buckets the profile is noise, and the safe answer is admit.
+const MIN_SERVABILITY_BUCKETS: usize = 168;
+
+/// G5. A series usable in fewer than this fraction of its observed slots is stuck open in
+/// the rest, and the product carries no field that could restrict scoring to the usable ones.
+const MIN_USABLE_SLOT_FRACTION_DENOMINATOR: usize = 8;
+
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct CreateAnomalyConfigRequest {
     pub name: String,
@@ -374,6 +396,8 @@ pub async fn create_config(
 ) -> Result<serde_json::Value> {
     req.filters = normalize_request_filters(req.filters).map_err(validation_error)?;
     validate_config_request(&req).map_err(validation_error)?;
+    // G5 admits when it cannot judge, so a create with no evidence to hand is accepted.
+    validate_servability(None).map_err(validation_error)?;
 
     // Feature 2 (PT-7): same normalization the alerts path uses, so a tag
     // means the same thing on both. Kept typed, not stringified, so the API
@@ -563,7 +587,7 @@ pub async fn create_config(
 pub async fn update_config(
     org_id: &str,
     anomaly_id: &str,
-    req: UpdateAnomalyConfigRequest,
+    mut req: UpdateAnomalyConfigRequest,
 ) -> Result<serde_json::Value> {
     let db = get_orm_client_rw().await;
 
@@ -574,6 +598,12 @@ pub async fn update_config(
         .map_err(|e| anyhow::anyhow!(e.to_string()))?
         .ok_or_else(|| anyhow::anyhow!("Config not found"))?;
 
+    // Normalized before the gates, as create does: `{}` and `null` persist as `[]`, so a gate
+    // comparing the raw value would read them as a change and re-litigate a grandfathered row
+    // over an edit that leaves the stored filters exactly as they were. Kept after the fetch
+    // so a request against a missing config still answers 404 rather than 400.
+    req.filters = normalize_request_filters(req.filters).map_err(validation_error)?;
+
     // Remember the pre-update threshold so we can detect an actual change below and, if so,
     // recompute the trained model's cutoff in place without a retrain.
     let previous_threshold = existing.threshold;
@@ -583,6 +613,10 @@ pub async fn update_config(
     let mut retryable_change = false;
 
     validated_intervals(&req, &existing).map_err(validation_error)?;
+    validated_denominator(&req, &existing).map_err(validation_error)?;
+    // G5 needs a query to judge, so an update carries no evidence: the gate refuses at
+    // creation and only ever grandfathers here.
+    validated_servability(&req, &existing, None).map_err(validation_error)?;
 
     let mut active_model = existing.into_active_model();
 
@@ -1376,6 +1410,60 @@ pub struct DetectionHistoryItem {
     pub points_scored: usize,
 }
 
+/// G4. Whether a detection target carries the denominator its aggregation needs.
+/// `NotACount` is distinct from `Present` so the gate cannot silently widen from counts
+/// to every aggregation without a test noticing.
+#[derive(Debug, PartialEq, Eq)]
+pub enum DenominatorVerdict {
+    Present,
+    Absent,
+    NotACount,
+}
+
+/// G5. Whether a series can be served at any configuration, per its training data.
+#[derive(Debug, PartialEq, Eq)]
+pub enum Servability {
+    Servable,
+    Unservable(String),
+}
+
+/// G5. The training-data summary the servability verdict is taken from.
+/// `slot_baselines` is always a full hour-of-week grid; `None` marks a slot the training
+/// window never observed, which is not the same fact as a slot observed to be zero.
+#[derive(Debug, Clone)]
+pub struct ServabilityEvidence {
+    pub slot_baselines: Vec<Option<f64>>,
+    pub buckets_observed: usize,
+}
+
+/// The fields that decide WHICH series a config scores, merged across a partial update.
+/// G4 and G5 both fire only when a request moves one of these off its persisted value.
+struct SeriesDefinition {
+    detection_function: String,
+    query_mode: String,
+    filters: Option<serde_json::Value>,
+    custom_sql: Option<String>,
+    stream_name: String,
+    histogram_interval: String,
+}
+
+impl SeriesDefinition {
+    /// The inputs G4 reads. The bucket size is excluded: it cannot create or remove a
+    /// denominator, so an interval edit must not drag a grandfathered row through the gate.
+    fn defines_the_same_query_as(&self, other: &Self) -> bool {
+        self.detection_function == other.detection_function
+            && self.query_mode == other.query_mode
+            && filter_rows(self.filters.as_ref()) == filter_rows(other.filters.as_ref())
+            && self.custom_sql == other.custom_sql
+            && self.stream_name == other.stream_name
+    }
+
+    /// G5 additionally reads the bucket size, because it changes what the baselines describe.
+    fn describes_the_same_series_as(&self, other: &Self) -> bool {
+        self.defines_the_same_query_as(other) && self.histogram_interval == other.histogram_interval
+    }
+}
+
 /// Startup recovery: ensure every enabled anomaly config has a live detection trigger
 /// in `scheduled_jobs`.
 ///
@@ -1449,11 +1537,28 @@ fn validate_config_request(req: &CreateAnomalyConfigRequest) -> Result<()> {
     }
 
     // Delegated so create and update cannot drift to two differently-worded rules.
-    validate_interval_pair(&req.schedule_interval, &req.histogram_interval)
+    validate_interval_pair(&req.schedule_interval, &req.histogram_interval)?;
+
+    // G4 reads the COMBINED form, which is what the row stores and what update sees.
+    validate_denominator(
+        &combine_detection_fn(
+            &req.detection_function,
+            req.detection_function_field.as_deref(),
+        ),
+        &req.stream_name,
+        &req.query_mode,
+        req.filters.as_ref(),
+        req.custom_sql.as_deref(),
+    )
 }
 
 /// Marks a rejected request with the prefix the API layer matches to answer 400, not 500.
 fn validation_error(e: anyhow::Error) -> anyhow::Error {
+    // Idempotent: a rule that already marked itself must not be double-prefixed on its way
+    // out through create_config, which wraps every rule indiscriminately.
+    if e.to_string().starts_with("validation error: ") {
+        return e;
+    }
     anyhow::anyhow!("validation error: {e}")
 }
 
@@ -1557,6 +1662,406 @@ fn validated_intervals(
         return Ok(());
     }
     validate_interval_pair(&schedule, &histogram)
+}
+
+/// G4. True for the aggregations that grow with population size and carry no normalizer.
+/// Reads the combined form the row stores, so `count` and `count(*)` are one config.
+fn is_count_aggregation(detection_function: &str) -> bool {
+    let normalized = detection_function.trim().to_ascii_lowercase();
+    normalized == "count" || normalized.starts_with("count(")
+}
+
+/// G4. Whether one predicate restricts the population to an error subset.
+fn is_error_predicate(field: &str, operator: &str, value: &str) -> bool {
+    let operator = operator.trim();
+    // A negated or downward comparison selects the healthy majority, not the error subset.
+    if !matches!(operator, "=" | "==" | ">" | ">=") {
+        return false;
+    }
+    let value = value.trim().trim_matches('\'').trim_matches('"');
+    // `priority = 'critical'` on a ticket stream is an ordinary slice, so the severity word
+    // only restricts when the column it sits on is a severity column.
+    if field_has_token(field, &["level", "severity", "status"]) && is_error_word(value) {
+        return true;
+    }
+    // A bare 5xx number carries no error meaning off a status column: `zip_code = 500` and
+    // `area_code = 503` are ordinary values, which a `contains("code")` test would refuse.
+    if !field_has_token(field, &["status"]) {
+        return false;
+    }
+    let Ok(parsed) = value.parse::<i64>() else {
+        return false;
+    };
+    let lower_bound = if operator == ">" {
+        // `status > 499` names the same band as `>= 500`; saturating keeps a huge literal out.
+        parsed.saturating_add(1)
+    } else {
+        parsed
+    };
+    SERVER_ERROR_BAND.contains(&lower_bound)
+}
+
+/// G4. Matches whole tokens rather than substrings, so `terror_logs` is not an error stream.
+fn is_error_word(token: &str) -> bool {
+    let token = token.trim().to_ascii_lowercase();
+    ERROR_VOCABULARY.contains(&token.as_str())
+}
+
+/// G4. Whole-token field matching, so `status_code` counts as a status column but
+/// `zip_code` and `error_code` do not.
+fn field_has_token(field: &str, wanted: &[&str]) -> bool {
+    field
+        .split(|c: char| !c.is_ascii_alphanumeric())
+        .any(|token| wanted.contains(&token.to_ascii_lowercase().as_str()))
+}
+
+/// G4. An error-named stream is the error subset of an application's activity, so a bare
+/// count of it carries the same ambiguity as a filtered one.
+fn stream_name_is_error_restricted(stream_name: &str) -> bool {
+    stream_name
+        .split(|c: char| !c.is_ascii_alphanumeric())
+        .any(is_error_word)
+}
+
+/// G4. Reads the structured filter list; an entry it cannot parse is not a restriction,
+/// because an unrelated payload bug must not surface as a denominator refusal.
+fn filters_are_error_restricted(filters: Option<&serde_json::Value>) -> bool {
+    let Some(serde_json::Value::Array(entries)) = filters else {
+        return false;
+    };
+    entries.iter().any(|entry| {
+        let (Some(field), Some(operator), Some(value)) = (
+            entry.get("field").and_then(|v| v.as_str()),
+            entry.get("operator").and_then(|v| v.as_str()),
+            entry.get("value").and_then(json_scalar_as_string),
+        ) else {
+            return false;
+        };
+        is_error_predicate(field, operator, &value)
+    })
+}
+
+/// G4. The filter `value` arrives as a string from the UI but a client may post a number.
+fn json_scalar_as_string(value: &serde_json::Value) -> Option<String> {
+    match value {
+        serde_json::Value::String(s) => Some(s.clone()),
+        serde_json::Value::Number(n) => Some(n.to_string()),
+        _ => None,
+    }
+}
+
+/// G4. Finds an error restriction anywhere in the SQL, not only in a WHERE clause: the same
+/// defect is expressible as a CASE inside the aggregate.
+fn custom_sql_is_error_restricted(sql: &str) -> bool {
+    sql_tokens(sql)
+        .windows(3)
+        .any(|w| is_error_predicate(&w[0], &w[1], &w[2]))
+}
+
+/// G4. custom_sql is the only mode that can carry a denominator, and a division is how it
+/// does: `errors / total` is a rate, `errors` alone is not.
+fn custom_sql_has_division(sql: &str) -> bool {
+    sql_tokens(sql).iter().any(|token| token == "/")
+}
+
+/// G4. A crude scanner, deliberately: it only has to surface `field op value` triples and
+/// bare operators, and a full SQL parse here would be a second dialect to keep in step.
+fn sql_tokens(sql: &str) -> Vec<String> {
+    let mut tokens = Vec::new();
+    let mut current = String::new();
+    let mut chars = sql.chars().peekable();
+    let mut in_string = false;
+    while let Some(c) = chars.next() {
+        if in_string {
+            current.push(c);
+            if c == '\'' {
+                in_string = false;
+                tokens.push(std::mem::take(&mut current));
+            }
+            continue;
+        }
+        // A comment's own slashes and dashes would otherwise read as a division or operator.
+        if c == '-' && chars.peek() == Some(&'-') {
+            if !current.is_empty() {
+                tokens.push(std::mem::take(&mut current));
+            }
+            for skipped in chars.by_ref() {
+                if skipped == '\n' {
+                    break;
+                }
+            }
+            continue;
+        }
+        if c == '/' && chars.peek() == Some(&'*') {
+            if !current.is_empty() {
+                tokens.push(std::mem::take(&mut current));
+            }
+            let mut previous = ' ';
+            for skipped in chars.by_ref() {
+                if previous == '*' && skipped == '/' {
+                    break;
+                }
+                previous = skipped;
+            }
+            continue;
+        }
+        if c.is_ascii_alphanumeric() || c == '_' || c == '.' {
+            current.push(c);
+            continue;
+        }
+        if !current.is_empty() {
+            tokens.push(std::mem::take(&mut current));
+        }
+        if c == '\'' {
+            in_string = true;
+            current.push(c);
+            continue;
+        }
+        if "<>=!/".contains(c) {
+            // `>=` and `!=` must stay one token or the operator reads as a bare `>`.
+            match tokens.last_mut() {
+                Some(last) if last.len() == 1 && "<>=!".contains(last.as_str()) => last.push(c),
+                _ => tokens.push(c.to_string()),
+            }
+        }
+    }
+    if !current.is_empty() {
+        tokens.push(current);
+    }
+    tokens
+}
+
+/// G4. Classifies a detection target's denominator from the config alone.
+fn count_denominator_verdict(
+    detection_function: &str,
+    stream_name: &str,
+    query_mode: &str,
+    filters: Option<&serde_json::Value>,
+    custom_sql: Option<&str>,
+) -> DenominatorVerdict {
+    if !is_count_aggregation(detection_function) {
+        return DenominatorVerdict::NotACount;
+    }
+    // The mode picks the query the detector actually runs, so the other mode's leftover
+    // field on the row is not part of this config and must not decide the verdict.
+    let custom_sql_mode = query_mode.eq_ignore_ascii_case("custom_sql");
+    let sql = custom_sql_mode.then_some(custom_sql).flatten();
+    let error_restricted = stream_name_is_error_restricted(stream_name)
+        || (!custom_sql_mode && filters_are_error_restricted(filters))
+        || sql.is_some_and(custom_sql_is_error_restricted);
+    if !error_restricted {
+        // An unrestricted count IS its own population; nothing is missing.
+        return DenominatorVerdict::Present;
+    }
+    // Filters mode expresses exactly one aggregate, so a denominator is inexpressible there.
+    match sql {
+        Some(sql) if custom_sql_has_division(sql) => DenominatorVerdict::Present,
+        _ => DenominatorVerdict::Absent,
+    }
+}
+
+/// G4. The pure denominator rule create and update share, so the two cannot drift apart.
+fn validate_denominator(
+    detection_function: &str,
+    stream_name: &str,
+    query_mode: &str,
+    filters: Option<&serde_json::Value>,
+    custom_sql: Option<&str>,
+) -> Result<()> {
+    match count_denominator_verdict(
+        detection_function,
+        stream_name,
+        query_mode,
+        filters,
+        custom_sql,
+    ) {
+        // Self-marked as a 400: this rule is reached through `validate_config_request`, whose
+        // other callers read its error directly rather than through `create_config`'s wrapper.
+        DenominatorVerdict::Absent => Err(validation_error(anyhow::anyhow!(
+            "a count over an error-restricted population carries no denominator, so 20 errors \
+             in 330,000 requests and 20 in 200 are the same number to the detector. Express it \
+             as a rate or ratio instead: in custom_sql mode divide the error count by the total \
+             count, or pick an aggregation that is already normalized."
+        ))),
+        DenominatorVerdict::Present | DenominatorVerdict::NotACount => Ok(()),
+    }
+}
+
+/// The series a partial update lands on: a submitted field wins, an absent one keeps the
+/// row's. The function is compared in its combined form because that is what the row stores.
+fn merged_series_definition(
+    req: &UpdateAnomalyConfigRequest,
+    existing: &infra::table::entity::anomaly_detection_config::Model,
+) -> SeriesDefinition {
+    SeriesDefinition {
+        detection_function: req
+            .detection_function
+            .as_deref()
+            .map(|f| combine_detection_fn(f, req.detection_function_field.as_deref()))
+            .unwrap_or_else(|| existing.detection_function.clone()),
+        query_mode: req
+            .query_mode
+            .clone()
+            .unwrap_or_else(|| existing.query_mode.clone()),
+        filters: req.filters.clone().or_else(|| existing.filters.clone()),
+        custom_sql: req
+            .custom_sql
+            .clone()
+            .or_else(|| existing.custom_sql.clone()),
+        stream_name: existing.stream_name.clone(),
+        histogram_interval: req
+            .histogram_interval
+            .clone()
+            .unwrap_or_else(|| existing.histogram_interval.clone()),
+    }
+}
+
+/// The filter list as rows, so absent, `null`, `{}` and `[]` all compare as "no filters" —
+/// the same equivalence `update_config` applies when it decides what to persist.
+fn filter_rows(filters: Option<&serde_json::Value>) -> Vec<serde_json::Value> {
+    filters
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default()
+}
+
+/// The persisted series, for comparison against the merged one.
+fn stored_series_definition(
+    existing: &infra::table::entity::anomaly_detection_config::Model,
+) -> SeriesDefinition {
+    SeriesDefinition {
+        detection_function: existing.detection_function.clone(),
+        query_mode: existing.query_mode.clone(),
+        filters: existing.filters.clone(),
+        custom_sql: existing.custom_sql.clone(),
+        stream_name: existing.stream_name.clone(),
+        histogram_interval: existing.histogram_interval.clone(),
+    }
+}
+
+/// G4. Validates the merged row only when the submitted fields actually differ from the
+/// persisted ones, so a row already broken on disk stays administrable — including a row
+/// whose stored function cannot be read, which never reaches the rule while it is untouched.
+fn validated_denominator(
+    req: &UpdateAnomalyConfigRequest,
+    existing: &infra::table::entity::anomaly_detection_config::Model,
+) -> Result<()> {
+    let merged = merged_series_definition(req, existing);
+    if merged.defines_the_same_query_as(&stored_series_definition(existing)) {
+        return Ok(());
+    }
+    validate_denominator(
+        &merged.detection_function,
+        &merged.stream_name,
+        &merged.query_mode,
+        merged.filters.as_ref(),
+        merged.custom_sql.as_deref(),
+    )
+}
+
+/// G5. The verdict, taken over observed slots only. Absent or thin evidence admits.
+fn assess_servability(evidence: &ServabilityEvidence) -> Servability {
+    // Below the bar the profile is noise, and wrongly refusing a working config is the
+    // worse error, so the answer is admit even when every observed slot reads zero.
+    if evidence.buckets_observed < MIN_SERVABILITY_BUCKETS {
+        return Servability::Servable;
+    }
+    let observed: Vec<f64> = evidence.slot_baselines.iter().flatten().copied().collect();
+    if observed.is_empty() {
+        return Servability::Servable;
+    }
+    // Two-sided: a legitimately negative series is live, while -0.0005 is as dead as +0.0005.
+    let usable = observed
+        .iter()
+        .filter(|b| b.abs() > NEAR_ZERO_BASELINE)
+        .count();
+    if usable * MIN_USABLE_SLOT_FRACTION_DENOMINATOR >= observed.len() {
+        return Servability::Servable;
+    }
+    Servability::Unservable(format!(
+        "this series has a near-zero baseline in {} of its {} observed hour-of-week slots: \
+         every non-zero bucket is then an unbounded relative excursion, so the detector would \
+         sit permanently in alarm. Pick a stream or aggregation that is continuously non-zero.",
+        observed.len() - usable,
+        observed.len()
+    ))
+}
+
+/// G5. Builds the evidence from the rows a training query actually returned.
+/// Its production caller is the create-time training query, which is enterprise-only; the
+/// contract is pinned here so OSS and enterprise cannot drift.
+#[allow(dead_code)]
+fn servability_evidence_from_points(
+    points: &[(i64, f64)],
+    interval_seconds: i64,
+) -> ServabilityEvidence {
+    let mut sums = vec![0.0f64; HOURS_PER_WEEK];
+    let mut counts = vec![0usize; HOURS_PER_WEEK];
+    let mut seen: std::collections::HashSet<i64> = std::collections::HashSet::new();
+    // Buckets are the unit of evidence, so a search returning a row twice must count once.
+    // Saturating rather than wrapping: a wrapped width lands on a plausible-looking bucket
+    // grid that would silently mis-dedup, the same trap `parse_interval` guards against.
+    let bucket_width_us = interval_seconds
+        .max(1)
+        .checked_mul(1_000_000)
+        .unwrap_or(i64::MAX);
+    for (timestamp_us, value) in points {
+        // A NaN or infinite bucket is not a baseline anyone can score against, and keeping
+        // it would read as usable and mask a dead series.
+        if !value.is_finite() {
+            continue;
+        }
+        let bucket = timestamp_us.div_euclid(bucket_width_us);
+        if !seen.insert(bucket) {
+            continue;
+        }
+        let slot = hour_of_week_slot(*timestamp_us);
+        sums[slot] += value;
+        counts[slot] += 1;
+    }
+    ServabilityEvidence {
+        // A mean, not a min or median: a slot that is mostly quiet with real traffic in it
+        // is a live slot, and either of those would read it as zero and refuse the series.
+        slot_baselines: (0..HOURS_PER_WEEK)
+            .map(|slot| (counts[slot] > 0).then(|| sums[slot] / counts[slot] as f64))
+            .collect(),
+        buckets_observed: seen.len(),
+    }
+}
+
+/// G5. The hour-of-week a microsecond timestamp falls in. The Unix epoch was a Thursday, so
+/// the offset makes slot 0 the start of a week rather than the middle of one.
+fn hour_of_week_slot(timestamp_us: i64) -> usize {
+    const EPOCH_WEEKDAY_OFFSET_HOURS: i64 = 96;
+    let hours = timestamp_us.div_euclid(3_600_000_000);
+    (hours + EPOCH_WEEKDAY_OFFSET_HOURS).rem_euclid(HOURS_PER_WEEK as i64) as usize
+}
+
+/// G5. The create-time rule. `None` evidence admits: a transient search failure must not
+/// become a permanent creation refusal.
+fn validate_servability(evidence: Option<&ServabilityEvidence>) -> Result<()> {
+    let Some(evidence) = evidence else {
+        return Ok(());
+    };
+    match assess_servability(evidence) {
+        Servability::Unservable(reason) => anyhow::bail!("{reason}"),
+        Servability::Servable => Ok(()),
+    }
+}
+
+/// G5. Judges only a request that actually redefines the series, so an administrative edit
+/// never depends on a live search and never re-litigates a row already on disk. The evidence
+/// describes the series the request would LAND ON, not the one currently stored.
+fn validated_servability(
+    req: &UpdateAnomalyConfigRequest,
+    existing: &infra::table::entity::anomaly_detection_config::Model,
+    evidence: Option<&ServabilityEvidence>,
+) -> Result<()> {
+    let merged = merged_series_definition(req, existing);
+    if merged.describes_the_same_series_as(&stored_series_definition(existing)) {
+        return Ok(());
+    }
+    validate_servability(evidence)
 }
 
 /// Collapses the `filters` shapes that mean "no filters" to `[]`; rejects any other non-array.
@@ -2682,7 +3187,9 @@ mod tests {
         use super::*;
 
         /// The persisted side of a partial update: 1h schedule against 5m buckets, valid.
-        fn stored_config() -> infra::table::entity::anomaly_detection_config::Model {
+        /// `pub(super)` so the G4/G5 grandfathering fixtures build on one persisted row
+        /// rather than three copies that can drift apart field by field.
+        pub(super) fn stored_config() -> infra::table::entity::anomaly_detection_config::Model {
             infra::table::entity::anomaly_detection_config::Model {
                 anomaly_id: "a1".to_string(),
                 org_id: "default".to_string(),
@@ -3169,5 +3676,1340 @@ mod tests {
         // Wiring the guard into train_model / force_retrain_for_threshold / ENT
         // trigger_training is a KNOWN GAP no unit test here can hold; the
         // implementation-phase diff review owns it.
+    }
+
+    // ── G4: a denominator-free error count is not a detection target ─────────
+
+    /// Phase 1H's headline "miss" was not a detector fault. `nginx_5xx_1h` took a x1352
+    /// excursion and scored 0.4771 because z = 0.348: the training window already held 29
+    /// values >= 1352, ten of them 9-54x larger, max 72,738. A bare error COUNT cannot
+    /// separate 20 errors in 330,000 requests from 20 errors in 200, so no forest and no
+    /// thresholder can rescue it -- only refusing the config can. The rate form of the same
+    /// signal, `nginx_5xx_rate_1h`, is servable and did detect the same platform outage.
+    mod denominator_rule {
+        use super::*;
+
+        /// A count restricted to an error subset, in filters mode: the shape that missed.
+        fn nginx_5xx_count_req() -> CreateAnomalyConfigRequest {
+            let mut req = make_valid_filters_req();
+            req.stream_name = "nginx_access".to_string();
+            req.detection_function = "count".to_string();
+            req.detection_function_field = None;
+            req.filters = Some(serde_json::json!([
+                {"field": "status", "operator": ">=", "value": "500"}
+            ]));
+            req
+        }
+
+        // ── the rejected class ──────────────────────────────────────────────
+
+        /// The live config the phase measured. Rejected because filters mode can express
+        /// exactly one aggregate, so a denominator is not merely absent here but
+        /// inexpressible: no edit short of switching to custom_sql can supply one.
+        #[test]
+        fn rejects_the_measured_nginx_5xx_count_config() {
+            let err = validate_config_request(&nginx_5xx_count_req())
+                .unwrap_err()
+                .to_string();
+            assert!(err.contains("denominator"), "got: {err}");
+        }
+
+        /// Pins the verdict itself, not just that an error came back, so an implementation
+        /// that refuses this config for some unrelated reason cannot satisfy the suite.
+        #[test]
+        fn the_measured_config_is_classified_absent_not_merely_refused() {
+            let req = nginx_5xx_count_req();
+            assert_eq!(
+                count_denominator_verdict(
+                    &combine_detection_fn(&req.detection_function, None),
+                    &req.stream_name,
+                    &req.query_mode,
+                    req.filters.as_ref(),
+                    req.custom_sql.as_deref(),
+                ),
+                DenominatorVerdict::Absent
+            );
+        }
+
+        /// The error vocabulary must be read from the FILTER, not only from the stream name:
+        /// `nginx_access` is a neutral name and the 5xx restriction lives in the predicate.
+        /// An implementation keyed on stream name alone passes the test above and fails here.
+        #[test]
+        fn an_error_restriction_is_recognised_in_the_filter_on_a_neutral_stream() {
+            for filter in [
+                serde_json::json!([{"field": "status", "operator": ">=", "value": "500"}]),
+                serde_json::json!([{"field": "status_code", "operator": "=", "value": "503"}]),
+                serde_json::json!([{"field": "level", "operator": "=", "value": "error"}]),
+                serde_json::json!([{"field": "severity", "operator": "=", "value": "fatal"}]),
+                serde_json::json!([{"field": "log_level", "operator": "=", "value": "critical"}]),
+            ] {
+                let mut req = nginx_5xx_count_req();
+                req.filters = Some(filter.clone());
+                assert!(
+                    validate_config_request(&req).is_err(),
+                    "{filter} restricts to an error subset and must be refused"
+                );
+            }
+        }
+
+        /// The symmetric half: a stream NAMED for its error subset, counted without any
+        /// filter, is the same denominator-free count. Keying on the filter alone misses it.
+        ///
+        /// This is deliberately NOT the `usage_records` case, though both are unfiltered
+        /// counts. `usage_records` is the population of interest itself; an error stream is
+        /// the error subset of an application's activity, and its count carries exactly the
+        /// 20-in-330,000 versus 20-in-200 ambiguity the gate exists to refuse. The repair is
+        /// reachable: `build_custom_sql_incremental_query` passes user SQL through verbatim,
+        /// so the denominator can be joined in from the request-volume stream.
+        #[test]
+        fn an_error_restriction_is_recognised_in_the_stream_name_with_no_filter() {
+            for stream in ["nginx_5xx", "nginx_5xx_1h", "app_errors", "error_log"] {
+                let mut req = nginx_5xx_count_req();
+                req.stream_name = stream.to_string();
+                req.filters = Some(serde_json::json!([]));
+                assert!(
+                    validate_config_request(&req).is_err(),
+                    "{stream} is an error subset stream and a bare count of it must be refused"
+                );
+            }
+        }
+
+        /// custom_sql is the only mode that CAN carry a denominator, so a custom_sql count
+        /// that does not is refused too. Restricting the gate to filters mode would leave
+        /// the identical defect reachable through the other mode.
+        #[test]
+        fn rejects_an_error_count_written_in_custom_sql_without_a_denominator() {
+            let mut req = make_valid_filters_req();
+            req.query_mode = "custom_sql".to_string();
+            req.filters = None;
+            req.detection_function = "count".to_string();
+            req.custom_sql = Some(
+                "SELECT histogram(_timestamp) AS ts, count(*) AS value FROM nginx_access \
+                 WHERE status >= 500 GROUP BY ts"
+                    .to_string(),
+            );
+            let err = validate_config_request(&req).unwrap_err().to_string();
+            assert!(err.contains("denominator"), "got: {err}");
+        }
+
+        /// The same defect written without a WHERE clause: the error restriction lives in a
+        /// CASE inside the aggregate, and nothing divides. An implementation scanning for an
+        /// error predicate only in a WHERE clause admits this, and it is the identical fault.
+        #[test]
+        fn rejects_an_error_count_restricted_inside_the_aggregate_with_no_division() {
+            let mut req = make_valid_filters_req();
+            req.query_mode = "custom_sql".to_string();
+            req.filters = None;
+            req.detection_function = "count".to_string();
+            req.custom_sql = Some(
+                "SELECT histogram(_timestamp) AS ts, \
+                 count(CASE WHEN status >= 500 THEN 1 END) AS value \
+                 FROM nginx_access GROUP BY ts"
+                    .to_string(),
+            );
+            let err = validate_config_request(&req).unwrap_err().to_string();
+            assert!(err.contains("denominator"), "got: {err}");
+        }
+
+        // ── the admitted class: this is the hard half ───────────────────────
+
+        /// `usage_records_1h` is a COUNT series carrying a real labelled positive (x9.6), so
+        /// a blanket "reject every count" rule is wrong. It counts the whole population
+        /// rather than an error subset, and needs no denominator to be interpretable.
+        #[test]
+        fn admits_the_labelled_positive_usage_records_count() {
+            let mut req = make_valid_filters_req();
+            req.stream_name = "usage_records".to_string();
+            req.detection_function = "count".to_string();
+            req.filters = Some(serde_json::json!([]));
+            assert!(
+                validate_config_request(&req).is_ok(),
+                "usage_records_1h is a servable count with a labelled positive"
+            );
+            assert_eq!(
+                count_denominator_verdict("count(*)", "usage_records", "filters", None, None),
+                DenominatorVerdict::Present,
+                "an unrestricted count IS its own population; nothing is missing"
+            );
+        }
+
+        /// The rate/ratio form of the very same signal must stay servable: `nginx_5xx_rate_1h`
+        /// is a live config that detected the platform outage the count series could not
+        /// express. A gate that took the rate form down would remove the only working option.
+        #[test]
+        fn admits_the_rate_form_of_the_rejected_signal() {
+            let mut req = make_valid_filters_req();
+            req.query_mode = "custom_sql".to_string();
+            req.filters = None;
+            req.detection_function = "count".to_string();
+            req.custom_sql = Some(
+                "SELECT histogram(_timestamp) AS ts, \
+                 count(CASE WHEN status >= 500 THEN 1 END) / count(*) AS value \
+                 FROM nginx_access GROUP BY ts"
+                    .to_string(),
+            );
+            assert!(
+                validate_config_request(&req).is_ok(),
+                "the ratio form carries its own denominator and is the servable answer"
+            );
+        }
+
+        /// A non-count aggregation over an error stream is not this defect: avg/p50/max of a
+        /// latency or size field is already a normalized quantity. Refusing it would be
+        /// scope creep, and would take `nginx_latency_p50_1h` down for the wrong reason.
+        #[test]
+        fn admits_non_count_aggregations_over_an_error_restricted_stream() {
+            for function in ["avg", "sum", "min", "max", "p50", "p95"] {
+                let mut req = nginx_5xx_count_req();
+                req.detection_function = function.to_string();
+                req.detection_function_field = Some("response_time".to_string());
+                assert_eq!(
+                    count_denominator_verdict(
+                        &combine_detection_fn(function, Some("response_time")),
+                        &req.stream_name,
+                        &req.query_mode,
+                        req.filters.as_ref(),
+                        None,
+                    ),
+                    DenominatorVerdict::NotACount,
+                    "{function} is not a count and this gate must not touch it"
+                );
+                assert!(validate_config_request(&req).is_ok(), "{function} refused");
+
+                // With no field `combine_detection_fn` returns the bare name, so the gate
+                // sees "p50" rather than "p50(response_time)". The verdict must not change.
+                assert_eq!(
+                    count_denominator_verdict(
+                        &combine_detection_fn(function, None),
+                        &req.stream_name,
+                        &req.query_mode,
+                        req.filters.as_ref(),
+                        None,
+                    ),
+                    DenominatorVerdict::NotACount,
+                    "the bare {function} is still not a count"
+                );
+            }
+        }
+
+        /// `sum` deserves its own arm: it is the aggregation most easily mistaken for a count
+        /// (both grow with volume) yet a sum of a measured field is not the defect this gate
+        /// describes, and folding it in would silently widen the rule.
+        #[test]
+        fn a_sum_over_an_error_subset_is_not_a_count() {
+            let mut req = nginx_5xx_count_req();
+            req.detection_function = "sum".to_string();
+            req.detection_function_field = Some("bytes_sent".to_string());
+            assert!(validate_config_request(&req).is_ok());
+        }
+
+        /// A non-error filter is a legitimate slice, not a numerator: counting one tenant's
+        /// or one endpoint's traffic is interpretable on its own. Rejecting every filtered
+        /// count would be the over-wide rule, and this is the test that stops it.
+        #[test]
+        fn admits_a_count_restricted_by_a_non_error_predicate() {
+            for filter in [
+                serde_json::json!([{"field": "org_id", "operator": "=", "value": "acme"}]),
+                serde_json::json!([{"field": "endpoint", "operator": "=", "value": "/api/v1"}]),
+                serde_json::json!([{"field": "status", "operator": "=", "value": "200"}]),
+                serde_json::json!([{"field": "method", "operator": "=", "value": "POST"}]),
+            ] {
+                let mut req = nginx_5xx_count_req();
+                req.filters = Some(filter.clone());
+                assert!(
+                    validate_config_request(&req).is_ok(),
+                    "{filter} is an ordinary slice, not an error numerator"
+                );
+            }
+        }
+
+        /// The boundary INSIDE the error vocabulary, from both sides. `status = 200` and
+        /// `status = 404` are not the 5xx class this gate is about; a rule that matched the
+        /// FIELD name `status` regardless of value would reject both and is killed here.
+        #[test]
+        fn the_status_field_alone_is_not_an_error_restriction() {
+            for (value, refused) in [
+                ("200", false),
+                ("204", false),
+                ("301", false),
+                ("400", false),
+                ("404", false),
+                ("500", true),
+                ("503", true),
+            ] {
+                let mut req = nginx_5xx_count_req();
+                req.filters =
+                    Some(serde_json::json!([{"field": "status", "operator": "=", "value": value}]));
+                assert_eq!(
+                    validate_config_request(&req).is_err(),
+                    refused,
+                    "status = {value} must {} be refused",
+                    if refused { "" } else { "not" }
+                );
+            }
+        }
+
+        /// The same value under different operators must reach different verdicts, or the
+        /// operator is being ignored. `status >= 200` is every request there is and must be
+        /// admitted; `status >= 500` is the error subset. An implementation reading only the
+        /// value refuses the first, which is the most ordinary count in the product.
+        #[test]
+        fn the_operator_is_read_and_not_only_the_value() {
+            for (operator, value, refused) in [
+                (">=", "200", false),
+                (">=", "500", true),
+                ("=", "500", true),
+                ("<", "500", false),
+            ] {
+                let mut req = nginx_5xx_count_req();
+                req.filters = Some(
+                    serde_json::json!([{"field": "status", "operator": operator, "value": value}]),
+                );
+                assert_eq!(
+                    validate_config_request(&req).is_err(),
+                    refused,
+                    "status {operator} {value}: expected refused={refused}"
+                );
+            }
+        }
+
+        /// The `>=` boundary on the 5xx band, pinned from both sides so an off-by-one on the
+        /// threshold (>= 499, or > 500 missing 500 itself) cannot survive. Values inside the
+        /// band beyond the endpoints are included so a hardcoded {500, 503, 599} value list
+        /// is not indistinguishable from a real range check.
+        ///
+        /// DELIBERATE SCOPE: a 4xx count is structurally just as denominator-free, and is
+        /// admitted anyway. The gate is drawn at the class Phase 1H actually measured, and
+        /// 4xx carries far more legitimate standalone uses (404 hunts, auth-failure spikes)
+        /// than 5xx does, so widening it would refuse working configs to catch a fault
+        /// nobody has observed. Extending the band is a decision with its own evidence bar,
+        /// not an oversight -- and this test is where that decision would be re-litigated.
+        #[test]
+        fn the_five_hundred_boundary_is_pinned_from_both_sides() {
+            for (value, refused) in [
+                ("499", false),
+                ("500", true),
+                ("502", true),
+                ("550", true),
+                ("599", true),
+                ("600", false),
+            ] {
+                let mut req = nginx_5xx_count_req();
+                req.filters =
+                    Some(serde_json::json!([{"field": "status", "operator": "=", "value": value}]));
+                assert_eq!(
+                    validate_config_request(&req).is_err(),
+                    refused,
+                    "status = {value}: expected refused={refused}"
+                );
+            }
+        }
+
+        /// The error clause is not always first. An implementation reading only `filters[0]`
+        /// passes every other test here and admits the exact config the gate exists to
+        /// refuse, so the clause is placed last as well as first.
+        #[test]
+        fn an_error_clause_is_found_wherever_it_sits_in_the_filter_list() {
+            let benign = serde_json::json!({"field": "org_id", "operator": "=", "value": "acme"});
+            let error = serde_json::json!({"field": "status", "operator": ">=", "value": "500"});
+            for filters in [
+                serde_json::json!([benign, error]),
+                serde_json::json!([benign, benign, error]),
+                serde_json::json!([error, benign]),
+            ] {
+                let mut req = nginx_5xx_count_req();
+                req.filters = Some(filters.clone());
+                assert!(
+                    validate_config_request(&req).is_err(),
+                    "{filters} carries an error clause and must be refused"
+                );
+            }
+        }
+
+        /// A NEGATED error predicate selects the healthy majority, not the error subset, so
+        /// it is an ordinary slice. An operator-blind implementation that matches the field
+        /// and value while ignoring `!=` refuses it, and refuses a legitimate config.
+        #[test]
+        fn a_negated_error_predicate_is_not_an_error_restriction() {
+            for operator in ["!=", "<"] {
+                let mut req = nginx_5xx_count_req();
+                req.filters = Some(
+                    serde_json::json!([{"field": "status", "operator": operator, "value": "500"}]),
+                );
+                assert!(
+                    validate_config_request(&req).is_ok(),
+                    "status {operator} 500 selects non-errors and is an ordinary slice"
+                );
+            }
+        }
+
+        /// A count restricted by an error predicate AND divided in custom_sql is the repair
+        /// path a user takes after being refused. It must actually work, or the error message
+        /// sends them somewhere that also fails.
+        #[test]
+        fn the_documented_repair_path_is_accepted() {
+            let mut req = make_valid_filters_req();
+            req.query_mode = "custom_sql".to_string();
+            req.filters = None;
+            req.detection_function = "count".to_string();
+            for sql in [
+                "SELECT histogram(_timestamp) AS ts, \
+                 sum(CASE WHEN status >= 500 THEN 1 ELSE 0 END) * 1.0 / count(*) AS value \
+                 FROM nginx_access GROUP BY ts",
+                "SELECT histogram(_timestamp) AS ts, \
+                 count(*) FILTER (WHERE status >= 500) / count(*) AS value \
+                 FROM nginx_access GROUP BY ts",
+            ] {
+                req.custom_sql = Some(sql.to_string());
+                assert!(
+                    validate_config_request(&req).is_ok(),
+                    "the repair the error message points at must be servable: {sql}"
+                );
+            }
+        }
+
+        /// The message has to name the fix, not just the fault: a user told only "refused"
+        /// cannot act, and the rate form is the whole point of the gate.
+        #[test]
+        fn the_refusal_names_the_actionable_repair() {
+            let err = validate_config_request(&nginx_5xx_count_req())
+                .unwrap_err()
+                .to_string();
+            assert!(err.contains("validation error"), "not a 400: {err}");
+            assert!(
+                err.contains("rate") || err.contains("ratio"),
+                "the message must point at the rate/ratio form: {err}"
+            );
+        }
+
+        // ── the producer: what actually builds the value being validated ────
+
+        /// The gate reads the COMBINED detection function, which `create_config` builds with
+        /// `combine_detection_fn` rather than taking from the request verbatim. A gate that
+        /// read `req.detection_function` would see "count" where the row stores "count(*)",
+        /// and would then disagree with itself on update, where only the stored form exists.
+        #[test]
+        fn the_gate_reads_the_combined_form_the_row_actually_stores() {
+            // `count` + a field still combines to `count(*)`, so both spellings a client can
+            // post land on the one string the row stores, and the gate must read that string.
+            assert_eq!(
+                combine_detection_fn("count", Some("request_id")),
+                "count(*)"
+            );
+            assert_eq!(
+                count_denominator_verdict(
+                    &combine_detection_fn("count", None),
+                    "nginx_5xx",
+                    "filters",
+                    Some(&serde_json::json!([])),
+                    None,
+                ),
+                DenominatorVerdict::Absent,
+                "count(*) over an error stream is denominator-free"
+            );
+
+            // The other combined shape the producer emits: a named field on a real
+            // aggregation. Reading the request's bare "avg" instead would lose the field.
+            assert_eq!(
+                count_denominator_verdict(
+                    &combine_detection_fn("avg", Some("response_time")),
+                    "nginx_5xx",
+                    "filters",
+                    Some(&serde_json::json!([])),
+                    None,
+                ),
+                DenominatorVerdict::NotACount
+            );
+        }
+
+        /// `combine_detection_fn` passes an already-combined string through untouched, so a
+        /// client posting "count(*)" directly reaches the gate in that form. Both spellings
+        /// of the same config must land on the same verdict or the gate is bypassable.
+        #[test]
+        fn a_pre_combined_request_reaches_the_same_verdict() {
+            let mut split = nginx_5xx_count_req();
+            split.detection_function = "count".to_string();
+            let mut pre_combined = nginx_5xx_count_req();
+            pre_combined.detection_function = "count(*)".to_string();
+            assert!(validate_config_request(&split).is_err());
+            assert!(
+                validate_config_request(&pre_combined).is_err(),
+                "posting the combined form must not bypass the gate"
+            );
+        }
+
+        /// Case must not be a bypass. A gate comparing raw strings lets `COUNT(*)` or a
+        /// `Status`/`ERROR` filter through, which is a one-character evasion.
+        #[test]
+        fn case_is_not_a_bypass() {
+            let mut upper_fn = nginx_5xx_count_req();
+            upper_fn.detection_function = "COUNT(*)".to_string();
+            assert!(validate_config_request(&upper_fn).is_err());
+
+            let mut upper_filter = nginx_5xx_count_req();
+            upper_filter.filters =
+                Some(serde_json::json!([{"field": "LEVEL", "operator": "=", "value": "ERROR"}]));
+            assert!(validate_config_request(&upper_filter).is_err());
+
+            let mut upper_stream = nginx_5xx_count_req();
+            upper_stream.stream_name = "APP_ERRORS".to_string();
+            upper_stream.filters = Some(serde_json::json!([]));
+            assert!(validate_config_request(&upper_stream).is_err());
+        }
+
+        /// A filters-mode config whose `filters` is the empty array and whose stream is
+        /// neutral is the most ordinary count there is. It anchors the default answer as
+        /// ADMIT, so a gate that inverted its comparison fails here rather than passing
+        /// every rejection test by refusing everything.
+        #[test]
+        fn the_default_answer_for_an_ordinary_count_is_admit() {
+            let mut req = make_valid_filters_req();
+            req.stream_name = "app_logs".to_string();
+            req.detection_function = "count".to_string();
+            req.filters = Some(serde_json::json!([]));
+            assert!(validate_config_request(&req).is_ok());
+        }
+
+        /// Malformed filter entries must not decide the verdict. Refusing on a shape the
+        /// gate cannot read would turn an unrelated payload bug into a denominator refusal.
+        #[test]
+        fn an_unreadable_filter_shape_does_not_trigger_a_refusal() {
+            for filter in [
+                serde_json::json!([{"no_field_key": "status"}]),
+                serde_json::json!([7]),
+                serde_json::json!(["status >= 500"]),
+                serde_json::json!([{"field": null, "value": null}]),
+            ] {
+                let mut req = nginx_5xx_count_req();
+                req.stream_name = "app_logs".to_string();
+                req.filters = Some(filter.clone());
+                assert!(
+                    validate_config_request(&req).is_ok(),
+                    "{filter} is unreadable, not an error restriction"
+                );
+            }
+        }
+
+        // ── grandfathering: the same discipline `validated_intervals` encodes ──
+
+        /// The persisted twin of `nginx_5xx_count_req`: a row create would now refuse.
+        fn broken_count_config() -> infra::table::entity::anomaly_detection_config::Model {
+            let mut stored = update_interval_validation::stored_config();
+            stored.stream_name = "nginx_5xx".to_string();
+            stored.detection_function = "count(*)".to_string();
+            stored.query_mode = "filters".to_string();
+            stored.filters = Some(serde_json::json!([]));
+            stored
+        }
+
+        /// Grandfathering 1 of 3, split so an always-validate implementation fails three
+        /// separate tests: an existing denominator-free row must stay disableable. This is
+        /// the operationally urgent one -- it is how an operator silences a bad config.
+        #[test]
+        fn a_broken_row_can_still_be_disabled() {
+            let req = UpdateAnomalyConfigRequest {
+                enabled: Some(false),
+                ..Default::default()
+            };
+            assert!(validated_denominator(&req, &broken_count_config()).is_ok());
+        }
+
+        #[test]
+        fn a_broken_row_can_still_be_renamed_and_moved() {
+            let req = UpdateAnomalyConfigRequest {
+                name: Some("renamed".to_string()),
+                folder_id: Some("other".to_string()),
+                ..Default::default()
+            };
+            assert!(validated_denominator(&req, &broken_count_config()).is_ok());
+        }
+
+        /// The full-body PUT the alerts v2 UI sends: every field resent at its stored value.
+        /// Keyed on PRESENCE this reads as "touching the detection function" and blocks the
+        /// rename; keyed on CHANGE it is correctly a no-op. Exactly the trap P0.4 hit.
+        #[test]
+        fn a_full_body_replay_of_the_unchanged_config_is_not_a_change() {
+            let broken = broken_count_config();
+            let req = UpdateAnomalyConfigRequest {
+                name: Some("renamed in the UI".to_string()),
+                detection_function: Some(broken.detection_function.clone()),
+                query_mode: Some(broken.query_mode.clone()),
+                filters: broken.filters.clone(),
+                ..Default::default()
+            };
+            assert!(
+                validated_denominator(&req, &broken).is_ok(),
+                "a UI rename must not be rejected by resent-but-identical fields"
+            );
+        }
+
+        /// The replay resends the SPLIT spelling too, because the UI renders the stored
+        /// `count(*)` back into a function box and a field box. `count` + no field recombines
+        /// to exactly the stored `count(*)`, so this is still not a change -- an
+        /// implementation comparing the raw request string to the stored one rejects it.
+        #[test]
+        fn a_replay_that_recombines_to_the_stored_function_is_not_a_change() {
+            let broken = broken_count_config();
+            let req = UpdateAnomalyConfigRequest {
+                detection_function: Some("count".to_string()),
+                ..Default::default()
+            };
+            assert!(validated_denominator(&req, &broken).is_ok());
+        }
+
+        /// Bulk enable reaches `update_config` with no 400 path at all, so a rejection here
+        /// surfaces as a 500 on a row the operator never asked to change. Split from the
+        /// disable case because the two travel different code paths in the UI.
+        #[test]
+        fn a_broken_row_can_still_be_bulk_enabled() {
+            let req = UpdateAnomalyConfigRequest {
+                enabled: Some(true),
+                ..Default::default()
+            };
+            assert!(validated_denominator(&req, &broken_count_config()).is_ok());
+        }
+
+        /// The counterpart of the interval gate's unparseable-stored-value case: a row whose
+        /// persisted `detection_function` cannot be read at all must still accept an edit
+        /// that leaves that field alone. An implementation that classifies the merged row
+        /// before checking whether anything changed refuses these rows forever.
+        #[test]
+        fn a_row_with_an_unreadable_stored_function_still_accepts_an_unrelated_edit() {
+            for stored_function in ["", "count(", "???"] {
+                let mut broken = broken_count_config();
+                broken.detection_function = stored_function.to_string();
+                let req = UpdateAnomalyConfigRequest {
+                    enabled: Some(false),
+                    ..Default::default()
+                };
+                assert!(
+                    validated_denominator(&req, &broken).is_ok(),
+                    "a row storing {stored_function:?} must stay administrable"
+                );
+            }
+        }
+
+        /// Grandfathering does not extend to a genuine edit. Adding a 5xx filter to an
+        /// already-error-named stream is still denominator-free, and the row was not
+        /// previously carrying that filter, so this IS a change and must be validated.
+        #[test]
+        fn genuinely_changing_the_config_on_a_broken_row_is_still_validated() {
+            let mut broken = broken_count_config();
+            broken.stream_name = "nginx_access".to_string();
+            let req = UpdateAnomalyConfigRequest {
+                filters: Some(serde_json::json!([
+                    {"field": "status", "operator": ">=", "value": "500"}
+                ])),
+                ..Default::default()
+            };
+            let err = validated_denominator(&req, &broken)
+                .unwrap_err()
+                .to_string();
+            assert!(err.contains("denominator"), "got: {err}");
+        }
+
+        /// Repairing a broken row must be allowed from every side, or grandfathering
+        /// becomes a trap that preserves the fault forever.
+        #[test]
+        fn repairing_a_broken_row_is_allowed() {
+            let broken = broken_count_config();
+
+            let to_an_average = UpdateAnomalyConfigRequest {
+                detection_function: Some("avg".to_string()),
+                detection_function_field: Some("response_time".to_string()),
+                ..Default::default()
+            };
+            assert!(validated_denominator(&to_an_average, &broken).is_ok());
+
+            let to_a_ratio = UpdateAnomalyConfigRequest {
+                query_mode: Some("custom_sql".to_string()),
+                custom_sql: Some(
+                    "SELECT histogram(_timestamp) AS ts, \
+                     count(CASE WHEN status >= 500 THEN 1 END) / count(*) AS value \
+                     FROM nginx_access GROUP BY ts"
+                        .to_string(),
+                ),
+                ..Default::default()
+            };
+            assert!(validated_denominator(&to_a_ratio, &broken).is_ok());
+        }
+
+        /// A healthy row must not be edited INTO the broken shape. Grandfathering exempts
+        /// what is already on disk, never a new fault introduced by this very request.
+        #[test]
+        fn a_healthy_row_cannot_be_edited_into_the_broken_shape() {
+            let mut healthy = update_interval_validation::stored_config();
+            healthy.stream_name = "nginx_access".to_string();
+            healthy.detection_function = "avg(response_time)".to_string();
+            let req = UpdateAnomalyConfigRequest {
+                detection_function: Some("count".to_string()),
+                filters: Some(serde_json::json!([
+                    {"field": "status", "operator": ">=", "value": "500"}
+                ])),
+                ..Default::default()
+            };
+            let err = validated_denominator(&req, &healthy)
+                .unwrap_err()
+                .to_string();
+            assert!(err.contains("denominator"), "got: {err}");
+        }
+
+        /// Update must reuse the create rule verbatim rather than growing a second,
+        /// differently-worded copy that can drift.
+        #[test]
+        fn update_shares_the_create_paths_wording() {
+            let from_create = validate_config_request(&nginx_5xx_count_req())
+                .unwrap_err()
+                .to_string();
+            let mut healthy = update_interval_validation::stored_config();
+            healthy.stream_name = "nginx_access".to_string();
+            healthy.detection_function = "avg(response_time)".to_string();
+            let req = UpdateAnomalyConfigRequest {
+                detection_function: Some("count".to_string()),
+                filters: Some(serde_json::json!([
+                    {"field": "status", "operator": ">=", "value": "500"}
+                ])),
+                ..Default::default()
+            };
+            let from_update = validated_denominator(&req, &healthy)
+                .unwrap_err()
+                .to_string();
+            assert_eq!(
+                from_create, from_update,
+                "create and update wording diverged"
+            );
+        }
+
+        /// The merge the update path lands on: an absent field keeps the row's value, a
+        /// submitted one wins. Validating only the payload would miss a change to the
+        /// function that conflicts with the UNCHANGED stored filters, and vice versa.
+        #[test]
+        fn an_absent_field_falls_back_to_the_persisted_value() {
+            let mut healthy = update_interval_validation::stored_config();
+            healthy.stream_name = "nginx_access".to_string();
+            healthy.detection_function = "avg(response_time)".to_string();
+            healthy.filters = Some(serde_json::json!([
+                {"field": "status", "operator": ">=", "value": "500"}
+            ]));
+
+            // Only the function is submitted; the 5xx restriction it conflicts with is stored.
+            let function_alone = UpdateAnomalyConfigRequest {
+                detection_function: Some("count".to_string()),
+                ..Default::default()
+            };
+            assert!(
+                validated_denominator(&function_alone, &healthy).is_err(),
+                "a lone function change must be judged against the stored filters"
+            );
+
+            let mut counting = update_interval_validation::stored_config();
+            counting.stream_name = "nginx_access".to_string();
+            counting.detection_function = "count(*)".to_string();
+            counting.filters = Some(serde_json::json!([]));
+            // Only the filter is submitted; the count it conflicts with is stored.
+            let filter_alone = UpdateAnomalyConfigRequest {
+                filters: Some(serde_json::json!([
+                    {"field": "status", "operator": ">=", "value": "500"}
+                ])),
+                ..Default::default()
+            };
+            assert!(
+                validated_denominator(&filter_alone, &counting).is_err(),
+                "a lone filter change must be judged against the stored function"
+            );
+        }
+    }
+
+    // ── G5: a series that cannot be served at any configuration ──────────────
+
+    /// Measured in section 4R/E-real D: 2 of 24 real series (~10%) have a per-slot baseline
+    /// at or near zero and were stuck open under EVERY arm tested. Those configs are
+    /// accepted today and recall is then measured on them. The gate refuses at creation with
+    /// a reason the user can act on. Unlike G4 this needs DATA, so the whole design question
+    /// is what happens when the data is unavailable, thin, or arrives later -- and the safe
+    /// answer is always ADMIT, because wrongly refusing a working config is worse than
+    /// admitting a weak one.
+    mod servability_rule {
+        use super::*;
+
+        /// A healthy series: every hour-of-week slot carries a baseline well clear of zero.
+        fn healthy_evidence() -> ServabilityEvidence {
+            ServabilityEvidence {
+                slot_baselines: vec![Some(120.0); 168],
+                buckets_observed: 2016,
+            }
+        }
+
+        /// `nginx_latency_p50_1h`, measured: 68.9% of its buckets are exactly 0.0. Its
+        /// per-slot baseline sits at zero across the week, which is the stuck-open class.
+        fn zero_baseline_evidence() -> ServabilityEvidence {
+            ServabilityEvidence {
+                slot_baselines: vec![Some(0.0); 168],
+                buckets_observed: 2016,
+            }
+        }
+
+        // ── the verdict, with data in hand ──────────────────────────────────
+
+        #[test]
+        fn a_healthy_series_is_servable() {
+            assert_eq!(
+                assess_servability(&healthy_evidence()),
+                Servability::Servable
+            );
+        }
+
+        /// The measured stuck-open class: a baseline of zero in every slot means any
+        /// non-zero bucket is an infinite relative excursion, so the config fires forever.
+        #[test]
+        fn an_all_zero_baseline_is_refused() {
+            match assess_servability(&zero_baseline_evidence()) {
+                Servability::Unservable(reason) => {
+                    assert!(reason.contains("baseline"), "got: {reason}")
+                }
+                other => panic!("expected Unservable, got {other:?}"),
+            }
+        }
+
+        /// The free parameter this gate turns on, pinned from BOTH sides and at the exact
+        /// step. The bar is a FRACTION of observed slots, not a single surviving slot:
+        /// `CreateAnomalyConfigRequest` carries no hour-of-week or slot restriction field, so
+        /// a user cannot configure the detector to score only the one slot that works. A
+        /// series usable in 1 slot of 168 is scored in all 168 and sits stuck open in 167 of
+        /// them, which is the failure this gate exists to refuse. An eighth of the week is
+        /// the bar: below it there is no configuration the product can express that serves
+        /// the series, which is what "unservable at any configuration" has to mean here.
+        /// The step is stated inclusively -- a series usable in exactly an eighth of its
+        /// observed slots is servable -- so 21 of 168 admits and 20 refuses.
+        #[test]
+        fn the_usable_slot_fraction_is_pinned_from_both_sides() {
+            for (usable_slots, unservable) in [
+                (0usize, true),
+                (1, true),
+                (20, true),
+                (21, false),
+                (84, false),
+                (168, false),
+            ] {
+                let mut evidence = ServabilityEvidence {
+                    slot_baselines: vec![Some(0.0); 168],
+                    buckets_observed: 2016,
+                };
+                for slot in evidence.slot_baselines.iter_mut().take(usable_slots) {
+                    *slot = Some(120.0);
+                }
+                assert_eq!(
+                    matches!(assess_servability(&evidence), Servability::Unservable(_)),
+                    unservable,
+                    "{usable_slots} usable slots of 168: expected unservable={unservable}"
+                );
+            }
+        }
+
+        /// "At or NEAR zero" is the measured wording, so a baseline just above zero counts.
+        /// An implementation testing `== 0.0` passes every all-zero test and fails here --
+        /// and would admit the whole near-zero half of the class the measurement found.
+        /// The step is at 0.001 INCLUSIVE, pinned adjacently rather than a decade apart, so
+        /// any epsilon other than exactly this one fails: `< 0.001` fails the 0.001 row and
+        /// `<= 0.0011` fails the 0.0011 row.
+        #[test]
+        fn a_near_zero_baseline_counts_as_zero_from_both_sides() {
+            for (baseline, unservable) in [
+                (0.0, true),
+                (0.0005, true),
+                (0.001, true),
+                (0.0011, false),
+                (0.01, false),
+                (1.0, false),
+            ] {
+                let evidence = ServabilityEvidence {
+                    slot_baselines: vec![Some(baseline); 168],
+                    buckets_observed: 2016,
+                };
+                assert_eq!(
+                    matches!(assess_servability(&evidence), Servability::Unservable(_)),
+                    unservable,
+                    "baseline {baseline}: expected unservable={unservable}"
+                );
+            }
+        }
+
+        /// A negative baseline is not a near-zero baseline. Only an absolute-value or
+        /// two-sided comparison gets this right; `baseline < epsilon` alone calls -50 unservable
+        /// and takes down every legitimately-negative series (deltas, temperature, drift).
+        /// Both magnitudes matter: -50 is a live series and must be admitted, while -0.0005
+        /// is near zero on the other side and must be refused. Testing only -50 leaves a
+        /// `baseline < 0 => servable` shortcut indistinguishable from a real `abs()`, and
+        /// that shortcut admits a series that is dead at negative epsilon.
+        #[test]
+        fn a_negative_baseline_is_judged_by_magnitude_not_by_sign() {
+            for (baseline, unservable) in [(-50.0, false), (-1.0, false), (-0.0005, true)] {
+                let evidence = ServabilityEvidence {
+                    slot_baselines: vec![Some(baseline); 168],
+                    buckets_observed: 2016,
+                };
+                assert_eq!(
+                    matches!(assess_servability(&evidence), Servability::Unservable(_)),
+                    unservable,
+                    "baseline {baseline}: expected unservable={unservable}"
+                );
+            }
+        }
+
+        // ── the safe default: absent, thin, or late data must ADMIT ─────────
+
+        /// No evidence at all. A brand-new stream has no history, and the overwhelmingly
+        /// common case for a new config is a stream that is fine. Refusing here would make
+        /// the gate's most frequent outcome its wrong one.
+        #[test]
+        fn no_evidence_at_all_admits() {
+            assert_eq!(
+                assess_servability(&ServabilityEvidence {
+                    slot_baselines: vec![None; 168],
+                    buckets_observed: 0,
+                }),
+                Servability::Servable
+            );
+        }
+
+        /// Thin evidence: enough buckets to compute something, not enough to trust it. The
+        /// bucket-count bar is a free parameter and is pinned from both sides, so an
+        /// off-by-one or a dropped bar cannot survive. Below the bar the answer is ADMIT
+        /// even when every observed slot is zero -- which is the whole point of the default.
+        #[test]
+        fn the_minimum_evidence_bar_is_pinned_from_both_sides() {
+            for (buckets_observed, refusable) in [
+                (0usize, false),
+                (1, false),
+                (167, false),
+                (168, true),
+                (2016, true),
+            ] {
+                // Only as many slots as buckets could have populated, so the fixture is a
+                // shape the producer could actually emit rather than an impossible one.
+                let mut slot_baselines = vec![None; 168];
+                for slot in slot_baselines.iter_mut().take(buckets_observed.min(168)) {
+                    *slot = Some(0.0);
+                }
+                let evidence = ServabilityEvidence {
+                    slot_baselines,
+                    buckets_observed,
+                };
+                assert_eq!(
+                    matches!(assess_servability(&evidence), Servability::Unservable(_)),
+                    refusable,
+                    "{buckets_observed} buckets: expected a refusal={refusable}"
+                );
+            }
+        }
+
+        /// Partial coverage: some slots were never observed. An unobserved slot is not a
+        /// zero slot, and counting it as one would refuse any series whose training window
+        /// simply did not span a full week -- a config problem, not a servability one.
+        #[test]
+        fn an_unobserved_slot_is_not_a_zero_slot() {
+            let mut evidence = healthy_evidence();
+            for slot in evidence.slot_baselines.iter_mut().take(140) {
+                *slot = None;
+            }
+            assert_eq!(
+                assess_servability(&evidence),
+                Servability::Servable,
+                "28 healthy observed slots out of 28 observed is a servable series"
+            );
+        }
+
+        /// The counterpart: the verdict is taken over OBSERVED slots only. Every slot anyone
+        /// has ever seen for this series is zero, so there is no configuration at which it
+        /// can be served; counting the 148 never-observed slots as usable would admit it.
+        ///
+        /// `buckets_observed` is 240, not a round 2016: at 5m buckets, 20 hour-of-week slots
+        /// hold 20 x 12 = 240 buckets in a 7-day window. A larger number here would be a
+        /// shape the producer cannot emit -- 2016 distinct buckets confined to 20 slots needs
+        /// 100 weeks -- and this is the one test separating a bucket-count bar from a
+        /// slot-count bar, so it must run on input the producer can actually construct.
+        #[test]
+        fn the_verdict_is_taken_over_observed_slots_not_the_whole_week() {
+            let mut evidence = ServabilityEvidence {
+                slot_baselines: vec![None; 168],
+                buckets_observed: 240,
+            };
+            for slot in evidence.slot_baselines.iter_mut().take(20) {
+                *slot = Some(0.0);
+            }
+            assert!(
+                matches!(assess_servability(&evidence), Servability::Unservable(_)),
+                "every observed slot is zero; an unobserved slot must not dilute that"
+            );
+        }
+
+        /// Evidence that cannot be fetched at all -- the search failed, the stream is not
+        /// yet queryable, the cluster is degraded. This is the "arrives later" case and it
+        /// must not turn a transient search failure into a permanent creation refusal.
+        #[test]
+        fn unavailable_evidence_admits_rather_than_refusing() {
+            assert!(validate_servability(None).is_ok());
+        }
+
+        /// The gate must be genuinely reachable with evidence in hand, or it is a rule that
+        /// can never fire. Pins the create-path wording as a 400 naming the fault.
+        #[test]
+        fn evidence_of_unservability_is_refused_with_an_actionable_reason() {
+            let err = validate_servability(Some(&zero_baseline_evidence()))
+                .map_err(validation_error)
+                .unwrap_err()
+                .to_string();
+            assert!(err.contains("validation error"), "not a 400: {err}");
+            assert!(err.contains("baseline"), "got: {err}");
+        }
+
+        #[test]
+        fn evidence_of_servability_is_accepted() {
+            assert!(validate_servability(Some(&healthy_evidence())).is_ok());
+        }
+
+        // ── the producer: what BUILDS the evidence ──────────────────────────
+
+        /// The defect a hand-written-inputs suite cannot catch: every test above invents an
+        /// evidence value, so the code that DERIVES one from query results is untested. These
+        /// are the rows the search actually returns for a config.
+        #[test]
+        fn evidence_is_derived_from_query_results() {
+            let points: Vec<(i64, f64)> = (0..336)
+                .map(|i| (1_700_000_000_000_000 + i * 3_600_000_000, 100.0))
+                .collect();
+            let evidence = servability_evidence_from_points(&points, 3600);
+            assert_eq!(evidence.buckets_observed, 336);
+            assert_eq!(
+                evidence.slot_baselines.len(),
+                168,
+                "the profile is always a full hour-of-week grid"
+            );
+            assert_eq!(assess_servability(&evidence), Servability::Servable);
+        }
+
+        /// The producer must reproduce the measured stuck-open series end to end, or the
+        /// gate is only ever proven against inputs a test wrote by hand.
+        #[test]
+        fn the_producer_reproduces_the_measured_unservable_series() {
+            let points: Vec<(i64, f64)> = (0..336)
+                .map(|i| (1_700_000_000_000_000 + i * 3_600_000_000, 0.0))
+                .collect();
+            let evidence = servability_evidence_from_points(&points, 3600);
+            assert!(matches!(
+                assess_servability(&evidence),
+                Servability::Unservable(_)
+            ));
+        }
+
+        /// `nginx_latency_p50_1h` as measured: 68.9% zeros, but they are not spread evenly --
+        /// they cluster in quiet slots. A series with genuinely busy slots must survive even
+        /// with a majority of zero BUCKETS, because the gate is about slots, not buckets. The
+        /// 9-to-17 weekday shape below is 40 busy slots of 168, so 76% of its buckets are
+        /// zero -- past the measured 68.9% and still servable.
+        #[test]
+        fn a_majority_of_zero_buckets_is_not_itself_unservable() {
+            let points: Vec<(i64, f64)> = (0..336)
+                .map(|i| {
+                    let hour_of_week = i % 168;
+                    let (day, hour) = (hour_of_week / 24, hour_of_week % 24);
+                    let value = if day < 5 && (9..17).contains(&hour) {
+                        150.0
+                    } else {
+                        0.0
+                    };
+                    (1_700_000_000_000_000 + i * 3_600_000_000, value)
+                })
+                .collect();
+            let evidence = servability_evidence_from_points(&points, 3600);
+            assert!(
+                points.iter().filter(|(_, v)| *v == 0.0).count() * 2 > points.len(),
+                "the fixture must actually be majority-zero for this test to mean anything"
+            );
+            assert_eq!(
+                assess_servability(&evidence),
+                Servability::Servable,
+                "a diurnal series with quiet nights is servable, not stuck open"
+            );
+        }
+
+        /// The producer's most consequential free parameter, and one every other producer
+        /// test is blind to: each fixture above is constant WITHIN a slot, so mean, median,
+        /// min and max are indistinguishable. A slot holding mostly zeros with occasional
+        /// traffic must read as usable, so the slot baseline cannot be a min (0.0, refusing a
+        /// live series) and cannot be a median (0.0 here, same fault). Pinned as a mean.
+        #[test]
+        fn a_slot_baseline_is_the_mean_of_its_buckets_not_the_min_or_median() {
+            // 12 five-minute buckets per hour-of-week slot; 2 of 12 carry traffic.
+            let points: Vec<(i64, f64)> = (0..(168 * 12))
+                .map(|i| {
+                    let value = if i % 12 < 2 { 600.0 } else { 0.0 };
+                    (1_700_000_000_000_000 + i * 300_000_000, value)
+                })
+                .collect();
+            let evidence = servability_evidence_from_points(&points, 300);
+            assert_eq!(evidence.buckets_observed, 168 * 12);
+            assert_eq!(
+                evidence.slot_baselines[0],
+                Some(100.0),
+                "the slot mean is 1200/12 = 100; a min or median would read 0 and refuse"
+            );
+            assert_eq!(
+                assess_servability(&evidence),
+                Servability::Servable,
+                "a bursty but live series is servable"
+            );
+        }
+
+        /// `interval_seconds` is otherwise passed as 3600 by every producer test, which hides
+        /// whether the grid is built from the timestamps or assumed hourly. At 5m there are
+        /// 12 buckets per slot, so an implementation treating each bucket as its own slot
+        /// overflows the 168-slot grid rather than folding into it.
+        #[test]
+        fn a_sub_hour_interval_folds_many_buckets_into_one_slot() {
+            let points: Vec<(i64, f64)> = (0..(168 * 12))
+                .map(|i| (1_700_000_000_000_000 + i * 300_000_000, 100.0))
+                .collect();
+            let evidence = servability_evidence_from_points(&points, 300);
+            assert_eq!(evidence.slot_baselines.len(), 168);
+            assert_eq!(evidence.buckets_observed, 168 * 12);
+            assert!(
+                evidence.slot_baselines.iter().all(|b| *b == Some(100.0)),
+                "every slot is observed and carries the same live baseline"
+            );
+        }
+
+        /// An empty result set produces evidence that admits, rather than an evidence value
+        /// that looks like an all-zero series. Absence and zero are the same thing at the
+        /// query layer for count aggregations, and conflating them here would refuse every
+        /// config created against a stream that has not ingested yet.
+        #[test]
+        fn no_returned_points_produce_admitting_evidence() {
+            let evidence = servability_evidence_from_points(&[], 3600);
+            assert_eq!(evidence.buckets_observed, 0);
+            assert_eq!(assess_servability(&evidence), Servability::Servable);
+        }
+
+        /// Duplicate timestamps must not inflate the bucket count past the evidence bar and
+        /// let a thin series be judged. A search can return repeats.
+        #[test]
+        fn repeated_timestamps_do_not_inflate_the_evidence_count() {
+            let points: Vec<(i64, f64)> = (0..400).map(|_| (1_700_000_000_000_000, 0.0)).collect();
+            let evidence = servability_evidence_from_points(&points, 3600);
+            assert_eq!(
+                evidence.buckets_observed, 1,
+                "400 copies of one bucket is one bucket of evidence"
+            );
+            assert_eq!(assess_servability(&evidence), Servability::Servable);
+        }
+
+        /// A NaN value must not silently read as near-zero and refuse the config, nor panic.
+        /// The safe default owns this case like every other unreadable input.
+        #[test]
+        fn a_non_finite_value_is_dropped_rather_than_read_as_a_baseline() {
+            for value in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+                let points: Vec<(i64, f64)> = (0..336)
+                    .map(|i| (1_700_000_000_000_000 + i * 3_600_000_000, value))
+                    .collect();
+                let evidence = servability_evidence_from_points(&points, 3600);
+                // Dropped, not kept: a retained NaN reads as usable and would mask a dead
+                // series, while a retained infinity is not a baseline anyone can score against.
+                assert_eq!(
+                    evidence.buckets_observed, 0,
+                    "{value} carries no usable baseline and must not count as evidence"
+                );
+                assert_eq!(assess_servability(&evidence), Servability::Servable);
+            }
+        }
+
+        /// A series that is mostly live but carries a few unreadable buckets must keep the
+        /// readable ones as evidence, rather than the whole series being discarded.
+        #[test]
+        fn a_few_non_finite_buckets_do_not_discard_the_readable_ones() {
+            let points: Vec<(i64, f64)> = (0..336)
+                .map(|i| {
+                    let value = if i % 50 == 0 { f64::NAN } else { 120.0 };
+                    (1_700_000_000_000_000 + i * 3_600_000_000, value)
+                })
+                .collect();
+            let evidence = servability_evidence_from_points(&points, 3600);
+            assert_eq!(evidence.buckets_observed, 336 - 7, "7 of 336 are NaN");
+            assert_eq!(assess_servability(&evidence), Servability::Servable);
+        }
+
+        // ── grandfathering: an already-unservable row stays administrable ────
+
+        fn unservable_config() -> infra::table::entity::anomaly_detection_config::Model {
+            let mut stored = update_interval_validation::stored_config();
+            stored.stream_name = "nginx_latency_p50".to_string();
+            stored.detection_function = "p50(response_time)".to_string();
+            stored
+        }
+
+        /// The two known-broken production rows must stay administrable under this gate too.
+        /// G5 needs a query to judge, and an update path that ran one would make every edit
+        /// depend on a live search -- so an update that does not touch the series definition
+        /// must not consult evidence at all.
+        #[test]
+        fn an_unservable_row_can_still_be_disabled_without_consulting_evidence() {
+            let req = UpdateAnomalyConfigRequest {
+                enabled: Some(false),
+                ..Default::default()
+            };
+            assert!(validated_servability(&req, &unservable_config(), None).is_ok());
+        }
+
+        #[test]
+        fn an_unservable_row_can_still_be_renamed_and_moved() {
+            let req = UpdateAnomalyConfigRequest {
+                name: Some("renamed".to_string()),
+                folder_id: Some("other".to_string()),
+                ..Default::default()
+            };
+            assert!(validated_servability(&req, &unservable_config(), None).is_ok());
+        }
+
+        /// Even WITH evidence in hand that the row is unservable, an administrative edit is
+        /// allowed. This is the grandfathering rule stated at its strongest: the gate refuses
+        /// at CREATION, and never retroactively locks a row already on disk.
+        #[test]
+        fn an_administrative_edit_is_allowed_even_against_unservable_evidence() {
+            let req = UpdateAnomalyConfigRequest {
+                enabled: Some(false),
+                ..Default::default()
+            };
+            assert!(
+                validated_servability(&req, &unservable_config(), Some(&zero_baseline_evidence()))
+                    .is_ok(),
+                "the gate refuses at creation, it does not lock existing rows"
+            );
+        }
+
+        /// A full-body replay resends the series-defining fields unchanged. Keyed on presence
+        /// this re-judges the row and blocks the rename; keyed on change it is a no-op.
+        #[test]
+        fn a_full_body_replay_of_the_unchanged_series_is_not_a_change() {
+            let stored = unservable_config();
+            let req = UpdateAnomalyConfigRequest {
+                name: Some("renamed in the UI".to_string()),
+                detection_function: Some(stored.detection_function.clone()),
+                query_mode: Some(stored.query_mode.clone()),
+                filters: stored.filters.clone(),
+                histogram_interval: Some(stored.histogram_interval.clone()),
+                ..Default::default()
+            };
+            assert!(
+                validated_servability(&req, &stored, Some(&zero_baseline_evidence())).is_ok(),
+                "resent-but-identical fields are not an edit"
+            );
+        }
+
+        /// Redefining the series IS a change, so it is judged -- but only when evidence is
+        /// actually available. This is the one arm where update refuses.
+        #[test]
+        fn redefining_the_series_is_judged_when_evidence_is_available() {
+            let stored = unservable_config();
+            let req = UpdateAnomalyConfigRequest {
+                detection_function: Some("p50".to_string()),
+                detection_function_field: Some("queue_depth".to_string()),
+                ..Default::default()
+            };
+            let err = validated_servability(&req, &stored, Some(&zero_baseline_evidence()))
+                .unwrap_err()
+                .to_string();
+            assert!(err.contains("baseline"), "got: {err}");
+        }
+
+        /// And the same redefinition with no evidence to hand is ADMITTED, not refused. The
+        /// safe default has to survive the update path, or an edit made while search is
+        /// degraded fails for a reason that has nothing to do with the edit.
+        #[test]
+        fn redefining_the_series_without_evidence_admits() {
+            let stored = unservable_config();
+            let req = UpdateAnomalyConfigRequest {
+                detection_function: Some("p50".to_string()),
+                detection_function_field: Some("queue_depth".to_string()),
+                ..Default::default()
+            };
+            assert!(validated_servability(&req, &stored, None).is_ok());
+        }
+
+        /// The caller contract for the `evidence` argument, which nothing else pins: it
+        /// describes the series the request would LAND ON, not the one already stored. Handed
+        /// the pre-edit series' evidence an implementation would refuse every repair and
+        /// admit every break, so the two arms below must disagree on the same stored row.
+        #[test]
+        fn the_evidence_describes_the_edited_series_not_the_stored_one() {
+            let stored = unservable_config();
+            let redefinition = || UpdateAnomalyConfigRequest {
+                detection_function: Some("p50".to_string()),
+                detection_function_field: Some("queue_depth".to_string()),
+                ..Default::default()
+            };
+            assert!(
+                validated_servability(&redefinition(), &stored, Some(&healthy_evidence())).is_ok(),
+                "healthy evidence for the NEW series must admit the edit"
+            );
+            assert!(
+                validated_servability(&redefinition(), &stored, Some(&zero_baseline_evidence()))
+                    .is_err(),
+                "dead evidence for the NEW series must refuse the same edit"
+            );
+        }
+
+        /// A healthy row must not be redefined INTO an unservable series. G4 has this test
+        /// and G5 needs it too: grandfathering exempts what is already on disk, never a new
+        /// fault introduced by this very request.
+        #[test]
+        fn a_healthy_row_cannot_be_redefined_into_an_unservable_series() {
+            let mut healthy = update_interval_validation::stored_config();
+            healthy.stream_name = "usage_records".to_string();
+            healthy.detection_function = "count(*)".to_string();
+            let req = UpdateAnomalyConfigRequest {
+                detection_function: Some("p50".to_string()),
+                detection_function_field: Some("queue_depth".to_string()),
+                ..Default::default()
+            };
+            let err = validated_servability(&req, &healthy, Some(&zero_baseline_evidence()))
+                .unwrap_err()
+                .to_string();
+            assert!(err.contains("baseline"), "got: {err}");
+        }
+
+        /// Repair must be reachable: pointing an unservable row at a healthy series is the
+        /// action the refusal asks for, and it must be accepted with evidence in hand.
+        #[test]
+        fn repairing_an_unservable_row_is_allowed() {
+            let stored = unservable_config();
+            let req = UpdateAnomalyConfigRequest {
+                detection_function: Some("count".to_string()),
+                ..Default::default()
+            };
+            assert!(validated_servability(&req, &stored, Some(&healthy_evidence())).is_ok());
+        }
+
+        /// The two gates read disjoint inputs, which is what makes them independent: G5's
+        /// verdict is a function of the evidence ALONE. Feeding it the same evidence under
+        /// configs that G4 judges oppositely must not move it -- an implementation that let
+        /// the config leak into the servability verdict fails here.
+        #[test]
+        fn the_servability_verdict_does_not_depend_on_the_config() {
+            let mut refused_by_g4 = make_valid_filters_req();
+            refused_by_g4.stream_name = "nginx_5xx".to_string();
+            refused_by_g4.detection_function = "count".to_string();
+            refused_by_g4.filters = Some(serde_json::json!([]));
+
+            let mut admitted_by_g4 = make_valid_filters_req();
+            admitted_by_g4.stream_name = "usage_records".to_string();
+            admitted_by_g4.detection_function = "count".to_string();
+            admitted_by_g4.filters = Some(serde_json::json!([]));
+
+            assert!(validate_config_request(&refused_by_g4).is_err());
+            assert!(validate_config_request(&admitted_by_g4).is_ok());
+
+            // Same evidence, opposite G4 verdicts: G5 must answer identically for both.
+            assert!(validate_servability(Some(&healthy_evidence())).is_ok());
+            assert!(validate_servability(Some(&zero_baseline_evidence())).is_err());
+        }
     }
 }
