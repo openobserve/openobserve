@@ -5912,10 +5912,6 @@ async fn handle_raman_triggers(
 ) -> Result<(), anyhow::Error> {
     let started_at = now_micros();
     let config = raman_config(&trigger.org, &trigger.module_key).await;
-    if raman_orphan_removed(&trigger, &config, started_at, trace_id).await {
-        return Ok(());
-    }
-    let config = config.unwrap_or_default();
     let window_minutes = raman_run_window_minutes(config.as_ref(), get_config().raman.enabled);
     let mut error = None;
     if window_minutes.is_some() {
@@ -5952,10 +5948,6 @@ async fn handle_raman_triggers(
 ) -> Result<(), anyhow::Error> {
     let started_at = now_micros();
     let config = raman_config(&trigger.org, &trigger.module_key).await;
-    if raman_orphan_removed(&trigger, &config, started_at, trace_id).await {
-        return Ok(());
-    }
-    let config = config.unwrap_or_default();
     let (window_minutes, error) = raman_run_outcome(
         &trigger.org,
         &trigger.module_key,
@@ -6075,77 +6067,20 @@ async fn run_raman_digest(
     crate::alerts::raman::sink::write_digest_records(org, records).await
 }
 
-/// The read error is kept, so a caller can tell a config that is gone from one it failed to read.
+/// A read failure is reported as absence, never propagated: the scheduler only logs
+/// what a handler returns, so an unreadable config would strand the row in `Processing`
+/// instead of retrying it once the database answers again.
 async fn raman_config(
     org: &str,
     config_id: &str,
-) -> Result<Option<infra::table::entity::raman_configs::Model>, infra::errors::Error> {
-    let read = infra::table::raman::get_by_id(get_orm_client_ro().await, org, config_id).await;
-    if let Err(e) = &read {
-        log::error!("[raman] could not read config {config_id} for org={org}: {e}");
+) -> Option<infra::table::entity::raman_configs::Model> {
+    match infra::table::raman::get_by_id(get_orm_client_ro().await, org, config_id).await {
+        Ok(config) => config,
+        Err(e) => {
+            log::error!("[raman] could not read config {config_id} for org={org}: {e}");
+            None
+        }
     }
-    read
-}
-
-/// Deletes a row whose config a read confirmed is gone, over an injected deleter for testability.
-async fn raman_orphan_swept<T, E, F, Fut>(
-    org: &str,
-    config_id: &str,
-    config: &Result<Option<T>, E>,
-    delete: F,
-) -> Option<Result<(), anyhow::Error>>
-where
-    F: FnOnce(String, String) -> Fut,
-    Fut: std::future::Future<Output = Result<(), anyhow::Error>>,
-{
-    // Only a successful read proves absence: deleting on a failed one destroys live schedules.
-    if !matches!(config, Ok(None)) {
-        return None;
-    }
-    log::warn!("[raman] trigger {config_id} for org={org} outlived its config; deleting the row");
-    Some(delete(org.to_string(), config_id.to_string()).await)
-}
-
-/// Only a succeeded delete removed the row; a failed one leaves it to re-arm and be swept again.
-fn raman_row_is_gone(swept: &Option<Result<(), anyhow::Error>>) -> bool {
-    matches!(swept, Some(Ok(())))
-}
-
-/// `true` when the row was an orphan and is gone, so the caller must stop without re-arming.
-async fn raman_orphan_removed(
-    trigger: &db::scheduler::Trigger,
-    config: &Result<Option<infra::table::entity::raman_configs::Model>, infra::errors::Error>,
-    started_at: i64,
-    trace_id: &str,
-) -> bool {
-    let deleter = |org: String, config_id: String| async move {
-        db::scheduler::delete(&org, db::scheduler::TriggerModule::Raman, &config_id)
-            .await
-            .map_err(|e| anyhow::anyhow!(e.to_string()))
-    };
-    let swept = raman_orphan_swept(&trigger.org, &trigger.module_key, config, deleter).await;
-    if let Some(Err(e)) = &swept {
-        // A failed delete re-arms instead, so the lane keeps draining and the sweep retries.
-        log::error!(
-            "[raman] could not delete orphaned trigger {} for org={}: {e}",
-            trigger.module_key,
-            trigger.org
-        );
-    }
-    if !raman_row_is_gone(&swept) {
-        return false;
-    }
-    // `next_run_at` of 0: the row is gone, so it has no next run to report.
-    publish_triggers_usage(raman_trigger_data(
-        trigger,
-        0,
-        None,
-        Some("raman config not found; deleted the orphaned trigger".to_string()),
-        started_at,
-        now_micros(),
-        trace_id,
-    ));
-    true
 }
 
 /// `Waiting`, never `Completed`: the hygiene job is periodic and the row has to be
@@ -7656,6 +7591,7 @@ mod tests {
     /// are the only parts a test can execute: the handler's analysing arm is
     /// `#[cfg(feature = "enterprise")]`, so neither CI runs it.
     mod raman {
+        #[cfg(feature = "enterprise")]
         use std::sync::{Arc, Mutex};
 
         use infra::table::entity::{raman_configs, raman_digests};
@@ -7719,31 +7655,6 @@ mod tests {
                 rule_overrides: None,
                 created_at: Some(NOW),
                 updated_at: Some(NOW),
-            }
-        }
-
-        fn present() -> Result<Option<raman_configs::Model>, infra::errors::Error> {
-            Ok(Some(config(true, 1440, 60)))
-        }
-
-        fn absent() -> Result<Option<raman_configs::Model>, infra::errors::Error> {
-            Ok(None)
-        }
-
-        /// The shape `get_by_id` returns when the metadata store cannot be reached.
-        fn unreadable() -> Result<Option<raman_configs::Model>, infra::errors::Error> {
-            Err(infra::errors::Error::DbError(
-                infra::errors::DbError::SeaORMError("connection refused".to_string()),
-            ))
-        }
-
-        /// Records the deletes dispatched, so a test asserts the removal and not the return.
-        fn deleter(
-            deletes: Arc<Mutex<Vec<(String, String)>>>,
-        ) -> impl FnOnce(String, String) -> std::future::Ready<Result<(), anyhow::Error>> {
-            move |org, config_id| {
-                deletes.lock().unwrap().push((org, config_id));
-                std::future::ready(Ok(()))
             }
         }
 
@@ -7929,87 +7840,6 @@ mod tests {
             .await;
             assert_eq!(window_minutes, Some(43200));
             assert_eq!(error.as_deref(), Some("collector unreachable"));
-        }
-
-        /// A row whose config a read confirmed gone re-armed forever, because nothing deleted it.
-        #[tokio::test]
-        async fn a_trigger_whose_config_is_confirmed_gone_is_deleted_rather_than_re_armed() {
-            let deletes = Arc::new(Mutex::new(Vec::new()));
-            let swept =
-                raman_orphan_swept("default", "cfg1", &absent(), deleter(deletes.clone())).await;
-            assert!(
-                matches!(swept, Some(Ok(()))),
-                "an orphaned trigger was left to re-arm every minute forever"
-            );
-            assert_eq!(
-                *deletes.lock().unwrap(),
-                vec![("default".to_string(), "cfg1".to_string())],
-                "the orphaned row was not the one deleted"
-            );
-        }
-
-        /// The trap: deleting on a transient read error costs a working org its whole schedule.
-        #[tokio::test]
-        async fn a_config_read_that_failed_deletes_nothing_and_leaves_the_row_to_re_arm() {
-            let deletes = Arc::new(Mutex::new(Vec::new()));
-            let swept =
-                raman_orphan_swept("default", "cfg1", &unreadable(), deleter(deletes.clone()))
-                    .await;
-            assert!(
-                swept.is_none(),
-                "a database that was merely unreachable destroyed a live schedule"
-            );
-            assert!(deletes.lock().unwrap().is_empty());
-        }
-
-        #[tokio::test]
-        async fn a_config_that_is_present_is_never_deleted() {
-            let deletes = Arc::new(Mutex::new(Vec::new()));
-            let swept =
-                raman_orphan_swept("default", "cfg1", &present(), deleter(deletes.clone())).await;
-            assert!(swept.is_none(), "a live config had its trigger deleted");
-            assert!(deletes.lock().unwrap().is_empty());
-        }
-
-        /// Reported, not swallowed: a failed delete re-arms so the sweep retries next pass.
-        #[tokio::test]
-        async fn a_delete_that_fails_is_reported_to_the_caller() {
-            let swept = raman_orphan_swept("default", "cfg1", &absent(), |_, _| {
-                std::future::ready(Err(anyhow::anyhow!("scheduler unreachable")))
-            })
-            .await;
-            let Some(Err(e)) = swept else {
-                panic!("a failed delete was reported as a completed sweep");
-            };
-            assert_eq!(e.to_string(), "scheduler unreachable");
-        }
-
-        /// A row the delete failed to remove is still there, so the caller has to re-arm it.
-        #[test]
-        fn only_a_delete_that_succeeded_counts_as_a_removed_row() {
-            assert!(raman_row_is_gone(&Some(Ok(()))));
-            assert!(
-                !raman_row_is_gone(&Some(Err(anyhow::anyhow!("scheduler unreachable")))),
-                "a failed delete was counted as a removed row, stranding it in Processing"
-            );
-            assert!(
-                !raman_row_is_gone(&None),
-                "a row that was never an orphan was counted as removed"
-            );
-        }
-
-        /// Neither arm is reachable from a test, so a source scan is the only parity check.
-        #[test]
-        fn every_arm_of_the_handler_sweeps_its_orphans() {
-            let needle = scannable("raman_orphan_removed(&trigger, &config, started_at, trace_id)");
-            for arm in [OSS_ARM, ENTERPRISE_ARM] {
-                assert_eq!(
-                    handler_arm(arm).matches(&needle).count(),
-                    1,
-                    "the {arm} arm of handle_raman_triggers must sweep an orphaned row \
-                     exactly once"
-                );
-            }
         }
 
         #[test]
