@@ -529,7 +529,7 @@ pub async fn move_workflows(
     ),
     params(
         ("org_id" = String, Path, description = "Organization id"),
-        ("workflow_id" = String, Path, description = "Workflow id"),
+        ("id" = String, Path, description = "Workflow id"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = inline(Object)),
@@ -629,7 +629,7 @@ pub async fn delete_workflows(
     ),
     params(
         ("org_id" = String, Path, description = "Organization id"),
-        ("workflow_id" = String, Path, description = "Workflow id"),
+        ("id" = String, Path, description = "Workflow id"),
     ),
     request_body(content = inline(Object), description = "Workflow data", content_type = "application/json"),
     responses(

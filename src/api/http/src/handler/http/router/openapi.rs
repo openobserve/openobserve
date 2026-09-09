@@ -527,6 +527,9 @@ use crate::{
         (name = "Service Streams", description = "Multi-signal correlation across logs, traces, and metrics (enterprise)"),
         (name = "Synthetics", description = "Synthetic monitoring — uptime and browser checks (enterprise)"),
         (name = "Announcements", description = "Operator-authored announcement banners shown across organizations (enterprise)"),
+        (name = "Anomaly Detection", description = "Anomaly detection configuration, training and detection runs (enterprise)"),
+        (name = "Workflows", description = "Workflow authoring, triggering and run history (enterprise)"),
+        (name = "Raman", description = "Alert hygiene digests and configuration (enterprise)"),
     ),
     info(
         description = "OpenObserve API documents [https://openobserve.ai/docs/](https://openobserve.ai/docs/)",
@@ -587,6 +590,7 @@ pub struct ApiDoc;
     openobserve_api_management::request::anomaly_detection::cancel_training,
     openobserve_api_management::request::anomaly_detection::detect_anomalies,
     openobserve_api_management::request::anomaly_detection::get_detection_history,
+    openobserve_api_management::request::alerts::history::get_all_anomaly_history,
     openobserve_api_management::request::workflows::save_workflow,
     openobserve_api_management::request::workflows::list_workflows,
     openobserve_api_management::request::workflows::delete_workflows,
@@ -754,11 +758,35 @@ mod experiment_tests {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "enterprise")]
+    use std::collections::BTreeSet;
+
     use utoipa::OpenApi;
 
     use super::ApiDoc;
 
-    /// Every route of the four enterprise-gated management modules, as the merged spec spells it.
+    #[cfg(feature = "enterprise")]
+    const ROUTER_SOURCE: &str = include_str!("mod.rs");
+
+    /// Only routes registered here are served; a route defined anywhere else is dead code.
+    #[cfg(feature = "enterprise")]
+    const SERVICE_ROUTES_SIGNATURE: &str = "pub fn service_routes(";
+
+    #[cfg(feature = "enterprise")]
+    const HTTP_METHODS: &[&str] = &[
+        "get", "post", "put", "delete", "patch", "head", "options", "trace",
+    ];
+
+    /// The path prefixes owned by the four enterprise-gated management modules.
+    #[cfg(feature = "enterprise")]
+    const ENTERPRISE_MODULE_PREFIXES: &[&str] = &[
+        "/{org_id}/anomaly_detection",
+        "/{org_id}/workflows",
+        "/{org_id}/tasks",
+        "/v2/{org_id}/raman",
+    ];
+
+    /// Spelled as the merged spec does; the router's own placeholder names differ.
     #[cfg(feature = "enterprise")]
     const ENTERPRISE_MODULE_ROUTES: &[(&str, &str)] = &[
         ("/api/v2/{org_id}/raman/config", "get"),
@@ -768,6 +796,7 @@ mod tests {
         ("/api/v2/{org_id}/raman/digests/{digest_id}", "get"),
         ("/api/{org_id}/anomaly_detection", "get"),
         ("/api/{org_id}/anomaly_detection", "post"),
+        ("/api/{org_id}/anomaly_detection/history", "get"),
         ("/api/{org_id}/anomaly_detection/{anomaly_id}", "get"),
         ("/api/{org_id}/anomaly_detection/{anomaly_id}", "put"),
         ("/api/{org_id}/anomaly_detection/{anomaly_id}", "delete"),
@@ -825,6 +854,125 @@ mod tests {
         ("/api/{org_id}/tasks/{entity_id}/test_run", "post"),
     ];
 
+    #[cfg(feature = "enterprise")]
+    fn service_routes_body() -> &'static str {
+        let start = ROUTER_SOURCE
+            .find(SERVICE_ROUTES_SIGNATURE)
+            .expect("the router must define service_routes()");
+        let after_signature = &ROUTER_SOURCE[start + SERVICE_ROUTES_SIGNATURE.len()..];
+        &after_signature[..after_signature
+            .find("\npub fn ")
+            .unwrap_or(after_signature.len())]
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn strip_comments(source: &str) -> String {
+        let mut without_blocks = String::with_capacity(source.len());
+        let mut rest = source;
+        while let Some(open) = rest.find("/*") {
+            without_blocks.push_str(&rest[..open]);
+            let after_open = &rest[open + 2..];
+            rest = match after_open.find("*/") {
+                Some(close) => &after_open[close + 2..],
+                None => "",
+            };
+        }
+        without_blocks.push_str(rest);
+        without_blocks
+            .lines()
+            .map(|line| line.split_once("//").map_or(line, |(code, _)| code))
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn normalize(source: &str) -> String {
+        source.chars().filter(|c| !c.is_whitespace()).collect()
+    }
+
+    /// Placeholder names never reach the wire, so only their positions can be compared.
+    #[cfg(feature = "enterprise")]
+    fn erase_placeholders(path: &str) -> String {
+        let mut erased = String::with_capacity(path.len());
+        let mut rest = path;
+        while let Some(open) = rest.find('{') {
+            erased.push_str(&rest[..open]);
+            erased.push_str("{}");
+            rest = match rest[open..].find('}') {
+                Some(close) => &rest[open + close + 1..],
+                None => "",
+            };
+        }
+        erased.push_str(rest);
+        erased
+    }
+
+    /// Stops at the `.route(` call's own closing paren, so a chained call is not part of it.
+    #[cfg(feature = "enterprise")]
+    fn balanced_arguments(call: &str) -> Option<&str> {
+        let mut depth = 1usize;
+        for (index, character) in call.char_indices() {
+            match character {
+                '(' => depth += 1,
+                ')' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        return Some(&call[..index]);
+                    }
+                }
+                _ => {}
+            }
+        }
+        None
+    }
+
+    /// `get(` inside a handler path such as `remote_tasks::get_remote_task` is not a verb binding.
+    #[cfg(feature = "enterprise")]
+    fn binds_method(bindings: &str, method: &str) -> bool {
+        let needle = format!("{method}(");
+        let mut searched = 0;
+        while let Some(at) = bindings[searched..].find(&needle) {
+            let start = searched + at;
+            let preceding = bindings[..start].chars().next_back();
+            if !preceding.is_some_and(|c| c.is_alphanumeric() || c == '_' || c == ':') {
+                return true;
+            }
+            searched = start + needle.len();
+        }
+        false
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn registered_module_routes() -> BTreeSet<(String, String)> {
+        let live = normalize(&strip_comments(service_routes_body()));
+        let mut routes = BTreeSet::new();
+        for call in live.split(".route(").skip(1) {
+            let Some(arguments) = balanced_arguments(call) else {
+                continue;
+            };
+            let Some(path) = arguments
+                .strip_prefix('"')
+                .and_then(|rest| rest.split('"').next())
+            else {
+                continue;
+            };
+            if !ENTERPRISE_MODULE_PREFIXES
+                .iter()
+                .any(|prefix| path.starts_with(prefix))
+            {
+                continue;
+            }
+            let bindings = &arguments[path.len() + 2..];
+            for method in HTTP_METHODS {
+                if binds_method(bindings, method) {
+                    let served = erase_placeholders(&format!("/api{path}"));
+                    routes.insert((served, (*method).to_string()));
+                }
+            }
+        }
+        routes
+    }
+
     // Handlers that gained a folder-destination authorization check must
     // advertise the 403 it returns, or clients cannot distinguish it from a bug.
     // The /{org}/anomaly_detection pair is annotated but enterprise-gated, so it
@@ -863,8 +1011,120 @@ mod tests {
         assert!(missing.is_empty(), "{missing:#?}");
     }
 
-    /// These modules reach the spec only via `SecurityAddon`, so the merged doc is the real
-    /// surface.
+    /// A path parameter with no placeholder makes generated clients demand a phantom value.
+    #[test]
+    fn every_declared_path_parameter_appears_in_its_template() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let paths = spec.get("paths").unwrap().as_object().unwrap();
+
+        let mut invalid = Vec::new();
+        for (path, item) in paths {
+            let placeholders: Vec<&str> = path
+                .split('{')
+                .skip(1)
+                .filter_map(|rest| rest.split('}').next())
+                .collect();
+            for (method, operation) in item.as_object().unwrap() {
+                let Some(parameters) = operation.get("parameters").and_then(|p| p.as_array())
+                else {
+                    continue;
+                };
+                for parameter in parameters {
+                    if parameter.get("in").and_then(|i| i.as_str()) != Some("path") {
+                        continue;
+                    }
+                    let name = parameter.get("name").and_then(|n| n.as_str()).unwrap_or("");
+                    if !placeholders.contains(&name) {
+                        invalid.push(format!(
+                            "{method} {path}: declares path parameter `{name}`, which the template \
+                             has no placeholder for"
+                        ));
+                    }
+                }
+            }
+        }
+        assert!(invalid.is_empty(), "{invalid:#?}");
+    }
+
+    /// Every handler in this module answers 403 while the feature switch is off.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn anomaly_detection_documents_the_statuses_its_handlers_return() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let paths = spec.get("paths").unwrap().as_object().unwrap();
+
+        let expected: &[(&str, &str, &[&str])] = &[
+            (
+                "/api/{org_id}/anomaly_detection",
+                "get",
+                &["200", "403", "500"],
+            ),
+            (
+                "/api/{org_id}/anomaly_detection",
+                "post",
+                &["200", "400", "403", "500"],
+            ),
+            (
+                "/api/{org_id}/anomaly_detection/{anomaly_id}",
+                "get",
+                &["200", "403", "404", "500"],
+            ),
+            (
+                "/api/{org_id}/anomaly_detection/{anomaly_id}",
+                "put",
+                &["200", "400", "403", "404", "500"],
+            ),
+            (
+                "/api/{org_id}/anomaly_detection/{anomaly_id}",
+                "delete",
+                &["200", "403", "404", "500"],
+            ),
+            (
+                "/api/{org_id}/anomaly_detection/{anomaly_id}/train",
+                "post",
+                &["200", "403", "404", "500"],
+            ),
+            (
+                "/api/{org_id}/anomaly_detection/{anomaly_id}/train",
+                "delete",
+                &["200", "403", "404", "500"],
+            ),
+            (
+                "/api/{org_id}/anomaly_detection/{anomaly_id}/detect",
+                "post",
+                &["200", "403", "404", "500"],
+            ),
+            (
+                "/api/{org_id}/anomaly_detection/{anomaly_id}/history",
+                "get",
+                &["200", "403", "500"],
+            ),
+        ];
+
+        let mut wrong = Vec::new();
+        for (path, method, statuses) in expected {
+            let Some(operation) = paths.get(*path).and_then(|item| item.get(*method)) else {
+                wrong.push(format!("{method} {path}: absent from the spec"));
+                continue;
+            };
+            let mut documented: Vec<&str> = operation
+                .get("responses")
+                .and_then(|r| r.as_object())
+                .map(|r| r.keys().map(String::as_str).collect())
+                .unwrap_or_default();
+            documented.sort_unstable();
+            let mut returned = statuses.to_vec();
+            returned.sort_unstable();
+            if documented != returned {
+                wrong.push(format!(
+                    "{method} {path}: documents {documented:?}, handler returns {returned:?}"
+                ));
+            }
+        }
+        assert!(wrong.is_empty(), "{wrong:#?}");
+    }
+
+    /// Only `SecurityAddon` merges these modules in, so the merged doc is the real surface.
     #[cfg(feature = "enterprise")]
     #[test]
     fn enterprise_gated_modules_are_published_in_the_openapi_surface() {
@@ -880,12 +1140,70 @@ mod tests {
                 "post" => item.post.is_some(),
                 "put" => item.put.is_some(),
                 "delete" => item.delete.is_some(),
-                other => panic!("{other} is not a method this table covers"),
+                "patch" => item.patch.is_some(),
+                "head" => item.head.is_some(),
+                "options" => item.options.is_some(),
+                "trace" => item.trace.is_some(),
+                other => {
+                    missing.push(format!("{other} {path}: not an HTTP method"));
+                    continue;
+                }
             };
             if !published {
                 missing.push(format!("{method} {path}: path present but method absent"));
             }
         }
         assert!(missing.is_empty(), "{missing:#?}");
+    }
+
+    /// A handler served over HTTP but absent from the spec is the gap this table closes.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn the_route_table_covers_exactly_what_the_router_registers() {
+        let registered = registered_module_routes();
+        assert!(
+            !registered.is_empty(),
+            "the scrape found no routes at all - service_routes() no longer registers these \
+             modules, or the scrape stopped matching it"
+        );
+        let listed: BTreeSet<(String, String)> = ENTERPRISE_MODULE_ROUTES
+            .iter()
+            .map(|(path, method)| (erase_placeholders(path), (*method).to_string()))
+            .collect();
+
+        let unlisted: Vec<_> = registered.difference(&listed).collect();
+        let unregistered: Vec<_> = listed.difference(&registered).collect();
+        assert!(
+            unlisted.is_empty() && unregistered.is_empty(),
+            "served by the router but not published: {unlisted:#?}\n\
+             published but not served by the router: {unregistered:#?}"
+        );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_commented_out_route_is_not_read_as_a_registration() {
+        assert_eq!(strip_comments("a\n// .route(\"/x\", get(h))\nb"), "a\n\nb");
+        assert_eq!(strip_comments("a/* .route(\"/x\") */b"), "ab");
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_chained_call_after_a_route_is_not_read_as_one_of_its_verbs() {
+        let call = normalize("\"/{org_id}/workflows\",get(h)).layer(post(x))");
+        let arguments = balanced_arguments(&call).expect("the route call must close");
+        assert!(binds_method(arguments, "get"));
+        assert!(!binds_method(arguments, "post"));
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_verb_name_inside_a_handler_path_is_not_read_as_a_verb_binding() {
+        assert!(binds_method("get(routes::post(state))", "get"));
+        assert!(!binds_method("get(routes::post(state))", "post"));
+        assert!(!binds_method(
+            "get(remote_tasks::get_remote_task)",
+            "delete"
+        ));
     }
 }

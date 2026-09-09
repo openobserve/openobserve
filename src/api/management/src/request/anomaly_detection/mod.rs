@@ -69,6 +69,7 @@ fn disabled_response() -> Option<Response> {
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = AnomalyConfigListResponse),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = MetaHttpResponse),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = MetaHttpResponse),
     ),
 )]
@@ -103,6 +104,7 @@ pub async fn list_configs(Path(org_id): Path<String>) -> Response {
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = AnomalyConfigResponse),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = MetaHttpResponse),
         (status = 404, description = "Not Found", content_type = "application/json", body = MetaHttpResponse),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = MetaHttpResponse),
     ),
@@ -150,7 +152,7 @@ fn resolve_owner(owner: Option<String>, fallback: &str) -> Option<String> {
         ("org_id" = String, Path, description = "Organization identifier"),
     ),
     responses(
-        (status = 201, description = "Created", content_type = "application/json", body = AnomalyConfigResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = AnomalyConfigResponse),
         (status = 400, description = "Bad Request", content_type = "application/json", body = MetaHttpResponse),
         (status = 403, description = "Forbidden", content_type = "application/json", body = MetaHttpResponse),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = MetaHttpResponse),
@@ -278,6 +280,7 @@ pub async fn update_config(
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = DeleteResponse),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = MetaHttpResponse),
         (status = 404, description = "Not Found", content_type = "application/json", body = MetaHttpResponse),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = MetaHttpResponse),
     ),
@@ -320,6 +323,7 @@ pub async fn delete_config(Path((org_id, anomaly_id)): Path<(String, String)>) -
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = TrainingResponse),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = MetaHttpResponse),
         (status = 404, description = "Not Found", content_type = "application/json", body = MetaHttpResponse),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = MetaHttpResponse),
     ),
@@ -358,6 +362,7 @@ pub async fn train_model(Path((org_id, anomaly_id)): Path<(String, String)>) -> 
     ),
     responses(
         (status = 200, description = "Training cancelled"),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = MetaHttpResponse),
         (status = 404, description = "Not Found", content_type = "application/json", body = MetaHttpResponse),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = MetaHttpResponse),
     ),
@@ -395,6 +400,7 @@ pub async fn cancel_training(Path((org_id, anomaly_id)): Path<(String, String)>)
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = DetectionResponse),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = MetaHttpResponse),
         (status = 404, description = "Not Found", content_type = "application/json", body = MetaHttpResponse),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = MetaHttpResponse),
     ),
@@ -434,6 +440,7 @@ pub async fn detect_anomalies(Path((org_id, anomaly_id)): Path<(String, String)>
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = DetectionHistoryResponse),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = MetaHttpResponse),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = MetaHttpResponse),
     ),
 )]
