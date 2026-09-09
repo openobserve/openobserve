@@ -30,7 +30,13 @@ import { getUUID } from "@/utils/uuid";
 
 type CheckVariable = NonNullable<BrowserCheck["variables"]>[number];
 
-const props = defineProps<{ check: BrowserCheck }>();
+const props = defineProps<{
+  check: BrowserCheck;
+  /** Referenced checks' steps, keyed by check id — same cache the replay reads
+   *  (§5.2). Absent means none have loaded yet, so a subtest step contributes
+   *  nothing to the count rather than reading as "0 usages" being wrong. */
+  childJourneys?: Map<string, { steps: BrowserStep[] }>;
+}>();
 const emit = defineEmits<{ "update:check": [value: BrowserCheck] }>();
 
 const { t } = useI18nTyped();
@@ -46,11 +52,21 @@ function stepUsesToken(step: BrowserStep, token: string): boolean {
   );
 }
 
+/** A subtest step runs no action of its own — usage inside it lives on the
+ *  referenced check's steps, not the reference row. */
+function stepsToScan(): BrowserStep[] {
+  return props.check.journey.flatMap((step) =>
+    step.action === "subtest"
+      ? (props.childJourneys?.get(step.subtest?.id ?? "")?.steps ?? [])
+      : [step],
+  );
+}
+
 function usageCount(name: string): number {
   const trimmed = name.trim();
   if (!trimmed) return 0;
   const token = `{{${trimmed}}}`;
-  return props.check.journey.filter((step) => stepUsesToken(step, token)).length;
+  return stepsToScan().filter((step) => stepUsesToken(step, token)).length;
 }
 
 const usageCounts = computed(() => variables.value.map((v) => usageCount(v.name)));
@@ -380,7 +396,7 @@ onBeforeUnmount(() => {
                 :variant="usageCounts[index] ? 'primary-soft' : 'default-soft'"
                 size="sm"
                 class="ms-1"
-                :data-test="`synthetics-check-variables-panel-usage-${index}-badge`"
+                :data-test="`synthetics-variable-usage-${index}`"
               >
                 {{ usageCounts[index] }}
                 <OTooltip :content="usageText(usageCounts[index] ?? 0)" side="top" />

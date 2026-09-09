@@ -45,6 +45,7 @@ const OTableStub = {
           <slot name="cell-lastCheck" :row="row" />
           <slot name="cell-method" :row="row" />
           <slot name="cell-steps" :row="row" />
+          <slot name="cell-referencedBy" :row="row" />
           <slot name="cell-assertions" :row="row" />
           <slot name="cell-folder_name" :row="row" />
           <slot name="cell-actions" :row="row" />
@@ -237,6 +238,7 @@ describe("MonitorTable", () => {
         "name",
         "url",
         "steps",
+        "referencedBy",
         "history",
         "responseTime",
         "uptime",
@@ -631,6 +633,41 @@ describe("MonitorTable", () => {
       expect(duplicateBtn.exists()).toBe(true);
       const moreBtn = wrapper.find('[data-test="monitor-table-more-btn"]');
       expect(moreBtn.exists()).toBe(true);
+    });
+  });
+
+  // ── Steps / Used-by cells (browser mode) ──────────────────────────────
+  // Task 15 / §5's list columns: `steps` is the server's EXPANDED count and
+  // `referencedBy` how many other checks use this one as a subtest.
+  describe("steps and used-by cells", () => {
+    it("renders the expanded step count and the used-by count in browser mode", () => {
+      wrapper = mountMonitorTable({
+        mode: "browser",
+        data: [{ id: "a", name: "checkout", steps: 16, referencedBy: 3 }],
+      });
+      expect(wrapper.find('[data-test="monitor-table-cell-steps"]').text()).toContain("16");
+      expect(wrapper.find('[data-test="monitor-table-cell-referencedBy"]').text()).toContain("3");
+    });
+
+    it("renders a dash for a check nothing references", () => {
+      wrapper = mountMonitorTable({
+        mode: "browser",
+        data: [{ id: "a", name: "login", steps: 13, referencedBy: 0 }],
+      });
+      expect(wrapper.find('[data-test="monitor-table-cell-referencedBy"]').text()).toBe("—");
+    });
+
+    // A journey that could not be read is not the same as a check with zero
+    // steps — null must not render as "0" or "NaN".
+    it("renders a dash, not 0, for a null steps count", () => {
+      wrapper = mountMonitorTable({
+        mode: "browser",
+        data: [{ id: "a", name: "unreadable", steps: null, referencedBy: 0 }],
+      });
+      const cell = wrapper.find('[data-test="monitor-table-cell-steps"]').text();
+      expect(cell).toBe("—");
+      expect(cell).not.toContain("0");
+      expect(cell).not.toContain("NaN");
     });
   });
 

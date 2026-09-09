@@ -531,6 +531,45 @@ const executedStepCount = computed(() => {
 });
 
 /**
+ * The set of referenced-check ids the journey currently names, as a stable
+ * string — so the watcher below only re-fetches when that SET actually
+ * changes, not on every unrelated journey edit.
+ */
+const subtestIdsSignature = computed(() =>
+  [
+    ...new Set(
+      check.value.journey.filter((s) => s.action === "subtest").map((s) => s.subtest?.id ?? ""),
+    ),
+  ]
+    .filter(Boolean)
+    .sort()
+    .join(","),
+);
+
+/**
+ * Loads referenced checks into `childrenCache` as soon as they are named,
+ * rather than waiting for `runReplay` (§7.3) — which is too late for the
+ * variables usage count, the insertion warning's step count and the
+ * reference row's preview, all of which render before any replay runs.
+ * Fires once for the check as it loads (edit mode) and again whenever a
+ * subtest step is added or removed. A failed fetch is logged, not fatal: the
+ * affected surfaces fall back on their own (usage count 0, delta-only
+ * warning, preview unavailable).
+ */
+watch(
+  subtestIdsSignature,
+  async () => {
+    try {
+      const loaded = await loadChildren(check.value.journey, fetchChildJourney);
+      for (const [id, child] of loaded) childrenCache.value.set(id, child);
+    } catch (err) {
+      console.error("[synthetics] failed to load referenced check(s)", err);
+    }
+  },
+  { immediate: true },
+);
+
+/**
  * Reconcile the selected folder against the folders this org actually has.
  *
  * `check.folder` arrives from `?folder=` (New Monitor opened inside a folder)
@@ -804,6 +843,7 @@ async function persist(): Promise<boolean> {
       toast({ variant: "warning", message: t("synthetics.newCheck.notFoundInOrg") });
       return false;
     }
+    if (mapCompositionSaveError(err)) return false;
     toast({
       variant: "error",
       message: err?.response?.data?.message || t("synthetics.newCheck.saveFailed"),
@@ -813,6 +853,49 @@ async function persist(): Promise<boolean> {
   } finally {
     isSaving.value = false;
   }
+}
+
+/**
+ * The editor's zod schema validates the AUTHORED journey; the server rejects a
+ * composition failure with an index into the EXPANDED one, which the zod path
+ * mapper (`applyStepFieldErrors` in BrowserJourney.vue) cannot resolve back to
+ * an authored row. So this does not try to map the index: it scans the
+ * server's message for a referenced child's name and attaches the failure to
+ * that reference row instead, falling back to a plain toast when no name
+ * matches. Returns whether the error was a composition failure at all.
+ */
+function mapCompositionSaveError(err: any): boolean {
+  const message: string = err?.response?.data?.message ?? "";
+  if (
+    err?.response?.status !== 400 ||
+    !(
+      message.startsWith("validation: config.steps") ||
+      message.startsWith("validation: expanded journey")
+    )
+  ) {
+    return false;
+  }
+  const matched = check.value.journey.find((step) => {
+    if (step.action !== "subtest") return false;
+    const name = step.subtest?.name || childrenCache.value.get(step.subtest?.id ?? "")?.name;
+    return !!name && message.includes(name);
+  });
+  if (matched) {
+    const idx = check.value.journey.indexOf(matched);
+    journeyFieldIssues.value = [{ path: ["journey", idx], message }];
+    toast({
+      variant: "error",
+      message: t("synthetics.validation.compositionChildFailed", {
+        name: matched.subtest?.name || matched.name || "",
+      }),
+    });
+  } else {
+    toast({
+      variant: "error",
+      message: message ? raw(message) : t("synthetics.newCheck.saveFailed"),
+    });
+  }
+  return true;
 }
 
 // ── Selection state (synced from BrowserJourney) ───────────────────────────
@@ -842,17 +925,76 @@ function onContinueToConfigure() {
   currentStep.value = 2;
 }
 
+// ── Usage confirmation (§5.3) ────────────────────────────────────────────
+// Saving a check that other checks reference as a subtest changes what THEY
+// run too, on their next fire — the author should see that before it happens,
+// not discover it from an unrelated check's next run.
+interface UsedByReference {
+  id: string;
+  name: string;
+  folder_id: string;
+}
+const usedByInfo = ref<{ references: UsedByReference[]; hidden: number } | null>(null);
+const usedByDialogOpen = computed({
+  get: () => usedByInfo.value !== null,
+  set: (open: boolean) => {
+    if (!open) {
+      usedByInfo.value = null;
+      pendingSaveAction = null;
+    }
+  },
+});
+let pendingSaveAction: (() => Promise<void>) | null = null;
+
+/**
+ * Runs `afterPersist` directly in create mode or when nothing references this
+ * check. Otherwise holds it behind the confirmation dialog. A failed
+ * `referencedBy` lookup must not block the save — it is logged and the save
+ * proceeds as if nothing was referencing it.
+ */
+async function checkUsageThenSave(afterPersist: () => Promise<void>) {
+  if (!check.value.id) {
+    await afterPersist();
+    return;
+  }
+  try {
+    const org = store.state.selectedOrganization.identifier;
+    const res = await syntheticsService.referencedBy(org, check.value.id);
+    const references = (res.data?.references ?? []) as UsedByReference[];
+    const hidden = res.data?.hidden_reference_count ?? 0;
+    if (references.length + hidden > 0) {
+      usedByInfo.value = { references, hidden };
+      pendingSaveAction = afterPersist;
+      return;
+    }
+  } catch (err) {
+    console.error("[synthetics] referencedBy check failed", err);
+  }
+  await afterPersist();
+}
+
+async function confirmUsedBySave() {
+  const action = pendingSaveAction;
+  usedByInfo.value = null;
+  pendingSaveAction = null;
+  if (action) await action();
+}
+
 /** Edit mode, Journey step: persist, then move on to Configure. */
 async function onSaveAndContinue() {
-  if (!(await persist())) return;
-  journeyStepDone.value = true;
-  currentStep.value = 2;
+  await checkUsageThenSave(async () => {
+    if (!(await persist())) return;
+    journeyStepDone.value = true;
+    currentStep.value = 2;
+  });
 }
 
 /** Persist, then return to the checks list. */
 async function onSaveAndExit() {
-  if (!(await persist())) return;
-  router.push(backTo.value);
+  await checkUsageThenSave(async () => {
+    if (!(await persist())) return;
+    router.push(backTo.value);
+  });
 }
 
 // ── Replay — uses the composable's phase-based state machine ────────────────
@@ -1211,6 +1353,7 @@ function onClearResults() {
                 <CheckVariablesPanel
                   v-if="variablesPanelOpen"
                   :check="check"
+                  :child-journeys="childrenCache"
                   class="border-border-default border-t"
                   @update:check="onConfigureUpdate"
                 />
@@ -1383,6 +1526,36 @@ function onClearResults() {
         </ODialog>
       </div>
     </template>
+
+    <!-- Usage confirmation (§5.3) — other checks reference this one, so
+         saving changes what they run too, on their next fire. -->
+    <ODialog
+      v-model:open="usedByDialogOpen"
+      size="sm"
+      :title="
+        t('synthetics.save.usedByTitle', {
+          name: check.name,
+          count: (usedByInfo?.references.length ?? 0) + (usedByInfo?.hidden ?? 0),
+        })
+      "
+      :primary-button-label="t('common.save')"
+      :secondary-button-label="t('common.cancel')"
+      data-test="synthetics-create-used-by-dialog"
+      @click:primary="confirmUsedBySave"
+      @click:secondary="usedByDialogOpen = false"
+    >
+      <div class="flex flex-col gap-3 py-1">
+        <ul class="m-0 flex list-none flex-col gap-1 p-0">
+          <li v-for="ref in usedByInfo?.references ?? []" :key="ref.id">
+            <span class="text-sm">{{ ref.name }}</span>
+          </li>
+        </ul>
+        <p v-if="(usedByInfo?.hidden ?? 0) > 0" class="text-text-secondary m-0 text-xs">
+          {{ t("synthetics.delete.hiddenReferences", { count: usedByInfo?.hidden ?? 0 }) }}
+        </p>
+        <p class="m-0">{{ t("synthetics.save.usedByBody") }}</p>
+      </div>
+    </ODialog>
 
     <!-- Unsaved changes dialog (route leave) — rendered at top level so it's
        available in ALL phases (gate, extension-setup, editor), not just editor. -->

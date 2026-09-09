@@ -430,8 +430,8 @@ describe("CheckVariablesPanel", () => {
     it("should count steps referencing the exact {{name}} token", () => {
       wrapper = mountPanel({ check: checkWith([varBaseUrl, varToken], journey) });
 
-      expect(wrapper.find(sel("-usage-0-badge")).text()).toBe("2");
-      expect(wrapper.find(sel("-usage-1-badge")).text()).toBe("1");
+      expect(wrapper.find('[data-test="synthetics-variable-usage-0"]').text()).toBe("2");
+      expect(wrapper.find('[data-test="synthetics-variable-usage-1"]').text()).toBe("1");
     });
 
     it("should show 0 for a variable that is not referenced, even by a superstring token", () => {
@@ -439,7 +439,47 @@ describe("CheckVariablesPanel", () => {
       const varBase = { id: "var-c", name: "BASE", value: "x", secure: false, example: "" };
       wrapper = mountPanel({ check: checkWith([varBase], journey) });
 
-      expect(wrapper.find(sel("-usage-0-badge")).text()).toBe("0");
+      expect(wrapper.find('[data-test="synthetics-variable-usage-0"]').text()).toBe("0");
+    });
+  });
+
+  // ── Composed usage (subtest references) ──────────────────────────────────
+  // Task 15 / §5.2: a subtest step runs no action of its own, so a variable used
+  // only inside the REFERENCED check's steps must still count. Note on the
+  // fixture: "type" is a live StepAction (only scroll/wait/screenshot are
+  // RETIRED_ACTIONS) — used deliberately, not "click", so this fixture also
+  // exercises stepUsesToken's value-matching path on a composed step.
+  describe("composed usage", () => {
+    const composedCheck: BrowserCheck = checkWith(
+      [{ id: "var-pw", name: "PASSWORD", value: "", secure: true, example: "" }],
+      [
+        { id: "s1", action: "navigate", value: "https://x" },
+        { id: "s2", action: "subtest", name: "Login", subtest: { id: "login-test" } },
+      ],
+    );
+    const children = new Map<string, { steps: BrowserStep[] }>([
+      ["login-test", { steps: [{ id: "c1", action: "type", name: "pw", value: "{{PASSWORD}}" }] }],
+    ]);
+
+    it("counts a variable used only inside a referenced check", () => {
+      wrapper = mountPanel({ check: composedCheck, childJourneys: children });
+
+      const cell = wrapper.find('[data-test="synthetics-variable-usage-0"]');
+      expect(cell.exists()).toBe(true);
+      expect(cell.text()).toBe("1");
+    });
+
+    // Pins the "load children on mount, not at replay" fix: with no children
+    // cache supplied, the count must read exactly 0 — asserted with `toBe`
+    // rather than `not.toContain("1")`, which the component satisfies in BOTH
+    // the correct and the (previously shipped) always-0 state and so pins
+    // nothing on its own.
+    it("reads as unreferenced when the child journeys have not been loaded", () => {
+      wrapper = mountPanel({ check: composedCheck });
+
+      const cell = wrapper.find('[data-test="synthetics-variable-usage-0"]');
+      expect(cell.exists()).toBe(true);
+      expect(cell.text()).toBe("0");
     });
   });
 

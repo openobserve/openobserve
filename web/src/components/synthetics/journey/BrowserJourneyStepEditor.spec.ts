@@ -615,6 +615,27 @@ describe("BrowserJourneyStepEditor subtest action", () => {
     expect((w2.emitted("update:step")!.at(-1)![0] as BrowserStep).subtest).toBeUndefined();
   });
 
+  // Task 15: the picker's feature gate. Both halves matter — without the ON
+  // case this test would pass trivially against pre-gate code, where the
+  // option is always offered, so the OFF-only assertion could not fail for
+  // the reason claimed.
+  it.each([
+    [true, true],
+    [false, false],
+  ])(
+    "offers the subtest action only when composition is enabled (flag=%s)",
+    async (flag, expected) => {
+      store.state.zoConfig.synthetics_composition_enabled = flag;
+      const w = render({ action: "click" });
+      const values = w
+        .findComponent(OSelect)
+        .props("options")
+        .map((o: { value: string }) => o.value);
+      expect(values.includes("subtest")).toBe(expected);
+      store.state.zoConfig.synthetics_composition_enabled = true;
+    },
+  );
+
   it("renders the subtest picker only for a subtest step, in place of the target/value/advanced blocks", () => {
     const w = render({ action: "subtest", subtest: { id: "login-test" } });
     expect(w.find(test("synthetics-journey-step-subtest-picker")).exists()).toBe(true);

@@ -16,6 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
 import type { BrowserStep, SettleResponse, StepAssertion, StepLocator } from "@/types/synthetics";
 import {
@@ -84,6 +85,7 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
+const store = useStore();
 
 /**
  * Apply an edit and keep the recorded wire step in sync.
@@ -143,7 +145,13 @@ const effectiveLocator = computed<StepLocator>(() => props.step.locator ?? { can
 
 // Built inside a computed so the option wording follows the active locale
 // rather than freezing at whatever was loaded when the module first evaluated.
-const actionSelectOptions = computed(() => actionOptions(t));
+// `subtest` is filtered out while composition is off — same `=== true` stance
+// the route guards take with `=== false`: an unknown flag hides the option.
+const actionSelectOptions = computed(() =>
+  actionOptions(t).filter(
+    (o) => o.value !== "subtest" || store?.state?.zoConfig?.synthetics_composition_enabled === true,
+  ),
+);
 
 const showValue = computed(() => VALUE_ACTIONS.includes(props.step.action));
 const valueLabel = computed(() => {
