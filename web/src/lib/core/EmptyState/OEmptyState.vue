@@ -51,11 +51,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :style="dotGridStyle"
     />
 
-    <!-- w-full/max-w-full: without it the stack sizes to its widest child (the
-         no-wrap action-card row) and overflows the viewport on phones. -->
+    <!-- max-w-full: the stack otherwise sizes to its widest child (the no-wrap action-card row). -->
     <div
       :class="[
-        'relative flex w-full max-w-full flex-col items-center text-center',
+        'relative flex w-full max-w-full min-w-0 flex-col items-center text-center',
         sizeClass.stack,
       ]"
     >

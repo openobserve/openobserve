@@ -725,6 +725,7 @@ describe("MainLayout Methods and Functions", () => {
     it("should have correct language list", () => {
       const langList = [
         { code: "en-us", label: "English" },
+        { code: "ar", label: "العربية" },
         { code: "tr-turk", label: "Türkçe" },
         { code: "zh-cn", label: "简体中文" },
         { code: "zh-tw", label: "繁體中文" },
@@ -741,7 +742,7 @@ describe("MainLayout Methods and Functions", () => {
         { code: "vi", label: "Tiếng Việt" },
       ];
 
-      expect(langList).toHaveLength(15);
+      expect(langList).toHaveLength(16);
       expect(langList[0].code).toBe("en-us");
       expect(langList[0].label).toBe("English");
     });
