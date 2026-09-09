@@ -134,20 +134,8 @@ impl Engine {
                 let return_bool = expr.return_bool();
                 let op = expr.op.is_comparison_operator();
 
-                // This is a very special case, as we treat the float also a
-                // `Value::Matrix(vec![element])` therefore, better convert it
-                // back to its representation.
-                // only a scalar-typed right side folds; a one-sample vector still matches by labels
-                let rhs = match rhs {
-                    Value::Matrix(m)
-                        if expr.rhs.value_type() == ValueType::Scalar
-                            && m.len() == 1
-                            && m[0].samples.len() == 1 =>
-                    {
-                        Value::Float(m[0].samples[0].value)
-                    }
-                    _ => rhs,
-                };
+                let lhs = scalar_operand(lhs, &expr.lhs);
+                let rhs = scalar_operand(rhs, &expr.rhs);
                 match (lhs, rhs) {
                     (Value::Float(left), Value::Float(right)) => {
                         let value = binaries::scalar_binary_operations(
@@ -237,6 +225,21 @@ impl Engine {
                 )));
             }
         })
+    }
+}
+
+/// Folds a scalar-typed operand evaluated as a one-sample series back into a scalar.
+fn scalar_operand(value: Value, expr: &PromExpr) -> Value {
+    // a one-sample vector is not a scalar: it keeps its labels for matching
+    match value {
+        Value::Matrix(m)
+            if expr.value_type() == ValueType::Scalar
+                && m.len() == 1
+                && m[0].samples.len() == 1 =>
+        {
+            Value::Float(m[0].samples[0].value)
+        }
+        other => other,
     }
 }
 
@@ -695,8 +698,18 @@ pub(crate) mod tests {
         assert_eq!(series.iter().map(|s| s.samples.len()).sum::<usize>(), 4);
     }
 
+    fn single_value(value: Value) -> f64 {
+        match value {
+            Value::Float(f) => f,
+            Value::Matrix(series) if series.len() == 1 && series[0].samples.len() == 1 => {
+                series[0].samples[0].value
+            }
+            other => panic!("expected one value, got {:?}", other.get_type()),
+        }
+    }
+
     #[tokio::test]
-    async fn test_only_a_scalar_typed_right_side_folds_into_a_scalar() {
+    async fn test_scalar_typed_operands_fold_on_either_side() {
         // a one-sample vector keeps label matching: the sum exists at that one step only
         let series = matrix(
             eval_on_empty("vector(1) + (timestamp(vector(1)) >= 1640995320)", 3)
@@ -707,14 +720,18 @@ pub(crate) mod tests {
         assert_eq!(series[0].samples.len(), 1);
         assert_eq!(series[0].samples[0].value, 1640995321.0);
 
-        // a scalar-typed right side still applies to every step
-        let series = matrix(
-            eval_on_empty("vector(1) + scalar(vector(2))", 1)
-                .await
-                .unwrap(),
-        );
-        assert_eq!(series.len(), 1);
-        assert_eq!(series[0].samples[0].value, 3.0);
+        // a scalar-typed side folds whichever side it is on, even against a labelled vector
+        let labelled = r#"label_replace(vector(2), "job", "x", "", "")"#;
+        for query in [
+            "vector(1) + scalar(vector(2))".to_string(),
+            format!("scalar(vector(1)) + {labelled}"),
+            format!("sum(scalar(vector(1)) + {labelled})"),
+            format!("{labelled} + scalar(vector(1))"),
+            "scalar(vector(1)) + scalar(vector(2))".to_string(),
+        ] {
+            let value = eval_on_empty(&query, 1).await.unwrap();
+            assert_eq!(single_value(value), 3.0, "{query}");
+        }
     }
 
     #[tokio::test]
