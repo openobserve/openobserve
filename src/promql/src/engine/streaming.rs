@@ -38,7 +38,7 @@ use super::{
 };
 use crate::{
     functions, fused, micros,
-    series_stream::merge::{StreamingSelector, series_label_columns, shard_sources},
+    series_stream::merge::{MergeSeriesStream, StreamingSelector, series_label_columns},
 };
 
 /// What scanning a selector takes: the normalized selector, its offset and label set, the
@@ -128,7 +128,7 @@ impl Engine {
             let selector = scan.streaming_selector();
             let eval = Arc::new(fused::SeriesEval::new(func.clone(), range, &self.eval_ctx));
             let run = async {
-                match shard_sources(
+                match MergeSeriesStream::shards(
                     ctx,
                     schema,
                     &selector,

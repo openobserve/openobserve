@@ -76,6 +76,52 @@ pub(crate) struct MergeSeriesStream {
 }
 
 impl MergeSeriesStream {
+    /// One source per shard over the selector's hash-sorted table, projected to the sample columns
+    /// plus `label_cols`; `None` when the layout cannot stream in order.
+    pub(crate) async fn shards(
+        ctx: &SessionContext,
+        schema: &Schema,
+        selector: &StreamingSelector<'_>,
+        label_cols: Vec<String>,
+        lookback: i64,
+        eval_ctx: &EvalContext,
+    ) -> Result<Option<Vec<impl Future<Output = Result<MergeSeriesStream>> + Send + 'static>>> {
+        if schema
+            .field_with_name(HASH_LABEL)
+            .is_ok_and(|field| field.data_type() != &DataType::UInt64)
+        {
+            return Ok(None);
+        }
+        let sorted_table = format!("{}{HASH_SORTED_TABLE_SUFFIX}", selector.table_name);
+        let Ok(df) = ctx.table(sorted_table.as_str()).await else {
+            return Ok(None);
+        };
+        let df = apply_time_window(
+            df,
+            eval_ctx.start - selector.offset,
+            eval_ctx.end - selector.offset,
+            eval_ctx.step,
+            lookback,
+        )?;
+        let df = apply_matchers(df, selector.matchers)?;
+        let mut columns = vec![TIMESTAMP_COL_NAME, HASH_LABEL, VALUE_LABEL];
+        columns.extend(label_cols.iter().map(String::as_str));
+        let shards = ctx.state().config().target_partitions();
+        let Some(shard_inputs) =
+            build_shard_inputs(&df, &columns, shards, &eval_ctx.trace_id).await?
+        else {
+            return Ok(None);
+        };
+        let label_cols = Arc::new(label_cols);
+        let offset = selector.offset;
+        Ok(Some(
+            shard_inputs
+                .into_iter()
+                .map(|streams| MergeSeriesStream::start(streams, label_cols.clone(), offset))
+                .collect(),
+        ))
+    }
+
     pub(crate) async fn start(
         streams: Vec<SendableRecordBatchStream>,
         group_cols: Arc<Vec<String>>,
@@ -241,51 +287,6 @@ impl ChainCursor {
         }
         Ok(())
     }
-}
-
-/// One series stream per shard over the selector's hash-sorted table, projected to the sample
-/// columns plus `label_cols`; `None` when the layout cannot stream in order.
-pub(crate) async fn shard_sources(
-    ctx: &SessionContext,
-    schema: &Schema,
-    selector: &StreamingSelector<'_>,
-    label_cols: Vec<String>,
-    lookback: i64,
-    eval_ctx: &EvalContext,
-) -> Result<Option<Vec<impl Future<Output = Result<MergeSeriesStream>> + Send + 'static>>> {
-    if schema
-        .field_with_name(HASH_LABEL)
-        .is_ok_and(|field| field.data_type() != &DataType::UInt64)
-    {
-        return Ok(None);
-    }
-    let sorted_table = format!("{}{HASH_SORTED_TABLE_SUFFIX}", selector.table_name);
-    let Ok(df) = ctx.table(sorted_table.as_str()).await else {
-        return Ok(None);
-    };
-    let df = apply_time_window(
-        df,
-        eval_ctx.start - selector.offset,
-        eval_ctx.end - selector.offset,
-        eval_ctx.step,
-        lookback,
-    )?;
-    let df = apply_matchers(df, selector.matchers)?;
-    let mut columns = vec![TIMESTAMP_COL_NAME, HASH_LABEL, VALUE_LABEL];
-    columns.extend(label_cols.iter().map(String::as_str));
-    let shards = ctx.state().config().target_partitions();
-    let Some(shard_inputs) = build_shard_inputs(&df, &columns, shards, &eval_ctx.trace_id).await?
-    else {
-        return Ok(None);
-    };
-    let label_cols = Arc::new(label_cols);
-    let offset = selector.offset;
-    Ok(Some(
-        shard_inputs
-            .into_iter()
-            .map(|streams| MergeSeriesStream::start(streams, label_cols.clone(), offset))
-            .collect(),
-    ))
 }
 
 /// The label columns an emitted series carries, in the sorted order the materializing loader

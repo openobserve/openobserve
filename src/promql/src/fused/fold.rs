@@ -13,8 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! The single fused fold: every series stream partition folds its series into
-//! per-group accumulators, and the partitions merge in order at the end. The
+//! The single fused fold: every series stream folds its series into per-group
+//! accumulators, and the sources merge in order at the end. The
 //! producers only decide how series arrive; the aggregation lives here once.
 
 use std::{sync::Arc, time::Duration};
@@ -90,7 +90,7 @@ impl SeriesEval {
     }
 }
 
-/// Folds all partitions concurrently and merges their groups; each source opens inside its own
+/// Folds all sources concurrently and merges their groups; each source opens inside its own
 /// task, and dropping the future aborts them all.
 pub(super) async fn fold_sources<F, S>(
     sources: Vec<F>,
@@ -105,10 +105,10 @@ where
         .into_iter()
         .map(|source| {
             let eval = eval.clone();
-            async move { fold_partition(source.await?, op, eval).await }
+            async move { fold_source(source.await?, op, eval).await }
         })
         .collect();
-    let folds = run_partitions(folds).await?;
+    let folds = run(folds).await?;
     let series_count = folds.iter().map(|(_, series)| series).sum();
     let value = merge_folds(
         folds.into_iter().map(|(groups, _)| groups).collect(),
@@ -117,8 +117,8 @@ where
     Ok((value, series_count))
 }
 
-/// Maps every partition's series through the function and returns them whole, in partition
-/// order; dropping the future aborts the partitions.
+/// Maps every source's series through the function and returns them whole, in source order;
+/// dropping the future aborts the sources.
 pub(crate) async fn map_sources<F, S>(
     sources: Vec<F>,
     eval: Arc<SeriesEval>,
@@ -138,10 +138,10 @@ where
         .into_iter()
         .map(|source| {
             let eval = eval.clone();
-            async move { map_partition(source.await?, eval).await }
+            async move { map_source(source.await?, eval).await }
         })
         .collect();
-    let parts = run_partitions(parts).await?;
+    let parts = run(parts).await?;
     let series_count: usize = parts.iter().map(|(_, series)| series).sum();
     let series: Vec<RangeValue> = parts.into_iter().flat_map(|(series, _)| series).collect();
     log::info!(
@@ -152,8 +152,8 @@ where
     Ok((series, series_count))
 }
 
-/// Maps one partition's series; like the generic evaluator, a series with no value is dropped.
-async fn map_partition<S: SeriesStream>(
+/// Maps one source's series; like the generic evaluator, a series with no value is dropped.
+async fn map_source<S: SeriesStream>(
     mut source: S,
     eval: Arc<SeriesEval>,
 ) -> Result<(Vec<RangeValue>, usize)> {
@@ -180,8 +180,8 @@ async fn map_partition<S: SeriesStream>(
     Ok((series, series_count))
 }
 
-/// Folds one partition's series into its group accumulators, dropping each as it goes.
-async fn fold_partition<S: SeriesStream>(
+/// Folds one source's series into its group accumulators, dropping each as it goes.
+async fn fold_source<S: SeriesStream>(
     mut source: S,
     op: FusedAggOp,
     eval: Arc<SeriesEval>,
@@ -205,8 +205,8 @@ async fn fold_partition<S: SeriesStream>(
     Ok((groups, series_count))
 }
 
-/// The first failed partition fails the whole; dropping the set aborts the rest.
-async fn run_partitions<T, Fut>(parts: Vec<Fut>) -> Result<Vec<T>>
+/// The first failed source fails the whole; dropping the set aborts the rest.
+async fn run<T, Fut>(parts: Vec<Fut>) -> Result<Vec<T>>
 where
     T: Send + 'static,
     Fut: Future<Output = Result<T>> + Send + 'static,
@@ -216,18 +216,18 @@ where
     for (index, part) in parts.into_iter().enumerate() {
         tasks.spawn(async move { (index, part.await) });
     }
-    // partitions finish in any order; the merge needs them in partition order
+    // sources finish in any order; the merge needs them in source order
     while let Some(joined) = tasks.join_next().await {
         let (index, part) = joined.map_err(|e| DataFusionError::Execution(e.to_string()))?;
         results[index] = Some(part?);
     }
     Ok(results
         .into_iter()
-        .map(|part| part.expect("every partition joined"))
+        .map(|part| part.expect("every source joined"))
         .collect())
 }
 
-/// Merges the partition groups in partition order; groups without output are dropped like the
+/// Merges the source groups in source order; groups without output are dropped like the
 /// generic path.
 fn merge_folds(folds: Vec<GroupAccs>, timestamps: &[i64]) -> Value {
     let mut folds = folds.into_iter();
@@ -286,7 +286,7 @@ mod tests {
 
     impl SeriesStream for FailingStream {
         async fn advance(&mut self) -> Result<Option<u64>> {
-            Err(DataFusionError::Execution("partition failed".into()))
+            Err(DataFusionError::Execution("source failed".into()))
         }
         fn labels(&mut self) -> Labels {
             Labels::default()
@@ -336,17 +336,17 @@ mod tests {
         };
         let failing = FailingStream;
         let folds = vec![
-            Box::pin(fold_partition(endless, FusedAggOp::Sum, eval.clone()))
+            Box::pin(fold_source(endless, FusedAggOp::Sum, eval.clone()))
                 as std::pin::Pin<Box<dyn Future<Output = Result<(GroupAccs, usize)>> + Send>>,
-            Box::pin(fold_partition(failing, FusedAggOp::Sum, eval)),
+            Box::pin(fold_source(failing, FusedAggOp::Sum, eval)),
         ];
 
         let start = std::time::Instant::now();
-        let result = run_partitions(folds).await;
-        assert!(result.is_err(), "the failed partition must fail the fold");
+        let result = run(folds).await;
+        assert!(result.is_err(), "the failed source must fail the fold");
         assert!(
             start.elapsed() < Duration::from_secs(5),
-            "must not wait for the endless partition"
+            "must not wait for the endless source"
         );
 
         // the aborted task drops its source at its next yield point
@@ -356,6 +356,6 @@ mod tests {
             }
             tokio::time::sleep(Duration::from_millis(20)).await;
         }
-        panic!("the endless partition was not aborted");
+        panic!("the endless source was not aborted");
     }
 }

@@ -35,7 +35,7 @@ use crate::{
     functions::{KEEP_METRIC_NAME_FUNC, RangeFunc},
     fused::FusedAggOp,
     micros,
-    series_stream::merge::{StreamingSelector, shard_sources},
+    series_stream::merge::{MergeSeriesStream, StreamingSelector},
 };
 
 /// The `agg(range_func(...))` pair being evaluated.
@@ -63,7 +63,7 @@ pub(crate) async fn fused_agg(
     };
     let lookback = micros(shape.range);
     let Some(sources) =
-        shard_sources(ctx, schema, &selector, group_cols, lookback, eval_ctx).await?
+        MergeSeriesStream::shards(ctx, schema, &selector, group_cols, lookback, eval_ctx).await?
     else {
         return Ok(None);
     };
@@ -428,7 +428,7 @@ mod tests {
                 offset: 0,
             };
             let label_cols = series_label_columns(&arrow_schema(), &all_labels, func_name);
-            let sources = shard_sources(
+            let sources = MergeSeriesStream::shards(
                 &ctx,
                 &arrow_schema(),
                 &selector,
