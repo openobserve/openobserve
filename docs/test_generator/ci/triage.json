@@ -1,0 +1,27 @@
+{
+  "feature_slug": "trial-expiry-settings",
+  "feature_title": "Expired Trial Settings Paywall",
+  "area": "GeneralTests",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "trialExpiry.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/GeneralTests/trialExpiry.spec.js",
+  "playwright_group": "GeneralTests",
+  "source_files": [
+    "web/src/components/settings/General.vue",
+    "web/src/layouts/MainLayout.vue",
+    "web/src/utils/auth.ts"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "All six changed paths live under web/src/ (components/settings, layouts, utils). None are in enterprise-owned locations (enterprise/, o2_enterprise/, src/enterprise/). The diff edits an inline `config.isEnterprise == 'true'` gate inside General.vue, but that is an OSS file and no enterprise repo path is touched, so this is an OSS change.",
+    "skip": "Not skipped. The change is user-facing: it alters the General settings page (hiding non-destructive sections when a trial expires) and the MainLayout route paywall. No skip marker, label, or comment was passed; feature_hint.txt and trigger_comment.txt are empty.",
+    "e2e": "E2E is warranted. On an expired trial, General.vue now conditionally hides the platform-settings and enterprise-feature sections while keeping the Danger Zone delete-org flow reachable, and MainLayout.vue's paywall now exempts the settings/general routes via shouldPaywallRoute. This is a real UI flow a user exercises and needs browser verification.",
+    "area": "The bulk of the UI change lives in web/src/components/settings/General.vue (the settings/general page plus delete-org Danger Zone) with supporting changes in MainLayout.vue and utils/auth.ts. There is no dedicated Settings folder in the matrix; sibling settings/org specs (theme-management, logoManagement, cipherKeys) live in GeneralTests, so that area fits.",
+    "group": "GeneralTests is the existing matrix shard whose run_files hold settings/org-level specs (theme-management, logoManagement, cipherKeys); the new spec belongs there. No new shard is required.",
+    "existing_tests": "No E2E specs in the diff. The only test files changed are Vitest unit specs under web/src (GeneralDangerZone.spec.ts, MainLayout.spec.ts, auth.spec.ts), which are unit tests, not Playwright coverage under tests/ui-testing/playwright-tests/."
+  }
+}

@@ -1,0 +1,660 @@
+===== COMPLETE LIST OF CHANGED FILES (6 files) =====
+# AUTHORITATIVE: this list is never truncated. The diff BODY below may be trimmed for
+# very large PRs, so decide WHICH files/areas changed (e.g. web/src frontend) from THIS list.
+web/src/components/settings/General.vue
+web/src/components/settings/GeneralDangerZone.spec.ts
+web/src/layouts/MainLayout.spec.ts
+web/src/layouts/MainLayout.vue
+web/src/utils/auth.spec.ts
+web/src/utils/auth.ts
+===== END CHANGED FILES =====
+
+diff --git a/web/src/components/settings/General.vue b/web/src/components/settings/General.vue
+index c2ae669beea..7c229a92e3f 100644
+--- a/web/src/components/settings/General.vue
++++ b/web/src/components/settings/General.vue
+@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+          Settings shell; this component renders only the form content. -->
+     <!-- platform settings section. The page gutter is owned by the Settings
+          shell's ConstrainedPage; this block adds none of its own. -->
+-    <div>
++    <div v-if="!trialExpired">
+       <GroupHeader :title="t('settings.platformSettings')" :showIcon="false" />
+       <div class="flex w-full flex-col">
+         <OForm
+@@ -174,6 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+     <div
+       id="enterpriseFeature"
+       v-if="
++        !trialExpired &&
+         config.isEnterprise == 'true' &&
+         store.state.zoConfig.meta_org == store.state.selectedOrganization.identifier
+       "
+@@ -603,7 +604,7 @@ import configService from "@/services/config";
+ import DOMPurify from "dompurify";
+ import GroupHeader from "../common/GroupHeader.vue";
+ import { applyThemeColors, switchThemeMode } from "@/utils/theme";
+-import { useLocalOrganization } from "@/utils/zincutils";
++import { isTrialExpired, useLocalOrganization } from "@/utils/zincutils";
+ import { formatSizeFromMB } from "@/utils/formatters";
+ import OButton from "@/lib/core/Button/OButton.vue";
+ import OInput from "@/lib/forms/Input/OInput.vue";
+@@ -769,6 +770,10 @@ export default defineComponent({
+       () => deleteConfirmInput.value.trim() === deleteOrgName.value,
+     );
+ 
++    const trialExpired = computed(() =>
++      isTrialExpired(store.state?.organizationData?.organizationSettings?.free_trial_expiry),
++    );
++
+     // Only cloud builds expose self-service org deletion. Backend enforces the
+     // real per-org RBAC check; this only governs visibility.
+     const canDeleteOrg = computed(() => {
+@@ -1385,6 +1390,7 @@ export default defineComponent({
+       updateCustomColor,
+       resetThemeColors,
+       currentPickerMode,
++      trialExpired,
+       // Delete organization (Danger Zone)
+       canDeleteOrg,
+       confirmDeleteOrg,
+diff --git a/web/src/components/settings/GeneralDangerZone.spec.ts b/web/src/components/settings/GeneralDangerZone.spec.ts
+index 98608dabed2..64051b04d2e 100644
+--- a/web/src/components/settings/GeneralDangerZone.spec.ts
++++ b/web/src/components/settings/GeneralDangerZone.spec.ts
+@@ -44,10 +44,12 @@ const summarySpy = vi.fn().mockResolvedValue({
+     streams: { num_streams: 18, total_storage_size: 4.2 * 1024 * 1024 },
+   },
+ });
++const deleteOrgSpy = vi.hoisted(() => vi.fn());
+ vi.mock("@/services/organizations", () => ({
+   default: {
+     post_organization_settings: vi.fn(),
+     get_organization_summary: (...a: any[]) => summarySpy(...a),
++    delete_org: (...a: any[]) => deleteOrgSpy(...a),
+   },
+ }));
+ 
+@@ -70,7 +72,7 @@ const mockStore = {
+     tempThemeColors: { light: null, dark: null },
+     selectedOrganization: { identifier: "test-org", label: "Acme Production" },
+     userInfo: { email: "me@o2.ai" },
+-    organizationData: { organizationSettings: { scrape_interval: 30 } },
++    organizationData: { organizationSettings: { scrape_interval: 30, free_trial_expiry: "" } },
+     zoConfig: {
+       meta_org: "test-org",
+       custom_logo_text: "Test Logo Text",
+@@ -114,6 +116,13 @@ describe("General settings Danger Zone", () => {
+       expect(zone(await mountGeneral())).toBe(true);
+     });
+ 
++    it("shows it to a root user", async () => {
++      orgUsersSpy.mockResolvedValue({
++        data: { data: [{ email: "me@o2.ai", role: "root" }] },
++      });
++      expect(zone(await mountGeneral())).toBe(true);
++    });
++
+     it.each(["editor", "viewer", "user", "member"])("hides it from a %s", async (role) => {
+       orgUsersSpy.mockResolvedValue({
+         data: { data: [{ email: "me@o2.ai", role }] },
+@@ -260,6 +269,136 @@ describe("General settings Danger Zone", () => {
+     expect((wrapper.vm as any).orgScope).toBe("32 dashboards · 18 streams · 4.20 TB data");
+   });
+ 
++  // Expired trials keep the Danger Zone and lose everything else on the page.
++  describe("expired trial", () => {
++    const EXPIRED = String((Date.now() - 30 * 24 * 60 * 60 * 1000) * 1000);
++
++    afterEach(() => {
++      (mockStore.state.organizationData.organizationSettings as any).free_trial_expiry = "";
++    });
++
++    const expireTrial = () => {
++      (mockStore.state.organizationData.organizationSettings as any).free_trial_expiry = EXPIRED;
++    };
++
++    it("still renders the delete button for an admin", async () => {
++      expireTrial();
++      const wrapper = await mountGeneral();
++
++      expect(wrapper.find('[data-test="general-settings-delete-org-btn"]').exists()).toBe(true);
++    });
++
++    // These shapes mean "no trial tracked", not a lapsed one.
++    it.each([
++      ["absent", undefined],
++      ["empty", ""],
++      ["zero", 0],
++      ["zero string", "0"],
++    ])("keeps the settings sections when the expiry is %s", async (_label, expiry) => {
++      (mockStore.state.organizationData.organizationSettings as any).free_trial_expiry = expiry;
++      const wrapper = await mountGeneral();
++
++      expect(wrapper.find('[data-test="general-settings-scrape-interval"]').exists()).toBe(true);
++    });
++
++    // Offering these invites edits a lapsed org can no longer act on.
++    it("hides the non-destructive settings sections", async () => {
++      expireTrial();
++      const wrapper = await mountGeneral();
++
++      expect(wrapper.find('[data-test="general-settings-scrape-interval"]').exists()).toBe(false);
++      expect(wrapper.find("#enterpriseFeature").exists()).toBe(false);
++    });
++
++    // The role gate still governs once the route is reachable.
++    it("hides the delete button from a member", async () => {
++      expireTrial();
++      orgUsersSpy.mockResolvedValue({
++        data: { data: [{ email: "me@o2.ai", role: "member" }] },
++      });
++      const wrapper = await mountGeneral();
++
++      expect(wrapper.find('[data-test="general-settings-delete-org-btn"]').exists()).toBe(false);
++    });
++
++    it("renders both the danger zone and the settings sections while the trial is live", async () => {
++      const wrapper = await mountGeneral();
++
++      expect(wrapper.find('[data-test="general-settings-delete-org-btn"]').exists()).toBe(true);
++      expect(wrapper.find('[data-test="general-settings-scrape-interval"]').exists()).toBe(true);
++      expect(wrapper.find("#enterpriseFeature").exists()).toBe(true);
++    });
++  });
++
++  // Without these the button can toast success while never calling the API.
++  describe("deleteOrg execution", () => {
++    beforeEach(() => {
++      deleteOrgSpy.mockReset();
++      deleteOrgSpy.mockResolvedValue({});
++    });
++
++    it("calls delete_org with the selected org identifier", async () => {
++      const wrapper = await mountGeneral();
++      await (wrapper.vm as any).deleteOrg();
++
++      expect(deleteOrgSpy).toHaveBeenCalledTimes(1);
++      expect(deleteOrgSpy).toHaveBeenCalledWith("test-org");
++    });
++
++    it("closes the dialog and clears the typed confirmation on success", async () => {
++      const wrapper = await mountGeneral();
++      (wrapper.vm as any).confirmDeleteOrg = true;
++      (wrapper.vm as any).deleteConfirmInput = "Acme Production";
++
++      await (wrapper.vm as any).deleteOrg();
++
++      expect((wrapper.vm as any).confirmDeleteOrg).toBe(false);
++      expect((wrapper.vm as any).deleteConfirmInput).toBe("");
++    });
++
++    // Clearing the org on a failed delete would strand the user on a live org.
++    it("keeps the dialog open and does not clear the org when the API fails", async () => {
++      deleteOrgSpy.mockRejectedValueOnce({
++        response: { data: { message: "Cannot delete this organization" } },
++      });
++      const wrapper = await mountGeneral();
++      (wrapper.vm as any).confirmDeleteOrg = true;
++
++      await (wrapper.vm as any).deleteOrg();
++
++      expect((wrapper.vm as any).confirmDeleteOrg).toBe(true);
++      expect((wrapper.vm as any).deleting).toBe(false);
++    });
++
++    it("does not call the API when no org is selected", async () => {
++      const wrapper = await mountGeneral();
++      const original = mockStore.state.selectedOrganization;
++      (mockStore.state as any).selectedOrganization = {};
++
++      await (wrapper.vm as any).deleteOrg();
++      (mockStore.state as any).selectedOrganization = original;
++
++      expect(deleteOrgSpy).not.toHaveBeenCalled();
++    });
++  });
++
++  // The type-to-confirm gate is the only guard on an irreversible action.
++  describe("deleteConfirmMatches gate", () => {
++    it("is false until the typed name matches, and trims surrounding space", async () => {
++      const wrapper = await mountGeneral();
++
++      expect((wrapper.vm as any).deleteConfirmMatches).toBe(false);
++
++      (wrapper.vm as any).deleteConfirmInput = "acme production";
++      await flushPromises();
++      expect((wrapper.vm as any).deleteConfirmMatches).toBe(false);
++
++      (wrapper.vm as any).deleteConfirmInput = "  Acme Production  ";
++      await flushPromises();
++      expect((wrapper.vm as any).deleteConfirmMatches).toBe(true);
++    });
++  });
++
+   it("keeps the delete flow usable when /summary fails", async () => {
+     summarySpy.mockRejectedValueOnce(new Error("boom"));
+     const wrapper = await mountGeneral();
+diff --git a/web/src/layouts/MainLayout.spec.ts b/web/src/layouts/MainLayout.spec.ts
+index 399ba7a6f51..ebb158b3e4b 100644
+--- a/web/src/layouts/MainLayout.spec.ts
++++ b/web/src/layouts/MainLayout.spec.ts
+@@ -17,6 +17,10 @@ import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
+ import { mount } from "@vue/test-utils";
+ import { defineComponent, ref, h } from "vue";
+ import * as cookies from "@/utils/cookies";
++import { shouldPaywallRoute } from "@/utils/auth";
++import config from "@/aws-exports";
++
++const EXPIRED_MICROS = (Date.now() - 30 * 24 * 60 * 60 * 1000) * 1000;
+ 
+ // ODialog stub mirrors the migrated public contract (v-model:open, size, show-close,
+ // update:open / click:* emits). Mirrors stubs used in other migrated specs.
+@@ -1737,16 +1741,36 @@ describe("MainLayout Methods and Functions", () => {
+       expect(days).toBeLessThanOrEqual(7);
+     });
+ 
+-    it("should check trial period allowed paths", () => {
+-      const isAllowedPath = (currentPath: string, allowedPaths: string[]) => {
+-        return allowedPaths.some((path) => currentPath.includes(path));
+-      };
++    // MainLayout's boot paywall calls this; "plans" 404s on a non-cloud build.
++    it("never paywalls a non-cloud build", () => {
++      (config as any).isCloud = "false";
++      expect(shouldPaywallRoute(EXPIRED_MICROS, "logs")).toBe(false);
++    });
++
++    it("paywalls an expired cloud org on a paid route", () => {
++      (config as any).isCloud = "true";
++      expect(shouldPaywallRoute(EXPIRED_MICROS, "logs")).toBe(true);
++    });
++
++    // The nav lands on "settings", which redirects to general; both must pass.
++    it.each(["settings", "general"])("exempts %s so the org stays deletable", (name) => {
++      (config as any).isCloud = "true";
++      expect(shouldPaywallRoute(EXPIRED_MICROS, name)).toBe(false);
++    });
+ 
+-      const allowedPaths = ["iam", "users", "organizations"];
++    // Exact match: a route embedding an exempt name must not inherit the exemption.
++    it.each(["settingsExport", "generalReports", "iamAudit", "orgSettings"])(
++      "still paywalls %s",
++      (name) => {
++        (config as any).isCloud = "true";
++        expect(shouldPaywallRoute(EXPIRED_MICROS, name)).toBe(true);
++      },
++    );
+ 
+-      expect(isAllowedPath("/iam/settings", allowedPaths)).toBe(true);
+-      expect(isAllowedPath("/users/list", allowedPaths)).toBe(true);
+-      expect(isAllowedPath("/dashboards", allowedPaths)).toBe(false);
++    it("does not paywall an org with no trial tracked", () => {
++      (config as any).isCloud = "true";
++      expect(shouldPaywallRoute(null, "logs")).toBe(false);
++      expect(shouldPaywallRoute("", "logs")).toBe(false);
+     });
+   });
+ 
+diff --git a/web/src/layouts/MainLayout.vue b/web/src/layouts/MainLayout.vue
+index f42f41837a6..6e4c4e7440d 100644
+--- a/web/src/layouts/MainLayout.vue
++++ b/web/src/layouts/MainLayout.vue
+@@ -179,8 +179,7 @@ import {
+   useLocalUserInfo,
+   getImageURL,
+   invalidateLoginData,
+-  getDueDays,
+-  trialPeriodAllowedPath,
++  shouldPaywallRoute,
+   emptyDataAllowedPaths,
+ } from "../utils/zincutils";
+ 
+@@ -1113,21 +1112,17 @@ export default defineComponent({
+         await useHomeDashboard(t).load(store.state?.selectedOrganization?.identifier);
+ 
+         if (
+-          orgSettings?.data?.data?.free_trial_expiry != null &&
+-          orgSettings?.data?.data?.free_trial_expiry != ""
++          shouldPaywallRoute(
++            orgSettings?.data?.data?.free_trial_expiry,
++            router.currentRoute.value.name,
++          )
+         ) {
+-          const trialDueDays = getDueDays(orgSettings?.data?.data?.free_trial_expiry);
+-          if (
+-            trialDueDays <= 0 &&
+-            trialPeriodAllowedPath.indexOf(router.currentRoute.value.name) == -1
+-          ) {
+-            router.push({
+-              name: "plans",
+-              query: {
+-                org_identifier: selectedOrg.value.identifier,
+-              },
+-            });
+-          }
++          router.push({
++            name: "plans",
++            query: {
++              org_identifier: selectedOrg.value.identifier,
++            },
++          });
+         }
+       } catch (error: any) {
+         // Handle permission errors gracefully (403 = Forbidden)
+diff --git a/web/src/utils/auth.spec.ts b/web/src/utils/auth.spec.ts
+index 988a31bd5eb..266d08c2314 100644
+--- a/web/src/utils/auth.spec.ts
++++ b/web/src/utils/auth.spec.ts
+@@ -51,6 +51,8 @@ import { useLocalUserInfo } from "@/utils/storage";
+ 
+ import {
+   trialPeriodAllowedPath,
++  trialPaywallAllowedPath,
++  isTrialExpired,
+   getUserInfo,
+   invalidateLoginData,
+   getDecodedAccessToken,
+@@ -95,18 +97,65 @@ afterEach(() => {
+ // trialPeriodAllowedPath
+ // ---------------------------------------------------------------------------
+ 
++describe("isTrialExpired", () => {
++  // getDueDays(null) is -20706, so a bare emptiness check misreads null as expired.
++  it.each([
++    ["undefined", undefined],
++    ["null", null],
++    ["empty string", ""],
++    ["zero", 0],
++    ["zero string", "0"],
++    ["NaN", NaN],
++    ["non-numeric", "abc"],
++  ])("treats %s as no trial tracked", (_label, expiry) => {
++    expect(isTrialExpired(expiry)).toBe(false);
++  });
++
++  it("is true only for a past expiry", () => {
++    expect(isTrialExpired((Date.now() - 30 * 24 * 60 * 60 * 1000) * 1000)).toBe(true);
++    expect(isTrialExpired((Date.now() + 14 * 24 * 60 * 60 * 1000) * 1000)).toBe(false);
++  });
++
++  // getDueDays floors, so a trial ending later today scores 0 — the live boundary.
++  it("treats the last day of a trial as expired", () => {
++    expect(isTrialExpired((Date.now() + 6 * 60 * 60 * 1000) * 1000)).toBe(true);
++    expect(isTrialExpired((Date.now() + 25 * 60 * 60 * 1000) * 1000)).toBe(false);
++  });
++
++  it("accepts the numeric string the API sends", () => {
++    expect(isTrialExpired(String((Date.now() - 30 * 24 * 60 * 60 * 1000) * 1000))).toBe(true);
++  });
++});
++
+ describe("trialPeriodAllowedPath", () => {
+   it("is an array with exactly 4 elements", () => {
+     expect(Array.isArray(trialPeriodAllowedPath)).toBe(true);
+     expect(trialPeriodAllowedPath).toHaveLength(4);
+   });
+ 
++  // The empty-data guard reads this list, so "general" must stay out of it.
++  it("does not contain general", () => {
++    expect(trialPeriodAllowedPath).not.toContain("general");
++  });
++
+   it("contains iam, users, organizations, invitations", () => {
+     expect(trialPeriodAllowedPath).toContain("iam");
+     expect(trialPeriodAllowedPath).toContain("users");
+     expect(trialPeriodAllowedPath).toContain("organizations");
+     expect(trialPeriodAllowedPath).toContain("invitations");
+   });
++
++  // The Danger Zone lives on /settings/general, so the paywall must let it through.
++  it("trialPaywallAllowedPath adds the settings shell and general", () => {
++    expect(trialPaywallAllowedPath).toContain("general");
++    expect(trialPaywallAllowedPath).toContain("settings");
++    trialPeriodAllowedPath.forEach((p) => expect(trialPaywallAllowedPath).toContain(p));
++  });
++
++  // The empty-data guard reads this list, so the shell must stay out of it.
++  it("does not contain the settings shell in the empty-data list", () => {
++    expect(trialPeriodAllowedPath).not.toContain("settings");
++  });
+ });
+ 
+ // ---------------------------------------------------------------------------
+@@ -308,6 +357,21 @@ describe("routeGuard", () => {
+     vi.mocked(organizationService.get_organization_summary).mockReset();
+   });
+ 
++  // Micros, 30 days past; ingested so the empty-data guard stays out of the way.
++  const buildExpiredTrialStore = () =>
++    buildMockStore({
++      state: {
++        organizationData: {
++          organizationSettings: {
++            free_trial_expiry: (Date.now() - 30 * 24 * 60 * 60 * 1000) * 1000,
++          },
++          isDataIngested: true,
++        },
++        selectedOrganization: { identifier: "my-org" },
++        zoConfig: { restricted_routes_on_empty_data: false },
++      },
++    });
++
+   describe("when isCloud is false", () => {
+     it("calls next() directly without trial check", async () => {
+       (config as any).isCloud = "false";
+@@ -341,9 +405,150 @@ describe("routeGuard", () => {
+ 
+       expect(mockNext).toHaveBeenCalledWith(expect.objectContaining({ name: "plans" }));
+     });
++
++    // The nav resolves to name "settings", not "general"; paywalling it hides the feature.
++    it("lets the nav settings shell through", async () => {
++      (config as any).isCloud = "true";
++      mockStore = buildExpiredTrialStore();
++      vi.mocked(useStore).mockReturnValue(mockStore as any);
++
++      await routeGuard({ name: "settings", path: "/settings" }, {}, mockNext);
++
++      expect(mockNext).toHaveBeenCalledTimes(1);
++      expect(mockNext).toHaveBeenCalledWith();
++    });
++
++    // An expired trial must not lock an admin out of deleting the org.
++    it("lets the general settings route through", async () => {
++      (config as any).isCloud = "true";
++      mockStore = buildExpiredTrialStore();
++      vi.mocked(useStore).mockReturnValue(mockStore as any);
++
++      await routeGuard({ name: "general", path: "/settings/general" }, {}, mockNext);
++
++      expect(mockNext).toHaveBeenCalledTimes(1);
++      expect(mockNext).toHaveBeenCalledWith();
++    });
++
++    // Sibling settings sections are named explicitly: the shell is exempt, the paid tree is not.
++    it.each([["logs"], ["dashboards"], ["cipherKeys"], ["organizationSettings"]])(
++      "still redirects %s to plans",
++      async (name) => {
++        (config as any).isCloud = "true";
++        mockStore = buildExpiredTrialStore();
++        vi.mocked(useStore).mockReturnValue(mockStore as any);
++
++        await routeGuard({ name, path: `/${name}` }, {}, mockNext);
++
++        expect(mockNext).toHaveBeenCalledWith(expect.objectContaining({ name: "plans" }));
++      },
++    );
++  });
++
++  describe('when isCloud is the string "false" and trial is expired', () => {
++    // isCloud is a string, so a truthiness check would fire on self-hosted too.
++    it("does not redirect a self-hosted build to plans", async () => {
++      (config as any).isCloud = "false";
++      mockStore = buildExpiredTrialStore();
++      vi.mocked(useStore).mockReturnValue(mockStore as any);
++
++      await routeGuard({ name: "logs", path: "/logs" }, {}, mockNext);
++
++      expect(mockNext).not.toHaveBeenCalledWith(expect.objectContaining({ name: "plans" }));
++      expect(mockNext).toHaveBeenCalledWith();
++    });
++  });
++
++  describe("when isCloud is true and trial is not expired", () => {
++    const buildLiveTrialStore = () =>
++      buildMockStore({
++        state: {
++          organizationData: {
++            organizationSettings: {
++              free_trial_expiry: (Date.now() + 14 * 24 * 60 * 60 * 1000) * 1000,
++            },
++            isDataIngested: true,
++          },
++          selectedOrganization: { identifier: "my-org" },
++          zoConfig: { restricted_routes_on_empty_data: false },
++        },
++      });
++
++    it.each(["logs", "general", "dashboard"])("lets %s through", async (name) => {
++      (config as any).isCloud = "true";
++      mockStore = buildLiveTrialStore();
++      vi.mocked(useStore).mockReturnValue(mockStore as any);
++
++      await routeGuard({ name, path: `/${name}` }, {}, mockNext);
++
++      expect(mockNext).toHaveBeenCalledTimes(1);
++      expect(mockNext).toHaveBeenCalledWith();
++    });
++  });
++
++  // A null expiry means no trial is tracked, so the paywall must not fire.
++  it("does not redirect when free_trial_expiry is null", async () => {
++    (config as any).isCloud = "true";
++    mockStore = buildMockStore({
++      state: {
++        organizationData: {
++          organizationSettings: { free_trial_expiry: null },
++          isDataIngested: true,
++        },
++        selectedOrganization: { identifier: "my-org" },
++        zoConfig: { restricted_routes_on_empty_data: false },
++      },
++    });
++    vi.mocked(useStore).mockReturnValue(mockStore as any);
++
++    await routeGuard({ name: "logs", path: "/logs" }, {}, mockNext);
++
++    expect(mockNext).not.toHaveBeenCalledWith(expect.objectContaining({ name: "plans" }));
++    expect(mockNext).toHaveBeenCalledWith();
+   });
+ 
+   describe("restricted_routes_on_empty_data guard", () => {
++    const buildNoDataStore = () =>
++      buildMockStore({
++        state: {
++          organizationData: {
++            organizationSettings: { free_trial_expiry: "" },
++            isDataIngested: false,
++          },
++          selectedOrganization: { identifier: "default" },
++          zoConfig: { restricted_routes_on_empty_data: true },
++        },
++      });
++
++    // emptyDataAllowedPaths is what exempts /settings/general here, not the name list.
++    it("lets /settings/general through on a no-data org", async () => {
++      (config as any).isCloud = "false";
++      vi.mocked(organizationService.get_organization_summary).mockResolvedValue({
++        data: { streams: { num_streams: 0 } },
++      });
++      mockStore = buildNoDataStore();
++      vi.mocked(useStore).mockReturnValue(mockStore as any);
++
++      await routeGuard({ name: "general", path: "/settings/general" }, {}, mockNext);
++
++      expect(mockNext).toHaveBeenCalledWith();
++      expect(mockNext).not.toHaveBeenCalledWith({ path: "/ingestion" });
++    });
++
++    // Same name, uncovered path: fails if the name list ever does the exempting.
++    it("does not exempt a general-named route at an uncovered path", async () => {
++      (config as any).isCloud = "false";
++      vi.mocked(organizationService.get_organization_summary).mockResolvedValue({
++        data: { streams: { num_streams: 0 } },
++      });
++      mockStore = buildNoDataStore();
++      vi.mocked(useStore).mockReturnValue(mockStore as any);
++
++      await routeGuard({ name: "general", path: "/settings/organization/general" }, {}, mockNext);
++
++      expect(mockNext).toHaveBeenCalledWith({ path: "/ingestion" });
++    });
++
+     it("redirects to /ingestion when num_streams is 0", async () => {
+       (config as any).isCloud = "false";
+       vi.mocked(organizationService.get_organization_summary).mockResolvedValue({
+diff --git a/web/src/utils/auth.ts b/web/src/utils/auth.ts
+index 5a34d413f18..d86406d9e71 100644
+--- a/web/src/utils/auth.ts
++++ b/web/src/utils/auth.ts
+@@ -24,6 +24,9 @@ const normalizePath = (path: string) =>
+ 
+ export const trialPeriodAllowedPath = ["iam", "users", "organizations", "invitations"];
+ 
++// Kept out of the empty-data guard; "settings" only redirects on to general.
++export const trialPaywallAllowedPath = [...trialPeriodAllowedPath, "settings", "general"];
++
+ export const getUserInfo = (loginString: string) => {
+   try {
+     let decToken = null;
+@@ -106,23 +109,35 @@ export const getDueDays = (microTimestamp: number): number => {
+   return dueDays;
+ };
+ 
++// Absent/empty/zero expiry means no trial is tracked, not a lapsed one.
++export const isTrialExpired = (expiry: unknown): boolean => {
++  if (expiry === undefined || expiry === null || expiry === "") return false;
++  const expiryMicros = Number(expiry);
++  if (!Number.isFinite(expiryMicros) || expiryMicros === 0) return false;
++  return getDueDays(expiryMicros) <= 0;
++};
++
++// Only cloud builds populate free_trial_expiry, so no other edition can paywall.
++export const shouldPaywallRoute = (expiry: unknown, routeName: unknown): boolean =>
++  config.isCloud === "true" &&
++  isTrialExpired(expiry) &&
++  trialPaywallAllowedPath.indexOf(routeName as string) === -1;
++
+ export const routeGuard = async (to: any, from: any, next: any) => {
+   const store = useStore();
+-  if (config.isCloud) {
+-    if (store.state.organizationData?.organizationSettings?.free_trial_expiry !== "") {
+-      const trialDueDays = getDueDays(
+-        store.state.organizationData?.organizationSettings?.free_trial_expiry,
+-      );
+-      if (trialDueDays <= 0 && trialPeriodAllowedPath.indexOf(to.name) === -1) {
+-        next({
+-          name: "plans",
+-          query: {
+-            org_identifier: store.state.selectedOrganization.identifier,
+-          },
+-        });
+-        return;
+-      }
+-    }
++  if (
++    shouldPaywallRoute(
++      store.state.organizationData?.organizationSettings?.free_trial_expiry,
++      to.name,
++    )
++  ) {
++    next({
++      name: "plans",
++      query: {
++        org_identifier: store.state.selectedOrganization.identifier,
++      },
++    });
++    return;
+   }
+ 
+   if (

@@ -1,0 +1,19 @@
+{
+  "feature_slug": "trial-expiry-settings",
+  "feature_title": "Expired Trial Settings Paywall",
+  "area": "GeneralTests",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "trialExpiry.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/GeneralTests/trialExpiry.spec.js",
+  "playwright_group": "GeneralTests",
+  "source_files": [
+    "web/src/components/settings/General.vue",
+    "web/src/layouts/MainLayout.vue",
+    "web/src/utils/auth.ts"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": ""
+}

@@ -6,6 +6,8 @@
 //   - OrgStorageEditor     (storage provider connection fields)
 //   - DomainManagement     (domain restriction input)
 
+import { expect } from '@playwright/test';
+
 export class SettingsFormValidationPage {
     /**
      * @param {import('@playwright/test').Page} page
@@ -36,6 +38,9 @@ export class SettingsFormValidationPage {
         this.scrapeIntervalField      = '[data-test="general-settings-scrape-interval-field"]';
         this.scrapeIntervalError      = '[data-test="general-settings-scrape-interval-error"]';
         this.generalSettingsSaveBtn   = '[data-test="dashboard-add-submit"]';
+        this.maxSeriesPerQueryField   = '[data-test="general-settings-max-series-per-query-field"]';
+        this.dangerZone               = '[data-test="general-settings-danger-zone"]';
+        this.deleteOrgBtn             = '[data-test="general-settings-delete-org-btn"]';
 
         // ── OrgStorageEditor — connection fields ─────────────────────────────
         // Provider cards (step 1)
@@ -180,6 +185,62 @@ export class SettingsFormValidationPage {
 
     getScrapeIntervalErrorLocator() {
         return this.page.locator(this.scrapeIntervalError);
+    }
+
+    // ── General Settings — trial-expiry paywall ─────────────────────────────
+
+    /**
+     * Navigate directly to Settings > General and wait for the platform form.
+     * A direct goto is more deterministic than the rail-click path and mirrors
+     * navigateToOrganizationSettings().
+     */
+    async gotoGeneralSettings() {
+        const org = process.env.ORGNAME || 'default';
+        const base = process.env.ZO_BASE_URL || 'http://localhost:5080';
+        await this.page.goto(`${base}/web/settings/general?org_identifier=${org}`);
+        await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+        await this.page.locator(this.scrapeIntervalField).waitFor({ state: 'visible', timeout: 15000 });
+    }
+
+    async expectScrapeIntervalFieldVisible() {
+        await expect(this.page.locator(this.scrapeIntervalField)).toBeVisible();
+    }
+
+    async expectScrapeIntervalFieldHidden() {
+        await expect(this.page.locator(this.scrapeIntervalField)).toBeHidden();
+    }
+
+    async expectMaxSeriesPerQueryFieldVisible() {
+        await expect(this.page.locator(this.maxSeriesPerQueryField)).toBeVisible();
+    }
+
+    async expectMaxSeriesPerQueryFieldHidden() {
+        await expect(this.page.locator(this.maxSeriesPerQueryField)).toBeHidden();
+    }
+
+    async expectGeneralSettingsSaveBtnVisible() {
+        await expect(this.page.locator(this.generalSettingsSaveBtn)).toBeVisible();
+    }
+
+    async expectDangerZoneVisible() {
+        await expect(this.page.locator(this.dangerZone)).toBeVisible();
+    }
+
+    async expectDangerZoneHidden() {
+        await expect(this.page.locator(this.dangerZone)).toBeHidden();
+    }
+
+    async expectDeleteOrgBtnVisible() {
+        await expect(this.page.locator(this.deleteOrgBtn)).toBeVisible();
+    }
+
+    async expectOnPlans() {
+        await expect(this.page).toHaveURL(/\/billings\/plans/);
+        await expect(this.page).toHaveURL(/org_identifier=/);
+    }
+
+    async expectNotOnPlans() {
+        await expect(this.page).not.toHaveURL(/\/billings\/plans/);
     }
 
     // ── OrgStorageEditor helpers ──────────────────────────────────────────────

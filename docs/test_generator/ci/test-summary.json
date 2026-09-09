@@ -1,0 +1,22 @@
+[
+  {
+    "title": "should render the full General Settings platform form without paywall",
+    "action": "new",
+    "verifies": "the platform settings form, theme chips, and save button render on OSS with no paywall and no plans redirect"
+  },
+  {
+    "title": "should not redirect a paid route to /billings/plans in OSS",
+    "action": "new",
+    "verifies": "navigating to the paid /logs route renders instead of redirecting to /billings/plans in OSS"
+  },
+  {
+    "title": "Expired trial hides settings sections but keeps Danger Zone — not wired: free_trial_expiry only set in cloud (src/db/src/organization.rs:58-59)",
+    "action": "new",
+    "verifies": "cloud-only paywall hides non-destructive settings sections while Danger Zone stays reachable (fixme placeholder)"
+  },
+  {
+    "title": "Expired trial redirects paid routes to plans but exempts settings/general — not wired: config.isCloud==='true' required; plans route is enterprise-only (router.ts:261-262)",
+    "action": "new",
+    "verifies": "cloud-only paywall redirects paid routes to plans while exempting settings/general (fixme placeholder)"
+  }
+]

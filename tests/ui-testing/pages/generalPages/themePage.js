@@ -332,6 +332,14 @@ export class ThemePage {
         await expect(this.themeDarkChip).toBeVisible();
     }
 
+    async expectThemeLightChipHidden() {
+        await expect(this.themeLightChip).toBeHidden();
+    }
+
+    async expectThemeDarkChipHidden() {
+        await expect(this.themeDarkChip).toBeHidden();
+    }
+
     // ==================== CSS Variable Checks ====================
 
     async getThemeColor() {

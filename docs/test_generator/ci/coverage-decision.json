@@ -1,0 +1,11 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/GeneralTests/trialExpiry.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/GeneralTests/settings-form-validation.spec.js",
+    "tests/ui-testing/playwright-tests/GeneralTests/theme-management.spec.js",
+    "tests/ui-testing/playwright-tests/GeneralTests/sanity.spec.js"
+  ],
+  "needs_registration": true,
+  "rationale": "No existing spec asserts the trial-expiry paywall or its OSS baseline. settings-form-validation.spec.js covers other Settings tabs (OrganizationSettings, storage, domain, model-pricing, correlation) — never the General settings platform form visibility or the paywall state. theme-management.spec.js covers theme switching/predefined themes, not the paywall. sanity.spec.js navigates to General settings and saves scrape interval (changeSettingsSuccessfully) but never asserts the paywall baseline. The feature doc confirms the E2E coverage is net-new. The two OSS-green assertions (full form renders without paywall; no redirect to /billings/plans) plus two cloud-only fixme placeholders belong in a dedicated GeneralTests spec registered in ci_matrix.json."
+}

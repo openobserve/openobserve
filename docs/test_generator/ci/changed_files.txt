@@ -1,0 +1,6 @@
+web/src/components/settings/General.vue
+web/src/components/settings/GeneralDangerZone.spec.ts
+web/src/layouts/MainLayout.spec.ts
+web/src/layouts/MainLayout.vue
+web/src/utils/auth.spec.ts
+web/src/utils/auth.ts
