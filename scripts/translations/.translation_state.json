@@ -660,7 +660,7 @@
           "version": "e63481cbd64faad4"
         },
         "csvImport": {
-          "button": "a98dd755ce89c4bf",
+          "button": "74f4f1715bd079de",
           "description": "35aae6828235a3a4",
           "error": "e43c431fa13a8228",
           "fileLabel": "73aad53a5abb150f",
@@ -668,7 +668,7 @@
           "placeholder": "5a89a61611729372",
           "sizeError": "0ad467734d18d2d7",
           "success": "488b4b3a6ce3ef5a",
-          "title": "574625eb17be34ab"
+          "title": "273ffa4013cbea8b"
         },
         "deleteItemError": "8dcc718b55bffccc",
         "deleteItemMessage": "09344649dd5a91e9",
@@ -829,6 +829,8 @@
     "experiments": {
       "addToDataset": "9fd728c66c9a256b",
       "baseline": "cc9ea7f7c64e772c",
+      "baselineError": "226a0a4a07213c5d",
+      "baselineRequiresCompleted": "e6c58255db32039d",
       "booleanScoreSummary": "37c346c40fb176cb",
       "cancel": "19766ed6ccb2f4a3",
       "cancelError": "fcbafd7456d280d2",
@@ -859,6 +861,7 @@
         "missing": "ac976e3c05fde02b",
         "optionsError": "aec64cbc569ed9fd",
         "panel": {
+          "allOutcomeDimensions": "f9986e9fb7e442bd",
           "bucketImproved": "c3b959224fda63f1",
           "bucketInconclusive": "9141583b65f4a524",
           "bucketMissing": "6be36ca49ee85210",
@@ -867,6 +870,7 @@
           "bucketTotal": "c9b3c38247f744e1",
           "bucketUnchanged": "88b6f7429ce74e85",
           "bucketUncompared": "0379e104452f1610",
+          "dimensionExcludedHint": "a6c4a20e0f17d8f3",
           "dimensionImproved": "2f79ebab0ef85cfa",
           "dimensionNoneCompared": "49d451b70d9666e9",
           "dimensionNoneComparedHint": "9a5814cee37f8f8c",
@@ -876,13 +880,21 @@
           "dimensionUnchanged": "74aab6a98ddf45dd",
           "input": "36ecb4f8669133ce",
           "measurePerRow": "ea499e00b0e5d66e",
+          "noOutcomeDimensions": "2f127b152117d4e8",
           "noRows": "ac57d5bd25e13bc3",
           "noScoreDimensionMoved": "40e8ca1fdab6c192",
           "ofScoreDimensions": "13d0c1da82c351b0",
           "oneSided": "a83090e433d21399",
           "oneSidedCoverage": "122dd60766f9b5a4",
           "outcome": "4e80abb5b14656d4",
+          "outcomeDimensionUnavailable": "870820136829adec",
+          "outcomeDimensions": "556f2a3d0a9ff75c",
+          "outcomeTooltipAll": "ff9a4173b6029c00",
+          "outcomeTooltipNone": "286e3104c8981623",
+          "outcomeTooltipPartial": "865f7cb3ebd5e059",
+          "selectedOutcomeDimensions": "b45686b0d0cba7de",
           "threshold": "0da627ada476c179",
+          "thresholdTooltip": "fd43c7e70272137b",
           "tileCost": "204a5eb2cd28bcfd",
           "tileLatency": "e0e7d293043c8cf6",
           "tileScoreDimensionsRegressed": "4092ceccd7306f48",
@@ -947,6 +959,7 @@
           "noPeers": "e651c1f0308a0981",
           "title": "22e90103a252059a"
         },
+        "costBreakdown": "49e18434853d9944",
         "datasetVersion": "7126d5d7ea42c517",
         "highDispersion": "0beb185ae4bd7009",
         "highDispersionBadge": "c4ebc6d4a5832cd9",
@@ -958,8 +971,9 @@
           "run": "00d60e31a4e6b834",
           "task": "4bc74b21357c6cf5"
         },
-        "p50Latency": "b0264f06ddd530ef",
-        "progress": "4664827f8e890192",
+        "p50Latency": "ae3a5c9fd1335067",
+        "partialCostBreakdown": "44c01afaa96493e6",
+        "progress": "9874168bd14d20f6",
         "retryFailed": "e534bc7f7c0a5852",
         "runSummary": "8a925e08de712892",
         "scoredRows": "28ebe6d3eef380a9",
@@ -1374,6 +1388,7 @@
     "queues": {
       "cleared": "15f3a2898addfc6c",
       "columns": {
+        "actions": "ff8059dc6752afdd",
         "description": "526e0087cc3f254d",
         "name": "dcd1d5223f73b3a9",
         "progress": "4664827f8e890192",
@@ -1418,6 +1433,7 @@
       "detail": {
         "allItems": "a52ace420f2175d0",
         "columns": {
+          "actions": "ff8059dc6752afdd",
           "added": "6b02e0d363a4af1c",
           "refId": "71bf90935fc231d2",
           "refType": "9b6e88e8943a8f9c",
@@ -10436,7 +10452,8 @@
       "createAndActivate": "347fa348fdb09b21",
       "remove": "c3812fc4acb861d5",
       "save": "1509f561f2416598",
-      "saveAsDraft": "6c462142d3681836"
+      "saveAsDraft": "6c462142d3681836",
+      "testConnection": "c02977b07ec93816"
     },
     "catalogScoreConfigNotFound": "f40f5ef1f9371929",
     "count": "37bac4952becf21a",
@@ -10789,10 +10806,10 @@
       }
     },
     "provider": {
-      "apiKeyHelp": "0d32b255d26b7f30",
+      "apiKeyHelp": "f4e65568370ffa24",
       "apiKeyLabel": "23189d55f6973f2c",
       "apiKeyPlaceholder": "100903efdd819b0f",
-      "authEditNote": "0bd89c4b477caae0",
+      "authEditNote": "e8fff442aa27b600",
       "authSection": "66880d2d8216260d",
       "availableModelsHelp": "969a44b1368a7d6c",
       "availableModelsLabel": "9dbfd0478bd51235",
@@ -10809,6 +10826,10 @@
       "saveError": "e21fa38b5758e4c9",
       "sectionTitle": "472590ae974d4c1f",
       "subtitle": "b71c16eb9ab6429c",
+      "testError": "c1d1f31022a233de",
+      "testFailed": "596c52f1eb65c1c3",
+      "testPassed": "22965568d22a14ee",
+      "testRunning": "3d0032b7b274243e",
       "typeLabel": "8c0f6d3ebfe7ba3a",
       "typeRequired": "2d973f48294309ac"
     },
@@ -13877,7 +13898,24 @@
     },
     "alertSli": {
       "groupingLocked": "d890da7de4e139da",
-      "ineligibleOption": "f2ac100da23bf7af",
+      "ineligible": {
+        "cron": "1d82bc6cee4002b4",
+        "grouped": "89731456c31c326c",
+        "noFixedInterval": "be7aa5ea4d5c19c1",
+        "notReferenceable": "d7464d7d61b6ff19",
+        "notScheduled": "b3e24789bf8dc89b",
+        "other": "1add22631d4957ec",
+        "silenced": "8b956ecaf1081ab5",
+        "tooInfrequent": "56c6797d6d4104b9",
+        "why": {
+          "cron": "f45668992c83a1f9",
+          "grouped": "e7c1b4d02dbfe02f",
+          "notReferenceable": "b6f2ba70874f5f7c",
+          "notScheduled": "4d6268ecd21a9920",
+          "silenced": "3febc0c7c6c12b67",
+          "tooInfrequent": "e796dfc81c1508b2"
+        }
+      },
       "loadFailed": "c115f89d39cb92a9",
       "noneEligible": "497129e7b433538a",
       "preview": {
@@ -13961,6 +13999,12 @@
     "deleteConfirmTitle": "f0426ce331bd7454",
     "deleteFailed": "cd476613ff4ea3ca",
     "deleted": "d41340b2c23793fa",
+    "duration": {
+      "days": "963e4ad5da392686",
+      "hours": "1eb8a48ad2a585d1",
+      "minutes": "0d60b1170642e906",
+      "seconds": "08cc4d4ec73f6979"
+    },
     "edit": "464c4ffd019e1e96",
     "editTitle": "69287c86c00891ce",
     "empty": {
@@ -13985,7 +14029,6 @@
       "countTotalPromqlHint": "ff85d92be60566de",
       "description": "526e0087cc3f254d",
       "errorBudget": "b45980a8f298350c",
-      "folder": "74ccd43303847f26",
       "goodWhen": "18595c2ada605e48",
       "goodWhenHint": "48de7090d2a23ffb",
       "groupBy": "956a51f6b098a41b",
@@ -14121,6 +14164,36 @@
       "timeSliceDescription": "aa8e3a2f33074f50"
     },
     "updateFailed": "96d5fe03dd338164",
+    "validation": {
+      "aggregateRequired": "7334ff58929ea8e2",
+      "alertCannotGroup": "06ce2c7521218ab7",
+      "alertSourceRequired": "8b7eaf39e275a45c",
+      "budgetRange": "57edbc756970e853",
+      "comparatorRequired": "4a0183d24e916340",
+      "criticalPositive": "b4837d8b956ff2df",
+      "criticalRequired": "60b847b9dda06296",
+      "frequencyPositive": "8db1462b32e08786",
+      "frequencyRequired": "2f087ed0c85032bb",
+      "goodExprRequired": "6444546db0aa4e82",
+      "groupedSlice": "eed2fd5d42e01d84",
+      "longWindowRequired": "d38cbaea1e32a1b8",
+      "nameRequired": "412d4c344bcb1314",
+      "nameTooLong": "9c895af8f41d9d77",
+      "promqlGoodRequired": "11158694db92835e",
+      "promqlTotalRequired": "b613d17609a7ecf2",
+      "shortInsideLong": "102b6774d9b61a16",
+      "shortWindowRequired": "068ca9cca461db9d",
+      "silenceNonNegative": "158bd5d24c8343ee",
+      "silenceRequired": "1ac38ba1177977cf",
+      "streamRequired": "d67419c7e346be52",
+      "streamTypeRequired": "685119205cd1d9ba",
+      "targetPrecision": "87c5c290d9bd8c62",
+      "targetRange": "20c071965c490e54",
+      "targetRequired": "462097c2b4783dd7",
+      "targetsRequired": "2e971984ab9df162",
+      "thresholdNumber": "5fe74cea9bc5d1fb",
+      "thresholdRequired": "60b847b9dda06296"
+    },
     "window": {
       "30d": "ffd7280513ce285e",
       "7d": "7f920bb639c93075",

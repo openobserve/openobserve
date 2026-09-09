@@ -42,7 +42,7 @@
     </div>
 
     <!-- The SLO is context, not a field: it comes from the page. -->
-    <SloAlertCondition v-model="form.condition" :slo="slo" />
+    <SloAlertCondition v-model="form.condition" :slo="slo" :errors="conditionFieldErrors" />
 
     <!-- Sized to their content (`width="sm"`, minutes suffix) rather than a
          half-panel column each: a two-digit interval in a 60rem input reads as
@@ -55,6 +55,8 @@
         suffix="min"
         :label="t('alerts.frequency')"
         required
+        :error="!!fieldError('frequencyMinutes')"
+        :error-message="fieldError('frequencyMinutes') || undefined"
         data-test="slo-alert-form-frequency"
       />
       <OInput
@@ -64,6 +66,8 @@
         suffix="min"
         :label="t('alerts.silence')"
         required
+        :error="!!fieldError('silenceMinutes')"
+        :error-message="fieldError('silenceMinutes') || undefined"
         data-test="slo-alert-form-silence"
       />
     </div>
@@ -74,13 +78,10 @@
       v-model:destinations="form.destinations"
       v-model:workflows="form.workflows"
       :destination-options="destinationOptions"
+      :error="fieldError('destinations') || undefined"
       data-test="slo-alert-form-targets"
       @refresh="loadDestinations"
     />
-
-    <OBanner v-if="saveError" variant="error" data-test="slo-alert-form-error">
-      {{ saveError }}
-    </OBanner>
 
     <div class="flex justify-end gap-2">
       <OButton
@@ -102,17 +103,18 @@
 import { computed, onMounted, reactive, ref, watch } from "vue";
 import { useStore } from "vuex";
 
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { makeSloAlertSchema } from "./SloAlertForm.schema";
+import { scrollToFirstError } from "@/lib/forms/Form/scrollToFirstError";
 
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import AlertDestinationsField from "@/components/alerts/AlertDestinationsField.vue";
 import SloAlertCondition from "@/components/slos/SloAlertCondition.vue";
 import alertsService from "@/services/alerts";
 import destinationService from "@/services/alert_destination";
 import type { Slo } from "@/ts/interfaces/slo";
-import { ALERT_NAME_UNSUPPORTED_CHARS } from "@/components/alerts/AddAlert.schema";
 import { buildSloAlertPayload, deriveSloAlertName } from "@/utils/alerts/sloAlertPayload";
 
 const props = defineProps<{ slo: Slo; alertId?: string | null }>();
@@ -128,7 +130,6 @@ const store = useStore();
 
 const org = computed(() => store.state.selectedOrganization?.identifier);
 const saving = ref(false);
-const saveError = ref("");
 const destinationOptions = ref<string[]>([]);
 
 /** The stored alert when editing. Held so the PUT can carry every field this
@@ -164,16 +165,7 @@ const form = reactive({
 //
 // `alerts.nameRequired` is the key the generic alert form already uses; there
 // is no `alerts.validation.nameRequired`, and a missing key renders as the key.
-const nameError = computed(() => {
-  if (!form.name.trim()) return t("alerts.nameRequired");
-  // Whitespace and "/" are both rejected server-side, and the first check runs
-  // before anything else — so a natural-language name never reaches save.
-  if (ALERT_NAME_UNSUPPORTED_CHARS.test(form.name) || form.name.includes("/")) {
-    return t("alerts.validation.nameUnsupportedChars");
-  }
-  return raw("");
-});
-
+// The rule itself lives in SloAlertForm.schema.ts.
 /** Keep the suggested name in step with the condition until the user types
  *  their own. Two alerts on one SLO are told apart by name, so a blank or
  *  duplicated default is the failure mode worth designing out. */
@@ -196,9 +188,66 @@ watch(
   },
 );
 
+// Shown only after a submit attempt, unlike the name field below.
+const attemptedSubmit = ref(false);
+
+// Edit mode fetches `form.name` async in `onMounted`; before that resolves the
+// field is blank same as a genuinely empty new alert. Gate the name error on
+// load having settled so it doesn't flash "required" while the GET is in flight.
+const nameFieldReady = ref(!props.alertId);
+
+/** The "no message" value. Branded so it is assignable to `error-message`. */
+const NO_ERROR = raw("");
+
+// Rules live in `SloAlertForm.schema.ts`.
+const validation = computed(() =>
+  makeSloAlertSchema(t).safeParse({
+    name: form.name,
+    frequencyMinutes: form.frequencyMinutes,
+    silenceMinutes: form.silenceMinutes,
+    destinations: form.destinations,
+    workflows: form.workflows,
+    condition: form.condition,
+  }),
+);
+
+const validationIssues = computed<Record<string, I18nText>>(() => {
+  const result = validation.value;
+  if (result.success) return {};
+  const out: Record<string, I18nText> = {};
+  for (const issue of result.error.issues) {
+    const key = issue.path.join(".");
+    if (!(key in out)) out[key] = issue.message as I18nText;
+  }
+  return out;
+});
+
+// Submit-then-change timing, matching `useOForm` elsewhere in the product.
+const fieldError = (path: string): I18nText =>
+  attemptedSubmit.value ? (validationIssues.value[path] ?? NO_ERROR) : NO_ERROR;
+
+const nameError = computed(() =>
+  nameFieldReady.value ? (validationIssues.value["name"] ?? NO_ERROR) : NO_ERROR,
+);
+
+// Handed to SloAlertCondition so its inputs render their own inline markers.
+const conditionFieldErrors = computed(() => ({
+  critical: fieldError("condition.critical"),
+  long: fieldError("condition.long_window_secs"),
+  short: fieldError("condition.short_window_secs"),
+}));
+
 const submit = async () => {
-  saveError.value = "";
-  if (nameError.value) return;
+  attemptedSubmit.value = true;
+
+  // Refuse to send a knowingly-invalid alert. Previously only the name was
+  // checked, and it returned SILENTLY — no banner, no field marker — so a
+  // rejected name looked exactly like nothing happening.
+  if (!validation.value.success) {
+    await scrollToFirstError();
+    toast({ variant: "error", message: t("alerts.messages.fixHighlightedFields") });
+    return;
+  }
 
   saving.value = true;
   try {
@@ -210,7 +259,10 @@ const submit = async () => {
     }
     emit("saved");
   } catch (e: any) {
-    saveError.value = e?.response?.data?.message || t("alerts.saveFailed");
+    toast({
+      variant: "error",
+      message: e?.response?.data?.message || t("alerts.saveFailed"),
+    });
   } finally {
     saving.value = false;
   }
@@ -258,6 +310,8 @@ onMounted(async () => {
     nameIsUserEdited.value = true;
   } catch (e: any) {
     emit("load-error", e?.response?.data?.message || t("alerts.loadFailed"));
+  } finally {
+    nameFieldReady.value = true;
   }
 });
 </script>
