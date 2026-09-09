@@ -66,6 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="min-h-0 flex-1 overflow-hidden">
         <div class="card-container h-full">
           <OTable
+            ref="oTableRef"
             :frame="false"
             data-test="workflow-list-table"
             :data="filteredWorkflows"
@@ -81,6 +82,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             table-id="workflows-workflow-list"
             width="100%"
             class="h-full w-full"
+            :current-page="currentPage"
+            @update:current-page="onPageChange"
             @row-click="openRuns"
           >
             <template #toolbar>
@@ -227,7 +230,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- Editor (add/edit) renders here as a child route. On a successful save it
        emits `saved`, so this parent refreshes the list — no route watcher. -->
   <router-view v-else v-slot="{ Component }">
-    <component :is="Component" @saved="getWorkflows" />
+    <component :is="Component" @saved="onEditorSaved" />
   </router-view>
 
   <ConfirmDialog
@@ -274,6 +277,19 @@ const orgId = computed(() => store.state.selectedOrganization.identifier as stri
 const loading = ref(true);
 const filterQuery = ref("");
 const workflows = ref<any[]>([]);
+const oTableRef: any = ref(null);
+// Plain ref, not URL/store-backed: WorkflowsList stays mounted across create/edit/runs child-route navigation, so this alone survives the round trip.
+const currentPage = ref(1);
+const onPageChange = (page: number) => {
+  currentPage.value = page;
+};
+
+// setTimeout(0) is a macrotask, so it runs after TanStack's own deferred auto-reset-on-data-change (its own microtask queue), letting the restored page win.
+const restorePageIndex = () => {
+  setTimeout(() => {
+    oTableRef.value?.table?.setPageIndex(currentPage.value - 1);
+  }, 0);
+};
 
 const filteredWorkflows = computed(() => {
   const q = filterQuery.value.trim().toLowerCase();
@@ -500,5 +516,14 @@ const deleteWorkflow = async () => {
   }
 };
 
-onMounted(getWorkflows);
+// Chained (not fire-and-forget) so restorePageIndex schedules its macrotask after the fetch's data update, not before.
+const onEditorSaved = async () => {
+  await getWorkflows();
+  restorePageIndex();
+};
+
+onMounted(async () => {
+  await getWorkflows();
+  restorePageIndex();
+});
 </script>

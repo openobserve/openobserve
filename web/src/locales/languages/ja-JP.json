@@ -10793,7 +10793,8 @@
         "scoreConfigs": "スコア設定",
         "targetDataset": "ターゲットデータセット",
         "progress": "進捗",
-        "updated": "更新日時"
+        "updated": "更新日時",
+        "actions": "操作"
       },
       "create": {
         "title": "新規キュー",
@@ -10847,7 +10848,8 @@
           "refType": "参照",
           "refId": "参照",
           "added": "追加日時",
-          "status": "ステータス"
+          "status": "ステータス",
+          "actions": "操作"
         },
         "status": {
           "pending": "保留中",
@@ -10959,6 +10961,8 @@
       "viewAll": "実験を表示",
       "baseline": "ベースライン",
       "setBaseline": "ベースラインに設定",
+      "baselineRequiresCompleted": "完了した実行のみをベースラインとして設定できます。",
+      "baselineError": "ベースラインの更新に失敗しました。",
       "selectForComparison": "比較用に選択",
       "progress": "{done} / {total} スロット",
       "noScores": "集計スコアなし",
@@ -11069,8 +11073,10 @@
       "addToDataset": "追加",
       "detail": {
         "by": "{user}による",
-        "p50Latency": "P50レイテンシ",
+        "p50Latency": "P50 タスクレイテンシ",
         "totalCost": "総コスト",
+        "costBreakdown": "タスク {task} · スコアリング {scoring}",
+        "partialCostBreakdown": "タスク {task} · スコアリング {scoring} · 一部",
         "highDispersion": "高分散ケース",
         "highDispersionHint": "試行が一致しない行",
         "scoredRows": "{scored}/{total} 行がスコア済み",
@@ -11100,7 +11106,7 @@
           "run": "実行"
         },
         "runSummary": "{trials} · {scorers}",
-        "progress": "進捗",
+        "progress": "タスク進捗",
         "scoring": "スコアリング",
         "scoringDistribution": "{success} 成功 · {failed} 失敗 · {pending} 保留 · {skipped} スキップ",
         "compare": "比較",
@@ -11193,6 +11199,16 @@
           "typeCategorical": "カテゴリ",
           "typeBoolean": "ブール",
           "threshold": "しきい値",
+          "thresholdTooltip": "ベースラインと候補の値の差が {percent} 以内の場合、回帰や改善ではなく「変化なし」とみなされます。",
+          "outcomeDimensions": "結果の判定基準",
+          "outcomeTooltipNone": "列が選択されていません。比較可能なすべての行が「未比較」と表示されます。",
+          "outcomeTooltipAll": "すべての対象列が各行の結果を決定します。",
+          "outcomeTooltipPartial": "{names} のみが各行の結果を決定します。他の列は表示されますが、結果には影響しません。",
+          "allOutcomeDimensions": "すべての対象列",
+          "noOutcomeDimensions": "列なし",
+          "selectedOutcomeDimensions": "{count} 列 | {count} 列",
+          "outcomeDimensionUnavailable": "{name}（比較ポリシーなし）",
+          "dimensionExcludedHint": "この列は結果の判定から除外されています。含めるには「結果の判定基準」で選択してください。",
           "measurePerRow": "試行全体の行ごとの平均",
           "dimensionImproved": "{count} 行が改善 | {count} 行が改善",
           "dimensionUnchanged": "{count} 行は変化なし | {count} 行は変化なし",
@@ -11274,8 +11290,8 @@
         },
         "searchPlaceholder": "項目を検索...",
         "csvImport": {
-          "button": "CSVをアップロード",
-          "title": "データセット項目のアップロード",
+          "button": "アイテムをインポート",
+          "title": "データセットアイテムのインポート",
           "description": "CSVファイルからデータセット項目をインポートします。",
           "fileLabel": "CSVファイル",
           "placeholder": "CSVファイルを選択",
@@ -12187,7 +12203,8 @@
       "remove": "削除",
       "save": "[保存]",
       "saveAsDraft": "下書きとして保存",
-      "createAndActivate": "保存して有効化"
+      "createAndActivate": "保存して有効化",
+      "testConnection": "接続テスト"
     },
     "scorerTypeDialog": {
       "title": "新しいスコアラーを作成",
@@ -12213,15 +12230,19 @@
       "availableModelsLabel": "ご利用可能なモデル",
       "apiKeyLabel": "APIキー",
       "apiKeyPlaceholder": "APIキーを入力",
-      "apiKeyHelp": "保存時に暗号化され、読み取ることはできません。編集時に空欄のままにすると既存のキーが保持されます。",
+      "apiKeyHelp": "保管時は暗号化され、読み戻されることはありません。編集を保存する際は空欄にすると、既存のキーが維持されます。",
       "authSection": "認証",
-      "authEditNote": "認証情報は読み取ることができません。ローテーションする場合のみAPIキーを再入力してください。",
+      "authEditNote": "認証情報は読み戻すことはできません。認証が必要なプロバイダーをテストするには、そのAPIキーを入力してください。",
       "cannotRename": "作成後に名前を変更することはできません。",
       "availableModelsHelp": "任意。このプロバイダーで利用可能なモデルのカンマ区切りリスト。",
       "saveError": "プロバイダを保存できませんでした",
       "nameRequired": "Provider name is required",
       "typeRequired": "Provider type is required",
-      "defaultModelRequired": "Default model is required"
+      "defaultModelRequired": "Default model is required",
+      "testRunning": "接続テスト中...",
+      "testPassed": "接続済み",
+      "testFailed": "接続に失敗しました",
+      "testError": "接続テストに失敗しました"
     },
     "scoreConfig": {
       "gteSymbol": "≥",
@@ -15696,7 +15717,6 @@
       "reservation": "予約",
       "sliType": "SLIタイプ",
       "owner": "オーナー",
-      "folder": "フォルダ",
       "streamPlaceholder": "ストリームを選択"
     },
     "empty": {
@@ -15726,7 +15746,24 @@
       "sourceHint": "アップタイムは、このアラートが発火していなかった測定時間の割合です。評価されなかった時間 — 一時停止、サイレンス、失敗 — は未測定であり、アップタイムとしてカウントされることはありません。",
       "loadFailed": "対象のアラートを読み込めませんでした",
       "noneEligible": "この組織のアラートはまだソースとして使用できません。",
-      "ineligibleOption": "{name} — {reason}",
+      "ineligible": {
+        "notScheduled": "スケジュールなし",
+        "grouped": "グループ化",
+        "notReferenceable": "使用不可",
+        "cron": "Cron スケジュール",
+        "tooInfrequent": "実行頻度が低すぎる",
+        "silenced": "サイレンス設定あり",
+        "other": "対象外",
+        "why": {
+          "notScheduled": "リアルタイムアラートはSLOに必要な実行履歴を保持しません。代わりにスケジュールアラートを使用してください。",
+          "grouped": "このアラートはグループごとに分割されており、実行時にどのグループをチェックしたかが記録されません。ここで使用するには group-by を削除してください。",
+          "notReferenceable": "SLOおよび複合アラートはソースにできません。通常のスケジュールアラートを選択してください。",
+          "cron": "このアラートは cron スケジュールで実行されるため、チェックの間隔が均一でなく、アップタイムを算出できません。固定間隔に変更してください。",
+          "tooInfrequent": "このアラートは {frequency} ごとに実行されます。未チェックの時間が生じないよう、{slice} ごとに少なくとも1回は実行される必要があります。",
+          "silenced": "発火後、このアラートは一定時間チェックを停止します。その停止期間は必ず異常が発生している期間と重なるため、SLOが実際よりも良く見えてしまいます。サイレンス期間を 0 に設定してください。"
+        },
+        "noFixedInterval": "固定間隔なし"
+      },
       "groupingLocked": "アラートベースのSLIはグループ化できません: 可用性台帳はグループごとではなくアラートごとに1回の実行を記録するため、グループごとのカバレッジは存在しません。",
       "sourceLink": "ソースアラート",
       "preview": {
@@ -15834,6 +15871,42 @@
       "editTargetMissing": "そのアラートはこのSLOにはもうありません。",
       "describeBurn": "バーンレート > {critical}（{long} と {short} にわたって）",
       "describeBudget": "エラー予算消費 > {critical}%"
+    },
+    "validation": {
+      "nameRequired": "SLO名は必須です",
+      "nameTooLong": "SLO名は256文字以内で指定してください",
+      "targetRequired": "目標値は必須です",
+      "targetRange": "目標値は0より大きく100未満で指定してください",
+      "targetPrecision": "目標値は小数点以下3桁以内で指定してください",
+      "streamTypeRequired": "ストリームタイプは必須です",
+      "streamRequired": "ストリームは必須です",
+      "goodExprRequired": "「Good when」は必須です",
+      "promqlGoodRequired": "「Good query」は必須です",
+      "promqlTotalRequired": "合計クエリは必須です",
+      "aggregateRequired": "集計式は必須です",
+      "comparatorRequired": "比較演算子は必須です",
+      "thresholdRequired": "しきい値は必須です",
+      "thresholdNumber": "しきい値は数値である必要があります",
+      "alertSourceRequired": "ソースアラートは必須です",
+      "groupedSlice": "グループ化されたSLOsは5分のスライスを使用する必要があります",
+      "alertCannotGroup": "アラートベースのSLIはグループ化できません",
+      "frequencyRequired": "頻度は必須です",
+      "frequencyPositive": "頻度は1分以上である必要があります",
+      "silenceRequired": "サイレンス期間は必須です",
+      "silenceNonNegative": "サイレンス期間は負の値にできません",
+      "targetsRequired": "送信先またはワークフローを少なくとも1つ選択してください",
+      "criticalRequired": "しきい値は必須です",
+      "criticalPositive": "しきい値は0より大きい必要があります",
+      "budgetRange": "バジェット消費は100%以下である必要があります",
+      "longWindowRequired": "長期ウィンドウは必須です",
+      "shortWindowRequired": "短期ウィンドウは必須です",
+      "shortInsideLong": "短期ウィンドウは長期ウィンドウより短い必要があります"
+    },
+    "duration": {
+      "seconds": "{count}秒 | {count}秒",
+      "minutes": "{count}分 | {count}分",
+      "hours": "{count}時間 | {count}時間",
+      "days": "{count}日 | {count}日"
     }
   },
   "promql": {

@@ -10793,7 +10793,8 @@
         "scoreConfigs": "Configuraciones de puntuación",
         "targetDataset": "Dataset de destino",
         "progress": "Progreso",
-        "updated": "Actualizado"
+        "updated": "Actualizado",
+        "actions": "Acciones"
       },
       "create": {
         "title": "Nueva cola",
@@ -10847,7 +10848,8 @@
           "refType": "Ref",
           "refId": "Referencia",
           "added": "Añadido",
-          "status": "Estado"
+          "status": "Estado",
+          "actions": "Acciones"
         },
         "status": {
           "pending": "Pendiente",
@@ -10959,6 +10961,8 @@
       "viewAll": "Ver experimentos",
       "baseline": "Línea base",
       "setBaseline": "Establecer línea base",
+      "baselineRequiresCompleted": "Solo una ejecución completada puede establecerse como línea de base.",
+      "baselineError": "No se pudo actualizar la línea de base.",
       "selectForComparison": "Seleccionar para comparación",
       "progress": "{done} de {total} espacios",
       "noScores": "No hay puntuaciones agregadas",
@@ -11069,8 +11073,10 @@
       "addToDataset": "Agregar",
       "detail": {
         "by": "por {user}",
-        "p50Latency": "Latencia P50",
+        "p50Latency": "Latencia P50 de tarea",
         "totalCost": "Costo total",
+        "costBreakdown": "Tarea {task} · Puntuación {scoring}",
+        "partialCostBreakdown": "Tarea {task} · Puntuación {scoring} · Parcial",
         "highDispersion": "Casos de alta dispersión",
         "highDispersionHint": "Filas donde los intentos no coinciden",
         "scoredRows": "{scored}/{total} filas puntuadas",
@@ -11100,7 +11106,7 @@
           "run": "Ejecución"
         },
         "runSummary": "{trials} · {scorers}",
-        "progress": "Progreso",
+        "progress": "Progreso de la tarea",
         "scoring": "Puntuación",
         "scoringDistribution": "{success} exitosos · {failed} fallidos · {pending} pendientes · {skipped} omitidos",
         "compare": "Comparar",
@@ -11193,6 +11199,16 @@
           "typeCategorical": "Categórico",
           "typeBoolean": "Booleano",
           "threshold": "Umbral",
+          "thresholdTooltip": "Los valores de la línea de base y los candidatos que difieran en {percent} o menos entre sí se consideran sin cambios, no regresados ni mejorados.",
+          "outcomeDimensions": "Criterios de resultado",
+          "outcomeTooltipNone": "No hay columnas seleccionadas — cada fila comparable se mostrará como No comparada.",
+          "outcomeTooltipAll": "Todas las columnas elegibles determinan el resultado de cada fila.",
+          "outcomeTooltipPartial": "Solo {names} determinan el resultado de cada fila. Las demás columnas se muestran, pero no lo afectan.",
+          "allOutcomeDimensions": "Todas las columnas elegibles",
+          "noOutcomeDimensions": "Sin columnas",
+          "selectedOutcomeDimensions": "{count} columna | {count} columnas",
+          "outcomeDimensionUnavailable": "{name} (sin política de comparación)",
+          "dimensionExcludedHint": "Esta columna está excluida de los resultados. Selecciónela en Criterios de resultado para incluirla.",
           "measurePerRow": "Media por fila, entre ensayos",
           "dimensionImproved": "{count} fila mejorada | {count} filas mejoradas",
           "dimensionUnchanged": "{count} fila sin cambios | {count} filas sin cambios",
@@ -11274,8 +11290,8 @@
         },
         "searchPlaceholder": "Buscar elementos...",
         "csvImport": {
-          "button": "Subir CSV",
-          "title": "Subir elementos del dataset",
+          "button": "Importar elementos",
+          "title": "Importar elementos del conjunto de datos",
           "description": "Importa elementos del dataset desde un archivo CSV.",
           "fileLabel": "Archivo CSV",
           "placeholder": "Selecciona un archivo CSV",
@@ -12187,7 +12203,8 @@
       "remove": "Eliminar",
       "save": "Guardar",
       "saveAsDraft": "Guardar como borrador",
-      "createAndActivate": "Guardar y activar"
+      "createAndActivate": "Guardar y activar",
+      "testConnection": "Probar conexión"
     },
     "scorerTypeDialog": {
       "title": "Crear un nuevo marcador",
@@ -12213,15 +12230,19 @@
       "availableModelsLabel": "Modelos disponibles",
       "apiKeyLabel": "Clave de API",
       "apiKeyPlaceholder": "Introduce la clave de API",
-      "apiKeyHelp": "Se almacena cifrada en reposo y nunca se vuelve a leer. Deja en blanco al editar para conservar la clave existente.",
+      "apiKeyHelp": "Se almacena cifrada en reposo y nunca se vuelve a leer. Déjela en blanco al guardar los cambios para conservar la clave existente.",
       "authSection": "Autenticación",
-      "authEditNote": "Las credenciales no se pueden volver a leer. Vuelve a introducir la clave de API solo si quieres rotarla.",
+      "authEditNote": "Las credenciales no se pueden volver a leer. Para probar un proveedor que requiera autenticación, ingrese su clave de API.",
       "cannotRename": "No se puede renombrar después de la creación.",
       "availableModelsHelp": "Opcional. Lista separada por comas de los modelos disponibles en este proveedor.",
       "saveError": "No se pudo guardar el proveedor",
       "nameRequired": "Provider name is required",
       "typeRequired": "Provider type is required",
-      "defaultModelRequired": "Default model is required"
+      "defaultModelRequired": "Default model is required",
+      "testRunning": "Probando conexión...",
+      "testPassed": "Conectado",
+      "testFailed": "Conexión fallida",
+      "testError": "No se pudo probar la conexión"
     },
     "scoreConfig": {
       "gteSymbol": "≥",
@@ -15696,7 +15717,6 @@
       "reservation": "Reserva",
       "sliType": "Tipo de SLI",
       "owner": "Propietario",
-      "folder": "Carpeta",
       "streamPlaceholder": "Seleccionar un flujo"
     },
     "empty": {
@@ -15726,7 +15746,24 @@
       "sourceHint": "El tiempo de actividad es la fracción del tiempo medido en que esta alerta no se estaba disparando. El tiempo en que no se evaluó — pausada, silenciada o con errores — no se mide y nunca se cuenta como tiempo de actividad.",
       "loadFailed": "No se pudieron cargar las alertas elegibles",
       "noneEligible": "Ninguna alerta en esta organización puede usarse como fuente todavía.",
-      "ineligibleOption": "{name} — {reason}",
+      "ineligible": {
+        "notScheduled": "No programada",
+        "grouped": "Agrupada",
+        "notReferenceable": "No utilizable",
+        "cron": "Programación cron",
+        "tooInfrequent": "Se ejecuta con muy poca frecuencia",
+        "silenced": "Tiene silencio",
+        "other": "No elegible",
+        "why": {
+          "notScheduled": "Las alertas en tiempo real no conservan el historial de ejecuciones que un SLO necesita. Utilice una alerta programada en su lugar.",
+          "grouped": "Esta alerta se divide por grupo y una ejecución no registra qué grupos comprobó. Elimine su agrupación para usarla aquí.",
+          "notReferenceable": "Las alertas SLO y compuestas no pueden ser fuentes. Elija una alerta programada normal.",
+          "cron": "Esta alerta se ejecuta con una programación cron, por lo que sus comprobaciones no están espaciadas uniformemente y no se puede calcular el tiempo de actividad. Cámbiela a un intervalo fijo.",
+          "tooInfrequent": "Esta alerta se ejecuta cada {frequency}. Debe ejecutarse al menos cada {slice} para que no haya períodos sin comprobar.",
+          "silenced": "Después de dispararse, esta alerta deja de comprobar durante un tiempo — y ese intervalo siempre cae en un período problemático, lo que favorecería al SLO. Establezca su período de silencio en 0."
+        },
+        "noFixedInterval": "sin intervalo fijo"
+      },
       "groupingLocked": "Un SLI basado en alertas no se puede agrupar: el libro de disponibilidad registra una ejecución por alerta, no por grupo, por lo que no hay una cobertura por grupo en la que apoyarse.",
       "sourceLink": "Alerta de origen",
       "preview": {
@@ -15834,6 +15871,42 @@
       "editTargetMissing": "Esa alerta ya no está en este SLO.",
       "describeBurn": "Tasa de consumo > {critical} en {long} y {short}",
       "describeBudget": "Presupuesto de errores consumido > {critical}%"
+    },
+    "validation": {
+      "nameRequired": "El nombre del SLO es obligatorio",
+      "nameTooLong": "El nombre del SLO debe tener 256 caracteres o menos",
+      "targetRequired": "El objetivo es obligatorio",
+      "targetRange": "El objetivo debe ser mayor que 0 y menor que 100",
+      "targetPrecision": "El objetivo admite como máximo 3 decimales",
+      "streamTypeRequired": "El tipo de stream es obligatorio",
+      "streamRequired": "El stream es obligatorio",
+      "goodExprRequired": "\"Bueno cuando\" es obligatorio",
+      "promqlGoodRequired": "La consulta de eventos buenos es obligatoria",
+      "promqlTotalRequired": "La consulta total es obligatoria",
+      "aggregateRequired": "La expresión de agregación es obligatoria",
+      "comparatorRequired": "El comparador es obligatorio",
+      "thresholdRequired": "El umbral es obligatorio",
+      "thresholdNumber": "El umbral debe ser un número",
+      "alertSourceRequired": "La alerta de origen es obligatoria",
+      "groupedSlice": "Los SLO agrupados deben usar un intervalo de 5 minutos",
+      "alertCannotGroup": "Un SLI basado en alertas no puede agruparse",
+      "frequencyRequired": "La frecuencia es obligatoria",
+      "frequencyPositive": "La frecuencia debe ser de al menos 1 minuto",
+      "silenceRequired": "El período de silencio es obligatorio",
+      "silenceNonNegative": "El período de silencio no puede ser negativo",
+      "targetsRequired": "Seleccione al menos un destino o flujo de trabajo",
+      "criticalRequired": "El umbral es obligatorio",
+      "criticalPositive": "El umbral debe ser mayor que 0",
+      "budgetRange": "El presupuesto consumido debe ser del 100% o menos",
+      "longWindowRequired": "La ventana larga es obligatoria",
+      "shortWindowRequired": "La ventana corta es obligatoria",
+      "shortInsideLong": "La ventana corta debe ser más corta que la ventana larga"
+    },
+    "duration": {
+      "seconds": "{count} segundo | {count} segundos",
+      "minutes": "{count} minuto | {count} minutos",
+      "hours": "{count} hora | {count} horas",
+      "days": "{count} día | {count} días"
     }
   },
   "promql": {

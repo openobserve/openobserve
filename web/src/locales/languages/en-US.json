@@ -15717,7 +15717,6 @@
       "reservation": "Reservation",
       "sliType": "SLI type",
       "owner": "Owner",
-      "folder": "Folder",
       "streamPlaceholder": "Select a stream"
     },
     "empty": {
@@ -15747,7 +15746,24 @@
       "sourceHint": "Uptime is the fraction of measured time this alert was not firing. Time it did not evaluate — paused, silenced, or failing — is unmeasured, and never counted as uptime.",
       "loadFailed": "Could not load the eligible alerts",
       "noneEligible": "No alert in this organization can be used as a source yet.",
-      "ineligibleOption": "{name} — {reason}",
+      "ineligible": {
+        "notScheduled": "Not scheduled",
+        "grouped": "Grouped",
+        "notReferenceable": "Not usable",
+        "cron": "Cron schedule",
+        "tooInfrequent": "Runs too rarely",
+        "silenced": "Has silence",
+        "other": "Not eligible",
+        "why": {
+          "notScheduled": "Real-time alerts don't keep the run history an SLO needs. Use a scheduled alert instead.",
+          "grouped": "This alert is split by group, and a run doesn't record which groups it checked. Remove its group-by to use it here.",
+          "notReferenceable": "SLO and composite alerts can't be sources. Pick a plain scheduled alert.",
+          "cron": "This alert runs on a cron schedule, so its checks aren't evenly spaced and uptime can't be worked out. Change it to a fixed interval.",
+          "tooInfrequent": "This alert runs every {frequency}. It needs to run at least every {slice} so no time goes unchecked.",
+          "silenced": "After firing, this alert stops checking for a while — and that gap always lands on a bad patch, which would flatter the SLO. Set its silence period to 0."
+        },
+        "noFixedInterval": "no fixed interval"
+      },
       "groupingLocked": "An alert-based SLI cannot be grouped: the availability ledger records one run per alert, not per group, so there is no per-group coverage to stand on.",
       "sourceLink": "Source alert",
       "preview": {
@@ -15855,6 +15871,42 @@
       "editTargetMissing": "That alert is no longer on this SLO.",
       "describeBurn": "Burn rate > {critical} over {long} and {short}",
       "describeBudget": "Error budget consumed > {critical}%"
+    },
+    "validation": {
+      "nameRequired": "SLO name is required",
+      "nameTooLong": "SLO name must be 256 characters or fewer",
+      "targetRequired": "Target is required",
+      "targetRange": "Target must be greater than 0 and below 100",
+      "targetPrecision": "Target supports at most 3 decimal places",
+      "streamTypeRequired": "Stream type is required",
+      "streamRequired": "Stream is required",
+      "goodExprRequired": "\"Good when\" is required",
+      "promqlGoodRequired": "Good query is required",
+      "promqlTotalRequired": "Total query is required",
+      "aggregateRequired": "Aggregate expression is required",
+      "comparatorRequired": "Comparator is required",
+      "thresholdRequired": "Threshold is required",
+      "thresholdNumber": "Threshold must be a number",
+      "alertSourceRequired": "Source alert is required",
+      "groupedSlice": "Grouped SLOs must use a 5-minute slice",
+      "alertCannotGroup": "An alert-based SLI cannot be grouped",
+      "frequencyRequired": "Frequency is required",
+      "frequencyPositive": "Frequency must be at least 1 minute",
+      "silenceRequired": "Silence period is required",
+      "silenceNonNegative": "Silence period cannot be negative",
+      "targetsRequired": "Select at least one destination or workflow",
+      "criticalRequired": "Threshold is required",
+      "criticalPositive": "Threshold must be greater than 0",
+      "budgetRange": "Budget consumed must be 100% or less",
+      "longWindowRequired": "Long window is required",
+      "shortWindowRequired": "Short window is required",
+      "shortInsideLong": "Short window must be shorter than the long window"
+    },
+    "duration": {
+      "seconds": "{count} second | {count} seconds",
+      "minutes": "{count} minute | {count} minutes",
+      "hours": "{count} hour | {count} hours",
+      "days": "{count} day | {count} days"
     }
   },
   "promql": {
