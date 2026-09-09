@@ -30,7 +30,13 @@ use config::{
 use datafusion::{arrow::datatypes::Schema, error::DataFusionError, prelude::SessionContext};
 use hashbrown::HashSet;
 use infra::errors::Result;
-use promql::{DEFAULT_LOOKBACK, TableProvider, exec::PromqlContext, promql::name_visitor};
+use metrics_index::MetricsFileLayout;
+use promql::{
+    DEFAULT_LOOKBACK, TableProvider,
+    exec::PromqlContext,
+    micros,
+    promql::{name_visitor, selector_window},
+};
 use promql_parser::{label::Matchers, parser};
 use proto::cluster_rpc;
 use rayon::slice::ParallelSliceMut;
@@ -40,6 +46,16 @@ mod storage;
 mod wal;
 
 type Context = (SessionContext, Arc<Schema>, ScanStats, bool);
+
+/// What a range query's groups are planned from.
+struct GroupPlan {
+    /// The heaviest stream's files, oldest `max_ts` first.
+    files: Vec<FileKey>,
+    /// How far before its start the query reads.
+    window: i64,
+    /// The newest legacy file's `max_ts`, only when hash-ordered files exist alongside it.
+    legacy_max_ts: Option<i64>,
+}
 
 struct StorageProvider {
     trace_id: String,
@@ -123,55 +139,22 @@ pub async fn search(
 
     let start = query.start;
     let end = query.end;
-    let step = query.step;
     let trace_id = req.job.as_ref().unwrap().trace_id.to_string();
-    let org_id = &req.org_id;
 
     let mut results = Vec::new();
     if start == end {
         results.push(search_inner(req).await?);
     } else {
-        // 1. get max records stream
-        let start_ts = std::time::Instant::now();
-        let file_list = match get_max_file_list(&trace_id, org_id, &query.query, start, end).await {
-            Ok(v) => v,
-            Err(e) => {
-                log::error!(
-                    "[trace_id {trace_id}] promql->search->grpc: get max records stream error: {e}"
-                );
-                return Err(e);
-            }
-        };
-        log::info!(
-            "[trace_id {trace_id}] promql->search->grpc: get max records stream, took: {} ms",
-            start_ts.elapsed().as_millis()
-        );
+        // cuts only pay off where the engine can stream
+        let with_cuts = cfg.search.feature_metrics_streaming_agg_enabled
+            && !query.query_exemplars
+            && !req.is_super_cluster;
+        let group = search_groups(req, with_cuts, "search").await?;
 
-        // 2. generate search group with max records stream
-        let start_ts = std::time::Instant::now();
-        let memory_limit = cfg.memory_cache.datafusion_max_size; // bytes
-        let group = match generate_search_group(memory_limit, file_list, start, end, step).await {
-            Ok(v) => v,
-            Err(e) => {
-                log::error!(
-                    "[trace_id {trace_id}] promql->search->grpc: generate search group error: {e}"
-                );
-                return Err(e);
-            }
-        };
-        if group.len() > 1 {
-            log::info!("[trace_id {trace_id}] promql->search->grpc: get groups {group:?}");
-        }
-        log::info!(
-            "[trace_id {trace_id}] promql->search->grpc: generate search group, took: {} ms",
-            start_ts.elapsed().as_millis()
-        );
-
-        // 3. search each group
+        // search each group
         for (start, end) in group {
             let mut req = req.clone();
-            req.need_wal =
-                end >= now_micros() - second_micros(cfg.limit.max_file_retention_time as i64 * 3);
+            req.need_wal = end >= wal_floor();
             req.query.as_mut().unwrap().start = start;
             req.query.as_mut().unwrap().end = end;
             let resp = search_inner(&req).await?;
@@ -205,14 +188,11 @@ pub async fn data(
     req: &cluster_rpc::MetricsQueryRequest,
     tx: mpsc::Sender<Result<cluster_rpc::MetricsQueryResponse, tonic::Status>>,
 ) -> Result<()> {
-    let cfg = config::get_config();
     let query = req.query.as_ref().unwrap();
 
     let start = query.start;
     let end = query.end;
-    let step = query.step;
     let trace_id = req.job.as_ref().unwrap().trace_id.to_string();
-    let org_id = &req.org_id;
 
     let (data_tx, mut data_rx) = mpsc::channel::<(value::Value, String, ScanStats, i64)>(2);
     let data_trace_id = trace_id.clone();
@@ -256,46 +236,12 @@ pub async fn data(
         );
         return Ok(());
     }
-    // 1. get max records stream
-    let file_list = match get_max_file_list(&trace_id, org_id, &query.query, start, end).await {
-        Ok(v) => v,
-        Err(e) => {
-            log::error!(
-                "[trace_id {trace_id}] promql->data->grpc: get max records stream error: {e}"
-            );
-            return Err(e);
-        }
-    };
-    log::info!(
-        "[trace_id {trace_id}] promql->data->grpc: get max records stream, took: {} ms",
-        start_ts.elapsed().as_millis()
-    );
+    let group = search_groups(req, false, "data").await?;
 
-    // 2. generate search group with max records stream
-    let start_ts = std::time::Instant::now();
-    let memory_limit = cfg.memory_cache.datafusion_max_size; // bytes
-    let group = match generate_search_group(memory_limit, file_list, start, end, step).await {
-        Ok(v) => v,
-        Err(e) => {
-            log::error!(
-                "[trace_id {trace_id}] promql->data->grpc: generate search group error: {e}"
-            );
-            return Err(e);
-        }
-    };
-    if group.len() > 1 {
-        log::info!("[trace_id {trace_id}] promql->data->grpc: get groups {group:?}");
-    }
-    log::info!(
-        "[trace_id {trace_id}] promql->data->grpc: generate data group, took: {} ms",
-        start_ts.elapsed().as_millis()
-    );
-
-    // 3. search each group
+    // search each group
     for (start, end) in group {
         let mut req = req.clone();
-        req.need_wal =
-            end >= now_micros() - second_micros(cfg.limit.max_file_retention_time as i64 * 3);
+        req.need_wal = end >= wal_floor();
         req.query.as_mut().unwrap().start = start;
         req.query.as_mut().unwrap().end = end;
         let resp = search_inner(&req).await?;
@@ -389,33 +335,99 @@ pub async fn search_inner(
     Ok((value, result_type, scan_stats, took))
 }
 
-async fn get_max_file_list(
+/// Plans a range query's groups: split at the streaming cuts when asked, then sized by memory.
+async fn search_groups(
+    req: &cluster_rpc::MetricsQueryRequest,
+    with_cuts: bool,
+    tag: &str,
+) -> Result<Vec<(i64, i64)>> {
+    let trace_id = req.job.as_ref().unwrap().trace_id.as_str();
+    let query = req.query.as_ref().unwrap();
+    let (start, end, step) = (query.start, query.end, query.step);
+
+    // 1. get max records stream
+    let start_ts = std::time::Instant::now();
+    let plan = match group_plan(trace_id, &req.org_id, &query.query, start, end).await {
+        Ok(v) => v,
+        Err(e) => {
+            log::error!(
+                "[trace_id {trace_id}] promql->{tag}->grpc: get max records stream error: {e}"
+            );
+            return Err(e);
+        }
+    };
+    log::info!(
+        "[trace_id {trace_id}] promql->{tag}->grpc: get max records stream, took: {} ms",
+        start_ts.elapsed().as_millis()
+    );
+
+    // 2. generate search group with max records stream
+    let start_ts = std::time::Instant::now();
+    let cuts = if with_cuts {
+        search_group_cuts(start, end, step, &plan, wal_floor())
+    } else {
+        Vec::new()
+    };
+    let memory_limit = config::get_config().memory_cache.datafusion_max_size; // bytes
+    let groups = match generate_search_groups(memory_limit, &plan, start, end, step, &cuts).await {
+        Ok(v) => v,
+        Err(e) => {
+            log::error!(
+                "[trace_id {trace_id}] promql->{tag}->grpc: generate search group error: {e}"
+            );
+            return Err(e);
+        }
+    };
+    if groups.len() > 1 {
+        log::info!(
+            "[trace_id {trace_id}] promql->{tag}->grpc: get groups {groups:?}, cuts {cuts:?}"
+        );
+    }
+    log::info!(
+        "[trace_id {trace_id}] promql->{tag}->grpc: generate search group, took: {} ms",
+        start_ts.elapsed().as_millis()
+    );
+    Ok(groups)
+}
+
+async fn group_plan(
     trace_id: &str,
     org_id: &str,
     query: &str,
     start: i64,
     end: i64,
-) -> Result<Vec<FileKey>> {
+) -> Result<GroupPlan> {
     // 1. get metrics name
     let ast = parser::parse(query).map_err(DataFusionError::Execution)?;
     let mut visitor = name_visitor::MetricNameVisitor::default();
     promql_parser::util::walk_expr(&mut visitor, &ast).unwrap();
     let metrics_name = visitor.into_names();
+    let window = micros(selector_window::max_selector_window(&ast));
 
     // 2. get max records stream
     let mut file_list = Vec::new();
     let mut max_records = 0;
+    let mut legacy_max_ts = None;
+    let mut hash_ordered = false;
     for stream_name in metrics_name {
+        // the read-back window loads with the first group, so its files count too
         let stream_file_list = search_service::file_list::query(
             trace_id,
             org_id,
             StreamType::Metrics,
             &stream_name,
             PartitionTimeLevel::default(),
-            start,
+            start - window,
             end,
         )
         .await?;
+        for file in &stream_file_list {
+            if MetricsFileLayout::is_hash_ordered(&file.key) {
+                hash_ordered = true;
+            } else {
+                legacy_max_ts = legacy_max_ts.max(Some(file.meta.max_ts));
+            }
+        }
         let stream_records = stream_file_list.iter().map(|f| f.meta.records).sum::<i64>();
         if stream_records > max_records {
             max_records = stream_records;
@@ -423,7 +435,75 @@ async fn get_max_file_list(
         }
     }
     file_list.par_sort_unstable_by(|a, b| a.meta.max_ts.cmp(&b.meta.max_ts));
-    Ok(file_list)
+    Ok(GroupPlan {
+        files: file_list,
+        window,
+        legacy_max_ts: legacy_max_ts.filter(|_| hash_ordered),
+    })
+}
+
+/// The time from which a group must also read the WAL.
+fn wal_floor() -> i64 {
+    let retention = config::get_config().limit.max_file_retention_time as i64;
+    now_micros() - second_micros(retention * 3)
+}
+
+/// Group boundaries after which every group streams from hash-ordered files alone.
+fn search_group_cuts(
+    start: i64,
+    end: i64,
+    step: i64,
+    plan: &GroupPlan,
+    wal_floor: i64,
+) -> Vec<i64> {
+    // a group starting at the cut reads back `window` and must still miss the newest legacy file
+    let layout_cut = plan.legacy_max_ts.map(|ts| ts + plan.window + step);
+    let mut cuts: Vec<i64> = layout_cut
+        .into_iter()
+        .chain([wal_floor])
+        .filter(|&cut| cut > start && cut <= end)
+        // groups evaluate on the query's own grid
+        .map(|cut| start + (cut - start + step - 1) / step * step)
+        .filter(|&cut| cut <= end)
+        .collect();
+    cuts.sort_unstable();
+    cuts.dedup();
+    cuts
+}
+
+/// Sizes the groups by memory within each piece between two cuts, so no group straddles a cut.
+async fn generate_search_groups(
+    memory_limit: usize,
+    plan: &GroupPlan,
+    start: i64,
+    end: i64,
+    step: i64,
+    cuts: &[i64],
+) -> Result<Vec<(i64, i64)>> {
+    if cuts.is_empty() {
+        return generate_search_group(memory_limit, plan.files.clone(), start, end, step).await;
+    }
+    let mut groups = Vec::new();
+    let mut piece_start = start;
+    for piece_end in cuts.iter().map(|cut| cut - step).chain([end]) {
+        if piece_start == piece_end {
+            groups.push((piece_start, piece_end));
+        } else {
+            let files = plan
+                .files
+                .iter()
+                .filter(|f| {
+                    f.meta.min_ts <= piece_end && f.meta.max_ts >= piece_start - plan.window
+                })
+                .cloned()
+                .collect();
+            groups.extend(
+                generate_search_group(memory_limit, files, piece_start, piece_end, step).await?,
+            );
+        }
+        piece_start = piece_end + step;
+    }
+    Ok(groups)
 }
 
 /// generate search group
@@ -631,5 +711,89 @@ mod tests {
         let expected = vec![(0, 200), (210, 300), (310, 430)];
         assert!(resp.is_ok());
         assert_eq!(resp.unwrap(), expected);
+    }
+
+    fn file(min_ts: i64, max_ts: i64, records: i64) -> FileKey {
+        FileKey {
+            meta: FileMeta {
+                records,
+                min_ts,
+                max_ts,
+                ..Default::default()
+            },
+            ..Default::default()
+        }
+    }
+
+    fn plan(files: Vec<FileKey>, window: i64, legacy_max_ts: Option<i64>) -> GroupPlan {
+        GroupPlan {
+            files,
+            window,
+            legacy_max_ts,
+        }
+    }
+
+    #[test]
+    fn test_search_group_cuts_land_on_the_query_grid() {
+        let mixed = plan(vec![], 300, Some(1000));
+        // the layout cut 1000 + 300 + 30 rounds up to 1350, the WAL floor 2000 to 2010
+        assert_eq!(
+            search_group_cuts(0, 3000, 30, &mixed, 2000),
+            vec![1350, 2010]
+        );
+        // an off-grid start keeps its own grid
+        assert_eq!(
+            search_group_cuts(5, 3000, 30, &mixed, 2000),
+            vec![1355, 2015]
+        );
+        // cuts outside (start, end] are dropped, a cut on `end` stays
+        assert_eq!(
+            search_group_cuts(1400, 3000, 30, &mixed, 4000),
+            Vec::<i64>::new()
+        );
+        assert_eq!(
+            search_group_cuts(0, 2010, 30, &mixed, 2000),
+            vec![1350, 2010]
+        );
+        assert_eq!(search_group_cuts(0, 2005, 30, &mixed, 2000), vec![1350]);
+        // no legacy files: only the WAL floor
+        let hash_only = plan(vec![], 300, None);
+        assert_eq!(search_group_cuts(0, 3000, 30, &hash_only, 2000), vec![2010]);
+        // coinciding cuts collapse
+        let adjacent = plan(vec![], 300, Some(1670));
+        assert_eq!(search_group_cuts(0, 3000, 30, &adjacent, 2000), vec![2010]);
+    }
+
+    #[tokio::test]
+    async fn test_generate_search_groups_never_straddle_a_cut() {
+        let files = vec![
+            file(0, 100, 100),
+            file(100, 200, 100),
+            file(200, 300, 100),
+            file(300, 400, 100),
+            file(400, 430, 30),
+        ];
+        let plan = plan(files, 0, None);
+        // no cuts: the memory sizing alone
+        assert_eq!(
+            generate_search_groups(100, &plan, 0, 430, 5, &[])
+                .await
+                .unwrap(),
+            vec![(0, 200), (205, 300), (305, 400), (405, 430)]
+        );
+        // each piece is sized on its own and the piece after a cut starts exactly at it
+        assert_eq!(
+            generate_search_groups(100, &plan, 0, 430, 5, &[300])
+                .await
+                .unwrap(),
+            vec![(0, 200), (205, 295), (300, 400), (405, 430)]
+        );
+        // a cut on `end` leaves a single-point group
+        assert_eq!(
+            generate_search_groups(100_000, &plan, 0, 430, 10, &[200, 430])
+                .await
+                .unwrap(),
+            vec![(0, 190), (200, 420), (430, 430)]
+        );
     }
 }
