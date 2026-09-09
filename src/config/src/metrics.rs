@@ -2578,6 +2578,11 @@ fn register_metrics(registry: &Registry) {
         .register(Box::new(SYNTHETICS_GRANT_WRITEBACK_FAILURES_TOTAL.clone()))
         .expect("Metric registered");
     registry
+        .register(Box::new(
+            SYNTHETICS_COMPOSITION_GUARD_FAILURES_TOTAL.clone(),
+        ))
+        .expect("Metric registered");
+    registry
         .register(Box::new(USAGE_ENQUEUE_FAILURES_TOTAL.clone()))
         .expect("Metric registered");
     registry
@@ -3251,6 +3256,10 @@ mod tests {
                 Box::new(SYNTHETICS_STEP_ZERO_FALLBACK_TOTAL.clone()),
             ),
             (
+                "SYNTHETICS_COMPOSITION_GUARD_FAILURES_TOTAL",
+                Box::new(SYNTHETICS_COMPOSITION_GUARD_FAILURES_TOTAL.clone()),
+            ),
+            (
                 "USAGE_ENQUEUE_FAILURES_TOTAL",
                 Box::new(USAGE_ENQUEUE_FAILURES_TOTAL.clone()),
             ),
@@ -3311,6 +3320,12 @@ mod tests {
                 "zo_synthetics_step_zero_fallback_total",
             ),
             (
+                SYNTHETICS_COMPOSITION_GUARD_FAILURES_TOTAL.desc()[0]
+                    .fq_name
+                    .as_str(),
+                "zo_synthetics_composition_guard_failures_total",
+            ),
+            (
                 USAGE_ENQUEUE_FAILURES_TOTAL.desc()[0].fq_name.as_str(),
                 "zo_usage_enqueue_failures_total",
             ),
@@ -3348,6 +3363,7 @@ mod tests {
         let _ = SYNTHETICS_BROWSER_MS_TOTAL.clone();
         let _ = SYNTHETICS_STEP_CLAMP_TOTAL.clone();
         let _ = SYNTHETICS_STEP_ZERO_FALLBACK_TOTAL.clone();
+        let _ = SYNTHETICS_COMPOSITION_GUARD_FAILURES_TOTAL.clone();
         let _ = USAGE_ENQUEUE_FAILURES_TOTAL.clone();
         let _ = TRIAL_QUOTA_FLUSH_DROPS_TOTAL.clone();
         let _ = METERING_OFFSET_AGE_SECONDS.clone();
