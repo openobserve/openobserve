@@ -45,7 +45,7 @@ import BrowserJourneyStepEditor from "./BrowserJourneyStepEditor.vue";
 import BrowserJourneyStepError from "./BrowserJourneyStepError.vue";
 import ExtensionSetupDialog from "./ExtensionSetupDialog.vue";
 import { stepIsMissingTarget } from "@/utils/synthetics/stepTarget";
-import { journeyToWireSteps } from "@/utils/synthetics/mapRecordedStep";
+import { journeyToWireSteps, mapWireSteps } from "@/utils/synthetics/mapRecordedStep";
 import { classifyPreflightFailure } from "@/utils/synthetics/replayFailure";
 import syntheticsService from "@/services/synthetics";
 import {
@@ -1089,7 +1089,7 @@ async function fetchChildJourneyForRestore(id: string): Promise<ChildJourney> {
   const child: ChildJourney = {
     id,
     name: data.name ?? "",
-    steps: (data.config?.steps ?? []) as BrowserStep[],
+    steps: mapWireSteps(data.config?.steps ?? []),
   };
   childrenCache.value.set(id, child);
   return child;
@@ -1114,7 +1114,7 @@ async function ensureChildLoaded(row: BrowserStep) {
     childrenCache.value.set(id, {
       id,
       name: data.name ?? "",
-      steps: (data.config?.steps ?? []) as BrowserStep[],
+      steps: mapWireSteps(data.config?.steps ?? []),
     });
   } catch (err: any) {
     if (err?.response?.status === 403) {
