@@ -146,10 +146,7 @@ mod tests {
         },
         *,
     };
-    use crate::{
-        functions,
-        series_stream::merge::{SeriesLabels, series_label_columns},
-    };
+    use crate::{functions, series_stream::merge::series_label_columns};
 
     fn arrow_schema() -> Arc<Schema> {
         use datafusion::arrow::datatypes::Field;
@@ -430,11 +427,7 @@ mod tests {
                 matchers: &Matchers::empty(),
                 offset: 0,
             };
-            let labels = SeriesLabels {
-                selector: &all_labels,
-                skip: false,
-            };
-            let label_cols = series_label_columns(&arrow_schema(), &labels, func_name);
+            let label_cols = series_label_columns(&arrow_schema(), &all_labels, func_name);
             let sources = shard_sources(
                 &ctx,
                 &arrow_schema(),

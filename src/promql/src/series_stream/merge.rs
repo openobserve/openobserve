@@ -62,13 +62,6 @@ pub(crate) struct StreamingSelector<'a> {
     pub offset: i64,
 }
 
-/// Which labels an emitted series carries: the engine's label selector narrows the projection,
-/// and a query that drops every label at the root skips them entirely.
-pub(crate) struct SeriesLabels<'a> {
-    pub selector: &'a HashSet<String>,
-    pub skip: bool,
-}
-
 /// One shard's series stream; every chain holds one run per series, so the minimum head hash is the
 /// next series.
 pub(crate) struct MergeSeriesStream {
@@ -300,12 +293,9 @@ pub(crate) async fn shard_sources(
 /// (which always keeps `le`), without the metric name unless the function keeps it.
 pub(crate) fn series_label_columns(
     schema: &Schema,
-    labels: &SeriesLabels<'_>,
+    label_selector: &HashSet<String>,
     func_name: &str,
 ) -> Vec<String> {
-    if labels.skip {
-        return vec![];
-    }
     let mut cols: Vec<String> = schema
         .fields()
         .iter()
@@ -314,8 +304,8 @@ pub(crate) fn series_label_columns(
         .filter(|name| {
             name != HASH_LABEL
                 && name != EXEMPLARS_LABEL
-                && (labels.selector.is_empty()
-                    || labels.selector.contains(name)
+                && (label_selector.is_empty()
+                    || label_selector.contains(name)
                     || name == BUCKET_LABEL)
                 && (name != NAME_LABEL || KEEP_METRIC_NAME_FUNC.contains(func_name))
         })
@@ -439,22 +429,20 @@ mod tests {
             Field::new(EXEMPLARS_LABEL, DataType::Utf8, true),
         ]);
         let all = HashSet::new();
-        let labels = |selector, skip| SeriesLabels { selector, skip };
         assert_eq!(
-            series_label_columns(&schema, &labels(&all, false), "rate"),
+            series_label_columns(&schema, &all, "rate"),
             ["instance", "le", "path"]
         );
         // last_over_time keeps the metric name, like an offset would
         assert_eq!(
-            series_label_columns(&schema, &labels(&all, false), "last_over_time"),
+            series_label_columns(&schema, &all, "last_over_time"),
             [NAME_LABEL, "instance", "le", "path"]
         );
         let selected: HashSet<String> = ["path".to_string()].into_iter().collect();
         assert_eq!(
-            series_label_columns(&schema, &labels(&selected, false), "rate"),
+            series_label_columns(&schema, &selected, "rate"),
             ["le", "path"]
         );
-        assert!(series_label_columns(&schema, &labels(&all, true), "rate").is_empty());
     }
 
     #[test]

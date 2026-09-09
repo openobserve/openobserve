@@ -38,7 +38,7 @@ use super::{
 };
 use crate::{
     functions, fused, micros,
-    series_stream::merge::{SeriesLabels, StreamingSelector, series_label_columns, shard_sources},
+    series_stream::merge::{StreamingSelector, series_label_columns, shard_sources},
 };
 
 /// A selector with its contexts created, ready for either streaming consumer.
@@ -119,11 +119,11 @@ impl Engine {
             return Ok(None);
         };
         if let [(ctx, schema, scan_stats, _)] = target.ctxs.as_slice() {
-            let labels = SeriesLabels {
-                selector: &target.label_selector,
-                skip: self.skip_labels,
+            let label_cols = if self.skip_labels {
+                vec![]
+            } else {
+                series_label_columns(schema, &target.label_selector, func.name())
             };
-            let label_cols = series_label_columns(schema, &labels, func.name());
             let selector = target.streaming_selector();
             let eval = Arc::new(fused::SeriesEval::new(func.clone(), range, &self.eval_ctx));
             let run = async {
