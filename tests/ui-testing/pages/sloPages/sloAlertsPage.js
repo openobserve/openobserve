@@ -37,7 +37,7 @@ export class SloAlertsPage {
       silence: '[data-test="slo-alert-form-silence"]',
       submit: '[data-test="slo-alert-form-submit"]',
       cancel: '[data-test="slo-alert-form-cancel"]',
-      formError: '[data-test="slo-alert-form-error"]',
+      formError: '[data-test="o-toast-message"]',
 
       // Condition
       conditionCritical: '[data-test="slos-sloalertcondition-critical"]',
@@ -54,6 +54,16 @@ export class SloAlertsPage {
   alertEdit(alertId) { return `[data-test="slo-alerts-edit-${alertId}"]`; }
   presetCard(key) { return `[data-test="slos-sloalertcondition-preset-${key}"]`; }
   kindOption(value) { return `[data-test="slos-sloalertcondition-kind-${value}"]`; }
+
+  // ------------------------------------------------------------- element getters
+
+  getListItemByName(name) {
+    return this.page.locator(this.locators.list).getByText(name, { exact: false });
+  }
+
+  getListRowsByName(name) {
+    return this.page.locator(`${this.locators.list} li`).filter({ hasText: name });
+  }
 
   // ------------------------------------------------------------------- actions
 
@@ -130,6 +140,9 @@ export class SloAlertsPage {
   async setDescription(text) { await this.fillInput(this.locators.description, text); }
   async setFrequency(mins) { await this.fillInput(this.locators.frequency, mins); }
   async setSilence(mins) { await this.fillInput(this.locators.silence, mins); }
+  async setCritical(value) { await this.fillInput(this.locators.conditionCritical, value); }
+  async setLongWindowHours(hours) { await this.fillInput(this.locators.conditionLong, hours); }
+  async setShortWindowMinutes(mins) { await this.fillInput(this.locators.conditionShort, mins); }
 
   async selectKind(kind) {
     const item = this.page.locator(this.kindOption(kind));
@@ -292,7 +305,7 @@ export class SloAlertsPage {
   /**
    * The NAME field's inline error.
    *
-   * A blank name never produces the `slo-alert-form-error` banner: `submit()`
+   * A blank name never produces a save toast: `submit()`
    * does `if (nameError.value) return;` before any request, so the only signal
    * is the OInput's own `-error` node. Asserting the banner here would demand
    * behaviour the form does not have.
@@ -303,11 +316,44 @@ export class SloAlertsPage {
     if (pattern) await expect(err).toContainText(pattern);
   }
 
-  /** The banner shown for a SERVER rejection (saveError). */
+  /** The toast raised for a refused save — the same surface the alert form uses. */
   async expectFormError(pattern = null) {
-    const err = this.page.locator(this.locators.formError);
+    const toasts = this.page.locator(this.locators.formError);
+    await expect(toasts.first()).toBeVisible({ timeout: 20000 });
+    if (pattern) await expect(toasts.filter({ hasText: pattern })).not.toHaveCount(0);
+  }
+
+  /** A field carries its own inline validation message. */
+  async expectFieldError(fieldSelector, pattern = null) {
+    const err = this.page.locator(`${fieldSelector} [data-test$="-error"]`).first();
     await expect(err).toBeVisible({ timeout: 20000 });
     if (pattern) await expect(err).toContainText(pattern);
+  }
+
+  async expectNoFieldError(fieldSelector) {
+    await expect(
+      this.page.locator(`${fieldSelector} [data-test$="-error"]`),
+    ).toHaveCount(0);
+  }
+
+  /**
+   * The form refused to submit at all.
+   *
+   * Counts alert writes while submitting: the check has to STOP the request,
+   * not decorate the field once the server has answered.
+   */
+  async submitExpectingClientRejection() {
+    let posted = 0;
+    const count = (req) => {
+      if (/\/alerts/.test(req.url()) && ['POST', 'PUT'].includes(req.method())) posted += 1;
+    };
+    this.page.on('request', count);
+    await this.page.locator(this.locators.submit).click();
+    await this.page.waitForTimeout(1500);
+    this.page.off('request', count);
+
+    await this.expectFormStillOpen();
+    expect(posted, 'an invalid alert must not reach the server').toBe(0);
   }
 
   async expectPresetActive(key) {
