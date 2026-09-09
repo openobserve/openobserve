@@ -13,28 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// SLO definition schema — the rules AddSlo enforces before it will POST.
-//
-// Same shape as the alert schemas (AddAlert.schema.ts and its step children): a
-// permissive `looseObject` with every rule in one `superRefine`, each issue
-// carrying the field PATH so the form can put the message on the offending
-// control. Messages are i18n keys resolved through the injected `t`, so this
-// file holds no copy.
-//
-// The required SET is a function of `sli_type` × query language, not a fixed
-// list — a PromQL count needs two expressions and NO stream, while a PromQL
-// time-slice still needs the stream. The discriminators are `_meta`, computed by
-// the form and passed in, because the language toggles live in component state
-// rather than in the payload.
-//
-// The API stays the authority. These rules exist because it was previously the
-// ONLY authority: an omitted required field failed deserialization with HTTP
-// 422, a body carrying no `message`, so the user was shown "Request failed with
-// status code 422" naming no field at all.
+// SLO definition schema: mirrors the API's required fields client-side so a missing field names itself instead of surfacing as an unlabeled HTTP 422.
 
 import { z } from "zod";
 
 import type { I18nText } from "@/types/i18n";
+import { isBlank } from "@/components/alerts/AddAlert.schema";
 
 export type Translator = (_key: string, _named?: Record<string, unknown>) => I18nText;
 
@@ -51,8 +35,7 @@ export interface SloFormMeta {
 /** The server's inclusive bound: 257 characters is the first rejection. */
 export const SLO_NAME_MAX = 256;
 
-/** Targets sit strictly inside (0, 100) — a 100% target has a zero error
- *  budget, which makes every burn rate either 0 or infinite. */
+/** Targets sit strictly inside (0, 100): a 100% target has a zero error budget. */
 export const TARGET_MIN_EXCLUSIVE = 0;
 export const TARGET_MAX_EXCLUSIVE = 100;
 
@@ -62,16 +45,7 @@ export const TARGET_DECIMALS = 3;
 /** D30: a grouped SLO is pinned to the 5-minute grid. */
 export const GROUPED_SLICE_SECS = 300;
 
-/** Blank in the sense the API's validator uses: whitespace does not count. */
-const isBlank = (v: unknown): boolean =>
-  v === undefined || v === null || (typeof v === "string" && v.trim() === "");
-
-/**
- * Build the SLO form schema for one `_meta` snapshot.
- *
- * Rebuilt whenever the discriminators change (the form does this in a computed),
- * because the required set changes with them.
- */
+/** Builds the SLO form schema for one `_meta` snapshot; rebuild when the discriminators change. */
 export const makeAddSloSchema = (t: Translator, meta: SloFormMeta) =>
   z
     .looseObject({

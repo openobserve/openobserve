@@ -1040,6 +1040,7 @@ const alertSourceOptions = computed(() =>
             : "slos.alertSli.ineligible.other") as I18nKey,
         ),
     badgeTitle: a.eligible ? undefined : ineligibilityReason(a),
+    badgeMuted: !a.eligible,
   })),
 );
 

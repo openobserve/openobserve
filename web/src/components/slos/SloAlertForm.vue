@@ -188,22 +188,18 @@ watch(
   },
 );
 
-/// Only the name was checked before, so a missing destination reached the server
-/// and came back as a banner reading "Alert destination or workflows is
-/// required" — accurate, but attached to nothing the user can see is wrong.
-/// These name the field instead.
-///
-/// Shown only after a submit attempt: unlike the name, which is prefilled from
-/// the condition, these start empty on every new alert and would otherwise paint
-/// the form red before anyone has typed.
+// Shown only after a submit attempt, unlike the name field below.
 const attemptedSubmit = ref(false);
+
+// Edit mode fetches `form.name` async in `onMounted`; before that resolves the
+// field is blank same as a genuinely empty new alert. Gate the name error on
+// load having settled so it doesn't flash "required" while the GET is in flight.
+const nameFieldReady = ref(!props.alertId);
 
 /** The "no message" value. Branded so it is assignable to `error-message`. */
 const NO_ERROR = raw("");
 
-/// Rules live in `SloAlertForm.schema.ts`, the arrangement the generic alert
-/// forms use — see the note at the top of that file for why `kind` changes the
-/// required set rather than merely relaxing it.
+// Rules live in `SloAlertForm.schema.ts`.
 const validation = computed(() =>
   makeSloAlertSchema(t).safeParse({
     name: form.name,
@@ -226,17 +222,15 @@ const validationIssues = computed<Record<string, I18nText>>(() => {
   return out;
 });
 
-/// Submit-then-change, the timing `useOForm` configures everywhere else: these
-/// fields start empty on every new alert and would otherwise paint the form red
-/// before anyone has typed. The name is the exception — it is prefilled from the
-/// condition, so it is marked as soon as it is emptied.
+// Submit-then-change timing, matching `useOForm` elsewhere in the product.
 const fieldError = (path: string): I18nText =>
   attemptedSubmit.value ? (validationIssues.value[path] ?? NO_ERROR) : NO_ERROR;
 
-const nameError = computed(() => validationIssues.value["name"] ?? NO_ERROR);
+const nameError = computed(() =>
+  nameFieldReady.value ? (validationIssues.value["name"] ?? NO_ERROR) : NO_ERROR,
+);
 
-/// Handed to SloAlertCondition so its inputs render their own inline markers,
-/// rather than the form reporting a condition problem far from the input.
+// Handed to SloAlertCondition so its inputs render their own inline markers.
 const conditionFieldErrors = computed(() => ({
   critical: fieldError("condition.critical"),
   long: fieldError("condition.long_window_secs"),
@@ -316,6 +310,8 @@ onMounted(async () => {
     nameIsUserEdited.value = true;
   } catch (e: any) {
     emit("load-error", e?.response?.data?.message || t("alerts.loadFailed"));
+  } finally {
+    nameFieldReady.value = true;
   }
 });
 </script>

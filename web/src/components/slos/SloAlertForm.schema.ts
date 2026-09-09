@@ -13,23 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// Burn-rate / error-budget alert schema, arranged like AddSlo.schema.ts and the
-// generic alert schemas: one `superRefine`, path-keyed issues, i18n messages.
-//
-// `kind` is the discriminator and it changes the required set outright: an
-// error-budget alert deliberately NULLS both windows (see the kind watcher in
-// SloAlertCondition), so a blanket "windows are required" rule would make that
-// whole kind unsubmittable.
+// Burn-rate / error-budget SLO alert schema: `kind` changes the required set outright, since an error-budget alert NULLS both windows on purpose.
 
 import { z } from "zod";
 
 import type { I18nText } from "@/types/i18n";
-import { ALERT_NAME_UNSUPPORTED_CHARS } from "@/components/alerts/AddAlert.schema";
+import { ALERT_NAME_UNSUPPORTED_CHARS, isBlank } from "@/components/alerts/AddAlert.schema";
 
 export type Translator = (_key: string, _named?: Record<string, unknown>) => I18nText;
-
-const isBlank = (v: unknown): boolean =>
-  v === undefined || v === null || (typeof v === "string" && v.trim() === "");
 
 export const makeSloAlertSchema = (t: Translator) =>
   z
@@ -45,9 +36,7 @@ export const makeSloAlertSchema = (t: Translator) =>
       const add = (path: (string | number)[], message: I18nText) =>
         ctx.addIssue({ code: z.ZodIssueCode.custom, path, message });
 
-      // The same name rule the generic alert form applies — these are ordinary
-      // alerts once saved, and a name this form accepts but that one rejects
-      // would be a trap.
+      // Same name rule the generic alert form applies: these become ordinary alerts once saved.
       if (isBlank(val.name)) {
         add(["name"], t("alerts.nameRequired"));
       } else if (
