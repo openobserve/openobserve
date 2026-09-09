@@ -694,6 +694,8 @@ fn dedup_tuples(tuples: &mut Vec<TupleKey>) {
 mod tests {
     use super::*;
 
+    const SOURCE: &str = include_str!("mod.rs");
+
     #[test]
     fn llm_workbench_migration_covers_every_org_below_the_playground_version() {
         for version in ["0.0.1", "0.0.39", "0.0.41", "0.0.42"] {
@@ -769,6 +771,39 @@ mod tests {
         assert_eq!(
             model.version, OWNERSHIP_BACKFILL_MODEL_VERSION,
             "the backfill is keyed to the shipped model; a model bump needs its own migration arm"
+        );
+    }
+
+    /// A relocated or commented-out call must not satisfy the branch check.
+    fn init_body() -> String {
+        let start = SOURCE
+            .find("pub async fn init(")
+            .expect("init() must exist");
+        let after = &SOURCE[start..];
+        let end = after.find("\nfn ").unwrap_or(after.len());
+        after[..end]
+            .lines()
+            .filter(|line| !line.trim_start().starts_with("//"))
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    #[test]
+    fn the_backfill_keys_are_resolved_only_for_existing_deployments() {
+        let body = init_body();
+        let branch = body
+            .find("if migrate_native_objects {")
+            .expect("init() must branch on migrate_native_objects");
+        let otherwise = branch
+            + body[branch..]
+                .find("} else {")
+                .expect("the native-objects branch must have an else");
+        let call = body
+            .find("all_org_ownership_keys(&pending)")
+            .expect("init() must resolve the pending ownership backfills");
+        assert!(
+            call > otherwise,
+            "the backfill must sit in the else branch; a fresh install already gets every type"
         );
     }
 }
