@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 //! Streaming evaluation of `agg(range_func(selector))` over hash-sorted
-//! metrics files: each hash shard merges its hash-ordered file chains one
+//! metrics files: each hash partition merges its hash-ordered file chains one
 //! series at a time through the shared fused fold, so the sample matrix is
 //! never materialized.
 
@@ -30,7 +30,7 @@ use config::{
 use datafusion::{arrow::datatypes::Schema, error::Result, prelude::SessionContext};
 use promql_parser::parser::LabelModifier;
 
-use super::fold::{SeriesEval, fold_sources};
+use super::fold::{SeriesEval, aggregate};
 use crate::{
     functions::{KEEP_METRIC_NAME_FUNC, RangeFunc},
     fused::FusedAggOp,
@@ -45,8 +45,8 @@ pub(crate) struct FusedShape {
     pub range: Duration,
 }
 
-/// Folds from per-shard ordered streams; `None` when the layout or shape cannot stream. The
-/// caller bounds it: dropping the future aborts the shard folds.
+/// Folds from per-partition ordered streams; `None` when the layout or shape cannot stream. The
+/// caller bounds it: dropping the future aborts the partition folds.
 pub(crate) async fn fused_agg(
     ctx: &SessionContext,
     schema: &Schema,
@@ -63,18 +63,19 @@ pub(crate) async fn fused_agg(
     };
     let lookback = micros(shape.range);
     let Some(sources) =
-        MergeSeriesStream::shards(ctx, schema, &selector, group_cols, lookback, eval_ctx).await?
+        MergeSeriesStream::execute_partitioned(ctx, schema, &selector, group_cols, lookback, eval_ctx)
+            .await?
     else {
         return Ok(None);
     };
     log::info!(
-        "[trace_id: {trace_id}] [PromQL Timing] streaming fused {}({}) started with {} shards",
+        "[trace_id: {trace_id}] [PromQL Timing] streaming fused {}({}) started with {} partitions",
         shape.op.name(),
         shape.func.name(),
         sources.len(),
     );
     let eval = Arc::new(SeriesEval::new(shape.func.clone(), shape.range, eval_ctx));
-    let (value, series_count) = fold_sources(sources, shape.op, eval).await?;
+    let (value, series_count) = aggregate(sources, shape.op, eval).await?;
 
     log::info!(
         "[trace_id: {trace_id}] [PromQL Timing] streaming fused {}({}) execution took: {:?}, folded {series_count} series into {} series",
@@ -428,7 +429,7 @@ mod tests {
                 offset: 0,
             };
             let label_cols = series_label_columns(&arrow_schema(), &all_labels, func_name);
-            let sources = MergeSeriesStream::shards(
+            let sources = MergeSeriesStream::execute_partitioned(
                 &ctx,
                 &arrow_schema(),
                 &selector,

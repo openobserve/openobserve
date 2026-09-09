@@ -90,9 +90,9 @@ impl SeriesEval {
     }
 }
 
-/// Folds all sources concurrently and merges their groups; each source opens inside its own
-/// task, and dropping the future aborts them all.
-pub(super) async fn fold_sources<F, S>(
+/// Aggregates every partition, partial then final; each source opens inside its own task, and
+/// dropping the future aborts them all.
+pub(super) async fn aggregate<F, S>(
     sources: Vec<F>,
     op: FusedAggOp,
     eval: Arc<SeriesEval>,
@@ -105,12 +105,12 @@ where
         .into_iter()
         .map(|source| {
             let eval = eval.clone();
-            async move { fold_source(source.await?, op, eval).await }
+            async move { aggregate_partial(source.await?, op, eval).await }
         })
         .collect();
-    let folds = run(folds).await?;
+    let folds = collect_partitioned(folds).await?;
     let series_count = folds.iter().map(|(_, series)| series).sum();
-    let value = merge_folds(
+    let value = aggregate_final(
         folds.into_iter().map(|(groups, _)| groups).collect(),
         &eval.timestamps,
     );
@@ -131,17 +131,17 @@ where
     let func_name = eval.func.name();
     let trace_id = eval.eval_ctx.trace_id.clone();
     log::info!(
-        "[trace_id: {trace_id}] [PromQL Timing] streaming {func_name}() started with {} shards",
+        "[trace_id: {trace_id}] [PromQL Timing] streaming {func_name}() started with {} partitions",
         sources.len(),
     );
     let parts = sources
         .into_iter()
         .map(|source| {
             let eval = eval.clone();
-            async move { map_source(source.await?, eval).await }
+            async move { map_partition(source.await?, eval).await }
         })
         .collect();
-    let parts = run(parts).await?;
+    let parts = collect_partitioned(parts).await?;
     let series_count: usize = parts.iter().map(|(_, series)| series).sum();
     let series: Vec<RangeValue> = parts.into_iter().flat_map(|(series, _)| series).collect();
     log::info!(
@@ -153,7 +153,7 @@ where
 }
 
 /// Maps one source's series; like the generic evaluator, a series with no value is dropped.
-async fn map_source<S: SeriesStream>(
+async fn map_partition<S: SeriesStream>(
     mut source: S,
     eval: Arc<SeriesEval>,
 ) -> Result<(Vec<RangeValue>, usize)> {
@@ -180,8 +180,9 @@ async fn map_source<S: SeriesStream>(
     Ok((series, series_count))
 }
 
-/// Folds one source's series into its group accumulators, dropping each as it goes.
-async fn fold_source<S: SeriesStream>(
+/// The partial aggregate of one partition: its series folded into group accumulators, each
+/// dropped as it goes.
+async fn aggregate_partial<S: SeriesStream>(
     mut source: S,
     op: FusedAggOp,
     eval: Arc<SeriesEval>,
@@ -205,8 +206,9 @@ async fn fold_source<S: SeriesStream>(
     Ok((groups, series_count))
 }
 
-/// The first failed source fails the whole; dropping the set aborts the rest.
-async fn run<T, Fut>(parts: Vec<Fut>) -> Result<Vec<T>>
+/// Collects every partition in order; the first failure fails the whole, and dropping the set
+/// aborts the rest.
+async fn collect_partitioned<T, Fut>(parts: Vec<Fut>) -> Result<Vec<T>>
 where
     T: Send + 'static,
     Fut: Future<Output = Result<T>> + Send + 'static,
@@ -227,9 +229,9 @@ where
         .collect())
 }
 
-/// Merges the source groups in source order; groups without output are dropped like the
-/// generic path.
-fn merge_folds(folds: Vec<GroupAccs>, timestamps: &[i64]) -> Value {
+/// The final aggregate: partial groups merged in partition order, groups without output dropped
+/// like the generic path.
+fn aggregate_final(folds: Vec<GroupAccs>, timestamps: &[i64]) -> Value {
     let mut folds = folds.into_iter();
     let Some(mut merged) = folds.next() else {
         return Value::None;
@@ -327,7 +329,7 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    async fn test_run_folds_fails_fast_and_aborts_the_rest() {
+    async fn test_collect_partitioned_fails_fast_and_aborts_the_rest() {
         let eval = eval();
         let dropped = Arc::new(AtomicBool::new(false));
         let endless = EndlessStream {
@@ -336,13 +338,13 @@ mod tests {
         };
         let failing = FailingStream;
         let folds = vec![
-            Box::pin(fold_source(endless, FusedAggOp::Sum, eval.clone()))
+            Box::pin(aggregate_partial(endless, FusedAggOp::Sum, eval.clone()))
                 as std::pin::Pin<Box<dyn Future<Output = Result<(GroupAccs, usize)>> + Send>>,
-            Box::pin(fold_source(failing, FusedAggOp::Sum, eval)),
+            Box::pin(aggregate_partial(failing, FusedAggOp::Sum, eval)),
         ];
 
         let start = std::time::Instant::now();
-        let result = run(folds).await;
+        let result = collect_partitioned(folds).await;
         assert!(result.is_err(), "the failed source must fail the fold");
         assert!(
             start.elapsed() < Duration::from_secs(5),

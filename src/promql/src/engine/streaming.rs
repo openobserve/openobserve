@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! The streaming entry for fused aggregations: attempts the ordered shard streams over the
+//! The streaming entry for fused aggregations: attempts the ordered partition streams over the
 //! selector's contexts and falls back to the materializing fold on the same contexts.
 //!
 //! Reads `ctx`, `eval_ctx`, `label_selector`; writes `result_type` on success.
@@ -128,7 +128,7 @@ impl Engine {
             let selector = scan.streaming_selector();
             let eval = Arc::new(fused::SeriesEval::new(func.clone(), range, &self.eval_ctx));
             let run = async {
-                match MergeSeriesStream::shards(
+                match MergeSeriesStream::execute_partitioned(
                     ctx,
                     schema,
                     &selector,
@@ -225,7 +225,7 @@ impl Engine {
     }
 
     /// Runs the streaming fold under the query timeout and the host's cancel signal; dropping
-    /// the future aborts the shard folds.
+    /// the future aborts the partition folds.
     async fn run_cancellable<T>(
         &self,
         run: impl Future<Output = Result<T>>,
