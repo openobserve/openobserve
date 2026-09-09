@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="min-h-0 w-full flex-1 overflow-hidden">
         <div class="bg-card-glass-bg h-full">
           <OTable
-            ref="qTable"
+            ref="oTableRef"
             :frame="false"
             data-test="enrichment-tables-list-table"
             :data="visibleRows"
@@ -52,6 +52,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             pagination="client"
             :page-size="selectedPerPage"
             :page-size-options="perPageOptionsList"
+            :current-page="currentPage"
+            @update:current-page="onPageChange"
             sorting="client"
             filter-mode="client"
             show-index
@@ -475,7 +477,6 @@ export default defineComponent({
     const jsTransforms: any = ref([]);
     const formData: any = ref({});
     const showAddJSTransformDialog: any = ref(false);
-    const qTable: any = ref(null);
     const selectedDelete: any = ref(null);
     const isUpdated: any = ref(false);
     const confirmDelete = ref<boolean>(false);
@@ -486,7 +487,19 @@ export default defineComponent({
     const showUrlJobsDialogState = ref<boolean>(false);
     const selectedTableForUrlJobs = ref<any>(null);
     const filterQuery = ref("");
-    const loading = ref(false);
+    const loading = ref(true);
+    // Plain ref, not URL/store-backed: only the OTable v-if branch unmounts on add/edit, not EnrichmentTableList itself.
+    const currentPage = ref(1);
+    const onPageChange = (page: number) => {
+      currentPage.value = page;
+    };
+    const oTableRef: any = ref(null);
+    // setTimeout(0) is a macrotask, so it runs after TanStack's own deferred auto-reset-on-data-change (its own microtask queue), letting the restored page win.
+    const restorePageIndex = () => {
+      setTimeout(() => {
+        oTableRef.value?.table?.setPageIndex(currentPage.value - 1);
+      }, 0);
+    };
     const { track } = useReo();
     const { toast } = useToast();
     const columns: OTableColumnDef[] = [
@@ -715,6 +728,7 @@ export default defineComponent({
         }
       } finally {
         loading.value = false;
+        restorePageIndex();
       }
     };
 
@@ -1043,7 +1057,10 @@ export default defineComponent({
     return {
       t,
       raw,
-      qTable,
+      oTableRef,
+      currentPage,
+      onPageChange,
+      restorePageIndex,
       store,
       router,
       jsTransforms,

@@ -885,7 +885,7 @@
     "queryFailed": "فشل الاستعلام",
     "unknownError": "خطأ غير معروف",
     "selectedLabel": "مختار",
-    "selectToFilter": "اختر التصفية",
+    "selectToFilter": "اختر فلتر",
     "clearSelection": "اختيار واضح",
     "includeModeHint": "وضع التضمين (=)",
     "excludeModeHint": "وضع الاستبعاد (≠)",
@@ -6314,7 +6314,7 @@
       "frequencyPositiveNumber": "تنبيه - {index}: يجب أن يكون التردد رقما موجبا أكبر من صفر ويجب أن يكون رقما.",
       "cronExpressionString": "تنبيه - {index}: تعبير الكرون يجب أن يكون خيطا.",
       "thresholdPositiveNumber": "تنبيه - {index}: يجب أن يكون العتبة عددا موجبا أكبر من 0 ويجب أن يكون رقما.",
-      "silenceNonNegativeNumber": "تنبيه - {index}: يجب أن يكون الصمت رقما موجبا أكبر من أو يساوي 0 ويجب أن يكون رقما.",
+      "silenceNonNegativeNumber": "تنبيه - {index}: يجب أن تكون فترة التهدئة رقمًا موجبًا أكبر من أو يساوي 0 ويجب أن تكون قيمة رقمية.",
       "frequencyTypeInvalid": "تنبيه - {index}: نوع التردد يجب أن يكون 'دقائق' أو 'كرون' ويجب أن يكون سلسلة.",
       "cronExpressionInvalid": "تنبيه - {index}: يجب أن يكون تعبير الكرون تعبيرا صالحا للكرون."
     },
@@ -6524,7 +6524,7 @@
       "nameInvalidChars": "الأحرف مثل :, ?, /, #، والمسافات غير مسموح بها.",
       "templateRequired": "النموذج مطلوب!",
       "validEmails": "أضف رسائل بريد إلكتروني صالحة!",
-      "silenceNonNegative": "يجب أن يكون إشعار الصمت أكبر من أو يساوي 0",
+      "silenceNonNegative": "يجب أن تكون فترة التهدئة أكبر من أو تساوي 0.",
       "pendingPeriodNonNegative": "يجب أن تكون مدة الانتظار أكبر من أو تساوي 0",
       "periodPositive": "يجب أن يكون الفاصل الزمني أكبر من 0",
       "destinationRequired": "هناك وجهة واحدة على الأقل مطلوبة.",
@@ -10793,7 +10793,8 @@
         "scoreConfigs": "إعدادات النقاط",
         "targetDataset": "مجموعة البيانات المستهدفة",
         "progress": "التقدم",
-        "updated": "تحديث"
+        "updated": "تحديث",
+        "actions": "إجراءات"
       },
       "create": {
         "title": "الطابور الجديد",
@@ -10847,7 +10848,8 @@
           "refType": "المرجع",
           "refId": "المرجع",
           "added": "تمت الإضافة",
-          "status": "الحالة"
+          "status": "الحالة",
+          "actions": "إجراءات"
         },
         "status": {
           "pending": "قيد الانتظار",
@@ -10959,6 +10961,8 @@
       "viewAll": "عرض التجارب",
       "baseline": "خط الأساس",
       "setBaseline": "خط الأساس المعين",
+      "baselineRequiresCompleted": "يمكن تعيين تشغيل مكتمل فقط كخط أساس",
+      "baselineError": "فشل تحديث خط الأساس",
       "selectForComparison": "اختر للمقارنة",
       "progress": "{done} {total} ماكينات القمار",
       "noScores": "لا توجد نتائج إجمالية",
@@ -11069,8 +11073,10 @@
       "addToDataset": "إضافة",
       "detail": {
         "by": "بواسطة {user}",
-        "p50Latency": "زمن استجابة P50",
+        "p50Latency": "زمن استجابة المهمة P50",
         "totalCost": "التكلفة الإجمالية",
+        "costBreakdown": "المهمة {task} · التقييم {scoring}",
+        "partialCostBreakdown": "المهمة {task} · التقييم {scoring} · جزئي",
         "highDispersion": "الحالات ذات التشتت العالي",
         "highDispersionHint": "صفوف تختلف فيها المحاكمات",
         "scoredRows": "{scored}/{total} صفوف تم تسجيلها",
@@ -11100,7 +11106,7 @@
           "run": "اركض"
         },
         "runSummary": "{trials} · {scorers}",
-        "progress": "التقدم",
+        "progress": "تقدّم المهمة",
         "scoring": "التسجيل",
         "scoringDistribution": "{success} ناجح · {failed} فشل · {pending} قيد الانتظار · {skipped} تم تخطيه",
         "compare": "قارن",
@@ -11193,6 +11199,16 @@
           "typeCategorical": "تصنيفي",
           "typeBoolean": "منطقي",
           "threshold": "العتبة",
+          "thresholdTooltip": "تُحتسب القيم الأساسية والمرشحة التي تكون ضمن نطاق {percent} من بعضها دون تغيير، وليست متراجعة أو محسّنة.",
+          "outcomeDimensions": "معايير النتيجة",
+          "outcomeTooltipNone": "لم يتم تحديد أي أعمدة — سيتم عرض كل صف قابل للمقارنة على أنه غير مقارن.",
+          "outcomeTooltipAll": "تحدد جميع الأعمدة المؤهلة نتيجة كل صف.",
+          "outcomeTooltipPartial": "فقط {names} تحدد نتيجة كل صف. تُعرض الأعمدة الأخرى لكنها لا تؤثر عليها.",
+          "allOutcomeDimensions": "جميع الأعمدة المؤهلة",
+          "noOutcomeDimensions": "لا أعمدة",
+          "selectedOutcomeDimensions": "{count} عمود | {count} أعمدة",
+          "outcomeDimensionUnavailable": "{name} (بدون سياسة مقارنة)",
+          "dimensionExcludedHint": "هذا العمود مستبعد من النتائج. حدده ضمن معايير النتيجة لتضمينه.",
           "measurePerRow": "متوسط لكل صف، فوق التجارب",
           "dimensionImproved": "تحسّن {count} صف | تحسّنت {count} صفوف",
           "dimensionUnchanged": "لم يتغيّر {count} صف | لم تتغيّر {count} صفوف",
@@ -11274,8 +11290,8 @@
         },
         "searchPlaceholder": "عناصر البحث...",
         "csvImport": {
-          "button": "رفع CSV",
-          "title": "رفع عناصر مجموعة البيانات",
+          "button": "استيراد العناصر",
+          "title": "استيراد عناصر مجموعة البيانات",
           "description": "استيراد عناصر مجموعة البيانات من ملف CSV.",
           "fileLabel": "ملف CSV",
           "placeholder": "اختر ملف CSV",
@@ -12187,7 +12203,8 @@
       "remove": "إزالة",
       "save": "حفظ",
       "saveAsDraft": "حفظ كمسودة",
-      "createAndActivate": "حفظ وتفعيل"
+      "createAndActivate": "حفظ وتفعيل",
+      "testConnection": "اختبار الاتصال"
     },
     "scorerTypeDialog": {
       "title": "إنشاء مسجل نقاط جديد",
@@ -12213,15 +12230,19 @@
       "availableModelsLabel": "النماذج المتوفرة",
       "apiKeyLabel": "مفتاح API",
       "apiKeyPlaceholder": "ادخل مفتاح API",
-      "apiKeyHelp": "يتم تخزينه مشفرا في حالة الراحة ولا يقرأ مرة أخرى. اترك المفتاح فارغا أثناء التحرير للحفاظ على المفتاح الحالي.",
+      "apiKeyHelp": "يُخزَّن مشفّرًا عند التخزين ولا يُقرأ مرة أخرى. اتركه فارغًا عند حفظ التعديلات للاحتفاظ بالمفتاح الحالي.",
       "authSection": "المصادقة",
-      "authEditNote": "لا يمكن قراءة بيانات الاعتماد مرة أخرى. أعد إدخال مفتاح API فقط إذا أردت تدويره.",
+      "authEditNote": "لا يمكن استرجاع بيانات الاعتماد. لاختبار موفّر يتطلب مصادقة، أدخل مفتاح API الخاص به.",
       "cannotRename": "لا يمكن إعادة تسميته بعد الخلق.",
       "availableModelsHelp": "اختياري. قائمة النماذج المفصولة بالفواصل المتوفرة على هذا المزود.",
       "saveError": "فشل في حفظ مزود الخدمة",
       "nameRequired": "اسم المزود مطلوب",
       "typeRequired": "نوع المزود مطلوب",
-      "defaultModelRequired": "النموذج الافتراضي مطلوب"
+      "defaultModelRequired": "النموذج الافتراضي مطلوب",
+      "testRunning": "جارٍ اختبار الاتصال...",
+      "testPassed": "متصل",
+      "testFailed": "فشل الاتصال",
+      "testError": "فشل اختبار الاتصال"
     },
     "scoreConfig": {
       "gteSymbol": "≥",
@@ -13872,6 +13893,7 @@
       "error": "خطأ",
       "failed": "فشل",
       "failedRuns": "محاولات فاشلة",
+      "errorRuns": "التشغيلات الخاطئة",
       "jumpToLastRun": "الانتقال إلى آخر جولة",
       "jumpToLatestData": "انتقل إلى أحدث البيانات",
       "lastRun": "الجولة الأخيرة",
@@ -13983,6 +14005,11 @@
       "stepsCount": "الخطوات ({count})",
       "title": "تفصيل الجري",
       "viewFullError": "عرض الخطأ الكامل وتتبع التكديس",
+      "errorSourceQuota": "تم بلوغ حد الحصة",
+      "errorSourceQuotaDesc": "تم استنفاد خطوات الصناعات الاصطناعية المضمنة للمؤسسة، لذلك تم تخطي هذا التشغيل. ويستأنف تلقائيًا بمجرد اشتراك المؤسسة أو رفع حد خطواتها.",
+      "errorSourceDispatch": "خطأ في الإرسال",
+      "errorSourceQueue": "خطأ في قائمة الانتظار",
+      "errorSourceProbe": "خطأ في المسبار",
       "viewFullErrorBtn": "عرض الخطأ الكامل",
       "detailUrl": "الرابط",
       "locatorResolution": "دقة تحديد الموقع",
@@ -14034,6 +14061,7 @@
       "durationByLocation": "المدة حسب الموقع (المتوسط)",
       "flakyRate": "معدل التقشر",
       "stepsWindowTruncated": "عرض أحدث {count} الإعدامات ({from} – {to})؛ النطاق المختار يحتوي على أكثر.",
+      "stepsErrorExcluded": "{count} من عمليات التنفيذ تعذّر تشغيلها (خطأ) ولا تظهر هنا — راجع تبويب النظرة العامة.",
       "retryRate": "معدل إعادة المحاولة",
       "statusTimeline": "الجدول الزمني للحالة",
       "tabOverview": "نظرة عامة",
@@ -15689,7 +15717,6 @@
       "reservation": "المحمية",
       "sliType": "نوع SLI",
       "owner": "المالك",
-      "folder": "المجلد",
       "streamPlaceholder": "اختر بثا"
     },
     "empty": {
@@ -15719,7 +15746,24 @@
       "sourceHint": "وقت التشغيل هو الجزء البسيط من الوقت المحدد الذي لم يكن هذا التنبيه يعمل. الوقت الذي لم يقيمه — مؤقتا أو صامت، أو فشل — غير محسوب ولم يحتسب أبدا كوقت تشغيل.",
       "loadFailed": "لم أتمكن من تحميل التنبيهات المؤهلة",
       "noneEligible": "لا يمكن استخدام أي تنبيه في هذه المنظمة كمصدر حتى الآن.",
-      "ineligibleOption": "{name} — {reason}",
+      "ineligible": {
+        "notScheduled": "غير مجدول",
+        "grouped": "مجمّع",
+        "notReferenceable": "غير قابل للاستخدام",
+        "cron": "جدول Cron",
+        "tooInfrequent": "يعمل بشكل نادر جدًا",
+        "silenced": "يحتوي على كتم",
+        "other": "غير مؤهل",
+        "why": {
+          "notScheduled": "لا تحتفظ التنبيهات اللحظية بسجل التشغيل الذي يحتاجه SLO. استخدم تنبيهًا مجدولًا بدلاً من ذلك.",
+          "grouped": "يتم تقسيم هذا التنبيه حسب المجموعة، والتشغيل لا يسجل المجموعات التي فحصها. أزل التجميع حسب المجموعة لاستخدامه هنا.",
+          "notReferenceable": "لا يمكن استخدام تنبيهات SLO والتنبيهات المركبة كمصادر. اختر تنبيهًا مجدولًا بسيطًا.",
+          "cron": "يعمل هذا التنبيه وفق جدول Cron، لذا فإن فحوصاته غير متباعدة بالتساوي ولا يمكن حساب زمن التوفر. غيّره إلى فاصل زمني ثابت.",
+          "tooInfrequent": "يعمل هذا التنبيه كل {frequency}. يجب أن يعمل على الأقل كل {slice} حتى لا تمر أي فترة دون فحص.",
+          "silenced": "بعد انطلاقه، يتوقف هذا التنبيه عن الفحص لفترة — وتصادف هذه الفجوة دائمًا فترةً سيئة، مما يجعل مؤشر SLO يبدو أفضل من الواقع. اضبط فترة الكتم على 0."
+        },
+        "noFixedInterval": "لا فاصل زمني ثابت"
+      },
       "groupingLocked": "لا يمكن تجميع SLI القائم على التنبيهات: سجل التوفر يسجل تشغيلا واحدا لكل تنبيه، وليس لكل مجموعة، لذلك لا توجد تغطية لكل مجموعة يمكن الاعتماد عليها.",
       "sourceLink": "تنبيه المصدر",
       "preview": {
@@ -15827,6 +15871,42 @@
       "editTargetMissing": "هذا التنبيه لم يعد موجودا في هذا الخطاب التنظيمي.",
       "describeBurn": "معدل الحرق > {critical} فوق {long} {short}",
       "describeBudget": "ميزانية الخطأ استهلكت > {critical}٪"
+    },
+    "validation": {
+      "nameRequired": "اسم SLO مطلوب",
+      "nameTooLong": "يجب ألا يتجاوز اسم SLO 256 حرفًا",
+      "targetRequired": "الهدف مطلوب",
+      "targetRange": "يجب أن يكون الهدف أكبر من 0 وأقل من 100",
+      "targetPrecision": "يدعم الهدف 3 منازل عشرية على الأكثر",
+      "streamTypeRequired": "نوع الجدول مطلوب",
+      "streamRequired": "الجدول مطلوب",
+      "goodExprRequired": "\"جيد عندما\" مطلوب",
+      "promqlGoodRequired": "الاستعلام الجيد مطلوب",
+      "promqlTotalRequired": "الاستعلام الكلي مطلوب",
+      "aggregateRequired": "تعبير التجميع مطلوب",
+      "comparatorRequired": "عامل المقارنة مطلوب",
+      "thresholdRequired": "العتبة مطلوبة",
+      "thresholdNumber": "يجب أن تكون العتبة رقمًا",
+      "alertSourceRequired": "تنبيه المصدر مطلوب",
+      "groupedSlice": "يجب أن تستخدم SLOs المجمعة شريحة مدتها 5 دقائق",
+      "alertCannotGroup": "لا يمكن تجميع SLI القائم على تنبيه",
+      "frequencyRequired": "التردد مطلوب",
+      "frequencyPositive": "يجب أن يكون التردد دقيقة واحدة على الأقل",
+      "silenceRequired": "فترة الإسكات مطلوبة",
+      "silenceNonNegative": "لا يمكن أن تكون فترة الإسكات سالبة",
+      "targetsRequired": "اختر وجهة أو سير عمل واحدًا على الأقل",
+      "criticalRequired": "العتبة مطلوبة",
+      "criticalPositive": "يجب أن تكون العتبة أكبر من 0",
+      "budgetRange": "يجب أن تكون الميزانية المستهلكة 100% أو أقل",
+      "longWindowRequired": "النافذة الطويلة مطلوبة",
+      "shortWindowRequired": "النافذة القصيرة مطلوبة",
+      "shortInsideLong": "يجب أن تكون النافذة القصيرة أقصر من النافذة الطويلة"
+    },
+    "duration": {
+      "seconds": "{count} ثانية | {count} ثوانٍ",
+      "minutes": "{count} دقيقة | {count} دقائق",
+      "hours": "{count} ساعة | {count} ساعات",
+      "days": "{count} يوم | {count} أيام"
     }
   },
   "promql": {

@@ -178,10 +178,10 @@ test.describe('SLO burn-rate alerts', { tag: ['@slo', '@sloAlerts', '@all'] }, (
   /**
    * A blank name is refused BEFORE any request, and says so on the field.
    *
-   * `submit()` returns early on `nameError` without setting `saveError`, so the
-   * error banner never appears — the inline field error is the whole of the
-   * feedback. The form must also stay open rather than closing on a no-op,
-   * which would look like success.
+   * The name is the one field marked without a submit first — it is prefilled
+   * from the condition, so an empty one is a deliberate deletion rather than a
+   * form nobody has filled in yet. The form must also stay open rather than
+   * closing on a no-op, which would look like success.
    */
   test('submitting without a name is refused with an inline field error', {
     tag: ['@P1', '@validation'],
@@ -288,21 +288,26 @@ test.describe('SLO burn-rate alerts', { tag: ['@slo', '@sloAlerts', '@all'] }, (
 
   /**
    * A destination is mandatory: an alert nobody hears about is not an alert.
-   * The server says so, and the form must surface that rather than appearing
-   * to succeed.
+   *
+   * This used to reach the server, which answered "Alert destination or
+   * workflows is required" in a banner attached to nothing on screen. The
+   * reason now lands on the field, and the banner only says that SOMETHING is
+   * highlighted — so both are asserted, at their new homes.
    */
   test('submitting without a destination is refused with the reason', {
     tag: ['@P1', '@validation', '@negative'],
-  }, async () => {
+  }, async ({ page }) => {
     const name = uniqueName(`${PREFIX}_nodest`);
     await pm.sloAlertsPage.clickAdd();
     await pm.sloAlertsPage.setName(name);
     await pm.sloAlertsPage.applyPreset('fast');
     // No destination selected.
-    await pm.sloAlertsPage.submit();
+    await pm.sloAlertsPage.submitExpectingClientRejection();
 
-    await pm.sloAlertsPage.expectFormError(/destination|workflow/i);
-    await pm.sloAlertsPage.expectFormStillOpen();
+    await expect(
+      page.locator('[data-test="alert-settings-destinations-error"]'),
+    ).toContainText(/at least one destination or workflow/i);
+    await pm.sloAlertsPage.expectFormError(/highlighted fields/i);
   });
 
   /** Cancel must not create anything. */
