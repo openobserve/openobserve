@@ -502,7 +502,7 @@ export class LogsPage {
         this.resultsSkeleton = '[data-test="logs-search-result-logs-table"] [data-test="o2-table-skeleton-body"]';
         this.resultsLoadingBanner = '[data-test="logs-search-result-logs-table"] [data-test="o2-table-loading-banner"]';
         this.noResultsFoundText = '[data-test="logs-search-no-events-found-text"]';
-        this.resultsProgressBar = '[data-test="logs-search-result-progress"] [data-test="loading-progress"]';
+        this.resultsProgressBar = '[data-test="logs-results-progress"]';
         this.tableRowExpandMenu = '[data-test^="o2-table-expand-"]';
         this.logDetailsIncludeExcludeBtn = '[data-test="log-details-include-exclude-field-btn"]';
         this.timestampCells = '[data-test="o2-table-cell-_timestamp"]';

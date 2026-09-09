@@ -3,8 +3,9 @@
  *
  * Collateral-damage guard for #14303: the results grid stayed hidden behind the
  * skeleton for the whole duration of a streaming-aggs query. The regression itself
- * is caught by the unit tests (SearchResult.spec.ts / OTable.spec.ts) — see
- * docs/issue-14303-implementation-spec.md §1.8.1. These cases assert the settled
+ * is caught by the unit tests (SearchResult.spec.ts / OTable.spec.ts); this suite
+ * can only assert settled state, because no route.fulfill body leaves a stream open
+ * long enough to observe the mid-stream render. These cases assert the settled
  * states adjacent to the fix still resolve correctly against a real backend.
  */
 

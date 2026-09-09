@@ -266,8 +266,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Outside scrollContainerRef so the results progress bar can't scroll away. -->
-      <div class="relative" data-test="logs-search-result-progress">
+      <div class="relative">
         <LoadingProgress
+          data-test="logs-results-progress"
           :loading="searchObj.loading"
           :loadingProgressPercentage="searchObj.loadingProgressPercentage || 0"
         />
