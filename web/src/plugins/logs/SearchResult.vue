@@ -2297,6 +2297,7 @@ export default defineComponent({
       );
     };
     // `immediate` so a mount with results already present still highlights them.
+    // `clearCache: true` is load-bearing: updateGridColumns() reassigns the columns on every streaming chunk, and this is the only path that drops the previous partition's highlighted HTML for a reused row index.
     watch(
       () => getColumns.value,
       () => reprocessLogsHighlight(true),
