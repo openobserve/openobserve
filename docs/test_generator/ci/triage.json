@@ -1,0 +1,25 @@
+{
+  "feature_slug": "traces-streaming-pagination",
+  "feature_title": "Traces Streaming Pagination",
+  "area": "Traces",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "tracesStreamingPagination.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Traces/tracesStreamingPagination.spec.js",
+  "playwright_group": "Traces",
+  "source_files": [
+    "web/src/plugins/traces/Index.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "The complete changed-files list contains only web/src/plugins/traces/Index.vue and web/src/plugins/traces/Index.spec.ts — both OSS frontend paths under web/src/. No enterprise-owned directories (enterprise/, o2_enterprise/) or enterprise-gated modules are touched, and no enterprise keywords (cipher/SSO/SAML/RBAC/SDR) appear in the paths or symbols. Classified OSS.",
+    "skip": "Not skipping. No explicit opt-out is present (trigger_comment.txt and feature_hint.txt are empty; no tests-added label was passed). The change is user-facing — it alters the Traces search results grid's streaming/pagination behavior in web/src/plugins/traces/Index.vue.",
+    "e2e": "E2E is warranted. The diff changes how the Traces page writes streamed result batches across pagination: replace-vs-append on the first write, clearing an exhausted/empty page, keeping prior rows under an error banner, and ignoring stale superseded requests. These are observable UI flows a user hits when searching and paginating traces.",
+    "area": "Traces. The entire functional change lives in web/src/plugins/traces/Index.vue (the main Traces page), and sibling Playwright specs live under tests/ui-testing/playwright-tests/Traces/.",
+    "group": "The Traces shard in the CI matrix already owns tracesSearch, traceQueryEditor, traceErrorFilter, traceDetails, and traceAdvancedFiltering specs. This pagination/streaming result-write behavior is a natural fit for that same shard.",
+    "existing_tests": "No E2E specs in the diff. The only test file changed is web/src/plugins/traces/Index.spec.ts, a Vitest unit test — not Playwright E2E coverage under tests/ui-testing/playwright-tests/ — so it does not count as existing E2E coverage for this feature."
+  }
+}

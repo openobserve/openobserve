@@ -1,0 +1,10 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/Traces/tracesStreamingPagination.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Traces/tracesSearch.spec.js",
+    "tests/ui-testing/playwright-tests/Traces/service-catalog.spec.js"
+  ],
+  "needs_registration": true,
+  "rationale": "No existing spec exercises the Traces search-result pagination. tracesSearch.spec.js covers search basics (stream select, run query, trace details) but never pages through results. service-catalog.spec.js paginates a different component (services-catalog OTable bottom bar), not the traces SearchResult OPagination driven by the streaming hasWritten fix (Issue #14317). The feature is a distinct regression with its own spec filename in run-context (spec_path = Traces/tracesStreamingPagination.spec.js); a dedicated spec keeps tracesSearch.spec.js (already a serial 9-test spec) from sprawling further. Must be registered in ci_matrix.json Traces run_files."
+}

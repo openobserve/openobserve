@@ -61,6 +61,15 @@ export class TracesPage {
     this.traceRowOperationName = '[data-test="trace-row-operation-name"]';
     this.traceRowDuration = '[data-test="trace-row-duration"]';
 
+    // Pagination (Traces SearchResult header OPagination + rows-per-page OSelect)
+    // Source: web/src/plugins/traces/SearchResult.vue
+    // OPagination forwards the parent data-test as `${parent}-prev` / `-next` / `-page-{n}`.
+    this.paginationBar = '[data-test="traces-search-result-pagination"]';
+    this.paginationPrevBtn = '[data-test="traces-search-result-pagination-prev"]';
+    this.paginationNextBtn = '[data-test="traces-search-result-pagination-next"]';
+    this.recordsPerPageSelect = '[data-test="traces-search-result-records-per-page"]';
+    this.recordsPerPageTrigger = '[data-test="traces-search-result-records-per-page-trigger"]';
+
     // Trace Details
     this.traceDetailsHeader = '[data-test="trace-details-header"]';
     this.traceDetailsBackButton = '[data-test="trace-details-back-btn"]';
@@ -1018,6 +1027,152 @@ export class TracesPage {
    */
   async getTraceCount() {
     return await this.page.locator(this.searchResultItem).count();
+  }
+
+  // ===== Traces SearchResult pagination methods =====
+
+  /**
+   * Page-number button selector: OPagination derives `${parent}-page-${n}`.
+   * @param {number} pageNumber - 1-indexed page number
+   * @returns {string}
+   */
+  paginationPageBtn(pageNumber) {
+    return `[data-test="traces-search-result-pagination-page-${pageNumber}"]`;
+  }
+
+  /**
+   * Rows-per-page option selector: OSelectItem derives `${parent}-option` + data-test-value.
+   * @param {number} rowsPerPage - option value (10/25/50/100)
+   * @returns {string}
+   */
+  recordsPerPageOption(rowsPerPage) {
+    return `[data-test="traces-search-result-records-per-page-option"][data-test-value="${rowsPerPage}"]`;
+  }
+
+  /**
+   * Whether the pagination toolbar is visible. Renders only after the count query
+   * resolves (showPagination = count > 0).
+   * @returns {Promise<boolean>}
+   */
+  async isPaginationVisible() {
+    return await this.page.locator(this.paginationBar).first().isVisible({ timeout: 5000 }).catch(() => false);
+  }
+
+  /**
+   * Wait for the pagination toolbar to become visible (count query resolved).
+   * @param {number} timeout - maximum wait in ms
+   */
+  async waitForPaginationVisible(timeout = 20000) {
+    await expect(this.page.locator(this.paginationBar).first()).toBeVisible({ timeout });
+  }
+
+  /**
+   * Parse the integer total out of the `traces-count-badge` text ("<N> Traces Found").
+   * @returns {Promise<number>} total trace count (0 when unparseable)
+   */
+  async getTotalTraceCount() {
+    const text = (await this.page.locator(this.tracesCountBadge).first().textContent({ timeout: 10000 }).catch(() => '')) || '';
+    const match = text.match(/(\d[\d,]*)/);
+    return match ? parseInt(match[1].replace(/,/g, ''), 10) : 0;
+  }
+
+  /**
+   * Read the stable text of each rendered result row as a set of identifiers.
+   * Row text includes the timestamp cell, which is unique per trace.
+   * @returns {Promise<string[]>}
+   */
+  async getVisibleRowIdentifiers() {
+    const rows = this.page.locator(this.searchResultItem);
+    const count = await rows.count();
+    const ids = [];
+    for (let i = 0; i < count; i++) {
+      const txt = (await rows.nth(i).textContent().catch(() => '')) || '';
+      if (txt.trim()) ids.push(txt.trim());
+    }
+    return ids;
+  }
+
+  /**
+   * Click a page-number button and wait for it to become enabled first.
+   * @param {number} pageNumber - 1-indexed page number
+   */
+  async clickPage(pageNumber) {
+    const btn = this.page.locator(this.paginationPageBtn(pageNumber)).first();
+    await btn.waitFor({ state: 'visible', timeout: 10000 });
+    await expect(btn).toBeEnabled({ timeout: 10000 });
+    await btn.click();
+  }
+
+  /**
+   * Click the Next button and wait for it to become enabled first.
+   */
+  async clickNextPage() {
+    const btn = this.page.locator(this.paginationNextBtn).first();
+    await btn.waitFor({ state: 'visible', timeout: 10000 });
+    await expect(btn).toBeEnabled({ timeout: 10000 });
+    await btn.click();
+  }
+
+  /**
+   * Click the Prev button and wait for it to become enabled first.
+   */
+  async clickPrevPage() {
+    const btn = this.page.locator(this.paginationPrevBtn).first();
+    await btn.waitFor({ state: 'visible', timeout: 10000 });
+    await expect(btn).toBeEnabled({ timeout: 10000 });
+    await btn.click();
+  }
+
+  /**
+   * Whether a page-number button carries data-test-active="true".
+   * @param {number} pageNumber - 1-indexed page number
+   * @returns {Promise<boolean>}
+   */
+  async isPageActive(pageNumber) {
+    const btn = this.page.locator(this.paginationPageBtn(pageNumber)).first();
+    return (await btn.getAttribute('data-test-active').catch(() => null)) === 'true';
+  }
+
+  /**
+   * Whether the Prev button is disabled (true on the first page).
+   * @returns {Promise<boolean>}
+   */
+  async isPrevDisabled() {
+    return await this.page.locator(this.paginationPrevBtn).first().isDisabled().catch(() => false);
+  }
+
+  /**
+   * Whether the Next button is disabled (true on the last page).
+   * @returns {Promise<boolean>}
+   */
+  async isNextDisabled() {
+    return await this.page.locator(this.paginationNextBtn).first().isDisabled().catch(() => false);
+  }
+
+  /**
+   * Change rows-per-page: open the OSelect and pick the matching option.
+   * SearchResult.vue's changeRowsPerPage resets currentPage to 0 and re-queries.
+   * @param {number} rowsPerPage - option value (10/25/50/100)
+   */
+  async changeRowsPerPage(rowsPerPage) {
+    const trigger = this.page.locator(this.recordsPerPageTrigger).first();
+    await trigger.waitFor({ state: 'visible', timeout: 10000 });
+    await trigger.click();
+    const option = this.page.locator(this.recordsPerPageOption(rowsPerPage)).first();
+    await option.waitFor({ state: 'visible', timeout: 5000 });
+    await option.click();
+    // Re-query fires async; settle the load state before returning so callers
+    // read a stable DOM.
+    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+  }
+
+  /**
+   * Read the rows-per-page select's current value (the trigger shows the selected label).
+   * @returns {Promise<string>}
+   */
+  async getRowsPerPageValue() {
+    const txt = (await this.page.locator(this.recordsPerPageTrigger).first().textContent().catch(() => '')) || '';
+    return txt.trim();
   }
 
   /**

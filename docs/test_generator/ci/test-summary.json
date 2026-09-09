@@ -1,0 +1,32 @@
+[
+  {
+    "title": "P0: Pagination controls become visible after a trace search",
+    "action": "new",
+    "verifies": "the count query gates pagination visibility so the count badge and pagination toolbar render after a search on a populated stream"
+  },
+  {
+    "title": "P0: Clicking page 2 replaces page-1 rows without leaving stale rows",
+    "action": "new",
+    "verifies": "the hasWritten fix swaps the grid to page-2 rows with no page-1 residue (replace, not append)"
+  },
+  {
+    "title": "P1: Next and Prev buttons navigate pages and swap content",
+    "action": "new",
+    "verifies": "the prev/next buttons drive the same replace-semantics page change and restore page-1 rows on return"
+  },
+  {
+    "title": "P1: Changing rows-per-page re-queries and resets to page 1",
+    "action": "new",
+    "verifies": "navigating to page 2 then changing rows-per-page resets currentPage back to page 1 (page-2 button deactivates), re-queries with the new size, and renders at most that many rows"
+  },
+  {
+    "title": "P2: Single page shows pagination with prev/next disabled",
+    "action": "new",
+    "verifies": "a single-page result renders pagination with both prev and next disabled"
+  },
+  {
+    "title": "P2: Zero results hide pagination and show the no-results state",
+    "action": "new",
+    "verifies": "a zero-result search keeps pagination hidden and renders the no-results state"
+  }
+]

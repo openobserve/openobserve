@@ -1,0 +1,17 @@
+{
+  "feature_slug": "traces-streaming-pagination",
+  "feature_title": "Traces Streaming Pagination",
+  "area": "Traces",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "tracesStreamingPagination.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Traces/tracesStreamingPagination.spec.js",
+  "playwright_group": "Traces",
+  "source_files": [
+    "web/src/plugins/traces/Index.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": ""
+}

@@ -1,0 +1,2 @@
+web/src/plugins/traces/Index.spec.ts
+web/src/plugins/traces/Index.vue

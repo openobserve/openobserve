@@ -1,0 +1,314 @@
+===== COMPLETE LIST OF CHANGED FILES (2 files) =====
+# AUTHORITATIVE: this list is never truncated. The diff BODY below may be trimmed for
+# very large PRs, so decide WHICH files/areas changed (e.g. web/src frontend) from THIS list.
+web/src/plugins/traces/Index.spec.ts
+web/src/plugins/traces/Index.vue
+===== END CHANGED FILES =====
+
+diff --git a/web/src/plugins/traces/Index.spec.ts b/web/src/plugins/traces/Index.spec.ts
+index cfedfad0fff..1eca875a418 100644
+--- a/web/src/plugins/traces/Index.spec.ts
++++ b/web/src/plugins/traces/Index.spec.ts
+@@ -1111,6 +1111,171 @@ describe("Index.vue (Main Traces Page)", () => {
+     });
+   });
+ 
++  describe("Streaming page writes (issue #14317)", () => {
++    // The shared beforeEach does not reset currentPage, so it would leak into later tests.
++    afterEach(() => {
++      mockSearchObj.data.resultGrid.currentPage = 0;
++    });
++
++    const meta = (hits: any[] = []) => ({
++      type: "search_response_metadata",
++      content: { results: { hits } },
++    });
++    const chunk = (hits: any[]) => ({
++      type: "search_response_hits",
++      content: { results: { hits } },
++    });
++    const spans = (prefix: string, n: number) =>
++      Array.from({ length: n }, (_, i) => ({
++        span_id: `${prefix}-${i}`,
++        trace_id: `t-${prefix}-${i}`,
++        service_name: "svc",
++        operation_name: "op",
++        _timestamp: 1700000000000000 + i,
++      }));
++
++    const mountPage = async () => {
++      mockSearchObj.meta.searchMode = "spans";
++      mockSearchObj.data.stream.selectedStream = { label: "default", value: "default" };
++      wrapper = mount(Index, {
++        attachTo: node,
++        global: {
++          plugins: [i18n, router],
++          provide: { store: store },
++          stubs: {
++            "search-bar": true,
++            "index-list": true,
++            "search-result": true,
++            "service-graph": true,
++            "services-catalog": true,
++            SanitizedHtmlRenderer: true,
++          },
++        },
++      });
++      await flushPromises();
++      // Mounting runs loadPageData, which can reset the stream selection.
++      mockSearchObj.data.stream.selectedStream = { label: "default", value: "default" };
++      // getQueryData derives `from` from currentPage, so this is what makes it page 2.
++      mockSearchObj.data.resultGrid.currentPage = 1;
++      mockSearchObj.meta.resultGrid.rowsPerPage = 25;
++      mockSearchObj.data.queryPayload = {
++        query: {
++          sql: "",
++          start_time: 1700000000000000,
++          end_time: 1700003600000000,
++          from: 0,
++          size: 25,
++        },
++      };
++      return wrapper;
++    };
++
++    const lastCallbacks = () => {
++      const calls = mockFetchQueryDataWithHttpStream.mock.calls;
++      return calls[calls.length - 1][1];
++    };
++
++    it("replaces the previous page when the stream opens with an empty batch", async () => {
++      await mountPage();
++      mockFetchQueryDataWithHttpStream.mockClear();
++      await wrapper.vm.getQueryData(true);
++      await flushPromises();
++
++      const page1 = spans("p1", 25);
++      mockSearchObj.data.queryResults.hits = [...page1];
++
++      const cb = lastCallbacks();
++      const page2 = spans("p2", 25);
++      // The backend opens every page past the first with an empty batch.
++      cb.data(null, meta([]));
++      cb.data(null, chunk([]));
++      cb.data(null, meta([]));
++      cb.data(null, chunk(page2));
++
++      const ids = mockSearchObj.data.queryResults.hits.map((h: any) => h.span_id);
++      expect(ids).toHaveLength(25);
++      expect(ids).toEqual(page2.map((h) => h.span_id));
++      expect(ids.some((id: string) => id.startsWith("p1-"))).toBe(false);
++    });
++
++    it("joins batches within one page instead of replacing them", async () => {
++      await mountPage();
++      mockFetchQueryDataWithHttpStream.mockClear();
++      await wrapper.vm.getQueryData(true);
++      await flushPromises();
++
++      const cb = lastCallbacks();
++      const first = spans("a", 5);
++      const second = spans("b", 20);
++      cb.data(null, meta([]));
++      cb.data(null, chunk(first));
++      cb.data(null, meta([]));
++      cb.data(null, chunk(second));
++
++      const ids = mockSearchObj.data.queryResults.hits.map((h: any) => h.span_id);
++      expect(ids).toEqual([...first, ...second].map((h) => h.span_id));
++    });
++
++    it("clears the grid when a page streams no rows at all", async () => {
++      await mountPage();
++      mockFetchQueryDataWithHttpStream.mockClear();
++      await wrapper.vm.getQueryData(true);
++      await flushPromises();
++
++      mockSearchObj.data.queryResults.hits = spans("p1", 25);
++
++      const cb = lastCallbacks();
++      cb.data(null, meta([]));
++      cb.data(null, chunk([]));
++      cb.complete(null);
++
++      expect(mockSearchObj.data.queryResults.hits).toEqual([]);
++    });
++
++    // Logs shows its error banner over the last results rather than blanking; traces matches it.
++    it("keeps the previous rows when a page fails before writing any", async () => {
++      await mountPage();
++      mockFetchQueryDataWithHttpStream.mockClear();
++      await wrapper.vm.getQueryData(true);
++      await flushPromises();
++
++      const page1 = spans("p1", 25);
++      mockSearchObj.data.queryResults.hits = [...page1];
++
++      const cb = lastCallbacks();
++      cb.data(null, meta([]));
++      cb.data(null, chunk([]));
++      cb.error(null, { content: { message: "boom", code: 500 } });
++
++      const ids = mockSearchObj.data.queryResults.hits.map((h: any) => h.span_id);
++      expect(ids).toEqual(page1.map((h) => h.span_id));
++    });
++
++    it("ignores batches from a request that a newer search superseded", async () => {
++      await mountPage();
++      mockFetchQueryDataWithHttpStream.mockClear();
++      await wrapper.vm.getQueryData(true);
++      await flushPromises();
++      const stale = lastCallbacks();
++
++      // A second search cancels the first and takes ownership of the grid.
++      await wrapper.vm.getQueryData(true);
++      await flushPromises();
++      const current = lastCallbacks();
++
++      const fresh = spans("new", 25);
++      current.data(null, meta([]));
++      current.data(null, chunk(fresh));
++
++      stale.data(null, meta([]));
++      stale.data(null, chunk(spans("old", 25)));
++      stale.complete(null);
++
++      const ids = mockSearchObj.data.queryResults.hits.map((h: any) => h.span_id);
++      expect(ids).toEqual(fresh.map((h) => h.span_id));
++    });
++  });
++
+   describe("Metrics Filters Integration", () => {
+     // Spies for SearchBar ref methods exposed via stub
+     const mockApplyFilters = vi.fn();
+diff --git a/web/src/plugins/traces/Index.vue b/web/src/plugins/traces/Index.vue
+index 90d5f681729..2cc620bca35 100644
+--- a/web/src/plugins/traces/Index.vue
++++ b/web/src/plugins/traces/Index.vue
+@@ -437,14 +437,8 @@ let currentSearchTraceId: string | null = null;
+ let currentCountTraceId: string | null = null;
+ // The processed WHERE clause from the last buildSearch() call — used for the count query
+ let builtWhereClause = "";
+-/**
+- * Tracks per-request streaming partition state.
+- * Each backend partition emits a search_response_metadata event; each chunk
+- * within that partition emits a search_response_hits event.
+- * We decide replace vs append using the same pattern as useSearchResponseHandler.
+- */
+-const tracesPartitionMap: Record<string, { partition: number; chunks: Record<number, number> }> =
+-  {};
++// A page's stream can open with an empty batch, so only an actual write may end the replace phase.
++const tracesRequestState: Record<string, { hasWritten: boolean }> = {};
+ 
+ const selectedStreamName = computed(() => searchObj.data.stream.selectedStream.value);
+ 
+@@ -840,7 +834,7 @@ async function getQueryData(isPagination: boolean = false, isSort: boolean = fal
+ 
+     // Cancel any in-flight stream before starting a new one
+     if (currentSearchTraceId) {
+-      if (tracesPartitionMap[currentSearchTraceId]) delete tracesPartitionMap[currentSearchTraceId];
++      if (tracesRequestState[currentSearchTraceId]) delete tracesRequestState[currentSearchTraceId];
+ 
+       cancelStreamQueryBasedOnRequestId({
+         trace_id: currentSearchTraceId,
+@@ -852,7 +846,7 @@ async function getQueryData(isPagination: boolean = false, isSort: boolean = fal
+     // Generate a unique ID for this search request
+     const searchTraceId = getUUID().replace(/-/g, "");
+     currentSearchTraceId = searchTraceId;
+-    tracesPartitionMap[searchTraceId] = { partition: 0, chunks: {} };
++    tracesRequestState[searchTraceId] = { hasWritten: false };
+ 
+     const isSpansMode = searchObj.meta.searchMode === "spans";
+     const sortCol = searchObj.meta.resultGrid.sortBy || "start_time";
+@@ -914,21 +908,13 @@ async function getQueryData(isPagination: boolean = false, isSort: boolean = fal
+       },
+       {
+         data: (_payload: any, response: any) => {
+-          // Each metadata event signals a new backend partition — advance the counter
+-          if (response.type === "search_response_metadata") {
+-            tracesPartitionMap[searchTraceId].partition++;
+-          }
+-
+           if (
+             response.type === "search_response_metadata" ||
+             response.type === "search_response_hits"
+           ) {
+-            // Track individual hit chunks within the current partition
+-            if (response.type === "search_response_hits") {
+-              const p = tracesPartitionMap[searchTraceId].partition;
+-              tracesPartitionMap[searchTraceId].chunks[p] =
+-                (tracesPartitionMap[searchTraceId].chunks[p] ?? 0) + 1;
+-            }
++            // A missing entry means a newer request owns the grid now.
++            const requestState = tracesRequestState[searchTraceId];
++            if (!requestState) return;
+ 
+             const rawHits: any[] = response.content?.results?.hits || [];
+             if (rawHits.length === 0) return;
+@@ -953,12 +939,7 @@ async function getQueryData(isPagination: boolean = false, isSort: boolean = fal
+             //   }
+             // }
+ 
+-            const partition = tracesPartitionMap[searchTraceId]?.partition ?? 1;
+-            const chunkCount = tracesPartitionMap[searchTraceId]?.chunks[partition] ?? 0;
+-            const isChunkedHits = chunkCount > 1;
+-            // appendResult: true when on a later partition or a later chunk within
+-            // the current partition (mirrors useSearchResponseHandler logic)
+-            const appendResult = partition > 1 || isChunkedHits;
++            const isFirstWrite = !requestState.hasWritten;
+ 
+             const formattedHits =
+               searchObj.meta.searchMode === "traces" ? formatTracesMetaData(rawHits) : rawHits;
+@@ -968,12 +949,10 @@ async function getQueryData(isPagination: boolean = false, isSort: boolean = fal
+             }
+ 
+             isLLMSpanPresent.value =
+-              (!appendResult ? false : isLLMSpanPresent.value) ||
++              (isFirstWrite ? false : isLLMSpanPresent.value) ||
+               formattedHits.some((hit: any) => isLLMTrace(hit));
+ 
+-            // Replace hits on the first partition of a pagination fetch (clears the
+-            // previous page) or on the very first data chunk of a fresh search
+-            if ((isPagination && partition === 1) || !appendResult) {
++            if (isFirstWrite) {
+               searchObj.data.queryResults.hits = formattedHits;
+             } else {
+               searchObj.data.queryResults.hits = [
+@@ -981,6 +960,7 @@ async function getQueryData(isPagination: boolean = false, isSort: boolean = fal
+                 ...formattedHits,
+               ];
+             }
++            requestState.hasWritten = true;
+             searchObj.data.queryResults.from = queryReq.query.from;
+ 
+             updateFieldValues(rawHits);
+@@ -1027,12 +1007,18 @@ async function getQueryData(isPagination: boolean = false, isSort: boolean = fal
+           });
+ 
+           currentSearchTraceId = null;
+-          delete tracesPartitionMap[searchTraceId];
++          // Logs keeps the last rows under an error banner, so a failed page must not blank here.
++          delete tracesRequestState[searchTraceId];
+         },
+         complete: (_payload: any) => {
+           searchObj.loading = false;
+           currentSearchTraceId = null;
+-          delete tracesPartitionMap[searchTraceId];
++          // An exhausted page must not leave the previous page under the new page number.
++          if (tracesRequestState[searchTraceId]?.hasWritten === false) {
++            searchObj.data.queryResults.hits = [];
++            isLLMSpanPresent.value = false;
++          }
++          delete tracesRequestState[searchTraceId];
+           if (!isPagination) {
+             fetchTracesCount();
+           }
+@@ -1082,6 +1068,8 @@ const cancelSearch = () => {
+     trace_id: currentSearchTraceId,
+     org_id: searchObj.organizationIdentifier,
+   });
++  // Cancelling tears down the listeners, so no terminal event will release this entry.
++  delete tracesRequestState[currentSearchTraceId];
+   currentSearchTraceId = null;
+   searchObj.loading = false;
+ };
