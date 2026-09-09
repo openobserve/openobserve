@@ -138,8 +138,8 @@ pub async fn publish_error(error_data: ErrorData) {
     let cfg = get_config();
     #[cfg(not(feature = "enterprise"))]
     {
-        if !cfg.common.usage_enabled {
-            log::debug!("[SELF-REPORTING] Skipping error publish - usage reporting disabled");
+        if !cfg.common.usage_reporting_errors_enabled {
+            log::debug!("[SELF-REPORTING] Skipping error publish - error reporting disabled");
             return;
         }
     }
@@ -218,6 +218,8 @@ pub async fn flush() {
     shutdown(cfg.limit.usage_reporting_thread_num).await;
 }
 
+/// Counts the request in Prometheus, then records usage; the enterprise build alone records usage.
+#[cfg_attr(not(feature = "enterprise"), allow(unreachable_code, unused_variables))]
 pub async fn report_request_usage_stats(
     stats: RequestStats,
     org_id: &str,
@@ -238,9 +240,7 @@ pub async fn report_request_usage_stats(
     }
 
     #[cfg(not(feature = "enterprise"))]
-    if !get_config().common.usage_enabled {
-        return;
-    }
+    return;
 
     let now = DateTime::from_timestamp_micros(timestamp).unwrap();
     let request_body = stats.request_body.unwrap_or(usage_type.to_string());
@@ -356,14 +356,10 @@ pub fn report_usage(usages: Vec<UsageData>) {
     tokio::spawn(publish_usage(usages));
 }
 
+#[cfg_attr(not(feature = "enterprise"), allow(unreachable_code, unused_variables))]
 async fn publish_usage(usages: Vec<UsageData>) {
     #[cfg(not(feature = "enterprise"))]
-    {
-        let cfg = get_config();
-        if !cfg.common.usage_enabled {
-            return;
-        }
-    }
+    return;
 
     for usage in usages {
         let event = usage.event;
@@ -788,5 +784,68 @@ mod tests {
         ];
         assert_eq!(count_data(&batch), (2, 1));
         assert_eq!(count_data(&[]), (0, 0));
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn report_request_usage_stats_keeps_the_ingest_counters() {
+        let org = "counter-test-org";
+        let before_records = metrics::INGEST_RECORDS
+            .with_label_values(&[org, StreamType::Logs.as_str()])
+            .get();
+        let before_bytes = metrics::INGEST_BYTES
+            .with_label_values(&[org, StreamType::Logs.as_str()])
+            .get();
+
+        report_request_usage_stats(
+            RequestStats {
+                records: 7,
+                size: 2.0,
+                ..Default::default()
+            },
+            org,
+            "counter-test-stream",
+            StreamType::Logs,
+            UsageType::Json,
+            0,
+            config::utils::time::now_micros(),
+        )
+        .await;
+
+        assert_eq!(
+            metrics::INGEST_RECORDS
+                .with_label_values(&[org, StreamType::Logs.as_str()])
+                .get(),
+            before_records + 7
+        );
+        assert_eq!(
+            metrics::INGEST_BYTES
+                .with_label_values(&[org, StreamType::Logs.as_str()])
+                .get(),
+            before_bytes + (2.0 * SIZE_IN_MB) as u64
+        );
+    }
+
+    #[test]
+    fn oss_usage_entry_points_return_before_enqueueing() {
+        let source = include_str!("lib.rs");
+        let gate = "#[cfg(not(feature = \"enterprise\"))]\n    return;";
+        assert_eq!(
+            source.matches(gate).count(),
+            2,
+            "report_request_usage_stats and publish_usage must both return early in the OSS build"
+        );
+    }
+
+    #[test]
+    fn publish_error_is_gated_on_the_errors_flag() {
+        let source = include_str!("lib.rs");
+        let body = source
+            .split("pub async fn publish_error")
+            .nth(1)
+            .expect("publish_error is defined");
+        let body = &body[..body.find("\npub ").unwrap_or(body.len())];
+        assert!(body.contains("if !cfg.common.usage_reporting_errors_enabled"));
+        assert!(!body.contains("if !cfg.common.usage_enabled"));
     }
 }
