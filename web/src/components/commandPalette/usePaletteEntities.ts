@@ -33,7 +33,8 @@ export interface PaletteEntitiesInput {
   providers: Ref<EntityProvider[]>;
 }
 
-const SEARCH_DEBOUNCE_MS = 120;
+// 300ms is the app's standard search-as-you-type delay (Logs, Traces, LogStream, alerts).
+const SEARCH_DEBOUNCE_MS = 300;
 const CACHE_TTL_MS = 60_000;
 
 interface CacheEntry {

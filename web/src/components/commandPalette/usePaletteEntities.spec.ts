@@ -89,13 +89,13 @@ describe("usePaletteEntities", () => {
       org: ref("org1"),
       providers: ref([provider("resources", ["dashboards"], { search })]),
     });
-    await tick(120);
+    await tick(300);
     expect(search).toHaveBeenCalledTimes(1);
     expect(search.mock.calls[0][0]).toBe("");
     query.value = "p";
     await flush();
     query.value = "pa";
-    await tick(119);
+    await tick(299);
     expect(search).toHaveBeenCalledTimes(1);
     await tick(1);
     expect(search).toHaveBeenCalledTimes(2);
@@ -114,17 +114,17 @@ describe("usePaletteEntities", () => {
       org: ref("org1"),
       providers: ref([provider("resources", ["reliability"], { search })]),
     });
-    await tick(120);
+    await tick(300);
     expect(search).toHaveBeenCalledTimes(1);
     query.value = "pa";
-    await tick(120);
+    await tick(300);
     query.value = "pay";
     await flush();
     expect(entities.value.map((i) => i.id)).toEqual(["alert:x"]);
     expect(search).toHaveBeenCalledTimes(2);
     vi.setSystemTime(Date.now() + 61_000);
     query.value = "pa";
-    await tick(120);
+    await tick(300);
     expect(search).toHaveBeenCalledTimes(3);
   });
 
@@ -147,7 +147,7 @@ describe("usePaletteEntities", () => {
         provider("users", ["iam"], { search: elsewhere }),
       ]),
     });
-    await tick(120);
+    await tick(300);
     expect(entities.value.map((i) => i.id)).toEqual(["function:f"]);
     expect(off).not.toHaveBeenCalled();
     expect(elsewhere).not.toHaveBeenCalled();

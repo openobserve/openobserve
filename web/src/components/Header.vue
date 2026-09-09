@@ -129,21 +129,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <!-- end left side -->
 
-    <!-- CENTER: command palette trigger -->
+    <!-- CENTER: command palette trigger; the wrapper owns the absolute centering because OButton's own position would override it -->
     <div class="min-w-0 flex-1" />
-    <OButton
-      variant="outline"
-      size="sm"
-      content-align="between"
-      icon-left="search"
-      class="bg-surface-base text-text-secondary hover:border-accent absolute top-1/2 left-1/2 hidden h-7! w-[min(24rem,calc(100vw-66rem))] -translate-x-1/2 -translate-y-1/2 rounded-full! pe-1.5! font-normal shadow-xs xl:inline-flex"
-      data-test="header-command-palette-trigger"
-      :aria-label="t('palette.title')"
-      @click="openPalette('header')"
+    <div
+      class="absolute top-1/2 left-1/2 hidden w-[min(24rem,calc(100vw-66rem))] -translate-x-1/2 -translate-y-1/2 xl:block"
     >
-      <span class="min-w-0 flex-1 truncate text-start">{{ t("palette.trigger") }}</span>
-      <OShortcut id="commandPalette" />
-    </OButton>
+      <OButton
+        variant="outline"
+        size="sm"
+        content-align="between"
+        icon-left="search"
+        class="bg-surface-base text-text-secondary hover:border-accent h-7! w-full rounded-full! pe-1.5! font-normal shadow-xs"
+        data-test="header-command-palette-trigger"
+        :aria-label="t('palette.title')"
+        @click="openPalette('header')"
+      >
+        <span class="min-w-0 flex-1 truncate text-start">{{ t("palette.trigger") }}</span>
+        <OShortcut id="commandPalette" />
+      </OButton>
+    </div>
 
     <!-- RIGHT SIDE: Controls -->
     <div class="flex shrink-0 items-center justify-end gap-1 pe-3">

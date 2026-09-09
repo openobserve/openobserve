@@ -112,7 +112,7 @@ const navLinks = [
 
 // The resources provider debounces 120ms then resolves async; wait past it.
 const settle = async () => {
-  await new Promise((r) => setTimeout(r, 140));
+  await new Promise((r) => setTimeout(r, 340));
   await flushPromises();
 };
 
