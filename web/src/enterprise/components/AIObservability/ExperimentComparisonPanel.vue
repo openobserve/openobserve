@@ -288,7 +288,6 @@ const thresholdTooltip = computed(() =>
   }),
 );
 
-
 const selectedDimensions = computed(
   () => props.outcomeDimensions ?? comparison.value.outcomeDimensions,
 );
