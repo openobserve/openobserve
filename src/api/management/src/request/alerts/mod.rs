@@ -24,7 +24,7 @@ use axum::{
 use axum_extra::extract::Query as ExtraQuery;
 use config::meta::{
     alerts::alert::{Alert as MetaAlert, AlertTypeFilter},
-    triggers::{Trigger, TriggerModule},
+    triggers::{ScheduledTriggerData, Trigger, TriggerModule},
 };
 use db::scheduler;
 use hashbrown::HashMap;
@@ -302,7 +302,7 @@ fn composite_input(
         warning_counts_as_firing: condition.warning_counts_as_firing,
         stale_child_policy: condition.stale_child_policy.storage_id(),
         destinations: alert.destinations,
-        template: alert.template,
+        template: alert.template.filter(|s| !s.is_empty()),
         context_attributes: alert
             .context_attributes
             .map(|value| serde_json::json!(value)),
@@ -480,12 +480,26 @@ async fn composite_detail_response(
 fn composite_list_item(
     definition: infra::table::entity::alert_composites::Model,
     folder_name: &str,
+    trigger_data: &mut HashMap<String, Trigger>,
 ) -> Option<ListAlertsResponseBodyItem> {
     let alert_id = Ksuid::from_str(&definition.id).ok()?;
     let tags = definition
         .tags
         .and_then(|tags| serde_json::from_value(tags).ok())
         .unwrap_or_default();
+
+    let (last_triggered_at, last_satisfied_at) =
+        if let Some(trigger) = trigger_data.remove(&alert_id.to_string()) {
+            (
+                trigger.end_time,
+                serde_json::from_str::<ScheduledTriggerData>(&trigger.data)
+                    .ok()
+                    .and_then(|trigger_data| trigger_data.last_satisfied_at),
+            )
+        } else {
+            (None, None)
+        };
+
     Some(ListAlertsResponseBodyItem {
         alert_id,
         folder_id: definition.folder_id.clone(),
@@ -497,8 +511,8 @@ fn composite_list_item(
         condition: None,
         trigger_condition: None,
         enabled: definition.enabled,
-        last_triggered_at: None,
-        last_satisfied_at: None,
+        last_triggered_at,
+        last_satisfied_at,
         is_real_time: false,
         last_trained_at: None,
         status: None,
@@ -2494,7 +2508,12 @@ pub async fn list_alerts(
                         .collect()
                 })
                 .unwrap_or_default();
-
+        let mut trigger_data = scheduler::list_by_org(&org_id, Some(TriggerModule::CompositeAlert))
+            .await
+            .unwrap_or_default()
+            .into_iter()
+            .map(|t| (t.module_key.clone(), t))
+            .collect();
         for definition in composite_definitions {
             if !folder_slug
                 .as_ref()
@@ -2521,7 +2540,8 @@ pub async fn list_alerts(
                 .get(&definition.folder_id)
                 .cloned()
                 .unwrap_or_else(|| definition.folder_id.clone());
-            let Some(item) = composite_list_item(definition, &folder_name) else {
+            let Some(item) = composite_list_item(definition, &folder_name, &mut trigger_data)
+            else {
                 continue;
             };
             let priority_matches = match &priority_filter {
