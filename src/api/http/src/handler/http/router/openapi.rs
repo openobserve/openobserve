@@ -854,15 +854,30 @@ mod tests {
         ("/api/{org_id}/tasks/{entity_id}/test_run", "post"),
     ];
 
+    // Ends at the column-0 close brace, so an item after the body is never scraped into it.
     #[cfg(feature = "enterprise")]
     fn service_routes_body() -> &'static str {
         let start = ROUTER_SOURCE
             .find(SERVICE_ROUTES_SIGNATURE)
             .expect("the router must define service_routes()");
         let after_signature = &ROUTER_SOURCE[start + SERVICE_ROUTES_SIGNATURE.len()..];
-        &after_signature[..after_signature
-            .find("\npub fn ")
-            .unwrap_or(after_signature.len())]
+        let end = after_signature
+            .find("\n}\n")
+            .expect("service_routes() must end at a column-0 close brace");
+        &after_signature[..end]
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn the_scrape_stops_at_the_end_of_service_routes() {
+        let body = service_routes_body();
+        for item in ["\nfn ", "\npub fn ", "\npub(crate) fn ", "\nasync fn "] {
+            assert!(
+                !body.contains(item),
+                "the scrape ran past service_routes() and swallowed a following {item:?} item, \
+                 so a route block moved there would read as registered while being served nowhere"
+            );
+        }
     }
 
     #[cfg(feature = "enterprise")]
@@ -1046,7 +1061,7 @@ mod tests {
         assert!(invalid.is_empty(), "{invalid:#?}");
     }
 
-    /// Every handler in this module answers 403 while the feature switch is off.
+    /// The bulk-history route is the exception: it carries no feature-switch guard at all.
     #[cfg(feature = "enterprise")]
     #[test]
     fn anomaly_detection_documents_the_statuses_its_handlers_return() {
@@ -1054,6 +1069,11 @@ mod tests {
         let paths = spec.get("paths").unwrap().as_object().unwrap();
 
         let expected: &[(&str, &str, &[&str])] = &[
+            (
+                "/api/{org_id}/anomaly_detection/history",
+                "get",
+                &["200", "400", "403", "500"],
+            ),
             (
                 "/api/{org_id}/anomaly_detection",
                 "get",
