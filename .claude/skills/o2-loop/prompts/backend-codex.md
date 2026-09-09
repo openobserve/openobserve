@@ -1,0 +1,2 @@
+## Notes for the Codex reviewer process
+You run in Codex's read-only sandbox inside a disposable checkout of the commit under review. There is no `AGENTS.md` in this repository; `CLAUDE.md` at the checkout root is the rules file, so do not search for anything else. The ledger paths given below are absolute and readable; `rg` is not installed, use `grep`, `cat`, and `git`. Do not run cargo; the evidence section already carries the build and test results.

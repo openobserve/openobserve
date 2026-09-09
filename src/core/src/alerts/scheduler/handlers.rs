@@ -3181,6 +3181,24 @@ async fn handle_report_triggers(
             ));
         }
     };
+
+    // The report is fetched by ID alone, so refuse to run one whose org drifted from its trigger.
+    if &report.org_id != org_id {
+        log::error!(
+            "[SCHEDULER trace_id {scheduler_trace_id}] Report {report_id} belongs to org {}, not to its trigger org {org_id}; skipping",
+            report.org_id
+        );
+        db::scheduler::delete(
+            &trigger.org,
+            db::scheduler::TriggerModule::Report,
+            &trigger.module_key,
+        )
+        .await?;
+        return Err(anyhow::anyhow!(
+            "Report {report_id} does not belong to org {org_id}"
+        ));
+    }
+
     let report_name = report.name.clone();
 
     #[cfg(feature = "cloud")]
