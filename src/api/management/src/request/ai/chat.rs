@@ -36,6 +36,11 @@ use {
     o2_enterprise::enterprise::{
         ai::{
             agent::meta::Role,
+            chat::{
+                PersistSettings, TurnIdentity, TurnSpec,
+                lease::{self, LeaseError},
+                spawn_turn,
+            },
             client::{
                 DEFAULT_AGENT_TYPE, ImageAttachment, QueryRequest, RCA_AGENT_TYPE,
                 SESSION_OWNER_UNAVAILABLE, get_agent_client, is_session_owner_unavailable,
@@ -336,6 +341,11 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
             } else {
                 Some(tool_skills)
             },
+            // Set by the persistence admission below when this turn is being
+            // stored; absent otherwise, so o2-ai streams exactly as before.
+            turn_id: None,
+            known_seq: None,
+            known_opencode_session_id: None,
         };
 
         // Forward the session id: without it every call load-balances to an
@@ -814,6 +824,11 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
             } else {
                 Some(tool_skills)
             },
+            // Set by the persistence admission below when this turn is being
+            // stored; absent otherwise, so o2-ai streams exactly as before.
+            turn_id: None,
+            known_seq: None,
+            known_opencode_session_id: None,
         };
 
         // Report successful start to audit
@@ -836,6 +851,152 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
         } else {
             Some(forward_headers)
         };
+
+        // ---- Server-side chat persistence -------------------------------
+        //
+        // With persistence on, the turn is owned by a background task rather
+        // than by this response: it holds the o2-ai connection, stores
+        // opencode's durable events in the org's protected chat-events
+        // stream, and feeds the browser through a bounded channel. Closing
+        // the tab drops only that channel.
+        if o2_enterprise::enterprise::ai::chat::is_enabled() {
+            let Some(session_id) = headers_to_forward
+                .as_ref()
+                .and_then(|h| h.get(X_O2_ASSISTANT_SESSION_ID.as_str()))
+                .cloned()
+            else {
+                // The session id is the key every stored event and the index
+                // row hang off; without it a turn cannot be persisted at all.
+                return MetaHttpResponse::bad_request(
+                    "A session id is required while chat persistence is enabled",
+                );
+            };
+
+            let now = config::utils::time::now_micros();
+            let row = match infra::table::ai_chat_sessions::get_or_create(
+                &org_id_str,
+                &session_id,
+                &user_id,
+                agent_type,
+                now,
+            )
+            .await
+            {
+                Ok(row) => row,
+                Err(e) => {
+                    // Durability is the contract here: answering without an
+                    // index row would silently drop the conversation.
+                    log::error!(
+                        "[AI-CHAT] [trace_id:{trace_id}] cannot read/create the session index row \
+                         for {org_id_str}/{session_id}: {e}"
+                    );
+                    return MetaHttpResponse::service_unavailable(
+                        "Chat persistence is unavailable; please retry",
+                    );
+                }
+            };
+            if !row.user_id.eq_ignore_ascii_case(&user_id) {
+                // The id is client-supplied: replaying someone else's must not
+                // append to (or reveal) their conversation.
+                log::warn!(
+                    "[AI-CHAT] [trace_id:{trace_id}] user {user_id} tried to continue session \
+                     {session_id} owned by another user"
+                );
+                return MetaHttpResponse::forbidden("This conversation belongs to another user");
+            }
+            if row.status != infra::table::ai_chat_sessions::STATUS_ACTIVE {
+                // Deleted: reads already stopped, so continuing it would
+                // append to a conversation nobody can see.
+                return MetaHttpResponse::not_found("This conversation has been deleted");
+            }
+
+            let lease = match lease::acquire(
+                &org_id_str,
+                &session_id,
+                get_o2_config().ai.chat_turn_lease_wait_secs,
+            )
+            .await
+            {
+                Ok(lease) => lease,
+                Err(LeaseError::Busy) => {
+                    config::metrics::AI_CHAT_TURN_LEASE_CONFLICTS_TOTAL
+                        .with_label_values(&[&org_id_str])
+                        .inc();
+                    return MetaHttpResponse::conflict(
+                        "Another turn is already running in this conversation",
+                    );
+                }
+                Err(LeaseError::Backend(e)) => {
+                    log::error!(
+                        "[AI-CHAT] [trace_id:{trace_id}] turn lease unavailable for \
+                         {org_id_str}/{session_id}: {e}"
+                    );
+                    return MetaHttpResponse::service_unavailable(
+                        "Chat coordination is unavailable; please retry",
+                    );
+                }
+            };
+
+            // Tell o2-ai to forward opencode's durable events, and how far our
+            // copy of them already reaches so it only sends what is missing.
+            let turn_id = config::ider::uuid();
+            let mut query_req = query_req;
+            query_req.turn_id = Some(turn_id.clone());
+            query_req.known_seq = Some(row.last_committed_seq);
+            query_req.known_opencode_session_id = row.opencode_session_id.clone();
+
+            let settings = PersistSettings::from_config();
+            let store = std::sync::Arc::new(openobserve_core::ai_chat::StreamChatStore::new(
+                settings.retention_days,
+            ));
+            let span_for_task = otel_chat_span;
+            let mut rx = spawn_turn(
+                TurnSpec {
+                    identity: TurnIdentity {
+                        org_id: org_id_str.clone(),
+                        session_id,
+                        user_id: user_id.clone(),
+                        agent_type,
+                        turn_id,
+                        trace_id: trace_id.clone(),
+                        epoch: row.session_epoch,
+                        last_committed_seq: row.last_committed_seq,
+                        opencode_session_id: row.opencode_session_id,
+                    },
+                    request: query_req,
+                    auth_header: auth_str,
+                    forward_headers: headers_to_forward,
+                    client,
+                    store,
+                    lease,
+                    // The span outlives this response now, so it is ended by
+                    // the task rather than at the end of the relay below.
+                    on_end: Some(Box::new(move || {
+                        if let Some(span_cx) = span_for_task {
+                            use opentelemetry::trace::TraceContextExt;
+                            span_cx.span().end();
+                        }
+                    })),
+                },
+                settings,
+            );
+
+            let body = async_stream::stream! {
+                while let Some(chunk) = rx.recv().await {
+                    yield Ok::<bytes::Bytes, std::io::Error>(chunk);
+                }
+            };
+            return axum::http::Response::builder()
+                .status(StatusCode::OK)
+                .header(
+                    axum::http::header::CONTENT_TYPE,
+                    mime::TEXT_EVENT_STREAM.as_ref(),
+                )
+                .header(axum::http::header::CACHE_CONTROL, "no-cache")
+                .header("X-Accel-Buffering", "no")
+                .body(Body::from_stream(body))
+                .unwrap_or_else(|_| Response::new(Body::empty()));
+        }
 
         // Move the OTel span context into the stream so it stays alive for the
         // full streaming duration. When the stream completes, the span is explicitly
@@ -1151,6 +1312,107 @@ pub async fn confirm_action(
         drop(session_id);
         drop(parts);
         drop(body_bytes);
+        MetaHttpResponse::bad_request("AI chat is only available in enterprise version")
+    }
+}
+
+/// CancelChat - stop the turn running in a conversation
+#[utoipa::path(
+    post,
+    path = "/{org_id}/ai/chats/{session_id}/cancel",
+    context_path = "/api",
+    tag = "AI",
+    operation_id = "CancelChat",
+    summary = "Stop the AI turn running in a conversation",
+    description = "Stops generation for a chat session. With server-side chat persistence \
+                   enabled the browser no longer holds the connection to the agent, so \
+                   disconnecting does not stop the turn — this does, and what was generated \
+                   up to that point stays saved.",
+    security(
+        ("Authorization" = [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("session_id" = String, Path, description = "Chat session ID")
+    ),
+    responses(
+        (status = StatusCode::OK, description = "Cancellation forwarded", body = Object),
+        (status = StatusCode::BAD_REQUEST, description = "Invalid session ID or AI agent not configured", body = Object),
+        (status = StatusCode::FORBIDDEN, description = "The conversation belongs to another user", body = Object),
+        (status = StatusCode::NOT_FOUND, description = "Unknown conversation", body = Object),
+        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = Object),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+pub async fn cancel(
+    Path((org_id, session_id)): Path<(String, String)>,
+    in_req: axum::extract::Request,
+) -> Response {
+    let (parts, _body) = in_req.into_parts();
+
+    #[cfg(feature = "enterprise")]
+    {
+        if !get_o2_config().ai.enabled {
+            return MetaHttpResponse::bad_request("AI is not enabled");
+        }
+        // Validated before it reaches an outbound URL and a routing key.
+        if !is_valid_session_id(&session_id) {
+            return MetaHttpResponse::bad_request("Invalid session id");
+        }
+        let client = match get_agent_client() {
+            Some(c) => c,
+            None => return MetaHttpResponse::bad_request("Agent service not configured"),
+        };
+
+        let user_id = parts
+            .headers
+            .get("user_id")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or_default()
+            .to_string();
+
+        // Only the owner may stop a turn. Without persistence there is no
+        // index row to check ownership against, and cancellation is already
+        // scoped by the session id the caller must know.
+        if o2_enterprise::enterprise::ai::chat::is_enabled() {
+            match infra::table::ai_chat_sessions::get(&org_id, &session_id).await {
+                Ok(Some(row)) => {
+                    if !row.user_id.eq_ignore_ascii_case(&user_id) {
+                        return MetaHttpResponse::forbidden(
+                            "This conversation belongs to another user",
+                        );
+                    }
+                }
+                Ok(None) => return MetaHttpResponse::not_found("Unknown conversation"),
+                Err(e) => {
+                    log::error!("[AI-CHAT] cannot read session {org_id}/{session_id}: {e}");
+                    return MetaHttpResponse::internal_error("Could not read the conversation");
+                }
+            }
+        }
+
+        let auth_str = openobserve_core::auth::extract_auth_str_from_headers(&parts.headers).await;
+        match client.cancel_session(&session_id, &org_id, &auth_str).await {
+            Ok(resp) => {
+                let status = StatusCode::from_u16(resp.status().as_u16())
+                    .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
+                let body = resp.text().await.unwrap_or_else(|_| "{}".to_string());
+                let json = serde_json::from_str::<serde_json::Value>(&body)
+                    .unwrap_or_else(|_| serde_json::json!({"message": body}));
+                (status, axum::Json(json)).into_response()
+            }
+            Err(e) => {
+                log::error!("[AI-CHAT] failed to forward cancel for {session_id}: {e}");
+                MetaHttpResponse::internal_error(format!("Failed to cancel: {e}"))
+            }
+        }
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    {
+        drop((org_id, session_id, parts));
         MetaHttpResponse::bad_request("AI chat is only available in enterprise version")
     }
 }

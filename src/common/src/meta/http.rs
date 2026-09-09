@@ -260,6 +260,22 @@ impl HttpResponse {
             .into_response()
     }
 
+    /// Send a ServiceUnavailable response in json format and associate the
+    /// provided error as `error` field.
+    ///
+    /// For a dependency this server needs being temporarily unreachable —
+    /// the request is worth retrying unchanged, unlike a 4xx.
+    pub fn service_unavailable(error: impl ToString) -> Response {
+        (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(Self::error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                error.to_string(),
+            )),
+        )
+            .into_response()
+    }
+
     /// Send a TooManyRequests response in json format and associate the
     /// provided error as `error` field.
     pub fn too_many_requests(error: impl ToString) -> Response {

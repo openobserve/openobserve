@@ -32,6 +32,16 @@ mod usage_schema;
 #[cfg(feature = "cloud")]
 pub use ingestion::ingest_data_retention_usages;
 
+/// Write records into an internal stream through the same path self-reporting
+/// uses: directly on an ingester, over gRPC to one otherwise. Returns once the
+/// ingester has accepted the batch. Used by server-side chat persistence.
+pub async fn ingest_internal_logs(
+    values: Vec<config::utils::json::Value>,
+    stream: config::meta::stream::StreamParams,
+) -> anyhow::Result<()> {
+    ingestion::ingest_reporting_data(values, stream).await
+}
+
 #[cfg(feature = "enterprise")]
 pub struct CoreAuditPublisher;
 

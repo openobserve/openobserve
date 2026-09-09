@@ -261,8 +261,33 @@ const useAiChat = () => {
     contextRegistry.register("default", defaultProvider);
   };
 
+  /**
+   * Ask the server to stop the turn running in a chat session.
+   *
+   * With server-side chat persistence the turn is owned by an OpenObserve
+   * background task rather than by the browser's request: aborting the fetch
+   * closes our view of the stream, but generation continues. This is what
+   * actually stops it. Whatever was produced up to that point stays saved.
+   *
+   * Fire-and-forget by design — the Stop button must not wait on the network.
+   */
+  const cancelAiChat = async (org_id: string, sessionId: string) => {
+    const url = `${store.state.API_ENDPOINT}/api/${org_id}/ai/chats/${sessionId}/cancel`;
+    return fetch(url, {
+      method: "POST",
+      credentials: "include",
+      // The tab may be closing right after this; keepalive lets the browser
+      // finish sending it anyway.
+      keepalive: true,
+      headers: {
+        "x-o2-assistant-session-id": sessionId,
+      },
+    });
+  };
+
   return {
     fetchAiChat,
+    cancelAiChat,
     submitFeedback,
     registerAiChatHandler,
     removeAiChatHandler,
