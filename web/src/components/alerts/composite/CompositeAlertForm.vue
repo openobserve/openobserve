@@ -141,14 +141,14 @@ const validateDraft = async (): Promise<void> => {
     if (sequence !== validationSequence) return;
     preview.value = response.data;
     emit("validation", response.data);
-  } catch {
+  } catch (e) {
     if (sequence !== validationSequence) return;
     preview.value = {
       valid: false,
       canonical_expression: draft.value.composite_condition.expression,
       children: [],
       warnings: [],
-      errors: [{ code: "validation_unavailable" }],
+      errors: [{ code: e.response?.data?.message || "validation_unavailable" }],
       result: null,
       result_level: null,
     };
