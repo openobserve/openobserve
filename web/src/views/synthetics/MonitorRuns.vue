@@ -177,9 +177,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- KPI Cards — gated on KPI + last-run queries -->
               <template v-if="kpiLoading || !kpiHasLoadedOnce">
                 <div class="px-page-edge">
-                  <div class="grid grid-cols-6 gap-2.5">
+                  <div class="grid grid-cols-7 gap-2.5">
                     <div
-                      v-for="n in 6"
+                      v-for="n in 7"
                       :key="n"
                       class="card-container rounded-default bg-surface-base border-border-default flex flex-col gap-2 border px-3.5 pt-2.5 pb-2.5"
                     >
@@ -191,7 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
               <template v-else>
                 <div class="px-page-edge">
-                  <div class="grid grid-cols-6 gap-2.5">
+                  <div class="grid grid-cols-7 gap-2.5">
                     <div
                       v-for="card in kpiCards"
                       :key="card.key"
@@ -833,6 +833,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   })
                 }}
               </p>
+              <!-- Errors have no steps, so they're absent below; point to where they are counted. -->
+              <p
+                v-if="!stepsLoading && kpiErrorRuns > 0"
+                class="text-text-secondary px-2 text-xs"
+                data-test="monitor-runs-steps-error-note"
+              >
+                {{ t("synthetics.runs.stepsErrorExcluded", { count: kpiErrorRuns }) }}
+              </p>
               <!-- Loading skeleton -->
               <template v-if="stepsLoading || !stepsHasLoadedOnce">
                 <div class="grid grid-cols-2 gap-2">
@@ -1109,6 +1117,17 @@ const deviceDisplay = (id: string): I18nText => {
 const emit = defineEmits<{
   (e: "edit"): void;
   (e: "open-run", runId: string, executionId: string): void;
+  (
+    e: "open-run-error",
+    info: {
+      errorSource: string;
+      message: string;
+      timestamp: number;
+      location: string;
+      browser: string;
+      device: string;
+    },
+  ): void;
   (e: "refresh"): void;
   (e: "jump-to-window", startTime: number, endTime: number): void;
 }>();
@@ -1471,7 +1490,10 @@ const p95Label = computed(() =>
   effectiveP95Ms.value > 0 ? fmtDur(effectiveP95Ms.value) : hasKpiData.value ? fmtDur(0) : "—",
 );
 const p95Ms = computed(() => effectiveP95Ms.value);
-const failCount = computed(() => String(synthetics.kpi.value.failedRuns));
+// Errors roll up into "failed" here (as the timeline does via rollUpStatus) so the "Errors over time" badge doesn't read 0 while error records exist.
+const failCount = computed(() =>
+  String(synthetics.kpi.value.failedRuns + synthetics.kpi.value.errorRuns),
+);
 
 interface KpiCard {
   key: string;
@@ -1555,6 +1577,13 @@ const kpiCards = computed<KpiCard[]>(() => {
         value: String(k.failedRuns),
         valueClass: k.failedRuns > 0 ? "text-status-error-text!" : undefined,
       },
+      // Its own card because rollUpStatus folds error into failed elsewhere; this is the one surface that keeps the two distinct.
+      {
+        key: "error-runs",
+        label: t("synthetics.results.errorRuns"),
+        value: String(k.errorRuns),
+        valueClass: k.errorRuns > 0 ? "text-status-error-text!" : undefined,
+      },
     ];
   }
   // Fallback: derive from mock data
@@ -1599,6 +1628,11 @@ const kpiCards = computed<KpiCard[]>(() => {
       key: "failed-runs",
       label: t("synthetics.results.failedRuns"),
       value: String(totalFails.value),
+    },
+    {
+      key: "error-runs",
+      label: t("synthetics.results.errorRuns"),
+      value: String(allRuns.value.filter((r) => r.status === "error").length),
     },
   ];
 });
@@ -1901,6 +1935,7 @@ const statusOptions = [
   { key: "pass", label: t("synthetics.results.passed"), dot: "var(--color-status-success-text)" },
   { key: "warning", label: t("synthetics.runs.warning"), dot: "var(--color-status-warning-text)" },
   { key: "fail", label: t("synthetics.results.failed"), dot: "var(--color-status-error-text)" },
+  { key: "error", label: t("synthetics.results.error"), dot: "var(--color-status-error-text)" },
 ];
 
 // ── Mock fallback data (used by Overview/Errors tabs when no real data) ────
@@ -2194,6 +2229,9 @@ const runColumns = computed<OTableColumnDef[]>(() => {
 
 // ── Steps: real data from composable ────────────────────────────────────
 const stepGroupsData = computed(() => synthetics.stepStats.value.stepGroups);
+/** Window-wide error count, from the KPI aggregate — used only to note on the
+ *  Steps tab that error executions are counted on Overview, not here. */
+const kpiErrorRuns = computed(() => synthetics.kpi.value.errorRuns);
 /** What the tally actually covered, so the panel can say so when the row cap
  *  bound rather than the selected time range (P2a). */
 const stepsCoverage = computed(
@@ -2428,7 +2466,7 @@ const errorChartOption = computed(() => {
         minute: "2-digit",
       });
     });
-    data = synthetics.buckets.value.map((b) => b.failedRuns);
+    data = synthetics.buckets.value.map((b) => b.failedRuns + b.errorRuns);
   } else {
     const rB = seedRand(31);
     const bucketCount = 24;
@@ -2509,6 +2547,18 @@ function openRun(row: { id: number }) {
     const executionId = realRun?.executionId || realRun?.jobId;
     if (realRun?.runId && executionId) {
       emit("open-run", realRun.runId, executionId);
+      return;
+    }
+    // No fetchable run/execution id (quota skips, older reaper rows): render the error from the row instead of a dead click.
+    if (realRun?.status === "error") {
+      emit("open-run-error", {
+        errorSource: realRun.errorSource,
+        message: realRun.error,
+        timestamp: realRun.timestamp,
+        location: realRun.location,
+        browser: realRun.browserEngine,
+        device: realRun.device,
+      });
       return;
     }
   }

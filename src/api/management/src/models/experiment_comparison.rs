@@ -15,9 +15,12 @@
 
 //! HTTP boundary models for Experiment comparisons.
 
+use std::collections::{BTreeMap, BTreeSet, HashMap};
+
+use config::meta::self_reporting::llm_experiments::ExperimentExecutionRecord;
 pub use domain::DEFAULT_COMPARISON_THRESHOLD;
-use openobserve_core::llm_evaluations::{
-    experiment_comparison as domain, experiment_results::ScoringStatus,
+use openobserve_core::llm_evaluations::experiments::{
+    comparison as domain, results::ScoringStatus,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -29,6 +32,8 @@ pub struct ExperimentComparisonQuery {
     pub baseline_id: String,
     pub candidate_id: String,
     pub threshold: Option<f64>,
+    /// Comma-separated dimension IDs; omitted selects all eligible columns, empty selects none.
+    pub outcome_dimensions: Option<String>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, ToSchema)]
@@ -73,6 +78,7 @@ pub enum ExperimentComparisonAssignmentBody {
 #[derive(Clone, Debug, PartialEq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ExperimentComparisonDimensionBody {
+    pub id: String,
     pub name: String,
     pub kind: ExperimentComparisonDimensionKindBody,
     /// Score value type. `null` for cost and latency dimensions.
@@ -89,8 +95,10 @@ pub struct ExperimentComparisonDimensionBody {
     pub delta: Option<f64>,
     /// Change in the better direction; positive always means improved.
     pub oriented_delta: Option<f64>,
-    /// Whether this dimension declares a Comparison Policy and can vote.
+    /// Whether this dimension is selected and can vote on the outcome.
     pub gating: bool,
+    /// Whether this dimension has a comparison policy and can be selected.
+    pub can_affect_outcome: bool,
     /// Whether `orientedDelta` is a fraction of the configured range rather
     /// than raw units, which is how the threshold should be read.
     pub normalized: bool,
@@ -115,6 +123,15 @@ pub struct ExperimentComparisonRowBody {
     pub candidate_row_id: Option<String>,
     pub bucket: ExperimentComparisonBucketBody,
     pub dimensions: Vec<ExperimentComparisonDimensionBody>,
+    pub trials: Vec<ExperimentComparisonTrialBody>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ExperimentComparisonTrialBody {
+    pub trial_index: u32,
+    pub baseline_output: Option<Value>,
+    pub candidate_output: Option<Value>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize, ToSchema)]
@@ -134,6 +151,7 @@ pub struct ExperimentComparisonCountsBody {
 #[derive(Clone, Debug, PartialEq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ExperimentComparisonSummaryDimensionBody {
+    pub id: String,
     pub name: String,
     pub kind: ExperimentComparisonDimensionKindBody,
     /// Score value type. `null` for cost and latency dimensions.
@@ -151,6 +169,7 @@ pub struct ExperimentComparisonSummaryDimensionBody {
     /// Aggregate change in the better direction over comparable rows.
     pub oriented_delta: Option<f64>,
     pub gating: bool,
+    pub can_affect_outcome: bool,
     pub normalized: bool,
     pub baseline_sample_count: u64,
     pub candidate_sample_count: u64,
@@ -167,6 +186,7 @@ pub struct ExperimentComparisonResponseBody {
     pub candidate_id: String,
     pub dataset_id: String,
     pub threshold: f64,
+    pub outcome_dimensions: Vec<String>,
     pub assignment_rule: String,
     /// One or both sides are still being scored. The comparison is readable,
     /// but it is provisional: it cannot serve as a CI result, and its
@@ -179,6 +199,18 @@ pub struct ExperimentComparisonResponseBody {
     pub counts: ExperimentComparisonCountsBody,
     pub dimensions: Vec<ExperimentComparisonSummaryDimensionBody>,
     pub rows: Vec<ExperimentComparisonRowBody>,
+}
+
+impl ExperimentComparisonQuery {
+    pub fn selected_dimensions(&self) -> Option<BTreeSet<String>> {
+        self.outcome_dimensions.as_ref().map(|value| {
+            if value.is_empty() {
+                BTreeSet::new()
+            } else {
+                value.split(',').map(str::to_string).collect()
+            }
+        })
+    }
 }
 
 impl From<domain::ExperimentComparisonBucket> for ExperimentComparisonBucketBody {
@@ -231,6 +263,7 @@ impl From<domain::ExperimentComparisonAssignment> for ExperimentComparisonAssign
 impl From<domain::ExperimentComparisonDimension> for ExperimentComparisonDimensionBody {
     fn from(value: domain::ExperimentComparisonDimension) -> Self {
         Self {
+            id: value.id,
             name: value.name,
             kind: value.kind.into(),
             data_type: value.data_type.map(Into::into),
@@ -244,6 +277,7 @@ impl From<domain::ExperimentComparisonDimension> for ExperimentComparisonDimensi
             delta: value.delta,
             oriented_delta: value.oriented_delta,
             gating: value.gating,
+            can_affect_outcome: value.can_affect_outcome,
             normalized: value.normalized,
             baseline_sample_count: value.baseline_sample_count,
             candidate_sample_count: value.candidate_sample_count,
@@ -273,6 +307,7 @@ impl From<domain::ExperimentComparison> for ExperimentComparisonResponseBody {
             candidate_id: value.candidate_id,
             dataset_id: value.dataset_id,
             threshold: value.threshold,
+            outcome_dimensions: value.outcome_dimensions,
             assignment_rule: value.assignment_rule,
             partial: value.partial,
             baseline_scoring_status: value.baseline_scoring_status,
@@ -282,6 +317,7 @@ impl From<domain::ExperimentComparison> for ExperimentComparisonResponseBody {
                 .dimensions
                 .into_iter()
                 .map(|dimension| ExperimentComparisonSummaryDimensionBody {
+                    id: dimension.id,
                     name: dimension.name,
                     kind: dimension.kind.into(),
                     data_type: dimension.data_type.map(Into::into),
@@ -295,6 +331,7 @@ impl From<domain::ExperimentComparison> for ExperimentComparisonResponseBody {
                     delta: dimension.delta,
                     oriented_delta: dimension.oriented_delta,
                     gating: dimension.gating,
+                    can_affect_outcome: dimension.can_affect_outcome,
                     normalized: dimension.normalized,
                     baseline_sample_count: dimension.baseline_sample_count,
                     candidate_sample_count: dimension.candidate_sample_count,
@@ -314,10 +351,86 @@ impl From<domain::ExperimentComparison> for ExperimentComparisonResponseBody {
                     candidate_row_id: row.candidate_row_id,
                     bucket: row.bucket.into(),
                     dimensions: row.dimensions.into_iter().map(Into::into).collect(),
+                    trials: Vec::new(),
                 })
                 .collect(),
         }
     }
+}
+
+impl ExperimentComparisonResponseBody {
+    pub fn with_trial_outputs(
+        mut self,
+        baseline_executions: &[ExperimentExecutionRecord],
+        candidate_executions: &[ExperimentExecutionRecord],
+    ) -> Self {
+        add_trial_outputs(&mut self.rows, baseline_executions, candidate_executions);
+        self
+    }
+}
+
+fn add_trial_outputs(
+    rows: &mut [ExperimentComparisonRowBody],
+    baseline_executions: &[ExperimentExecutionRecord],
+    candidate_executions: &[ExperimentExecutionRecord],
+) {
+    let baseline_outputs = execution_outputs_by_row(baseline_executions);
+    let candidate_outputs = execution_outputs_by_row(candidate_executions);
+
+    for row in rows {
+        let baseline = row
+            .baseline_row_id
+            .as_deref()
+            .and_then(|row_id| baseline_outputs.get(row_id));
+        let candidate = row
+            .candidate_row_id
+            .as_deref()
+            .and_then(|row_id| candidate_outputs.get(row_id));
+        let trial_indexes = baseline
+            .into_iter()
+            .flat_map(|outputs| outputs.keys())
+            .chain(candidate.into_iter().flat_map(|outputs| outputs.keys()))
+            .copied()
+            .collect::<BTreeSet<_>>();
+
+        row.trials = trial_indexes
+            .into_iter()
+            .map(|trial_index| ExperimentComparisonTrialBody {
+                trial_index,
+                baseline_output: trial_output(baseline, trial_index),
+                candidate_output: trial_output(candidate, trial_index),
+            })
+            .collect();
+    }
+}
+
+fn execution_outputs_by_row(
+    executions: &[ExperimentExecutionRecord],
+) -> HashMap<&str, BTreeMap<u32, (i64, Option<&Value>)>> {
+    let mut outputs = HashMap::<_, BTreeMap<_, _>>::new();
+    for execution in executions {
+        let trials = outputs.entry(execution.row_id.as_str()).or_default();
+        let should_replace = trials
+            .get(&execution.trial_index)
+            .is_none_or(|(timestamp, _)| execution._timestamp >= *timestamp);
+        if should_replace {
+            trials.insert(
+                execution.trial_index,
+                (execution._timestamp, execution.output.as_ref()),
+            );
+        }
+    }
+    outputs
+}
+
+fn trial_output(
+    outputs: Option<&BTreeMap<u32, (i64, Option<&Value>)>>,
+    trial_index: u32,
+) -> Option<Value> {
+    outputs
+        .and_then(|outputs| outputs.get(&trial_index))
+        .and_then(|(_, output)| *output)
+        .cloned()
 }
 
 #[cfg(test)]
@@ -325,6 +438,26 @@ mod tests {
     use serde_json::json;
 
     use super::*;
+
+    #[test]
+    fn outcome_selection_distinguishes_default_all_from_explicit_none() {
+        for (selection, expected) in [
+            (None, None),
+            (Some(""), Some(BTreeSet::new())),
+            (
+                Some("cost,latency,cost"),
+                Some(BTreeSet::from(["cost".to_string(), "latency".to_string()])),
+            ),
+        ] {
+            let query: ExperimentComparisonQuery = serde_json::from_value(json!({
+                "baselineId": "baseline",
+                "candidateId": "candidate",
+                "outcomeDimensions": selection,
+            }))
+            .unwrap();
+            assert_eq!(query.selected_dimensions(), expected);
+        }
+    }
 
     #[test]
     fn comparison_row_json_exposes_the_dataset_input() {
@@ -335,6 +468,7 @@ mod tests {
             candidate_row_id: Some("candidate-row".to_string()),
             bucket: ExperimentComparisonBucketBody::Unchanged,
             dimensions: vec![],
+            trials: vec![],
         };
 
         let value = serde_json::to_value(body).unwrap();
@@ -347,6 +481,8 @@ mod tests {
     #[test]
     fn dimension_json_exposes_score_type_and_categorical_labels() {
         let body = ExperimentComparisonDimensionBody::from(domain::ExperimentComparisonDimension {
+            id: "score:verdict".to_string(),
+            can_affect_outcome: true,
             name: "verdict · v1".to_string(),
             kind: domain::ExperimentComparisonDimensionKind::Score,
             data_type: Some(domain::ExperimentComparisonScoreDataType::Categorical),
@@ -378,6 +514,8 @@ mod tests {
     #[test]
     fn intrinsic_dimension_json_keeps_type_and_labels_null() {
         let body = ExperimentComparisonDimensionBody::from(domain::ExperimentComparisonDimension {
+            id: "cost".to_string(),
+            can_affect_outcome: true,
             name: "cost".to_string(),
             kind: domain::ExperimentComparisonDimensionKind::Cost,
             data_type: None,
@@ -404,5 +542,65 @@ mod tests {
         assert_eq!(value["dataType"], serde_json::Value::Null);
         assert_eq!(value["baselineLabel"], serde_json::Value::Null);
         assert_eq!(value["candidateLabel"], serde_json::Value::Null);
+    }
+
+    #[test]
+    fn comparison_rows_expose_latest_baseline_and_candidate_output_per_trial() {
+        let mut rows = vec![ExperimentComparisonRowBody {
+            logical_id: "row-1".to_string(),
+            input: json!({"question": "What changed?"}),
+            baseline_row_id: Some("baseline-row".to_string()),
+            candidate_row_id: Some("candidate-row".to_string()),
+            bucket: ExperimentComparisonBucketBody::Unchanged,
+            dimensions: vec![],
+            trials: vec![],
+        }];
+        let baseline = vec![
+            execution("baseline-row", 0, 10, json!("old baseline")),
+            execution("baseline-row", 0, 20, json!("baseline")),
+            execution("baseline-row", 1, 30, json!("baseline second")),
+        ];
+        let candidate = vec![
+            execution("candidate-row", 0, 20, json!("candidate")),
+            execution("candidate-row", 2, 30, json!("candidate third")),
+        ];
+
+        add_trial_outputs(&mut rows, &baseline, &candidate);
+
+        assert_eq!(
+            serde_json::to_value(&rows[0].trials).unwrap(),
+            json!([
+                {
+                    "trialIndex": 0,
+                    "baselineOutput": "baseline",
+                    "candidateOutput": "candidate"
+                },
+                {
+                    "trialIndex": 1,
+                    "baselineOutput": "baseline second",
+                    "candidateOutput": null
+                },
+                {
+                    "trialIndex": 2,
+                    "baselineOutput": null,
+                    "candidateOutput": "candidate third"
+                }
+            ])
+        );
+    }
+
+    fn execution(
+        row_id: &str,
+        trial_index: u32,
+        timestamp: i64,
+        output: Value,
+    ) -> ExperimentExecutionRecord {
+        ExperimentExecutionRecord {
+            row_id: row_id.to_string(),
+            trial_index,
+            output: Some(output),
+            _timestamp: timestamp,
+            ..Default::default()
+        }
     }
 }

@@ -40,9 +40,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              that read as padding and only fade in on tab hover — at rest every
              tab is clean text. The name and the input carry the same box
              (px-0.5), the pencil is absolutely positioned (out of flow) in the
-             pr-2.5 reserve, and both gutters exist in display AND edit mode, so
+             pe-2.5 reserve, and both gutters exist in display AND edit mode, so
              entering/leaving edit never changes the tab's width. -->
-        <div class="flex w-full flex-nowrap items-center" :class="canManage ? 'pr-2.5' : ''">
+        <div class="flex w-full flex-nowrap items-center" :class="canManage ? 'pe-2.5' : ''">
           <!-- Auto-size the input to its text via an invisible sizer sharing the
                input's grid cell, so the field is exactly as wide as the name.
                `size="1"` neutralises the input's default ~20ch intrinsic width so
@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Editable affordance: a pencil in the tab's right gutter that
                fades in when the tab is hovered (group/otab comes from OTab) and
                renames on click. While editing, the same slot shows a tick that
-               commits the rename. Both are absolutely positioned in the pr-2.5
+               commits the rename. Both are absolutely positioned in the pe-2.5
                reserve, so swapping them never affects the tab's width. -->
           <OIcon
             v-if="canManage && editingTabId !== tab.tabId"
@@ -130,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="!viewOnly"
       variant="ghost"
       size="icon"
-      class="ml-1"
+      class="ms-1"
       @click="
         () => {
           showAddTabDialog = true;

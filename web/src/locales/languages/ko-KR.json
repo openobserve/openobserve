@@ -848,7 +848,9 @@
     },
     "condition": {
       "loading": "조건 로딩 중...",
-      "loadError": "저장된 조건을 읽을 수 없어 재설정되었습니다. 지금 저장하면 덮어쓰게 됩니다."
+      "loadError": "저장된 조건을 읽을 수 없어 재설정되었습니다. 지금 저장하면 덮어쓰게 됩니다.",
+      "unknownColumn": "\"{column}\"은(는) 이 트리거의 페이로드에 없으므로 이 조건이 일치하지 않을 수 있습니다.",
+      "unknownColumnSuggestion": "\"{suggestion}\"을(를) 뜻하셨나요?"
     },
     "destination": {
       "createNew": "새 대상 만들기",
@@ -883,7 +885,7 @@
     "queryFailed": "쿼리 실패",
     "unknownError": "알 수 없는 오류",
     "selectedLabel": "선택됨",
-    "selectToFilter": "선택하여 필터링",
+    "selectToFilter": "필터 선택",
     "clearSelection": "선택 지우기",
     "includeModeHint": "포함 모드 (=)",
     "excludeModeHint": "제외 모드 (≠)",
@@ -2560,7 +2562,9 @@
       "title": "워크플로 실행",
       "edit": "워크플로 편집",
       "debugInEditor": "편집기에서 디버그",
-      "staleGraphWarning": "이 워크플로는 이 실행 이후 편집되었습니다 — 실행된 {count} 단계가 더 이상 존재하지 않으므로 상태가 여기에 표시되지 않습니다. | 이 워크플로는 이 실행 이후 편집되었습니다 — 실행된 {count} 단계가 더 이상 존재하지 않으므로 상태가 여기에 표시되지 않습니다."
+      "staleGraphWarning": "이 워크플로는 이 실행 이후 편집되었습니다 — 실행된 {count} 단계가 더 이상 존재하지 않으므로 상태가 여기에 표시되지 않습니다. | 이 워크플로는 이 실행 이후 편집되었습니다 — 실행된 {count} 단계가 더 이상 존재하지 않으므로 상태가 여기에 표시되지 않습니다.",
+      "hideList": "실행 목록 숨기기",
+      "showList": "실행 목록 표시"
     },
     "history": {
       "button": "실행",
@@ -2576,10 +2580,21 @@
       "error": "오류",
       "success": "성공",
       "failed": "실패",
+      "testRun": "테스트 실행",
+      "runType": "유형",
+      "testRunTooltip": "편집기에서 시작되었습니다. 대상 단계는 실제로 전송됩니다.",
+      "showTestRuns": "테스트 실행 {count}개 표시",
+      "hideTestRuns": "테스트 실행 숨기기",
       "open": "기록",
       "openFullView": "전체 실행 보기 열기",
       "loadError": "실행을 로드하는 중 오류 발생",
-      "loadRunError": "이 실행을 로드하는 중 오류 발생"
+      "loadRunError": "이 실행을 로드하는 중 오류 발생",
+      "retry": "재시도",
+      "retryTooltip": "기록된 입력으로 이 실패한 실행을 다시 실행합니다.",
+      "retryTitle": "이 실행을 재시도하시겠습니까?",
+      "retryMessage": "실패한 실행이 기록한 입력으로 새 실행을 만듭니다. 대상 단계는 실제로 전송됩니다.",
+      "retryStarted": "재시도가 시작되었습니다. 목록에 새 실행으로 표시됩니다.",
+      "retryError": "이 실행을 재시도할 수 없습니다."
     },
     "edit": "편집",
     "view": "보기",
@@ -2596,7 +2611,9 @@
     "triggerRequired": "트리거가 필요합니다.",
     "addStepRequired": "트리거 뒤에 최소 하나의 단계를 추가하세요.",
     "connectAllNodes": "저장하기 전에 모든 노드를 연결하세요.",
+    "branchPathsRequired": "Connect each Branch path to a step | 1 Branch step has connections that do not match its paths. Open it, define the paths, then re-connect them. | {count} Branch steps have connections that do not match their paths.",
     "finishStepsBeforePublish": "게시 전에 {count}개 단계의 설정이 필요합니다 — 캔버스에서 강조 표시됩니다. | 게시 전에 {count}개 단계의 설정이 필요합니다 — 캔버스에서 강조 표시됩니다.",
+    "noChangesToPublish": "게시할 변경 사항이 없습니다. 이 워크플로우는 이미 게시된 버전과 일치합니다.",
     "draft": "초안",
     "saveDraft": "초안으로 저장",
     "publish": "게시",
@@ -2643,7 +2660,7 @@
     "loadError": "워크플로 로드 불가",
     "deleteNode": "노드 삭제",
     "deleteNodeTitle": "단계 삭제",
-    "deleteNodeConfirm": "이 단계를 삭제하시겠습니까? 되돌릴 수 없습니다.",
+    "deleteNodeConfirm": "이 단계를 삭제하시겠습니까? 실행 취소할 수 있습니다.",
     "namePlaceholder": "제목 없는 워크플로",
     "renameHint": "이 워크플로 이름을 바꾸려면 클릭",
     "editMode": "워크플로 편집",
@@ -2656,11 +2673,29 @@
       "runFromBeginning": "시작(트리거)",
       "runFromNote": "여기부터 아래 단계만 실행됩니다.",
       "inputLabel": "샘플 입력",
+      "source": {
+        "sample": "생성된 샘플",
+        "run": "{run} 실행에서 가져옴",
+        "edited": "직접 편집함"
+      },
+      "revertInput": "되돌리기",
+      "useRunInput": "실행 입력 사용…",
+      "lastTestRun": "마지막 테스트 실행(이 탭)",
+      "runHasNoInput": "해당 실행에는 이 단계에 대한 저장된 입력이 없습니다.",
       "invalidJson": "유효한 JSON 레코드 배열을 입력하세요.",
       "resultHint": "실행 후 각 단계에는 캔버스에 확인 또는 오류 아이콘이 표시됩니다.",
+      "rehearsalOnly": "테스트 실행에서만 통과했습니다 — 샘플 페이로드에 대한 리허설일 뿐, 게시된 워크플로우가 작동한다는 증거는 아닙니다.",
       "notVerified": "이 단계에 도달한 레코드가 없습니다 — 상위 조건에서 필터링되었거나 이전 단계에서 오류가 발생했습니다.",
+      "notConfigured": "이 단계가 설정되지 않아 이번 실행에서 아무 작업도 하지 않았습니다. 설정한 후 다시 테스트하세요.",
+      "recordedFailure": "이 단계는 마지막으로 기록된 실행에서 실패했습니다.",
+      "recordsUnavailable": "이전 실행에서 기록되었습니다. 레코드를 검사하려면 테스트를 다시 실행하세요.",
+      "dirtySelf": "이 단계가 마지막으로 실행된 이후 구성이 변경되었습니다. 단계를 다시 테스트하세요.",
+      "dirtyUpstream": "이 단계가 실행된 이후 이전 단계가 변경되었습니다. 단계를 다시 테스트하세요.",
       "run": "테스트 실행",
       "runError": "테스트를 실행할 수 없습니다.",
+      "suppressDestinations": "실제로 대상에 보내지 않음",
+      "suppressDestinationsHint": "대상 단계는 라우팅을 결정하지만 아무것도 전달되지 않습니다.",
+      "dispatchWarning": "테스트가 실제로 실행됩니다. 이 실행은 {destinations}에 실제로 전달됩니다.",
       "stepResult": {
         "viewHint": "입력/출력을 보려면 클릭",
         "input": "입력",
@@ -2686,8 +2721,10 @@
         "status": {
           "ok": "통과",
           "error": "오류",
-          "skipped": "레코드 없음"
-        }
+          "skipped": "레코드 없음",
+          "noMatch": "일치 없음"
+        },
+        "suppressed": "억제됨 — 실제 대상으로 전송되지 않음"
       }
     },
     "linkAlerts": {
@@ -2720,6 +2757,7 @@
       "kindLogic": "로직",
       "kindAction": "액션",
       "condition": "조건",
+      "branch": "분기",
       "function": "함수",
       "sendToDestination": "대상",
       "configComingSoon": "{node} 구성은 이후 단계에서 제공됩니다.",
@@ -2727,12 +2765,41 @@
       "sectionDestination": "대상",
       "stepSearchPlaceholder": "단계 검색...",
       "stepNoMatch": "검색과 일치하는 단계가 없습니다.",
-      "conditionDesc": "규칙에 따라 분기",
+      "conditionDesc": "규칙이 일치하는 경우에만 계속합니다.",
+      "branchDesc": "각 레코드를 처음 일치하는 경로로 라우팅합니다.",
+      "branchCaseLabel": "경로 이름(선택 사항)",
+      "branchCaseLabelPlaceholder": "예: 높은 심각도",
+      "branchAddCase": "경로 추가",
+      "branchRemoveCase": "경로 제거",
+      "branchMoveUp": "경로 위로 이동",
+      "branchMoveDown": "경로 아래로 이동",
+      "branchPathNumber": "경로 {index}",
+      "branchElseTitle": "그 외 모든 것",
+      "branchElseHint": "위의 어떤 경로와도 일치하지 않는 레코드는 여기로 이동합니다.",
+      "branchNoteTitle": "분기 지침",
+      "branchNoteFirstMatch": "경로는 위에서 아래로 확인되며 첫 번째 일치 항목이 적용됩니다. 따라서 모든 레코드는 정확히 하나의 경로로 나갑니다.",
+      "branchNoteUnwired": "연결된 것이 없는 경로는 해당 레코드를 그냥 삭제합니다.",
       "functionDesc": "함수로 페이로드 재구성",
       "destinationDesc": "대상으로 보내기",
       "triggerBody": "연결된 알림이 실행될 때 실행",
       "triggerDataExampleNote": "예시일 뿐 — 실제 열은 알림 쿼리에서 가져옵니다.",
       "incidentEventTypeLabel": "이벤트 유형",
+      "incidentEventType": {
+        "created": "인시던트 생성됨",
+        "alert": "알림 발생",
+        "severity_upgrade": "심각도 상향됨",
+        "severity_override": "심각도 재정의됨",
+        "acknowledged": "확인됨",
+        "resolved": "해결됨",
+        "reopened": "재개됨",
+        "dimension_upgraded": "차원 상향됨",
+        "title_changed": "제목 변경됨",
+        "assignment_changed": "할당 변경됨",
+        "comment": "댓글 추가됨",
+        "ai_analysis_begin": "AI 분석 시작됨",
+        "ai_analysis_complete": "AI 분석 완료됨",
+        "ai_analysis_failed": "AI 분석 실패"
+      },
       "incidentCommonTitle": "공통 필드 (모든 이벤트)",
       "incidentSpecificTitle": "이벤트별 필드",
       "incidentNoExtraFields": "이 이벤트는 공통 필드 외에 추가 필드가 없습니다.",
@@ -2759,11 +2826,14 @@
       "enable": "단계 활성화",
       "disabledBadge": "비활성화됨",
       "incompleteBadge": "나중에 설정",
+      "unwiredBadge": "연결되지 않은 경로",
       "unsavedFnTitle": "저장되지 않은 함수 변경 사항",
       "unsavedFnMessage": "이 단계에는 라이브러리에 저장되지 않은 함수 코드가 있습니다. 저장하거나 변경 사항을 취소하거나 계속 편집할 수 있습니다.",
       "unsavedFnSave": "함수 저장",
       "unsavedFnDiscard": "변경 사항 취소",
-      "unsavedFnKeep": "계속 편집"
+      "unsavedFnKeep": "계속 편집",
+      "destination": "대상",
+      "branchPathUnset": "{name} · 규칙 미설정"
     },
     "commonFieldsAbove": "위의 공통 필드",
     "canvas": {
@@ -2787,11 +2857,15 @@
       "openStep": "{name} 열기",
       "runToView": "이 데이터를 보려면 테스트를 실행하세요.",
       "noBranchItems": "이 분기에 항목이 없습니다.",
+      "forwardedCount": "전달된 레코드: {out}/{total} | 전달된 레코드: {out}/{total}",
+      "noMatchForwarded": "일치 항목 없음 — 전달된 레코드 0/{total} | 일치 항목 없음 — 전달된 레코드 0/{total}",
+      "branchDropped": "일치하는 경로가 없는 레코드 {count}개 — 삭제됨 | 일치하는 경로가 없는 레코드 {count}개 — 삭제됨",
       "noUpstream": "상위 단계가 없습니다.",
       "noRunYet": "아직 실행이 없습니다.",
       "runLabel": "실행",
       "switchRun": "실행 전환",
       "notInRun": "이 단계는 이 실행에 포함되지 않습니다.",
+      "noRunData": "이 실행은 단계 데이터를 저장하지 않았습니다.",
       "runTest": "테스트 실행",
       "noItems": "항목 없음",
       "itemsCount": "{count} 항목 | {count} 항목",
@@ -2801,8 +2875,14 @@
       "executeStep": "단계 실행",
       "sample": "샘플",
       "editStep": "단계 편집",
+      "readOnlyRun": "과거 실행을 보고 있으므로 이 단계의 구성은 여기에서 변경할 수 없습니다.",
+      "readOnlyRunEdit": "워크플로우에서 편집",
       "testInputHint": "테스트 입력 — 편집 후 단계를 실행하세요.",
-      "noRunsList": "아직 실행 기록이 없습니다."
+      "noRunsList": "아직 실행 기록이 없습니다.",
+      "resetInput": "샘플로 재설정",
+      "eventPager": "{n} / {total}",
+      "nextEvent": "다음 이벤트",
+      "prevEvent": "이전 이벤트"
     },
     "runOverlay": {
       "banner": "과거 실행({run})의 단계 데이터를 표시합니다. 자유롭게 편집할 수 있습니다 — 이 실행은 변경되지 않습니다.",
@@ -2829,6 +2909,8 @@
       "noConfig": "구성 없음",
       "functionLabel": "함수",
       "destinationLabel": "대상",
+      "branchPathsLabel": "경로",
+      "branchNoRule": "규칙 미설정",
       "destinationUnsupported": "지원되지 않는 유형",
       "destinationMissing": "이 대상은 더 이상 존재하지 않거나 읽을 수 없습니다.",
       "headersLabel": "헤더",
@@ -3718,7 +3800,7 @@
       "dynamodbPipelineTitle": "DynamoDB → Firehose 스트리밍",
       "dynamodbTagline": "Kinesis Firehose를 통해 DynamoDB 항목 변경 사항을 OpenObserve로 스트리밍하세요.",
       "ec2IamNote": "에이전트가 Name 태그를 읽고 호스트 식별자로 사용할 수 있도록 인스턴스에 ec2:DescribeTags 및 ec2:DescribeInstances 권한이 있는 IAM 역할이 필요합니다.",
-      "enableSessionReplayDesc": "세션 리플레이는 RUM과 **별도로** 구성되며 `rumConfiguration.customEndpoint`를 **상속하지 않습니다**. 또한 경로를 추가하지 않으므로 아래의 전체 `/replay` URL이 필요합니다. 이 설정이 잘못되면 RUM 이벤트는 도착하지만 리플레이는 도착하지 않는 일반적인 원인이 됩니다.",
+      "enableSessionReplayDesc": "세션 리플레이는 실제 사용자 모니터링과 **별도로** 구성되며 `rumConfiguration.customEndpoint`를 상속하지 **않습니다**. 아래에 실제 사용자 모니터링/로그 URL과 동일한 형식의 자체 기본 URL을 지정하세요. 브리지가 `/replay`를 직접 추가하므로 직접 추가하지 **마세요**. 수동으로 `/replay`를 추가하면 경로가 중복 추가되어 모든 업로드가 401로 거부됩니다. 실제 사용자 모니터링 이벤트는 도착하지만 세션 리플레이가 도착하지 않는 일반적인 이유입니다.",
       "enableSessionReplayTitle": "세션 리플레이 활성화",
       "endpointLabel": "엔드포인트",
       "externalEndpointVariant": "외부 엔드포인트",
@@ -3920,18 +4002,16 @@
       "rnInitNote": "가능한 한 빨리 초기화하세요. 측정하려는 화면보다 먼저 provider가 마운트되어야 합니다.",
       "rnInstallNote": "세션 리플레이 및 내비게이션 패키지는 선택 사항입니다. 화면 녹화나 자동 뷰 추적이 필요 없으면 해당 라인을 제거하세요.",
       "rnNavigationNote": "이것이 없어도 `O2Rum.startView()` / `O2Rum.stopView()`로 수동으로 뷰를 기록할 수 있습니다.",
-      "rnSessionReplayNote": "React Native의 세션 리플레이는 현재 Android에서 확인되었습니다. iOS에서 SDK는 이 URL에 자체 경로를 추가하므로 리플레이 업로드가 아직 OpenObserve에 도달하지 않습니다. RUM, 로그, 크래시는 영향을 받지 않습니다.",
-      "rnTrouble401A": "`clientToken`은 이 조직의 **RUM 토큰**이며 수집 패스코드가 아닙니다. 회전된 경우 이 페이지의 헤더에서 다시 생성하고 앱을 다시 빌드하세요.",
+      "rnSessionReplayNote": "세션 리플레이는 SDK 0.1.2 기준으로 iOS와 Android 모두에서 검증되었습니다. 세그먼트는 업로드 전에 배치 처리되므로 표시되기까지 약간의 지연이 있을 수 있습니다.",
+      "rnTrouble401A": "두 가지 일반적인 원인이 있습니다. 첫째, `clientToken` — 이 조직의 **실제 사용자 모니터링 토큰**이어야 하며 수집 패스코드가 아닙니다. 토큰이 교체된 경우 이 페이지의 헤더에서 다시 생성하고 앱을 다시 빌드하세요. 둘째, 특히 세션 리플레이의 경우: `customEndpoint`에 `/replay`를 직접 추가하면 경로가 중복 추가됩니다(브리지가 이미 추가함). 백엔드에서도 401로 거부하므로 기본 URL만 전달하세요.",
       "rnTrouble401Q": "요청이 401 또는 403을 반환합니다",
       "rnTroubleCleartextA": "Android는 기본적으로 평문(cleartext) 트래픽을 차단합니다. `http://` 엔드포인트의 경우 SDK 구성에 `additionalConfiguration: {config}`를 설정하고 앱의 네트워크 보안 구성에서 호스트에 대한 평문을 허용하세요. 로컬 개발이 아닌 경우 HTTPS를 사용하세요.",
       "rnTroubleCleartextQ": "Android 릴리스/디버그 빌드가 일반 HTTP로 아무것도 보내지 않습니다",
       "rnTroubleIosBuildA": "패키지를 추가한 후 `npx pod-install`(또는 `cd ios && pod install`)을 실행한 다음 Xcode 또는 `npx react-native run-ios`로 다시 빌드하세요. Metro만 다시 로드하면 새 네이티브 모듈이 적용되지 않습니다.",
       "rnTroubleIosBuildQ": "iOS 빌드가 실패하거나 네이티브 모듈이 없습니다",
-      "rnTroubleIosReplayA": "현재 React Native SDK의 알려진 제한 사항: iOS에서는 세션 리플레이 `customEndpoint`에 자체 경로를 추가하므로 업로드가 OpenObserve의 `/replay` 경로를 놓칩니다. Android는 URL을 그대로 사용하여 작동합니다. RUM 이벤트, 로그, 크래시 보고는 두 플랫폼 모두 영향을 받지 않습니다.",
-      "rnTroubleIosReplayQ": "세션 리플레이는 Android에서 작동하지만 iOS에서는 작동하지 않습니다",
       "rnTroubleMaskedA": "그것이 기본값입니다. `textAndInputPrivacyLevel`, `imagePrivacyLevel`, `touchPrivacyLevel`은 모두 가장 엄격한 설정(`MASK_ALL`)을 기본값으로 합니다. 개인정보 보호 정책이 허용하는 범위에서만 완화하세요. `MASK_SENSITIVE_INPUTS`는 나머지를 표시하면서 비밀번호와 카드 필드를 숨깁니다.",
       "rnTroubleMaskedQ": "리플레이가 렌더링되지만 모든 것이 마스킹됩니다",
-      "rnTroubleNoReplayA": "거의 항상 엔드포인트 문제입니다. 세션 리플레이는 별도로 구성되며 `rumConfiguration.customEndpoint`를 **상속하지 않습니다**. 설정하지 않으면 빈 문자열로 기본 설정되어 업로드가 보이지 않는 곳으로 갑니다. 전체 URL을 명시적으로 전달하세요: `customEndpoint: '{replayUrl}'` — 핵심 SDK의 기본 URL에는 없는 끝의 `/replay`를 유의하세요.",
+      "rnTroubleNoReplayA": "거의 항상 엔드포인트 문제입니다. 세션 리플레이는 별도로 구성되며 `rumConfiguration.customEndpoint`를 상속하지 **않습니다**. 설정하지 않으면 빈 문자열로 기본 설정되어 업로드가 아무 곳에도 도달하지 않습니다. 기본 URL을 명시적으로 전달하세요: `customEndpoint: '{replayUrl}'` — 브리지가 `/replay`를 자체적으로 추가하므로(SDK 0.1.2 기준), 해당 접미사를 직접 추가하지 마세요. 그렇지 않으면 업로드가 401로 거부됩니다.",
       "rnTroubleNoReplayQ": "RUM 이벤트는 도착하지만 세션 리플레이가 없습니다",
       "rnTroubleNothingArrivesA": "먼저 호스트를 확인하세요. 위의 수정 상자를 참조하세요. `localhost`는 사용자 컴퓨터가 아닌 기기로 해석됩니다. Android 에뮬레이터에서는 `10.0.2.2`, iOS 시뮬레이터에서는 `localhost`, 실제 기기에서는 컴퓨터의 LAN IP를 사용하세요.",
       "rnTroubleNothingArrivesQ": "에뮬레이터나 기기에서 전혀 도착하지 않습니다",
@@ -6234,7 +6314,7 @@
       "frequencyPositiveNumber": "Alert - {index}: 빈도는 0보다 큰 양수여야 하며 숫자여야 합니다.",
       "cronExpressionString": "Alert - {index}: Cron 표현식은 문자열이어야 합니다.",
       "thresholdPositiveNumber": "Alert - {index}: 임계값은 0보다 큰 양수여야 하며 숫자여야 합니다.",
-      "silenceNonNegativeNumber": "Alert - {index}: 무음 시간은 0보다 크거나 같은 양수여야 하며 숫자여야 합니다.",
+      "silenceNonNegativeNumber": "알림 - {index}: 쿨다운 기간은 0보다 크거나 같은 숫자여야 합니다.",
       "frequencyTypeInvalid": "Alert - {index}: 빈도 유형은 'minutes' 또는 'cron'이어야 하며 문자열이어야 합니다.",
       "cronExpressionInvalid": "Alert - {index}: Cron 표현식은 유효한 cron 표현식이어야 합니다."
     },
@@ -6418,6 +6498,7 @@
       "firing": "발화 중",
       "ok": "정상",
       "error": "오류",
+      "pending": "대기 중",
       "skipped": "건너뜀",
       "unknown": "알 수 없음",
       "flapping": "변동",
@@ -6443,7 +6524,8 @@
       "nameInvalidChars": ":, ?, /, # 및 공백과 같은 문자는 허용되지 않습니다.",
       "templateRequired": "템플릿은 필수입니다!",
       "validEmails": "유효한 이메일을 추가하세요!",
-      "silenceNonNegative": "알림 침묵은 0 이상이어야 합니다",
+      "silenceNonNegative": "쿨다운 기간은 0보다 크거나 같아야 합니다.",
+      "pendingPeriodNonNegative": "대기 기간은 0 이상이어야 합니다.",
       "periodPositive": "기간은 0보다 커야 합니다",
       "destinationRequired": "대상이 하나 이상 필요합니다.",
       "thresholdPositive": "임계값은 0보다 커야 합니다",
@@ -6454,6 +6536,7 @@
       "timestampAliasBanned": "{column}은(는) 열 별칭으로 사용할 수 없습니다. 대신 time_bucket을 사용하세요.",
       "credentialFieldRequired": "{field}은(는) 필수입니다",
       "minimumFrequency": "최소 주기는 {minutes}분이어야 합니다.",
+      "pendingPeriodNotMultiple": "확인 주기({minutes}분)의 배수가 아닙니다 — 알림 발생 전에 최대 한 번의 추가 간격을 더 기다릴 수 있습니다.",
       "nameMandatoryString": "이름은 필수이며 유효한 문자열이어야 합니다.",
       "orgIdMismatch": "조직 ID는 {orgId}와 같아야 합니다.",
       "streamTypeMandatory": "스트림 유형은 필수이며 logs, metrics, traces 중 하나여야 합니다.",
@@ -6659,6 +6742,9 @@
       "cooldown": "재사용 대기시간",
       "betweenAlerts": "경고 사이",
       "noCooldown": "재사용 대기시간 없음",
+      "pendingPeriod": "대기",
+      "beforeFiring": "{duration} 후 발생",
+      "firesImmediately": "즉시 발생",
       "minuteCount": "{n}분 | {n}분",
       "hourCount": "{n}시간 | {n}시간",
       "timeRangeCount": "{n}개 시간 범위 ({ranges}) | {n}개 시간 범위 ({ranges})",
@@ -6675,6 +6761,7 @@
         "conditionOther": "{threshold}개 이벤트 ({operator})",
         "alertMeWhenMinutes": "{count}분 기간 내에 {condition}이(가) 발생하면 알림",
         "alertMeWhenHours": "{count}시간 기간 내에 {condition}이(가) 발생하면 알림",
+        "pendingPeriodClause": ", {duration} 동안 대기한 후",
         "cooldownClause": ", 단, {cooldown}마다 최대 한 번",
         "defaultConditions": "구성된 조건이 충족되면 알림 받기"
       }
@@ -7139,6 +7226,8 @@
       "writeQueryHint": "쿼리를 작성하여 시작하기",
       "sqlEditorHint": "전체 편집기를 열어 실행 및 검증",
       "checkEvery": "확인 간격",
+      "pendingPeriod": "대기",
+      "pendingPeriodTooltip": "알림 발생 전에 이 시간만큼 대기하므로, 한 번의 잘못된 간격에 반응하는 대신 조건이 유지되어야 합니다.",
       "cronExpressionPlaceholder": "0 */10 * * * *",
       "timezonePlaceholder": "시간대",
       "onThese": "다음에서",
@@ -10617,6 +10706,10 @@
         "success": "데이터셋에 추가됨",
         "loadError": "데이터셋을 불러오지 못했습니다",
         "error": "이 항목을 데이터셋에 추가하지 못했습니다"
+      },
+      "playground": {
+        "button": "플레이그라운드에서 열기",
+        "hint": "이 호출의 메시지를 플레이그라운드에 불러와 편집하고 다시 실행하세요."
       }
     },
     "discovery": {
@@ -10700,7 +10793,8 @@
         "scoreConfigs": "점수 구성",
         "targetDataset": "대상 데이터셋",
         "progress": "진행 상황",
-        "updated": "업데이트됨"
+        "updated": "업데이트됨",
+        "actions": "작업"
       },
       "create": {
         "title": "새 큐",
@@ -10754,7 +10848,8 @@
           "refType": "참조",
           "refId": "참조",
           "added": "추가됨",
-          "status": "상태"
+          "status": "상태",
+          "actions": "작업"
         },
         "status": {
           "pending": "대기 중",
@@ -10866,6 +10961,8 @@
       "viewAll": "실험 보기",
       "baseline": "베이스라인",
       "setBaseline": "베이스라인 설정",
+      "baselineRequiresCompleted": "완료된 실행만 기준선으로 설정할 수 있습니다.",
+      "baselineError": "기준선을 업데이트하지 못했습니다.",
       "selectForComparison": "비교를 위해 선택",
       "progress": "슬롯 {total}개 중 {done}개",
       "noScores": "집계 점수 없음",
@@ -10976,15 +11073,20 @@
       "addToDataset": "추가",
       "detail": {
         "by": "{user} 작성",
-        "p50Latency": "P50 지연 시간",
+        "p50Latency": "P50 태스크 지연 시간",
         "totalCost": "총 비용",
+        "costBreakdown": "태스크 {task} · 스코어링 {scoring}",
+        "partialCostBreakdown": "태스크 {task} · 스코어링 {scoring} · 부분",
         "highDispersion": "고분산 케이스",
         "highDispersionHint": "시도가 일치하지 않는 행",
         "scoredRows": "{scored}/{total}개 행 채점됨",
         "columns": {
           "input": "입력",
           "output": "출력",
-          "latency": "지연 시간"
+          "trials": "시도",
+          "dispersion": "분산도",
+          "latency": "지연 시간",
+          "p50Latency": "P50 지연 시간"
         },
         "retryFailed": "실패한 슬롯 재시도",
         "loadError": "실험을 불러오지 못했습니다",
@@ -11004,7 +11106,7 @@
           "run": "실행"
         },
         "runSummary": "{trials} · {scorers}",
-        "progress": "진행률",
+        "progress": "태스크 진행률",
         "scoring": "채점",
         "scoringDistribution": "{success} 성공 · {failed} 실패 · {pending} 대기 · {skipped} 건너뜀",
         "compare": "비교",
@@ -11022,8 +11124,12 @@
         },
         "slotStatus": "상태",
         "searchPlaceholder": "입력 또는 출력 검색",
+        "searchInputPlaceholder": "입력값 검색",
         "statusFilter": "상태",
-        "statusFilterAll": "모든 상태"
+        "statusFilterAll": "모든 상태",
+        "sortByDispersion": "분산도 기준 정렬",
+        "highDispersionBadge": "높음",
+        "trialNumber": "시도 {n}"
       },
       "rowDetail": {
         "fallbackTitle": "실험 행",
@@ -11093,6 +11199,16 @@
           "typeCategorical": "범주형",
           "typeBoolean": "불리언",
           "threshold": "임계값",
+          "thresholdTooltip": "기준선 값과 후보 값이 서로 {percent} 이내이면 저하 또는 개선이 아닌 변경 없음으로 처리됩니다.",
+          "outcomeDimensions": "결과 기준",
+          "outcomeTooltipNone": "선택된 열이 없습니다 — 비교 가능한 모든 행이 비교 안 됨으로 표시됩니다.",
+          "outcomeTooltipAll": "적격한 모든 열이 각 행의 결과를 결정합니다.",
+          "outcomeTooltipPartial": "{names}만 각 행의 결과를 결정합니다. 다른 열은 표시되지만 결과에 영향을 미치지 않습니다.",
+          "allOutcomeDimensions": "적격한 모든 열",
+          "noOutcomeDimensions": "열 없음",
+          "selectedOutcomeDimensions": "{count}개 열 | {count}개 열",
+          "outcomeDimensionUnavailable": "{name} (비교 정책 없음)",
+          "dimensionExcludedHint": "이 열은 결과 산정에서 제외됩니다. 포함하려면 결과 기준에서 선택하세요.",
           "measurePerRow": "행당 평균 (시행 전체)",
           "dimensionImproved": "{count} 행 개선됨 | {count} 행 개선됨",
           "dimensionUnchanged": "{count} 행 변경 없음 | {count} 행 변경 없음",
@@ -11114,10 +11230,13 @@
           "trial": "시행 {index}",
           "noContent": "제공되지 않음",
           "noOutput": "출력 없음",
-          "absentSide": "이 실행에 없음"
+          "absentSide": "이 실행에 없음",
+          "enterFullscreen": "전체 화면으로 전환",
+          "exitFullscreen": "전체 화면 종료"
         }
       },
-      "selectionCount": "2개 중 {count}개 선택됨"
+      "selectionCount": "2개 중 {count}개 선택됨",
+      "clearBaseline": "기준선 지우기"
     },
     "datasets": {
       "listTitle": "데이터셋",
@@ -11171,8 +11290,8 @@
         },
         "searchPlaceholder": "항목 검색...",
         "csvImport": {
-          "button": "CSV 업로드",
-          "title": "데이터셋 항목 업로드",
+          "button": "항목 가져오기",
+          "title": "데이터셋 항목 가져오기",
           "description": "CSV 파일에서 데이터셋 항목을 가져옵니다.",
           "fileLabel": "CSV 파일",
           "placeholder": "CSV 파일 선택",
@@ -11186,7 +11305,7 @@
           "expectedOutput": "예상 출력",
           "source": "소스",
           "tags": "태그",
-          "version": "버전",
+          "version": "데이터셋 버전",
           "actions": "작업"
         },
         "deleteItemTitle": "항목 삭제",
@@ -11200,7 +11319,7 @@
             "item": "항목",
             "versions": "버전"
           },
-          "versionPill": "v{version} · {count} 버전 | v{version} · {count} 버전",
+          "versionPill": "버전 {count}개 | 버전 {count}개",
           "sourceSection": "소스",
           "sourceTrace": "트레이스",
           "sourceSpan": "스팬",
@@ -11665,8 +11784,6 @@
       "title": "플레이그라운드",
       "runAll": "모두 실행",
       "runAllTooltip": "모든 변형 실행",
-      "running": "실행 중… ({done}/{total})",
-      "stop": "중지",
       "recentDrafts": "최근 초안",
       "recentDraftsSection": "이 브라우저 · 최근 10개",
       "draftVersus": "vs",
@@ -11675,6 +11792,7 @@
       "fromExperiment": "실험 {name}에서 복제됨",
       "variables": "변수",
       "noVariables": "메시지에 {token}이(가) 없습니다. 입력을 매개변수화하려면 하나를 추가하세요.",
+      "unusedSampledValue": "아직 메시지에서 참조되지 않음: {tokens}. 사용하려면 메시지에 입력하세요.",
       "variablePlaceholder": "{name}의 값",
       "addExpected": "+ 예상 출력",
       "expectedLabel": "예상",
@@ -11689,8 +11807,9 @@
       "variant": "변형 {label}",
       "variantLimit": "벤치에는 최대 {max}개의 변형이 들어갑니다.",
       "duplicateVariant": "변형 복제",
+      "resetVariant": "벤치 재설정",
       "removeVariant": "변형 제거",
-      "runVariant": "이 변형 실행",
+      "runVariant": "실행",
       "createExperiment": "실험 생성",
       "modelPlaceholder": "모델을 선택하거나 입력하세요.",
       "providerUnknown": "알 수 없는 공급자",
@@ -11716,6 +11835,13 @@
       "toolsEmpty": "정의된 도구가 없습니다.",
       "toolCall": "도구 호출",
       "toolCallNote": "실행이 여기서 중지됩니다. 플레이그라운드는 도구를 실행하지 않습니다.",
+      "toolCallAddToMessages": "메시지에 추가",
+      "toolCallContinueTooltip": "이 호출을 대화에 추가하고 결과 필드를 엽니다.",
+      "toolCallAddedToMessages": "도구 호출 추가됨 — 도구 결과를 입력하고 다시 실행하세요.",
+      "toolArgumentsPlaceholder": "도구 인수 (JSON)",
+      "toolResultPlaceholder": "도구 결과를 입력하세요…",
+      "toolResultRequired": "계속하려면 위에 도구 결과를 입력하세요.",
+      "toolSetupRequired": "계속하려면 도구를 선택하고 해당 인수를 제공하세요.",
       "toolInvalidJson": "매개변수는 유효한 JSON이어야 합니다.",
       "schema": "스키마",
       "schemaOn": "스키마 · 켜짐",
@@ -11723,6 +11849,8 @@
       "schemaToggle": "출력을 JSON 스키마로 제한",
       "schemaHelp": "스키마가 설정되면 출력이 JSON 형식으로 렌더링됩니다.",
       "schemaInvalidJson": "스키마는 유효한 JSON이어야 합니다.",
+      "schemaIgnored": "스키마 · 이 공급자가 무시함",
+      "schemaUnsupported": "이 공급자에는 구조화 출력 필드가 없습니다. 스키마는 이 열에 유지되지만 전송되지 않으며 모델은 일반 텍스트로 응답합니다.",
       "outputPlaceholder": "출력이 여기에 표시됩니다 — 실행을 누르세요.",
       "outputNotRun": "실행되지 않음",
       "retry": "재시도",
@@ -11740,6 +11868,7 @@
       "sampleDatasetPlaceholder": "데이터셋 선택",
       "sampleSubmit": "샘플 가져오기",
       "sampleLoadError": "해당 데이터셋에서 행을 불러올 수 없습니다.",
+      "sampleApplied": "샘플 {index} / {total}을(를) 불러왔습니다 — 메시지에서 {token}으로 참조하세요.",
       "sampleEmpty": "이 데이터셋에는 아직 항목이 없습니다.",
       "noProviderTitle": "플레이그라운드에는 LLM 공급자가 필요합니다.",
       "noProviderBody": "프롬프트를 실행하려면 공급자를 연결하세요. 약 1분이 걸립니다.",
@@ -11752,6 +11881,8 @@
       "reset": "초기화",
       "resetTitle": "플레이그라운드 초기화",
       "resetMessage": "모든 변형, 행, 출력을 지우고 다시 시작하시겠습니까? 이 작업은 취소할 수 없습니다.",
+      "resetVariantTitle": "벤치 재설정",
+      "resetVariantMessage": "이 벤치의 프롬프트와 출력을 지우시겠습니까? 이 작업은 되돌릴 수 없습니다.",
       "scrollLeft": "왼쪽으로 스크롤",
       "scrollRight": "오른쪽으로 스크롤",
       "addMessage": "메시지",
@@ -11767,6 +11898,7 @@
       "variantSettings": "모델 설정",
       "messageToolPlaceholder": "도구 선택",
       "variablesCount": "변수 · {count}",
+      "newValueTag": "신규",
       "variableUsed": "이 변형에서 참조됨",
       "variableUnused": "이 변형에서 참조되지 않음 — 여기서는 빈 값으로 렌더링됨",
       "addVariable": "변수 추가",
@@ -11815,7 +11947,9 @@
       "sampleFullView": "전체 보기",
       "sampleBack": "목록으로 돌아가기",
       "sampleInput": "입력",
-      "sampleExpected": "기대 출력"
+      "sampleExpected": "기대 출력",
+      "fromTrace": "트레이스 스팬 {id}에서",
+      "openInPlaygroundFailed": "이 스팬을 Playground에서 열 수 없습니다."
     }
   },
   "onlineEvals": {
@@ -11848,12 +11982,14 @@
     },
     "scoreConfigLibrary": {
       "searchPlaceholder": "스코어 구성 검색...",
-      "scoreConfigsLabel": "{count} 스코어 구성 | {count} 스코어 구성"
+      "scoreConfigsLabel": "{count} 스코어 구성 | {count} 스코어 구성",
+      "selectedOfTotal": "{selected} / {total} 선택됨"
     },
     "scorerLibrary": {
       "noProvidersMessage": "LLM Judge 채점기를 가져오기 전에 먼저 프로바이더를 생성하세요.",
       "searchPlaceholder": "채점기 검색...",
-      "scorerCountSuffix": "{count} 채점기 | {count} 채점기"
+      "scorerCountSuffix": "{count} 채점기 | {count} 채점기",
+      "selectedOfTotal": "{selected} / {total} 선택됨"
     },
     "title": "평가",
     "loadError": "온라인 평가를 로드하지 못했습니다.",
@@ -11970,7 +12106,8 @@
         "legendFalseCount": "거짓 ({count})",
         "kpis": {
           "average": "평균",
-          "p50p95": "P50/P95",
+          "p50": "P50",
+          "p95": "P95",
           "unhealthy": "건강에 해로운",
           "healthy": "건강한",
           "trueRate": "긍정 비율",
@@ -12066,7 +12203,8 @@
       "remove": "제거",
       "save": "저장",
       "saveAsDraft": "초안으로 저장",
-      "createAndActivate": "저장 및 활성화"
+      "createAndActivate": "저장 및 활성화",
+      "testConnection": "연결 테스트"
     },
     "scorerTypeDialog": {
       "title": "새 채점자 생성",
@@ -12079,8 +12217,6 @@
       "remoteCta": "엔드포인트 구성"
     },
     "provider": {
-      "sectionStep1": "01",
-      "sectionStep2": "02",
       "backTo": "제공업체로 돌아가기",
       "createTitle": "LLM 제공자 생성",
       "editTitle": "LLM 제공자 편집",
@@ -12089,20 +12225,24 @@
       "nameLabel": "이름",
       "typeLabel": "제공자 유형",
       "endpointLabel": "끝점",
-      "endpointPlaceholder": "선택적 사용자 지정 엔드포인트",
+      "endpointPlaceholder": "전체 completions URL, 예: https://your-host/v1/chat/completions",
       "defaultModelLabel": "기본 모델",
       "availableModelsLabel": "사용 가능한 모델",
       "apiKeyLabel": "API 키",
       "apiKeyPlaceholder": "API 키 입력",
-      "apiKeyHelp": "저장 시 암호화되어 저장되며 다시 읽을 수 없습니다. 기존 키를 유지하려면 편집 시 비워 두세요.",
+      "apiKeyHelp": "암호화되어 저장되며 다시 조회되지 않습니다. 기존 키를 유지하려면 편집 내용을 저장할 때 입력란을 비워 두세요.",
       "authSection": "인증",
-      "authEditNote": "자격 증명은 다시 읽을 수 없습니다. 교체하려는 경우에만 API 키를 다시 입력하세요.",
+      "authEditNote": "인증 정보는 다시 조회할 수 없습니다. 인증이 필요한 공급자를 테스트하려면 API 키를 입력하세요.",
       "cannotRename": "생성 후에는 이름을 변경할 수 없습니다.",
       "availableModelsHelp": "선택 사항. 이 공급자에서 사용할 수 있는 모델의 쉼표로 구분된 목록입니다.",
       "saveError": "공급자를 저장하지 못했습니다.",
       "nameRequired": "Provider name is required",
       "typeRequired": "Provider type is required",
-      "defaultModelRequired": "Default model is required"
+      "defaultModelRequired": "Default model is required",
+      "testRunning": "연결 테스트 중...",
+      "testPassed": "연결됨",
+      "testFailed": "연결 실패",
+      "testError": "연결 테스트에 실패했습니다."
     },
     "scoreConfig": {
       "gteSymbol": "≥",
@@ -13753,6 +13893,7 @@
       "error": "오류",
       "failed": "실패",
       "failedRuns": "실패한 실행",
+      "errorRuns": "오류 실행",
       "jumpToLastRun": "마지막 실행으로 이동",
       "jumpToLatestData": "최신 데이터로 이동",
       "lastRun": "라스트 런",
@@ -13864,6 +14005,11 @@
       "stepsCount": "단계 ({count}개)",
       "title": "실행 상세",
       "viewFullError": "전체 오류 및 스택 트레이스 보기",
+      "errorSourceQuota": "할당량 한도 도달",
+      "errorSourceQuotaDesc": "조직에 포함된 Synthetics 단계가 모두 소진되어 이 실행이 건너뛰어졌습니다. 조직이 구독하거나 단계 한도가 올라가면 실행이 자동으로 재개됩니다.",
+      "errorSourceDispatch": "디스패치 오류",
+      "errorSourceQueue": "큐 오류",
+      "errorSourceProbe": "프로브 오류",
       "viewFullErrorBtn": "전체 오류 보기",
       "detailUrl": "URL",
       "locatorResolution": "로케이터 해석",
@@ -13915,6 +14061,7 @@
       "durationByLocation": "위치별 기간(평균)",
       "flakyRate": "Flaky Rate",
       "stepsWindowTruncated": "Showing the newest {count} executions ({from} – {to}); the selected range holds more.",
+      "stepsErrorExcluded": "{count}개 실행이 오류로 실행되지 못해 여기에 표시되지 않습니다. 개요 탭을 참조하세요.",
       "retryRate": "재시도율",
       "statusTimeline": "상태 타임라인",
       "tabOverview": "개요",
@@ -15570,7 +15717,6 @@
       "reservation": "예약",
       "sliType": "SLI 유형",
       "owner": "소유자",
-      "folder": "폴더",
       "streamPlaceholder": "스트림 선택"
     },
     "empty": {
@@ -15600,7 +15746,24 @@
       "sourceHint": "가동 시간은 이 알림이 발생하지 않았던 측정 시간의 비율입니다. 일시 중지, 음소거 또는 실패로 평가되지 않은 시간은 측정되지 않으며 가동 시간으로 계산되지 않습니다.",
       "loadFailed": "적격 알림을 불러올 수 없습니다",
       "noneEligible": "이 조직에는 아직 소스로 사용할 수 있는 알림이 없습니다.",
-      "ineligibleOption": "{name} — {reason}",
+      "ineligible": {
+        "notScheduled": "스케줄 없음",
+        "grouped": "그룹화됨",
+        "notReferenceable": "사용할 수 없음",
+        "cron": "Cron 스케줄",
+        "tooInfrequent": "너무 드물게 실행됨",
+        "silenced": "무음 있음",
+        "other": "부적격",
+        "why": {
+          "notScheduled": "실시간 알림은 SLO에 필요한 실행 기록을 보관하지 않습니다. 대신 스케줄 알림을 사용하세요.",
+          "grouped": "이 알림은 그룹별로 분할되고, 실행에서 어떤 그룹을 확인했는지 기록되지 않습니다. 여기에서 사용하려면 그룹별 분할을 제거하세요.",
+          "notReferenceable": "SLO 및 복합 알림은 소스로 사용할 수 없습니다. 일반 스케줄 알림을 선택하세요.",
+          "cron": "이 알림은 Cron 스케줄로 실행되므로 검사 간격이 일정하지 않아 가동 시간을 계산할 수 없습니다. 고정 간격으로 변경하세요.",
+          "tooInfrequent": "이 알림은 {frequency}마다 실행됩니다. 점검되지 않는 시간이 없도록 최소 {slice}마다 실행되어야 합니다.",
+          "silenced": "알림이 트리거된 후 이 알림은 한동안 확인을 중지합니다. 그 공백은 항상 장애 구간과 겹쳐 SLO가 실제보다 좋아 보입니다. 무음 기간을 0으로 설정하세요."
+        },
+        "noFixedInterval": "고정 간격 없음"
+      },
       "groupingLocked": "알림 기반 SLI는 그룹화할 수 없습니다: 가용성 원장은 그룹별이 아닌 알림별로 한 번의 실행을 기록하므로, 의지할 그룹별 적용 범위가 없습니다.",
       "sourceLink": "소스 알림",
       "preview": {
@@ -15708,6 +15871,42 @@
       "editTargetMissing": "그 알림은 더 이상 이 SLO에 없습니다.",
       "describeBurn": "소진율 > {critical} ({long} 및 {short} 동안)",
       "describeBudget": "오류 예산 소비 > {critical}%"
+    },
+    "validation": {
+      "nameRequired": "SLO 이름은 필수입니다.",
+      "nameTooLong": "SLO 이름은 256자 이하여야 합니다.",
+      "targetRequired": "목표값은 필수입니다.",
+      "targetRange": "목표값은 0보다 크고 100보다 작아야 합니다.",
+      "targetPrecision": "목표값은 소수점 이하 최대 3자리까지 지원합니다.",
+      "streamTypeRequired": "스트림 유형은 필수입니다.",
+      "streamRequired": "스트림은 필수입니다.",
+      "goodExprRequired": "'정상일 때'는 필수입니다.",
+      "promqlGoodRequired": "정상 쿼리는 필수입니다.",
+      "promqlTotalRequired": "총 쿼리는 필수입니다",
+      "aggregateRequired": "집계 표현식은 필수입니다",
+      "comparatorRequired": "비교 연산자는 필수입니다",
+      "thresholdRequired": "임계값은 필수입니다",
+      "thresholdNumber": "임계값은 숫자여야 합니다",
+      "alertSourceRequired": "소스 알림은 필수입니다",
+      "groupedSlice": "그룹화된 SLO는 5분 슬라이스를 사용해야 합니다",
+      "alertCannotGroup": "알림 기반 SLI는 그룹화할 수 없습니다",
+      "frequencyRequired": "주기는 필수입니다",
+      "frequencyPositive": "주기는 최소 1분 이상이어야 합니다",
+      "silenceRequired": "음소거 기간은 필수입니다",
+      "silenceNonNegative": "음소거 기간은 음수일 수 없습니다",
+      "targetsRequired": "수신처 또는 워크플로우를 하나 이상 선택해야 합니다",
+      "criticalRequired": "임계값은 필수입니다",
+      "criticalPositive": "임계값은 0보다 커야 합니다",
+      "budgetRange": "소비된 예산은 100% 이하여야 합니다",
+      "longWindowRequired": "긴 기간은 필수입니다",
+      "shortWindowRequired": "짧은 기간은 필수입니다",
+      "shortInsideLong": "짧은 기간은 긴 기간보다 짧아야 합니다"
+    },
+    "duration": {
+      "seconds": "{count}초 | {count}초",
+      "minutes": "{count}분 | {count}분",
+      "hours": "{count}시간 | {count}시간",
+      "days": "{count}일 | {count}일"
     }
   },
   "promql": {

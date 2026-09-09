@@ -21,12 +21,17 @@ export type ButtonVariant =
   | "ghost-warning"
   | "ghost-neutral"
   | "outline-destructive"
+  // Solid "stop this running operation" red — distinct from destructive
+  // (delete/danger): a query/task actively in flight that a click will abort
+  | "cancel-query"
   | "sidebar-toggle"
   // Dedicated variant for sidebar panel collapse/expand icon button
   | "panel-collapse"
   // Primary-colored tall-narrow vertical rectangle — for splitter collapse/expand buttons
   | "sidebar-button"
   | "destructive"
+  // Icon-only exclude-filter toggle (≠) — lighter red than destructive; glyph-on-fill, so 3:1 non-text contrast applies
+  | "filter-exclude"
   // AI-themed gradient — purple→pink gradient background, white text (AI send/generate buttons)
   | "ai-gradient"
   // Use on dark gradient backgrounds — white background with primary text

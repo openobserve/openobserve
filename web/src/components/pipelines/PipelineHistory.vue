@@ -218,7 +218,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #bottom="{ totalRows }">
-            <div class="mr-4 flex items-center py-2 text-xs font-normal">
+            <div class="me-4 flex items-center py-2 text-xs font-normal">
               {{ totalRows }} {{ t("pipeline.header") }}
             </div>
           </template>
@@ -285,7 +285,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="text-sm">
                   <OIcon
                     :name="selectedRow.is_realtime ? 'speed' : 'schedule'"
-                    class="mr-1"
+                    class="me-1"
                     size="xs"
                   />
                   {{ selectedRow.is_realtime ? t("common.realTime") : t("alerts.scheduled") }}
@@ -294,8 +294,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="w-1/2">
                 <div class="text-text-label mb-1 text-xs">{{ t("pipeline.silencedLabel") }}</div>
                 <div class="text-sm">
-                  <OIcon v-if="selectedRow.is_silenced" name="volume-off" size="xs" class="mr-1" />
-                  <OIcon v-else name="volume-up" size="xs" class="mr-1" />
+                  <OIcon v-if="selectedRow.is_silenced" name="volume-off" size="xs" class="me-1" />
+                  <OIcon v-else name="volume-up" size="xs" class="me-1" />
                   {{ selectedRow.is_silenced ? t("common.yes") : t("common.no") }}
                 </div>
               </div>
@@ -344,7 +344,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OIcon
                       :name="selectedRow.is_partial ? 'warning' : 'check-circle'"
                       :class="[
-                        'mr-1',
+                        'me-1',
                         selectedRow.is_partial ? 'text-warning' : 'text-status-positive',
                       ]"
                       size="xs"
@@ -372,7 +372,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OSeparator class="my-2" />
             <div class="py-1">
               <div class="text-text-label mb-1 text-xs">
-                <OIcon name="error" size="xs" class="mr-1" />
+                <OIcon name="error" size="xs" class="me-1" />
                 {{ t("pipeline.errorDetailsLabel") }}
               </div>
               <div
@@ -395,7 +395,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OSeparator class="my-2" />
             <div class="py-1">
               <div class="text-text-label mb-1 text-xs">
-                <OIcon name="check-circle" size="xs" class="mr-1" />
+                <OIcon name="check-circle" size="xs" class="me-1" />
                 {{ t("pipeline.responseLabel") }}
               </div>
               <div

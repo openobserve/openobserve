@@ -50,12 +50,14 @@ const summarySpy = vi.fn().mockResolvedValue({
     streams: { num_streams: 18, total_storage_size: 4.2 * 1024 * 1024 },
   },
 });
+const deleteOrgSpy = vi.hoisted(() => vi.fn());
 vi.mock("@/services/organizations", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
   return overlayServiceMock(await importOriginal(), {
     default: {
       post_organization_settings: vi.fn(),
       get_organization_summary: (...a: any[]) => summarySpy(...a),
+      delete_org: (...a: any[]) => deleteOrgSpy(...a),
     },
   });
 });
@@ -82,7 +84,7 @@ const mockStore = {
     tempThemeColors: { light: null, dark: null },
     selectedOrganization: { identifier: "test-org", label: "Acme Production" },
     userInfo: { email: "me@o2.ai" },
-    organizationData: { organizationSettings: { scrape_interval: 30 } },
+    organizationData: { organizationSettings: { scrape_interval: 30, free_trial_expiry: "" } },
     zoConfig: {
       meta_org: "test-org",
       custom_logo_text: "Test Logo Text",
@@ -123,6 +125,13 @@ describe("General settings Danger Zone", () => {
     const zone = (w: any) => w.find('[data-test="general-settings-danger-zone"]').exists();
 
     it("shows it to an admin of this org", async () => {
+      expect(zone(await mountGeneral())).toBe(true);
+    });
+
+    it("shows it to a root user", async () => {
+      orgUsersSpy.mockResolvedValue({
+        data: { data: [{ email: "me@o2.ai", role: "root" }] },
+      });
       expect(zone(await mountGeneral())).toBe(true);
     });
 
@@ -270,6 +279,136 @@ describe("General settings Danger Zone", () => {
 
     expect(summarySpy).toHaveBeenCalledTimes(1);
     expect((wrapper.vm as any).orgScope).toBe("32 dashboards · 18 streams · 4.20 TB data");
+  });
+
+  // Expired trials keep the Danger Zone and lose everything else on the page.
+  describe("expired trial", () => {
+    const EXPIRED = String((Date.now() - 30 * 24 * 60 * 60 * 1000) * 1000);
+
+    afterEach(() => {
+      (mockStore.state.organizationData.organizationSettings as any).free_trial_expiry = "";
+    });
+
+    const expireTrial = () => {
+      (mockStore.state.organizationData.organizationSettings as any).free_trial_expiry = EXPIRED;
+    };
+
+    it("still renders the delete button for an admin", async () => {
+      expireTrial();
+      const wrapper = await mountGeneral();
+
+      expect(wrapper.find('[data-test="general-settings-delete-org-btn"]').exists()).toBe(true);
+    });
+
+    // These shapes mean "no trial tracked", not a lapsed one.
+    it.each([
+      ["absent", undefined],
+      ["empty", ""],
+      ["zero", 0],
+      ["zero string", "0"],
+    ])("keeps the settings sections when the expiry is %s", async (_label, expiry) => {
+      (mockStore.state.organizationData.organizationSettings as any).free_trial_expiry = expiry;
+      const wrapper = await mountGeneral();
+
+      expect(wrapper.find('[data-test="general-settings-scrape-interval"]').exists()).toBe(true);
+    });
+
+    // Offering these invites edits a lapsed org can no longer act on.
+    it("hides the non-destructive settings sections", async () => {
+      expireTrial();
+      const wrapper = await mountGeneral();
+
+      expect(wrapper.find('[data-test="general-settings-scrape-interval"]').exists()).toBe(false);
+      expect(wrapper.find("#enterpriseFeature").exists()).toBe(false);
+    });
+
+    // The role gate still governs once the route is reachable.
+    it("hides the delete button from a member", async () => {
+      expireTrial();
+      orgUsersSpy.mockResolvedValue({
+        data: { data: [{ email: "me@o2.ai", role: "member" }] },
+      });
+      const wrapper = await mountGeneral();
+
+      expect(wrapper.find('[data-test="general-settings-delete-org-btn"]').exists()).toBe(false);
+    });
+
+    it("renders both the danger zone and the settings sections while the trial is live", async () => {
+      const wrapper = await mountGeneral();
+
+      expect(wrapper.find('[data-test="general-settings-delete-org-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="general-settings-scrape-interval"]').exists()).toBe(true);
+      expect(wrapper.find("#enterpriseFeature").exists()).toBe(true);
+    });
+  });
+
+  // Without these the button can toast success while never calling the API.
+  describe("deleteOrg execution", () => {
+    beforeEach(() => {
+      deleteOrgSpy.mockReset();
+      deleteOrgSpy.mockResolvedValue({});
+    });
+
+    it("calls delete_org with the selected org identifier", async () => {
+      const wrapper = await mountGeneral();
+      await (wrapper.vm as any).deleteOrg();
+
+      expect(deleteOrgSpy).toHaveBeenCalledTimes(1);
+      expect(deleteOrgSpy).toHaveBeenCalledWith("test-org");
+    });
+
+    it("closes the dialog and clears the typed confirmation on success", async () => {
+      const wrapper = await mountGeneral();
+      (wrapper.vm as any).confirmDeleteOrg = true;
+      (wrapper.vm as any).deleteConfirmInput = "Acme Production";
+
+      await (wrapper.vm as any).deleteOrg();
+
+      expect((wrapper.vm as any).confirmDeleteOrg).toBe(false);
+      expect((wrapper.vm as any).deleteConfirmInput).toBe("");
+    });
+
+    // Clearing the org on a failed delete would strand the user on a live org.
+    it("keeps the dialog open and does not clear the org when the API fails", async () => {
+      deleteOrgSpy.mockRejectedValueOnce({
+        response: { data: { message: "Cannot delete this organization" } },
+      });
+      const wrapper = await mountGeneral();
+      (wrapper.vm as any).confirmDeleteOrg = true;
+
+      await (wrapper.vm as any).deleteOrg();
+
+      expect((wrapper.vm as any).confirmDeleteOrg).toBe(true);
+      expect((wrapper.vm as any).deleting).toBe(false);
+    });
+
+    it("does not call the API when no org is selected", async () => {
+      const wrapper = await mountGeneral();
+      const original = mockStore.state.selectedOrganization;
+      (mockStore.state as any).selectedOrganization = {};
+
+      await (wrapper.vm as any).deleteOrg();
+      (mockStore.state as any).selectedOrganization = original;
+
+      expect(deleteOrgSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  // The type-to-confirm gate is the only guard on an irreversible action.
+  describe("deleteConfirmMatches gate", () => {
+    it("is false until the typed name matches, and trims surrounding space", async () => {
+      const wrapper = await mountGeneral();
+
+      expect((wrapper.vm as any).deleteConfirmMatches).toBe(false);
+
+      (wrapper.vm as any).deleteConfirmInput = "acme production";
+      await flushPromises();
+      expect((wrapper.vm as any).deleteConfirmMatches).toBe(false);
+
+      (wrapper.vm as any).deleteConfirmInput = "  Acme Production  ";
+      await flushPromises();
+      expect((wrapper.vm as any).deleteConfirmMatches).toBe(true);
+    });
   });
 
   it("keeps the delete flow usable when /summary fails", async () => {

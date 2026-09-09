@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Main Panel -->
         <main
           data-test="main-content"
-          class="bg-surface-chrome-deeper flex min-h-0 flex-col pr-2 pb-2"
+          class="bg-surface-chrome-deeper flex min-h-0 flex-col pe-2 pb-2"
           :style="{
             width: !store.state.isAiChatEnabled
               ? '100%'
@@ -128,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             // The chat is a floating card in both modes — match the main content
             // card's right/bottom gap (+ rounded-surface corners) so they read as
             // the same card. Expanding only widens it; it never overlays the header.
-            'pr-2 pb-2',
+            'pe-2 pb-2',
           ]"
           :style="[
             {
@@ -181,8 +181,7 @@ import {
   useLocalUserInfo,
   getImageURL,
   invalidateLoginData,
-  getDueDays,
-  trialPeriodAllowedPath,
+  shouldPaywallRoute,
   emptyDataAllowedPaths,
 } from "../utils/zincutils";
 
@@ -491,6 +490,10 @@ export default defineComponent({
       {
         label: raw("English"),
         code: "en-us",
+      },
+      {
+        label: raw("العربية"),
+        code: "ar",
       },
       {
         label: raw("Türkçe"),
@@ -1113,21 +1116,17 @@ export default defineComponent({
         await useHomeDashboard(t).load(store.state?.selectedOrganization?.identifier);
 
         if (
-          orgSettings?.data?.data?.free_trial_expiry != null &&
-          orgSettings?.data?.data?.free_trial_expiry != ""
+          shouldPaywallRoute(
+            orgSettings?.data?.data?.free_trial_expiry,
+            router.currentRoute.value.name,
+          )
         ) {
-          const trialDueDays = getDueDays(orgSettings?.data?.data?.free_trial_expiry);
-          if (
-            trialDueDays <= 0 &&
-            trialPeriodAllowedPath.indexOf(router.currentRoute.value.name) == -1
-          ) {
-            router.push({
-              name: "plans",
-              query: {
-                org_identifier: selectedOrg.value.identifier,
-              },
-            });
-          }
+          router.push({
+            name: "plans",
+            query: {
+              org_identifier: selectedOrg.value.identifier,
+            },
+          });
         }
       } catch (error: any) {
         // Handle permission errors gracefully (403 = Forbidden)
@@ -1264,6 +1263,8 @@ export default defineComponent({
     };
 
     const toggleAIChat = () => {
+      // ai_enabled arrives with the async /config response, so it can't gate registration.
+      if (!store.state.zoConfig.ai_enabled) return;
       // On the home page, switch to the AI tab instead of opening the side panel
       if (router.currentRoute.value.name === "home") {
         window.dispatchEvent(new CustomEvent("o2:home-switch-tab", { detail: "ai" }));
@@ -1376,7 +1377,10 @@ export default defineComponent({
     };
 
     // ── Global shortcuts: AI Chat ─────────────────────────────────────────
-    useShortcuts([{ id: "aiChatToggle", handler: () => toggleAIChat() }]);
+    // O2 AI is enterprise-only: on OSS the Ctrl+B binding must not exist at all.
+    if (config.isEnterprise == "true") {
+      useShortcuts([{ id: "aiChatToggle", handler: () => toggleAIChat() }]);
+    }
 
     return {
       isDark,

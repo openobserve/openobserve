@@ -208,20 +208,36 @@ pub static SQL_SECONDARY_INDEX_SEARCH_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     fields
 });
 
+const _DEFAULT_QUICK_MODE_FIELDS: [&str; 9] = [
+    // Losing these silently degrades sourcemap translation, breadcrumbs and session replay.
+    "service",
+    "version",
+    "session_id",
+    "view_url",
+    // Losing these leaves the trace detail page without spans to build a waterfall from.
+    "service_name",
+    "operation_name",
+    "trace_id",
+    "span_id",
+    "duration",
+];
 pub static QUICK_MODEL_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
-    let mut fields = get_config()
-        .common
-        .feature_quick_mode_fields
-        .split(',')
-        .filter_map(|s| {
-            let s = s.trim();
-            if s.is_empty() {
-                None
-            } else {
-                Some(s.to_string())
-            }
-        })
-        .collect::<Vec<_>>();
+    let mut fields = chain(
+        _DEFAULT_QUICK_MODE_FIELDS.iter().map(|s| s.to_string()),
+        get_config()
+            .common
+            .feature_quick_mode_fields
+            .split(',')
+            .filter_map(|s| {
+                let s = s.trim();
+                if s.is_empty() {
+                    None
+                } else {
+                    Some(s.to_string())
+                }
+            }),
+    )
+    .collect::<Vec<_>>();
     fields.sort();
     fields.dedup();
     fields
@@ -1528,9 +1544,27 @@ pub struct Search {
     #[env_config(
         name = "ZO_FEATURE_METRICS_FUSED_AGG_ENABLED",
         default = true,
-        help = "Fold PromQL agg(range_func(...)) queries incrementally instead of materializing the range function output; disable to fall back to the generic evaluator"
+        help = "Fold PromQL agg(range_func(...)) queries incrementally instead of materializing the range function output"
     )]
     pub feature_metrics_fused_agg_enabled: bool,
+    #[env_config(
+        name = "ZO_FEATURE_METRICS_STREAMING_AGG_ENABLED",
+        default = true,
+        help = "Evaluate fused PromQL agg(range_func(...)) queries as a stream over hash-sorted metrics files, series by series"
+    )]
+    pub feature_metrics_streaming_agg_enabled: bool,
+    #[env_config(
+        name = "ZO_METRICS_INDEX_SELECTION_CACHE_ENABLED",
+        default = false,
+        help = "Cache the row ranges a PromQL query selected from each `.midx` metrics index, keyed by file and matchers, so a repeated query skips decoding and evaluating the index."
+    )]
+    pub metrics_index_selection_cache_enabled: bool,
+    #[env_config(
+        name = "ZO_METRICS_INDEX_SELECTION_CACHE_MAX_SIZE",
+        default = 256,
+        help = "Maximum memory size in MB of the metrics index selection cache."
+    )]
+    pub metrics_index_selection_cache_max_size: usize,
     #[env_config(
         name = "ZO_FEATURE_DYNAMIC_PUSHDOWN_FILTER_ENABLED",
         default = true,
@@ -1737,7 +1771,11 @@ pub struct Common {
         help = "Comma-separated fields to build bloom filter on for all streams, replaces the deprecated ZO_BLOOM_FILTER_DEFAULT_FIELDS"
     )]
     pub feature_bloom_filter_extra_fields: String,
-    #[env_config(name = "ZO_FEATURE_QUICK_MODE_FIELDS", default = "")]
+    #[env_config(
+        name = "ZO_FEATURE_QUICK_MODE_FIELDS",
+        default = "",
+        help = "Comma-separated extra fields quick mode always returns when the stream has them, on top of the built-in defaults"
+    )]
     pub feature_quick_mode_fields: String,
     #[env_config(name = "ZO_FEATURE_QUERY_QUEUE_ENABLED", default = true)]
     pub feature_query_queue_enabled: bool,
@@ -2175,6 +2213,9 @@ pub struct Limit {
     pub disk_free: usize,
     #[env_config(name = "ZO_PAYLOAD_LIMIT", default = 209715200)]
     pub req_payload_limit: usize,
+    #[env_config(name = "ZO_JS_FUNCTION_MAX_EXECUTION_TIME_SECS", default = 5)]
+    // 0 falls back to default
+    pub js_function_max_execution_time_secs: u64,
     #[env_config(name = "ZO_MAX_FILE_RETENTION_TIME", default = 600)] // seconds
     pub max_file_retention_time: u64,
     // MB, per log file size limit on disk
@@ -2241,8 +2282,12 @@ pub struct Limit {
     pub query_thread_num: usize,
     #[env_config(name = "ZO_FILE_DOWNLOAD_THREAD_NUM", default = 0)]
     pub file_download_thread_num: usize,
-    #[env_config(name = "ZO_FILE_DOWNLOAD_MIN_RECORDS", default = 100)]
-    pub file_download_min_records: i64,
+    #[env_config(
+        name = "ZO_FILE_DOWNLOAD_SYNC_MAX_SIZE",
+        default = 1,
+        help = "Files up to this size in MB are downloaded into the cache before a search reads them instead of being range-read from object storage, 0 disables"
+    )]
+    pub file_download_sync_max_size: usize,
     #[env_config(name = "ZO_FILE_DOWNLOAD_PRIORITY_QUEUE_THREAD_NUM", default = 0)]
     pub file_download_priority_queue_thread_num: usize,
     #[env_config(name = "ZO_FILE_DOWNLOAD_PRIORITY_QUEUE_WINDOW_SECS", default = 3600)]
@@ -2705,7 +2750,7 @@ pub struct Compact {
     #[env_config(
         name = "ZO_METRICS_INDEX_ENABLED",
         default = false,
-        help = "Experimental metrics index layout. The ingester writes Parquet metrics files ordered by (__hash__, _timestamp) instead of _timestamp DESC and marks them with a `hash-sorted-v1-` file name prefix; the compactor writes the configured Parquet or Vortex format and merges a closed hour into size-split `indexed-v1-` files with a `.midx` metrics index. Only affects newly written metrics files of streams whose __hash__ column is UInt64; SQL queries on metrics streams must not assume a _timestamp order while it is on."
+        help = "Experimental metrics index layout. The ingester writes Parquet metrics files ordered by (__hash__, _timestamp) instead of _timestamp DESC and marks them with a `hash-sorted-v1-` file name prefix; the compactor writes the configured Parquet or Vortex format and merges the pending files of an open hour into size-split `hash-merged-v1-` files and a closed hour into size-split `indexed-v1-` files with a `.midx` metrics index. Only affects newly written metrics files of streams whose __hash__ column is UInt64; SQL queries on metrics streams must not assume a _timestamp order while it is on."
     )]
     pub metrics_index_enabled: bool,
     #[env_config(name = "ZO_COMPACT_INTERVAL", default = 10)] // seconds
@@ -3609,6 +3654,7 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     } else {
         cfg.limit.max_file_size_in_memory *= 1024 * 1024;
     }
+    cfg.limit.file_download_sync_max_size *= 1024 * 1024;
 
     // check for metrics limit
     if cfg.limit.metrics_max_points_per_series == 0 {

@@ -42,12 +42,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="min-h-0 w-full flex-1 overflow-hidden">
         <div class="h-full">
           <OTable
+            ref="oTableRef"
             :frame="false"
             :data="visibleRows"
             :columns="columns"
             row-key="name"
             :loading="loading"
             pagination="client"
+            :current-page="currentPage"
+            @update:current-page="onPageChange"
             :page-size="pageSize"
             :page-size-options="pageSizeOptions"
             selection="multiple"
@@ -148,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <template #bottom>
               <div class="flex w-full items-center justify-between py-2">
-                <div class="mr-4 flex items-center text-xs font-normal">
+                <div class="me-4 flex items-center text-xs font-normal">
                   {{ resultTotal }} {{ t("function.header") }}
                 </div>
                 <OButton
@@ -334,6 +337,19 @@ export default defineComponent({
 
     const orgId = useOrgId();
 
+    // Plain ref, not URL/store-backed: only the OTable v-if branch unmounts on add/edit, not FunctionList itself.
+    const currentPage = ref(1);
+    const onPageChange = (page: number) => {
+      currentPage.value = page;
+    };
+    const oTableRef: any = ref(null);
+    // setTimeout(0) is a macrotask, so it runs after TanStack's own deferred auto-reset-on-data-change (its own microtask queue), letting the restored page win.
+    const restorePageIndex = () => {
+      setTimeout(() => {
+        oTableRef.value?.table?.setPageIndex(currentPage.value - 1);
+      }, 0);
+    };
+
     // The list is the query, not a copy of it. Anything that invalidates
     // ["org", id, "functions"] — this page's writes, the two in the Logs search
     // bar, the function form — repaints these rows with no wiring here.
@@ -349,6 +365,16 @@ export default defineComponent({
     // is any request in flight, including one with rows already on screen.
     const loading = functions.isPending;
     const fetching = functions.isFetching;
+    // main restored the page inside the old chain's `.finally`; the query has no
+    // such hook, so the same restore rides the cold read settling instead.
+    watch(
+      loading,
+      (isLoading) => {
+        if (isLoading) return;
+        restorePageIndex();
+      },
+      { once: true },
+    );
 
     const jsTransforms = computed(() =>
       (functions.data.value ?? []).map((data: any) => ({
@@ -773,6 +799,10 @@ export default defineComponent({
       confirmBulkDelete,
       selectedFunctions,
       selectedFunctionIds,
+      currentPage,
+      onPageChange,
+      oTableRef,
+      restorePageIndex,
     };
   },
   computed: {

@@ -175,7 +175,8 @@ export function buildSQLContext(
       missingValueData?.filter((item: any) => {
         return (
           xAxisKeys.every((key: any) => getDataValue(item, key) != null) &&
-          yAxisKeys.every((key: any) => getDataValue(item, key) != null) &&
+          // some, not every: one null y must not erase the row, its x category and the other series
+          (!yAxisKeys.length || yAxisKeys.some((key: any) => getDataValue(item, key) != null)) &&
           breakDownKeys.every((key: any) => getDataValue(item, key) != null)
         );
       }) || [];

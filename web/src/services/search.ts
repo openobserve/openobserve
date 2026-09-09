@@ -16,6 +16,10 @@
 import { generateTraceContext } from "@/utils/zincutils";
 import { patchNsFieldsInJson } from "@/utils/nsFieldsPatch";
 import http from "./http";
+import type {
+  OrgTraceTimeRangeResponse,
+  TraceTimeRangeOptions,
+} from "@/ts/interfaces/traces/traceTimeRange.types";
 
 const search = {
   search: (
@@ -335,6 +339,26 @@ const search = {
     const query = params.toString();
     const url = `/api/${org_identifier}/${stream_name}/traces/${encodeURIComponent(trace_id)}/details${query ? `?${query}` : ""}`;
     return http().get(url);
+  },
+  /** Which stream holds each trace id, and the time range it actually ran in. */
+  get_trace_time_ranges: ({
+    org_identifier,
+    trace_ids,
+    start_time,
+    end_time,
+    hint_ts,
+    streams,
+  }: TraceTimeRangeOptions) => {
+    const params = new URLSearchParams({ trace_id: trace_ids.join(",") });
+    if (start_time != null && end_time != null) {
+      params.set("start_time", String(start_time));
+      params.set("end_time", String(end_time));
+    }
+    if (hint_ts != null) params.set("hint_ts", String(hint_ts));
+    if (streams?.length) params.set("streams", streams.join(","));
+    return http().get<OrgTraceTimeRangeResponse>(
+      `/api/${org_identifier}/traces/time_range?${params.toString()}`,
+    );
   },
   getTraceDAG: (
     org_identifier: string,

@@ -76,10 +76,10 @@ async function performIngestion() {
             });
         }
 
-        // CRITICAL: Add delay to allow metrics to be indexed
-        testLogger.info('Waiting 5 seconds for metrics to be fully indexed...');
-        await new Promise(resolve => setTimeout(resolve, 5000));
-        testLogger.info('Indexing delay complete, metrics should be queryable');
+        // Gate on the seeded metric actually being queryable (WAL indexing lags the
+        // ingest ack) instead of a blind sleep — the data-rendering tests pin to cpu_usage.
+        testLogger.info('Waiting for seeded metric cpu_usage to become queryable...');
+        await metricsIngestion.waitForMetricQueryable('cpu_usage');
 
         return result;
     } catch (error) {

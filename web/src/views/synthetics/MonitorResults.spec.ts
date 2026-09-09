@@ -147,6 +147,7 @@ function makeWrapper() {
           template: `
             <div data-test="monitor-runs">
               <button data-test="trigger-open-run" @click="$emit('open-run', 'run-123', 'exec-1')" />
+              <button data-test="trigger-open-run-error" @click="$emit('open-run-error', { errorSource: 'quota', message: 'steps exhausted', timestamp: 1700000000000, location: 'aws-us-east-1', browser: 'chromium', device: 'desktop' })" />
               <button data-test="trigger-edit" @click="$emit('edit')" />
               <button data-test="trigger-refresh" @click="$emit('refresh')" />
               <button data-test="trigger-jump-to-window" @click="$emit('jump-to-window', 1000, 2000)" />
@@ -163,6 +164,7 @@ function makeWrapper() {
             "overrideRunId",
             "overrideExecutionId",
             "overrideMonitorType",
+            "overrideError",
           ],
         },
         BetaBadge: {
@@ -279,6 +281,28 @@ describe("MonitorResults", () => {
       await flushPromises();
 
       expect(wrapper.find('[data-test="run-detail"]').exists()).toBe(true);
+    });
+
+    it("passes an override error to RunDetail (and clears run/exec ids) when MonitorRuns emits open-run-error", async () => {
+      wrapper = makeWrapper();
+      await flushPromises();
+
+      await wrapper.find('[data-test="trigger-open-run-error"]').trigger("click");
+      await flushPromises();
+
+      const runDetail = wrapper.findComponent('[data-test="run-detail"]');
+      expect(runDetail.props("overrideError")).toMatchObject({
+        errorSource: "quota",
+        message: "steps exhausted",
+      });
+      // An id-less error must NOT carry run/exec ids — RunDetail renders it from
+      // the row instead of fetching a per-execution record.
+      expect(runDetail.props("overrideRunId")).toBe("");
+      expect(runDetail.props("overrideExecutionId")).toBe("");
+      // No run/exec query params are written for an id-less error.
+      expect(mockRouterReplace).not.toHaveBeenCalledWith(
+        expect.objectContaining({ query: expect.objectContaining({ run: expect.anything() }) }),
+      );
     });
 
     it("should pass an empty override-monitor-type to RunDetail until fetchCheck resolves", async () => {

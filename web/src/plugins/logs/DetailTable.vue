@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </OTabs>
       </div>
-      <div class="flex shrink-0 items-center gap-2 pr-3">
+      <div class="flex shrink-0 items-center gap-2 pe-3">
         <O2AIContextAddBtn
           data-test="logs-detail-ai-context-btn"
           @sendToAiChat="sendToAiChat(JSON.stringify(rowData))"
@@ -416,7 +416,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm-action"
             :disabled="currentIndex <= 0"
             @click="$emit('showPrevDetail', false, true)"
-            ><OIcon name="navigate-before" size="sm" class="mr-1" />{{
+            ><OIcon name="navigate-before" size="sm" class="me-1" />{{
               t("common.previous")
             }}</OButton
           >
@@ -451,7 +451,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm-action"
             :disabled="currentIndex >= totalLength - 1"
             @click="$emit('showNextDetail', true, false)"
-            >{{ t("common.next") }}<OIcon name="navigate-next" size="sm" class="ml-1"
+            >{{ t("common.next") }}<OIcon name="navigate-next" size="sm" class="ms-1"
           /></OButton>
         </div>
       </div>

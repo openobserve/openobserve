@@ -27,12 +27,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
     :subtitle="t('dashboard.subtitle')"
   >
     <template #actions>
-      <OButton
-        variant="primary"
-        size="sm"
-        icon-left="add"
-        @click="addDashboard"
-      >
+      <OButton variant="primary" size="sm" @click="addDashboard">
         {{ t("dashboard.add") }}
       </OButton>
     </template>
@@ -50,7 +45,6 @@ keeps the title's X/Y position identical as a user navigates list → detail →
 edit, which is the whole point.
 
 **How.**
-
 - The component is `OPageHeader`, at
   `web/src/lib/core/PageHeader/OPageHeader.vue`. Its full API — props, slots, and
   the one-row-content contract — is documented in this rule (below), so you can
@@ -77,9 +71,54 @@ edit, which is the whole point.
   declares** — see [navigation-menus](navigation-menus.md#icon-parity).
 - Put page actions in `#actions` using O2 components. Do not add your own
   `border-b`, height, or padding around it — the header owns its own chrome.
+- **The header's create CTA is label-only — no `+` icon.** Write
+  `<OButton variant="primary" size="sm">New alert</OButton>`, never
+  `icon-left="add"`. This applies to every New/Add/Create button in `#actions`,
+  on list and detail pages alike. See *The header create CTA carries no icon*
+  below for the boundary — utility actions and in-section adders are different.
 - **Do not** style `OPageHeader` from the outside with utility classes or a
   wrapper trying to change its internals. If it can't express what a page needs,
   that's a change to `OPageHeader` itself, not a per-page override.
+
+#### The header create CTA carries no icon
+
+The primary New/Add/Create button in `#actions` is **text only**:
+
+```vue
+<!-- ✅ -->
+<template #actions>
+  <OButton variant="primary" size="sm" data-test="alert-list-add-btn" @click="create">
+    {{ t("alerts.add") }}
+  </OButton>
+</template>
+
+<!-- ❌ never on a header CTA -->
+<OButton variant="primary" size="sm" icon-left="add">{{ t("alerts.add") }}</OButton>
+```
+
+**Why.** A page header has exactly one primary action, in a fixed, known place.
+The `+` adds no information there — the label already says what the button
+makes — and it competes with the module icon tile on the same row. The app had
+drifted both ways; the label-only form is the settled convention.
+
+**The boundary — three things this rule does NOT cover.** Do not strip these:
+
+| Keep the `+` on | Because | Example |
+|---|---|---|
+| **In-section adders** — a repeatable row-adder inside a form, `OFormSection` / `OEmptyState` / `ODialog` `#actions`, or any body content | Repeated affordance in a dense form; the `+` is what makes it scannable as "one more of these" | `+ Add header`, `+ Add condition`, `+ Add variable` |
+| **Icon-only buttons** (`size="icon-*"`, label in an `OTooltip`) | The `+` *is* the button's content — removing it leaves an empty square | `ViewDashboard`'s Add-panel toolbar button |
+| **Utility actions in the header** that are not create CTAs | Semantic icons are correct and expected there | Import → `upload-file`, Refresh → `refresh`, Edit → `edit` |
+
+So the rule is narrow and precise: **a generic `+` prefixed to a create CTA in
+`#actions`**. A *semantic* icon on a header button is fine — the SLO detail
+page's outline "New alert" uses the `notifications` bell to match its `shield`
+and `edit` siblings, and that stays.
+
+**Auditing this.** Grep alone over-reports: an `OFormSection` or `OEmptyState`
+`#actions` slot nested inside `OPageLayout` looks identical to a header slot. To
+find real violations, resolve each `<OButton icon-left="add">` to the component
+that **owns** the enclosing `<template #actions>` and keep only the ones owned by
+`OPageHeader` / `OPageLayout`.
 
 ### 2. Build from O2 components in `web/src/lib`
 
@@ -95,7 +134,6 @@ how a UI ends up with nine slightly different buttons. Baked-in design is the
 feature, not a limitation.
 
 **How.**
-
 - Pick the right component from the [§ Component catalog](component-catalog.md) —
   it maps scenarios to components and links the reference file with each one's
   props, slots, and a usage example.
@@ -138,7 +176,6 @@ numeric scale (`p-3`, `w-80`, `gap-2`) already maps to rem, so preferring
 utilities usually removes the temptation entirely.
 
 **How.**
-
 - Reach for a Tailwind utility first — **bare, no `tw:` prefix** (`p-3`, `w-80`,
   `gap-2`). The numeric scale is `0.25rem`-based: `2 → 0.5rem`, `4 → 1rem`, etc.
 - Need an exact value not on the scale? Use a **rem** arbitrary value:
@@ -150,7 +187,7 @@ utilities usually removes the temptation entirely.
   widths, query conditions, canvas/email consumers and a handful more. The list is
   the table in `SKILL.md` §3, enforced by `local/no-hardcoded-px`. If your px is one
   of them, annotate the site — `// eslint-disable-next-line local/no-hardcoded-px --
-<why px is correct here>` — so the reason travels with the code. Any other `px`
+  <why px is correct here>` — so the reason travels with the code. Any other `px`
   — inline, in a style block, or in a class arbitrary value — is a smell.
   In a `<style>` block the directive goes **inside the block** as a CSS comment
   (`/* eslint-disable-next-line local/no-hardcoded-px -- … */`); the rule parses style
@@ -159,7 +196,7 @@ utilities usually removes the temptation entirely.
   there is no allowlist, by design, so that every px keeps a stated reason.
 - **Prefer `eslint-disable-next-line`; use a `disable`/`enable` range only when the
   syntax forces it** (px inside a multi-line opening tag or template literal, where a
-  comment cannot be placed). A range silences _everything_ between its markers, so open
+  comment cannot be placed). A range silences *everything* between its markers, so open
   it directly before the element that owns the px — never before a parent wrapper or
   `<template>` — and close it right after that element's `>`. ESLint does not report an
   unused template directive, so an over-wide range will keep silencing new px forever
@@ -178,7 +215,6 @@ utilities usually removes the temptation entirely.
 
 **What.** Do not add `<style scoped>` blocks. Style layout/spacing with **bare
 Tailwind utility classes** (`flex flex-col gap-4 p-6`). **One thing is banned:**
-
 - ❌ the **`tw:` prefix** — it was removed from this project; `tw:flex` no longer
   resolves. Write `flex`, not `tw:flex`.
 
@@ -199,8 +235,8 @@ a keep-comment:
 ```
 
 Sanctioned tags: `lib-override:<lib>`, `generated-content`, `keyframes`, `print`,
-`scrollbar`, `complex-state`, `brand`, `third-party` — one line stating _why this
-cannot be utilities_. (`keep: <tag>` punctuation also accepted.)
+`scrollbar`, `complex-state`, `brand`, `third-party` — one line stating *why this
+cannot be utilities*. (`keep: <tag>` punctuation also accepted.)
 
 **Comments count as debt too.** The design-consistency counters scan raw file
 text — comments included. A `16px`, a `#fff`, or a `var(--color-*)` written in a
@@ -221,7 +257,6 @@ read the same across every screen. Inline `style` blocks carry no token and beat
 everything — they're the last resort, not the default.
 
 **How.**
-
 - **Layout & spacing**: bare Tailwind utilities on the element:
   ```vue
   <div class="flex flex-col gap-4 p-6">
@@ -266,7 +301,6 @@ token before minting one, and never add a second name for a value that already
 has one — an alias is a decision made twice that silently splits adoption.
 
 **How — using tokens.**
-
 - Prefer **token-backed Tailwind utilities**: `text-text-heading` (titles),
   `text-text-body`, `text-text-secondary`, `text-text-label`, `text-text-muted`,
   `bg-surface-base`, `bg-surface-subtle`, `border-border-default` — theme-aware by
@@ -321,7 +355,6 @@ tokens and variants — a user-facing value lives in one shared place, never
 scattered as a literal at the call site.
 
 **How.**
-
 - `const { t } = useI18n()` in setup; `{{ t('module.key') }}` in templates,
   `t('module.key')` in script. Group keys under a sensible namespace
   (e.g. `notificationChannels.title`).
@@ -336,3 +369,4 @@ scattered as a literal at the call site.
   keys, icon names, CSS/utility classes, and developer-only console logs.
 
 ---
+

@@ -40,7 +40,7 @@
         </div>
 
         <OIcon
-          class="mr-1 cursor-pointer"
+          class="me-1 cursor-pointer"
           size="sm"
           name="close"
           @click="removeMarkLineByIndex(index)"

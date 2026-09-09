@@ -576,7 +576,7 @@ describe("MetricLegends", () => {
 
     it("should render an icon alongside each legend item label", () => {
       // Each legend item must have both an icon and a non-empty text label —
-      // the "mr-2" spacing class is a visual detail handled by CSS, not a
+      // the "me-2" spacing class is a visual detail handled by CSS, not a
       // behavioral assertion.
       const legendItems = wrapper.findAll('[data-test^="metrics-legends-item-"]');
       expect(legendItems.length).toBe(4);

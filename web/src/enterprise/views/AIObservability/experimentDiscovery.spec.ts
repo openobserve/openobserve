@@ -13,42 +13,49 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { beforeEach, describe, expect, it } from "vitest";
-import type { ExperimentDetail } from "@/services/llm-experiments.service";
-import {
-  comparisonEligibility,
-  experimentEvidence,
-  fetchExperimentDetails,
-  groupExperiments,
-  readExperimentBaselines,
-  writeExperimentBaselines,
-} from "./experimentDiscovery";
+import { describe, expect, it } from "vitest";
+import { comparisonEligibility, experimentEvidence, groupExperiments } from "./experimentDiscovery";
 import { makeExperiment } from "./experimentTestFixtures";
 
 const experiment = (id: string, datasetId: string, createdAt: number) =>
   makeExperiment({ id, name: id, datasetId, createdAt });
 
-beforeEach(() => localStorage.clear());
-
 describe("experiment discovery", () => {
+  it("reads cost straight off the row's aggregate summary", () => {
+    const row = makeExperiment({
+      aggregateSummary: {
+        p50LatencyMs: 4511,
+        totalCost: 0.118156603,
+        taskCost: 0.040630363,
+        scoringCost: 0.07752624,
+        costIncomplete: false,
+        incomplete: false,
+        incompleteTaskSlots: 0,
+        incompleteScoreDimensions: 0,
+        errorTaskSlots: 0,
+      },
+    });
+    expect(experimentEvidence(row).cost).toBe(0.118156603);
+  });
+
   it("groups by dataset, keeps filters independent, and pins the baseline first", () => {
     const rows = [
-      experiment("old", "dataset-a", 1),
       experiment("new", "dataset-a", 2),
+      makeExperiment({
+        id: "old",
+        name: "old",
+        datasetId: "dataset-a",
+        createdAt: 1,
+        isBaseline: true,
+      }),
       experiment("other", "dataset-b", 3),
     ];
-    const groups = groupExperiments(
-      rows,
-      new Map([["dataset-a", "Dataset A"]]),
-      { "dataset-a": "old" },
-      "dataset-a",
-      "",
-    );
+    const groups = groupExperiments(rows, new Map([["dataset-a", "Dataset A"]]), "dataset-a", "");
 
     expect(groups).toHaveLength(1);
     expect(groups[0].datasetName).toBe("Dataset A");
     expect(groups[0].experiments.map(({ id }) => id)).toEqual(["old", "new"]);
-    expect(groupExperiments(rows, new Map(), {}, "", "oth")[0].experiments[0].id).toBe("other");
+    expect(groupExperiments(rows, new Map(), "", "oth")[0].experiments[0].id).toBe("other");
   });
 
   it("reports why cross-dataset comparison is unavailable", () => {
@@ -61,83 +68,65 @@ describe("experiment discovery", () => {
     ).toBe(true);
   });
 
-  it("summarizes numeric, boolean, categorical, mixed, and missing score values", () => {
-    const base = experiment("a", "one", 1);
-    const detail = {
-      experiment: base,
-      preview: {
-        datasetId: "one",
-        datasetVersion: 1,
-        rowCount: 2,
-        trialCount: 1,
-        slotCount: 2,
-        pinnedScorers: [],
-        sampleSlots: [],
-      },
-      results: {
-        executions: [
-          {
-            experimentId: "a",
-            itemLogicalId: "one",
-            rowId: "row-1",
-            trialIndex: 0,
-            status: "ok",
-            output: null,
-            errorMessage: null,
-            latencyMs: 1,
-            tokensIn: 1,
-            tokensOut: 1,
-            cost: 0.1,
-            traceId: null,
-            timestamp: 1,
-          },
-          {
-            experimentId: "a",
-            itemLogicalId: "one",
-            rowId: "row-1",
-            trialIndex: 0,
-            status: "ok",
-            output: null,
-            errorMessage: null,
-            latencyMs: 1,
-            tokensIn: 1,
-            tokensOut: 1,
-            cost: 0.2,
-            traceId: null,
-            timestamp: 2,
-          },
-        ],
-        scores: [
-          { name: "quality", value_numeric: 0.5 },
-          { name: "quality", value_numeric: 1 },
-          { name: "quality", value_numeric: null },
-          { name: "approved", value_boolean: true },
-          { name: "approved", value_boolean: false },
-          { name: "approved" },
-          { name: "label", value_categorical: "good" },
-          { name: "label", value_categorical: "good" },
-          { name: "label", value_categorical: "bad" },
-          { name: "mixed", value_numeric: 0.25 },
-          { name: "mixed", value_categorical: "review" },
-          { name: "missing", value_numeric: null, value_boolean: null, value_categorical: null },
-        ],
-      },
-    } satisfies ExperimentDetail;
+  it("reshapes the row's type-aware score summaries for the browse table", () => {
+    const row = makeExperiment({
+      executionProgress: { completed: 1, total: 2, skipped: 0 },
+      scoreSummaries: [
+        {
+          scorerId: "s-quality",
+          scorerVersion: 1,
+          name: "quality",
+          scoreConfigId: null,
+          scoreConfigName: null,
+          scoreConfigVersion: null,
+          sampleCount: 2,
+          errorCount: 0,
+          pendingCount: 0,
+          noReferenceCount: 0,
+          noTraceCount: 0,
+          skippedCount: 0,
+          value: { kind: "numeric", mean: 0.75 },
+        },
+        {
+          scorerId: "s-approved",
+          scorerVersion: 1,
+          name: "approved",
+          scoreConfigId: null,
+          scoreConfigName: null,
+          scoreConfigVersion: null,
+          sampleCount: 2,
+          errorCount: 0,
+          pendingCount: 0,
+          noReferenceCount: 0,
+          noTraceCount: 0,
+          skippedCount: 0,
+          value: { kind: "boolean", trueCount: 1, falseCount: 1 },
+        },
+        {
+          scorerId: "s-label",
+          scorerVersion: 1,
+          name: "label",
+          scoreConfigId: null,
+          scoreConfigName: null,
+          scoreConfigVersion: null,
+          sampleCount: 3,
+          errorCount: 0,
+          pendingCount: 0,
+          noReferenceCount: 0,
+          noTraceCount: 0,
+          skippedCount: 0,
+          value: { kind: "categorical", counts: { good: 2, bad: 1 } },
+        },
+      ],
+    });
 
-    expect(experimentEvidence(detail)).toEqual({
+    expect(experimentEvidence(row)).toEqual({
       completedSlots: 1,
       totalSlots: 2,
-      cost: 0.30000000000000004,
+      cost: null,
       scores: [
         { name: "quality", kind: "numeric", value: 0.75, sampleCount: 2 },
-        { name: "mixed", kind: "numeric", value: 0.25, sampleCount: 1 },
-        {
-          name: "approved",
-          kind: "boolean",
-          trueCount: 1,
-          falseCount: 1,
-          sampleCount: 2,
-        },
+        { name: "approved", kind: "boolean", trueCount: 1, falseCount: 1, sampleCount: 2 },
         {
           name: "label",
           kind: "categorical",
@@ -147,44 +136,7 @@ describe("experiment discovery", () => {
           ],
           sampleCount: 3,
         },
-        {
-          name: "mixed",
-          kind: "categorical",
-          values: [{ value: "review", count: 1 }],
-          sampleCount: 1,
-        },
       ],
     });
-  });
-
-  it("persists one baseline per dataset and tolerates malformed storage", () => {
-    writeExperimentBaselines("acme", { one: "experiment-a" });
-    expect(readExperimentBaselines("acme")).toEqual({ one: "experiment-a" });
-    localStorage.setItem("o2_experiment_baselines_acme", "not-json");
-    expect(readExperimentBaselines("acme")).toEqual({});
-  });
-
-  it("hydrates available details without failing the whole browse surface", async () => {
-    const rows = [experiment("one", "dataset-a", 1), experiment("two", "dataset-a", 2)];
-    const detail = {
-      experiment: rows[0],
-      preview: {
-        datasetId: "dataset-a",
-        datasetVersion: 1,
-        rowCount: 0,
-        trialCount: 1,
-        slotCount: 0,
-        pinnedScorers: [],
-        sampleSlots: [],
-      },
-      results: { executions: [], scores: [] },
-    } satisfies ExperimentDetail;
-
-    const details = await fetchExperimentDetails(rows, async (id) => {
-      if (id === "two") throw new Error("not available");
-      return detail;
-    });
-
-    expect(details).toEqual({ one: detail });
   });
 });

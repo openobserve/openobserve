@@ -190,16 +190,19 @@ describe("PlaygroundVariantHeader — schema", () => {
     PlaygroundSchemaDialog: true,
   };
 
-  function schemaBtn(responseSchema: string | null) {
-    const wrapper = mount(PlaygroundVariantHeader, {
+  function header(responseSchema: string | null, providerId = "openai") {
+    return mount(PlaygroundVariantHeader, {
       props: {
-        variant: { ...emptyVariant("openai", "gpt-4o-mini"), responseSchema },
+        variant: { ...emptyVariant(providerId, "gpt-4o-mini"), responseSchema },
         providers,
         label: "A",
       },
       global: { stubs },
     });
-    return wrapper.get('[data-test^="ai-playground-schema-btn-"]');
+  }
+
+  function schemaBtn(responseSchema: string | null, providerId = "openai") {
+    return header(responseSchema, providerId).get('[data-test^="ai-playground-schema-btn-"]');
   }
 
   it("reads as inactive with no schema set", () => {
@@ -214,5 +217,30 @@ describe("PlaygroundVariantHeader — schema", () => {
     const button = schemaBtn('{"type":"object"}');
     expect(button.classes()).toContain("bg-accent/12!");
     expect(button.attributes("title")).toBe("aiObservability.playground.schemaOn");
+  });
+
+  // The bug this guards: the accent tint read as "in force" on a provider whose
+  // request never carries the schema, and the answer came back as prose with
+  // nothing anywhere to explain why.
+  it("warns instead of reading as on when the provider carries no schema", () => {
+    const button = schemaBtn('{"type":"object"}', "anthropic");
+    expect(button.classes()).toContain("bg-banner-warning-bg!");
+    expect(button.classes()).not.toContain("bg-accent/12!");
+    expect(button.attributes("title")).toBe("aiObservability.playground.schemaIgnored");
+  });
+
+  // Nothing is being dropped until a schema exists to drop.
+  it("stays inactive on such a provider while no schema is set", () => {
+    const button = schemaBtn(null, "anthropic");
+    expect(button.classes()).not.toContain("bg-banner-warning-bg!");
+    expect(button.attributes("title")).toBe("aiObservability.playground.schema");
+  });
+
+  it("tells the dialog which providers drop the schema", () => {
+    const dialog = (providerId: string) =>
+      header('{"type":"object"}', providerId).getComponent({ name: "PlaygroundSchemaDialog" });
+
+    expect(dialog("anthropic").props("dropped")).toBe(true);
+    expect(dialog("openai").props("dropped")).toBe(false);
   });
 });

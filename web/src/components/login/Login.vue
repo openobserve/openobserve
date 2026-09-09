@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             store.state.zoConfig.hasOwnProperty('custom_logo_text') &&
             store.state.zoConfig?.custom_logo_text != ''
           "
-          class="mr-2 w-full cursor-pointer p-0 text-xl font-bold font-semibold"
+          class="me-2 w-full cursor-pointer p-0 text-xl font-bold font-semibold"
           >{{ store.state.zoConfig.custom_logo_text }}</span
         >
         <span class="flex w-full justify-center">

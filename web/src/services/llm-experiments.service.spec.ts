@@ -17,6 +17,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import http from "./http";
 import llmExperimentsService, {
   normalizeExperimentComparison,
+  normalizeExperimentResultRowPage,
   normalizeExperimentRowDetail,
 } from "./llm-experiments.service";
 
@@ -32,7 +33,80 @@ beforeEach(() => {
   mockClient.get.mockResolvedValue({ data: {} });
 });
 
+describe("list()", () => {
+  it("sends the dataset filter with the summary request", async () => {
+    await llmExperimentsService.list("acme", {
+      includeSummary: true,
+      datasetId: "dataset-1",
+    });
+
+    expect(mockClient.get).toHaveBeenCalledWith("/api/acme/experiments", {
+      params: { includeSummary: true, datasetId: "dataset-1" },
+    });
+  });
+
+  it("uses the consolidated summary status while preserving execution status", async () => {
+    mockClient.get.mockResolvedValue({
+      data: {
+        list: [
+          {
+            id: "experiment-1",
+            status: "scoring",
+            executionStatus: "completed",
+            executionStatusReason: "task execution finished",
+          },
+        ],
+      },
+    });
+
+    const [experiment] = await llmExperimentsService.list("acme", {
+      includeSummary: true,
+    });
+
+    expect(experiment).toMatchObject({
+      status: "scoring",
+      executionStatus: "completed",
+      executionStatusReason: "task execution finished",
+    });
+  });
+
+  it("falls back to execution status when summary status is unavailable", async () => {
+    mockClient.get.mockResolvedValue({
+      data: {
+        list: [
+          {
+            id: "experiment-1",
+            status: null,
+            execution_status: "running",
+          },
+        ],
+      },
+    });
+
+    const [experiment] = await llmExperimentsService.list("acme", {
+      includeSummary: true,
+    });
+
+    expect(experiment).toMatchObject({
+      status: "running",
+      executionStatus: "running",
+    });
+  });
+});
+
 describe("llm-experiments compare()", () => {
+  it.each([{ ids: ["cost", "latency"] }, { ids: [] }])(
+    "sends explicit column selections, including none: $ids",
+    async ({ ids }) => {
+      await llmExperimentsService.compare("acme", "base", "cand", 0.15, ids);
+      expect(mockClient.get.mock.calls[0][1].params).toEqual({
+        baselineId: "base",
+        candidateId: "cand",
+        threshold: 0.15,
+        outcomeDimensions: ids.join(","),
+      });
+    },
+  );
   // The server owns the neutral threshold (0.05). Sending a client-side default
   // silently overrides it, and a 0 makes every movement a regression.
   it("omits the threshold entirely when the caller does not pick one", async () => {
@@ -52,7 +126,144 @@ describe("llm-experiments compare()", () => {
   });
 });
 
+describe("get() slot status", () => {
+  it.each([
+    { total_cost: 0.1182, task_cost: 0.0406, scoring_cost: 0.0776, cost_incomplete: true },
+    { totalCost: 0.1182, taskCost: 0.0406, scoringCost: 0.0776, costIncomplete: true },
+  ])("preserves the run cost breakdown: %o", async (aggregate) => {
+    mockClient.get.mockResolvedValue({
+      data: {
+        experiment: { id: "exp-1" },
+        results: { aggregate_summary: aggregate },
+      },
+    });
+    const detail = await llmExperimentsService.get("acme", "exp-1");
+    expect(detail.results.aggregateSummary).toMatchObject({
+      totalCost: 0.1182,
+      taskCost: 0.0406,
+      scoringCost: 0.0776,
+      costIncomplete: true,
+    });
+  });
+
+  it("keeps the server rollup and derives one when the field is absent", async () => {
+    const slot = (extra: Record<string, unknown>) => ({
+      row_id: "r1",
+      logical_id: "c1",
+      trial_index: 0,
+      input: "q",
+      expected_output: null,
+      execution: null,
+      client_scores: [],
+      ...extra,
+    });
+    mockClient.get.mockResolvedValue({
+      data: {
+        experiment: { id: "exp-1", name: "run" },
+        results: {
+          slots: [
+            slot({ status: "score_failed", task_status: "ok", scores: [] }),
+            slot({ task_status: "error", scores: [] }),
+            slot({ task_status: "ok", scores: [{ scorer_id: "s", status: "pending" }] }),
+            slot({ task_status: "ok", scores: [{ scorer_id: "s", status: "success" }] }),
+          ],
+        },
+      },
+    });
+
+    const detail = await llmExperimentsService.get("acme", "exp-1", { resultPage: 1 });
+
+    expect(detail.results.slots?.map((s) => s.status)).toEqual([
+      "score_failed",
+      "task_failed",
+      "scoring",
+      "completed",
+    ]);
+  });
+});
+
+describe("listRows()", () => {
+  it("normalizes row aggregates and sends dispersion ordering", async () => {
+    mockClient.get.mockResolvedValue({
+      data: {
+        rows: [
+          {
+            row_index: 4,
+            row_id: "row-4",
+            logical_id: "case-4",
+            input: "question",
+            trial_count: 3,
+            status: "completed",
+            p50_latency_ms: 840,
+            score_summaries: [
+              {
+                scorer_id: "judge",
+                scorer_version: 2,
+                score_config_name: "answer_quality",
+                value: { kind: "numeric", mean: 0.75 },
+              },
+            ],
+            dispersion: {
+              row_id: "row-4",
+              logical_id: "case-4",
+              max_normalized: 0.42,
+              high: true,
+            },
+          },
+        ],
+        pagination: { page: 1, page_size: 100, total_rows: 1, has_more: false },
+      },
+    });
+
+    const page = await llmExperimentsService.listRows("acme", "exp-1", {
+      page: 1,
+      pageSize: 100,
+      sort: "dispersion_desc",
+      highDispersionOnly: true,
+    });
+
+    expect(mockClient.get).toHaveBeenCalledWith("/api/acme/experiments/exp-1/rows", {
+      params: {
+        page: 1,
+        pageSize: 100,
+        sort: "dispersion_desc",
+        highDispersionOnly: true,
+      },
+    });
+    expect(page.rows[0]).toMatchObject({
+      rowIndex: 4,
+      rowId: "row-4",
+      trialCount: 3,
+      p50LatencyMs: 840,
+      scoreSummaries: [{ scoreConfigName: "answer_quality" }],
+      dispersion: { maxNormalized: 0.42, high: true },
+    });
+    expect(page.pagination).toEqual({ page: 1, pageSize: 100, totalRows: 1, hasMore: false });
+  });
+
+  it("normalizes snake-case row pages directly", () => {
+    expect(
+      normalizeExperimentResultRowPage({ pagination: { total_rows: 0 }, rows: [] }),
+    ).toMatchObject({ pagination: { totalRows: 0 }, rows: [] });
+  });
+});
+
 describe("normalizeExperimentComparison()", () => {
+  it("preserves empty selection and eligibility independently of selected gating", () => {
+    const normalized = normalizeExperimentComparison({
+      outcome_dimensions: [],
+      dimensions: [{ id: "cost", kind: "cost", can_affect_outcome: true, gating: false }],
+    });
+    expect(normalized.outcomeDimensions).toEqual([]);
+    expect(normalized.dimensions[0]).toMatchObject({
+      id: "cost",
+      canAffectOutcome: true,
+      gating: false,
+    });
+    expect(
+      normalizeExperimentComparison({ outcomeDimensions: ["latency"] }).outcomeDimensions,
+    ).toEqual(["latency"]);
+  });
   it("normalizes score-config metadata and aggregate oriented deltas", () => {
     const dimension = {
       name: "internal-producer-id · v1",

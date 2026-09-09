@@ -63,7 +63,7 @@ const silenceMinutes = computed({
     data-test="synthetics-check-alerts"
   >
     <div class="border-border-default flex items-center border-b px-3 py-2.5">
-      <div class="rounded-default bg-accent mr-2 h-4 w-[0.1875rem] shrink-0" />
+      <div class="rounded-default bg-accent me-2 h-4 w-[0.1875rem] shrink-0" />
       <h3 class="text-text-heading text-base font-semibold">
         {{ t("synthetics.scheduleAlert.alerts") }}
       </h3>
@@ -118,7 +118,7 @@ const silenceMinutes = computed({
               data-test="synthetics-check-alerts-cooldown-input"
             />
           </div>
-          <div class="text-text-body flex h-7 items-center justify-center pl-2 text-sm">
+          <div class="text-text-body flex h-7 items-center justify-center ps-2 text-sm">
             {{ t("synthetics.scheduleAlert.minutes") }}
           </div>
         </div>

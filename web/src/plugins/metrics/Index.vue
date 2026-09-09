@@ -135,6 +135,7 @@ import { PanelEditor, type PanelEditorVariablesData } from "@/components/dashboa
 import { saveMetricsStream, restoreMetricsStream } from "@/utils/streamPersist";
 import useDefaultPanelFields from "@/composables/dashboard/useDefaultPanelFields";
 import { useRoute, useRouter } from "vue-router";
+import { useListBackNavigation } from "@/composables/useListBackNavigation";
 import ShareButton from "@/components/common/ShareButton.vue";
 import {
   getMetricsConfig,
@@ -561,23 +562,15 @@ export default defineComponent({
       showAddToDashboardDialog.value = false;
     };
 
-    const goBackToExplorer = () => {
-      const back = router.options?.history?.state?.back;
-      if (
-        typeof back === "string" &&
-        back.startsWith("/metrics") &&
-        !back.startsWith("/metrics/editor")
-      ) {
-        router.back();
-        return;
-      }
-      router.push({
+    const goBackToExplorer = useListBackNavigation({
+      isListPath: (path) => path.startsWith("/metrics") && !path.startsWith("/metrics/editor"),
+      fallback: () => ({
         name: "metrics",
         query: {
           org_identifier: store.state.selectedOrganization?.identifier,
         },
-      });
-    };
+      }),
+    });
 
     // [END] cancel running queries
 

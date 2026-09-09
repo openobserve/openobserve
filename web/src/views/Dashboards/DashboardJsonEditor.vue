@@ -40,7 +40,7 @@
         class="text-status-error-text max-h-50 overflow-y-auto p-3"
       >
         <div class="mb-2 font-bold">{{ t("dashboard.dashboardJsonEditor.pleaseFixIssues") }}</div>
-        <ul class="ml-3">
+        <ul class="ms-3">
           <li v-for="(error, index) in validationErrors" :key="index">
             {{ error }}
           </li>

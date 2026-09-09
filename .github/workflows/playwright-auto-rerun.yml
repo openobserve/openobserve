@@ -35,29 +35,41 @@ jobs:
        github.event.workflow_run.run_attempt == 1)
     steps:
       - name: Debug - Print trigger information
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          WR_ID: ${{ github.event.workflow_run.id }}
+          WR_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          WR_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+          WR_STATUS: ${{ github.event.workflow_run.status }}
+          WR_NAME: ${{ github.event.workflow_run.name }}
+          WR_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          WR_SHA: ${{ github.event.workflow_run.head_sha }}
+          WR_EVENT: ${{ github.event.workflow_run.event }}
+          WR_HEAD_REPO: ${{ github.event.workflow_run.head_repository.full_name }}
+          INPUT_RUN_ID: ${{ inputs.run_id }}
         run: |
           echo "::group::Trigger Information"
-          echo "Event name: ${{ github.event_name }}"
-          echo "Repository: ${{ github.repository }}"
+          echo "Event name: $EVENT_NAME"
+          echo "Repository: $GITHUB_REPOSITORY"
 
-          if [ "${{ github.event_name }}" = "workflow_run" ]; then
-            echo "::notice::🔄 Auto-rerun triggered for branch: ${{ github.event.workflow_run.head_branch }}"
-            echo "Workflow run ID: ${{ github.event.workflow_run.id }}"
-            echo "Workflow run conclusion: ${{ github.event.workflow_run.conclusion }}"
-            echo "Workflow run attempt: ${{ github.event.workflow_run.run_attempt }}"
-            echo "Workflow run status: ${{ github.event.workflow_run.status }}"
-            echo "Workflow name: ${{ github.event.workflow_run.name }}"
-            echo "Branch: ${{ github.event.workflow_run.head_branch }}"
-            echo "Commit: ${{ github.event.workflow_run.head_sha }}"
-            echo "Event type: ${{ github.event.workflow_run.event }}"
+          if [ "$EVENT_NAME" = "workflow_run" ]; then
+            echo "::notice::🔄 Auto-rerun triggered for branch: $WR_BRANCH"
+            echo "Workflow run ID: $WR_ID"
+            echo "Workflow run conclusion: $WR_CONCLUSION"
+            echo "Workflow run attempt: $WR_ATTEMPT"
+            echo "Workflow run status: $WR_STATUS"
+            echo "Workflow name: $WR_NAME"
+            echo "Branch: $WR_BRANCH"
+            echo "Commit: $WR_SHA"
+            echo "Event type: $WR_EVENT"
 
             # For PR events, extract PR number from head_branch (format: refs/pull/123/merge or branch name)
-            if [ "${{ github.event.workflow_run.event }}" = "pull_request" ]; then
+            if [ "$WR_EVENT" = "pull_request" ]; then
               echo "::notice::📋 Triggered by PR event"
-              echo "PR Head Repo: ${{ github.event.workflow_run.head_repository.full_name }}"
+              echo "PR Head Repo: $WR_HEAD_REPO"
             fi
           else
-            echo "Manual run_id input: ${{ inputs.run_id }}"
+            echo "Manual run_id input: $INPUT_RUN_ID"
           fi
           echo "::endgroup::"
 
@@ -87,16 +99,19 @@ jobs:
         env:
           GH_REPO: ${{ github.repository }}
           GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          WR_ID: ${{ github.event.workflow_run.id }}
+          INPUT_RUN_ID: ${{ inputs.run_id }}
         run: |
           echo "::group::Determining workflow run ID"
 
           # Determine run ID based on trigger type
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            RUN_ID=${{ inputs.run_id }}
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            RUN_ID="$INPUT_RUN_ID"
             echo "::notice::Manual trigger mode"
             echo "::notice::Run ID from input: $RUN_ID"
           else
-            RUN_ID=${{ github.event.workflow_run.id }}
+            RUN_ID="$WR_ID"
             echo "::notice::Automatic trigger mode (workflow_run)"
             echo "::notice::Run ID from workflow_run event: $RUN_ID"
           fi
@@ -106,7 +121,7 @@ jobs:
           # Verify the run exists and get its details
           echo "::group::Fetching workflow run details"
 
-          RUN_INFO=$(gh run view $RUN_ID --repo $GH_REPO --json conclusion,status,databaseId,attempt,event 2>&1)
+          RUN_INFO=$(gh run view "$RUN_ID" --repo "$GH_REPO" --json conclusion,status,databaseId,attempt,event 2>&1)
 
           if [ $? -ne 0 ]; then
             echo "::error::Failed to fetch run information for run ID $RUN_ID"
@@ -135,7 +150,7 @@ jobs:
             exit 1
           fi
 
-          if [ "$CONCLUSION" != "failure" ] && [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
+          if [ "$CONCLUSION" != "failure" ] && [ "$EVENT_NAME" != "workflow_dispatch" ]; then
             echo "::warning::Workflow did not fail (conclusion: $CONCLUSION). Skipping rerun."
             echo "::notice::This is expected if the workflow succeeded or was cancelled manually."
             exit 0
@@ -148,7 +163,7 @@ jobs:
           echo "::group::Triggering workflow rerun"
           echo "::notice::Executing: gh run rerun $RUN_ID --failed --repo $GH_REPO"
 
-          RERUN_OUTPUT=$(gh run rerun $RUN_ID --failed --repo $GH_REPO 2>&1)
+          RERUN_OUTPUT=$(gh run rerun "$RUN_ID" --failed --repo "$GH_REPO" 2>&1)
           RERUN_EXIT_CODE=$?
 
           if [ $RERUN_EXIT_CODE -eq 0 ]; then

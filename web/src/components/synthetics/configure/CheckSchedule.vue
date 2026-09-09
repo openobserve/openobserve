@@ -237,7 +237,7 @@ const startTime = computed({
 <template>
   <div class="rounded-default border-border-default mb-4 border">
     <div class="border-border-default flex items-center border-b px-3 py-2.5">
-      <div class="rounded-default bg-accent mr-2 h-4 w-[0.1875rem] shrink-0" />
+      <div class="rounded-default bg-accent me-2 h-4 w-[0.1875rem] shrink-0" />
       <h3 class="text-text-heading text-base font-semibold">
         {{ t("synthetics.scheduleAlert.schedule") }}
       </h3>
@@ -305,7 +305,7 @@ const startTime = computed({
         <div>
           <div class="text-text-secondary mb-1 font-bold">
             {{ t("synthetics.scheduleAlert.cronExpression") }}
-            <OIcon name="info" size="sm" class="text-text-muted ml-1 cursor-pointer">
+            <OIcon name="info" size="sm" class="text-text-muted ms-1 cursor-pointer">
               <OTooltip side="right" align="center">
                 <template #content>
                   <span style="font-size: var(--text-sm); white-space: pre-line">

@@ -240,6 +240,24 @@ describe("usePanelDrilldown", () => {
     expect(api.drilldownAllColumns.value).toBe(false);
   });
 
+  it("still resolves drillable columns when the WHERE clause is deeply nested", async () => {
+    // Regression: astify() is exponential in WHERE nesting, so a builder-generated
+    // predicate like this used to block the main thread for minutes on mount.
+    let where = `"c0" = 'v0'`;
+    for (let i = 1; i < 22; i++) where = `(${where} AND "c${i}" = 'v${i}')`;
+    const deps = makeTableDeps(
+      `select service, count(*) as cnt from logs where ${where} group by service`,
+    );
+
+    const started = Date.now();
+    const api = usePanelDrilldown(deps as any);
+    await flush(() => api.drilldownColumnAliases.value.length > 0);
+
+    expect(api.drilldownColumnAliases.value).toContain("service");
+    expect(api.drilldownColumnAliases.value).not.toContain("cnt");
+    expect(Date.now() - started).toBeLessThan(5000);
+  });
+
   it("treats SELECT * / dynamic-columns tables as all-columns drillable", async () => {
     const deps = makeTableDeps("select * from logs");
     const api = usePanelDrilldown(deps as any);

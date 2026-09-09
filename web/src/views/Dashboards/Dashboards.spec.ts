@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { shallowMount } from "@vue/test-utils";
+import { shallowMount, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
 import Dashboards from "./Dashboards.vue";
 import { createStore } from "vuex";
@@ -726,6 +726,20 @@ describe("Dashboards.vue", () => {
       await settle();
 
       expect(wrapper.vm.activeFolderId).toBe("__favorites__");
+    });
+
+    it("restores the page from the URL and keeps it there after the landing decision's own URL sync", async () => {
+      await router.push({ path: "/dashboards", query: { folder: "default", page: "3" } });
+      wrapper = shallowMount(Dashboards, {
+        global: buildGlobalConfig(storeWithTwo(), router, i18n),
+      });
+      await settle();
+      await flushPromises();
+      await settle();
+
+      expect(wrapper.vm.currentPage).toBe(3);
+      // The folder-switch watcher rewrites the URL as part of landing — it must not drop `page` while doing so.
+      expect(router.currentRoute.value.query.page).toBe("3");
     });
 
     it("toggleFavorite persists the per-user setting resolved to the active folder", async () => {

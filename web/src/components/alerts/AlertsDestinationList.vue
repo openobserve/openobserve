@@ -41,7 +41,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="alert-destination-list-add-alert-btn"
           variant="primary"
           size="sm"
-          icon-left="add"
           :disabled="!templates.length"
           @click="editDestination(null)"
           >{{ t(`alert_destinations.add`) }}</OButton
@@ -49,6 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <div class="bg-card-glass-bg min-h-0 flex-1">
         <OTable
+          ref="oTableRef"
           data-test="alert-destinations-list-table"
           :data="visibleRows"
           :columns="columns"
@@ -59,6 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           pagination="client"
           :page-size="20"
           :page-size-options="[5, 10, 20, 50, 100]"
+          :current-page="currentPage"
           :footer-title="t('alert_destinations.header')"
           sorting="client"
           :default-columns="false"
@@ -68,6 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           show-index
           :show-global-filter="false"
           @update:selected-ids="handleSelectedIdsUpdate"
+          @update:current-page="onPageChange"
         >
           <template #toolbar>
             <div class="flex w-full items-center gap-2">
@@ -309,7 +311,7 @@ import destinationService from "@/services/alert_destination";
 import { templatesQuery } from "@/services/alert_templates.queries";
 import { useStore } from "vuex";
 import ConfirmDialog from "../ConfirmDialog.vue";
-import { useRouter } from "vue-router";
+import { useRouter, useRoute } from "vue-router";
 import type { DestinationPayload } from "@/ts/interfaces";
 import { usePrebuiltDestinations } from "@/composables/usePrebuiltDestinations";
 import type { Template } from "@/ts/interfaces/index";
@@ -459,9 +461,19 @@ export default defineComponent({
     const showDestinationEditor = ref(false);
     const showImportDestination = ref(false);
     const router = useRouter();
+    const route = useRoute();
     const filterQuery = ref("");
     const resultTotal = ref(0);
     const deletingDestinations = ref(new Set<string>());
+    const oTableRef: any = ref(null);
+
+    // URL-synced so returning from add/edit/import (Back/Update/Cancel) lands on the same page instead of resetting to page 1.
+    const currentPage = ref(Number(route.query.page) || 1);
+    const onPageChange = (page: number) => {
+      currentPage.value = page;
+      if (String(route.query.page ?? "1") === String(page)) return;
+      router.replace({ query: { ...route.query, page: String(page) } });
+    };
 
     const selectedDestinationIds = computed(() =>
       selectedDestinations.value.map((d: any) => d.name),
@@ -530,6 +542,17 @@ export default defineComponent({
     };
 
     const loading = ref(false);
+    // The first real load lands after mount and races TanStack's own auto-reset-on-data-change, which resolves through its own deferred microtask queue — setTimeout(0) runs strictly after that queue drains, so the restored page reliably wins.
+    watch(
+      loading,
+      (isLoading) => {
+        if (isLoading) return;
+        setTimeout(() => {
+          oTableRef.value?.table?.setPageIndex(currentPage.value - 1);
+        }, 0);
+      },
+      { once: true },
+    );
     // Request in flight with rows still on screen — the refresh button's
     // spinner. `loading` is the skeleton, for a cold read only.
     const fetching = ref(false);
@@ -625,9 +648,11 @@ export default defineComponent({
       toggleDestinationEditor();
       resetEditingDestination();
       if (!destination) {
+        const { name: _name, ...restQuery } = router.currentRoute.value.query;
         router.push({
           name: "alertDestinations",
           query: {
+            ...restQuery,
             action: "add",
             org_identifier: store.state.selectedOrganization.identifier,
           },
@@ -637,6 +662,7 @@ export default defineComponent({
         router.push({
           name: "alertDestinations",
           query: {
+            ...router.currentRoute.value.query,
             action: "update",
             name: destination.name,
             org_identifier: store.state.selectedOrganization.identifier,
@@ -687,13 +713,16 @@ export default defineComponent({
     };
     const toggleDestinationEditor = () => {
       showDestinationEditor.value = !showDestinationEditor.value;
-      if (!showDestinationEditor.value)
+      if (!showDestinationEditor.value) {
+        const { action: _action, name: _name, ...restQuery } = router.currentRoute.value.query;
         router.push({
           name: "alertDestinations",
           query: {
+            ...restQuery,
             org_identifier: store.state.selectedOrganization.identifier,
           },
         });
+      }
     };
     const filterData = (rows: any, terms: any) => {
       var filtered = [];
@@ -730,9 +759,11 @@ export default defineComponent({
     };
     const importDestination = () => {
       showImportDestination.value = true;
+      const { name: _name, ...restQuery } = router.currentRoute.value.query;
       router.push({
         name: "alertDestinations",
         query: {
+          ...restQuery,
           action: "import",
           org_identifier: store.state.selectedOrganization.identifier,
         },
@@ -956,6 +987,9 @@ export default defineComponent({
       getPrebuiltTypeName,
       getCustomDestinationLabel,
       isDefaultPrebuiltTemplate,
+      oTableRef,
+      currentPage,
+      onPageChange,
     };
   },
 });

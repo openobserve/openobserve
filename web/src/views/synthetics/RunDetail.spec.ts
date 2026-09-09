@@ -518,3 +518,69 @@ describe("RunDetail — per-step page activity", () => {
     w.unmount();
   });
 });
+
+describe("RunDetail — id-less error override (quota / reaper rows)", () => {
+  let w: VueWrapper;
+
+  const overrideError = {
+    errorSource: "quota",
+    message: "the organization's included synthetics steps are exhausted, so this run was skipped",
+    timestamp: 1_700_000_000_000,
+    location: "aws-us-east-1",
+    browser: "chromium",
+    device: "desktop",
+  };
+
+  afterEach(() => {
+    w?.unmount();
+    vi.clearAllMocks();
+    mockLoading.value = false;
+  });
+
+  it("renders the error banner from the row and issues NO per-execution query", async () => {
+    mockRunDetailRef.value = null; // nothing fetched — the row has no ids
+    mockFetchRun.mockClear();
+    w = mountComponent({ drawerMode: true, overrideMonitorType: "browser", overrideError });
+    await flushPromises();
+
+    expect(w.find('[data-test="synthetics-run-detail-steps-error-banner"]').exists()).toBe(true);
+    expect(mockFetchRun).not.toHaveBeenCalled();
+  });
+
+  it("shows the quota source label and its FE explanation", async () => {
+    mockRunDetailRef.value = null;
+    w = mountComponent({ drawerMode: true, overrideMonitorType: "browser", overrideError });
+    await flushPromises();
+
+    expect(w.find('[data-test="synthetics-run-detail-error-source"]').text()).toBe(
+      "synthetics.runDetail.errorSourceQuota",
+    );
+    expect(w.find('[data-test="synthetics-run-detail-error-desc"]').text()).toBe(
+      "synthetics.runDetail.errorSourceQuotaDesc",
+    );
+  });
+
+  it("shows a source label but no explanation for a non-quota source", async () => {
+    mockRunDetailRef.value = null;
+    w = mountComponent({
+      drawerMode: true,
+      overrideMonitorType: "browser",
+      overrideError: { ...overrideError, errorSource: "dispatch" },
+    });
+    await flushPromises();
+
+    expect(w.find('[data-test="synthetics-run-detail-error-source"]').text()).toBe(
+      "synthetics.runDetail.errorSourceDispatch",
+    );
+    expect(w.find('[data-test="synthetics-run-detail-error-desc"]').exists()).toBe(false);
+  });
+
+  it("renders the error view even for a protocol monitor type (skips ProtocolRunSummary)", async () => {
+    mockRunDetailRef.value = null;
+    w = mountComponent({ drawerMode: true, overrideMonitorType: "http", overrideError });
+    await flushPromises();
+
+    expect(w.find('[data-test="protocol-run-summary-stub"]').exists()).toBe(false);
+    expect(w.find('[data-test="synthetics-run-detail-steps-error-banner"]').exists()).toBe(true);
+  });
+});

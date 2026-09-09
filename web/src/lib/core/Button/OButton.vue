@@ -93,6 +93,13 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "focus-visible:ring-3 focus-visible:ring-button-destructive-hover",
     "disabled:opacity-60",
   ].join(" "),
+  "filter-exclude": [
+    "bg-error-500 text-button-destructive-foreground border-0",
+    "enabled:hover:bg-error-600",
+    "enabled:active:bg-error-600",
+    "focus-visible:ring-3 focus-visible:ring-error-600",
+    "disabled:opacity-60",
+  ].join(" "),
   "ghost-warning": [
     "bg-transparent text-button-ghost-warning-text border-0",
     "enabled:hover:bg-button-ghost-warning-hover-bg",
@@ -124,6 +131,16 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "enabled:active:bg-button-ghost-destructive-active-bg",
     "focus-visible:ring-3 focus-visible:ring-button-ghost-destructive-focus-ring",
     "disabled:opacity-50",
+  ].join(" "),
+  // Stop a running operation (query/task in flight) — distinct from
+  // destructive (delete/danger). No dedicated hover/active token yet, so
+  // states are opacity-derived from the one cancel-query-bg color.
+  "cancel-query": [
+    "bg-cancel-query-bg text-button-primary-foreground border-0",
+    "enabled:hover:opacity-90",
+    "enabled:active:opacity-80",
+    "focus-visible:ring-3 focus-visible:ring-cancel-query-bg",
+    "disabled:opacity-60",
   ].join(" "),
   // Panel collapse: ghost muted — for sidebar panel header collapse/expand.
   // Transparent bg, muted icon color, subtle hover. Blends into header without visual weight.

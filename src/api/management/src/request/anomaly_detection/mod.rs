@@ -24,6 +24,8 @@ pub use openobserve_core::anomaly_detection::{
     CreateAnomalyConfigRequest, UpdateAnomalyConfigRequest,
 };
 use openobserve_core::auth::UserEmail;
+#[cfg(feature = "enterprise")]
+use openobserve_core::auth::check_folder_write_permissions;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -150,6 +152,7 @@ fn resolve_owner(owner: Option<String>, fallback: &str) -> Option<String> {
     responses(
         (status = 201, description = "Created", content_type = "application/json", body = AnomalyConfigResponse),
         (status = 400, description = "Bad Request", content_type = "application/json", body = MetaHttpResponse),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = MetaHttpResponse),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = MetaHttpResponse),
     ),
     request_body(
@@ -168,6 +171,14 @@ pub async fn create_config(
         return resp;
     }
     req.owner = resolve_owner(req.owner, &user_email.user_id);
+    // The route gate resolves `?folder=`; this body folder is what actually gets written.
+    #[cfg(feature = "enterprise")]
+    if let Some(folder) = req.folder_id.as_deref().filter(|f| !f.is_empty())
+        && !check_folder_write_permissions(&org_id, &user_email.user_id, "alert_folders", folder)
+            .await
+    {
+        return MetaHttpResponse::forbidden("Unauthorized Access");
+    }
     match anomaly_service::create_config(&org_id, req).await {
         Ok(config) => MetaHttpResponse::json(config),
         Err(e) => {
@@ -198,6 +209,7 @@ pub async fn create_config(
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = AnomalyConfigResponse),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = MetaHttpResponse),
         (status = 404, description = "Not Found", content_type = "application/json", body = MetaHttpResponse),
         (status = 400, description = "Bad Request", content_type = "application/json", body = MetaHttpResponse),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = MetaHttpResponse),
@@ -225,6 +237,14 @@ pub async fn update_config(
             o
         }
     });
+    // An update carrying a folder_id is also a move, so the destination needs its own check.
+    #[cfg(feature = "enterprise")]
+    if let Some(folder) = req.folder_id.as_deref().filter(|f| !f.is_empty())
+        && !check_folder_write_permissions(&org_id, &user_email.user_id, "alert_folders", folder)
+            .await
+    {
+        return MetaHttpResponse::forbidden("Unauthorized Access");
+    }
     match anomaly_service::update_config(&org_id, &anomaly_id, req).await {
         Ok(config) => MetaHttpResponse::json(config),
         Err(e) if e.to_string().contains("not found") => {

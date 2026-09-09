@@ -16,35 +16,25 @@
     <div class="min-h-0 flex-1 space-y-5 overflow-auto px-5 py-4">
       <!-- Input and Expected Output come from the dataset row, so they are the
            same on both sides — shown once instead of duplicated per column. -->
-      <section class="flex flex-col gap-1.5">
-        <div class="flex min-h-8 items-center gap-2">
-          <h4 class="text-compact text-text-heading m-0 font-semibold">
-            {{ t("aiObservability.experiments.comparePage.rowDrawer.input") }}
-          </h4>
-          <OTag
-            size="sm"
-            icon=""
-            variant="default-soft"
-            :label="t('aiObservability.experiments.comparePage.rowDrawer.fromDataset')"
-          />
-        </div>
-        <ContentBox :value="sharedInput" data-test="ai-experiment-comparison-input" />
-      </section>
+      <ContentBox
+        ref="inputBoxRef"
+        :label="t('aiObservability.experiments.comparePage.rowDrawer.input')"
+        :tag-label="t('aiObservability.experiments.comparePage.rowDrawer.fromDataset')"
+        :value="sharedInput"
+        :fullscreen="fullscreenEl === inputBoxRef?.rootEl"
+        data-test="ai-experiment-comparison-input"
+        @toggle-fullscreen="toggle"
+      />
 
-      <section class="flex flex-col gap-1.5">
-        <div class="flex min-h-8 items-center gap-2">
-          <h4 class="text-compact text-text-heading m-0 font-semibold">
-            {{ t("aiObservability.experiments.comparePage.rowDrawer.expectedOutput") }}
-          </h4>
-          <OTag
-            size="sm"
-            icon=""
-            variant="default-soft"
-            :label="t('aiObservability.experiments.comparePage.rowDrawer.fromDataset')"
-          />
-        </div>
-        <ContentBox :value="sharedExpected" data-test="ai-experiment-comparison-expected" />
-      </section>
+      <ContentBox
+        ref="expectedBoxRef"
+        :label="t('aiObservability.experiments.comparePage.rowDrawer.expectedOutput')"
+        :tag-label="t('aiObservability.experiments.comparePage.rowDrawer.fromDataset')"
+        :value="sharedExpected"
+        :fullscreen="fullscreenEl === expectedBoxRef?.rootEl"
+        data-test="ai-experiment-comparison-expected"
+        @toggle-fullscreen="toggle"
+      />
 
       <section class="flex flex-col gap-1.5">
         <div class="flex min-h-8 flex-wrap items-center justify-between gap-2">
@@ -69,19 +59,17 @@
         </div>
 
         <div class="grid gap-3 lg:grid-cols-2">
-          <div
+          <ContentBox
             v-for="side in sides"
             :key="side.key"
-            class="flex min-w-0 flex-col gap-1.5"
-            :data-test="`ai-experiment-comparison-${side.key}`"
-          >
-            <span class="text-2xs text-text-tertiary font-semibold">{{ side.label }}</span>
-            <ContentBox
-              :value="side.output"
-              :absent="!side.detail"
-              :data-test="`ai-experiment-comparison-${side.key}-output`"
-            />
-          </div>
+            :ref="(el) => setOutputBoxRef(side.key, el)"
+            :label="side.label"
+            :value="side.output"
+            :absent="!side.detail"
+            :fullscreen="fullscreenEl === outputBoxRefs[side.key]?.rootEl"
+            :data-test="`ai-experiment-comparison-${side.key}-output`"
+            @toggle-fullscreen="toggle"
+          />
         </div>
       </section>
 
@@ -146,6 +134,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
+import { useFullscreenBox } from "@/composables/useFullscreenBox";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
@@ -189,6 +178,19 @@ defineEmits<{ "update:open": [open: boolean]; step: [direction: -1 | 1] }>();
 const { t } = useI18nTyped();
 
 const activeTrialIndex = ref(0);
+
+// One fullscreen slot shared by all four boxes (Input, Expected Output,
+// Baseline, Candidate) — the Fullscreen API only ever has a single fullscreen
+// element, so each box compares itself against the SAME ref rather than
+// carrying its own boolean.
+const { fullscreenEl, toggle } = useFullscreenBox();
+const inputBoxRef = ref<InstanceType<typeof ContentBox> | null>(null);
+const expectedBoxRef = ref<InstanceType<typeof ContentBox> | null>(null);
+const outputBoxRefs = ref<Record<string, InstanceType<typeof ContentBox> | null>>({});
+
+function setOutputBoxRef(key: string, el: unknown) {
+  outputBoxRefs.value[key] = el as InstanceType<typeof ContentBox> | null;
+}
 
 const bucketLabel = computed(() => raw(props.row?.bucket));
 

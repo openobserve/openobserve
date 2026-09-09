@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { createStore } from "vuex";
 import i18n from "@/locales";
@@ -498,6 +498,104 @@ describe("EnrichmentTableList", () => {
       ];
 
       expect(vm.selectedEnrichmentTableIds).toEqual(["table_a", "table_b"]);
+    });
+  });
+
+  // ── page persistence across editor round trip (OTable pagination-reset fix) ─
+
+  describe("page persistence across editor round trip (OTable pagination-reset fix)", () => {
+    // 45 rows / pageSize 20 gives 3 pages, so page 3 is a real target to restore.
+    const manyTables = {
+      list: Array.from({ length: 45 }, (_, i) => ({
+        name: `table${i + 1}`,
+        stream_type: "enrichment_tables",
+        stats: { doc_num: 10, storage_size: 1, compressed_size: 0.5 },
+      })),
+    };
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("starts loading=true before the initial fetch resolves", () => {
+      mockGetStreams.mockResolvedValue(manyTables);
+      const wrapper = mountComponent();
+      expect((wrapper.vm as any).loading).toBe(true);
+    });
+
+    it("defaults currentPage to 1", async () => {
+      mockGetStreams.mockResolvedValue(manyTables);
+      const wrapper = mountComponent();
+      await flushPromises();
+      expect((wrapper.vm as any).currentPage).toBe(1);
+    });
+
+    it("onPageChange updates currentPage", async () => {
+      mockGetStreams.mockResolvedValue(manyTables);
+      const wrapper = mountComponent();
+      await flushPromises();
+      const vm = wrapper.vm as any;
+      vm.onPageChange(3);
+      expect(vm.currentPage).toBe(3);
+    });
+
+    it("restorePageIndex reasserts the page via a macrotask (setTimeout(0))", async () => {
+      mockGetStreams.mockResolvedValue(manyTables);
+      const wrapper = mountComponent();
+      await flushPromises();
+      vi.useFakeTimers();
+      const vm = wrapper.vm as any;
+      vm.currentPage = 3;
+      const setPageIndex = vi.fn();
+      vm.oTableRef = { table: { setPageIndex } };
+
+      vm.restorePageIndex();
+      expect(setPageIndex).not.toHaveBeenCalled();
+
+      vi.runAllTimers();
+      expect(setPageIndex).toHaveBeenCalledWith(2);
+    });
+
+    it("keeps the page after Cancel unmounts and remounts OTable via the AddEnrichmentTable v-if swap", async () => {
+      mockGetStreams.mockResolvedValue(manyTables);
+      const wrapper = mountComponent();
+      await flushPromises();
+      const vm = wrapper.vm as any;
+
+      vm.onPageChange(3);
+      await flushPromises();
+      expect(vm.oTableRef.table.getState().pagination.pageIndex).toBe(2);
+
+      vm.showAddJSTransformDialog = true;
+      await flushPromises();
+      expect(vm.oTableRef).toBeNull();
+
+      vm.hideForm();
+      await flushPromises();
+
+      expect(vm.oTableRef.table.getState().pagination.pageIndex).toBe(2);
+    });
+
+    it("keeps the page after Save triggers an async refetch that races TanStack's own reset", async () => {
+      mockGetStreams.mockResolvedValue(manyTables);
+      const wrapper = mountComponent();
+      await flushPromises();
+      const vm = wrapper.vm as any;
+
+      vm.onPageChange(3);
+      await flushPromises();
+      expect(vm.oTableRef.table.getState().pagination.pageIndex).toBe(2);
+
+      vm.showAddJSTransformDialog = true;
+      await flushPromises();
+
+      mockGetStreams.mockResolvedValue(manyTables);
+      vm.refreshList();
+      await flushPromises();
+      // flush the setTimeout(0) macrotask that restorePageIndex scheduled
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(vm.oTableRef.table.getState().pagination.pageIndex).toBe(2);
     });
   });
 

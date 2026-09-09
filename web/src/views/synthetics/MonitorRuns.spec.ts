@@ -536,10 +536,11 @@ describe("MonitorRuns", () => {
   });
 
   describe("KPI tiles", () => {
-    it("should render six tiles and neither Degraded nor Unstable Slices", () => {
+    it("should render seven tiles including Error Runs, and neither Degraded nor Unstable Slices", () => {
       wrapper = mountRuns();
 
-      expect(wrapper.findAll('[data-test^="monitor-runs-kpi-"]')).toHaveLength(6);
+      expect(wrapper.findAll('[data-test^="monitor-runs-kpi-"]')).toHaveLength(7);
+      expect(wrapper.find('[data-test="monitor-runs-kpi-error-runs"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="monitor-runs-kpi-degraded-runs"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="monitor-runs-kpi-unstable-partitions"]').exists()).toBe(
         false,

@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <template #header-right>
       <div class="flex items-center">
-        <span class="legend-count mr-3 text-sm" data-test="dashboard-show-legends-count">
+        <span class="legend-count me-3 text-sm" data-test="dashboard-show-legends-count">
           {{ t("dashboard.totalLegends", { count: legends.length }) }}
         </span>
         <OButton
@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <div class="flex w-full flex-nowrap items-center">
               <div
-                class="rounded-default mr-2.5 h-3 w-5 shrink-0"
+                class="rounded-default me-2.5 h-3 w-5 shrink-0"
                 :style="{ backgroundColor: legend.color || DEFAULT_LEGEND_COLOR }"
               ></div>
               <div
@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 variant="ghost"
                 size="icon"
-                class="ml-1 shrink-0 opacity-0 transition-opacity duration-200 ease-in-out group-hover:opacity-100"
+                class="ms-1 shrink-0 opacity-0 transition-opacity duration-200 ease-in-out group-hover:opacity-100"
                 data-test="dashboard-legend-copy-btn"
                 :data-copied="isLegendCopied(Number(index)) ? 'true' : undefined"
                 @click.stop="copyLegend(legend.name, Number(index))"

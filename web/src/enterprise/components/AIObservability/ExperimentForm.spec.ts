@@ -70,7 +70,7 @@ const scorer = {
 };
 
 const provider = {
-  id: "pr-1",
+  id: "pe-1",
   name: "Production OpenAI",
   providerType: "openai",
   availableModels: ["gpt-4o"],
@@ -115,7 +115,7 @@ async function createWrapper() {
 function fillValid(w: any) {
   setField(w, "name", "prompt v4 probe");
   setField(w, "datasetId", "ds-1");
-  setField(w, "providerId", "pr-1");
+  setField(w, "providerId", "pe-1");
   setField(w, "userPrompt", "{{ input }}");
   setField(w, "scorerIds", ["sc-1"]);
 }
@@ -171,7 +171,7 @@ describe("ExperimentForm", () => {
     await submit(wrapper);
     expect(llmExperimentsService.create).not.toHaveBeenCalled();
 
-    setField(wrapper, "providerId", "pr-1");
+    setField(wrapper, "providerId", "pe-1");
     setField(wrapper, "userPrompt", "   ");
     await submit(wrapper);
     expect(llmExperimentsService.create).not.toHaveBeenCalled();
@@ -341,7 +341,7 @@ describe("ExperimentForm", () => {
   it("shows the resolved provider endpoint once a provider is chosen", async () => {
     wrapper = await createWrapper();
     expect(wrapper.find('[data-test="ai-experiment-form-provider-summary"]').exists()).toBe(false);
-    setField(wrapper, "providerId", "pr-1");
+    setField(wrapper, "providerId", "pe-1");
     await flushPromises();
     const summary = wrapper.find('[data-test="ai-experiment-form-provider-summary"]');
     expect(summary.exists()).toBe(true);
@@ -384,7 +384,7 @@ describe("ExperimentForm — clone", () => {
         { role: "system", content: "You are terse." },
         { role: "user", content: "Summarise {{ input }}" },
       ],
-      providerId: "pr-1",
+      providerId: "pe-1",
       model: "gpt-4o",
       params: { temperature: 0.7 },
     },
@@ -418,7 +418,7 @@ describe("ExperimentForm — clone", () => {
     expect(values.name).toBe("prompt v3 probe (Copy)");
     expect(values.datasetId).toBe("ds-1");
     expect(values.sources).toEqual(["trace"]);
-    expect(values.providerId).toBe("pr-1");
+    expect(values.providerId).toBe("pe-1");
     expect(values.model).toBe("gpt-4o");
     expect(values.systemPrompt).toBe("You are terse.");
     expect(values.userPrompt).toBe("Summarise {{ input }}");

@@ -284,6 +284,7 @@ use crate::{
         synthetics::get_synthetic,
         synthetics::update_synthetic,
         synthetics::delete_synthetic,
+        synthetics::move_synthetics,
         synthetics::set_synthetic_enabled,
         synthetics::run_synthetic_now,
         synthetics::list_locations,
@@ -535,6 +536,7 @@ pub struct ApiDoc;
     openobserve_api_management::request::experiments::list_experiments,
     openobserve_api_management::request::experiments::compare_experiments,
     openobserve_api_management::request::experiments::get_experiment,
+    openobserve_api_management::request::experiments::list_experiment_result_rows,
     openobserve_api_management::request::experiments::get_experiment_row,
     openobserve_api_management::request::experiments::retry_experiment_slot,
     openobserve_api_management::request::experiments::cancel_experiment,
@@ -570,6 +572,9 @@ pub struct ApiDoc;
     openobserve_api_management::request::remote_tasks::end_remote_task_signing_grace,
     openobserve_api_management::request::remote_tasks::revoke_remote_task_signing_secret,
 ))]
+#[openapi(components(schemas(
+    openobserve_api_management::models::experiments::ExperimentResultRowSortBody,
+)))]
 struct EnterpriseExperimentApiDoc;
 
 pub struct SecurityAddon;
@@ -712,5 +717,50 @@ mod experiment_tests {
         );
         assert!(comparison.responses.responses.contains_key("400"));
         assert!(comparison.responses.responses.contains_key("403"));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use utoipa::OpenApi;
+
+    use super::ApiDoc;
+
+    // Handlers that gained a folder-destination authorization check must
+    // advertise the 403 it returns, or clients cannot distinguish it from a bug.
+    // The /{org}/anomaly_detection pair is annotated but enterprise-gated, so it
+    // is absent from this ApiDoc and cannot be asserted from an OSS build.
+    #[test]
+    fn folder_scoped_writes_document_forbidden() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let paths = spec.get("paths").unwrap().as_object().unwrap();
+
+        let cases: &[(&str, &str)] = &[
+            ("/api/v2/{org_id}/alerts", "post"),
+            ("/api/v2/{org_id}/alerts/{alert_id}", "put"),
+            ("/api/v2/{org_id}/alerts/{alert_id}/clone", "post"),
+            ("/api/v2/{org_id}/alerts/move", "patch"),
+            ("/api/{org_id}/slos", "post"),
+            ("/api/{org_id}/slos/{slo_id}", "put"),
+            ("/api/{org_id}/slos/move", "post"),
+            ("/api/{org_id}/synthetics/{id}", "put"),
+            ("/api/v2/{org_id}/synthetics/move", "patch"),
+            ("/api/v2/{org_id}/reports/{report_id}", "put"),
+            ("/api/v2/{org_id}/reports/move", "patch"),
+            ("/api/{org_id}/folders/dashboards/{dashboard_id}", "put"),
+            ("/api/{org_id}/dashboards/move", "patch"),
+        ];
+
+        let mut missing = Vec::new();
+        for (path, method) in cases {
+            let Some(item) = paths.get(*path).and_then(|p| p.get(*method)) else {
+                missing.push(format!("{method} {path}: not found in spec"));
+                continue;
+            };
+            if item.get("responses").and_then(|r| r.get("403")).is_none() {
+                missing.push(format!("{method} {path}: no 403 documented"));
+            }
+        }
+        assert!(missing.is_empty(), "{missing:#?}");
     }
 }

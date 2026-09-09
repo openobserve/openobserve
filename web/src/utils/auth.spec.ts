@@ -59,6 +59,8 @@ import { useLocalUserInfo } from "@/utils/storage";
 
 import {
   trialPeriodAllowedPath,
+  trialPaywallAllowedPath,
+  isTrialExpired,
   getUserInfo,
   invalidateLoginData,
   getDecodedAccessToken,
@@ -103,10 +105,45 @@ afterEach(() => {
 // trialPeriodAllowedPath
 // ---------------------------------------------------------------------------
 
+describe("isTrialExpired", () => {
+  // getDueDays(null) is -20706, so a bare emptiness check misreads null as expired.
+  it.each([
+    ["undefined", undefined],
+    ["null", null],
+    ["empty string", ""],
+    ["zero", 0],
+    ["zero string", "0"],
+    ["NaN", NaN],
+    ["non-numeric", "abc"],
+  ])("treats %s as no trial tracked", (_label, expiry) => {
+    expect(isTrialExpired(expiry)).toBe(false);
+  });
+
+  it("is true only for a past expiry", () => {
+    expect(isTrialExpired((Date.now() - 30 * 24 * 60 * 60 * 1000) * 1000)).toBe(true);
+    expect(isTrialExpired((Date.now() + 14 * 24 * 60 * 60 * 1000) * 1000)).toBe(false);
+  });
+
+  // getDueDays floors, so a trial ending later today scores 0 — the live boundary.
+  it("treats the last day of a trial as expired", () => {
+    expect(isTrialExpired((Date.now() + 6 * 60 * 60 * 1000) * 1000)).toBe(true);
+    expect(isTrialExpired((Date.now() + 25 * 60 * 60 * 1000) * 1000)).toBe(false);
+  });
+
+  it("accepts the numeric string the API sends", () => {
+    expect(isTrialExpired(String((Date.now() - 30 * 24 * 60 * 60 * 1000) * 1000))).toBe(true);
+  });
+});
+
 describe("trialPeriodAllowedPath", () => {
   it("is an array with exactly 4 elements", () => {
     expect(Array.isArray(trialPeriodAllowedPath)).toBe(true);
     expect(trialPeriodAllowedPath).toHaveLength(4);
+  });
+
+  // The empty-data guard reads this list, so "general" must stay out of it.
+  it("does not contain general", () => {
+    expect(trialPeriodAllowedPath).not.toContain("general");
   });
 
   it("contains iam, users, organizations, invitations", () => {
@@ -114,6 +151,18 @@ describe("trialPeriodAllowedPath", () => {
     expect(trialPeriodAllowedPath).toContain("users");
     expect(trialPeriodAllowedPath).toContain("organizations");
     expect(trialPeriodAllowedPath).toContain("invitations");
+  });
+
+  // The Danger Zone lives on /settings/general, so the paywall must let it through.
+  it("trialPaywallAllowedPath adds the settings shell and general", () => {
+    expect(trialPaywallAllowedPath).toContain("general");
+    expect(trialPaywallAllowedPath).toContain("settings");
+    trialPeriodAllowedPath.forEach((p) => expect(trialPaywallAllowedPath).toContain(p));
+  });
+
+  // The empty-data guard reads this list, so the shell must stay out of it.
+  it("does not contain the settings shell in the empty-data list", () => {
+    expect(trialPeriodAllowedPath).not.toContain("settings");
   });
 });
 
@@ -316,6 +365,21 @@ describe("routeGuard", () => {
     vi.mocked(organizationService.get_organization_summary).mockReset();
   });
 
+  // Micros, 30 days past; ingested so the empty-data guard stays out of the way.
+  const buildExpiredTrialStore = () =>
+    buildMockStore({
+      state: {
+        organizationData: {
+          organizationSettings: {
+            free_trial_expiry: (Date.now() - 30 * 24 * 60 * 60 * 1000) * 1000,
+          },
+          isDataIngested: true,
+        },
+        selectedOrganization: { identifier: "my-org" },
+        zoConfig: { restricted_routes_on_empty_data: false },
+      },
+    });
+
   describe("when isCloud is false", () => {
     it("calls next() directly without trial check", async () => {
       (config as any).isCloud = "false";
@@ -349,9 +413,150 @@ describe("routeGuard", () => {
 
       expect(mockNext).toHaveBeenCalledWith(expect.objectContaining({ name: "plans" }));
     });
+
+    // The nav resolves to name "settings", not "general"; paywalling it hides the feature.
+    it("lets the nav settings shell through", async () => {
+      (config as any).isCloud = "true";
+      mockStore = buildExpiredTrialStore();
+      vi.mocked(useStore).mockReturnValue(mockStore as any);
+
+      await routeGuard({ name: "settings", path: "/settings" }, {}, mockNext);
+
+      expect(mockNext).toHaveBeenCalledTimes(1);
+      expect(mockNext).toHaveBeenCalledWith();
+    });
+
+    // An expired trial must not lock an admin out of deleting the org.
+    it("lets the general settings route through", async () => {
+      (config as any).isCloud = "true";
+      mockStore = buildExpiredTrialStore();
+      vi.mocked(useStore).mockReturnValue(mockStore as any);
+
+      await routeGuard({ name: "general", path: "/settings/general" }, {}, mockNext);
+
+      expect(mockNext).toHaveBeenCalledTimes(1);
+      expect(mockNext).toHaveBeenCalledWith();
+    });
+
+    // Sibling settings sections are named explicitly: the shell is exempt, the paid tree is not.
+    it.each([["logs"], ["dashboards"], ["cipherKeys"], ["organizationSettings"]])(
+      "still redirects %s to plans",
+      async (name) => {
+        (config as any).isCloud = "true";
+        mockStore = buildExpiredTrialStore();
+        vi.mocked(useStore).mockReturnValue(mockStore as any);
+
+        await routeGuard({ name, path: `/${name}` }, {}, mockNext);
+
+        expect(mockNext).toHaveBeenCalledWith(expect.objectContaining({ name: "plans" }));
+      },
+    );
+  });
+
+  describe('when isCloud is the string "false" and trial is expired', () => {
+    // isCloud is a string, so a truthiness check would fire on self-hosted too.
+    it("does not redirect a self-hosted build to plans", async () => {
+      (config as any).isCloud = "false";
+      mockStore = buildExpiredTrialStore();
+      vi.mocked(useStore).mockReturnValue(mockStore as any);
+
+      await routeGuard({ name: "logs", path: "/logs" }, {}, mockNext);
+
+      expect(mockNext).not.toHaveBeenCalledWith(expect.objectContaining({ name: "plans" }));
+      expect(mockNext).toHaveBeenCalledWith();
+    });
+  });
+
+  describe("when isCloud is true and trial is not expired", () => {
+    const buildLiveTrialStore = () =>
+      buildMockStore({
+        state: {
+          organizationData: {
+            organizationSettings: {
+              free_trial_expiry: (Date.now() + 14 * 24 * 60 * 60 * 1000) * 1000,
+            },
+            isDataIngested: true,
+          },
+          selectedOrganization: { identifier: "my-org" },
+          zoConfig: { restricted_routes_on_empty_data: false },
+        },
+      });
+
+    it.each(["logs", "general", "dashboard"])("lets %s through", async (name) => {
+      (config as any).isCloud = "true";
+      mockStore = buildLiveTrialStore();
+      vi.mocked(useStore).mockReturnValue(mockStore as any);
+
+      await routeGuard({ name, path: `/${name}` }, {}, mockNext);
+
+      expect(mockNext).toHaveBeenCalledTimes(1);
+      expect(mockNext).toHaveBeenCalledWith();
+    });
+  });
+
+  // A null expiry means no trial is tracked, so the paywall must not fire.
+  it("does not redirect when free_trial_expiry is null", async () => {
+    (config as any).isCloud = "true";
+    mockStore = buildMockStore({
+      state: {
+        organizationData: {
+          organizationSettings: { free_trial_expiry: null },
+          isDataIngested: true,
+        },
+        selectedOrganization: { identifier: "my-org" },
+        zoConfig: { restricted_routes_on_empty_data: false },
+      },
+    });
+    vi.mocked(useStore).mockReturnValue(mockStore as any);
+
+    await routeGuard({ name: "logs", path: "/logs" }, {}, mockNext);
+
+    expect(mockNext).not.toHaveBeenCalledWith(expect.objectContaining({ name: "plans" }));
+    expect(mockNext).toHaveBeenCalledWith();
   });
 
   describe("restricted_routes_on_empty_data guard", () => {
+    const buildNoDataStore = () =>
+      buildMockStore({
+        state: {
+          organizationData: {
+            organizationSettings: { free_trial_expiry: "" },
+            isDataIngested: false,
+          },
+          selectedOrganization: { identifier: "default" },
+          zoConfig: { restricted_routes_on_empty_data: true },
+        },
+      });
+
+    // emptyDataAllowedPaths is what exempts /settings/general here, not the name list.
+    it("lets /settings/general through on a no-data org", async () => {
+      (config as any).isCloud = "false";
+      vi.mocked(organizationService.get_organization_summary).mockResolvedValue({
+        data: { streams: { num_streams: 0 } },
+      });
+      mockStore = buildNoDataStore();
+      vi.mocked(useStore).mockReturnValue(mockStore as any);
+
+      await routeGuard({ name: "general", path: "/settings/general" }, {}, mockNext);
+
+      expect(mockNext).toHaveBeenCalledWith();
+      expect(mockNext).not.toHaveBeenCalledWith({ path: "/ingestion" });
+    });
+
+    // Same name, uncovered path: fails if the name list ever does the exempting.
+    it("does not exempt a general-named route at an uncovered path", async () => {
+      (config as any).isCloud = "false";
+      vi.mocked(organizationService.get_organization_summary).mockResolvedValue({
+        data: { streams: { num_streams: 0 } },
+      });
+      mockStore = buildNoDataStore();
+      vi.mocked(useStore).mockReturnValue(mockStore as any);
+
+      await routeGuard({ name: "general", path: "/settings/organization/general" }, {}, mockNext);
+
+      expect(mockNext).toHaveBeenCalledWith({ path: "/ingestion" });
+    });
+
     it("redirects to /ingestion when num_streams is 0", async () => {
       (config as any).isCloud = "false";
       vi.mocked(organizationService.get_organization_summary).mockResolvedValue({

@@ -79,7 +79,8 @@ read it once, it is the backbone of everything below.
    `<div class="header">…<h1>` or a `q-toolbar`. One header contract keeps the
    title in the same place across list → detail → edit. Peer/section tabs need
    **`tabs-below`** (the slot alone renders them inline beside the title), and the
-   header `icon` must be the SAME `IconName` the page's nav entry declares.
+   header `icon` must be the SAME `IconName` the page's nav entry declares. The
+   header's **create CTA is label-only — never `icon-left="add"`**.
 2. **Build from O2 components in `web/src/lib`** — never a bare HTML control
    (`<button>`, `<input>`) or a third-party UI primitive when an `O*` equivalent
    exists. Drive them by **intent**
@@ -575,13 +576,9 @@ Run this in your head before writing template markup, and again before
 considering the UI done:
 
 - [ ] Page/module header is `OPageHeader` (not a hand-built header bar).
-- [ ] Any data the page reads is a `queryOptions()` in
-      `services/<domain>.queries.ts`, consumed with `useQuery` — not a service
-      call with a hand-rolled `loading` ref. Durations come from
-      `cachePolicy.ts`, never a bare number. Writes are `mutationOptions()`
-      declaring `meta.invalidates`; a component never calls `invalidateQueries`
-      itself. Anything carrying a token or key material omits the `persister`.
-      See [references/data-fetching.md](references/data-fetching.md).
+- [ ] The header's **create CTA is label-only** — no `icon-left="add"`. The `+`
+      stays on in-section adders, icon-only buttons, and never applies to
+      utility actions (Import/Refresh/Edit keep their semantic icons).
 - [ ] Peer/section tabs pass **`tabs-below`** so the strip is the full-width
       row-2 band — the bare `#header-tabs`/`#tabs` slot renders them inline
       beside the title, where they shift as the title's width changes.
@@ -589,6 +586,13 @@ considering the UI done:
       (`navGroups.ts` / `linksList` / `settingsItems` / SectionRail). A module
       showing one glyph in the rail and another in its header reads as two
       places — see [navigation-menus](references/navigation-menus.md#icon-parity).
+- [ ] Any data the page reads is a `queryOptions()` in
+      `services/<domain>.queries.ts`, consumed with `useQuery` — not a service
+      call with a hand-rolled `loading` ref. Durations come from
+      `cachePolicy.ts`, never a bare number. Writes are `mutationOptions()`
+      declaring `meta.invalidates`; a component never calls `invalidateQueries`
+      itself. Anything carrying a token or key material omits the `persister`.
+      See [references/data-fetching.md](references/data-fetching.md).
 - [ ] Every interactive control is an O2 component if one exists in
       `web/src/lib` — no bare HTML controls or third-party primitives with an O2 equivalent.
 - [ ] A self-contained/repeated UI element with no matching component was

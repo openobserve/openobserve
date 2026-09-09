@@ -54,7 +54,7 @@ on:
   pull_request:
     # `labeled` so adding the 'mobile-e2e' label re-fires the run and turns the device jobs on
     # (lets you validate the full Android + iOS suite on a PR before merging).
-    types: [opened, reopened, synchronize, labeled]
+    types: [opened, reopened, synchronize, labeled, ready_for_review, converted_to_draft]
     paths:
       - "tests/mobile-testing/**"
       - ".github/workflows/mobile-sdk-e2e.yml"
@@ -107,6 +107,8 @@ jobs:
   # Self-contained model → no secrets to check.
   # -------------------------------------------------------------------------------------------
   preflight:
+    # Paid CI runs only on PRs carrying the 'ready-for-ci' label; the merge queue runs unit tests on the merged code.
+    if: ${{ github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'ready-for-ci') && github.event.pull_request.draft == false) }}
     name: Preflight & readiness
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -177,7 +179,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       # Which platform's files changed in this PR? (only evaluated for pull_request events)
-      - uses: dorny/paths-filter@v4
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         id: filter
         if: github.event_name == 'pull_request'
         with:
@@ -252,7 +254,10 @@ jobs:
     needs: [preflight, decide]
     if: needs.decide.outputs.run_android == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    # Allow 15 minutes of artifact polling plus setup/API overhead. A recent
+    # cold Playwright build published its pair 55 seconds after the old
+    # 40-attempt window expired, which forced a redundant 36-minute fallback.
+    timeout-minutes: 18
     permissions:
       actions: read
       contents: read
@@ -287,8 +292,9 @@ jobs:
           fi
 
           # When both workflows started for the same PR update, Mobile reaches this
-          # resolver before Playwright finishes its ~3-7 minute build. Wait for that
-          # active run instead of immediately starting a duplicate ~35 minute cold build.
+          # resolver before Playwright publishes its artifact pair. Wait up to
+          # 15 minutes for that active run instead of starting a duplicate
+          # ~35 minute cold build; completed producers still exit early.
           if [ -z "$RUN_ID" ]; then
             PLAYWRIGHT_RUN_ID=$(gh api --method GET \
               "repos/${GITHUB_REPOSITORY}/actions/workflows/playwright.yml/runs?head_sha=${SOURCE_HEAD_SHA}&per_page=20" \
@@ -297,7 +303,7 @@ jobs:
 
             if [ -n "$PLAYWRIGHT_RUN_ID" ]; then
               echo "Waiting for Playwright run $PLAYWRIGHT_RUN_ID to publish exact-SHA artifacts"
-              for _ in $(seq 1 40); do
+              for _ in $(seq 1 60); do
                 READY=$(artifacts_ready "$PLAYWRIGHT_RUN_ID")
                 if [ "$READY" -ge 2 ]; then
                   RUN_ID="$PLAYWRIGHT_RUN_ID"
@@ -341,10 +347,10 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
+      - uses: ./.github/actions/github-auth
+      - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master
         with:
-          shared-key: mobile-e2e-linux-oo-v2
+          toolchain: stable
       - name: Install Protoc
         run: bash ./.github/protoc.sh
       - uses: actions/setup-node@v4
@@ -391,10 +397,10 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
+      - uses: ./.github/actions/github-auth
+      - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master
         with:
-          shared-key: mobile-e2e-macos-oo-v2
+          toolchain: stable
       - name: Install Protoc (macOS)
         run: brew install protobuf || true
       - uses: actions/setup-node@v4
@@ -480,8 +486,7 @@ jobs:
         with: { distribution: temurin, java-version: "17" }
       - uses: actions/setup-node@v4
         with: { node-version: "20" }
-      - uses: gradle/actions/setup-gradle@v6
-
+      - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
       - name: Install Maestro
         run: |
           curl -Ls "https://get.maestro.mobile.dev" | bash
@@ -579,7 +584,7 @@ jobs:
         run: gradle --no-daemon assembleDebug
 
       - name: Boot emulator, install apps, run suite
-        uses: reactivecircus/android-emulator-runner@v2
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
           api-level: 35
           target: google_apis
@@ -658,7 +663,7 @@ jobs:
           esac
 
       # Pin Xcode so a runner-image update can't silently move the toolchain under the alpha SDK.
-      - uses: maxim-lobanov/setup-xcode@v1
+      - uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
         with:
           # Pin 16.4 explicitly: macos-15's 'latest-stable' is now Xcode 26, which dropped the Swift
           # compatibility libs the SDK's static libs force-load → arm64 link error. 16.x still ships them.
@@ -819,7 +824,7 @@ jobs:
   merge_reports:
     name: Merge Reports
     needs: [android, ios]
-    if: always()
+    if: always() && (github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'ready-for-ci') && github.event.pull_request.draft == false))
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:

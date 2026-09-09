@@ -80,6 +80,7 @@ vi.mock("@/composables/useSyntheticsRecorder", () => ({
     stopReplay: mockRecorderStopReplay,
     stopReplayAndForget: vi.fn(),
     registerAutoDetect: vi.fn(),
+    cleanup: vi.fn(),
     isReplaying: { value: false },
     // The capability handshake. Defaulting to "not supported" keeps these tests on the
     // pre-restore path, which is what they were written against — a mock that claimed

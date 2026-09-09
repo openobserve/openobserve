@@ -23,7 +23,6 @@ use config::{
 };
 use hashbrown::{HashMap, HashSet};
 use infra::{cache::file_data, file_list as infra_file_list, schema::get_partition_time_level};
-use metrics_index::MetricsFileLayout;
 use search::datafusion::merge::MergeMode;
 use search_service::file_list;
 use tokio::{
@@ -33,7 +32,7 @@ use tokio::{
 
 use super::{
     job::job_range_end,
-    metrics::{MetricsIndexMergeScope, metrics_index_merge_scope},
+    plan::{BatchLimits, plan_batches},
 };
 use crate::worker::{MergeBatch, MergeSender};
 
@@ -170,95 +169,33 @@ pub async fn merge_by_stream(
                 }
             }
 
-            if files_with_size.len() <= 1 && !mode.merges_whole_batch() {
-                return Ok(vec![]);
-            }
-            // what a closed indexed metrics hour merges, see [`MetricsIndexMergeScope`]
-            if mode.is_metrics_indexed() {
-                match metrics_index_merge_scope(&files_with_size, cfg.compact.max_file_size) {
-                    MetricsIndexMergeScope::Skip => return Ok(vec![]),
-                    MetricsIndexMergeScope::LateFilesOnly => {
-                        files_with_size.retain(|f| {
-                            MetricsFileLayout::of(&f.key) != Some(MetricsFileLayout::Indexed)
-                        });
-                        log::debug!(
-                            "[COMPACTOR] merge_by_stream [{org_id}/{stream_type}/{stream_name}] metrics_indexed late merge of {} files, indexed files untouched",
-                            files_with_size.len()
-                        );
-                    }
-                    MetricsIndexMergeScope::WholeHour => {
-                        log::debug!(
-                            "[COMPACTOR] merge_by_stream [{org_id}/{stream_type}/{stream_name}] metrics_indexed fragmentation cap hit, full rewrite of {} files",
-                            files_with_size.len()
-                        );
-                    }
-                }
-            }
-
-            // group files need to merge
-            let mut batch_groups = Vec::new();
-            if mode.merges_whole_batch() {
-                batch_groups.push(MergeBatch {
-                    batch_id: 0,
-                    org_id: org_id.clone(),
-                    stream_type,
-                    stream_name: stream_name.clone(),
-                    prefix: prefix.clone(),
-                    files: files_with_size.clone(),
-                    mode: mode.clone(),
-                });
-            } else {
-                let mut new_file_list = Vec::new();
-                let mut new_file_size = 0;
-                for file in files_with_size.iter() {
-                    if new_file_size + file.meta.original_size > cfg.compact.max_file_size as i64
-                        || (cfg.compact.max_group_files > 0
-                            && new_file_list.len() >= cfg.compact.max_group_files)
-                    {
-                        if new_file_list.len() <= 1 {
-                            if job_strategy == MergeStrategy::FileSize {
-                                break;
-                            }
-                            new_file_list.clear();
-                            new_file_size = file.meta.original_size;
-                            new_file_list.push(file.clone());
-                            continue; // replace previous file with current file
-                        }
-                        batch_groups.push(MergeBatch {
-                            batch_id: batch_groups.len(),
-                            org_id: org_id.clone(),
-                            stream_type,
-                            stream_name: stream_name.clone(),
-                            prefix: prefix.clone(),
-                            files: new_file_list.clone(),
-                            mode: mode.clone(),
-                        });
-                        new_file_size = 0;
-                        new_file_list.clear();
-                    }
-                    new_file_size += file.meta.original_size;
-                    new_file_list.push(file.clone());
-                }
-                // The trailing batch is always below max_file_size (the loop flushes a group
-                // only when adding the next file would exceed it). In incremental mode we do
-                // NOT seal this remainder: more files will arrive in the still-open hour, and
-                // sealing now would force re-merging it later (write amplification). Carry it
-                // to the next round; the scheduled hour-end pass seals whatever is left.
-                if new_file_list.len() > 1 && !is_incremental {
-                    batch_groups.push(MergeBatch {
-                        batch_id: batch_groups.len(),
-                        org_id: org_id.clone(),
-                        stream_type,
-                        stream_name: stream_name.clone(),
-                        prefix: prefix.clone(),
-                        files: new_file_list.clone(),
-                        mode: mode.clone(),
-                    });
-                }
-
-                if batch_groups.is_empty() {
-                    return Ok(vec![]); // no files need to merge
-                }
+            let limits = BatchLimits {
+                strategy: &job_strategy,
+                max_file_size: cfg.compact.max_file_size,
+                max_group_files: cfg.compact.max_group_files,
+                is_incremental,
+                merge_max_original_size: infra_file_list::merge_max_original_size(),
+            };
+            let batch_groups: Vec<MergeBatch> = plan_batches(
+                files_with_size,
+                &mode,
+                &limits,
+                &format!("{org_id}/{stream_type}/{stream_name}"),
+            )
+            .into_iter()
+            .enumerate()
+            .map(|(batch_id, (files, mode))| MergeBatch {
+                batch_id,
+                org_id: org_id.clone(),
+                stream_type,
+                stream_name: stream_name.clone(),
+                prefix: prefix.clone(),
+                files,
+                mode,
+            })
+            .collect();
+            if batch_groups.is_empty() {
+                return Ok(vec![]); // no files need to merge
             }
 
             // send to worker
@@ -280,7 +217,7 @@ pub async fn merge_by_stream(
             let mut check_guard = HashSet::with_capacity(batch_groups.len());
             let mut orphan_blooms = Vec::new();
             for ret in worker_results {
-                let (batch_id, new_files) = match ret {
+                let (batch_id, new_files, retire_files) = match ret {
                     Ok(v) => v,
                     Err(e) => {
                         log::error!("[COMPACTOR] merge files failed: {e}");
@@ -297,24 +234,11 @@ pub async fn merge_by_stream(
                 }
                 check_guard.insert(batch_id);
 
-                // delete small files keys & write big files keys, use transaction
-                let delete_file_list = batch_groups.get(batch_id).unwrap().files.as_slice();
-                let mut events = Vec::with_capacity(new_files.len() + delete_file_list.len());
-                for new_file in new_files {
-                    if !new_file.key.is_empty() {
-                        events.push(new_file);
-                    }
+                // retire the merged inputs and the gone files, never the planned batch
+                let events = retirement_events(new_files, &retire_files);
+                if events.is_empty() {
+                    continue;
                 }
-
-                for file in delete_file_list {
-                    events.push(FileKey {
-                        deleted: true,
-                        selection: None,
-                        row_group_size: None,
-                        ..file.clone()
-                    });
-                }
-                events.sort_by(|a, b| a.key.cmp(&b.key));
 
                 // write file list to storage
                 if let Err(e) = write_file_list(&org_id, stream_type, &events).await {
@@ -326,13 +250,11 @@ pub async fn merge_by_stream(
                 // drop the merged source files from this node's disk cache;
                 // on nodes that also serve queries they may still be in use
                 if cluster::LOCAL_NODE.is_compactor() && !cluster::LOCAL_NODE.is_querier() {
-                    file_data::delete::add(
-                        delete_file_list.iter().map(|f| f.key.clone()).collect(),
-                    );
+                    file_data::delete::add(retire_files.iter().map(|f| f.key.clone()).collect());
                 }
 
                 // collect orphan blooms after writing file list successfully
-                for file in delete_file_list {
+                for file in &retire_files {
                     if file.meta.bloom_ver > 0 {
                         orphan_blooms.push(file.meta.bloom_ver);
                     }
@@ -467,6 +389,23 @@ async fn write_file_list(
     Ok(())
 }
 
+/// File-list events that add `new_files` and delete `retire_files`; delete-only is valid.
+fn retirement_events(new_files: Vec<FileKey>, retire_files: &[FileKey]) -> Vec<FileKey> {
+    if retire_files.is_empty() {
+        return Vec::new();
+    }
+    let mut events = Vec::with_capacity(new_files.len() + retire_files.len());
+    events.extend(new_files.into_iter().filter(|f| !f.key.is_empty()));
+    events.extend(retire_files.iter().map(|file| FileKey {
+        deleted: true,
+        selection: None,
+        row_group_size: None,
+        ..file.clone()
+    }));
+    events.sort_by(|a, b| a.key.cmp(&b.key));
+    events
+}
+
 /// sort by time range without overlapping
 fn sort_by_time_range(mut file_list: Vec<FileKey>) -> Vec<FileKey> {
     let files_num = file_list.len();
@@ -522,6 +461,44 @@ mod tests {
             selection: None,
             row_group_size: None,
         }
+    }
+
+    #[test]
+    fn test_retirement_events_empty_retire_files_produces_nothing() {
+        let new_files = vec![create_file_key("out.parquet", 1000, 2000, 4096)];
+        let events = retirement_events(new_files, &[]);
+        assert!(events.is_empty());
+    }
+
+    #[test]
+    fn test_retirement_events_delete_only_without_new_files() {
+        let gone = vec![create_file_key("gone.parquet", 1000, 2000, 1024)];
+        let events = retirement_events(Vec::new(), &gone);
+        let keys: Vec<(&str, bool)> = events.iter().map(|f| (f.key.as_str(), f.deleted)).collect();
+        assert_eq!(keys, vec![("gone.parquet", true)]);
+    }
+
+    #[test]
+    fn test_retirement_events_retires_exactly_retire_files() {
+        let new_files = vec![
+            create_file_key("out.parquet", 1000, 3000, 4096),
+            create_file_key("", 0, 0, 0),
+        ];
+        let retire = vec![
+            create_file_key("b.parquet", 2000, 3000, 1024),
+            create_file_key("a.parquet", 1000, 2000, 1024),
+        ];
+        let events = retirement_events(new_files, &retire);
+        let keys: Vec<(&str, bool)> = events.iter().map(|f| (f.key.as_str(), f.deleted)).collect();
+        assert_eq!(
+            keys,
+            vec![
+                ("a.parquet", true),
+                ("b.parquet", true),
+                ("out.parquet", false)
+            ]
+        );
+        assert!(events.iter().all(|f| f.selection.is_none()));
     }
 
     #[test]

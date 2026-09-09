@@ -3,6 +3,10 @@
   Structured output for one variant. The toggle and the schema are one decision:
   turning it off keeps the text you wrote, so flipping back does not cost you
   the schema.
+
+  A provider that cannot carry a schema still gets the full dialog rather than a
+  disabled one — the variant keeps the schema either way, and swapping the model
+  is what makes it live. The banner says so instead.
 -->
 <template>
   <ODialog
@@ -18,6 +22,11 @@
     @click:secondary="emit('update:open', false)"
   >
     <div class="flex flex-col gap-3">
+      <!-- Read before the schema is written rather than after an answer comes
+           back as prose: the request drops it with nothing else to say so. -->
+      <OBanner v-if="dropped" variant="warning" data-test="ai-playground-schema-unsupported">
+        {{ t("aiObservability.playground.schemaUnsupported") }}
+      </OBanner>
       <OCheckbox
         v-model="enabled"
         :label="t('aiObservability.playground.schemaToggle')"
@@ -44,8 +53,15 @@ import { useI18nTyped } from "@/types/i18n";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 
-const props = defineProps<{ open: boolean; schema: string | null }>();
+const props = defineProps<{
+  open: boolean;
+  schema: string | null;
+  /** The selected provider has no field to carry a schema, so one set here is
+   *  kept on the variant and left out of the request. */
+  dropped?: boolean;
+}>();
 
 const emit = defineEmits<{
   "update:open": [value: boolean];

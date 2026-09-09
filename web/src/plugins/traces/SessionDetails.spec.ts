@@ -10,6 +10,7 @@ const mockFetchSession = vi.fn();
 const mockFetchTurnDetail = vi.fn();
 const mockFetchSessionSpans = vi.fn();
 const mockRouterPush = vi.fn();
+const mockRouterBack = vi.fn();
 
 // Mutable route state — tests set these to drive computed values
 const mockRouteQuery = {
@@ -19,6 +20,7 @@ const mockRouteQuery = {
   to: "1700001000000000",
   org_identifier: "default",
 };
+let mockRouteName = "sessionDetails";
 
 vi.mock("./composables/useSessions", () => ({
   useSessions: vi.fn(() => ({
@@ -64,8 +66,8 @@ vi.mock("./ThreadToolCalls.vue", () => ({
 }));
 
 vi.mock("vue-router", () => ({
-  useRoute: vi.fn(() => ({ query: mockRouteQuery })),
-  useRouter: vi.fn(() => ({ push: mockRouterPush })),
+  useRoute: vi.fn(() => ({ query: mockRouteQuery, name: mockRouteName })),
+  useRouter: vi.fn(() => ({ push: mockRouterPush, back: mockRouterBack })),
 }));
 
 vi.mock("vuex", () => ({
@@ -249,6 +251,10 @@ beforeEach(() => {
   mockRouteQuery.stream = "test-stream";
   mockRouteQuery.from = "1700000000000000";
   mockRouteQuery.to = "1700001000000000";
+  mockRouteName = "sessionDetails";
+  // No back-navigable history by default (matches a fresh/direct visit) — tests
+  // that need the router.back() path opt in with history.pushState below.
+  window.history.replaceState(null, "");
 
   // Default: successful fetch with detail + one trace
   mockFetchSession.mockResolvedValue({
@@ -348,6 +354,19 @@ describe("SessionDetails — not found state", () => {
 });
 
 describe("SessionDetails — KPI strip", () => {
+  it("shows the selected session user ID in the header", async () => {
+    mockFetchSession.mockResolvedValue({
+      detail: makeDetail({ userId: "user-a" }),
+      traces: [makeTrace()],
+    });
+
+    const wrapper = await mountComponent();
+    const userId = wrapper.find('[data-test="session-detail-user-id"]');
+
+    expect(userId.exists()).toBe(true);
+    expect(userId.text()).toBe("user-a");
+  });
+
   it("renders KPI strip with Turns value", async () => {
     mockFetchSession.mockResolvedValue({
       detail: makeDetail({ turns: 5 }),
@@ -664,7 +683,7 @@ describe("SessionDetails — navigation", () => {
     expect(pushArg.query.trace_id).toBe("trace-xyz");
   });
 
-  it("back button returns to the traces sessions tab", async () => {
+  it("back button returns to the traces sessions tab when there's no history to pop", async () => {
     const wrapper = await mountComponent();
 
     await wrapper.find("[data-test='session-detail-back-btn']").trigger("click");
@@ -673,5 +692,27 @@ describe("SessionDetails — navigation", () => {
     const pushArg = mockRouterPush.mock.calls[0][0];
     expect(pushArg.name).toBe("traces");
     expect(pushArg.query.tab).toBe("sessions");
+  });
+
+  it("uses real browser back when history allows it, so the list's own filters round-trip", async () => {
+    window.history.pushState({ back: "/previous" }, "", "/previous-fake-url");
+    const wrapper = await mountComponent();
+
+    await wrapper.find("[data-test='session-detail-back-btn']").trigger("click");
+
+    expect(mockRouterBack).toHaveBeenCalledTimes(1);
+    expect(mockRouterPush).not.toHaveBeenCalled();
+  });
+
+  it("falls back to a manual push to the AI sessions list when opened without history", async () => {
+    mockRouteName = "aiSessionDetails";
+    const wrapper = await mountComponent();
+
+    await wrapper.find("[data-test='session-detail-back-btn']").trigger("click");
+
+    expect(mockRouterBack).not.toHaveBeenCalled();
+    expect(mockRouterPush).toHaveBeenCalled();
+    const pushArg = mockRouterPush.mock.calls[0][0];
+    expect(pushArg.name).toBe("aiSessions");
   });
 });
