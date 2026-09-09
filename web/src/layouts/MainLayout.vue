@@ -179,8 +179,7 @@ import {
   useLocalUserInfo,
   getImageURL,
   invalidateLoginData,
-  getDueDays,
-  trialPeriodAllowedPath,
+  shouldPaywallRoute,
   emptyDataAllowedPaths,
 } from "../utils/zincutils";
 
@@ -491,6 +490,10 @@ export default defineComponent({
       {
         label: raw("English"),
         code: "en-us",
+      },
+      {
+        label: raw("العربية"),
+        code: "ar",
       },
       {
         label: raw("Türkçe"),
@@ -1109,21 +1112,17 @@ export default defineComponent({
         await useHomeDashboard(t).load(store.state?.selectedOrganization?.identifier);
 
         if (
-          orgSettings?.data?.data?.free_trial_expiry != null &&
-          orgSettings?.data?.data?.free_trial_expiry != ""
+          shouldPaywallRoute(
+            orgSettings?.data?.data?.free_trial_expiry,
+            router.currentRoute.value.name,
+          )
         ) {
-          const trialDueDays = getDueDays(orgSettings?.data?.data?.free_trial_expiry);
-          if (
-            trialDueDays <= 0 &&
-            trialPeriodAllowedPath.indexOf(router.currentRoute.value.name) == -1
-          ) {
-            router.push({
-              name: "plans",
-              query: {
-                org_identifier: selectedOrg.value.identifier,
-              },
-            });
-          }
+          router.push({
+            name: "plans",
+            query: {
+              org_identifier: selectedOrg.value.identifier,
+            },
+          });
         }
       } catch (error: any) {
         // Handle permission errors gracefully (403 = Forbidden)
