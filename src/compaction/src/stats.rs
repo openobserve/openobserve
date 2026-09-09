@@ -18,7 +18,7 @@ use std::{collections::HashSet, time::Duration};
 use config::{
     cluster::LOCAL_NODE,
     get_config,
-    meta::stream::StreamType,
+    meta::stream::{StreamStats, StreamType},
     metrics,
     utils::time::{HourFormat, day_micros, get_ymdh_from_micros, now_micros},
 };
@@ -78,11 +78,7 @@ pub async fn update_stats_from_file_list() -> Result<(), anyhow::Error> {
         HashSet::new()
     };
 
-    let yesterday_boundary = get_yesterday_boundary();
-    let new_data_range = (yesterday_boundary.clone(), "".to_string());
-    let old_data_range = ("".to_string(), yesterday_boundary.clone());
-
-    let iter = [(new_data_range, true), (old_data_range, false)];
+    let iter = stats_date_ranges();
 
     let grouped = db::schema::list_all_streams_grouped().await;
     let mut total_streams = 0;
@@ -137,13 +133,14 @@ pub async fn update_stats_from_file_list() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+/// Returns the stats it wrote so callers need not read `stream_stats` back through a replica.
 pub async fn update_stats_from_file_list_for_stream(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
     date_range: (String, String),
     is_recent: bool,
-) -> Result<(), anyhow::Error> {
+) -> Result<StreamStats, anyhow::Error> {
     let mut stats =
         infra_file_list::stats_by_date_range(org_id, stream_type, stream_name, date_range.clone())
             .await?;
@@ -162,7 +159,7 @@ pub async fn update_stats_from_file_list_for_stream(
     }
     infra_file_list::set_stream_stats(org_id, stream_type, stream_name, &stats, is_recent).await?;
 
-    Ok(())
+    Ok(stats)
 }
 
 async fn update_stats_lock_node() -> Result<Option<i64>, anyhow::Error> {
@@ -234,6 +231,15 @@ async fn update_stream_stats_with_retry(
         tokio::time::sleep(delay).await;
         attempt += 1;
     }
+}
+
+/// Recent and historical scan ranges as `((start, end), is_recent)`; an empty bound is open-ended.
+pub fn stats_date_ranges() -> [((String, String), bool); 2] {
+    let yesterday_boundary = get_yesterday_boundary();
+    [
+        ((yesterday_boundary.clone(), String::new()), true),
+        ((String::new(), yesterday_boundary), false),
+    ]
 }
 
 /// Get yesterday's boundary date (yesterday 00:00:00 in YYYY/MM/DD/00)
@@ -324,6 +330,16 @@ mod tests {
 
         // Should handle empty range gracefully (may return error or empty stats)
         let _ = result; // Test structure - actual behavior depends on implementation
+    }
+
+    #[test]
+    fn test_stats_date_ranges() {
+        let [(recent_range, recent), (old_range, old)] = stats_date_ranges();
+        let boundary = get_yesterday_boundary();
+        assert!(recent);
+        assert_eq!(recent_range, (boundary.clone(), String::new()));
+        assert!(!old);
+        assert_eq!(old_range, (String::new(), boundary));
     }
 
     #[test]
