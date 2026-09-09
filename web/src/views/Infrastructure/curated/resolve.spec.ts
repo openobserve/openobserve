@@ -1571,6 +1571,49 @@ describe("layout flow — 192-col rows", () => {
       expect(chart.layout.y).toBeGreaterThan(0);
     }
   });
+
+  it("forwards a panel's decimals into config, and omits the key when unset", () => {
+    // A `decimals` the resolver drops leaves the renderer on its default 2, which is
+    // what clipped "800.00 cores" — the declaration is only worth anything if it lands.
+    const summary = build(resolve({})).tabs.find((t: any) => t.tabId === "summary");
+    const cfg = (id: string) => summary.panels.find((p: any) => p.id === id).config;
+    expect(cfg("k8s_sm_fleet_cpu").decimals).toBe(0);
+    expect(cfg("k8s_sm_fleet_memory")).not.toHaveProperty("decimals");
+  });
+
+  it("packs a short panel into the free column beside a taller one", () => {
+    // The Summary stack: the quadrant is h:39 and the two bar panels h:20 + h:19, so a
+    // plain left-to-right wrap would drop the memory panel to y=39 UNDER the quadrant
+    // instead of under the CPU panel. This is the only section that exercises the
+    // packing, and the one whose arrangement was asked for explicitly.
+    const summary = build(resolve({})).tabs.find((t: any) => t.tabId === "summary");
+    const at = (id: string) => summary.panels.find((p: any) => p.id === id).layout;
+    expect(at("k8s_sm_fleet_quadrant")).toMatchObject({ x: 0, y: 0, w: 120, h: 39 });
+    expect(at("k8s_sm_fleet_cpu")).toMatchObject({ x: 120, y: 0, w: 72, h: 20 });
+    expect(at("k8s_sm_fleet_memory")).toMatchObject({ x: 120, y: 20, w: 72, h: 19 });
+  });
+
+  it("leaves every uniform-height section laid out exactly as a plain wrap would", () => {
+    // The packing must be a no-op wherever a row's panels share one height, which is
+    // every section but Summary. Checked against the plain wrap recomputed here, so a
+    // future packing change that silently reflows Health or Utilization fails.
+    for (const tab of build(resolve({})).tabs) {
+      if (tab.tabId === "summary") continue;
+      let x = 0;
+      let y = 0;
+      let rowHeight = 0;
+      for (const p of tab.panels) {
+        if (x + p.layout.w > 192) {
+          x = 0;
+          y += rowHeight;
+          rowHeight = 0;
+        }
+        expect({ id: p.id, x: p.layout.x, y: p.layout.y }).toEqual({ id: p.id, x, y });
+        x += p.layout.w;
+        rowHeight = Math.max(rowHeight, p.layout.h);
+      }
+    }
+  });
 });
 
 // ── Strip model + freshness (pass-4 additions) ─────────────────────────────

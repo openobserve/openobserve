@@ -43,8 +43,12 @@ const SECTION_ID = "summary";
 /** The hero: the per-cluster commitment scatter. */
 const PANEL_ID = "k8s_sm_fleet_quadrant";
 
-/** Its neighbour: the fleet-TOTAL reserved-vs-used bars, on the native chart path. */
-const RESOURCES_ID = "k8s_sm_fleet_resources";
+/** Its neighbours: the fleet-TOTAL capacity/reserved/used bars, on the native chart path. */
+const CPU_ID = "k8s_sm_fleet_cpu";
+const MEMORY_ID = "k8s_sm_fleet_memory";
+
+/** Both bar panels share every structural invariant; only unit and metric differ. */
+const RESOURCE_IDS = [CPU_ID, MEMORY_ID];
 
 const section = () => {
   const found = kubernetesPage.sections.find((s: any) => s.id === SECTION_ID);
@@ -235,14 +239,16 @@ describe("summary — shape", () => {
     expect(ids[0], `${SECTION_ID} must be the landing tab`).toBe(SECTION_ID);
   });
 
-  it("holds the quadrant and the fleet resource overview, in that order", () => {
+  it("holds the quadrant then the CPU and memory bars, in that order", () => {
     // The fault data (pending pods, restarts, failed pods) stays FOLDED INTO the
     // quadrant rather than split off: a third panel would make the reader join two
     // views by cluster name by eye, which is the join the bubble chart exists to have
-    // already done. The resource overview earns its own panel for the opposite reason
-    // — it is fleet-TOTAL, carries no per-cluster dimension to join on, and its
-    // reserved-vs-used gap has no place on a commitment scatter.
-    expect(panels().map((p: any) => p.id)).toEqual([PANEL_ID, RESOURCES_ID]);
+    // already done. The resource bars earn their own panels for the opposite reason
+    // — they are fleet-TOTAL, carry no per-cluster dimension to join on, and their
+    // capacity-vs-reserved-vs-used gap has no place on a commitment scatter. CPU and
+    // memory are split in two because a panel carries ONE unit, and cores on the same
+    // value axis as bytes is what forced the old normalisation to percent.
+    expect(panels().map((p: any) => p.id)).toEqual([PANEL_ID, CPU_ID, MEMORY_ID]);
   });
 
   it("the panel is a custom_chart", () => {
@@ -1512,26 +1518,26 @@ describe("summary — the plot stays square at EVERY resolution", () => {
   });
 });
 
-describe("summary — the fleet resource overview is a NATIVE panel, not a second custom_chart", () => {
+describe("summary — the fleet resource bars are NATIVE panels, not a second custom_chart", () => {
   // The absolute fleet size no other tab reports: all 25 panels on Inventory / Nodes /
-  // Utilization are cluster-scoped, and the quadrant beside this one plots per-cluster
-  // RATIOS. Measured live 2026-09-09T01:23:43Z: CPU capacity 471.52 cores, reserved
-  // 276.34 (58.6%), used 62.47 (13.2%); memory capacity 2218.70 GB, reserved 1315.51
-  // (59.3%), used 1171.42 (52.8%); 10 clusters, 101 nodes, k8s_node_memory_usage
+  // Utilization are cluster-scoped, and the quadrant beside these plots per-cluster
+  // RATIOS. Measured live 2026-09-09T03:55:51Z: CPU capacity 598.92 cores, reserved
+  // 272.78, used 62.85; memory capacity 2467252301824 B (2.24 TiB), reserved
+  // 1300981082912 B, used 1179641700352 B; 10 clusters, 101 nodes, k8s_node_memory_usage
   // answering for all 101.
 
-  it("renders through the platform chart path, so it inherits theming and tooltips", () => {
+  it.each(RESOURCE_IDS)("%s renders through the platform chart path", (id) => {
     // The whole point of the rework: hand-drawn `graphic` elements inside the
     // custom_chart carried none of the product's conventions.
-    expect(panel(RESOURCES_ID).customChartContent).toBeUndefined();
-    expect(panel(RESOURCES_ID).type).not.toBe("custom_chart");
+    expect(panel(id).customChartContent).toBeUndefined();
+    expect(panel(id).type).not.toBe("custom_chart");
   });
 
-  it("is an h-bar, the one bar type whose category axis is the SERIES name", () => {
-    // promql `bar` is a TIME-SERIES bar: its x axis is timestamps, so four instant sums
-    // would plot as four points at one tick, not four labelled rows.
+  it.each(RESOURCE_IDS)("%s is an h-bar, whose category axis is the SERIES name", (id) => {
+    // promql `bar` is a TIME-SERIES bar: its x axis is timestamps, so three instant sums
+    // would plot as three points at one tick, not three labelled rows.
     // convertPromQLBarChart.ts non-stacked branch pushes one category PER SERIES.
-    expect(panel(RESOURCES_ID).type).toBe("h-bar");
+    expect(panel(id).type).toBe("h-bar");
   });
 
   it("routes through the modular converter the app actually registers", () => {
@@ -1546,79 +1552,118 @@ describe("summary — the fleet resource overview is a NATIVE panel, not a secon
     const list = source.slice(source.indexOf("NEW_CHART_TYPES"));
     const routed = list.slice(0, list.indexOf("]"));
     expect(routed, "h-bar is no longer routed to the modular converter").toContain(
-      `"${panel(RESOURCES_ID).type}"`,
+      `"${panel(CPU_ID).type}"`,
     );
   });
 
-  it("normalises BOTH resources to percent, since one panel carries one unit", () => {
-    // Cores and bytes cannot share a value axis, and percent-of-capacity is also the
-    // comparison the panel exists to make.
-    expect(panel(RESOURCES_ID).unit).toBe("percent");
-    expect(UNIT_VALUES.has(panel(RESOURCES_ID).unit)).toBe(true);
-    for (const query of queriesOf(RESOURCES_ID)) {
-      expect(query, `not normalised to a percentage: ${query}`).toContain("* 100");
-      expect(query, "a percentage must divide by its own capacity").toContain(
-        "kube_node_status_allocatable",
+  it("reports ABSOLUTE cores, with no normalisation and no division at all", () => {
+    // Splitting CPU from memory is what buys the absolute axis: one panel carries one
+    // unit, so cores and bytes on one axis is exactly what forced percent before.
+    expect(panel(CPU_ID).unit).toBe("custom");
+    expect(panel(CPU_ID).unitCustom).toBe(" cores");
+    expect(UNIT_VALUES.has(panel(CPU_ID).unit)).toBe(true);
+    for (const query of queriesOf(CPU_ID)) {
+      expect(query, `a ratio, not an absolute: ${query}`).not.toContain("/");
+      expect(query, `rescaled away from cores: ${query}`).not.toContain("* 100");
+      expect(query, `not a CPU query: ${query}`).toMatch(/resource="cpu"|k8s_node_cpu_usage/);
+    }
+  });
+
+  it("reports RAW bytes, letting the renderer pick the 1024 divisor", () => {
+    // convertDataIntoUnitValue.ts walks the bytes table down from PB and divides by the
+    // largest 1024 power that fits, so a query that pre-divided to GiB would be labelled
+    // as bytes and read a billion times too small.
+    expect(panel(MEMORY_ID).unit).toBe("bytes");
+    expect(UNIT_VALUES.has(panel(MEMORY_ID).unit)).toBe(true);
+    for (const query of queriesOf(MEMORY_ID)) {
+      expect(query, `pre-divided bytes: ${query}`).not.toContain("/");
+      expect(query, `rescaled bytes: ${query}`).not.toMatch(/\*\s*\d/);
+      expect(query, `not a memory query: ${query}`).toMatch(
+        /resource="memory"|k8s_node_memory_usage/,
       );
     }
   });
 
-  it("reports used on BOTH rows, because the asymmetry read as a bug", () => {
-    // k8s_node_memory_usage EXISTS and covered all 101 nodes when measured, so showing
-    // used for CPU only was a presentation gap, not a data one.
-    const legends = panel(RESOURCES_ID).variants.flatMap((v: any) =>
-      v.queries.map((q: any) => q.legend as string),
-    );
+  it("drops the decimals on cores, which the 4% right inset cannot afford", () => {
+    // MEASURED: convertPromQLBarChart.ts reserves a flat "4%" right inset on a
+    // horizontal bar, and at w:72 that is 26px — "800.00 cores" rendered as
+    // "800.00 cor". Bytes keep the default 2 because the renderer scales them
+    // ("465.66GB"), so the digits carry real magnitude there.
+    expect(panel(CPU_ID).decimals).toBe(0);
+    expect(panel(MEMORY_ID).decimals).toBeUndefined();
+  });
+
+  it("plots capacity, reserved and used — the reference plus the two readings", () => {
+    // Capacity is not decoration: on an absolute axis a reserved bar alone cannot say
+    // how much room is left, which is the whole question the panel answers.
     // Declaration order is BOTTOM-UP because an ECharts category y-axis puts index 0 at
-    // the bottom (axisBuilder.ts sets no `inverse`), so this list reversed is what the
-    // reader sees top-to-bottom: CPU reserved, CPU used, Memory reserved, Memory used.
-    expect(legends).toEqual(["Memory used", "Memory reserved", "CPU used", "CPU reserved"]);
-    expect([...legends].reverse()).toEqual([
-      "CPU reserved",
-      "CPU used",
-      "Memory reserved",
-      "Memory used",
-    ]);
+    // the bottom (axisBuilder.ts sets no `inverse`), so reversed is what the reader sees.
+    for (const id of RESOURCE_IDS) {
+      const legends = panel(id).variants.flatMap((v: any) =>
+        v.queries.map((q: any) => q.legend as string),
+      );
+      expect(legends, `${id} legends`).toEqual(["Used", "Reserved", "Capacity"]);
+      expect([...legends].reverse(), `${id} top-down`).toEqual(["Capacity", "Reserved", "Used"]);
+    }
+  });
+
+  it("names both panels' rows IDENTICALLY, so one colour means one thing", () => {
+    // getSeriesColor with no colour config hashes the SERIES NAME into the 12-colour
+    // palette (colorPalette.ts:302), so the old "CPU reserved" / "Memory used" pair
+    // collided on series-5 and one lavender bar meant two different things. Sharing the
+    // three names makes Capacity, Reserved and Used one colour each across both panels.
+    const legendsOf = (id: string) =>
+      panel(id).variants.flatMap((v: any) => v.queries.map((q: any) => q.legend as string));
+    expect(legendsOf(MEMORY_ID)).toEqual(legendsOf(CPU_ID));
+    expect(new Set(legendsOf(CPU_ID)).size, "a duplicate row name within one panel").toBe(3);
   });
 
   it("carries no by(...) at all, so it adds no cardinality debt", () => {
     // A fleet total needs no grouping, which also sidesteps lintCardinality
     // (resolve.ts:943) rather than adding a third deferred failure.
-    for (const query of queriesOf(RESOURCES_ID)) {
-      expect(query, `an unnecessary grouping: ${query}`).not.toMatch(/\bby\s*\(/);
+    for (const id of RESOURCE_IDS) {
+      for (const query of queriesOf(id)) {
+        expect(query, `an unnecessary grouping: ${query}`).not.toMatch(/\bby\s*\(/);
+      }
     }
   });
 
   it("carries no ${scope:} token, because the section declares no scopedBy", () => {
     // A fleet TOTAL that honoured the cluster picker would stop being a fleet total.
-    for (const query of queriesOf(RESOURCES_ID)) {
-      expect(query).not.toContain("${scope:");
+    for (const id of RESOURCE_IDS) {
+      for (const query of queriesOf(id)) {
+        expect(query).not.toContain("${scope:");
+      }
     }
   });
 
   it("keeps kubeletstats OUT of requiresStreams so a NotReady node cannot hide it", () => {
     // The usage metrics stop on a NotReady node; requiring them would blank the
     // capacity and reservation bars exactly when a node has dropped.
-    for (const variant of panel(RESOURCES_ID).variants as any[]) {
-      expect(variant.requiresStreams).not.toContain("k8s_node_cpu_usage");
-      expect(variant.requiresStreams).not.toContain("k8s_node_memory_usage");
-      expect(variant.requiresStreams.length).toBeGreaterThan(0);
+    for (const id of RESOURCE_IDS) {
+      for (const variant of panel(id).variants as any[]) {
+        expect(variant.requiresStreams, id).not.toContain("k8s_node_cpu_usage");
+        expect(variant.requiresStreams, id).not.toContain("k8s_node_memory_usage");
+        expect(variant.requiresStreams.length, id).toBeGreaterThan(0);
+      }
     }
   });
 
-  it("pins the instant, since every bar divides two SEPARATE queries", () => {
-    for (const variant of panel(RESOURCES_ID).variants as any[]) {
-      expect(variant.queryMode).toBe("instant");
-      expect(variant.queryType).toBe("promql");
+  it("pins the instant, since the three bars come from three SEPARATE queries", () => {
+    for (const id of RESOURCE_IDS) {
+      for (const variant of panel(id).variants as any[]) {
+        expect(variant.queryMode, id).toBe("instant");
+        expect(variant.queryType, id).toBe("promql");
+      }
     }
   });
 
   it("a missing `used` yields NO bar rather than a zero one", async () => {
     // Verified against the real processor, not assumed: an empty `result` maps to an
     // empty series list, so the h-bar branch pushes no category and no value. A false
-    // 0% would read as "nothing is running" on a fleet that is running fine.
+    // 0 would read as "nothing is running" on a fleet that is running fine.
     const processed = await processPromQLData(
-      [{ result: [{ metric: {}, value: [0, "58.6"] }] }, { result: [] }] as any,
+      [{ result: [{ metric: {}, value: [0, "598.92"] }] }, { result: [] }] as any,
       { queries: [{ config: {} }, { config: {} }] } as any,
       { state: { timezone: "UTC", selectedOrganization: { identifier: "default" } } } as any,
     );
@@ -1626,31 +1671,45 @@ describe("summary — the fleet resource overview is a NATIVE panel, not a secon
     expect(processed[1].series, "an absent usage query produced a bar").toHaveLength(0);
   });
 
-  it("sits BESIDE the quadrant on one row, with the quadrant the wider of the two", () => {
-    // flowLayout wraps past GRID_COLUMNS (192), so 120 + 72 is one row with no engine change.
+  it("STACKS both bars in the free column beside the quadrant", () => {
+    // The requested arrangement, and it only holds because the two heights SUM to the
+    // quadrant's: flowLayout packs at the lowest free y, so a taller pair would push the
+    // second panel onto its own row under the quadrant instead.
     const quadrant = panel(PANEL_ID).layout;
-    const resources = panel(RESOURCES_ID).layout;
-    expect(quadrant.w + resources.w).toBeLessThanOrEqual(192);
-    expect(quadrant.w).toBeGreaterThan(resources.w);
-    // Equal heights, or flowLayout drops the shorter one onto its own row.
-    expect(resources.h).toBe(quadrant.h);
+    const cpu = panel(CPU_ID).layout;
+    const memory = panel(MEMORY_ID).layout;
+    expect(cpu.w, "the two bar panels must share one column").toBe(memory.w);
+    expect(quadrant.w + cpu.w).toBeLessThanOrEqual(192);
+    expect(quadrant.w, "the quadrant stays the hero").toBeGreaterThan(cpu.w);
+    expect(cpu.h + memory.h, "the stack must fill the quadrant's height exactly").toBe(quadrant.h);
   });
 
-  it("titles itself in resolvable en-US copy that names the comparison", () => {
-    const title = copy(panel(RESOURCES_ID).titleKey);
-    expect(title.trim().length).toBeGreaterThan(0);
-    expect(title.toLowerCase()).toContain("reserved");
-    expect(title.toLowerCase()).toContain("used");
+  // The RESOLVED x/y of the stack is asserted in resolve.spec.ts, where the stream and
+  // semantic-dictionary fixtures a full resolve needs already live.
+
+  it("titles both panels in resolvable en-US copy naming the three bars", () => {
+    for (const id of RESOURCE_IDS) {
+      const title = copy(panel(id).titleKey).toLowerCase();
+      expect(title.trim().length, id).toBeGreaterThan(0);
+      expect(title, id).toContain("capacity");
+      expect(title, id).toContain("reserved");
+      expect(title, id).toContain("used");
+    }
+    // The unit is only on the CPU axis as a suffix, so the title has to say cores.
+    expect(copy(panel(CPU_ID).titleKey).toLowerCase()).toContain("cores");
   });
 
   it("carries a byUrl drilldown decoding to one of its OWN queries", () => {
-    // Lint rules 27/28: the shared panel() helper builds it from queries[0].
-    const drilldowns = (panel(RESOURCES_ID).drilldown ?? []) as any[];
-    expect(drilldowns.length).toBeGreaterThan(0);
-    const target = drilldowns[0].data?.url ?? drilldowns[0].url ?? "";
-    const decoded = b64DecodeUnicodeSafe(
-      new URL(target, "http://x").searchParams.get("query") ?? "",
-    );
-    expect(queriesOf(RESOURCES_ID)).toContain(decoded);
+    // Lint rules 27/28: the shared panel() helper builds it from queries[0]. With two
+    // near-identical panels the copy-paste failure is live rather than theoretical.
+    for (const id of RESOURCE_IDS) {
+      const drilldowns = (panel(id).drilldown ?? []) as any[];
+      expect(drilldowns.length, id).toBeGreaterThan(0);
+      const target = drilldowns[0].data?.url ?? drilldowns[0].url ?? "";
+      const decoded = b64DecodeUnicodeSafe(
+        new URL(target, "http://x").searchParams.get("query") ?? "",
+      );
+      expect(queriesOf(id), id).toContain(decoded);
+    }
   });
 });
