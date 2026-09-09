@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             variant="secondary"
             size="md"
-            class="mb-4 ml-4"
+            class="ms-4 mb-4"
             @click="completeSubscriptionProcess"
           >
             {{ t("organization.proceed_subscription") }}

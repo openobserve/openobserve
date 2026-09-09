@@ -30,6 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="workflow-flow o2vf_node"
     :class="{ 'workflow-flow--readonly': readOnly }"
     :connect-on-click="false"
+    :delete-key-code="null"
     :default-viewport="{ zoom: 0.8 }"
     :min-zoom="0.2"
     :max-zoom="4"
@@ -63,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="workflow-edge-delete-hint"
       class="bg-surface-base text-text-body border-border-default rounded-default absolute top-5 left-1/2 z-1000 flex -translate-x-1/2 items-center border px-4 py-2.5 text-sm shadow-lg dark:shadow-lg"
     >
-      <OIcon name="info" class="mr-1" size="sm" />
+      <OIcon name="info" class="me-1" size="sm" />
       {{ t("workflow.canvas.edgeDeleteHint") }}
     </div>
 
@@ -91,7 +92,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data="edgeProps.data"
         :marker-end="edgeProps.markerEnd"
         :style="edgeProps.style"
+        :selected="edgeProps.selected"
         :insertable="!readOnly && isEdgeRevealed(edgeProps.id)"
+        :label="edgeBranchLabel(edgeProps.id, t)"
         @insert="onEdgeInsert(edgeProps.id, $event)"
         @insert-enter="onInsertEnter(edgeProps.id)"
         @insert-leave="onInsertLeave"
@@ -174,8 +177,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     v-if="isEmptyCanvas && !readOnly"
     data-test="workflow-flow-start-scaffold"
-    class="absolute top-24 left-1/2 z-10 flex origin-top -translate-x-1/2 scale-[var(--ghost-zoom,1)] flex-col items-center"
-    :style="{ '--ghost-zoom': viewport.zoom }"
+    class="absolute top-[var(--wf-oy,0)] left-[var(--wf-ox,0)] z-10 flex origin-top -translate-x-1/2 scale-[var(--wf-oz,1)] flex-col items-center"
+    :style="startAnchorStyle"
   >
     <WorkflowStartCard
       :tag="t('workflow.node.kindTrigger')"
@@ -190,9 +193,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Dashed connector + `+` between the two slots — same chip as every other
          "add a step here" affordance; here it opens the Action picker. -->
     <div class="flex flex-col items-center">
-      <span class="border-border-strong h-5 border-l-2"></span>
+      <span class="border-border-strong h-5 border-s-2"></span>
       <FlowAddButton data-test="workflow-flow-start-add" @click="openActionPicker($event)" />
-      <span class="border-border-strong h-5 border-l-2"></span>
+      <span class="border-border-strong h-5 border-s-2"></span>
     </div>
 
     <WorkflowStartCard
@@ -223,9 +226,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     }"
   >
     <div class="flex flex-col items-center">
-      <span class="border-border-strong h-5 border-l-2"></span>
+      <span class="border-border-strong h-5 border-s-2"></span>
       <FlowAddButton data-test="workflow-flow-action-add" @click="openActionPicker($event)" />
-      <span class="border-border-strong h-5 border-l-2"></span>
+      <span class="border-border-strong h-5 border-s-2"></span>
     </div>
     <WorkflowStartCard
       :tag="t('workflow.node.kindAction')"
@@ -245,9 +248,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
        it tracks the node. -->
   <div
     v-for="pt in appendPoints"
-    :key="pt.id"
+    :key="`${pt.id}:${pt.handle}`"
     data-test="workflow-flow-append-add"
-    class="absolute top-[var(--wf-oy,0)] left-[var(--wf-ox,0)] z-20 flex origin-top -translate-x-1/2 scale-[var(--wf-oz,1)] flex-col items-center"
+    class="pointer-events-none absolute top-[var(--wf-oy,0)] left-[var(--wf-ox,0)] z-20 flex origin-top -translate-x-1/2 scale-[var(--wf-oz,1)] flex-col items-center"
     :style="{ '--wf-ox': pt.left + 'px', '--wf-oy': pt.top + 'px', '--wf-oz': pt.zoom }"
     @mouseenter="onAppendEnter(pt.id)"
     @mouseleave="onNodeMouseLeave"
@@ -255,7 +258,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Connector is ALWAYS drawn for a shown point — a leaf's straight stub, or a
          branch's short side-nudged curve. Option C: the point only renders while its
          node is hovered, so at rest there's nothing here. -->
-    <span v-if="!pt.svgW" class="border-border-strong h-5 border-l-2"></span>
+    <span v-if="!pt.svgW" class="border-border-strong h-5 border-s-2"></span>
     <svg
       v-else
       :width="pt.svgW"
@@ -270,7 +273,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         stroke-width="2"
       />
     </svg>
-    <FlowAddButton @click="openStepPicker(pt.id, 'out', $event)" />
+    <!-- The wrapper is click-through so it cannot swallow a wiring drag on the
+         handle beneath it; only the button itself takes the pointer back. -->
+    <FlowAddButton
+      class="pointer-events-auto"
+      @mouseenter="onAppendEnter(pt.id)"
+      @click="openStepPicker(pt.id, pt.handle, $event)"
+    />
   </div>
 
   <!-- Trigger-missing fallback: no trigger but the canvas isn't empty (a step was
@@ -280,8 +289,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     v-if="needsTrigger && !isEmptyCanvas && !readOnly"
     data-test="workflow-flow-start-node"
-    class="absolute top-24 left-1/2 z-10 flex origin-top -translate-x-1/2 scale-[var(--ghost-zoom,1)] flex-col items-center"
-    :style="{ '--ghost-zoom': viewport.zoom }"
+    class="absolute top-[var(--wf-oy,0)] left-[var(--wf-ox,0)] z-10 flex origin-top -translate-x-1/2 scale-[var(--wf-oz,1)] flex-col items-center"
+    :style="startAnchorStyle"
   >
     <WorkflowStartCard
       :tag="t('workflow.node.kindTrigger')"
@@ -317,6 +326,9 @@ import useWorkflowCanvas, {
   redoWorkflow,
   tidyWorkflowLayout,
   nodeMeta,
+  edgeBranchLabel,
+  branchHandles,
+  NEW_BRANCH_PATH_HANDLE,
 } from "./useWorkflowCanvas";
 
 import "@vue-flow/core/dist/style.css";
@@ -338,6 +350,7 @@ const {
   openActionPicker,
   openStepPicker,
   openInsertPicker,
+  requestDeleteNode,
 } = useWorkflowCanvas(t);
 
 const {
@@ -347,6 +360,7 @@ const {
   dimensions,
   findNode,
   getSelectedEdges,
+  getSelectedNodes,
   removeEdges,
   fitView,
   setCenter,
@@ -430,8 +444,8 @@ const isTextInputTarget = (target: EventTarget | null): boolean => {
 };
 
 // Keyboard handling on the canvas:
-//   • Backspace/Delete removes the selected edge (the action the hint advertises;
-//     scoped to EDGES only so node deletion keeps flowing through the confirm dialog).
+//   • Backspace/Delete removes the selected edge (the action the hint advertises);
+//     a selected NODE instead opens the same confirm dialog as the trash button.
 //   • Ctrl/Cmd+Z undoes the last structural change; Ctrl/Cmd+Shift+Z redoes it
 //     (redo is keyboard-only — no on-screen button, by product decision).
 // All of these are inert on the read-only Runs canvas and while a text input /
@@ -450,11 +464,18 @@ const onKeydown = (event: KeyboardEvent) => {
 
   if (event.key !== "Delete" && event.key !== "Backspace") return;
   const selected = getSelectedEdges.value;
-  if (!selected.length) return;
+  if (selected.length) {
+    event.preventDefault();
+    // Snapshot BEFORE removal so the edge-delete is a single undo step.
+    pushWorkflowHistory();
+    removeEdges(selected.map((e) => e.id));
+    return;
+  }
+  // VueFlow's own delete keys are off (delete-key-code null) so nodes reach this confirm.
+  const node = getSelectedNodes.value[0];
+  if (!node) return;
   event.preventDefault();
-  // Snapshot BEFORE removal so the edge-delete is a single undo step.
-  pushWorkflowHistory();
-  removeEdges(selected.map((e) => e.id));
+  requestDeleteNode(node.id);
 };
 
 onMounted(() => {
@@ -517,6 +538,16 @@ const screenBelow = (node: any) => {
   };
 };
 
+// The start ghosts have no node to hang off, so they are SCREEN-anchored (pane centre,
+// a fixed drop below the top edge) rather than pinned to flow origin — which sits at the
+// pane's top-left corner under the default viewport and puts the cards half off-screen.
+const START_TOP_PX = 96;
+const startAnchorStyle = computed(() => ({
+  "--wf-ox": (dimensions.value?.width ?? 0) / 2 + "px",
+  "--wf-oy": START_TOP_PX + "px",
+  "--wf-oz": 1,
+}));
+
 // Persistent Action slot: shown once the trigger is placed but no step follows it
 // yet, pinned flush under the trigger node (so choosing the trigger keeps the
 // Action ghost in view). Null otherwise.
@@ -526,10 +557,10 @@ const actionSlot = computed(() => {
 });
 
 // Option C reveal state: the currently-hovered node and edge drive the append `+` and
-// the mid-edge insert `+`. A generous hide delay so the cursor can travel the connector
-// path onto the small `+` without it vanishing first (the `+`'s own mouseenter cancels
-// the timer anyway; this covers the gap in between).
-const HIDE_DELAY = 300;
+// the mid-edge insert `+`.
+// Long enough to cross open canvas to a Branch's outermost `+` without racing it;
+// hovering another node clears it at once (onNodeMouseEnter), so nothing lingers.
+const HIDE_DELAY = 15000;
 const hoveredNodeId = ref("");
 const hoveredEdgeId = ref("");
 let nodeHideTimer: ReturnType<typeof setTimeout> | null = null;
@@ -638,6 +669,47 @@ const appendPointFor = (node: any) => {
   };
 };
 
+// One `+` per arm carrying that arm's stable handle: a single shared `+` can only pass "out", which yields an edge with no source_handle that fails Branch path validation.
+const ARM_GAP = 88;
+const appendPointsFor = (node: any) => {
+  const handles = branchHandles(node);
+  // A case-less Branch declares nothing, so its + must MINT a path — an "out" + here would wire a handle-less edge the backend rejects.
+  if (node?.data?.node_type === "branch" && !handles.length)
+    return [{ id: node.id, handle: NEW_BRANCH_PATH_HANDLE, ...appendPointFor(node) }];
+  if (handles.length < 2) return [{ id: node.id, handle: "out", ...appendPointFor(node) }];
+  const base = screenBelow(node);
+  // An arm already wired leads somewhere: re-offering its `+` made a fully wired
+  // Branch sprout one arrow per arm on hover, reading as new unconnected paths.
+  const wired = new Set(
+    ((workflowObj.currentSelectedWorkflow.edges || []) as any[])
+      .filter((e: any) => (e.source ?? e.sourceNode?.id) === node.id)
+      .map((e: any) => e.sourceHandle),
+  );
+  // A fully wired Branch still needs one `+` to add a FURTHER path — every other node
+  // type keeps its affordance when wired, and dropping it stranded the Branch.
+  const unwired = handles.filter((h: string) => !wired.has(h));
+  const open = unwired.length ? unwired : [NEW_BRANCH_PATH_HANDLE];
+  // Anchored to the arm's OWN handle, not spread across the unwired ones: re-spreading
+  // floated each `+` between arms instead of on the path it would extend.
+  const mid = (handles.length - 1) / 2;
+  // Half a gap past the last arm: dead centre collided with the middle arm's mid-edge
+  // `+`, so that one arrow appeared to carry two buttons.
+  const newPathOff = (mid + 0.5) * ARM_GAP;
+  return open.map((handle: string) => {
+    const off =
+      handle === NEW_BRANCH_PATH_HANDLE ? newPathOff : (handles.indexOf(handle) - mid) * ARM_GAP;
+    return {
+      id: node.id,
+      handle,
+      ...base,
+      left: base.left + off * base.zoom,
+      hoverOnly: true,
+      cx: -off,
+      svgW: 2 * Math.max(Math.abs(off), 1),
+    };
+  });
+};
+
 // Append `+` points: one under EVERY step that can still chain onward (not a
 // terminal/output node), so a fan-out branch can be added from any node — but a
 // point whose slot is taken (`hoverOnly`) shows only while its node is hovered.
@@ -655,7 +727,7 @@ const appendPoints = computed(() => {
         if (hasTrigger.value && stepCount.value === 0) return false;
         return true;
       })
-      .map((n: any) => ({ id: n.id, ...appendPointFor(n) }))
+      .flatMap((n: any) => appendPointsFor(n))
       // Option C: nothing shows at rest — a node's append `+` appears only while that
       // node (or its own `+`) is hovered. Leaves hover-gate too, so at rest the whole
       // canvas is quiet.

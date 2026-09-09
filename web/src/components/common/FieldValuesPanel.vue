@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Scrollable values area -->
     <div class="max-h-64 overflow-y-auto">
       <!-- Loading state (only shown when there are no interim cached results) -->
-      <div v-show="fieldValues?.isLoading && !displayValues.length" class="relative h-15 py-1 pl-3">
+      <div v-show="fieldValues?.isLoading && !displayValues.length" class="relative h-15 py-1 ps-3">
         <!-- scrim off: this box is empty while loading, so there is nothing to
              dim — and the scrim is 70% of surface-base (white), which on this
              panel's grey surface just reads as a white block. -->
@@ -111,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- No values found -->
       <div
         v-show="!displayValues.length && !fieldValues?.isLoading"
-        class="text-o2-text-secondary py-1 pl-3 text-sm"
+        class="text-o2-text-secondary py-1 ps-3 text-sm"
         data-test="field-values-panel-no-values-msg"
       >
         <template v-if="fieldValues?.errMsg">{{ fieldValues.errMsg }}</template>
@@ -130,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           (displayValues[0] as any)?.synthetic &&
           !fieldValues?.isLoading
         "
-        class="text-o2-text-secondary pb-1 pl-3 text-xs italic"
+        class="text-o2-text-secondary ps-3 pb-1 text-xs italic"
         data-test="field-values-panel-no-count-msg"
       >
         {{ t("search.noDataInRangeHint") }}
@@ -158,19 +158,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
 
             <div
-              class="flex min-w-0 flex-row flex-wrap justify-between pl-1"
+              class="flex min-w-0 flex-row flex-wrap justify-between ps-1"
               :class="showMultiSelect ? 'w-[calc(100%-1.5rem)]' : 'w-full'"
             >
               <div
                 :title="value.key"
-                class="text-field-list-label-text text-3! w-[calc(100%-3.125rem)] pr-1 break-words whitespace-pre-wrap"
+                class="text-field-list-label-text text-3! w-[calc(100%-3.125rem)] pe-1 break-words whitespace-pre-wrap"
               >
                 {{ value.label ?? value.key }}
               </div>
               <div
                 v-if="value.count != null"
                 :title="String(value.count)"
-                class="text-3! contents truncate pr-0 text-right"
+                class="text-3! contents truncate pe-0 text-right"
                 :class="showMultiSelect ? 'w-[3.125rem]' : ''"
               >
                 {{ formatLargeNumber(value.count) }}

@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="mt-4 ml-1 flex">
+  <div class="ms-1 mt-4 flex">
     <div class="w-full">
       <div class="mb-1 text-base font-bold">{{ t("rum.errorStack") }}</div>
       <div class="mb-2">{{ error_stack[0] }}</div>
@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-if="index"
                 data-test="error-stack-trace-line"
-                class="border-border-default text-compact border-r border-b border-l border-solid px-2 py-1.5"
+                class="border-border-default text-compact border-s border-e border-b border-solid px-2 py-1.5"
                 :class="Number(index) === 1 ? 'border-t' : ''"
                 :style="{
                   'border-radius':

@@ -25,6 +25,13 @@ export function useTablePagination<TData>(
   // In client mode, allow the parent to force a specific page by passing currentPage.
   // This lets callers reset to page 1 on filter/search changes without relying on
   // TanStack's autoResetPageIndex (which can't distinguish filter vs expansion changes).
+  // Immediate so a caller seeding currentPage from a persisted/URL value (e.g.
+  // restoring the page a user was on before navigating away) lands there on
+  // first render instead of always starting at TanStack's default page 0. Only
+  // safe for data that's already present at mount — TanStack's own auto-reset
+  // resolves through its own deferred microtask queue on a later data change, so
+  // a caller whose data loads asynchronously must not mount until it has data
+  // (see Dashboards.vue's key-swap) or this gets silently overwritten.
   watch(
     () => props.currentPage,
     (page) => {
@@ -32,6 +39,7 @@ export function useTablePagination<TData>(
         table.setPageIndex(page - 1);
       }
     },
+    { immediate: true },
   );
 
   // Client-side: current page from TanStack state

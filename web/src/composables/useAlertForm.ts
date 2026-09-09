@@ -1934,7 +1934,11 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
           message: t("alerts.messages.anomalyConfigUpdated"),
         });
       } else {
-        await anomalyDetectionService.create(orgId, payload);
+        await anomalyDetectionService.create(
+          orgId,
+          payload,
+          (activeFolderId.value as string) || "default",
+        );
         toast({
           variant: "success",
           message: t("alerts.anomalyCreated"),

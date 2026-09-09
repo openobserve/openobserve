@@ -8319,6 +8319,7 @@ dependencies = [
  "tokio",
  "tracing",
  "urlencoding",
+ "usage_reporting",
 ]
 
 [[package]]
@@ -11074,6 +11075,7 @@ dependencies = [
  "rayon",
  "regex",
  "regex-syntax",
+ "schema",
  "serde",
  "serde_json",
  "sqlparser",

@@ -82,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #header-tabs>
       <!-- Pull the strip left (cancel the header's px-4) so the first tab lines
              up with the vertical sub-nav (Kubernetes/…) in the section below. -->
-      <div class="-ml-3 w-full">
+      <div class="-ms-3 w-full">
         <OTabs v-model="ingestTabType" align="left">
           <ORouteTab
             name="recommended"

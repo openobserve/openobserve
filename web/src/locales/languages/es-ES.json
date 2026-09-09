@@ -848,7 +848,9 @@
     },
     "condition": {
       "loading": "Cargando condiciones...",
-      "loadError": "La condición guardada no se pudo leer y se ha restablecido. Guardar ahora la sobrescribirá."
+      "loadError": "La condición guardada no se pudo leer y se ha restablecido. Guardar ahora la sobrescribirá.",
+      "unknownColumn": "\"{column}\" no está en la carga útil de este desencadenador, por lo que esta condición puede no coincidir nunca.",
+      "unknownColumnSuggestion": "¿Querías decir \"{suggestion}\"?"
     },
     "destination": {
       "createNew": "Crear nuevo destino",
@@ -2560,7 +2562,9 @@
       "title": "Ejecuciones de flujo de trabajo",
       "edit": "Editar flujo de trabajo",
       "debugInEditor": "Depurar en el editor",
-      "staleGraphWarning": "Este flujo de trabajo ha sido editado desde esta ejecución — {count} paso que ejecutó ya no existe, por lo que su estado no se muestra aquí. | Este flujo de trabajo ha sido editado desde esta ejecución — {count} pasos que ejecutó ya no existen, por lo que sus estados no se muestran aquí."
+      "staleGraphWarning": "Este flujo de trabajo ha sido editado desde esta ejecución — {count} paso que ejecutó ya no existe, por lo que su estado no se muestra aquí. | Este flujo de trabajo ha sido editado desde esta ejecución — {count} pasos que ejecutó ya no existen, por lo que sus estados no se muestran aquí.",
+      "hideList": "Ocultar la lista de ejecuciones",
+      "showList": "Mostrar lista de ejecuciones"
     },
     "history": {
       "button": "Ejecuciones",
@@ -2576,10 +2580,21 @@
       "error": "Error",
       "success": "Éxito",
       "failed": "Fallido",
+      "testRun": "Ejecución de prueba",
+      "runType": "Tipo",
+      "testRunTooltip": "Se inició desde el editor. Los pasos de destino envían realmente.",
+      "showTestRuns": "Mostrar {count} ejecución(es) de prueba",
+      "hideTestRuns": "Ocultar ejecuciones de prueba",
       "open": "Historial",
       "openFullView": "Abrir vista completa de ejecuciones",
       "loadError": "Error al cargar ejecuciones",
-      "loadRunError": "Error al cargar esta ejecución"
+      "loadRunError": "Error al cargar esta ejecución",
+      "retry": "Reintentar",
+      "retryTooltip": "Reejecutar esta ejecución fallida a partir de su entrada registrada.",
+      "retryTitle": "¿Reintentar esta ejecución?",
+      "retryMessage": "Esto crea una nueva ejecución a partir de la entrada que registró la ejecución fallida. Los pasos de destino envían realmente.",
+      "retryStarted": "Reintento iniciado: aparece en la lista como una nueva ejecución.",
+      "retryError": "No se pudo reintentar esta ejecución."
     },
     "edit": "Editar",
     "view": "Ver",
@@ -2596,7 +2611,9 @@
     "triggerRequired": "Se requiere un desencadenante",
     "addStepRequired": "Agrega al menos un paso después del desencadenante",
     "connectAllNodes": "Conecta todos los nodos antes de guardar",
+    "branchPathsRequired": "Conecta cada ruta de bifurcación a un paso | 1 paso de bifurcación tiene conexiones que no coinciden con sus rutas. Ábrelo, define las rutas y vuelve a conectarlas. | {count} pasos de bifurcación tienen conexiones que no coinciden con sus rutas.",
     "finishStepsBeforePublish": "{count} paso necesita configuración antes de publicar — resaltado en el lienzo. | {count} pasos necesitan configuración antes de publicar — resaltados en el lienzo.",
+    "noChangesToPublish": "No hay cambios que publicar: este flujo de trabajo ya coincide con la versión publicada.",
     "draft": "Borrador",
     "saveDraft": "Guardar como borrador",
     "publish": "Publicar",
@@ -2643,7 +2660,7 @@
     "loadError": "No se puede cargar el workflow",
     "deleteNode": "Eliminar nodo",
     "deleteNodeTitle": "Eliminar paso",
-    "deleteNodeConfirm": "¿Estás seguro de que quieres eliminar este paso? Esto no se puede deshacer.",
+    "deleteNodeConfirm": "¿Seguro que quieres eliminar este paso? Puedes deshacerlo.",
     "namePlaceholder": "Workflow sin título",
     "renameHint": "Haz clic para renombrar este flujo de trabajo",
     "editMode": "Editar flujo de trabajo",
@@ -2656,11 +2673,29 @@
       "runFromBeginning": "Inicio (disparador)",
       "runFromNote": "Solo se ejecutarán los pasos desde aquí hacia abajo.",
       "inputLabel": "Entrada de muestra",
+      "source": {
+        "sample": "Muestra generada",
+        "run": "De la ejecución: {run}",
+        "edited": "Editado por ti"
+      },
+      "revertInput": "Revertir",
+      "useRunInput": "Usar entrada de la ejecución…",
+      "lastTestRun": "Última ejecución de prueba (esta pestaña)",
+      "runHasNoInput": "Esa ejecución no tiene entrada almacenada para este paso.",
       "invalidJson": "Ingresa un array JSON válido de registros.",
       "resultHint": "Después de ejecutar, cada paso muestra un icono de verificación o error en el lienzo.",
+      "rehearsalOnly": "Pasó solo en una ejecución de prueba: un ensayo con una carga útil de muestra — no es evidencia de que el flujo de trabajo publicado funcione.",
       "notVerified": "Ningún registro llegó a este paso — una condición anterior los filtró, o un paso anterior falló.",
+      "notConfigured": "Este paso no está configurado, así que no hizo nada en esta ejecución. Configúralo y vuelve a probar.",
+      "recordedFailure": "Este paso falló en la última ejecución registrada.",
+      "recordsUnavailable": "Registrado en una ejecución anterior: vuelve a ejecutar la prueba para inspeccionar los registros.",
+      "dirtySelf": "Ha cambiado la configuración desde la última ejecución de este paso. Vuelve a probar el paso.",
+      "dirtyUpstream": "Un paso anterior cambió desde que este paso se ejecutó. Vuelve a probar el paso.",
       "run": "Ejecutar prueba",
       "runError": "No se puede ejecutar la prueba.",
+      "suppressDestinations": "No enviar realmente a los destinos",
+      "suppressDestinationsHint": "Los pasos de destino resuelven su enrutamiento pero no se entrega nada.",
+      "dispatchWarning": "La prueba es real: esta ejecución entregará realmente a {destinations}.",
       "stepResult": {
         "viewHint": "Haz clic para ver entrada / salida",
         "input": "Entrada",
@@ -2686,8 +2721,10 @@
         "status": {
           "ok": "Aprobado",
           "error": "Con error",
-          "skipped": "Sin registros"
-        }
+          "skipped": "Sin registros",
+          "noMatch": "Sin coincidencia"
+        },
+        "suppressed": "Suprimido: no se envió al destino real."
       }
     },
     "linkAlerts": {
@@ -2720,6 +2757,7 @@
       "kindLogic": "Lógica",
       "kindAction": "Acción",
       "condition": "Condición",
+      "branch": "Bifurcación",
       "function": "Función",
       "sendToDestination": "Destino",
       "configComingSoon": "La configuración de {node} llegará en un paso posterior",
@@ -2727,12 +2765,41 @@
       "sectionDestination": "Destino",
       "stepSearchPlaceholder": "Buscar pasos...",
       "stepNoMatch": "Ningún paso coincide con su búsqueda.",
-      "conditionDesc": "Ramificar según una regla",
+      "conditionDesc": "Continuar solo cuando una regla coincida.",
+      "branchDesc": "Enruta cada registro por la primera ruta que coincida.",
+      "branchCaseLabel": "Nombre de la ruta (opcional)",
+      "branchCaseLabelPlaceholder": "p. ej., Severidad alta",
+      "branchAddCase": "Añadir ruta",
+      "branchRemoveCase": "Eliminar ruta",
+      "branchMoveUp": "Subir ruta",
+      "branchMoveDown": "Bajar ruta",
+      "branchPathNumber": "Ruta {index}",
+      "branchElseTitle": "Todo lo demás",
+      "branchElseHint": "Los registros que no coinciden con ninguna ruta anterior salen por aquí.",
+      "branchNoteTitle": "Pautas de bifurcación",
+      "branchNoteFirstMatch": "Las rutas se comprueban de arriba a abajo y gana la PRIMERA coincidencia, por lo que cada registro sale exactamente por una ruta.",
+      "branchNoteUnwired": "Una ruta con nada conectado simplemente descarta sus registros.",
       "functionDesc": "Reformar la carga útil con una función",
       "destinationDesc": "Enviar a un destino",
       "triggerBody": "Se ejecuta cuando se activa una alerta asociada",
       "triggerDataExampleNote": "Solo ejemplo — las columnas reales provienen de la consulta de su alerta.",
       "incidentEventTypeLabel": "Tipo de evento",
+      "incidentEventType": {
+        "created": "Incidente creado",
+        "alert": "Alerta activada",
+        "severity_upgrade": "Gravedad aumentada",
+        "severity_override": "Gravedad sobrescrita",
+        "acknowledged": "Reconocido",
+        "resolved": "Resuelto",
+        "reopened": "Reabierto",
+        "dimension_upgraded": "Dimensión aumentada",
+        "title_changed": "Título cambiado",
+        "assignment_changed": "Asignación cambiada",
+        "comment": "Comentario añadido",
+        "ai_analysis_begin": "Análisis de IA iniciado",
+        "ai_analysis_complete": "Análisis de IA completado",
+        "ai_analysis_failed": "Análisis de IA fallido"
+      },
       "incidentCommonTitle": "Campos comunes (todos los eventos)",
       "incidentSpecificTitle": "Campos específicos del evento",
       "incidentNoExtraFields": "Este evento no añade campos más allá de los comunes.",
@@ -2759,11 +2826,14 @@
       "enable": "Activar paso",
       "disabledBadge": "Desactivado",
       "incompleteBadge": "Configurar más tarde",
+      "unwiredBadge": "Ruta no conectada",
       "unsavedFnTitle": "Cambios de función sin guardar",
       "unsavedFnMessage": "Este paso tiene código de función que no está guardado en su biblioteca. Guárdelo, descarte los cambios o siga editando.",
       "unsavedFnSave": "Guardar función",
       "unsavedFnDiscard": "Descartar cambios",
-      "unsavedFnKeep": "Seguir editando"
+      "unsavedFnKeep": "Seguir editando",
+      "destination": "Destino",
+      "branchPathUnset": "{name} · sin regla establecida"
     },
     "commonFieldsAbove": "campos comunes arriba",
     "canvas": {
@@ -2787,11 +2857,15 @@
       "openStep": "Abrir {name}",
       "runToView": "Ejecute una prueba para ver estos datos.",
       "noBranchItems": "No hay elementos en esta rama.",
+      "forwardedCount": "{out} de {total} registro reenviado | {out} de {total} registros reenviados",
+      "noMatchForwarded": "Sin coincidencia — 0 de {total} registro reenviado | Sin coincidencia — 0 de {total} registros reenviados",
+      "branchDropped": "{count} registro no coincidió con ninguna ruta — se descartó | {count} registros no coincidieron con ninguna ruta — se descartaron",
       "noUpstream": "No hay pasos anteriores.",
       "noRunYet": "Aún no se ha ejecutado.",
       "runLabel": "Ejecución",
       "switchRun": "Cambiar ejecución",
       "notInRun": "Este paso no está incluido en esta ejecución.",
+      "noRunData": "Esta ejecución no almacenó datos del paso.",
       "runTest": "Ejecutar prueba",
       "noItems": "No hay elementos",
       "itemsCount": "{count} elemento | {count} elementos",
@@ -2801,8 +2875,14 @@
       "executeStep": "Ejecutar paso",
       "sample": "Muestra",
       "editStep": "Editar paso",
+      "readOnlyRun": "Estás viendo una ejecución anterior, por lo que la configuración de este paso no se puede cambiar aquí.",
+      "readOnlyRunEdit": "Editar en el flujo de trabajo",
       "testInputHint": "Entrada de prueba — edite y luego ejecute el paso.",
-      "noRunsList": "Aún no hay ejecuciones."
+      "noRunsList": "Aún no hay ejecuciones.",
+      "resetInput": "Restablecer a la muestra",
+      "eventPager": "{n} de {total}",
+      "nextEvent": "Siguiente evento",
+      "prevEvent": "Evento anterior"
     },
     "runOverlay": {
       "banner": "Mostrando datos de paso de una ejecución anterior ({run}). Puede editar libremente — esta ejecución nunca se modifica.",
@@ -2829,6 +2909,8 @@
       "noConfig": "Sin configuración",
       "functionLabel": "Función",
       "destinationLabel": "Destino",
+      "branchPathsLabel": "Rutas",
+      "branchNoRule": "Sin regla establecida",
       "destinationUnsupported": "Tipo no compatible",
       "destinationMissing": "Este destino ya no existe o no se puede leer.",
       "headersLabel": "Encabezados",
@@ -3718,7 +3800,7 @@
       "dynamodbPipelineTitle": "Transmitir DynamoDB → Firehose",
       "dynamodbTagline": "Transmite los cambios de elementos de DynamoDB a OpenObserve mediante Kinesis Firehose.",
       "ec2IamNote": "Requiere un rol de IAM en la instancia con ec2:DescribeTags y ec2:DescribeInstances, para que el agente pueda leer la etiqueta Name y usarla como identificador del host.",
-      "enableSessionReplayDesc": "Session Replay se configura **por separado** de RUM y **no** hereda `rumConfiguration.customEndpoint`. Tampoco agrega una ruta, por lo que necesita la URL completa `/replay` a continuación. Equivocarse en esto es la razón habitual por la que los eventos RUM llegan pero las repeticiones nunca llegan.",
+      "enableSessionReplayDesc": "Session Replay se configura **por separado** de RUM y **no** hereda `rumConfiguration.customEndpoint`. Dale su propia URL base a continuación, igual que la de RUM/Logs. El puente agrega `/replay` por sí mismo, así que **no** lo agregues tú: un `/replay` agregado manualmente duplica la ruta y el backend rechaza cada carga con 401, que es la razón habitual por la que los eventos de RUM llegan pero las grabaciones de sesión nunca lo hacen.",
       "enableSessionReplayTitle": "Habilitar Session Replay",
       "endpointLabel": "Endpoint",
       "externalEndpointVariant": "Endpoint externo",
@@ -3920,18 +4002,16 @@
       "rnInitNote": "Inicializa lo antes posible — el proveedor debe montarse antes de las pantallas que quieres medir.",
       "rnInstallNote": "Los paquetes de session-replay y navegación son opcionales — elimina cualquiera de las líneas si no necesitas grabación de pantalla o seguimiento automático de vistas.",
       "rnNavigationNote": "Sin esto, aún puedes registrar vistas manualmente con `O2Rum.startView()` / `O2Rum.stopView()`.",
-      "rnSessionReplayNote": "Session Replay en React Native está actualmente verificado en Android. En iOS, el SDK agrega su propia ruta a esta URL, por lo que las cargas de repetición aún no llegan a OpenObserve — RUM, registros y fallos no se ven afectados.",
-      "rnTrouble401A": "El `clientToken` es el **token RUM** de esta organización, no el código de acceso de ingesta. Si se rotó, regenéralo desde el encabezado de esta página y reconstruye la aplicación.",
+      "rnSessionReplayNote": "Session Replay está probado tanto en iOS como en Android a partir del SDK 0.1.2. Los segmentos se agrupan en lotes antes de subirse, así que cabe esperar una breve demora antes de que aparezcan.",
+      "rnTrouble401A": "Hay dos causas comunes. Primero, el `clientToken` — debe ser el **token RUM** de esta organización, no el código de acceso de ingesta; si se ha rotado, regenéralo desde el encabezado de esta página y recompila la aplicación. Segundo, específicamente para Session Replay: agregar `/replay` a `customEndpoint` manualmente duplica la ruta (el puente ya lo agrega), y el backend también lo rechaza con 401 — pasa solo la URL base en su lugar.",
       "rnTrouble401Q": "Las solicitudes devuelven 401 o 403",
       "rnTroubleCleartextA": "Android bloquea el tráfico de texto plano por defecto. Para un endpoint `http://`, establece `additionalConfiguration: {config}` en la configuración del SDK y permite texto plano para tu host en la configuración de seguridad de red de la aplicación. Prefiere HTTPS fuera del desarrollo local.",
       "rnTroubleCleartextQ": "La compilación de Android en release/debug no envía nada por HTTP plano",
       "rnTroubleIosBuildA": "Ejecuta `npx pod-install` (o `cd ios && pod install`) después de agregar los paquetes, luego reconstruye desde Xcode o `npx react-native run-ios`. Una recarga solo con Metro no detectará los nuevos módulos nativos.",
       "rnTroubleIosBuildQ": "La compilación de iOS falla o falta el módulo nativo",
-      "rnTroubleIosReplayA": "Limitación conocida del SDK actual de React Native: en iOS agrega su propia ruta al `customEndpoint` de session-replay, por lo que las cargas no alcanzan la ruta `/replay` de OpenObserve. Android usa la URL tal cual y funciona. Los eventos RUM, registros e reportes de fallos no se ven afectados en ninguna de las dos plataformas.",
-      "rnTroubleIosReplayQ": "Session replay funciona en Android pero no en iOS",
       "rnTroubleMaskedA": "Ese es el valor predeterminado. `textAndInputPrivacyLevel`, `imagePrivacyLevel` y `touchPrivacyLevel` tienen como valor predeterminado su configuración más estricta (`MASK_ALL`). Relájalos solo tanto como permita tu política de privacidad — `MASK_SENSITIVE_INPUTS` mantiene ocultas las contraseñas y los campos de tarjetas mientras muestra el resto.",
       "rnTroubleMaskedQ": "Las repeticiones se renderizan pero todo está enmascarado",
-      "rnTroubleNoReplayA": "Casi siempre es el endpoint. Session Replay se configura por separado y **no** hereda `rumConfiguration.customEndpoint`; si se deja sin establecer, toma por defecto una cadena vacía y las cargas no van a ningún lugar visible. Pasa la URL completa explícitamente: `customEndpoint: '{replayUrl}'` — ten en cuenta el `/replay` final, que la URL base del SDK principal no tiene.",
+      "rnTroubleNoReplayA": "Casi siempre es el endpoint. Session Replay se configura por separado y **no** hereda `rumConfiguration.customEndpoint`; si se deja sin establecer, el valor predeterminado es una cadena vacía y las cargas no van a ningún lugar visible. Pasa la URL base explícitamente: `customEndpoint: '{replayUrl}'` — el puente agrega `/replay` por sí mismo (a partir del SDK 0.1.2), así que no agregues ese sufijo tú mismo o las cargas se rechazarán con 401.",
       "rnTroubleNoReplayQ": "Los eventos RUM llegan pero no hay session replay",
       "rnTroubleNothingArrivesA": "Revisa primero el host — mira el cuadro de solución anterior. `localhost` se resuelve al dispositivo, no a tu máquina: usa `10.0.2.2` en el emulador de Android, `localhost` en el simulador de iOS y la IP LAN de tu máquina en un dispositivo físico.",
       "rnTroubleNothingArrivesQ": "No llega nada desde un emulador o dispositivo",
@@ -6418,6 +6498,7 @@
       "firing": "Disparada",
       "ok": "Ok",
       "error": "Error",
+      "pending": "Pendiente",
       "skipped": "Omitidas",
       "unknown": "Desconocido",
       "flapping": "Aleteo",
@@ -6444,6 +6525,7 @@
       "templateRequired": "La plantilla es obligatoria.",
       "validEmails": "¡Agrega correos electrónicos válidos!",
       "silenceNonNegative": "El silencio de notificaciones debe ser mayor o igual que 0",
+      "pendingPeriodNonNegative": "El período de espera debe ser mayor o igual a 0",
       "periodPositive": "El período debe ser mayor que 0",
       "destinationRequired": "Se requiere al menos un destino.",
       "thresholdPositive": "El umbral debe ser mayor que 0",
@@ -6454,6 +6536,7 @@
       "timestampAliasBanned": "{column} no se puede usar como alias de columna. Usa time_bucket en su lugar.",
       "credentialFieldRequired": "{field} es obligatorio",
       "minimumFrequency": "La frecuencia mínima debe ser {minutes} minutos",
+      "pendingPeriodNotMultiple": "No es un múltiplo de la frecuencia de comprobación ({minutes} min) — la alerta puede esperar hasta un intervalo adicional antes de dispararse.",
       "nameMandatoryString": "El nombre es obligatorio y debe ser una cadena válida",
       "orgIdMismatch": "El ID de la organización debe ser igual a {orgId}",
       "streamTypeMandatory": "El tipo de flujo es obligatorio y debe ser uno de: logs, metrics, traces",
@@ -6659,6 +6742,9 @@
       "cooldown": "Enfriamiento",
       "betweenAlerts": "entre alertas",
       "noCooldown": "Sin tiempo de recarga",
+      "pendingPeriod": "Esperar durante",
+      "beforeFiring": "{duration} antes de dispararse",
+      "firesImmediately": "Se dispara inmediatamente",
       "minuteCount": "{n} minuto | {n} minutos",
       "hourCount": "{n} hora | {n} horas",
       "timeRangeCount": "{n} rango de tiempo ({ranges}) | {n} rangos de tiempo ({ranges})",
@@ -6675,6 +6761,7 @@
         "conditionOther": "{threshold} eventos ({operator})",
         "alertMeWhenMinutes": "Alértame cuando {condition} ocurran en cualquier período de {count} minutos",
         "alertMeWhenHours": "Alértame cuando {condition} ocurran en cualquier período de {count} horas",
+        "pendingPeriodClause": ", después de esperar durante {duration}",
         "cooldownClause": ", pero no más de una vez cada {cooldown}",
         "defaultConditions": "Avisarme cuando se cumplan las condiciones configuradas"
       }
@@ -7139,6 +7226,8 @@
       "writeQueryHint": "Escribe una consulta para empezar",
       "sqlEditorHint": "Utilice el editor completo abierto para ejecutar y validar",
       "checkEvery": "Verificar cada",
+      "pendingPeriod": "Esperar durante",
+      "pendingPeriodTooltip": "Espera este tiempo antes de dispararse, de modo que la condición deba mantenerse en lugar de activarse con un solo intervalo malo.",
       "cronExpressionPlaceholder": "0 */10 * * * *",
       "timezonePlaceholder": "zona horaria",
       "onThese": "en estos",
@@ -10617,6 +10706,10 @@
         "success": "Añadido al conjunto de datos",
         "loadError": "No se pudieron cargar los conjuntos de datos",
         "error": "No se pudo añadir este elemento al conjunto de datos"
+      },
+      "playground": {
+        "button": "Abrir en Playground",
+        "hint": "Carga los mensajes de esta llamada en Playground para editarla y volver a ejecutarla."
       }
     },
     "discovery": {
@@ -10700,7 +10793,8 @@
         "scoreConfigs": "Configuraciones de puntuación",
         "targetDataset": "Dataset de destino",
         "progress": "Progreso",
-        "updated": "Actualizado"
+        "updated": "Actualizado",
+        "actions": "Acciones"
       },
       "create": {
         "title": "Nueva cola",
@@ -10754,7 +10848,8 @@
           "refType": "Ref",
           "refId": "Referencia",
           "added": "Añadido",
-          "status": "Estado"
+          "status": "Estado",
+          "actions": "Acciones"
         },
         "status": {
           "pending": "Pendiente",
@@ -10866,6 +10961,8 @@
       "viewAll": "Ver experimentos",
       "baseline": "Línea base",
       "setBaseline": "Establecer línea base",
+      "baselineRequiresCompleted": "Solo una ejecución completada puede establecerse como línea de base.",
+      "baselineError": "No se pudo actualizar la línea de base.",
       "selectForComparison": "Seleccionar para comparación",
       "progress": "{done} de {total} espacios",
       "noScores": "No hay puntuaciones agregadas",
@@ -10976,15 +11073,20 @@
       "addToDataset": "Agregar",
       "detail": {
         "by": "por {user}",
-        "p50Latency": "Latencia P50",
+        "p50Latency": "Latencia P50 de tarea",
         "totalCost": "Costo total",
+        "costBreakdown": "Tarea {task} · Puntuación {scoring}",
+        "partialCostBreakdown": "Tarea {task} · Puntuación {scoring} · Parcial",
         "highDispersion": "Casos de alta dispersión",
         "highDispersionHint": "Filas donde los intentos no coinciden",
         "scoredRows": "{scored}/{total} filas puntuadas",
         "columns": {
           "input": "Entrada",
           "output": "Salida",
-          "latency": "Latencia"
+          "trials": "Pruebas",
+          "dispersion": "Dispersión",
+          "latency": "Latencia",
+          "p50Latency": "Latencia P50"
         },
         "retryFailed": "Reintentar espacios fallidos",
         "loadError": "Error al cargar el experimento",
@@ -11004,7 +11106,7 @@
           "run": "Ejecución"
         },
         "runSummary": "{trials} · {scorers}",
-        "progress": "Progreso",
+        "progress": "Progreso de la tarea",
         "scoring": "Puntuación",
         "scoringDistribution": "{success} exitosos · {failed} fallidos · {pending} pendientes · {skipped} omitidos",
         "compare": "Comparar",
@@ -11022,8 +11124,12 @@
         },
         "slotStatus": "Estado",
         "searchPlaceholder": "Buscar entrada o salida",
+        "searchInputPlaceholder": "Buscar por entrada",
         "statusFilter": "Estado",
-        "statusFilterAll": "Todos los estados"
+        "statusFilterAll": "Todos los estados",
+        "sortByDispersion": "Ordenar por dispersión",
+        "highDispersionBadge": "Alta",
+        "trialNumber": "Prueba {n}"
       },
       "rowDetail": {
         "fallbackTitle": "Fila de experimento",
@@ -11093,6 +11199,16 @@
           "typeCategorical": "Categórico",
           "typeBoolean": "Booleano",
           "threshold": "Umbral",
+          "thresholdTooltip": "Los valores de la línea de base y los candidatos que difieran en {percent} o menos entre sí se consideran sin cambios, no regresados ni mejorados.",
+          "outcomeDimensions": "Criterios de resultado",
+          "outcomeTooltipNone": "No hay columnas seleccionadas — cada fila comparable se mostrará como No comparada.",
+          "outcomeTooltipAll": "Todas las columnas elegibles determinan el resultado de cada fila.",
+          "outcomeTooltipPartial": "Solo {names} determinan el resultado de cada fila. Las demás columnas se muestran, pero no lo afectan.",
+          "allOutcomeDimensions": "Todas las columnas elegibles",
+          "noOutcomeDimensions": "Sin columnas",
+          "selectedOutcomeDimensions": "{count} columna | {count} columnas",
+          "outcomeDimensionUnavailable": "{name} (sin política de comparación)",
+          "dimensionExcludedHint": "Esta columna está excluida de los resultados. Selecciónela en Criterios de resultado para incluirla.",
           "measurePerRow": "Media por fila, entre ensayos",
           "dimensionImproved": "{count} fila mejorada | {count} filas mejoradas",
           "dimensionUnchanged": "{count} fila sin cambios | {count} filas sin cambios",
@@ -11114,10 +11230,13 @@
           "trial": "Ensayo {index}",
           "noContent": "No proporcionado",
           "noOutput": "Sin salida",
-          "absentSide": "No presente en esta ejecución"
+          "absentSide": "No presente en esta ejecución",
+          "enterFullscreen": "Entrar en pantalla completa",
+          "exitFullscreen": "Salir de pantalla completa"
         }
       },
-      "selectionCount": "{count} de 2 seleccionados"
+      "selectionCount": "{count} de 2 seleccionados",
+      "clearBaseline": "Borrar la línea base"
     },
     "datasets": {
       "listTitle": "Conjuntos de datos",
@@ -11171,8 +11290,8 @@
         },
         "searchPlaceholder": "Buscar elementos...",
         "csvImport": {
-          "button": "Subir CSV",
-          "title": "Subir elementos del dataset",
+          "button": "Importar elementos",
+          "title": "Importar elementos del conjunto de datos",
           "description": "Importa elementos del dataset desde un archivo CSV.",
           "fileLabel": "Archivo CSV",
           "placeholder": "Selecciona un archivo CSV",
@@ -11186,7 +11305,7 @@
           "expectedOutput": "Salida esperada",
           "source": "Fuente",
           "tags": "Etiquetas",
-          "version": "Versión",
+          "version": "Versión del conjunto de datos",
           "actions": "Acciones"
         },
         "deleteItemTitle": "Eliminar elemento",
@@ -11200,7 +11319,7 @@
             "item": "Elemento",
             "versions": "Versiones"
           },
-          "versionPill": "{count} Versión | {count} Versiones",
+          "versionPill": "{count} versión | {count} versiones",
           "sourceSection": "Origen",
           "sourceTrace": "Traza",
           "sourceSpan": "Span",
@@ -11665,8 +11784,6 @@
       "title": "Zona de pruebas",
       "runAll": "Ejecutar todo",
       "runAllTooltip": "Ejecutar cada variante",
-      "running": "Ejecutando… ({done}/{total})",
-      "stop": "Detener",
       "recentDrafts": "Borradores recientes",
       "recentDraftsSection": "Este navegador · últimos 10",
       "draftVersus": "vs",
@@ -11675,6 +11792,7 @@
       "fromExperiment": "Clonado del experimento {name}",
       "variables": "Variables",
       "noVariables": "No hay {token} en los mensajes — agrega uno para parametrizar la entrada.",
+      "unusedSampledValue": "Todavía no se ha hecho referencia a {tokens} en un mensaje. Escríbelo en un mensaje para usarlo.",
       "variablePlaceholder": "Valor para {name}",
       "addExpected": "+ Resultado esperado",
       "expectedLabel": "Esperado",
@@ -11689,8 +11807,9 @@
       "variant": "Variante {label}",
       "variantLimit": "El banco de pruebas admite como máximo {max} variantes.",
       "duplicateVariant": "Duplicar variante",
+      "resetVariant": "Restablecer comparativa",
       "removeVariant": "Eliminar variante",
-      "runVariant": "Ejecutar esta variante",
+      "runVariant": "Ejecutar",
       "createExperiment": "Crear experimento",
       "modelPlaceholder": "Selecciona o escribe un modelo",
       "providerUnknown": "Proveedor desconocido",
@@ -11716,6 +11835,13 @@
       "toolsEmpty": "No hay herramientas definidas.",
       "toolCall": "Llamada a herramienta",
       "toolCallNote": "La ejecución se detiene aquí — la Zona de pruebas no ejecuta herramientas.",
+      "toolCallAddToMessages": "Agregar a los mensajes",
+      "toolCallContinueTooltip": "Agrega esta llamada a la conversación y abre su campo de resultado.",
+      "toolCallAddedToMessages": "Llamada a herramienta agregada — introduce el resultado de la herramienta y vuelve a ejecutar.",
+      "toolArgumentsPlaceholder": "Argumentos de la herramienta (JSON)",
+      "toolResultPlaceholder": "Introduce el resultado de la herramienta…",
+      "toolResultRequired": "Introduce el resultado de la herramienta arriba para continuar.",
+      "toolSetupRequired": "Selecciona una herramienta y proporciona sus argumentos para continuar.",
       "toolInvalidJson": "Los parámetros deben ser JSON válido.",
       "schema": "Esquema",
       "schemaOn": "Esquema · Activado",
@@ -11742,6 +11868,7 @@
       "sampleDatasetPlaceholder": "Seleccione un conjunto de datos",
       "sampleSubmit": "Muestra",
       "sampleLoadError": "No se pudieron cargar las filas de ese conjunto de datos.",
+      "sampleApplied": "Muestra cargada {index} de {total} — haz referencia a ella con {token} en un mensaje.",
       "sampleEmpty": "Este conjunto de datos aún no tiene elementos.",
       "noProviderTitle": "El Playground necesita un proveedor de LLM",
       "noProviderBody": "Conecte un proveedor para ejecutar prompts. Tarda aproximadamente un minuto.",
@@ -11754,6 +11881,8 @@
       "reset": "Restablecer",
       "resetTitle": "Restablecer Playground",
       "resetMessage": "¿Borrar todas las variantes, filas y salidas y empezar de nuevo? Esta acción no se puede deshacer.",
+      "resetVariantTitle": "Restablecer banco de pruebas",
+      "resetVariantMessage": "¿Borrar el prompt y la salida de este banco de pruebas? No se puede deshacer.",
       "scrollLeft": "Desplazar a la izquierda",
       "scrollRight": "Desplazar a la derecha",
       "addMessage": "Mensaje",
@@ -11769,6 +11898,7 @@
       "variantSettings": "Ajustes del modelo",
       "messageToolPlaceholder": "Seleccionar herramienta",
       "variablesCount": "Variables · {count}",
+      "newValueTag": "Nuevo",
       "variableUsed": "Referenciada por esta variante",
       "variableUnused": "No referenciada por esta variante — se muestra vacía aquí",
       "addVariable": "Agregar variable",
@@ -11817,7 +11947,9 @@
       "sampleFullView": "Vista completa",
       "sampleBack": "Volver a la lista",
       "sampleInput": "Entrada",
-      "sampleExpected": "Salida esperada"
+      "sampleExpected": "Salida esperada",
+      "fromTrace": "Desde el span de la traza {id}",
+      "openInPlaygroundFailed": "No se pudo abrir este span en el Playground."
     }
   },
   "onlineEvals": {
@@ -11850,12 +11982,14 @@
     },
     "scoreConfigLibrary": {
       "searchPlaceholder": "Buscar configuraciones de puntuación...",
-      "scoreConfigsLabel": "{count} configuración de puntuación | {count} configuraciones de puntuación"
+      "scoreConfigsLabel": "{count} configuración de puntuación | {count} configuraciones de puntuación",
+      "selectedOfTotal": "{selected} de {total} seleccionados"
     },
     "scorerLibrary": {
       "noProvidersMessage": "Crea un Proveedor primero antes de importar scorers de LLM Judge.",
       "searchPlaceholder": "Buscar scorers...",
-      "scorerCountSuffix": "{count} scorer | {count} scorers"
+      "scorerCountSuffix": "{count} scorer | {count} scorers",
+      "selectedOfTotal": "{selected} de {total} seleccionados"
     },
     "title": "Evaluaciones",
     "loadError": "No se pudieron cargar las evaluaciones en línea",
@@ -11972,7 +12106,8 @@
         "legendFalseCount": "falso ({count})",
         "kpis": {
           "average": "Promedio",
-          "p50p95": "P50/ P95",
+          "p50": "P50",
+          "p95": "P95",
           "unhealthy": "Insalubre",
           "healthy": "Saludable",
           "trueRate": "Tasa verdadera",
@@ -12068,7 +12203,8 @@
       "remove": "Eliminar",
       "save": "Guardar",
       "saveAsDraft": "Guardar como borrador",
-      "createAndActivate": "Guardar y activar"
+      "createAndActivate": "Guardar y activar",
+      "testConnection": "Probar conexión"
     },
     "scorerTypeDialog": {
       "title": "Crear un nuevo marcador",
@@ -12081,8 +12217,6 @@
       "remoteCta": "Configurar endpoint"
     },
     "provider": {
-      "sectionStep1": "01",
-      "sectionStep2": "02",
       "backTo": "Volver a Proveedores",
       "createTitle": "Crear proveedor de LLM",
       "editTitle": "Editar proveedor de LLM",
@@ -12091,20 +12225,24 @@
       "nameLabel": "Nombre",
       "typeLabel": "Tipo de proveedor",
       "endpointLabel": "Punto final",
-      "endpointPlaceholder": "Punto final personalizado opcional",
+      "endpointPlaceholder": "URL de completions completa, p. ej. https://your-host/v1/chat/completions",
       "defaultModelLabel": "Modelo predeterminado",
       "availableModelsLabel": "Modelos disponibles",
       "apiKeyLabel": "Clave de API",
       "apiKeyPlaceholder": "Introduce la clave de API",
-      "apiKeyHelp": "Se almacena cifrada en reposo y nunca se vuelve a leer. Deja en blanco al editar para conservar la clave existente.",
+      "apiKeyHelp": "Se almacena cifrada en reposo y nunca se vuelve a leer. Déjela en blanco al guardar los cambios para conservar la clave existente.",
       "authSection": "Autenticación",
-      "authEditNote": "Las credenciales no se pueden volver a leer. Vuelve a introducir la clave de API solo si quieres rotarla.",
+      "authEditNote": "Las credenciales no se pueden volver a leer. Para probar un proveedor que requiera autenticación, ingrese su clave de API.",
       "cannotRename": "No se puede renombrar después de la creación.",
       "availableModelsHelp": "Opcional. Lista separada por comas de los modelos disponibles en este proveedor.",
       "saveError": "No se pudo guardar el proveedor",
       "nameRequired": "Provider name is required",
       "typeRequired": "Provider type is required",
-      "defaultModelRequired": "Default model is required"
+      "defaultModelRequired": "Default model is required",
+      "testRunning": "Probando conexión...",
+      "testPassed": "Conectado",
+      "testFailed": "Conexión fallida",
+      "testError": "No se pudo probar la conexión"
     },
     "scoreConfig": {
       "gteSymbol": "≥",
@@ -13755,6 +13893,7 @@
       "error": "Error",
       "failed": "Falló",
       "failedRuns": "Ejecuaciones fallidas",
+      "errorRuns": "Ejecuciones con error",
       "jumpToLastRun": "Ir a la última ejecución",
       "jumpToLatestData": "Ir a los datos más recientes",
       "lastRun": "Última ejecución",
@@ -13866,6 +14005,11 @@
       "stepsCount": "Pasos ({count})",
       "title": "Detalle de ejecución",
       "viewFullError": "Ver error completo y traza de pila",
+      "errorSourceQuota": "Límite de cuota alcanzado",
+      "errorSourceQuotaDesc": "Los pasos de Sintéticos incluidos de la organización están agotados, por lo que esta ejecución se omitió. Se reanudará automáticamente cuando la organización se suscriba o se aumente su límite de pasos.",
+      "errorSourceDispatch": "Error de envío",
+      "errorSourceQueue": "Error de cola",
+      "errorSourceProbe": "Error de sonda",
       "viewFullErrorBtn": "Ver error completo",
       "detailUrl": "URL",
       "locatorResolution": "Resolución del localizador",
@@ -13917,6 +14061,7 @@
       "durationByLocation": "Duración por ubicación (promedio)",
       "flakyRate": "Flaky Rate",
       "stepsWindowTruncated": "Showing the newest {count} executions ({from} – {to}); the selected range holds more.",
+      "stepsErrorExcluded": "{count} ejecuciones no se pudieron ejecutar (error) y no se muestran aquí — consulta la pestaña Resumen.",
       "retryRate": "Tasa de reintento",
       "statusTimeline": "Línea de tiempo de estado",
       "tabOverview": "Resumen general",
@@ -15572,7 +15717,6 @@
       "reservation": "Reserva",
       "sliType": "Tipo de SLI",
       "owner": "Propietario",
-      "folder": "Carpeta",
       "streamPlaceholder": "Seleccionar un flujo"
     },
     "empty": {
@@ -15602,7 +15746,24 @@
       "sourceHint": "El tiempo de actividad es la fracción del tiempo medido en que esta alerta no se estaba disparando. El tiempo en que no se evaluó — pausada, silenciada o con errores — no se mide y nunca se cuenta como tiempo de actividad.",
       "loadFailed": "No se pudieron cargar las alertas elegibles",
       "noneEligible": "Ninguna alerta en esta organización puede usarse como fuente todavía.",
-      "ineligibleOption": "{name} — {reason}",
+      "ineligible": {
+        "notScheduled": "No programada",
+        "grouped": "Agrupada",
+        "notReferenceable": "No utilizable",
+        "cron": "Programación cron",
+        "tooInfrequent": "Se ejecuta con muy poca frecuencia",
+        "silenced": "Tiene silencio",
+        "other": "No elegible",
+        "why": {
+          "notScheduled": "Las alertas en tiempo real no conservan el historial de ejecuciones que un SLO necesita. Utilice una alerta programada en su lugar.",
+          "grouped": "Esta alerta se divide por grupo y una ejecución no registra qué grupos comprobó. Elimine su agrupación para usarla aquí.",
+          "notReferenceable": "Las alertas SLO y compuestas no pueden ser fuentes. Elija una alerta programada normal.",
+          "cron": "Esta alerta se ejecuta con una programación cron, por lo que sus comprobaciones no están espaciadas uniformemente y no se puede calcular el tiempo de actividad. Cámbiela a un intervalo fijo.",
+          "tooInfrequent": "Esta alerta se ejecuta cada {frequency}. Debe ejecutarse al menos cada {slice} para que no haya períodos sin comprobar.",
+          "silenced": "Después de dispararse, esta alerta deja de comprobar durante un tiempo — y ese intervalo siempre cae en un período problemático, lo que favorecería al SLO. Establezca su período de silencio en 0."
+        },
+        "noFixedInterval": "sin intervalo fijo"
+      },
       "groupingLocked": "Un SLI basado en alertas no se puede agrupar: el libro de disponibilidad registra una ejecución por alerta, no por grupo, por lo que no hay una cobertura por grupo en la que apoyarse.",
       "sourceLink": "Alerta de origen",
       "preview": {
@@ -15710,6 +15871,42 @@
       "editTargetMissing": "Esa alerta ya no está en este SLO.",
       "describeBurn": "Tasa de consumo > {critical} en {long} y {short}",
       "describeBudget": "Presupuesto de errores consumido > {critical}%"
+    },
+    "validation": {
+      "nameRequired": "El nombre del SLO es obligatorio",
+      "nameTooLong": "El nombre del SLO debe tener 256 caracteres o menos",
+      "targetRequired": "El objetivo es obligatorio",
+      "targetRange": "El objetivo debe ser mayor que 0 y menor que 100",
+      "targetPrecision": "El objetivo admite como máximo 3 decimales",
+      "streamTypeRequired": "El tipo de stream es obligatorio",
+      "streamRequired": "El stream es obligatorio",
+      "goodExprRequired": "\"Bueno cuando\" es obligatorio",
+      "promqlGoodRequired": "La consulta de eventos buenos es obligatoria",
+      "promqlTotalRequired": "La consulta total es obligatoria",
+      "aggregateRequired": "La expresión de agregación es obligatoria",
+      "comparatorRequired": "El comparador es obligatorio",
+      "thresholdRequired": "El umbral es obligatorio",
+      "thresholdNumber": "El umbral debe ser un número",
+      "alertSourceRequired": "La alerta de origen es obligatoria",
+      "groupedSlice": "Los SLO agrupados deben usar un intervalo de 5 minutos",
+      "alertCannotGroup": "Un SLI basado en alertas no puede agruparse",
+      "frequencyRequired": "La frecuencia es obligatoria",
+      "frequencyPositive": "La frecuencia debe ser de al menos 1 minuto",
+      "silenceRequired": "El período de silencio es obligatorio",
+      "silenceNonNegative": "El período de silencio no puede ser negativo",
+      "targetsRequired": "Seleccione al menos un destino o flujo de trabajo",
+      "criticalRequired": "El umbral es obligatorio",
+      "criticalPositive": "El umbral debe ser mayor que 0",
+      "budgetRange": "El presupuesto consumido debe ser del 100% o menos",
+      "longWindowRequired": "La ventana larga es obligatoria",
+      "shortWindowRequired": "La ventana corta es obligatoria",
+      "shortInsideLong": "La ventana corta debe ser más corta que la ventana larga"
+    },
+    "duration": {
+      "seconds": "{count} segundo | {count} segundos",
+      "minutes": "{count} minuto | {count} minutos",
+      "hours": "{count} hora | {count} horas",
+      "days": "{count} día | {count} días"
     }
   },
   "promql": {

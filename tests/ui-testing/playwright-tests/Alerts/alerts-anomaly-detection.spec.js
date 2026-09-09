@@ -1,21 +1,46 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// Anomaly Detection — end-to-end suite.
+//
+// Anomaly detection is an alert *type*, not a module: it lives behind the
+// `anomalyDetection` tab on the Alerts list and is edited in the AddAlert
+// wizard's anomaly-config / anomaly-alerting tabs. This file is the single
+// anomaly suite — it replaces the former Anomaly/ folder and the separate
+// anomaly-detection-form-validation spec.
+//
+// ENTERPRISE-ONLY. `anomaly_detection_enabled` is false unless the binary is
+// built with --features enterprise, and OSS CI is not, so every test here skips
+// there. Deliberately absent from the OSS ci_matrix.json — build-ci-matrix.js
+// rejects a spec listed in both the base and the overlay — and registered in
+// o2-enterprise's ci_matrix.ent.json under `append.Alerts` instead.
+
+const http = require('http');
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
-const logData = require('../../fixtures/log.json');
-const { getOrgName, listAnomalyDetections, triggerAnomalyDetection, getAnomalyHistory } = require('../utils/api-helper.js');
+const { listAnomalyDetections, triggerAnomalyDetection, getAnomalyHistory, deleteDestination, deleteTemplate, createAnomalyViaApi, waitForAnomalyListed, createMockDestination, destinationExists, searchSql, seedAnomalyStream, waitForStream,
+  triggerAnomalyTraining, waitForAnomalyTrained } = require('../utils/api-helper.js');
 
-test.describe("Anomaly Detection Alerts", () => {
-  test.describe.configure({ mode: 'serial' });
-
+test.describe('Anomaly Detection', () => {
   let pm;
-  // Generate randomValue ONCE for all serial tests so they can share the same anomaly name
-  const randomValue = Date.now().toString().slice(-6);
-  const testStreamName = 'e2e_automate'; // Stream created by global setup
-  const testAnomalyName = (suffix) => `E2E_Anomaly_${suffix}_${randomValue}`;
+  // One value per run so the lifecycle chain can hand names between tests.
+  // Timestamp ALONE is not unique per worker: workers start within the same
+  // millisecond window and Date.now().slice(-6) then collides, so two of them
+  // share template/destination/anomaly names — the create 500s on a duplicate
+  // key and one worker's cleanup deletes the other's fixtures. The random
+  // suffix is what actually makes the run id unique.
+  const randomValue = `${Date.now().toString().slice(-6)}${Math.random().toString(36).slice(2, 8)}`;
+  const testStreamName = 'e2e_automate';
+  // Unique per call: tests own their own records now, and two parallel tests
+  // asking for the same suffix must not collide on one name.
+  let seq = 0;
+  const anomalyName = (suffix) => `E2E_Anomaly_${suffix}${++seq}_${randomValue}`;
 
-  // Prerequisite template and destination names - ensures Add Alert button is enabled
+  // The Add button is disabled while the org has no destination, so both must
+  // exist before any wizard test can open.
   const prerequisiteTemplateName = `e2e_anomaly_template_${randomValue}`;
   const prerequisiteDestinationName = `e2e_anomaly_dest_${randomValue}`;
+
 
   test.beforeEach(async ({ page }, testInfo) => {
     testLogger.testStart(testInfo.title, testInfo.file);
@@ -23,800 +48,841 @@ test.describe("Anomaly Detection Alerts", () => {
     await navigateToBase(page);
     pm = new PageManager(page);
 
-    // Ensure template and destination exist (same pattern as alerts-e2e-flow.spec.js)
-    // This enables the Add Alert button which is disabled when no destinations exist
     await pm.alertTemplatesPage.ensureTemplateExists(prerequisiteTemplateName);
-    await pm.alertDestinationsPage.ensureDestinationExists(prerequisiteDestinationName, 'DEMO', prerequisiteTemplateName);
+    // Created through the API, like the template above, rather than driven
+    // through the destinations form. The URL must be routable and absolute:
+    // the SSRF guard rejects bare placeholders ("relative URL without a base")
+    // and private IPs, and a silently failed create leaves every test without
+    // the destination it later selects.
+    const dest = await createMockDestination(
+      page,
+      prerequisiteDestinationName,
+      prerequisiteTemplateName,
+    );
+    // beforeEach runs before every test, so only the first call in a worker
+    // actually creates it; the rest come back 400 "already exists" (not 409).
+    // Assert the destination EXISTS rather than pinning a status code — that
+    // is what the tests depend on, and it survives the API changing its mind.
+    if (dest.status !== 200) {
+      expect(
+        await destinationExists(page, prerequisiteDestinationName),
+        `destination ${prerequisiteDestinationName} missing; create returned ${dest.status}: ${JSON.stringify(dest.data)}`,
+      ).toBe(true);
+    }
 
-    // Navigate to alerts page and then to anomaly detection tab
-    await pm.commonActions.navigateToAlerts();
-    await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+    // Presence of the tab is the only honest feature check — AlertList coerces
+    // activeTab back to "all" without rewriting ?tab=, so the URL always lies.
+    const available = await pm.anomalyDetectionPage.isAnomalyDetectionAvailable();
+    test.skip(!available, 'Anomaly Detection is disabled on this build (OSS, or ZO_ANOMALY_DETECTION_DISABLED)');
 
-    // Navigate to anomaly detection tab
     await pm.anomalyDetectionPage.navigateToAnomalyTab();
-
-    // Wait for alerts table to be ready
-    await pm.anomalyDetectionPage.waitForAlertsTable();
-
-    testLogger.info('Test setup completed', { randomValue });
-  });
-
-  // ========================================================================
-  // P0 TESTS - SMOKE / CRITICAL PATH
-  // ========================================================================
-
-  test.describe("Create Anomaly Detection - Builder Mode", () => {
-
-    test("Create basic anomaly detection with builder mode", {
-      tag: ['@smoke', '@anomaly', '@P0', '@all']
-    }, async ({ page }) => {
-      testLogger.info('Creating basic anomaly detection');
-
-      const anomalyName = testAnomalyName('Basic');
-
-      // Start anomaly creation
-      await pm.anomalyDetectionPage.clickAddAnomaly();
-
-      // Fill basic setup
-      await pm.anomalyDetectionPage.fillBasicSetup(
-        anomalyName,
-        'logs',
-        testStreamName
-      );
-
-      // Wait for the anomaly configuration UI to be ready
-      await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
-
-      testLogger.info('Checking if anomaly configuration UI is visible');
-
-      // Click Detection Config tab using POM method
-      await pm.anomalyDetectionPage.clickTab('Detection Config');
-
-      // Configure detection settings using POM methods
-      testLogger.info('Setting detection configuration');
-      await pm.anomalyDetectionPage.setDetectionResolution(5, 'm');
-      await pm.anomalyDetectionPage.setCheckEvery(10, 'm');
-      await pm.anomalyDetectionPage.setLookBackWindow(30, 'm');
-      await pm.anomalyDetectionPage.setTrainingWindow(1);
-
-      // Set retrain interval - it should already be set to "Never" by default, skip if not critical
-      testLogger.info('Skipping retrain interval (default is Never)');
-
-      // Disable alerting using POM method (alerting is enabled by default with no destination)
-      // Tab navigation inside disableAlerting() dismisses any open menus deterministically
-      await pm.anomalyDetectionPage.disableAlerting();
-
-      // Wait for Vue reactivity and validation to complete
-      // clickSave() waits for the save button to be enabled deterministically
-      await pm.anomalyDetectionPage.clickSave();
-
-      // Verify we're back on the list and the anomaly appears
-      const anomalyRow = pm.anomalyDetectionPage.getAnomalyRow(anomalyName);
-      await expect(anomalyRow).toBeVisible({ timeout: 15000 });
-
-      testLogger.info('Anomaly created successfully and visible in list', { anomalyName });
-    });
-
-    test("View anomaly detection in list", {
-      tag: ['@smoke', '@anomaly', '@P0', '@all']
-    }, async ({ page }) => {
-      testLogger.info('Viewing anomaly in list');
-
-      const anomalyName = testAnomalyName('Basic');
-
-      // Verify anomaly appears in the alerts list
-      const anomalyRow = pm.anomalyDetectionPage.getAnomalyRow(anomalyName);
-      await expect(anomalyRow).toBeVisible({ timeout: 10000 });
-
-      // Verify action buttons using POM methods
-      await pm.anomalyDetectionPage.expectEditButtonVisible(anomalyName);
-      await pm.anomalyDetectionPage.expectPauseButtonVisible(anomalyName);
-
-      testLogger.info('Anomaly visible in list with action buttons');
-    });
-
-    test("Edit existing anomaly detection", {
-      tag: ['@smoke', '@anomaly', '@P0', '@all']
-    }, async ({ page }) => {
-      testLogger.info('Editing anomaly detection');
-
-      const anomalyName = testAnomalyName('Basic');
-
-      // Click edit button using POM method
-      await pm.anomalyDetectionPage.editAnomaly(anomalyName);
-
-      // Verify wizard opens in edit mode
-      await pm.anomalyDetectionPage.expectEditModeOpen();
-
-      // Change training window to 7 days
-      await pm.anomalyDetectionPage.setTrainingWindow(7);
-
-      // Verify seasonality text changes
-      await pm.anomalyDetectionPage.expectSeasonalityText('hour + day-of-week');
-
-      // Save changes using POM method
-      await pm.anomalyDetectionPage.clickSave();
-
-      // Verify still in list
-      const anomalyRow = pm.anomalyDetectionPage.getAnomalyRow(anomalyName);
-      await expect(anomalyRow).toBeVisible({ timeout: 10000 });
-
-      testLogger.info('Anomaly edited successfully');
-    });
-
-    test("Delete anomaly detection", {
-      tag: ['@smoke', '@anomaly', '@P0', '@all']
-    }, async ({ page }) => {
-      testLogger.info('Deleting anomaly detection');
-
-      const anomalyName = testAnomalyName('Basic');
-
-      // Delete anomaly using POM method
-      await pm.anomalyDetectionPage.deleteAnomaly(anomalyName);
-
-      // Verify removed from list
-      const anomalyRow = pm.anomalyDetectionPage.getAnomalyRow(anomalyName);
-      await expect(anomalyRow).not.toBeVisible({ timeout: 10000 });
-
-      testLogger.info('Anomaly deleted successfully');
-    });
-  });
-
-  // ========================================================================
-  // P1 TESTS - FUNCTIONAL / MAIN WORKFLOWS
-  // ========================================================================
-
-  test.describe("Create Anomaly Detection - SQL Mode", () => {
-
-    test("Create anomaly with SQL mode", {
-      tag: ['@functional', '@anomaly', '@P1', '@all']
-    }, async ({ page }) => {
-      testLogger.info('Creating anomaly with SQL mode');
-
-      const anomalyName = testAnomalyName('SQL');
-
-      // Start creation
-      await pm.anomalyDetectionPage.clickAddAnomaly();
-
-      await pm.anomalyDetectionPage.fillBasicSetup(anomalyName, 'logs', testStreamName);
-
-      // Configure with SQL
-      await pm.anomalyDetectionPage.clickTab('Detection Config');
-      await pm.anomalyDetectionPage.selectQueryMode('sql');
-
-      // Verify SQL editor appears (Monaco editor takes time to initialize)
-      await pm.anomalyDetectionPage.expectSqlEditorVisible();
-
-      // Set custom SQL - use simple count without invalid field references
-      const customSql = `SELECT histogram(_timestamp, '10m') AS time_bucket, count(*) AS value FROM "${testStreamName}" GROUP BY time_bucket ORDER BY time_bucket`;
-      await pm.anomalyDetectionPage.setSqlQuery(customSql);
-
-      // Set intervals
-      await pm.anomalyDetectionPage.setDetectionResolution(10, 'm');
-      await pm.anomalyDetectionPage.setCheckEvery(30, 'm');
-      await pm.anomalyDetectionPage.setLookBackWindow(1, 'h');
-      await pm.anomalyDetectionPage.setTrainingWindow(3);
-      await pm.anomalyDetectionPage.setRetrainInterval('Never');
-
-      // Disable alerting (required - alerting is enabled by default with no destination)
-      await pm.anomalyDetectionPage.disableAlerting();
-
-      // Save
-      await pm.anomalyDetectionPage.clickSave();
-
-      // Verify created
-      await pm.anomalyDetectionPage.expectAnomalyInList(anomalyName);
-
-      testLogger.info('SQL mode anomaly created successfully');
-    });
-  });
-
-  test.describe("Anomaly Configuration - Builder Mode", () => {
-
-    test("Create anomaly with detection function (avg)", {
-      tag: ['@functional', '@anomaly', '@P1', '@all']
-    }, async ({ page }) => {
-      testLogger.info('Creating anomaly with avg function');
-
-      const anomalyName = testAnomalyName('Avg');
-
-      await pm.anomalyDetectionPage.clickAddAnomaly();
-
-      await pm.anomalyDetectionPage.fillBasicSetup(anomalyName, 'logs', testStreamName);
-
-      await pm.anomalyDetectionPage.clickTab('Detection Config');
-      await pm.anomalyDetectionPage.selectQueryMode('builder');
-
-      // Configure with avg function - use 'code' field which exists in test data
-      await pm.anomalyDetectionPage.configureBuilderMode({
-        function: 'avg',
-        field: 'code'
-      });
-
-      // Verify field selector appeared
-      await pm.anomalyDetectionPage.expectDetectionFieldVisible();
-
-      // Set other config
-      await pm.anomalyDetectionPage.setDetectionResolution(5, 'm');
-      await pm.anomalyDetectionPage.setCheckEvery(15, 'm');
-      await pm.anomalyDetectionPage.setLookBackWindow(30, 'm');
-      await pm.anomalyDetectionPage.setTrainingWindow(1);
-      await pm.anomalyDetectionPage.setRetrainInterval('1 day');
-
-      // Disable alerting (required - alerting is enabled by default with no destination)
-      await pm.anomalyDetectionPage.disableAlerting();
-
-      await pm.anomalyDetectionPage.clickSave();
-
-      await pm.anomalyDetectionPage.expectAnomalyInList(anomalyName);
-
-      testLogger.info('Anomaly with avg function created successfully');
-    });
-
-    test("Add filters in builder mode", {
-      tag: ['@functional', '@anomaly', '@P1', '@all']
-    }, async ({ page }) => {
-      testLogger.info('Creating anomaly with filters');
-
-      const anomalyName = testAnomalyName('Filtered');
-
-      await pm.anomalyDetectionPage.clickAddAnomaly();
-
-      await pm.anomalyDetectionPage.fillBasicSetup(anomalyName, 'logs', testStreamName);
-
-      await pm.anomalyDetectionPage.clickTab('Detection Config');
-      await pm.anomalyDetectionPage.selectQueryMode('builder');
-
-      // Add filters - use fields that exist in the test stream
-      await pm.anomalyDetectionPage.addFilter('code', '=', '200');
-      await pm.anomalyDetectionPage.addFilter('stream', 'Contains', 'stdout');
-
-      // Verify filters added using POM method
-      await pm.anomalyDetectionPage.expectFilterCount(2);
-
-      // Complete config
-      await pm.anomalyDetectionPage.setDetectionResolution(5, 'm');
-      await pm.anomalyDetectionPage.setCheckEvery(10, 'm');
-      await pm.anomalyDetectionPage.setLookBackWindow(30, 'm');
-      await pm.anomalyDetectionPage.setTrainingWindow(1);
-
-      // Disable alerting (required - alerting is enabled by default with no destination)
-      await pm.anomalyDetectionPage.disableAlerting();
-
-      await pm.anomalyDetectionPage.clickSave();
-      await pm.anomalyDetectionPage.expectAnomalyInList(anomalyName);
-
-      testLogger.info('Anomaly with filters created successfully');
-    });
-  });
-
-  test.describe("Anomaly Alerting Configuration", () => {
-
-    test("Enable alerting with destinations (CI/CD compatible)", {
-      tag: ['@functional', '@anomaly', '@P1', '@all', '@cicd']
-    }, async ({ page }) => {
-      testLogger.info('Creating anomaly with alerting enabled');
-
-      // Use the prerequisite destination created in beforeEach
-      const testDestinationName = prerequisiteDestinationName;
-
-      const anomalyName = testAnomalyName('WithAlerts');
-
-      await pm.anomalyDetectionPage.clickAddAnomaly();
-
-      await pm.anomalyDetectionPage.fillBasicSetup(anomalyName, 'logs', testStreamName);
-
-      // Config tab
-      await pm.anomalyDetectionPage.clickTab('Detection Config');
-      await pm.anomalyDetectionPage.setDetectionResolution(5, 'm');
-      await pm.anomalyDetectionPage.setCheckEvery(10, 'm');
-      await pm.anomalyDetectionPage.setLookBackWindow(30, 'm');
-      await pm.anomalyDetectionPage.setTrainingWindow(1);
-
-      // Alerting tab
-      await pm.anomalyDetectionPage.clickTab('Alerting');
-
-      // Alerting should already be enabled by default, but ensure it's on
-      await pm.anomalyDetectionPage.toggleNotifications(true);
-
-      // Verify destination selector appears
-      await pm.anomalyDetectionPage.expectDestinationSelectorVisible();
-
-      // Select the prerequisite destination created in beforeEach using POM method
-      const destFound = await pm.anomalyDetectionPage.selectDestination(testDestinationName);
-
-      // Verify destination error is gone (destination selected)
-      const errorVisible = await pm.anomalyDetectionPage.isDestinationErrorVisible();
-      if (errorVisible || !destFound) {
-        testLogger.warn('Destination error still visible - destination may not be selected');
-        // Cancel and skip test
-        await pm.anomalyDetectionPage.clickBack();
-        test.skip(true, 'Could not select destination in dropdown');
-        return;
-      }
-
-      // Save anomaly
-      await pm.anomalyDetectionPage.clickSave();
-      await pm.anomalyDetectionPage.expectAnomalyInList(anomalyName);
-
-      testLogger.info('Anomaly with alerting created successfully');
-    });
-
-    test("Refresh destinations list", {
-      tag: ['@functional', '@anomaly', '@P1', '@all']
-    }, async ({ page }) => {
-      testLogger.info('Testing refresh destinations');
-
-      const anomalyName = testAnomalyName('RefreshDest');
-
-      await pm.anomalyDetectionPage.clickAddAnomaly();
-
-      await pm.anomalyDetectionPage.fillBasicSetup(anomalyName, 'logs', testStreamName);
-
-      await pm.anomalyDetectionPage.clickTab('Detection Config');
-      await pm.anomalyDetectionPage.setDetectionResolution(5, 'm');
-      await pm.anomalyDetectionPage.setCheckEvery(10, 'm');
-      await pm.anomalyDetectionPage.setLookBackWindow(30, 'm');
-      await pm.anomalyDetectionPage.setTrainingWindow(1);
-
-      await pm.anomalyDetectionPage.clickTab('Alerting');
-      await pm.anomalyDetectionPage.toggleNotifications(true);
-
-      // Click refresh button
-      await pm.anomalyDetectionPage.refreshDestinations();
-
-      // Verify no errors (destinations reloaded)
-      await pm.anomalyDetectionPage.expectDestinationSelectorVisible();
-
-      // Cancel creation
-      await pm.anomalyDetectionPage.clickBack();
-
-      testLogger.info('Destinations refresh works');
-    });
-  });
-
-  test.describe("Anomaly Management Operations", () => {
-
-    // TODO: Status badge doesn't update to 'disabled' after pause - needs backend investigation
-    test.skip("Pause and resume anomaly detection", {
-      tag: ['@functional', '@anomaly', '@P1', '@all']
-    }, async ({ page }) => {
-      testLogger.info('Testing pause and resume');
-
-      // Create an anomaly first
-      const anomalyName = testAnomalyName('PauseResume');
-
-      await pm.anomalyDetectionPage.createAnomalyDetection({
-        name: anomalyName,
-        streamType: 'logs',
-        streamName: testStreamName,
-        detection: {
-          mode: 'builder',
-          function: 'count'
-        },
-        schedule: {
-          resolution: { value: 5, unit: 'm' },
-          checkEvery: { value: 10, unit: 'm' },
-          lookBack: { value: 30, unit: 'm' }
-        },
-        training: {
-          window: 1,
-          retrain: 'Never'
-        }
-      });
-
-      // Wait for anomaly to be ready (may take time for training)
-      // In real scenario, we'd poll for status or use a fixture with pre-trained anomaly
-      // Use deterministic wait for the pause button to be ready instead of arbitrary delay
-      const pauseRow = pm.anomalyDetectionPage.getAnomalyRow(anomalyName);
-      await expect(pauseRow).toBeVisible({ timeout: 15000 });
-
-      // Pause
-      await pm.anomalyDetectionPage.clickPauseAnomaly(anomalyName);
-
-      // Verify status changes to disabled
-      await pm.anomalyDetectionPage.expectAnomalyStatus(anomalyName, 'disabled');
-
-      // Resume
-      await pm.anomalyDetectionPage.clickResumeAnomaly(anomalyName);
-
-      // Verify status changes back
-      // Note: Status may be "waiting" or "ready" depending on training state
-      // We just verify it's no longer "disabled"
-      const row = pm.anomalyDetectionPage.getAnomalyRow(anomalyName);
-      // OBadge migration: use data-test selector instead of the legacy badge class
-      await expect(row.locator('[data-test="anomaly-detection-status-badge"]')).not.toContainText('disabled', { ignoreCase: true, timeout: 5000 });
-
-      testLogger.info('Pause/resume works correctly');
-    });
-
-    test("Trigger anomaly detection via UI", {
-      tag: ['@functional', '@anomaly', '@P1', '@all', '@cicd']
-    }, async ({ page }) => {
-      testLogger.info('Testing trigger anomaly detection');
-
-      // This test verifies that anomaly detection can be triggered manually
-      // Similar to how regular alerts can be triggered in CI/CD pipelines
-
-      // First, we need an existing anomaly in the list
-      // The P0 tests should have left some anomalies or we create one
-      const anomalyName = testAnomalyName('Trigger');
-
-      // Create anomaly first using POM methods
-      await pm.anomalyDetectionPage.clickAddAnomaly();
-      await pm.anomalyDetectionPage.fillBasicSetup(anomalyName, 'logs', testStreamName);
-
-      // Set minimal config
-      await pm.anomalyDetectionPage.clickTab('Detection Config');
-      await pm.anomalyDetectionPage.setDetectionResolution(5, 'm');
-      await pm.anomalyDetectionPage.setCheckEvery(10, 'm');
-      await pm.anomalyDetectionPage.setLookBackWindow(30, 'm');
-      await pm.anomalyDetectionPage.setTrainingWindow(1);
-
-      // Disable alerting to allow save
-      await pm.anomalyDetectionPage.disableAlerting();
-
-      // Save
-      await pm.anomalyDetectionPage.clickSave();
-
-      // Verify created
-      await pm.anomalyDetectionPage.expectAnomalyInList(anomalyName);
-
-      // Now trigger detection via the UI menu using POM method
-      testLogger.info('Triggering detection via UI');
-      await pm.anomalyDetectionPage.clickTriggerDetection(anomalyName);
-
-      testLogger.info('Trigger anomaly detection test completed');
-    });
-
-    test("Trigger anomaly detection via API", {
-      tag: ['@functional', '@anomaly', '@P1', '@all', '@cicd', '@api']
-    }, async ({ page }) => {
-      testLogger.info('Testing trigger anomaly detection via API');
-
-      // List anomaly detections to find one we can trigger
-      testLogger.info('Listing anomaly detections via API');
-      const anomalies = await listAnomalyDetections(page);
-
-      testLogger.info('Anomaly list response', { count: anomalies.length });
-
-      if (anomalies.length > 0) {
-        // Try to trigger the first anomaly that's enabled and trained
-        const targetAnomaly = anomalies.find(a => a.enabled && (a.is_trained || a.status === 'ready')) || anomalies[0];
-        const anomalyId = targetAnomaly.anomaly_id || targetAnomaly.id;
-        const anomalyName = targetAnomaly.name;
-
-        testLogger.info('Triggering detection for anomaly', { anomalyId, anomalyName, status: targetAnomaly.status });
-
-        // Trigger detection via API
-        const triggerResp = await triggerAnomalyDetection(page, anomalyId);
-
-        testLogger.info('Trigger detection response', { status: triggerResp.status, data: triggerResp.data });
-
-        // 200 = success, 400/404 = anomaly not ready/found
-        if (triggerResp.status === 200) {
-          testLogger.info('Anomaly detection triggered successfully via API');
-        } else if (triggerResp.status === 400 || triggerResp.status === 404) {
-          testLogger.info('Anomaly not ready for detection trigger', { reason: triggerResp.data?.message || 'Unknown' });
-        } else {
-          testLogger.warn('Unexpected response from trigger API', { status: triggerResp.status, data: triggerResp.data });
-        }
-
-        // Optional: Check detection history to verify trigger was recorded
-        const historyResp = await getAnomalyHistory(page, anomalyId);
-        testLogger.info('Detection history', { status: historyResp.status, entries: historyResp.data?.length || 0 });
-
-      } else {
-        testLogger.info('No anomaly detections found to trigger - test will be skipped');
-      }
-
-      testLogger.info('API trigger test completed');
-    });
-  });
-
-  test.describe("Sensitivity and Preview", () => {
-
-    test("Data preview chart populates automatically", {
-      tag: ['@functional', '@anomaly', '@P1', '@all']
-    }, async ({ page }) => {
-      testLogger.info('Testing data preview');
-
-      const anomalyName = testAnomalyName('Preview');
-
-      await pm.anomalyDetectionPage.clickAddAnomaly();
-
-      // Nothing to query yet, so the Preview card sits in its empty state
-      await pm.anomalyDetectionPage.expectDataPreviewEmptyState();
-
-      await pm.anomalyDetectionPage.fillBasicSetup(anomalyName, 'logs', testStreamName);
-
-      await pm.anomalyDetectionPage.clickTab('Detection Config');
-      await pm.anomalyDetectionPage.selectQueryMode('builder');
-
-      // Set config to enable preview
-      await pm.anomalyDetectionPage.setDetectionResolution(5, 'm');
-      await pm.anomalyDetectionPage.setCheckEvery(10, 'm');
-      await pm.anomalyDetectionPage.setLookBackWindow(30, 'm');
-      await pm.anomalyDetectionPage.setTrainingWindow(1);
-
-      // The chart populates itself once a stream is selected — no Load data button
-      await pm.anomalyDetectionPage.waitForDataPreview();
-
-      // Cancel without saving
-      await pm.anomalyDetectionPage.clickBack();
-
-      testLogger.info('Preview chart loaded successfully');
-    });
-
-    test("Adjust sensitivity tier and percentile", {
-      tag: ['@functional', '@anomaly', '@P1', '@all']
-    }, async ({ page }) => {
-      testLogger.info('Testing sensitivity adjustment');
-
-      const anomalyName = testAnomalyName('Sensitivity');
-
-      await pm.anomalyDetectionPage.clickAddAnomaly();
-
-      await pm.anomalyDetectionPage.fillBasicSetup(anomalyName, 'logs', testStreamName);
-
-      await pm.anomalyDetectionPage.clickTab('Detection Config');
-
-      // Resolution feeds the hint below the control
-      await pm.anomalyDetectionPage.setDetectionResolution(5, 'm');
-
-      await pm.anomalyDetectionPage.scrollToSensitivitySection();
-
-      // Picking a tier sets the percentile it stands for
-      await pm.anomalyDetectionPage.selectSensitivityTier(95);
-      await pm.anomalyDetectionPage.expectSensitivityTierActive(95);
-
-      const tierPercentile = await pm.anomalyDetectionPage.getSensitivityPercentile();
-      expect(tierPercentile).toBe('95');
-
-      // Typing a percentile re-highlights the tier that matches it
-      await pm.anomalyDetectionPage.setSensitivityPercentile(99);
-      await pm.anomalyDetectionPage.expectSensitivityTierActive(99);
-
-      // Hint restates the percentile as an anomaly rate
-      const hint = await pm.anomalyDetectionPage.getSensitivityHint();
-      testLogger.info('Sensitivity updated', { hint });
-      expect(hint).toContain('1%');
-
-      await pm.anomalyDetectionPage.clickBack();
-
-      testLogger.info('Sensitivity adjustment works');
-    });
-  });
-
-  test.describe("Summary Tab", () => {
-
-    test("View anomaly summary", {
-      tag: ['@functional', '@anomaly', '@P1', '@all']
-    }, async ({ page }) => {
-      testLogger.info('Testing summary view');
-
-      const anomalyName = testAnomalyName('Summary');
-
-      await pm.anomalyDetectionPage.clickAddAnomaly();
-
-      await pm.anomalyDetectionPage.fillBasicSetup(anomalyName, 'logs', testStreamName);
-
-      // Fill config
-      await pm.anomalyDetectionPage.clickTab('Detection Config');
-      await pm.anomalyDetectionPage.setDetectionResolution(5, 'm');
-      await pm.anomalyDetectionPage.setCheckEvery(10, 'm');
-      await pm.anomalyDetectionPage.setLookBackWindow(30, 'm');
-      await pm.anomalyDetectionPage.setTrainingWindow(7);
-
-      // Go to summary
-      await pm.anomalyDetectionPage.clickTab('Summary');
-
-      // Verify summary text appears using POM methods
-      // expectSummaryVisible() waits for the summary container deterministically
-      await pm.anomalyDetectionPage.expectSummaryVisible();
-
-      // Verify summary contains key information
-      await pm.anomalyDetectionPage.expectSummaryContains(testStreamName);
-      await pm.anomalyDetectionPage.expectSummaryContains('7'); // training window days
-
-      await pm.anomalyDetectionPage.clickBack();
-
-      testLogger.info('Summary displayed correctly');
-    });
-  });
-
-  test.describe("Tab Switching", () => {
-
-    test.skip("Switch between Builder and SQL tabs", {
-      tag: ['@functional', '@anomaly', '@P1', '@all']
-    }, async ({ page }) => {
-      testLogger.info('Testing tab switching');
-
-      const anomalyName = testAnomalyName('TabSwitch');
-
-      await pm.anomalyDetectionPage.clickAddAnomaly();
-
-      await pm.anomalyDetectionPage.fillBasicSetup(anomalyName, 'logs', testStreamName);
-
-      await pm.anomalyDetectionPage.clickTab('Detection Config');
-
-      // Start in Builder mode
-      await pm.anomalyDetectionPage.selectQueryMode('builder');
-
-      // Add a filter
-      await pm.anomalyDetectionPage.addFilter('status', '=', 'error');
-
-      // Switch to SQL
-      await pm.anomalyDetectionPage.selectQueryMode('sql');
-
-      // Verify SQL editor appears and query was generated (should contain the filter)
-      await pm.anomalyDetectionPage.expectSqlEditorVisible();
-      // SQL should contain the WHERE clause for the filter
-      // (This is implementation-dependent, may need adjustment)
-
-      // Switch back to Builder
-      await pm.anomalyDetectionPage.selectQueryMode('builder');
-
-      // Verify filter still there using POM method
-      await pm.anomalyDetectionPage.expectFilterRowWithField('status');
-
-      await pm.anomalyDetectionPage.clickBack();
-
-      testLogger.info('Tab switching preserves data');
-    });
-  });
-
-  // ========================================================================
-  // P2 TESTS - EDGE CASES
-  // ========================================================================
-
-  test.describe("Validation Tests", () => {
-
-    test.skip("Validation: Missing required fields", {
-      tag: ['@edge-case', '@anomaly', '@P2', '@all']
-    }, async ({ page }) => {
-      testLogger.info('Testing validation errors');
-
-      await pm.anomalyDetectionPage.clickAddAnomaly();
-
-      // Try to proceed without filling required fields
-      const anomalyName = testAnomalyName('Validation');
-
-      await pm.anomalyDetectionPage.fillBasicSetup(anomalyName, 'logs', testStreamName);
-
-      await pm.anomalyDetectionPage.clickTab('Detection Config');
-
-      // Clear detection window to trigger validation
-      await pm.anomalyDetectionPage.clearDetectionWindowValue();
-
-      // Try to save - should show validation error
-      await pm.anomalyDetectionPage.clickSaveForValidation();
-
-      // Verify error appears
-      await pm.anomalyDetectionPage.expectValidationError(pm.anomalyDetectionPage.selectors.detectionWindowError);
-
-      // Fix the error
-      await pm.anomalyDetectionPage.setDetectionResolution(5, 'm');
-      await pm.anomalyDetectionPage.setCheckEvery(10, 'm');
-      await pm.anomalyDetectionPage.setLookBackWindow(30, 'm');
-      await pm.anomalyDetectionPage.setTrainingWindow(1);
-
-      // Disable alerting (required - alerting is enabled by default with no destination)
-      await pm.anomalyDetectionPage.disableAlerting();
-
-      // Now save should work
-      await pm.anomalyDetectionPage.clickSave();
-
-      await pm.anomalyDetectionPage.expectAnomalyInList(anomalyName);
-
-      testLogger.info('Validation works correctly');
-    });
-
-    test("Validation: Destination required when alerting enabled", {
-      tag: ['@edge-case', '@anomaly', '@P2', '@all']
-    }, async ({ page }) => {
-      testLogger.info('Testing destination validation');
-
-      const anomalyName = testAnomalyName('DestValidation');
-
-      await pm.anomalyDetectionPage.clickAddAnomaly();
-
-      await pm.anomalyDetectionPage.fillBasicSetup(anomalyName, 'logs', testStreamName);
-
-      await pm.anomalyDetectionPage.clickTab('Detection Config');
-      await pm.anomalyDetectionPage.setDetectionResolution(5, 'm');
-      await pm.anomalyDetectionPage.setCheckEvery(10, 'm');
-      await pm.anomalyDetectionPage.setLookBackWindow(30, 'm');
-      await pm.anomalyDetectionPage.setTrainingWindow(1);
-
-      // Enable alerting without selecting destinations
-      await pm.anomalyDetectionPage.clickTab('Alerting');
-      await pm.anomalyDetectionPage.toggleNotifications(true);
-
-      // Don't select any destinations
-
-      // Try to save
-      await pm.anomalyDetectionPage.clickSaveForValidation();
-
-      // Verify error message
-      await pm.anomalyDetectionPage.expectValidationError(pm.anomalyDetectionPage.selectors.destinationError);
-
-      // Verify error text
-      await pm.anomalyDetectionPage.expectDestinationErrorContains('At least one destination is required');
-
-      // Cancel
-      await pm.anomalyDetectionPage.clickBack();
-
-      testLogger.info('Destination validation works');
-    });
-
-    test("Validation: SQL mode timestamp alias error", {
-      tag: ['@edge-case', '@anomaly', '@P2', '@all']
-    }, async ({ page }) => {
-      testLogger.info('Testing timestamp alias validation');
-
-      const anomalyName = testAnomalyName('TimestampError');
-
-      await pm.anomalyDetectionPage.clickAddAnomaly();
-
-      await pm.anomalyDetectionPage.fillBasicSetup(anomalyName, 'logs', testStreamName);
-
-      await pm.anomalyDetectionPage.clickTab('Detection Config');
-      await pm.anomalyDetectionPage.selectQueryMode('sql');
-
-      // Set invalid SQL with _timestamp as alias
-      const invalidSql = `SELECT _timestamp AS _timestamp, count(*) AS value FROM "${testStreamName}" GROUP BY _timestamp ORDER BY _timestamp`;
-      await pm.anomalyDetectionPage.setSqlQuery(invalidSql);
-
-      // Set other required fields
-      await pm.anomalyDetectionPage.setDetectionResolution(5, 'm');
-      await pm.anomalyDetectionPage.setCheckEvery(10, 'm');
-      await pm.anomalyDetectionPage.setLookBackWindow(30, 'm');
-      await pm.anomalyDetectionPage.setTrainingWindow(1);
-
-      // Verify error appears
-      await pm.anomalyDetectionPage.expectValidationError(pm.anomalyDetectionPage.selectors.customSqlTimestampError);
-
-      await pm.anomalyDetectionPage.expectTimestampErrorContains('_timestamp cannot be used as a column alias');
-
-      // Save should be blocked
-      await pm.anomalyDetectionPage.expectSaveButtonDisabled();
-
-      await pm.anomalyDetectionPage.clickBack();
-
-      testLogger.info('Timestamp alias validation works');
-    });
   });
 
   test.afterEach(async ({}, testInfo) => {
     testLogger.testEnd(testInfo.title, testInfo.status);
   });
 
-  // Cleanup: Delete all test anomalies
-  test.afterAll(async ({ browser }) => {
-    testLogger.info('Running test cleanup - deleting test anomalies');
+  // ════════════════════════════════════════════════════════════════════════
+  // Form validation — the wizard never disables Save; it validates on click
+  // ════════════════════════════════════════════════════════════════════════
 
-    // Verify required env vars are set (auth is handled by api-helper.js)
-    if (!process.env.ZO_BASE_URL || !process.env.ZO_ROOT_USER_EMAIL || !process.env.ZO_ROOT_USER_PASSWORD || !process.env.ORGNAME) {
+  test.describe('Form validation', () => {
+    test('blank name blocks save and paints the name field', {
+      tag: ['@anomaly', '@P0', '@smoke', '@all'],
+    }, async () => {
+      await pm.anomalyDetectionPage.openAddAnomalyWizard();
+
+      // OForm keeps submit enabled and validates on click, so the offending
+      // field gets painted rather than the user guessing why a grey button
+      // does nothing.
+      await expect(pm.anomalyDetectionPage.getSaveBtnLocator()).toBeEnabled();
+      await pm.anomalyDetectionPage.save();
+
+      await expect(pm.anomalyDetectionPage.getNameErrorLocator()).toHaveText('Anomaly name is required.');
+      await expect(
+        pm.anomalyDetectionPage.getToastLocator(/fix the highlighted fields/i),
+      ).toBeVisible();
+
+      await pm.anomalyDetectionPage.cancel();
+    });
+
+    test('stream type select is present when the wizard opens', {
+      tag: ['@anomaly', '@P0', '@smoke', '@all'],
+    }, async ({ page }) => {
+      await pm.anomalyDetectionPage.openAddAnomalyWizard();
+      await expect(pm.anomalyDetectionPage.getStreamTypeSelectLocator()).toBeVisible();
+      await pm.anomalyDetectionPage.cancel();
+    });
+
+    test('cancel closes the wizard and returns to the list', {
+      tag: ['@anomaly', '@P2', '@functional', '@all'],
+    }, async ({ page }) => {
+      await pm.anomalyDetectionPage.openAddAnomalyWizard();
+      await pm.anomalyDetectionPage.cancel();
+      await expect(pm.anomalyDetectionPage.getListTableLocator()).toBeVisible();
+    });
+
+    test('destination is required once notifications are enabled', {
+      tag: ['@anomaly', '@P1', '@functional', '@all'],
+    }, async () => {
+      await pm.anomalyDetectionPage.openAddAnomalyWizard();
+      await pm.anomalyDetectionPage.fillBasicSetup(anomalyName('destreq'), 'logs', testStreamName);
+      await pm.anomalyDetectionPage.openAlertingTab();
+      await pm.anomalyDetectionPage.toggleNotifications(true);
+      await pm.anomalyDetectionPage.save();
+
+      await expect(pm.anomalyDetectionPage.getDestinationErrorLocator()).toBeVisible();
+      await pm.anomalyDetectionPage.cancel();
+    });
+
+    test('SQL mode rejects aliasing the timestamp column', {
+      tag: ['@anomaly', '@P1', '@functional', '@all'],
+    }, async ({ page }) => {
+      await pm.anomalyDetectionPage.openAddAnomalyWizard();
+      await pm.anomalyDetectionPage.fillBasicSetup(anomalyName('alias'), 'logs', testStreamName);
+      await pm.anomalyDetectionPage.openConfigTab();
+      await pm.anomalyDetectionPage.selectQueryMode('custom_sql');
+      await pm.anomalyDetectionPage.setCustomSql(
+        `SELECT histogram(_timestamp) AS _timestamp, count(*) AS value FROM "${testStreamName}"`,
+      );
+      await pm.anomalyDetectionPage.save();
+
+      // Bare-Monaco errors only render after the first submit attempt.
+      await expect(
+        pm.anomalyDetectionPage.getCustomSqlTimestampErrorLocator(),
+      ).toBeVisible();
+      await pm.anomalyDetectionPage.cancel();
+    });
+
+    test('empty SQL in custom_sql mode blocks save', {
+      tag: ['@anomaly', '@P1', '@functional', '@all'],
+    }, async ({ page }) => {
+      await pm.anomalyDetectionPage.openAddAnomalyWizard();
+      await pm.anomalyDetectionPage.fillBasicSetup(anomalyName('emptysql'), 'logs', testStreamName);
+      await pm.anomalyDetectionPage.openConfigTab();
+      await pm.anomalyDetectionPage.selectQueryMode('custom_sql');
+      // The mode switch seeds a default query, so the editor has to be emptied
+      // to reach the required-SQL state at all.
+      await pm.anomalyDetectionPage.clearCustomSql();
+      await pm.anomalyDetectionPage.save();
+
+      await expect(
+        pm.anomalyDetectionPage.getCustomSqlRequiredErrorLocator(),
+      ).toBeVisible();
+      await pm.anomalyDetectionPage.cancel();
+    });
+  });
+
+  // ════════════════════════════════════════════════════════════════════════
+  // Sensitivity — tier toggle and percentile input share the `threshold` field
+  // ════════════════════════════════════════════════════════════════════════
+
+  test.describe('Sensitivity', () => {
+    test.beforeEach(async () => {
+      await pm.anomalyDetectionPage.openAddAnomalyWizard();
+      await pm.anomalyDetectionPage.fillBasicSetup(anomalyName('sens'), 'logs', testStreamName);
+      await pm.anomalyDetectionPage.openConfigTab();
+    });
+
+    test.afterEach(async () => {
+      await pm.anomalyDetectionPage.cancel();
+    });
+
+    test('each tier writes its percentile into the shared threshold field', {
+      tag: ['@anomaly', '@P0', '@smoke', '@all'],
+    }, async () => {
+      for (const [tier, percentile] of [[99, '99'], [97, '97'], [95, '95']]) {
+        await pm.anomalyDetectionPage.selectSensitivityTier(tier);
+        expect(await pm.anomalyDetectionPage.getSensitivityPercentile()).toBe(percentile);
+        expect(await pm.anomalyDetectionPage.getActiveSensitivityTier()).toBe(tier);
+      }
+    });
+
+    test('typing a tier percentile lights that tier up', {
+      tag: ['@anomaly', '@P1', '@functional', '@all'],
+    }, async () => {
+      await pm.anomalyDetectionPage.setSensitivityPercentile(95);
+      expect(await pm.anomalyDetectionPage.getActiveSensitivityTier()).toBe(95);
+    });
+
+    test('an off-tier percentile is accepted with no tier selected', {
+      tag: ['@anomaly', '@P1', '@functional', '@all'],
+    }, async () => {
+      await pm.anomalyDetectionPage.setSensitivityPercentile(88);
+      await expect(pm.anomalyDetectionPage.getSensitivityErrorLocator()).toBeHidden();
+      expect(await pm.anomalyDetectionPage.getActiveSensitivityTier()).toBeNull();
+    });
+
+    test('the hint restates the flag rate at the current resolution', {
+      tag: ['@anomaly', '@P1', '@functional', '@all'],
+    }, async () => {
+      await pm.anomalyDetectionPage.setHistogramInterval(5, 'm');
+      await pm.anomalyDetectionPage.selectSensitivityTier(97);
+
+      // 97 flags the most unusual 3% of buckets; at 5m resolution that is
+      // 288 buckets/day * 0.03 ≈ 9 per day.
+      const hint = pm.anomalyDetectionPage.getSensitivityHintLocator();
+      await expect(hint).toBeVisible();
+      await expect(hint).toContainText('3%');
+      await expect(hint).toContainText('5m');
+    });
+
+    test('the hint recomputes when the resolution changes', {
+      tag: ['@anomaly', '@P1', '@functional', '@all'],
+    }, async () => {
+      await pm.anomalyDetectionPage.selectSensitivityTier(97);
+      await pm.anomalyDetectionPage.setHistogramInterval(5, 'm');
+      const atFiveMinutes = await pm.anomalyDetectionPage.getSensitivityHintLocator().textContent();
+
+      await pm.anomalyDetectionPage.setHistogramInterval(1, 'h');
+      await expect(pm.anomalyDetectionPage.getSensitivityHintLocator()).not.toHaveText(atFiveMinutes);
+      await expect(pm.anomalyDetectionPage.getSensitivityHintLocator()).toContainText('1h');
+    });
+
+    for (const [label, value] of [['below the floor', 49], ['above the ceiling', 100], ['fractional', 97.5]]) {
+      test(`rejects a ${label} percentile`, {
+        tag: ['@anomaly', '@P1', '@functional', '@all'],
+      }, async () => {
+        await pm.anomalyDetectionPage.setSensitivityPercentile(value);
+        await pm.anomalyDetectionPage.save();
+        await expect(pm.anomalyDetectionPage.getSensitivityErrorLocator()).toHaveText(
+          'Enter a whole number between 50 and 99',
+        );
+      });
+    }
+
+    test('the hint is suppressed while the percentile is invalid', {
+      tag: ['@anomaly', '@P2', '@functional', '@all'],
+    }, async () => {
+      await pm.anomalyDetectionPage.setSensitivityPercentile(49);
+      await expect(pm.anomalyDetectionPage.getSensitivityHintLocator()).toBeHidden();
+    });
+  });
+
+  // ════════════════════════════════════════════════════════════════════════
+  // Builder mode — filters and the read-only SQL preview
+  // ════════════════════════════════════════════════════════════════════════
+
+  test.describe('Builder mode', () => {
+    test.beforeEach(async () => {
+      await pm.anomalyDetectionPage.openAddAnomalyWizard();
+      await pm.anomalyDetectionPage.fillBasicSetup(anomalyName('builderui'), 'logs', testStreamName);
+      await pm.anomalyDetectionPage.openConfigTab();
+    });
+
+    test.afterEach(async () => {
+      await pm.anomalyDetectionPage.cancel();
+    });
+
+    test('the detection-function field appears only for non-count functions', {
+      tag: ['@anomaly', '@P1', '@functional', '@all'],
+    }, async ({ page }) => {
+      const fieldSelect = pm.anomalyDetectionPage.getDetectionFunctionFieldLocator();
+      await expect(fieldSelect).toBeHidden();
+
+      await pm.anomalyDetectionPage.selectDetectionFunction('avg');
+      await expect(fieldSelect).toBeVisible();
+
+      await pm.anomalyDetectionPage.selectDetectionFunction('count');
+      await expect(fieldSelect).toBeHidden();
+    });
+
+    test('filters can be added and removed', {
+      tag: ['@anomaly', '@P1', '@functional', '@all'],
+    }, async () => {
+      const rows = pm.anomalyDetectionPage.getFilterRows();
+      const initial = await rows.count();
+
+      await pm.anomalyDetectionPage.addFilter('kubernetes_namespace_name', '=', 'ziox');
+      await expect(rows).toHaveCount(initial + 1);
+
+      await pm.anomalyDetectionPage.removeFilter(initial);
+      await expect(rows).toHaveCount(initial);
+    });
+
+    test('the SQL preview reflects the builder configuration', {
+      tag: ['@anomaly', '@P0', '@smoke', '@all'],
+    }, async () => {
+      await pm.anomalyDetectionPage.selectDetectionFunction('count');
+      await pm.anomalyDetectionPage.setHistogramInterval(5, 'm');
+
+      const sql = await pm.anomalyDetectionPage.getSqlPreviewText();
+      // The anomaly query must alias its time column as time_bucket and its
+      // measure as value — that contract is what the preview proves.
+      expect(sql).toContain('time_bucket');
+      expect(sql).toContain(testStreamName);
+    });
+
+    test('the SQL preview is hidden in custom_sql mode', {
+      tag: ['@anomaly', '@P2', '@functional', '@all'],
+    }, async ({ page }) => {
+      await expect(pm.anomalyDetectionPage.getSqlPreviewLocator()).toBeVisible();
+      await pm.anomalyDetectionPage.selectQueryMode('custom_sql');
+      await expect(pm.anomalyDetectionPage.getSqlPreviewLocator()).toBeHidden();
+    });
+  });
+
+  // ════════════════════════════════════════════════════════════════════════
+  // Data preview — auto-loads, no "Load preview" button any more
+  // ════════════════════════════════════════════════════════════════════════
+
+  test.describe('Data preview', () => {
+    test('empty until a stream is chosen, then populates on its own', {
+      tag: ['@anomaly', '@P0', '@smoke', '@all'],
+    }, async () => {
+      await pm.anomalyDetectionPage.openAddAnomalyWizard();
+      await expect(pm.anomalyDetectionPage.getDataPreviewEmptyLocator()).toBeVisible();
+
+      await pm.anomalyDetectionPage.fillBasicSetup(anomalyName('preview'), 'logs', testStreamName);
+
+      // Edits are debounced 600ms before the query fires; nothing is clicked.
+      await pm.anomalyDetectionPage.waitForDataPreview();
+      await expect(pm.anomalyDetectionPage.getDataPreviewEmptyLocator()).toBeHidden();
+
+      await pm.anomalyDetectionPage.cancel();
+    });
+
+    test('a mid-edit blank interval keeps the last chart instead of blanking', {
+      tag: ['@anomaly', '@P2', '@functional', '@all'],
+    }, async () => {
+      await pm.anomalyDetectionPage.openAddAnomalyWizard();
+      await pm.anomalyDetectionPage.fillBasicSetup(anomalyName('previewedit'), 'logs', testStreamName);
+      await pm.anomalyDetectionPage.waitForDataPreview();
+
+      await pm.anomalyDetectionPage.openConfigTab();
+      await pm.anomalyDetectionPage.clearHistogramInterval();
+
+      // canPreview goes false, which blocks the query but must not tear the
+      // chart down — the empty state means "nothing to preview", not "invalid".
+      await expect(pm.anomalyDetectionPage.getDataPreviewChartLocator()).toBeVisible();
+
+      await pm.anomalyDetectionPage.cancel();
+    });
+  });
+
+  // ════════════════════════════════════════════════════════════════════════
+  // Alerting step — priority, tags, destinations
+  // ════════════════════════════════════════════════════════════════════════
+
+  test.describe('Alerting configuration', () => {
+    test.beforeEach(async () => {
+      await pm.anomalyDetectionPage.openAddAnomalyWizard();
+      await pm.anomalyDetectionPage.fillBasicSetup(anomalyName('alerting'), 'logs', testStreamName);
+      await pm.anomalyDetectionPage.openAlertingTab();
+    });
+
+    test.afterEach(async () => {
+      await pm.anomalyDetectionPage.cancel();
+    });
+
+    test('priority and tags are settable', {
+      tag: ['@anomaly', '@P1', '@functional', '@all'],
+    }, async ({ page }) => {
+      await pm.anomalyDetectionPage.selectPriority(2);
+      // Assert the rendered label, not data-test-selected-value: OSelect emits
+      // that attribute only from its searchable trigger, and priority is a
+      // non-searchable select rendered by the reka SelectTrigger branch.
+      await expect(
+        pm.anomalyDetectionPage.getPriorityTriggerLocator(),
+      ).toContainText('P2');
+
+      await pm.anomalyDetectionPage.addTags(['team-platform']);
+      await expect(pm.anomalyDetectionPage.getTagsInputLocator()).toContainText('team-platform');
+    });
+
+    test('the destination picker appears only when notifications are on', {
+      tag: ['@anomaly', '@P1', '@functional', '@all'],
+    }, async ({ page }) => {
+      const destination = pm.anomalyDetectionPage.getDestinationLocator();
+      await pm.anomalyDetectionPage.toggleNotifications(false);
+      await expect(destination).toBeHidden();
+
+      await pm.anomalyDetectionPage.toggleNotifications(true);
+      await expect(destination).toBeVisible();
+    });
+
+    test('the destination list can be refreshed', {
+      tag: ['@anomaly', '@P2', '@functional', '@all'],
+    }, async ({ page }) => {
+      await pm.anomalyDetectionPage.toggleNotifications(true);
+      await pm.anomalyDetectionPage.refreshDestinations();
+      await expect(pm.anomalyDetectionPage.getDestinationLocator()).toBeVisible();
+    });
+  });
+
+  // ════════════════════════════════════════════════════════════════════════
+  // Lifecycle and detection charts
+  //
+  // Serial: these share one anomaly, created by the first test and deleted by
+  // the last, and the charts read that same record. They sit under one parent
+  // so the ordering is declared rather than depending across describes — and so
+  // a failure here cannot abort the independent describes above.
+  // ════════════════════════════════════════════════════════════════════════
+
+  test.describe('Lifecycle and detection charts', () => {
+    // Parallel, not serial. Only the two "creates ..." tests exercise the
+    // wizard's creation path; the rest need a config to ACT on, so each makes
+    // its own through the API (~1s versus ~15s of wizard) and owns it outright.
+    // Sharing one record forced serial ordering, which made a single flake
+    // retry the whole block — 11 tests retried three times on one CI run.
+    test.describe.configure({ mode: 'parallel' });
+
+    /**
+     * A config for this test alone, so nothing it does can disturb another.
+     *
+     * Reloads after creating: the list is fetched when the tab mounts, and
+     * beforeEach has already mounted it, so a record created through the API
+     * afterwards is simply absent until the page refetches.
+     */
+    const ownAnomaly = async (page, suffix, opts) => {
+      const name = anomalyName(suffix);
+      await createAnomalyViaApi(page, name, opts);
+      // Settle the backend before touching the UI: creation returns before the
+      // record is queryable, so a reload can still render a list without it.
+      await waitForAnomalyListed(page, name);
+      await page.reload();
+      await page.waitForLoadState('domcontentloaded', { timeout: 30000 }).catch(() => {});
+      await pm.anomalyDetectionPage.navigateToAnomalyTab();
+      await pm.anomalyDetectionPage.searchAnomaly(name);
+      await expect(
+        pm.anomalyDetectionPage.getRow(name),
+        `${name} was created via the API but never appeared in the list`,
+      ).toBeVisible({ timeout: 20000 });
+      return name;
+    };
+
+    test.describe('Lifecycle', () => {
+      test('creates an anomaly in builder mode', {
+        tag: ['@anomaly', '@P0', '@smoke', '@all'],
+      }, async () => {
+        const name = anomalyName('builder');
+        await pm.anomalyDetectionPage.openAddAnomalyWizard();
+        await pm.anomalyDetectionPage.fillBasicSetup(name, 'logs', testStreamName);
+
+        await pm.anomalyDetectionPage.openConfigTab();
+        await pm.anomalyDetectionPage.selectDetectionFunction('count');
+        await pm.anomalyDetectionPage.setHistogramInterval(5, 'm');
+        await pm.anomalyDetectionPage.setScheduleInterval(10, 'm');
+        await pm.anomalyDetectionPage.setDetectionWindow(1, 'h');
+        await pm.anomalyDetectionPage.setTrainingWindow(7);
+        await pm.anomalyDetectionPage.selectRetrainInterval(7);
+        await pm.anomalyDetectionPage.selectSensitivityTier(97);
+
+        await pm.anomalyDetectionPage.openAlertingTab();
+        await pm.anomalyDetectionPage.toggleNotifications(true);
+        await pm.anomalyDetectionPage.selectDestinations([prerequisiteDestinationName]);
+
+        await pm.anomalyDetectionPage.saveAndExpectSuccess();
+
+        await pm.anomalyDetectionPage.navigateToAnomalyTab();
+        await pm.anomalyDetectionPage.searchAnomaly(name);
+        await expect(pm.anomalyDetectionPage.getRow(name)).toBeVisible();
+      });
+
+      test('creates an anomaly in SQL mode', {
+        tag: ['@anomaly', '@P1', '@functional', '@all'],
+      }, async () => {
+        const name = anomalyName('sql');
+        await pm.anomalyDetectionPage.openAddAnomalyWizard();
+        await pm.anomalyDetectionPage.fillBasicSetup(name, 'logs', testStreamName);
+
+        await pm.anomalyDetectionPage.openConfigTab();
+        await pm.anomalyDetectionPage.selectQueryMode('custom_sql');
+        await pm.anomalyDetectionPage.setCustomSql(
+          `SELECT histogram(_timestamp, '5 minute') AS time_bucket, count(*) AS value FROM "${testStreamName}" GROUP BY time_bucket`,
+        );
+        await pm.anomalyDetectionPage.setHistogramInterval(5, 'm');
+
+        await pm.anomalyDetectionPage.openAlertingTab();
+        await pm.anomalyDetectionPage.toggleNotifications(false);
+
+        await pm.anomalyDetectionPage.saveAndExpectSuccess();
+
+        await pm.anomalyDetectionPage.navigateToAnomalyTab();
+        await pm.anomalyDetectionPage.searchAnomaly(name);
+        await expect(pm.anomalyDetectionPage.getRow(name)).toBeVisible();
+      });
+
+      // The only non-creation test that still builds its fixture through the
+      // wizard. Its whole point is that a config SAVED BY THE FORM round-trips
+      // back into the form; an API-created record would only prove "API write →
+      // UI read", which is not the regression worth guarding.
+      test('edit mode loads the saved configuration', {
+        tag: ['@anomaly', '@P1', '@functional', '@all'],
+      }, async ({ page }) => {
+        const name = anomalyName('edit');
+        await pm.anomalyDetectionPage.openAddAnomalyWizard();
+        await pm.anomalyDetectionPage.fillBasicSetup(name, 'logs', testStreamName);
+        await pm.anomalyDetectionPage.openConfigTab();
+        await pm.anomalyDetectionPage.selectSensitivityTier(97);
+        await pm.anomalyDetectionPage.openAlertingTab();
+        await pm.anomalyDetectionPage.toggleNotifications(false);
+        await pm.anomalyDetectionPage.saveAndExpectSuccess();
+
+        await pm.anomalyDetectionPage.navigateToAnomalyTab();
+        await pm.anomalyDetectionPage.searchAnomaly(name);
+        await pm.anomalyDetectionPage.openEdit(name);
+
+        // The name is readonly in edit mode, so it renders as plain text.
+        await expect(pm.anomalyDetectionPage.getNameValueLocator()).toContainText(name);
+
+        await pm.anomalyDetectionPage.openConfigTab();
+        // The percentile readback only exists where the tier controls do; on
+        // older builds the edit-load path is still covered by the name above.
+        if (await pm.anomalyDetectionPage.hasSensitivityTiers()) {
+          expect(await pm.anomalyDetectionPage.getSensitivityPercentile()).toBe('97');
+        }
+
+        await pm.anomalyDetectionPage.cancel();
+      });
+
+      test('pause and resume toggle the anomaly', {
+        tag: ['@anomaly', '@P1', '@functional', '@all'],
+      }, async ({ page }) => {
+        const name = await ownAnomaly(page, 'pause');
+        await pm.anomalyDetectionPage.togglePause(name);
+        await expect(pm.anomalyDetectionPage.getToastLocator(/success/i)).toBeVisible();
+
+        await pm.anomalyDetectionPage.togglePause(name);
+        await expect(pm.anomalyDetectionPage.getRow(name)).toBeVisible();
+      });
+
+      test('detection can be triggered from the row menu', {
+        tag: ['@anomaly', '@P2', '@functional', '@all'],
+      }, async ({ page }) => {
+        const name = await ownAnomaly(page, 'trigger');
+        await pm.anomalyDetectionPage.triggerDetection(name);
+        await expect(pm.anomalyDetectionPage.getToastLocator(/detection|triggered/i)).toBeVisible();
+      });
+
+      test('detection can be triggered via the API and lands in history', {
+        tag: ['@anomaly', '@P2', '@api', '@all'],
+      }, async ({ page }) => {
+        const name = anomalyName('apitrigger');
+        const id = await createAnomalyViaApi(page, name);
+
+        const triggered = await triggerAnomalyDetection(page, id);
+
+        // A config created seconds ago has no trained model yet, so a detection
+        // run is expected to be refused. What matters is that the refusal says
+        // why — the handler funnels every non-"not found" error into a 500, so
+        // an empty body here would leave the caller with nothing to act on.
+        if (![200, 202].includes(triggered.status)) {
+          const body = JSON.stringify(triggered.data ?? triggered.body ?? {});
+          expect(
+            body.length > 2,
+            `detect returned ${triggered.status} with no explanation: ${body}`,
+          ).toBe(true);
+          testLogger.info('Detection refused on an untrained config', {
+            status: triggered.status,
+            body,
+          });
+        }
+
+        // getAnomalyHistory returns the raw {status, data} envelope and the
+        // endpoint serialises a bare array, verified against a live response.
+        // (The DetectionHistoryResponse {history: [...]} utoipa annotation on
+        // the handler does NOT match what it actually returns.)
+        const history = await getAnomalyHistory(page, id);
+        expect(history.status).toBe(200);
+        expect(Array.isArray(history.data)).toBe(true);
+      });
+
+      test('deletes an anomaly', {
+        tag: ['@anomaly', '@P0', '@smoke', '@all'],
+      }, async ({ page }) => {
+        const name = await ownAnomaly(page, 'delete');
+        await pm.anomalyDetectionPage.deleteAnomaly(name);
+        await expect(pm.anomalyDetectionPage.getRow(name)).toBeHidden();
+      });
+    });
+
+    // ══════════════════════════════════════════════════════════════════════
+    // Detection charts — three readings of the `_anomalies` stream
+    // ══════════════════════════════════════════════════════════════════════
+
+    test.describe('Detection charts', () => {
+      test('the detail page renders all three panels behind one range picker', {
+        tag: ['@anomaly', '@P1', '@functional', '@all'],
+      }, async ({ page }) => {
+        const name = await ownAnomaly(page, 'charts');
+        await pm.anomalyDetectionPage.openDetail(name);
+
+        await expect(pm.anomalyDetectionPage.getDetectionChartsLocator()).toBeVisible();
+        for (const key of ['metric', 'score', 'deviation']) {
+          await expect(pm.anomalyDetectionPage.getChartPanelLocator(key)).toBeVisible();
+        }
+      });
+
+      test('the shared range picker drives every panel', {
+        tag: ['@anomaly', '@P2', '@functional', '@all'],
+      }, async ({ page }) => {
+        const name = await ownAnomaly(page, 'range');
+        await pm.anomalyDetectionPage.openDetail(name);
+        await expect(pm.anomalyDetectionPage.getDetectionChartsLocator()).toBeVisible();
+
+        // One picker for all three: separate pickers would let the panels
+        // silently disagree about which window they are showing.
+        for (const range of ['1h', '6h', '24h']) {
+          await pm.anomalyDetectionPage.selectChartRange(range);
+          await expect(
+            pm.anomalyDetectionPage.getChartRangeItemLocator(range),
+          ).toHaveAttribute('data-state', 'on');
+        }
+      });
+
+      test('a panel with no model data shows its unavailable state, not a broken chart', {
+        tag: ['@anomaly', '@P2', '@functional', '@all'],
+      }, async ({ page }) => {
+        const name = await ownAnomaly(page, 'emptychart');
+        await pm.anomalyDetectionPage.openDetail(name);
+
+        // A freshly created anomaly has not trained, so each panel is either a
+        // rendered chart or the explicit unavailable state — never neither.
+        // Poll rather than count once: the panels mount asynchronously, and a
+        // bare count() races the render instead of waiting for it.
+        for (const key of ['metric', 'score', 'deviation']) {
+          const body = pm.anomalyDetectionPage.getChartBodyLocator(key);
+          const empty = pm.anomalyDetectionPage.getChartEmptyLocator(key);
+          await expect
+            .poll(async () => (await body.count()) + (await empty.count()), {
+              timeout: 30000,
+              message: `panel ${key} rendered neither a chart nor its empty state`,
+            })
+            .toBeGreaterThan(0);
+        }
+      });
+    });
+  });
+
+  // ════════════════════════════════════════════════════════════════════════
+  // End to end: a seeded spike is trained on, detected, alerted and charted.
+  //
+  // The only test that exercises the feature's actual purpose. Everything else
+  // stops at "the config saved"; this one proves the model fires. Training
+  // needs history, so the stream is seeded with backdated buckets — the shared
+  // e2e_automate stream is all stamped "now" and cannot train a model.
+  // ════════════════════════════════════════════════════════════════════════
+
+  test.describe('End to end detection', () => {
+    // A receiver the test owns, so delivery is proved from the wire rather than
+    // inferred. Mirrors alerts-content-templates.spec.js. Needs the backend to
+    // reach 127.0.0.1 of this runner AND loopback allowlisted
+    // (ZO_SSRF_ALLOW_LOOPBACK) — true in CI, false against a remote env, where
+    // the destination create is refused and the delivery check stands down.
+    let receiver;
+    let receiverPort;
+    let received;
+
+    test.beforeAll(async () => {
+      received = [];
+      receiver = http.createServer((req, res) => {
+        let body = '';
+        req.on('data', (c) => { body += c; });
+        req.on('end', () => {
+          received.push({ url: req.url, body });
+          res.writeHead(200, { 'Content-Type': 'text/plain' });
+          res.end('ok');
+        });
+      });
+      await new Promise((resolve) => receiver.listen(0, '127.0.0.1', resolve));
+      receiverPort = receiver.address().port;
+      testLogger.info('Started in-test HTTP receiver', { receiverPort });
+    });
+
+    test.afterAll(async () => {
+      if (receiver) await new Promise((resolve) => receiver.close(resolve));
+    });
+
+
+    const firingName = anomalyName('fire');
+    const seededStream = `anomaly_e2e_${randomValue}`;
+
+    test('a seeded spike is detected, alerted on, and charted', {
+      tag: ['@anomaly', '@P0', '@smoke', '@e2e', '@all'],
+    }, async ({ page }) => {
+      test.slow();
+
+      // 4 hours of 1-minute buckets at a flat baseline, with a 120-count spike
+      // held back from the newest buckets so it stays inside the 1h detection
+      // window. Four hours because CI drops anything backdated further
+      // (ZO_INGEST_ALLOWED_UPTO), 1-minute because the model needs 100+ points.
+      const seed = await seedAnomalyStream(page, seededStream, {
+        hours: 4,
+        bucketSeconds: 60,
+        baseline: 10,
+        spikeValue: 120,
+        spikeBuckets: 4,
+      });
+      expect(seed.status, `seeding ${seededStream} failed: ${JSON.stringify(seed.data)}`).toBe(200);
+      await waitForStream(page, seededStream);
+
+      // Aim a destination at the in-test receiver BEFORE the wizard mounts: it
+      // fetches destinations once, on mount, so one created later is missing
+      // from the picker and refreshing it is a race. The SSRF guard refuses a
+      // private ip unless loopback is allowlisted, so where it is not, fall
+      // back to the shared destination and leave delivery unasserted.
+      received.length = 0;
+      const sinkName = `e2e_anomaly_sink_${randomValue}`;
+      const sink = await createMockDestination(page, sinkName, prerequisiteTemplateName, {
+        url: `http://127.0.0.1:${receiverPort}/anomaly`,
+      });
+      const deliveryAssertable = sink.status === 200;
+      if (!deliveryAssertable) {
+        testLogger.warn(
+          'DELIVERY NOT ASSERTED — the loopback destination was refused, so the only ' +
+            'proof an alert left the process is skipped for this run',
+          { status: sink.status, body: JSON.stringify(sink.data) },
+        );
+      }
+      // The app caches its stream list from page load, which happened before
+      // the seed — without a reload the new stream is absent from the picker
+      // even though the API already lists it.
+      await page.reload();
+      await page.waitForLoadState('domcontentloaded', { timeout: 30000 }).catch(() => {});
+
+      await pm.anomalyDetectionPage.navigateToAnomalyTab();
+      await pm.anomalyDetectionPage.openAddAnomalyWizard();
+      await pm.anomalyDetectionPage.fillBasicSetup(firingName, 'logs', seededStream);
+
+      await pm.anomalyDetectionPage.openConfigTab();
+      await pm.anomalyDetectionPage.selectDetectionFunction('count');
+      // Resolution matches the seeded bucket width — at 5m the 1m buckets
+      // collapse and the model sees a fifth of the points.
+      await pm.anomalyDetectionPage.setHistogramInterval(1, 'm');
+      await pm.anomalyDetectionPage.setScheduleInterval(10, 'm');
+      await pm.anomalyDetectionPage.setDetectionWindow(1, 'h');
+      await pm.anomalyDetectionPage.setTrainingWindow(1);
+      await pm.anomalyDetectionPage.selectSensitivityTier(95);
+
+      await pm.anomalyDetectionPage.openAlertingTab();
+      await pm.anomalyDetectionPage.toggleNotifications(true);
+      await pm.anomalyDetectionPage.selectDestinations([
+        deliveryAssertable ? sinkName : prerequisiteDestinationName,
+      ]);
+      await pm.anomalyDetectionPage.saveAndExpectSuccess();
+
+      const configs = await listAnomalyDetections(page);
+      const created = configs.find((c) => c.name === firingName);
+      expect(created, `${firingName} should be listed by the API`).toBeTruthy();
+      const id = created.anomaly_id || created.id;
+
+      // The notification is sent inline by the detection run, gated on
+      // `anomaly_count > 0 && alert_enabled`. If the wizard failed to persist
+      // either of these, detection still "succeeds" and no alert is ever sent —
+      // a silent hole this suite would otherwise not notice.
+      expect(created.alert_enabled, 'alert_enabled must persist from the wizard').toBe(true);
+      expect(created.alert_destinations).toContain(
+        deliveryAssertable ? sinkName : prerequisiteDestinationName,
+      );
+
+      // Training and detection have no UI trigger that reports completion, so
+      // they are driven through the API; the assertions below are on the result.
+      const trainStarted = await triggerAnomalyTraining(page, id);
+      expect([200, 202]).toContain(trainStarted.status);
+      const trained = await waitForAnomalyTrained(page, id);
+      expect(trained.is_trained).toBe(true);
+
+      const detected = await triggerAnomalyDetection(page, id);
+      expect(
+        detected.status,
+        `detection failed: ${JSON.stringify(detected.data)}`,
+      ).toBe(200);
+
+      // The spike must be found, and found as the worst point — a run that
+      // flags only baseline noise would otherwise look like a pass.
+      expect(detected.data.anomalies_found).toBeGreaterThan(0);
+      const worst = Math.max(...detected.data.anomalies.map((a) => a.actual_value));
+      expect(worst).toBe(120);
+      const spike = detected.data.anomalies.find((a) => a.actual_value === 120);
+      expect(spike.is_anomaly).toBe(true);
+      expect(spike.score).toBeGreaterThan(spike.threshold_value);
+
+      // Each detection run writes one row per scored bucket to _anomalies,
+      // which is the only source the detail-page charts read.
+      await pm.anomalyDetectionPage.navigateToAnomalyTab();
+      await pm.anomalyDetectionPage.searchAnomaly(firingName);
+      await pm.anomalyDetectionPage.openDetail(firingName);
+      await expect(pm.anomalyDetectionPage.getDetectionChartsLocator()).toBeVisible();
+      for (const key of ['metric', 'score', 'deviation']) {
+        await expect(pm.anomalyDetectionPage.getChartPanelLocator(key)).toBeVisible();
+      }
+
+      // The flagged overlay must sit exactly ON the metric it marks. The
+      // renderer colours a series, not a segment, so the flagged buckets are a
+      // second null-gapped line — and taking max(actual_value) over the flagged
+      // ROWS instead of the bucket reads a different row wherever a bucket holds
+      // both a flagged and an unflagged point, drawing the overlay BELOW the
+      // metric. The SQL shape is unit-tested; this checks the values it returns.
+      const chartRows = await searchSql(
+        page,
+        `SELECT histogram(_timestamp, '5m') AS zo_sql_key, ` +
+          `max(actual_value) AS zo_sql_num, ` +
+          `CASE WHEN max(CASE WHEN is_anomaly THEN 1 ELSE 0 END) = 1 ` +
+          `THEN max(actual_value) END AS anomaly_value ` +
+          `FROM "_anomalies" WHERE anomaly_id = '${id}' ` +
+          `GROUP BY zo_sql_key ORDER BY zo_sql_key`,
+      );
+      const flagged = chartRows.filter((r) => r.anomaly_value !== null && r.anomaly_value !== undefined);
+      expect(flagged.length, 'the charted series must flag at least one bucket').toBeGreaterThan(0);
+      for (const row of flagged) {
+        expect(
+          row.anomaly_value,
+          `overlay ${row.anomaly_value} must equal the metric ${row.zo_sql_num} at ${row.zo_sql_key}`,
+        ).toBe(row.zo_sql_num);
+      }
+      expect(Math.max(...flagged.map((r) => r.anomaly_value))).toBe(120);
+
+      // Delivery. The notification is sent inline by the detection run, so a
+      // regression that stops it would pass every assertion above. Asserting it
+      // from the wire is the only way to know it actually left the process.
+      if (deliveryAssertable) {
+        await expect
+          .poll(() => received.length, {
+            timeout: 60000,
+            message: `no webhook delivered to the in-test receiver for ${firingName}`,
+          })
+          .toBeGreaterThan(0);
+        const delivered = received.map((r) => r.body).join('\n');
+        expect(delivered, 'the payload must name the anomaly that fired').toContain(firingName);
+      } else {
+        testLogger.warn(
+          'DELIVERY NOT ASSERTED — the backend cannot reach this runner; detection and ' +
+            'charts are proven but the notification path is not',
+        );
+      }
+    });
+  });
+
+  test.afterAll(async ({ browser }) => {
+    if (
+      !process.env.ZO_BASE_URL ||
+      !process.env.ZO_ROOT_USER_EMAIL ||
+      !process.env.ZO_ROOT_USER_PASSWORD ||
+      !process.env.ORGNAME
+    ) {
       testLogger.warn('Skipping cleanup - missing environment variables');
       return;
     }
 
     const context = await browser.newContext();
     const page = await context.newPage();
-
     try {
-      // Navigate to base URL first - required for page.evaluate() to make fetch calls
+      // page.evaluate() can only fetch once the page is on the app origin.
       await page.goto(process.env.ZO_BASE_URL);
       await page.waitForLoadState('domcontentloaded', { timeout: 10000 }).catch(() => {});
-
-      const pm = new PageManager(page);
-      // cleanupTestAnomalies uses env vars for auth via shared api-helper.js
-      await pm.anomalyDetectionPage.cleanupTestAnomalies(`E2E_Anomaly`);
-      testLogger.info('Test anomalies cleanup completed');
-
-      // Note: Template and destination created via UI in beforeEach are not cleaned up here
-      // They may be reused by subsequent test runs or cleaned up by a separate cleanup job
+      const cleanupPm = new PageManager(page);
+      // Scope to THIS worker's run id. afterAll fires once per worker, and the
+      // config runs 5 of them, so deleting by the shared "E2E_Anomaly" prefix
+      // lets a worker finishing early wipe another worker's fixtures mid-test.
+      await cleanupPm.anomalyDetectionPage.cleanupTestAnomalies(randomValue);
+      // Destination last: it cannot be removed while an anomaly still points at
+      // it. Left uncleaned these accumulate every run, and a long destination
+      // list is what makes the virtualized picker drop options out of the DOM.
+      await deleteDestination(page, prerequisiteDestinationName);
+      // Template after the destination that references it. Both are named per
+      // worker, so this only ever removes what this run created.
+      await deleteTemplate(page, prerequisiteTemplateName);
     } catch (error) {
       testLogger.warn('Cleanup failed', { error: error.message });
     } finally {

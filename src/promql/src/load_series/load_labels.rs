@@ -57,7 +57,7 @@ pub(super) trait LoadedLabelsObserver: Send + Sync {
 /// Label values are looked up by borrowed `&str`, so cache hits only clone the
 /// `Arc`. A low-reuse column disables and releases its cache after an observation
 /// window instead of retaining one map entry per series.
-struct LabelInterner {
+pub(crate) struct LabelInterner {
     name: String,
     values: Option<HashMap<String, Arc<Label>>>,
     window_lookups: usize,
@@ -65,7 +65,7 @@ struct LabelInterner {
 }
 
 impl LabelInterner {
-    fn new(name: String) -> Self {
+    pub(crate) fn new(name: String) -> Self {
         Self {
             name,
             values: Some(HashMap::new()),
@@ -74,7 +74,7 @@ impl LabelInterner {
         }
     }
 
-    fn intern(&mut self, value: &str) -> Arc<Label> {
+    pub(crate) fn intern(&mut self, value: &str) -> Arc<Label> {
         let Some(values) = self.values.as_mut() else {
             return Arc::new(Label {
                 name: self.name.clone(),
@@ -116,13 +116,13 @@ impl LabelInterner {
     }
 }
 
-pub enum LabelColumn<'a> {
+pub(crate) enum LabelColumn<'a> {
     Utf8(&'a StringArray),
     Utf8View(&'a StringViewArray),
 }
 
 impl<'a> LabelColumn<'a> {
-    pub fn try_from_array(column: &'a dyn Array) -> Option<Self> {
+    pub(crate) fn try_from_array(column: &'a dyn Array) -> Option<Self> {
         match column.data_type() {
             DataType::Utf8 => column
                 .as_any()
@@ -136,14 +136,14 @@ impl<'a> LabelColumn<'a> {
         }
     }
 
-    pub fn is_null(&self, row: usize) -> bool {
+    pub(crate) fn is_null(&self, row: usize) -> bool {
         match self {
             Self::Utf8(values) => values.is_null(row),
             Self::Utf8View(values) => values.is_null(row),
         }
     }
 
-    pub fn value(&self, row: usize) -> &str {
+    pub(crate) fn value(&self, row: usize) -> &str {
         match self {
             Self::Utf8(values) => values.value(row),
             Self::Utf8View(values) => values.value(row),

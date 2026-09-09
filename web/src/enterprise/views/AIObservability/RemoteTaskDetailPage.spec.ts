@@ -7,7 +7,8 @@ import type { RemoteTask } from "@/services/remote-tasks.service";
 
 const route = reactive({ params: { id: "head-1" }, query: {} }) as any;
 const push = vi.fn();
-vi.mock("vue-router", () => ({ useRoute: () => route, useRouter: () => ({ push }) }));
+const back = vi.fn();
+vi.mock("vue-router", () => ({ useRoute: () => route, useRouter: () => ({ push, back }) }));
 vi.mock("vuex", () => ({
   useStore: () => ({ state: { selectedOrganization: { identifier: "acme" } } }),
 }));
@@ -83,6 +84,19 @@ beforeEach(() => {
 });
 
 describe("RemoteTaskDetailPage", () => {
+  it("uses real browser back when there's history to pop, instead of the bare Remote Tasks list", async () => {
+    window.history.pushState({ back: "/previous" }, "", "/previous-fake-url");
+    const wrapper = mountPage();
+    await flushPromises();
+    push.mockClear();
+
+    await wrapper.get('[data-test="ai-remote-task-detail-back-btn"]').trigger("click");
+
+    expect(back).toHaveBeenCalledTimes(1);
+    expect(push).not.toHaveBeenCalled();
+    window.history.replaceState(null, "");
+  });
+
   it("renders the head and its versions without runtime errors", async () => {
     const errors: unknown[] = [];
     const wrapper = mount(RemoteTaskDetailPage, {

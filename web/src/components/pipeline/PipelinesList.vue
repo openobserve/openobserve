@@ -23,6 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="min-h-0 w-full flex-1 overflow-hidden">
       <div class="bg-card-glass-bg h-full">
         <OTable
+          ref="oTableRef"
           :frame="false"
           :key="activeTab"
           data-test="pipeline-list-table"
@@ -34,6 +35,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :show-global-filter="false"
           :page-size="20"
           :page-size-options="[20, 50, 100, 250, 500]"
+          :current-page="currentPage"
+          @update:current-page="onPageChange"
           selection="multiple"
           :enable-column-resize="true"
           :persist-columns="true"
@@ -72,12 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="flex w-full items-center gap-2">
               <OToggleGroup
                 :model-value="activeTab"
-                @update:model-value="
-                  (v) => {
-                    activeTab = v as string;
-                    updateActiveTab();
-                  }
-                "
+                @update:model-value="onTabChange"
                 data-test="pipeline-list-tabs"
               >
                 <OToggleGroupItem value="all" size="sm" data-test="tab-all">
@@ -290,7 +288,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="flex items-start justify-center">
                 <div
                   data-test="scheduled-pipeline-expanded-sql"
-                  class="border-border-default border-l-accent bg-surface-subtle text-text-body h-full max-h-50 w-full overflow-y-auto border border-l-3 p-2.5 whitespace-normal"
+                  class="border-border-default border-s-accent bg-surface-subtle text-text-body h-full max-h-50 w-full overflow-y-auto border border-s-3 p-2.5 whitespace-normal"
                 >
                   <pre style="text-wrap: wrap">{{ row?.sql_query }} </pre>
                 </div>
@@ -316,7 +314,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template #bottom="bottomProps">
             <div class="flex w-full items-center justify-between py-1">
-              <div class="mr-4 flex items-center text-xs font-normal">
+              <div class="me-4 flex items-center text-xs font-normal">
                 {{ bottomProps.totalRows }} {{ t("pipeline.header") }}
               </div>
               <div v-if="selectedPipelineIds.length > 0" class="flex items-center gap-2">
@@ -476,7 +474,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-for="(msg, idx) in nodeErrorMessages(nodeError)"
                 :key="idx"
-                class="error-message rounded-default bg-banner-error-soft-bg border-l-status-negative text-banner-error-soft-text border-l-3 p-3 font-mono text-xs leading-[1.5] wrap-break-word whitespace-pre-wrap"
+                class="error-message rounded-default bg-banner-error-soft-bg border-s-status-negative text-banner-error-soft-text border-s-3 p-3 font-mono text-xs leading-[1.5] wrap-break-word whitespace-pre-wrap"
               >
                 {{ msg }}
               </div>
@@ -556,13 +554,28 @@ const resumePipelineDialogMeta: any = ref({
 
 const { pipelineObj } = useDragAndDrop(t);
 
+const oTableRef: any = ref(null);
+// Plain ref, not URL/store-backed: PipelinesList stays mounted across pipelineEditor/import/history/backfill child-route navigation, so this alone survives the round trip.
+const currentPage = ref(1);
+const onPageChange = (page: number) => {
+  currentPage.value = page;
+};
+
+// setTimeout(0) is a macrotask, so it runs after TanStack's own deferred auto-reset-on-data-change (its own microtask queue), letting the restored page win.
+const restorePageIndex = () => {
+  setTimeout(() => {
+    oTableRef.value?.table?.setPageIndex(currentPage.value - 1);
+  }, 0);
+};
+
+// Only re-fetches when landing back on the list itself; the `v-if` swap destroys and recreates OTable for the whole editor/import/history/backfill visit, so its page needs reasserting once this fetch settles.
 watch(
   () => router.currentRoute.value.name,
   async (newName, oldName) => {
-    // Only re-fetch when we land back on the list itself
     if (newName !== "pipelines" || newName === oldName) return;
     await getPipelines();
     updateActiveTab();
+    restorePageIndex();
   },
 );
 
@@ -755,6 +768,13 @@ const updateActiveTab = () => {
 
   columns.value = getColumnsForActiveTab(activeTab.value);
 };
+
+// Resets the page too: `:key="activeTab"` remounts OTable, which could otherwise land past the newly-filtered tab's last page.
+const onTabChange = (tab: any) => {
+  activeTab.value = tab as string;
+  currentPage.value = 1;
+  updateActiveTab();
+};
 //this is the function to check whether the pipeline is enabled or not
 //becuase if it is not enabled then we need to show the dialog to resume the pipeline from where it paused / start from now
 //else we need to toggle the pipeline state
@@ -929,6 +949,7 @@ columns.value = getColumnsForActiveTab(activeTab.value);
 onMounted(async () => {
   await getPipelines(); // Ensure pipelines are fetched before updating
   updateActiveTab();
+  restorePageIndex();
 });
 
 // Empty-state "New pipeline" → the dedicated pipeline-builder page (not the

@@ -120,13 +120,21 @@ test.describe("ConfigPanel — Advanced Settings", () => {
     // Apply, wait for API response + ECharts repaint before pixel scan
     await applyAndWaitForRender(page, pm);
 
-    const colorResult = await verifyColorOnCanvas(page, { r: 230, g: 57, b: 70 });
+    // The repaint gate only proves some canvas painted, not that the custom-color mapping repaint landed — poll the pixel scan so it is not read one-shot mid-repaint.
+    let colorResult;
+    await expect
+      .poll(
+        async () => {
+          colorResult = await verifyColorOnCanvas(page, { r: 230, g: 57, b: 70 });
+          return colorResult.matchingPixels;
+        },
+        {
+          timeout: 15000,
+          message: `Expected ${customColor} on the chart canvas for series "${selectedSeriesName}"`,
+        }
+      )
+      .toBeGreaterThanOrEqual(5);
     testLogger.info("Canvas color verification", { matchingPixels: colorResult.matchingPixels, colorFound: colorResult.colorFound });
-    expect(
-      colorResult.colorFound,
-      `Expected ${customColor} on the chart canvas for series "${selectedSeriesName}", ` +
-        `but only ${colorResult.matchingPixels} pixels matched across ${colorResult.canvasCount} canvases`
-    ).toBe(true);
 
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);

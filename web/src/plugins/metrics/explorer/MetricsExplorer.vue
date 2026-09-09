@@ -148,7 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            just the grid (with the Views rail), no facets. -->
       <aside
         v-if="isExplore"
-        class="border-border-default flex min-h-0 w-60 flex-none flex-col border-r"
+        class="border-border-default flex min-h-0 w-60 flex-none flex-col border-e"
         :aria-label="t('metrics.explorer.railsAriaLabel')"
       >
         <!-- Panel header: the facet selector, stretched to fill the column.

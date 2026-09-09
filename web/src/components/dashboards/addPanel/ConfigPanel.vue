@@ -158,7 +158,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OTooltip :content="raw(formattedPickerValue)" max-width="20rem" />
               </div>
               <OIcon
-                class="mr-1 ml-2 flex-shrink-0 shrink-0 cursor-pointer"
+                class="ms-2 me-1 flex-shrink-0 shrink-0 cursor-pointer"
                 size="sm"
                 name="close"
                 data-test="dashboard-config-cancel-panel-time"
@@ -473,7 +473,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("dashboard.legendLabel") }}
               <div>
                 <OIcon
-                  class="ml-1"
+                  class="ms-1"
                   size="sm"
                   name="info-outline"
                   data-test="dashboard-config-promql-legend-info"
@@ -1671,7 +1671,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="flex items-center">
             <CustomDateTimePicker v-model="picker.offSet" :picker="picker" :isFirstEntry="false" />
             <OIcon
-              class="mr-1 ml-2 cursor-pointer"
+              class="ms-2 me-1 cursor-pointer"
               size="sm"
               name="close"
               @click="removeTimeShift(index)"

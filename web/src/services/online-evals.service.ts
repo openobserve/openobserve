@@ -258,6 +258,13 @@ const unwrapList = <T>(response: any, key = "list"): T[] => {
   return [];
 };
 
+// Score Configs change far less often than the pages that merely read them
+// get visited — a session-lived cache keyed by org avoids re-fetching the
+// whole list on every page mount. Callers that just mutated a config (create,
+// update, delete) must keep using `scoreConfigs.list` directly for
+// guaranteed-fresh data; this cache is for read-only consumers only.
+const scoreConfigsCache = new Map<string, Promise<ScoreConfig[]>>();
+
 const onlineEvalsService = {
   providers: {
     list: async (orgId: string): Promise<Provider[]> =>
@@ -273,11 +280,34 @@ const onlineEvalsService = {
     delete: async (orgId: string, providerId: string): Promise<void> => {
       await http().delete(`/api/${orgId}/providers/${providerId}`);
     },
+    testConfig: async (
+      orgId: string,
+      payload: ProviderPayload,
+      providerId?: string,
+    ): Promise<string> =>
+      (
+        await http().post(`/api/${orgId}/providers/test`, {
+          ...payload,
+          ...(providerId ? { providerId } : {}),
+        })
+      ).data.message,
   },
 
   scoreConfigs: {
     list: async (orgId: string): Promise<ScoreConfig[]> =>
       unwrapList<ScoreConfig>(await http().get(`/api/${orgId}/score_configs`)),
+    // Read-only, cached-per-org variant of `list` — for pages that only need
+    // Score Configs as reference data (e.g. looking up a scorer's configured
+    // healthy value) and would otherwise refetch the whole list on every visit.
+    listCached: async (orgId: string): Promise<ScoreConfig[]> => {
+      let pending = scoreConfigsCache.get(orgId);
+      if (!pending) {
+        pending = onlineEvalsService.scoreConfigs.list(orgId);
+        pending.catch(() => scoreConfigsCache.delete(orgId));
+        scoreConfigsCache.set(orgId, pending);
+      }
+      return pending;
+    },
     create: async (orgId: string, payload: Record<string, any>): Promise<ScoreConfig> =>
       (await http().post(`/api/${orgId}/score_configs`, payload)).data,
     update: async (

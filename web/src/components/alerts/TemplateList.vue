@@ -40,13 +40,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="template-list-add-btn"
           variant="primary"
           size="sm"
-          icon-left="add"
           @click="editTemplate(null)"
           >{{ t(`alert_templates.add`) }}</OButton
         >
       </template>
       <div class="bg-card-glass-bg min-h-0 flex-1 overflow-hidden">
         <OTable
+          ref="oTableRef"
           :frame="false"
           data-test="alert-templates-list-table"
           :data="visibleRows"
@@ -59,6 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           pagination="client"
           :page-size="20"
           :page-size-options="[5, 10, 20, 50, 100]"
+          :current-page="currentPage"
           :footer-title="t('alert_templates.header')"
           sorting="client"
           filter-mode="client"
@@ -66,6 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           show-index
           :show-global-filter="false"
           @update:selected-ids="handleSelectedIdsUpdate"
+          @update:current-page="onPageChange"
         >
           <template #toolbar>
             <div class="flex w-full items-center gap-2">
@@ -165,7 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #cell-actions="{ row }">
             <OButton
               :title="t('alert_templates.exportTemplate')"
-              class="ml-1"
+              class="ms-1"
               variant="ghost"
               size="icon-sm"
               @click.stop="exportTemplate(row)"
@@ -176,7 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
             <OButton
               :data-test="`alert-template-list-${row.name}-update-template`"
-              class="ml-1"
+              class="ms-1"
               variant="ghost"
               size="icon-sm"
               :title="
@@ -190,7 +192,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
             <OButton
               :data-test="`alert-template-list-${row.name}-clone-template`"
-              class="ml-1"
+              class="ms-1"
               variant="ghost"
               size="icon-sm"
               :title="t('alert_templates.clone')"
@@ -201,7 +203,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
             <OButton
               :data-test="`alert-template-list-${row.name}-delete-template`"
-              class="ml-1"
+              class="ms-1"
               variant="ghost"
               size="icon-sm"
               :title="
@@ -360,6 +362,15 @@ const filterQuery = ref("");
 // Top-right tab filter — mirrors the alerts list pattern. "prebuilt" shows
 // system templates (name starts with `prebuilt_`), "custom" shows the rest.
 const activeTab = ref<"all" | "prebuilt" | "custom">("all");
+const oTableRef: any = ref(null);
+
+// URL-synced so returning from add/edit/import (Back/Update/Cancel) lands on the same page instead of resetting to page 1.
+const currentPage = ref(Number(router.currentRoute.value.query.page) || 1);
+const onPageChange = (page: number) => {
+  currentPage.value = page;
+  if (String(router.currentRoute.value.query.page ?? "1") === String(page)) return;
+  router.replace({ query: { ...router.currentRoute.value.query, page: String(page) } });
+};
 
 const selectedTemplateIds = computed(() => selectedTemplates.value.map((item: any) => item.name));
 
@@ -395,6 +406,17 @@ watch(
 );
 
 const loading = ref(false);
+// The first real load lands after mount and races TanStack's own auto-reset-on-data-change, which resolves through its own deferred microtask queue — setTimeout(0) runs strictly after that queue drains, so the restored page reliably wins.
+watch(
+  loading,
+  (isLoading) => {
+    if (isLoading) return;
+    setTimeout(() => {
+      oTableRef.value?.table?.setPageIndex(currentPage.value - 1);
+    }, 0);
+  },
+  { once: true },
+);
 const getTemplates = () => {
   const dismiss = toast({
     variant: "loading",
@@ -475,26 +497,24 @@ const editTemplate = (template: any = null) => {
   cloningTemplate.value = false;
   toggleTemplateEditor();
 
-  const query: { [key: string]: string } = {
-    action: template ? "update" : "add",
-    org_identifier: store.state.selectedOrganization.identifier,
-  };
-
-  if (template) query.name = template.name;
-
-  if (router.currentRoute.value.query.type)
-    query.type = router.currentRoute.value.query.type.toString() as string;
-
   if (!template) {
+    // Strip a stale `name` left over from a previous "update" visit — everything
+    // else (including `page`) survives the round trip to the editor and back.
+    const { name: _name, ...restQuery } = router.currentRoute.value.query;
     router.push({
       name: "alertTemplates",
-      query,
+      query: {
+        ...restQuery,
+        action: "add",
+        org_identifier: store.state.selectedOrganization.identifier,
+      },
     });
   } else {
     editingTemplate.value = { ...template };
     router.push({
       name: "alertTemplates",
       query: {
+        ...router.currentRoute.value.query,
         action: "update",
         name: template.name,
         org_identifier: store.state.selectedOrganization.identifier,
@@ -521,9 +541,11 @@ const cloneTemplate = (template: any) => {
   };
   cloningTemplate.value = true;
   showTemplateEditor.value = true;
+  const { name: _name, ...restQuery } = router.currentRoute.value.query;
   router.push({
     name: "alertTemplates",
     query: {
+      ...restQuery,
       action: "add",
       org_identifier: store.state.selectedOrganization.identifier,
     },
@@ -562,9 +584,11 @@ const deleteTemplate = () => {
 };
 const importTemplate = () => {
   showImportTemplate.value = true;
+  const { name: _name, ...restQuery } = router.currentRoute.value.query;
   router.push({
     name: "alertTemplates",
     query: {
+      ...restQuery,
       action: "import",
       org_identifier: store.state.selectedOrganization.identifier,
     },
@@ -580,13 +604,16 @@ const cancelDeleteTemplate = () => {
 };
 const toggleTemplateEditor = () => {
   showTemplateEditor.value = !showTemplateEditor.value;
-  if (!showTemplateEditor.value)
+  if (!showTemplateEditor.value) {
+    const { action: _action, name: _name, ...restQuery } = router.currentRoute.value.query;
     router.push({
       name: "alertTemplates",
       query: {
+        ...restQuery,
         org_identifier: store.state.selectedOrganization.identifier,
       },
     });
+  }
 };
 const filterData = (rows: any, terms: any) => {
   var filtered = [];

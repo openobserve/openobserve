@@ -8,7 +8,7 @@ on:
   pull_request:
     branches:
       - "**"
-    # labeled/unlabeled so adding or removing 'e2e' starts or resets CI; drafts never run paid CI.
+    # labeled/unlabeled so adding or removing 'ready-for-ci' starts or resets CI; drafts never run paid CI.
     types: [opened, reopened, synchronize, labeled, unlabeled, ready_for_review, converted_to_draft]
   merge_group:
 
@@ -28,8 +28,8 @@ env:
 
 jobs:
   check_changes:
-    # Paid CI runs only on PRs carrying the 'e2e' label; the merge queue runs unit tests on the merged code.
-    if: ${{ github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'e2e') && github.event.pull_request.draft == false) }}
+    # Paid CI runs only on PRs carrying the 'ready-for-ci' label; the merge queue runs unit tests on the merged code.
+    if: ${{ github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'ready-for-ci') && github.event.pull_request.draft == false) }}
     name: check_changes
     runs-on: ubuntu-latest
     permissions:
@@ -44,16 +44,19 @@ jobs:
         with:
           fetch-depth: 0
 
+      # One shared classification for every suite (see .github/actions/classify-changes); a change to
+      # this workflow file re-tests itself on top of it.
+      - uses: ./.github/actions/classify-changes
+        id: classify
       - id: check
+        env:
+          HAS_CHANGES: ${{ steps.classify.outputs.run_db }}
+          CHANGED_WORKFLOWS: ${{ steps.classify.outputs.changed_workflows }}
         run: |
-          CHANGED=$(git diff --name-only origin/${{ github.base_ref || 'main' }} ${{ github.sha }})
-          # Same contract as playwright/api: other workflows' files are irrelevant, this file re-tests itself.
-          if [ -z "$CHANGED" ] || echo "$CHANGED" | grep -qE '^\.github/workflows/db-testing\.yml$'; then
-            echo "has_changes=true" >> $GITHUB_OUTPUT
-          elif echo "$CHANGED" | grep -qvE '(\.md$|^docs/|^web/|^tests/ui-testing/|^tests/playwright-tests/|\.(png|jpe?g|gif|svg|webp)$|^\.github/workflows/)'; then
-            echo "has_changes=true" >> $GITHUB_OUTPUT
+          if [ "$HAS_CHANGES" = "true" ] || echo " $CHANGED_WORKFLOWS " | grep -q ' db-testing.yml '; then
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
           else
-            echo "has_changes=false" >> $GITHUB_OUTPUT
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
           fi
 
   db_validation_tests:
@@ -90,12 +93,12 @@ jobs:
 
       - uses: ./.github/actions/github-auth
       - name: Setup Rust Toolchain
-        uses: dtolnay/rust-toolchain@master
+        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master
         with:
           toolchain: nightly-2026-05-20
 
       - name: Setup Rust Cache
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           # This successful main-branch build is the single writer for the
           # canonical dev(debug=0)+mimalloc cache consumed by API and DB PRs.
@@ -153,7 +156,7 @@ jobs:
           fi
 
       - name: Setup rye
-        uses: eifinger/setup-rye@v4
+        uses: eifinger/setup-rye@c694239a43768373e87d0103d7f547027a23f3c8 # v4.2.9
         env:
           # Reuse setup-python's interpreter so `rye self install` skips the flaky toolchain download.
           RYE_TOOLCHAIN: ${{ steps.setup-python.outputs.python-path }}
@@ -230,7 +233,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions: {}
     needs: [check_changes, db_validation_tests]
-    if: always() && (github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'e2e') && github.event.pull_request.draft == false))
+    if: always() && (github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'ready-for-ci') && github.event.pull_request.draft == false))
     steps:
       - name: Check test results
         run: |

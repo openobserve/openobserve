@@ -83,7 +83,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="w-full justify-start"
               @click="quickSelectStream(stream.value)"
             >
-              <span class="truncate">{{ stream.label }}</span>
+              <span class="min-w-0 flex-1 truncate">{{ stream.label }}</span>
+              <OTooltip :content="raw(stream.label)" side="right" align="center" />
             </OButton>
             <span
               v-if="streamList.length > quickPickStreams.length"
@@ -177,7 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <template #empty>
           <div data-test="logs-search-no-field-found-text" class="mx-0 w-5/6 pt-3 text-center">
-            <OIcon name="info" size="sm" class="mr-1 align-middle" />
+            <OIcon name="info" size="sm" class="me-1 align-middle" />
             {{ t("search.noFieldFoundInStream") }}
           </div>
         </template>
@@ -258,6 +259,7 @@ import {
   computed,
   nextTick,
   defineAsyncComponent,
+  onUnmounted,
 } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
@@ -1731,6 +1733,11 @@ export default defineComponent({
         traceIdMapper.value[field] = [];
       }
     };
+
+    // An open field's value stream outlives this component and retains it via its handler; cancel all on unmount.
+    onUnmounted(() => {
+      Object.keys(traceIdMapper.value).forEach((field) => cancelTraceId(field));
+    });
 
     const cancelValueApi = (value: string) => {
       //remove the field from the openedFilterFields

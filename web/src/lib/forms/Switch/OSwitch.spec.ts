@@ -63,6 +63,30 @@ describe("OSwitch", () => {
     expect(wrapper.emitted("update:modelValue")![0][0]).toBe(true);
   });
 
+  it("mirrors the checked-thumb offset for RTL at every size", () => {
+    for (const [size, offset] of [
+      ["sm", "2"],
+      ["md", "2.5"],
+      ["lg", "3"],
+      ["xl", "5"],
+    ] as const) {
+      const sized = mount(OSwitch, { props: { size, modelValue: true } });
+      const thumb = sized.find('[role="switch"]').find("span");
+
+      expect(thumb.classes()).toContain(`translate-x-${offset}`);
+      expect(thumb.classes()).toContain(`rtl:-translate-x-${offset}`);
+      sized.unmount();
+    }
+  });
+
+  it("parks the thumb at the reading edge while unchecked", () => {
+    wrapper = mount(OSwitch, { props: { modelValue: false } });
+    const thumb = wrapper.find('[role="switch"]').find("span");
+
+    expect(thumb.classes()).toContain("translate-x-0");
+    expect(thumb.classes().some((className) => className.startsWith("rtl:"))).toBe(false);
+  });
+
   it("renders correctly with lg size and still toggles", async () => {
     wrapper = mount(OSwitch, { props: { size: "lg", modelValue: false } });
     expect(wrapper.find("button").exists()).toBe(true);

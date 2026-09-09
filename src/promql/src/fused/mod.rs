@@ -18,9 +18,130 @@
 //! evaluator's intermediate per-series materialization.
 
 mod accumulator;
-mod eval;
-mod fold;
+mod aggregate;
+mod eval_range;
+pub(crate) mod matrix;
 mod op;
+mod range_expr;
+pub(crate) mod stream;
 
-pub(crate) use eval::fused_range_agg;
+use datafusion::error::{DataFusionError, Result};
+pub(crate) use eval_range::eval_range;
 pub(crate) use op::FusedAggOp;
+pub(crate) use range_expr::RangeExpr;
+use tokio::task::JoinSet;
+
+/// Collects every partition in order; the first failure fails the whole, and dropping the set
+/// aborts the rest.
+pub(super) async fn collect_partitioned<T, Fut>(parts: Vec<Fut>) -> Result<Vec<T>>
+where
+    T: Send + 'static,
+    Fut: Future<Output = Result<T>> + Send + 'static,
+{
+    let mut results: Vec<Option<T>> = parts.iter().map(|_| None).collect();
+    let mut tasks = JoinSet::new();
+    for (index, part) in parts.into_iter().enumerate() {
+        tasks.spawn(async move { (index, part.await) });
+    }
+    // sources finish in any order; the merge needs them in source order
+    while let Some(joined) = tasks.join_next().await {
+        let (index, part) = joined.map_err(|e| DataFusionError::Execution(e.to_string()))?;
+        results[index] = Some(part?);
+    }
+    Ok(results
+        .into_iter()
+        .map(|part| part.expect("every source joined"))
+        .collect())
+}
+
+#[cfg(test)]
+mod test_support {
+    use config::meta::promql::value::{EvalContext, Value};
+    use promql_parser::parser::LabelModifier;
+
+    pub(super) type CanonicalSeries = (Vec<(String, String)>, Vec<(i64, u64)>);
+
+    pub(super) const SECOND: i64 = 1_000_000;
+    pub(super) const BASE: i64 = 1_000 * SECOND;
+
+    pub(super) fn eval_ctx() -> EvalContext {
+        EvalContext::new(
+            BASE + 60 * SECOND,
+            BASE + 180 * SECOND,
+            60 * SECOND,
+            "test".into(),
+        )
+    }
+
+    pub(super) fn canonical_matrix(value: Value) -> Vec<CanonicalSeries> {
+        let matrix = match value {
+            Value::Matrix(matrix) => matrix,
+            Value::None => return vec![],
+            value => panic!("expected matrix or none, got {}", value.get_type()),
+        };
+        let mut canonical = matrix
+            .into_iter()
+            .map(|series| {
+                let mut labels = series
+                    .labels
+                    .iter()
+                    .map(|label| (label.name.clone(), label.value.clone()))
+                    .collect::<Vec<_>>();
+                labels.sort();
+                let samples = series
+                    .samples
+                    .iter()
+                    .map(|sample| (sample.timestamp, sample.value.to_bits()))
+                    .collect::<Vec<_>>();
+                (labels, samples)
+            })
+            .collect::<Vec<_>>();
+        canonical.sort_by(|a, b| a.0.cmp(&b.0));
+        canonical
+    }
+
+    pub(super) fn by(labels: &[&str]) -> Option<LabelModifier> {
+        Some(LabelModifier::Include(promql_parser::label::Labels {
+            labels: labels.iter().map(|label| label.to_string()).collect(),
+        }))
+    }
+
+    pub(super) fn without(labels: &[&str]) -> Option<LabelModifier> {
+        Some(LabelModifier::Exclude(promql_parser::label::Labels {
+            labels: labels.iter().map(|label| label.to_string()).collect(),
+        }))
+    }
+
+    /// Labels and timestamps must match exactly; values may drift in the last bits (fold order
+    /// differs).
+    pub(super) fn assert_matrix_close(
+        expected: Vec<CanonicalSeries>,
+        actual: Vec<CanonicalSeries>,
+        context: &str,
+    ) {
+        assert_eq!(expected.len(), actual.len(), "{context}: series count");
+        for (expected, actual) in expected.iter().zip(&actual) {
+            assert_eq!(expected.0, actual.0, "{context}: labels");
+            assert_eq!(expected.1.len(), actual.1.len(), "{context}: sample count");
+            for (&(expected_ts, expected_bits), &(actual_ts, actual_bits)) in
+                expected.1.iter().zip(&actual.1)
+            {
+                assert_eq!(expected_ts, actual_ts, "{context}: timestamps");
+                if expected_bits == actual_bits {
+                    continue;
+                }
+                let expected_value = f64::from_bits(expected_bits);
+                let actual_value = f64::from_bits(actual_bits);
+                assert!(
+                    expected_value.is_finite() && actual_value.is_finite(),
+                    "{context}: non-finite values must match exactly"
+                );
+                let tolerance = expected_value.abs().max(actual_value.abs()) * 1e-12;
+                assert!(
+                    (expected_value - actual_value).abs() <= tolerance,
+                    "{context}: {expected_value} vs {actual_value}"
+                );
+            }
+        }
+    }
+}

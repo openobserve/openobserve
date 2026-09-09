@@ -45,12 +45,6 @@ pub fn matcher_residual_field<'a>(schema: &'a Schema, matcher: &Matcher) -> Opti
     schema.field_with_name(&matcher.name).ok()
 }
 
-/// Whether `matcher_predicates` evaluates this matcher on the given schema.
-/// Index pruning may claim exactness only for matchers covered under this rule.
-pub fn matcher_is_residual(schema: &Schema, matcher: &Matcher) -> bool {
-    matcher_residual_field(schema, matcher).is_some()
-}
-
 /// Build the DataFusion predicates used for PromQL label matchers.
 ///
 /// Keeping predicate construction separate lets storage-side secondary

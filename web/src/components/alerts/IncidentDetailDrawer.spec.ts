@@ -954,6 +954,21 @@ describe("IncidentDetailDrawer.vue", () => {
         query: { org_identifier: "default" },
       });
     });
+
+    it("preserves the existing route query (e.g. page) when closing back to the list", async () => {
+      wrapper = await createWrapper();
+      router.currentRoute.value.query = { page: "3" } as any;
+      const pushSpy = vi.spyOn(router, "push");
+
+      wrapper.vm.close();
+      await nextTick();
+
+      expect(pushSpy).toHaveBeenCalledWith({
+        name: "incidentList",
+        query: { page: "3", org_identifier: "default" },
+      });
+      router.currentRoute.value.query = {};
+    });
   });
 
   describe("Organization Context", () => {

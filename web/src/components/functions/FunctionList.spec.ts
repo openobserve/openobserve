@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import FunctionList from "./FunctionList.vue";
 import i18n from "@/locales";
@@ -914,6 +914,110 @@ describe("FunctionList", () => {
       const dialog = wrapper.find('[data-test-stub="o-dialog"]');
       expect(dialog.text()).toContain("1. Pipeline 1");
       expect(dialog.text()).toContain("2. Pipeline 2");
+    });
+  });
+
+  describe("Page persistence across editor round trip (OTable pagination-reset fix)", () => {
+    // 45 rows / pageSize 20 gives 3 pages, so page 3 is a real target to restore.
+    const manyFunctionsData = {
+      data: {
+        list: Array.from({ length: 45 }, (_, i) => ({
+          name: `func${i + 1}`,
+          function: "identity()",
+          params: "",
+          transType: 0,
+        })),
+      },
+    };
+
+    const mountList = () =>
+      mount(FunctionList, {
+        global: { plugins: [i18n, store, router], stubs: globalStubs },
+      });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("starts loading=true before the initial fetch resolves", () => {
+      mockJsTransformList.mockResolvedValue(manyFunctionsData);
+      const wrapper = mountList();
+      expect((wrapper.vm as any).loading).toBe(true);
+    });
+
+    it("defaults currentPage to 1", async () => {
+      mockJsTransformList.mockResolvedValue(manyFunctionsData);
+      const wrapper = mountList();
+      await flushPromises();
+      expect((wrapper.vm as any).currentPage).toBe(1);
+    });
+
+    it("onPageChange updates currentPage", async () => {
+      mockJsTransformList.mockResolvedValue(manyFunctionsData);
+      const wrapper = mountList();
+      await flushPromises();
+      const vm = wrapper.vm as any;
+      vm.onPageChange(3);
+      expect(vm.currentPage).toBe(3);
+    });
+
+    it("restorePageIndex reasserts the page via a macrotask (setTimeout(0))", async () => {
+      mockJsTransformList.mockResolvedValue(manyFunctionsData);
+      const wrapper = mountList();
+      await flushPromises();
+      vi.useFakeTimers();
+      const vm = wrapper.vm as any;
+      vm.currentPage = 3;
+      const setPageIndex = vi.fn();
+      vm.oTableRef = { table: { setPageIndex } };
+
+      vm.restorePageIndex();
+      expect(setPageIndex).not.toHaveBeenCalled();
+
+      vi.runAllTimers();
+      expect(setPageIndex).toHaveBeenCalledWith(2);
+    });
+
+    it("keeps the page after Cancel unmounts and remounts OTable via the AddFunction v-if swap", async () => {
+      mockJsTransformList.mockResolvedValue(manyFunctionsData);
+      const wrapper = mountList();
+      await flushPromises();
+      const vm = wrapper.vm as any;
+
+      vm.onPageChange(3);
+      await flushPromises();
+      expect(vm.oTableRef.table.getState().pagination.pageIndex).toBe(2);
+
+      vm.showAddJSTransformDialog = true;
+      await flushPromises();
+      expect(vm.oTableRef).toBeNull();
+
+      vm.hideForm();
+      await flushPromises();
+
+      expect(vm.oTableRef.table.getState().pagination.pageIndex).toBe(2);
+    });
+
+    it("keeps the page after Save triggers an async refetch that races TanStack's own reset", async () => {
+      mockJsTransformList.mockResolvedValue(manyFunctionsData);
+      const wrapper = mountList();
+      await flushPromises();
+      const vm = wrapper.vm as any;
+
+      vm.onPageChange(3);
+      await flushPromises();
+      expect(vm.oTableRef.table.getState().pagination.pageIndex).toBe(2);
+
+      vm.showAddJSTransformDialog = true;
+      await flushPromises();
+
+      mockJsTransformList.mockResolvedValue(manyFunctionsData);
+      vm.refreshList();
+      await flushPromises();
+      // flush the setTimeout(0) macrotask that restorePageIndex scheduled
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(vm.oTableRef.table.getState().pagination.pageIndex).toBe(2);
     });
   });
 

@@ -368,6 +368,26 @@ pub enum SloValidationError {
     AlertSliSourceSilenceGated { silence_minutes: i64 },
 }
 
+impl SloValidationError {
+    /// A stable, short identifier for the source-alert rejections.
+    ///
+    /// The picker shows one chip per ineligible alert and the full sentence on
+    /// hover; the chip's wording is a UI decision and must not be parsed back
+    /// out of `Display`, which is prose and changes. `None` for the variants
+    /// that cannot reach the picker.
+    pub fn source_alert_code(&self) -> Option<&'static str> {
+        match self {
+            Self::AlertSliSourceNotScheduled => Some("not_scheduled"),
+            Self::AlertSliSourceIsGrouped => Some("grouped"),
+            Self::AlertSliSourceIneligible => Some("not_referenceable"),
+            Self::AlertSliSourceIsCron => Some("cron"),
+            Self::AlertSliSourceTooInfrequent { .. } => Some("too_infrequent"),
+            Self::AlertSliSourceSilenceGated { .. } => Some("silenced"),
+            _ => None,
+        }
+    }
+}
+
 impl std::fmt::Display for SloValidationError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -2015,6 +2035,54 @@ mod tests {
         }
         assert_eq!(source_alert_ineligibility(&facts, SLICE_60_SECS), None);
         assert_eq!(validate_slo(&alert_def(), 99.9, Some(facts)), Ok(()));
+    }
+
+    /// Every rejection the picker can show must carry a code.
+    ///
+    /// The UI labels the row from the code and keeps the sentence for the
+    /// hover, so a variant that reaches the picker with `None` would render an
+    /// unlabelled chip — and parsing the sentence instead is what this exists
+    /// to prevent.
+    #[test]
+    fn every_source_alert_rejection_carries_a_code() {
+        let cases = [
+            SloValidationError::AlertSliSourceNotScheduled,
+            SloValidationError::AlertSliSourceIsGrouped,
+            SloValidationError::AlertSliSourceIneligible,
+            SloValidationError::AlertSliSourceIsCron,
+            SloValidationError::AlertSliSourceTooInfrequent {
+                frequency_secs: 3600,
+                slice_interval_secs: SLICE_300_SECS,
+            },
+            SloValidationError::AlertSliSourceSilenceGated {
+                silence_minutes: 30,
+            },
+        ];
+        let mut codes: Vec<&str> = cases
+            .iter()
+            .map(|e| {
+                e.source_alert_code()
+                    .unwrap_or_else(|| panic!("no code for {e:?}"))
+            })
+            .collect();
+        // Distinct, or two rejections would be labelled identically.
+        let before = codes.len();
+        codes.sort_unstable();
+        codes.dedup();
+        assert_eq!(
+            codes.len(),
+            before,
+            "duplicate source-alert codes: {codes:?}"
+        );
+    }
+
+    /// A rejection that cannot reach the picker has no chip to label.
+    #[test]
+    fn non_source_rejections_have_no_code() {
+        assert_eq!(
+            SloValidationError::TargetOutOfRange(100.0).source_alert_code(),
+            None
+        );
     }
 
     /// The picker and the save path must never disagree: whatever the helper

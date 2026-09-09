@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- Output Section with Destination-specific Error Display -->
     <template #output-content>
-      <div class="border-border-default flex h-full w-full min-w-100 flex-col border-l">
+      <div class="border-border-default flex h-full w-full min-w-100 flex-col border-s">
         <div
           v-if="destinationErrorsToDisplay.length > 0 || destinationCreators.length > 0"
           class="text-text-heading shrink-0 py-3 text-center text-sm font-semibold"

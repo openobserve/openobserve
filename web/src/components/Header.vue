@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OButton>
 
     <!-- LEFT SIDE: Logo -->
-    <div class="flex shrink-0 items-center justify-start pl-3">
+    <div class="flex shrink-0 items-center justify-start ps-3">
       <!-- LOGO SECTION: Displays custom or default OpenObserve logo -->
       <!-- Shows custom logo/text if configured in enterprise mode -->
       <div
@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           :href="homeUrl"
           @click.prevent="goToHome"
-          class="mr-2 flex cursor-pointer items-center p-0 text-xl font-bold font-semibold text-inherit no-underline"
+          class="me-2 flex cursor-pointer items-center p-0 text-xl font-bold font-semibold text-inherit no-underline"
           >{{ store.state.zoConfig.custom_logo_text }}</a
         >
 
@@ -148,10 +148,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="min-w-0 flex-1" />
 
     <!-- RIGHT SIDE: Controls -->
-    <div class="flex shrink-0 items-center justify-end gap-1 pr-3">
+    <div class="flex shrink-0 items-center justify-end gap-1 pe-3">
       <!-- QUOTA WARNING SECTION: Shows warning when quota threshold is reached -->
       <div
-        class="mr-4 flex items-center gap-1"
+        class="me-4 flex items-center gap-1"
         v-if="store.state.organizationData.quotaThresholdMsg"
       >
         <div type="warning" icon="cloud" class="bg-status-warning-bg rounded-default inline p-1.25">
@@ -376,7 +376,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- Submenu — absolutely positioned to the left of parent dropdown -->
                 <div
                   v-if="showLanguageSubmenu"
-                  class="rounded-default bg-dropdown-bg border-dropdown-border absolute top-0 right-full z-9999 mr-1 min-w-50 border py-1 shadow-lg dark:shadow-lg"
+                  class="rounded-default bg-dropdown-bg border-dropdown-border absolute end-full top-0 z-9999 me-1 min-w-50 border py-1 shadow-lg dark:shadow-lg"
                   data-test="language-dropdown-item"
                   @click.stop
                 >
@@ -385,7 +385,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :key="lang.code"
                     type="button"
                     :data-test="`language-dropdown-item-${lang.code}`"
-                    class="flex w-full cursor-pointer items-center gap-2.5 border-0 bg-transparent px-3 py-1.5 text-left text-sm leading-[1.2] text-inherit"
+                    class="flex w-full cursor-pointer items-center gap-2.5 border-0 bg-transparent px-3 py-1.5 text-start text-sm leading-[1.2] text-inherit"
                     :class="[
                       'hover:bg-dropdown-item-hover-bg',
                       { 'font-semibold': selectedLanguage.code === lang.code },

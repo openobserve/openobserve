@@ -27,7 +27,7 @@ use config::meta::{
 use db::scheduler;
 use openobserve_api_common::extractors::Headers;
 #[cfg(feature = "enterprise")]
-use openobserve_core::auth::check_permissions;
+use openobserve_core::auth::{check_folder_write_permissions, check_permissions};
 use openobserve_core::{
     auth::UserEmail,
     dashboards::reports::{self, ReportError},
@@ -669,6 +669,7 @@ pub async fn get_report_v2(Path((org_id, report_id)): Path<(String, String)>) ->
     request_body(content = inline(Report), description = "Report details"),
     responses(
         (status = StatusCode::OK, description = "Updated", body = ()),
+        (status = StatusCode::FORBIDDEN, description = "Forbidden", body = ()),
         (status = StatusCode::NOT_FOUND, description = "Not found", body = ()),
     ),
     extensions(
@@ -681,13 +682,41 @@ pub async fn update_report_v2(
     Headers(user_email): Headers<UserEmail>,
     axum::Json(mut report): axum::Json<Report>,
 ) -> Response {
-    report.last_edited_by = user_email.user_id;
+    // The authorization subject comes from the header, never from the body.
+    let user_id = user_email.user_id;
+    report.last_edited_by = user_id.clone();
     // ?folder on update means "move to this folder"; absent means stay in current folder.
     let new_folder: Option<String> = uri.query().and_then(|q| {
         url::form_urlencoded::parse(q.as_bytes())
             .find(|(k, _)| k == "folder")
             .map(|(_, v)| v.into_owned())
     });
+    // The route gate resolves `?folder=`, which HERE names the DESTINATION, so a
+    // move is authorized against the folder it lands in and never against the one
+    // it leaves. Check the source before honouring the move.
+    #[cfg(feature = "enterprise")]
+    if new_folder.is_some() {
+        let curr_folder = match reports::get_by_id(&org_id, &report_id).await {
+            Ok((folder, _)) => folder.folder_id,
+            Err(e) => return e.into(),
+        };
+        if !check_permissions(
+            &report_id,
+            &org_id,
+            &user_id,
+            "reports",
+            "PUT",
+            Some(&curr_folder),
+            false,
+            true,
+            false,
+        )
+        .await
+        {
+            return MetaHttpResponse::forbidden("Unauthorized Access");
+        }
+    }
+
     match reports::update_by_id(&org_id, &report_id, new_folder.as_deref(), report).await {
         Ok(_) => MetaHttpResponse::ok("Report updated"),
         Err(e) => e.into(),
@@ -881,6 +910,7 @@ pub async fn trigger_report_v2(Path((org_id, report_id)): Path<(String, String)>
     ),
     responses(
         (status = 200, description = "Success", body = Object),
+        (status = 403, description = "Forbidden", body = ()),
         (status = 404, description = "Not found", body = ()),
     ),
     extensions(
@@ -889,22 +919,26 @@ pub async fn trigger_report_v2(Path((org_id, report_id)): Path<(String, String)>
 )]
 pub async fn move_reports(
     Path(org_id): Path<String>,
-    OriginalUri(uri): OriginalUri,
     Headers(user_email): Headers<UserEmail>,
     axum::Json(req): axum::Json<MoveReportsRequestBody>,
 ) -> Response {
     let _user_id = user_email.user_id;
-    let _folder_id = get_folder(uri.query().unwrap_or(""));
-
     #[cfg(feature = "enterprise")]
     for id in &req.report_ids {
+        // The report's stored folder, not `?folder=`: the query param is caller
+        // supplied, so authorizing against it lets the caller name a folder they
+        // do hold and move a report out of one they do not.
+        let curr_folder = match reports::get_by_id(&org_id, id).await {
+            Ok((folder, _)) => folder.folder_id,
+            Err(e) => return e.into(),
+        };
         if !check_permissions(
             id,
             &org_id,
             &_user_id,
             "reports",
             "PUT",
-            Some(&_folder_id),
+            Some(&curr_folder),
             false,
             true,
             false,
@@ -913,6 +947,13 @@ pub async fn move_reports(
         {
             return MetaHttpResponse::forbidden("Unauthorized Access");
         }
+    }
+
+    #[cfg(feature = "enterprise")]
+    if !check_folder_write_permissions(&org_id, &_user_id, "report_folders", &req.dst_folder_id)
+        .await
+    {
+        return MetaHttpResponse::forbidden("Unauthorized Access");
     }
 
     match reports::move_to_folder(&org_id, &req.report_ids, &req.dst_folder_id).await {

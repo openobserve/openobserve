@@ -80,6 +80,8 @@
                 size="sm"
                 :placeholder="raw(row.titleField.label)"
                 :aria-label="raw(row.titleField.label)"
+                :error="nameInvalid(row)"
+                :error-message="nameInvalid(row) ? t('common.nameIsRequired') : undefined"
                 :data-test="`oncall-preset-field-${row.key}-name`"
                 @update:model-value="(v: string) => setField(row, row.titleField, v)"
               />
@@ -116,6 +118,8 @@
                 :options="memberOptions"
                 class="min-w-0 md:w-56"
                 :aria-label="raw(row.memberField.label)"
+                :error="membersInvalid(row)"
+                :error-message="membersInvalid(row) ? t('oncall.presetMembersRequired') : undefined"
                 :data-test="`oncall-preset-field-${row.key}-members`"
                 @update:model-value="(v: string[]) => setField(row, row.memberField, v)"
               />
@@ -375,6 +379,9 @@ const loading = ref(false);
 const chosen = ref<PresetDescriptor | null>(null);
 const applying = ref(false);
 const applyError = ref("");
+/// Gates the per-field red rings: they only appear once a save has actually
+/// been tried, not while the form is still being filled in for the first time.
+const attempted = ref(false);
 const confirmReplace = ref(false);
 const defaultsOpen = ref(false);
 /// Which optional groups the user has taken off their default. Keyed by row.
@@ -394,7 +401,10 @@ watch(
   open,
   (isOpen) => {
     if (isOpen && !presets.value.length) fetchPresets();
-    if (!isOpen) applyError.value = "";
+    if (!isOpen) {
+      applyError.value = "";
+      attempted.value = false;
+    }
   },
   // A dialog can be MOUNTED open; without this the catalogue never loads.
   { immediate: true },
@@ -444,6 +454,7 @@ function defaultModelOf(preset: PresetDescriptor): Record<string, unknown> {
 function choose(preset: PresetDescriptor) {
   chosen.value = preset;
   applyError.value = "";
+  attempted.value = false;
   defaultsOpen.value = false;
   overridden.value = {};
   model.value = defaultModelOf(preset);
@@ -652,6 +663,22 @@ function setField(row: RowSpec, field: PresetInput | null, value: unknown) {
   if (field) row.entry[field.field] = value;
 }
 
+/// Whether a row's own controls are on screen at all — the un-overridden
+/// catch-all shows its default sentence instead, so it has nothing to validate.
+function controlsVisible(row: RowSpec): boolean {
+  return !(row.optional && !overridden.value[row.key]);
+}
+
+function nameInvalid(row: RowSpec): boolean {
+  return attempted.value && Boolean(row.titleField) && !titleOf(row).trim();
+}
+
+function membersInvalid(row: RowSpec): boolean {
+  return (
+    attempted.value && Boolean(row.memberField) && controlsVisible(row) && !membersOf(row).length
+  );
+}
+
 function edgeOf(window: WindowSpec | null, edge: "from" | "to"): SelectModelValue {
   if (!window) return undefined;
   return window.model[window[edge].field] as SelectModelValue;
@@ -794,22 +821,43 @@ const replaceNote = computed<I18nText>(() =>
 
 // ── Applying ──────────────────────────────────────────────────────────────────
 
-/// A row whose title is a REQUIRED text field (only follow-the-sun's regions,
-/// which the preset genuinely cannot guess) but is blank or was never typed
-/// into. Caught here, before the request leaves the browser, because the
-/// server refuses a blank name too but only after a round trip — and its
-/// rejection arrives as axum's own extraction failure, not this API's usual
-/// named-field error.
-function missingNameRow(): RowSpec | null {
-  return rows.value.find((row) => row.titleField && !titleOf(row).trim()) ?? null;
+interface InvalidField {
+  kind: "name" | "members";
+  label: string;
+}
+
+/// Every row whose title or member list is required but blank — a name the
+/// preset genuinely cannot guess (only follow-the-sun's regions), or a layer
+/// with nobody in it. Caught here, before the request leaves the browser,
+/// because the server refuses both too but only after a round trip — and a
+/// missing `members` arrives as axum's own extraction failure, not this
+/// API's usual named-field error.
+function invalidFields(): InvalidField[] {
+  const out: InvalidField[] = [];
+  for (const row of rows.value) {
+    if (row.titleField && !titleOf(row).trim())
+      out.push({ kind: "name", label: row.titleField.label });
+    if (row.memberField && controlsVisible(row) && !membersOf(row).length)
+      out.push({ kind: "members", label: row.memberField.label });
+  }
+  return out;
 }
 
 async function apply() {
   if (!chosen.value) return;
   applyError.value = "";
-  const missing = missingNameRow();
-  if (missing?.titleField) {
-    applyError.value = t("oncall.presetsMissingName", { label: missing.titleField.label });
+  attempted.value = true;
+  const invalid = invalidFields();
+  if (invalid.length === 1) {
+    const [field] = invalid;
+    applyError.value =
+      field.kind === "name"
+        ? t("oncall.presetsMissingName", { label: field.label })
+        : t("oncall.presetsMissingMembers", { label: field.label });
+    return;
+  }
+  if (invalid.length > 1) {
+    applyError.value = t("oncall.presetsFixHighlighted");
     return;
   }
   applying.value = true;

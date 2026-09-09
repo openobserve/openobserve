@@ -127,7 +127,7 @@ const iconSize: Record<NonNullable<ToggleGroupItemProps["size"]>, "xs" | "sm" | 
         v-if="isReorderable"
         name="drag-indicator"
         :size="iconSize[props.size]"
-        class="-ml-0.5 shrink-0 opacity-40"
+        class="-ms-0.5 shrink-0 opacity-40"
         aria-hidden="true"
       />
       <!-- Slot takes precedence; falls back to `icon-left` prop -->

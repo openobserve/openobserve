@@ -431,6 +431,9 @@ pub struct SloEligibleAlert {
     pub eligible: bool,
     /// The validator's own message, verbatim — not a second wording of it.
     pub reason: Option<String>,
+    /// A stable identifier for `reason`, so the picker can label the row
+    /// without parsing the sentence. See `SloValidationError::source_alert_code`.
+    pub reason_code: Option<String>,
 }
 
 /// Reduce one alert to its picker row, or `None` if it cannot be referenced.
@@ -449,6 +452,10 @@ pub fn slo_eligibility(alert: &Alert) -> Option<SloEligibleAlert> {
         name: alert.name.clone(),
         frequency_secs: facts.frequency_secs,
         eligible: reason.is_none(),
+        reason_code: reason
+            .as_ref()
+            .and_then(|e| e.source_alert_code())
+            .map(str::to_string),
         reason: reason.map(|e| e.to_string()),
     })
 }
@@ -935,6 +942,21 @@ pub async fn set_enabled(org: &str, id: &str, enabled: bool) -> Result<bool, Slo
 // ---------------------------------------------------------------------------
 // read path
 // ---------------------------------------------------------------------------
+
+/// The folder each named SLO currently lives in, skipping ids that do not resolve.
+///
+/// Callers authorize a move's source side with this: an SLO has no OFGA object
+/// type of its own, so it is checked as an alert parented by its folder.
+pub async fn folders_of(org: &str, ids: &[String]) -> Result<Vec<(String, String)>, SloError> {
+    let db = get_orm_client_ro().await;
+    let mut out = Vec::with_capacity(ids.len());
+    for id in ids {
+        if let Some(slo) = slos_table::get(db, org, id).await? {
+            out.push((slo.id, slo.folder_id));
+        }
+    }
+    Ok(out)
+}
 
 /// One SLO with its rollup measurement.
 pub async fn get_with_status(

@@ -389,6 +389,7 @@ pub async fn delete_dashboard_bulk(
     ),
     responses(
         (status = StatusCode::OK, description = "Dashboard Moved", body = Object),
+        (status = StatusCode::FORBIDDEN, description = "Forbidden", body = ()),
         (status = StatusCode::NOT_FOUND, description = "Dashboard not found", body = ()),
     ),
     extensions(
@@ -404,7 +405,8 @@ pub async fn move_dashboard(
     if !ensure_dashboard_in_org(&org_id, &dashboard_id).await {
         return MetaHttpResponse::not_found("Dashboard not found");
     }
-    // For this endpoint, openfga check is already done in the middleware
+    // The destination is authorized inside `dashboards::move_dashboard`, which
+    // both routes go through — see the check hoisted out of `_check_openfga`.
     match dashboards::move_dashboard(
         &org_id,
         &dashboard_id,
@@ -437,6 +439,7 @@ pub async fn move_dashboard(
     request_body(content = inline(MoveDashboardsRequestBody), description = "Identifies dashboards and the destination folder", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = ()),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
         (status = 500, description = "Failure",  content_type = "application/json", body = ()),
     ),
