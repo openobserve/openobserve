@@ -1,6 +1,6 @@
 use infra::db::{get_orm_client_ro, get_orm_client_rw};
 
-use super::*;
+use super::{composition, composition_lock, *};
 
 // ── Synthetics CRUD ──────────────────────────────────────────────────────────────
 
@@ -50,6 +50,17 @@ pub async fn create_synthetic(
     // normalisation so membership checks see canonical ids.
     validate_against_capabilities(org_id, &body, true).await?;
 
+    let guard = composition_lock::lock(org_id)
+        .await
+        .map_err(|e| anyhow::Error::new(composition::CompositionError::Lock(e.to_string())))?;
+    let checked = composition::validate_for_save(get_orm_client_ro().await, org_id, None, &body)
+        .await
+        .map_err(anyhow::Error::new);
+    if let Err(e) = checked {
+        let _ = guard.release().await;
+        return Err(e);
+    }
+
     // Encrypt credential fields before persisting.
     body = encrypt_synthetic_auth(org_id, body).await?;
     body.owner = Some(created_by.to_owned());
@@ -58,6 +69,10 @@ pub async fn create_synthetic(
     let mut result = synthetics_checks::create(conn, org_id, body, false)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+    guard
+        .release()
+        .await
+        .map_err(|e| anyhow::anyhow!("composition lock release: {e}"))?;
 
     // The public slug behind the stored PK. Derived from what was written
     // rather than from the request, so a request that named its folder by PK
@@ -163,6 +178,18 @@ pub async fn update_synthetic(
     // `start` freshness check (edits round-trip the original start date).
     validate_against_capabilities(org_id, &body, false).await?;
 
+    let guard = composition_lock::lock(org_id)
+        .await
+        .map_err(|e| anyhow::Error::new(composition::CompositionError::Lock(e.to_string())))?;
+    let checked =
+        composition::validate_for_save(get_orm_client_ro().await, org_id, Some(id), &body)
+            .await
+            .map_err(anyhow::Error::new);
+    if let Err(e) = checked {
+        let _ = guard.release().await;
+        return Err(e);
+    }
+
     // Read current folder_id (KSUID PK) before update — needed for OpenFGA relation change.
     let old_folder_pk = synthetics_checks::get(conn, org_id, id)
         .await
@@ -189,6 +216,10 @@ pub async fn update_synthetic(
     let mut check = synthetics_checks::update(conn, org_id, id, body)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+    guard
+        .release()
+        .await
+        .map_err(|e| anyhow::anyhow!("composition lock release: {e}"))?;
 
     // Recompute next_run_at so the scheduler uses the new frequency immediately.
     let now_us = config::utils::time::now_micros();
@@ -262,6 +293,19 @@ pub async fn update_synthetic(
 
 pub async fn delete_synthetic(org_id: &str, id: &str) -> anyhow::Result<bool> {
     let conn = get_orm_client_rw().await;
+
+    let guard = composition_lock::lock(org_id)
+        .await
+        .map_err(|e| anyhow::Error::new(composition::CompositionError::Lock(e.to_string())))?;
+    if let Err(e) =
+        composition::ensure_not_referenced(conn, org_id, std::slice::from_ref(&id.to_owned()))
+            .await
+            .map_err(anyhow::Error::new)
+    {
+        let _ = guard.release().await;
+        return Err(e);
+    }
+
     // Drain any queued checks before deleting.
     synthetics_jobs::drain_check(conn, id)
         .await
@@ -269,6 +313,10 @@ pub async fn delete_synthetic(org_id: &str, id: &str) -> anyhow::Result<bool> {
     let deleted = synthetics_checks::delete(conn, org_id, id)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+    guard
+        .release()
+        .await
+        .map_err(|e| anyhow::anyhow!("composition lock release: {e}"))?;
     #[cfg(feature = "enterprise")]
     if deleted
         && o2_enterprise::enterprise::common::config::get_config()
@@ -421,6 +469,18 @@ pub async fn delete_synthetics_bulk(
     let replicate = o2_enterprise::enterprise::common::config::get_config()
         .super_cluster
         .enabled;
+
+    let guard = composition_lock::lock(org_id)
+        .await
+        .map_err(|e| anyhow::Error::new(composition::CompositionError::Lock(e.to_string())))?;
+    if let Err(e) = composition::ensure_not_referenced(conn, org_id, ids)
+        .await
+        .map_err(anyhow::Error::new)
+    {
+        let _ = guard.release().await;
+        return Err(e);
+    }
+
     for id in ids {
         synthetics_jobs::drain_check(conn, id)
             .await
@@ -438,6 +498,10 @@ pub async fn delete_synthetics_bulk(
             remove_ownership(org_id, &obj, "", "").await;
         }
     }
+    guard
+        .release()
+        .await
+        .map_err(|e| anyhow::anyhow!("composition lock release: {e}"))?;
     Ok(())
 }
 
