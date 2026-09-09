@@ -1,0 +1,17 @@
+{
+  "feature_slug": "composite-alert-trigger-timestamps",
+  "feature_title": "Composite Alert Trigger Timestamps",
+  "area": "Alerts",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": true,
+  "spec_filename": "alerts-composite-trigger-timestamps.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Alerts/alerts-composite-trigger-timestamps.spec.js",
+  "playwright_group": "Alerts",
+  "source_files": [
+    "web/src/components/alerts/composite/CompositeAlertForm.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": ""
+}

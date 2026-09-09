@@ -1,0 +1,25 @@
+{
+  "feature_slug": "composite-alert-trigger-timestamps",
+  "feature_title": "Composite Alert Trigger Timestamps",
+  "area": "Alerts",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": true,
+  "spec_filename": "alerts-composite-trigger-timestamps.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Alerts/alerts-composite-trigger-timestamps.spec.js",
+  "playwright_group": "Alerts",
+  "source_files": [
+    "web/src/components/alerts/composite/CompositeAlertForm.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "All six changed paths live under OSS-owned locations: src/api/management, src/config, src/core, src/infra, and web/src. None are under enterprise/, o2_enterprise/, or src/enterprise/, and no enterprise keyword (cipher/SSO/SAML/RBAC/SDR/sensitive-data/logo-management) appears in the paths or symbols, so this is an OSS change.",
+    "skip": "Not skipped. The diff includes a user-facing frontend change (web/src/components/alerts/composite/CompositeAlertForm.vue) and no explicit opt-out (no tests-added label and an empty trigger comment), so the no-user-facing-change skip does not apply.",
+    "e2e": "E2E is warranted. The composite alert list now populates last_triggered_at and last_satisfied_at (previously hardcoded None), and the composite alert form now surfaces the real validation error message instead of a generic code — both are user-exercisable UI/behavior changes a Playwright spec can verify.",
+    "area": "The bulk of the user-facing change is in web/src/components/alerts/composite/CompositeAlertForm.vue and the related alert list API, and an existing tests/ui-testing/playwright-tests/Alerts folder with sibling alerts-*.spec.js specs is the natural home.",
+    "group": "The Alerts shard (actual_folder Alerts) already groups alerts-e2e-flow.spec.js, alerts-ui-operations.spec.js, alerts-advanced.spec.js and related alert specs, so the new composite-alert spec joins that existing group.",
+    "existing_tests": "No E2E specs in the diff. The changed files are Rust backend sources and one Vue component; no files under tests/ui-testing/playwright-tests/ were modified, so there is no existing Playwright coverage for this feature."
+  }
+}

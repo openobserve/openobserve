@@ -1,0 +1,10 @@
+{
+  "action": "append",
+  "target_spec": "tests/ui-testing/playwright-tests/Alerts/alerts-composite-ui.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Alerts/alerts-composite-ui.spec.js",
+    "tests/api-testing/tests/alerts/test_composite_alerts.py"
+  ],
+  "needs_registration": false,
+  "rationale": "alerts-composite-ui.spec.js is the existing composite-alert spec and already owns createChild/createCompositeFixture/seedAlertFixtures plus the detail/list/form-preview route-mock patterns. None of its 7 tests cover the trigger-timestamp surfaces this feature changes: the list-level last_triggered_at/last_satisfied_at columns (the diff's headline — composite_list_item now populates them instead of hardcoding None), the form preview's real validation-error message, or the detail 'Last computed' level_at / status timeline. Appending the new test()s reuses ~50 lines of fixtures/boilerplate and avoids a new ci_matrix.json entry. The run-context spec_path is only used when action is 'new', so it is intentionally not followed here."
+}
