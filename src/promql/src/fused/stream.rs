@@ -31,7 +31,6 @@ use config::{
 use datafusion::{
     arrow::datatypes::{DataType, Schema},
     error::Result,
-    execution::SendableRecordBatchStream,
     prelude::SessionContext,
 };
 use hashbrown::HashSet;
@@ -81,36 +80,22 @@ pub(crate) async fn fused_agg(
     let start_time = std::time::Instant::now();
     let trace_id = eval_ctx.trace_id.clone();
 
-    if schema
-        .field_with_name(HASH_LABEL)
-        .is_ok_and(|field| field.data_type() != &DataType::UInt64)
-    {
-        return Ok(None);
-    }
     let Some(group_cols) = group_label_columns(modifier, schema, shape.func.name()) else {
         return Ok(None);
     };
-    let mut columns = vec![TIMESTAMP_COL_NAME, HASH_LABEL, VALUE_LABEL];
-    columns.extend(group_cols.iter().map(String::as_str));
-
-    let Some(shard_inputs) =
-        shard_inputs(ctx, &selector, micros(shape.range), &columns, eval_ctx).await?
+    let lookback = micros(shape.range);
+    let Some(sources) =
+        shard_sources(ctx, schema, &selector, group_cols, lookback, eval_ctx).await?
     else {
         return Ok(None);
     };
-    let shards = shard_inputs.len();
-
     log::info!(
-        "[trace_id: {trace_id}] [PromQL Timing] streaming fused {}({}) started with {shards} shards",
+        "[trace_id: {trace_id}] [PromQL Timing] streaming fused {}({}) started with {} shards",
         shape.op.name(),
         shape.func.name(),
+        sources.len(),
     );
     let params = FoldParams::new(shape.op, shape.func.clone(), shape.range, eval_ctx);
-    let group_cols = Arc::new(group_cols);
-    let sources = shard_inputs
-        .into_iter()
-        .map(|streams| MergeSeriesStream::start(streams, group_cols.clone(), selector.offset))
-        .collect();
     let (value, series_count) = fold_sources(sources, params).await?;
 
     log::info!(
@@ -141,30 +126,17 @@ pub(crate) async fn range_series<T: Send + 'static>(
     let func_name = eval.func.name();
     let trace_id = eval.eval_ctx.trace_id.clone();
 
-    if schema
-        .field_with_name(HASH_LABEL)
-        .is_ok_and(|field| field.data_type() != &DataType::UInt64)
-    {
-        return Ok(None);
-    }
     let label_cols = series_label_columns(schema, &labels, func_name);
-    let mut columns = vec![TIMESTAMP_COL_NAME, HASH_LABEL, VALUE_LABEL];
-    columns.extend(label_cols.iter().map(String::as_str));
-
-    let Some(shard_inputs) =
-        shard_inputs(ctx, &selector, micros(eval.range), &columns, &eval.eval_ctx).await?
+    let lookback = micros(eval.range);
+    let Some(sources) =
+        shard_sources(ctx, schema, &selector, label_cols, lookback, &eval.eval_ctx).await?
     else {
         return Ok(None);
     };
     log::info!(
         "[trace_id: {trace_id}] [PromQL Timing] streaming {func_name}() started with {} shards",
-        shard_inputs.len(),
+        sources.len(),
     );
-    let label_cols = Arc::new(label_cols);
-    let sources = shard_inputs
-        .into_iter()
-        .map(|streams| MergeSeriesStream::start(streams, label_cols.clone(), selector.offset))
-        .collect();
     let (series, series_count) = emit_sources(sources, eval, emit).await?;
 
     log::info!(
@@ -175,15 +147,22 @@ pub(crate) async fn range_series<T: Send + 'static>(
     Ok(Some((series, series_count)))
 }
 
-/// The per-shard ordered streams of the selector's hash-sorted table projected to `columns`;
-/// `None` when the table is missing or a shard plan cannot stream in order.
-async fn shard_inputs(
+/// One series stream per shard over the selector's hash-sorted table, projected to the sample
+/// columns plus `label_cols`; `None` when the layout cannot stream in order.
+async fn shard_sources(
     ctx: &SessionContext,
+    schema: &Schema,
     selector: &StreamingSelector<'_>,
+    label_cols: Vec<String>,
     lookback: i64,
-    columns: &[&str],
     eval_ctx: &EvalContext,
-) -> Result<Option<Vec<Vec<SendableRecordBatchStream>>>> {
+) -> Result<Option<Vec<impl Future<Output = Result<MergeSeriesStream>> + Send + 'static>>> {
+    if schema
+        .field_with_name(HASH_LABEL)
+        .is_ok_and(|field| field.data_type() != &DataType::UInt64)
+    {
+        return Ok(None);
+    }
     let sorted_table = format!("{}{HASH_SORTED_TABLE_SUFFIX}", selector.table_name);
     let Ok(df) = ctx.table(sorted_table.as_str()).await else {
         return Ok(None);
@@ -196,8 +175,21 @@ async fn shard_inputs(
         lookback,
     )?;
     let df = apply_matchers(df, selector.matchers)?;
+    let mut columns = vec![TIMESTAMP_COL_NAME, HASH_LABEL, VALUE_LABEL];
+    columns.extend(label_cols.iter().map(String::as_str));
     let shards = ctx.state().config().target_partitions();
-    build_shard_inputs(&df, columns, shards, &eval_ctx.trace_id).await
+    let Some(shard_inputs) = build_shard_inputs(&df, &columns, shards, &eval_ctx.trace_id).await?
+    else {
+        return Ok(None);
+    };
+    let label_cols = Arc::new(label_cols);
+    let offset = selector.offset;
+    Ok(Some(
+        shard_inputs
+            .into_iter()
+            .map(|streams| MergeSeriesStream::start(streams, label_cols.clone(), offset))
+            .collect(),
+    ))
 }
 
 /// The label columns an emitted series carries, in the sorted order the materializing loader
