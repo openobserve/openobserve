@@ -1491,6 +1491,7 @@ pub fn service_routes() -> Router {
             .route("/{org_id}/synthetics/{id}/resolved-variables", get(synthetics::get_synthetic_resolved_variables))
             .route("/{org_id}/synthetics/{id}/variables/{name}/promote", post(synthetics::promote_synthetic_variable))
             .route("/{org_id}/synthetics/{id}/run", post(synthetics::run_synthetic_now))
+            .route("/{org_id}/synthetics/{id}/referenced-by", get(synthetics::get_referenced_by))
             .route("/{org_id}/synthetics/{id}/enable", put(synthetics::set_synthetic_enabled))
             .route("/{org_id}/synthetics/{id}/artifact", get(synthetics::get_artifact))
             .route("/{org_id}/synthetics/{id}/artifacts/presign", post(synthetics::presign_artifacts))

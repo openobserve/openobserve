@@ -293,6 +293,7 @@ use crate::{
         synthetics::move_synthetics,
         synthetics::set_synthetic_enabled,
         synthetics::run_synthetic_now,
+        synthetics::get_referenced_by,
         synthetics::list_locations,
         synthetics::list_synthetics_variables,
         synthetics::create_synthetics_variable,
