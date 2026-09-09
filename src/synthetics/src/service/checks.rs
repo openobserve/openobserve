@@ -1,4 +1,5 @@
 use infra::db::{get_orm_client_ro, get_orm_client_rw};
+use sea_orm::DatabaseConnection;
 
 use super::{composition, composition_lock, *};
 
@@ -53,26 +54,16 @@ pub async fn create_synthetic(
     let guard = composition_lock::lock(org_id)
         .await
         .map_err(|e| anyhow::Error::new(composition::CompositionError::Lock(e.to_string())))?;
-    let checked = composition::validate_for_save(get_orm_client_ro().await, org_id, None, &body)
-        .await
-        .map_err(anyhow::Error::new);
-    if let Err(e) = checked {
-        let _ = guard.release().await;
-        return Err(e);
-    }
-
-    // Encrypt credential fields before persisting.
-    body = encrypt_synthetic_auth(org_id, body).await?;
-    body.owner = Some(created_by.to_owned());
-
-    let conn = get_orm_client_rw().await;
-    let mut result = synthetics_checks::create(conn, org_id, body, false)
-        .await
-        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
-    guard
+    // The mutation runs to completion — success or error — before the guard is released, so
+    // every exit from the critical section releases the lock exactly once (see
+    // `composite_graph_lock`'s callers in src/core, the precedent this follows).
+    let mutation = create_synthetic_under_lock(org_id, body, created_by).await;
+    let unlock = guard
         .release()
         .await
-        .map_err(|e| anyhow::anyhow!("composition lock release: {e}"))?;
+        .map_err(|e| anyhow::Error::new(composition::CompositionError::Lock(e.to_string())));
+    let mut result = mutation?;
+    unlock?;
 
     // The public slug behind the stored PK. Derived from what was written
     // rather than from the request, so a request that named its folder by PK
@@ -181,45 +172,15 @@ pub async fn update_synthetic(
     let guard = composition_lock::lock(org_id)
         .await
         .map_err(|e| anyhow::Error::new(composition::CompositionError::Lock(e.to_string())))?;
-    let checked =
-        composition::validate_for_save(get_orm_client_ro().await, org_id, Some(id), &body)
-            .await
-            .map_err(anyhow::Error::new);
-    if let Err(e) = checked {
-        let _ = guard.release().await;
-        return Err(e);
-    }
-
-    // Read current folder_id (KSUID PK) before update — needed for OpenFGA relation change.
-    let old_folder_pk = synthetics_checks::get(conn, org_id, id)
-        .await
-        .map_err(|e| anyhow::anyhow!(e.to_string()))?
-        .map(|m| m.folder_id);
-
-    // Resolve folder slug → KSUID PK (FK constraint requires folders.id, not folders.folder_id).
-    // Falls back to the original value if not found (already a PK).
-    let new_folder_pk = if !body.folder_id.is_empty() {
-        let pk = folders::get_pk_by_name(org_id, &body.folder_id, FolderType::Synthetics)
-            .await
-            .map_err(|e| anyhow::anyhow!(e.to_string()))?;
-        if let Some(ref p) = pk {
-            body.folder_id = p.clone();
-        }
-        pk.or_else(|| Some(body.folder_id.clone()))
-    } else {
-        None
-    };
-
-    // Encrypt credential fields before persisting.
-    body = encrypt_synthetic_auth(org_id, body).await?;
-
-    let mut check = synthetics_checks::update(conn, org_id, id, body)
-        .await
-        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
-    guard
+    // See `create_synthetic_under_lock`: the mutation runs to completion before the guard is
+    // released, so every exit releases the lock exactly once.
+    let mutation = update_synthetic_under_lock(conn, org_id, id, body).await;
+    let unlock = guard
         .release()
         .await
-        .map_err(|e| anyhow::anyhow!("composition lock release: {e}"))?;
+        .map_err(|e| anyhow::Error::new(composition::CompositionError::Lock(e.to_string())));
+    let (old_folder_pk, new_folder_pk, mut check) = mutation?;
+    unlock?;
 
     // Recompute next_run_at so the scheduler uses the new frequency immediately.
     let now_us = config::utils::time::now_micros();
@@ -297,26 +258,15 @@ pub async fn delete_synthetic(org_id: &str, id: &str) -> anyhow::Result<bool> {
     let guard = composition_lock::lock(org_id)
         .await
         .map_err(|e| anyhow::Error::new(composition::CompositionError::Lock(e.to_string())))?;
-    if let Err(e) =
-        composition::ensure_not_referenced(conn, org_id, std::slice::from_ref(&id.to_owned()))
-            .await
-            .map_err(anyhow::Error::new)
-    {
-        let _ = guard.release().await;
-        return Err(e);
-    }
-
-    // Drain any queued checks before deleting.
-    synthetics_jobs::drain_check(conn, id)
-        .await
-        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
-    let deleted = synthetics_checks::delete(conn, org_id, id)
-        .await
-        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
-    guard
+    // See `create_synthetic_under_lock`: the mutation runs to completion before the guard is
+    // released, so every exit releases the lock exactly once.
+    let mutation = delete_synthetic_under_lock(conn, org_id, id).await;
+    let unlock = guard
         .release()
         .await
-        .map_err(|e| anyhow::anyhow!("composition lock release: {e}"))?;
+        .map_err(|e| anyhow::Error::new(composition::CompositionError::Lock(e.to_string())));
+    let deleted = mutation?;
+    unlock?;
     #[cfg(feature = "enterprise")]
     if deleted
         && o2_enterprise::enterprise::common::config::get_config()
@@ -515,35 +465,23 @@ pub async fn delete_synthetics_bulk(
     let guard = composition_lock::lock(org_id)
         .await
         .map_err(|e| anyhow::Error::new(composition::CompositionError::Lock(e.to_string())))?;
-    if let Err(e) = composition::ensure_not_referenced(conn, org_id, ids)
-        .await
-        .map_err(anyhow::Error::new)
-    {
-        let _ = guard.release().await;
-        return Err(e);
-    }
-
-    for id in ids {
-        synthetics_jobs::drain_check(conn, id)
-            .await
-            .map_err(|e| anyhow::anyhow!(e.to_string()))?;
-        let deleted = synthetics_checks::delete(conn, org_id, id)
-            .await
-            .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+    // See `create_synthetic_under_lock`: the mutation runs to completion before the guard is
+    // released, so every exit releases the lock exactly once.
+    let mutation = delete_synthetics_bulk_under_lock(
+        conn,
+        org_id,
+        ids,
+        ofga,
         #[cfg(feature = "enterprise")]
-        if deleted && replicate {
-            o2_enterprise::enterprise::super_cluster::queue::synthetics_check_delete(org_id, id)
-                .await?;
-        }
-        if deleted && ofga {
-            let obj = format!("{}:{}", get_ofga_type("synthetics"), id);
-            remove_ownership(org_id, &obj, "", "").await;
-        }
-    }
-    guard
+        replicate,
+    )
+    .await;
+    let unlock = guard
         .release()
         .await
-        .map_err(|e| anyhow::anyhow!("composition lock release: {e}"))?;
+        .map_err(|e| anyhow::Error::new(composition::CompositionError::Lock(e.to_string())));
+    mutation?;
+    unlock?;
     Ok(())
 }
 
@@ -661,6 +599,123 @@ pub async fn run_synthetic_now(org_id: &str, id: &str) -> anyhow::Result<()> {
     synthetics_checks::advance_schedule(conn, id, check.last_triggered_at, 0)
         .await
         .map_err(|e| anyhow::anyhow!("[synthetics] run_synthetic_now advance_schedule: {e}"))
+}
+
+/// The create mutation run while `checks.rs`'s callers hold the composition lock — kept as
+/// its own `?`-propagating scope so the lock is always released exactly once, win or lose.
+async fn create_synthetic_under_lock(
+    org_id: &str,
+    mut body: Synthetic,
+    created_by: &str,
+) -> anyhow::Result<Synthetic> {
+    composition::validate_for_save(get_orm_client_ro().await, org_id, None, &body)
+        .await
+        .map_err(anyhow::Error::new)?;
+
+    // Encrypt credential fields before persisting.
+    body = encrypt_synthetic_auth(org_id, body).await?;
+    body.owner = Some(created_by.to_owned());
+
+    let conn = get_orm_client_rw().await;
+    synthetics_checks::create(conn, org_id, body, false)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))
+}
+
+/// The update mutation run under the composition lock. Returns the pre-update folder PK
+/// alongside the resolved new one, so the caller can react to a folder move after the lock
+/// (and its release, guaranteed exactly once) is out of the way.
+async fn update_synthetic_under_lock(
+    conn: &DatabaseConnection,
+    org_id: &str,
+    id: &str,
+    mut body: Synthetic,
+) -> anyhow::Result<(Option<String>, Option<String>, Synthetic)> {
+    composition::validate_for_save(get_orm_client_ro().await, org_id, Some(id), &body)
+        .await
+        .map_err(anyhow::Error::new)?;
+
+    // Read current folder_id (KSUID PK) before update — needed for OpenFGA relation change.
+    let old_folder_pk = synthetics_checks::get(conn, org_id, id)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?
+        .map(|m| m.folder_id);
+
+    // Resolve folder slug → KSUID PK (FK constraint requires folders.id, not folders.folder_id).
+    // Falls back to the original value if not found (already a PK).
+    let new_folder_pk = if !body.folder_id.is_empty() {
+        let pk = folders::get_pk_by_name(org_id, &body.folder_id, FolderType::Synthetics)
+            .await
+            .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+        if let Some(ref p) = pk {
+            body.folder_id = p.clone();
+        }
+        pk.or_else(|| Some(body.folder_id.clone()))
+    } else {
+        None
+    };
+
+    // Encrypt credential fields before persisting.
+    body = encrypt_synthetic_auth(org_id, body).await?;
+
+    let check = synthetics_checks::update(conn, org_id, id, body)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+
+    Ok((old_folder_pk, new_folder_pk, check))
+}
+
+/// The delete mutation run under the composition lock: refuse a still-referenced check,
+/// then drain and delete it.
+async fn delete_synthetic_under_lock(
+    conn: &DatabaseConnection,
+    org_id: &str,
+    id: &str,
+) -> anyhow::Result<bool> {
+    composition::ensure_not_referenced(conn, org_id, std::slice::from_ref(&id.to_owned()))
+        .await
+        .map_err(anyhow::Error::new)?;
+
+    // Drain any queued checks before deleting.
+    synthetics_jobs::drain_check(conn, id)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+    synthetics_checks::delete(conn, org_id, id)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))
+}
+
+/// The bulk-delete mutation run under the composition lock: refuse the batch if any id is
+/// still referenced, then drain and delete each one.
+async fn delete_synthetics_bulk_under_lock(
+    conn: &DatabaseConnection,
+    org_id: &str,
+    ids: &[String],
+    ofga: bool,
+    #[cfg(feature = "enterprise")] replicate: bool,
+) -> anyhow::Result<()> {
+    composition::ensure_not_referenced(conn, org_id, ids)
+        .await
+        .map_err(anyhow::Error::new)?;
+
+    for id in ids {
+        synthetics_jobs::drain_check(conn, id)
+            .await
+            .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+        let deleted = synthetics_checks::delete(conn, org_id, id)
+            .await
+            .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+        #[cfg(feature = "enterprise")]
+        if deleted && replicate {
+            o2_enterprise::enterprise::super_cluster::queue::synthetics_check_delete(org_id, id)
+                .await?;
+        }
+        if deleted && ofga {
+            let obj = format!("{}:{}", get_ofga_type("synthetics"), id);
+            remove_ownership(org_id, &obj, "", "").await;
+        }
+    }
+    Ok(())
 }
 
 /// A row's expanded step count (browser only, §5.11) and how many checks embed it as a subtest.

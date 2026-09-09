@@ -207,8 +207,14 @@ mod tests {
             .find("pub async fn run_synthetic_now")
             .expect("run_synthetic_now moved");
         let body = &checks[start..];
-        let end = body[1..]
-            .find("\npub ")
+        // Bounded by the next top-level fn of ANY visibility, not just `pub` — the
+        // private `..._under_lock` helpers checks.rs groups after every pub fn (per
+        // CLAUDE.md's ordering rule) sit right after this one and must not be
+        // swept into its body just because there is no further `pub fn` to stop at.
+        let end = ["\npub ", "\nasync fn ", "\nfn "]
+            .iter()
+            .filter_map(|marker| body[1..].find(marker))
+            .min()
             .map(|i| i + 1)
             .unwrap_or(body.len());
         assert!(
