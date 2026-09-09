@@ -1004,7 +1004,7 @@ fn quota_trigger_record(
 /// A non-2xx is checked explicitly: `send()` resolves to `Ok` for a 401 as
 /// readily as for a 200, so treating the transport error as the only failure
 /// drops every record from a mis-scoped token and logs nothing.
-async fn post_json(
+pub(crate) async fn post_json(
     client: &reqwest::Client,
     url: &str,
     token: &str,

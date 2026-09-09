@@ -55,6 +55,10 @@ pub struct CheckNotification {
     /// `sftp_degraded`, `flaky`. `None` from a probe too old to report one, in
     /// which case the message stays generic rather than guessing.
     pub status_reason: Option<String>,
+    /// `"config"` marks a run that never reached the target — the journey could
+    /// not be assembled — so the wording must say "misconfigured", not "probe
+    /// infrastructure error".
+    pub error_source: String,
     pub degraded: bool,
     /// Locations that did not pass, worst first.
     ///
@@ -223,6 +227,13 @@ fn status_headline(n: &CheckNotification) -> String {
     }
     match n.status.as_str() {
         "warning" => format!("{} passed only after retries (flaky)", n.check_name),
+        "error" if n.error_source == "config" => format!(
+            "{} is misconfigured — {}",
+            n.check_name,
+            n.error
+                .as_deref()
+                .unwrap_or("its subtest references cannot be expanded")
+        ),
         "error" => format!(
             "{} could not be checked — probe infrastructure error",
             n.check_name
@@ -588,6 +599,7 @@ mod tests {
             consecutive_failures: 3,
             flaky: false,
             status_reason: None,
+            error_source: "probe".into(),
             degraded: false,
             failing_locations: vec!["aws-us-east-1".into(), "aws-us-west-1".into()],
             passing_locations: vec!["aws-eu-central-1".into()],
@@ -666,6 +678,19 @@ mod tests {
                 status_headline(&n)
             );
         }
+    }
+
+    #[test]
+    fn a_config_error_reads_as_misconfigured_not_as_probe_infrastructure() {
+        let mut n = firing();
+        n.status = "error".into();
+        n.error_source = "config".into();
+        n.error =
+            Some("'Login (shared)' grew and this test now needs 51 steps; the limit is 50".into());
+        let headline = status_headline(&n);
+        assert!(headline.contains("misconfigured"), "{headline}");
+        assert!(headline.contains("51 steps"), "{headline}");
+        assert!(!headline.contains("probe infrastructure"), "{headline}");
     }
 
     #[test]

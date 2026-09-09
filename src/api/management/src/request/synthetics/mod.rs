@@ -1117,9 +1117,14 @@ pub async fn job_resolve(
             return MetaHttpResponse::bad_request(e.to_string());
         }
     };
+    let req_job_id = req.job_id.clone();
     match openobserve_synthetics::job_api::resolve(req, &org_id).await {
         Ok(resp) => MetaHttpResponse::json(resp),
         Err(e) => {
+            if let Some(cfg_err) = e.downcast_ref::<openobserve_synthetics::job_api::ConfigError>()
+            {
+                return settle_config_error(&org_id, &req_job_id, cfg_err).await;
+            }
             let msg = e.to_string();
             if msg.starts_with("forbidden") {
                 return MetaHttpResponse::forbidden(msg);
@@ -1131,6 +1136,49 @@ pub async fn job_resolve(
             MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), msg).into_response()
         }
     }
+}
+
+/// Completes the job as an `error` with `error_source = "config"`: it alerts, it is not billed, and
+/// the probe is told to stop.
+async fn settle_config_error(
+    org_id: &str,
+    job_id: &str,
+    err: &openobserve_synthetics::job_api::ConfigError,
+) -> Response {
+    let ack = openobserve_synthetics::job_api::AckRequest {
+        job_id: job_id.to_owned(),
+        claimed_by: None,
+        status: "error".to_owned(),
+        response_time_ms: 0.0,
+        error: Some(err.message.clone()),
+        trigger_type: "scheduled".to_owned(),
+        status_reason: Some(err.status_reason.to_owned()),
+        attempts: 0,
+        error_source: openobserve_synthetics::alerting::ERROR_SOURCE_CONFIG.to_owned(),
+        steps_executed: 0,
+        steps_defined: 0,
+        browser_ms: 0,
+    };
+    if let Err(e) = process_ack(ack, org_id).await {
+        tracing::error!(job_id, "[synthetics] job_resolve: config-error ack: {e}");
+    }
+    if let Err(e) =
+        openobserve_synthetics::job_api::report_config_error_result(org_id, job_id, err).await
+    {
+        tracing::error!(
+            job_id,
+            "[synthetics] job_resolve: config-error result row: {e}"
+        );
+    }
+    (
+        StatusCode::UNPROCESSABLE_ENTITY,
+        Json(serde_json::json!({
+            "code": "config_error",
+            "status_reason": err.status_reason,
+            "message": err.message
+        })),
+    )
+        .into_response()
 }
 
 #[utoipa::path(
@@ -1344,6 +1392,8 @@ async fn process_ack(
     let status = req.status.clone();
     let response_time_ms = req.response_time_ms;
     let error = req.error.clone();
+    #[cfg(feature = "enterprise")]
+    let error_source = req.error_source.clone();
     let checked_at = config::utils::time::now_micros();
 
     let resp = openobserve_synthetics::job_api::ack(req, token_org).await?;
@@ -1403,6 +1453,7 @@ async fn process_ack(
             flaky,
             degraded,
             status_reason: resp.status_reason.clone(),
+            error_source: error_source.clone(),
             failing_locations: resp.failing_locations.clone(),
             passing_locations: resp.passing_locations.clone(),
         };
