@@ -72,8 +72,7 @@ test.describe("Logs Streaming Render Regression", () => {
     await pm.logsPage.setQueryEditorContent('SELECT * FROM "e2e_automate" WHERE kubernetes_pod_name = \'nonexistent_pod_14303_regression\'');
     await pm.logsPage.runQueryAndWaitForResults();
 
-    const noResultsVisible = await pm.logsPage.isNoResultsMessageVisible();
-    expect(noResultsVisible, 'No-events empty state must render for a zero-row result').toBeTruthy();
+    await expect(page.locator(pm.logsPage.noResultsFoundText), 'No-events empty state must render for a zero-row result').toBeVisible();
     await expect(page.locator(pm.logsPage.resultsSkeleton)).toHaveCount(0);
 
     testLogger.info('✓ PASSED: zero-row query still shows the no-events empty state');
