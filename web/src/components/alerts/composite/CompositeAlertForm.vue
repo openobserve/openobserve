@@ -141,7 +141,7 @@ const validateDraft = async (): Promise<void> => {
     if (sequence !== validationSequence) return;
     preview.value = response.data;
     emit("validation", response.data);
-  } catch (e) {
+  } catch (e: any) {
     if (sequence !== validationSequence) return;
     preview.value = {
       valid: false,
