@@ -100,6 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               show-index
               row-key="alert_id"
               :loading="loading"
+              :forbidden="forbidden"
               pagination="client"
               :page-size="pageSize"
               :page-size-options="pageSizeOptions"
@@ -1006,6 +1007,7 @@ export default defineComponent({
     // Start in the loading state so the table shows the skeleton on first
     // render instead of briefly flashing the empty state before the fetch.
     const loading = ref(true);
+    const forbidden = ref(false);
     const isSubmitting = ref(false);
 
     // Compact toolbar: icon-only buttons when AI sidebar is open at narrow widths
@@ -1756,6 +1758,7 @@ export default defineComponent({
         folderId = "";
       }
       loading.value = true;
+      forbidden.value = false;
       try {
         const res = await alertsService.listByFolderId(
           1,
@@ -1950,13 +1953,17 @@ export default defineComponent({
           }
         }
         dismiss();
-      } catch (error) {
+      } catch (error: any) {
         console.error(error);
         dismiss();
-        toast({
-          variant: "error",
-          message: t("toastMessages.alerts.errorWhilePullingAlerts"),
-        });
+        forbidden.value = error?.response?.status === 403;
+        // The grouped access toast already reports a 403; a second red toast adds nothing.
+        if (!forbidden.value) {
+          toast({
+            variant: "error",
+            message: t("toastMessages.alerts.errorWhilePullingAlerts"),
+          });
+        }
       } finally {
         loading.value = false;
       }
@@ -3390,6 +3397,7 @@ export default defineComponent({
       streams,
       isFetchingStreams,
       loading,
+      forbidden,
       isSubmitting,
       filterQuery,
       getImageURL,

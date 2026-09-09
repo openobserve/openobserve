@@ -53,6 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :columns="columns"
           row-key="name"
           :loading="loading"
+          :forbidden="forbidden"
           :selected-ids="selectedDestinationIds"
           selection="multiple"
           pagination="client"
@@ -516,6 +517,7 @@ export default defineComponent({
     };
 
     const loading = ref(false);
+    const forbidden = ref(false);
     const getDestinations = () => {
       const dismiss = toast({
         variant: "loading",
@@ -523,6 +525,7 @@ export default defineComponent({
         timeout: 0,
       });
       loading.value = true;
+      forbidden.value = false;
       destinationService
         .list({
           page_num: 1,
@@ -546,7 +549,8 @@ export default defineComponent({
           updateRoute();
         })
         .catch((err) => {
-          if (err.response.status != 403) {
+          forbidden.value = err?.response?.status === 403;
+          if (!forbidden.value) {
             toast({
               variant: "error",
               message: t("toastMessages.alerts.errorWhilePullingDestinations"),
@@ -878,6 +882,7 @@ export default defineComponent({
       editDestination,
       getImageURL,
       loading,
+      forbidden,
       conformDeleteDestination,
       filterQuery,
       filterData,

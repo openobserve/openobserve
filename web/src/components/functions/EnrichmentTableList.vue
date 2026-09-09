@@ -49,6 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :columns="columns"
             row-key="name"
             :loading="loading"
+            :forbidden="forbidden"
             pagination="client"
             :page-size="selectedPerPage"
             :page-size-options="perPageOptionsList"
@@ -487,6 +488,7 @@ export default defineComponent({
     const selectedTableForUrlJobs = ref<any>(null);
     const filterQuery = ref("");
     const loading = ref(false);
+    const forbidden = ref(false);
     const { track } = useReo();
     const { toast } = useToast();
     const columns: OTableColumnDef[] = [
@@ -597,6 +599,7 @@ export default defineComponent({
 
     const getLookupTables = async (force: boolean = false) => {
       loading.value = true;
+      forbidden.value = false;
       const dismiss = toast({
         variant: "loading",
         message: t("toastMessages.functions.pleaseWaitWhileLoadingEnrichmentTables"),
@@ -707,7 +710,8 @@ export default defineComponent({
       } catch (err: any) {
         console.info("Error while fetching enrichment tables", err);
         dismiss();
-        if (err.response?.status != 403) {
+        forbidden.value = err?.response?.status === 403;
+        if (!forbidden.value) {
           toast({
             variant: "error",
             message: err.response?.data?.message || t("functions.fetchFunctionsError"),
@@ -1054,6 +1058,7 @@ export default defineComponent({
       selectedDelete,
       getLookupTables,
       loading,
+      forbidden,
       resultTotal,
       refreshList,
       perPageOptionsList,

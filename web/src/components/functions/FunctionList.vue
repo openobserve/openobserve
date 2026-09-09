@@ -47,6 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :columns="columns"
             row-key="name"
             :loading="loading"
+            :forbidden="forbidden"
             pagination="client"
             :page-size="pageSize"
             :page-size-options="pageSizeOptions"
@@ -327,8 +328,10 @@ export default defineComponent({
     };
 
     const loading = ref(false);
+    const forbidden = ref(false);
     const getJSTransforms = () => {
       loading.value = true;
+      forbidden.value = false;
       // return ;
       const dismiss = toast({
         variant: "loading",
@@ -371,7 +374,8 @@ export default defineComponent({
           console.error("Error while pulling function", err);
 
           dismiss();
-          if (err?.response?.status && err?.response?.status != 403) {
+          forbidden.value = err?.response?.status === 403;
+          if (err?.response?.status && !forbidden.value) {
             toast({
               variant: "error",
               message: t("toastMessages.functions.errorWhilePullingFunction"),
@@ -727,6 +731,7 @@ export default defineComponent({
       selectedDelete,
       getJSTransforms,
       loading,
+      forbidden,
       resultTotal,
       refreshList,
       pageSize,

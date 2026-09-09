@@ -122,6 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :columns="columns"
             row-key="id"
             :loading="loading"
+            :forbidden="forbidden"
             :frame="false"
             :default-columns="false"
             show-index
@@ -906,14 +907,16 @@ export default defineComponent({
         // String() matches JS's own null→"null" key coercion (behavior-neutral).
         loading.value =
           !store.state.organizationData.allDashboardList[String(activeFolderId.value)];
+        forbidden.value = false;
         try {
           const response = await getAllDashboardsByFolderId(store, activeFolderId.value);
 
           dashboardList.value = response || [];
         } catch (error) {
           console.error("Error loading dashboards:", error);
+          forbidden.value = asCaughtError(error).response?.status === 403;
           // The grouped access toast already reports a 403; a second red toast adds nothing.
-          if (asCaughtError(error).response?.status !== 403) {
+          if (!forbidden.value) {
             showErrorNotification(
               raw(asCaughtError(error).message || t("dashboard.dashboards.failedToLoadFolder")),
             );
@@ -1138,6 +1141,8 @@ export default defineComponent({
     // Start in the loading state so the table shows the skeleton on first
     // render instead of briefly flashing the empty state before the fetch.
     const loading = ref(true);
+    // Only the dashboards fetch is authoritative on access; the folder list is not.
+    const forbidden = ref(false);
     const getDashboards = async () => {
       const dismiss = toast({
         variant: "loading",
@@ -1697,6 +1702,7 @@ export default defineComponent({
       dashboard,
       columns,
       loading,
+      forbidden,
       showAddDashboardDialog,
       showAddDashboardFromGitHub,
       addDashboard,
