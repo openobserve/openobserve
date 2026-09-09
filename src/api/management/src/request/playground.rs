@@ -28,13 +28,12 @@ use openobserve_api_common::extractors::Headers;
 use openobserve_core::{
     auth::{UserEmail, is_ofga_object_visible},
     llm_evaluations::{
-        experiment_runner::render_prompt,
+        experiments::runner::render_prompt,
         playground::{self, PlaygroundError},
-        provider::{
+        providers::{
             PreparedProvider, ProviderChatMessage, ProviderChatParams, ProviderChatToolCall,
-            ProviderStreamStartError, RawProviderConfig,
+            ProviderStreamStartError, RawProviderConfig, stream::ProviderChatDelta,
         },
-        provider_stream::ProviderChatDelta,
         sync_scoring::{self, SyncScoringError},
     },
 };

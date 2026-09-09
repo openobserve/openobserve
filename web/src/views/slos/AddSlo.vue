@@ -366,6 +366,8 @@
               :options="alertSourceOptions"
               :loading="isFetchingAlertSources"
               :placeholder="t('slos.alertSli.sourcePlaceholder')"
+              :error="!!alertSourceError"
+              :error-message="alertSourceError || undefined"
               required
               class="mt-3"
               data-test="slos-addslo-alert-source"
@@ -375,15 +377,7 @@
               {{ t("slos.alertSli.sourceHint") }}
             </p>
             <OBanner
-              v-if="alertSourceError"
-              variant="error"
-              class="mt-3"
-              data-test="slos-addslo-alert-source-error"
-            >
-              {{ alertSourceError }}
-            </OBanner>
-            <OBanner
-              v-else-if="!isFetchingAlertSources && !hasEligibleAlert"
+              v-if="!isFetchingAlertSources && !hasEligibleAlert && !alertSourceError"
               variant="info"
               class="mt-3"
               data-test="slos-addslo-alert-source-empty"
@@ -938,7 +932,7 @@ watch(isGrouped, (grouped) => {
 // the server's own reason attached rather than being filtered away.
 const alertSources = ref<SloEligibleAlert[]>([]);
 const isFetchingAlertSources = ref(false);
-const alertSourceError = ref<string | null>(null);
+const alertSourceError = ref<I18nText | null>(null);
 
 const hasEligibleAlert = computed(() => alertSources.value.some((a) => a.eligible));
 
@@ -959,9 +953,9 @@ async function loadAlertSources() {
   try {
     const res = await sloService.eligibleAlerts(org.value);
     alertSources.value = res.data?.list ?? [];
-  } catch {
+  } catch (e: any) {
     alertSources.value = [];
-    alertSourceError.value = t("slos.alertSli.loadFailed");
+    alertSourceError.value = raw(e?.response?.data?.message) || t("slos.alertSli.loadFailed");
   } finally {
     isFetchingAlertSources.value = false;
   }
@@ -1058,9 +1052,8 @@ function definitionKey(): string {
 
 const backTarget = computed(() => ({
   name: "sloList",
-  // Carry the folder back, or cancelling out of a folder lands on default and
-  // the SLO just saved looks like it vanished.
-  query: { org_identifier: org.value, folder: form.folder_id },
+  // Spread first so page/etc. survive the round trip; folder is overridden explicitly since the form may have switched away from the one the list opened with.
+  query: { ...route.query, org_identifier: org.value, folder: form.folder_id },
 }));
 
 function onFolderSelected(folder: any) {
@@ -1093,6 +1086,9 @@ async function load() {
     name: body.name,
     description: body.description ?? "",
     tags: body.tags ?? [],
+    // Without this the seeded default is sent back on every edit, which reads
+    // as a move out of the SLO's real folder.
+    folder_id: body.folder_id || form.folder_id,
     sli_type: body.sli_type,
     config: { stream_type: countStreamType, ...flat },
     target: body.target,
@@ -1185,8 +1181,15 @@ async function save() {
     router.push(backTarget.value);
   } catch (e: any) {
     // The backend's budget rejection carries its arithmetic (§6b.4d); show it
-    // verbatim rather than replacing it with a generic message.
-    error.value = e?.response?.data?.message || e?.message || t("slos.saveFailed");
+    // verbatim rather than replacing it with a generic message. A rejected
+    // JSON body (missing/mistyped field) comes back as a plain-text response,
+    // not `{message}`, so that shape has to be read directly too.
+    const body = e?.response?.data;
+    error.value =
+      body?.message ||
+      (typeof body === "string" && body.trim()) ||
+      e?.message ||
+      t("slos.saveFailed");
   } finally {
     saving.value = false;
   }

@@ -31,11 +31,15 @@ const OBanner = {
   props: ["variant", "dense", "preserveWhitespace"],
   template: '<div v-bind="$attrs"><slot /></div>',
 };
+const OSpinner = {
+  props: ["variant", "size"],
+  template: '<span class="o-spinner" />',
+};
 
 function mountCell(cell: PlaygroundCell | undefined, props: Record<string, unknown> = {}) {
   return mount(PlaygroundOutputCell, {
     props: { cell, ...props },
-    global: { stubs: { OButton, OTag, OBanner } },
+    global: { stubs: { OButton, OTag, OBanner, OSpinner } },
   });
 }
 
@@ -70,6 +74,22 @@ describe("PlaygroundOutputCell", () => {
 
     expect(text.text()).toContain("The refund");
     expect(text.find(".animate-pulse").exists()).toBe(true);
+  });
+
+  it("shows a rotating analyzing message before any text has streamed back", () => {
+    const wrapper = mountCell({ ...idleCell(), status: "streaming", text: "" });
+    const waiting = wrapper.find('[data-test="ai-playground-output-analyzing"]');
+
+    expect(waiting.exists()).toBe(true);
+    expect(waiting.find(".o-spinner").exists()).toBe(true);
+    expect(wrapper.find('[data-test="ai-playground-output-text"]').exists()).toBe(false);
+  });
+
+  it("switches to the streamed text as soon as the first token arrives", () => {
+    const wrapper = mountCell({ ...idleCell(), status: "streaming", text: "The re" });
+
+    expect(wrapper.find('[data-test="ai-playground-output-analyzing"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="ai-playground-output-text"]').exists()).toBe(true);
   });
 
   it("hides usage while still streaming — a partial total would be wrong", () => {

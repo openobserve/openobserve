@@ -456,10 +456,14 @@ const frozenBanner = computed(() => {
   };
 });
 
-const backTarget = computed(() => ({
-  name: "sloList",
-  query: { org_identifier: org.value },
-}));
+const backTarget = computed(() => {
+  // `edit_alert` opens this page's inline alerts panel — transient here, meaningless on the list.
+  const { edit_alert: _editAlert, ...restQuery } = route.query;
+  return {
+    name: "sloList",
+    query: { ...restQuery, org_identifier: org.value },
+  };
+});
 
 const subtitle = computed(() => {
   if (!slo.value) return raw("");
@@ -607,10 +611,12 @@ async function loadGroups() {
 }
 
 function goToEdit() {
+  // `edit_alert` opens this page's inline alerts panel — transient here, meaningless on the editor.
+  const { edit_alert: _editAlert, ...restQuery } = route.query;
   router.push({
     name: "editSlo",
     params: { slo_id: sloId.value },
-    query: { org_identifier: org.value },
+    query: { ...restQuery, org_identifier: org.value },
   });
 }
 

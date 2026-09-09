@@ -381,9 +381,17 @@ export default defineComponent({
         .then((res) => (templates.value = res.data));
     };
     const updateRoute = () => {
-      if (router.currentRoute.value.query.action === "add") editDestination(null);
-      if (router.currentRoute.value.query.action === "update")
-        editDestination(getDestinationByName(router.currentRoute.value.query.name as string));
+      const action = router.currentRoute.value.query.action;
+      const name = router.currentRoute.value.query.name as string;
+      // No-op when the editor already matches the route; a stale getDestinations().then() resolution re-invokes editDestination() and flips the just-opened editor closed.
+      if (action === "add" && !showDestinationEditor.value) {
+        editDestination(null);
+      } else if (
+        action === "update" &&
+        !(showDestinationEditor.value && editingDestination.value?.name === name)
+      ) {
+        editDestination(getDestinationByName(name));
+      }
     };
     const getDestinationByName = (name: string) => {
       return destinations.value.find((destination) => destination.name === name);

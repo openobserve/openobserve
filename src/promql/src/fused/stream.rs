@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 //! Streaming evaluation of `agg(range_func(selector))` over hash-sorted
-//! metrics files: each hash shard merges its hash-ordered file chains one
+//! metrics files: each hash partition merges its hash-ordered file chains one
 //! series at a time through the shared fused fold, so the sample matrix is
 //! never materialized.
 
@@ -23,33 +23,20 @@ use std::{sync::Arc, time::Duration};
 use config::{
     TIMESTAMP_COL_NAME,
     meta::promql::{
-        EXEMPLARS_LABEL, HASH_LABEL, HASH_SORTED_TABLE_SUFFIX, NAME_LABEL, VALUE_LABEL,
+        EXEMPLARS_LABEL, HASH_LABEL, NAME_LABEL, VALUE_LABEL,
         value::{EvalContext, Value},
     },
 };
-use datafusion::{
-    arrow::datatypes::{DataType, Schema},
-    error::Result,
-    prelude::SessionContext,
-};
-use promql_parser::{label::Matchers, parser::LabelModifier};
+use datafusion::{arrow::datatypes::Schema, error::Result, prelude::SessionContext};
+use promql_parser::parser::LabelModifier;
 
-use super::fold::{FoldParams, fold_sources};
+use super::{aggregate::aggregate, range_expr::RangeExpr};
 use crate::{
     functions::{KEEP_METRIC_NAME_FUNC, RangeFunc},
     fused::FusedAggOp,
-    load_series::apply_time_window,
     micros,
-    series_source::stream::{StreamSource, build_shard_inputs},
-    utils::apply_matchers,
+    series_stream::merge::{MergeSeriesStream, StreamingSelector},
 };
-
-/// The selector being scanned; `offset` is the `offset` modifier in microseconds.
-pub(crate) struct StreamingSelector<'a> {
-    pub table_name: &'a str,
-    pub matchers: &'a Matchers,
-    pub offset: i64,
-}
 
 /// The `agg(range_func(...))` pair being evaluated.
 pub(crate) struct FusedShape {
@@ -58,8 +45,8 @@ pub(crate) struct FusedShape {
     pub range: Duration,
 }
 
-/// Folds from per-shard ordered streams; `None` when the layout or shape cannot stream. The
-/// caller bounds it: dropping the future aborts the shard folds.
+/// Folds from per-partition ordered streams; `None` when the layout or shape cannot stream. The
+/// caller bounds it: dropping the future aborts the partition folds.
 pub(crate) async fn fused_agg(
     ctx: &SessionContext,
     schema: &Schema,
@@ -71,49 +58,25 @@ pub(crate) async fn fused_agg(
     let start_time = std::time::Instant::now();
     let trace_id = eval_ctx.trace_id.clone();
 
-    if schema
-        .field_with_name(HASH_LABEL)
-        .is_ok_and(|field| field.data_type() != &DataType::UInt64)
-    {
-        return Ok(None);
-    }
     let Some(group_cols) = group_label_columns(modifier, schema, shape.func.name()) else {
         return Ok(None);
     };
-    let sorted_table = format!("{}{HASH_SORTED_TABLE_SUFFIX}", selector.table_name);
-    let Ok(df) = ctx.table(sorted_table.as_str()).await else {
+    let lookback = micros(shape.range);
+    let Some(sources) = MergeSeriesStream::execute_partitioned(
+        ctx, schema, &selector, group_cols, lookback, eval_ctx,
+    )
+    .await?
+    else {
         return Ok(None);
     };
-
-    let df = apply_time_window(
-        df,
-        eval_ctx.start - selector.offset,
-        eval_ctx.end - selector.offset,
-        eval_ctx.step,
-        micros(shape.range),
-    )?;
-    let df = apply_matchers(df, selector.matchers)?;
-
-    let mut columns = vec![TIMESTAMP_COL_NAME, HASH_LABEL, VALUE_LABEL];
-    columns.extend(group_cols.iter().map(String::as_str));
-
-    let shards = ctx.state().config().target_partitions();
-    let Some(shard_inputs) = build_shard_inputs(&df, &columns, shards, &trace_id).await? else {
-        return Ok(None);
-    };
-
     log::info!(
-        "[trace_id: {trace_id}] [PromQL Timing] streaming fused {}({}) started with {shards} shards",
+        "[trace_id: {trace_id}] [PromQL Timing] streaming fused {}({}) started with {} partitions",
         shape.op.name(),
         shape.func.name(),
+        sources.len(),
     );
-    let params = FoldParams::new(shape.op, shape.func.clone(), shape.range, eval_ctx);
-    let group_cols = Arc::new(group_cols);
-    let sources = shard_inputs
-        .into_iter()
-        .map(|streams| StreamSource::start(streams, group_cols.clone(), selector.offset))
-        .collect();
-    let (value, series_count) = fold_sources(sources, params).await?;
+    let eval = Arc::new(RangeExpr::new(shape.func.clone(), shape.range, eval_ctx));
+    let (value, series_count) = aggregate(sources, shape.op, eval).await?;
 
     log::info!(
         "[trace_id: {trace_id}] [PromQL Timing] streaming fused {}({}) execution took: {:?}, folded {series_count} series into {} series",
@@ -160,22 +123,28 @@ fn group_label_columns(
 
 #[cfg(test)]
 mod tests {
-    use config::meta::promql::value::{Label, RangeValue, Sample, TimeWindow};
+    use config::meta::promql::{
+        HASH_SORTED_TABLE_SUFFIX,
+        value::{Label, RangeValue, Sample, TimeWindow},
+    };
     use datafusion::{
-        arrow::array::{Float64Array, Int64Array, RecordBatch, StringArray, UInt64Array},
+        arrow::{
+            array::{Float64Array, Int64Array, RecordBatch, StringArray, UInt64Array},
+            datatypes::DataType,
+        },
         datasource::MemTable,
         logical_expr::SortExpr,
         prelude::{SessionConfig, col},
     };
-    use hashbrown::HashMap;
+    use hashbrown::{HashMap, HashSet};
     use itertools::Itertools;
-    use promql_parser::label::Labels as ModifierLabels;
+    use promql_parser::label::{Labels as ModifierLabels, Matchers};
 
     use super::{
-        super::{matrix, test_support::*},
+        super::{eval_range::eval_range, matrix, range_expr::RangeExpr, test_support::*},
         *,
     };
-    use crate::functions;
+    use crate::{functions, series_stream::merge::series_label_columns};
 
     fn arrow_schema() -> Arc<Schema> {
         use datafusion::arrow::datatypes::Field;
@@ -414,6 +383,67 @@ mod tests {
                     );
                 }
             }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_range_series_matches_eval_range_for_all_funcs() {
+        let ctx = session_ctx();
+        register_sorted_table(&ctx);
+        let range = Duration::from_secs(60);
+        let eval_ctx = eval_ctx();
+        let all_labels = HashSet::new();
+        let func_cases = [
+            "avg_over_time",
+            "changes",
+            "count_over_time",
+            "delta",
+            "deriv",
+            "idelta",
+            "increase",
+            "irate",
+            "last_over_time",
+            "max_over_time",
+            "min_over_time",
+            "rate",
+            "resets",
+            "stddev_over_time",
+            "stdvar_over_time",
+            "sum_over_time",
+        ];
+        for func_name in func_cases {
+            let func: Arc<dyn RangeFunc> =
+                Arc::from(functions::fusable_range_func(func_name).unwrap());
+            let expected = functions::eval_range(
+                Value::Matrix(reference_matrix(range)),
+                func.clone(),
+                &eval_ctx,
+            )
+            .unwrap();
+            let selector = StreamingSelector {
+                table_name: "m",
+                matchers: &Matchers::empty(),
+                offset: 0,
+            };
+            let label_cols = series_label_columns(&arrow_schema(), &all_labels, func_name);
+            let sources = MergeSeriesStream::execute_partitioned(
+                &ctx,
+                &arrow_schema(),
+                &selector,
+                label_cols,
+                micros(range),
+                &eval_ctx,
+            )
+            .await
+            .unwrap()
+            .expect("the sorted table streams");
+            let eval = Arc::new(RangeExpr::new(func, range, &eval_ctx));
+            let (actual, _) = eval_range(sources, eval).await.unwrap();
+            assert_matrix_close(
+                canonical_matrix(expected),
+                canonical_matrix(Value::Matrix(actual)),
+                &format!("streaming {func_name}()"),
+            );
         }
     }
 

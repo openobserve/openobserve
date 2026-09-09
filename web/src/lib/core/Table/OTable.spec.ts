@@ -2109,4 +2109,38 @@ describe("OTable", () => {
       expect(emitted![emitted!.length - 1][0]).toEqual(newOrder);
     });
   });
+
+  // currentPage only lands if it's present at mount alongside the real data — data arriving after mount loses the race to TanStack's own deferred autoResetPageIndex, so async callers must remount (e.g. via :key) rather than update data in place.
+  describe("controlled currentPage (client mode)", () => {
+    it("restores the given page when mounted directly with data already present", async () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(20),
+          columns: makeColumns(),
+          pagination: "client",
+          pageSize: 5,
+          currentPage: 3,
+        },
+      });
+      await nextTick();
+      expect((wrapper.vm as any).table.getState().pagination.pageIndex).toBe(2);
+    });
+
+    it("does NOT restore the page if data arrives after mount (documents the race)", async () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: [],
+          columns: makeColumns(),
+          pagination: "client",
+          pageSize: 5,
+          currentPage: 3,
+          loading: true,
+        },
+      });
+      await wrapper.setProps({ data: makeRows(20), loading: false });
+      await nextTick();
+      await nextTick();
+      expect((wrapper.vm as any).table.getState().pagination.pageIndex).toBe(0);
+    });
+  });
 });
