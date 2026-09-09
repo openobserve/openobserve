@@ -11853,6 +11853,8 @@
       "schemaInvalidJson": "Schema must be valid JSON.",
       "schemaIgnored": "Schema · Ignored by this provider",
       "schemaUnsupported": "This provider has no structured-output field. The schema is kept on this column, but it is not sent and the model answers with plain text.",
+      "schemaApproximated": "Schema · Approximated by this provider",
+      "schemaApproximatedHelp": "This provider only supports JSON mode, not a JSON schema. The request is sent in JSON mode with the schema restated in the prompt, so the answer is JSON but its shape is not guaranteed.",
       "outputPlaceholder": "Output appears here — press Run.",
       "outputNotRun": "Not run",
       "retry": "Retry",

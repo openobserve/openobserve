@@ -36,6 +36,13 @@ const providers: Provider[] = [
     availableModels: ["claude-sonnet", "claude-haiku"],
     defaultModel: "claude-sonnet",
   },
+  {
+    id: "deepseek",
+    name: "DeepSeek",
+    providerType: "deepseek",
+    availableModels: ["deepseek-chat"],
+    defaultModel: "deepseek-chat",
+  },
 ];
 
 describe("PlaygroundVariantHeader", () => {
@@ -236,11 +243,24 @@ describe("PlaygroundVariantHeader — schema", () => {
     expect(button.attributes("title")).toBe("aiObservability.playground.schema");
   });
 
-  it("tells the dialog which providers drop the schema", () => {
+  // The bug this guards: DeepSeek took the schema as if it were OpenAI and the
+  // run died on a raw provider 400 with no warning anywhere before it.
+  it("warns, rather than reading as on, when the provider only approximates the schema", () => {
+    const button = schemaBtn('{"type":"object"}', "deepseek");
+    expect(button.classes()).toContain("bg-banner-warning-bg!");
+    expect(button.classes()).not.toContain("bg-accent/12!");
+    expect(button.attributes("title")).toBe("aiObservability.playground.schemaApproximated");
+  });
+
+  it("tells the dialog which providers drop or approximate the schema", () => {
     const dialog = (providerId: string) =>
       header('{"type":"object"}', providerId).getComponent({ name: "PlaygroundSchemaDialog" });
 
     expect(dialog("anthropic").props("dropped")).toBe(true);
+    expect(dialog("anthropic").props("approximated")).toBe(false);
+    expect(dialog("deepseek").props("dropped")).toBe(false);
+    expect(dialog("deepseek").props("approximated")).toBe(true);
     expect(dialog("openai").props("dropped")).toBe(false);
+    expect(dialog("openai").props("approximated")).toBe(false);
   });
 });

@@ -174,20 +174,44 @@ function normalizeScore(row: any): PlaygroundScoreResult {
  *  builder. Everything else — OpenAI, DeepSeek, Azure, gateways — takes the
  *  `chat/completions` shape. */
 const ANTHROPIC_KIND = "anthropic";
+/** Has JSON mode but rejects `json_schema`; the server degrades it for us. */
+const DEEPSEEK_KIND = "deepseek";
 
 function providerKind(request: PlaygroundRunRequest): string {
   return (request.providerType ?? "").trim().toLowerCase();
 }
 
 /**
- * True when a provider of this kind carries no response schema at all.
+ * How faithfully a provider kind honours a response schema.
  *
- * Exported because the UI has to say so BEFORE a run: a schema set against such
- * a provider never leaves the client, and the only other evidence is an answer
- * that comes back as prose for no stated reason.
+ * - `native`: the schema is enforced by the provider (OpenAI `json_schema`,
+ *   Ollama `format`).
+ * - `approximated`: the provider only has a JSON mode. The server downgrades
+ *   the request to it and restates the schema in the prompt, so the answer is
+ *   JSON but its shape is asked for, not guaranteed.
+ * - `dropped`: the provider has no structured-output field at all; the schema
+ *   never leaves the client.
+ *
+ * Exported because the UI has to say so BEFORE a run: the only other evidence
+ * is an answer that comes back as prose, or off-shape, for no stated reason.
+ * Unknown kinds count as native, which is what the server falls back to.
  */
+export type ResponseSchemaSupport = "native" | "approximated" | "dropped";
+
+export function responseSchemaSupport(providerType?: string): ResponseSchemaSupport {
+  switch ((providerType ?? "").trim().toLowerCase()) {
+    case ANTHROPIC_KIND:
+      return "dropped";
+    case DEEPSEEK_KIND:
+      return "approximated";
+    default:
+      return "native";
+  }
+}
+
+/** True when a provider of this kind carries no response schema at all. */
 export function providerDropsResponseSchema(providerType?: string): boolean {
-  return (providerType ?? "").trim().toLowerCase() === ANTHROPIC_KIND;
+  return responseSchemaSupport(providerType) === "dropped";
 }
 
 /**

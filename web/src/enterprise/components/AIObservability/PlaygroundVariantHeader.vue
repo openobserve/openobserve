@@ -142,6 +142,7 @@
       v-model:open="schemaOpen"
       :schema="variant.responseSchema"
       :dropped="schemaDropped"
+      :approximated="schemaApproximated"
       @apply="(responseSchema) => patch({ responseSchema })"
     />
   </div>
@@ -161,7 +162,7 @@ import {
   type PlaygroundVariant,
 } from "@/enterprise/views/AIObservability/playgroundDraft";
 import type { Provider } from "@/services/online-evals.service";
-import { providerDropsResponseSchema } from "@/services/llm-playground.service";
+import { responseSchemaSupport } from "@/services/llm-playground.service";
 
 /** Provider id and model travel as one select value but stay two fields on the
  *  variant — the run request, the experiment handoff and the draft titles all
@@ -252,19 +253,22 @@ const selectedProvider = computed(() =>
 
 const providerName = computed(() => selectedProvider.value?.name ?? "");
 
-/** Whether the schema this variant carries actually reaches the model. Unknown
+/** How far the schema this variant carries actually reaches the model. Unknown
  *  to the provider list — a draft restored from another org — is treated as
- *  carrying it: the run is what finds out, and a warning on every unresolved
- *  provider would cry wolf. */
-const schemaDropped = computed(() => {
+ *  carrying it natively: the run is what finds out, and a warning on every
+ *  unresolved provider would cry wolf. */
+const schemaSupport = computed(() => {
   const provider = selectedProvider.value;
-  return providerDropsResponseSchema(provider?.providerType ?? provider?.provider_type);
+  return responseSchemaSupport(provider?.providerType ?? provider?.provider_type);
 });
+const schemaDropped = computed(() => schemaSupport.value === "dropped");
+const schemaApproximated = computed(() => schemaSupport.value === "approximated");
 
 /** Icon-only, so variant, tint and tooltip are the whole message and move as
- *  one. Three states, not two: an accent tint on a provider that drops the
- *  schema claims "in force" about something the request never carries, and the
- *  only other evidence is an answer that arrives as prose. */
+ *  one. Four states, not two: an accent tint on a provider that drops the
+ *  schema claims "in force" about something the request never carries, and on
+ *  one that only approximates it claims a guarantee the provider never made.
+ *  The only other evidence is an answer that arrives as prose, or off-shape. */
 const schemaButton = computed(() => {
   if (!props.variant.responseSchema) {
     return {
@@ -278,6 +282,13 @@ const schemaButton = computed(() => {
       variant: "ghost-warning" as const,
       tint: "bg-banner-warning-bg!",
       title: t("aiObservability.playground.schemaIgnored"),
+    };
+  }
+  if (schemaApproximated.value) {
+    return {
+      variant: "ghost-warning" as const,
+      tint: "bg-banner-warning-bg!",
+      title: t("aiObservability.playground.schemaApproximated"),
     };
   }
   return {
