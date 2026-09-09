@@ -4643,6 +4643,36 @@ mod tests {
             );
         }
 
+        /// The discriminating case the two tests above cannot reach. Each of them fixes one
+        /// side of the observed-slot rule while leaving the other side free: the 28 healthy
+        /// slots above clear the one-eighth bar over the whole week (21 of 168) as well as
+        /// over the observed set, and a `usable = 0` series is unservable under any
+        /// denominator. Only a count that is usable over its OBSERVED slots and short of the
+        /// bar over all 168 separates them -- 20 healthy slots is servable at 20/20 and a
+        /// refusal at 20/168, so both counting an unobserved slot as zero and taking the
+        /// denominator over the whole week turn this admission into a refusal.
+        #[test]
+        fn a_partly_observed_week_is_judged_only_on_what_was_observed() {
+            let mut evidence = ServabilityEvidence {
+                slot_baselines: vec![None; 168],
+                buckets_observed: 240,
+            };
+            for slot in evidence.slot_baselines.iter_mut().take(20) {
+                *slot = Some(120.0);
+            }
+            assert_eq!(
+                evidence.slot_baselines.iter().flatten().count() * 8,
+                160,
+                "the fixture must sit BELOW the one-eighth bar over 168, or it cannot \
+                 discriminate"
+            );
+            assert_eq!(
+                assess_servability(&evidence),
+                Servability::Servable,
+                "20 of 20 observed slots are healthy; the 148 unobserved ones are not zeros"
+            );
+        }
+
         /// Evidence that cannot be fetched at all -- the search failed, the stream is not
         /// yet queryable, the cluster is degraded. This is the "arrives later" case and it
         /// must not turn a transient search failure into a permanent creation refusal.
@@ -4776,6 +4806,41 @@ mod tests {
             assert!(
                 evidence.slot_baselines.iter().all(|b| *b == Some(100.0)),
                 "every slot is observed and carries the same live baseline"
+            );
+        }
+
+        /// Partial coverage driven through the PRODUCER, which every other producer test is
+        /// blind to: each of them spans a full week, so the grid is `Some` everywhere and a
+        /// producer emitting only as many slots as it observed still lands on 168, while
+        /// `flatten()` over the observed slots removes nothing. A training window covering 20
+        /// hour-of-week slots leaves 148 slots genuinely unobserved, so the grid is short at
+        /// 90 unless it is always built at a full 168, and the observed-slot denominator is
+        /// 20 rather than 168. The base timestamp is snapped to an hour boundary: an unaligned
+        /// one spills the 240th bucket into a 21st slot, which lands exactly on the one-eighth
+        /// bar and stops the case discriminating at all.
+        #[test]
+        fn a_partly_covered_window_is_derived_and_judged_over_its_observed_slots() {
+            const HOUR_US: i64 = 3_600_000_000;
+            let base = (1_700_000_000_000_000 / HOUR_US) * HOUR_US;
+            let points: Vec<(i64, f64)> = (0..(20 * 12))
+                .map(|i| (base + i * 300_000_000, 120.0))
+                .collect();
+            let evidence = servability_evidence_from_points(&points, 300);
+            assert_eq!(
+                evidence.slot_baselines.len(),
+                168,
+                "the grid is a full hour-of-week week even when the window covered 20 slots"
+            );
+            assert_eq!(evidence.buckets_observed, 240);
+            assert_eq!(
+                evidence.slot_baselines.iter().flatten().count(),
+                20,
+                "148 slots must be genuinely unobserved, or this cannot discriminate"
+            );
+            assert_eq!(
+                assess_servability(&evidence),
+                Servability::Servable,
+                "every slot the window observed is healthy; the rest were never seen"
             );
         }
 
