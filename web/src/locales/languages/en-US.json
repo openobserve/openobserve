@@ -3470,6 +3470,12 @@
     "joinSlack": "Join the Slack",
     "maybeLater": "Maybe later"
   },
+  "connectDataSourcePopup": {
+    "title": "To get started, let's connect your first data source.",
+    "description": "We've got lots to show you, but we'll need to get your data connected first. Most teams see their first logs in about a minute.",
+    "connectButton": "Connect a data source",
+    "dismissLink": "I'll do this later"
+  },
   "confirmDialog": {
     "continueFromWherePaused": "Continue from where it paused",
     "startFromNow": "Start from now.",
