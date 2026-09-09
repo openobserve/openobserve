@@ -175,6 +175,16 @@ select_backend() {
   [ "$BACKEND" != "codex" ] || [ -z "$MAX_BUDGET_USD" ] || die "--max-budget-usd applies to the claude backend only"
 }
 
+verdict_needs_response() {
+  python3 - "$1" <<'PY'
+import json, sys
+with open(sys.argv[1]) as f:
+    v = json.load(f)
+open_prior = [p for p in v.get("prior_findings", []) if p.get("status") == "still_open"]
+sys.exit(0 if v.get("findings") or open_prior else 1)
+PY
+}
+
 check_json() {
   python3 - "$1" "$2" <<'PY'
 import json, sys
@@ -229,11 +239,15 @@ check_inputs() {
   [ "$ROUND" -gt 1 ] || return 0
   local r f
   for r in $(seq 1 $((ROUND - 1))); do
-    for f in verdict.json coder-response.json commit; do
+    for f in verdict.json commit; do
       [ -r "$LEDGER/round-$r/$f" ] && [ -s "$LEDGER/round-$r/$f" ] || die "missing or empty $LEDGER/round-$r/$f, required for round $ROUND"
     done
     check_json "$LEDGER/round-$r/verdict.json" "verdict,findings,prior_findings"
-    check_json "$LEDGER/round-$r/coder-response.json" "round,responses"
+    # A verdict with nothing to answer (no findings, no still_open prior) owes no coder response.
+    if verdict_needs_response "$LEDGER/round-$r/verdict.json"; then
+      [ -s "$LEDGER/round-$r/coder-response.json" ] || die "missing or empty $LEDGER/round-$r/coder-response.json, required for round $ROUND (the round $r verdict has findings to answer)"
+    fi
+    [ -s "$LEDGER/round-$r/coder-response.json" ] && check_json "$LEDGER/round-$r/coder-response.json" "round,responses"
     local also
     for also in ${ALSO_REPOS[@]+"${ALSO_REPOS[@]}"}; do
       [ -s "$LEDGER/round-$r/also/$(repo_name_of "$also")/commit" ] || die "missing $LEDGER/round-$r/also/$(repo_name_of "$also")/commit, required for round $ROUND"
@@ -571,10 +585,14 @@ write_prompt() {
         echo '```'
         echo
         echo "## Round $r coder response"
-        echo '```json'
-        cat "$LEDGER/round-$r/coder-response.json"
-        echo
-        echo '```'
+        if [ -s "$LEDGER/round-$r/coder-response.json" ]; then
+          echo '```json'
+          cat "$LEDGER/round-$r/coder-response.json"
+          echo
+          echo '```'
+        else
+          echo "(the round $r verdict had nothing to answer; no coder response)"
+        fi
         for name in "$LEDGER/round-$r"/also/*/; do
           [ -s "$name/coder-response.json" ] || continue
           echo
