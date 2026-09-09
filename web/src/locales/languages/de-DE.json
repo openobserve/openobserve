@@ -9794,6 +9794,8 @@
       "outputTokens": "Ausgabe-Tokens",
       "out": "Ausgang",
       "totalCost": "Gesamtkosten",
+      "scores": "Bewertungen",
+      "notScoredYet": "Noch nicht bewertet",
       "preview": "Vorschau",
       "input": "Eingabe",
       "output": "Ausgabe",
@@ -11108,6 +11110,10 @@
         "runSummary": "{trials} · {scorers}",
         "progress": "Aufgabenfortschritt",
         "scoring": "Bewertung",
+        "tasks": "Aufgaben",
+        "scores": "Bewertungen",
+        "taskDistribution": "{succeeded} erfolgreich · {failed} fehlgeschlagen · {pending} ausstehend · {skipped} übersprungen",
+        "scoreOutcomeDistribution": "{scored} bewertet · {failed} fehlgeschlagen · {pending} ausstehend · {skipped} übersprungen · {unscored} unbewertet",
         "scoringDistribution": "{success} erfolgreich · {failed} fehlgeschlagen · {pending} ausstehend · {skipped} übersprungen",
         "compare": "Vergleichen",
         "comparePicker": {
@@ -11851,6 +11857,8 @@
       "schemaInvalidJson": "Das Schema muss gültiges JSON sein.",
       "schemaIgnored": "Schema · Von diesem Anbieter ignoriert",
       "schemaUnsupported": "Dieser Anbieter hat kein Feld für strukturierte Ausgabe. Das Schema bleibt in dieser Spalte erhalten, wird aber nicht gesendet, und das Modell antwortet mit reinem Text.",
+      "schemaApproximated": "Schema · Von diesem Anbieter angenähert",
+      "schemaApproximatedHelp": "Dieser Anbieter unterstützt nur den JSON-Modus, kein JSON-Schema. Die Anfrage wird im JSON-Modus gesendet, wobei das Schema in der Eingabeaufforderung wiederholt wird. Die Antwort ist daher JSON, ihre Form ist jedoch nicht garantiert.",
       "outputPlaceholder": "Die Ausgabe erscheint hier — drücken Sie „Ausführen“.",
       "outputNotRun": "Nicht ausgeführt",
       "retry": "Wiederholen",
@@ -11954,6 +11962,12 @@
   },
   "onlineEvals": {
     "versionPrefix": "v",
+    "traceScoreChip": {
+      "reasoning": "Warum",
+      "scoredAt": "Bewertet {time}",
+      "moreCount": "+{count} weitere",
+      "allScores": "Alle Bewertungen ({count})"
+    },
     "importNameRequired": "Name *",
     "importNewNameRequired": "Neuer Name *",
     "importDataTypeRequired": "Datentyp *",
@@ -12224,8 +12238,10 @@
       "sectionTitle": "Anbieter",
       "nameLabel": "Name",
       "typeLabel": "Anbietertyp",
-      "endpointLabel": "Endpunkt",
-      "endpointPlaceholder": "Vollständige Completions-URL, z. B. https://your-host/v1/chat/completions",
+      "endpointLabel": "Basis-URL",
+      "endpointPlaceholder": "Basis-URL, z. B. https://your-host/v1",
+      "endpointHelpDefault": "Leer lassen, um den Standardwert zu verwenden: {url}",
+      "endpointHelpRequired": "Erforderlich – dieser Anbieter hat keine Standard-Basis-URL.",
       "defaultModelLabel": "Standardmodell",
       "availableModelsLabel": "Verfügbare Modelle",
       "apiKeyLabel": "API-Schlüssel",
@@ -12234,7 +12250,6 @@
       "authSection": "Authentifizierung",
       "authEditNote": "Anmeldedaten können nicht erneut ausgelesen werden. Um einen Anbieter zu testen, der Authentifizierung erfordert, geben Sie dessen API-Schlüssel ein.",
       "cannotRename": "Kann nach der Erstellung nicht umbenannt werden.",
-      "availableModelsHelp": "Optional. Kommagetrennte Liste der bei diesem Anbieter verfügbaren Modelle.",
       "saveError": "Anbieter konnte nicht gespeichert werden",
       "nameRequired": "Provider name is required",
       "typeRequired": "Provider type is required",
@@ -12341,7 +12356,8 @@
         "nameRequired": "Name is required",
         "nameFormat": "Use lowercase letters, numbers, and underscores only",
         "minRequired": "Min is required",
-        "maxRequired": "Max is required"
+        "maxRequired": "Max is required",
+        "maxNotGreaterThanMin": "Max muss größer als Min sein"
       },
       "import": {
         "title": "Score-Konfiguration importieren",
@@ -12912,7 +12928,7 @@
     },
     "empty": {
       "title": "Noch keine LLM-Anbieter",
-      "description": "LLM-Anbieter speichern die Verbindungsdetails (Endpunkt und Anmeldeinformationen) für die Sprachmodelle, die Ihre LLM-Judge-Scorer aufrufen. Fügen Sie eines hinzu, um mit der Durchführung von Bewertungen durch Richter zu beginnen."
+      "description": "LLM-Anbieter speichern die Verbindungsdaten (Basis-URL + Zugangsdaten) für die Sprachmodelle, die von Ihren LLM-Judge-Scorern aufgerufen werden. Fügen Sie einen hinzu, um richterbasierte Bewertungen auszuführen."
     }
   },
   "logs": {
@@ -16000,6 +16016,12 @@
     "aiQueueDetail": "Warteschlange",
     "aiQueueReview": "Warteschlangen-Überprüfung",
     "aiDatasetDetail": "Datensatz",
+    "aiExperimentCreate": "Neues Experiment",
+    "aiExperimentCompare": "Experimente vergleichen",
+    "aiExperimentDetail": "Experiment",
+    "aiRemoteTaskCreate": "Neue Remote-Aufgabe",
+    "aiRemoteTaskEdit": "Remote-Aufgabe bearbeiten",
+    "aiRemoteTaskDetail": "Remote-Aufgabe",
     "notFound": "404 - Nicht gefunden",
     "createReport": "Bericht erstellen",
     "addCheck": "Prüfung hinzufügen",
