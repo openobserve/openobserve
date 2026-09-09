@@ -26,6 +26,12 @@ use serde::{Deserialize, Deserializer, Serialize};
 use super::entity::{raman_configs, raman_digests};
 use crate::errors::{DbError, Error};
 
+/// Matches the paged sweep in `alert_incidents`, and stays under the oldest SQLite bind limit.
+const DIGEST_DELETE_BATCH_SIZE: u64 = 500;
+
+/// Caps one sweep at 5M rows so a lowered retention drains over passes, not in one lock.
+const MAX_DIGEST_DELETE_BATCHES: u32 = 10_000;
+
 /// One scheduled run's digest, before the write gives it a row identity.
 #[derive(Clone, Debug)]
 pub struct NewDigest {
@@ -215,11 +221,13 @@ pub async fn delete_digests_before<C: ConnectionTrait>(
     conn: &C,
     cutoff_us: i64,
 ) -> Result<u64, Error> {
-    let deleted = raman_digests::Entity::delete_many()
-        .filter(raman_digests::Column::WindowEnd.lt(cutoff_us))
-        .exec(conn)
-        .await?;
-    Ok(deleted.rows_affected)
+    delete_digests_in_batches(
+        conn,
+        cutoff_us,
+        DIGEST_DELETE_BATCH_SIZE,
+        MAX_DIGEST_DELETE_BATCHES,
+    )
+    .await
 }
 
 /// Removes the org's raman config together with every digest it produced.
@@ -236,6 +244,39 @@ pub async fn delete_by_org(db: &DatabaseConnection, org: &str) -> Result<(), Err
         .await?;
     txn.commit().await?;
     Ok(())
+}
+
+/// Lowering the retention expires a whole backlog at once, which one statement would lock.
+async fn delete_digests_in_batches<C: ConnectionTrait>(
+    conn: &C,
+    cutoff_us: i64,
+    batch_size: u64,
+    max_batches: u32,
+) -> Result<u64, Error> {
+    let mut total = 0;
+    for pass in 0..max_batches {
+        let ids: Vec<String> = expired_digest_ids_query(cutoff_us, batch_size)
+            .into_tuple::<String>()
+            .all(conn)
+            .await
+            .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+        if ids.is_empty() {
+            return Ok(total);
+        }
+        let page_full = ids.len() as u64 == batch_size;
+        let deleted = raman_digests::Entity::delete_many()
+            .filter(raman_digests::Column::Id.is_in(ids))
+            .exec(conn)
+            .await?;
+        total += deleted.rows_affected;
+        if !page_full {
+            return Ok(total);
+        }
+        if pass + 1 == max_batches {
+            log::warn!("raman digest retention stopped at its budget of {total} rows");
+        }
+    }
+    Ok(total)
 }
 
 async fn write_config<C: ConnectionTrait>(
@@ -359,6 +400,15 @@ fn digest_upsert_statement(
     )
 }
 
+/// Only the ids: the batch delete never needs the `findings` blob it is discarding.
+fn expired_digest_ids_query(cutoff_us: i64, batch_size: u64) -> Select<raman_digests::Entity> {
+    raman_digests::Entity::find()
+        .select_only()
+        .column(raman_digests::Column::Id)
+        .filter(raman_digests::Column::WindowEnd.lt(cutoff_us))
+        .limit(batch_size)
+}
+
 fn digest_summary_query(org: &str, limit: u64, offset: u64) -> Select<raman_digests::Entity> {
     raman_digests::Entity::find()
         .select_only()
@@ -383,9 +433,11 @@ fn digest_summary_query(org: &str, limit: u64, offset: u64) -> Select<raman_dige
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeMap;
+
     use sea_orm::{
         ActiveModelTrait, ActiveValue::Set, ConnectionTrait, Database, DatabaseBackend,
-        PaginatorTrait, QueryTrait, Statement,
+        MockDatabase, MockExecResult, PaginatorTrait, QueryTrait, Statement, Value,
     };
 
     use super::*;
@@ -539,6 +591,73 @@ mod tests {
             .await
             .iter()
             .any(|(name, ..)| name == "org")
+    }
+
+    /// Each row gets its own window: the unique window index rejects an exact repeat.
+    async fn seed_digest_run(db: &DatabaseConnection, from: i64, to: i64) {
+        let rows: Vec<raman_digests::ActiveModel> = (from..to)
+            .map(|i| raman_digests::ActiveModel {
+                id: Set(format!("digest-{i:07}")),
+                org: Set(ORG.to_string()),
+                config_id: Set(CONFIG.to_string()),
+                cluster: Set(String::new()),
+                window_start: Set(WINDOW_START + i),
+                window_end: Set(WINDOW_END + i),
+                generated_at: Set(WINDOW_END + i),
+                finding_count: Set(0),
+                findings: Set(serde_json::json!([])),
+                coverage_gap: Set(false),
+            })
+            .collect();
+        for chunk in rows.chunks(100) {
+            raman_digests::Entity::insert_many(chunk.to_vec())
+                .exec(db)
+                .await
+                .unwrap();
+        }
+    }
+
+    async fn index_columns(db: &DatabaseConnection, index: &str) -> Vec<String> {
+        db.query_all(Statement::from_string(
+            DatabaseBackend::Sqlite,
+            format!("PRAGMA index_info('{index}')"),
+        ))
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|row| row.try_get::<String>("", "name").unwrap())
+        .collect()
+    }
+
+    async fn index_names(db: &DatabaseConnection, table: &str) -> Vec<String> {
+        db.query_all(Statement::from_string(
+            DatabaseBackend::Sqlite,
+            format!("PRAGMA index_list('{table}')"),
+        ))
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|row| row.try_get::<String>("", "name").unwrap())
+        .collect()
+    }
+
+    async fn query_plan(db: &DatabaseConnection, sql: &str) -> String {
+        db.query_all(Statement::from_string(
+            DatabaseBackend::Sqlite,
+            format!("EXPLAIN QUERY PLAN {sql}"),
+        ))
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|row| row.try_get::<String>("", "detail").unwrap())
+        .collect::<Vec<_>>()
+        .join(" | ")
+    }
+
+    fn mock_id_page(from: i64, to: i64) -> Vec<BTreeMap<String, Value>> {
+        (from..to)
+            .map(|i| BTreeMap::from([("id".to_string(), Value::from(format!("digest-{i:07}")))]))
+            .collect()
     }
 
     /// The completeness pin: a raman table added to the migration but not to
@@ -1665,5 +1784,144 @@ mod tests {
 
         assert_eq!(delete_digests_before(&db, WINDOW_END).await.unwrap(), 0);
         assert_eq!(digest_count(&db).await, 1);
+    }
+    /// The sweep carries no org, so the composite index leading with `org` cannot serve it.
+    #[tokio::test]
+    async fn the_expired_digest_sweep_has_a_single_column_window_end_index() {
+        let db = db().await;
+        let single_column: Vec<String> = index_names(&db, "raman_digests")
+            .await
+            .into_iter()
+            .filter(|name| name.starts_with("idx_"))
+            .collect();
+
+        let mut served_by = Vec::new();
+        for name in single_column {
+            if index_columns(&db, &name).await == vec!["window_end".to_string()] {
+                served_by.push(name);
+            }
+        }
+        assert_eq!(
+            served_by,
+            vec!["idx_raman_digests_window_end".to_string()],
+            "an org-less DELETE on window_end has no index to seek"
+        );
+    }
+
+    /// A full scan every hour is the cost even when the sweep deletes nothing.
+    #[tokio::test]
+    async fn the_expired_digest_sweep_seeks_an_index_instead_of_scanning_the_table() {
+        let db = db().await;
+        let sql = expired_digest_ids_query(WINDOW_END, DIGEST_DELETE_BATCH_SIZE)
+            .build(DatabaseBackend::Sqlite)
+            .to_string();
+        let plan = query_plan(&db, &sql).await;
+
+        assert!(
+            plan.contains("USING INDEX idx_raman_digests_window_end"),
+            "the retention sweep still scans raman_digests: {plan}"
+        );
+        assert!(!plan.contains("SCAN raman_digests"), "{plan}");
+    }
+
+    /// One unbatched DELETE of a lowered retention's backlog is a single very long lock.
+    #[tokio::test]
+    async fn the_sweep_deletes_in_bounded_batches_rather_than_one_statement() {
+        let full = DIGEST_DELETE_BATCH_SIZE as i64;
+        let db = MockDatabase::new(DatabaseBackend::Sqlite)
+            .append_query_results([mock_id_page(0, full), mock_id_page(full, full + 3)])
+            .append_exec_results([
+                MockExecResult {
+                    last_insert_id: 0,
+                    rows_affected: DIGEST_DELETE_BATCH_SIZE,
+                },
+                MockExecResult {
+                    last_insert_id: 0,
+                    rows_affected: 3,
+                },
+            ])
+            .into_connection();
+
+        let deleted = delete_digests_before(&db, WINDOW_END).await.unwrap();
+
+        assert_eq!(deleted, DIGEST_DELETE_BATCH_SIZE + 3);
+        let log: Vec<String> = db
+            .into_transaction_log()
+            .into_iter()
+            .flat_map(|txn| {
+                txn.statements()
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>()
+            })
+            .collect();
+        assert_eq!(log.len(), 4, "the sweep did not page: {log:?}");
+        assert!(log[0].contains("LIMIT 500"), "{}", log[0]);
+        assert!(log[1].starts_with("DELETE"), "{}", log[1]);
+        assert!(log[2].contains("LIMIT 500"), "{}", log[2]);
+        assert!(log[3].starts_with("DELETE"), "{}", log[3]);
+    }
+
+    /// The contract is the whole backlog, not whatever the last batch happened to hold.
+    #[tokio::test]
+    async fn delete_digests_before_returns_the_total_across_every_batch() {
+        let db = db().await;
+        let config = seeded_config(&db).await;
+        let expired = DIGEST_DELETE_BATCH_SIZE as i64 + 1;
+        seed_digest_run(&db, 0, expired + 2).await;
+
+        let deleted = delete_digests_before(&db, WINDOW_END + expired)
+            .await
+            .unwrap();
+
+        assert_eq!(deleted, expired as u64, "the total lost a batch");
+        assert_eq!(digest_count(&db).await, 2, "the cutoff is exclusive");
+        assert_eq!(get_by_org(&db, ORG).await.unwrap(), Some(config));
+    }
+
+    /// An erroring or perpetually refilled table must not keep one sweep looping.
+    #[tokio::test]
+    async fn the_sweep_stops_at_its_per_sweep_budget_instead_of_draining_everything() {
+        let db = db().await;
+        seed_digest_run(&db, 0, 5).await;
+
+        let deleted = delete_digests_in_batches(&db, WINDOW_END + 5, 2, 2)
+            .await
+            .unwrap();
+
+        assert_eq!(deleted, 4, "the budget did not cap the sweep");
+        assert_eq!(digest_count(&db).await, 1);
+    }
+
+    /// A short page means the backlog is drained, so the sweep must not issue another pass.
+    #[tokio::test]
+    async fn a_short_batch_ends_the_sweep_without_another_pass() {
+        let db = db().await;
+        seed_digest_run(&db, 0, 3).await;
+
+        assert_eq!(
+            delete_digests_in_batches(&db, WINDOW_END + 3, 10, 100)
+                .await
+                .unwrap(),
+            3
+        );
+        assert_eq!(digest_count(&db).await, 0);
+    }
+
+    /// The sweep is org-less and id-only, or it cannot seek `idx_raman_digests_window_end`.
+    #[test]
+    fn the_expired_digest_ids_query_is_bounded_and_selects_nothing_but_the_id() {
+        for backend in [DatabaseBackend::Sqlite, DatabaseBackend::Postgres] {
+            let sql = expired_digest_ids_query(WINDOW_END, 500)
+                .build(backend)
+                .to_string();
+            assert!(sql.contains(r#""window_end" < 1757003600000000"#), "{sql}");
+            assert!(sql.contains("LIMIT 500"), "{sql}");
+            assert!(!sql.contains("findings"), "{sql}");
+            assert!(
+                !sql.contains(r#""org""#),
+                "the sweep is deployment-wide: {sql}"
+            );
+        }
     }
 }

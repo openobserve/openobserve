@@ -154,7 +154,7 @@ pub(super) fn config_indexes() -> [IndexCreateStatement; 1] {
         .to_owned()]
 }
 
-pub(super) fn digest_indexes() -> [IndexCreateStatement; 2] {
+pub(super) fn digest_indexes() -> [IndexCreateStatement; 3] {
     [
         // A re-pulled overrunning run must not write a second digest for the window.
         Index::create()
@@ -171,6 +171,13 @@ pub(super) fn digest_indexes() -> [IndexCreateStatement; 2] {
             .name("idx_raman_digests_org_window_end")
             .table(RamanDigests::Table)
             .col(RamanDigests::Org)
+            .col(RamanDigests::WindowEnd)
+            .if_not_exists()
+            .to_owned(),
+        // The hourly retention sweep carries no org, so an `org`-leading index cannot serve it.
+        Index::create()
+            .name("idx_raman_digests_window_end")
+            .table(RamanDigests::Table)
             .col(RamanDigests::WindowEnd)
             .if_not_exists()
             .to_owned(),
