@@ -30,7 +30,7 @@ use config::{
 use datafusion::{arrow::datatypes::Schema, error::Result, prelude::SessionContext};
 use promql_parser::parser::LabelModifier;
 
-use super::fold::{RangeExpr, aggregate};
+use super::{aggregate::aggregate, range_expr::RangeExpr};
 use crate::{
     functions::{KEEP_METRIC_NAME_FUNC, RangeFunc},
     fused::FusedAggOp,
@@ -141,11 +141,7 @@ mod tests {
     use promql_parser::label::{Labels as ModifierLabels, Matchers};
 
     use super::{
-        super::{
-            fold::{RangeExpr, map_sources},
-            matrix,
-            test_support::*,
-        },
+        super::{eval_range::eval_range, matrix, range_expr::RangeExpr, test_support::*},
         *,
     };
     use crate::{functions, series_stream::merge::series_label_columns};
@@ -442,7 +438,7 @@ mod tests {
             .unwrap()
             .expect("the sorted table streams");
             let eval = Arc::new(RangeExpr::new(func, range, &eval_ctx));
-            let (actual, _) = map_sources(sources, eval).await.unwrap();
+            let (actual, _) = eval_range(sources, eval).await.unwrap();
             assert_matrix_close(
                 canonical_matrix(expected),
                 canonical_matrix(Value::Matrix(actual)),
