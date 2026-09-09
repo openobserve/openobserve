@@ -138,8 +138,8 @@ pub async fn publish_error(error_data: ErrorData) {
     let cfg = get_config();
     #[cfg(not(feature = "enterprise"))]
     {
-        if !cfg.common.usage_enabled {
-            log::debug!("[SELF-REPORTING] Skipping error publish - usage reporting disabled");
+        if !cfg.common.usage_reporting_errors_enabled {
+            log::debug!("[SELF-REPORTING] Skipping error publish - error reporting disabled");
             return;
         }
     }
@@ -200,8 +200,8 @@ pub async fn publish_error(error_data: ErrorData) {
 
 /// Drain the reporting queues at shutdown.
 ///
-/// Not gated on `usage_enabled` either: trigger records are always queued, so
-/// a deployment with usage reporting off still has buffered alert history that
+/// Not gated on `usage_enabled`: trigger records are always queued, so a
+/// deployment with usage reporting off still has buffered alert history that
 /// must reach a stream before the process exits.
 ///
 /// The scheduler is included in the role test because it is the node that
@@ -838,13 +838,14 @@ mod tests {
     }
 
     #[test]
-    fn publish_error_keeps_its_original_gate() {
+    fn publish_error_is_gated_on_the_errors_flag() {
         let source = include_str!("lib.rs");
         let body = source
             .split("pub async fn publish_error")
             .nth(1)
             .expect("publish_error is defined");
         let body = &body[..body.find("\npub ").unwrap_or(body.len())];
-        assert!(body.contains("if !cfg.common.usage_enabled"));
+        assert!(body.contains("if !cfg.common.usage_reporting_errors_enabled"));
+        assert!(!body.contains("if !cfg.common.usage_enabled"));
     }
 }

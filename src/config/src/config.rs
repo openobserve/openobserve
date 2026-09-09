@@ -1932,7 +1932,7 @@ pub struct Common {
     #[env_config(
         name = "ZO_USAGE_REPORTING_ENABLED",
         default = false,
-        help = "Report usage (metering) data. Enterprise only: the open source build never writes the usage stream whatever this is set to. In the open source build the flag still gates error reporting and the auto-creation of missing organizations. It never covered trigger records, which are published unconditionally because they are product history rather than telemetry."
+        help = "Report usage (metering) data. Enterprise only: the open source build never writes the usage stream whatever this is set to. In the open source build the flag still gates the auto-creation of missing organizations. Error records follow ZO_USAGE_REPORTING_ERRORS_ENABLED, and trigger records are published unconditionally because they are product history rather than telemetry."
     )]
     pub usage_enabled: bool,
     #[env_config(
