@@ -34,7 +34,8 @@ const SELECT_EVENT = "Command Palette Select";
 export function usePaletteTelemetry(store: { state: any }) {
   const { track } = useReo();
   // Reo guards itself on analytics + cloud; the segment SDK does not, so mirror that gate here.
-  const sendSegment = (event: string, payload: Record<string, unknown>) => {
+  // Values stay primitive so the payload satisfies the analytics SDK's ApiObject type.
+  const sendSegment = (event: string, payload: Record<string, string | number | undefined>) => {
     if (config.enableAnalytics == "true" && config.isCloud == "true") segment.track(event, payload);
   };
 
