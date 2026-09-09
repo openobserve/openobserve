@@ -92,22 +92,17 @@ export const useSearchResponseHandler = () => {
     if (payload.type === "search" && response?.type === "search_response_hits") {
       const isStreamingAggs =
         response.content?.streaming_aggs || searchObj.data.queryResults.streaming_aggs;
-      const shouldAppendStreamingResults = isStreamingAggs
-        ? !response.content?.results?.hits?.length
-        : true;
-      searchPartitionMap[payload.traceId].chunks[searchPartitionMap[payload.traceId].partition]++;
+      const partitionState = searchPartitionMap[payload.traceId];
+      partitionState.chunks[partitionState.partition]++;
 
-      const isChunkedHits =
-        searchPartitionMap[payload.traceId].chunks[searchPartitionMap[payload.traceId].partition] >
-        1;
+      const isChunkedHits = partitionState.chunks[partitionState.partition] > 1;
 
-      handleStreamingHits(
-        payload,
-        response,
-        payload.isPagination,
-        shouldAppendStreamingResults &&
-          (searchPartitionMap[payload.traceId].partition > 1 || isChunkedHits),
-      );
+      // Streaming aggs restate the aggregate per partition; only a partition's later chunks append.
+      const appendResult = isStreamingAggs
+        ? isChunkedHits
+        : partitionState.partition > 1 || isChunkedHits;
+
+      handleStreamingHits(payload, response, payload.isPagination, appendResult);
       return;
     }
 
@@ -234,7 +229,12 @@ export const useSearchResponseHandler = () => {
     }
 
     if (appendResult) {
-      searchObj.data.queryResults.total += response.content.results.total;
+      // Every streaming-aggs partition restates the same total; took and scan_size are per-partition.
+      if (response.content?.streaming_aggs) {
+        searchObj.data.queryResults.total = response.content.results.total;
+      } else {
+        searchObj.data.queryResults.total += response.content.results.total;
+      }
       searchObj.data.queryResults.took += response.content.results.took;
       searchObj.data.queryResults.scan_size += response.content.results.scan_size;
     } else {

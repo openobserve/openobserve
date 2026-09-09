@@ -560,6 +560,108 @@ describe("useSearchResponseHandler", () => {
     });
   });
 
+  describe("streaming aggs accumulation (#14303)", () => {
+    const searchPayload = (traceId: string) => ({
+      type: "search",
+      traceId,
+      isPagination: false,
+      queryReq: { query: { from: 0, size: 100 } },
+    });
+
+    const metadata = (results: Record<string, any>, streamingAggs = true) => ({
+      type: "search_response_metadata",
+      content: { streaming_aggs: streamingAggs, results },
+    });
+
+    const hitsChunk = (hits: any[], streamingAggs = true) => ({
+      type: "search_response_hits",
+      content: { streaming_aggs: streamingAggs, results: { hits } },
+    });
+
+    const partitionMetadata = { total: 10, took: 5, scan_size: 100, from: 0 };
+
+    it("#14303 §3.1 replaces hits when each streaming-aggs partition sends one chunk", () => {
+      const traceId = "trace-14303-partitions";
+
+      [[{ id: "p1" }], [{ id: "p2" }], [{ id: "p3" }]].forEach((hits) => {
+        responseHandler.handleSearchResponse(
+          searchPayload(traceId) as any,
+          metadata(partitionMetadata) as any,
+        );
+        responseHandler.handleSearchResponse(searchPayload(traceId) as any, hitsChunk(hits) as any);
+      });
+
+      expect(mockState.searchObj.data.queryResults.hits).toEqual([{ id: "p3" }]);
+    });
+
+    it("#14303 §3.1 appends later chunks of the same streaming-aggs partition", () => {
+      const traceId = "trace-14303-chunks";
+
+      responseHandler.handleSearchResponse(
+        searchPayload(traceId) as any,
+        metadata(partitionMetadata) as any,
+      );
+
+      [[{ id: "c1" }], [{ id: "c2" }], [{ id: "c3" }]].forEach((hits) => {
+        responseHandler.handleSearchResponse(searchPayload(traceId) as any, hitsChunk(hits) as any);
+      });
+
+      expect(mockState.searchObj.data.queryResults.hits).toEqual([
+        { id: "c1" },
+        { id: "c2" },
+        { id: "c3" },
+      ]);
+    });
+
+    it("#14303 §3.2 replaces total while took and scan_size stay additive", () => {
+      const traceId = "trace-14303-total";
+
+      for (let partition = 0; partition < 3; partition++) {
+        responseHandler.handleSearchResponse(
+          searchPayload(traceId) as any,
+          metadata(partitionMetadata) as any,
+        );
+        responseHandler.handleSearchResponse(
+          searchPayload(traceId) as any,
+          hitsChunk([{ id: partition }]) as any,
+        );
+      }
+
+      expect(mockState.searchObj.data.queryResults.total).toBe(10);
+      expect(mockState.searchObj.data.queryResults.took).toBe(15);
+      expect(mockState.searchObj.data.queryResults.scan_size).toBe(300);
+    });
+
+    it("appends on the non-streaming-aggs path for both later partitions and later chunks", () => {
+      const traceId = "trace-14303-plain";
+
+      responseHandler.handleSearchResponse(
+        searchPayload(traceId) as any,
+        metadata({ total: 5, took: 1, scan_size: 10, from: 0, hits: [] }, false) as any,
+      );
+      responseHandler.handleSearchResponse(
+        searchPayload(traceId) as any,
+        hitsChunk([{ id: 1 }], false) as any,
+      );
+      responseHandler.handleSearchResponse(
+        searchPayload(traceId) as any,
+        hitsChunk([{ id: 2 }], false) as any,
+      );
+
+      responseHandler.handleSearchResponse(
+        searchPayload(traceId) as any,
+        metadata({ total: 5, took: 1, scan_size: 10, from: 0, hits: [] }, false) as any,
+      );
+      responseHandler.handleSearchResponse(
+        searchPayload(traceId) as any,
+        hitsChunk([{ id: 3 }], false) as any,
+      );
+
+      expect(mockState.searchObj.data.queryResults.hits).toEqual([{ id: 1 }, { id: 2 }, { id: 3 }]);
+      expect(mockState.searchObj.data.queryResults.total).toBe(10);
+    });
+  });
+
   describe("handleFunctionError", () => {
     it("should set function error when present", () => {
       // Use mockState directly
