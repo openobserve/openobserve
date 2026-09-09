@@ -84,7 +84,6 @@ pub(super) fn configs_statement() -> TableCreateStatement {
                 .not_null()
                 .default(43200),
         )
-        .col(ColumnDef::new(RamanConfigs::RuleOverrides).json().null())
         .col(ColumnDef::new(RamanConfigs::CreatedAt).big_integer().null())
         .col(ColumnDef::new(RamanConfigs::UpdatedAt).big_integer().null())
         .to_owned()
@@ -192,7 +191,6 @@ enum RamanConfigs {
     Enabled,
     FrequencyMinutes,
     WindowMinutes,
-    RuleOverrides,
     CreatedAt,
     UpdatedAt,
 }

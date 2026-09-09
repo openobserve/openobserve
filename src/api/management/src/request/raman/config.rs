@@ -61,7 +61,7 @@ pub async fn get_raman_config(Path(org_id): Path<String>) -> Response {
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
-    request_body(content = inline(Object), description = "Partial raman config: enabled, frequency_minutes, window_minutes, rule_overrides", content_type = "application/json"),
+    request_body(content = inline(Object), description = "Partial raman config: enabled, frequency_minutes, window_minutes", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "A cadence or window outside its accepted bounds", content_type = "application/json", body = Object),

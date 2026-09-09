@@ -15,7 +15,9 @@
 
 //! Retention for the raman digest rows, which no stream retention governs (spec 8.1).
 
-use config::{cluster::LOCAL_NODE, get_config, spawn_pausable_job, utils::time::now_micros};
+use config::{
+    cluster::LOCAL_NODE, get_config, metrics, spawn_pausable_job, utils::time::now_micros,
+};
 use infra::db::get_orm_client_rw;
 
 /// Retention is measured in days, so an hourly pass needs no knob of its own.
@@ -52,7 +54,9 @@ pub fn run() {
             };
 
             let conn = get_orm_client_rw().await;
-            match infra::table::raman::delete_digests_before(conn, cutoff).await {
+            let swept = infra::table::raman::delete_digests_before(conn, cutoff).await;
+            record_sweep(&swept);
+            match swept {
                 Ok(0) => {}
                 Ok(n) => log::info!("[RAMAN_DIGEST_REAPER] deleted {n} expired digests"),
                 Err(e) => log::error!("[RAMAN_DIGEST_REAPER] sweep failed: {e}"),
@@ -60,6 +64,13 @@ pub fn run() {
         },
         pause_if: sweep_paused(get_config().raman.retention_days)
     );
+}
+
+/// A dead reaper must not look like an idle one: completed passes count, failed ones do not.
+fn record_sweep(swept: &Result<u64, infra::errors::Error>) {
+    let Ok(deleted) = swept else { return };
+    metrics::RAMAN_RETENTION_SWEEPS_TOTAL.inc();
+    metrics::RAMAN_DIGESTS_DELETED_TOTAL.inc_by(*deleted);
 }
 
 /// Split out from the sweep because an off-by-1000 here empties the table in one pass.
@@ -158,6 +169,53 @@ mod tests {
             get_config().raman.retention_days,
             365,
             "ZO_RAMAN_RETENTION_DAYS must keep a year of digests by default"
+        );
+    }
+
+    /// A pass that deletes nothing must still count, or a reaper that is gone
+    /// looks exactly like a reaper with nothing to do.
+    #[test]
+    fn every_completed_pass_counts_and_a_failed_one_does_not() {
+        let sweeps = || config::metrics::RAMAN_RETENTION_SWEEPS_TOTAL.get();
+        let deleted = || config::metrics::RAMAN_DIGESTS_DELETED_TOTAL.get();
+        let (sweeps_before, deleted_before) = (sweeps(), deleted());
+
+        record_sweep(&Ok(0));
+        assert_eq!(
+            sweeps(),
+            sweeps_before + 1,
+            "a pass that deleted nothing did not count as a sweep"
+        );
+        assert_eq!(deleted(), deleted_before, "an empty pass deleted rows");
+
+        record_sweep(&Ok(7));
+        assert_eq!(sweeps(), sweeps_before + 2);
+        assert_eq!(deleted(), deleted_before + 7, "the deleted rows were lost");
+
+        record_sweep(&Err(infra::errors::Error::Message("boom".to_string())));
+        assert_eq!(
+            sweeps(),
+            sweeps_before + 2,
+            "a failed pass counted as a completed sweep, silencing the dead-man's switch"
+        );
+        assert_eq!(deleted(), deleted_before + 7);
+    }
+
+    /// The sweep body sits inside a macro no test can call, so nothing else pins
+    /// the seam to the one place that must use it.
+    #[test]
+    fn the_sweep_body_records_every_pass() {
+        let body = include_str!("raman_digest_reaper.rs")
+            .split_once("pub fn run() {")
+            .expect("run() was renamed")
+            .1
+            // A column-0 brace: the first `\npub fn ` would swallow the helpers below.
+            .split_once("\n}\n")
+            .expect("run() has no column-0 closing brace")
+            .0;
+        assert!(
+            body.contains("record_sweep("),
+            "the sweep never records its pass: {body}"
         );
     }
 

@@ -15,7 +15,7 @@
 
 //! Per-org config writes, digest writes and lookups, and org teardown for the raman tables.
 
-use config::{ider, utils::time::now_micros};
+use config::{ider, metrics, utils::time::now_micros};
 use sea_orm::{
     ActiveModelTrait, ActiveValue::Set, ColumnTrait, ConnectionTrait, DatabaseConnection,
     EntityTrait, FromQueryResult, Insert, Iterable, QueryFilter, QueryOrder, QuerySelect, Select,
@@ -61,20 +61,16 @@ pub struct NewConfig {
     pub enabled: bool,
     pub frequency_minutes: i32,
     pub window_minutes: i32,
-    /// SQL NULL is "no overrides"; `{}` is an empty override document and stays one.
-    pub rule_overrides: Option<serde_json::Value>,
 }
 
-/// The `{ enabled?, frequency_minutes?, window_minutes?, rule_overrides? }` body
-/// of a partial config update, where every absent field means "leave it alone".
+/// The `{ enabled?, frequency_minutes?, window_minutes? }` body of a partial
+/// config update, where every absent field means "leave it alone".
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct ConfigPatch {
     pub enabled: Patch<bool>,
     pub frequency_minutes: Patch<i32>,
     pub window_minutes: Patch<i32>,
-    /// `Set(None)` clears the overrides; `Unchanged` keeps whatever is stored.
-    pub rule_overrides: Patch<Option<serde_json::Value>>,
 }
 
 /// A digest without its `findings` blob, so a timeline listing never ships one.
@@ -92,7 +88,7 @@ pub struct DigestSummary {
 }
 
 impl<'de, T: Deserialize<'de>> Deserialize<'de> for Patch<T> {
-    /// A present field is a set value, `null` included; absence never reaches here.
+    /// A present field is a set value; absence never reaches here.
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         T::deserialize(deserializer).map(Patch::Set)
     }
@@ -273,6 +269,7 @@ async fn delete_digests_in_batches<C: ConnectionTrait>(
             return Ok(total);
         }
         if pass + 1 == max_batches {
+            metrics::RAMAN_RETENTION_BUDGET_EXHAUSTED_TOTAL.inc();
             log::warn!("raman digest retention stopped at its budget of {total} rows");
         }
     }
@@ -302,7 +299,6 @@ fn config_active_model(org: &str, config: NewConfig, now: i64) -> raman_configs:
         enabled: Set(config.enabled),
         frequency_minutes: Set(config.frequency_minutes),
         window_minutes: Set(config.window_minutes),
-        rule_overrides: Set(config.rule_overrides),
         created_at: Set(Some(now)),
         updated_at: Set(Some(now)),
     }
@@ -327,9 +323,6 @@ fn patch_active_model(org: &str, patch: ConfigPatch, now: i64) -> raman_configs:
     }
     if let Patch::Set(window_minutes) = patch.window_minutes {
         model.window_minutes = Set(window_minutes);
-    }
-    if let Patch::Set(rule_overrides) = patch.rule_overrides {
-        model.rule_overrides = Set(rule_overrides);
     }
     model
 }
@@ -450,6 +443,10 @@ mod tests {
     const WINDOW_END: i64 = 1_757_003_600_000_000;
     const NOW: i64 = 1_757_004_000_000_000;
 
+    /// The budget counter is process-wide, so the tests that exhaust the budget
+    /// cannot observe their own increment while another of them runs.
+    static BUDGET_SWEEPS: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
     async fn db() -> DatabaseConnection {
         let db = Database::connect("sqlite::memory:").await.unwrap();
         create_raman_tables_for_test(&db).await.unwrap();
@@ -479,7 +476,6 @@ mod tests {
             enabled: true,
             frequency_minutes: 60,
             window_minutes: 720,
-            rule_overrides: Some(serde_json::json!({"noise": {"enabled": false}})),
         }
     }
 
@@ -1114,7 +1110,6 @@ mod tests {
                 enabled: false,
                 frequency_minutes: 5,
                 window_minutes: 30,
-                rule_overrides: None,
             },
         )
         .await
@@ -1123,7 +1118,6 @@ mod tests {
         assert!(!stored.enabled);
         assert_eq!(stored.frequency_minutes, 5);
         assert_eq!(stored.window_minutes, 30);
-        assert_eq!(stored.rule_overrides, None);
     }
 
     /// `id` is `varchar(27)`, so a snowflake here would be rejected by postgres
@@ -1166,7 +1160,6 @@ mod tests {
         assert_eq!(after.id, before.id);
         assert_eq!(after.frequency_minutes, before.frequency_minutes);
         assert_eq!(after.window_minutes, before.window_minutes);
-        assert_eq!(after.rule_overrides, before.rule_overrides);
     }
 
     #[tokio::test]
@@ -1189,7 +1182,6 @@ mod tests {
         assert_eq!(after.id, before.id);
         assert_eq!(after.enabled, before.enabled);
         assert_eq!(after.window_minutes, before.window_minutes);
-        assert_eq!(after.rule_overrides, before.rule_overrides);
     }
 
     #[tokio::test]
@@ -1212,103 +1204,6 @@ mod tests {
         assert_eq!(after.id, before.id);
         assert_eq!(after.enabled, before.enabled);
         assert_eq!(after.frequency_minutes, before.frequency_minutes);
-        assert_eq!(after.rule_overrides, before.rule_overrides);
-    }
-
-    #[tokio::test]
-    async fn a_patch_of_rule_overrides_alone_leaves_every_other_field_at_its_stored_value() {
-        let db = db().await;
-        let before = seeded_config(&db).await;
-        let overrides = serde_json::json!({"silent": {"enabled": true}});
-
-        let after = patch_config(
-            &db,
-            ORG,
-            ConfigPatch {
-                rule_overrides: Patch::Set(Some(overrides.clone())),
-                ..Default::default()
-            },
-        )
-        .await
-        .unwrap();
-
-        assert_eq!(after.rule_overrides, Some(overrides));
-        assert_eq!(after.id, before.id);
-        assert_eq!(after.enabled, before.enabled);
-        assert_eq!(after.frequency_minutes, before.frequency_minutes);
-        assert_eq!(after.window_minutes, before.window_minutes);
-    }
-
-    /// NULL is the one "no overrides"; clearing must reach it explicitly.
-    #[tokio::test]
-    async fn a_patch_clears_rule_overrides_only_when_it_sets_them_to_null() {
-        let db = db().await;
-        let before = seeded_config(&db).await;
-        assert!(
-            before.rule_overrides.is_some(),
-            "the fixture stores overrides"
-        );
-
-        patch_config(&db, ORG, ConfigPatch::default())
-            .await
-            .unwrap();
-        assert_eq!(
-            get_by_org(&db, ORG).await.unwrap().unwrap().rule_overrides,
-            before.rule_overrides,
-            "an absent rule_overrides cleared the stored overrides"
-        );
-
-        let cleared = patch_config(
-            &db,
-            ORG,
-            ConfigPatch {
-                rule_overrides: Patch::Set(None),
-                ..Default::default()
-            },
-        )
-        .await
-        .unwrap();
-        assert_eq!(cleared.rule_overrides, None);
-    }
-
-    /// An empty override document is a decision the caller made; NULL is the
-    /// absence of one, and collapsing the two loses that distinction.
-    #[tokio::test]
-    async fn an_empty_rule_overrides_object_is_stored_as_an_object_and_not_as_null() {
-        let db = db().await;
-        seeded_config(&db).await;
-
-        let after = patch_config(
-            &db,
-            ORG,
-            ConfigPatch {
-                rule_overrides: Patch::Set(Some(serde_json::json!({}))),
-                ..Default::default()
-            },
-        )
-        .await
-        .unwrap();
-
-        assert_eq!(after.rule_overrides, Some(serde_json::json!({})));
-        assert_ne!(after.rule_overrides, None);
-    }
-
-    #[tokio::test]
-    async fn a_non_trivial_rule_overrides_payload_round_trips_intact() {
-        let db = db().await;
-        let overrides = serde_json::json!({
-            "noise": {"enabled": false, "min_firings": 12, "labels": ["a", "b"]},
-            "silent": {"enabled": true, "note": "a \u{1f50e} \"quoted\" string, with a comma"},
-            "nested": {"deep": {"deeper": [1, 2.5, null, true]}},
-        });
-        let mut config = new_config();
-        config.rule_overrides = Some(overrides.clone());
-        upsert_config(&db, ORG, config).await.unwrap();
-
-        assert_eq!(
-            get_by_org(&db, ORG).await.unwrap().unwrap().rule_overrides,
-            Some(overrides)
-        );
     }
 
     #[tokio::test]
@@ -1324,7 +1219,6 @@ mod tests {
         assert_eq!(after.enabled, before.enabled);
         assert_eq!(after.frequency_minutes, before.frequency_minutes);
         assert_eq!(after.window_minutes, before.window_minutes);
-        assert_eq!(after.rule_overrides, before.rule_overrides);
     }
 
     /// The row is created lazily on the org's first write, so a patch has no
@@ -1346,7 +1240,6 @@ mod tests {
         assert!(created.enabled);
         assert_eq!(created.frequency_minutes, 1440);
         assert_eq!(created.window_minutes, 43200);
-        assert_eq!(created.rule_overrides, None);
         assert_eq!(config_count(&db).await, 1);
     }
 
@@ -1399,7 +1292,6 @@ mod tests {
                 enabled: Patch::Set(false),
                 frequency_minutes: Patch::Set(5),
                 window_minutes: Patch::Set(30),
-                rule_overrides: Patch::Set(None),
             },
         )
         .await
@@ -1452,18 +1344,13 @@ mod tests {
         );
     }
 
-    /// The API contract is `{ enabled?, ... }`: absence must not decode as a
-    /// value, and an explicit `null` must not decode as absence.
+    /// The API contract is `{ enabled?, ... }`: absence must not decode as a value.
     #[test]
-    fn an_absent_patch_field_decodes_as_unchanged_and_an_explicit_null_as_a_cleared_value() {
+    fn an_absent_patch_field_decodes_as_unchanged_and_a_present_one_as_a_set_value() {
         let absent: ConfigPatch = serde_json::from_str("{}").unwrap();
         assert_eq!(absent.enabled, Patch::Unchanged);
         assert_eq!(absent.frequency_minutes, Patch::Unchanged);
         assert_eq!(absent.window_minutes, Patch::Unchanged);
-        assert_eq!(absent.rule_overrides, Patch::Unchanged);
-
-        let cleared: ConfigPatch = serde_json::from_str(r#"{"rule_overrides": null}"#).unwrap();
-        assert_eq!(cleared.rule_overrides, Patch::Set(None));
 
         let disabled: ConfigPatch = serde_json::from_str(r#"{"enabled": false}"#).unwrap();
         assert_eq!(
@@ -1523,7 +1410,6 @@ mod tests {
         assert!(update.contains("\"enabled\""));
         assert!(update.contains("\"frequency_minutes\""));
         assert!(update.contains("\"window_minutes\""));
-        assert!(update.contains("\"rule_overrides\""));
     }
 
     /// The column list is the whole guarantee: a column named here is written
@@ -1544,11 +1430,7 @@ mod tests {
 
         assert!(update.contains("\"enabled\""));
         assert!(update.contains("\"updated_at\""));
-        for absent in [
-            "\"frequency_minutes\"",
-            "\"window_minutes\"",
-            "\"rule_overrides\"",
-        ] {
+        for absent in ["\"frequency_minutes\"", "\"window_minutes\""] {
             assert!(
                 !update.contains(absent),
                 "{absent} was not patched but is written anyway: {update}"
@@ -1882,6 +1764,7 @@ mod tests {
     /// An erroring or perpetually refilled table must not keep one sweep looping.
     #[tokio::test]
     async fn the_sweep_stops_at_its_per_sweep_budget_instead_of_draining_everything() {
+        let _budget = BUDGET_SWEEPS.lock().await;
         let db = db().await;
         seed_digest_run(&db, 0, 5).await;
 
@@ -1891,6 +1774,36 @@ mod tests {
 
         assert_eq!(deleted, 4, "the budget did not cap the sweep");
         assert_eq!(digest_count(&db).await, 1);
+    }
+
+    /// Stopping at the budget is retention falling behind, and a log line buried
+    /// in `infra` is nothing an alert can watch.
+    #[tokio::test]
+    async fn stopping_at_the_budget_is_counted_and_a_drained_sweep_is_not() {
+        let _budget = BUDGET_SWEEPS.lock().await;
+        let db = db().await;
+        seed_digest_run(&db, 0, 5).await;
+        let exhausted = || config::metrics::RAMAN_RETENTION_BUDGET_EXHAUSTED_TOTAL.get();
+        let before = exhausted();
+
+        delete_digests_in_batches(&db, WINDOW_END + 5, 2, 2)
+            .await
+            .unwrap();
+        assert_eq!(
+            exhausted(),
+            before + 1,
+            "the sweep stopped at its budget with nothing but a log line to say so"
+        );
+
+        delete_digests_in_batches(&db, WINDOW_END + 5, 10, 100)
+            .await
+            .unwrap();
+        assert_eq!(
+            exhausted(),
+            before + 1,
+            "a sweep that drained the backlog reported falling behind"
+        );
+        assert_eq!(digest_count(&db).await, 0);
     }
 
     /// A short page means the backlog is drained, so the sweep must not issue another pass.

@@ -5949,12 +5949,11 @@ async fn handle_raman_triggers(
     let started_at = now_micros();
     let config = raman_config(&trigger.org, &trigger.module_key).await;
     let (window_minutes, error) = raman_run_outcome(
-        &trigger.org,
-        &trigger.module_key,
+        &trigger,
         config.as_ref(),
         get_config().raman.enabled,
-        |org, config_id, window_minutes| async move {
-            run_raman_digest(&org, &config_id, window_minutes).await
+        |org, config_id, window_minutes, run_at_micros| async move {
+            run_raman_digest(&org, &config_id, window_minutes, run_at_micros).await
         },
     )
     .await;
@@ -5975,20 +5974,29 @@ async fn handle_raman_triggers(
 /// digest a deployment switch permits, and the one it never starts.
 #[cfg(feature = "enterprise")]
 async fn raman_run_outcome<F, Fut>(
-    org: &str,
-    config_id: &str,
+    trigger: &db::scheduler::Trigger,
     config: Option<&infra::table::entity::raman_configs::Model>,
     raman_enabled: bool,
     run: F,
 ) -> (Option<i64>, Option<String>)
 where
-    F: FnOnce(String, String, i64) -> Fut,
+    F: FnOnce(String, String, i64, i64) -> Fut,
     Fut: std::future::Future<Output = Result<(), anyhow::Error>>,
 {
     let window_minutes = raman_run_window_minutes(config, raman_enabled);
+    // Every pull rewrites `start_time`; only the due time survives a re-pull unchanged.
+    let run_at_micros = trigger.next_run_at;
+    let org = &trigger.org;
+    let config_id = &trigger.module_key;
     let mut error = None;
     if let Some(window_minutes) = window_minutes
-        && let Err(e) = run(org.to_string(), config_id.to_string(), window_minutes).await
+        && let Err(e) = run(
+            org.to_string(),
+            config_id.to_string(),
+            window_minutes,
+            run_at_micros,
+        )
+        .await
     {
         log::error!("[raman] digest run failed for {config_id} org={org}: {e}");
         error = Some(e.to_string());
@@ -6004,12 +6012,13 @@ async fn run_raman_digest(
     org: &str,
     config_id: &str,
     window_minutes: i64,
+    run_at_micros: i64,
 ) -> Result<(), anyhow::Error> {
     use o2_enterprise::enterprise::{
         raman_collect::{
             collector::{CollectionPlan, RamanCollector},
             digest::{DigestKey, digest_row_now},
-            window::{effective_max_query_range_hours, window_ending_now},
+            window::{effective_max_query_range_hours, window_for_run},
         },
         raman_rules::engine::{default_rules, run},
     };
@@ -6020,10 +6029,11 @@ async fn run_raman_digest(
             .enabled,
     );
     // No per-stream override is consulted: the clamp is the only bound the search path has.
-    let plan =
-        CollectionPlan::new(org, window_ending_now(window_minutes)).with_max_query_range_hours(
-            effective_max_query_range_hours(0, get_config().limit.default_max_query_range_days),
-        );
+    let plan = CollectionPlan::new(org, window_for_run(run_at_micros, window_minutes))
+        .with_max_query_range_hours(effective_max_query_range_hours(
+            0,
+            get_config().limit.default_max_query_range_days,
+        ));
     let collection = crate::alerts::raman::RamanSearchAdapter
         .collect(&plan)
         .await
@@ -6146,8 +6156,10 @@ fn raman_trigger_data(
         (Some(_), true) => RunOutcome::Error,
         (Some(_), false) => RunOutcome::Succeeded,
     };
-    let window_start = window_minutes.map_or(started_at, |minutes| {
-        started_at.saturating_sub(minutes.saturating_mul(60).saturating_mul(1_000_000))
+    // The analysed window is anchored at the run instant, which a re-pull leaves unchanged.
+    let run_at = trigger.next_run_at;
+    let window_start = window_minutes.map_or(run_at, |minutes| {
+        run_at.saturating_sub(minutes.saturating_mul(60).saturating_mul(1_000_000))
     });
     TriggerData {
         _timestamp: finished_at,
@@ -6161,7 +6173,7 @@ fn raman_trigger_data(
         is_silenced: trigger.is_silenced,
         status,
         start_time: window_start,
-        end_time: started_at,
+        end_time: run_at,
         retries: trigger.retries,
         error,
         delay_in_secs: Some(Duration::microseconds(started_at - trigger.next_run_at).num_seconds()),
@@ -7606,6 +7618,10 @@ mod tests {
         const OSS_ARM: &str = "#[cfg(not(feature = \"enterprise\"))]";
         const ENTERPRISE_ARM: &str = "#[cfg(feature = \"enterprise\")]";
 
+        /// What the injected runner was handed: org, config, window minutes, run instant.
+        #[cfg(feature = "enterprise")]
+        type RecordedRuns = Arc<Mutex<Vec<(String, String, i64, i64)>>>;
+
         /// Comments and whitespace dropped: no wrap or commented-out line moves a count.
         fn scannable(source: &str) -> String {
             let mut without_blocks = String::with_capacity(source.len());
@@ -7652,7 +7668,6 @@ mod tests {
                 enabled,
                 frequency_minutes,
                 window_minutes,
-                rule_overrides: None,
                 created_at: Some(NOW),
                 updated_at: Some(NOW),
             }
@@ -7661,11 +7676,13 @@ mod tests {
         /// Records what the arm dispatched, so a test asserts the run and not the return.
         #[cfg(feature = "enterprise")]
         fn recorder(
-            runs: Arc<Mutex<Vec<(String, String, i64)>>>,
-        ) -> impl FnOnce(String, String, i64) -> std::future::Ready<Result<(), anyhow::Error>>
+            runs: RecordedRuns,
+        ) -> impl FnOnce(String, String, i64, i64) -> std::future::Ready<Result<(), anyhow::Error>>
         {
-            move |org, config_id, window_minutes| {
-                runs.lock().unwrap().push((org, config_id, window_minutes));
+            move |org, config_id, window_minutes, run_at_micros| {
+                runs.lock()
+                    .unwrap()
+                    .push((org, config_id, window_minutes, run_at_micros));
                 std::future::ready(Ok(()))
             }
         }
@@ -7773,8 +7790,7 @@ mod tests {
         async fn the_deployment_switch_off_starts_no_digest_at_all() {
             let runs = Arc::new(Mutex::new(Vec::new()));
             let (window_minutes, error) = raman_run_outcome(
-                "default",
-                "cfg1",
+                &trigger(),
                 Some(&config(true, 1440, 43200)),
                 false,
                 recorder(runs.clone()),
@@ -7793,8 +7809,7 @@ mod tests {
         async fn a_disabled_org_config_starts_no_digest_even_with_the_switch_on() {
             let runs = Arc::new(Mutex::new(Vec::new()));
             let (window_minutes, error) = raman_run_outcome(
-                "default",
-                "cfg1",
+                &trigger(),
                 Some(&config(false, 1440, 43200)),
                 true,
                 recorder(runs.clone()),
@@ -7811,8 +7826,7 @@ mod tests {
         async fn an_enabled_deployment_starts_one_digest_over_the_window_the_config_declares() {
             let runs = Arc::new(Mutex::new(Vec::new()));
             let (window_minutes, error) = raman_run_outcome(
-                "default",
-                "cfg1",
+                &trigger(),
                 Some(&config(true, 1440, 7200)),
                 true,
                 recorder(runs.clone()),
@@ -7822,7 +7836,12 @@ mod tests {
             assert_eq!(error, None);
             assert_eq!(
                 *runs.lock().unwrap(),
-                vec![("default".to_string(), "cfg1".to_string(), 7200)]
+                vec![(
+                    "default".to_string(),
+                    "cfg1".to_string(),
+                    7200,
+                    NOW - 5 * MINUTE
+                )]
             );
         }
 
@@ -7831,15 +7850,41 @@ mod tests {
         #[tokio::test]
         async fn a_failed_digest_is_reported_on_the_row_rather_than_returned() {
             let (window_minutes, error) = raman_run_outcome(
-                "default",
-                "cfg1",
+                &trigger(),
                 Some(&config(true, 1440, 43200)),
                 true,
-                |_, _, _| std::future::ready(Err(anyhow::anyhow!("collector unreachable"))),
+                |_, _, _, _| std::future::ready(Err(anyhow::anyhow!("collector unreachable"))),
             )
             .await;
             assert_eq!(window_minutes, Some(43200));
             assert_eq!(error.as_deref(), Some("collector unreachable"));
+        }
+
+        /// The anchor is `next_run_at` and not `start_time`: every pull rewrites
+        /// `start_time`, so a re-pulled attempt would derive a fresh window, miss the
+        /// upsert's unique key and insert a second digest for the one logical run.
+        #[cfg(feature = "enterprise")]
+        #[tokio::test]
+        async fn the_run_instant_is_the_triggers_due_time_and_not_the_wall_clock() {
+            const DUE_AT: i64 = 1_704_067_200_000_000;
+            let runs = Arc::new(Mutex::new(Vec::new()));
+            let mut trigger = trigger();
+            trigger.next_run_at = DUE_AT;
+            trigger.start_time = Some(now_micros());
+            let (window_minutes, error) = raman_run_outcome(
+                &trigger,
+                Some(&config(true, 1440, 7200)),
+                true,
+                recorder(runs.clone()),
+            )
+            .await;
+            assert_eq!(window_minutes, Some(7200));
+            assert_eq!(error, None);
+            assert_eq!(
+                runs.lock().unwrap().first().map(|run| run.3),
+                Some(DUE_AT),
+                "a re-pulled attempt must re-derive the window its first attempt derived"
+            );
         }
 
         #[test]
@@ -7911,6 +7956,8 @@ mod tests {
 
         const STARTED: i64 = NOW;
         const FINISHED: i64 = NOW + 3 * 1_000_000;
+        /// Hours behind `STARTED`, so no assertion can read the queue delay as rounding.
+        const DUE: i64 = NOW - 3 * 60 * MINUTE;
 
         fn trigger() -> db::scheduler::Trigger {
             db::scheduler::Trigger {
@@ -7930,6 +7977,21 @@ mod tests {
                 NOW + 30 * MINUTE,
                 window_minutes,
                 error,
+                STARTED,
+                FINISHED,
+                "trace-1",
+            )
+        }
+
+        fn delayed_row(window_minutes: Option<i64>) -> TriggerData {
+            raman_trigger_data(
+                &db::scheduler::Trigger {
+                    next_run_at: DUE,
+                    ..trigger()
+                },
+                NOW + 30 * MINUTE,
+                window_minutes,
+                None,
                 STARTED,
                 FINISHED,
                 "trace-1",
@@ -7981,19 +8043,23 @@ mod tests {
             assert_ne!(id, "default");
         }
 
+        /// The row reports the window asked for; the clamp is recorded in the digest's coverage.
         #[test]
-        fn the_published_window_is_the_one_the_pass_asked_for() {
-            let published = row(Some(60), None);
-            assert_eq!(published.start_time, STARTED - 60 * MINUTE);
-            assert_eq!(published.end_time, STARTED);
+        fn the_published_window_is_the_one_the_run_asked_for_not_the_attempt_reporting_it() {
+            let published = delayed_row(Some(60));
+            assert_eq!(published.end_time, DUE);
+            assert_eq!(published.start_time, DUE - 60 * MINUTE);
+            assert_ne!(published.end_time, STARTED);
+            assert_eq!(published.delay_in_secs, Some(3 * 60 * 60));
+            assert_eq!(published.evaluation_took_in_secs, Some(3.0));
         }
 
-        /// A run that analysed nothing must not claim a window it never read.
+        /// Anchored at the run instant, so a re-pull republishes the same empty window.
         #[test]
         fn a_skipped_run_claims_no_analysed_window() {
-            let published = row(None, None);
-            assert_eq!(published.start_time, STARTED);
-            assert_eq!(published.end_time, STARTED);
+            let published = delayed_row(None);
+            assert_eq!(published.start_time, DUE);
+            assert_eq!(published.end_time, DUE);
         }
 
         #[test]
@@ -8072,6 +8138,21 @@ mod tests {
             assert!(
                 scannable("raman_run_window_minutes(\n    config.as_ref(),\n    get_config().raman.enabled,\n)")
                     .contains(&scannable(RUN_DECISION))
+            );
+        }
+
+        /// The handler's own runner and `run_raman_digest` are unreachable from a test, so
+        /// a source scan is the only check that the anchor survives the hop out of the seam.
+        #[test]
+        fn the_digest_derives_its_window_from_the_run_instant_and_never_from_the_clock() {
+            let source = scannable(live_source(HANDLERS_SOURCE));
+            assert!(handler_arm(ENTERPRISE_ARM).contains(&scannable(
+                "run_raman_digest(&org, &config_id, window_minutes, run_at_micros)"
+            )));
+            assert!(source.contains(&scannable("window_for_run(run_at_micros, window_minutes)")));
+            assert!(
+                !source.contains("window_ending_now"),
+                "a wall-clock window makes a re-pulled run insert a second digest"
             );
         }
 

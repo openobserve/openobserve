@@ -148,7 +148,6 @@ async fn raman_configs_columns_types_nullability_and_primary_key_are_pinned() {
             ("enabled".to_string(), "boolean".to_string(), 1, 0),
             ("frequency_minutes".to_string(), "integer".to_string(), 1, 0),
             ("window_minutes".to_string(), "integer".to_string(), 1, 0),
-            ("rule_overrides".to_string(), "json_text".to_string(), 0, 0),
             ("created_at".to_string(), "bigint".to_string(), 0, 0),
             ("updated_at".to_string(), "bigint".to_string(), 0, 0),
         ]
@@ -294,7 +293,6 @@ async fn raman_defaults_apply_when_the_writer_omits_the_columns() {
     assert!(!stored.enabled);
     assert_eq!(stored.frequency_minutes, 1440);
     assert_eq!(stored.window_minutes, 43200);
-    assert_eq!(stored.rule_overrides, None);
     assert_eq!(stored.created_at, None);
     assert_eq!(stored.updated_at, None);
 

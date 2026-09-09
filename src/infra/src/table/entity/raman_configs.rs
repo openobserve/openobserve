@@ -12,7 +12,6 @@ pub struct Model {
     pub enabled: bool,
     pub frequency_minutes: i32,
     pub window_minutes: i32,
-    pub rule_overrides: Option<Json>,
     pub created_at: Option<i64>,
     pub updated_at: Option<i64>,
 }
