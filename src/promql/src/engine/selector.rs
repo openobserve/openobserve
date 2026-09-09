@@ -54,6 +54,7 @@ impl Engine {
     pub(super) async fn eval_vector_selector(
         &mut self,
         selector: &VectorSelector,
+        ctxs: Option<SelectorContexts>,
     ) -> Result<Vec<RangeValue>> {
         if self.result_type.is_none() {
             self.result_type = Some("vector".to_string());
@@ -61,7 +62,7 @@ impl Engine {
 
         let selector = named_selector(selector.clone(), "VectorSelector")?;
 
-        let data = self.selector_load_data_owned(&selector, None, None).await?;
+        let data = self.selector_load_data_owned(&selector, None, ctxs).await?;
 
         let metrics_cache = match data.get_range_values() {
             Some(v) => v,
@@ -688,7 +689,7 @@ mod tests {
             at: None,
         };
 
-        engine.eval_vector_selector(&selector).await.unwrap();
+        engine.eval_vector_selector(&selector, None).await.unwrap();
 
         let matchers = captured.lock().unwrap().take().unwrap();
         assert!(matchers.matchers.iter().all(|m| m.name != NAME_LABEL));
@@ -726,7 +727,7 @@ mod tests {
             at: None,
         };
 
-        let result = engine.eval_vector_selector(&selector).await;
+        let result = engine.eval_vector_selector(&selector, None).await;
         assert!(result.is_ok());
         let values = result.unwrap();
         assert_eq!(values.len(), 0); // Mock provider returns empty data
@@ -762,7 +763,7 @@ mod tests {
             at: None,
         };
 
-        let result = engine.eval_vector_selector(&selector).await;
+        let result = engine.eval_vector_selector(&selector, None).await;
         assert!(result.is_ok());
         let values = result.unwrap();
         assert_eq!(values.len(), 0); // Mock provider returns empty data
@@ -798,7 +799,7 @@ mod tests {
             at: None,
         };
 
-        let result = engine.eval_vector_selector(&selector).await;
+        let result = engine.eval_vector_selector(&selector, None).await;
         assert!(result.is_ok());
         let values = result.unwrap();
         assert_eq!(values.len(), 0); // Mock provider returns empty data
@@ -871,7 +872,7 @@ mod tests {
             at: None,
         };
 
-        let result = engine.eval_vector_selector(&selector).await;
+        let result = engine.eval_vector_selector(&selector, None).await;
 
         assert!(result.is_err(), "expected an error, not a panic");
         assert!(
