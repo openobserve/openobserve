@@ -140,9 +140,7 @@ async fn persist_alert_run_state(
                 .unwrap_or(false)
             });
         if transition_changed || stale_to_fresh {
-            let db = get_orm_client_ro().await;
             nudge_composite_parents(
-                db,
                 &alert.org_id,
                 alert_id,
                 infra::table::alert_composites::ChildKind::Alert,
@@ -228,9 +226,7 @@ async fn persist_alert_run_state(
             .unwrap_or(false)
         });
     if transition_changed || stale_to_fresh {
-        let db = get_orm_client_ro().await;
         nudge_composite_parents(
-            db,
             &alert.org_id,
             alert_id,
             infra::table::alert_composites::ChildKind::Alert,
@@ -619,20 +615,27 @@ fn composite_stale_k() -> i64 {
 /// same level). Idempotent and coalesced: `next_run_at` is only ever pulled
 /// earlier, never pushed out.
 async fn nudge_composite_parents(
-    db: &sea_orm::DatabaseConnection,
     org: &str,
     child_id: &str,
     child_kind: infra::table::alert_composites::ChildKind,
     now: i64,
 ) {
-    let parents =
-        match infra::table::alert_composites::list_parents(db, org, child_kind, child_id).await {
-            Ok(parents) => parents,
-            Err(error) => {
-                log::error!("[COMPOSITE_ALERT] failed to look up parents for {child_id}: {error}");
-                return;
-            }
-        };
+    let parents = match infra::table::alert_composites::list_parents(
+        get_orm_client_ro().await,
+        org,
+        child_kind,
+        child_id,
+    )
+    .await
+    {
+        Ok(parents) => parents,
+        Err(error) => {
+            log::error!("[COMPOSITE_ALERT] failed to look up parents for {child_id}: {error}");
+            return;
+        }
+    };
+    // SQLite opens the read-only pool with read_only(true), and the loop below writes.
+    let db = get_orm_client_rw().await;
     for parent in parents {
         // Order matters: generation first, then the job advance. A completion
         // that later re-reads the generation must observe the nudge.
@@ -1041,7 +1044,6 @@ async fn handle_composite_alert_trigger(
     });
     if significant {
         nudge_composite_parents(
-            db,
             &trigger.org,
             &definition.definition.id,
             infra::table::alert_composites::ChildKind::Composite,
