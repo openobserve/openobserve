@@ -20,9 +20,10 @@ use config::{
 };
 use http::StatusCode;
 use infra::errors::{Error, Result};
-use ingestion_common::{IngestUser, SystemJobType};
+use ingestion_common::{IngestUser, SYSTEM_JOB_TYPE_METADATA_KEY, SystemJobType};
 use proto::cluster_rpc::{
-    IngestionRequest, IngestionResponse, IngestionType, ingest_server::Ingest,
+    IngestRequestMetadata, IngestionRequest, IngestionResponse, IngestionType,
+    ingest_server::Ingest,
 };
 use tonic::{Request, Response, Status};
 
@@ -53,7 +54,8 @@ impl Ingest for Ingester {
             })
             .unwrap_or(false);
 
-        let internal_user = IngestUser::SystemJob(SystemJobType::InternalGrpc);
+        let internal_user =
+            IngestUser::SystemJob(system_job_type_from_metadata(req.metadata.as_ref()));
 
         let mut metrics_reply: Option<IngestionResponse> = None;
         let resp = match stream_type {
@@ -235,6 +237,17 @@ fn encode_metrics_reply(resp: &ingestion_common::IngestionResponse) -> Ingestion
         };
     }
     ok_reply()
+}
+
+/// Absent, empty or unrecognised values keep today's `InternalGrpc` attribution.
+fn system_job_type_from_metadata(metadata: Option<&IngestRequestMetadata>) -> SystemJobType {
+    metadata
+        .and_then(|m| {
+            m.data
+                .get(SYSTEM_JOB_TYPE_METADATA_KEY)
+                .and_then(|v| v.parse::<SystemJobType>().ok())
+        })
+        .unwrap_or(SystemJobType::InternalGrpc)
 }
 
 #[cfg(test)]
@@ -422,6 +435,69 @@ mod tests {
         assert_eq!(IngestionType::Kinesisfh as i32, 3);
         assert_eq!(IngestionType::Rum as i32, 4);
         assert_eq!(IngestionType::Usage as i32, 5);
+    }
+
+    #[test]
+    fn test_system_job_type_defaults_to_internal_grpc_without_metadata() {
+        assert_eq!(
+            system_job_type_from_metadata(None),
+            SystemJobType::InternalGrpc
+        );
+    }
+
+    #[test]
+    fn test_system_job_type_defaults_to_internal_grpc_when_key_is_absent() {
+        let metadata = IngestRequestMetadata {
+            data: HashMap::from([("is_derived".to_string(), "true".to_string())]),
+        };
+        assert_eq!(
+            system_job_type_from_metadata(Some(&metadata)),
+            SystemJobType::InternalGrpc
+        );
+    }
+
+    #[test]
+    fn test_system_job_type_defaults_to_internal_grpc_for_unknown_or_empty_values() {
+        for value in ["", "raman", "RamanDigest", "internal grpc", " raman_digest"] {
+            let metadata = IngestRequestMetadata {
+                data: HashMap::from([("system_job_type".to_string(), value.to_string())]),
+            };
+            assert_eq!(
+                system_job_type_from_metadata(Some(&metadata)),
+                SystemJobType::InternalGrpc,
+                "'{value}' must not change how an internal ingest is attributed"
+            );
+        }
+    }
+
+    #[test]
+    fn test_system_job_type_metadata_is_honoured_for_every_variant() {
+        for job in [
+            SystemJobType::SelfMetricsPromql,
+            SystemJobType::ServiceGraph,
+            SystemJobType::SelfReporting,
+            SystemJobType::InternalGrpc,
+            SystemJobType::AnomalyDetection,
+            SystemJobType::RamanDigest,
+        ] {
+            let metadata = IngestRequestMetadata {
+                data: job.as_ingest_metadata(),
+            };
+            assert_eq!(system_job_type_from_metadata(Some(&metadata)), job);
+        }
+    }
+
+    #[test]
+    fn test_raman_digest_metadata_attributes_the_write_to_the_digest_job() {
+        let metadata = IngestRequestMetadata {
+            data: SystemJobType::RamanDigest.as_ingest_metadata(),
+        };
+        let job = system_job_type_from_metadata(Some(&metadata));
+        assert_eq!(job, SystemJobType::RamanDigest);
+        assert_eq!(
+            IngestUser::SystemJob(job).to_email(),
+            "raman_digest@system.local"
+        );
     }
 
     #[test]

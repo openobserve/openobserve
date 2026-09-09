@@ -19,11 +19,12 @@
 //! `_o2_raman_digests` stream, mirroring
 //! `traces::agent_signals::aggregator::write_agent_signals`. Record shaping is
 //! `raman_digest_records` in the scheduler handler — ungated, so a test can run
-//! it. This file holds no branch on purpose:
-//! `alerts::raman` is enterprise-gated, so everything here is compiled by
-//! enterprise CI but exercised by no test suite in either edition.
+//! it. `alerts::raman` is enterprise-gated, so everything here is compiled by
+//! enterprise CI but its one test runs under `--features enterprise` only, which
+//! no CI job executes.
 
 use config::meta::stream::StreamType;
+use ingestion_common::SystemJobType;
 use proto::cluster_rpc;
 
 /// The `_o2_` prefix is load-bearing: `is_internal_rollup_stream` is a prefix guard.
@@ -35,17 +36,7 @@ pub async fn write_digest_records(
     records: Vec<serde_json::Value>,
 ) -> Result<(), anyhow::Error> {
     let record_count = records.len();
-    let req = cluster_rpc::IngestionRequest {
-        org_id: org_id.to_string(),
-        // `logs::ingest` forces Logs regardless; the search adapter reads Logs.
-        stream_type: StreamType::Logs.as_str().to_string(),
-        stream_name: DIGEST_STREAM.to_string(),
-        data: Some(cluster_rpc::IngestionData {
-            data: serde_json::to_vec(&records)?,
-        }),
-        ingestion_type: Some(cluster_rpc::IngestionType::Json as i32),
-        metadata: None,
-    };
+    let req = digest_ingest_request(org_id, &records)?;
     crate::ingestion::ingestion_service::ingest(req)
         .await
         .map(|_| ())
@@ -53,4 +44,44 @@ pub async fn write_digest_records(
         .inspect_err(|e| {
             log::error!("[Raman] failed to write {record_count} digest records for {org_id}: {e}");
         })
+}
+
+fn digest_ingest_request(
+    org_id: &str,
+    records: &[serde_json::Value],
+) -> Result<cluster_rpc::IngestionRequest, serde_json::Error> {
+    Ok(cluster_rpc::IngestionRequest {
+        org_id: org_id.to_string(),
+        // `logs::ingest` forces Logs regardless; the search adapter reads Logs.
+        stream_type: StreamType::Logs.as_str().to_string(),
+        stream_name: DIGEST_STREAM.to_string(),
+        data: Some(cluster_rpc::IngestionData {
+            data: serde_json::to_vec(records)?,
+        }),
+        ingestion_type: Some(cluster_rpc::IngestionType::Json as i32),
+        // without this the gRPC handler attributes the write to internal_grpc@system.local
+        metadata: Some(cluster_rpc::IngestRequestMetadata {
+            data: SystemJobType::RamanDigest.as_ingest_metadata(),
+        }),
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use ingestion_common::SYSTEM_JOB_TYPE_METADATA_KEY;
+
+    use super::*;
+
+    #[test]
+    fn test_digest_ingest_request_is_attributed_to_the_raman_digest_job() {
+        let req = digest_ingest_request("org", &[serde_json::json!({"a": 1})]).unwrap();
+        let metadata = req
+            .metadata
+            .expect("digest writes must name their system job, not fall back to internal_grpc");
+        assert_eq!(
+            metadata.data.get(SYSTEM_JOB_TYPE_METADATA_KEY),
+            Some(&"raman_digest".to_string())
+        );
+        assert_eq!(req.stream_name, DIGEST_STREAM);
+    }
 }

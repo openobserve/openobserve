@@ -16,6 +16,7 @@
 use std::{
     collections::HashMap,
     io::{BufReader, Cursor, Lines},
+    str::FromStr,
 };
 
 use ::common::meta::stream::SchemaRecords;
@@ -23,6 +24,9 @@ use bytes::Bytes;
 use config::utils::json;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
+
+/// gRPC ingest metadata key naming the system job behind an internal write.
+pub const SYSTEM_JOB_TYPE_METADATA_KEY: &str = "system_job_type";
 
 /// System job types for backend ingestion processes
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -45,6 +49,31 @@ impl SystemJobType {
             SystemJobType::InternalGrpc => "internal_grpc",
             SystemJobType::AnomalyDetection => "anomaly_detection",
             SystemJobType::RamanDigest => "raman_digest",
+        }
+    }
+
+    /// Ingest metadata that names this job, so the gRPC handler can parse it back.
+    pub fn as_ingest_metadata(&self) -> HashMap<String, String> {
+        HashMap::from([(
+            SYSTEM_JOB_TYPE_METADATA_KEY.to_string(),
+            self.as_email_local().to_string(),
+        )])
+    }
+}
+
+impl FromStr for SystemJobType {
+    type Err = String;
+
+    /// Exact match on `as_email_local()`: a second spelling would split the audit trail.
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "self_metrics_promql" => Ok(SystemJobType::SelfMetricsPromql),
+            "service_graph" => Ok(SystemJobType::ServiceGraph),
+            "self_reporting" => Ok(SystemJobType::SelfReporting),
+            "internal_grpc" => Ok(SystemJobType::InternalGrpc),
+            "anomaly_detection" => Ok(SystemJobType::AnomalyDetection),
+            "raman_digest" => Ok(SystemJobType::RamanDigest),
+            other => Err(format!("unknown system job type: {other}")),
         }
     }
 }
@@ -1101,6 +1130,63 @@ mod tests {
         assert!(!obj.contains_key("_primary_term"));
         assert!(!obj.contains_key("error"));
         assert!(!obj.contains_key("originalRecord"));
+    }
+
+    /// The exhaustive match stops compiling when a variant is added without a canonical spelling.
+    #[test]
+    fn test_system_job_type_round_trips_through_its_email_local_part() {
+        let all = [
+            SystemJobType::SelfMetricsPromql,
+            SystemJobType::ServiceGraph,
+            SystemJobType::SelfReporting,
+            SystemJobType::InternalGrpc,
+            SystemJobType::AnomalyDetection,
+            SystemJobType::RamanDigest,
+        ];
+        for job in all {
+            let canonical = match job {
+                SystemJobType::SelfMetricsPromql => "self_metrics_promql",
+                SystemJobType::ServiceGraph => "service_graph",
+                SystemJobType::SelfReporting => "self_reporting",
+                SystemJobType::InternalGrpc => "internal_grpc",
+                SystemJobType::AnomalyDetection => "anomaly_detection",
+                SystemJobType::RamanDigest => "raman_digest",
+            };
+            assert_eq!(job.as_email_local(), canonical);
+            assert_eq!(
+                canonical.parse::<SystemJobType>(),
+                Ok(job),
+                "{canonical} must parse back to the variant that spells it"
+            );
+        }
+    }
+
+    #[test]
+    fn test_system_job_type_parse_rejects_unknown_and_empty_values() {
+        assert!("".parse::<SystemJobType>().is_err());
+        assert!("not_a_job".parse::<SystemJobType>().is_err());
+        assert!("RamanDigest".parse::<SystemJobType>().is_err());
+        assert!(" raman_digest".parse::<SystemJobType>().is_err());
+    }
+
+    #[test]
+    fn test_system_job_type_ingest_metadata_uses_the_canonical_key_and_spelling() {
+        let meta = SystemJobType::RamanDigest.as_ingest_metadata();
+        assert_eq!(
+            meta.get(SYSTEM_JOB_TYPE_METADATA_KEY),
+            Some(&"raman_digest".to_string())
+        );
+        assert_eq!(meta.len(), 1);
+    }
+
+    #[test]
+    fn test_system_job_type_ingest_metadata_round_trips_into_a_digest_email() {
+        let meta = SystemJobType::RamanDigest.as_ingest_metadata();
+        let parsed: SystemJobType = meta[SYSTEM_JOB_TYPE_METADATA_KEY].parse().unwrap();
+        assert_eq!(
+            IngestUser::SystemJob(parsed).to_email(),
+            "raman_digest@system.local"
+        );
     }
 
     #[test]
