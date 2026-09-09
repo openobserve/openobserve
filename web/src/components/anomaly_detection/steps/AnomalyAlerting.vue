@@ -130,6 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm"
               class="ms-1"
               :title="t('alerts.alertSettings.refreshDestinations')"
+              data-test="anomaly-refresh-destinations"
               @click="$emit('refresh:destinations')"
               icon-left="refresh"
             />

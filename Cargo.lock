@@ -8319,6 +8319,7 @@ dependencies = [
  "tokio",
  "tracing",
  "urlencoding",
+ "usage_reporting",
 ]
 
 [[package]]

@@ -15,7 +15,7 @@
 
 // The sensitivity control's copy is half the defect: the old tooltip described
 // the opposite of what the detector does. `no-missing-keys` reads en-US alone,
-// so nothing else would notice the other 14 locales keeping the wrong sentence.
+// so nothing else would notice the other locales keeping the wrong sentence.
 //
 // Placeholder parity is NOT checked here — localeMessages.spec.ts already does
 // it compiler-accurately, and allows the legitimate subset case this file's
@@ -77,8 +77,10 @@ const KEPT = ["alerts.sensitivity", "alerts.anomaly.sensitivityTooltip"];
 
 // The backwards copy, frozen per locale. Asserting each locale MOVED off its own
 // stale sentence is the only mechanical way to catch a translation pass that
-// updated English and left the other 14 describing behaviour that never existed.
+// updated English and left the other locales describing behaviour that never existed.
 const STALE_TOOLTIPS: Record<string, string> = {
+  "ar-SA":
+    "اضبط نطاق نقاط الشذوذ للتحكم في الحساسية. النقاط التي تكون خارج هذا النطاق لن تفعل التنبيهات. استخدم المخطط لعرض البيانات التاريخية وضبط المؤشر وفقا لذلك.",
   "de-DE":
     "Passen Sie den Bereich für die Anomaliebewertung an, um die Empfindlichkeit zu kontrollieren. Punkte, deren Werte außerhalb dieses Bereichs liegen, lösen keine Warnmeldungen aus. Verwenden Sie das Diagramm, um historische Daten zu visualisieren und entsprechend anzupassen.",
   "en-US":
@@ -115,7 +117,7 @@ describe("anomaly sensitivity locale parity", () => {
   it("reads every locale file", () => {
     // An exact count: a glob that silently matched fewer would make every
     // per-locale assertion below vacuous.
-    expect(ALL_LOCALES.map(([name]) => name)).toHaveLength(15);
+    expect(ALL_LOCALES.map(([name]) => name)).toHaveLength(16);
   });
 
   it("knows the stale tooltip for every locale it will check", () => {
