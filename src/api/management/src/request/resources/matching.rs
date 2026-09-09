@@ -52,10 +52,8 @@ pub fn is_candidate(name: &str, id: &str, description: &str, q: &str) -> bool {
         || (!description.is_empty() && fold(description).contains(q))
 }
 
-/// First matching rule wins, same ladder as the browser ranker; 0 means no match.
-pub fn score(name: &str, id: &str, description: &str, q: &str) -> u32 {
-    let name = fold(name);
-    let id = fold(id);
+/// Scores already-folded `name`/`id`; `description` is folded lazily only if reached.
+fn score_folded(name: &str, id: &str, description: &str, q: &str) -> u32 {
     if name == q {
         return SCORE_NAME_EXACT;
     }
@@ -77,6 +75,12 @@ pub fn score(name: &str, id: &str, description: &str, q: &str) -> u32 {
     0
 }
 
+/// First matching rule wins, same ladder as the browser ranker; 0 means no match.
+#[cfg(test)]
+pub fn score(name: &str, id: &str, description: &str, q: &str) -> u32 {
+    score_folded(&fold(name), &fold(id), description, q)
+}
+
 /// Scores, drops non-matches, orders by score then name, cuts to `limit`; the flag says rows were
 /// cut. Each name is folded once for the ordering rather than on every comparison.
 pub fn rank(hits: Vec<ResourceHit>, q: &str, limit: usize) -> (Vec<ResourceHit>, bool) {
@@ -85,15 +89,13 @@ pub fn rank(hits: Vec<ResourceHit>, q: &str, limit: usize) -> (Vec<ResourceHit>,
     } else {
         hits.into_iter()
             .filter_map(|mut hit| {
-                let s = score(
-                    &hit.name,
-                    &hit.id,
-                    hit.description.as_deref().unwrap_or(""),
-                    q,
-                );
+                // Fold name and id once here, then reuse for both scoring and the sort key.
+                let name = fold(&hit.name);
+                let id = fold(&hit.id);
+                let s = score_folded(&name, &id, hit.description.as_deref().unwrap_or(""), q);
                 (s > 0).then(|| {
                     hit.score = s;
-                    (fold(&hit.name), hit)
+                    (name, hit)
                 })
             })
             .collect()
