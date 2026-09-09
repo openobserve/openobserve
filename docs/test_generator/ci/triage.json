@@ -1,0 +1,27 @@
+{
+  "feature_slug": "logs-quick-mode-pin",
+  "feature_title": "Logs Quick Mode Pin to Toolbar",
+  "area": "Logs",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "logsQuickModePin.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Logs/logsQuickModePin.spec.js",
+  "playwright_group": "Logs-Core",
+  "source_files": [
+    "web/src/plugins/logs/SearchBar.vue",
+    "web/src/utils/logs/constants.ts",
+    "web/src/utils/zincutils.ts"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "All changed paths live under web/src/** (SearchBar.vue, constants.ts, zincutils.ts, locales/*.json, and two Vitest .spec.ts files). None are under enterprise-owned directories (enterprise/, o2_enterprise/, src/enterprise/), and no enterprise keywords (cipher/SSO/SAML/RBAC/SDR) appear in paths or symbols, so this is an open-source change.",
+    "skip": "Not skipped. The change adds a user-facing control (pin/unpin Quick Mode in the logs search bar) with persistent state, and there is no tests-added label or skip request in the trigger comment. No skip marker applies.",
+    "e2e": "E2E is warranted because SearchBar.vue adds a new toolbar toggle and a pin/unpin button in the quick-mode menu, each with new data-test attributes and a localStorage-backed state (quickModePinned). This is a new user-exercisable interaction that needs verification of pin/unpin persistence and toolbar visibility.",
+    "area": "Logs. The bulk of the functional change is in web/src/plugins/logs/SearchBar.vue with supporting web/src/utils/logs/constants.ts, and the closest existing spec set (logsquickmode.spec.js, shareLink.spec.js, etc.) lives in the Logs area.",
+    "group": "Logs-Core. The related existing quick-mode spec logsquickmode.spec.js is already in the Logs-Core matrix shard in .github/workflows/playwright.yml, so the pin feature belongs alongside it.",
+    "existing_tests": "No E2E specs in the diff. The only test files changed (ViewPanel.spec.ts, FunctionSelector.spec.ts) are Vitest unit tests under web/src/** and are not Playwright E2E coverage under tests/ui-testing/playwright-tests/."
+  }
+}

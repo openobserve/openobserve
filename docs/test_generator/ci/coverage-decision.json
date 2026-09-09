@@ -1,0 +1,9 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/Logs/logsQuickModePin.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Logs/logsquickmode.spec.js"
+  ],
+  "needs_registration": true,
+  "rationale": "logsquickmode.spec.js covers the Quick Mode menu toggle / interesting-fields / SQL-mode behaviors, but has a heavy beforeEach (enableQuickModeIfDisabled + clickAllFields) and no coverage of the new pin-to-toolbar behavior (SearchBar.vue pin button -> logs-search-bar-quick-mode-pinned-toggle-btn). The pin feature is a distinct sub-feature with different setup (default pinned state must be normalized via localStorage clear). run-context supplies a dedicated spec_filename/spec_path (logsQuickModePin.spec.js), so a new spec under Logs-Core is the least-duplicative fit. Needs registration: add logsQuickModePin.spec.js to the Logs-Core run_files list in .github/workflows/playwright.yml."
+}

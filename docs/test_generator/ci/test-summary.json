@@ -1,0 +1,31 @@
+{
+  "feature_slug": "logs-quick-mode-pin",
+  "summary": "Generated a new parallel spec verifying the Logs Quick Mode pin-to-toolbar behavior (pin renders toolbar toggle, unpin removes it, state persists across reload, toolbar toggle flips Quick Mode, and the pin button is decoupled from Quick Mode).",
+  "tests": [
+    {
+      "title": "should render the pinned Quick Mode toolbar toggle after pinning",
+      "action": "new",
+      "verifies": "clicking the pin button renders the pinned Quick Mode toolbar toggle and sets the pin button to the pinned (primary) color"
+    },
+    {
+      "title": "should unpin Quick Mode and remove the pinned toolbar toggle",
+      "action": "new",
+      "verifies": "clicking the pin button while pinned removes the toolbar toggle and returns the pin button to the unpinned (grey-6) color"
+    },
+    {
+      "title": "should persist the Quick Mode pin state across page reload",
+      "action": "new",
+      "verifies": "a non-default pin state (unpinned) survives a page reload instead of resetting to the default pinned state"
+    },
+    {
+      "title": "should toggle Quick Mode using the pinned toolbar toggle",
+      "action": "new",
+      "verifies": "clicking the pinned toolbar toggle flips the Quick Mode state (q-toggle__inner truthy/falsy)"
+    },
+    {
+      "title": "should not toggle Quick Mode when clicking the pin button",
+      "action": "new",
+      "verifies": "clicking the pin button changes only the pin state and leaves Quick Mode unchanged (decoupled controls)"
+    }
+  ]
+}

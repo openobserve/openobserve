@@ -1,0 +1,324 @@
+diff --git a/web/src/components/dashboards/viewPanel/ViewPanel.spec.ts b/web/src/components/dashboards/viewPanel/ViewPanel.spec.ts
+index d4c53cad473..9efaf77b48f 100644
+--- a/web/src/components/dashboards/viewPanel/ViewPanel.spec.ts
++++ b/web/src/components/dashboards/viewPanel/ViewPanel.spec.ts
+@@ -94,6 +94,7 @@ vi.mock("@/composables/useStreamingSearch", () => ({
+ // Mock additional utilities that may cause import issues
+ vi.mock("@/utils/zincutils", () => ({
+   useLocalWrapContent: vi.fn(() => null),
++  useLocalQuickModePin: vi.fn(() => "true"),
+ }));
+ vi.mock("@/utils/query/sqlUtils", () => ({}));
+ vi.mock("@/utils/query/search", () => ({}));
+diff --git a/web/src/locales/languages/de.json b/web/src/locales/languages/de.json
+index 35af639532f..744c4a3b11c 100644
+--- a/web/src/locales/languages/de.json
++++ b/web/src/locales/languages/de.json
+@@ -384,7 +384,9 @@
+     "patternNavNext": "Weiter",
+     "patternWildcardSampleValues": "Beispielwerte",
+     "wildcardSampleValues": "Beispielwerte",
+-    "patternZScore": "Z-Score: {zScore} (durchschnittliche Häufigkeit: {avgFrequency})"
++    "patternZScore": "Z-Score: {zScore} (durchschnittliche Häufigkeit: {avgFrequency})",
++    "pinToToolbar": "An Werkzeugleiste anheften",
++    "unpinFromToolbar": "Von der Werkzeugleiste lösen"
+   },
+   "menu": {
+     "home": "Startseite",
+diff --git a/web/src/locales/languages/en.json b/web/src/locales/languages/en.json
+index 0cc920fd01d..5c327c16051 100644
+--- a/web/src/locales/languages/en.json
++++ b/web/src/locales/languages/en.json
+@@ -197,6 +197,8 @@
+     "sqlModeLabel": "SQL Mode",
+     "nlpModeLabel": "Natural Language Mode",
+     "quickModeLabel": "Quick Mode",
++    "pinToToolbar": "Pin to toolbar",
++    "unpinFromToolbar": "Unpin from toolbar",
+     "toggleFunctionLabel": "Function",
+     "labelWrap": "Wrap Content",
+     "messageWrapContent": "Wrap Table Content",
+diff --git a/web/src/locales/languages/es.json b/web/src/locales/languages/es.json
+index 6dfa819193f..624b2367f54 100644
+--- a/web/src/locales/languages/es.json
++++ b/web/src/locales/languages/es.json
+@@ -384,7 +384,9 @@
+     "patternNavNext": "Próxima",
+     "patternWildcardSampleValues": "Valores de muestra",
+     "wildcardSampleValues": "Valores de muestra",
+-    "patternZScore": "Puntuación Z: {zScore} (frecuencia promedio: {AvgFrequency})"
++    "patternZScore": "Puntuación Z: {zScore} (frecuencia promedio: {AvgFrequency})",
++    "pinToToolbar": "Fijar a la barra de herramientas",
++    "unpinFromToolbar": "Desanclar de la barra de herramientas"
+   },
+   "menu": {
+     "home": "Inicio",
+diff --git a/web/src/locales/languages/fr.json b/web/src/locales/languages/fr.json
+index b89b8fd187e..9dce7f44304 100644
+--- a/web/src/locales/languages/fr.json
++++ b/web/src/locales/languages/fr.json
+@@ -384,7 +384,9 @@
+     "patternNavNext": "Suivant",
+     "patternWildcardSampleValues": "Exemples de valeurs",
+     "wildcardSampleValues": "Exemples de valeurs",
+-    "patternZScore": "Score Z : {zScore} (fréquence moyenne : {AVGFrequency})"
++    "patternZScore": "Score Z : {zScore} (fréquence moyenne : {AVGFrequency})",
++    "pinToToolbar": "Ajouter à la barre d'outils",
++    "unpinFromToolbar": "Détacher de la barre d'outils"
+   },
+   "menu": {
+     "home": "Accueil",
+diff --git a/web/src/locales/languages/it.json b/web/src/locales/languages/it.json
+index d07ff2afeee..b84f1fe688b 100644
+--- a/web/src/locales/languages/it.json
++++ b/web/src/locales/languages/it.json
+@@ -384,7 +384,9 @@
+     "patternWildcardSampleValues": "Valori di esempio",
+     "wildcardSampleValues": "Valori di esempio",
+     "patternZScore": "Z-score: {zScore} (frequenza media: {avgFrequency})",
+-    "createAlertFromPattern": "Crea un avviso da questo modello"
++    "createAlertFromPattern": "Crea un avviso da questo modello",
++    "pinToToolbar": "Aggiungi alla barra degli strumenti",
++    "unpinFromToolbar": "Sblocca dalla barra degli strumenti"
+   },
+   "menu": {
+     "home": "Home",
+diff --git a/web/src/locales/languages/ja.json b/web/src/locales/languages/ja.json
+index c2fe28ead8f..30834211b63 100644
+--- a/web/src/locales/languages/ja.json
++++ b/web/src/locales/languages/ja.json
+@@ -384,7 +384,9 @@
+     "patternNavNext": "[次へ]",
+     "patternWildcardSampleValues": "サンプル値",
+     "wildcardSampleValues": "サンプル値",
+-    "patternZScore": "Z スコア:{スコア} (平均周波数:{平均周波数})"
++    "patternZScore": "Z スコア:{スコア} (平均周波数:{平均周波数})",
++    "pinToToolbar": "ツールバーに固定",
++    "unpinFromToolbar": "ツールバーからピン留め解除"
+   },
+   "menu": {
+     "home": "ホーム",
+diff --git a/web/src/locales/languages/ko.json b/web/src/locales/languages/ko.json
+index 4e5ea2a1cb0..16306522850 100644
+--- a/web/src/locales/languages/ko.json
++++ b/web/src/locales/languages/ko.json
+@@ -384,7 +384,9 @@
+     "patternWildcardSampleValues": "샘플 값",
+     "wildcardSampleValues": "샘플 값",
+     "patternZScore": "Z-점수: {z점수} (평균 주파수: {평균 주파수})",
+-    "createAlertFromPattern": "이 패턴으로 알림 생성"
++    "createAlertFromPattern": "이 패턴으로 알림 생성",
++    "pinToToolbar": "도구 모음에 고정",
++    "unpinFromToolbar": "도구 모음에서 고정 해제"
+   },
+   "menu": {
+     "home": "홈",
+diff --git a/web/src/locales/languages/nl.json b/web/src/locales/languages/nl.json
+index 561abaf5662..0d34a79675e 100644
+--- a/web/src/locales/languages/nl.json
++++ b/web/src/locales/languages/nl.json
+@@ -384,7 +384,9 @@
+     "patternWildcardSampleValues": "Voorbeeldwaarden",
+     "wildcardSampleValues": "Voorbeeldwaarden",
+     "patternZScore": "Z-score: {zScore} (gemiddelde frequentie: {avgFrequency})",
+-    "createAlertFromPattern": "Creëer een waarschuwing op basis van dit patroon"
++    "createAlertFromPattern": "Creëer een waarschuwing op basis van dit patroon",
++    "pinToToolbar": "Aan de werkbalk vastmaken",
++    "unpinFromToolbar": "Van de werkbalk loskoppelen"
+   },
+   "menu": {
+     "home": "Home",
+diff --git a/web/src/locales/languages/pt.json b/web/src/locales/languages/pt.json
+index dbefc6d68dd..2a3a3ac459f 100644
+--- a/web/src/locales/languages/pt.json
++++ b/web/src/locales/languages/pt.json
+@@ -384,7 +384,9 @@
+     "patternNavNext": "Próximo",
+     "patternWildcardSampleValues": "Valores da amostra",
+     "wildcardSampleValues": "Valores da amostra",
+-    "patternZScore": "Pontuação Z: {zScore} (frequência média: {avgFrequency})"
++    "patternZScore": "Pontuação Z: {zScore} (frequência média: {avgFrequency})",
++    "pinToToolbar": "Fixar na barra de ferramentas",
++    "unpinFromToolbar": "Desfixar da barra de ferramentas"
+   },
+   "menu": {
+     "home": "Início",
+diff --git a/web/src/locales/languages/tr.json b/web/src/locales/languages/tr.json
+index b3f6da22d42..a22e044e7ef 100644
+--- a/web/src/locales/languages/tr.json
++++ b/web/src/locales/languages/tr.json
+@@ -384,7 +384,9 @@
+     "patternWildcardSampleValues": "Örnek değerler",
+     "wildcardSampleValues": "Örnek değerler",
+     "patternZScore": "Z puanı: {zScore} (ortalama frekans: {avgFrequency})",
+-    "createAlertFromPattern": "Bu modelden uyarı oluştur"
++    "createAlertFromPattern": "Bu modelden uyarı oluştur",
++    "pinToToolbar": "Araç çubuğuna sabitleyin",
++    "unpinFromToolbar": "Araç çubuğundan sabitlemeyi kaldırın"
+   },
+   "menu": {
+     "home": "Ana Sayfa",
+diff --git a/web/src/locales/languages/zh.json b/web/src/locales/languages/zh.json
+index d46b56ceefd..2b5fb2987bc 100644
+--- a/web/src/locales/languages/zh.json
++++ b/web/src/locales/languages/zh.json
+@@ -384,7 +384,9 @@
+     "patternNavNext": "下一步",
+     "patternWildcardSampleValues": "样本值",
+     "wildcardSampleValues": "样本值",
+-    "patternZScore": "Z 分数：{zScore}（平均频率：{avgFrequency}）"
++    "patternZScore": "Z 分数：{zScore}（平均频率：{avgFrequency}）",
++    "pinToToolbar": "固定到工具栏",
++    "unpinFromToolbar": "从工具栏中取消固定"
+   },
+   "menu": {
+     "home": "主页",
+diff --git a/web/src/plugins/logs/FunctionSelector.spec.ts b/web/src/plugins/logs/FunctionSelector.spec.ts
+index 12da39334a1..e98968a6d77 100644
+--- a/web/src/plugins/logs/FunctionSelector.spec.ts
++++ b/web/src/plugins/logs/FunctionSelector.spec.ts
+@@ -37,6 +37,7 @@ vi.mock("@/composables/useLogs", () => ({
+ vi.mock("@/utils/zincutils", () => ({
+   getImageURL: vi.fn((path: string) => `http://localhost:8080/${path}`),
+   useLocalWrapContent: vi.fn(() => false),
++  useLocalQuickModePin: vi.fn(() => "true"),
+ }));
+ 
+ installQuasar();
+diff --git a/web/src/plugins/logs/SearchBar.vue b/web/src/plugins/logs/SearchBar.vue
+index 595d2af9784..388244a1132 100644
+--- a/web/src/plugins/logs/SearchBar.vue
++++ b/web/src/plugins/logs/SearchBar.vue
+@@ -157,6 +157,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+             </q-tooltip>
+           </q-toggle>
+         </div>
++        <div
++          v-if="!shouldMoveSqlToggleToMenu && searchObj.meta.quickModePinned"
++          class="toolbar-toggle-container element-box-shadow"
++        >
++          <q-toggle
++            data-test="logs-search-bar-quick-mode-pinned-toggle-btn"
++            v-model="searchObj.meta.quickMode"
++            class="o2-toggle-button-xs"
++            size="xs"
++            flat
++            :class="
++              store.state.theme === 'dark'
++                ? 'o2-toggle-button-xs-dark'
++                : 'o2-toggle-button-xs-light'
++            "
++            @update:model-value="handleQuickModePinnedUpdate"
++          >
++            <img :src="quickModeIcon" alt="Quick Mode" class="toolbar-icon" />
++            <q-tooltip>
++              {{ t("search.quickModeLabel") }}
++            </q-tooltip>
++          </q-toggle>
++        </div>
+         <q-btn-group
+           v-if="!shouldMoveSavedViewToMenu"
+           class="q-ml-xs q-pa-none element-box-shadow el-border"
+@@ -567,6 +590,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+                     {{ t("search.quickModeLabel") }}
+                   </q-item-label>
+                 </q-item-section>
++                <q-item-section side>
++                  <q-btn
++                    data-test="logs-search-bar-quick-mode-pin-btn"
++                    flat
++                    round
++                    dense
++                    size="xs"
++                    icon="push_pin"
++                    :color="
++                      searchObj.meta.quickModePinned ? 'primary' : 'grey-6'
++                    "
++                    @click.stop="toggleQuickModePin"
++                  >
++                    <q-tooltip>
++                      {{
++                        searchObj.meta.quickModePinned
++                          ? t("search.unpinFromToolbar")
++                          : t("search.pinToToolbar")
++                      }}
++                    </q-tooltip>
++                  </q-btn>
++                </q-item-section>
+               </q-item>
+ 
+               <q-separator />
+@@ -2309,6 +2354,7 @@ import {
+   getImageURL,
+   useLocalInterestingFields,
+   useLocalSavedView,
++  useLocalQuickModePin,
+   queryIndexSplit,
+   timestampToTimezoneDate,
+   b64EncodeUnicode,
+@@ -4734,6 +4780,15 @@ export default defineComponent({
+       emit("handleQuickModeChange");
+     };
+ 
++    const toggleQuickModePin = () => {
++      searchObj.meta.quickModePinned = !searchObj.meta.quickModePinned;
++      useLocalQuickModePin(String(searchObj.meta.quickModePinned));
++    };
++
++    const handleQuickModePinnedUpdate = () => {
++      emit("handleQuickModeChange");
++    };
++
+     const handleHistogramMode = () => {};
+ 
+     const handleRunQueryFn = (clear_cache = false) => {
+@@ -5320,6 +5375,8 @@ export default defineComponent({
+       config,
+       handleRegionsSelection,
+       handleQuickMode,
++      toggleQuickModePin,
++      handleQuickModePinnedUpdate,
+       handleHistogramMode,
+       regionFilterMethod,
+       regionFilterRef,
+diff --git a/web/src/utils/logs/constants.ts b/web/src/utils/logs/constants.ts
+index 407a7e39226..1f24aded2d2 100644
+--- a/web/src/utils/logs/constants.ts
++++ b/web/src/utils/logs/constants.ts
+@@ -13,7 +13,7 @@
+ // You should have received a copy of the GNU Affero General Public License
+ // along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ 
+-import { useLocalWrapContent } from "@/utils/zincutils";
++import { useLocalWrapContent, useLocalQuickModePin } from "@/utils/zincutils";
+ import { TimePeriodUnit } from "@/ts/interfaces";
+ 
+ /**
+@@ -124,6 +124,7 @@ export const DEFAULT_LOGS_CONFIG = {
+     sqlModeManualTrigger: false,
+     nlpMode: false,
+     quickMode: false,
++    quickModePinned: useLocalQuickModePin() !== "false",
+     queryEditorPlaceholderFlag: true,
+     functionEditorPlaceholderFlag: true,
+     resultGrid: {
+diff --git a/web/src/utils/zincutils.ts b/web/src/utils/zincutils.ts
+index 29d9fd1b33a..58f10f6bdbc 100644
+--- a/web/src/utils/zincutils.ts
++++ b/web/src/utils/zincutils.ts
+@@ -354,6 +354,15 @@ export const useLocalWrapContent = (val = "", isDelete = false) => {
+   return wrapcontent.value;
+ };
+ 
++export const useLocalQuickModePin = (val = "", isDelete = false) => {
++  const quickModePinned: any = useLocalStorage(
++    "logsQuickModePinned",
++    val,
++    isDelete,
++  );
++  return quickModePinned.value;
++};
++
+ export const deleteSessionStorageVal = (key: string) => {
+   try {
+     return sessionStorage.removeItem(key);

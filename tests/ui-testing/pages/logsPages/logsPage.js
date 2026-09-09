@@ -26,6 +26,8 @@ export class LogsPage {
         this.queryButton = "[data-test='logs-search-bar-refresh-btn']";
         this.queryEditor = '[data-test="logs-search-bar-query-editor"]';
         this.quickModeToggle = '[data-test="logs-search-bar-quick-mode-toggle-btn"]';
+        this.quickModePinBtn = '[data-test="logs-search-bar-quick-mode-pin-btn"]';
+        this.quickModePinnedToggle = '[data-test="logs-search-bar-quick-mode-pinned-toggle-btn"]';
         this.sqlModeToggle = '[data-test="logs-search-bar-sql-mode-toggle-btn"]';
         this.sqlModeSwitch = { role: 'switch', name: 'SQL Mode' };
         this.dateTimeButton = '[data-test="date-time-btn"]';
@@ -1151,6 +1153,58 @@ export class LogsPage {
         const isOn = await toggleInner.evaluate(node => node.classList.contains('q-toggle__inner--truthy')).catch(() => false);
         await this.page.keyboard.press('Escape');
         return isOn;
+    }
+
+    // ---- Quick Mode Pin to Toolbar methods ----
+
+    // Open the utilities hamburger menu (contains the Quick Mode row + pin button)
+    async openUtilitiesMenu() {
+        await this.page.locator(this.utilitiesMenuButton).click();
+        await expect(this.page.locator(this.quickModePinBtn)).toBeVisible();
+    }
+
+    // Close the utilities menu (it stays open after Quick Mode row clicks — no v-close-popup)
+    async closeUtilitiesMenu() {
+        await this.page.keyboard.press('Escape');
+    }
+
+    // Click the pin button inside the utilities menu (toggles pin state), then close the menu
+    async clickQuickModePin() {
+        await this.openUtilitiesMenu();
+        await this.page.locator(this.quickModePinBtn).click();
+        await this.closeUtilitiesMenu();
+    }
+
+    // Click the pinned Quick Mode toggle rendered on the toolbar (flips quickMode)
+    async clickQuickModePinnedToggle() {
+        await expect(this.page.locator(this.quickModePinnedToggle)).toBeVisible();
+        await this.page.locator(this.quickModePinnedToggle).click();
+    }
+
+    // Read the pinned toolbar toggle's on/off state (true = Quick Mode on)
+    async getQuickModePinnedToggleState() {
+        const toggleInner = this.page.locator('[data-test="logs-search-bar-quick-mode-pinned-toggle-btn"] .q-toggle__inner');
+        const isOn = await toggleInner.evaluate(node => node.classList.contains('q-toggle__inner--truthy')).catch(() => false);
+        return isOn;
+    }
+
+    // Expect the pinned toolbar toggle to be visible (rendered only when pinned + viewport > 1280px)
+    async expectQuickModePinnedToggleVisible() {
+        await expect(this.page.locator(this.quickModePinnedToggle)).toBeVisible();
+    }
+
+    // Expect the pinned toolbar toggle to be hidden/removed (unpinned)
+    async expectQuickModePinnedToggleHidden() {
+        await expect(this.page.locator(this.quickModePinnedToggle)).toBeHidden();
+    }
+
+    // Read the pin button's color state (true = pinned/primary, false = unpinned/grey-6)
+    async getPinButtonColorState() {
+        await this.openUtilitiesMenu();
+        const pinBtn = this.page.locator(this.quickModePinBtn);
+        const isPinned = await pinBtn.evaluate(node => node.classList.contains('text-primary')).catch(() => false);
+        await this.closeUtilitiesMenu();
+        return isPinned;
     }
 
     // Histogram methods

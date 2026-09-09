@@ -1,0 +1,19 @@
+{
+  "feature_slug": "logs-quick-mode-pin",
+  "feature_title": "Logs Quick Mode Pin to Toolbar",
+  "area": "Logs",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "logsQuickModePin.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Logs/logsQuickModePin.spec.js",
+  "playwright_group": "Logs-Core",
+  "source_files": [
+    "web/src/plugins/logs/SearchBar.vue",
+    "web/src/utils/logs/constants.ts",
+    "web/src/utils/zincutils.ts"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": ""
+}
