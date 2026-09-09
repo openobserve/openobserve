@@ -61,13 +61,9 @@ pub struct ProviderResponseBody {
     pub org_id: String,
     pub name: String,
     pub provider_type: String,
-    /// Endpoint exactly as stored: the complete URL for providers that
-    /// configured one, and null for providers using the built-in default.
-    /// The provider form seeds its input from this, so a provider on the
-    /// default keeps an empty field and keeps tracking the default.
+    /// Null for a provider on the built-in default, so the form field stays empty.
     pub endpoint: Option<String>,
-    /// Complete URL this provider calls, with the built-in default filled in
-    /// when `endpoint` is null. This is the field to display.
+    /// The URL actually called, with the default filled in when `endpoint` is null.
     pub resolved_endpoint: String,
     pub default_model: String,
     pub available_models: Vec<String>,
@@ -106,23 +102,6 @@ impl From<ProviderRequestBody> for infra::table::providers::Provider {
     }
 }
 
-/// Complete URL a provider calls, falling back to the stored value if the
-/// provider type is one this build cannot resolve. Responses must never fail on
-/// a row that is merely unusable, so this cannot return an error.
-#[cfg(feature = "enterprise")]
-fn resolved_endpoint_of(provider: &infra::table::providers::Provider) -> String {
-    o2_enterprise::enterprise::llm_evaluations::providers::resolve_endpoint_for_type(
-        &provider.provider_type,
-        provider.endpoint.as_deref(),
-    )
-    .unwrap_or_else(|_| provider.endpoint.clone().unwrap_or_default())
-}
-
-#[cfg(not(feature = "enterprise"))]
-fn resolved_endpoint_of(provider: &infra::table::providers::Provider) -> String {
-    provider.endpoint.clone().unwrap_or_default()
-}
-
 impl From<infra::table::providers::Provider> for ProviderResponseBody {
     fn from(value: infra::table::providers::Provider) -> Self {
         let resolved_endpoint = resolved_endpoint_of(&value);
@@ -152,6 +131,21 @@ impl From<Vec<infra::table::providers::Provider>> for ListProvidersResponseBody 
     }
 }
 
+/// Falls back to the stored value for an unresolvable type: a response must not fail on a bad row.
+#[cfg(feature = "enterprise")]
+fn resolved_endpoint_of(provider: &infra::table::providers::Provider) -> String {
+    o2_enterprise::enterprise::llm_evaluations::providers::resolve_endpoint_for_type(
+        &provider.provider_type,
+        provider.endpoint.as_deref(),
+    )
+    .unwrap_or_else(|_| provider.endpoint.clone().unwrap_or_default())
+}
+
+#[cfg(not(feature = "enterprise"))]
+fn resolved_endpoint_of(provider: &infra::table::providers::Provider) -> String {
+    provider.endpoint.clone().unwrap_or_default()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -179,8 +173,7 @@ mod tests {
 
     #[test]
     fn test_provider_response_fills_in_the_default_endpoint() {
-        // `endpoint` stays null so the row keeps tracking the default, but the
-        // response still tells the UI which URL the provider actually calls.
+        // `endpoint` stays null to track the default; the response still names the URL called.
         let provider = infra::table::providers::Provider {
             id: "abc".to_string(),
             org_id: "org1".to_string(),

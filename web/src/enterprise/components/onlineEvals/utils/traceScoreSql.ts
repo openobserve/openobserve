@@ -18,9 +18,7 @@ import { latestScoresFromSql } from "./latestScoreSql";
 
 export type TraceScoreScope = "span" | "trace";
 
-/** The scores recorded against one specific span or trace — the same
- *  `_llm_scores` records Quality aggregates, narrowed to a single target
- *  instead of a scorer-wide rollup. */
+/** The same `_llm_scores` records Quality aggregates, narrowed to one span or trace. */
 export function buildTargetScoresSql(scope: TraceScoreScope, targetId: string): string {
   const column = scope === "span" ? "span_id" : "trace_id";
   const where = `CAST(${column} AS VARCHAR) = '${escapeSqlString(targetId)}'`;

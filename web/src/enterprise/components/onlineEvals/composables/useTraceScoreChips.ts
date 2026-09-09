@@ -23,15 +23,11 @@ export interface TraceScoreChip {
   key: string;
   label: string;
   value: string;
-  /** What this dimension measures, from the Score Config — the "why does
-   *  this number mean anything" context a bare chip can't carry on its own. */
+  /** From the Score Config: the context a bare number cannot carry on its own. */
   description: string | null;
-  /** The judge's stated reasoning for this specific score, when the scorer
-   *  recorded one — the single most useful thing to surface on hover, since
-   *  it explains this exact value rather than the dimension in general. */
+  /** The judge's reasoning for this exact value, when the scorer recorded one. */
   reasoning: string | null;
-  /** When this score was recorded, in epoch ms — a chip on a 6-day-old trace
-   *  could easily be evaluated well after the fact by an async Eval Job. */
+  /** Epoch ms; an async Eval Job can score a trace long after it landed. */
   scoredAtMs: number | null;
 }
 
@@ -51,12 +47,7 @@ function formatValue(row: Record<string, unknown>): string {
   return "—";
 }
 
-/** Real per-target evaluation scores, shown as a chip on the trace/span the
- *  reviewer is already looking at instead of only in the separate Quality
- *  dashboard. Every failure path — a non-LLM org with no `_llm_scores`
- *  stream, a transient search error, a missing score-config lookup — must
- *  resolve to "no chips" rather than surface anywhere, since this is a
- *  purely additive affordance on a page every trace (LLM or not) renders. */
+/** Every failure path must resolve to "no chips": this renders on every trace, LLM or not. */
 export function useTraceScoreChips() {
   const store = useStore();
   const { executeQueryOnce } = useLLMStreamQuery();
@@ -72,9 +63,7 @@ export function useTraceScoreChips() {
     try {
       const endTimeUs = Date.now() * 1000;
       const [rows, configs] = await Promise.all([
-        // The dedup subquery's ROW_NUMBER()/ORDER BY need the full time range
-        // in one shot — the streaming endpoint evaluates window functions per
-        // slice, which can surface a stale row ahead of a newer one.
+        // The streaming endpoint evaluates window functions per slice, which can rank a stale row first.
         executeQueryOnce(
           buildTargetScoresSql(scope, targetId),
           Math.max(0, Math.floor(startTimeUs) - 1),
@@ -90,11 +79,7 @@ export function useTraceScoreChips() {
         if (id) configById.set(id, config);
       }
 
-      // An automated Eval Job score and a manual annotation for the same
-      // dimension are separate evaluation attempts with separate identities
-      // by design (append-only ledger), so the dedup subquery legitimately
-      // returns both. Collapse them here to the single most recent value per
-      // scorer, so a later manual override actually supersedes the chip.
+      // An eval job score and a manual annotation are separate ledger entries, so keep the newest per scorer.
       const latestByScorer = new Map<
         string,
         { row: Record<string, unknown>; scoredAtUs: number }

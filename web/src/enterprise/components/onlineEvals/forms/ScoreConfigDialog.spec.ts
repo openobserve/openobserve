@@ -1,12 +1,7 @@
 // @vitest-environment jsdom
 // Copyright 2026 OpenObserve Inc.
 //
-// Behavior tests for ScoreConfigDialog after the OForm + Zod migration
-// (online-evals-migration.md row 68). At least one test mounts the REAL <OForm>
-// and proves the schema gates an empty/invalid submit (name required + the
-// create-only slug pattern), rejects an impossible min≥max numeric range, and
-// preserves the intentionally valid empty categorical config
-// (`categories: null`). Also verifies the kept dirty affordance.
+// One test mounts the real <OForm>, so the schema itself is what gates an invalid submit.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";

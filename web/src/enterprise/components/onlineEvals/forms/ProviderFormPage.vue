@@ -263,9 +263,7 @@ const endpointPlaceholder = computed(
     t("onlineEvals.provider.endpointPlaceholder"),
 );
 
-// The one thing this field's help text must answer: what happens if I leave
-// it blank. Providers with a real working default say so; the rest have no
-// default to fall back to and need to be told that plainly instead.
+// The help text must say what a blank field does: a real default, or plainly no fallback at all.
 const endpointHelpText = computed(() => {
   const defaultUrl = DEFAULT_PROVIDER_BASE_URLS[formValues.value.providerType];
   return defaultUrl

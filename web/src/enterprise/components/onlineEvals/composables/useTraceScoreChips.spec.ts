@@ -86,10 +86,7 @@ describe("useTraceScoreChips", () => {
     ]);
   });
 
-  // The score chip is a purely additive affordance rendered on every trace —
-  // LLM or not. A non-LLM org has no `_llm_scores` stream at all, so the
-  // search call rejects; that must never surface as an error, only as "no
-  // chips", or every plain trace in the app would show a broken widget.
+  // A non-LLM org has no `_llm_scores` stream, so a rejected search must read as "no chips", never an error.
   it("resolves to no chips, never throws, when the score query fails", async () => {
     mockExecuteQueryOnce.mockRejectedValue(new Error("stream [_llm_scores] not found"));
     mockListCached.mockResolvedValue([]);
@@ -107,8 +104,7 @@ describe("useTraceScoreChips", () => {
     const { chips, load } = useTraceScoreChips();
     await load("span", "span-123", 1_000_000);
 
-    // The config lookup failing degrades to the raw scorer id as the label —
-    // it does not blank the scores that DID come back.
+    // A failed config lookup falls back to the raw scorer id; it must not blank the scores that came back.
     expect(chips.value).toEqual([
       {
         key: "s1",
@@ -129,12 +125,7 @@ describe("useTraceScoreChips", () => {
     expect(chips.value).toEqual([]);
   });
 
-  // An automated Eval Job score and a manual annotation for the same
-  // dimension are separate evaluation attempts by design (distinct
-  // `_evaluation_key`s in an append-only ledger), so the backend query
-  // legitimately returns both rows for "correctness". The chip must show
-  // only the newer one, not both, and must pick correctly regardless of
-  // which row happens to arrive first in the result array.
+  // An eval job score and a manual annotation for one dimension are both returned; only the newer may show.
   it("collapses multiple rows for the same scorer to the single most recent value", async () => {
     mockExecuteQueryOnce.mockResolvedValue([
       {

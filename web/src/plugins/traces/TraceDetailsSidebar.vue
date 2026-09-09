@@ -302,9 +302,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
           </OTag>
 
-          <!-- Score Chips — real evaluator scores recorded against this exact
-               span, so a reviewer sees "safe/unsafe" without a trip to
-               Quality. Nothing until a real score resolves for this span. -->
+          <!-- Real evaluator scores for this exact span; nothing renders until one resolves. -->
           <template v-if="isLLMSpan">
             <OSeparator vertical class="mx-1.5 h-3.5" />
             <span class="text-3xs text-text-secondary me-1 shrink-0 font-medium">{{
@@ -1127,8 +1125,7 @@ export default defineComponent({
     // Check if this is an LLM span to set default tab
     const isLLMSpan = computed(() => isLLMTrace(props.span));
     const canPreviewSpan = computed(() => hasTracePreview(props.span));
-    // Score chips don't poll — a fresh annotation via the toolbar's annotate
-    // menu must explicitly tell the chip row to re-check.
+    // Score chips don't poll, so a fresh annotation must tell the chip row to re-check.
     const scoreChipsRef = ref<{ refresh: () => void } | null>(null);
     function onScoreAnnotated() {
       scoreChipsRef.value?.refresh();

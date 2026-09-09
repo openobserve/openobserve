@@ -596,11 +596,7 @@ function buildHealthyThreshold(v: ScoreConfigForm) {
   return { healthy_value: v.healthyBool };
 }
 
-// @submit handler — OForm only calls this once the schema passes (name required,
-// the create-only slug pattern, and min < max for numeric configs). A
-// categorical config with zero categories is allowed (buildCategories() just
-// sends `categories: null`). The handler builds the payload from the validated
-// `value` only. OForm awaits this, so the ODrawer Save spinner spans the save.
+// OForm calls this only after the schema passes and awaits it, so the Save spinner spans the save.
 async function save(value: ScoreConfigForm) {
   if (!props.orgId) return;
   try {
