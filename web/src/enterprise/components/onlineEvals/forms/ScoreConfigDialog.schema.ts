@@ -2,11 +2,11 @@
 //
 // Validation schema for ScoreConfigDialog.vue (online-evals score-config drawer).
 // Client-side validation: (1) name — required + a create-only lowercase-slug
-// pattern; (2) min/max — each must be a non-empty number, but ONLY when the data
-// type is numeric (the inputs are hidden and the values are dropped from the
-// payload for categorical/boolean, so a blank must not block Save there — the
-// check is gated on dataType in superRefine). There is NO min<max ordering rule
-// and NO "≥1 category" rule.
+// pattern; (2) min/max — each must be a non-empty number, and Min must be
+// strictly less than Max, but ONLY when the data type is numeric (the inputs
+// are hidden and the values are dropped from the payload for
+// categorical/boolean, so a blank must not block Save there — the check is
+// gated on dataType in superRefine). There is NO "≥1 category" rule.
 //
 // The component owns <OForm>: it creates the form with `useOForm` and reads it
 // reactively through `form.useStore` (single source of truth, no mirror ref, no
@@ -89,9 +89,23 @@ export const makeScoreConfigSchema = (
           message: t("onlineEvals.scoreConfig.validation.maxRequired"),
         });
       }
+      // An inverted or zero-width range (min >= max) corrupts every downstream
+      // normalization that divides by (max - min) — reject it here rather than
+      // at the point of division. Only checked once both sides are usable
+      // numbers so this never masks the required-field messages above.
+      if (
+        !isBlankNumber(val.min) &&
+        !isBlankNumber(val.max) &&
+        Number(val.min) >= Number(val.max)
+      ) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["max"],
+          message: t("onlineEvals.scoreConfig.validation.maxNotGreaterThanMin"),
+        });
+      }
     });
-// Intentionally NO numeric `min < max` ordering rule and NO categorical
-// "≥1 category" rule — both min≥max ranges and empty categorical are allowed.
+// Intentionally NO categorical "≥1 category" rule — empty categorical is allowed.
 
 export type ScoreConfigForm = z.infer<ReturnType<typeof makeScoreConfigSchema>>;
 
