@@ -55,6 +55,16 @@ export class SloAlertsPage {
   presetCard(key) { return `[data-test="slos-sloalertcondition-preset-${key}"]`; }
   kindOption(value) { return `[data-test="slos-sloalertcondition-kind-${value}"]`; }
 
+  // ------------------------------------------------------------- element getters
+
+  getListItemByName(name) {
+    return this.page.locator(this.locators.list).getByText(name, { exact: false });
+  }
+
+  getListRowsByName(name) {
+    return this.page.locator(`${this.locators.list} li`).filter({ hasText: name });
+  }
+
   // ------------------------------------------------------------------- actions
 
   async clickAdd() {

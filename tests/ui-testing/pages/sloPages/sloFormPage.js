@@ -234,10 +234,30 @@ export class SloFormPage {
   }
 
   /** Toggle-group items report their state; clicking blind can silently no-op. */
+  /**
+   * Click an OToggleGroupItem and confirm it took.
+   *
+   * The explicit `scrollIntoViewIfNeeded` is load-bearing. "Visible" only means
+   * the element has a box, not that it is in the viewport, and the form grows
+   * and shrinks as branches mount — a language flip right after typing into
+   * Monaco (which scrolls on focus) put the toggle off-screen often enough to
+   * fail the shard while passing in isolation. Playwright's own auto-scroll
+   * loses that race when a scroll is still settling, so we scroll first and
+   * retry once rather than assuming the layout has stopped moving.
+   */
   async selectToggle(selector) {
     const item = this.page.locator(selector);
     await item.waitFor({ state: 'visible', timeout: 15000 });
-    await item.click();
+    for (const attempt of [1, 2]) {
+      try {
+        await item.scrollIntoViewIfNeeded({ timeout: 5000 });
+        await item.click({ timeout: 10000 });
+        break;
+      } catch (error) {
+        if (attempt === 2) throw error;
+        await this.page.waitForTimeout(300);
+      }
+    }
     await expect(item).toHaveAttribute('data-state', 'on', { timeout: 10000 });
   }
 
