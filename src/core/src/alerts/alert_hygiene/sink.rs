@@ -20,8 +20,8 @@
 //! `traces::agent_signals::aggregator::write_agent_signals`. The stream is the only
 //! record of a run, governed by ordinary stream retention, so every batch that fails
 //! loses the findings it carried and the run is reported as failed. A record
-//! `logs::ingest` rejects on its own is invisible here: the gRPC ingest handler
-//! discards the per-record status and answers 200 regardless.
+//! `logs::ingest` rejects on its own still answers 200, but the gRPC ingest handler
+//! reports how many in `failed_records`, so those records are counted as lost too.
 //! `alerts::alert_hygiene` is enterprise-gated, so everything here is compiled by
 //! enterprise CI but its one test runs under `--features enterprise` only, which
 //! no CI job executes.
@@ -45,17 +45,28 @@ pub async fn write_digest_records(
 ) -> Result<(), anyhow::Error> {
     let record_count = records.len();
     let requests = digest_ingest_requests(org_id, &records)?;
-    let mut lost = 0;
+    let mut lost: u64 = 0;
     for (index, req) in requests.into_iter().enumerate() {
         let first = index * MAX_RECORDS_PER_BATCH;
         let last = (first + MAX_RECORDS_PER_BATCH).min(record_count);
         // Aborting would guarantee a short run, and a retry would duplicate: no idempotency key.
-        if let Err(e) = write_batch(req).await {
-            lost += last - first;
-            log::error!(
-                "[AlertHygiene] digest batch {index} (records {first}..{last} of {record_count}) \
-                 failed for {org_id}: {e}"
-            );
+        match write_batch(req).await {
+            Ok(0) => {}
+            Ok(failed) => {
+                lost += failed;
+                log::error!(
+                    "[AlertHygiene] digest batch {index} (records {first}..{last} of \
+                     {record_count}) was accepted for {org_id} but {failed} of its records were \
+                     rejected"
+                );
+            }
+            Err(e) => {
+                lost += (last - first) as u64;
+                log::error!(
+                    "[AlertHygiene] digest batch {index} (records {first}..{last} of \
+                     {record_count}) failed for {org_id}: {e}"
+                );
+            }
         }
     }
     if lost > 0 {
@@ -66,24 +77,24 @@ pub async fn write_digest_records(
     Ok(())
 }
 
-async fn write_batch(req: cluster_rpc::IngestionRequest) -> Result<(), anyhow::Error> {
+async fn write_batch(req: cluster_rpc::IngestionRequest) -> Result<u64, anyhow::Error> {
     let res = crate::ingestion::ingestion_service::ingest(req)
         .await
         .map_err(|e| anyhow::anyhow!("{e}"))?;
-    match refusal(&res) {
-        Some(message) => Err(anyhow::anyhow!("{message}")),
-        None => Ok(()),
-    }
+    batch_loss(&res)
 }
 
-/// `ingest` answers `Ok` for a refused write too, so the code it carries is the only signal.
-fn refusal(res: &cluster_rpc::IngestionResponse) -> Option<String> {
-    (res.status_code != 200).then(|| {
-        format!(
+/// `Err` means the whole batch was refused; `Ok(n)` that `n` of its records were rejected.
+fn batch_loss(res: &cluster_rpc::IngestionResponse) -> Result<u64, anyhow::Error> {
+    if res.status_code != 200 {
+        return Err(anyhow::anyhow!(
             "ingest refused the batch: code {} {}",
-            res.status_code, res.message
-        )
-    })
+            res.status_code,
+            res.message
+        ));
+    }
+    // an absent count means the path reports no per-record status, not that none failed
+    Ok(res.failed_records.unwrap_or(0))
 }
 
 fn digest_ingest_requests(
@@ -135,25 +146,49 @@ mod tests {
         assert_eq!(req.stream_name, DIGEST_STREAM);
     }
 
-    fn response(status_code: i32, message: &str) -> cluster_rpc::IngestionResponse {
+    fn response(
+        status_code: i32,
+        message: &str,
+        failed_records: Option<u64>,
+    ) -> cluster_rpc::IngestionResponse {
         cluster_rpc::IngestionResponse {
             status_code,
             message: message.to_string(),
+            failed_records,
         }
     }
 
     /// The gRPC handler answers 500 with the reason in the body rather than failing the call.
     #[test]
     fn a_refused_batch_is_a_failure_carrying_the_reason_the_response_gave() {
+        let err = batch_loss(&response(500, "stream not found", None)).unwrap_err();
         assert_eq!(
-            refusal(&response(500, "stream not found")),
-            Some("ingest refused the batch: code 500 stream not found".to_string())
+            err.to_string(),
+            "ingest refused the batch: code 500 stream not found"
         );
+    }
+
+    /// A refused batch loses every record it carried, whatever count the response gave.
+    #[test]
+    fn a_refused_batch_is_a_failure_even_when_it_reports_no_rejected_records() {
+        assert!(batch_loss(&response(500, "stream not found", Some(0))).is_err());
     }
 
     #[test]
     fn an_accepted_batch_is_not_reported_as_a_failure() {
-        assert_eq!(refusal(&response(200, "OK")), None);
+        assert_eq!(batch_loss(&response(200, "OK", Some(0))).unwrap(), 0);
+    }
+
+    /// An ingest path that reports no per-record status must not be read as a partial loss.
+    #[test]
+    fn an_accepted_batch_without_a_reported_count_is_treated_as_a_clean_write() {
+        assert_eq!(batch_loss(&response(200, "OK", None)).unwrap(), 0);
+    }
+
+    #[test]
+    fn an_accepted_batch_that_rejected_records_loses_exactly_those_records() {
+        let res = response(200, "3 records rejected: bad timestamp", Some(3));
+        assert_eq!(batch_loss(&res).unwrap(), 3);
     }
 
     /// One request per run would put a large fleet's findings over the transport limit.

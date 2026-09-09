@@ -39,6 +39,7 @@ message IngestRequestMetadata {
 }
 
 message IngestionResponse {
-    int32 status_code = 1;
-    string    message = 2;    
+    int32              status_code = 1;
+    string                 message = 2;
+    optional uint64 failed_records = 3;
 }

@@ -2621,6 +2621,8 @@ pub struct IngestionResponse {
     pub status_code: i32,
     #[prost(string, tag = "2")]
     pub message: ::prost::alloc::string::String,
+    #[prost(uint64, optional, tag = "3")]
+    pub failed_records: ::core::option::Option<u64>,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
 #[repr(i32)]

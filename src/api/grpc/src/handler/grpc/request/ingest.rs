@@ -32,6 +32,12 @@ use crate::service::ingestion::create_log_ingestion_req;
 #[derive(Default)]
 pub struct Ingester;
 
+/// Records `logs::ingest` rejected individually while still answering 200 overall.
+struct RecordFailures {
+    failed: u64,
+    reason: String,
+}
+
 #[tonic::async_trait]
 impl Ingest for Ingester {
     async fn ingest(
@@ -60,22 +66,15 @@ impl Ingest for Ingester {
         let mut metrics_reply: Option<IngestionResponse> = None;
         let resp = match stream_type {
             StreamType::Logs => {
-                let log_ingestion_type = req.ingestion_type.unwrap_or_default();
-                let data = bytes::Bytes::from(in_data.data);
-                match create_log_ingestion_req(log_ingestion_type, data) {
-                    Err(e) => Err(e),
-                    Ok(ingestion_req) => openobserve_core::logs::ingest::ingest(
-                        0,
-                        &org_id,
-                        &stream_name,
-                        ingestion_req,
-                        internal_user.clone(),
-                        None,
-                        is_derived,
-                    )
-                    .await
-                    .map_or_else(Err, |_| Ok(())),
-                }
+                ingest_logs(
+                    req.ingestion_type,
+                    in_data.data,
+                    &org_id,
+                    &stream_name,
+                    internal_user.clone(),
+                    is_derived,
+                )
+                .await
             }
             StreamType::Metrics => {
                 let stream_name =  if stream_name.is_empty(){
@@ -96,7 +95,10 @@ impl Ingest for Ingester {
                     let data = bytes::Bytes::from(in_data.data);
                     openobserve_core::metrics::json::ingest(&org_id, stream_name, data, internal_user)
                         .await
-                        .map(|resp| metrics_reply = Some(encode_metrics_reply(&resp)))
+                        .map(|resp| {
+                            metrics_reply = Some(encode_metrics_reply(&resp));
+                            None
+                        })
                         .map_err(|e| Error::IngestionError(format!("error in ingesting metrics {e}")))
                 }
             }
@@ -115,7 +117,7 @@ impl Ingest for Ingester {
                     // internal ingestion does not require email id
                     openobserve_core::traces::ingest_json(&org_id, data, OtlpRequestType::Grpc, &stream_name, internal_user)
                         .await
-                        .map(|_| ()) // we don't care about success response
+                        .map(|_| None) // traces do not report per-record status
                         .map_err(|e| Error::IngestionError(format!("error in ingesting traces {e}")))
                 }
             }
@@ -151,29 +153,21 @@ impl Ingest for Ingester {
                                 "Internal gPRC ingestion service errors saving enrichment data: http code {status}"
                             )))
                         } else {
-                            Ok(())
+                            Ok(None)
                         }
                     }
                 }
             }
             StreamType::ServiceGraph => {
-                // Service graph edges - use same pattern as Logs
-                let log_ingestion_type = req.ingestion_type.unwrap_or_default();
-                let data = bytes::Bytes::from(in_data.data);
-                match create_log_ingestion_req(log_ingestion_type, data) {
-                    Err(e) => Err(e),
-                    Ok(ingestion_req) => openobserve_core::logs::ingest::ingest(
-                        0,
-                        &org_id,
-                        &stream_name,
-                        ingestion_req,
-                        internal_user,
-                        None,
-                        is_derived,
-                    )
-                    .await
-                    .map_or_else(Err, |_| Ok(())),
-                }
+                ingest_logs(
+                    req.ingestion_type,
+                    in_data.data,
+                    &org_id,
+                    &stream_name,
+                    internal_user,
+                    is_derived,
+                )
+                .await
             }
             _ => Err(Error::IngestionError(
                 "Internal gRPC ingestion service currently only supports Logs, Metrics, Traces, EnrichmentTables, and ServiceGraph"
@@ -182,10 +176,11 @@ impl Ingest for Ingester {
         };
 
         let reply = match resp {
-            Ok(_) => metrics_reply.unwrap_or_else(ok_reply),
+            Ok(failures) => metrics_reply.unwrap_or_else(|| success_reply(failures)),
             Err(err) => IngestionResponse {
                 status_code: 500,
                 message: err.to_string(),
+                failed_records: None,
             },
         };
 
@@ -206,6 +201,7 @@ fn ok_reply() -> IngestionResponse {
     IngestionResponse {
         status_code: 200,
         message: "OK".to_string(),
+        failed_records: None,
     }
 }
 
@@ -228,15 +224,69 @@ fn encode_metrics_reply(resp: &ingestion_common::IngestionResponse) -> Ingestion
         return IngestionResponse {
             status_code: i32::from(resp.code),
             message: resp.error.clone().unwrap_or_default(),
+            failed_records: None,
         };
     }
     if resp.status.iter().any(|s| s.status.failed > 0) {
         return IngestionResponse {
             status_code: 207,
             message: json::to_string(resp).unwrap_or_default(),
+            failed_records: None,
         };
     }
     ok_reply()
+}
+
+async fn ingest_logs(
+    ingestion_type: Option<i32>,
+    data: Vec<u8>,
+    org_id: &str,
+    stream_name: &str,
+    user: IngestUser,
+    is_derived: bool,
+) -> Result<Option<RecordFailures>> {
+    let ingestion_req =
+        create_log_ingestion_req(ingestion_type.unwrap_or_default(), bytes::Bytes::from(data))?;
+    let res = openobserve_core::logs::ingest::ingest(
+        0,
+        org_id,
+        stream_name,
+        ingestion_req,
+        user,
+        None,
+        is_derived,
+    )
+    .await?;
+    Ok(Some(record_failures(&res)))
+}
+
+/// `RecordStatus::error` holds the last error a stream hit, not every one of them.
+fn record_failures(res: &ingestion_common::IngestionResponse) -> RecordFailures {
+    RecordFailures {
+        failed: res.status.iter().map(|s| u64::from(s.status.failed)).sum(),
+        reason: res
+            .status
+            .iter()
+            .filter(|s| s.status.failed > 0 && !s.status.error.is_empty())
+            .map(|s| format!("{}: {}", s.name, s.status.error))
+            .collect::<Vec<_>>()
+            .join("; "),
+    }
+}
+
+/// `None` means the path reports no per-record status, which is not the same as none failed.
+fn success_reply(failures: Option<RecordFailures>) -> IngestionResponse {
+    let failed_records = failures.as_ref().map(|f| f.failed);
+    let message = match failures.filter(|f| f.failed > 0) {
+        Some(f) if f.reason.is_empty() => format!("{} records rejected", f.failed),
+        Some(f) => format!("{} records rejected: {}", f.failed, f.reason),
+        None => "OK".to_string(),
+    };
+    IngestionResponse {
+        status_code: 200,
+        message,
+        failed_records,
+    }
 }
 
 /// Absent, empty or unrecognised values keep today's `InternalGrpc` attribution.
@@ -371,6 +421,7 @@ mod tests {
         let success_response = IngestionResponse {
             status_code: 200,
             message: "OK".to_string(),
+            failed_records: None,
         };
 
         assert_eq!(success_response.status_code, 200);
@@ -379,6 +430,7 @@ mod tests {
         let error_response = IngestionResponse {
             status_code: 500,
             message: "Error occurred".to_string(),
+            failed_records: None,
         };
 
         assert_eq!(error_response.status_code, 500);
@@ -738,6 +790,96 @@ mod tests {
                     | StreamType::EnrichmentTables
             ));
         }
+    }
+
+    fn stream_status(name: &str, successful: u32, failed: u32, error: &str) -> StreamStatus {
+        StreamStatus {
+            name: name.to_string(),
+            status: RecordStatus {
+                successful,
+                failed,
+                error: error.to_string(),
+            },
+            items: vec![],
+        }
+    }
+
+    fn core_response(status: Vec<StreamStatus>) -> ingestion_common::IngestionResponse {
+        ingestion_common::IngestionResponse::new(200, status)
+    }
+
+    #[test]
+    fn test_record_failures_sums_failed_across_every_entry_of_the_status_vector() {
+        let res = core_response(vec![
+            stream_status("a", 10, 3, "bad timestamp"),
+            stream_status("b", 5, 0, ""),
+            stream_status("c", 1, 7, "schema conflict"),
+        ]);
+        assert_eq!(record_failures(&res).failed, 10);
+    }
+
+    #[test]
+    fn test_record_failures_reports_zero_when_every_stream_accepted_its_records() {
+        let res = core_response(vec![
+            stream_status("a", 10, 0, ""),
+            stream_status("b", 5, 0, ""),
+        ]);
+        let failures = record_failures(&res);
+        assert_eq!(failures.failed, 0);
+        assert!(failures.reason.is_empty());
+    }
+
+    #[test]
+    fn test_record_failures_collects_a_reason_only_from_the_streams_that_lost_records() {
+        let res = core_response(vec![
+            stream_status("a", 10, 3, "bad timestamp"),
+            stream_status("b", 5, 0, "stale error from a clean stream"),
+            stream_status("c", 1, 7, "schema conflict"),
+        ]);
+        assert_eq!(
+            record_failures(&res).reason,
+            "a: bad timestamp; c: schema conflict"
+        );
+    }
+
+    #[test]
+    fn test_an_arm_that_does_not_report_per_record_status_answers_200_ok_with_no_count() {
+        let reply = success_reply(None);
+        assert_eq!(reply.status_code, 200);
+        assert_eq!(reply.message, "OK");
+        assert_eq!(reply.failed_records, None);
+    }
+
+    #[test]
+    fn test_a_clean_reported_write_answers_200_ok_with_an_explicit_zero() {
+        let reply = success_reply(Some(RecordFailures {
+            failed: 0,
+            reason: String::new(),
+        }));
+        assert_eq!(reply.status_code, 200);
+        assert_eq!(reply.message, "OK");
+        assert_eq!(reply.failed_records, Some(0));
+    }
+
+    #[test]
+    fn test_a_partial_failure_stays_200_and_carries_the_count_and_the_reason() {
+        let reply = success_reply(Some(RecordFailures {
+            failed: 3,
+            reason: "a: bad timestamp".to_string(),
+        }));
+        assert_eq!(reply.status_code, 200);
+        assert_eq!(reply.message, "3 records rejected: a: bad timestamp");
+        assert_eq!(reply.failed_records, Some(3));
+    }
+
+    #[test]
+    fn test_a_partial_failure_without_a_recorded_reason_still_carries_the_count() {
+        let reply = success_reply(Some(RecordFailures {
+            failed: 2,
+            reason: String::new(),
+        }));
+        assert_eq!(reply.message, "2 records rejected");
+        assert_eq!(reply.failed_records, Some(2));
     }
 
     #[test]
