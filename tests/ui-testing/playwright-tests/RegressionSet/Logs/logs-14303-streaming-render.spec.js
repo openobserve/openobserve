@@ -38,6 +38,9 @@ test.describe("Logs Streaming Render Regression", () => {
     await page.waitForTimeout(1000);
     await pm.logsPage.clickDateTimeButton();
     await pm.logsPage.clickRelative1HourOrFallback();
+    // sqlMode's watcher rewrites the editor asynchronously, so it must settle here, before any test writes its query
+    await pm.logsPage.enableSqlModeIfNeeded();
+    await page.waitForTimeout(2000);
 
     testLogger.info('Logs streaming render regression test setup completed');
   });
@@ -45,11 +48,8 @@ test.describe("Logs Streaming Render Regression", () => {
   test("aggregate query resolves to settled rows with no skeleton or banner left behind @bug-14303 @P1 @streamingAggs @regression @logsRegression", async ({ page }) => {
     testLogger.info('Test: streaming_aggs query settles the results grid (Bug #14303)');
 
-    // sqlMode's watcher asynchronously rewrites the editor, so it must land before we write the query
-    await pm.logsPage.enableSqlModeIfNeeded();
-    await page.waitForTimeout(500);
     await pm.logsPage.clearAndFillQueryEditor('SELECT kubernetes_pod_name, count(*) as total FROM "e2e_automate" GROUP BY kubernetes_pod_name');
-    await page.waitForTimeout(500);
+    await pm.logsPage.expectQueryEditorContainsText('GROUP BY kubernetes_pod_name');
     await pm.logsPage.runQueryAndWaitForResults();
 
     await pm.logsPage.expectResultsGridSettledWithRows();
@@ -67,11 +67,8 @@ test.describe("Logs Streaming Render Regression", () => {
     testLogger.info('Test: non-aggregate query still settles the results grid (Bug #14303)');
 
     const plainQuery = 'SELECT * FROM "e2e_automate"';
-    // sqlMode's watcher asynchronously rewrites the editor, so it must land before we write the query
-    await pm.logsPage.enableSqlModeIfNeeded();
-    await page.waitForTimeout(500);
     await pm.logsPage.clearAndFillQueryEditor(plainQuery);
-    await page.waitForTimeout(500);
+    await pm.logsPage.expectQueryEditorContainsText(plainQuery);
     await pm.logsPage.runQueryAndWaitForResults();
 
     await pm.logsPage.expectResultsGridSettledWithRows();
@@ -83,11 +80,8 @@ test.describe("Logs Streaming Render Regression", () => {
   test("zero-row query still shows the no-events empty state @bug-14303 @P1 @streamingAggs @regression @logsRegression", async ({ page }) => {
     testLogger.info('Test: empty result set still renders the no-events state (Bug #14303)');
 
-    // sqlMode's watcher asynchronously rewrites the editor, so it must land before we write the query
-    await pm.logsPage.enableSqlModeIfNeeded();
-    await page.waitForTimeout(500);
     await pm.logsPage.clearAndFillQueryEditor('SELECT * FROM "e2e_automate" WHERE kubernetes_pod_name = \'nonexistent_pod_14303_regression\'');
-    await page.waitForTimeout(500);
+    await pm.logsPage.expectQueryEditorContainsText('nonexistent_pod_14303_regression');
     await pm.logsPage.runQueryAndWaitForResults();
 
     await expect(page.locator(pm.logsPage.noResultsFoundText), 'No-events empty state must render for a zero-row result').toBeVisible();
