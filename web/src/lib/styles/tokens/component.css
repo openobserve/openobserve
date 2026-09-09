@@ -133,8 +133,8 @@
   --color-button-warning-focus-ring: color-mix(in srgb, var(--color-warning-400) 50%, transparent);
 
   /* Button — destructive */
-  --color-button-destructive: var(--color-error-600);
-  --color-button-destructive-hover: var(--color-error-700);
+  --color-button-destructive: var(--color-error-500);
+  --color-button-destructive-hover: var(--color-error-600);
   --color-button-destructive-disabled: var(--color-error-300);
   --color-button-destructive-foreground: var(--color-white);
   --color-button-destructive-focus-ring: var(--color-error-400);
