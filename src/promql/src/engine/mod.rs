@@ -26,7 +26,7 @@ use datafusion::error::{DataFusionError, Result};
 use hashbrown::HashSet;
 use promql_parser::parser::{
     AggregateExpr, Call, Expr as PromExpr, MatrixSelector, NumberLiteral, ParenExpr, StringLiteral,
-    UnaryExpr,
+    UnaryExpr, value::ValueType,
 };
 
 use crate::{binaries, exec::PromqlContext, promql::label_usage::labels_dropped_at_root};
@@ -137,10 +137,10 @@ impl Engine {
                 // This is a very special case, as we treat the float also a
                 // `Value::Matrix(vec![element])` therefore, better convert it
                 // back to its representation.
-                // a set operator needs a vector on both sides, so its right side is never folded
+                // only a scalar-typed right side folds; a one-sample vector still matches by labels
                 let rhs = match rhs {
                     Value::Matrix(m)
-                        if !expr.op.is_set_operator()
+                        if expr.rhs.value_type() == ValueType::Scalar
                             && m.len() == 1
                             && m[0].samples.len() == 1 =>
                     {
@@ -649,51 +649,72 @@ pub(crate) mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_set_operators_keep_the_other_side_when_one_is_empty() {
+    /// Evaluates `query` on the empty mock provider over `steps` one-minute steps.
+    async fn eval_on_empty(query: &str, steps: i64) -> Result<Value> {
         let trace_id = "test_trace";
-        let query_ctx = create_test_query_ctx(trace_id, "test_org", 30);
-        // three steps, so the vector side is not folded into a scalar
+        let ctx = Arc::new(PromqlContext::new(
+            create_test_query_ctx(trace_id, "test_org", 30),
+            SimpleMockProvider,
+            vec![],
+        ));
+        let start = 1640995200000000i64;
         let eval_ctx = EvalContext::new(
-            1640995200000000i64,
-            1640995320000000i64,
-            60000000i64,
+            start,
+            start + (steps - 1) * 60000000,
+            60000000,
             trace_id.to_string(),
         );
-        let eval = |query: &str| {
-            let ctx = Arc::new(PromqlContext::new(
-                query_ctx.clone(),
-                SimpleMockProvider,
-                vec![],
-            ));
-            let expr = promql_parser::parser::parse(query).unwrap();
-            let eval_ctx = eval_ctx.clone();
-            async move { Engine::new(trace_id, ctx, eval_ctx).exec_expr(&expr).await }
-        };
+        let expr = promql_parser::parser::parse(query).unwrap();
+        Engine::new(trace_id, ctx, eval_ctx).exec_expr(&expr).await
+    }
 
+    fn matrix(value: Value) -> Vec<RangeValue> {
+        match value {
+            Value::Matrix(series) => series,
+            other => panic!("expected a matrix, got {:?}", other.get_type()),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_set_operators_keep_the_other_side_when_one_is_empty() {
         // `up` has no data on the mock provider, so the fallback vector must come through
-        let Value::Matrix(series) = eval("up or vector(0)").await.unwrap() else {
-            panic!("`or` with an empty left side must return the right side");
-        };
+        for steps in [1, 3] {
+            let series = matrix(eval_on_empty("up or vector(0)", steps).await.unwrap());
+            assert_eq!(series.len(), 1, "{steps} steps");
+            assert_eq!(series[0].samples.len(), steps as usize);
+            assert!(series[0].samples.iter().all(|s| s.value == 0.0));
+        }
+        let series = matrix(eval_on_empty("vector(0) unless up", 3).await.unwrap());
         assert_eq!(series.len(), 1);
-        assert_eq!(series[0].samples.len(), 3);
-        assert!(series[0].samples.iter().all(|s| s.value == 0.0));
-
-        let Value::Matrix(series) = eval("vector(0) unless up").await.unwrap() else {
-            panic!("`unless` with an empty right side must return the left side");
-        };
-        assert_eq!(series.len(), 1);
-
-        let value = eval("vector(0) and up").await.unwrap();
-        assert!(matches!(value, Value::Matrix(series) if series.is_empty()));
+        assert!(matrix(eval_on_empty("vector(0) and up", 3).await.unwrap()).is_empty());
 
         // a right side filtered down to one sample must stay a vector for the set operator
         let sparse = r#"vector(0) or label_replace(timestamp(vector(1)) >= 1640995320, "source", "sparse", "", "")"#;
-        let Value::Matrix(series) = eval(sparse).await.unwrap() else {
-            panic!("`or` must keep a single-sample right side");
-        };
+        let series = matrix(eval_on_empty(sparse, 3).await.unwrap());
         assert_eq!(series.len(), 2);
         assert_eq!(series.iter().map(|s| s.samples.len()).sum::<usize>(), 4);
+    }
+
+    #[tokio::test]
+    async fn test_only_a_scalar_typed_right_side_folds_into_a_scalar() {
+        // a one-sample vector keeps label matching: the sum exists at that one step only
+        let series = matrix(
+            eval_on_empty("vector(1) + (timestamp(vector(1)) >= 1640995320)", 3)
+                .await
+                .unwrap(),
+        );
+        assert_eq!(series.len(), 1);
+        assert_eq!(series[0].samples.len(), 1);
+        assert_eq!(series[0].samples[0].value, 1640995321.0);
+
+        // a scalar-typed right side still applies to every step
+        let series = matrix(
+            eval_on_empty("vector(1) + scalar(vector(2))", 1)
+                .await
+                .unwrap(),
+        );
+        assert_eq!(series.len(), 1);
+        assert_eq!(series[0].samples[0].value, 3.0);
     }
 
     #[tokio::test]
