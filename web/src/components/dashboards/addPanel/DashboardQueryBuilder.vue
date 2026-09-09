@@ -115,7 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                   <div
                     :data-test="`dashboard-x-item-${itemX?.alias}-menu`"
-                    class="field-function-menu-popup dashboard-query-builder-dropdown overflow-hidden p-0"
+                    class="field-function-menu-popup dashboard-query-builder-dropdown overflow-hidden p-0 max-lg:max-h-[75vh] max-lg:overflow-y-auto"
                     :style="{
                       width:
                         dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
@@ -286,7 +286,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                   <div
                     :data-test="`dashboard-b-item-${itemB?.alias}-menu`"
-                    class="field-function-menu-popup dashboard-query-builder-dropdown overflow-hidden p-0"
+                    class="field-function-menu-popup dashboard-query-builder-dropdown overflow-hidden p-0 max-lg:max-h-[75vh] max-lg:overflow-y-auto"
                     :style="{
                       width:
                         dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
@@ -421,7 +421,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
               <div
                 :data-test="`dashboard-y-item-${itemY?.alias}-menu`"
-                class="field-function-menu-popup dashboard-query-builder-dropdown overflow-hidden p-0"
+                class="field-function-menu-popup dashboard-query-builder-dropdown overflow-hidden p-0 max-lg:max-h-[75vh] max-lg:overflow-y-auto"
                 :style="{
                   width:
                     dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
@@ -555,7 +555,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
                 <div
                   :data-test="`dashboard-z-item-${itemZ?.alias}-menu`"
-                  class="field-function-menu-popup dashboard-query-builder-dropdown overflow-hidden p-0"
+                  class="field-function-menu-popup dashboard-query-builder-dropdown overflow-hidden p-0 max-lg:max-h-[75vh] max-lg:overflow-y-auto"
                   :style="{
                     width:
                       dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
