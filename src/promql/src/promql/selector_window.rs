@@ -19,42 +19,77 @@ use promql_parser::parser::{Expr, Offset};
 
 use crate::DEFAULT_LOOKBACK;
 
-/// How far before an evaluation timestamp the query reads: the widest selector range or
-/// lookback plus its positive offset, with subqueries nesting their inner window.
-pub fn max_selector_window(expr: &Expr) -> Duration {
+/// What a query reads around each evaluation timestamp.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct SelectorWindow {
+    /// The farthest read before the timestamp: widest range or lookback plus positive offset.
+    pub back: Duration,
+    /// The farthest read after the timestamp: the largest negative offset.
+    pub ahead: Duration,
+    /// A subquery evaluates its inner expression inside the evaluated range only.
+    pub subquery: bool,
+}
+
+impl SelectorWindow {
+    fn merge(self, other: Self) -> Self {
+        Self {
+            back: self.back.max(other.back),
+            ahead: self.ahead.max(other.ahead),
+            subquery: self.subquery || other.subquery,
+        }
+    }
+}
+
+pub fn selector_window(expr: &Expr) -> SelectorWindow {
     match expr {
-        Expr::VectorSelector(vs) => DEFAULT_LOOKBACK + positive_offset(&vs.offset),
-        Expr::MatrixSelector(ms) => ms.range + positive_offset(&ms.vs.offset),
+        Expr::VectorSelector(vs) => offset_window(DEFAULT_LOOKBACK, &vs.offset),
+        Expr::MatrixSelector(ms) => offset_window(ms.range, &ms.vs.offset),
         Expr::Subquery(sq) => {
-            max_selector_window(&sq.expr) + sq.range + positive_offset(&sq.offset)
+            let inner = selector_window(&sq.expr);
+            let own = offset_window(sq.range, &sq.offset);
+            SelectorWindow {
+                back: inner.back + own.back,
+                ahead: inner.ahead + own.ahead,
+                subquery: true,
+            }
         }
         Expr::Aggregate(agg) => {
             let param = agg
                 .param
                 .as_deref()
-                .map_or(Duration::ZERO, max_selector_window);
-            max_selector_window(&agg.expr).max(param)
+                .map_or_else(Default::default, selector_window);
+            selector_window(&agg.expr).merge(param)
         }
-        Expr::Unary(unary) => max_selector_window(&unary.expr),
-        Expr::Paren(paren) => max_selector_window(&paren.expr),
-        Expr::Binary(binary) => {
-            max_selector_window(&binary.lhs).max(max_selector_window(&binary.rhs))
-        }
+        Expr::Unary(unary) => selector_window(&unary.expr),
+        Expr::Paren(paren) => selector_window(&paren.expr),
+        Expr::Binary(binary) => selector_window(&binary.lhs).merge(selector_window(&binary.rhs)),
         Expr::Call(call) => call
             .args
             .args
             .iter()
-            .map(|arg| max_selector_window(arg))
-            .max()
-            .unwrap_or(Duration::ZERO),
-        Expr::NumberLiteral(_) | Expr::StringLiteral(_) | Expr::Extension(_) => Duration::ZERO,
+            .map(|arg| selector_window(arg))
+            .fold(SelectorWindow::default(), SelectorWindow::merge),
+        Expr::NumberLiteral(_) | Expr::StringLiteral(_) | Expr::Extension(_) => {
+            SelectorWindow::default()
+        }
     }
 }
 
-fn positive_offset(offset: &Option<Offset>) -> Duration {
+fn offset_window(range: Duration, offset: &Option<Offset>) -> SelectorWindow {
     match offset {
-        Some(Offset::Pos(offset)) => *offset,
-        _ => Duration::ZERO,
+        Some(Offset::Pos(offset)) => SelectorWindow {
+            back: range + *offset,
+            ..Default::default()
+        },
+        Some(Offset::Neg(offset)) => SelectorWindow {
+            back: range,
+            ahead: *offset,
+            ..Default::default()
+        },
+        None => SelectorWindow {
+            back: range,
+            ..Default::default()
+        },
     }
 }
 
@@ -64,21 +99,72 @@ mod tests {
 
     use super::*;
 
-    fn window(query: &str) -> Duration {
-        max_selector_window(&parser::parse(query).unwrap())
+    fn window(query: &str) -> SelectorWindow {
+        selector_window(&parser::parse(query).unwrap())
+    }
+
+    fn minutes(m: u64) -> Duration {
+        Duration::from_secs(60 * m)
+    }
+
+    fn plain(back: Duration) -> SelectorWindow {
+        SelectorWindow {
+            back,
+            ..Default::default()
+        }
     }
 
     #[test]
-    fn test_max_selector_window() {
-        let minutes = |m: u64| Duration::from_secs(60 * m);
-        assert_eq!(window("up"), minutes(5));
-        assert_eq!(window("up offset 10m"), minutes(15));
-        assert_eq!(window("up offset -10m"), minutes(5));
-        assert_eq!(window("rate(x[1m])"), minutes(1));
-        assert_eq!(window("rate(x[1h] offset 30m)"), minutes(90));
-        assert_eq!(window("sum(rate(a[5m])) / sum(rate(b[1h]))"), minutes(60));
-        assert_eq!(window("topk(3, rate(a[15m]))"), minutes(15));
-        assert_eq!(window("max_over_time(rate(a[5m])[1h:1m])"), minutes(65));
-        assert_eq!(window("1 + 2"), Duration::ZERO);
+    fn test_selector_window() {
+        assert_eq!(window("up"), plain(minutes(5)));
+        assert_eq!(window("up offset 10m"), plain(minutes(15)));
+        assert_eq!(window("rate(x[1m])"), plain(minutes(1)));
+        assert_eq!(window("rate(x[1h] offset 30m)"), plain(minutes(90)));
+        assert_eq!(
+            window("sum(rate(a[5m])) / sum(rate(b[1h]))"),
+            plain(minutes(60))
+        );
+        assert_eq!(window("topk(3, rate(a[15m]))"), plain(minutes(15)));
+        assert_eq!(window("1 + 2"), SelectorWindow::default());
+    }
+
+    #[test]
+    fn test_selector_window_reads_ahead_on_negative_offsets() {
+        assert_eq!(
+            window("up offset -10m"),
+            SelectorWindow {
+                back: minutes(5),
+                ahead: minutes(10),
+                subquery: false
+            }
+        );
+        assert_eq!(
+            window("rate(a[5m] offset -3m) + rate(b[1h] offset 2m)"),
+            SelectorWindow {
+                back: minutes(62),
+                ahead: minutes(3),
+                subquery: false
+            }
+        );
+    }
+
+    #[test]
+    fn test_selector_window_flags_subqueries() {
+        assert_eq!(
+            window("max_over_time(rate(a[5m])[1h:1m])"),
+            SelectorWindow {
+                back: minutes(65),
+                ahead: Duration::ZERO,
+                subquery: true
+            }
+        );
+        assert_eq!(
+            window("sum(a) + max_over_time(b[1h:1m] offset -5m)"),
+            SelectorWindow {
+                back: minutes(65),
+                ahead: minutes(5),
+                subquery: true
+            }
+        );
     }
 }

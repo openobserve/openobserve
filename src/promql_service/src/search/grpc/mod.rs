@@ -35,7 +35,7 @@ use promql::{
     DEFAULT_LOOKBACK, TableProvider,
     exec::PromqlContext,
     micros,
-    promql::{name_visitor, selector_window},
+    promql::{name_visitor, selector_window::SelectorWindow},
 };
 use promql_parser::{label::Matchers, parser};
 use proto::cluster_rpc;
@@ -51,8 +51,8 @@ type Context = (SessionContext, Arc<Schema>, ScanStats, bool);
 struct GroupPlan {
     /// The heaviest stream's files, oldest `max_ts` first.
     files: Vec<FileKey>,
-    /// How far before its start the query reads.
-    window: i64,
+    /// What the query reads around each evaluation timestamp.
+    window: SelectorWindow,
     /// The newest legacy file's `max_ts`, only when hash-ordered files exist alongside it.
     legacy_max_ts: Option<i64>,
 }
@@ -165,10 +165,11 @@ pub async fn search(
 
         // 2. generate search group with max records stream
         let start_ts = std::time::Instant::now();
-        // cuts only pay off where the engine can stream
+        // cuts pay off only where the engine streams; a subquery's inner expression is per-group
         let cuts = if cfg.search.feature_metrics_streaming_agg_enabled
             && !query.query_exemplars
             && !req.is_super_cluster
+            && !plan.window.subquery
         {
             search_group_cuts(start, end, step, &plan, wal_floor())
         } else {
@@ -198,7 +199,7 @@ pub async fn search(
         // 3. search each group
         for (start, end) in group {
             let mut req = req.clone();
-            req.need_wal = end >= wal_floor();
+            req.need_wal = end + micros(plan.window.ahead) >= wal_floor();
             req.query.as_mut().unwrap().start = start;
             req.query.as_mut().unwrap().end = end;
             let resp = search_inner(&req).await?;
@@ -321,7 +322,7 @@ pub async fn data(
     // 3. search each group
     for (start, end) in group {
         let mut req = req.clone();
-        req.need_wal = end >= wal_floor();
+        req.need_wal = end + micros(plan.window.ahead) >= wal_floor();
         req.query.as_mut().unwrap().start = start;
         req.query.as_mut().unwrap().end = end;
         let resp = search_inner(&req).await?;
@@ -427,7 +428,7 @@ async fn get_max_file_list(
     let mut visitor = name_visitor::MetricNameVisitor::default();
     promql_parser::util::walk_expr(&mut visitor, &ast).unwrap();
     let metrics_name = visitor.into_names();
-    let window = micros(selector_window::max_selector_window(&ast));
+    let window = promql::promql::selector_window::selector_window(&ast);
 
     // 2. get max records stream
     let mut file_list = Vec::new();
@@ -442,7 +443,7 @@ async fn get_max_file_list(
             StreamType::Metrics,
             &stream_name,
             PartitionTimeLevel::default(),
-            start - window,
+            start - micros(window.back),
             end,
         )
         .await?;
@@ -482,10 +483,14 @@ fn search_group_cuts(
     wal_floor: i64,
 ) -> Vec<i64> {
     // a group starting at the cut reads back `window` and must still miss the newest legacy file
-    let layout_cut = plan.legacy_max_ts.map(|ts| ts + plan.window + step);
+    let layout_cut = plan
+        .legacy_max_ts
+        .map(|ts| ts + micros(plan.window.back) + step);
+    // a group ending before the cut still reads `ahead` past its end, which must stay off the WAL
+    let wal_cut = wal_floor - micros(plan.window.ahead);
     let mut cuts: Vec<i64> = layout_cut
         .into_iter()
-        .chain([wal_floor])
+        .chain([wal_cut])
         .filter(|&cut| cut > start && cut <= end)
         // groups evaluate on the query's own grid
         .map(|cut| start + (cut - start + step - 1) / step * step)
@@ -521,7 +526,10 @@ async fn generate_search_groups(
         let files = plan
             .files
             .iter()
-            .filter(|f| f.meta.min_ts <= piece_end && f.meta.max_ts >= piece_start - plan.window)
+            .filter(|f| {
+                f.meta.min_ts <= piece_end
+                    && f.meta.max_ts >= piece_start - micros(plan.window.back)
+            })
             .cloned()
             .collect();
         groups.extend(
@@ -751,10 +759,13 @@ mod tests {
         }
     }
 
-    fn plan(files: Vec<FileKey>, window: i64, legacy_max_ts: Option<i64>) -> GroupPlan {
+    fn plan(files: Vec<FileKey>, back: u64, legacy_max_ts: Option<i64>) -> GroupPlan {
         GroupPlan {
             files,
-            window,
+            window: SelectorWindow {
+                back: Duration::from_micros(back),
+                ..Default::default()
+            },
             legacy_max_ts,
         }
     }
@@ -797,6 +808,10 @@ mod tests {
         let adjacent = plan(vec![], 300, Some(1670));
         assert_eq!(search_group_cuts(0, 3000, 30, &adjacent, 2000), vec![2010]);
         assert_eq!(search_group_cuts(0, 3000, 30, &mixed, 1360), vec![1350]);
+        // a negative offset reads past the group end, so the WAL cut moves that far earlier
+        let mut ahead = plan(vec![], 300, None);
+        ahead.window.ahead = Duration::from_micros(100);
+        assert_eq!(search_group_cuts(0, 3000, 30, &ahead, 2000), vec![1920]);
     }
 
     #[tokio::test]
