@@ -34,6 +34,21 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: (...args: unknown[]) => mockToast(...args),
 }));
 
+// Mocked so `ensureChildLoaded`'s `org.value` read (via useStore) resolves
+// instead of throwing when no Vuex plugin is installed on the test wrapper.
+vi.mock("vuex", async () => {
+  const actual = await vi.importActual<typeof import("vuex")>("vuex");
+  return {
+    ...actual,
+    useStore: () => ({ state: { selectedOrganization: { identifier: "default" } } }),
+  };
+});
+
+const mockSyntheticsGet = vi.fn();
+vi.mock("@/services/synthetics", () => ({
+  default: { get: (...args: unknown[]) => mockSyntheticsGet(...args) },
+}));
+
 import BrowserJourney from "./BrowserJourney.vue";
 
 // Stubs emit native-component click so parent @click handlers fire.
@@ -1875,6 +1890,47 @@ describe("BrowserJourney restore-then-record", () => {
     await flushPromises();
 
     expect(mockToast).not.toHaveBeenCalled();
+  });
+
+  // C1 regression: restoring a prefix that contains a subtest reference caches the
+  // child's steps into the SAME Map `CreateBrowserTest.vue` writes through
+  // `mapWireSteps` — the mapped UI model, not the raw stored wire steps merely cast.
+  // Two writers hitting the one Map with different shapes is what corrupted replay: a
+  // stored `fill` step falls through `buildWireFromStep`'s missing `case "fill"` and
+  // replays as a click, and a stored `navigate` loses its target (`url` vs `value`).
+  it("caches a restored subtest child's steps through mapWireSteps, not a raw cast of the stored wire", async () => {
+    mockSyntheticsGet.mockResolvedValue({
+      data: {
+        name: "Login",
+        config: {
+          steps: [
+            { id: "w1", action: "navigate", url: "https://example.com/login" },
+            { id: "w2", action: "fill", value: "user@example.com" },
+          ],
+        },
+      },
+    });
+    const cache = new Map();
+    const journeyWithSubtest = [
+      ...journey,
+      { id: "s4", action: "subtest", name: "Log in (shared)", subtest: { id: "login-test" } },
+    ] as any[];
+    wrapper = mountJourney({
+      modelValue: journeyWithSubtest,
+      extensionReady: true,
+      canRecordFrom: true,
+      childrenCache: cache,
+    });
+
+    await clickRecord();
+
+    const child = cache.get("login-test");
+    expect(child).toBeDefined();
+    // A raw cast would leave action "fill" (an invalid StepAction) and no `value`
+    // (the wire step used `url`) on the navigate step — exactly what the corrupted
+    // cache used to hand to `journeyToWireSteps` on replay.
+    expect(child.steps.map((s: BrowserStep) => s.action)).toEqual(["navigate", "type"]);
+    expect(child.steps[0].value).toBe("https://example.com/login");
   });
 });
 
