@@ -24,11 +24,46 @@ use sea_orm::{
 };
 use svix_ksuid::KsuidLike;
 
-use super::entity::{alert_incident_alerts, alert_incidents};
+use super::entity::{alert_incident_alerts, alert_incidents, oncall_responses};
 use crate::{
     db::{get_orm_client_ro, get_orm_client_rw},
     errors::{self, DbError, Error},
 };
+
+/// The row a new incident starts as.
+///
+/// One construction site, so the plain create and the on-call promotion's
+/// transaction cannot drift as columns are added.
+fn new_incident(
+    org_id: &str,
+    severity: &str,
+    group_values: serde_json::Value,
+    key_type: &str,
+    first_alert_at: i64,
+    title: Option<String>,
+) -> alert_incidents::ActiveModel {
+    let now = chrono::Utc::now().timestamp_micros();
+
+    alert_incidents::ActiveModel {
+        id: Set(svix_ksuid::Ksuid::new(None, None).to_string()),
+        org_id: Set(org_id.to_string()),
+        status: Set("open".to_string()),
+        severity: Set(severity.to_string()),
+        group_values: Set(group_values),
+        key_type: Set(key_type.to_string()),
+        topology_context: Set(None),
+        first_alert_at: Set(first_alert_at),
+        last_alert_at: Set(first_alert_at),
+        resolved_at: Set(None),
+        alert_count: Set(0), // Will be incremented by add_alert_to_incident
+        title: Set(title),
+        assigned_to: Set(None),
+        acknowledged_by: Set(None),
+        acknowledged_at: Set(None),
+        created_at: Set(now),
+        updated_at: Set(now),
+    }
+}
 
 /// Get incident by ID
 pub async fn get(org_id: &str, id: &str) -> Result<Option<alert_incidents::Model>, errors::Error> {
@@ -51,33 +86,83 @@ pub async fn create(
     title: Option<String>,
 ) -> Result<alert_incidents::Model, errors::Error> {
     let client = get_orm_client_rw().await;
-    let now = chrono::Utc::now().timestamp_micros();
-    let id = svix_ksuid::Ksuid::new(None, None).to_string();
 
-    let model = alert_incidents::ActiveModel {
-        id: Set(id),
-        org_id: Set(org_id.to_string()),
-        status: Set("open".to_string()),
-        severity: Set(severity.to_string()),
-        group_values: Set(group_values),
-        key_type: Set(key_type.to_string()),
-        topology_context: Set(None),
-        first_alert_at: Set(first_alert_at),
-        last_alert_at: Set(first_alert_at),
-        resolved_at: Set(None),
-        alert_count: Set(0), // Will be incremented by add_alert_to_incident
-        title: Set(title),
-        assigned_to: Set(None),
-        acknowledged_by: Set(None),
-        acknowledged_at: Set(None),
-        created_at: Set(now),
-        updated_at: Set(now),
-    };
+    new_incident(
+        org_id,
+        severity,
+        group_values,
+        key_type,
+        first_alert_at,
+        title,
+    )
+    .insert(client)
+    .await
+    .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
+}
 
-    model
-        .insert(client)
+/// Opens an incident and points an on-call record at it, in one transaction.
+///
+/// A promotion is two writes, and they were two statements: a failure between
+/// them left an incident nothing pointed at and a record still saying it had
+/// never been promoted, so the retry passed the already-promoted guard and
+/// opened a second incident for the same firing.
+///
+/// The update is conditional on the record still being unpromoted, which is
+/// also what makes that guard hold under two promotions at once: one commits,
+/// the other writes nothing.
+///
+/// `Ok(None)` means nothing was written — no such record in this org, or
+/// somebody had already promoted it.
+pub async fn create_and_attach_to_oncall_response(
+    org_id: &str,
+    response_id: &str,
+    severity: &str,
+    group_values: serde_json::Value,
+    key_type: &str,
+    first_alert_at: i64,
+    title: Option<String>,
+) -> Result<Option<alert_incidents::Model>, errors::Error> {
+    let client = get_orm_client_rw().await;
+    let txn = client
+        .begin()
         .await
-        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+
+    let incident = new_incident(
+        org_id,
+        severity,
+        group_values,
+        key_type,
+        first_alert_at,
+        title,
+    )
+    .insert(&txn)
+    .await
+    .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+
+    let attached = oncall_responses::Entity::update_many()
+        .col_expr(
+            oncall_responses::Column::IncidentId,
+            Expr::value(incident.id.clone()),
+        )
+        .filter(oncall_responses::Column::OrgId.eq(org_id))
+        .filter(oncall_responses::Column::Id.eq(response_id))
+        .filter(oncall_responses::Column::IncidentId.is_null())
+        .exec(&txn)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+
+    if attached.rows_affected == 0 {
+        txn.rollback()
+            .await
+            .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+        return Ok(None);
+    }
+
+    txn.commit()
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    Ok(Some(incident))
 }
 
 /// Add an alert to an existing incident (updates last_alert_at and alert_count)

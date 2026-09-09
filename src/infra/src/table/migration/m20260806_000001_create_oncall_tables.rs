@@ -464,6 +464,32 @@ impl MigrationTrait for Migration {
                     .col(OncallResponseEvents::Id)
                     .to_owned(),
             )
+            .await?;
+
+        // P4: nobody is paged twice for the same (run, rung, person,
+        // channel). The engine checks the ledger before sending, but that
+        // check is a read followed by an insert, and nothing stopped two of
+        // them interleaving. This is the half of the rule the database can
+        // hold: one row per key, so a duplicate is a conflict the writer
+        // resolves rather than a second page nobody notices.
+        //
+        // Every other kind of entry leaves all four of the trailing columns
+        // null, and null is distinct from null in a unique index on all three
+        // engines, so notes and rung entries are unaffected.
+        manager
+            .create_index(
+                Index::create()
+                    .if_not_exists()
+                    .table(OncallResponseEvents::Table)
+                    .name("idx_oncall_response_events_delivery")
+                    .col(OncallResponseEvents::ResponseId)
+                    .col(OncallResponseEvents::LadderRun)
+                    .col(OncallResponseEvents::RungMicros)
+                    .col(OncallResponseEvents::Recipient)
+                    .col(OncallResponseEvents::Channel)
+                    .unique()
+                    .to_owned(),
+            )
             .await
     }
 
@@ -575,4 +601,58 @@ enum OncallResponseEvents {
     Recipient,
     Channel,
     Delivered,
+}
+
+#[cfg(test)]
+mod tests {
+    use sea_orm::{ConnectionTrait, Database, DatabaseConnection, DbBackend, Statement};
+
+    use super::*;
+
+    /// The delivery ledger only, on a database this migration built.
+    async fn migrated() -> DatabaseConnection {
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        Migration.up(&SchemaManager::new(&db)).await.unwrap();
+        db
+    }
+
+    async fn write_event(
+        db: &DatabaseConnection,
+        id: &str,
+        key: &str,
+    ) -> Result<(), sea_orm::DbErr> {
+        db.execute(Statement::from_string(
+            DbBackend::Sqlite,
+            format!(
+                "INSERT INTO oncall_response_events (id, response_id, kind, at, actor, body, \
+                 rung_micros, ladder_run, recipient, channel, delivered) VALUES ('{id}', {key})"
+            ),
+        ))
+        .await
+        .map(|_| ())
+    }
+
+    /// P4 is a rule about who gets woken, so the ledger it is read from has to
+    /// be able to state it. Without the constraint the dedup is a read followed
+    /// by an insert, and two of those interleaving page one person twice with
+    /// nothing in the schema to say they had already been reached.
+    #[tokio::test]
+    async fn test_the_ledger_holds_one_row_per_person_per_channel_per_rung() {
+        let db = migrated().await;
+        let key = "'resp_1', 6, 1000, 'o2-engine', 'email delivered to ana@o2.ai', 0, 1, \
+                   'ana@o2.ai', 1, true";
+        write_event(&db, "ev_1", key).await.unwrap();
+        assert!(write_event(&db, "ev_2", key).await.is_err());
+    }
+
+    /// The same constraint must not reach the timeline a person reads. Every
+    /// entry that is not a delivery leaves the four trailing columns null, and
+    /// the whole design rests on null being distinct from null here.
+    #[tokio::test]
+    async fn test_two_notes_on_one_record_are_not_a_duplicate() {
+        let db = migrated().await;
+        let key = "'resp_1', 1, 1000, 'ana@o2.ai', 'looking at it', NULL, NULL, NULL, NULL, NULL";
+        write_event(&db, "ev_1", key).await.unwrap();
+        write_event(&db, "ev_2", key).await.unwrap();
+    }
 }

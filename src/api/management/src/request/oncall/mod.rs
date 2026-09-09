@@ -4670,8 +4670,14 @@ pub async fn promote_to_incident(
             "oncall_source_id": record.subject.source_id,
             "oncall_response_id": record.id,
         });
-        let incident = match infra::table::alert_incidents::create(
+        // The incident and the record's link to it are written together. Two
+        // statements left an incident nothing pointed at when the second one
+        // failed, and the retry — reading a record the failure had left
+        // unpromoted — walked past the guard above and opened a second
+        // incident for the same firing.
+        let incident = match infra::table::alert_incidents::create_and_attach_to_oncall_response(
             &org_id,
+            &response_id,
             &severity.to_string(),
             group_values,
             "AlertId",
@@ -4680,7 +4686,16 @@ pub async fn promote_to_incident(
         )
         .await
         {
-            Ok(i) => i,
+            Ok(Some(i)) => i,
+            // Somebody promoted it between the guard above and this write,
+            // or the record has gone. Either way nothing was created.
+            Ok(None) => {
+                return MetaHttpResponse::error(
+                    StatusCode::CONFLICT.as_u16(),
+                    "this record has already been promoted".to_string(),
+                )
+                .into_response();
+            }
             Err(e) => {
                 tracing::error!("[oncall] promote create incident: {e}");
                 return MetaHttpResponse::error(
@@ -4690,6 +4705,8 @@ pub async fn promote_to_incident(
                 .into_response();
             }
         };
+        let mut updated = record.clone();
+        updated.incident_id = Some(incident.id.clone());
 
         // Link the alert in, so the incident screen shows what it was made of.
         // Best effort: an incident that exists and is attached is worth more
@@ -4722,36 +4739,24 @@ pub async fn promote_to_incident(
         // the reader knowing there is a page behind it.
         carry_page_history_into_incident(&org_id, &response_id, &incident.id, &record).await;
 
-        match infra::table::oncall_responses::attach_incident(&org_id, &response_id, &incident.id)
-            .await
+        // The timeline is how a page explains itself the next morning, and
+        // "this became an incident" is the single most important thing that can
+        // happen to one.
+        if let Err(e) = o2_enterprise::enterprise::oncall::escalation::add_note(
+            &org_id,
+            &response_id,
+            &user_email.user_id,
+            &format!("promoted to incident {}", incident.id),
+        )
+        .await
         {
-            Ok(Some(updated)) => {
-                // The timeline is how a page explains itself the next morning,
-                // and "this became an incident" is the single most important
-                // thing that can happen to one.
-                if let Err(e) = o2_enterprise::enterprise::oncall::escalation::add_note(
-                    &org_id,
-                    &response_id,
-                    &user_email.user_id,
-                    &format!("promoted to incident {}", incident.id),
-                )
-                .await
-                {
-                    tracing::warn!("[oncall] promote note: {e}");
-                }
-                MetaHttpResponse::json(serde_json::json!({
-                    "incident_id": incident.id,
-                    "severity": incident.severity,
-                    "response": updated,
-                }))
-            }
-            Ok(None) => MetaHttpResponse::not_found("Response not found"),
-            Err(e) => {
-                tracing::error!("[oncall] promote attach: {e}");
-                MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
-                    .into_response()
-            }
+            tracing::warn!("[oncall] promote note: {e}");
         }
+        MetaHttpResponse::json(serde_json::json!({
+            "incident_id": incident.id,
+            "severity": incident.severity,
+            "response": updated,
+        }))
     }
     #[cfg(not(feature = "enterprise"))]
     {

@@ -913,6 +913,20 @@ pub async fn list_for_incident(
         .collect())
 }
 
+/// Writes one timeline entry, and rewrites the ledger row when one already
+/// exists for this `(response, run, rung, recipient, channel)`.
+///
+/// The unique index on those five columns is what enforces P4 — one row per
+/// page to one person on one channel — so a second write for the same key is a
+/// constraint violation rather than a second row. That is not an error here:
+/// both writers are describing the same page, and the later outcome is the true
+/// one. It has to be an update rather than a shrug, because the send that
+/// arrives second is the *retry* of a send that failed, and a ledger still
+/// reading `delivered: false` for a page that landed is what makes the next
+/// replay wake somebody who has already been woken.
+///
+/// Entries that are not deliveries leave the four trailing columns null, and
+/// null is distinct from null in a unique index, so they never collide.
 pub async fn add_event(response_id: &str, event: &ResponseEvent) -> Result<(), errors::Error> {
     let client = get_orm_client_rw().await;
     let model = oncall_response_events::ActiveModel {
@@ -928,7 +942,36 @@ pub async fn add_event(response_id: &str, event: &ResponseEvent) -> Result<(), e
         channel: Set(event.channel.map(|c| c.to_i32())),
         delivered: Set(event.delivered),
     };
-    model.insert(client).await?;
+    let Err(e) = model.insert(client).await else {
+        return Ok(());
+    };
+    let msg = e.to_string().to_lowercase();
+    if !(msg.contains("unique") || msg.contains("duplicate")) {
+        return Err(e.into());
+    }
+    // Only a delivery row can have collided, so every key column below is
+    // known to hold a value — a null never conflicts with anything.
+    oncall_response_events::Entity::update_many()
+        .col_expr(oncall_response_events::Column::At, Expr::value(event.at))
+        .col_expr(
+            oncall_response_events::Column::Actor,
+            Expr::value(event.actor.clone()),
+        )
+        .col_expr(
+            oncall_response_events::Column::Body,
+            Expr::value(event.body.clone()),
+        )
+        .col_expr(
+            oncall_response_events::Column::Delivered,
+            Expr::value(event.delivered),
+        )
+        .filter(oncall_response_events::Column::ResponseId.eq(response_id))
+        .filter(oncall_response_events::Column::LadderRun.eq(event.ladder_run))
+        .filter(oncall_response_events::Column::RungMicros.eq(event.rung_micros))
+        .filter(oncall_response_events::Column::Recipient.eq(event.recipient.clone()))
+        .filter(oncall_response_events::Column::Channel.eq(event.channel.map(|c| c.to_i32())))
+        .exec(client)
+        .await?;
     Ok(())
 }
 
