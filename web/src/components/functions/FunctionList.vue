@@ -42,12 +42,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="min-h-0 w-full flex-1 overflow-hidden">
         <div class="h-full">
           <OTable
+            ref="oTableRef"
             :frame="false"
             :data="visibleRows"
             :columns="columns"
             row-key="name"
             :loading="loading"
             pagination="client"
+            :current-page="currentPage"
+            @update:current-page="onPageChange"
             :page-size="pageSize"
             :page-size-options="pageSizeOptions"
             selection="multiple"
@@ -326,7 +329,20 @@ export default defineComponent({
       window.open(routeUrl, "_blank");
     };
 
-    const loading = ref(false);
+    // Plain ref, not URL/store-backed: only the OTable v-if branch unmounts on add/edit, not FunctionList itself.
+    const currentPage = ref(1);
+    const onPageChange = (page: number) => {
+      currentPage.value = page;
+    };
+    const oTableRef: any = ref(null);
+    // setTimeout(0) is a macrotask, so it runs after TanStack's own deferred auto-reset-on-data-change (its own microtask queue), letting the restored page win.
+    const restorePageIndex = () => {
+      setTimeout(() => {
+        oTableRef.value?.table?.setPageIndex(currentPage.value - 1);
+      }, 0);
+    };
+
+    const loading = ref(true);
     const getJSTransforms = () => {
       loading.value = true;
       // return ;
@@ -380,6 +396,7 @@ export default defineComponent({
         })
         .finally(() => {
           loading.value = false;
+          restorePageIndex();
         });
     };
 
@@ -758,6 +775,10 @@ export default defineComponent({
       confirmBulkDelete,
       selectedFunctions,
       selectedFunctionIds,
+      currentPage,
+      onPageChange,
+      oTableRef,
+      restorePageIndex,
     };
   },
   computed: {

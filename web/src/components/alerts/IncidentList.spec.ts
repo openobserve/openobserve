@@ -565,5 +565,89 @@ describe("IncidentList.vue", () => {
         }),
       );
     });
+
+    it("preserves the existing route query (e.g. page) when navigating to detail", async () => {
+      router.currentRoute.value.query = { page: "3", foo: "bar" } as any;
+      const pushSpy = vi.spyOn(router, "push");
+      wrapper = createWrapper();
+      await flushPromises();
+
+      const incident = (wrapper.vm as any).allIncidents[0];
+      (wrapper.vm as any).viewIncident(incident);
+
+      expect(pushSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          query: expect.objectContaining({ page: "3", foo: "bar", org_identifier: "default" }),
+        }),
+      );
+      router.currentRoute.value.query = {};
+    });
+  });
+
+  // ── Page persistence across navigation (Vuex-backed, like searchQuery/statusFilter) ──
+
+  describe("currentPage persistence", () => {
+    it("defaults currentPage to 1 when no saved state exists", () => {
+      wrapper = createWrapper();
+      expect((wrapper.vm as any).currentPage).toBe(1);
+    });
+
+    it("restores currentPage from the Vuex incidents store on mount", () => {
+      store.state.incidents = {
+        incidents: {
+          searchQuery: "",
+          statusFilter: "active",
+          pagination: { page: 4, rowsPerPage: 20 },
+          organizationIdentifier: "default",
+        },
+        cachedData: [],
+        isInitialized: true,
+        shouldRefresh: false,
+      };
+      wrapper = createWrapper();
+      expect((wrapper.vm as any).currentPage).toBe(4);
+      store.state.incidents = { incidents: {}, isInitialized: false };
+    });
+
+    it("onPageChange updates currentPage and persists the new page to the store", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+      const dispatchSpy = store.dispatch as any;
+      dispatchSpy.mockClear();
+
+      (wrapper.vm as any).onPageChange(5);
+
+      expect((wrapper.vm as any).currentPage).toBe(5);
+      expect(dispatchSpy).toHaveBeenCalledWith(
+        "incidents/setIncidents",
+        expect.objectContaining({ pagination: { page: 5, rowsPerPage: 20 } }),
+      );
+    });
+
+    it("reasserts the restored page once loading settles (TanStack auto-reset race)", async () => {
+      vi.useFakeTimers();
+      store.state.incidents = {
+        incidents: {
+          searchQuery: "",
+          statusFilter: "active",
+          pagination: { page: 3, rowsPerPage: 20 },
+          organizationIdentifier: "default",
+        },
+        cachedData: [],
+        isInitialized: true,
+        shouldRefresh: false,
+      };
+      wrapper = createWrapper();
+      const setPageIndex = vi.fn();
+      // OTable is stubbed in this suite, so plant the piece of its exposed surface the fix depends on directly onto the template ref.
+      (wrapper.vm as any).qTableRef.table = { setPageIndex };
+
+      await flushPromises();
+      vi.runAllTimers();
+
+      expect(setPageIndex).toHaveBeenCalledWith(2);
+      store.state.incidents = { incidents: {}, isInitialized: false };
+      vi.useRealTimers();
+    });
   });
 });
