@@ -93,6 +93,13 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "focus-visible:ring-3 focus-visible:ring-button-destructive-hover",
     "disabled:opacity-60",
   ].join(" "),
+  "filter-exclude": [
+    "bg-error-500 text-button-destructive-foreground border-0",
+    "enabled:hover:bg-error-600",
+    "enabled:active:bg-error-600",
+    "focus-visible:ring-3 focus-visible:ring-error-600",
+    "disabled:opacity-60",
+  ].join(" "),
   "ghost-warning": [
     "bg-transparent text-button-ghost-warning-text border-0",
     "enabled:hover:bg-button-ghost-warning-hover-bg",
