@@ -60,6 +60,9 @@ export class SloFormPage {
       alertSource: '[data-test="slos-addslo-alert-source"]',
       alertSourceEmpty: '[data-test="slos-addslo-alert-source-empty"]',
       alertSourceHint: '[data-test="slos-addslo-alert-source-hint"]',
+      // The picker carries its own error now (:error / :error-message), so the
+      // load-failure text renders as OSelect's "-error" node, not a sibling banner.
+      alertSourceError: '[data-test="slos-addslo-alert-source-error"]',
 
       // Time-slice preview.
       //
@@ -650,6 +653,27 @@ export class SloFormPage {
 
   async expectAlertSourceHintVisible() {
     await expect(this.page.locator(this.locators.alertSourceHint)).toBeVisible({ timeout: 15000 });
+  }
+
+  /**
+   * The source picker's own load-failure error.
+   *
+   * The error was moved off the sibling OBanner onto OSelect's `:error` /
+   * `:error-message` props, so the failure now surfaces as the picker's
+   * `-error` node. A 500 without a body falls back to the generic copy.
+   */
+  async expectAlertSourceErrorVisible(pattern = null) {
+    const err = this.page.locator(this.locators.alertSourceError);
+    await expect(err).toBeVisible({ timeout: 15000 });
+    if (pattern) await expect(err).toContainText(pattern);
+  }
+
+  /**
+   * The "no eligible alerts" info banner must be hidden while a load error is
+   * showing — the two used to render side by side.
+   */
+  async expectAlertSourceEmptyAbsent() {
+    await expect(this.page.locator(this.locators.alertSourceEmpty)).toHaveCount(0, { timeout: 15000 });
   }
 }
 

@@ -1,0 +1,25 @@
+{
+  "feature_slug": "slo-alert-source-error",
+  "feature_title": "SLO Alert SLI Source Error Handling",
+  "area": "Alerts",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "slo-alert-source-error.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Alerts/slo-alert-source-error.spec.js",
+  "playwright_group": "Alerts",
+  "source_files": [
+    "web/src/views/slos/AddSlo.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "The two changed paths are web/src/views/slos/AddSlo.vue and web/src/views/slos/AddSloAlertSli.spec.ts, both under web/src (the OSS frontend). No enterprise-owned paths (enterprise/, o2_enterprise/, src/enterprise/) are touched and there are no enterprise-gated keywords (cipher/SSO/SAML/RBAC/SDR/sensitive-data/logo-management) in the paths or symbols, so edition is oss.",
+    "skip": "Not skipped. No tests-added label or skip comment was supplied (trigger_comment.txt and feature_hint.txt are both empty), and the change alters user-facing UI in web/src rather than being docs/CI/comment-only.",
+    "e2e": "E2E is warranted. The diff moves the alert SLI source load error off a sibling OBanner and onto the OSelect picker's own :error/:error-message props, and adds a guard so the empty-state banner is hidden while a load error is showing. A user can exercise this by opening Add SLO, choosing the alert SLI type, and triggering a source load failure.",
+    "area": "The bulk of the UI change lives in web/src/views/slos/AddSlo.vue (the Add SLO view). SLO is surfaced under the Alerts section of the OpenObserve UI, so the Alerts area is the closest existing playwright-tests folder for sibling specs.",
+    "group": "The Alerts matrix shard is an existing ci-matrix group (the enterprise overlay appends alerts-anomaly-detection.spec.js to it), so the new SLO alert-source spec belongs in the Alerts group.",
+    "existing_tests": "No E2E specs in the diff. The only test file changed is web/src/views/slos/AddSloAlertSli.spec.ts, which is a Vitest unit test under web/src — not a Playwright spec under tests/ui-testing/playwright-tests/ — so existing_tests_in_diff is false."
+  }
+}

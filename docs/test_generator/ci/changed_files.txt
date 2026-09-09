@@ -1,0 +1,2 @@
+web/src/views/slos/AddSlo.vue
+web/src/views/slos/AddSloAlertSli.spec.ts

@@ -1,0 +1,17 @@
+[
+  {
+    "title": "should surface the server's own message on the source picker when the source load fails",
+    "action": "new",
+    "verifies": "a failed eligible-alerts load with a server message shows that message on the source picker"
+  },
+  {
+    "title": "should fall back to the generic message when the source load fails without a reason",
+    "action": "new",
+    "verifies": "a failed eligible-alerts load with no server message falls back to the generic copy"
+  },
+  {
+    "title": "should hide the empty-state banner while a source load error is showing",
+    "action": "new",
+    "verifies": "the no-eligible-alerts info banner is not rendered while the picker is showing a load error"
+  }
+]

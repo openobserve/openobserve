@@ -1,0 +1,149 @@
+===== COMPLETE LIST OF CHANGED FILES (2 files) =====
+# AUTHORITATIVE: this list is never truncated. The diff BODY below may be trimmed for
+# very large PRs, so decide WHICH files/areas changed (e.g. web/src frontend) from THIS list.
+web/src/views/slos/AddSlo.vue
+web/src/views/slos/AddSloAlertSli.spec.ts
+===== END CHANGED FILES =====
+
+diff --git a/web/src/views/slos/AddSlo.vue b/web/src/views/slos/AddSlo.vue
+index 271c76caeaa..bb0bc416bc4 100644
+--- a/web/src/views/slos/AddSlo.vue
++++ b/web/src/views/slos/AddSlo.vue
+@@ -366,6 +366,8 @@
+               :options="alertSourceOptions"
+               :loading="isFetchingAlertSources"
+               :placeholder="t('slos.alertSli.sourcePlaceholder')"
++              :error="!!alertSourceError"
++              :error-message="alertSourceError || undefined"
+               required
+               class="mt-3"
+               data-test="slos-addslo-alert-source"
+@@ -375,15 +377,7 @@
+               {{ t("slos.alertSli.sourceHint") }}
+             </p>
+             <OBanner
+-              v-if="alertSourceError"
+-              variant="error"
+-              class="mt-3"
+-              data-test="slos-addslo-alert-source-error"
+-            >
+-              {{ alertSourceError }}
+-            </OBanner>
+-            <OBanner
+-              v-else-if="!isFetchingAlertSources && !hasEligibleAlert"
++              v-if="!isFetchingAlertSources && !hasEligibleAlert && !alertSourceError"
+               variant="info"
+               class="mt-3"
+               data-test="slos-addslo-alert-source-empty"
+@@ -938,7 +932,7 @@ watch(isGrouped, (grouped) => {
+ // the server's own reason attached rather than being filtered away.
+ const alertSources = ref<SloEligibleAlert[]>([]);
+ const isFetchingAlertSources = ref(false);
+-const alertSourceError = ref<string | null>(null);
++const alertSourceError = ref<I18nText | null>(null);
+ 
+ const hasEligibleAlert = computed(() => alertSources.value.some((a) => a.eligible));
+ 
+@@ -959,9 +953,9 @@ async function loadAlertSources() {
+   try {
+     const res = await sloService.eligibleAlerts(org.value);
+     alertSources.value = res.data?.list ?? [];
+-  } catch {
++  } catch (e: any) {
+     alertSources.value = [];
+-    alertSourceError.value = t("slos.alertSli.loadFailed");
++    alertSourceError.value = raw(e?.response?.data?.message) || t("slos.alertSli.loadFailed");
+   } finally {
+     isFetchingAlertSources.value = false;
+   }
+@@ -1188,8 +1182,15 @@ async function save() {
+     router.push(backTarget.value);
+   } catch (e: any) {
+     // The backend's budget rejection carries its arithmetic (§6b.4d); show it
+-    // verbatim rather than replacing it with a generic message.
+-    error.value = e?.response?.data?.message || e?.message || t("slos.saveFailed");
++    // verbatim rather than replacing it with a generic message. A rejected
++    // JSON body (missing/mistyped field) comes back as a plain-text response,
++    // not `{message}`, so that shape has to be read directly too.
++    const body = e?.response?.data;
++    error.value =
++      body?.message ||
++      (typeof body === "string" && body.trim()) ||
++      e?.message ||
++      t("slos.saveFailed");
+   } finally {
+     saving.value = false;
+   }
+diff --git a/web/src/views/slos/AddSloAlertSli.spec.ts b/web/src/views/slos/AddSloAlertSli.spec.ts
+index 1d7afcbcb55..33a4460dcb1 100644
+--- a/web/src/views/slos/AddSloAlertSli.spec.ts
++++ b/web/src/views/slos/AddSloAlertSli.spec.ts
+@@ -117,10 +117,11 @@ function byTest(wrapper: VueWrapper, component: Component, test: string) {
+   return hit;
+ }
+ 
+-async function mountForm() {
++async function mountForm(setup?: () => void) {
+   vi.mocked(sloService.eligibleAlerts).mockResolvedValue({
+     data: { list: ELIGIBLE },
+   } as never);
++  setup?.();
+ 
+   const wrapper = mount(AddSlo, {
+     attachTo: node,
+@@ -305,6 +306,55 @@ describe("AddSlo — alert SLI", () => {
+   });
+ });
+ 
++describe("AddSlo — alert source load failure", () => {
++  beforeEach(() => {
++    vi.mocked(sloService.eligibleAlerts).mockClear();
++  });
++
++  // The picker itself carries the error now (:error / :error-message on
++  // OSelect), not a sibling OBanner — so the failure has to surface through
++  // the select's own error slot.
++  it("surfaces the server's message on the source picker", async () => {
++    const wrapper = await mountForm(() => {
++      vi.mocked(sloService.eligibleAlerts).mockRejectedValue({
++        response: { data: { message: "org has no alerts configured" } },
++      });
++    });
++    await selectAlertType(wrapper);
++
++    const select = byTest(wrapper, OSelect, "slos-addslo-alert-source");
++    expect(select.props("error")).toBe(true);
++    expect(select.props("errorMessage")).toBe("org has no alerts configured");
++    expect(wrapper.text()).toContain("org has no alerts configured");
++  });
++
++  // No server message at all (network failure, 500 with no body) falls back
++  // to the generic copy rather than showing "undefined" or an empty banner.
++  it("falls back to the generic message when the server gives no reason", async () => {
++    const wrapper = await mountForm(() => {
++      vi.mocked(sloService.eligibleAlerts).mockRejectedValue(new Error("network down"));
++    });
++    await selectAlertType(wrapper);
++
++    const select = byTest(wrapper, OSelect, "slos-addslo-alert-source");
++    expect(select.props("error")).toBe(true);
++    expect(select.props("errorMessage")).toBe(i18n.global.t("slos.alertSli.loadFailed"));
++  });
++
++  // Without the `!alertSourceError` guard, the "no eligible alerts" info
++  // banner and the picker's error would show side by side.
++  it("hides the empty-state banner while a load error is showing", async () => {
++    const wrapper = await mountForm(() => {
++      vi.mocked(sloService.eligibleAlerts).mockRejectedValue({
++        response: { data: { message: "boom" } },
++      });
++    });
++    await selectAlertType(wrapper);
++
++    expect(wrapper.find('[data-test="slos-addslo-alert-source-empty"]').exists()).toBe(false);
++  });
++});
++
+ describe("AddSlo — time-slice SLI", () => {
+   beforeEach(() => {
+     vi.mocked(sloService.create).mockClear();
