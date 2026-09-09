@@ -848,7 +848,9 @@
     },
     "condition": {
       "loading": "Voorwaarden laden...",
-      "loadError": "De opgeslagen voorwaarde kon niet worden gelezen en is gereset. Opslaan zal deze nu overschrijven."
+      "loadError": "De opgeslagen voorwaarde kon niet worden gelezen en is gereset. Opslaan zal deze nu overschrijven.",
+      "unknownColumn": "\"{column}\" maakt geen deel uit van de payload van deze trigger, dus deze voorwaarde komt mogelijk nooit overeen.",
+      "unknownColumnSuggestion": "Bedoelde je \"{suggestion}\"?"
     },
     "destination": {
       "createNew": "Nieuwe bestemming maken",
@@ -883,7 +885,7 @@
     "queryFailed": "Query mislukt",
     "unknownError": "Onbekende fout",
     "selectedLabel": "geselecteerd",
-    "selectToFilter": "Selecteer om te filteren",
+    "selectToFilter": "Selecteer filter",
     "clearSelection": "Selectie wissen",
     "includeModeHint": "Inclusief modus (=)",
     "excludeModeHint": "Uitsluitmodus (≠)",
@@ -2560,7 +2562,9 @@
       "title": "Workflow-uitvoeringen",
       "edit": "Workflow bewerken",
       "debugInEditor": "Debuggen in editor",
-      "staleGraphWarning": "Deze workflow is bewerkt sinds deze run — {count} stap die werd uitgevoerd bestaat niet meer, dus de status wordt hier niet getoond. | Deze workflow is bewerkt sinds deze run — {count} stappen die werden uitgevoerd bestaan niet meer, dus hun status wordt hier niet getoond."
+      "staleGraphWarning": "Deze workflow is bewerkt sinds deze run — {count} stap die werd uitgevoerd bestaat niet meer, dus de status wordt hier niet getoond. | Deze workflow is bewerkt sinds deze run — {count} stappen die werden uitgevoerd bestaan niet meer, dus hun status wordt hier niet getoond.",
+      "hideList": "Verberg lijst met runs",
+      "showList": "Toon lijst met runs"
     },
     "history": {
       "button": "Uitvoeringen",
@@ -2576,10 +2580,21 @@
       "error": "Fout",
       "success": "Succes",
       "failed": "Mislukt",
+      "testRun": "Testrun",
+      "runType": "Type",
+      "testRunTooltip": "Gestart vanuit de editor. Bestemmingsstappen verzenden daadwerkelijk.",
+      "showTestRuns": "Toon {count} testrun(s)",
+      "hideTestRuns": "Verberg testruns",
       "open": "Geschiedenis",
       "openFullView": "Volledige runsweergave openen",
       "loadError": "Fout bij het laden van uitvoeringen",
-      "loadRunError": "Fout bij het laden van deze uitvoering"
+      "loadRunError": "Fout bij het laden van deze uitvoering",
+      "retry": "Opnieuw proberen",
+      "retryTooltip": "Voer deze mislukte run opnieuw uit vanaf de vastgelegde invoer.",
+      "retryTitle": "Deze run opnieuw proberen?",
+      "retryMessage": "Dit maakt een nieuwe run van de vastgelegde invoer van de mislukte run. Bestemmingsstappen verzenden daadwerkelijk.",
+      "retryStarted": "De nieuwe poging is gestart — deze verschijnt in de lijst als een nieuwe run.",
+      "retryError": "Kan deze run niet opnieuw proberen."
     },
     "edit": "Bewerken",
     "view": "Bekijken",
@@ -2596,7 +2611,9 @@
     "triggerRequired": "Een trigger is vereist",
     "addStepRequired": "Voeg ten minste één stap toe na de trigger",
     "connectAllNodes": "Verbind alle knooppunten voordat u opslaat",
+    "branchPathsRequired": "Verbind elk vertakkingspad met een stap | 1 vertakkingsstap heeft verbindingen die niet overeenkomen met de paden. Open de stap, definieer de paden en verbind ze opnieuw. | {count} vertakkingsstappen hebben verbindingen die niet overeenkomen met hun paden.",
     "finishStepsBeforePublish": "{count} stap moet worden geconfigureerd voordat je publiceert — gemarkeerd op het canvas. | {count} stappen moeten worden geconfigureerd voordat je publiceert — gemarkeerd op het canvas.",
+    "noChangesToPublish": "Geen wijzigingen om te publiceren — deze workflow komt al overeen met de gepubliceerde versie.",
     "draft": "Concept",
     "saveDraft": "Opslaan als concept",
     "publish": "Publiceren",
@@ -2643,7 +2660,7 @@
     "loadError": "Kan workflow niet laden",
     "deleteNode": "Node verwijderen",
     "deleteNodeTitle": "Stap verwijderen",
-    "deleteNodeConfirm": "Weet u zeker dat u deze stap wilt verwijderen? Dit kan niet ongedaan worden gemaakt.",
+    "deleteNodeConfirm": "Weet je zeker dat je deze stap wilt verwijderen? Je kunt dit ongedaan maken.",
     "namePlaceholder": "Naamloze workflow",
     "renameHint": "Klik om deze workflow te hernoemen",
     "editMode": "Workflow bewerken",
@@ -2656,11 +2673,29 @@
       "runFromBeginning": "Begin (trigger)",
       "runFromNote": "Alleen stappen vanaf hier worden uitgevoerd.",
       "inputLabel": "Voorbeeldinvoer",
+      "source": {
+        "sample": "Gegenereerd voorbeeld",
+        "run": "Van run: {run}",
+        "edited": "Bewerkt door jou"
+      },
+      "revertInput": "Herstel",
+      "useRunInput": "Gebruik invoer van run…",
+      "lastTestRun": "Laatste testrun (dit tabblad)",
+      "runHasNoInput": "Die run heeft geen opgeslagen invoer voor deze stap.",
       "invalidJson": "Voer een geldige JSON-array van records in.",
       "resultHint": "Na uitvoering toont elke stap een vinkje of een foutpictogram op het canvas.",
+      "rehearsalOnly": "Alleen geslaagd in een testrun — een oefening met een voorbeeldpayload, geen bewijs dat de gepubliceerde workflow werkt.",
       "notVerified": "Er zijn geen records bij deze stap aangekomen — een upstream-voorwaarde heeft ze eruit gefilterd, of een eerdere stap gaf een fout.",
+      "notConfigured": "Deze stap is niet ingesteld, dus heeft deze niets gedaan in deze run. Configureer de stap en test opnieuw.",
+      "recordedFailure": "Deze stap is mislukt tijdens de laatste vastgelegde run.",
+      "recordsUnavailable": "Vastgelegd in een eerdere run — voer de test opnieuw uit om de records te bekijken.",
+      "dirtySelf": "Configuratie is gewijzigd sinds deze stap voor het laatst draaide. Test de stap opnieuw.",
+      "dirtyUpstream": "Een eerdere stap is gewijzigd sinds deze stap voor het laatst is uitgevoerd. Test de stap opnieuw.",
       "run": "Test uitvoeren",
       "runError": "Kan de test niet uitvoeren.",
+      "suppressDestinations": "Niet daadwerkelijk naar bestemmingen verzenden",
+      "suppressDestinationsHint": "Bestemmingsstappen bepalen hun routering, maar er wordt niets bezorgd.",
+      "dispatchWarning": "Testen is live: deze run levert daadwerkelijk aan {destinations}.",
       "stepResult": {
         "viewHint": "Klik om invoer / uitvoer te bekijken",
         "input": "Invoer",
@@ -2686,8 +2721,10 @@
         "status": {
           "ok": "Geslaagd",
           "error": "Fout",
-          "skipped": "Geen records"
-        }
+          "skipped": "Geen records",
+          "noMatch": "Geen overeenkomst"
+        },
+        "suppressed": "Onderdrukt — niet naar de echte bestemming verzonden"
       }
     },
     "linkAlerts": {
@@ -2720,6 +2757,7 @@
       "kindLogic": "Logica",
       "kindAction": "Actie",
       "condition": "Voorwaarde",
+      "branch": "Vertakking",
       "function": "Functie",
       "sendToDestination": "Bestemming",
       "configComingSoon": "Configuratie van {node} komt in een latere stap",
@@ -2727,7 +2765,20 @@
       "sectionDestination": "Bestemming",
       "stepSearchPlaceholder": "Stappen zoeken...",
       "stepNoMatch": "Geen stappen die overeenkomen met uw zoekopdracht.",
-      "conditionDesc": "Vertakken op basis van een regel",
+      "conditionDesc": "Alleen doorgaan wanneer een regel overeenkomt",
+      "branchDesc": "Stuur elk record langs het eerste overeenkomende pad",
+      "branchCaseLabel": "Padnaam (optioneel)",
+      "branchCaseLabelPlaceholder": "bijv. Hoge prioriteit",
+      "branchAddCase": "Pad toevoegen",
+      "branchRemoveCase": "Pad verwijderen",
+      "branchMoveUp": "Pad omhoog verplaatsen",
+      "branchMoveDown": "Pad omlaag verplaatsen",
+      "branchPathNumber": "Pad {index}",
+      "branchElseTitle": "Al het overige",
+      "branchElseHint": "Records die geen van de bovenstaande paden matchen, komen hier terecht.",
+      "branchNoteTitle": "Vertakkingsrichtlijnen",
+      "branchNoteFirstMatch": "Paden worden van boven naar beneden gecontroleerd en de EERSTE overeenkomst wint, dus elk record vertrekt via precies één pad.",
+      "branchNoteUnwired": "Een pad waar niets op is aangesloten, laat zijn records gewoon vallen.",
       "functionDesc": "Payload hervormen met een functie",
       "destinationDesc": "Verzenden naar een bestemming",
       "triggerBody": "Wordt uitgevoerd wanneer een gekoppelde melding wordt geactiveerd",
@@ -2775,11 +2826,14 @@
       "enable": "Stap inschakelen",
       "disabledBadge": "Uitgeschakeld",
       "incompleteBadge": "Stel later in",
+      "unwiredBadge": "Niet-aangesloten pad",
       "unsavedFnTitle": "Niet-opgeslagen functiewijzigingen",
       "unsavedFnMessage": "Deze stap bevat functiecode die niet in je bibliotheek is opgeslagen. Sla deze op, verwerp de wijzigingen of blijf bewerken.",
       "unsavedFnSave": "Functie opslaan",
       "unsavedFnDiscard": "Wijzigingen verwerpen",
-      "unsavedFnKeep": "Blijf bewerken"
+      "unsavedFnKeep": "Blijf bewerken",
+      "destination": "Bestemming",
+      "branchPathUnset": "{name} · geen regel ingesteld"
     },
     "commonFieldsAbove": "algemene velden hierboven",
     "canvas": {
@@ -2803,11 +2857,15 @@
       "openStep": "Open {name}",
       "runToView": "Voer een test uit om deze gegevens te bekijken.",
       "noBranchItems": "Geen items op deze vertakking.",
+      "forwardedCount": "{out} van de {total} record doorgestuurd | {out} van de {total} records doorgestuurd",
+      "noMatchForwarded": "Geen overeenkomst — 0 van de {total} record doorgestuurd | Geen overeenkomst — 0 van de {total} records doorgestuurd",
+      "branchDropped": "{count} record kwam met geen pad overeen — verwijderd | {count} records kwamen met geen pad overeen — verwijderd",
       "noUpstream": "Geen upstream-stappen.",
       "noRunYet": "Nog geen run.",
       "runLabel": "Run",
       "switchRun": "Wissel run",
       "notInRun": "Deze stap is niet opgenomen in deze run.",
+      "noRunData": "Deze run heeft geen stapgegevens opgeslagen.",
       "runTest": "Test uitvoeren",
       "noItems": "Geen items",
       "itemsCount": "{count} item | {count} items",
@@ -2817,8 +2875,14 @@
       "executeStep": "Stap uitvoeren",
       "sample": "Voorbeeld",
       "editStep": "Stap bewerken",
+      "readOnlyRun": "Je bekijkt een eerdere run, dus de configuratie van deze stap kan hier niet worden gewijzigd.",
+      "readOnlyRunEdit": "Bewerken in Workflow",
       "testInputHint": "Testinvoer — bewerk en voer vervolgens de stap uit.",
-      "noRunsList": "Nog geen runs."
+      "noRunsList": "Nog geen runs.",
+      "resetInput": "Reset naar voorbeeld",
+      "eventPager": "{n} van {total}",
+      "nextEvent": "Volgende gebeurtenis",
+      "prevEvent": "Vorige gebeurtenis"
     },
     "runOverlay": {
       "banner": "Toont stapgegevens van een eerdere run ({run}). Je kunt vrij bewerken — deze run wordt nooit gewijzigd.",
@@ -2845,6 +2909,8 @@
       "noConfig": "Geen configuratie",
       "functionLabel": "Functie",
       "destinationLabel": "Bestemming",
+      "branchPathsLabel": "Paden",
+      "branchNoRule": "Geen regel ingesteld",
       "destinationUnsupported": "Niet-ondersteund type",
       "destinationMissing": "Deze bestemming bestaat niet meer of kan niet worden gelezen.",
       "headersLabel": "Headers",
@@ -3734,7 +3800,7 @@
       "dynamodbPipelineTitle": "Stream DynamoDB → Firehose",
       "dynamodbTagline": "Stream DynamoDB-itemwijzigingen naar OpenObserve via Kinesis Firehose.",
       "ec2IamNote": "Vereist een IAM-rol op de instantie met ec2:DescribeTags en ec2:DescribeInstances, zodat de agent de Name-tag kan lezen en als host-id kan gebruiken.",
-      "enableSessionReplayDesc": "Sessiereplay wordt **apart** geconfigureerd van RUM en erft **niet** `rumConfiguration.customEndpoint`. Het voegt ook geen pad toe, dus het heeft de volledige `/replay`-URL hieronder nodig. Dit fout doen is de gebruikelijke reden waarom RUM-gebeurtenissen aankomen maar replays nooit.",
+      "enableSessionReplayDesc": "Session Replay wordt **apart** van Monitoring van echte gebruikers geconfigureerd en erft `rumConfiguration.customEndpoint` **niet**. Geef het hieronder een eigen basis-URL — in dezelfde vorm als die van Monitoring van echte gebruikers/Logboeken. De bridge voegt zelf `/replay` toe, dus voeg het **niet** zelf toe: een handmatig toegevoegd `/replay` verdubbelt het pad en elke upload wordt met 401 afgewezen, wat de gebruikelijke reden is waarom er gebeurtenissen van Monitoring van echte gebruikers binnenkomen, maar replays nooit.",
       "enableSessionReplayTitle": "Sessiereplay inschakelen",
       "endpointLabel": "Endpoint",
       "externalEndpointVariant": "Extern eindpunt",
@@ -3936,18 +4002,16 @@
       "rnInitNote": "Initialiseer zo vroeg mogelijk — de provider moet worden gemount voordat de schermen die je wilt meten verschijnen.",
       "rnInstallNote": "De session-replay- en navigatiepakketten zijn optioneel — verwijder een van beide regels als je geen schermopname of automatische view-tracking nodig hebt.",
       "rnNavigationNote": "Zonder dit kun je views nog steeds handmatig opnemen met `O2Rum.startView()` / `O2Rum.stopView()`.",
-      "rnSessionReplayNote": "Session Replay op React Native is momenteel geverifieerd op Android. Op iOS voegt de SDK zijn eigen pad toe aan deze URL, dus replay-uploads bereiken OpenObserve nog niet — RUM, logs en crashes worden niet beïnvloed.",
-      "rnTrouble401A": "De `clientToken` is het **RUM-token** van deze organisatie, niet de ingestie-toegangscode. Als het is geroteerd, genereer het dan opnieuw vanuit de header van deze pagina en herbouw de app.",
+      "rnSessionReplayNote": "Session Replay is geverifieerd op zowel iOS als Android vanaf SDK 0.1.2. Segmenten worden vóór upload gebundeld, dus verwacht een korte vertraging voordat ze verschijnen.",
+      "rnTrouble401A": "Twee veelvoorkomende oorzaken. Ten eerste: de `clientToken` — dat moet het **token voor Monitoring van echte gebruikers** van deze organisatie zijn, niet de ingestie-passcode; als het is geroteerd, genereer het dan opnieuw via de header van deze pagina en herbouw de app. Ten tweede, specifiek voor Session Replay: het zelf toevoegen van `/replay` aan `customEndpoint` verdubbelt het pad (de bridge doet dit al), wat de backend ook met een 401 afwijst — geef in plaats daarvan de kale basis-URL door.",
       "rnTrouble401Q": "Verzoeken retourneren 401 of 403",
       "rnTroubleCleartextA": "Android blokkeert standaard cleartext-verkeer. Stel voor een `http://`-eindpunt `additionalConfiguration: {config}` in in de SDK-configuratie en sta cleartext toe voor je host in de netwerkbeveiligingsconfiguratie van de app. Geef de voorkeur aan HTTPS buiten lokale ontwikkeling.",
       "rnTroubleCleartextQ": "Android release/debug-build verzendt niets over gewone HTTP",
       "rnTroubleIosBuildA": "Voer `npx pod-install` uit (of `cd ios && pod install`) na het toevoegen van de pakketten en herbouw vervolgens vanuit Xcode of `npx react-native run-ios`. Een herlading via alleen Metro zal nieuwe native modules niet oppikken.",
       "rnTroubleIosBuildQ": "De iOS-build mislukt of de native module ontbreekt",
-      "rnTroubleIosReplayA": "Bekende beperking van de huidige React Native SDK: op iOS voegt de SDK zijn eigen pad toe aan de session-replay `customEndpoint`, waardoor uploads de `/replay`-route van OpenObserve missen. Android gebruikt de URL letterlijk en werkt. RUM-gebeurtenissen, logs en crashrapportage worden op beide platforms niet beïnvloed.",
-      "rnTroubleIosReplayQ": "Session replay werkt op Android maar niet op iOS",
       "rnTroubleMaskedA": "Dat is de standaard. `textAndInputPrivacyLevel`, `imagePrivacyLevel` en `touchPrivacyLevel` staan standaard allemaal op hun strengste instelling (`MASK_ALL`). Versoepel ze alleen zo ver als je privacybeleid toestaat — `MASK_SENSITIVE_INPUTS` houdt wachtwoorden en kaartvelden verborgen terwijl de rest wordt getoond.",
       "rnTroubleMaskedQ": "Replays worden weergegeven maar alles is gemaskeerd",
-      "rnTroubleNoReplayA": "Bijna altijd het eindpunt. Session Replay wordt afzonderlijk geconfigureerd en erft **niet** `rumConfiguration.customEndpoint`; als het niet is ingesteld, is de standaardwaarde een lege string en gaan uploads nergens heen die je kunt zien. Geef de volledige URL expliciet door: `customEndpoint: '{replayUrl}'` — let op het afsluitende `/replay`, dat de basis-URL van de core SDK niet heeft.",
+      "rnTroubleNoReplayA": "Bijna altijd ligt het aan het endpoint. Session Replay wordt apart geconfigureerd en erft `rumConfiguration.customEndpoint` **niet**. Als `customEndpoint` niet is ingesteld, is de standaardwaarde een lege string en kun je de uploads nergens zien. Geef de basis-URL expliciet door: `customEndpoint: '{replayUrl}'` — de bridge voegt zelf `/replay` toe (vanaf SDK 0.1.2), dus voeg dat achtervoegsel niet zelf toe, anders worden uploads met een 401 afgewezen.",
       "rnTroubleNoReplayQ": "RUM-gebeurtenissen komen aan, maar er is geen session replay",
       "rnTroubleNothingArrivesA": "Controleer eerst de host — zie het oplossingskader hierboven. `localhost` verwijst naar het apparaat, niet naar je machine: gebruik `10.0.2.2` op de Android-emulator, `localhost` op de iOS-simulator en het LAN-IP-adres van je machine op een fysiek apparaat.",
       "rnTroubleNothingArrivesQ": "Er komt helemaal niets aan van een emulator of apparaat",
@@ -6250,7 +6314,7 @@
       "frequencyPositiveNumber": "Alert - {index}: Frequentie moet een positief getal groter dan 0 zijn en moet een getal zijn.",
       "cronExpressionString": "Alert - {index}: Cron-expressie moet een string zijn.",
       "thresholdPositiveNumber": "Alert - {index}: Drempelwaarde moet een positief getal groter dan 0 zijn en moet een getal zijn.",
-      "silenceNonNegativeNumber": "Alert - {index}: Stilte moet een positief getal groter dan of gelijk aan 0 zijn en moet een getal zijn.",
+      "silenceNonNegativeNumber": "Alert - {index}: De afkoelingsperiode moet een positief getal groter dan of gelijk aan 0 zijn en moet een getal zijn.",
       "frequencyTypeInvalid": "Alert - {index}: Frequentie Type moet 'minutes' of 'cron' zijn en moet een string zijn.",
       "cronExpressionInvalid": "Alert - {index}: Cron-expressie moet een geldige cron-expressie zijn."
     },
@@ -6434,6 +6498,7 @@
       "firing": "Actief",
       "ok": "Ok",
       "error": "Fout",
+      "pending": "In afwachting",
       "skipped": "Overgeslagen",
       "unknown": "Onbekend",
       "flapping": "Flapperen",
@@ -6459,7 +6524,8 @@
       "nameInvalidChars": "Tekens zoals :, ?, /, # en spaties zijn niet toegestaan.",
       "templateRequired": "Sjabloon is vereist!",
       "validEmails": "Voeg geldige e-mailadressen toe!",
-      "silenceNonNegative": "Meldingsdemping moet groter dan of gelijk aan 0 zijn",
+      "silenceNonNegative": "De afkoelingsperiode moet groter dan of gelijk aan 0 zijn",
+      "pendingPeriodNonNegative": "De wachtperiode moet groter dan of gelijk aan 0 zijn.",
       "periodPositive": "Periode moet groter dan 0 zijn",
       "destinationRequired": "Ten minste één bestemming is vereist.",
       "thresholdPositive": "Drempelwaarde moet groter dan 0 zijn",
@@ -6470,6 +6536,7 @@
       "timestampAliasBanned": "{column} kan niet als kolomalias worden gebruikt. Gebruik in plaats daarvan time_bucket.",
       "credentialFieldRequired": "{field} is vereist",
       "minimumFrequency": "Minimumfrequentie moet {minutes} minuten zijn",
+      "pendingPeriodNotMultiple": "Geen veelvoud van de controleafrequentie ({minutes} min) — het alarm kan tot één extra interval wachten voordat het afgaat.",
       "nameMandatoryString": "Naam is verplicht en moet een geldige string zijn",
       "orgIdMismatch": "Organisatie-ID moet gelijk zijn aan {orgId}",
       "streamTypeMandatory": "Streamtype is verplicht en moet een van de volgende zijn: logs, metrics, traces",
@@ -6675,6 +6742,9 @@
       "cooldown": "Afkoelen",
       "betweenAlerts": "tussen waarschuwingen",
       "noCooldown": "Geen afkoelperiode",
+      "pendingPeriod": "Aanhoudtijd",
+      "beforeFiring": "{duration} voordat het alarm afgaat",
+      "firesImmediately": "Gaat onmiddellijk af",
       "minuteCount": "{n} minuut | {n} minuten",
       "hourCount": "{n} uur | {n} uur",
       "timeRangeCount": "{n} tijdsbereik ({ranges}) | {n} tijdsbereiken ({ranges})",
@@ -6691,6 +6761,7 @@
         "conditionOther": "{threshold} gebeurtenissen ({operator})",
         "alertMeWhenMinutes": "Waarschuw mij wanneer {condition} voorkomen in een willekeurige periode van {count} minuten",
         "alertMeWhenHours": "Waarschuw mij wanneer {condition} voorkomen in een willekeurige periode van {count} uur",
+        "pendingPeriodClause": ", na {duration} te hebben aangehouden",
         "cooldownClause": ", maar niet vaker dan één keer per {cooldown}",
         "defaultConditions": "Waarschuw me wanneer aan de geconfigureerde voorwaarden is voldaan"
       }
@@ -7155,6 +7226,8 @@
       "writeQueryHint": "Schrijf een vraag om aan de slag te gaan",
       "sqlEditorHint": "Gebruik de volledige open editor om uit te voeren en te valideren",
       "checkEvery": "Controleer elke",
+      "pendingPeriod": "Aanhoudtijd",
+      "pendingPeriodTooltip": "Wacht zo lang voordat het alarm afgaat, zodat een voorwaarde moet blijven bestaan in plaats van dat één slecht interval het alarm doet afgaan.",
       "cronExpressionPlaceholder": "0 */10 * * * *",
       "timezonePlaceholder": "tijdzone",
       "onThese": "op deze",
@@ -9721,6 +9794,8 @@
       "outputTokens": "Uitvoertokens",
       "out": "Uit",
       "totalCost": "Totale kosten",
+      "scores": "Scores",
+      "notScoredYet": "Nog niet gescoord",
       "preview": "Voorbeeld",
       "input": "Invoer",
       "output": "Uitvoer",
@@ -10633,6 +10708,10 @@
         "success": "Toegevoegd aan de dataset",
         "loadError": "Kan datasets niet laden",
         "error": "Kan dit item niet aan de dataset toevoegen"
+      },
+      "playground": {
+        "button": "Openen in Playground",
+        "hint": "Laad de berichten van deze aanroep in de Playground om de aanroep te bewerken en opnieuw uit te voeren."
       }
     },
     "discovery": {
@@ -10716,7 +10795,8 @@
         "scoreConfigs": "Scoreconfiguraties",
         "targetDataset": "Doeldataset",
         "progress": "Voortgang",
-        "updated": "Bijgewerkt"
+        "updated": "Bijgewerkt",
+        "actions": "Acties"
       },
       "create": {
         "title": "Nieuwe wachtrij",
@@ -10770,7 +10850,8 @@
           "refType": "Ref",
           "refId": "Referentie",
           "added": "Toegevoegd",
-          "status": "Status"
+          "status": "Status",
+          "actions": "Acties"
         },
         "status": {
           "pending": "In afwachting",
@@ -10882,6 +10963,8 @@
       "viewAll": "Experimenten bekijken",
       "baseline": "Basislijn",
       "setBaseline": "Basislijn instellen",
+      "baselineRequiresCompleted": "Alleen een voltooide run kan als baseline worden ingesteld.",
+      "baselineError": "Baseline bijwerken is mislukt.",
       "selectForComparison": "Selecteer voor vergelijking",
       "progress": "{done} van {total} slots",
       "noScores": "Geen geaggregeerde scores",
@@ -10992,15 +11075,20 @@
       "addToDataset": "Toevoegen",
       "detail": {
         "by": "door {user}",
-        "p50Latency": "P50-latentie",
+        "p50Latency": "P50-taaklatentie",
         "totalCost": "Totale kosten",
+        "costBreakdown": "Taak {task} · Scoring {scoring}",
+        "partialCostBreakdown": "Taak {task} · Scoring {scoring} · Gedeeltelijk",
         "highDispersion": "Gevallen met hoge spreiding",
         "highDispersionHint": "Rijen waarin proeven verschillen",
         "scoredRows": "{scored}/{total} rijen gescoord",
         "columns": {
           "input": "Invoer",
           "output": "Uitvoer",
-          "latency": "Latentie"
+          "trials": "Proeven",
+          "dispersion": "Spreiding",
+          "latency": "Latentie",
+          "p50Latency": "P50-latentie"
         },
         "retryFailed": "Mislukte slots opnieuw proberen",
         "loadError": "Kan het experiment niet laden",
@@ -11020,8 +11108,12 @@
           "run": "Run"
         },
         "runSummary": "{trials} · {scorers}",
-        "progress": "Voortgang",
+        "progress": "Taakvoortgang",
         "scoring": "Scoren",
+        "tasks": "Taken",
+        "scores": "Scores",
+        "taskDistribution": "{succeeded} geslaagd · {failed} mislukt · {pending} in afwachting · {skipped} overgeslagen",
+        "scoreOutcomeDistribution": "{scored} gescoord · {failed} mislukt · {pending} in afwachting · {skipped} overgeslagen · {unscored} niet gescoord",
         "scoringDistribution": "{success} geslaagd · {failed} mislukt · {pending} in behandeling · {skipped} overgeslagen",
         "compare": "Vergelijken",
         "comparePicker": {
@@ -11038,8 +11130,12 @@
         },
         "slotStatus": "Status",
         "searchPlaceholder": "Zoek invoer of uitvoer",
+        "searchInputPlaceholder": "Zoek op invoer",
         "statusFilter": "Status",
-        "statusFilterAll": "Alle statussen"
+        "statusFilterAll": "Alle statussen",
+        "sortByDispersion": "Sorteer op spreiding",
+        "highDispersionBadge": "Hoog",
+        "trialNumber": "Proef {n}"
       },
       "rowDetail": {
         "fallbackTitle": "Experimentrij",
@@ -11109,6 +11205,16 @@
           "typeCategorical": "Categorisch",
           "typeBoolean": "Booleaans",
           "threshold": "Drempelwaarde",
+          "thresholdTooltip": "Baseline- en kandidaatwaarden die binnen {percent} van elkaar liggen, tellen als ongewijzigd, niet als verslechterd of verbeterd.",
+          "outcomeDimensions": "Uitkomstcriteria",
+          "outcomeTooltipNone": "Er zijn geen kolommen geselecteerd — elke vergelijkbare rij wordt weergegeven als Niet vergeleken.",
+          "outcomeTooltipAll": "Alle in aanmerking komende kolommen bepalen de uitkomst van elke rij.",
+          "outcomeTooltipPartial": "Alleen {names} bepalen de uitkomst van elke rij. Andere kolommen worden weergegeven, maar hebben er geen invloed op.",
+          "allOutcomeDimensions": "Alle in aanmerking komende kolommen",
+          "noOutcomeDimensions": "Geen kolommen",
+          "selectedOutcomeDimensions": "{count} kolom | {count} kolommen",
+          "outcomeDimensionUnavailable": "{name} (geen vergelijkingsbeleid)",
+          "dimensionExcludedHint": "Deze kolom is uitgesloten van de uitkomsten. Selecteer deze onder Uitkomstcriteria om hem op te nemen.",
           "measurePerRow": "Gemiddelde per rij, over trials",
           "dimensionImproved": "{count} rij verbeterd | {count} rijen verbeterd",
           "dimensionUnchanged": "{count} rij ongewijzigd | {count} rijen ongewijzigd",
@@ -11130,10 +11236,13 @@
           "trial": "Trial {index}",
           "noContent": "Niet opgegeven",
           "noOutput": "Geen uitvoer",
-          "absentSide": "Niet aanwezig in deze run"
+          "absentSide": "Niet aanwezig in deze run",
+          "enterFullscreen": "Volledig scherm openen",
+          "exitFullscreen": "Volledig scherm verlaten"
         }
       },
-      "selectionCount": "{count} van 2 geselecteerd"
+      "selectionCount": "{count} van 2 geselecteerd",
+      "clearBaseline": "Basislijn wissen"
     },
     "datasets": {
       "listTitle": "Datasets",
@@ -11187,8 +11296,8 @@
         },
         "searchPlaceholder": "Zoek items...",
         "csvImport": {
-          "button": "CSV uploaden",
-          "title": "Datasetitems uploaden",
+          "button": "Items importeren",
+          "title": "Dataset-items importeren",
           "description": "Importeer datasetitems uit een CSV-bestand.",
           "fileLabel": "CSV-bestand",
           "placeholder": "Kies een CSV-bestand",
@@ -11202,7 +11311,7 @@
           "expectedOutput": "Verwachte uitvoer",
           "source": "Bron",
           "tags": "Tags",
-          "version": "Versie",
+          "version": "Datasetversie",
           "actions": "Acties"
         },
         "deleteItemTitle": "Item verwijderen",
@@ -11681,8 +11790,6 @@
       "title": "Playground",
       "runAll": "Alles uitvoeren",
       "runAllTooltip": "Voer elke variant uit",
-      "running": "Bezig… ({done}/{total})",
-      "stop": "Stop",
       "recentDrafts": "Recente concepten",
       "recentDraftsSection": "Deze browser · laatste 10",
       "draftVersus": "vs",
@@ -11691,6 +11798,7 @@
       "fromExperiment": "Gekloond uit experiment {name}",
       "variables": "Variabelen",
       "noVariables": "Geen {token} in de berichten — voeg er een toe om de invoer te parametriseren.",
+      "unusedSampledValue": "Nog niet verwezen in een bericht: {tokens}. Typ het in een bericht om het te gebruiken.",
       "variablePlaceholder": "Waarde voor {name}",
       "addExpected": "+ Verwacht resultaat",
       "expectedLabel": "Verwacht",
@@ -11705,8 +11813,9 @@
       "variant": "Variant {label}",
       "variantLimit": "De testbank bevat maximaal {max} varianten.",
       "duplicateVariant": "Variant dupliceren",
+      "resetVariant": "Bench resetten",
       "removeVariant": "Variant verwijderen",
-      "runVariant": "Voer deze variant uit",
+      "runVariant": "Uitvoeren",
       "createExperiment": "Experiment maken",
       "modelPlaceholder": "Selecteer of typ een model",
       "providerUnknown": "Onbekende provider",
@@ -11732,6 +11841,13 @@
       "toolsEmpty": "Geen tools gedefinieerd.",
       "toolCall": "Toolaanroep",
       "toolCallNote": "De uitvoering stopt hier — de Playground voert geen tools uit.",
+      "toolCallAddToMessages": "Toevoegen aan berichten",
+      "toolCallContinueTooltip": "Voegt deze aanroep toe aan het gesprek en opent het resultaatveld.",
+      "toolCallAddedToMessages": "Toolaanroep toegevoegd — voer het toolresultaat in en voer opnieuw uit.",
+      "toolArgumentsPlaceholder": "Toolargumenten (JSON)",
+      "toolResultPlaceholder": "Voer het toolresultaat in…",
+      "toolResultRequired": "Voer het toolresultaat hierboven in om door te gaan.",
+      "toolSetupRequired": "Selecteer een tool en voer de argumenten in om door te gaan.",
       "toolInvalidJson": "Parameters moeten geldige JSON zijn.",
       "schema": "Schema",
       "schemaOn": "Schema · Aan",
@@ -11741,6 +11857,8 @@
       "schemaInvalidJson": "Schema moet geldige JSON zijn.",
       "schemaIgnored": "Schema · Genegeerd door deze provider",
       "schemaUnsupported": "Deze provider heeft geen veld voor gestructureerde uitvoer. Het schema blijft in deze kolom bewaard, maar wordt niet verzonden en het model antwoordt met platte tekst.",
+      "schemaApproximated": "Schema · Benaderd door deze provider",
+      "schemaApproximatedHelp": "Deze provider ondersteunt alleen JSON-modus, geen JSON-schema. Het verzoek wordt in JSON-modus verzonden, waarbij het schema opnieuw in de prompt wordt vermeld, dus het antwoord is JSON, maar de structuur ervan is niet gegarandeerd.",
       "outputPlaceholder": "Uitvoer verschijnt hier — druk op Uitvoeren.",
       "outputNotRun": "Niet uitgevoerd",
       "retry": "Opnieuw proberen",
@@ -11758,6 +11876,7 @@
       "sampleDatasetPlaceholder": "Selecteer een dataset",
       "sampleSubmit": "Voorbeeld",
       "sampleLoadError": "Kon geen rijen uit die dataset laden.",
+      "sampleApplied": "Sample {index} van {total} geladen — verwijs ernaar met {token} in een bericht.",
       "sampleEmpty": "Deze dataset heeft nog geen items.",
       "noProviderTitle": "De Playground heeft een LLM-provider nodig",
       "noProviderBody": "Verbind een provider om prompts uit te voeren. Het duurt ongeveer een minuut.",
@@ -11770,6 +11889,8 @@
       "reset": "Reset",
       "resetTitle": "Playground resetten",
       "resetMessage": "Alle varianten, rijen en uitvoer wissen en opnieuw beginnen? Dit kan niet ongedaan worden gemaakt.",
+      "resetVariantTitle": "Bench resetten",
+      "resetVariantMessage": "De prompt en uitvoer van deze bench wissen? Dit kan niet ongedaan worden gemaakt.",
       "scrollLeft": "Naar links scrollen",
       "scrollRight": "Naar rechts scrollen",
       "addMessage": "Bericht",
@@ -11785,6 +11906,7 @@
       "variantSettings": "Modelinstellingen",
       "messageToolPlaceholder": "Selecteer hulpmiddel",
       "variablesCount": "Variabelen · {count}",
+      "newValueTag": "Nieuw",
       "variableUsed": "Verwezen door deze variant",
       "variableUnused": "Niet verwezen door deze variant — wordt hier leeg weergegeven",
       "addVariable": "Variabele toevoegen",
@@ -11833,11 +11955,19 @@
       "sampleFullView": "Volledige weergave",
       "sampleBack": "Terug naar lijst",
       "sampleInput": "Input",
-      "sampleExpected": "Verwachte output"
+      "sampleExpected": "Verwachte output",
+      "fromTrace": "Van trace-span {id}",
+      "openInPlaygroundFailed": "Kon deze span niet openen in de Playground."
     }
   },
   "onlineEvals": {
     "versionPrefix": "v",
+    "traceScoreChip": {
+      "reasoning": "Waarom",
+      "scoredAt": "Gescoord {time}",
+      "moreCount": "+{count} meer",
+      "allScores": "Alle scores ({count})"
+    },
     "importNameRequired": "Naam *",
     "importNewNameRequired": "Nieuwe naam *",
     "importDataTypeRequired": "Datatype *",
@@ -11866,12 +11996,14 @@
     },
     "scoreConfigLibrary": {
       "searchPlaceholder": "Zoek scoreconfiguraties...",
-      "scoreConfigsLabel": "{count} scoreconfiguratie | {count} scoreconfiguraties"
+      "scoreConfigsLabel": "{count} scoreconfiguratie | {count} scoreconfiguraties",
+      "selectedOfTotal": "{selected} van {total} geselecteerd"
     },
     "scorerLibrary": {
       "noProvidersMessage": "Maak eerst een Provider aan voordat u LLM Judge-scorers importeert.",
       "searchPlaceholder": "Zoek scorers...",
-      "scorerCountSuffix": "{count} scorer | {count} scorers"
+      "scorerCountSuffix": "{count} scorer | {count} scorers",
+      "selectedOfTotal": "{selected} van {total} geselecteerd"
     },
     "title": "Beoordelingen",
     "loadError": "Het laden van online evaluaties is mislukt",
@@ -11988,7 +12120,8 @@
         "legendFalseCount": "onwaar ({count})",
         "kpis": {
           "average": "Gemiddeld",
-          "p50p95": "P50/P95",
+          "p50": "P50",
+          "p95": "P95",
           "unhealthy": "Ongezond",
           "healthy": "Gezond",
           "trueRate": "Waarheidspercentage",
@@ -12084,7 +12217,8 @@
       "remove": "Verwijderen",
       "save": "Opslaan",
       "saveAsDraft": "Opslaan als concept",
-      "createAndActivate": "Opslaan en activeren"
+      "createAndActivate": "Opslaan en activeren",
+      "testConnection": "Verbinding testen"
     },
     "scorerTypeDialog": {
       "title": "Maak een nieuwe scorer",
@@ -12097,8 +12231,6 @@
       "remoteCta": "Endpoint configureren"
     },
     "provider": {
-      "sectionStep1": "01",
-      "sectionStep2": "02",
       "backTo": "Terug naar Providers",
       "createTitle": "LLM-provider aanmaken",
       "editTitle": "LLM-provider bewerken",
@@ -12106,21 +12238,26 @@
       "sectionTitle": "Aanbieder",
       "nameLabel": "Naam",
       "typeLabel": "Soort provider",
-      "endpointLabel": "Eindpunt",
-      "endpointPlaceholder": "Optioneel aangepast eindpunt",
+      "endpointLabel": "Basis-URL",
+      "endpointPlaceholder": "Basis-URL, bijv. https://your-host/v1",
+      "endpointHelpDefault": "Laat leeg om de standaard te gebruiken: {url}",
+      "endpointHelpRequired": "Verplicht — deze provider heeft geen standaard basis-URL.",
       "defaultModelLabel": "Standaardmodel",
       "availableModelsLabel": "Beschikbare modellen",
       "apiKeyLabel": "API-sleutel",
       "apiKeyPlaceholder": "Voer API-sleutel in",
-      "apiKeyHelp": "Wordt versleuteld opgeslagen en nooit teruggelezen. Laat leeg bij het bewerken om de bestaande sleutel te behouden.",
+      "apiKeyHelp": "Versleuteld opgeslagen en nooit teruggelezen. Laat dit veld leeg bij het opslaan van wijzigingen om de bestaande sleutel te behouden.",
       "authSection": "Authenticatie",
-      "authEditNote": "Inloggegevens kunnen niet worden teruggelezen. Voer de API-sleutel alleen opnieuw in als je deze wilt roteren.",
+      "authEditNote": "Inloggegevens kunnen niet worden teruggelezen. Om een provider te testen die authenticatie vereist, voer je de API-sleutel in.",
       "cannotRename": "Kan na het aanmaken niet worden hernoemd.",
-      "availableModelsHelp": "Optioneel. Door komma's gescheiden lijst van modellen die beschikbaar zijn op deze provider.",
       "saveError": "Het opslaan van de provider is mislukt",
       "nameRequired": "Provider name is required",
       "typeRequired": "Provider type is required",
-      "defaultModelRequired": "Default model is required"
+      "defaultModelRequired": "Default model is required",
+      "testRunning": "Verbinding wordt getest...",
+      "testPassed": "Verbonden",
+      "testFailed": "Verbinding mislukt",
+      "testError": "Kan de verbinding niet testen."
     },
     "scoreConfig": {
       "gteSymbol": "≥",
@@ -12219,7 +12356,8 @@
         "nameRequired": "Name is required",
         "nameFormat": "Use lowercase letters, numbers, and underscores only",
         "minRequired": "Min is required",
-        "maxRequired": "Max is required"
+        "maxRequired": "Max is required",
+        "maxNotGreaterThanMin": "Max moet groter zijn dan Min"
       },
       "import": {
         "title": "Scoreconfiguratie importeren",
@@ -12790,7 +12928,7 @@
     },
     "empty": {
       "title": "Nog geen LLM-aanbieders",
-      "description": "LLM-providers slaan de verbindingsgegevens (eindpunt + inloggegevens) op voor de taalmodellen die uw LLM Judge-scorers aanroepen. Voeg er een toe om te beginnen met het uitvoeren van evaluaties op basis van rechters."
+      "description": "LLM-providers slaan de verbindingsgegevens (basis-URL en credentials) op voor de taalmodellen die uw LLM-judgescorers aanroepen. Voeg er een toe om evaluaties op basis van een judge uit te voeren."
     }
   },
   "logs": {
@@ -13771,6 +13909,7 @@
       "error": "Fout",
       "failed": "Mislukt",
       "failedRuns": "Mislukte runs",
+      "errorRuns": "Foutruns",
       "jumpToLastRun": "Ga naar laatste run",
       "jumpToLatestData": "Ga naar nieuwste gegevens",
       "lastRun": "Laatste run",
@@ -13882,6 +14021,11 @@
       "stepsCount": "Stappen ({count})",
       "title": "Run-detail",
       "viewFullError": "Bekijk volledige fout & stacktrace",
+      "errorSourceQuota": "Quotalimiet bereikt",
+      "errorSourceQuotaDesc": "De inbegrepen synthetics-stappen van de organisatie zijn uitgeput, waardoor deze run is overgeslagen. Deze wordt automatisch hervat zodra de organisatie zich abonneert of de stappenlimiet wordt verhoogd.",
+      "errorSourceDispatch": "Verzendfout",
+      "errorSourceQueue": "Wachtrijfout",
+      "errorSourceProbe": "Probe-fout",
       "viewFullErrorBtn": "Bekijk volledige fout",
       "detailUrl": "URL",
       "locatorResolution": "Locator-resolutie",
@@ -13933,6 +14077,7 @@
       "durationByLocation": "Duur per locatie (gem.)",
       "flakyRate": "Flaky Rate",
       "stepsWindowTruncated": "Showing the newest {count} executions ({from} – {to}); the selected range holds more.",
+      "stepsErrorExcluded": "{count} uitvoeringen konden niet worden uitgevoerd (fout) en worden hier niet weergegeven — zie het tabblad Overzicht.",
       "retryRate": "Herhalingspercentage",
       "statusTimeline": "Statustijdlijn",
       "tabOverview": "Overzicht",
@@ -15588,7 +15733,6 @@
       "reservation": "Reservering",
       "sliType": "SLI-type",
       "owner": "Eigenaar",
-      "folder": "Map",
       "streamPlaceholder": "Selecteer een stream"
     },
     "empty": {
@@ -15618,7 +15762,24 @@
       "sourceHint": "Uptime is het deel van de gemeten tijd dat deze alert niet actief was. Tijd dat hij niet evalueerde — gepauzeerd, gedempt of falend — is ongemeten en telt nooit mee als uptime.",
       "loadFailed": "Kon de in aanmerking komende alerts niet laden",
       "noneEligible": "Nog geen enkele alert in deze organisatie kan als bron worden gebruikt.",
-      "ineligibleOption": "{name} — {reason}",
+      "ineligible": {
+        "notScheduled": "Niet gepland",
+        "grouped": "Gegroepeerd",
+        "notReferenceable": "Niet bruikbaar",
+        "cron": "Cron-schema",
+        "tooInfrequent": "Draait te zelden",
+        "silenced": "Heeft stilte",
+        "other": "Niet in aanmerking",
+        "why": {
+          "notScheduled": "Realtime-alarmen bewaren de rungeschiedenis die een SLO nodig heeft niet. Gebruik in plaats daarvan een gepland alarm.",
+          "grouped": "Dit alarm is opgesplitst per groep, en een run registreert niet welke groepen deze heeft gecontroleerd. Verwijder de group-by om dit alarm hier te gebruiken.",
+          "notReferenceable": "SLO- en samengestelde alarmen kunnen geen bron zijn. Kies een gewoon gepland alarm.",
+          "cron": "Dit alarm draait op een cron-schema, waardoor de controles niet gelijkmatig zijn en de uptime niet kan worden bepaald. Verander dit naar een vast interval.",
+          "tooInfrequent": "Dit alarm draait elke {frequency}. Het moet minstens elke {slice} draaien, zodat er geen tijd ongecontroleerd blijft.",
+          "silenced": "Na het afgaan stopt dit alarm een tijdje met controleren — en die onderbreking valt altijd in een slechte periode, waardoor de SLO er beter uitziet dan hij is. Stel de stilteperiode in op 0."
+        },
+        "noFixedInterval": "geen vast interval"
+      },
       "groupingLocked": "Een op alerts gebaseerde SLI kan niet worden gegroepeerd: het beschikbaarheidslogboek registreert één run per alert, niet per groep, dus er is geen dekking per groep om op te bouwen.",
       "sourceLink": "Bron-alert",
       "preview": {
@@ -15726,6 +15887,42 @@
       "editTargetMissing": "Die melding staat niet meer op deze SLO.",
       "describeBurn": "Verbrandingssnelheid > {critical} over {long} en {short}",
       "describeBudget": "Foutbudget verbruikt > {critical}%"
+    },
+    "validation": {
+      "nameRequired": "SLO-naam is verplicht",
+      "nameTooLong": "SLO-naam mag maximaal 256 tekens bevatten",
+      "targetRequired": "Doel is verplicht",
+      "targetRange": "Doel moet groter dan 0 en kleiner dan 100 zijn",
+      "targetPrecision": "Doel ondersteunt maximaal 3 decimalen",
+      "streamTypeRequired": "Streamtype is verplicht",
+      "streamRequired": "Stream is verplicht",
+      "goodExprRequired": "\"Goed wanneer\" is verplicht",
+      "promqlGoodRequired": "Goede query is verplicht",
+      "promqlTotalRequired": "Totale query is vereist",
+      "aggregateRequired": "Aggregatie-expressie is vereist",
+      "comparatorRequired": "Vergelijker is vereist",
+      "thresholdRequired": "Drempelwaarde is vereist",
+      "thresholdNumber": "Drempelwaarde moet een getal zijn",
+      "alertSourceRequired": "Bronalarm is vereist",
+      "groupedSlice": "Gegroepeerde SLO's moeten een 5-minuten-slice gebruiken",
+      "alertCannotGroup": "Een alarmgebaseerde SLI kan niet worden gegroepeerd",
+      "frequencyRequired": "Frequentie is vereist",
+      "frequencyPositive": "Frequentie moet ten minste 1 minuut zijn",
+      "silenceRequired": "Stilteperiode is vereist",
+      "silenceNonNegative": "Stilteperiode mag niet negatief zijn",
+      "targetsRequired": "Selecteer ten minste één bestemming of workflow",
+      "criticalRequired": "Drempelwaarde is vereist",
+      "criticalPositive": "Drempelwaarde moet groter zijn dan 0",
+      "budgetRange": "Verbruikt budget moet 100% of minder zijn",
+      "longWindowRequired": "Lang venster is vereist",
+      "shortWindowRequired": "Kort venster is vereist",
+      "shortInsideLong": "Kort venster moet korter zijn dan het lange venster"
+    },
+    "duration": {
+      "seconds": "{count} seconde | {count} seconden",
+      "minutes": "{count} minuut | {count} minuten",
+      "hours": "{count} uur | {count} uur",
+      "days": "{count} dag | {count} dagen"
     }
   },
   "promql": {
@@ -15819,6 +16016,12 @@
     "aiQueueDetail": "Wachtrij",
     "aiQueueReview": "Wachtrijcontrole",
     "aiDatasetDetail": "Dataset",
+    "aiExperimentCreate": "Nieuw experiment",
+    "aiExperimentCompare": "Experimenten vergelijken",
+    "aiExperimentDetail": "Experiment",
+    "aiRemoteTaskCreate": "Nieuwe remote-taak",
+    "aiRemoteTaskEdit": "Remote-taak bewerken",
+    "aiRemoteTaskDetail": "Remote-taak",
     "notFound": "404 - Niet gevonden",
     "createReport": "Rapport maken",
     "addCheck": "Controle toevoegen",

@@ -32,6 +32,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         pagination="client"
         :page-size="pageSize"
         :page-size-options="[20, 50, 100, 250, 500]"
+        :current-page="currentPage"
+        @update:current-page="onPageChange"
         sorting="client"
         filter-mode="client"
         :default-columns="false"
@@ -301,7 +303,19 @@ export default defineComponent({
     const route = useRoute();
 
     const qTableRef: any = ref(null);
-    const loading = ref(false);
+    // Starts true so the skeleton shows on first render and the once-off page-restore watch below fires on the real true→false transition.
+    const loading = ref(true);
+    // The first real load lands after mount and races TanStack's own auto-reset-on-data-change, which resolves through its own deferred microtask queue — setTimeout(0) runs strictly after that queue drains, so the restored page reliably wins.
+    watch(
+      loading,
+      (isLoading) => {
+        if (isLoading) return;
+        setTimeout(() => {
+          qTableRef.value?.table?.setPageIndex(currentPage.value - 1);
+        }, 0);
+      },
+      { once: true },
+    );
     // The incident dataset is read-only display data replaced wholesale on every
     // reload, so hold it in a shallowRef (and freeze each row on load — see
     // loadIncidents). Vue then never deep-proxies the hundreds of objects, which
@@ -321,6 +335,12 @@ export default defineComponent({
     );
     const isRestoringState = ref(false);
     const pageSize = ref(20);
+    // Restored from the Vuex incidents store (same mechanism as searchQuery/statusFilter) so returning from a detail view lands back on the same page.
+    const currentPage = ref(1);
+    const onPageChange = (page: number) => {
+      currentPage.value = page;
+      savePageState();
+    };
     // Severity facet — independent of status ("all" | "P1".."P4").
     const severityFilter = ref("all");
 
@@ -575,14 +595,15 @@ export default defineComponent({
       store.dispatch("incidents/setIncidents", {
         searchQuery: searchQuery.value,
         statusFilter: statusFilter.value,
-        pagination: { page: 1, rowsPerPage: 20 },
+        pagination: { page: currentPage.value, rowsPerPage: 20 },
         organizationIdentifier: store.state.selectedOrganization.identifier,
       });
 
+      // Spread the existing query so anything already on this route (e.g. page) survives the round trip to the detail view and back.
       router.push({
         name: "incidentDetail",
         params: { id: incident.id },
-        query: { org_identifier: store.state.selectedOrganization.identifier },
+        query: { ...route.query, org_identifier: store.state.selectedOrganization.identifier },
       });
     };
 
@@ -591,7 +612,7 @@ export default defineComponent({
       store.dispatch("incidents/setIncidents", {
         searchQuery: searchQuery.value,
         statusFilter: statusFilter.value,
-        pagination: { page: 1, rowsPerPage: 20 },
+        pagination: { page: currentPage.value, rowsPerPage: 20 },
         organizationIdentifier: store.state.selectedOrganization.identifier,
       });
     };
@@ -760,6 +781,9 @@ export default defineComponent({
         if (savedState.statusFilter !== undefined) {
           statusFilter.value = savedState.statusFilter;
         }
+        if (savedState.pagination?.page) {
+          currentPage.value = savedState.pagination.page;
+        }
         return true;
       }
       return false;
@@ -774,6 +798,9 @@ export default defineComponent({
         if (shouldRefresh) {
           store.dispatch("incidents/setShouldRefresh", false);
         }
+      } else {
+        // Cached data means loadIncidents() never ran, so loading needs an explicit false here to fire the once-off page-restore watch.
+        loading.value = false;
       }
 
       if (!store.state.incidents.isInitialized) {
@@ -784,7 +811,7 @@ export default defineComponent({
         store.dispatch("incidents/setIncidents", {
           searchQuery: searchQuery.value,
           statusFilter: statusFilter.value,
-          pagination: { page: 1, rowsPerPage: 20 },
+          pagination: { page: currentPage.value, rowsPerPage: 20 },
           organizationIdentifier: store.state.selectedOrganization.identifier,
         });
       }
@@ -829,6 +856,8 @@ export default defineComponent({
       clearFilters,
       columns,
       pageSize,
+      currentPage,
+      onPageChange,
       loadIncidents,
       refreshIncidents,
       viewIncident,

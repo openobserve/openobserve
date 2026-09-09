@@ -1,13 +1,7 @@
 // @vitest-environment jsdom
 // Copyright 2026 OpenObserve Inc.
 //
-// Behavior tests for ScoreConfigDialog after the OForm + Zod migration
-// (online-evals-migration.md row 68). At least one test mounts the REAL <OForm>
-// and proves the schema gates an empty/invalid submit (name required + the
-// create-only slug pattern), while — matching origin/main pre-migration — a
-// min≥max numeric range and an empty categorical config both still save
-// (`categories: null`), so an unwired `:schema` would be caught. Also verifies
-// the kept dirty affordance.
+// One test mounts the real <OForm>, so the schema itself is what gates an invalid submit.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
@@ -137,17 +131,24 @@ describe("ScoreConfigDialog", () => {
     expect(payload.numericRange).toEqual({ min: 0, max: 1 });
   });
 
-  it("allows a numeric range where min >= max (no ordering rule — pre-migration parity)", async () => {
+  it("blocks submit when min >= max — an inverted range corrupts (max - min) normalization downstream", async () => {
     wrapper = await createWrapper();
     setField(wrapper, "name", "faithfulness");
     setField(wrapper, "min", 5);
     setField(wrapper, "max", 1);
-    // main never validated min<max, so this saves as-is.
     await submit(wrapper);
-    expect(oform(wrapper).form.state.isValid).toBe(true);
-    expect(onlineEvalsService.scoreConfigs.create).toHaveBeenCalledTimes(1);
-    const payload = (onlineEvalsService.scoreConfigs.create as any).mock.calls[0][1];
-    expect(payload.numericRange).toEqual({ min: 5, max: 1 });
+    expect(oform(wrapper).form.state.isValid).toBe(false);
+    expect(onlineEvalsService.scoreConfigs.create).not.toHaveBeenCalled();
+  });
+
+  it("blocks submit when min equals max (a zero-width range)", async () => {
+    wrapper = await createWrapper();
+    setField(wrapper, "name", "faithfulness");
+    setField(wrapper, "min", 1);
+    setField(wrapper, "max", 1);
+    await submit(wrapper);
+    expect(oform(wrapper).form.state.isValid).toBe(false);
+    expect(onlineEvalsService.scoreConfigs.create).not.toHaveBeenCalled();
   });
 
   it("blocks submit when min or max is cleared (a blank number is not allowed)", async () => {

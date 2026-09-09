@@ -92,6 +92,25 @@ async function clear() {
   return false;
 }
 
+/** Drain to a stable-empty sink: a prior serial test's async SMTP delivery can land after clear(),
+ *  and with only one valid org recipient the count cannot be scoped by address, so wait until the
+ *  sink has stayed empty for `stableMs` (re-clearing any late arrival) before sending the next message. */
+async function waitUntilEmptyStable(stableMs = 3000, timeoutMs = 30000) {
+  const deadline = Date.now() + timeoutMs;
+  let emptySince = null;
+  while (Date.now() < deadline) {
+    if ((await count()) === 0) {
+      if (emptySince === null) emptySince = Date.now();
+      else if (Date.now() - emptySince >= stableMs) return true;
+    } else {
+      await clear();
+      emptySince = null;
+    }
+    await new Promise((r) => setTimeout(r, 1000));
+  }
+  return false;
+}
+
 async function waitForCount(n, timeoutMs = 120000) {
   const deadline = Date.now() + timeoutMs;
   let last = 0;
@@ -143,4 +162,4 @@ async function latest() {
   return null;
 }
 
-module.exports = { available, unavailableReason, backend, list, count, clear, waitForCount, latest };
+module.exports = { available, unavailableReason, backend, list, count, clear, waitUntilEmptyStable, waitForCount, latest };

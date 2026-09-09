@@ -217,7 +217,7 @@ pub async fn merge_by_stream(
             let mut check_guard = HashSet::with_capacity(batch_groups.len());
             let mut orphan_blooms = Vec::new();
             for ret in worker_results {
-                let (batch_id, new_files) = match ret {
+                let (batch_id, new_files, retire_files) = match ret {
                     Ok(v) => v,
                     Err(e) => {
                         log::error!("[COMPACTOR] merge files failed: {e}");
@@ -234,24 +234,11 @@ pub async fn merge_by_stream(
                 }
                 check_guard.insert(batch_id);
 
-                // delete small files keys & write big files keys, use transaction
-                let delete_file_list = batch_groups.get(batch_id).unwrap().files.as_slice();
-                let mut events = Vec::with_capacity(new_files.len() + delete_file_list.len());
-                for new_file in new_files {
-                    if !new_file.key.is_empty() {
-                        events.push(new_file);
-                    }
+                // retire the merged inputs and the gone files, never the planned batch
+                let events = retirement_events(new_files, &retire_files);
+                if events.is_empty() {
+                    continue;
                 }
-
-                for file in delete_file_list {
-                    events.push(FileKey {
-                        deleted: true,
-                        selection: None,
-                        row_group_size: None,
-                        ..file.clone()
-                    });
-                }
-                events.sort_by(|a, b| a.key.cmp(&b.key));
 
                 // write file list to storage
                 if let Err(e) = write_file_list(&org_id, stream_type, &events).await {
@@ -263,13 +250,11 @@ pub async fn merge_by_stream(
                 // drop the merged source files from this node's disk cache;
                 // on nodes that also serve queries they may still be in use
                 if cluster::LOCAL_NODE.is_compactor() && !cluster::LOCAL_NODE.is_querier() {
-                    file_data::delete::add(
-                        delete_file_list.iter().map(|f| f.key.clone()).collect(),
-                    );
+                    file_data::delete::add(retire_files.iter().map(|f| f.key.clone()).collect());
                 }
 
                 // collect orphan blooms after writing file list successfully
-                for file in delete_file_list {
+                for file in &retire_files {
                     if file.meta.bloom_ver > 0 {
                         orphan_blooms.push(file.meta.bloom_ver);
                     }
@@ -404,6 +389,23 @@ async fn write_file_list(
     Ok(())
 }
 
+/// File-list events that add `new_files` and delete `retire_files`; delete-only is valid.
+fn retirement_events(new_files: Vec<FileKey>, retire_files: &[FileKey]) -> Vec<FileKey> {
+    if retire_files.is_empty() {
+        return Vec::new();
+    }
+    let mut events = Vec::with_capacity(new_files.len() + retire_files.len());
+    events.extend(new_files.into_iter().filter(|f| !f.key.is_empty()));
+    events.extend(retire_files.iter().map(|file| FileKey {
+        deleted: true,
+        selection: None,
+        row_group_size: None,
+        ..file.clone()
+    }));
+    events.sort_by(|a, b| a.key.cmp(&b.key));
+    events
+}
+
 /// sort by time range without overlapping
 fn sort_by_time_range(mut file_list: Vec<FileKey>) -> Vec<FileKey> {
     let files_num = file_list.len();
@@ -459,6 +461,44 @@ mod tests {
             selection: None,
             row_group_size: None,
         }
+    }
+
+    #[test]
+    fn test_retirement_events_empty_retire_files_produces_nothing() {
+        let new_files = vec![create_file_key("out.parquet", 1000, 2000, 4096)];
+        let events = retirement_events(new_files, &[]);
+        assert!(events.is_empty());
+    }
+
+    #[test]
+    fn test_retirement_events_delete_only_without_new_files() {
+        let gone = vec![create_file_key("gone.parquet", 1000, 2000, 1024)];
+        let events = retirement_events(Vec::new(), &gone);
+        let keys: Vec<(&str, bool)> = events.iter().map(|f| (f.key.as_str(), f.deleted)).collect();
+        assert_eq!(keys, vec![("gone.parquet", true)]);
+    }
+
+    #[test]
+    fn test_retirement_events_retires_exactly_retire_files() {
+        let new_files = vec![
+            create_file_key("out.parquet", 1000, 3000, 4096),
+            create_file_key("", 0, 0, 0),
+        ];
+        let retire = vec![
+            create_file_key("b.parquet", 2000, 3000, 1024),
+            create_file_key("a.parquet", 1000, 2000, 1024),
+        ];
+        let events = retirement_events(new_files, &retire);
+        let keys: Vec<(&str, bool)> = events.iter().map(|f| (f.key.as_str(), f.deleted)).collect();
+        assert_eq!(
+            keys,
+            vec![
+                ("a.parquet", true),
+                ("b.parquet", true),
+                ("out.parquet", false)
+            ]
+        );
+        assert!(events.iter().all(|f| f.selection.is_none()));
     }
 
     #[test]

@@ -13,7 +13,6 @@
       "alerts-history.spec.js",
       "alerts-template-prebuilt-guard.spec.js",
       "alerts-form-validation.spec.js",
-      "anomaly-detection-form-validation.spec.js",
       "alerts-priority-tags.spec.js",
       "alerts-multialert-ui.spec.js",
       "alert-library.spec.js",
@@ -149,7 +148,7 @@
   },
   {
     "testfolder": "Dashboards-Tables",
-    "_comment": "Owns the pagination and pivot-table specs (previously their own single-spec shards) \u2014 keep them here.",
+    "_comment": "Owns the pagination and pivot-table specs (previously their own single-spec shards) — keep them here.",
     "actual_folder": "Dashboards",
     "browser": "chrome",
     "run_files": [
@@ -315,7 +314,7 @@
     ]
   },
   {
-    "_comment": "Own shard because isSelectStarForTable() only exists when the server runs with ZO_QUICK_MODE_ENABLED=true. That flag is read once at process start, so it cannot vary between tests sharing a backend \u2014 each shard gets its own OpenObserve process. Every other shard omits quick_mode_enabled and keeps the default (false).",
+    "_comment": "Own shard because isSelectStarForTable() only exists when the server runs with ZO_QUICK_MODE_ENABLED=true. That flag is read once at process start, so it cannot vary between tests sharing a backend — each shard gets its own OpenObserve process. Every other shard omits quick_mode_enabled and keeps the default (false).",
     "testfolder": "Logs-SelectStar",
     "actual_folder": "Logs",
     "browser": "chrome",
@@ -409,7 +408,7 @@
   },
   {
     "testfolder": "RUM-Token",
-    "_comment": "rum-token.spec.js RESETS the org RUM token; running it beside the dataflow specs (workers run files in parallel) would 401 their in-flight SDK beacons. Own shard = own isolated instance \u2014 do NOT merge back into RUM.",
+    "_comment": "rum-token.spec.js RESETS the org RUM token; running it beside the dataflow specs (workers run files in parallel) would 401 their in-flight SDK beacons. Own shard = own isolated instance — do NOT merge back into RUM.",
     "actual_folder": "RUM",
     "browser": "chrome",
     "run_files": [
@@ -452,7 +451,7 @@
   },
   {
     "testfolder": "SLO",
-    "_comment": "SLO lifecycle, form validation and the alert SLI type. No backfill dependency, so these run in parallel \u2014 but pinned to 3 workers: at 5 the concurrent SLO/alert/destination writes trip SQLite's 'database is locked' on the single-node meta store. The REST contract is covered by pytest in tests/api-testing/tests/slos/.",
+    "_comment": "SLO lifecycle, form validation and the alert SLI type. No backfill dependency, so these run in parallel — but pinned to 3 workers: at 5 the concurrent SLO/alert/destination writes trip SQLite's 'database is locked' on the single-node meta store. The REST contract is covered by pytest in tests/api-testing/tests/slos/.",
     "actual_folder": "SLO",
     "browser": "chrome",
     "ingest_allowed_upto": "240",
@@ -460,6 +459,7 @@
     "run_files": [
       "slo-crud.spec.js",
       "slo-form-validation.spec.js",
+      "slo-required-fields.spec.js",
       "slo-alert-sli.spec.js"
     ],
     "disabled": []
