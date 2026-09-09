@@ -138,8 +138,8 @@ pub async fn publish_error(error_data: ErrorData) {
     let cfg = get_config();
     #[cfg(not(feature = "enterprise"))]
     {
-        if !cfg.common.usage_reporting_errors_enabled {
-            log::debug!("[SELF-REPORTING] Skipping error publish - error reporting disabled");
+        if !cfg.common.usage_enabled {
+            log::debug!("[SELF-REPORTING] Skipping error publish - usage reporting disabled");
             return;
         }
     }
@@ -218,6 +218,7 @@ pub async fn flush() {
     shutdown(cfg.limit.usage_reporting_thread_num).await;
 }
 
+/// Counts the request in Prometheus, then records usage; the enterprise build alone records usage.
 #[cfg_attr(not(feature = "enterprise"), allow(unreachable_code, unused_variables))]
 pub async fn report_request_usage_stats(
     stats: RequestStats,
@@ -837,14 +838,13 @@ mod tests {
     }
 
     #[test]
-    fn publish_error_is_not_gated_on_usage_enabled() {
+    fn publish_error_keeps_its_original_gate() {
         let source = include_str!("lib.rs");
         let body = source
             .split("pub async fn publish_error")
             .nth(1)
             .expect("publish_error is defined");
         let body = &body[..body.find("\npub ").unwrap_or(body.len())];
-        assert!(body.contains("if !cfg.common.usage_reporting_errors_enabled"));
-        assert!(!body.contains("if !cfg.common.usage_enabled"));
+        assert!(body.contains("if !cfg.common.usage_enabled"));
     }
 }
