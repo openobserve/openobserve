@@ -25,14 +25,14 @@ use config::{
         stream::StreamType,
     },
 };
-use o2_enterprise::enterprise::raman_collect::collector::RamanSearchPort;
+use o2_enterprise::enterprise::alert_hygiene_collect::collector::AlertHygieneSearchPort;
 use search_service::grpc_search::grpc_search;
 
 /// The OSS half of the injected port; enterprise cannot depend on `search_service`.
 #[derive(Clone, Copy, Debug, Default)]
-pub struct RamanSearchAdapter;
+pub struct AlertHygieneSearchAdapter;
 
-impl RamanSearchPort for RamanSearchAdapter {
+impl AlertHygieneSearchPort for AlertHygieneSearchAdapter {
     fn search(
         &self,
         org_id: String,

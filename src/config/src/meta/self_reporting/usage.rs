@@ -216,8 +216,8 @@ pub enum TriggerDataType {
     /// The per-org alerting-hygiene job. Persisted by serde name — this enum has
     /// no discriminant form — so the wire name, not the position, is what a stored
     /// row depends on.
-    #[serde(rename = "raman")]
-    Raman,
+    #[serde(rename = "alert_hygiene")]
+    AlertHygiene,
 }
 
 impl TriggerDataType {
@@ -1155,45 +1155,45 @@ mod run_outcome_tests {
         assert!(!TriggerDataType::AnomalyDetectionTraining.is_condition_bearing());
     }
 
-    // ── Raman: the hygiene job's own observability row ──────────────────────
+    // ── Alert hygiene: the hygiene job's own observability row ──────────────
 
-    /// Raman evaluates no alert condition, so it can never be "firing"; a run
+    /// Alert hygiene evaluates no alert condition, so it can never be "firing"; a run
     /// that completed is [`RunOutcome::Succeeded`].
     #[test]
-    fn raman_is_not_condition_bearing() {
-        assert!(!TriggerDataType::Raman.is_condition_bearing());
+    fn alert_hygiene_is_not_condition_bearing() {
+        assert!(!TriggerDataType::AlertHygiene.is_condition_bearing());
     }
 
     /// The variant is persisted by serde name only — there is no `from_i32` for
     /// this enum — so the wire name is the compatibility surface.
     #[test]
-    fn raman_serialises_under_its_own_wire_name() {
+    fn alert_hygiene_serialises_under_its_own_wire_name() {
         assert_eq!(
-            serde_json::to_string(&TriggerDataType::Raman).unwrap(),
-            "\"raman\""
+            serde_json::to_string(&TriggerDataType::AlertHygiene).unwrap(),
+            "\"alert_hygiene\""
         );
         assert_eq!(
-            serde_json::from_str::<TriggerDataType>("\"raman\"").unwrap(),
-            TriggerDataType::Raman
+            serde_json::from_str::<TriggerDataType>("\"alert_hygiene\"").unwrap(),
+            TriggerDataType::AlertHygiene
         );
     }
 
     /// A legacy `completed` row for a non-condition module normalises to
     /// `Succeeded`, never `Firing`.
     #[test]
-    fn a_legacy_completed_raman_row_normalises_to_succeeded() {
+    fn a_legacy_completed_alert_hygiene_row_normalises_to_succeeded() {
         assert_eq!(
-            normalize_outcome("completed", &TriggerDataType::Raman, None),
+            normalize_outcome("completed", &TriggerDataType::AlertHygiene, None),
             Some(RunOutcome::Succeeded)
         );
     }
 
-    /// `normalize_legacy_outcome` rewrites only condition-bearing modules, so a
-    /// raman `Succeeded` must survive it untouched.
+    /// `normalize_legacy_outcome` rewrites only condition-bearing modules, so an
+    /// alert_hygiene `Succeeded` must survive it untouched.
     #[test]
-    fn normalize_legacy_outcome_leaves_a_raman_success_alone() {
+    fn normalize_legacy_outcome_leaves_an_alert_hygiene_success_alone() {
         let mut data = TriggerData {
-            module: TriggerDataType::Raman,
+            module: TriggerDataType::AlertHygiene,
             status: RunOutcome::Succeeded,
             ..Default::default()
         };

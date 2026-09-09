@@ -186,6 +186,7 @@ mod m20260831_000001_add_exhausted_at_to_oncall_responses;
 mod m20260901_000001_reset_anomaly_detection_retries;
 mod m20260903_000001_add_anomaly_last_failed_at;
 mod m20260906_000001_add_anomaly_last_alert_fired_at;
+mod m20260907_000001_create_alert_hygiene_tables;
 mod m20260910_000001_add_folder_id_to_workflows;
 mod m20260911_000001_add_splunk_token_to_org_ingestion_tokens;
 mod m20260912_000001_add_anomaly_alert_budget;
@@ -195,7 +196,6 @@ mod m20260916_000001_add_folder_id_to_workflow_drafts;
 mod m20260917_000001_create_llm_experiment_slot_retries;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
-mod m20260907_000001_create_raman_tables;
 
 #[cfg(test)]
 pub(crate) async fn create_scheduled_jobs_for_test(
@@ -310,39 +310,37 @@ pub(crate) async fn create_synthetics_for_test(
 }
 
 #[cfg(test)]
-pub(crate) async fn create_raman_tables_for_test(
+pub(crate) async fn create_alert_hygiene_tables_for_test(
     db: &sea_orm::DatabaseConnection,
 ) -> Result<(), DbErr> {
     use sea_orm_migration::MigrationTrait;
     let manager = SchemaManager::new(db);
-    m20260907_000001_create_raman_tables::Migration
+    m20260907_000001_create_alert_hygiene_tables::Migration
         .up(&manager)
         .await
 }
 
 #[cfg(test)]
-pub(crate) async fn drop_raman_tables_for_test(
+pub(crate) async fn drop_alert_hygiene_tables_for_test(
     db: &sea_orm::DatabaseConnection,
 ) -> Result<(), DbErr> {
     use sea_orm_migration::MigrationTrait;
     let manager = SchemaManager::new(db);
-    m20260907_000001_create_raman_tables::Migration
+    m20260907_000001_create_alert_hygiene_tables::Migration
         .down(&manager)
         .await
 }
 
 #[cfg(test)]
-pub(crate) fn raman_migration_sql_for_test(backend: sea_orm::DatabaseBackend) -> Vec<String> {
-    use m20260907_000001_create_raman_tables as migration;
+pub(crate) fn alert_hygiene_migration_sql_for_test(
+    backend: sea_orm::DatabaseBackend,
+) -> Vec<String> {
+    use m20260907_000001_create_alert_hygiene_tables as migration;
 
-    let mut sql = vec![
-        backend.build(&migration::configs_statement()).to_string(),
-        backend.build(&migration::digests_statement()).to_string(),
-    ];
+    let mut sql = vec![backend.build(&migration::configs_statement()).to_string()];
     sql.extend(
         migration::config_indexes()
             .iter()
-            .chain(migration::digest_indexes().iter())
             .map(|statement| backend.build(statement).to_string()),
     );
     sql
@@ -529,7 +527,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260915_000001_add_profiles_streams_to_service_streams::Migration),
             Box::new(m20260916_000001_add_folder_id_to_workflow_drafts::Migration),
             Box::new(m20260917_000001_create_llm_experiment_slot_retries::Migration),
-            Box::new(m20260907_000001_create_raman_tables::Migration),
+            Box::new(m20260907_000001_create_alert_hygiene_tables::Migration),
         ]
     }
 }
@@ -571,7 +569,7 @@ mod tests {
         (83, "m20260910_000001_add_folder_id_to_workflows"),
         (84, "m20260916_000001_add_folder_id_to_workflow_drafts"),
         (85, "m20260917_000001_create_llm_experiment_slot_retries"),
-        (86, "m20260907_000001_create_raman_tables"),
+        (86, "m20260907_000001_create_alert_hygiene_tables"),
     ];
 
     #[test]

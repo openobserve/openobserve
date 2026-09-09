@@ -36,7 +36,7 @@ pub enum SystemJobType {
     SelfReporting,
     InternalGrpc,
     AnomalyDetection,
-    RamanDigest,
+    AlertHygieneDigest,
 }
 
 impl SystemJobType {
@@ -48,7 +48,7 @@ impl SystemJobType {
             SystemJobType::SelfReporting => "self_reporting",
             SystemJobType::InternalGrpc => "internal_grpc",
             SystemJobType::AnomalyDetection => "anomaly_detection",
-            SystemJobType::RamanDigest => "raman_digest",
+            SystemJobType::AlertHygieneDigest => "alert_hygiene_digest",
         }
     }
 
@@ -72,7 +72,7 @@ impl FromStr for SystemJobType {
             "self_reporting" => Ok(SystemJobType::SelfReporting),
             "internal_grpc" => Ok(SystemJobType::InternalGrpc),
             "anomaly_detection" => Ok(SystemJobType::AnomalyDetection),
-            "raman_digest" => Ok(SystemJobType::RamanDigest),
+            "alert_hygiene_digest" => Ok(SystemJobType::AlertHygieneDigest),
             other => Err(format!("unknown system job type: {other}")),
         }
     }
@@ -1011,23 +1011,23 @@ mod tests {
     }
 
     #[test]
-    fn test_raman_digest_job_has_its_own_email_local_part() {
+    fn test_alert_hygiene_digest_job_has_its_own_email_local_part() {
         assert_eq!(
-            SystemJobType::RamanDigest.as_email_local(),
-            "raman_digest",
+            SystemJobType::AlertHygieneDigest.as_email_local(),
+            "alert_hygiene_digest",
             "digest writes must not be attributed to another subsystem"
         );
     }
 
     #[test]
-    fn test_raman_digest_email_local_part_is_unique_across_system_jobs() {
+    fn test_alert_hygiene_digest_email_local_part_is_unique_across_system_jobs() {
         let all = [
             SystemJobType::SelfMetricsPromql,
             SystemJobType::ServiceGraph,
             SystemJobType::SelfReporting,
             SystemJobType::InternalGrpc,
             SystemJobType::AnomalyDetection,
-            SystemJobType::RamanDigest,
+            SystemJobType::AlertHygieneDigest,
         ];
         let mut locals: Vec<&str> = all.iter().map(|j| j.as_email_local()).collect();
         locals.sort_unstable();
@@ -1041,14 +1041,14 @@ mod tests {
     }
 
     #[test]
-    fn test_raman_digest_ingest_user_renders_a_system_local_email() {
-        let user = IngestUser::SystemJob(SystemJobType::RamanDigest);
-        assert_eq!(user.to_email(), "raman_digest@system.local");
+    fn test_alert_hygiene_digest_ingest_user_renders_a_system_local_email() {
+        let user = IngestUser::SystemJob(SystemJobType::AlertHygieneDigest);
+        assert_eq!(user.to_email(), "alert_hygiene_digest@system.local");
     }
 
     #[test]
-    fn test_raman_digest_ingest_user_is_a_system_job_not_a_user() {
-        let user = IngestUser::SystemJob(SystemJobType::RamanDigest);
+    fn test_alert_hygiene_digest_ingest_user_is_a_system_job_not_a_user() {
+        let user = IngestUser::SystemJob(SystemJobType::AlertHygieneDigest);
         assert!(
             !matches!(user, IngestUser::User(_)),
             "the _o2_ rollup write guard rejects IngestUser::User, so a digest writer must never be one"
@@ -1141,7 +1141,7 @@ mod tests {
             SystemJobType::SelfReporting,
             SystemJobType::InternalGrpc,
             SystemJobType::AnomalyDetection,
-            SystemJobType::RamanDigest,
+            SystemJobType::AlertHygieneDigest,
         ];
         for job in all {
             let canonical = match job {
@@ -1150,7 +1150,7 @@ mod tests {
                 SystemJobType::SelfReporting => "self_reporting",
                 SystemJobType::InternalGrpc => "internal_grpc",
                 SystemJobType::AnomalyDetection => "anomaly_detection",
-                SystemJobType::RamanDigest => "raman_digest",
+                SystemJobType::AlertHygieneDigest => "alert_hygiene_digest",
             };
             assert_eq!(job.as_email_local(), canonical);
             assert_eq!(
@@ -1165,27 +1165,27 @@ mod tests {
     fn test_system_job_type_parse_rejects_unknown_and_empty_values() {
         assert!("".parse::<SystemJobType>().is_err());
         assert!("not_a_job".parse::<SystemJobType>().is_err());
-        assert!("RamanDigest".parse::<SystemJobType>().is_err());
-        assert!(" raman_digest".parse::<SystemJobType>().is_err());
+        assert!("AlertHygieneDigest".parse::<SystemJobType>().is_err());
+        assert!(" alert_hygiene_digest".parse::<SystemJobType>().is_err());
     }
 
     #[test]
     fn test_system_job_type_ingest_metadata_uses_the_canonical_key_and_spelling() {
-        let meta = SystemJobType::RamanDigest.as_ingest_metadata();
+        let meta = SystemJobType::AlertHygieneDigest.as_ingest_metadata();
         assert_eq!(
             meta.get(SYSTEM_JOB_TYPE_METADATA_KEY),
-            Some(&"raman_digest".to_string())
+            Some(&"alert_hygiene_digest".to_string())
         );
         assert_eq!(meta.len(), 1);
     }
 
     #[test]
     fn test_system_job_type_ingest_metadata_round_trips_into_a_digest_email() {
-        let meta = SystemJobType::RamanDigest.as_ingest_metadata();
+        let meta = SystemJobType::AlertHygieneDigest.as_ingest_metadata();
         let parsed: SystemJobType = meta[SYSTEM_JOB_TYPE_METADATA_KEY].parse().unwrap();
         assert_eq!(
             IngestUser::SystemJob(parsed).to_email(),
-            "raman_digest@system.local"
+            "alert_hygiene_digest@system.local"
         );
     }
 

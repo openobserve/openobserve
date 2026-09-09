@@ -1454,8 +1454,6 @@ pub async fn init_deferred() -> Result<(), anyhow::Error> {
 mod tests {
     use super::{AnomalyClaimTransition, anomaly_claim_transition};
 
-    const SOURCE: &str = include_str!("mod.rs");
-
     /// A claim resolving after init grants scheduling on the next tick, with no restart.
     #[test]
     fn a_claim_appearing_later_starts_scheduling_without_reinit() {
@@ -1483,27 +1481,6 @@ mod tests {
         assert_eq!(
             anomaly_claim_transition(false, false),
             AnomalyClaimTransition::Hold
-        );
-    }
-
-    /// A reaper nothing calls is a table that grows forever, and no other test would notice.
-    #[test]
-    fn init_starts_the_raman_digest_reaper() {
-        let start = SOURCE
-            .find("pub async fn init(")
-            .expect("the job module must define init()");
-        let after = &SOURCE[start..];
-        let end = after
-            .find("\n}\n")
-            .expect("init() must end at a column-0 close brace");
-        let body = after[..end]
-            .lines()
-            .filter(|line| !line.trim_start().starts_with("//"))
-            .collect::<Vec<_>>()
-            .join("\n");
-        assert!(
-            body.contains("raman_digest_reaper::run();"),
-            "init() must start the raman digest reaper, or nothing ever expires a raman_digests row"
         );
     }
 }

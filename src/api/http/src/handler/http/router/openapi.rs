@@ -529,7 +529,7 @@ use crate::{
         (name = "Announcements", description = "Operator-authored announcement banners shown across organizations (enterprise)"),
         (name = "Anomaly Detection", description = "Anomaly detection configuration, training and detection runs (enterprise)"),
         (name = "Workflows", description = "Workflow authoring, triggering and run history (enterprise)"),
-        (name = "Raman", description = "Alert hygiene digests and configuration (enterprise)"),
+        (name = "Alert Hygiene", description = "Alert hygiene digests and configuration (enterprise)"),
     ),
     info(
         description = "OpenObserve API documents [https://openobserve.ai/docs/](https://openobserve.ai/docs/)",
@@ -602,11 +602,9 @@ pub struct ApiDoc;
     openobserve_api_management::request::workflows::enable_workflow,
     openobserve_api_management::request::workflows::get_workflow_history,
     openobserve_api_management::request::workflows::promote_draft,
-    openobserve_api_management::request::raman::config::get_raman_config,
-    openobserve_api_management::request::raman::config::update_raman_config,
-    openobserve_api_management::request::raman::digests::list_raman_digests,
-    openobserve_api_management::request::raman::digests::get_raman_digest,
-    openobserve_api_management::request::raman::digests::run_raman_digest,
+    openobserve_api_management::request::alert_hygiene::config::get_alert_hygiene_config,
+    openobserve_api_management::request::alert_hygiene::config::update_alert_hygiene_config,
+    openobserve_api_management::request::alert_hygiene::digests::run_alert_hygiene_digest,
 ))]
 #[openapi(components(schemas(
     openobserve_api_management::models::experiments::ExperimentResultRowSortBody,
@@ -783,17 +781,15 @@ mod tests {
         "/{org_id}/anomaly_detection",
         "/{org_id}/workflows",
         "/{org_id}/tasks",
-        "/v2/{org_id}/raman",
+        "/v2/{org_id}/alert_hygiene",
     ];
 
     /// Spelled as the merged spec does; the router's own placeholder names differ.
     #[cfg(feature = "enterprise")]
     const ENTERPRISE_MODULE_ROUTES: &[(&str, &str)] = &[
-        ("/api/v2/{org_id}/raman/config", "get"),
-        ("/api/v2/{org_id}/raman/config", "put"),
-        ("/api/v2/{org_id}/raman/digests", "get"),
-        ("/api/v2/{org_id}/raman/digests/run", "post"),
-        ("/api/v2/{org_id}/raman/digests/{digest_id}", "get"),
+        ("/api/v2/{org_id}/alert_hygiene/config", "get"),
+        ("/api/v2/{org_id}/alert_hygiene/config", "put"),
+        ("/api/v2/{org_id}/alert_hygiene/digests/run", "post"),
         ("/api/{org_id}/anomaly_detection", "get"),
         ("/api/{org_id}/anomaly_detection", "post"),
         ("/api/{org_id}/anomaly_detection/history", "get"),

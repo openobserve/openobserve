@@ -636,7 +636,9 @@ pub async fn handle_triggers(
         db::scheduler::TriggerModule::OncallEscalation => {
             handle_oncall_escalation_triggers(trigger).await
         }
-        db::scheduler::TriggerModule::Raman => handle_raman_triggers(trace_id, trigger).await,
+        db::scheduler::TriggerModule::AlertHygiene => {
+            handle_alert_hygiene_triggers(trace_id, trigger).await
+        }
     }
 }
 
@@ -5902,29 +5904,30 @@ async fn handle_slo_backfill_triggers(
     Ok(())
 }
 
-/// OSS runs no hygiene analysis, but it still pulls raman rows, so it must re-arm
+/// OSS runs no hygiene analysis, but it still pulls alert_hygiene rows, so it must re-arm
 /// them: a handler that returns without finalizing leaves the row `Processing`
 /// forever and the lane silently stops draining.
 #[cfg(not(feature = "enterprise"))]
-async fn handle_raman_triggers(
+async fn handle_alert_hygiene_triggers(
     trace_id: &str,
     trigger: db::scheduler::Trigger,
 ) -> Result<(), anyhow::Error> {
     let started_at = now_micros();
-    let config = raman_config(&trigger.org, &trigger.module_key).await;
-    let window_minutes = raman_run_window_minutes(config.as_ref(), get_config().raman.enabled);
+    let config = alert_hygiene_config(&trigger.org, &trigger.module_key).await;
+    let window_minutes =
+        alert_hygiene_run_window_minutes(config.as_ref(), get_config().alert_hygiene.enabled);
     let mut error = None;
     if window_minutes.is_some() {
         log::warn!(
-            "[raman] config {} is enabled but hygiene analysis is an enterprise feature; \
+            "[alert_hygiene] config {} is enabled but hygiene analysis is an enterprise feature; \
              re-arming without a digest",
             trigger.module_key
         );
         error = Some("hygiene analysis is an enterprise feature".to_string());
     }
-    let next_run_at = raman_next_run_at(now_micros(), config.as_ref());
+    let next_run_at = alert_hygiene_next_run_at(now_micros(), config.as_ref());
     // No window: OSS analyses nothing, so the row must not claim it did.
-    publish_triggers_usage(raman_trigger_data(
+    publish_triggers_usage(alert_hygiene_trigger_data(
         &trigger,
         next_run_at,
         None,
@@ -5933,7 +5936,7 @@ async fn handle_raman_triggers(
         now_micros(),
         trace_id,
     ));
-    finalize_raman_trigger(trigger, next_run_at, trace_id).await
+    finalize_alert_hygiene_trigger(trigger, next_run_at, trace_id).await
 }
 
 /// One hygiene pass over the org's own alerting history.
@@ -5942,23 +5945,23 @@ async fn handle_raman_triggers(
 /// handler returns, so an early return would leave the row `Processing` until the
 /// watcher reclaimed it, over and over, with nothing in the queue ever completing.
 #[cfg(feature = "enterprise")]
-async fn handle_raman_triggers(
+async fn handle_alert_hygiene_triggers(
     trace_id: &str,
     trigger: db::scheduler::Trigger,
 ) -> Result<(), anyhow::Error> {
     let started_at = now_micros();
-    let config = raman_config(&trigger.org, &trigger.module_key).await;
-    let (window_minutes, error) = raman_run_outcome(
+    let config = alert_hygiene_config(&trigger.org, &trigger.module_key).await;
+    let (window_minutes, error) = alert_hygiene_run_outcome(
         &trigger,
         config.as_ref(),
-        get_config().raman.enabled,
+        get_config().alert_hygiene.enabled,
         |org, config_id, window_minutes, run_at_micros| async move {
-            run_raman_digest(&org, &config_id, window_minutes, run_at_micros).await
+            run_alert_hygiene_digest(&org, &config_id, window_minutes, run_at_micros).await
         },
     )
     .await;
-    let next_run_at = raman_next_run_at(now_micros(), config.as_ref());
-    publish_triggers_usage(raman_trigger_data(
+    let next_run_at = alert_hygiene_next_run_at(now_micros(), config.as_ref());
+    publish_triggers_usage(alert_hygiene_trigger_data(
         &trigger,
         next_run_at,
         window_minutes,
@@ -5967,23 +5970,23 @@ async fn handle_raman_triggers(
         now_micros(),
         trace_id,
     ));
-    finalize_raman_trigger(trigger, next_run_at, trace_id).await
+    finalize_alert_hygiene_trigger(trigger, next_run_at, trace_id).await
 }
 
 /// The run decision and its dispatch, over an injected runner so a test can assert the
 /// digest a deployment switch permits, and the one it never starts.
 #[cfg(feature = "enterprise")]
-async fn raman_run_outcome<F, Fut>(
+async fn alert_hygiene_run_outcome<F, Fut>(
     trigger: &db::scheduler::Trigger,
-    config: Option<&infra::table::entity::raman_configs::Model>,
-    raman_enabled: bool,
+    config: Option<&infra::table::entity::alert_hygiene_configs::Model>,
+    alert_hygiene_enabled: bool,
     run: F,
 ) -> (Option<i64>, Option<String>)
 where
     F: FnOnce(String, String, i64, i64) -> Fut,
     Fut: std::future::Future<Output = Result<(), anyhow::Error>>,
 {
-    let window_minutes = raman_run_window_minutes(config, raman_enabled);
+    let window_minutes = alert_hygiene_run_window_minutes(config, alert_hygiene_enabled);
     // Every pull rewrites `start_time`; only the due time survives a re-pull unchanged.
     let run_at_micros = trigger.next_run_at;
     let org = &trigger.org;
@@ -5998,32 +6001,30 @@ where
         )
         .await
     {
-        log::error!("[raman] digest run failed for {config_id} org={org}: {e}");
+        log::error!("[alert_hygiene] digest run failed for {config_id} org={org}: {e}");
         error = Some(e.to_string());
     }
     (window_minutes, error)
 }
 
-/// Collect, judge, store, then project. The table is the system of record and the
-/// stream copy is governed by ordinary retention, so a failed projection must not
-/// cost the digest.
+/// Collect, judge, then write: the stream is the only output, so a failed write loses the run.
 #[cfg(feature = "enterprise")]
-async fn run_raman_digest(
+async fn run_alert_hygiene_digest(
     org: &str,
     config_id: &str,
     window_minutes: i64,
     run_at_micros: i64,
 ) -> Result<(), anyhow::Error> {
     use o2_enterprise::enterprise::{
-        raman_collect::{
-            collector::{CollectionPlan, RamanCollector},
-            digest::{DigestKey, digest_row_now},
+        alert_hygiene_collect::{
+            collector::{AlertHygieneCollector, CollectionPlan},
+            digest::{DigestKey, digest_records_now},
             window::{effective_max_query_range_hours, window_for_run},
         },
-        raman_rules::engine::{default_rules, run},
+        alert_hygiene_rules::engine::{default_rules, run},
     };
 
-    let cluster = raman_cluster(
+    let cluster = alert_hygiene_cluster(
         o2_enterprise::enterprise::common::config::get_config()
             .super_cluster
             .enabled,
@@ -6034,13 +6035,13 @@ async fn run_raman_digest(
             0,
             get_config().limit.default_max_query_range_days,
         ));
-    let collection = crate::alerts::raman::RamanSearchAdapter
+    let collection = crate::alerts::alert_hygiene::AlertHygieneSearchAdapter
         .collect(&plan)
         .await
         .map_err(|e| anyhow::anyhow!("{e}"))?;
 
     let report = run(&default_rules(), &collection.context);
-    let row = digest_row_now(
+    let records = digest_records_now(
         DigestKey {
             org,
             config_id,
@@ -6051,43 +6052,20 @@ async fn run_raman_digest(
         &report,
         &collection.coverage,
     )?;
-
-    let digest = infra::table::raman::upsert_digest(
-        get_orm_client_rw().await,
-        infra::table::raman::NewDigest {
-            org: org.to_string(),
-            config_id: config_id.to_string(),
-            cluster,
-            window_start: row.window_start,
-            window_end: row.window_end,
-            generated_at: row.generated_at,
-            finding_count: row.finding_count as i32,
-            findings: json::from_str(&row.findings)?,
-            coverage_gap: row.coverage_gap,
-        },
-    )
-    .await
-    .map_err(|e| anyhow::anyhow!(e.to_string()))?;
-
-    let records = raman_digest_records(&digest);
-    // The sink carries no branch of its own, so the empty guard lives here where a test runs.
-    if records.is_empty() {
-        return Ok(());
-    }
-    crate::alerts::raman::sink::write_digest_records(org, records).await
+    crate::alerts::alert_hygiene::sink::write_digest_records(org, records).await
 }
 
 /// A read failure is reported as absence, never propagated: the scheduler only logs
 /// what a handler returns, so an unreadable config would strand the row in `Processing`
 /// instead of retrying it once the database answers again.
-async fn raman_config(
+async fn alert_hygiene_config(
     org: &str,
     config_id: &str,
-) -> Option<infra::table::entity::raman_configs::Model> {
-    match infra::table::raman::get_by_id(get_orm_client_ro().await, org, config_id).await {
+) -> Option<infra::table::entity::alert_hygiene_configs::Model> {
+    match infra::table::alert_hygiene::get_by_id(get_orm_client_ro().await, org, config_id).await {
         Ok(config) => config,
         Err(e) => {
-            log::error!("[raman] could not read config {config_id} for org={org}: {e}");
+            log::error!("[alert_hygiene] could not read config {config_id} for org={org}: {e}");
             None
         }
     }
@@ -6095,7 +6073,7 @@ async fn raman_config(
 
 /// `Waiting`, never `Completed`: the hygiene job is periodic and the row has to be
 /// re-claimable on its next due date.
-async fn finalize_raman_trigger(
+async fn finalize_alert_hygiene_trigger(
     mut trigger: db::scheduler::Trigger,
     next_run_at: i64,
     trace_id: &str,
@@ -6108,11 +6086,15 @@ async fn finalize_raman_trigger(
 
 /// Measured from the end of the run, not its start, so a pass that overruns its own
 /// cadence re-arms one interval out instead of immediately.
-fn raman_next_run_at(now: i64, config: Option<&infra::table::entity::raman_configs::Model>) -> i64 {
+fn alert_hygiene_next_run_at(
+    now: i64,
+    config: Option<&infra::table::entity::alert_hygiene_configs::Model>,
+) -> i64 {
     const DEFAULT_FREQUENCY_MINUTES: i64 = 1440;
     const RESYNC_SECS: i64 = 60;
 
-    // Raman configs never replicate but trigger deletes do, so absence is a peer, not a deletion.
+    // Alert hygiene configs never replicate but trigger deletes do, so absence is a peer, not a
+    // deletion.
     let Some(config) = config else {
         return now.saturating_add(second_micros(RESYNC_SECS));
     };
@@ -6125,11 +6107,11 @@ fn raman_next_run_at(now: i64, config: Option<&infra::table::entity::raman_confi
 }
 
 /// Both the deployment switch and the org's own config must allow the run.
-fn raman_run_window_minutes(
-    config: Option<&infra::table::entity::raman_configs::Model>,
-    raman_enabled: bool,
+fn alert_hygiene_run_window_minutes(
+    config: Option<&infra::table::entity::alert_hygiene_configs::Model>,
+    alert_hygiene_enabled: bool,
 ) -> Option<i64> {
-    if !raman_enabled {
+    if !alert_hygiene_enabled {
         return None;
     }
     config
@@ -6141,7 +6123,7 @@ fn raman_run_window_minutes(
 /// enterprise arm — which runs in no test suite — reports what a test can check.
 /// `window_minutes` is `Some` only when a pass was actually attempted: that is what
 /// separates a skipped run from a successful one.
-fn raman_trigger_data(
+fn alert_hygiene_trigger_data(
     trigger: &db::scheduler::Trigger,
     next_run_at: i64,
     window_minutes: Option<i64>,
@@ -6164,10 +6146,10 @@ fn raman_trigger_data(
     TriggerData {
         _timestamp: finished_at,
         org: trigger.org.clone(),
-        module: TriggerDataType::Raman,
+        module: TriggerDataType::AlertHygiene,
         // Parseable by the collector's last-slash split, though `alert` is the only
-        // module it analyses, so a raman row can never feed its own digest.
-        key: format!("raman/{}", trigger.module_key),
+        // module it analyses, so an alert_hygiene row can never feed its own digest.
+        key: format!("alert_hygiene/{}", trigger.module_key),
         next_run_at,
         is_realtime: trigger.is_realtime,
         is_silenced: trigger.is_silenced,
@@ -6188,41 +6170,15 @@ fn raman_trigger_data(
     }
 }
 
-/// Empty outside a super-cluster, matching `raman_digests.cluster`: the column is part
-/// of the per-window unique key, so a renamed single cluster must not fork its digests.
+/// Empty outside a super-cluster: every digest record carries it, so a renamed single
+/// cluster must not split one org's stream across two cluster names.
 #[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
-fn raman_cluster(super_cluster_enabled: bool) -> String {
+fn alert_hygiene_cluster(super_cluster_enabled: bool) -> String {
     if super_cluster_enabled {
         config::get_cluster_name()
     } else {
         String::new()
     }
-}
-
-/// One stream record per finding, stamped at the analysed window's end.
-#[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
-fn raman_digest_records(digest: &infra::table::entity::raman_digests::Model) -> Vec<json::Value> {
-    let Some(findings) = digest.findings.get("findings").and_then(|v| v.as_array()) else {
-        return Vec::new();
-    };
-    findings
-        .iter()
-        .filter_map(|finding| finding.as_object())
-        .map(|finding| {
-            let mut record = finding.clone();
-            // Written last so the stored row's identity wins any collision with a finding field.
-            record.insert("_timestamp".to_string(), digest.window_end.into());
-            record.insert("digest_id".to_string(), digest.id.clone().into());
-            record.insert("org".to_string(), digest.org.clone().into());
-            record.insert("config_id".to_string(), digest.config_id.clone().into());
-            record.insert("cluster".to_string(), digest.cluster.clone().into());
-            record.insert("window_start".to_string(), digest.window_start.into());
-            record.insert("window_end".to_string(), digest.window_end.into());
-            record.insert("generated_at".to_string(), digest.generated_at.into());
-            record.insert("coverage_gap".to_string(), digest.coverage_gap.into());
-            json::Value::Object(record)
-        })
-        .collect()
 }
 
 fn publish_slo_pass(
@@ -7599,14 +7555,14 @@ mod tests {
         }
     }
 
-    /// The raman hygiene job's schedule, projection and reporting decisions. These
+    /// The alert hygiene job's schedule and reporting decisions. These
     /// are the only parts a test can execute: the handler's analysing arm is
     /// `#[cfg(feature = "enterprise")]`, so neither CI runs it.
-    mod raman {
+    mod alert_hygiene {
         #[cfg(feature = "enterprise")]
         use std::sync::{Arc, Mutex};
 
-        use infra::table::entity::{raman_configs, raman_digests};
+        use infra::table::entity::alert_hygiene_configs;
 
         use super::*;
 
@@ -7614,7 +7570,7 @@ mod tests {
         const MINUTE: i64 = 60 * 1_000_000;
         /// Both decision inputs as one fragment, so a scan catches an arm that drops the
         /// switch as surely as one that never asks.
-        const RUN_DECISION: &str = "config.as_ref(), get_config().raman.enabled";
+        const RUN_DECISION: &str = "config.as_ref(), get_config().alert_hygiene.enabled";
         const OSS_ARM: &str = "#[cfg(not(feature = \"enterprise\"))]";
         const ENTERPRISE_ARM: &str = "#[cfg(feature = \"enterprise\")]";
 
@@ -7646,10 +7602,10 @@ mod tests {
         /// One `#[cfg]` arm alone: a whole-region count hides one arm reading twice and one never.
         fn handler_arm(cfg_attribute: &str) -> String {
             let source = live_source(HANDLERS_SOURCE);
-            let signature = format!("{cfg_attribute}\nasync fn handle_raman_triggers(");
-            let start = source
-                .find(&signature)
-                .unwrap_or_else(|| panic!("handle_raman_triggers has no `{cfg_attribute}` arm"));
+            let signature = format!("{cfg_attribute}\nasync fn handle_alert_hygiene_triggers(");
+            let start = source.find(&signature).unwrap_or_else(|| {
+                panic!("handle_alert_hygiene_triggers has no `{cfg_attribute}` arm")
+            });
             let arm = &source[start..];
             let end = arm
                 .find("\n}\n")
@@ -7661,8 +7617,8 @@ mod tests {
             enabled: bool,
             frequency_minutes: i32,
             window_minutes: i32,
-        ) -> raman_configs::Model {
-            raman_configs::Model {
+        ) -> alert_hygiene_configs::Model {
+            alert_hygiene_configs::Model {
                 id: "cfg1".to_string(),
                 org: "default".to_string(),
                 enabled,
@@ -7687,33 +7643,14 @@ mod tests {
             }
         }
 
-        fn digest(findings: serde_json::Value) -> raman_digests::Model {
-            raman_digests::Model {
-                id: "dig1".to_string(),
-                org: "default".to_string(),
-                config_id: "cfg1".to_string(),
-                cluster: String::new(),
-                window_start: NOW - 60 * MINUTE,
-                window_end: NOW,
-                generated_at: NOW + 1,
-                finding_count: 0,
-                findings,
-                coverage_gap: true,
-            }
-        }
-
-        fn payload(findings: serde_json::Value) -> serde_json::Value {
-            serde_json::json!({ "version": 1, "findings": findings, "skips": [] })
-        }
-
         #[test]
         fn the_cadence_comes_from_the_config_row_and_not_from_a_constant() {
             assert_eq!(
-                raman_next_run_at(NOW, Some(&config(true, 30, 60))),
+                alert_hygiene_next_run_at(NOW, Some(&config(true, 30, 60))),
                 NOW + 30 * MINUTE
             );
             assert_eq!(
-                raman_next_run_at(NOW, Some(&config(true, 1440, 60))),
+                alert_hygiene_next_run_at(NOW, Some(&config(true, 1440, 60))),
                 NOW + 1440 * MINUTE
             );
         }
@@ -7721,21 +7658,21 @@ mod tests {
         #[test]
         fn a_disabled_config_is_still_re_armed_at_its_own_cadence() {
             assert_eq!(
-                raman_next_run_at(NOW, Some(&config(false, 30, 60))),
+                alert_hygiene_next_run_at(NOW, Some(&config(false, 30, 60))),
                 NOW + 30 * MINUTE
             );
         }
 
         #[test]
         fn a_config_the_region_cannot_see_yet_is_retried_a_minute_out() {
-            assert_eq!(raman_next_run_at(NOW, None), NOW + MINUTE);
+            assert_eq!(alert_hygiene_next_run_at(NOW, None), NOW + MINUTE);
         }
 
         #[test]
         fn a_non_positive_cadence_falls_back_to_the_daily_column_default() {
             for frequency in [0, -1, i32::MIN] {
                 assert_eq!(
-                    raman_next_run_at(NOW, Some(&config(true, frequency, 60))),
+                    alert_hygiene_next_run_at(NOW, Some(&config(true, frequency, 60))),
                     NOW + 1440 * MINUTE,
                     "a corrupt cadence of {frequency} must not re-arm in the past"
                 );
@@ -7745,32 +7682,32 @@ mod tests {
         #[test]
         fn every_re_armed_trigger_is_scheduled_strictly_in_the_future() {
             for row in [None, Some(config(true, 5, 60)), Some(config(false, 0, 60))] {
-                assert!(raman_next_run_at(NOW, row.as_ref()) > NOW);
+                assert!(alert_hygiene_next_run_at(NOW, row.as_ref()) > NOW);
             }
         }
 
         #[test]
         fn a_disabled_config_may_not_run_analysis() {
             assert_eq!(
-                raman_run_window_minutes(Some(&config(false, 30, 60)), true),
+                alert_hygiene_run_window_minutes(Some(&config(false, 30, 60)), true),
                 None
             );
         }
 
         #[test]
         fn a_missing_config_may_not_run_analysis() {
-            assert_eq!(raman_run_window_minutes(None, true), None);
+            assert_eq!(alert_hygiene_run_window_minutes(None, true), None);
         }
 
         #[test]
         fn an_enabled_config_is_analysed_over_the_window_it_declares() {
             assert_eq!(
-                raman_run_window_minutes(Some(&config(true, 1440, 43200)), true),
+                alert_hygiene_run_window_minutes(Some(&config(true, 1440, 43200)), true),
                 Some(43200)
             );
         }
 
-        /// The deployment switch outranks the org's own: an operator turning raman off
+        /// The deployment switch outranks the org's own: an operator turning alert_hygiene off
         /// must stop every org, not only the ones that had not opted in.
         #[test]
         fn the_deployment_switch_off_declines_even_an_enabled_config() {
@@ -7779,7 +7716,7 @@ mod tests {
                 Some(config(true, 1440, 43200)),
                 Some(config(false, 30, 60)),
             ] {
-                assert_eq!(raman_run_window_minutes(row.as_ref(), false), None);
+                assert_eq!(alert_hygiene_run_window_minutes(row.as_ref(), false), None);
             }
         }
 
@@ -7789,7 +7726,7 @@ mod tests {
         #[tokio::test]
         async fn the_deployment_switch_off_starts_no_digest_at_all() {
             let runs = Arc::new(Mutex::new(Vec::new()));
-            let (window_minutes, error) = raman_run_outcome(
+            let (window_minutes, error) = alert_hygiene_run_outcome(
                 &trigger(),
                 Some(&config(true, 1440, 43200)),
                 false,
@@ -7800,7 +7737,7 @@ mod tests {
             assert_eq!(error, None);
             assert!(
                 runs.lock().unwrap().is_empty(),
-                "an operator turning raman off must stop the digest, not only the reporting"
+                "an operator turning alert_hygiene off must stop the digest, not only the reporting"
             );
         }
 
@@ -7808,7 +7745,7 @@ mod tests {
         #[tokio::test]
         async fn a_disabled_org_config_starts_no_digest_even_with_the_switch_on() {
             let runs = Arc::new(Mutex::new(Vec::new()));
-            let (window_minutes, error) = raman_run_outcome(
+            let (window_minutes, error) = alert_hygiene_run_outcome(
                 &trigger(),
                 Some(&config(false, 1440, 43200)),
                 true,
@@ -7825,7 +7762,7 @@ mod tests {
         #[tokio::test]
         async fn an_enabled_deployment_starts_one_digest_over_the_window_the_config_declares() {
             let runs = Arc::new(Mutex::new(Vec::new()));
-            let (window_minutes, error) = raman_run_outcome(
+            let (window_minutes, error) = alert_hygiene_run_outcome(
                 &trigger(),
                 Some(&config(true, 1440, 7200)),
                 true,
@@ -7849,7 +7786,7 @@ mod tests {
         #[cfg(feature = "enterprise")]
         #[tokio::test]
         async fn a_failed_digest_is_reported_on_the_row_rather_than_returned() {
-            let (window_minutes, error) = raman_run_outcome(
+            let (window_minutes, error) = alert_hygiene_run_outcome(
                 &trigger(),
                 Some(&config(true, 1440, 43200)),
                 true,
@@ -7861,8 +7798,8 @@ mod tests {
         }
 
         /// The anchor is `next_run_at` and not `start_time`: every pull rewrites
-        /// `start_time`, so a re-pulled attempt would derive a fresh window, miss the
-        /// upsert's unique key and insert a second digest for the one logical run.
+        /// `start_time`, so a re-pulled attempt would derive a fresh window and write a
+        /// second, differently-windowed set of records for the one logical run.
         #[cfg(feature = "enterprise")]
         #[tokio::test]
         async fn the_run_instant_is_the_triggers_due_time_and_not_the_wall_clock() {
@@ -7871,7 +7808,7 @@ mod tests {
             let mut trigger = trigger();
             trigger.next_run_at = DUE_AT;
             trigger.start_time = Some(now_micros());
-            let (window_minutes, error) = raman_run_outcome(
+            let (window_minutes, error) = alert_hygiene_run_outcome(
                 &trigger,
                 Some(&config(true, 1440, 7200)),
                 true,
@@ -7889,67 +7826,7 @@ mod tests {
 
         #[test]
         fn a_single_cluster_deployment_keys_its_digests_on_an_empty_cluster() {
-            assert_eq!(raman_cluster(false), "");
-        }
-
-        #[test]
-        fn a_digest_with_no_findings_projects_no_records() {
-            assert!(raman_digest_records(&digest(payload(serde_json::json!([])))).is_empty());
-        }
-
-        #[test]
-        fn a_payload_without_a_findings_array_projects_no_records() {
-            assert!(raman_digest_records(&digest(serde_json::json!({ "version": 1 }))).is_empty());
-            assert!(raman_digest_records(&digest(serde_json::json!("corrupt"))).is_empty());
-        }
-
-        #[test]
-        fn one_record_is_projected_for_every_finding() {
-            let records = raman_digest_records(&digest(payload(serde_json::json!([
-                { "rule_id": "silent", "title": "a" },
-                { "rule_id": "noise", "title": "b" },
-            ]))));
-            assert_eq!(records.len(), 2);
-            assert_eq!(records[0]["rule_id"], "silent");
-            assert_eq!(records[1]["title"], "b");
-        }
-
-        #[test]
-        fn every_projected_record_carries_the_digest_row_identity() {
-            let records = raman_digest_records(&digest(payload(serde_json::json!([
-                { "rule_id": "silent" }
-            ]))));
-            let record = &records[0];
-            assert_eq!(record["digest_id"], "dig1");
-            assert_eq!(record["org"], "default");
-            assert_eq!(record["config_id"], "cfg1");
-            assert_eq!(record["cluster"], "");
-            assert_eq!(record["window_start"], NOW - 60 * MINUTE);
-            assert_eq!(record["window_end"], NOW);
-            assert_eq!(record["generated_at"], NOW + 1);
-            assert_eq!(record["coverage_gap"], true);
-            assert_eq!(record["_timestamp"], NOW);
-        }
-
-        /// The stored row is the system of record, so its identity must win over a
-        /// same-named field a future rule could put in a finding.
-        #[test]
-        fn the_digest_identity_overrides_a_colliding_finding_field() {
-            let records = raman_digest_records(&digest(payload(serde_json::json!([
-                { "rule_id": "silent", "org": "spoofed", "_timestamp": 1 }
-            ]))));
-            assert_eq!(records[0]["org"], "default");
-            assert_eq!(records[0]["_timestamp"], NOW);
-        }
-
-        #[test]
-        fn a_finding_that_is_not_an_object_is_dropped_rather_than_projected() {
-            let records = raman_digest_records(&digest(payload(serde_json::json!([
-                "not an object",
-                { "rule_id": "noise" },
-            ]))));
-            assert_eq!(records.len(), 1);
-            assert_eq!(records[0]["rule_id"], "noise");
+            assert_eq!(alert_hygiene_cluster(false), "");
         }
 
         // ── The observability row ───────────────────────────────────────────
@@ -7962,7 +7839,7 @@ mod tests {
         fn trigger() -> db::scheduler::Trigger {
             db::scheduler::Trigger {
                 org: "default".to_string(),
-                module: db::scheduler::TriggerModule::Raman,
+                module: db::scheduler::TriggerModule::AlertHygiene,
                 module_key: "cfg1".to_string(),
                 next_run_at: NOW - 5 * MINUTE,
                 retries: 2,
@@ -7972,7 +7849,7 @@ mod tests {
         }
 
         fn row(window_minutes: Option<i64>, error: Option<String>) -> TriggerData {
-            raman_trigger_data(
+            alert_hygiene_trigger_data(
                 &trigger(),
                 NOW + 30 * MINUTE,
                 window_minutes,
@@ -7984,7 +7861,7 @@ mod tests {
         }
 
         fn delayed_row(window_minutes: Option<i64>) -> TriggerData {
-            raman_trigger_data(
+            alert_hygiene_trigger_data(
                 &db::scheduler::Trigger {
                     next_run_at: DUE,
                     ..trigger()
@@ -8027,8 +7904,8 @@ mod tests {
         }
 
         #[test]
-        fn the_published_row_names_the_raman_module() {
-            assert_eq!(row(Some(60), None).module, TriggerDataType::Raman);
+        fn the_published_row_names_the_alert_hygiene_module() {
+            assert_eq!(row(Some(60), None).module, TriggerDataType::AlertHygiene);
         }
 
         /// The collector splits a key on its LAST slash and reads the tail as an id,
@@ -8036,9 +7913,9 @@ mod tests {
         #[test]
         fn the_published_key_names_the_config_and_survives_the_collector_split() {
             let key = row(Some(60), None).key;
-            assert_eq!(key, "raman/cfg1");
+            assert_eq!(key, "alert_hygiene/cfg1");
             let (name, id) = key.rsplit_once('/').expect("key is splittable");
-            assert_eq!(name, "raman");
+            assert_eq!(name, "alert_hygiene");
             assert_eq!(id, "cfg1");
             assert_ne!(id, "default");
         }
@@ -8080,12 +7957,12 @@ mod tests {
         /// a source scan is the only check that reaches the enterprise one.
         #[test]
         fn every_arm_of_the_handler_publishes_its_row() {
-            let needle = scannable("publish_triggers_usage(raman_trigger_data(");
+            let needle = scannable("publish_triggers_usage(alert_hygiene_trigger_data(");
             for arm in [OSS_ARM, ENTERPRISE_ARM] {
                 assert_eq!(
                     handler_arm(arm).matches(&needle).count(),
                     1,
-                    "the {arm} arm of handle_raman_triggers must publish exactly one row"
+                    "the {arm} arm of handle_alert_hygiene_triggers must publish exactly one row"
                 );
             }
         }
@@ -8099,19 +7976,19 @@ mod tests {
                 assert_eq!(
                     handler_arm(arm).matches(&needle).count(),
                     1,
-                    "the {arm} arm of handle_raman_triggers must ask the deployment \
+                    "the {arm} arm of handle_alert_hygiene_triggers must ask the deployment \
                      switch exactly once"
                 );
             }
         }
 
         /// Disabling must stay reversible: the switch may not reach the re-arm or the
-        /// delete path, or turning raman off would cost every org its schedule.
+        /// delete path, or turning alert_hygiene off would cost every org its schedule.
         #[test]
         fn the_deployment_switch_is_read_nowhere_but_the_two_run_decisions() {
             for arm in [OSS_ARM, ENTERPRISE_ARM] {
                 assert_eq!(
-                    handler_arm(arm).matches("raman.enabled").count(),
+                    handler_arm(arm).matches("alert_hygiene.enabled").count(),
                     1,
                     "the {arm} arm reads the deployment switch somewhere other than \
                      its own run decision"
@@ -8119,7 +7996,7 @@ mod tests {
             }
             assert_eq!(
                 scannable(live_source(HANDLERS_SOURCE))
-                    .matches("raman.enabled")
+                    .matches("alert_hygiene.enabled")
                     .count(),
                 2,
                 "the deployment switch reached a path other than the decision to run"
@@ -8136,18 +8013,18 @@ mod tests {
         #[test]
         fn a_wrapped_run_decision_scans_as_the_same_call_as_a_single_line_one() {
             assert!(
-                scannable("raman_run_window_minutes(\n    config.as_ref(),\n    get_config().raman.enabled,\n)")
+                scannable("alert_hygiene_run_window_minutes(\n    config.as_ref(),\n    get_config().alert_hygiene.enabled,\n)")
                     .contains(&scannable(RUN_DECISION))
             );
         }
 
-        /// The handler's own runner and `run_raman_digest` are unreachable from a test, so
+        /// The handler's own runner and `run_alert_hygiene_digest` are unreachable from a test, so
         /// a source scan is the only check that the anchor survives the hop out of the seam.
         #[test]
         fn the_digest_derives_its_window_from_the_run_instant_and_never_from_the_clock() {
             let source = scannable(live_source(HANDLERS_SOURCE));
             assert!(handler_arm(ENTERPRISE_ARM).contains(&scannable(
-                "run_raman_digest(&org, &config_id, window_minutes, run_at_micros)"
+                "run_alert_hygiene_digest(&org, &config_id, window_minutes, run_at_micros)"
             )));
             assert!(source.contains(&scannable("window_for_run(run_at_micros, window_minutes)")));
             assert!(
@@ -8156,13 +8033,13 @@ mod tests {
             );
         }
 
-        /// The hygiene job analyses `alert` rows only. A raman row that read as one
+        /// The hygiene job analyses `alert` rows only. An alert_hygiene row that read as one
         /// would make the job analyse its own failures.
         #[test]
-        fn a_raman_row_cannot_be_mistaken_for_an_alert_row() {
+        fn an_alert_hygiene_row_cannot_be_mistaken_for_an_alert_row() {
             let module = row(Some(60), None).module;
             assert!(!module.is_condition_bearing());
-            assert_eq!(serde_json::to_string(&module).unwrap(), "\"raman\"");
+            assert_eq!(serde_json::to_string(&module).unwrap(), "\"alert_hygiene\"");
             assert_ne!(
                 serde_json::to_string(&module).unwrap(),
                 serde_json::to_string(&TriggerDataType::Alert).unwrap()

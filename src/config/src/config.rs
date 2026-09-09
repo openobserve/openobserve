@@ -82,7 +82,7 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 83: add folder_id to workflows.
 // 84: add folder_id to workflow_drafts.
 // 85: create llm_experiment_slot_retries.
-// 86: create raman_configs and raman_digests.
+// 86: create alert_hygiene_configs.
 pub const DB_SCHEMA_VERSION: u64 = 86;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
@@ -946,7 +946,7 @@ pub struct Config {
     pub synthetics: Synthetics,
     pub alert_composite: AlertComposite,
     pub db_monitoring: DatabaseMonitoring,
-    pub raman: Raman,
+    pub alert_hygiene: AlertHygiene,
 }
 
 /// Database Monitoring (design: `db-monitoring/dbm-design-doc.md` §8) —
@@ -975,19 +975,13 @@ pub struct DatabaseMonitoring {
 
 /// The deployment switch over alert hygiene, second-gated by each org's own config row.
 #[derive(Debug, Serialize, EnvConfig, Default)]
-pub struct Raman {
+pub struct AlertHygiene {
     #[env_config(
-        name = "ZO_RAMAN_ENABLED",
+        name = "ZO_ALERT_HYGIENE_ENABLED",
         default = false,
-        help = "Master switch for alert hygiene (Raman). Off by default; while it is off no org's hygiene pass runs and every well-formed request to /v2/{org_id}/raman/* answers 404, whatever each org's own config says."
+        help = "Master switch for alert hygiene. Off by default; while it is off no org's hygiene pass runs and every well-formed request to /v2/{org_id}/alert_hygiene/* answers 404, whatever each org's own config says."
     )]
     pub enabled: bool,
-    #[env_config(
-        name = "ZO_RAMAN_RETENTION_DAYS",
-        default = 365,
-        help = "How long a raman digest row (raman_digests) is kept, in days. Nothing else expires these rows: the stream copy in _o2_raman_digests is governed by ordinary stream retention, the table is not. A year keeps the hygiene timeline comparable year over year at roughly one row per org per day. Independent of ZO_RAMAN_ENABLED, so a deployment that turns raman off still expires what it already wrote. 0 or less disables the reaper."
-    )]
-    pub retention_days: i64,
 }
 
 /// Synthetic monitoring. Lives here rather than in `o2_enterprise` because the
@@ -2638,11 +2632,11 @@ pub struct Limit {
     )]
     pub scheduler_query_reco_concurrency: i64,
     #[env_config(
-        name = "ZO_SCHEDULER_RAMAN_CONCURRENCY",
+        name = "ZO_SCHEDULER_ALERT_HYGIENE_CONCURRENCY",
         default = 0,
-        help = "Max raman digest jobs pulled per cycle and the worker-pool size. Only used when ZO_SCHEDULER_PER_MODULE_PULLERS=true. 0 inherits ZO_ALERT_SCHEDULE_CONCURRENCY."
+        help = "Max alert hygiene digest jobs pulled per cycle and the worker-pool size. Only used when ZO_SCHEDULER_PER_MODULE_PULLERS=true. 0 inherits ZO_ALERT_SCHEDULE_CONCURRENCY."
     )]
-    pub scheduler_raman_concurrency: i64,
+    pub scheduler_alert_hygiene_concurrency: i64,
     // Per-module poll cadence in seconds. 0 = inherit ZO_ALERT_SCHEDULE_INTERVAL (the alert pull
     // frequency). Only used when ZO_SCHEDULER_PER_MODULE_PULLERS=true. One var per module so each
     // puller can poll at its own rate (e.g. backfill slower, synthetics faster). The alert lane
@@ -2696,11 +2690,11 @@ pub struct Limit {
     )]
     pub scheduler_query_reco_interval: i64,
     #[env_config(
-        name = "ZO_SCHEDULER_RAMAN_INTERVAL",
+        name = "ZO_SCHEDULER_ALERT_HYGIENE_INTERVAL",
         default = 0, // seconds
-        help = "Poll cadence in seconds for the raman digest puller. Only used when ZO_SCHEDULER_PER_MODULE_PULLERS=true. 0 inherits ZO_ALERT_SCHEDULE_INTERVAL."
+        help = "Poll cadence in seconds for the alert hygiene digest puller. Only used when ZO_SCHEDULER_PER_MODULE_PULLERS=true. 0 inherits ZO_ALERT_SCHEDULE_INTERVAL."
     )]
-    pub scheduler_raman_interval: i64,
+    pub scheduler_alert_hygiene_interval: i64,
     #[env_config(name = "ZO_SEARCH_JOB_WORKS", default = 1)]
     pub search_job_workers: i64,
     #[env_config(name = "ZO_SEARCH_JOB_SCHEDULE_INTERVAL", default = 10)] // seconds
@@ -5955,11 +5949,11 @@ mod tests {
         );
     }
 
-    /// A raman pass is a per-org query over a 30-day window on a daily cadence, so a
+    /// An alert_hygiene pass is a per-org query over a 30-day window on a daily cadence, so a
     /// deployment that never asked for one must never pay for one.
     #[test]
-    fn test_raman_is_off_by_default() {
-        assert!(!Config::init().unwrap().raman.enabled);
+    fn test_alert_hygiene_is_off_by_default() {
+        assert!(!Config::init().unwrap().alert_hygiene.enabled);
     }
 
     #[test]

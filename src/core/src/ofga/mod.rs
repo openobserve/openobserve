@@ -57,7 +57,7 @@ const OWNERSHIP_BACKFILL_RESOURCES: [&str; 10] = [
     "search_inspector",
     "status_pages",
     "playground",
-    "raman",
+    "alert_hygiene",
 ];
 
 /// Which back-fills the jump from one model version to another still owes.
@@ -723,7 +723,7 @@ mod tests {
             all_org_ownership_keys(&pending),
             OWNERSHIP_BACKFILL_RESOURCES.to_vec()
         );
-        assert!(OWNERSHIP_BACKFILL_RESOURCES.contains(&"raman"));
+        assert!(OWNERSHIP_BACKFILL_RESOURCES.contains(&"alert_hygiene"));
         assert!(OWNERSHIP_BACKFILL_RESOURCES.contains(&"mcp"));
     }
 

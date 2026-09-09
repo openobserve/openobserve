@@ -458,7 +458,13 @@ mod tests {
 
     #[test]
     fn test_system_job_type_defaults_to_internal_grpc_for_unknown_or_empty_values() {
-        for value in ["", "raman", "RamanDigest", "internal grpc", " raman_digest"] {
+        for value in [
+            "",
+            "alert_hygiene",
+            "AlertHygieneDigest",
+            "internal grpc",
+            " alert_hygiene_digest",
+        ] {
             let metadata = IngestRequestMetadata {
                 data: HashMap::from([("system_job_type".to_string(), value.to_string())]),
             };
@@ -478,7 +484,7 @@ mod tests {
             SystemJobType::SelfReporting,
             SystemJobType::InternalGrpc,
             SystemJobType::AnomalyDetection,
-            SystemJobType::RamanDigest,
+            SystemJobType::AlertHygieneDigest,
         ] {
             let metadata = IngestRequestMetadata {
                 data: job.as_ingest_metadata(),
@@ -488,15 +494,15 @@ mod tests {
     }
 
     #[test]
-    fn test_raman_digest_metadata_attributes_the_write_to_the_digest_job() {
+    fn test_alert_hygiene_digest_metadata_attributes_the_write_to_the_digest_job() {
         let metadata = IngestRequestMetadata {
-            data: SystemJobType::RamanDigest.as_ingest_metadata(),
+            data: SystemJobType::AlertHygieneDigest.as_ingest_metadata(),
         };
         let job = system_job_type_from_metadata(Some(&metadata));
-        assert_eq!(job, SystemJobType::RamanDigest);
+        assert_eq!(job, SystemJobType::AlertHygieneDigest);
         assert_eq!(
             IngestUser::SystemJob(job).to_email(),
-            "raman_digest@system.local"
+            "alert_hygiene_digest@system.local"
         );
     }
 

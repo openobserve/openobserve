@@ -54,8 +54,8 @@ pub enum TriggerModule {
     /// next rung's delay. Its own lane so a paging timer is never queued
     /// behind an alert evaluation backlog.
     OncallEscalation,
-    /// Periodic digest run over the raman rules engine, one job per org config.
-    Raman,
+    /// Periodic digest run over the alert_hygiene rules engine, one job per org config.
+    AlertHygiene,
 }
 
 impl std::fmt::Display for TriggerModule {
@@ -71,7 +71,7 @@ impl std::fmt::Display for TriggerModule {
             Self::SloBackfill => write!(f, "slo_backfill"),
             Self::CompositeAlert => write!(f, "composite_alert"),
             Self::OncallEscalation => write!(f, "oncall_escalation"),
-            Self::Raman => write!(f, "raman"),
+            Self::AlertHygiene => write!(f, "alert_hygiene"),
         }
     }
 }
@@ -239,8 +239,11 @@ mod tests {
         assert_eq!(TriggerModule::Slo.to_string(), "slo");
         assert_eq!(TriggerModule::SloBackfill.to_string(), "slo_backfill");
         assert_eq!(TriggerModule::CompositeAlert.to_string(), "composite_alert");
-        assert_eq!(TriggerModule::OncallEscalation.to_string(), "oncall_escalation");
-        assert_eq!(TriggerModule::Raman.to_string(), "raman");
+        assert_eq!(
+            TriggerModule::OncallEscalation.to_string(),
+            "oncall_escalation"
+        );
+        assert_eq!(TriggerModule::AlertHygiene.to_string(), "alert_hygiene");
     }
 
     /// Two variants sharing a `Display` string would make the wire/log form
@@ -258,7 +261,7 @@ mod tests {
             TriggerModule::SloBackfill,
             TriggerModule::CompositeAlert,
             TriggerModule::OncallEscalation,
-            TriggerModule::Raman,
+            TriggerModule::AlertHygiene,
         ];
         let unique: std::collections::HashSet<String> =
             all.iter().map(ToString::to_string).collect();
@@ -280,7 +283,7 @@ mod tests {
         assert_eq!(TriggerModule::SloBackfill as i32, 7);
         assert_eq!(TriggerModule::CompositeAlert as i32, 8);
         assert_eq!(TriggerModule::OncallEscalation as i32, 9);
-        assert_eq!(TriggerModule::Raman as i32, 10);
+        assert_eq!(TriggerModule::AlertHygiene as i32, 10);
     }
 
     #[test]
@@ -298,7 +301,7 @@ mod tests {
             (TriggerModule::SloBackfill, "SloBackfill"),
             (TriggerModule::CompositeAlert, "CompositeAlert"),
             (TriggerModule::OncallEscalation, "OncallEscalation"),
-            (TriggerModule::Raman, "Raman"),
+            (TriggerModule::AlertHygiene, "AlertHygiene"),
         ] {
             assert_eq!(
                 serde_json::to_string(&variant).unwrap(),

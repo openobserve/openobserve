@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! The raman REST surface: a well-formed request meets the deployment-switch guard first.
+//! The alert_hygiene REST surface: a well-formed request meets the deployment-switch guard first.
 
 #[cfg(feature = "enterprise")]
 pub mod config;
@@ -24,16 +24,17 @@ pub mod digests;
 use {
     axum::response::{IntoResponse, Response},
     common::meta::http::HttpResponse as MetaHttpResponse,
-    o2_enterprise::enterprise::raman_service::RamanServiceError,
+    o2_enterprise::enterprise::alert_hygiene_service::AlertHygieneServiceError,
 };
 
 #[cfg(feature = "enterprise")]
-const DISABLED_MESSAGE: &str = "Alert hygiene (Raman) is disabled (ZO_RAMAN_ENABLED=false)";
+const DISABLED_MESSAGE: &str = "Alert hygiene is disabled (ZO_ALERT_HYGIENE_ENABLED=false)";
 
-/// The whole REST surface behind one predicate: no route reads or writes a raman row while off.
+/// The whole REST surface behind one predicate: no route reads or writes an alert_hygiene row while
+/// off.
 #[cfg(feature = "enterprise")]
 fn deployment_disabled() -> Option<Response> {
-    (!::config::get_config().raman.enabled).then(disabled_response)
+    (!::config::get_config().alert_hygiene.enabled).then(disabled_response)
 }
 
 #[cfg(feature = "enterprise")]
@@ -42,10 +43,10 @@ fn disabled_response() -> Response {
 }
 
 #[cfg(feature = "enterprise")]
-fn error_response(error: &RamanServiceError) -> Response {
+fn error_response(error: &AlertHygieneServiceError) -> Response {
     let status = error.http_status();
     if status >= 500 {
-        log::error!("[raman] {error}");
+        log::error!("[alert_hygiene] {error}");
     }
     MetaHttpResponse::error(status, error.to_string()).into_response()
 }
@@ -119,13 +120,13 @@ mod tests {
     #[cfg(feature = "enterprise")]
     fn with_switch<T>(enabled: bool, f: impl FnOnce() -> T) -> T {
         let _guard = SWITCH_LOCK.lock().unwrap_or_else(|e| e.into_inner());
-        let previous = std::env::var("ZO_RAMAN_ENABLED").ok();
-        unsafe { std::env::set_var("ZO_RAMAN_ENABLED", enabled.to_string()) };
+        let previous = std::env::var("ZO_ALERT_HYGIENE_ENABLED").ok();
+        unsafe { std::env::set_var("ZO_ALERT_HYGIENE_ENABLED", enabled.to_string()) };
         ::config::refresh_config().expect("config refresh");
         let out = f();
         match previous {
-            Some(value) => unsafe { std::env::set_var("ZO_RAMAN_ENABLED", value) },
-            None => unsafe { std::env::remove_var("ZO_RAMAN_ENABLED") },
+            Some(value) => unsafe { std::env::set_var("ZO_ALERT_HYGIENE_ENABLED", value) },
+            None => unsafe { std::env::remove_var("ZO_ALERT_HYGIENE_ENABLED") },
         }
         ::config::refresh_config().expect("config refresh");
         out
@@ -133,36 +134,28 @@ mod tests {
 
     /// Restated here rather than read off `http_status()`, so the mapping is asserted, not echoed.
     #[cfg(feature = "enterprise")]
-    fn documented_status(error: &RamanServiceError) -> u16 {
+    fn documented_status(error: &AlertHygieneServiceError) -> u16 {
         match error {
-            RamanServiceError::NotFound { .. } => 404,
-            RamanServiceError::InvalidInput { .. } => 400,
-            RamanServiceError::Storage(_) => 500,
+            AlertHygieneServiceError::NotFound { .. } => 404,
+            AlertHygieneServiceError::InvalidInput { .. } => 400,
+            AlertHygieneServiceError::Storage(_) => 500,
         }
     }
 
     #[test]
-    fn every_raman_route_binds_its_verb_to_its_own_handler() {
+    fn every_alert_hygiene_route_binds_its_verb_to_its_own_handler() {
         for (path, binding) in [
             (
-                "/v2/{org_id}/raman/config",
-                "get(raman::config::get_raman_config)",
+                "/v2/{org_id}/alert_hygiene/config",
+                "get(alert_hygiene::config::get_alert_hygiene_config)",
             ),
             (
-                "/v2/{org_id}/raman/config",
-                "put(raman::config::update_raman_config)",
+                "/v2/{org_id}/alert_hygiene/config",
+                "put(alert_hygiene::config::update_alert_hygiene_config)",
             ),
             (
-                "/v2/{org_id}/raman/digests",
-                "get(raman::digests::list_raman_digests)",
-            ),
-            (
-                "/v2/{org_id}/raman/digests/run",
-                "post(raman::digests::run_raman_digest)",
-            ),
-            (
-                "/v2/{org_id}/raman/digests/{digest_id}",
-                "get(raman::digests::get_raman_digest)",
+                "/v2/{org_id}/alert_hygiene/digests/run",
+                "post(alert_hygiene::digests::run_alert_hygiene_digest)",
             ),
         ] {
             assert!(
@@ -176,8 +169,8 @@ mod tests {
     #[test]
     fn a_wrapped_handler_argument_normalizes_to_the_same_call_as_a_single_line_one() {
         assert_eq!(
-            normalize("get(\n    raman::config::get_raman_config,\n)"),
-            normalize("get(raman::config::get_raman_config)")
+            normalize("get(\n    alert_hygiene::config::get_alert_hygiene_config,\n)"),
+            normalize("get(alert_hygiene::config::get_alert_hygiene_config)")
         );
     }
 
@@ -187,9 +180,10 @@ mod tests {
         assert_eq!(strip_comments("a/* .route(\"/x\") */b"), "ab");
     }
 
-    /// Five handlers, one predicate: a handler that skips it answers while ZO_RAMAN_ENABLED is off.
+    /// Three handlers, one predicate: a handler skipping it answers while ZO_ALERT_HYGIENE_ENABLED
+    /// is off.
     #[test]
-    fn every_raman_handler_opens_with_the_deployment_guard() {
+    fn every_alert_hygiene_handler_opens_with_the_deployment_guard() {
         let guard = normalize(GUARDED_SIGNATURE);
         let mut handlers = 0;
         for (file, source) in [("config.rs", CONFIG_SOURCE), ("digests.rs", DIGESTS_SOURCE)] {
@@ -204,7 +198,7 @@ mod tests {
                 );
             }
         }
-        assert_eq!(handlers, 5, "the raman surface is five handlers");
+        assert_eq!(handlers, 3, "the alert_hygiene surface is three handlers");
     }
 
     #[test]
@@ -225,7 +219,7 @@ mod tests {
             .unwrap();
         let body = String::from_utf8(body.to_vec()).unwrap();
         assert!(
-            body.contains("ZO_RAMAN_ENABLED"),
+            body.contains("ZO_ALERT_HYGIENE_ENABLED"),
             "an operator must be able to read the switch's name off the response: {body}"
         );
     }
@@ -237,11 +231,11 @@ mod tests {
     fn the_guard_answers_only_while_the_deployment_switch_is_off() {
         assert!(
             with_switch(false, deployment_disabled).is_some(),
-            "ZO_RAMAN_ENABLED=false must turn the whole surface into a 404"
+            "ZO_ALERT_HYGIENE_ENABLED=false must turn the whole surface into a 404"
         );
         assert!(
             with_switch(true, deployment_disabled).is_none(),
-            "ZO_RAMAN_ENABLED=true must let every request through to the service layer"
+            "ZO_ALERT_HYGIENE_ENABLED=true must let every request through to the service layer"
         );
     }
 
@@ -249,9 +243,9 @@ mod tests {
     #[test]
     fn every_service_error_variant_reaches_the_client_as_its_documented_status() {
         for error in [
-            RamanServiceError::not_found("config", "acme"),
-            RamanServiceError::invalid_input("limit", "must be positive"),
-            RamanServiceError::Storage("connection reset".into()),
+            AlertHygieneServiceError::not_found("config", "acme"),
+            AlertHygieneServiceError::invalid_input("limit", "must be positive"),
+            AlertHygieneServiceError::Storage("connection reset".into()),
         ] {
             let expected = documented_status(&error);
             assert_eq!(

@@ -234,8 +234,9 @@ struct ConfigResponse<'a> {
     /// the UI never has to distinguish "feed switched off here" from "collector
     /// not reporting".
     database_monitoring_enabled: bool,
-    /// Alert hygiene (`ZO_RAMAN_ENABLED`): false on OSS, where what it gates is enterprise-only.
-    raman_enabled: bool,
+    /// Alert hygiene (`ZO_ALERT_HYGIENE_ENABLED`): false on OSS, where what it gates is
+    /// enterprise-only.
+    alert_hygiene_enabled: bool,
     enable_cross_linking: bool,
     show_fts_field_values: bool,
     search_inspector_enabled: bool,
@@ -490,7 +491,7 @@ pub async fn zo_config(
     let synthetics_private_locations_enabled = enterprise_value!(false, cfg.synthetics.enabled);
     let synthetics_recorder_extension_url = &cfg.synthetics.recorder_extension_url;
     let oncall_enabled = enterprise_value!(false, o2cfg.oncall.enabled);
-    let raman_enabled = enterprise_value!(false, cfg.raman.enabled);
+    let alert_hygiene_enabled = enterprise_value!(false, cfg.alert_hygiene.enabled);
 
     #[cfg(feature = "cloud")]
     let build_type = "cloud";
@@ -608,7 +609,7 @@ pub async fn zo_config(
         synthetics_private_locations_enabled,
         synthetics_recorder_extension_url: synthetics_recorder_extension_url.to_string(),
         database_monitoring_enabled: cfg.db_monitoring.enabled,
-        raman_enabled,
+        alert_hygiene_enabled,
         enable_cross_linking: cfg.common.enable_cross_linking,
         show_fts_field_values: cfg.common.show_fts_field_values,
         search_inspector_enabled,
@@ -2270,23 +2271,23 @@ mod tests {
     /// A literal at the construction site reports `false` to the UI on an enterprise
     /// deployment that has the switch on, and no OSS run can see it.
     #[test]
-    fn the_raman_flag_on_the_config_payload_is_fed_from_the_deployment_switch() {
+    fn the_alert_hygiene_flag_on_the_config_payload_is_fed_from_the_deployment_switch() {
         let source = live_source(include_str!("mod.rs"));
         for needle in [
-            "\n    raman_enabled: bool,\n",
-            "\n    let raman_enabled = enterprise_value!(false, cfg.raman.enabled);\n",
-            "\n        raman_enabled,\n",
+            "\n    alert_hygiene_enabled: bool,\n",
+            "\n    let alert_hygiene_enabled = enterprise_value!(false, cfg.alert_hygiene.enabled);\n",
+            "\n        alert_hygiene_enabled,\n",
         ] {
             assert!(
                 source.contains(needle),
-                "the /config payload must declare, bind and construct raman_enabled \
+                "the /config payload must declare, bind and construct alert_hygiene_enabled \
                  verbatim, and construct it by shorthand: {needle:?}"
             );
         }
         assert_eq!(
-            source.matches("raman_enabled").count(),
+            source.matches("alert_hygiene_enabled").count(),
             3,
-            "raman_enabled must be the ONLY raman_* field on the /config payload, \
+            "alert_hygiene_enabled must be the ONLY alert_hygiene_* field on the /config payload, \
              declared once, bound once and constructed once"
         );
     }
@@ -2295,7 +2296,7 @@ mod tests {
     /// implements what it gates.
     #[cfg(not(feature = "enterprise"))]
     #[tokio::test]
-    async fn the_oss_config_payload_carries_raman_enabled_as_false() {
+    async fn the_oss_config_payload_carries_alert_hygiene_enabled_as_false() {
         let response = zo_config(Path("default".to_string()), None)
             .await
             .into_response();
@@ -2303,6 +2304,6 @@ mod tests {
             .await
             .unwrap();
         let payload: serde_json::Value = serde_json::from_slice(&body).unwrap();
-        assert_eq!(payload["raman_enabled"], serde_json::json!(false));
+        assert_eq!(payload["alert_hygiene_enabled"], serde_json::json!(false));
     }
 }

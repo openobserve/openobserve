@@ -41,6 +41,8 @@ use usage_reporting::http_report_metrics;
 use crate::{search as SearchService, service::setup_tracing_with_trace_id};
 
 pub mod alert;
+#[cfg(feature = "enterprise")]
+pub mod alert_hygiene;
 pub mod backfill;
 pub mod composite;
 pub mod composite_graph_lock;
@@ -57,8 +59,6 @@ pub mod notifications;
 #[cfg(feature = "enterprise")]
 pub mod org_config;
 pub mod prebuilt;
-#[cfg(feature = "enterprise")]
-pub mod raman;
 pub mod scheduler;
 pub mod templates;
 

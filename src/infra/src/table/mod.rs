@@ -20,6 +20,9 @@ use crate::{db::get_orm_client_ddl, dist_lock};
 
 pub mod alert_composites;
 pub mod alert_eval_intervals;
+pub mod alert_hygiene;
+#[cfg(test)]
+mod alert_hygiene_schema_contract_tests;
 pub mod alert_incidents;
 pub mod alert_states;
 pub mod alerts;
@@ -66,9 +69,6 @@ mod org_sweep_contract_tests;
 pub mod org_users;
 pub mod organizations;
 pub mod providers;
-pub mod raman;
-#[cfg(test)]
-mod raman_schema_contract_tests;
 pub mod ratelimit;
 pub mod re_pattern;
 pub mod re_pattern_stream_map;

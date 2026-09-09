@@ -689,9 +689,9 @@ fn resolve_module_configs(
             lease_timeout_secs: None,
         },
         ModuleSchedulerConfig {
-            module: TriggerModule::Raman,
-            concurrency: pick_concurrency(cfg.limit.scheduler_raman_concurrency),
-            poll_interval_secs: pick_interval(cfg.limit.scheduler_raman_interval),
+            module: TriggerModule::AlertHygiene,
+            concurrency: pick_concurrency(cfg.limit.scheduler_alert_hygiene_concurrency),
+            poll_interval_secs: pick_interval(cfg.limit.scheduler_alert_hygiene_interval),
             lease_timeout_secs: None,
         },
     ]
@@ -958,25 +958,28 @@ mod tests {
             TriggerModule::Slo,
             TriggerModule::SloBackfill,
             TriggerModule::OncallEscalation,
-            TriggerModule::Raman,
+            TriggerModule::AlertHygiene,
         ] {
             assert!(modules.contains(&m), "missing module {m:?}");
         }
     }
 
     /// The silent-failure site: this vec is hand-written and nothing in the
-    /// compiler checks it, so a missing lane means raman rows are never
+    /// compiler checks it, so a missing lane means alert_hygiene rows are never
     /// claimed and no error is ever logged.
     #[test]
-    fn test_resolve_module_configs_includes_a_raman_lane() {
+    fn test_resolve_module_configs_includes_an_alert_hygiene_lane() {
         let cfg = config::Config::default();
-        let raman = find_module(
+        let alert_hygiene = find_module(
             &resolve_module_configs(&cfg, &make_config()),
-            TriggerModule::Raman,
+            TriggerModule::AlertHygiene,
         );
-        assert!(raman.concurrency > 0, "a lane with no budget pulls nothing");
         assert!(
-            raman.poll_interval_secs > 0,
+            alert_hygiene.concurrency > 0,
+            "a lane with no budget pulls nothing"
+        );
+        assert!(
+            alert_hygiene.poll_interval_secs > 0,
             "a lane with a zero cadence would spin"
         );
     }
@@ -984,24 +987,27 @@ mod tests {
     /// A lane config is inert unless it becomes an actual puller, so pin the
     /// end-to-end wiring rather than only the vec entry.
     #[test]
-    fn test_raman_lane_becomes_a_dedicated_puller() {
+    fn test_alert_hygiene_lane_becomes_a_dedicated_puller() {
         let base = make_config();
         let mut cfg = config::Config::default();
-        cfg.limit.scheduler_raman_concurrency = 4;
+        cfg.limit.scheduler_alert_hygiene_concurrency = 4;
         let scheduler =
             Scheduler::new_with_modules(base.clone(), resolve_module_configs(&cfg, &base));
-        let raman_workers = scheduler
+        let alert_hygiene_workers = scheduler
             .workers
             .iter()
-            .filter(|w| w.module == Some(TriggerModule::Raman))
+            .filter(|w| w.module == Some(TriggerModule::AlertHygiene))
             .count();
-        assert_eq!(raman_workers, 4, "raman lane did not get its worker pool");
+        assert_eq!(
+            alert_hygiene_workers, 4,
+            "alert_hygiene lane did not get its worker pool"
+        );
         assert!(
             scheduler
                 .lanes
                 .iter()
-                .any(|l| l.job_puller.module == Some(TriggerModule::Raman)),
-            "no puller claims raman rows"
+                .any(|l| l.job_puller.module == Some(TriggerModule::AlertHygiene)),
+            "no puller claims alert_hygiene rows"
         );
     }
 
@@ -1024,7 +1030,7 @@ mod tests {
             TriggerModule::AnomalyDetection,
             TriggerModule::QueryRecommendations,
             TriggerModule::Slo,
-            TriggerModule::Raman,
+            TriggerModule::AlertHygiene,
         ] {
             let c = find_module(&configs, m.clone());
             assert_eq!(c.concurrency, 3, "{m:?} should inherit base concurrency");
@@ -1060,7 +1066,7 @@ mod tests {
         cfg.limit.scheduler_backfill_concurrency = 3;
         cfg.limit.scheduler_slo_concurrency = 5;
         cfg.limit.scheduler_slo_backfill_concurrency = 2;
-        cfg.limit.scheduler_raman_concurrency = 6;
+        cfg.limit.scheduler_alert_hygiene_concurrency = 6;
         let configs = resolve_module_configs(&cfg, &base);
 
         // Alert has no dedicated var: it reuses the base (ZO_ALERT_SCHEDULE_CONCURRENCY).
@@ -1087,7 +1093,10 @@ mod tests {
             find_module(&configs, TriggerModule::SloBackfill).concurrency,
             2
         );
-        assert_eq!(find_module(&configs, TriggerModule::Raman).concurrency, 6);
+        assert_eq!(
+            find_module(&configs, TriggerModule::AlertHygiene).concurrency,
+            6
+        );
     }
 
     #[test]
@@ -1102,7 +1111,7 @@ mod tests {
         cfg.limit.scheduler_anomaly_interval = 30;
         cfg.limit.scheduler_slo_interval = 45;
         cfg.limit.scheduler_slo_backfill_interval = 300;
-        cfg.limit.scheduler_raman_interval = 90;
+        cfg.limit.scheduler_alert_hygiene_interval = 90;
         // query_reco left at 0 → inherits the alert pull frequency (10)
         let configs = resolve_module_configs(&cfg, &base);
 
@@ -1136,7 +1145,7 @@ mod tests {
             300
         );
         assert_eq!(
-            find_module(&configs, TriggerModule::Raman).poll_interval_secs,
+            find_module(&configs, TriggerModule::AlertHygiene).poll_interval_secs,
             90
         );
         assert_eq!(

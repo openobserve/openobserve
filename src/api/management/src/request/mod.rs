@@ -15,6 +15,9 @@
 
 #[cfg(feature = "enterprise")]
 pub mod ai;
+// `test` is kept so an OSS test build still compiles the route-registration tests inside.
+#[cfg(any(feature = "enterprise", test))]
+pub mod alert_hygiene;
 pub mod alerts;
 #[cfg(feature = "enterprise")]
 pub mod annotation_queues;
@@ -54,9 +57,6 @@ pub mod playground;
 pub mod profiling;
 #[cfg(feature = "enterprise")]
 pub mod providers;
-// `test` is kept so an OSS test build still compiles the route-registration tests inside.
-#[cfg(any(feature = "enterprise", test))]
-pub mod raman;
 #[cfg(feature = "enterprise")]
 pub mod remote_tasks;
 #[cfg(feature = "enterprise")]

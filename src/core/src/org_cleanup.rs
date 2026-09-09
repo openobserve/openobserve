@@ -421,12 +421,12 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     // under #[cfg(not(feature = "enterprise"))] above. Importing it twice would
     // collide on the OSS build.
     use infra::table::{
-        alert_incidents, anomaly_detection, backfill_jobs, compactor_manual_jobs, dashboards,
-        destinations, distinct_values, enrichment_table_urls, enrichment_tables, folders,
-        gen_ai_agents, incident_events, incident_integrations, kv_store, llm_evaluations,
+        alert_hygiene, alert_incidents, anomaly_detection, backfill_jobs, compactor_manual_jobs,
+        dashboards, destinations, distinct_values, enrichment_table_urls, enrichment_tables,
+        folders, gen_ai_agents, incident_events, incident_integrations, kv_store, llm_evaluations,
         llm_secrets, model_pricing, online_eval_jobs, org_ai_toolsets, org_storage_providers,
-        providers, raman, ratelimit, re_pattern, re_pattern_stream_map, reports, score_configs,
-        scorers, search_queue, short_urls, slo, slo_backfill_jobs, slo_budget, slos, source_maps,
+        providers, ratelimit, re_pattern, re_pattern_stream_map, reports, score_configs, scorers,
+        search_queue, short_urls, slo, slo_backfill_jobs, slo_budget, slos, source_maps,
         status_pages, synthetics_agents, synthetics_checks, synthetics_jobs, synthetics_locations,
         synthetics_probe_tokens, synthetics_runs, system_settings, templates, timed_annotations,
         workflows,
@@ -627,10 +627,10 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/compactor_manual_jobs: {e}"))?;
     // org ids are re-usable and the config row is UNIQUE per org: a leftover breaks the next org.
-    let raman_conn = get_orm_client_rw().await;
-    raman::delete_by_org(raman_conn, org_id)
+    let alert_hygiene_conn = get_orm_client_rw().await;
+    alert_hygiene::delete_by_org(alert_hygiene_conn, org_id)
         .await
-        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/raman: {e}"))?;
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/alert_hygiene: {e}"))?;
     // Delete the S3 result objects backing this org's search jobs BEFORE dropping
     // the DB rows — the result paths are derived from each job's created_at/trace_id,
     // so once the rows are gone the objects can no longer be located and would leak.
@@ -735,7 +735,7 @@ where
     D: Fn(Trigger) -> DFut,
     DFut: std::future::Future<Output = Result<(), infra::errors::Error>>,
 {
-    // Every module, never one: the raman handler re-arms an orphan rather than delete it.
+    // Every module, never one: the alert_hygiene handler re-arms an orphan rather than delete it.
     let triggers = list(org_id.to_string(), None).await?;
     for trigger in triggers {
         delete(trigger)
@@ -1373,22 +1373,23 @@ mod tests {
         );
     }
 
-    // ===================== Raman teardown =================================
+    // ===================== Alert hygiene teardown =========================
     //
     // Same technique, same limit as the SLO block above: the call is pinned as
-    // WRITTEN, not as run. What each raman TABLE contains after the call is
-    // pinned behaviourally instead, by `infra::table::raman`'s own tests, which
+    // WRITTEN, not as run. What each alert_hygiene TABLE contains after the call is
+    // pinned behaviourally instead, by `infra::table::alert_hygiene`'s own tests, which
     // enumerate the tables from the migration rather than from a list — so a
-    // third raman table would have to be swept there without anyone editing a
+    // second alert_hygiene table would have to be swept there without anyone editing a
     // whitelist. This block only guarantees the sweep is reached at all.
 
-    /// Both raman tables go in this one transactional call, against the org
-    /// being torn down — not some other one.
-    const RAMAN_DELETES: [&str; 1] = ["raman::delete_by_org(raman_conn, org_id)"];
+    /// The alert_hygiene table goes in this one call, against the org being torn down
+    /// — not some other one.
+    const ALERT_HYGIENE_DELETES: [&str; 1] =
+        ["alert_hygiene::delete_by_org(alert_hygiene_conn, org_id)"];
 
     #[test]
-    fn test_db_resources_deletes_the_raman_tables() {
-        for call in RAMAN_DELETES {
+    fn test_db_resources_deletes_the_alert_hygiene_tables() {
+        for call in ALERT_HYGIENE_DELETES {
             position_of(call);
         }
     }
@@ -1414,13 +1415,13 @@ mod tests {
     const TABLE_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../infra/src/table");
 
     const ALERTS: &str = "delete_org_alerts(org_id)";
+    const ALERT_HYGIENE: &str = "alert_hygiene::delete_by_org(alert_hygiene_conn, org_id)";
     const INCIDENT_INTEGRATIONS: &str = "incident_integrations::delete_by_org(conn, org_id)";
     const LLM_EVALUATIONS: &str = "llm_evaluations::delete_by_org(conn, org_id)";
-    const RAMAN: &str = "raman::delete_by_org(raman_conn, org_id)";
     const STATUS_PAGES: &str = "status_pages::delete_by_org(conn, org_id)";
     const WORKFLOWS: &str = "workflows::delete_by_org(conn, org_id)";
 
-    const ENTITY_SWEEPS: [(&str, Sweep); 76] = [
+    const ENTITY_SWEEPS: [(&str, Sweep); 75] = [
         (
             "alert_composites",
             Sweep::Call("alert_composites::delete_by_org(conn, org_id)"),
@@ -1433,6 +1434,7 @@ mod tests {
             "alert_eval_intervals",
             Sweep::Exempt("delete_by_alert runs in the per-alert teardown loop"),
         ),
+        ("alert_hygiene_configs", Sweep::Call(ALERT_HYGIENE)),
         (
             "alert_incidents",
             Sweep::Call("alert_incidents::delete_by_org(org_id)"),
@@ -1531,8 +1533,6 @@ mod tests {
             "providers",
             Sweep::Call("providers::delete_all_by_org(org_id)"),
         ),
-        ("raman_configs", Sweep::Call(RAMAN)),
-        ("raman_digests", Sweep::Call(RAMAN)),
         (
             "rate_limit_rules",
             Sweep::Call("ratelimit::delete_by_org(conn, org_id)"),
@@ -1851,7 +1851,7 @@ mod tests {
             },
             Trigger {
                 org: "acme".to_string(),
-                module: TriggerModule::Raman,
+                module: TriggerModule::AlertHygiene,
                 module_key: "config-1".to_string(),
                 ..Default::default()
             },
@@ -1886,7 +1886,7 @@ mod tests {
                 ),
                 (
                     "acme".to_string(),
-                    TriggerModule::Raman,
+                    TriggerModule::AlertHygiene,
                     "config-1".to_string()
                 ),
             ]

@@ -4,6 +4,7 @@ pub use super::trial_quota_usage::Entity as TrialQuotaUsage;
 pub use super::{
     alert_composite_children::Entity as AlertCompositeChildren,
     alert_composites::Entity as AlertComposites,
+    alert_hygiene_configs::Entity as AlertHygieneConfigs,
     alert_incident_alerts::Entity as AlertIncidentAlerts,
     alert_incidents::Entity as AlertIncidents, alerts::Entity as Alerts,
     anomaly_detection_config::Entity as AnomalyDetectionConfig,
@@ -20,7 +21,6 @@ pub use super::{
     llm_experiments::Entity as LlmExperiments, org_ingestion_tokens::Entity as OrgIngestionTokens,
     org_storage_providers::Entity as OrgStorageProviders, org_users::Entity as OrgUsers,
     organizations::Entity as Organizations, pipeline_last_errors::Entity as PipelineLastErrors,
-    raman_configs::Entity as RamanConfigs, raman_digests::Entity as RamanDigests,
     re_pattern_stream_map::Entity as RePatternStreamMap, re_patterns::Entity as RePatterns,
     report_dashboards::Entity as ReportDashboards, reports::Entity as Reports,
     search_job_partitions::Entity as SearchJobPartitions,

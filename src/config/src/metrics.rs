@@ -2585,24 +2585,6 @@ pub static HEC_AUTH_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
-/// Completed digest-retention sweeps. A dead-man's switch, not a workload count.
-///
-/// The reaper publishes nothing else, so a stalled one is invisible: no deletions and
-/// nothing expired look identical. Alert on
-/// `rate(zo_raman_retention_sweeps_total[3h]) == 0`, which is why a pass that deletes
-/// zero rows still counts.
-pub static RAMAN_RETENTION_SWEEPS_TOTAL: Lazy<IntCounter> = Lazy::new(|| {
-    IntCounter::with_opts(
-        Opts::new(
-            "raman_retention_sweeps_total",
-            "Completed raman digest retention sweeps.",
-        )
-        .namespace(NAMESPACE)
-        .const_labels(create_const_labels()),
-    )
-    .expect("Metric created")
-});
-
 // Deliberate: `organization`, not spec §14.1's `org_id`, as for HEC_AUTH_TOTAL.
 pub static HEC_REQUESTS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
@@ -2613,41 +2595,6 @@ pub static HEC_REQUESTS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
         &["status", "organization"],
-    )
-    .expect("Metric created")
-});
-
-/// Expired digest rows the retention sweep actually removed.
-///
-/// Deliberately unlabelled: one leader sweeps the table deployment-wide with a
-/// query that carries no org, so a per-org label would be both unavailable and
-/// unbounded in cardinality.
-pub static RAMAN_DIGESTS_DELETED_TOTAL: Lazy<IntCounter> = Lazy::new(|| {
-    IntCounter::with_opts(
-        Opts::new(
-            "raman_digests_deleted_total",
-            "Expired raman digest rows removed by the retention sweep.",
-        )
-        .namespace(NAMESPACE)
-        .const_labels(create_const_labels()),
-    )
-    .expect("Metric created")
-});
-
-/// Sweeps that hit their per-sweep row budget while rows were still expired.
-///
-/// This is retention falling behind: the sweep deleted all it was allowed to
-/// and left a backlog for the next hour. Sustained increases mean the backlog
-/// is growing faster than the budget drains it. Without this counter the only
-/// evidence is a `warn` buried in `infra`, which no alert can watch.
-pub static RAMAN_RETENTION_BUDGET_EXHAUSTED_TOTAL: Lazy<IntCounter> = Lazy::new(|| {
-    IntCounter::with_opts(
-        Opts::new(
-            "raman_retention_budget_exhausted_total",
-            "Raman retention sweeps that stopped at their per-sweep row budget.",
-        )
-        .namespace(NAMESPACE)
-        .const_labels(create_const_labels()),
     )
     .expect("Metric created")
 });
@@ -3282,15 +3229,6 @@ fn register_metrics(registry: &Registry) {
 
     // on-call paging and escalation
     oncall::register(registry);
-    registry
-        .register(Box::new(RAMAN_RETENTION_SWEEPS_TOTAL.clone()))
-        .expect("Metric registered");
-    registry
-        .register(Box::new(RAMAN_DIGESTS_DELETED_TOTAL.clone()))
-        .expect("Metric registered");
-    registry
-        .register(Box::new(RAMAN_RETENTION_BUDGET_EXHAUSTED_TOTAL.clone()))
-        .expect("Metric registered");
 }
 
 pub fn create_const_labels() -> HashMap<String, String> {
@@ -3513,92 +3451,6 @@ mod tests {
             SYNTHETICS_STEPS_TOTAL.desc()[0].variable_labels,
             vec!["organization".to_string(), "event".to_string()],
         );
-    }
-
-    /// A counter that is declared but never registered is never scraped, and a
-    /// dashboard cannot tell that from a permanent zero — which is exactly the
-    /// healthy reading for all three of these.
-    #[test]
-    fn raman_retention_metrics_are_registered() {
-        use prometheus::core::Collector;
-
-        let registry = Registry::new();
-        register_metrics(&registry);
-
-        let declared: Vec<(&str, Box<dyn Collector>)> = vec![
-            (
-                "RAMAN_RETENTION_SWEEPS_TOTAL",
-                Box::new(RAMAN_RETENTION_SWEEPS_TOTAL.clone()),
-            ),
-            (
-                "RAMAN_DIGESTS_DELETED_TOTAL",
-                Box::new(RAMAN_DIGESTS_DELETED_TOTAL.clone()),
-            ),
-            (
-                "RAMAN_RETENTION_BUDGET_EXHAUSTED_TOTAL",
-                Box::new(RAMAN_RETENTION_BUDGET_EXHAUSTED_TOTAL.clone()),
-            ),
-        ];
-
-        for (name, collector) in declared {
-            assert!(
-                matches!(
-                    registry.register(collector),
-                    Err(prometheus::Error::AlreadyReg)
-                ),
-                "{name} is declared but `register_metrics` never registers it, so it is never \
-                 scraped and reads as a permanent zero",
-            );
-        }
-    }
-
-    /// These names are the operator-facing contract, so a rename here is a breaking change.
-    #[test]
-    fn the_raman_retention_metric_names_are_pinned() {
-        use prometheus::core::Collector;
-
-        for (metric, expected) in [
-            (
-                RAMAN_RETENTION_SWEEPS_TOTAL.desc()[0].fq_name.as_str(),
-                "zo_raman_retention_sweeps_total",
-            ),
-            (
-                RAMAN_DIGESTS_DELETED_TOTAL.desc()[0].fq_name.as_str(),
-                "zo_raman_digests_deleted_total",
-            ),
-            (
-                RAMAN_RETENTION_BUDGET_EXHAUSTED_TOTAL.desc()[0]
-                    .fq_name
-                    .as_str(),
-                "zo_raman_retention_budget_exhausted_total",
-            ),
-        ] {
-            assert_eq!(metric, expected);
-        }
-
-        // One leader sweeps the table globally, so an org label here is unbounded.
-        assert!(
-            RAMAN_RETENTION_SWEEPS_TOTAL.desc()[0]
-                .variable_labels
-                .is_empty()
-        );
-        assert!(
-            RAMAN_DIGESTS_DELETED_TOTAL.desc()[0]
-                .variable_labels
-                .is_empty()
-        );
-        assert!(
-            RAMAN_RETENTION_BUDGET_EXHAUSTED_TOTAL.desc()[0]
-                .variable_labels
-                .is_empty()
-        );
-    }
-
-    #[test]
-    fn test_statics_raman_retention() {
-        let _ = RAMAN_RETENTION_SWEEPS_TOTAL.clone();
-        let _ = RAMAN_DIGESTS_DELETED_TOTAL.clone();
-        let _ = RAMAN_RETENTION_BUDGET_EXHAUSTED_TOTAL.clone();
     }
 
     #[test]

@@ -306,9 +306,9 @@ async fn update(msg: Message) -> Result<()> {
                 );
             }
         }
-        TriggerModule::Raman => {
-            // Only sync if the raman config still exists in this region.
-            if infra::table::raman::get_by_id(conn, &trigger.org, &trigger.module_key)
+        TriggerModule::AlertHygiene => {
+            // Only sync if the alert hygiene config still exists in this region.
+            if infra::table::alert_hygiene::get_by_id(conn, &trigger.org, &trigger.module_key)
                 .await
                 .unwrap_or(None)
                 .is_some()
@@ -323,7 +323,7 @@ async fn update(msg: Message) -> Result<()> {
                 })?;
             } else {
                 log::warn!(
-                    "[SUPER_CLUSTER:sync] Raman config not found for module_key: {}. No need to sync this trigger",
+                    "[SUPER_CLUSTER:sync] Alert hygiene config not found for module_key: {}. No need to sync this trigger",
                     trigger.module_key
                 );
             }
