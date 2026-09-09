@@ -210,6 +210,18 @@ pub async fn list_digest_summaries<C: ConnectionTrait>(
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
 }
 
+/// Deployment-wide by design: retention is an operator's setting, never an org's.
+pub async fn delete_digests_before<C: ConnectionTrait>(
+    conn: &C,
+    cutoff_us: i64,
+) -> Result<u64, Error> {
+    let deleted = raman_digests::Entity::delete_many()
+        .filter(raman_digests::Column::WindowEnd.lt(cutoff_us))
+        .exec(conn)
+        .await?;
+    Ok(deleted.rows_affected)
+}
+
 /// Removes the org's raman config together with every digest it produced.
 pub async fn delete_by_org(db: &DatabaseConnection, org: &str) -> Result<(), Error> {
     let txn = db.begin().await?;
@@ -1582,5 +1594,76 @@ mod tests {
 
         assert_eq!(read.findings, findings);
         assert_eq!(read.finding_count, 1);
+    }
+
+    /// `window_end` is what the timeline pages on, so reaping trims its oldest page.
+    #[tokio::test]
+    async fn delete_digests_before_removes_only_digests_whose_window_ended_before_the_cutoff() {
+        let db = db().await;
+        seed_digest(&db, WINDOW_END).await;
+        seed_digest(&db, WINDOW_END + 3_600_000_000).await;
+        let newest = seed_digest(&db, WINDOW_END + 7_200_000_000).await;
+
+        let deleted = delete_digests_before(&db, WINDOW_END + 3_600_000_000)
+            .await
+            .unwrap();
+
+        assert_eq!(deleted, 1, "the cutoff is exclusive: window_end < cutoff");
+        let left = list_digest_summaries(&db, ORG, 10, 0).await.unwrap();
+        assert_eq!(left.len(), 2);
+        assert_eq!(left[0].id, newest.id);
+        assert_eq!(left[1].window_end, WINDOW_END + 3_600_000_000);
+    }
+
+    /// Retention is a deployment-wide policy, so one sweep reaches every org's rows.
+    #[tokio::test]
+    async fn delete_digests_before_reaps_every_org() {
+        let db = db().await;
+        seed_digest(&db, WINDOW_END).await;
+        let mut theirs = new_digest("config-2", "", WINDOW_START, WINDOW_END);
+        theirs.org = OTHER_ORG.to_string();
+        upsert_digest(&db, theirs).await.unwrap();
+
+        let deleted = delete_digests_before(&db, WINDOW_END + 1).await.unwrap();
+
+        assert_eq!(deleted, 2);
+        assert_eq!(digest_count(&db).await, 0);
+    }
+
+    /// A sweep reaching `raman_configs` would silently unschedule every org it touched.
+    #[tokio::test]
+    async fn delete_digests_before_never_touches_a_config_row() {
+        let db = db().await;
+        let config = seeded_config(&db).await;
+        seed_digest(&db, WINDOW_END).await;
+
+        delete_digests_before(&db, WINDOW_END + 1).await.unwrap();
+
+        assert_eq!(digest_count(&db).await, 0);
+        assert_eq!(get_by_org(&db, ORG).await.unwrap(), Some(config));
+    }
+
+    /// A re-pulled run rewrites `generated_at` but never the window it analysed.
+    #[tokio::test]
+    async fn delete_digests_before_ages_a_digest_by_its_window_not_by_when_it_was_written() {
+        let db = db().await;
+        let mut late = new_digest(CONFIG, "", WINDOW_START, WINDOW_END);
+        late.generated_at = WINDOW_END + 400 * 86_400_000_000;
+        upsert_digest(&db, late).await.unwrap();
+
+        assert_eq!(
+            delete_digests_before(&db, WINDOW_END + 1).await.unwrap(),
+            1,
+            "the sweep aged the digest by `generated_at`, so a re-run would revive it"
+        );
+    }
+
+    #[tokio::test]
+    async fn delete_digests_before_is_a_no_op_when_nothing_has_aged_out() {
+        let db = db().await;
+        seed_digest(&db, WINDOW_END).await;
+
+        assert_eq!(delete_digests_before(&db, WINDOW_END).await.unwrap(), 0);
+        assert_eq!(digest_count(&db).await, 1);
     }
 }

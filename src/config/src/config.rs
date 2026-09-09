@@ -982,6 +982,12 @@ pub struct Raman {
         help = "Master switch for alert hygiene (Raman). Off by default; while it is off no org's hygiene pass runs and every well-formed request to /v2/{org_id}/raman/* answers 404, whatever each org's own config says."
     )]
     pub enabled: bool,
+    #[env_config(
+        name = "ZO_RAMAN_RETENTION_DAYS",
+        default = 365,
+        help = "How long a raman digest row (raman_digests) is kept, in days. Nothing else expires these rows: the stream copy in _o2_raman_digests is governed by ordinary stream retention, the table is not. A year keeps the hygiene timeline comparable year over year at roughly one row per org per day. Independent of ZO_RAMAN_ENABLED, so a deployment that turns raman off still expires what it already wrote. 0 or less disables the reaper."
+    )]
+    pub retention_days: i64,
 }
 
 /// Synthetic monitoring. Lives here rather than in `o2_enterprise` because the
