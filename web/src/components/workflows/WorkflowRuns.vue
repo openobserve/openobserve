@@ -85,15 +85,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </OPageHeader>
 
-    <!-- max-md: master-detail side by side leaves the runs panel too narrow to read. -->
+    <!-- < lg: master-detail side by side leaves the runs panel too narrow to read. -->
     <div
-      class="relative flex min-h-0 flex-1 gap-2 px-2 pt-3 max-md:flex-col max-md:overflow-y-auto"
+      class="relative flex min-h-0 flex-1 gap-2 px-2 pt-3 max-lg:flex-col max-lg:overflow-y-auto"
     >
       <!-- Read-only canvas (per-node run status overlay). Clicking a node's ✓/✗ badge
            opens its NDV (read-only here) with the step's Input · Config · Output — the
            SAME panel the editor uses, so results read identically in both places. -->
       <div
-        class="rounded-surface bg-surface-subtle relative mb-3 min-w-0 flex-1 overflow-hidden max-md:h-64 max-md:flex-none dark:bg-transparent"
+        class="rounded-surface bg-surface-subtle relative mb-3 min-w-0 flex-1 overflow-hidden max-lg:h-64 max-lg:flex-none dark:bg-transparent"
       >
         <WorkflowCanvas />
       </div>
@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-if="!panelCollapsed"
         data-test="workflow-runs-panel"
-        class="rounded-surface border-border-default bg-surface-base mb-3 flex min-h-0 w-[27.5rem] max-w-[46%] shrink-0 flex-col overflow-hidden border max-md:h-96 max-md:w-full max-md:max-w-full"
+        class="rounded-surface border-border-default bg-surface-base mb-3 flex min-h-0 w-[27.5rem] max-w-[46%] shrink-0 flex-col overflow-hidden border max-lg:h-96 max-lg:w-full max-lg:max-w-full"
       >
         <WorkflowRunsPanel
           ref="runsPanelRef"

@@ -39,7 +39,7 @@ describe("DbmTableToolbar", () => {
    * The row's shape is what eight tables shared: a flex row that may shrink to
    * nothing, with a FIXED-width search box that may not. Lose `w-64` and the
    * search box grows with the page, pushing the scope chips off the row.
-   * Below md the row wraps and the search drops to its own line, because
+   * Below lg the row wraps and the search drops to its own line, because
    * `overflow-hidden` cut the trailing controls off instead of moving them.
    */
   it("keeps the search box at a fixed width inside a shrinkable row", () => {
@@ -56,7 +56,7 @@ describe("DbmTableToolbar", () => {
       ]),
     );
     expect(wrapper.get('[data-test="dbm-samples-search"]').element.parentElement?.className).toBe(
-      "w-64 shrink-0 max-md:order-last max-md:w-full max-md:basis-full",
+      "w-64 shrink-0 max-lg:order-last max-lg:w-full max-lg:basis-full",
     );
   });
 

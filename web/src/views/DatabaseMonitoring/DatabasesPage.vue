@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             search-data-test="dbm-databases-search"
           >
             <DbmScopeFilters
-              class="min-w-0 flex-1"
+              class="min-w-0 flex-1 max-lg:flex-none max-lg:basis-auto"
               :filters="dimensionFilters"
               @clear="clearScope"
             />

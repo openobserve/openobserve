@@ -97,7 +97,7 @@ const slots = defineSlots<OTableSlots<TData>>();
 // < md every table behaves as horizontalScroll: columns keep their natural
 // width and the extra ones are reached by scrolling WITHIN the table, instead
 // of being crushed until only the name column survives.
-const { isMobile: isMobileViewport } = useBreakpoint();
+const { isMobile: isMobileViewport, lgUp } = useBreakpoint();
 const horizontalScrollOn = computed(() => !!props.horizontalScroll || isMobileViewport.value);
 
 // A row only gets the pointer cursor when it's actually interactive — i.e. the
@@ -817,14 +817,18 @@ provide("o2TableBoundedFill", hasBoundedFill);
 const allowHorizontalScroll = computed(() => {
   if (horizontalScrollOn.value) return true;
   if (!hasFillColumn.value) return true;
+  if (containerWidth.value <= 0) return false;
   if (useComputedWidth.value) {
-    if (containerWidth.value <= 0) return false;
     // Frozen → scroll once the resized columns exceed the container.
     if (frozen.value) return realSum() > containerWidth.value + 1;
     // Fill → scroll once the columns can't fit even at their min widths
     // (table-fixed otherwise grows past 100% and the overflow is clipped).
     return fillMinSum() > containerWidth.value + 1;
   }
+  // Below lg a filler absorbs leftover only while the other columns fit; past
+  // that the table grows anyway and the trailing columns are clipped out of
+  // reach. Desktop keeps main's clipping so laptop layouts are untouched.
+  if (!lgUp.value) return fillMinSum() > containerWidth.value + 1;
   return false;
 });
 
