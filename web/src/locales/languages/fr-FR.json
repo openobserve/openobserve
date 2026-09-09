@@ -885,7 +885,7 @@
     "queryFailed": "Échec de la requête",
     "unknownError": "Erreur inconnue",
     "selectedLabel": "sélectionnés",
-    "selectToFilter": "Sélectionner pour filtrer",
+    "selectToFilter": "Sélectionner un filtre",
     "clearSelection": "Effacer la sélection",
     "includeModeHint": "Mode inclusion (=)",
     "excludeModeHint": "Mode exclusion (≠)",
@@ -6314,7 +6314,7 @@
       "frequencyPositiveNumber": "Alerte - {index} : la fréquence doit être un nombre positif supérieur à 0 et doit être un nombre.",
       "cronExpressionString": "Alerte - {index} : l'expression Cron doit être une chaîne.",
       "thresholdPositiveNumber": "Alerte - {index} : le seuil doit être un nombre positif supérieur à 0 et doit être un nombre.",
-      "silenceNonNegativeNumber": "Alerte - {index} : le silence doit être un nombre positif supérieur ou égal à 0 et doit être un nombre.",
+      "silenceNonNegativeNumber": "Alerte - {index} : la période de silence doit être un nombre positif supérieur ou égal à 0 et doit être un nombre.",
       "frequencyTypeInvalid": "Alerte - {index} : le type de fréquence doit être 'minutes' ou 'cron' et doit être une chaîne.",
       "cronExpressionInvalid": "Alerte - {index} : l'expression Cron doit être une expression Cron valide."
     },
@@ -6524,7 +6524,7 @@
       "nameInvalidChars": "Les caractères comme :, ?, /, # et les espaces ne sont pas autorisés.",
       "templateRequired": "Le modèle est requis !",
       "validEmails": "Ajoutez des e-mails valides !",
-      "silenceNonNegative": "La mise en sourdine des notifications doit être supérieure ou égale à 0",
+      "silenceNonNegative": "La période de silence doit être supérieure ou égale à 0",
       "pendingPeriodNonNegative": "La période d'attente doit être supérieure ou égale à 0",
       "periodPositive": "La période doit être supérieure à 0",
       "destinationRequired": "Au moins une destination est requise.",
@@ -10793,7 +10793,8 @@
         "scoreConfigs": "Configurations de score",
         "targetDataset": "Jeu de données cible",
         "progress": "Progression",
-        "updated": "Mis à jour"
+        "updated": "Mis à jour",
+        "actions": "Actions"
       },
       "create": {
         "title": "Nouvelle file",
@@ -10847,7 +10848,8 @@
           "refType": "Réf",
           "refId": "Référence",
           "added": "Ajouté",
-          "status": "Statut"
+          "status": "Statut",
+          "actions": "Actions"
         },
         "status": {
           "pending": "En attente",
@@ -10959,6 +10961,8 @@
       "viewAll": "Voir les expériences",
       "baseline": "Référence",
       "setBaseline": "Définir comme référence",
+      "baselineRequiresCompleted": "Seule une exécution terminée peut être définie comme référence",
+      "baselineError": "Échec de la mise à jour de la référence",
       "selectForComparison": "Sélectionner pour comparaison",
       "progress": "{done} sur {total} emplacements",
       "noScores": "Aucun score agrégé",
@@ -11069,8 +11073,10 @@
       "addToDataset": "Ajouter",
       "detail": {
         "by": "par {user}",
-        "p50Latency": "Latence P50",
+        "p50Latency": "Latence P50 des tâches",
         "totalCost": "Coût total",
+        "costBreakdown": "Tâche {task} · Scoring {scoring}",
+        "partialCostBreakdown": "Tâche {task} · Scoring {scoring} · Partiel",
         "highDispersion": "Cas à forte dispersion",
         "highDispersionHint": "Lignes où les essais divergent",
         "scoredRows": "{scored}/{total} lignes évaluées",
@@ -11100,7 +11106,7 @@
           "run": "Exécution"
         },
         "runSummary": "{trials} · {scorers}",
-        "progress": "Progrès",
+        "progress": "Progression de la tâche",
         "scoring": "Notation",
         "scoringDistribution": "{success} réussi · {failed} échoué · {pending} en attente · {skipped} ignoré",
         "compare": "Comparer",
@@ -11193,6 +11199,16 @@
           "typeCategorical": "Catégoriel",
           "typeBoolean": "Booléen",
           "threshold": "Seuil",
+          "thresholdTooltip": "Les valeurs de référence et candidates à moins de {percent} les unes des autres comptent comme inchangées, et non comme régressées ou améliorées.",
+          "outcomeDimensions": "Critères de résultat",
+          "outcomeTooltipNone": "Aucune colonne sélectionnée — chaque ligne comparable s'affichera comme Non comparée.",
+          "outcomeTooltipAll": "Toutes les colonnes éligibles déterminent le résultat de chaque ligne.",
+          "outcomeTooltipPartial": "Seules {names} déterminent le résultat de chaque ligne. Les autres colonnes sont affichées mais ne l'affectent pas.",
+          "allOutcomeDimensions": "Toutes les colonnes éligibles",
+          "noOutcomeDimensions": "Aucune colonne",
+          "selectedOutcomeDimensions": "{count} colonne | {count} colonnes",
+          "outcomeDimensionUnavailable": "{name} (aucune stratégie de comparaison)",
+          "dimensionExcludedHint": "Cette colonne est exclue des résultats. Sélectionnez-la dans Critères de résultat pour l'inclure.",
           "measurePerRow": "Moyenne par ligne, sur les essais",
           "dimensionImproved": "{count} ligne améliorée | {count} lignes améliorées",
           "dimensionUnchanged": "{count} ligne inchangée | {count} lignes inchangées",
@@ -11274,7 +11290,7 @@
         },
         "searchPlaceholder": "Rechercher des éléments...",
         "csvImport": {
-          "button": "Importer CSV",
+          "button": "Importer des éléments",
           "title": "Importer les éléments du jeu de données",
           "description": "Importez des éléments de jeu de données à partir d'un fichier CSV.",
           "fileLabel": "Fichier CSV",
@@ -12187,7 +12203,8 @@
       "remove": "Supprimer",
       "save": "Enregistrer",
       "saveAsDraft": "Enregistrer comme brouillon",
-      "createAndActivate": "Enregistrer et activer"
+      "createAndActivate": "Enregistrer et activer",
+      "testConnection": "Tester la connexion"
     },
     "scorerTypeDialog": {
       "title": "Créez un nouveau scorer",
@@ -12213,15 +12230,19 @@
       "availableModelsLabel": "Modèles disponibles",
       "apiKeyLabel": "Clé API",
       "apiKeyPlaceholder": "Saisissez la clé API",
-      "apiKeyHelp": "Stockée chiffrée au repos et jamais relue. Laissez vide lors de la modification pour conserver la clé existante.",
+      "apiKeyHelp": "Stockée chiffrée au repos et jamais relue. Laissez vide lors de l'enregistrement des modifications pour conserver la clé existante.",
       "authSection": "Authentification",
-      "authEditNote": "Les identifiants ne peuvent pas être relus. Saisissez à nouveau la clé API uniquement si vous souhaitez la renouveler.",
+      "authEditNote": "Les informations d'identification ne peuvent pas être relues. Pour tester un fournisseur nécessitant une authentification, saisissez sa clé API.",
       "cannotRename": "Ne peut pas être renommé après la création.",
       "availableModelsHelp": "Facultatif. Liste de modèles disponibles sur ce fournisseur, séparés par des virgules.",
       "saveError": "Impossible d'enregistrer le fournisseur",
       "nameRequired": "Provider name is required",
       "typeRequired": "Provider type is required",
-      "defaultModelRequired": "Default model is required"
+      "defaultModelRequired": "Default model is required",
+      "testRunning": "Test de la connexion en cours...",
+      "testPassed": "Connecté",
+      "testFailed": "Échec de la connexion",
+      "testError": "Échec du test de connexion"
     },
     "scoreConfig": {
       "gteSymbol": "≥",
@@ -15696,7 +15717,6 @@
       "reservation": "Réservation",
       "sliType": "Type de SLI",
       "owner": "Propriétaire",
-      "folder": "Dossier",
       "streamPlaceholder": "Sélectionner un flux"
     },
     "empty": {
@@ -15726,7 +15746,24 @@
       "sourceHint": "La disponibilité est la fraction du temps mesuré pendant laquelle cette alerte ne se déclenchait pas. Le temps pendant lequel elle n'a pas évalué — pause, silence ou échec — est non mesuré et n'est jamais compté comme disponibilité.",
       "loadFailed": "Impossible de charger les alertes éligibles",
       "noneEligible": "Aucune alerte de cette organisation ne peut encore être utilisée comme source.",
-      "ineligibleOption": "{name} — {reason}",
+      "ineligible": {
+        "notScheduled": "Non planifiée",
+        "grouped": "Regroupée",
+        "notReferenceable": "Non utilisable",
+        "cron": "Planification cron",
+        "tooInfrequent": "S'exécute trop rarement",
+        "silenced": "Comporte une période de silence",
+        "other": "Non éligible",
+        "why": {
+          "notScheduled": "Les alertes en temps réel ne conservent pas l'historique des exécutions dont un SLO a besoin. Utilisez plutôt une alerte planifiée.",
+          "grouped": "Cette alerte est divisée par groupe, et une exécution n'enregistre pas les groupes qu'elle a vérifiés. Supprimez son regroupement pour l'utiliser ici.",
+          "notReferenceable": "Les alertes SLO et composites ne peuvent pas être utilisées comme sources. Choisissez une simple alerte planifiée.",
+          "cron": "Cette alerte s'exécute selon un calendrier cron, donc ses vérifications ne sont pas régulièrement espacées et la disponibilité ne peut pas être calculée. Passez à un intervalle fixe.",
+          "tooInfrequent": "Cette alerte s'exécute toutes les {frequency}. Elle doit s'exécuter au moins toutes les {slice} afin qu'aucune période ne reste sans contrôle.",
+          "silenced": "Après son déclenchement, cette alerte cesse de vérifier pendant un moment — et cette pause tombe toujours sur une mauvaise passe, ce qui flatterait le SLO. Réglez sa période de silence sur 0."
+        },
+        "noFixedInterval": "aucun intervalle fixe"
+      },
       "groupingLocked": "Un SLI basé sur une alerte ne peut pas être groupé : le registre de disponibilité enregistre une exécution par alerte, pas par groupe, il n'y a donc aucune couverture par groupe sur laquelle s'appuyer.",
       "sourceLink": "Alerte source",
       "preview": {
@@ -15834,6 +15871,42 @@
       "editTargetMissing": "Cette alerte ne fait plus partie de ce SLO.",
       "describeBurn": "Taux de combustion > {critical} sur {long} et {short}",
       "describeBudget": "Budget d'erreur consommé > {critical}%"
+    },
+    "validation": {
+      "nameRequired": "Le nom du SLO est requis",
+      "nameTooLong": "Le nom du SLO doit comporter 256 caractères ou moins",
+      "targetRequired": "La cible est requise",
+      "targetRange": "La cible doit être supérieure à 0 et inférieure à 100",
+      "targetPrecision": "La cible accepte au plus 3 décimales",
+      "streamTypeRequired": "Le type de flux est requis",
+      "streamRequired": "Le flux est requis",
+      "goodExprRequired": "La condition « Bon quand » est requise",
+      "promqlGoodRequired": "La requête de bons événements est requise",
+      "promqlTotalRequired": "La requête totale est requise",
+      "aggregateRequired": "L'expression d'agrégation est requise",
+      "comparatorRequired": "Le comparateur est requis",
+      "thresholdRequired": "Le seuil est requis",
+      "thresholdNumber": "Le seuil doit être un nombre",
+      "alertSourceRequired": "L'alerte source est requise",
+      "groupedSlice": "Les SLO groupés doivent utiliser une tranche de 5 minutes",
+      "alertCannotGroup": "Un SLI basé sur une alerte ne peut pas être groupé",
+      "frequencyRequired": "La fréquence est requise",
+      "frequencyPositive": "La fréquence doit être d'au moins 1 minute",
+      "silenceRequired": "La période de silence est requise",
+      "silenceNonNegative": "La période de silence ne peut pas être négative",
+      "targetsRequired": "Sélectionnez au moins une destination ou un workflow",
+      "criticalRequired": "Le seuil est requis",
+      "criticalPositive": "Le seuil doit être supérieur à 0",
+      "budgetRange": "Le budget consommé doit être de 100 % ou moins",
+      "longWindowRequired": "La fenêtre longue est requise",
+      "shortWindowRequired": "La fenêtre courte est requise",
+      "shortInsideLong": "La fenêtre courte doit être plus courte que la fenêtre longue"
+    },
+    "duration": {
+      "seconds": "{count} seconde | {count} secondes",
+      "minutes": "{count} minute | {count} minutes",
+      "hours": "{count} heure | {count} heures",
+      "days": "{count} jour | {count} jours"
     }
   },
   "promql": {
