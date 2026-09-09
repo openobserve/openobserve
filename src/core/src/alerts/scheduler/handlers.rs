@@ -992,25 +992,12 @@ async fn handle_composite_alert_trigger(
         // unless somebody labels it, a composite routes to the org's catch-all
         // and lands on the unrouted queue — the honest outcome for a signal
         // nobody has claimed, and a visible one rather than silence.
+        // Whether an incident took this firing. Hoisted, because correlation
+        // runs inside the deliverable branch below and paging has to know the
+        // answer even when that branch never runs. Gated like its only reader,
+        // because a build without the feature has no paging path to tell.
         #[cfg(feature = "enterprise")]
-        {
-            let notification_alert = composite_notification_alert(&definition.definition);
-            // Mirrors the alert path: a firing the incident path will take is
-            // not paged twice. A predicate, asked before correlation runs, so
-            // both producers gate on the same thing.
-            let incidents_will_page = notification_alert.creates_incident
-                && o2_enterprise::enterprise::common::config::get_config()
-                    .incidents
-                    .enabled;
-            if o2_enterprise::enterprise::oncall::is_enabled() && !incidents_will_page {
-                let rows = [composite_notification_row(
-                    &definition.definition.expression,
-                    evaluated.result,
-                    &evaluated.children,
-                )];
-                page_for_alert_firing(trace_id, &notification_alert, &rows).await;
-            }
-        }
+        let mut composite_incident_handled = false;
 
         let delivery = if matches!(outcome, RunOutcome::Pending) {
             DeliveryDecision::SuppressedByPending
@@ -1073,6 +1060,11 @@ async fn handle_composite_alert_trigger(
             #[cfg(not(feature = "enterprise"))]
             let incident_handled = false;
 
+            #[cfg(feature = "enterprise")]
+            {
+                composite_incident_handled = incident_handled;
+            }
+
             let delivery_result = if incident_handled {
                 Ok(crate::alerts::alert::NotificationOutcome::default())
             } else {
@@ -1119,6 +1111,23 @@ async fn handle_composite_alert_trigger(
                     delivery_retry_at = Some(now.saturating_add(10_000_000));
                 }
             }
+        }
+
+        // Paged on what correlation did, and outside the deliverable branch on
+        // purpose. A composite that is firing but silenced never reaches
+        // correlation at all, so no incident exists to page on its behalf. The
+        // old predicate suppressed the page anyway, and that firing woke
+        // nobody. A composite carries no identity, so an unlabelled one routes
+        // to the catch-all and lands on the unrouted queue, which is visible.
+        #[cfg(feature = "enterprise")]
+        if o2_enterprise::enterprise::oncall::is_enabled() && !composite_incident_handled {
+            let notification_alert = composite_notification_alert(&definition.definition);
+            let rows = [composite_notification_row(
+                &definition.definition.expression,
+                evaluated.result,
+                &evaluated.children,
+            )];
+            page_for_alert_firing(trace_id, &notification_alert, &rows).await;
         }
     }
 
@@ -2893,23 +2902,6 @@ async fn handle_alert_triggers(
         // person. It therefore runs regardless of whether incidents handle the
         // notification below, and a failure here must never fail the alert —
         // the destinations still have to go out.
-        // ...but exactly once per firing. When this alert feeds an incident,
-        // the incident is the correlated view and pages on its own behalf —
-        // paging here too would wake the same person twice for one event, and
-        // would page again for a symptom that merely folded into an open
-        // parent.
-        #[cfg(feature = "enterprise")]
-        let incidents_will_page = alert.creates_incident
-            && o2_enterprise::enterprise::common::config::get_config()
-                .incidents
-                .enabled
-            && !data.is_empty();
-
-        #[cfg(feature = "enterprise")]
-        if o2_enterprise::enterprise::oncall::is_enabled() && !incidents_will_page {
-            page_for_alert_firing(&scheduler_trace_id, &alert, &data).await;
-        }
-
         // True when incident correlation ran and handled the notification internally
         // (either sent it for a new incident/alert type, or suppressed it for a repeat).
         // When false, the direct send_notification() call below fires instead.
@@ -2963,6 +2955,22 @@ async fn handle_alert_triggers(
 
         #[cfg(not(feature = "enterprise"))]
         let incident_handled_notification = false;
+
+        // ...but exactly once per firing. When this alert feeds an incident, the
+        // incident is the correlated view and pages on its own behalf. Paging
+        // here too would wake the same person twice for one event.
+        //
+        // Asked AFTER correlation, on what it actually did. This used to be a
+        // prediction, computed before correlation ran, from `creates_incident`
+        // and the incidents flag. When correlation then returned nothing, or
+        // errored, no incident existed to page and the alert-side page had
+        // already been suppressed on its behalf, so the firing woke nobody at
+        // all. The notification path below has always fallen back this way. A
+        // duplicate page is recoverable and a missed one is not.
+        #[cfg(feature = "enterprise")]
+        if o2_enterprise::enterprise::oncall::is_enabled() && !incident_handled_notification {
+            page_for_alert_firing(&scheduler_trace_id, &alert, &data).await;
+        }
 
         let vars = get_row_column_map(&data);
         // Multi-time range alerts can have multiple time ranges, hence only
