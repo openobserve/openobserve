@@ -30,6 +30,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     searchable
     :placeholder="placeholder"
     :aria-label="ariaLabel"
+    :error="error"
+    :error-message="errorMessage"
     size="sm"
     :data-test="dataTest"
     @update:model-value="(value: SelectModelValue) => (model = (value ?? []) as string[])"
@@ -69,8 +71,17 @@ const props = withDefaults(
     placeholder?: I18nText;
     ariaLabel?: I18nText;
     dataTest?: string;
+    error?: boolean;
+    errorMessage?: I18nText;
   }>(),
-  { named: 2, placeholder: undefined, ariaLabel: undefined, dataTest: undefined },
+  {
+    named: 2,
+    placeholder: undefined,
+    ariaLabel: undefined,
+    dataTest: undefined,
+    error: false,
+    errorMessage: undefined,
+  },
 );
 
 const model = defineModel<string[]>({ default: () => [] });

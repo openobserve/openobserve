@@ -150,7 +150,7 @@ const stubs = {
   },
   OInlineEdit: {
     name: "OInlineEdit",
-    props: ["modelValue"],
+    props: ["modelValue", "error"],
     emits: ["update:modelValue"],
     template: `<span>{{ modelValue }}</span>`,
   },
@@ -164,7 +164,7 @@ const stubs = {
   OToggleGroupItem: { name: "OToggleGroupItem", template: "<button><slot /></button>" },
   OnCallMemberPicker: {
     name: "OnCallMemberPicker",
-    props: ["modelValue"],
+    props: ["modelValue", "error"],
     emits: ["update:modelValue"],
     template: `<div class="member-picker" />`,
   },
@@ -320,6 +320,12 @@ describe("OnCallSchedulePresets", () => {
     await wrapper
       .findComponent('[data-test="oncall-preset-field-groups-1-name"]')
       .vm.$emit("update:modelValue", "EMEA");
+    await wrapper
+      .findComponent('[data-test="oncall-preset-field-groups-0-members"]')
+      .vm.$emit("update:modelValue", ["a@example.com"]);
+    await wrapper
+      .findComponent('[data-test="oncall-preset-field-groups-1-members"]')
+      .vm.$emit("update:modelValue", ["b@example.com"]);
   }
 
   /// Absent beats empty: an un-overridden catch-all must not be sent as an
@@ -339,15 +345,81 @@ describe("OnCallSchedulePresets", () => {
   /// The bug this guards: a group whose required name was never typed in must
   /// never reach the network — the server refuses it too, but only after a
   /// round trip, and with axum's raw extraction-failure text rather than a
-  /// sentence written for the person who left the field blank.
-  it("blocks apply and names the field when a required group name is blank", async () => {
+  /// sentence written for the person who left the field blank. The one blank
+  /// field is also marked, not just named in a banner underneath everything.
+  it("blocks apply and flags the field when a required group name is blank", async () => {
     const wrapper = await renderOpen(0);
+    await wrapper
+      .findComponent('[data-test="oncall-preset-field-groups-0-name"]')
+      .vm.$emit("update:modelValue", "APAC");
+    await wrapper
+      .findComponent('[data-test="oncall-preset-field-groups-0-members"]')
+      .vm.$emit("update:modelValue", ["a@example.com"]);
+    await wrapper
+      .findComponent('[data-test="oncall-preset-field-groups-1-members"]')
+      .vm.$emit("update:modelValue", ["b@example.com"]);
     await wrapper.find('[data-test="oncall-presets-apply"]').trigger("click");
     await flushPromises();
 
     expect(service.applySchedulePreset).not.toHaveBeenCalled();
     expect(wrapper.find('[data-test="oncall-presets-error"]').text()).toContain("Group");
+    expect(
+      wrapper.findComponent('[data-test="oncall-preset-field-groups-1-name"]').props("error"),
+    ).toBe(true);
+    expect(
+      wrapper.findComponent('[data-test="oncall-preset-field-groups-0-name"]').props("error"),
+    ).toBe(false);
     expect(wrapper.emitted("applied")).toBeFalsy();
+  });
+
+  /// The other half of the same bug: a required group with nobody assigned
+  /// never reaches the network either — previously it did, and the server's
+  /// axum extraction rejected it with "missing field `members`" instead of a
+  /// sentence written for the person who left the picker on "Nobody yet".
+  it("blocks apply and flags the field when a required group has nobody assigned", async () => {
+    const wrapper = await renderOpen(0);
+    await wrapper
+      .findComponent('[data-test="oncall-preset-field-groups-0-name"]')
+      .vm.$emit("update:modelValue", "APAC");
+    await wrapper
+      .findComponent('[data-test="oncall-preset-field-groups-1-name"]')
+      .vm.$emit("update:modelValue", "EMEA");
+    await wrapper
+      .findComponent('[data-test="oncall-preset-field-groups-0-members"]')
+      .vm.$emit("update:modelValue", ["a@example.com"]);
+    await wrapper.find('[data-test="oncall-presets-apply"]').trigger("click");
+    await flushPromises();
+
+    expect(service.applySchedulePreset).not.toHaveBeenCalled();
+    expect(wrapper.find('[data-test="oncall-presets-error"]').text()).toContain("Members");
+    expect(
+      wrapper.findComponent('[data-test="oncall-preset-field-groups-1-members"]').props("error"),
+    ).toBe(true);
+    expect(wrapper.emitted("applied")).toBeFalsy();
+  });
+
+  /// When more than one field is left blank, the banner reads as a general
+  /// pointer to the form rather than naming just the first offender — but
+  /// every offending field is still marked, not only the first one found.
+  it("flags every offending field and shows a general message when several are blank", async () => {
+    const wrapper = await renderOpen(0);
+    await wrapper.find('[data-test="oncall-presets-apply"]').trigger("click");
+    await flushPromises();
+
+    expect(service.applySchedulePreset).not.toHaveBeenCalled();
+    expect(wrapper.find('[data-test="oncall-presets-error"]').text()).toContain("highlighted");
+    expect(
+      wrapper.findComponent('[data-test="oncall-preset-field-groups-0-name"]').props("error"),
+    ).toBe(true);
+    expect(
+      wrapper.findComponent('[data-test="oncall-preset-field-groups-0-members"]').props("error"),
+    ).toBe(true);
+    expect(
+      wrapper.findComponent('[data-test="oncall-preset-field-groups-1-name"]').props("error"),
+    ).toBe(true);
+    expect(
+      wrapper.findComponent('[data-test="oncall-preset-field-groups-1-members"]').props("error"),
+    ).toBe(true);
   });
 
   /// A full replace of a working schedule gets a confirm; replacing nothing
