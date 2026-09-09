@@ -78,7 +78,10 @@ test.describe('Regression: Search History re-apply retains the query (#14283)', 
     const encodedQuery = url.searchParams.get('query');
     expect(encodedQuery).toBeTruthy();
 
-    const decoded = Buffer.from(encodedQuery, 'base64').toString('utf-8');
+    // b64EncodeUnicode emits URL-safe base64 (+ - / _ = .); undo that rather than
+    // relying on Node's decoder being lenient about the alphabet.
+    const standardBase64 = encodedQuery.replace(/-/g, '+').replace(/_/g, '/').replace(/\./g, '=');
+    const decoded = Buffer.from(standardBase64, 'base64').toString('utf-8');
     expect(decoded).toContain(EARLIER_MARKER);
     expect(url.searchParams.get('sql_mode')).toBe('true');
   });
