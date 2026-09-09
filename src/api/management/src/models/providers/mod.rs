@@ -43,6 +43,16 @@ pub struct ProviderRequestBody {
     pub is_default: bool,
 }
 
+/// HTTP request body for testing a Provider without persisting changes.
+#[derive(Clone, Debug, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ProviderTestRequestBody {
+    #[serde(flatten)]
+    pub provider: ProviderRequestBody,
+    #[serde(default)]
+    pub provider_id: Option<String>,
+}
+
 /// HTTP response body for a Provider (auth_config masked).
 #[derive(Clone, Debug, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
@@ -176,6 +186,23 @@ mod tests {
         assert_eq!(body.auth_config, serde_json::json!({"api_key": "k"}));
         assert!(body.rate_limits.is_none());
         assert!(body.is_default);
+    }
+
+    #[test]
+    fn test_provider_test_request_accepts_a_stored_provider_id() {
+        let body: ProviderTestRequestBody = serde_json::from_value(serde_json::json!({
+            "name": "Test",
+            "providerType": "openai",
+            "authConfig": {"api_key": ""},
+            "providerId": "provider-1"
+        }))
+        .unwrap();
+
+        assert_eq!(body.provider_id.as_deref(), Some("provider-1"));
+        assert_eq!(
+            body.provider.auth_config,
+            serde_json::json!({"api_key": ""})
+        );
     }
 
     #[test]
