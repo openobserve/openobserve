@@ -229,6 +229,63 @@ mod tests {
         db
     }
 
+    /// `synthetics_checks::create` never sets `tz_offset` or the six runtime/alerting
+    /// counters (`last_triggered_at`, `last_check_status`, `consecutive_failures`,
+    /// `last_alert_at`, `alerting`, `degraded_notified_at`) — it relies on the column's
+    /// DB-level `DEFAULT`, exactly as the real migrations define it
+    /// (`m20260707_000001_create_synthetics_monitors`,
+    /// `m20260730_000001_add_alert_state_to_synthetics_monitors`). `db()`'s
+    /// `create_table_from_entity` carries no such defaults, so any test that calls
+    /// `create()` itself (rather than inserting a fully-populated model directly) needs a
+    /// schema that does, or the insert fails on those columns before `create()`'s own logic
+    /// — the one under test — ever runs.
+    async fn db_with_synthetics_defaults() -> sea_orm::DatabaseConnection {
+        let mut opts = ConnectOptions::new("sqlite::memory:".to_string());
+        opts.max_connections(1);
+        let db = Database::connect(opts).await.unwrap();
+        db.execute_unprepared("PRAGMA foreign_keys = ON")
+            .await
+            .unwrap();
+        db.execute_unprepared(
+            "CREATE TABLE synthetics (
+                id TEXT NOT NULL PRIMARY KEY,
+                org_id TEXT NOT NULL,
+                folder_id TEXT NOT NULL,
+                tz_offset INTEGER NOT NULL DEFAULT 0,
+                name TEXT NOT NULL,
+                synthetics_type TEXT NOT NULL,
+                target TEXT NOT NULL,
+                description TEXT NOT NULL DEFAULT '',
+                tags TEXT NOT NULL,
+                config TEXT NOT NULL,
+                frequency TEXT NOT NULL,
+                locations TEXT NOT NULL,
+                enabled BOOLEAN NOT NULL DEFAULT 1,
+                destinations TEXT NOT NULL,
+                settings TEXT NOT NULL,
+                secrets TEXT NOT NULL DEFAULT '{}',
+                next_run_at BIGINT NOT NULL DEFAULT 0,
+                last_triggered_at BIGINT NOT NULL DEFAULT 0,
+                last_check_status INTEGER NOT NULL DEFAULT 0,
+                consecutive_failures INTEGER NOT NULL DEFAULT 0,
+                last_alert_at BIGINT NOT NULL DEFAULT 0,
+                alerting BOOLEAN NOT NULL DEFAULT 0,
+                degraded_notified_at BIGINT NOT NULL DEFAULT 0,
+                owner TEXT NULL,
+                created_at BIGINT NOT NULL,
+                updated_at BIGINT NOT NULL
+            )",
+        )
+        .await
+        .unwrap();
+        let backend = db.get_database_backend();
+        let schema = Schema::new(backend);
+        db.execute(backend.build(&schema.create_table_from_entity(Entity)))
+            .await
+            .unwrap();
+        db
+    }
+
     async fn insert_check(db: &sea_orm::DatabaseConnection, id: &str, name: &str, steps: usize) {
         let steps: Vec<serde_json::Value> = (0..steps)
             .map(|i| serde_json::json!({ "id": format!("c{i}"), "action": "navigate", "url": "https://x" }))
@@ -295,14 +352,11 @@ mod tests {
     async fn a_failed_refs_write_rolls_the_check_back_with_it() {
         use config::meta::synthetics::{Synthetic, SyntheticType};
 
-        let db = db().await;
+        let db = db_with_synthetics_defaults().await;
         insert_check(&db, "a", "login", 13).await;
-        db.execute_unprepared("DROP TABLE synthetics_refs")
-            .await
-            .unwrap();
 
-        let parent = Synthetic {
-            id: "p".into(),
+        let make_parent = |id: &str| Synthetic {
+            id: id.to_string(),
             org_id: "org1".into(),
             name: "checkout".into(),
             check_type: SyntheticType::Browser,
@@ -311,7 +365,24 @@ mod tests {
             }),
             ..Synthetic::default()
         };
-        let err = crate::table::synthetics_checks::create(&db, "org1", parent, true).await;
+
+        // Precondition: against a healthy, unmodified schema `create()` must succeed. Without
+        // this, a schema-setup regression could make the write below fail for a reason that
+        // has nothing to do with the dropped `synthetics_refs` table, and the test would pass
+        // for the wrong reason again.
+        let healthy =
+            crate::table::synthetics_checks::create(&db, "org1", make_parent("ok"), true).await;
+        assert!(
+            healthy.is_ok(),
+            "create() must succeed against a healthy schema: {healthy:?}"
+        );
+
+        db.execute_unprepared("DROP TABLE synthetics_refs")
+            .await
+            .unwrap();
+
+        let err =
+            crate::table::synthetics_checks::create(&db, "org1", make_parent("p"), true).await;
         assert!(err.is_err(), "the missing refs table must fail the write");
         assert!(
             crate::table::synthetics_checks::get(&db, "org1", "p")
