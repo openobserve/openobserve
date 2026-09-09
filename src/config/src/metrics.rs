@@ -379,6 +379,25 @@ pub static SYNTHETICS_GRANT_WRITEBACK_FAILURES_TOTAL: Lazy<IntCounter> = Lazy::n
     .expect("Metric created")
 });
 
+/// Subtest expansion at `resolve` refused to hand the probe a journey — a
+/// deleted child, a nested reference, or an unreadable child config.
+///
+/// Deliberately unlabelled, same rationale as
+/// [`SYNTHETICS_UNREADABLE_CHECKS_TOTAL`]: it should sit at zero, and a
+/// per-org label would put customer-controlled ids into its cardinality.
+pub static SYNTHETICS_COMPOSITION_GUARD_FAILURES_TOTAL: Lazy<IntCounter> = Lazy::new(|| {
+    IntCounter::with_opts(
+        Opts::new(
+            "synthetics_composition_guard_failures_total",
+            "Subtest expansions at resolve that failed one of our own guards.".to_owned()
+                + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+    )
+    .expect("Metric created")
+});
+
 /// Service graph v4 edge resolutions by confidence tier; org only, never a stream label.
 pub static O2_SERVICE_GRAPH_RESOLVED_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(

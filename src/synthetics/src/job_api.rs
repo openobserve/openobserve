@@ -1052,6 +1052,27 @@ pub enum AlertDecision {
     Degraded,
 }
 
+pub const REASON_CONFIG_STEPS_EXCEEDED: &str = "config_steps_exceeded";
+pub const REASON_CONFIG_REFERENCE_MISSING: &str = "config_reference_missing";
+pub const REASON_CONFIG_REFERENCE_INVALID: &str = "config_reference_invalid";
+
+/// Expansion could not produce a runnable journey (§5.11); `guard_failure` marks family 2 — a guard
+/// of ours failed.
+#[derive(Debug, Clone)]
+pub struct ConfigError {
+    pub status_reason: &'static str,
+    pub message: String,
+    pub guard_failure: bool,
+}
+
+impl std::fmt::Display for ConfigError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}: {}", self.status_reason, self.message)
+    }
+}
+
+impl std::error::Error for ConfigError {}
+
 // ── Service functions (called by OSS handlers) ────────────────────────────────
 
 /// Returns full synthetic config for a pending check so the probe knows what to execute.
@@ -1174,6 +1195,8 @@ pub async fn resolve(req: ResolveRequest, token_org: &str) -> anyhow::Result<Res
             }
         }
     }
+
+    expand_for_resolve(conn, &mut synthetic).await?;
 
     // Redact password/token from auth before sending — probe uses env_inject instead.
     synthetic.auth = synthetic.auth.map(redact_auth);
@@ -1305,6 +1328,132 @@ fn redact_auth(auth: SyntheticAuth) -> SyntheticAuth {
         },
         other => other,
     }
+}
+
+fn expand_journey(
+    parent_steps: &[serde_json::Value],
+    children: &HashMap<String, config::meta::synthetics_composition::ChildJourney>,
+) -> Result<Vec<serde_json::Value>, ConfigError> {
+    use config::meta::{
+        synthetics::is_composition_action,
+        synthetics_composition::{ExpansionError, expand_steps},
+    };
+    // Keyed on the ACTION, not on `subtest_refs`: a malformed step (action `subtest`, no
+    // `subtest.id`) yields no ref, so keying the early return on the ref list would hand it
+    // straight to the probe. It is also rejected BY NAME here rather than being left to fall
+    // through `expand_steps` as `MissingChild("")`, which would report it as a deleted child.
+    let mut has_reference = false;
+    for step in parent_steps {
+        if !step
+            .get("action")
+            .and_then(|a| a.as_str())
+            .is_some_and(is_composition_action)
+        {
+            continue;
+        }
+        has_reference = true;
+        let names_a_child = step
+            .pointer("/subtest/id")
+            .and_then(serde_json::Value::as_str)
+            .is_some_and(|id| !id.trim().is_empty());
+        if !names_a_child {
+            return Err(ConfigError {
+                status_reason: REASON_CONFIG_REFERENCE_INVALID,
+                message: format!(
+                    "step '{}' is a subtest reference that names no check",
+                    step.get("id")
+                        .and_then(serde_json::Value::as_str)
+                        .unwrap_or_default()
+                ),
+                guard_failure: true,
+            });
+        }
+    }
+    if !has_reference {
+        return Ok(parent_steps.to_vec());
+    }
+    let expanded = expand_steps(parent_steps, children).map_err(|e| ConfigError {
+        status_reason: match e {
+            ExpansionError::MissingChild(_) => REASON_CONFIG_REFERENCE_MISSING,
+            _ => REASON_CONFIG_REFERENCE_INVALID,
+        },
+        message: e.to_string(),
+        guard_failure: true,
+    })?;
+    if expanded.len() > config::meta::synthetics::MAX_STEPS {
+        return Err(ConfigError {
+            status_reason: REASON_CONFIG_STEPS_EXCEEDED,
+            message: format!(
+                "this test now needs {} steps after expanding its subtests; the limit is {}",
+                expanded.len(),
+                config::meta::synthetics::MAX_STEPS
+            ),
+            guard_failure: false,
+        });
+    }
+    Ok(expanded)
+}
+
+/// Splices every referenced child's stored steps into the parent's config, or says why it cannot.
+async fn expand_for_resolve<C: sea_orm::ConnectionTrait>(
+    conn: &C,
+    synthetic: &mut config::meta::synthetics::Synthetic,
+) -> anyhow::Result<()> {
+    use config::meta::{
+        synthetics::{BrowserConfig, SyntheticType},
+        synthetics_composition::{ChildJourney, subtest_refs},
+    };
+    if synthetic.check_type != SyntheticType::Browser {
+        return Ok(());
+    }
+    let steps = synthetic
+        .config
+        .get("steps")
+        .and_then(|s| s.as_array())
+        .cloned()
+        .unwrap_or_default();
+    let refs = subtest_refs(&steps);
+    if refs.is_empty() {
+        return Ok(());
+    }
+    let mut children = HashMap::new();
+    for child_id in refs.iter().collect::<std::collections::HashSet<_>>() {
+        if let Some(child) = synthetics_checks::get_cached(conn, &synthetic.org_id, child_id)
+            .await
+            .map_err(|e| anyhow::anyhow!(e.to_string()))?
+            && child.check_type == SyntheticType::Browser
+        {
+            // NOT `unwrap_or_default()`: a 0-step child would splice nothing, the reference
+            // would silently vanish, and the run would under-report against its frozen count.
+            let cfg: BrowserConfig = serde_json::from_value(child.config).map_err(|e| {
+                config::metrics::SYNTHETICS_COMPOSITION_GUARD_FAILURES_TOTAL.inc();
+                anyhow::Error::new(ConfigError {
+                    status_reason: REASON_CONFIG_REFERENCE_INVALID,
+                    message: format!(
+                        "referenced check '{}' has an unreadable journey: {e}",
+                        child.id
+                    ),
+                    guard_failure: true,
+                })
+            })?;
+            children.insert(
+                child.id.clone(),
+                ChildJourney {
+                    id: child.id,
+                    name: child.name,
+                    steps: cfg.steps,
+                },
+            );
+        }
+    }
+    let expanded = expand_journey(&steps, &children).map_err(|e| {
+        if e.guard_failure {
+            config::metrics::SYNTHETICS_COMPOSITION_GUARD_FAILURES_TOTAL.inc();
+        }
+        anyhow::Error::new(e)
+    })?;
+    synthetic.config["steps"] = serde_json::Value::Array(expanded);
+    Ok(())
 }
 
 /// The 200 an ack that did not apply gets: a duplicate, or a late one from a
@@ -2665,6 +2814,82 @@ mod tests {
                 steps_configured: 14,
                 metadata: "{}".to_string(),
             }
+        }
+    }
+
+    mod expansion {
+        use std::collections::HashMap;
+
+        use config::meta::synthetics_composition::ChildJourney;
+        use serde_json::json;
+
+        use super::super::*;
+
+        fn nav(id: &str) -> serde_json::Value {
+            json!({ "id": id, "action": "navigate", "url": "https://x" })
+        }
+
+        fn child(id: &str, steps: usize) -> ChildJourney {
+            ChildJourney {
+                id: id.into(),
+                name: id.into(),
+                steps: (0..steps).map(|i| nav(&format!("c{i}"))).collect(),
+            }
+        }
+
+        fn parent(refs: &[&str], own: usize) -> Vec<serde_json::Value> {
+            let mut v: Vec<_> = (0..own).map(|i| nav(&format!("s{i}"))).collect();
+            for (i, r) in refs.iter().enumerate() {
+                v.push(
+                    json!({ "id": format!("r{i}"), "action": "subtest", "subtest": { "id": r } }),
+                );
+            }
+            v
+        }
+
+        #[test]
+        fn a_plain_journey_passes_through_untouched() {
+            let steps = parent(&[], 3);
+            assert_eq!(expand_journey(&steps, &HashMap::new()).unwrap(), steps);
+        }
+
+        #[test]
+        fn over_the_cap_is_a_customer_fixable_config_error() {
+            let children = HashMap::from([("big".to_string(), child("big", 40))]);
+            // `parent`'s `own` count EXCLUDES the reference it appends, so this is
+            // 11 own steps + 40 child steps = 51 executed: exactly one over the cap.
+            let err = expand_journey(&parent(&["big"], 11), &children).unwrap_err();
+            assert_eq!(err.status_reason, REASON_CONFIG_STEPS_EXCEEDED);
+            assert!(!err.guard_failure);
+            assert!(err.message.contains("51"), "{}", err.message);
+        }
+
+        #[test]
+        fn a_malformed_reference_never_reaches_a_browser() {
+            // No `subtest.id`, so it yields no ref — the early return must still catch it.
+            let steps = vec![nav("s0"), json!({ "id": "r0", "action": "subtest" })];
+            let err = expand_journey(&steps, &HashMap::new()).unwrap_err();
+            assert_eq!(err.status_reason, REASON_CONFIG_REFERENCE_INVALID);
+            assert!(err.guard_failure);
+        }
+
+        #[test]
+        fn a_missing_child_is_our_guard_failure() {
+            let err = expand_journey(&parent(&["gone"], 1), &HashMap::new()).unwrap_err();
+            assert_eq!(err.status_reason, REASON_CONFIG_REFERENCE_MISSING);
+            assert!(err.guard_failure);
+        }
+
+        #[test]
+        fn a_child_holding_a_reference_is_our_guard_failure() {
+            let mut nested = child("nested", 2);
+            nested
+                .steps
+                .push(json!({ "id": "z", "action": "subtest", "subtest": { "id": "other" } }));
+            let children = HashMap::from([("nested".to_string(), nested)]);
+            let err = expand_journey(&parent(&["nested"], 1), &children).unwrap_err();
+            assert_eq!(err.status_reason, REASON_CONFIG_REFERENCE_INVALID);
+            assert!(err.guard_failure);
         }
     }
 }
