@@ -22,6 +22,7 @@ import {
   journeyToWireSteps,
   mapWireStep,
   mapWireSteps,
+  substituteVariables,
 } from "./mapRecordedStep";
 import { buildV2Step } from "./buildV2Steps";
 
@@ -546,5 +547,43 @@ describe("subtest steps", () => {
       { id: "s2", action: "subtest", name: "Log in (shared)", subtest: { id: "login-test" } },
     ];
     expect(() => journeyToWireSteps(steps)).toThrow(/expanded before replay/);
+  });
+});
+
+describe("substituteVariables", () => {
+  it("fails loudly rather than typing an empty string for an undefined variable", () => {
+    const step: WireStep = { id: "s1", action: "fill", value: "{{PASSWORD}}" };
+    expect(() => substituteVariables(step, {})).toThrow(/PASSWORD/);
+    expect(substituteVariables(step, { PASSWORD: "hunter2" }).value).toBe("hunter2");
+  });
+
+  it("leaves a cosmetic placeholder in a step name alone instead of aborting the replay", () => {
+    const step: WireStep = { id: "s1", action: "fill", value: "x", name: "Fill {{EMAIL}}" };
+    expect(substituteVariables(step, {}).name).toBe("Fill {{EMAIL}}");
+  });
+
+  it("throws for an unresolved url placeholder", () => {
+    const step: WireStep = { id: "s1", action: "navigate", url: "https://{{HOST}}/login" };
+    expect(() => substituteVariables(step, {})).toThrow(/HOST/);
+  });
+
+  it("throws for an unresolved key placeholder", () => {
+    const step: WireStep = { id: "s1", action: "press", key: "{{KEY}}" };
+    expect(() => substituteVariables(step, {})).toThrow(/KEY/);
+  });
+
+  it("leaves an unresolved text placeholder literally in place instead of throwing", () => {
+    const step: WireStep = { id: "s1", action: "assert", text: "Welcome {{USER}}" };
+    expect(substituteVariables(step, {}).text).toBe("Welcome {{USER}}");
+  });
+
+  it("leaves an unresolved selector placeholder literally in place instead of throwing", () => {
+    const step: WireStep = { id: "s1", action: "click", selector: "#{{ELEMENT_ID}}" };
+    expect(substituteVariables(step, {}).selector).toBe("#{{ELEMENT_ID}}");
+  });
+
+  it("still substitutes a defined variable in a lenient field", () => {
+    const step: WireStep = { id: "s1", action: "assert", text: "Welcome {{USER}}" };
+    expect(substituteVariables(step, { USER: "Ada" }).text).toBe("Welcome Ada");
   });
 });
