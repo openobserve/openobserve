@@ -34,7 +34,10 @@ use promql::{
     DEFAULT_LOOKBACK, TableProvider,
     exec::PromqlContext,
     micros,
-    promql::{name_visitor, selector_window::SelectorWindow},
+    promql::{
+        name_visitor,
+        selector_window::{SelectorWindow, selector_window},
+    },
 };
 use promql_parser::{label::Matchers, parser};
 use proto::cluster_rpc;
@@ -162,14 +165,14 @@ pub async fn search(
 
         // 2. generate search group with max records stream
         let start_ts = std::time::Instant::now();
-        // the cut pays off only where the engine streams; a subquery's inner expression is
-        // per-group
+        let wal_floor = wal_floor();
+        // no cut without streaming, and none around a subquery, whose inner expression is per-group
         let cut = if cfg.search.feature_metrics_streaming_agg_enabled
             && !query.query_exemplars
             && !req.is_super_cluster
             && !plan.window.subquery
         {
-            wal_cut(start, end, step, micros(plan.window.ahead), wal_floor())
+            wal_cut(start, end, step, micros(plan.window.ahead), wal_floor)
         } else {
             None
         };
@@ -198,7 +201,7 @@ pub async fn search(
         // 3. search each group
         for (start, end) in group {
             let mut req = req.clone();
-            req.need_wal = end + micros(plan.window.ahead) >= wal_floor();
+            req.need_wal = end + micros(plan.window.ahead) >= wal_floor;
             req.query.as_mut().unwrap().start = start;
             req.query.as_mut().unwrap().end = end;
             let resp = search_inner(&req).await?;
@@ -319,9 +322,10 @@ pub async fn data(
     );
 
     // 3. search each group
+    let wal_floor = wal_floor();
     for (start, end) in group {
         let mut req = req.clone();
-        req.need_wal = end + micros(plan.window.ahead) >= wal_floor();
+        req.need_wal = end + micros(plan.window.ahead) >= wal_floor;
         req.query.as_mut().unwrap().start = start;
         req.query.as_mut().unwrap().end = end;
         let resp = search_inner(&req).await?;
@@ -427,7 +431,7 @@ async fn get_max_file_list(
     let mut visitor = name_visitor::MetricNameVisitor::default();
     promql_parser::util::walk_expr(&mut visitor, &ast).unwrap();
     let metrics_name = visitor.into_names();
-    let window = promql::promql::selector_window::selector_window(&ast);
+    let window = selector_window(&ast);
 
     // 2. get max records stream
     let mut file_list = Vec::new();
