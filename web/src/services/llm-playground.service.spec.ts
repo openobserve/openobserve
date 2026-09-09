@@ -381,8 +381,7 @@ describe("runPlayground — live adapter", () => {
     expect(providerDropsResponseSchema(undefined)).toBe(false);
   });
 
-  // DeepSeek has a JSON mode but answers `json_schema` with a 400. The server
-  // degrades the request for it; the UI only has to say so ahead of time.
+  // DeepSeek answers `json_schema` with a 400; the server degrades it, the UI only warns ahead.
   it("grades how far each provider kind honours a schema", () => {
     expect(responseSchemaSupport("openai")).toBe("native");
     expect(responseSchemaSupport("ollama")).toBe("native");
@@ -392,8 +391,7 @@ describe("runPlayground — live adapter", () => {
     expect(responseSchemaSupport("anthropic")).toBe("dropped");
   });
 
-  // The server owns the DeepSeek downgrade, so the client keeps sending the
-  // one wire shape it knows; only Anthropic is shaped away client-side.
+  // The server owns the DeepSeek downgrade; only Anthropic is shaped away client-side.
   it("still sends the json_schema shape to a provider that approximates it", async () => {
     const fetchMock = stubFetch(
       streamingResponse([frame({ type: "done", latencyMs: 1, usage: {} })]),

@@ -243,8 +243,7 @@ describe("PlaygroundVariantHeader — schema", () => {
     expect(button.attributes("title")).toBe("aiObservability.playground.schema");
   });
 
-  // The bug this guards: DeepSeek took the schema as if it were OpenAI and the
-  // run died on a raw provider 400 with no warning anywhere before it.
+  // Guards the bug where DeepSeek got the OpenAI schema shape and died on a raw 400 unwarned.
   it("warns, rather than reading as on, when the provider only approximates the schema", () => {
     const button = schemaBtn('{"type":"object"}', "deepseek");
     expect(button.classes()).toContain("bg-banner-warning-bg!");
