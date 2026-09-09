@@ -39,8 +39,9 @@ pub enum ResourceType {
 #[derive(Debug, Default, Deserialize, IntoParams)]
 #[into_params(parameter_in = Query)]
 pub struct SearchResourcesQuery {
-    /// Matched against name for every type, plus id (or email) and description for the types that
-    /// carry them; empty lists the alphabetical head of each type.
+    /// Matched against name for every type; also id or email for saved views, users and service
+    /// accounts, and id and description for pipelines and synthetic checks; empty lists the
+    /// alphabetical head of each type.
     #[serde(default)]
     pub q: String,
     /// Comma-separated subset of resource types; every type when absent.

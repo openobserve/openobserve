@@ -64,17 +64,19 @@ test.describe('Command palette', () => {
     tag: ['@commandPalette', '@general', '@P1', '@all'],
   }, async () => {
     const title = `E2E Palette Dashboard ${Date.now()}`;
-    const created = await cleanup.createMinimalDashboard(title);
-    createdDashboards.push(created);
+    await cleanup.createMinimalDashboard(title);
     await pm.commandPalettePage.openWithKeyboard();
     await pm.commandPalettePage.selectScope('dashboards');
     await pm.commandPalettePage.expectFirstRow('action:newDashboard');
     await pm.commandPalettePage.type(title);
     await pm.commandPalettePage.expectRowsOfType('dashboard');
-    await pm.commandPalettePage.clickFirstRowOfType('dashboard');
+    // The row id is `dashboard:<folder>/<id>`; take the real id from it rather than the create response.
+    const itemId = await pm.commandPalettePage.clickFirstRowOfType('dashboard');
+    const dashboardId = itemId.split('/').pop();
+    createdDashboards.push({ dashboardId, folderId: 'default' });
     await pm.commandPalettePage.expectClosed();
     await pm.commandPalettePage.expectUrl(/\/web\/dashboards\/view\?/, ORG);
-    await pm.commandPalettePage.expectQueryParam('dashboard', created.dashboardId);
+    await pm.commandPalettePage.expectQueryParam('dashboard', dashboardId);
   });
 
   test('finds a stream by name and opens it in the logs explorer', {
