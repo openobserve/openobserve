@@ -10794,7 +10794,8 @@
         "scoreConfigs": "Puan Yapılandırmaları",
         "targetDataset": "Hedef Veri Seti",
         "progress": "İlerleme",
-        "updated": "Güncellendi"
+        "updated": "Güncellendi",
+        "actions": "Eylemler"
       },
       "create": {
         "title": "Yeni Kuyruk",
@@ -10848,7 +10849,8 @@
           "refType": "Ref",
           "refId": "Referans",
           "added": "Eklendi",
-          "status": "Durum"
+          "status": "Durum",
+          "actions": "Eylemler"
         },
         "status": {
           "pending": "Beklemede",
@@ -10960,6 +10962,8 @@
       "viewAll": "Deneyleri görüntüle",
       "baseline": "Temel",
       "setBaseline": "Temeli belirle",
+      "baselineRequiresCompleted": "Yalnızca tamamlanmış bir çalıştırma temel olarak ayarlanabilir",
+      "baselineError": "Temel güncellenemedi",
       "selectForComparison": "Karşılaştırma için seç",
       "progress": "{done}/{total} slot",
       "noScores": "Toplam puan yok",
@@ -11070,8 +11074,10 @@
       "addToDataset": "Ekle",
       "detail": {
         "by": "{user} tarafından",
-        "p50Latency": "P50 Gecikme",
+        "p50Latency": "P50 Görev Gecikmesi",
         "totalCost": "Toplam Maliyet",
+        "costBreakdown": "Görev {task} · Puanlama {scoring}",
+        "partialCostBreakdown": "Görev {task} · Puanlama {scoring} · Kısmi",
         "highDispersion": "Yüksek Dağılımlı Durumlar",
         "highDispersionHint": "Denemelerin uyuşmadığı satırlar",
         "scoredRows": "{scored}/{total} satır puanlandı",
@@ -11101,7 +11107,7 @@
           "run": "Çalıştırma"
         },
         "runSummary": "{trials} · {scorers}",
-        "progress": "İlerleme",
+        "progress": "Görev İlerlemesi",
         "scoring": "Puanlama",
         "scoringDistribution": "{success} başarılı · {failed} başarısız · {pending} beklemede · {skipped} atlandı",
         "compare": "Karşılaştır",
@@ -11194,6 +11200,16 @@
           "typeCategorical": "Kategorik",
           "typeBoolean": "Boolean",
           "threshold": "Eşik",
+          "thresholdTooltip": "Birbirinin {percent} yakınında olan temel ve aday değerler, gerilemiş veya iyileşmiş olarak değil, değişmemiş olarak sayılır.",
+          "outcomeDimensions": "Sonuç ölçütleri",
+          "outcomeTooltipNone": "Hiçbir sütun seçilmedi — karşılaştırılabilir her satır Karşılaştırılmadı olarak gösterilecek.",
+          "outcomeTooltipAll": "Tüm uygun sütunlar her satırın sonucunu belirler.",
+          "outcomeTooltipPartial": "Her satırın sonucunu yalnızca {names} belirler. Diğer sütunlar gösterilir ancak sonucu etkilemez.",
+          "allOutcomeDimensions": "Tüm uygun sütunlar",
+          "noOutcomeDimensions": "Sütun yok",
+          "selectedOutcomeDimensions": "{count} sütun | {count} sütun",
+          "outcomeDimensionUnavailable": "{name} (karşılaştırma politikası yok)",
+          "dimensionExcludedHint": "Bu sütun sonuçlara dahil edilmiyor. Dahil etmek için Sonuç ölçütleri altından seçin.",
           "measurePerRow": "Denemeler boyunca satır başına ortalama",
           "dimensionImproved": "{count} satır iyileşti | {count} satır iyileşti",
           "dimensionUnchanged": "{count} satır değişmedi | {count} satır değişmedi",
@@ -11275,8 +11291,8 @@
         },
         "searchPlaceholder": "Öğelerde Ara...",
         "csvImport": {
-          "button": "CSV Yükle",
-          "title": "Veri Kümesi Öğelerini Yükle",
+          "button": "Öğeleri İçe Aktar",
+          "title": "Veri Kümesi Öğelerini İçe Aktar",
           "description": "Bir CSV dosyasından veri kümesi öğelerini içe aktarın.",
           "fileLabel": "CSV dosyası",
           "placeholder": "Bir CSV dosyası seçin",
@@ -12188,7 +12204,8 @@
       "remove": "Kaldır",
       "save": "Kaydet",
       "saveAsDraft": "Taslak Olarak Kaydet",
-      "createAndActivate": "Kaydet ve Etkinleştir"
+      "createAndActivate": "Kaydet ve Etkinleştir",
+      "testConnection": "Bağlantıyı Test Et"
     },
     "scorerTypeDialog": {
       "title": "Yeni bir Golcü Oluştur",
@@ -12214,15 +12231,19 @@
       "availableModelsLabel": "Mevcut modeller",
       "apiKeyLabel": "API Anahtarı",
       "apiKeyPlaceholder": "API anahtarını girin",
-      "apiKeyHelp": "Beklemede şifrelenmiş olarak saklanır ve asla geri okunmaz. Mevcut anahtarı korumak için düzenlerken boş bırakın.",
+      "apiKeyHelp": "Bekleme sırasında şifreli saklanır ve asla geri okunmaz. Düzenlemeleri kaydederken mevcut anahtarı korumak için boş bırakın.",
       "authSection": "Kimlik Doğrulama",
-      "authEditNote": "Kimlik bilgileri geri okunamaz. API anahtarını yalnızca değiştirmek istiyorsanız yeniden girin.",
+      "authEditNote": "Kimlik bilgileri geri okunamaz. Kimlik doğrulaması gerektiren bir sağlayıcıyı test etmek için API anahtarını girin.",
       "cannotRename": "Oluşturulduktan sonra yeniden adlandırılamaz.",
       "availableModelsHelp": "İsteğe bağlı. Bu Sağlayıcıda kullanılabilen modellerin virgülle ayrılmış listesi.",
       "saveError": "Sağlayıcı kaydedilemedi",
       "nameRequired": "Provider name is required",
       "typeRequired": "Provider type is required",
-      "defaultModelRequired": "Default model is required"
+      "defaultModelRequired": "Default model is required",
+      "testRunning": "Bağlantı test ediliyor...",
+      "testPassed": "Bağlandı",
+      "testFailed": "Bağlantı başarısız",
+      "testError": "Bağlantı test edilemedi"
     },
     "scoreConfig": {
       "gteSymbol": "≥",

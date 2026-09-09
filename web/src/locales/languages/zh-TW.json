@@ -10789,7 +10789,8 @@
         "scoreConfigs": "評分配置",
         "targetDataset": "目標資料集",
         "progress": "進度",
-        "updated": "已更新"
+        "updated": "已更新",
+        "actions": "操作"
       },
       "create": {
         "title": "新增佇列",
@@ -10843,7 +10844,8 @@
           "refType": "參考",
           "refId": "參考",
           "added": "已新增",
-          "status": "狀態"
+          "status": "狀態",
+          "actions": "操作"
         },
         "status": {
           "pending": "待審核",
@@ -10955,6 +10957,8 @@
       "viewAll": "檢視實驗",
       "baseline": "基線",
       "setBaseline": "設為基準線",
+      "baselineRequiresCompleted": "只有已完成的運行可以設為基線",
+      "baselineError": "更新基線失敗",
       "selectForComparison": "選取以進行比較",
       "progress": "{done} / {total} 個槽位",
       "noScores": "無彙總分數",
@@ -11065,8 +11069,10 @@
       "addToDataset": "新增",
       "detail": {
         "by": "由 {user}",
-        "p50Latency": "P50 延遲",
+        "p50Latency": "P50 任務延遲",
         "totalCost": "總成本",
+        "costBreakdown": "任務 {task} · 評分 {scoring}",
+        "partialCostBreakdown": "任務 {task} · 評分 {scoring} · 部分",
         "highDispersion": "高離散案例",
         "highDispersionHint": "試驗結果不一致的列",
         "scoredRows": "{scored}/{total} 列已評分",
@@ -11096,7 +11102,7 @@
           "run": "執行"
         },
         "runSummary": "{trials} · {scorers}",
-        "progress": "進度",
+        "progress": "任務進度",
         "scoring": "評分",
         "scoringDistribution": "{success} 成功 · {failed} 失敗 · {pending} 待處理 · {skipped} 跳過",
         "compare": "比較",
@@ -11189,6 +11195,16 @@
           "typeCategorical": "類別",
           "typeBoolean": "布林值",
           "threshold": "閾值",
+          "thresholdTooltip": "基線與候選值彼此相差在 {percent} 以內時，視為未改變，而非退化或改善。",
+          "outcomeDimensions": "結果條件",
+          "outcomeTooltipNone": "未選取任何欄位 — 每個可比較的資料列都會顯示為「未比較」。",
+          "outcomeTooltipAll": "所有符合條件的欄位都會決定每個資料列的結果。",
+          "outcomeTooltipPartial": "只有 {names} 決定每個資料列的結果。其他欄位會顯示，但不會影響結果。",
+          "allOutcomeDimensions": "所有符合條件的欄位",
+          "noOutcomeDimensions": "無欄位",
+          "selectedOutcomeDimensions": "{count} 個欄位 | {count} 個欄位",
+          "outcomeDimensionUnavailable": "{name}（無比較策略）",
+          "dimensionExcludedHint": "此欄位不會用於結果判定。請在「結果條件」中選取它，將其納入。",
           "measurePerRow": "每列平均值（跨試驗）",
           "dimensionImproved": "{count} 行已改善 | {count} 行已改善",
           "dimensionUnchanged": "{count} 行未變更 | {count} 行未變更",
@@ -11270,8 +11286,8 @@
         },
         "searchPlaceholder": "搜尋項目...",
         "csvImport": {
-          "button": "上傳 CSV",
-          "title": "上傳數據集項目",
+          "button": "匯入項目",
+          "title": "匯入資料集項目",
           "description": "從 CSV 檔案匯入數據集項目。",
           "fileLabel": "CSV 檔案",
           "placeholder": "選擇 CSV 檔案",
@@ -12183,7 +12199,8 @@
       "remove": "移除",
       "save": "儲存",
       "saveAsDraft": "儲存為草稿",
-      "createAndActivate": "儲存並啟用"
+      "createAndActivate": "儲存並啟用",
+      "testConnection": "測試連線"
     },
     "scorerTypeDialog": {
       "title": "建立新的評分器",
@@ -12209,15 +12226,19 @@
       "availableModelsLabel": "可用模型",
       "apiKeyLabel": "API 金鑰",
       "apiKeyPlaceholder": "輸入 API 金鑰",
-      "apiKeyHelp": "以加密方式靜態儲存，且永不再次讀取。編輯時保留空白以維持現有金鑰。",
+      "apiKeyHelp": "以靜態加密方式儲存，且永不回讀。儲存變更時請留空，以保留現有金鑰。",
       "authSection": "驗證",
-      "authEditNote": "憑證無法再次讀取。僅在您想輪替時才重新輸入 API 金鑰。",
+      "authEditNote": "憑證無法回讀。若要測試需要驗證的提供者，請輸入其 API 金鑰。",
       "cannotRename": "建立後無法重新命名。",
       "availableModelsHelp": "選用。此供應商上可用模型的逗號分隔清單。",
       "saveError": "儲存供應商失敗",
       "nameRequired": "Provider name is required",
       "typeRequired": "Provider type is required",
-      "defaultModelRequired": "Default model is required"
+      "defaultModelRequired": "Default model is required",
+      "testRunning": "正在測試連線...",
+      "testPassed": "已連線",
+      "testFailed": "連線失敗",
+      "testError": "測試連線失敗"
     },
     "scoreConfig": {
       "gteSymbol": "≥",

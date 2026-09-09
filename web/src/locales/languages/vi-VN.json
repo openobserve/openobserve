@@ -10794,7 +10794,8 @@
         "scoreConfigs": "Cấu hình điểm số",
         "targetDataset": "Tập dữ liệu đích",
         "progress": "Tiến trình",
-        "updated": "Đã cập nhật"
+        "updated": "Đã cập nhật",
+        "actions": "Thao tác"
       },
       "create": {
         "title": "Hàng đợi mới",
@@ -10848,7 +10849,8 @@
           "refType": "Tham chiếu",
           "refId": "Tham chiếu",
           "added": "Đã thêm",
-          "status": "Trạng thái"
+          "status": "Trạng thái",
+          "actions": "Thao tác"
         },
         "status": {
           "pending": "Đang chờ",
@@ -10960,6 +10962,8 @@
       "viewAll": "Xem thử nghiệm",
       "baseline": "Đường cơ sở",
       "setBaseline": "Đặt làm đường cơ sở",
+      "baselineRequiresCompleted": "Chỉ một lần chạy đã hoàn thành mới có thể được đặt làm đường cơ sở",
+      "baselineError": "Không thể cập nhật đường cơ sở",
       "selectForComparison": "Chọn để so sánh",
       "progress": "{done} trên {total} ô",
       "noScores": "Không có điểm tổng hợp",
@@ -11070,8 +11074,10 @@
       "addToDataset": "Thêm",
       "detail": {
         "by": "bởi {user}",
-        "p50Latency": "Độ trễ P50",
+        "p50Latency": "Độ trễ tác vụ P50",
         "totalCost": "Tổng chi phí",
+        "costBreakdown": "Tác vụ {task} · Chấm điểm {scoring}",
+        "partialCostBreakdown": "Tác vụ {task} · Chấm điểm {scoring} · Một phần",
         "highDispersion": "Các trường hợp có độ phân tán cao",
         "highDispersionHint": "Các hàng có kết quả lần thử khác nhau",
         "scoredRows": "{scored}/{total} hàng được chấm điểm",
@@ -11101,7 +11107,7 @@
           "run": "Lần chạy"
         },
         "runSummary": "{trials} · {scorers}",
-        "progress": "Tiến trình",
+        "progress": "Tiến độ tác vụ",
         "scoring": "Chấm điểm",
         "scoringDistribution": "{success} thành công · {failed} thất bại · {pending} đang chờ · {skipped} bỏ qua",
         "compare": "So sánh",
@@ -11194,6 +11200,16 @@
           "typeCategorical": "Phân loại",
           "typeBoolean": "Boolean",
           "threshold": "Ngưỡng",
+          "thresholdTooltip": "Nếu các giá trị của đường cơ sở và ứng viên chênh lệch không quá {percent} thì được tính là không đổi, chứ không phải suy giảm hay cải thiện.",
+          "outcomeDimensions": "Tiêu chí kết quả",
+          "outcomeTooltipNone": "Không có cột nào được chọn — mọi hàng có thể so sánh sẽ hiển thị là Chưa so sánh.",
+          "outcomeTooltipAll": "Tất cả các cột đủ điều kiện sẽ xác định kết quả của mỗi hàng.",
+          "outcomeTooltipPartial": "Chỉ {names} xác định kết quả của mỗi hàng. Các cột khác được hiển thị nhưng không ảnh hưởng tới kết quả.",
+          "allOutcomeDimensions": "Tất cả các cột đủ điều kiện",
+          "noOutcomeDimensions": "Không có cột",
+          "selectedOutcomeDimensions": "{count} cột | {count} cột",
+          "outcomeDimensionUnavailable": "{name} (không có chính sách so sánh)",
+          "dimensionExcludedHint": "Cột này bị loại khỏi kết quả. Hãy chọn nó trong mục Tiêu chí kết quả để đưa vào.",
           "measurePerRow": "Giá trị trung bình mỗi hàng, qua các lần thử",
           "dimensionImproved": "{count} hàng được cải thiện | {count} hàng được cải thiện",
           "dimensionUnchanged": "{count} hàng không thay đổi | {count} hàng không thay đổi",
@@ -11275,8 +11291,8 @@
         },
         "searchPlaceholder": "Tìm kiếm các mục...",
         "csvImport": {
-          "button": "Tải lên CSV",
-          "title": "Tải lên các mục dữ liệu",
+          "button": "Nhập các mục",
+          "title": "Nhập các mục của bộ dữ liệu",
           "description": "Nhập các mục dữ liệu từ tệp CSV.",
           "fileLabel": "Tệp CSV",
           "placeholder": "Chọn tệp CSV",
@@ -12188,7 +12204,8 @@
       "remove": "Xóa",
       "save": "Lưu",
       "saveAsDraft": "Lưu dưới dạng bản nháp",
-      "createAndActivate": "Lưu & Kích hoạt"
+      "createAndActivate": "Lưu & Kích hoạt",
+      "testConnection": "Kiểm tra kết nối"
     },
     "scorerTypeDialog": {
       "title": "Tạo bộ chấm điểm mới",
@@ -12214,15 +12231,19 @@
       "availableModelsLabel": "Mô hình có sẵn",
       "apiKeyLabel": "Khóa API",
       "apiKeyPlaceholder": "Nhập khóa API",
-      "apiKeyHelp": "Được lưu trữ mã hóa và không bao giờ đọc lại. Để trống khi chỉnh sửa để giữ khóa hiện tại.",
+      "apiKeyHelp": "Khóa được mã hóa khi lưu trữ và không bao giờ được đọc lại. Để trống khi lưu các chỉnh sửa để giữ khóa hiện có.",
       "authSection": "Xác thực",
-      "authEditNote": "Thông tin xác thực không thể đọc lại. Chỉ nhập lại khóa API nếu bạn muốn thay đổi nó.",
+      "authEditNote": "Không thể đọc lại thông tin xác thực. Để kiểm tra nhà cung cấp yêu cầu xác thực, hãy nhập khóa API của nhà cung cấp đó.",
       "cannotRename": "Không thể đổi tên sau khi tạo.",
       "availableModelsHelp": "Tùy chọn. Danh sách các mô hình được phân cách bằng dấu phẩy có sẵn trên Nhà cung cấp này.",
       "saveError": "Không lưu được nhà cung cấp",
       "nameRequired": "Tên nhà cung cấp là bắt buộc",
       "typeRequired": "Loại nhà cung cấp là bắt buộc",
-      "defaultModelRequired": "Mô hình mặc định là bắt buộc"
+      "defaultModelRequired": "Mô hình mặc định là bắt buộc",
+      "testRunning": "Đang kiểm tra kết nối...",
+      "testPassed": "Đã kết nối",
+      "testFailed": "Kết nối thất bại",
+      "testError": "Không thể kiểm tra kết nối"
     },
     "scoreConfig": {
       "gteSymbol": "≥",

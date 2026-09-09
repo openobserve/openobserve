@@ -10794,7 +10794,8 @@
         "scoreConfigs": "Configurations de score",
         "targetDataset": "Jeu de données cible",
         "progress": "Progression",
-        "updated": "Mis à jour"
+        "updated": "Mis à jour",
+        "actions": "Actions"
       },
       "create": {
         "title": "Nouvelle file",
@@ -10848,7 +10849,8 @@
           "refType": "Réf",
           "refId": "Référence",
           "added": "Ajouté",
-          "status": "Statut"
+          "status": "Statut",
+          "actions": "Actions"
         },
         "status": {
           "pending": "En attente",
@@ -10960,6 +10962,8 @@
       "viewAll": "Voir les expériences",
       "baseline": "Référence",
       "setBaseline": "Définir comme référence",
+      "baselineRequiresCompleted": "Seule une exécution terminée peut être définie comme ligne de base.",
+      "baselineError": "Échec de la mise à jour de la ligne de base.",
       "selectForComparison": "Sélectionner pour comparaison",
       "progress": "{done} sur {total} emplacements",
       "noScores": "Aucun score agrégé",
@@ -11070,8 +11074,10 @@
       "addToDataset": "Ajouter",
       "detail": {
         "by": "par {user}",
-        "p50Latency": "Latence P50",
+        "p50Latency": "Latence de tâche P50",
         "totalCost": "Coût total",
+        "costBreakdown": "Tâche {task} · Notation {scoring}",
+        "partialCostBreakdown": "Tâche {task} · Notation {scoring} · Partiel",
         "highDispersion": "Cas à forte dispersion",
         "highDispersionHint": "Lignes où les essais divergent",
         "scoredRows": "{scored}/{total} lignes évaluées",
@@ -11101,7 +11107,7 @@
           "run": "Exécution"
         },
         "runSummary": "{trials} · {scorers}",
-        "progress": "Progrès",
+        "progress": "Progression de la tâche",
         "scoring": "Notation",
         "scoringDistribution": "{success} réussi · {failed} échoué · {pending} en attente · {skipped} ignoré",
         "compare": "Comparer",
@@ -11194,6 +11200,16 @@
           "typeCategorical": "Catégoriel",
           "typeBoolean": "Booléen",
           "threshold": "Seuil",
+          "thresholdTooltip": "Les valeurs de référence et du candidat qui se situent à {percent} l'une de l'autre sont considérées comme inchangées, sans régression ni amélioration.",
+          "outcomeDimensions": "Critères de résultat",
+          "outcomeTooltipNone": "Aucune colonne sélectionnée — chaque ligne comparable apparaîtra comme « Non comparé ».",
+          "outcomeTooltipAll": "Toutes les colonnes éligibles déterminent le résultat de chaque ligne.",
+          "outcomeTooltipPartial": "Uniquement {names} déterminent le résultat de chaque ligne. Les autres colonnes sont affichées mais ne l'affectent pas.",
+          "allOutcomeDimensions": "Toutes les colonnes éligibles",
+          "noOutcomeDimensions": "Aucune colonne",
+          "selectedOutcomeDimensions": "{count} colonne | {count} colonnes",
+          "outcomeDimensionUnavailable": "{name} (aucune règle de comparaison)",
+          "dimensionExcludedHint": "Cette colonne est exclue des résultats. Sélectionnez-la sous « Critères de résultat » pour l'inclure.",
           "measurePerRow": "Moyenne par ligne, sur les essais",
           "dimensionImproved": "{count} ligne améliorée | {count} lignes améliorées",
           "dimensionUnchanged": "{count} ligne inchangée | {count} lignes inchangées",
@@ -11275,7 +11291,7 @@
         },
         "searchPlaceholder": "Rechercher des éléments...",
         "csvImport": {
-          "button": "Importer CSV",
+          "button": "Importer des éléments",
           "title": "Importer les éléments du jeu de données",
           "description": "Importez des éléments de jeu de données à partir d'un fichier CSV.",
           "fileLabel": "Fichier CSV",
@@ -12188,7 +12204,8 @@
       "remove": "Supprimer",
       "save": "Enregistrer",
       "saveAsDraft": "Enregistrer comme brouillon",
-      "createAndActivate": "Enregistrer et activer"
+      "createAndActivate": "Enregistrer et activer",
+      "testConnection": "Tester la connexion"
     },
     "scorerTypeDialog": {
       "title": "Créez un nouveau scorer",
@@ -12214,15 +12231,19 @@
       "availableModelsLabel": "Modèles disponibles",
       "apiKeyLabel": "Clé API",
       "apiKeyPlaceholder": "Saisissez la clé API",
-      "apiKeyHelp": "Stockée chiffrée au repos et jamais relue. Laissez vide lors de la modification pour conserver la clé existante.",
+      "apiKeyHelp": "Stockée chiffrée au repos et jamais relue. Laissez vide lors de l'enregistrement des modifications pour conserver la clé existante.",
       "authSection": "Authentification",
-      "authEditNote": "Les identifiants ne peuvent pas être relus. Saisissez à nouveau la clé API uniquement si vous souhaitez la renouveler.",
+      "authEditNote": "Les identifiants ne peuvent pas être relus. Pour tester un fournisseur qui exige une authentification, saisissez sa clé API.",
       "cannotRename": "Ne peut pas être renommé après la création.",
       "availableModelsHelp": "Facultatif. Liste de modèles disponibles sur ce fournisseur, séparés par des virgules.",
       "saveError": "Impossible d'enregistrer le fournisseur",
       "nameRequired": "Provider name is required",
       "typeRequired": "Provider type is required",
-      "defaultModelRequired": "Default model is required"
+      "defaultModelRequired": "Default model is required",
+      "testRunning": "Test de la connexion...",
+      "testPassed": "Connecté",
+      "testFailed": "Échec de la connexion",
+      "testError": "Échec du test de connexion"
     },
     "scoreConfig": {
       "gteSymbol": "≥",

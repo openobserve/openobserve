@@ -10794,7 +10794,8 @@
         "scoreConfigs": "Score-Konfigurationen",
         "targetDataset": "Zieldatensatz",
         "progress": "Fortschritt",
-        "updated": "Aktualisiert"
+        "updated": "Aktualisiert",
+        "actions": "Aktionen"
       },
       "create": {
         "title": "Neue Warteschlange",
@@ -10848,7 +10849,8 @@
           "refType": "Ref",
           "refId": "Referenz",
           "added": "Hinzugefügt",
-          "status": "Status"
+          "status": "Status",
+          "actions": "Aktionen"
         },
         "status": {
           "pending": "Ausstehend",
@@ -10960,6 +10962,8 @@
       "viewAll": "Experimente anzeigen",
       "baseline": "Basislinie",
       "setBaseline": "Basislinie festlegen",
+      "baselineRequiresCompleted": "Nur ein abgeschlossener Lauf kann als Baseline festgelegt werden.",
+      "baselineError": "Fehler beim Aktualisieren der Baseline.",
       "selectForComparison": "Für Vergleich auswählen",
       "progress": "{done} von {total} Slots",
       "noScores": "Keine aggregierten Bewertungen",
@@ -11070,8 +11074,10 @@
       "addToDataset": "Hinzufügen",
       "detail": {
         "by": "von {user}",
-        "p50Latency": "P50-Latenz",
+        "p50Latency": "P50-Task-Latenz",
         "totalCost": "Gesamtkosten",
+        "costBreakdown": "Task {task} · Scoring {scoring}",
+        "partialCostBreakdown": "Task {task} · Scoring {scoring} · Teilweise",
         "highDispersion": "Fälle mit hoher Streuung",
         "highDispersionHint": "Zeilen, in denen Versuche voneinander abweichen",
         "scoredRows": "{scored}/{total} Zeilen bewertet",
@@ -11101,7 +11107,7 @@
           "run": "Lauf"
         },
         "runSummary": "{trials} · {scorers}",
-        "progress": "Fortschritt",
+        "progress": "Task-Fortschritt",
         "scoring": "Bewertung",
         "scoringDistribution": "{success} erfolgreich · {failed} fehlgeschlagen · {pending} ausstehend · {skipped} übersprungen",
         "compare": "Vergleichen",
@@ -11194,6 +11200,16 @@
           "typeCategorical": "Kategorisch",
           "typeBoolean": "Boolesch",
           "threshold": "Schwellenwert",
+          "thresholdTooltip": "Baseline- und Kandidatenwerte, die um höchstens {percent} voneinander abweichen, gelten als unverändert, nicht als verschlechtert oder verbessert.",
+          "outcomeDimensions": "Ergebniskriterien",
+          "outcomeTooltipNone": "Es sind keine Spalten ausgewählt — jede vergleichbare Zeile wird als Nicht verglichen angezeigt.",
+          "outcomeTooltipAll": "Alle geeigneten Spalten bestimmen das Ergebnis jeder Zeile.",
+          "outcomeTooltipPartial": "Nur {names} bestimmen das Ergebnis jeder Zeile. Andere Spalten werden angezeigt, haben aber keinen Einfluss darauf.",
+          "allOutcomeDimensions": "Alle geeigneten Spalten",
+          "noOutcomeDimensions": "Keine Spalten",
+          "selectedOutcomeDimensions": "{count} Spalte | {count} Spalten",
+          "outcomeDimensionUnavailable": "{name} (keine Vergleichsrichtlinie)",
+          "dimensionExcludedHint": "Diese Spalte ist von den Ergebnissen ausgeschlossen. Wählen Sie sie unter Ergebniskriterien aus, um sie einzubeziehen.",
           "measurePerRow": "Mittelwert pro Zeile über alle Versuche",
           "dimensionImproved": "{count} Zeile verbessert | {count} Zeilen verbessert",
           "dimensionUnchanged": "{count} Zeile unverändert | {count} Zeilen unverändert",
@@ -11275,8 +11291,8 @@
         },
         "searchPlaceholder": "Elemente suchen...",
         "csvImport": {
-          "button": "CSV hochladen",
-          "title": "Dataset-Elemente hochladen",
+          "button": "Elemente importieren",
+          "title": "Datensatzelemente importieren",
           "description": "Dataset-Elemente aus einer CSV-Datei importieren.",
           "fileLabel": "CSV-Datei",
           "placeholder": "CSV-Datei auswählen",
@@ -12188,7 +12204,8 @@
       "remove": "Entfernen",
       "save": "Speichern",
       "saveAsDraft": "Als Entwurf speichern",
-      "createAndActivate": "Speichern & Aktivieren"
+      "createAndActivate": "Speichern & Aktivieren",
+      "testConnection": "Verbindung testen"
     },
     "scorerTypeDialog": {
       "title": "Einen neuen Scorer erstellen",
@@ -12214,15 +12231,19 @@
       "availableModelsLabel": "Verfügbare Modelle",
       "apiKeyLabel": "API-Schlüssel",
       "apiKeyPlaceholder": "API-Schlüssel eingeben",
-      "apiKeyHelp": "Im Ruhezustand verschlüsselt gespeichert und nie wieder ausgelesen. Lassen Sie das Feld beim Bearbeiten leer, um den vorhandenen Schlüssel beizubehalten.",
+      "apiKeyHelp": "Wird verschlüsselt gespeichert und niemals erneut ausgelesen. Lassen Sie das Feld beim Speichern von Änderungen leer, um den vorhandenen Schlüssel beizubehalten.",
       "authSection": "Authentifizierung",
-      "authEditNote": "Anmeldedaten können nicht ausgelesen werden. Geben Sie den API-Schlüssel nur erneut ein, wenn Sie ihn rotieren möchten.",
+      "authEditNote": "Anmeldedaten können nicht erneut ausgelesen werden. Um einen Anbieter zu testen, der eine Authentifizierung erfordert, geben Sie dessen API-Schlüssel ein.",
       "cannotRename": "Kann nach der Erstellung nicht umbenannt werden.",
       "availableModelsHelp": "Optional. Kommagetrennte Liste der bei diesem Anbieter verfügbaren Modelle.",
       "saveError": "Anbieter konnte nicht gespeichert werden",
       "nameRequired": "Provider name is required",
       "typeRequired": "Provider type is required",
-      "defaultModelRequired": "Default model is required"
+      "defaultModelRequired": "Default model is required",
+      "testRunning": "Verbindung wird getestet...",
+      "testPassed": "Verbunden",
+      "testFailed": "Verbindung fehlgeschlagen",
+      "testError": "Fehler beim Testen der Verbindung."
     },
     "scoreConfig": {
       "gteSymbol": "≥",

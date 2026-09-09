@@ -10794,7 +10794,8 @@
         "scoreConfigs": "Configurazioni punteggio",
         "targetDataset": "Dataset di destinazione",
         "progress": "Avanzamento",
-        "updated": "Aggiornato"
+        "updated": "Aggiornato",
+        "actions": "Azioni"
       },
       "create": {
         "title": "Nuova coda",
@@ -10848,7 +10849,8 @@
           "refType": "Rif.",
           "refId": "Riferimento",
           "added": "Aggiunto",
-          "status": "Stato"
+          "status": "Stato",
+          "actions": "Azioni"
         },
         "status": {
           "pending": "In attesa",
@@ -10960,6 +10962,8 @@
       "viewAll": "Visualizza esperimenti",
       "baseline": "Baseline",
       "setBaseline": "Imposta baseline",
+      "baselineRequiresCompleted": "Solo un'esecuzione completata può essere impostata come baseline",
+      "baselineError": "Aggiornamento della baseline non riuscito",
       "selectForComparison": "Seleziona per il confronto",
       "progress": "{done} di {total} slot",
       "noScores": "Nessun punteggio aggregato",
@@ -11070,8 +11074,10 @@
       "addToDataset": "Aggiungi",
       "detail": {
         "by": "da {user}",
-        "p50Latency": "Latenza P50",
+        "p50Latency": "Latenza P50 dell'attività",
         "totalCost": "Costo totale",
+        "costBreakdown": "Attività {task} · Scoring {scoring}",
+        "partialCostBreakdown": "Attività {task} · Scoring {scoring} · Parziale",
         "highDispersion": "Casi ad alta dispersione",
         "highDispersionHint": "Righe in cui le prove differiscono",
         "scoredRows": "{scored}/{total} righe valutate",
@@ -11101,7 +11107,7 @@
           "run": "Esecuzione"
         },
         "runSummary": "{trials} · {scorers}",
-        "progress": "Avanzamento",
+        "progress": "Avanzamento attività",
         "scoring": "Valutazione",
         "scoringDistribution": "{success} riusciti · {failed} falliti · {pending} in sospeso · {skipped} saltati",
         "compare": "Confronta",
@@ -11194,6 +11200,16 @@
           "typeCategorical": "Categorico",
           "typeBoolean": "Booleano",
           "threshold": "Soglia",
+          "thresholdTooltip": "I valori della baseline e del candidato che differiscono tra loro entro {percent} sono considerati invariati, non regrediti o migliorati.",
+          "outcomeDimensions": "Criteri di esito",
+          "outcomeTooltipNone": "Nessuna colonna selezionata: ogni riga confrontabile verrà mostrata come Non confrontata.",
+          "outcomeTooltipAll": "Tutte le colonne idonee determinano l'esito di ogni riga.",
+          "outcomeTooltipPartial": "Solo {names} determinano l'esito di ogni riga. Le altre colonne sono mostrate ma non lo influenzano.",
+          "allOutcomeDimensions": "Tutte le colonne idonee",
+          "noOutcomeDimensions": "Nessuna colonna",
+          "selectedOutcomeDimensions": "{count} colonna | {count} colonne",
+          "outcomeDimensionUnavailable": "{name} (nessun criterio di confronto)",
+          "dimensionExcludedHint": "Questa colonna è esclusa dagli esiti. Selezionala in Criteri di esito per includerla.",
           "measurePerRow": "Media per riga, su tutte le prove",
           "dimensionImproved": "{count} riga migliorata | {count} righe migliorate",
           "dimensionUnchanged": "{count} riga invariata | {count} righe invariate",
@@ -11275,8 +11291,8 @@
         },
         "searchPlaceholder": "Cerca elementi...",
         "csvImport": {
-          "button": "Carica CSV",
-          "title": "Carica elementi del dataset",
+          "button": "Importa elementi",
+          "title": "Importa elementi del dataset",
           "description": "Importa elementi del dataset da un file CSV.",
           "fileLabel": "File CSV",
           "placeholder": "Scegli un file CSV",
@@ -12188,7 +12204,8 @@
       "remove": "Rimuovi",
       "save": "Salva",
       "saveAsDraft": "Salva come bozza",
-      "createAndActivate": "Salva e attiva"
+      "createAndActivate": "Salva e attiva",
+      "testConnection": "Test connessione"
     },
     "scorerTypeDialog": {
       "title": "Crea un nuovo segnapunti",
@@ -12214,15 +12231,19 @@
       "availableModelsLabel": "Modelli disponibili",
       "apiKeyLabel": "Chiave API",
       "apiKeyPlaceholder": "Inserisci la chiave API",
-      "apiKeyHelp": "Memorizzata cifrata a riposo e mai riletta. Lascia vuoto durante la modifica per mantenere la chiave esistente.",
+      "apiKeyHelp": "Viene memorizzata crittografata a riposo e non viene mai letta nuovamente. Lasciare vuoto quando si salvano le modifiche per mantenere la chiave esistente.",
       "authSection": "Autenticazione",
-      "authEditNote": "Le credenziali non possono essere rilette. Reinserisci la chiave API solo se vuoi ruotarla.",
+      "authEditNote": "Le credenziali non possono essere rilette. Per testare un provider che richiede autenticazione, inserisci la sua chiave API.",
       "cannotRename": "Non può essere rinominato dopo la creazione.",
       "availableModelsHelp": "Facoltativo. Elenco di modelli disponibili su questo provider, separati da virgola.",
       "saveError": "Impossibile salvare il provider",
       "nameRequired": "Provider name is required",
       "typeRequired": "Provider type is required",
-      "defaultModelRequired": "Default model is required"
+      "defaultModelRequired": "Default model is required",
+      "testRunning": "Test della connessione in corso...",
+      "testPassed": "Connesso",
+      "testFailed": "Connessione non riuscita",
+      "testError": "Impossibile testare la connessione"
     },
     "scoreConfig": {
       "gteSymbol": "≥",

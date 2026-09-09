@@ -10794,7 +10794,8 @@
         "scoreConfigs": "점수 구성",
         "targetDataset": "대상 데이터셋",
         "progress": "진행 상황",
-        "updated": "업데이트됨"
+        "updated": "업데이트됨",
+        "actions": "작업"
       },
       "create": {
         "title": "새 큐",
@@ -10848,7 +10849,8 @@
           "refType": "참조",
           "refId": "참조",
           "added": "추가됨",
-          "status": "상태"
+          "status": "상태",
+          "actions": "작업"
         },
         "status": {
           "pending": "대기 중",
@@ -10960,6 +10962,8 @@
       "viewAll": "실험 보기",
       "baseline": "베이스라인",
       "setBaseline": "베이스라인 설정",
+      "baselineRequiresCompleted": "완료된 실행만 기준선으로 설정할 수 있습니다.",
+      "baselineError": "기준선 업데이트에 실패했습니다.",
       "selectForComparison": "비교를 위해 선택",
       "progress": "슬롯 {total}개 중 {done}개",
       "noScores": "집계 점수 없음",
@@ -11070,8 +11074,10 @@
       "addToDataset": "추가",
       "detail": {
         "by": "{user} 작성",
-        "p50Latency": "P50 지연 시간",
+        "p50Latency": "P50 태스크 레이턴시",
         "totalCost": "총 비용",
+        "costBreakdown": "태스크 {task} · 스코어링 {scoring}",
+        "partialCostBreakdown": "태스크 {task} · 스코어링 {scoring} · 부분",
         "highDispersion": "고분산 케이스",
         "highDispersionHint": "시도가 일치하지 않는 행",
         "scoredRows": "{scored}/{total}개 행 채점됨",
@@ -11101,7 +11107,7 @@
           "run": "실행"
         },
         "runSummary": "{trials} · {scorers}",
-        "progress": "진행률",
+        "progress": "태스크 진행률",
         "scoring": "채점",
         "scoringDistribution": "{success} 성공 · {failed} 실패 · {pending} 대기 · {skipped} 건너뜀",
         "compare": "비교",
@@ -11194,6 +11200,16 @@
           "typeCategorical": "범주형",
           "typeBoolean": "불리언",
           "threshold": "임계값",
+          "thresholdTooltip": "기준선과 후보 값이 서로의 {percent} 이내에 있으면 변경되지 않은 것으로 간주하며, 악화 또는 개선으로 보지 않습니다.",
+          "outcomeDimensions": "결과 기준",
+          "outcomeTooltipNone": "선택된 열이 없습니다 — 비교 가능한 모든 행은 비교되지 않은 것으로 표시됩니다.",
+          "outcomeTooltipAll": "모든 적격 열은 각 행의 결과를 결정합니다.",
+          "outcomeTooltipPartial": "오직 {names}만 각 행의 결과를 결정합니다. 다른 열은 표시되지만 결과에는 영향을 미치지 않습니다.",
+          "allOutcomeDimensions": "모든 적격 열",
+          "noOutcomeDimensions": "열 없음",
+          "selectedOutcomeDimensions": "{count}개의 열 | {count}개의 열",
+          "outcomeDimensionUnavailable": "{name} (비교 정책 없음)",
+          "dimensionExcludedHint": "이 열은 결과 산정에서 제외됩니다. 포함하려면 결과 기준에서 선택하세요.",
           "measurePerRow": "행당 평균 (시행 전체)",
           "dimensionImproved": "{count} 행 개선됨 | {count} 행 개선됨",
           "dimensionUnchanged": "{count} 행 변경 없음 | {count} 행 변경 없음",
@@ -11275,8 +11291,8 @@
         },
         "searchPlaceholder": "항목 검색...",
         "csvImport": {
-          "button": "CSV 업로드",
-          "title": "데이터셋 항목 업로드",
+          "button": "항목 가져오기",
+          "title": "데이터셋 항목 가져오기",
           "description": "CSV 파일에서 데이터셋 항목을 가져옵니다.",
           "fileLabel": "CSV 파일",
           "placeholder": "CSV 파일 선택",
@@ -12188,7 +12204,8 @@
       "remove": "제거",
       "save": "저장",
       "saveAsDraft": "초안으로 저장",
-      "createAndActivate": "저장 및 활성화"
+      "createAndActivate": "저장 및 활성화",
+      "testConnection": "연결 테스트"
     },
     "scorerTypeDialog": {
       "title": "새 채점자 생성",
@@ -12214,15 +12231,19 @@
       "availableModelsLabel": "사용 가능한 모델",
       "apiKeyLabel": "API 키",
       "apiKeyPlaceholder": "API 키 입력",
-      "apiKeyHelp": "저장 시 암호화되어 저장되며 다시 읽을 수 없습니다. 기존 키를 유지하려면 편집 시 비워 두세요.",
+      "apiKeyHelp": "암호화된 상태로 저장되며 다시 읽어올 수 없습니다. 기존 키를 유지하려면 변경 사항을 저장할 때 이 필드를 비워 두세요.",
       "authSection": "인증",
-      "authEditNote": "자격 증명은 다시 읽을 수 없습니다. 교체하려는 경우에만 API 키를 다시 입력하세요.",
+      "authEditNote": "인증 정보는 다시 읽어올 수 없습니다. 인증이 필요한 공급자를 테스트하려면 해당 API 키를 입력하세요.",
       "cannotRename": "생성 후에는 이름을 변경할 수 없습니다.",
       "availableModelsHelp": "선택 사항. 이 공급자에서 사용할 수 있는 모델의 쉼표로 구분된 목록입니다.",
       "saveError": "공급자를 저장하지 못했습니다.",
       "nameRequired": "Provider name is required",
       "typeRequired": "Provider type is required",
-      "defaultModelRequired": "Default model is required"
+      "defaultModelRequired": "Default model is required",
+      "testRunning": "연결 테스트 중...",
+      "testPassed": "연결됨",
+      "testFailed": "연결 실패",
+      "testError": "연결 테스트에 실패했습니다."
     },
     "scoreConfig": {
       "gteSymbol": "≥",

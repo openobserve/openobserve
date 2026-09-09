@@ -10794,7 +10794,8 @@
         "scoreConfigs": "Scoreconfiguraties",
         "targetDataset": "Doeldataset",
         "progress": "Voortgang",
-        "updated": "Bijgewerkt"
+        "updated": "Bijgewerkt",
+        "actions": "Acties"
       },
       "create": {
         "title": "Nieuwe wachtrij",
@@ -10848,7 +10849,8 @@
           "refType": "Ref",
           "refId": "Referentie",
           "added": "Toegevoegd",
-          "status": "Status"
+          "status": "Status",
+          "actions": "Acties"
         },
         "status": {
           "pending": "In afwachting",
@@ -10960,6 +10962,8 @@
       "viewAll": "Experimenten bekijken",
       "baseline": "Basislijn",
       "setBaseline": "Basislijn instellen",
+      "baselineRequiresCompleted": "Alleen een voltooide run kan als basislijn worden ingesteld.",
+      "baselineError": "Bijwerken van de basislijn is mislukt.",
       "selectForComparison": "Selecteer voor vergelijking",
       "progress": "{done} van {total} slots",
       "noScores": "Geen geaggregeerde scores",
@@ -11070,8 +11074,10 @@
       "addToDataset": "Toevoegen",
       "detail": {
         "by": "door {user}",
-        "p50Latency": "P50-latentie",
+        "p50Latency": "P50-taaklatentie",
         "totalCost": "Totale kosten",
+        "costBreakdown": "Taak {task} · Scoring {scoring}",
+        "partialCostBreakdown": "Taak {task} · Scoring {scoring} · Gedeeltelijk",
         "highDispersion": "Gevallen met hoge spreiding",
         "highDispersionHint": "Rijen waarin proeven verschillen",
         "scoredRows": "{scored}/{total} rijen gescoord",
@@ -11101,7 +11107,7 @@
           "run": "Run"
         },
         "runSummary": "{trials} · {scorers}",
-        "progress": "Voortgang",
+        "progress": "Taakvoortgang",
         "scoring": "Scoren",
         "scoringDistribution": "{success} geslaagd · {failed} mislukt · {pending} in behandeling · {skipped} overgeslagen",
         "compare": "Vergelijken",
@@ -11194,6 +11200,16 @@
           "typeCategorical": "Categorisch",
           "typeBoolean": "Booleaans",
           "threshold": "Drempelwaarde",
+          "thresholdTooltip": "Baseline- en kandidaatwaarden binnen {percent} van elkaar gelden als ongewijzigd, niet als verslechterd of verbeterd.",
+          "outcomeDimensions": "Uitkomstcriteria",
+          "outcomeTooltipNone": "Er zijn geen kolommen geselecteerd — elke vergelijkbare rij wordt weergegeven als Niet vergeleken.",
+          "outcomeTooltipAll": "Alle in aanmerking komende kolommen bepalen de uitkomst van elke rij.",
+          "outcomeTooltipPartial": "Alleen {names} bepalen de uitkomst van elke rij. Andere kolommen worden getoond, maar hebben daar geen invloed op.",
+          "allOutcomeDimensions": "Alle in aanmerking komende kolommen",
+          "noOutcomeDimensions": "Geen kolommen",
+          "selectedOutcomeDimensions": "{count} kolom | {count} kolommen",
+          "outcomeDimensionUnavailable": "{name} (geen vergelijkingsbeleid)",
+          "dimensionExcludedHint": "Deze kolom is uitgesloten van de uitkomsten. Selecteer deze onder Uitkomstcriteria om deze op te nemen.",
           "measurePerRow": "Gemiddelde per rij, over trials",
           "dimensionImproved": "{count} rij verbeterd | {count} rijen verbeterd",
           "dimensionUnchanged": "{count} rij ongewijzigd | {count} rijen ongewijzigd",
@@ -11275,8 +11291,8 @@
         },
         "searchPlaceholder": "Zoek items...",
         "csvImport": {
-          "button": "CSV uploaden",
-          "title": "Datasetitems uploaden",
+          "button": "Items importeren",
+          "title": "Dataset-items importeren",
           "description": "Importeer datasetitems uit een CSV-bestand.",
           "fileLabel": "CSV-bestand",
           "placeholder": "Kies een CSV-bestand",
@@ -12188,7 +12204,8 @@
       "remove": "Verwijderen",
       "save": "Opslaan",
       "saveAsDraft": "Opslaan als concept",
-      "createAndActivate": "Opslaan en activeren"
+      "createAndActivate": "Opslaan en activeren",
+      "testConnection": "Verbinding testen"
     },
     "scorerTypeDialog": {
       "title": "Maak een nieuwe scorer",
@@ -12214,15 +12231,19 @@
       "availableModelsLabel": "Beschikbare modellen",
       "apiKeyLabel": "API-sleutel",
       "apiKeyPlaceholder": "Voer API-sleutel in",
-      "apiKeyHelp": "Wordt versleuteld opgeslagen en nooit teruggelezen. Laat leeg bij het bewerken om de bestaande sleutel te behouden.",
+      "apiKeyHelp": "Wordt versleuteld opgeslagen en nooit teruggelezen. Laat dit leeg bij het opslaan van wijzigingen om de bestaande sleutel te behouden.",
       "authSection": "Authenticatie",
-      "authEditNote": "Inloggegevens kunnen niet worden teruggelezen. Voer de API-sleutel alleen opnieuw in als je deze wilt roteren.",
+      "authEditNote": "Inloggegevens kunnen niet worden teruggelezen. Om een provider te testen die authenticatie vereist, voer je de API-sleutel in.",
       "cannotRename": "Kan na het aanmaken niet worden hernoemd.",
       "availableModelsHelp": "Optioneel. Door komma's gescheiden lijst van modellen die beschikbaar zijn op deze provider.",
       "saveError": "Het opslaan van de provider is mislukt",
       "nameRequired": "Provider name is required",
       "typeRequired": "Provider type is required",
-      "defaultModelRequired": "Default model is required"
+      "defaultModelRequired": "Default model is required",
+      "testRunning": "Verbinding testen...",
+      "testPassed": "Verbonden",
+      "testFailed": "Verbinding mislukt",
+      "testError": "Verbinding testen is mislukt."
     },
     "scoreConfig": {
       "gteSymbol": "≥",

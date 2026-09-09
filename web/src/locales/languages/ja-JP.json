@@ -10794,7 +10794,8 @@
         "scoreConfigs": "スコア設定",
         "targetDataset": "ターゲットデータセット",
         "progress": "進捗",
-        "updated": "更新日時"
+        "updated": "更新日時",
+        "actions": "操作"
       },
       "create": {
         "title": "新規キュー",
@@ -10848,7 +10849,8 @@
           "refType": "参照",
           "refId": "参照",
           "added": "追加日時",
-          "status": "ステータス"
+          "status": "ステータス",
+          "actions": "操作"
         },
         "status": {
           "pending": "保留中",
@@ -10960,6 +10962,8 @@
       "viewAll": "実験を表示",
       "baseline": "ベースライン",
       "setBaseline": "ベースラインに設定",
+      "baselineRequiresCompleted": "ベースラインに設定できるのは、完了した実行のみです。",
+      "baselineError": "ベースラインの更新に失敗しました。",
       "selectForComparison": "比較用に選択",
       "progress": "{done} / {total} スロット",
       "noScores": "集計スコアなし",
@@ -11070,8 +11074,10 @@
       "addToDataset": "追加",
       "detail": {
         "by": "{user}による",
-        "p50Latency": "P50レイテンシ",
+        "p50Latency": "P50 タスクレイテンシ",
         "totalCost": "総コスト",
+        "costBreakdown": "タスク {task} · スコアリング {scoring}",
+        "partialCostBreakdown": "タスク {task} · スコアリング {scoring} · 一部",
         "highDispersion": "高分散ケース",
         "highDispersionHint": "試行が一致しない行",
         "scoredRows": "{scored}/{total} 行がスコア済み",
@@ -11101,7 +11107,7 @@
           "run": "実行"
         },
         "runSummary": "{trials} · {scorers}",
-        "progress": "進捗",
+        "progress": "タスクの進捗",
         "scoring": "スコアリング",
         "scoringDistribution": "{success} 成功 · {failed} 失敗 · {pending} 保留 · {skipped} スキップ",
         "compare": "比較",
@@ -11194,6 +11200,16 @@
           "typeCategorical": "カテゴリ",
           "typeBoolean": "ブール",
           "threshold": "しきい値",
+          "thresholdTooltip": "ベースライン値と候補値が互いに {percent} 以内の差であれば、変化なしと見なされ、悪化や改善とは見なされません。",
+          "outcomeDimensions": "結果判定基準",
+          "outcomeTooltipNone": "列が選択されていません。比較可能なすべての行は「比較対象外」と表示されます。",
+          "outcomeTooltipAll": "対象となるすべての列が、各行の結果を決定します。",
+          "outcomeTooltipPartial": "{names} のみが各行の結果を決定します。他の列は表示されますが、結果には影響しません。",
+          "allOutcomeDimensions": "対象となるすべての列",
+          "noOutcomeDimensions": "列なし",
+          "selectedOutcomeDimensions": "{count}列 | {count}列",
+          "outcomeDimensionUnavailable": "{name}（比較ポリシーなし）",
+          "dimensionExcludedHint": "この列は結果判定から除外されています。含めるには、「結果判定基準」でこの列を選択してください。",
           "measurePerRow": "試行全体の行ごとの平均",
           "dimensionImproved": "{count} 行が改善 | {count} 行が改善",
           "dimensionUnchanged": "{count} 行は変化なし | {count} 行は変化なし",
@@ -11275,8 +11291,8 @@
         },
         "searchPlaceholder": "項目を検索...",
         "csvImport": {
-          "button": "CSVをアップロード",
-          "title": "データセット項目のアップロード",
+          "button": "項目をインポート",
+          "title": "データセット項目のインポート",
           "description": "CSVファイルからデータセット項目をインポートします。",
           "fileLabel": "CSVファイル",
           "placeholder": "CSVファイルを選択",
@@ -12188,7 +12204,8 @@
       "remove": "削除",
       "save": "[保存]",
       "saveAsDraft": "下書きとして保存",
-      "createAndActivate": "保存して有効化"
+      "createAndActivate": "保存して有効化",
+      "testConnection": "接続テスト"
     },
     "scorerTypeDialog": {
       "title": "新しいスコアラーを作成",
@@ -12214,15 +12231,19 @@
       "availableModelsLabel": "ご利用可能なモデル",
       "apiKeyLabel": "APIキー",
       "apiKeyPlaceholder": "APIキーを入力",
-      "apiKeyHelp": "保存時に暗号化され、読み取ることはできません。編集時に空欄のままにすると既存のキーが保持されます。",
+      "apiKeyHelp": "保管中は暗号化され、読み戻されることはありません。既存のキーを保持するには、編集を保存するときは空欄のままにしてください。",
       "authSection": "認証",
-      "authEditNote": "認証情報は読み取ることができません。ローテーションする場合のみAPIキーを再入力してください。",
+      "authEditNote": "認証情報は読み戻すことができません。認証が必要なプロバイダーをテストするには、その API キーを入力してください。",
       "cannotRename": "作成後に名前を変更することはできません。",
       "availableModelsHelp": "任意。このプロバイダーで利用可能なモデルのカンマ区切りリスト。",
       "saveError": "プロバイダを保存できませんでした",
       "nameRequired": "Provider name is required",
       "typeRequired": "Provider type is required",
-      "defaultModelRequired": "Default model is required"
+      "defaultModelRequired": "Default model is required",
+      "testRunning": "接続テスト中...",
+      "testPassed": "接続済み",
+      "testFailed": "接続に失敗しました",
+      "testError": "接続テストに失敗しました"
     },
     "scoreConfig": {
       "gteSymbol": "≥",

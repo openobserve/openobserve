@@ -10794,7 +10794,8 @@
         "scoreConfigs": "Configurações de Pontuação",
         "targetDataset": "Dataset de Destino",
         "progress": "Progresso",
-        "updated": "Atualizado"
+        "updated": "Atualizado",
+        "actions": "Ações"
       },
       "create": {
         "title": "Nova Fila",
@@ -10848,7 +10849,8 @@
           "refType": "Ref",
           "refId": "Referência",
           "added": "Adicionado",
-          "status": "Status"
+          "status": "Status",
+          "actions": "Ações"
         },
         "status": {
           "pending": "Pendente",
@@ -10960,6 +10962,8 @@
       "viewAll": "Ver experimentos",
       "baseline": "Linha de base",
       "setBaseline": "Definir linha de base",
+      "baselineRequiresCompleted": "Somente uma execução concluída pode ser definida como linha de base",
+      "baselineError": "Falha ao atualizar a linha de base",
       "selectForComparison": "Selecionar para comparação",
       "progress": "{done} de {total} slots",
       "noScores": "Sem pontuações agregadas",
@@ -11070,8 +11074,10 @@
       "addToDataset": "Adicionar",
       "detail": {
         "by": "por {user}",
-        "p50Latency": "Latência P50",
+        "p50Latency": "Latência P50 da Tarefa",
         "totalCost": "Custo Total",
+        "costBreakdown": "Tarefa {task} · Avaliação {scoring}",
+        "partialCostBreakdown": "Tarefa {task} · Avaliação {scoring} · Parcial",
         "highDispersion": "Casos de Alta Dispersão",
         "highDispersionHint": "Linhas em que as tentativas divergem",
         "scoredRows": "{scored}/{total} linhas pontuadas",
@@ -11101,7 +11107,7 @@
           "run": "Execução"
         },
         "runSummary": "{trials} · {scorers}",
-        "progress": "Progresso",
+        "progress": "Progresso da Tarefa",
         "scoring": "Pontuação",
         "scoringDistribution": "{success} sucesso · {failed} falha · {pending} pendente · {skipped} ignorado",
         "compare": "Comparar",
@@ -11194,6 +11200,16 @@
           "typeCategorical": "Categórico",
           "typeBoolean": "Booleano",
           "threshold": "Limite",
+          "thresholdTooltip": "Valores de linha de base e candidatos que estejam dentro de {percent} entre si são considerados inalterados, não regredidos ou melhorados.",
+          "outcomeDimensions": "Critérios de resultado",
+          "outcomeTooltipNone": "Nenhuma coluna está selecionada — cada linha comparável será exibida como Não Comparado.",
+          "outcomeTooltipAll": "Todas as colunas elegíveis determinam o resultado de cada linha.",
+          "outcomeTooltipPartial": "Somente {names} determinam o resultado de cada linha. Outras colunas são exibidas, mas não o afetam.",
+          "allOutcomeDimensions": "Todas as colunas elegíveis",
+          "noOutcomeDimensions": "Nenhuma coluna",
+          "selectedOutcomeDimensions": "{count} coluna | {count} colunas",
+          "outcomeDimensionUnavailable": "{name} (sem política de comparação)",
+          "dimensionExcludedHint": "Esta coluna está excluída dos resultados. Selecione-a em Critérios de resultado para incluí-la.",
           "measurePerRow": "Média por linha, ao longo das tentativas",
           "dimensionImproved": "{count} linha melhorou | {count} linhas melhoraram",
           "dimensionUnchanged": "{count} linha inalterada | {count} linhas inalteradas",
@@ -11275,8 +11291,8 @@
         },
         "searchPlaceholder": "Pesquisar Itens...",
         "csvImport": {
-          "button": "Enviar CSV",
-          "title": "Enviar Itens do Dataset",
+          "button": "Importar Itens",
+          "title": "Importar Itens do Conjunto de Dados",
           "description": "Importe itens do dataset a partir de um arquivo CSV.",
           "fileLabel": "Arquivo CSV",
           "placeholder": "Escolha um arquivo CSV",
@@ -12188,7 +12204,8 @@
       "remove": "Remover",
       "save": "Salvar",
       "saveAsDraft": "Salvar como Rascunho",
-      "createAndActivate": "Salvar e Ativar"
+      "createAndActivate": "Salvar e Ativar",
+      "testConnection": "Testar Conexão"
     },
     "scorerTypeDialog": {
       "title": "Crie um novo marcador",
@@ -12214,15 +12231,19 @@
       "availableModelsLabel": "Modelos disponíveis",
       "apiKeyLabel": "Chave de API",
       "apiKeyPlaceholder": "Insira a chave de API",
-      "apiKeyHelp": "Armazenada criptografada em repouso e nunca lida novamente. Deixe em branco ao editar para manter a chave existente.",
+      "apiKeyHelp": "A chave é armazenada criptografada em repouso e nunca é lida novamente. Deixe em branco ao salvar as alterações para manter a chave existente.",
       "authSection": "Autenticação",
-      "authEditNote": "As credenciais não podem ser lidas novamente. Insira a chave de API novamente apenas se quiser rotacioná-la.",
+      "authEditNote": "As credenciais não podem ser lidas novamente. Para testar um provedor que exige autenticação, insira a chave de API dele.",
       "cannotRename": "Não pode ser renomeado após a criação.",
       "availableModelsHelp": "Opcional. Lista separada por vírgulas de modelos disponíveis neste Provedor.",
       "saveError": "Falha ao salvar o provedor",
       "nameRequired": "Provider name is required",
       "typeRequired": "Provider type is required",
-      "defaultModelRequired": "Default model is required"
+      "defaultModelRequired": "Default model is required",
+      "testRunning": "Testando conexão...",
+      "testPassed": "Conectado",
+      "testFailed": "Falha na conexão",
+      "testError": "Falha ao testar a conexão"
     },
     "scoreConfig": {
       "gteSymbol": "≥",
