@@ -111,7 +111,9 @@ const MAX_VISIBLE_CHIPS = 2;
 const { t } = useI18nTyped();
 
 const props = defineProps<{
+  /** Picks the `_llm_scores` column matched: `span_id` for "span", `trace_id` for "trace". */
   scope: TraceScoreScope;
+  /** The span or trace id the scores were recorded against. */
   targetId: string;
   /** Lower bound of the search window; the upper bound is "now", since scores land well after the trace. */
   startTimeUs: number;

@@ -172,6 +172,28 @@ mod tests {
     }
 
     #[test]
+    fn test_provider_response_keeps_a_legacy_full_url() {
+        let legacy = "https://api.openai.com/v1/chat/completions";
+        let provider = infra::table::providers::Provider {
+            id: "abc".to_string(),
+            org_id: "org1".to_string(),
+            name: "OpenAI".to_string(),
+            provider_type: "openai".to_string(),
+            endpoint: Some(legacy.to_string()),
+            default_model: "gpt-4o".to_string(),
+            available_models: vec!["gpt-4o".to_string()],
+            auth_config: serde_json::json!({"api_key": "secret"}),
+            rate_limits: None,
+            is_default: false,
+            created_at: 1000,
+            updated_at: 2000,
+        };
+        let resp = ProviderResponseBody::from(provider);
+        assert_eq!(resp.endpoint.as_deref(), Some(legacy));
+        assert_eq!(resp.resolved_endpoint, legacy);
+    }
+
+    #[test]
     fn test_provider_response_fills_in_the_default_endpoint() {
         // `endpoint` stays null to track the default; the response still names the URL called.
         let provider = infra::table::providers::Provider {
