@@ -15,7 +15,7 @@
 
 import { describe, expect, it } from "vitest";
 import type { BrowserStep } from "@/types/synthetics";
-import { buildV2Step, buildV2Steps, isSaveableJourney } from "./buildV2Steps";
+import { buildV2Step, buildV2Steps, isSaveableJourney, isStorableAction } from "./buildV2Steps";
 
 function step(overrides: Partial<BrowserStep> = {}): BrowserStep {
   return {
@@ -246,5 +246,26 @@ describe("SE-18: a completed manual step does not block the save", () => {
       },
     ];
     expect(isSaveableJourney(journey)).toBe(true);
+  });
+});
+
+describe("subtest steps", () => {
+  it("stores a subtest step as the reference and nothing else", () => {
+    const wire = buildV2Step({
+      id: "s2",
+      action: "subtest",
+      name: "Log in (shared)",
+      subtest: { id: "login-test", name: "Login" },
+    });
+    expect(wire).toEqual({
+      id: "s2",
+      action: "subtest",
+      name: "Log in (shared)",
+      subtest: { id: "login-test" },
+    });
+  });
+
+  it("is storable", () => {
+    expect(isStorableAction("subtest")).toBe(true);
   });
 });

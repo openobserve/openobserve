@@ -13486,7 +13486,8 @@
         "scroll": "Scroll",
         "wait": "Wait",
         "assert": "Assert",
-        "screenshot": "Screenshot"
+        "screenshot": "Screenshot",
+        "subtest": "Subtest"
       },
       "clickTypeLabel": "Click type",
       "clickTypeHelp": "Right click opens a context menu; double click sends two clicks.",
@@ -14284,6 +14285,8 @@
       "urlRequired": "Starting URL is required",
       "fixHighlightedFields": "Fix the highlighted fields before saving",
       "retiredAction": "\"{action}\" is no longer supported — remove or replace \"{step}\"",
+      "subtestRequired": "Choose the test to run here",
+      "subtestFlags": "A subtest cannot be optional or always-run — its failure always fails this test",
       "runBudgetExceeded": "This check could take up to {worstCase} per run, over the {limit} limit. Remove a browser/device combo, or lower retries. ({combos} combo(s) × {attempts} attempt(s) × {perAttempt} each.)",
       "runBudgetRetriesHint": "Lowering retries brings this check back inside the {limit} run limit.",
       "folderUnavailable": "Folder \"{folder}\" is not available in this organization — saving to the default folder."
