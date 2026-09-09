@@ -1,13 +1,5 @@
 #!/usr/bin/env node
-/**
- * pw-triage-comment.js — render the sticky PR comment for Playwright shard triage.
- *
- * Reads the generated matrix from $MATRIX and the selection log (argv[1], the
- * generate_matrix job's /tmp/pw-select-log.txt) and prints a compact markdown body:
- * mode, shards with per-shard spec counts, total specs, and the selection reasoning
- * (only when the log has content — full-matrix runs have no log). Env $MARKER,
- * $SMOKE_ACTIVE, $HEAD_SHA, $ATTEMPT tune the header/footer. stdout is the comment body.
- */
+// Render the sticky PR shard-triage comment from $MATRIX + the select log (argv[2]) to stdout.
 const fs = require("fs");
 
 function readLog(path) {
