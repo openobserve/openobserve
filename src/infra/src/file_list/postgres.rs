@@ -1107,8 +1107,7 @@ WHERE stream = $1 {time_filter}
 GROUP BY stream;
             "#
         );
-        // we use RW here to avoid error: canceling statement due to conflict with recovery
-        // PG SQLSTATE 40001
+        // Read from the primary: a lagging hot standby cancels this scan with SQLSTATE 40001
         let pool = CLIENT_RW.clone();
         DB_QUERY_NUMS
             .with_label_values(&["stats_by_date_range", "file_list"])
