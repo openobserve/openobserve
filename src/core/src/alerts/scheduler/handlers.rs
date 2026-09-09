@@ -140,7 +140,7 @@ async fn persist_alert_run_state(
                 .unwrap_or(false)
             });
         if transition_changed || stale_to_fresh {
-            let db = get_orm_client_ro().await;
+            let db = get_orm_client_rw().await;
             nudge_composite_parents(
                 db,
                 &alert.org_id,
@@ -228,7 +228,7 @@ async fn persist_alert_run_state(
             .unwrap_or(false)
         });
     if transition_changed || stale_to_fresh {
-        let db = get_orm_client_ro().await;
+        let db = get_orm_client_rw().await;
         nudge_composite_parents(
             db,
             &alert.org_id,
