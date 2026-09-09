@@ -1,15 +1,8 @@
 // Copyright 2026 OpenObserve Inc.
-//
-// The "Kubernetes viewer" role preset: the metric streams the curated
-// Infrastructure pages query, and the per-stream permission objects a role
-// needs to render them. Pure data plus a pure builder — the UI owns the save.
 
-import type { RolePermission } from "./readonlyPreset";
+export const K8S_VIEWER_PERMS = ["AllowList", "AllowGet"] as const;
 
-export const K8S_VIEWER_PERMS = ["AllowList", "AllowGet"];
-
-// The union of every `requiresStreams` in the curated packs, kept BY HAND —
-// k8sViewerPreset.spec.ts fails when a pack adds or drops one.
+// Kept BY HAND — k8sViewerPreset.spec.ts fails when a curated pack adds or drops a stream.
 export const K8S_VIEWER_STREAMS: string[] = [
   "k8s_node_cpu_usage",
   "k8s_node_cpu_utilization",
@@ -49,14 +42,3 @@ export const K8S_VIEWER_STREAMS: string[] = [
   "system_memory_usage",
   "system_network_io",
 ];
-
-// Same permission-object format EditRole saves for an INDIVIDUAL stream: the
-// resource name is the stream TYPE and the entity is the bare stream name. Names
-// are passed through verbatim — the frontend has no counterpart to the backend's
-// into_ofga_supported_format, so every name here must already be OFGA-safe.
-export const buildK8sViewerPermissions = (
-  streams: string[] = K8S_VIEWER_STREAMS,
-): RolePermission[] =>
-  streams.flatMap((name) =>
-    K8S_VIEWER_PERMS.map((permission) => ({ object: `metrics:${name}`, permission })),
-  );

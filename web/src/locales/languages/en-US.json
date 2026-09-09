@@ -2066,7 +2066,7 @@
         "custom": "Custom (empty role)",
         "readonly": "Read-only (view access to all resources)",
         "dbm": "Database Monitoring viewer (read-only on the DB Monitoring module and the metric streams its Metrics tab queries)",
-        "k8s": "Kubernetes viewer (read access to Kubernetes & host metrics)"
+        "k8s": "Kubernetes viewer (read-only on the metric streams the Kubernetes & Host Infrastructure pages query)"
       },
       "name": {
         "required": "Role name is required.",
@@ -2104,7 +2104,9 @@
       "updateSuccess": "Updated role successfully!",
       "updateError": "Error while updating role!",
       "dbmPresetSeeded": "Pre-selected read access on {matched} of {total} DB Monitoring metric streams, plus the DB Monitoring module. Review before saving.",
-      "dbmPresetNoMatch": "None of the {total} DB Monitoring metric streams exist in this organization yet, so nothing was pre-selected on them; the DB Monitoring module grant was still staged."
+      "dbmPresetNoMatch": "None of the {total} DB Monitoring metric streams exist in this organization yet, so nothing was pre-selected on them; the DB Monitoring module grant was still staged.",
+      "k8sPresetSeeded": "Pre-selected read access on {matched} of {total} Kubernetes metric streams. Review before saving.",
+      "k8sPresetNoMatch": "None of the {total} Kubernetes metric streams exist in this organization yet, so nothing was pre-selected."
     },
     "rolesPage": {
       "subtitle": "Roles bundle permissions — assign them to Users, Service Accounts, or Groups to grant access.",
