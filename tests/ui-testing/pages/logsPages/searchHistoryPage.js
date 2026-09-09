@@ -13,6 +13,7 @@ export class SearchHistoryPage {
     this.page = page;
 
     this.searchHistoryPath = '/web/logs/search-history';
+    this.logsPath = '/web/logs';
 
     // ===== ENTRY POINT (SearchBar.vue) =====
     // Search History lives in the more-options (hamburger) menu, not the "More" utilities one.
@@ -79,6 +80,45 @@ export class SearchHistoryPage {
     testLogger.info('Re-applied query from Search History', { reAppliedSql });
 
     return reAppliedSql;
+  }
+
+  /**
+   * URL-safe base64 that matches web/src/utils/formatters.ts b64EncodeUnicode, so the
+   * deep link we build decodes with the same alphabet the frontend's b64DecodeUnicode
+   * expects (- + / _ = .).
+   */
+  b64EncodeUnicode(str) {
+    const percentEncoded = encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (_, p1) =>
+      String.fromCharCode(parseInt(p1, 16)),
+    );
+    return Buffer.from(percentEncoded, 'latin1')
+      .toString('base64')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=/g, '.');
+  }
+
+  /**
+   * Builds the exact deep-link URL goToLogs constructs (SearchHistory.vue:663-689) for a
+   * re-applied query, so a test can exercise the fresh-mount re-apply path deterministically
+   * without waiting on the async usage-publish round-trip.
+   */
+  buildReApplyUrl(query, { stream = 'e2e_automate', org = process.env['ORGNAME'] } = {}) {
+    const queryObject = {
+      stream_type: 'logs',
+      stream,
+      period: '15m',
+      refresh: '0',
+      sql_mode: 'true',
+      query: this.b64EncodeUnicode(query),
+      defined_schemas: 'user_defined_schema',
+      org_identifier: org,
+      quick_mode: 'false',
+      show_histogram: 'true',
+      type: 'search_history_re_apply',
+      fn_editor: 'false',
+    };
+    return `${this.logsPath}?${new URLSearchParams(queryObject).toString()}`;
   }
 }
 

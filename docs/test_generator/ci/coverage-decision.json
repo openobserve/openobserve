@@ -1,0 +1,10 @@
+{
+  "action": "extend",
+  "target_spec": "tests/ui-testing/playwright-tests/RegressionSet/Logs/logs-14283.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/RegressionSet/Logs/logs-14283.spec.js",
+    "tests/ui-testing/playwright-tests/Logs/searchJobInspector.spec.js"
+  ],
+  "needs_registration": false,
+  "rationale": "The dev's diff already adds logs-14283.spec.js with two tests covering the primary regression: (P0) re-applying an earlier query from Search History restores it into the editor over the stale Vuex cache, and (P1) the re-applied query is carried in the logs URL. searchJobInspector.spec.js is a different feature (inspector) and is not de-duplicable with this. The spec/page-object/CI-matrix wiring is already present, so a new file or registration is wrong. The remaining gap is small: the URL test does not assert the `type` param was cleaned up (useLogs.ts:428-430), and the suite depends entirely on the async usage-publish round-trip — a deterministic deep-link variant would exercise the fixed fresh-mount path without that timing dependency. Extend the existing spec with those, rather than add a new file."
+}

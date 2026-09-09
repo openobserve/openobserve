@@ -1,0 +1,5 @@
+tests/ui-testing/ci-matrix/ci_matrix_regression.json
+tests/ui-testing/pages/logsPages/searchHistoryPage.js
+tests/ui-testing/pages/page-manager.js
+tests/ui-testing/playwright-tests/RegressionSet/Logs/logs-14283.spec.js
+web/src/plugins/logs/Index.vue

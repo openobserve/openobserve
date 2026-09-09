@@ -1,0 +1,292 @@
+===== COMPLETE LIST OF CHANGED FILES (5 files) =====
+# AUTHORITATIVE: this list is never truncated. The diff BODY below may be trimmed for
+# very large PRs, so decide WHICH files/areas changed (e.g. web/src frontend) from THIS list.
+tests/ui-testing/ci-matrix/ci_matrix_regression.json
+tests/ui-testing/pages/logsPages/searchHistoryPage.js
+tests/ui-testing/pages/page-manager.js
+tests/ui-testing/playwright-tests/RegressionSet/Logs/logs-14283.spec.js
+web/src/plugins/logs/Index.vue
+===== END CHANGED FILES =====
+
+diff --git a/tests/ui-testing/ci-matrix/ci_matrix_regression.json b/tests/ui-testing/ci-matrix/ci_matrix_regression.json
+index c8796b6f6ae..66e2c07af9f 100644
+--- a/tests/ui-testing/ci-matrix/ci_matrix_regression.json
++++ b/tests/ui-testing/ci-matrix/ci_matrix_regression.json
+@@ -8,7 +8,8 @@
+       "logs-bugs.spec.js",
+       "logs-9754.spec.js",
+       "logs-9044-7354.spec.js",
+-      "logs-multistream-matchall-pagination.spec.js"
++      "logs-multistream-matchall-pagination.spec.js",
++      "logs-14283.spec.js"
+     ],
+     "disabled": []
+   },
+diff --git a/tests/ui-testing/pages/logsPages/searchHistoryPage.js b/tests/ui-testing/pages/logsPages/searchHistoryPage.js
+new file mode 100644
+index 00000000000..5ce4a86dda7
+--- /dev/null
++++ b/tests/ui-testing/pages/logsPages/searchHistoryPage.js
+@@ -0,0 +1,85 @@
++// searchHistoryPage.js
++const testLogger = require('../../playwright-tests/utils/test-logger.js');
++
++/**
++ * Page Object Model for the standalone Search History page (/web/logs/search-history).
++ *
++ * Search History is backed by usage reporting, so rows only appear once the usage
++ * batch has been published — every read here polls the refresh button rather than
++ * assuming the row is present on first paint.
++ */
++export class SearchHistoryPage {
++  constructor(page) {
++    this.page = page;
++
++    this.searchHistoryPath = '/web/logs/search-history';
++
++    // ===== ENTRY POINT (SearchBar.vue) =====
++    // Search History lives in the more-options (hamburger) menu, not the "More" utilities one.
++    this.moreOptionsMenuBtn = '[data-test="logs-search-bar-more-options-btn"]';
++    this.searchHistoryItemBtn = '[data-test="search-history-item-btn"]';
++
++    // ===== SEARCH HISTORY PAGE (SearchHistory.vue) =====
++    this.tableRow = '[data-test^="o2-table-row-"]';
++    this.refreshHistoryBtn = '[data-test="search-history-get-history-btn"]';
++    this.goToLogsBtn = '[data-test="search-history-go-to-logs-btn"]';
++    this.colorizedSql = '[data-test="search-history-sql-colorized"]';
++  }
++
++  /** Opens Search History through the logs search-bar menu, as a user would. */
++  async openFromLogs() {
++    await this.page.locator(this.moreOptionsMenuBtn).click();
++    const historyItem = this.page.locator(this.searchHistoryItemBtn);
++    await historyItem.waitFor({ state: 'visible', timeout: 15000 });
++    await historyItem.click();
++    await this.page.waitForURL(/\/logs\/search-history/, { timeout: 30000 });
++    await this.page.locator(this.refreshHistoryBtn).waitFor({ state: 'visible', timeout: 30000 });
++    testLogger.info('Search History page opened');
++  }
++
++  rowContaining(sqlFragment) {
++    // Body rows only — the expansion panel is a separate <tr> carrying the same text.
++    return this.page.locator(this.tableRow).filter({ hasText: sqlFragment }).first();
++  }
++
++  /**
++   * Usage rows are published asynchronously, so refresh until the query shows up.
++   */
++  async waitForQueryRow(sqlFragment, { attempts = 12, intervalMs = 5000 } = {}) {
++    const row = this.rowContaining(sqlFragment);
++
++    for (let attempt = 1; attempt <= attempts; attempt++) {
++      if (await row.count()) {
++        testLogger.info(`Search History row found on attempt ${attempt}`, { sqlFragment });
++        return row;
++      }
++      await this.page.locator(this.refreshHistoryBtn).click();
++      await this.page.waitForTimeout(intervalMs);
++    }
++
++    throw new Error(
++      `Search History never listed a query containing "${sqlFragment}" after ${attempts} refreshes — ` +
++        'usage reporting is most likely disabled or not publishing on this environment.',
++    );
++  }
++
++  /** Expands the row for the given query and re-applies it on the logs page. */
++  async reApplyQuery(sqlFragment) {
++    const row = await this.waitForQueryRow(sqlFragment);
++
++    // The table expands on row click (expand-on-row-click), which reveals Go to Logs.
++    await row.click();
++    const goToLogs = this.page.locator(this.goToLogsBtn).first();
++    await goToLogs.waitFor({ state: 'visible', timeout: 15000 });
++
++    const reAppliedSql = (await this.page.locator(this.colorizedSql).first().innerText()).trim();
++
++    await goToLogs.click();
++    await this.page.waitForURL(/\/logs(\?|$)/, { timeout: 30000 });
++    testLogger.info('Re-applied query from Search History', { reAppliedSql });
++
++    return reAppliedSql;
++  }
++}
++
++export default SearchHistoryPage;
+diff --git a/tests/ui-testing/pages/page-manager.js b/tests/ui-testing/pages/page-manager.js
+index 30db7598ce6..d1f20407fd5 100644
+--- a/tests/ui-testing/pages/page-manager.js
++++ b/tests/ui-testing/pages/page-manager.js
+@@ -104,6 +104,7 @@ const WorkflowsPage = require("./workflowsPages/workflowsPage.js");
+ 
+ // ===== LOGS, REPORTS, STREAMS, PIPELINES ADDITIONAL PAGE OBJECTS =====
+ import { LogsQueryPage } from "./logsPages/logsQueryPage.js";
++import { SearchHistoryPage } from "./logsPages/searchHistoryPage.js";
+ import UnflattenedPage from "./logsPages/unflattened.js";
+ 
+ // ===== SDR (SENSITIVE DATA REDACTION) PAGE OBJECTS =====
+@@ -178,6 +179,7 @@ class PageManager {
+ 
+     // ===== SANITY SPEC ADDITIONAL PAGE OBJECTS =====
+     this.logsPage = new LogsPage(page);
++    this.searchHistoryPage = new SearchHistoryPage(page);
+     this.streamsPage = new StreamsPage(page);
+     this.alertTemplatesPage = new AlertTemplatesPage(page);
+     this.alertDestinationsPage = new AlertDestinationsPage(page);
+diff --git a/tests/ui-testing/playwright-tests/RegressionSet/Logs/logs-14283.spec.js b/tests/ui-testing/playwright-tests/RegressionSet/Logs/logs-14283.spec.js
+new file mode 100644
+index 00000000000..e51a0b7e656
+--- /dev/null
++++ b/tests/ui-testing/playwright-tests/RegressionSet/Logs/logs-14283.spec.js
+@@ -0,0 +1,88 @@
++const { test, expect, navigateToBase } = require('../../utils/enhanced-baseFixtures.js');
++const PageManager = require('../../../pages/page-manager.js');
++const testLogger = require('../../utils/test-logger.js');
++const logData = require('../../../fixtures/log.json');
++
++// https://github.com/openobserve/openobserve/issues/14283
++//
++// Search History became a standalone route in #13512, so re-applying a query from it
++// remounts the logs page. The mount path used to restore the cached searchObj from Vuex
++// on top of the query carried in the URL, and the re-applied query was silently dropped.
++// The regression only shows up when the logs page has already been used in the session —
++// that is what puts the stale query in the cache — hence the two searches in beforeEach.
++test.describe('Regression: Search History re-apply retains the query (#14283)', () => {
++  test.describe.configure({ mode: 'serial' });
++
++  // The predicates are always true on purpose: the two searches only need to be
++  // textually distinct and both return rows. A filter that matches nothing leaves the
++  // results grid unrendered, and waitForResultsLoaded() never sees its pagination.
++  const EARLIER_QUERY = `SELECT * FROM "e2e_automate" WHERE 200 = 200`;
++  const LATEST_QUERY = `SELECT * FROM "e2e_automate" WHERE 404 = 404`;
++  const EARLIER_MARKER = '200';
++  const LATEST_MARKER = '404';
++
++  let pm;
++
++  test.beforeEach(async ({ page }, testInfo) => {
++    testLogger.testStart(testInfo.title, testInfo.file);
++    await navigateToBase(page);
++    pm = new PageManager(page);
++
++    await page.goto(`${logData.logsUrl}?org_identifier=${process.env['ORGNAME']}`);
++    await page.waitForLoadState('domcontentloaded');
++    await page.waitForTimeout(2000);
++
++    await pm.logsPage.selectIndexStream('e2e_automate');
++    await page.waitForTimeout(1000);
++
++    for (const query of [EARLIER_QUERY, LATEST_QUERY]) {
++      await pm.logsPage.typeQuery(query);
++      await page.waitForTimeout(500);
++      await pm.logsPage.selectRunQuery();
++      await pm.logsPage.waitForResultsLoaded();
++    }
++
++    testLogger.info('Two searches run; the logs cache now holds the later query');
++  });
++
++  test('Re-applying an earlier query from Search History loads it into the editor', {
++    tag: ['@regression', '@logs', '@searchHistory', '@P0'],
++  }, async ({ page }) => {
++    await pm.searchHistoryPage.openFromLogs();
++
++    // Match on the literal alone: the SQL recorded in usage may differ in spacing
++    // from what was typed, but 200 vs 404 is what discriminates the two queries.
++    // Both markers are compared against editor/URL text only, never against log rows.
++    const reAppliedSql = await pm.searchHistoryPage.reApplyQuery(EARLIER_MARKER);
++    expect(reAppliedSql).toContain(EARLIER_MARKER);
++
++    // Fall back to a plain read so a miss reports the query the editor actually held
++    // (the stale one) rather than an opaque poll timeout.
++    const editorText = await pm.logsPage
++      .getQueryEditorTextWhenReady(EARLIER_MARKER, 30000)
++      .catch(() => pm.logsPage.getQueryEditorText());
++    testLogger.info('Editor content after re-apply', { editorText });
++
++    expect(editorText).toContain(EARLIER_MARKER);
++    // The stale cached query must not win over the one carried in the URL.
++    expect(editorText).not.toContain(LATEST_MARKER);
++  });
++
++  test('Re-applied query is carried in the logs URL', {
++    tag: ['@regression', '@logs', '@searchHistory', '@P1'],
++  }, async ({ page }) => {
++    await pm.searchHistoryPage.openFromLogs();
++    await pm.searchHistoryPage.reApplyQuery(EARLIER_MARKER);
++
++    const url = new URL(page.url());
++    const encodedQuery = url.searchParams.get('query');
++    expect(encodedQuery).toBeTruthy();
++
++    // b64EncodeUnicode emits URL-safe base64 (+ - / _ = .); undo that rather than
++    // relying on Node's decoder being lenient about the alphabet.
++    const standardBase64 = encodedQuery.replace(/-/g, '+').replace(/_/g, '/').replace(/\./g, '=');
++    const decoded = Buffer.from(standardBase64, 'base64').toString('utf-8');
++    expect(decoded).toContain(EARLIER_MARKER);
++    expect(url.searchParams.get('sql_mode')).toBe('true');
++  });
++});
+diff --git a/web/src/plugins/logs/Index.vue b/web/src/plugins/logs/Index.vue
+index f08c9d688c1..ba16abc1475 100644
+--- a/web/src/plugins/logs/Index.vue
++++ b/web/src/plugins/logs/Index.vue
+@@ -883,7 +883,17 @@ export default defineComponent({
+       return searchObj.meta.logsVisualizeToggle === "logs";
+     }
+ 
++    // Search History and the AI chat only re-apply the query; the scheduler also runs it.
++    const RE_APPLY_QUERY_TYPES = ["search_history_re_apply", "ai_chat_query"];
++    const URL_DRIVEN_QUERY_TYPES = [...RE_APPLY_QUERY_TYPES, "search_scheduler"];
++
+     const isRouteChanged = () => {
++      // Not kept alive: this fresh mount never fires the type watchers, so the cached searchObj would bury the URL query (#14283).
++      if (URL_DRIVEN_QUERY_TYPES.includes(router.currentRoute.value.query.type)) {
++        store.dispatch("logs/setIsInitialized", false);
++        return;
++      }
++
+       if (
+         !Object.hasOwn(router.currentRoute.value.query, "stream") ||
+         !Object.hasOwn(router.currentRoute.value.query, "org_identifier")
+@@ -911,6 +921,8 @@ export default defineComponent({
+     // Setup logic for the logs tab
+     async function setupLogsTab() {
+       try {
++        // restoreUrlQueryParams() deletes a search_history_re_apply `type` off the route, so read it first.
++        const arrivalType = router.currentRoute.value.query.type;
+         isRouteChanged();
+         if (!store.state.logs.isInitialized) {
+           searchObj.organizationIdentifier = store.state.selectedOrganization.identifier;
+@@ -970,8 +982,12 @@ export default defineComponent({
+           }
+ 
+           if (isLogsTab()) {
+-            searchObj.loading = true;
+-            loadLogsData();
++            if (RE_APPLY_QUERY_TYPES.includes(arrivalType)) {
++              await applyReAppliedQuery();
++            } else {
++              searchObj.loading = true;
++              loadLogsData();
++            }
+           } else if (searchObj.meta.logsVisualizeToggle === "patterns") {
+             await loadPatternsData();
+             await extractPatternsForCurrentQuery();
+@@ -1111,6 +1127,16 @@ export default defineComponent({
+       loadLogsData();
+     }
+ 
++    // loadLogsData() minus getQueryData(): a re-applied query is loaded for the user to run, not run for them.
++    async function applyReAppliedQuery() {
++      searchObj.meta.searchApplied = false;
++      await getStreamList();
++      await getFunctions();
++      await extractFields();
++      refreshData();
++      searchObj.loading = false;
++    }
++
+     // Helper function for handling the stream explorer
+     async function handleStreamExplorer() {
+       resetSearchObj();

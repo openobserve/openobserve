@@ -1,0 +1,12 @@
+[
+  {
+    "title": "Re-applied query is carried in the logs URL",
+    "action": "extend",
+    "verifies": "the re-applied query is carried in the logs URL (URL-safe base64 + sql_mode=true) and the transient type param is cleaned up after restore"
+  },
+  {
+    "title": "A direct search_history_re_apply deep link restores the query on a fresh mount",
+    "action": "extend",
+    "verifies": "a direct type=search_history_re_apply deep link restores the earlier query into the editor without the stale cached query winning, and the type param is removed"
+  }
+]

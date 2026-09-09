@@ -1,0 +1,25 @@
+{
+  "feature_slug": "search-history-reapply-query",
+  "feature_title": "Logs Search History Re-apply Query",
+  "area": "Logs",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "logs-14283.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/RegressionSet/Logs/logs-14283.spec.js",
+  "playwright_group": "Logs-Regression",
+  "source_files": [
+    "web/src/plugins/logs/Index.vue"
+  ],
+  "existing_tests_in_diff": true,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "All five changed paths are open-source locations — web/src/plugins/logs/Index.vue (Vue frontend) and tests/ui-testing/** (Playwright page objects, an E2E spec, and the CI matrix). No path touches an enterprise-owned directory (enterprise/, o2_enterprise/, src/enterprise/), and no enterprise keywords (SSO/SAML/RBAC/SDR/cipher/logo-management) appear in the paths or symbols, so this is an OSS change.",
+    "skip": "Not skipping. There is no explicit opt-out (no tests-added label was passed, and the trigger comment is empty), and the change is user-facing: web/src/plugins/logs/Index.vue alters how a query re-applied from Search History is loaded into the logs editor, which is an observable UI behavior change.",
+    "e2e": "E2E is warranted. The change fixes a regression (#14283) where re-applying an earlier query from the standalone Search History route silently dropped the query because the cached searchObj overwrote the URL-driven query. This is an observable UI interaction — open Search History, re-apply a query, and verify the editor and URL retain it — that needs browser-level verification.",
+    "area": "Area is Logs. The only frontend change is in web/src/plugins/logs/Index.vue, and the added spec lives in tests/ui-testing/playwright-tests/RegressionSet/Logs/ alongside the other Logs regression specs.",
+    "group": "playwright_group is Logs-Regression. The diff adds logs-14283.spec.js to the regression CI matrix group whose run_files already contain logs-bugs, logs-9754, logs-9044-7354, and logs-multistream-matchall-pagination; the enterprise overlay (ci_matrix_regression.ent.json) confirms this group is named Logs-Regression.",
+    "existing_tests": "Yes — the diff adds a new Playwright E2E spec, tests/ui-testing/playwright-tests/RegressionSet/Logs/logs-14283.spec.js, which covers exactly this feature (re-apply from Search History retains the query in the editor and URL). This is genuine E2E coverage, so the Architect should enhance or complement it rather than start from scratch."
+  }
+}

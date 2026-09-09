@@ -1,0 +1,17 @@
+{
+  "feature_slug": "search-history-reapply-query",
+  "feature_title": "Logs Search History Re-apply Query",
+  "area": "Logs",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "logs-14283.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/RegressionSet/Logs/logs-14283.spec.js",
+  "playwright_group": "Logs-Regression",
+  "source_files": [
+    "web/src/plugins/logs/Index.vue"
+  ],
+  "existing_tests_in_diff": true,
+  "skip": false,
+  "skip_reason": ""
+}

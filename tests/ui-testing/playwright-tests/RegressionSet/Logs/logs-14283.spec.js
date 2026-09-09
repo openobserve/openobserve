@@ -84,5 +84,32 @@ test.describe('Regression: Search History re-apply retains the query (#14283)', 
     const decoded = Buffer.from(standardBase64, 'base64').toString('utf-8');
     expect(decoded).toContain(EARLIER_MARKER);
     expect(url.searchParams.get('sql_mode')).toBe('true');
+
+    // restoreUrlQueryParams deletes the transient arrival marker after restoring the
+    // query (useLogs.ts:428-430) — it must not linger in the URL.
+    expect(url.searchParams.get('type')).toBeNull();
+  });
+
+  test('A direct search_history_re_apply deep link restores the query on a fresh mount', {
+    tag: ['@regression', '@logs', '@searchHistory', '@P2'],
+  }, async ({ page }) => {
+    // Deterministic variant of the re-apply path: bypass the async usage-publish
+    // round-trip and land directly on the URL goToLogs constructs. A full page load
+    // exercises setupLogsTab's fresh-mount restore without the usage timing dependency.
+    const deepLinkUrl = pm.searchHistoryPage.buildReApplyUrl(EARLIER_QUERY);
+    await page.goto(deepLinkUrl);
+    await page.waitForLoadState('domcontentloaded');
+
+    const editorText = await pm.logsPage
+      .getQueryEditorTextWhenReady(EARLIER_MARKER, 30000)
+      .catch(() => pm.logsPage.getQueryEditorText());
+    testLogger.info('Editor content after deep-link re-apply', { editorText });
+
+    expect(editorText).toContain(EARLIER_MARKER);
+    expect(editorText).not.toContain(LATEST_MARKER);
+
+    // The transient arrival marker is removed after restore here too.
+    const url = new URL(page.url());
+    expect(url.searchParams.get('type')).toBeNull();
   });
 });
