@@ -36,6 +36,20 @@ const oDrawerStub = {
   emits: ["update:open", "close"],
 };
 
+// Named stub so props and the presence of a `loading-banner` slot are observable.
+vi.mock("@/lib/core/Table/OTable.vue", () => ({
+  // defineAsyncComponent unwraps `.default` only for a module-shaped result.
+  __esModule: true,
+  default: {
+    name: "OTable",
+    props: ["columns", "data", "loading", "streaming", "wrap", "rowKey", "virtualScroll"],
+    template:
+      '<div data-test="otable-stub">' +
+      '<div v-if="$slots[\'loading-banner\']" data-test="otable-stub-has-loading-banner-slot" />' +
+      "</div>",
+  },
+}));
+
 describe("SearchResult Component", () => {
   let wrapper: any;
 
@@ -81,7 +95,6 @@ describe("SearchResult Component", () => {
           DetailTable: true,
           ChartRenderer: true,
           SanitizedHtmlRenderer: true,
-          OTable: true,
           CellActions: true,
           O2AIContextAddBtn: true,
           PatternDetailsDialog: true,
@@ -874,6 +887,75 @@ describe("SearchResult Component", () => {
       await flushPromises();
 
       expect(wrapper.vm.searchObj.meta.showDetailTab).toBe(false);
+    });
+  });
+  describe("streaming results grid (#14303)", () => {
+    const hits = (n: number) =>
+      Array.from({ length: n }, (_, i) => ({ _timestamp: i, log: `line-${i}` }));
+
+    const setState = async (loading: boolean, rows: any[]) => {
+      wrapper.vm.searchObj.loading = loading;
+      wrapper.vm.searchObj.data.queryResults = { hits: rows };
+      await wrapper.vm.$nextTick();
+      await flushPromises();
+    };
+
+    const table = () => wrapper.findComponent({ name: "OTable" });
+
+    it("shows the skeleton on first paint: loading with no rows", async () => {
+      await setState(true, []);
+      expect(table().props("loading")).toBe(true);
+      expect(table().props("streaming")).toBe(false);
+    });
+
+    it("switches to streaming once rows exist while still loading", async () => {
+      await setState(true, hits(3));
+      expect(table().props("loading")).toBe(false);
+      expect(table().props("streaming")).toBe(true);
+    });
+
+    it("is neither loading nor streaming once the search settles with rows", async () => {
+      await setState(false, hits(3));
+      expect(table().props("loading")).toBe(false);
+      expect(table().props("streaming")).toBe(false);
+    });
+
+    it("is neither loading nor streaming when the search settles with no rows", async () => {
+      await setState(false, []);
+      expect(table().props("loading")).toBe(false);
+      expect(table().props("streaming")).toBe(false);
+    });
+
+    it("tracks the latest hits array across successive replacements", async () => {
+      await setState(true, hits(2));
+      expect(table().props("data").length).toBe(2);
+      await setState(true, hits(5));
+      expect(table().props("data").length).toBe(5);
+      await setState(true, hits(9));
+      expect(table().props("data").length).toBe(9);
+    });
+
+    it("never remounts the grid across successive replacements", async () => {
+      await setState(true, hits(2));
+      const uid = table().vm.$.uid;
+      await setState(true, hits(5));
+      expect(table().vm.$.uid).toBe(uid);
+      await setState(true, hits(9));
+      expect(table().vm.$.uid).toBe(uid);
+      await setState(false, hits(9));
+      expect(table().vm.$.uid).toBe(uid);
+    });
+
+    it("returns streaming to false when the hits are emptied mid-search", async () => {
+      await setState(true, hits(3));
+      expect(table().props("streaming")).toBe(true);
+      await setState(true, []);
+      expect(table().props("streaming")).toBe(false);
+    });
+
+    it("passes a loading-banner slot so OTable suppresses its default banner", async () => {
+      await setState(true, hits(3));
+      expect(wrapper.find('[data-test="otable-stub-has-loading-banner-slot"]').exists()).toBe(true);
     });
   });
 });
