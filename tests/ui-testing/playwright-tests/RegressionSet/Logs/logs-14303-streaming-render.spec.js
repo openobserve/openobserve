@@ -50,8 +50,9 @@ test.describe("Logs Streaming Render Regression", () => {
     await pm.logsPage.runQueryAndWaitForResults();
 
     await pm.logsPage.expectResultsGridSettledWithRows();
+    await pm.logsPage.expectResultsProgressBarFadedOut();
 
-    testLogger.info('✓ PASSED: aggregate query settles with rows, no skeleton or banner');
+    testLogger.info('✓ PASSED: aggregate query settles with rows, no skeleton, banner or progress bar');
   });
 
   test("plain non-aggregate logs query is unchanged @bug-14303 @P1 @streamingAggs @regression @logsRegression", async ({ page }) => {

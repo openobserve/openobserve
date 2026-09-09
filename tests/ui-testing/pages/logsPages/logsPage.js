@@ -501,6 +501,7 @@ export class LogsPage {
         this.logsSearchResultTableRows = '[data-test="logs-search-result-logs-table"] tbody tr[data-test^="o2-table-row-"]';
         this.resultsSkeleton = '[data-test="logs-search-result-logs-table"] [data-test="o2-table-skeleton-body"]';
         this.resultsLoadingBanner = '[data-test="logs-search-result-logs-table"] [data-test="o2-table-loading-banner"]';
+        this.resultsProgressBar = '[data-test="logs-search-result-progress"] [data-test="loading-progress"]';
         this.tableRowExpandMenu = '[data-test^="o2-table-expand-"]';
         this.logDetailsIncludeExcludeBtn = '[data-test="log-details-include-exclude-field-btn"]';
         this.timestampCells = '[data-test="o2-table-cell-_timestamp"]';
@@ -10688,6 +10689,13 @@ export class LogsPage {
         await expect(this.page.locator(this.resultsSkeleton)).toHaveCount(0);
         await expect(this.page.locator(this.resultsLoadingBanner)).toHaveCount(0);
         testLogger.info('Results grid settled with rows, no skeleton or loading banner');
+    }
+
+    /** Assert the results progress bar has faded out once the search settled. */
+    async expectResultsProgressBarFadedOut() {
+        // The bar stays mounted to run its own fade, so absence is opacity-0, not detachment.
+        await expect(this.page.locator(this.resultsProgressBar)).toHaveClass(/opacity-0/);
+        testLogger.info('Results progress bar faded out after the search settled');
     }
 
     // ============================================================================

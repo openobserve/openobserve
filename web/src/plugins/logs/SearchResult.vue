@@ -265,6 +265,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
+      <!-- Outside scrollContainerRef so the results progress bar can't scroll away. -->
+      <div class="relative" data-test="logs-search-result-progress">
+        <LoadingProgress
+          :loading="searchObj.loading"
+          :loadingProgressPercentage="searchObj.loadingProgressPercentage || 0"
+        />
+      </div>
+
       <!-- Combined scroll: histogram + logs/patterns scroll together vertically.
         The histogram is pinned along the X axis only (see histogramPinStyle), so
         scrolling the wide results table sideways can't drag the chart with it. -->
