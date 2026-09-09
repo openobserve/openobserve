@@ -10,6 +10,7 @@
  * - Pagination not showing with histogram and SQL disabled
  * - Error message should identify problematic field
  * - #14228: Builder saved view not applied when already on the Build tab
+ * - #14255: Newly created saved view fails to apply (colOrder.filter is not a function)
  */
 
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
@@ -23,6 +24,23 @@ const { getOrgIdentifier, isCloudEnvironment } = require('../utils/cloud-auth.js
 // is provably restored config rather than config re-derived from this query.
 const BUILDER_QUERY =
   'SELECT histogram(_timestamp) as "x_axis_1", count(*) as "y_axis_1" FROM "e2e_automate" GROUP BY x_axis_1';
+
+const COL_ORDER_STREAM = 'e2e_automate';
+const COL_ORDER_FIELD = 'kubernetes_container_name';
+
+/**
+ * Save whatever is currently on screen as a new saved view.
+ */
+async function saveCurrentViewAs(pm, page, viewName) {
+  await pm.logsPage.clickSavedViewsExpand();
+  await page.waitForTimeout(500);
+  await pm.logsPage.clickSaveViewButton();
+  await page.waitForTimeout(500);
+  await pm.logsPage.fillSavedViewName(viewName);
+  await page.waitForTimeout(500);
+  await pm.logsPage.clickSavedViewDialogSave();
+  await page.waitForTimeout(2000);
+}
 
 /**
  * Build a chart on the Build tab and save it as a saved view.
@@ -40,14 +58,7 @@ async function createBuilderSavedView(pm, page, viewName, chartType) {
   await pm.logsPage.selectChartType(chartType);
   await pm.logsPage.verifyChartTypeSelected(chartType);
 
-  await pm.logsPage.clickSavedViewsExpand();
-  await page.waitForTimeout(500);
-  await pm.logsPage.clickSaveViewButton();
-  await page.waitForTimeout(500);
-  await pm.logsPage.fillSavedViewName(viewName);
-  await page.waitForTimeout(500);
-  await pm.logsPage.clickSavedViewDialogSave();
-  await page.waitForTimeout(2000);
+  await saveCurrentViewAs(pm, page, viewName);
   testLogger.info(`Builder saved view created: ${viewName} (chart type ${chartType})`);
 }
 
@@ -72,6 +83,118 @@ async function deleteSavedViewQuietly(pm, page, viewName) {
   } catch (cleanupError) {
     testLogger.debug(`Saved view cleanup skipped: ${viewName}`);
   }
+}
+
+function savedViewsApiBase() {
+  const base = process.env.INGESTION_URL || process.env.ZO_BASE_URL || '';
+  return base.endsWith('/') ? base.slice(0, -1) : base;
+}
+
+function savedViewsApiUrl(suffix = '') {
+  return `${savedViewsApiBase()}/api/${getOrgIdentifier() || 'default'}/savedviews${suffix}`;
+}
+
+async function findSavedViewId(page, viewName) {
+  const response = await page.request.get(savedViewsApiUrl(), { headers: getHeaders() });
+  const body = await response.json();
+  const match = (body.views || []).find((view) => view.view_name === viewName);
+  return match ? match.view_id : null;
+}
+
+/**
+ * Read back a saved view's stored searchObj payload through the API.
+ */
+async function fetchSavedViewPayload(page, viewName) {
+  const viewId = await findSavedViewId(page, viewName);
+  expect(viewId, `Saved view not found through the API: ${viewName}`).toBeTruthy();
+  const response = await page.request.get(savedViewsApiUrl(`/${viewId}`), { headers: getHeaders() });
+  return (await response.json()).data;
+}
+
+/**
+ * Store a view whose colOrder uses the pre-fix `{0:"a",1:"b"}` shape, which the
+ * UI cannot produce any more but which is still sitting in existing installs.
+ */
+async function createLegacyColOrderView(page, sourcePayload, viewName, streamName) {
+  const payload = JSON.parse(JSON.stringify(sourcePayload));
+  const order = payload.data.resultGrid.colOrder[streamName];
+  expect(Array.isArray(order) && order.length, `Source view has no colOrder for ${streamName}`).toBeTruthy();
+  payload.data.resultGrid.colOrder[streamName] = { ...order };
+
+  const response = await page.request.post(savedViewsApiUrl(), {
+    headers: getHeaders(),
+    data: { view_name: viewName, data: payload },
+  });
+  expect(response.ok(), `Failed to seed legacy saved view: ${viewName}`).toBeTruthy();
+  testLogger.info(`Seeded legacy-format saved view: ${viewName}`);
+}
+
+async function deleteSavedViewViaApi(page, viewName) {
+  try {
+    const viewId = await findSavedViewId(page, viewName);
+    if (viewId) {
+      await page.request.delete(savedViewsApiUrl(`/${viewId}`), { headers: getHeaders() });
+      testLogger.info(`Cleaned up saved view through the API: ${viewName}`);
+    }
+  } catch (cleanupError) {
+    testLogger.debug(`API saved view cleanup skipped: ${viewName}`);
+  }
+}
+
+/**
+ * The colOrder corruption only surfaces once the stream has a non-default column
+ * set, so every #14255 test needs a field pinned to the results table.
+ */
+async function addFieldToResultsTable(pm, page, fieldName) {
+  await pm.logsPage.fillIndexFieldSearchInput(fieldName);
+  await page.waitForTimeout(500);
+  await pm.logsPage.hoverOnFieldExpandButton(fieldName);
+  await pm.logsPage.clickAddFieldToTableButton(fieldName);
+  await page.waitForTimeout(1000);
+  await pm.logsPage.fillIndexFieldSearchInput('');
+  await page.waitForTimeout(300);
+  await pm.logsPage.expectFieldInTableHeader(fieldName);
+  testLogger.info(`Pinned ${fieldName} to the results table`);
+}
+
+/**
+ * The `colOrder.filter is not a function` TypeError is swallowed by applySavedView's
+ * catch, which logs this string — a more reliable signal than the 1s toast.
+ */
+function trackApplyErrors(page) {
+  const errors = [];
+  page.on('console', (msg) => {
+    if (msg.text().includes('Error while applying saved view')) {
+      errors.push(msg.text());
+    }
+  });
+  return errors;
+}
+
+function trackSavedViewCreates(page) {
+  const payloads = [];
+  page.on('request', (request) => {
+    if (request.method() !== 'POST' || !request.url().includes('/savedviews')) return;
+    try {
+      payloads.push(request.postDataJSON());
+    } catch (parseError) {
+      testLogger.debug('Saved view POST body was not JSON');
+    }
+  });
+  return payloads;
+}
+
+function expectColOrderIsArray(payloads, viewName) {
+  const created = payloads.find((body) => body?.view_name === viewName);
+  expect(created, `No saved view POST captured for ${viewName}`).toBeTruthy();
+  const colOrder = created.data?.data?.resultGrid?.colOrder || {};
+  for (const [streamName, order] of Object.entries(colOrder)) {
+    expect(
+      Array.isArray(order),
+      `Bug #14255: colOrder for ${streamName} was persisted as ${JSON.stringify(order)} instead of an array`,
+    ).toBeTruthy();
+  }
+  return colOrder;
 }
 
 test.describe("Logs Regression Bug Fixes", () => {
@@ -1031,6 +1154,183 @@ test.describe("Logs Regression Bug Fixes", () => {
     }
 
     testLogger.info('✓ PASSED: Non-builder saved view handled correctly (Bug #14228)');
+  });
+
+  // ==========================================================================
+  // Bug #14255: Applying a newly created saved view fails on colOrder.filter
+  // https://github.com/openobserve/openobserve/pull/14255
+  // ==========================================================================
+  test("should apply a saved view created on the build tab without a colOrder error @bug-14255 @P0 @savedViews @regression", async ({ page }) => {
+    testLogger.info('Test: New saved view applies after a build-tab round trip (Bug #14255)');
+    test.setTimeout(300000);
+
+    const sourceViewName = `streamslog_colorder_14255_src_${Date.now()}`;
+    const newViewName = `streamslog_colorder_14255_new_${Date.now()}`;
+    const applyErrors = trackApplyErrors(page);
+    const createPayloads = trackSavedViewCreates(page);
+
+    try {
+      await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier() || 'default'}`);
+      await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+      await pm.logsPage.selectStream(COL_ORDER_STREAM);
+      await page.waitForTimeout(1000);
+
+      // The source view has to carry a real colOrder array, which only exists
+      // once the results table has rendered with a pinned field.
+      await pm.logsPage.clickRefreshButton();
+      await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+      await pm.logsPage.expectLogsTableVisible();
+      await addFieldToResultsTable(pm, page, COL_ORDER_FIELD);
+
+      await pm.logsPage.clickBuildToggle();
+      await pm.logsPage.waitForBuildTabLoaded();
+      await pm.logsPage.expectBuildTabSelected();
+      await saveCurrentViewAs(pm, page, sourceViewName);
+      testLogger.info(`Build-tab source view created: ${sourceViewName}`);
+
+      // Reload with no stream selected. The results table never renders, so
+      // searchObj keeps an empty colOrder and the merge has no array to merge into.
+      await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier() || 'default'}`);
+      await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+      await page.waitForTimeout(2000);
+
+      await applySavedViewByName(pm, page, sourceViewName);
+      await pm.logsPage.expectBuildTabSelected();
+      testLogger.info('Source view applied while the results table was never rendered');
+
+      // Saved without visiting the Logs tab, so nothing has repaired colOrder in
+      // between — the payload is exactly what the merge left behind.
+      await pm.logsPage.selectChartType('area');
+      await pm.logsPage.verifyChartTypeSelected('area');
+      await saveCurrentViewAs(pm, page, newViewName);
+      testLogger.info(`New view saved from the build tab: ${newViewName}`);
+
+      const savedColOrder = expectColOrderIsArray(createPayloads, newViewName);
+      testLogger.info(`✓ CHECK PASSED: persisted colOrder ${JSON.stringify(savedColOrder)}`);
+
+      await pm.logsPage.clickLogsToggle();
+      await pm.logsPage.expectLogsTabSelected();
+
+      await applySavedViewByName(pm, page, newViewName);
+
+      expect(
+        applyErrors,
+        `Bug #14255: applying the new view failed — ${applyErrors.join(' | ')}`,
+      ).toHaveLength(0);
+      testLogger.info('✓ PRIMARY CHECK PASSED: no colOrder.filter failure on apply');
+
+      // The view was saved from the Build tab, so it restores that tab rather than
+      // the Logs tab it was applied from.
+      await pm.logsPage.expectBuildTabSelected();
+      await pm.logsPage.clickLogsToggle();
+      await pm.logsPage.expectLogsTabSelected();
+
+      // The failing branch aborted before selectedFields was assigned, so the
+      // pinned column is what proves the view actually applied.
+      await pm.logsPage.clickRefreshButton();
+      await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+      await pm.logsPage.expectLogsTableVisible();
+      await pm.logsPage.expectFieldInTableHeader(COL_ORDER_FIELD);
+
+    } finally {
+      await deleteSavedViewViaApi(page, newViewName);
+      await deleteSavedViewViaApi(page, sourceViewName);
+    }
+
+    testLogger.info('✓ PASSED: New saved view applied cleanly (Bug #14255)');
+  });
+
+  test("should apply a saved view whose colOrder uses the legacy object shape @bug-14255 @P1 @savedViews @regression", async ({ page }) => {
+    testLogger.info('Test: Legacy `{0:"a"}` colOrder still applies (Bug #14255)');
+    test.setTimeout(240000);
+
+    const sourceViewName = `streamslog_colorder_14255_base_${Date.now()}`;
+    const legacyViewName = `streamslog_colorder_14255_legacy_${Date.now()}`;
+    const applyErrors = trackApplyErrors(page);
+
+    try {
+      await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier() || 'default'}`);
+      await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+      await pm.logsPage.selectStream(COL_ORDER_STREAM);
+      await page.waitForTimeout(1000);
+
+      await pm.logsPage.clickRefreshButton();
+      await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+      await pm.logsPage.expectLogsTableVisible();
+      await addFieldToResultsTable(pm, page, COL_ORDER_FIELD);
+      await saveCurrentViewAs(pm, page, sourceViewName);
+
+      const sourcePayload = await fetchSavedViewPayload(page, sourceViewName);
+      await createLegacyColOrderView(page, sourcePayload, legacyViewName, COL_ORDER_STREAM);
+
+      await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier() || 'default'}`);
+      await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+      await page.waitForTimeout(2000);
+
+      await applySavedViewByName(pm, page, legacyViewName);
+
+      expect(
+        applyErrors,
+        `Bug #14255: legacy colOrder view failed to apply — ${applyErrors.join(' | ')}`,
+      ).toHaveLength(0);
+      await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+      await pm.logsPage.expectLogsTableVisible();
+      await pm.logsPage.expectFieldInTableHeader(COL_ORDER_FIELD);
+      testLogger.info('✓ PRIMARY CHECK PASSED: legacy colOrder normalised on apply');
+
+    } finally {
+      await deleteSavedViewViaApi(page, legacyViewName);
+      await deleteSavedViewViaApi(page, sourceViewName);
+    }
+
+    testLogger.info('✓ PASSED: Legacy colOrder saved view applied (Bug #14255)');
+  });
+
+  test("should re-persist a legacy colOrder as an array on the next save @bug-14255 @P2 @savedViews @regression", async ({ page }) => {
+    testLogger.info('Test: Applying a legacy view heals colOrder for the next save (Bug #14255)');
+    test.setTimeout(240000);
+
+    const sourceViewName = `streamslog_colorder_14255_seed_${Date.now()}`;
+    const legacyViewName = `streamslog_colorder_14255_old_${Date.now()}`;
+    const resavedViewName = `streamslog_colorder_14255_resaved_${Date.now()}`;
+    const createPayloads = trackSavedViewCreates(page);
+
+    try {
+      await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier() || 'default'}`);
+      await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+      await pm.logsPage.selectStream(COL_ORDER_STREAM);
+      await page.waitForTimeout(1000);
+
+      await pm.logsPage.clickRefreshButton();
+      await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+      await pm.logsPage.expectLogsTableVisible();
+      await addFieldToResultsTable(pm, page, COL_ORDER_FIELD);
+      await saveCurrentViewAs(pm, page, sourceViewName);
+
+      const sourcePayload = await fetchSavedViewPayload(page, sourceViewName);
+      await createLegacyColOrderView(page, sourcePayload, legacyViewName, COL_ORDER_STREAM);
+
+      await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier() || 'default'}`);
+      await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+      await page.waitForTimeout(2000);
+
+      await applySavedViewByName(pm, page, legacyViewName);
+      await saveCurrentViewAs(pm, page, resavedViewName);
+
+      const resavedColOrder = expectColOrderIsArray(createPayloads, resavedViewName);
+      expect(
+        resavedColOrder[COL_ORDER_STREAM],
+        `Bug #14255: the re-saved view lost the pinned column`,
+      ).toContain(COL_ORDER_FIELD);
+      testLogger.info('✓ PRIMARY CHECK PASSED: legacy shape is not re-persisted');
+
+    } finally {
+      await deleteSavedViewViaApi(page, resavedViewName);
+      await deleteSavedViewViaApi(page, legacyViewName);
+      await deleteSavedViewViaApi(page, sourceViewName);
+    }
+
+    testLogger.info('✓ PASSED: colOrder re-saved as an array (Bug #14255)');
   });
 
   test.afterEach(async () => {
