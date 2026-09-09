@@ -58,16 +58,6 @@
               </div>
             </div>
 
-            <div>
-              <OFormInput
-                name="endpoint"
-                :label="t('onlineEvals.provider.endpointLabel')"
-                :placeholder="raw(endpointPlaceholder)"
-                size="sm"
-                data-test="provider-form-endpoint-input"
-              />
-            </div>
-
             <div class="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3">
               <div>
                 <OFormInput
@@ -86,10 +76,20 @@
                   :label="t('onlineEvals.provider.availableModelsLabel')"
                   :placeholder="raw('gpt-4o-mini, gpt-4.1')"
                   size="sm"
-                  :help-text="t('onlineEvals.provider.availableModelsHelp')"
                   data-test="provider-form-available-models-input"
                 />
               </div>
+            </div>
+
+            <div>
+              <OFormInput
+                name="endpoint"
+                :label="t('onlineEvals.provider.endpointLabel')"
+                :placeholder="raw(endpointPlaceholder)"
+                size="sm"
+                :help-text="endpointHelpText"
+                data-test="provider-form-endpoint-input"
+              />
             </div>
           </div>
         </section>
@@ -208,6 +208,10 @@ import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import onlineEvalsService, { type Provider } from "@/services/online-evals.service";
+import {
+  DEFAULT_PROVIDER_BASE_URLS,
+  SUGGESTED_PROVIDER_BASE_URLS,
+} from "@/utils/llmProviderBaseUrls";
 import { availableModelsOf, defaultModelOf, providerTypeOf } from "../utils/evalEntity";
 import { showError, splitCsv } from "../utils/evalFormat";
 import { makeProviderFormSchema, type ProviderForm } from "./ProviderFormPage.schema";
@@ -254,20 +258,22 @@ const providerTypeOptions = computed(() => [
   { label: t("ingestion.otherLabel"), value: "other" },
 ]);
 
-const DEFAULT_ENDPOINTS: Record<string, string> = {
-  openai: "https://api.openai.com/v1/chat/completions",
-  deepseek: "https://api.deepseek.com/chat/completions",
-  anthropic: "https://api.anthropic.com/v1/messages",
-  azure_openai: "https://{resource}.openai.azure.com/openai/deployments/{deployment}",
-  ollama: "http://localhost:11434/api/generate",
-  vllm: "http://localhost:8000/v1/chat/completions",
-};
-
 const endpointPlaceholder = computed(
   () =>
-    DEFAULT_ENDPOINTS[formValues.value.providerType] ||
+    DEFAULT_PROVIDER_BASE_URLS[formValues.value.providerType] ||
+    SUGGESTED_PROVIDER_BASE_URLS[formValues.value.providerType] ||
     t("onlineEvals.provider.endpointPlaceholder"),
 );
+
+// The one thing this field's help text must answer: what happens if I leave
+// it blank. Providers with a real working default say so; the rest have no
+// default to fall back to and need to be told that plainly instead.
+const endpointHelpText = computed(() => {
+  const defaultUrl = DEFAULT_PROVIDER_BASE_URLS[formValues.value.providerType];
+  return defaultUrl
+    ? t("onlineEvals.provider.endpointHelpDefault", { url: defaultUrl })
+    : t("onlineEvals.provider.endpointHelpRequired");
+});
 
 function initForm(row: Provider | null): ProviderForm {
   if (!row) {
