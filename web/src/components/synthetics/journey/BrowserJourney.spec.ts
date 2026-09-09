@@ -15,6 +15,9 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
+import { nextTick } from "vue";
+import type { BrowserStep } from "@/types/synthetics";
+import type { ExpansionMap } from "@/utils/synthetics/expandJourney";
 
 // `t` still returns the bare key — every existing assertion compares against one.
 // It is a spy as well so the interpolation params can be asserted, which is the
@@ -1023,6 +1026,117 @@ describe("BrowserJourney per-step failure evidence", () => {
     const emitted = wrapper.emitted("replay-up-to")!;
     expect(emitted.length).toBeGreaterThan(0);
     for (const call of emitted) expect(call).toEqual([2]);
+  });
+});
+
+// Real JourneySteps (and its real OTable) rather than a fake stub: the dot and
+// progress hooks these tests assert on are rendered by JourneySteps itself, and a
+// hand-written stub could echo back whatever id/index convention the test expects
+// without ever exercising the real one. BrowserJourneyStepEditor IS stubbed —
+// mounting it for real for a `subtest` row pulls in SubtestPicker, which fetches
+// the check list on mount against the real (unmocked) syntheticsService.
+const BrowserJourneyStepEditorStub = { template: '<div class="step-editor-stub" />' };
+const { JourneySteps: _droppedJourneyStepsStub, ...STUBS_WITH_REAL_JOURNEY_STEPS } = STUBS;
+
+function mountWithRealSteps(props: Record<string, unknown> = {}) {
+  return mount(BrowserJourney, {
+    props: { modelValue: [], ...props },
+    global: {
+      stubs: {
+        ...STUBS_WITH_REAL_JOURNEY_STEPS,
+        BrowserJourneyStepEditor: BrowserJourneyStepEditorStub,
+      },
+    },
+  }) as VueWrapper;
+}
+
+describe("BrowserJourney with a subtest reference", () => {
+  let w: VueWrapper;
+
+  afterEach(() => {
+    w?.unmount();
+  });
+
+  const journey: BrowserStep[] = [
+    { id: "s1", action: "navigate", name: "Open", value: "https://example.com" },
+    {
+      id: "s2",
+      action: "subtest",
+      name: "Log in (shared)",
+      subtest: { id: "login-test", name: "Login" },
+    },
+    {
+      id: "s3",
+      action: "click",
+      name: "Logs",
+      locator: { candidates: [{ kind: "css", value: "#logs" }] },
+    },
+  ];
+  const map: ExpansionMap = new Map([
+    ["s2_c1", { authoredStepId: "s2", childIndex: 0, childStepName: "Open login", childCount: 3 }],
+    ["s2_c2", { authoredStepId: "s2", childIndex: 1, childStepName: "fill email", childCount: 3 }],
+    ["s2_c3", { authoredStepId: "s2", childIndex: 2, childStepName: "submit", childCount: 3 }],
+  ]);
+
+  it("pins the error card to the reference row, names the child step that failed, and re-runs to the authored position", async () => {
+    const stepResults = new Map([
+      ["s1", { stepId: "s1", stepName: "Open", passed: true, durationMs: 400 }],
+      ["s2_c1", { stepId: "s2_c1", stepName: "Open login", passed: true, durationMs: 380 }],
+      [
+        "s2_c2",
+        {
+          stepId: "s2_c2",
+          stepName: "fill email",
+          passed: false,
+          durationMs: 3200,
+          error: "timeout",
+        },
+      ],
+    ]);
+    w = mountWithRealSteps({
+      modelValue: journey,
+      replayPhase: "failed",
+      stepResults,
+      expansionMap: map,
+    });
+    await nextTick();
+    // One card, on the reference row, naming the child step by its position inside the child.
+    const cards = w.findAll('[data-test="synthetics-journey-step-error-card"]');
+    expect(cards).toHaveLength(1);
+    expect(cards[0].text()).toContain("2. fill email");
+    // The dot hook is index-based and 0-based, so the reference row — authored
+    // position 2 — is index 1.
+    expect(w.find('[data-test="synthetics-journey-step-dot-1"]').exists()).toBe(true);
+    // The retry button on that card re-runs to the REFERENCE row's authored
+    // position (2), never to a composed child index the author never wrote.
+    await w.find('[data-test="synthetics-journey-error-retry-btn"]').trigger("click");
+    const emitted = w.emitted("replay-up-to")!;
+    expect(emitted.length).toBeGreaterThan(0);
+    for (const call of emitted) expect(call).toEqual([2]);
+  });
+
+  it("reports child progress on the collapsed reference row while it runs", async () => {
+    const stepResults = new Map([
+      ["s2_c1", { stepId: "s2_c1", stepName: "Open login", passed: true, durationMs: 380 }],
+    ]);
+    w = mountWithRealSteps({
+      modelValue: journey,
+      replayPhase: "running",
+      stepResults,
+      activeStepId: "s2_c2",
+      expansionMap: map,
+    });
+    await nextTick();
+    // On the row itself, not in the expansion: nothing auto-expands during `running`.
+    const progress = w.find('[data-test="synthetics-journey-subtest-progress-1"]');
+    expect(progress.exists()).toBe(true);
+    expect(progress.text()).toContain("1/3");
+    // The active child ("s2_c2") is a composed id — the reference row's OWN dot
+    // must read "active", which only happens if it is translated back to "s2"
+    // before being compared against the row's id.
+    const dot = w.find('[data-test="synthetics-journey-step-dot-1"]');
+    expect(dot.exists()).toBe(true);
+    expect(dot.classes().join(" ")).toContain("badge-primary-soft-bg");
   });
 });
 

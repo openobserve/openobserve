@@ -66,6 +66,8 @@ const props = withDefaults(
     iconKey?: string;
     /** When set, renders colored status dots per step during replay. */
     dotStateFn?: (row: TData) => StepDotState | undefined;
+    /** When set, renders a "{done}/{total}" counter on a collapsed reference row. */
+    stepProgressFn?: (row: TData) => { done: number; total: number } | null;
     /** When true, hides row action buttons (during replay). */
     locked?: boolean;
     /**
@@ -200,6 +202,15 @@ function dotClass(state: StepDotState | undefined): string {
 
 function getDotState(row: TData): StepDotState | undefined {
   return props.dotStateFn?.(row);
+}
+
+/** Row's position in `data` — the same 0-based unit the dot/progress hooks are keyed by. */
+function rowIndex(row: TData): number {
+  return (props.data as TData[]).indexOf(row);
+}
+
+function stepProgress(row: TData): { done: number; total: number } | null {
+  return props.stepProgressFn?.(row) ?? null;
 }
 
 // ── Column definitions ─────────────────────────────────────────────
@@ -440,6 +451,7 @@ function handleUpdateExpanded(ids: string[]) {
             'shrink-0 tabular-nums',
             getDotState(row) ? '' : 'text-text-muted w-6 text-center text-sm',
           ]"
+          :data-test="getDotState(row) ? `synthetics-journey-step-dot-${rowIndex(row)}` : undefined"
         >
           <OSpinner
             v-if="getDotState(row) === 'active'"
@@ -447,7 +459,7 @@ function handleUpdateExpanded(ids: string[]) {
             size="xs"
             class="text-accent"
           />
-          <template v-else>{{ (data as any[]).indexOf(row) + 1 }}</template>
+          <template v-else>{{ rowIndex(row) + 1 }}</template>
         </span>
 
         <!-- Selection is handled by OTable's built-in checkbox column when selection="multiple" -->
@@ -471,6 +483,22 @@ function handleUpdateExpanded(ids: string[]) {
         <span class="text-text-body min-w-0 flex-1 truncate text-sm">
           {{ stepName(row) }}
         </span>
+
+        <!-- Sub-step progress on a collapsed reference row while its children run
+             (§7.3) — nothing auto-expands during `running`, so this is the only
+             place progress is visible until the author opens the row. -->
+        <span
+          v-if="mode === 'editor' && stepProgress(row)"
+          class="text-text-secondary shrink-0 font-mono text-xs tabular-nums"
+          :data-test="`synthetics-journey-subtest-progress-${rowIndex(row)}`"
+          :aria-label="
+            t('synthetics.journey.subtest.progressAria', {
+              done: stepProgress(row)!.done,
+              total: stepProgress(row)!.total,
+            })
+          "
+          >{{ stepProgress(row)!.done }}/{{ stepProgress(row)!.total }}</span
+        >
 
         <!-- Selector/value preview (editor mode only) -->
         <span

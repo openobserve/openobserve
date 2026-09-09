@@ -48,7 +48,14 @@ import { stepIsMissingTarget } from "@/utils/synthetics/stepTarget";
 import { journeyToWireSteps } from "@/utils/synthetics/mapRecordedStep";
 import { classifyPreflightFailure } from "@/utils/synthetics/replayFailure";
 import syntheticsService from "@/services/synthetics";
-import { composedStepId, type ChildJourney } from "@/utils/synthetics/expandJourney";
+import {
+  composedStepId,
+  translateStepId,
+  loadChildren,
+  expandJourney,
+  type ChildJourney,
+  type ExpansionMap,
+} from "@/utils/synthetics/expandJourney";
 
 const props = defineProps<{
   modelValue: BrowserStep[];
@@ -124,6 +131,13 @@ const props = defineProps<{
    * one cache in memory, never two that can drift apart.
    */
   childrenCache?: Map<string, ChildJourney>;
+  /**
+   * Composed-child-id → authored-row map for the PARENT's replay (Task 12's
+   * `expandJourney`), owned by the host. Undefined when the host has not run a
+   * replay yet, or replays without subtest support — every lookup then falls
+   * back to identity, so an ordinary journey behaves exactly as before.
+   */
+  expansionMap?: ExpansionMap;
 }>();
 
 // Falls back to an empty Map for a host that has not wired the cache yet —
@@ -170,6 +184,15 @@ const emit = defineEmits<{
  */
 const anchorStepId = ref<string | null>(null);
 
+/**
+ * Composed-child-id → authored-row map for THIS restore's own prefix expansion.
+ *
+ * A separate map from the `expansionMap` prop: that one belongs to the parent's
+ * replay session, this restore is a different recorder instance entirely, started
+ * from `startRecording`'s own `expandJourney` call over the prefix.
+ */
+const restoreExpansionMap = ref<ExpansionMap | undefined>(undefined);
+
 /** How many prefix steps have reported a result, for the restore banner. */
 const restoredCount = computed(() => recorder.stepResults.size);
 
@@ -184,7 +207,10 @@ const restoreTotal = computed(() => {
 const failedStepNumber = computed(() => {
   const id = prefixFailure.value?.stepId;
   if (!id) return 0;
-  return props.modelValue.findIndex((s) => s.id === id) + 1;
+  const authoredId = restoreExpansionMap.value
+    ? translateStepId(restoreExpansionMap.value, id)
+    : id;
+  return props.modelValue.findIndex((s) => s.id === authoredId) + 1;
 });
 
 // ── Filter / expand / select state ──────────────────────────────────────────
@@ -249,10 +275,49 @@ const isReplayTerminal = computed(
 // executing while `stopping`, so letting a step be edited would race the player.
 const isReplayLocked = computed(() => isReplayRunning.value || isReplayStopping.value);
 
+/**
+ * Folds expanded child results onto their authored row (§7.3); identity for
+ * ordinary steps.
+ *
+ * A reference row is `fail` as soon as any child failed (the runner stops the
+ * reference there), `pass` once every one of its `childCount` children has
+ * reported a passing result, and otherwise still in flight (`undefined`).
+ */
+function resultFor(stepId: string): StepReplayResult | undefined {
+  const own = props.stepResults?.get(stepId);
+  if (own || !props.expansionMap) return own;
+  const children = [...props.expansionMap.entries()].filter(([, e]) => e.authoredStepId === stepId);
+  if (children.length === 0) return undefined;
+  const failed = children.map(([id]) => props.stepResults?.get(id)).find((r) => r && !r.passed);
+  if (failed) {
+    const entry = props.expansionMap.get(failed.stepId)!;
+    return { ...failed, stepName: `${entry.childIndex + 1}. ${entry.childStepName}` };
+  }
+  const done = children.filter(([id]) => props.stepResults?.has(id)).length;
+  const total = children[0][1].childCount;
+  if (done < total) return undefined;
+  const durationMs = children.reduce(
+    (sum, [id]) => sum + (props.stepResults?.get(id)?.durationMs ?? 0),
+    0,
+  );
+  return { stepId, stepName: "", passed: true, durationMs };
+}
+
+/** Child progress `{done, total}` for a reference row, or null off a reference row. */
+function childProgress(stepId: string): { done: number; total: number } | null {
+  if (!props.expansionMap) return null;
+  const children = [...props.expansionMap.entries()].filter(([, e]) => e.authoredStepId === stepId);
+  if (children.length === 0) return null;
+  return {
+    done: children.filter(([id]) => props.stepResults?.has(id)).length,
+    total: children[0][1].childCount,
+  };
+}
+
 /** Index of the first failing step in journey order, or -1 when none failed. */
 const firstFailedIndex = computed(() =>
   props.modelValue.findIndex((s) => {
-    const r = props.stepResults?.get(s.id);
+    const r = resultFor(s.id);
     return r && !r.passed;
   }),
 );
@@ -261,7 +326,7 @@ const firstFailedIndex = computed(() =>
 const failedStepResult = computed<StepReplayResult | undefined>(() => {
   if (firstFailedIndex.value < 0) return undefined;
   const step = props.modelValue[firstFailedIndex.value];
-  return props.stepResults?.get(step.id);
+  return resultFor(step.id);
 });
 
 /**
@@ -272,7 +337,7 @@ const failedStepResult = computed<StepReplayResult | undefined>(() => {
  */
 function failedResultFor(row: BrowserStep): StepReplayResult | undefined {
   if (!isReplayActive.value) return undefined;
-  const r = props.stepResults?.get(row.id);
+  const r = resultFor(row.id);
   return r && !r.passed ? r : undefined;
 }
 
@@ -300,7 +365,7 @@ watch(
 /** Derive the status dot state for a step based on replay results. */
 function stepDotState(stepId: string): StepDotState | undefined {
   if (!isReplayActive.value || !props.replayPhase) return undefined;
-  const result = props.stepResults?.get(stepId);
+  const result = resultFor(stepId);
   if (result) {
     return result.passed ? "pass" : "fail";
   }
@@ -308,7 +373,13 @@ function stepDotState(stepId: string): StepDotState | undefined {
   // the step it was interrupted on with no result, and rendering that as "active" is what
   // left the journey showing a step spinning forever. Outside `running` it falls through
   // to "pending" — an empty circle, which is the truth: that step never completed.
-  if (isReplayRunning.value && props.activeStepId === stepId) return "active";
+  // The active id can be a composed child's — translate it to the reference row it
+  // belongs to, the same way a result is folded onto that row.
+  const activeStepId =
+    props.activeStepId && props.expansionMap
+      ? translateStepId(props.expansionMap, props.activeStepId)
+      : props.activeStepId;
+  if (isReplayRunning.value && activeStepId === stepId) return "active";
   const stepIndex = props.modelValue.findIndex((s) => s.id === stepId);
   if (firstFailedIndex.value >= 0 && stepIndex > firstFailedIndex.value) return "skip";
   if (props.replayPhase === "running") return "pending";
@@ -643,7 +714,7 @@ defineExpose({
  * that cannot restore — takes the original path, because there is either nothing to
  * replay or no way to replay it.
  */
-function startRecording() {
+async function startRecording() {
   const insertAt = currentInsertAt();
   const prefix = props.modelValue.slice(0, insertAt);
 
@@ -651,14 +722,29 @@ function startRecording() {
     // Nothing was restored, so the capture starts on a browser that knows nothing about
     // the prefix — steps from it cannot be filed at the anchor.
     anchorStepId.value = null;
+    restoreExpansionMap.value = undefined;
     recorder.startRecording(props.startUrl ?? "", props.testIdAttr).catch((err) => {
       recorder.error.value = err instanceof Error ? err.message : String(err);
     });
     return;
   }
 
+  // The prefix is what gets restored, so a subtest reference in it has to be
+  // expanded first — the anchor cannot land inside a reference because `data`
+  // holds authored rows only, but the RESTORE runs the child's real steps.
+  let expandedPrefix = prefix;
+  try {
+    const children = await loadChildren(prefix, fetchChildJourneyForRestore);
+    const result = expandJourney(prefix, children);
+    expandedPrefix = result.steps;
+    restoreExpansionMap.value = result.map;
+  } catch (err) {
+    recorder.error.value = err instanceof Error ? err.message : String(err);
+    return;
+  }
+
   recorder
-    .startRecordingFrom(journeyToWireSteps(prefix), {
+    .startRecordingFrom(journeyToWireSteps(expandedPrefix), {
       targetUrl: props.startUrl,
       testIdAttr: props.testIdAttr,
     })
@@ -678,7 +764,9 @@ function startRecording() {
 function onRecordFromFailure() {
   const failed = restoreStepFailure.value;
   if (!failed) return;
-  anchorStepId.value = failed.stepId;
+  anchorStepId.value = restoreExpansionMap.value
+    ? translateStepId(restoreExpansionMap.value, failed.stepId)
+    : failed.stepId;
   recorder.recordFromHere().catch((err) => {
     recorder.error.value = err instanceof Error ? err.message : String(err);
   });
@@ -992,6 +1080,21 @@ function childRowsFor(row: BrowserStep) {
   }));
 }
 
+/** Reuses the shared cache before hitting the network — see `childrenCache` prop doc. */
+async function fetchChildJourneyForRestore(id: string): Promise<ChildJourney> {
+  const cached = childrenCache.value.get(id);
+  if (cached) return cached;
+  const res = await syntheticsService.get(org.value, id);
+  const data = res.data ?? {};
+  const child: ChildJourney = {
+    id,
+    name: data.name ?? "",
+    steps: (data.config?.steps ?? []) as BrowserStep[],
+  };
+  childrenCache.value.set(id, child);
+  return child;
+}
+
 async function ensureChildLoaded(row: BrowserStep) {
   const id = row.subtest?.id;
   if (!id) return;
@@ -1146,6 +1249,10 @@ function duplicateCapturedStep(index: number, step: BrowserStep) {
 // ── Dot state wrapper for JourneySteps ────────────────────────────────────
 function dotStateForRow(row: BrowserStep): StepDotState | undefined {
   return stepDotState(row.id);
+}
+
+function stepProgressForRow(row: BrowserStep): { done: number; total: number } | null {
+  return childProgress(row.id);
 }
 
 // ── Row status color: red left border for rows with validation errors ──────
@@ -1780,6 +1887,7 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
       name-key="name"
       detail-key="selector"
       :dot-state-fn="dotStateForRow"
+      :step-progress-fn="stepProgressForRow"
       :locked="isReplayLocked || isRestoring"
       :readonly="readonly"
       :enable-reorder="showDragColumn"

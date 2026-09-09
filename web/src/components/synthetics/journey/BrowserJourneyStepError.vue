@@ -101,6 +101,16 @@ const fidelityNotes = computed(() => props.result.fidelity?.notes ?? []);
     </div>
 
     <div class="px-3 py-3">
+      <!-- A folded reference-row result carries the child step's position-prefixed
+           name (§7.3) — without it the card would say nothing about WHICH child
+           of the reference failed. -->
+      <p
+        v-if="result.stepName"
+        class="text-text-heading m-0 mb-1 text-xs font-semibold"
+        data-test="synthetics-journey-step-error-name"
+      >
+        {{ result.stepName }}
+      </p>
       <p class="text-text-body m-0 text-xs" data-test="synthetics-journey-step-error-message">
         {{ se?.message || result.error }}
       </p>

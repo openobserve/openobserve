@@ -13683,7 +13683,8 @@
         "stepsBadge": "{count} steps",
         "ignoredEnv": "This test's own variables, auth and cookies are ignored here — the parent's apply.",
         "noAccess": "You don't have access to \"{name}\", so its steps can't be shown here.",
-        "noAccessToast": "You don't have access to one of the tests this test references."
+        "noAccessToast": "You don't have access to one of the tests this test references.",
+        "progressAria": "{done} of {total} sub-steps complete"
       }
     },
     "labels": {
