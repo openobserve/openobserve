@@ -102,7 +102,16 @@ export const useSearchResponseHandler = () => {
         ? isChunkedHits
         : partitionState.partition > 1 || isChunkedHits;
 
-      handleStreamingHits(payload, response, payload.isPagination, appendResult);
+      // A paginated first partition restarts the page, but not once its own later chunks arrive.
+      const resetOnPaginationStart = !(isStreamingAggs && isChunkedHits);
+
+      handleStreamingHits(
+        payload,
+        response,
+        payload.isPagination,
+        appendResult,
+        resetOnPaginationStart,
+      );
       return;
     }
 
@@ -169,10 +178,16 @@ export const useSearchResponseHandler = () => {
     response: WebSocketSearchResponse,
     isPagination: boolean,
     appendResult: boolean = false,
+    resetOnPaginationStart: boolean = true,
   ) => {
     const hits = response.content?.results?.hits || [];
 
-    if ((isPagination && searchPartitionMap[payload.traceId].partition === 1) || !appendResult) {
+    if (
+      (isPagination &&
+        searchPartitionMap[payload.traceId].partition === 1 &&
+        resetOnPaginationStart) ||
+      !appendResult
+    ) {
       clearCache();
       searchObj.data.queryResults.hits = hits;
     } else if (appendResult) {
