@@ -24,10 +24,7 @@ use infra::errors::ErrorCodes;
 use promql_parser::parser::LabelModifier;
 use rayon::prelude::*;
 
-use super::{
-    fold::{RangeExpr, aggregate},
-    op::FusedAggOp,
-};
+use super::{aggregate::aggregate, op::FusedAggOp, range_expr::RangeExpr};
 use crate::{
     functions::{KEEP_METRIC_NAME_FUNC, RangeFunc},
     series_stream::matrix::matrix_streams,
