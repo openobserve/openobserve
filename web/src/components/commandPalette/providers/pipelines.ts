@@ -23,11 +23,11 @@ interface PipelineRow {
 }
 
 /** A pipeline row: id `pipeline:<id>`, opened in the pipeline editor. */
-export function pipelineToItem(row: PipelineRow, group?: string): PaletteItem {
+export function pipelineToItem(row: PipelineRow, group?: string, pausedLabel = ""): PaletteItem {
   const parts = [
     row.source?.source_type,
     row.source?.stream_name,
-    row.enabled === false ? "paused" : "",
+    row.enabled === false ? pausedLabel : "",
   ];
   return {
     id: `pipeline:${row.pipeline_id}`,

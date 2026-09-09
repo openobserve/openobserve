@@ -136,10 +136,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <OButton
         variant="outline"
-        size="sm"
+        size="search-pill"
         content-align="between"
         icon-left="search"
-        class="bg-surface-base text-text-secondary hover:border-accent h-7! w-full rounded-full! pe-1.5! font-normal shadow-xs"
+        class="bg-surface-base text-text-secondary hover:border-accent w-full shadow-xs"
         data-test="header-command-palette-trigger"
         :aria-label="t('palette.title')"
         @click="openPalette('header')"

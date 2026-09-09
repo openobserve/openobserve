@@ -84,7 +84,9 @@ export type ButtonSize =
   // 30px labeled button — matches toolbar icon height for labeled outline toolbar buttons
   | "sm-toolbar"
   // Chip with fixed 12px font — for dashboard query builder axis field chips
-  | "chip-12";
+  | "chip-12"
+  // Pill-shaped search trigger for the header command-palette box — owns height, radius, padding and weight
+  | "search-pill";
 
 export interface ButtonProps extends PrimitiveProps {
   /** Visual style variant */

@@ -16,7 +16,9 @@
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 
+/// Rows returned per type when the caller does not specify `limit`.
 pub const DEFAULT_LIMIT: u64 = 20;
+/// Upper bound on `limit`; larger values are rejected with 400.
 pub const MAX_LIMIT: u64 = 100;
 
 /// Kinds of org metadata the resource search can return.
@@ -59,7 +61,7 @@ pub struct ResourceHit {
     /// Display name.
     pub name: String,
     /// Match score; higher is a closer match. Exact name 80, exact id 70, prefix 60, word-start
-    /// 40, substring 20.
+    /// 40, name substring 20, id or description substring 10.
     pub score: u32,
     /// Owning folder id (dashboards, alerts, synthetic checks).
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -97,6 +99,7 @@ pub struct SearchResourcesResponse {
 }
 
 impl ResourceType {
+    /// Every searchable type, in the order the empty response lists them.
     pub const ALL: [ResourceType; 9] = [
         ResourceType::Dashboard,
         ResourceType::Alert,
@@ -109,6 +112,7 @@ impl ResourceType {
         ResourceType::Synthetic,
     ];
 
+    /// Parses one wire name (the `snake_case` serde form); trims surrounding whitespace.
     pub fn parse(value: &str) -> Option<Self> {
         match value.trim() {
             "dashboard" => Some(Self::Dashboard),
@@ -126,6 +130,7 @@ impl ResourceType {
 }
 
 impl ResourceHit {
+    /// A hit with score 0 and every type-specific field unset; sources fill in what applies.
     pub fn new(kind: ResourceType, id: impl Into<String>, name: impl Into<String>) -> Self {
         Self {
             kind,

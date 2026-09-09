@@ -103,10 +103,6 @@ async fn permit_for(ctx: &SourceContext<'_>, resource: &str) -> anyhow::Result<P
     Ok(Permit::new(objects, key, ctx.org_id))
 }
 
-fn cap(limit: u64) -> usize {
-    fetch_size(limit) as usize
-}
-
 /// Same core list the Dashboards page uses, so folder and per-dashboard permissions apply
 /// unchanged.
 async fn dashboards(ctx: &SourceContext<'_>) -> anyhow::Result<Vec<ResourceHit>> {
@@ -170,7 +166,6 @@ async fn alerts(ctx: &SourceContext<'_>) -> anyhow::Result<Vec<ResourceHit>> {
 
 /// Per type, because the stream permission filter only applies when a type is given.
 async fn streams(ctx: &SourceContext<'_>) -> anyhow::Result<Vec<ResourceHit>> {
-    let limit = cap(ctx.limit);
     let mut hits = Vec::new();
     for stream_type in SEARCHABLE_STREAM_TYPES {
         let key = stream_type.as_str();
@@ -188,9 +183,6 @@ async fn streams(ctx: &SourceContext<'_>) -> anyhow::Result<Vec<ResourceHit>> {
             );
             hit.stream_type = Some(key.to_owned());
             hits.push(hit);
-            if hits.len() >= limit {
-                return Ok(hits);
-            }
         }
     }
     Ok(hits)
@@ -205,7 +197,6 @@ async fn saved_views(ctx: &SourceContext<'_>) -> anyhow::Result<Vec<ResourceHit>
         .views
         .into_iter()
         .filter(|v| permit.allows(&v.view_id) && is_candidate(&v.view_name, &v.view_id, "", ctx.q))
-        .take(cap(ctx.limit))
         .map(|v| ResourceHit::new(ResourceType::SavedView, v.view_id, v.view_name))
         .collect())
 }
@@ -216,7 +207,6 @@ async fn functions(ctx: &SourceContext<'_>) -> anyhow::Result<Vec<ResourceHit>> 
     Ok(rows
         .into_iter()
         .filter(|f| permit.allows(&f.name) && is_candidate(&f.name, "", "", ctx.q))
-        .take(cap(ctx.limit))
         .map(|f| ResourceHit::new(ResourceType::Function, f.name.clone(), f.name))
         .collect())
 }
@@ -229,7 +219,6 @@ async fn pipelines(ctx: &SourceContext<'_>) -> anyhow::Result<Vec<ResourceHit>> 
     Ok(rows
         .into_iter()
         .filter(|p| is_candidate(&p.name, &p.id, &p.description, ctx.q))
-        .take(cap(ctx.limit))
         .map(|p| {
             let mut hit = ResourceHit::new(ResourceType::Pipeline, p.id, p.name);
             hit.enabled = Some(p.enabled);
@@ -309,7 +298,6 @@ async fn users(ctx: &SourceContext<'_>) -> anyhow::Result<Vec<ResourceHit>> {
         ));
     }
     hits.retain(|h| is_candidate(&h.name, &h.id, "", ctx.q));
-    hits.truncate(cap(ctx.limit));
     Ok(hits)
 }
 
@@ -332,7 +320,6 @@ async fn service_accounts(ctx: &SourceContext<'_>) -> anyhow::Result<Vec<Resourc
             )
         })
         .filter(|h| is_candidate(&h.name, &h.id, "", ctx.q))
-        .take(cap(ctx.limit))
         .collect())
 }
 
@@ -350,7 +337,6 @@ async fn synthetics(ctx: &SourceContext<'_>) -> anyhow::Result<Vec<ResourceHit>>
         .checks
         .into_iter()
         .filter(|c| permit.allows(&c.id) && is_candidate(&c.name, &c.id, &c.description, ctx.q))
-        .take(cap(ctx.limit))
         .map(|c| {
             let mut hit = ResourceHit::new(ResourceType::Synthetic, c.id, c.name);
             hit.folder_id = Some(c.folder_id);

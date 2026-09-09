@@ -27,10 +27,15 @@ interface CheckRow {
 }
 
 /** A synthetic-check row: id `synthetic:<id>`, opened on its results page. */
-export function syntheticToItem(row: CheckRow, org: string, group?: string): PaletteItem {
+export function syntheticToItem(
+  row: CheckRow,
+  org: string,
+  group?: string,
+  pausedLabel = "",
+): PaletteItem {
   const id = String(row.id);
   const folder = row.folder_id || "default";
-  const parts = [row.type?.toUpperCase(), row.target, row.enabled === false ? "paused" : ""];
+  const parts = [row.type?.toUpperCase(), row.target, row.enabled === false ? pausedLabel : ""];
   return {
     id: `synthetic:${id}`,
     type: "synthetic",

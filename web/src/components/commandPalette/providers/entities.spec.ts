@@ -97,13 +97,17 @@ describe("entity mappers", () => {
   });
 
   it("maps an alert with its folder and paused state", () => {
-    const item = alertToItem({
-      alert_id: "a1",
-      name: "p99",
-      folder_id: "f1",
-      folder_name: "SRE",
-      enabled: false,
-    });
+    const item = alertToItem(
+      {
+        alert_id: "a1",
+        name: "p99",
+        folder_id: "f1",
+        folder_name: "SRE",
+        enabled: false,
+      },
+      undefined,
+      "paused",
+    );
     expect(item.keywords).toContain("a1");
     expect(item).toMatchObject({
       id: "alert:a1",
@@ -167,6 +171,8 @@ describe("entity mappers", () => {
         enabled: false,
       },
       "org1",
+      undefined,
+      "paused",
     );
     expect(item).toMatchObject({ id: "synthetic:42", subtitle: "BROWSER · https://x.io · paused" });
     expect(item.keywords).toContain("42");

@@ -276,6 +276,7 @@ const sizeClasses: Record<NonNullable<ButtonProps["size"]>, string> = {
   // Same as chip but with fixed 12px font — for dashboard query builder axis field chips
   // (needed because the html font-size is 14px, making text-xs = 10.5px instead of 12px)
   "chip-12": "h-6 ps-2 pe-1.5 !text-xs gap-1 rounded-default leading-none",
+  "search-pill": "h-7 ps-3 pe-1.5 text-sm gap-2 rounded-full font-normal",
   "sm-action": "h-[2.125rem] ps-3 pe-3 min-w-20 text-sm gap-2 rounded-default",
   md: "h-10 ps-4 pe-4 text-sm gap-2 rounded-default",
   lg: "h-12 ps-6 pe-6 text-base gap-3 rounded-default",

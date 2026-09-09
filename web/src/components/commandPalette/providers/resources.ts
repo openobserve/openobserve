@@ -125,6 +125,7 @@ export function hitToItem(
   specs: ResourceTypeSpec[],
 ): PaletteItem | null {
   const group = specs.find((s) => s.type === hit.type)?.groups[0];
+  const paused = String(ctx.t("palette.state.paused"));
   switch (hit.type) {
     case "dashboard":
       return dashboardToItem(
@@ -148,6 +149,7 @@ export function hitToItem(
           description: hit.description,
         },
         group,
+        paused,
       );
     case "stream": {
       const type = hit.stream_type as SearchableStreamType;
@@ -167,7 +169,11 @@ export function hitToItem(
     case "function":
       return functionToItem({ name: hit.name }, String(ctx.t("palette.scopes.function")), group);
     case "pipeline":
-      return pipelineToItem({ pipeline_id: hit.id, name: hit.name, enabled: hit.enabled }, group);
+      return pipelineToItem(
+        { pipeline_id: hit.id, name: hit.name, enabled: hit.enabled },
+        group,
+        paused,
+      );
     case "user":
       return userToItem(
         { email: hit.id, first_name: personName(hit), role: hit.role },
@@ -185,6 +191,7 @@ export function hitToItem(
         { id: hit.id, name: hit.name, folder_id: hit.folder_id, enabled: hit.enabled },
         ctx.org,
         group,
+        paused,
       );
     default:
       return null;

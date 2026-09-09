@@ -88,7 +88,6 @@ export const PALETTE_ALIASES: AliasEntry[] = [
   { trigger: "slack", target: "page:alertDestinations" },
   { trigger: "template", target: "page:alertTemplates" },
   { trigger: "library", target: "page:alertLibrary" },
-  { trigger: "catalog", target: "page:alertLibrary" },
   { trigger: "db", target: "page:dbmDatabases", minLen: 2 },
   { trigger: "postgres", target: "page:dbmDatabases" },
   { trigger: "mysql", target: "page:dbmDatabases" },

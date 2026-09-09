@@ -2858,8 +2858,8 @@
       "runToView": "Run A Test To View This Data.",
       "noBranchItems": "No Items On This Branch.",
       "forwardedCount": "{out} of {total} record forwarded | {out} of {total} records forwarded",
-      "noMatchForwarded": "No match \u2014 0 of {total} record forwarded | No match \u2014 0 of {total} records forwarded",
-      "branchDropped": "{count} record matched no path \u2014 dropped | {count} records matched no path \u2014 dropped",
+      "noMatchForwarded": "No match — 0 of {total} record forwarded | No match — 0 of {total} records forwarded",
+      "branchDropped": "{count} record matched no path — dropped | {count} records matched no path — dropped",
       "noUpstream": "No Upstream Steps.",
       "noRunYet": "No Run Yet.",
       "runLabel": "Run",
@@ -17224,6 +17224,9 @@
       "showScopes": "filter by type",
       "hideScopes": "hide filters"
     },
-    "noResults": "No matches for \"{q}\""
+    "noResults": "No matches for \"{q}\"",
+    "state": {
+      "paused": "paused"
+    }
   }
 }
