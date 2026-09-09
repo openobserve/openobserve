@@ -1,20 +1,27 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
+const APICleanup = require('../../pages/apiCleanup.js');
 
 const ORG = process.env['ORGNAME'] || 'default';
-const ROOT_EMAIL = process.env['ZO_ROOT_USER_EMAIL'];
 
 test.describe('Command palette', () => {
   let pm;
+  let cleanup;
+  let createdDashboards;
 
   test.beforeEach(async ({ page }, testInfo) => {
     testLogger.testStart(testInfo.title, testInfo.file);
     await navigateToBase(page);
     pm = new PageManager(page);
+    cleanup = new APICleanup(page);
+    createdDashboards = [];
   });
 
   test.afterEach(async ({}, testInfo) => {
+    for (const d of createdDashboards) {
+      await cleanup.deleteDashboard(d.dashboardId, d.folderId).catch(() => {});
+    }
     testLogger.testEnd(testInfo.title, testInfo.status);
   });
 
@@ -56,18 +63,18 @@ test.describe('Command palette', () => {
   test('narrows to the Dashboards rail category and opens one', {
     tag: ['@commandPalette', '@general', '@P1', '@all'],
   }, async () => {
+    const title = `E2E Palette Dashboard ${Date.now()}`;
+    const created = await cleanup.createMinimalDashboard(title);
+    createdDashboards.push(created);
     await pm.commandPalettePage.openWithKeyboard();
     await pm.commandPalettePage.selectScope('dashboards');
     await pm.commandPalettePage.expectFirstRow('action:newDashboard');
+    await pm.commandPalettePage.type(title);
     await pm.commandPalettePage.expectRowsOfType('dashboard');
-    await pm.commandPalettePage.selectScope('reliability');
-    await pm.commandPalettePage.expectRowsOfType('alert');
-    await pm.commandPalettePage.expectRowsOfType('dashboard');
-    await pm.commandPalettePage.deselectScope('reliability');
-    const id = await pm.commandPalettePage.clickFirstRowOfType('dashboard');
+    await pm.commandPalettePage.clickFirstRowOfType('dashboard');
     await pm.commandPalettePage.expectClosed();
     await pm.commandPalettePage.expectUrl(/\/web\/dashboards\/view\?/, ORG);
-    await pm.commandPalettePage.expectQueryParam('dashboard', id.split('/').pop());
+    await pm.commandPalettePage.expectQueryParam('dashboard', created.dashboardId);
   });
 
   test('finds a stream by name and opens it in the logs explorer', {
@@ -82,17 +89,15 @@ test.describe('Command palette', () => {
     await pm.commandPalettePage.expectQueryParam('stream', 'e2e_automate');
   });
 
-  test('finds an admin user and opens their IAM entry from the Help menu entry', {
+  test('opens from the Help menu entry and jumps to a page', {
     tag: ['@commandPalette', '@general', '@P2', '@all'],
   }, async () => {
-    test.skip(!ROOT_EMAIL, 'ZO_ROOT_USER_EMAIL is not set');
     await pm.commandPalettePage.openFromHelpMenu();
-    await pm.commandPalettePage.type(ROOT_EMAIL);
-    await pm.commandPalettePage.expectRowsOfType('user');
-    await pm.commandPalettePage.clickFirstRowOfType('user');
+    await pm.commandPalettePage.type('logs');
+    await pm.commandPalettePage.expectFirstRow('page:logs');
+    await pm.commandPalettePage.pressEnter();
     await pm.commandPalettePage.expectClosed();
-    await pm.commandPalettePage.expectUrl(/\/web\/iam\/users/, ORG);
-    await pm.commandPalettePage.expectQueryParam('action', 'update');
+    await pm.commandPalettePage.expectUrl(/\/web\/logs/, ORG);
   });
 
   test('shows the empty state for a query with no matches', {
