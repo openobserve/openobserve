@@ -174,7 +174,7 @@ const wrapperClasses = computed(() => [
           <PopoverContent
             :side-offset="6"
             align="start"
-            class="rounded-default bg-colorpicker-popup-bg border-colorpicker-popup-border z-10001 flex w-55 flex-col gap-3 border p-3 shadow-md"
+            class="rounded-default bg-colorpicker-popup-bg border-colorpicker-popup-border z-10001 flex w-55 flex-col gap-3 border p-3 shadow-md max-lg:max-h-[var(--reka-popper-available-height,75vh)] max-lg:overflow-y-auto"
           >
             <!-- Saturation / Brightness area -->
             <!-- ColorAreaRoot passes gradient styles via scoped slot -->

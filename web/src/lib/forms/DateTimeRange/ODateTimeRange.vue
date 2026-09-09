@@ -372,7 +372,7 @@ const triggerClasses = computed(() => [
       <PopoverContent
         :side-offset="4"
         align="start"
-        class="rounded-default bg-datepicker-popup-bg border-datepicker-popup-border z-50 w-80 border shadow-lg outline-none"
+        class="rounded-default bg-datepicker-popup-bg border-datepicker-popup-border z-50 w-80 border shadow-lg outline-none max-lg:max-h-[var(--reka-popper-available-height,75vh)] max-lg:overflow-y-auto"
         data-test="datetimerange-popup"
       >
         <!-- Tab bar -->

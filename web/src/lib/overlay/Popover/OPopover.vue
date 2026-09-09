@@ -231,6 +231,8 @@ onBeforeUnmount(() => {
         :class="[
           // max-w keeps wide popovers on-screen on small viewports.
           'max-w-[calc(100vw-1rem)] outline-none',
+          // < lg a popover taller than the space below its trigger ran off-screen unreachable.
+          'max-lg:max-h-[var(--reka-popper-available-height,75vh)] max-lg:overflow-y-auto',
           // Surface
           'bg-dropdown-bg border-dropdown-border rounded-default border shadow-md',
           // Open/close reveal animation (matches ODropdown)

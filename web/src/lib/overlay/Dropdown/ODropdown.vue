@@ -300,6 +300,8 @@ onBeforeUnmount(() => {
           // Layout — max-w keeps wide menus on-screen on small viewports.
           // Stacking is the inline z-index above, not a class.
           'max-w-[calc(100vw-1rem)] min-w-40 p-1',
+          // < lg a menu taller than the space below its trigger ran off-screen unreachable.
+          'max-lg:max-h-[var(--reka-popper-available-height,75vh)] max-lg:overflow-y-auto',
           // Surface
           'bg-dropdown-bg border-dropdown-border rounded-default border shadow-md',
           // Typography

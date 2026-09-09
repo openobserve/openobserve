@@ -85,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
             </template>
             <div
-              class="field-function-menu-popup dashboard-maps-query-builder-dropdown w-[min(48.1875rem,calc(100vw-1.5rem))]! translate-y-2 overflow-hidden rounded-none p-0 shadow-md max-lg:max-h-[75vh] max-lg:overflow-y-auto"
+              class="field-function-menu-popup dashboard-maps-query-builder-dropdown w-[min(48.1875rem,calc(100vw-1.5rem))]! translate-y-2 overflow-hidden rounded-none p-0 shadow-md max-lg:max-h-[var(--reka-popper-available-height,75vh)] max-lg:overflow-y-auto"
               :data-test="`dashboard-name-item-${nameLabel}-menu`"
             >
               <div
@@ -210,7 +210,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
             </template>
             <div
-              class="field-function-menu-popup dashboard-maps-query-builder-dropdown w-[min(48.1875rem,calc(100vw-1.5rem))]! translate-y-2 overflow-hidden rounded-none p-0 shadow-md max-lg:max-h-[75vh] max-lg:overflow-y-auto"
+              class="field-function-menu-popup dashboard-maps-query-builder-dropdown w-[min(48.1875rem,calc(100vw-1.5rem))]! translate-y-2 overflow-hidden rounded-none p-0 shadow-md max-lg:max-h-[var(--reka-popper-available-height,75vh)] max-lg:overflow-y-auto"
               :data-test="`dashboard-value_for_maps-item-${valueLabel}-menu`"
             >
               <div

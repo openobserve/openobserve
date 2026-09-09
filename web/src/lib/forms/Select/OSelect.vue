@@ -1826,6 +1826,7 @@ const fieldWidthClass = computed(() => {
           :class="[
             'z-10001 max-w-[calc(100vw-1rem)] min-w-(--reka-select-trigger-width)',
             'overflow-hidden',
+            'max-lg:max-h-[var(--reka-popper-available-height,75vh)] max-lg:overflow-y-auto',
             'rounded-default border shadow-md',
             'bg-select-content-bg border-select-content-border',
             // Clip-path reveal: unveiled at full size from its trigger edge (no
