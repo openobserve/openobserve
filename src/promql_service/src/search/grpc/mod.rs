@@ -30,7 +30,6 @@ use config::{
 use datafusion::{arrow::datatypes::Schema, error::DataFusionError, prelude::SessionContext};
 use hashbrown::HashSet;
 use infra::errors::Result;
-use metrics_index::MetricsFileLayout;
 use promql::{
     DEFAULT_LOOKBACK, TableProvider,
     exec::PromqlContext,
@@ -51,10 +50,8 @@ type Context = (SessionContext, Arc<Schema>, ScanStats, bool);
 struct GroupPlan {
     /// The heaviest stream's files, oldest `max_ts` first.
     files: Vec<FileKey>,
-    /// What the query reads around each evaluation timestamp.
+    /// What the query reads beyond its evaluation range.
     window: SelectorWindow,
-    /// The newest legacy file's `max_ts`, only when hash-ordered files exist alongside it.
-    legacy_max_ts: Option<i64>,
 }
 
 struct StorageProvider {
@@ -165,18 +162,20 @@ pub async fn search(
 
         // 2. generate search group with max records stream
         let start_ts = std::time::Instant::now();
-        // cuts pay off only where the engine streams; a subquery's inner expression is per-group
-        let cuts = if cfg.search.feature_metrics_streaming_agg_enabled
+        // the cut pays off only where the engine streams; a subquery's inner expression is
+        // per-group
+        let cut = if cfg.search.feature_metrics_streaming_agg_enabled
             && !query.query_exemplars
             && !req.is_super_cluster
             && !plan.window.subquery
         {
-            search_group_cuts(start, end, step, &plan, wal_floor())
+            wal_cut(start, end, step, micros(plan.window.ahead), wal_floor())
         } else {
-            Vec::new()
+            None
         };
         let memory_limit = cfg.memory_cache.datafusion_max_size; // bytes
-        let group = match generate_search_groups(memory_limit, &plan, start, end, step, &cuts).await
+        let group = match generate_search_groups(memory_limit, plan.files, start, end, step, cut)
+            .await
         {
             Ok(v) => v,
             Err(e) => {
@@ -188,7 +187,7 @@ pub async fn search(
         };
         if group.len() > 1 {
             log::info!(
-                "[trace_id {trace_id}] promql->search->grpc: get groups {group:?}, cuts {cuts:?}"
+                "[trace_id {trace_id}] promql->search->grpc: get groups {group:?}, wal cut {cut:?}"
             );
         }
         log::info!(
@@ -433,27 +432,17 @@ async fn get_max_file_list(
     // 2. get max records stream
     let mut file_list = Vec::new();
     let mut max_records = 0;
-    let mut legacy_max_ts = None;
-    let mut hash_ordered = false;
     for stream_name in metrics_name {
-        // the read-back window loads with the first group, so its files count too
         let stream_file_list = search_service::file_list::query(
             trace_id,
             org_id,
             StreamType::Metrics,
             &stream_name,
             PartitionTimeLevel::default(),
-            start - micros(window.back),
+            start,
             end,
         )
         .await?;
-        for file in &stream_file_list {
-            if MetricsFileLayout::is_hash_ordered(&file.key) {
-                hash_ordered = true;
-            } else {
-                legacy_max_ts = legacy_max_ts.max(Some(file.meta.max_ts));
-            }
-        }
         let stream_records = stream_file_list.iter().map(|f| f.meta.records).sum::<i64>();
         if stream_records > max_records {
             max_records = stream_records;
@@ -464,7 +453,6 @@ async fn get_max_file_list(
     Ok(GroupPlan {
         files: file_list,
         window,
-        legacy_max_ts: legacy_max_ts.filter(|_| hash_ordered),
     })
 }
 
@@ -474,69 +462,39 @@ fn wal_floor() -> i64 {
     now_micros() - second_micros(retention * 3)
 }
 
-/// Group boundaries after which every group streams from hash-ordered files alone.
-fn search_group_cuts(
-    start: i64,
-    end: i64,
-    step: i64,
-    plan: &GroupPlan,
-    wal_floor: i64,
-) -> Vec<i64> {
-    // a group starting at the cut reads back `window` and must still miss the newest legacy file
-    let layout_cut = plan
-        .legacy_max_ts
-        .map(|ts| ts + micros(plan.window.back) + step);
+/// The grid-aligned cut before the WAL floor, `None` when the range does not straddle it.
+fn wal_cut(start: i64, end: i64, step: i64, ahead: i64, wal_floor: i64) -> Option<i64> {
     // a group ending before the cut still reads `ahead` past its end, which must stay off the WAL
-    let wal_cut = wal_floor - micros(plan.window.ahead);
-    let mut cuts: Vec<i64> = layout_cut
-        .into_iter()
-        .chain([wal_cut])
-        .filter(|&cut| cut > start && cut <= end)
-        // groups evaluate on the query's own grid
-        .map(|cut| start + (cut - start + step - 1) / step * step)
-        .collect();
-    cuts.sort_unstable();
-    // a lone point evaluates as an instant vector the leader cannot merge: every piece keeps two
-    let mut kept = Vec::new();
-    let mut piece_start = start;
-    for cut in cuts {
-        if cut >= piece_start + 2 * step && cut + step <= end {
-            kept.push(cut);
-            piece_start = cut;
-        }
+    let cut = wal_floor - ahead;
+    if cut <= start || cut > end {
+        return None;
     }
-    kept
+    // groups evaluate on the query's own grid
+    let cut = start + (cut - start + step - 1) / step * step;
+    // a lone point evaluates as an instant vector the leader cannot merge: both pieces keep two
+    (cut >= start + 2 * step && cut + step <= end).then_some(cut)
 }
 
-/// Sizes the groups by memory within each piece between two cuts, so no group straddles a cut.
+/// Sizes the groups by memory on each side of the cut, so no group straddles it.
 async fn generate_search_groups(
     memory_limit: usize,
-    plan: &GroupPlan,
+    files: Vec<FileKey>,
     start: i64,
     end: i64,
     step: i64,
-    cuts: &[i64],
+    cut: Option<i64>,
 ) -> Result<Vec<(i64, i64)>> {
-    if cuts.is_empty() {
-        return generate_search_group(memory_limit, plan.files.clone(), start, end, step).await;
-    }
-    let mut groups = Vec::new();
-    let mut piece_start = start;
-    for piece_end in cuts.iter().map(|cut| cut - step).chain([end]) {
-        let files = plan
-            .files
-            .iter()
-            .filter(|f| {
-                f.meta.min_ts <= piece_end
-                    && f.meta.max_ts >= piece_start - micros(plan.window.back)
-            })
-            .cloned()
-            .collect();
-        groups.extend(
-            generate_search_group(memory_limit, files, piece_start, piece_end, step).await?,
-        );
-        piece_start = piece_end + step;
-    }
+    let Some(cut) = cut else {
+        return generate_search_group(memory_limit, files, start, end, step).await;
+    };
+    let head = files
+        .iter()
+        .filter(|f| f.meta.min_ts <= cut - step)
+        .cloned()
+        .collect();
+    let tail = files.into_iter().filter(|f| f.meta.max_ts >= cut).collect();
+    let mut groups = generate_search_group(memory_limit, head, start, cut - step, step).await?;
+    groups.extend(generate_search_group(memory_limit, tail, cut, end, step).await?);
     Ok(groups)
 }
 
@@ -759,63 +717,26 @@ mod tests {
         }
     }
 
-    fn plan(files: Vec<FileKey>, back: u64, legacy_max_ts: Option<i64>) -> GroupPlan {
-        GroupPlan {
-            files,
-            window: SelectorWindow {
-                back: Duration::from_micros(back),
-                ..Default::default()
-            },
-            legacy_max_ts,
-        }
-    }
-
     #[test]
-    fn test_search_group_cuts_land_on_the_query_grid() {
-        let mixed = plan(vec![], 300, Some(1000));
-        // the layout cut 1000 + 300 + 30 rounds up to 1350, the WAL floor 2000 to 2010
-        assert_eq!(
-            search_group_cuts(0, 3000, 30, &mixed, 2000),
-            vec![1350, 2010]
-        );
-        // an off-grid start keeps its own grid
-        assert_eq!(
-            search_group_cuts(5, 3000, 30, &mixed, 2000),
-            vec![1355, 2015]
-        );
-        // cuts outside (start, end] are dropped
-        assert_eq!(
-            search_group_cuts(1400, 3000, 30, &mixed, 4000),
-            Vec::<i64>::new()
-        );
-        // every piece keeps at least two points: no cut on `end`, none one step after `start`
-        assert_eq!(search_group_cuts(0, 2010, 30, &mixed, 2000), vec![1350]);
-        assert_eq!(search_group_cuts(0, 2005, 30, &mixed, 2000), vec![1350]);
-        let hash_only = plan(vec![], 300, None);
-        assert_eq!(search_group_cuts(0, 3000, 30, &hash_only, 2970), vec![2970]);
-        assert_eq!(
-            search_group_cuts(0, 3000, 30, &hash_only, 2980),
-            Vec::<i64>::new()
-        );
-        let at_start = plan(vec![], 0, Some(0));
-        assert_eq!(
-            search_group_cuts(0, 3000, 30, &at_start, 4000),
-            Vec::<i64>::new()
-        );
-        // no legacy files: only the WAL floor
-        assert_eq!(search_group_cuts(0, 3000, 30, &hash_only, 2000), vec![2010]);
-        // coinciding or adjacent cuts collapse into the first
-        let adjacent = plan(vec![], 300, Some(1670));
-        assert_eq!(search_group_cuts(0, 3000, 30, &adjacent, 2000), vec![2010]);
-        assert_eq!(search_group_cuts(0, 3000, 30, &mixed, 1360), vec![1350]);
-        // a negative offset reads past the group end, so the WAL cut moves that far earlier
-        let mut ahead = plan(vec![], 300, None);
-        ahead.window.ahead = Duration::from_micros(100);
-        assert_eq!(search_group_cuts(0, 3000, 30, &ahead, 2000), vec![1920]);
+    fn test_wal_cut_lands_on_the_query_grid() {
+        // the floor rounds up to the query's own grid
+        assert_eq!(wal_cut(0, 3000, 30, 0, 2000), Some(2010));
+        assert_eq!(wal_cut(5, 3000, 30, 0, 2000), Some(2015));
+        // a floor outside (start, end] leaves one group
+        assert_eq!(wal_cut(1400, 3000, 30, 0, 1000), None);
+        assert_eq!(wal_cut(0, 3000, 30, 0, 4000), None);
+        // both pieces keep at least two points
+        assert_eq!(wal_cut(0, 2010, 30, 0, 2000), None);
+        assert_eq!(wal_cut(0, 3000, 30, 0, 2970), Some(2970));
+        assert_eq!(wal_cut(0, 3000, 30, 0, 2980), None);
+        assert_eq!(wal_cut(0, 3000, 30, 0, 30), None);
+        assert_eq!(wal_cut(0, 3000, 30, 0, 31), Some(60));
+        // a negative offset reads past the group end, so the cut moves that far earlier
+        assert_eq!(wal_cut(0, 3000, 30, 100, 2000), Some(1920));
     }
 
     #[tokio::test]
-    async fn test_generate_search_groups_never_straddle_a_cut() {
+    async fn test_generate_search_groups_never_straddle_the_cut() {
         let files = vec![
             file(0, 100, 100),
             file(100, 200, 100),
@@ -823,27 +744,26 @@ mod tests {
             file(300, 400, 100),
             file(400, 430, 30),
         ];
-        let plan = plan(files, 0, None);
-        // no cuts: the memory sizing alone
+        // no cut: the memory sizing alone
         assert_eq!(
-            generate_search_groups(100, &plan, 0, 430, 5, &[])
+            generate_search_groups(100, files.clone(), 0, 430, 5, None)
                 .await
                 .unwrap(),
             vec![(0, 200), (205, 300), (305, 400), (405, 430)]
         );
-        // each piece is sized on its own and the piece after a cut starts exactly at it
+        // each side is sized on its own and the tail starts exactly at the cut
         assert_eq!(
-            generate_search_groups(100, &plan, 0, 430, 5, &[300])
+            generate_search_groups(100, files.clone(), 0, 430, 5, Some(300))
                 .await
                 .unwrap(),
             vec![(0, 200), (205, 295), (300, 400), (405, 430)]
         );
-        // the last piece is a two-point group of its own
+        // the tail may be a two-point group of its own
         assert_eq!(
-            generate_search_groups(100_000, &plan, 0, 430, 10, &[200, 420])
+            generate_search_groups(100_000, files, 0, 430, 10, Some(420))
                 .await
                 .unwrap(),
-            vec![(0, 190), (200, 410), (420, 430)]
+            vec![(0, 410), (420, 430)]
         );
     }
 }
