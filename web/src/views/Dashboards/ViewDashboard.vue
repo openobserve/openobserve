@@ -924,6 +924,11 @@ export default defineComponent({
       );
     };
 
+    const spanOf = (time: any) =>
+      time?.start_time && time?.end_time
+        ? time.end_time.getTime() - time.start_time.getTime()
+        : null;
+
     // Compute times for all panels in all tabs
     // @param forceRefresh - If true, always create new time objects to force all panels to refresh
     const computeAllPanelTimes = (forceRefresh = false) => {
@@ -936,10 +941,13 @@ export default defineComponent({
         end_time: new Date(dateTimePicker.value.getConsumableDateTime().endTime),
       };
 
-      // CRITICAL FIX: Preserve existing __global reference if time hasn't changed
-      // This prevents unnecessary refreshes of panels that depend on global time
+      // A non-forced recompute must not advance a relative range: its resolved now drifts a few hundred ms between calls during load, refiring every global panel's time watcher (cache paint → spurious refetch).
       const existingGlobalTime = currentTimeObjPerPanel.value.__global;
-      const shouldUpdateGlobal = forceRefresh || !areTimesEqual(existingGlobalTime, globalTime);
+      const isRelativeGlobal = selectedDate.value?.valueType === "relative";
+      const globalTimeChanged = isRelativeGlobal
+        ? spanOf(existingGlobalTime) !== spanOf(globalTime)
+        : !areTimesEqual(existingGlobalTime, globalTime);
+      const shouldUpdateGlobal = forceRefresh || !existingGlobalTime || globalTimeChanged;
 
       // Build the new panel times object
       const newPanelTimes: Record<string, any> = {
