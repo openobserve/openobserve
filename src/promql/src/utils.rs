@@ -28,7 +28,25 @@ use datafusion::{
     prelude::{DataFrame, Expr, col, lit},
 };
 use hashbrown::HashSet;
-use promql_parser::label::{MatchOp, Matchers};
+use promql_parser::{
+    label::{MatchOp, Matchers},
+    parser::VectorSelector,
+};
+
+/// The stream a selector reads from: the bare metric name, else an `__name__` equality matcher.
+pub fn metric_name(selector: &VectorSelector) -> Option<String> {
+    if let Some(name) = selector.name.as_ref() {
+        return Some(name.clone());
+    }
+    // only `=` resolves to one stream; a regex or negated `__name__` names a set the engine
+    // cannot read, so it must fail rather than authorize a stream no one has
+    selector
+        .matchers
+        .find_matchers(NAME_LABEL)
+        .into_iter()
+        .find(|mat| matches!(mat.op, MatchOp::Equal))
+        .map(|mat| mat.value)
+}
 
 /// Build the DataFusion predicates used for PromQL label matchers.
 ///
