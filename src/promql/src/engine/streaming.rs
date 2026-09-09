@@ -21,7 +21,7 @@
 use std::{sync::Arc, time::Duration};
 
 use config::meta::promql::value::*;
-use datafusion::error::Result;
+use datafusion::{arrow::datatypes::Schema, error::Result, prelude::SessionContext};
 use futures::future::pending;
 use infra::errors::ErrorCodes;
 use promql_parser::{
@@ -36,7 +36,10 @@ use super::{
         plain_selector,
     },
 };
-use crate::{functions, fused, micros};
+use crate::{
+    functions, fused, micros,
+    series_stream::merge::{SeriesLabels, StreamingSelector, series_label_columns, shard_sources},
+};
 
 /// A selector with its contexts created, ready for either streaming consumer.
 struct StreamingTarget {
@@ -116,54 +119,34 @@ impl Engine {
         let Some(target) = self.streaming_target(vs, range).await? else {
             return Ok(None);
         };
-        let timeout = self.ctx.query_ctx.timeout;
         if let [(ctx, schema, scan_stats, _)] = target.ctxs.as_slice() {
-            let labels = fused::stream::SeriesLabels {
-                selector: &target.label_selector,
-                skip: self.skip_labels,
-            };
-            let eval_ctx = &self.eval_ctx;
-            let eval = Arc::new(fused::SeriesEval::new(func.clone(), range, eval_ctx));
+            let eval = Arc::new(fused::SeriesEval::new(func.clone(), range, &self.eval_ctx));
             // the generic path evaluates an empty selector to None, not to an empty matrix
             let value = match quantile {
-                None => {
-                    let run = fused::stream::range_series(
-                        ctx,
-                        schema,
-                        target.streaming_selector(),
-                        eval,
-                        labels,
-                        fused::row_series,
-                    );
-                    self.run_cancellable(run, timeout)
-                        .await?
-                        .map(|(series, scanned)| match scanned {
-                            0 => Value::None,
-                            _ => Value::Matrix(series),
-                        })
-                }
-                Some(phi) => {
-                    let run = fused::stream::range_series(
-                        ctx,
-                        schema,
-                        target.streaming_selector(),
-                        eval,
-                        labels,
-                        fused::column_series,
-                    );
-                    match self.run_cancellable(run, timeout).await? {
-                        None => None,
-                        Some((_, 0)) => {
-                            Some(functions::histogram_quantile(phi, Value::None, eval_ctx)?)
-                        }
-                        Some((series, _)) => Some(functions::histogram_quantile_columnar(
-                            phi,
-                            &eval_ctx.timestamps(),
-                            series,
-                            eval_ctx,
-                        )?),
-                    }
-                }
+                None => self
+                    .stream_series(&target, ctx, schema, eval, fused::row_series)
+                    .await?
+                    .map(|(series, scanned)| match scanned {
+                        0 => Value::None,
+                        _ => Value::Matrix(series),
+                    }),
+                Some(phi) => match self
+                    .stream_series(&target, ctx, schema, eval, fused::column_series)
+                    .await?
+                {
+                    None => None,
+                    Some((_, 0)) => Some(functions::histogram_quantile(
+                        phi,
+                        Value::None,
+                        &self.eval_ctx,
+                    )?),
+                    Some((series, _)) => Some(functions::histogram_quantile_columnar(
+                        phi,
+                        &self.eval_ctx.timestamps(),
+                        series,
+                        &self.eval_ctx,
+                    )?),
+                },
             };
             if let Some(value) = value {
                 self.ctx.scan_stats.write().await.add(scan_stats);
@@ -188,6 +171,34 @@ impl Engine {
             None => Ok(Some(value)),
             Some(phi) => functions::histogram_quantile(phi, value, &self.eval_ctx).map(Some),
         }
+    }
+
+    /// Plans the shard sources carrying the series labels and emits every series through `emit`,
+    /// under the query timeout; `None` when the layout cannot stream.
+    async fn stream_series<T: Send + 'static>(
+        &self,
+        target: &StreamingTarget,
+        ctx: &SessionContext,
+        schema: &Schema,
+        eval: Arc<fused::SeriesEval>,
+        emit: fused::SeriesEmitter<T>,
+    ) -> Result<Option<(Vec<T>, usize)>> {
+        let labels = SeriesLabels {
+            selector: &target.label_selector,
+            skip: self.skip_labels,
+        };
+        let label_cols = series_label_columns(schema, &labels, eval.func.name());
+        let selector = target.streaming_selector();
+        let lookback = micros(eval.range);
+        let run = async {
+            match shard_sources(ctx, schema, &selector, label_cols, lookback, &self.eval_ctx)
+                .await?
+            {
+                None => Ok(None),
+                Some(sources) => fused::emit_sources(sources, eval, emit).await.map(Some),
+            }
+        };
+        self.run_cancellable(run, self.ctx.query_ctx.timeout).await
     }
 
     /// Normalizes the selector and creates its contexts; `None` when a query-level gate rules
@@ -288,8 +299,8 @@ impl Engine {
 }
 
 impl StreamingTarget {
-    fn streaming_selector(&self) -> fused::stream::StreamingSelector<'_> {
-        fused::stream::StreamingSelector {
+    fn streaming_selector(&self) -> StreamingSelector<'_> {
+        StreamingSelector {
             table_name: self.selector.name.as_deref().unwrap_or_default(),
             matchers: &self.scan_matchers,
             offset: self.offset,

@@ -24,7 +24,7 @@ pub(crate) mod matrix;
 mod op;
 pub(crate) mod stream;
 
-pub(crate) use fold::{SeriesEval, column_series, row_series};
+pub(crate) use fold::{SeriesEmitter, SeriesEval, column_series, emit_sources, row_series};
 pub(crate) use op::FusedAggOp;
 
 #[cfg(test)]

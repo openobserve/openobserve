@@ -23,8 +23,9 @@ use config::{
     meta::{
         plan::generate_plan_string,
         promql::{
-            HASH_LABEL, VALUE_LABEL,
-            value::{Labels, Sample},
+            BUCKET_LABEL, EXEMPLARS_LABEL, HASH_LABEL, HASH_SORTED_TABLE_SUFFIX, NAME_LABEL,
+            VALUE_LABEL,
+            value::{EvalContext, Labels, Sample},
         },
     },
     utils::hash::gxhash,
@@ -32,7 +33,7 @@ use config::{
 use datafusion::{
     arrow::{
         array::{AsArray, RecordBatch},
-        datatypes::{Float64Type, Int64Type, UInt64Type},
+        datatypes::{DataType, Float64Type, Int64Type, Schema, UInt64Type},
     },
     error::{DataFusionError, Result},
     execution::{SendableRecordBatchStream, TaskContext},
@@ -41,12 +42,32 @@ use datafusion::{
         expressions::Column,
         sorts::{sort::SortExec, sort_preserving_merge::SortPreservingMergeExec},
     },
-    prelude::{DataFrame, col, lit},
+    prelude::{DataFrame, SessionContext, col, lit},
 };
 use futures::TryStreamExt;
+use hashbrown::HashSet;
+use promql_parser::label::Matchers;
 
 use super::SeriesStream;
-use crate::load_series::{LabelColumn, LabelInterner, batch_run_len};
+use crate::{
+    functions::KEEP_METRIC_NAME_FUNC,
+    load_series::{LabelColumn, LabelInterner, apply_time_window, batch_run_len},
+    utils::apply_matchers,
+};
+
+/// The selector being scanned; `offset` is the `offset` modifier in microseconds.
+pub(crate) struct StreamingSelector<'a> {
+    pub table_name: &'a str,
+    pub matchers: &'a Matchers,
+    pub offset: i64,
+}
+
+/// Which labels an emitted series carries: the engine's label selector narrows the projection,
+/// and a query that drops every label at the root skips them entirely.
+pub(crate) struct SeriesLabels<'a> {
+    pub selector: &'a HashSet<String>,
+    pub skip: bool,
+}
 
 /// One shard's series stream; every chain holds one run per series, so the minimum head hash is the
 /// next series.
@@ -229,9 +250,83 @@ impl ChainCursor {
     }
 }
 
+/// One series stream per shard over the selector's hash-sorted table, projected to the sample
+/// columns plus `label_cols`; `None` when the layout cannot stream in order.
+pub(crate) async fn shard_sources(
+    ctx: &SessionContext,
+    schema: &Schema,
+    selector: &StreamingSelector<'_>,
+    label_cols: Vec<String>,
+    lookback: i64,
+    eval_ctx: &EvalContext,
+) -> Result<Option<Vec<impl Future<Output = Result<MergeSeriesStream>> + Send + 'static>>> {
+    if schema
+        .field_with_name(HASH_LABEL)
+        .is_ok_and(|field| field.data_type() != &DataType::UInt64)
+    {
+        return Ok(None);
+    }
+    let sorted_table = format!("{}{HASH_SORTED_TABLE_SUFFIX}", selector.table_name);
+    let Ok(df) = ctx.table(sorted_table.as_str()).await else {
+        return Ok(None);
+    };
+    let df = apply_time_window(
+        df,
+        eval_ctx.start - selector.offset,
+        eval_ctx.end - selector.offset,
+        eval_ctx.step,
+        lookback,
+    )?;
+    let df = apply_matchers(df, selector.matchers)?;
+    let mut columns = vec![TIMESTAMP_COL_NAME, HASH_LABEL, VALUE_LABEL];
+    columns.extend(label_cols.iter().map(String::as_str));
+    let shards = ctx.state().config().target_partitions();
+    let Some(shard_inputs) = build_shard_inputs(&df, &columns, shards, &eval_ctx.trace_id).await?
+    else {
+        return Ok(None);
+    };
+    let label_cols = Arc::new(label_cols);
+    let offset = selector.offset;
+    Ok(Some(
+        shard_inputs
+            .into_iter()
+            .map(|streams| MergeSeriesStream::start(streams, label_cols.clone(), offset))
+            .collect(),
+    ))
+}
+
+/// The label columns an emitted series carries, in the sorted order the materializing loader
+/// uses: string columns other than the hash and exemplars, narrowed by the label selector
+/// (which always keeps `le`), without the metric name unless the function keeps it.
+pub(crate) fn series_label_columns(
+    schema: &Schema,
+    labels: &SeriesLabels<'_>,
+    func_name: &str,
+) -> Vec<String> {
+    if labels.skip {
+        return vec![];
+    }
+    let mut cols: Vec<String> = schema
+        .fields()
+        .iter()
+        .filter(|field| matches!(field.data_type(), DataType::Utf8 | DataType::Utf8View))
+        .map(|field| field.name().clone())
+        .filter(|name| {
+            name != HASH_LABEL
+                && name != EXEMPLARS_LABEL
+                && (labels.selector.is_empty()
+                    || labels.selector.contains(name)
+                    || name == BUCKET_LABEL)
+                && (name != NAME_LABEL || KEEP_METRIC_NAME_FUNC.contains(func_name))
+        })
+        .collect();
+    cols.sort();
+    cols
+}
+
 /// Every shard's ordered input streams; `None` (logged) means a shard's plan cannot stream in
 /// order.
-pub(crate) async fn build_shard_inputs(
+async fn build_shard_inputs(
     df: &DataFrame,
     columns: &[&str],
     shards: usize,
@@ -327,12 +422,40 @@ fn hash_ordered(plan: &Arc<dyn ExecutionPlan>) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use datafusion::{
-        arrow::datatypes::{DataType, Field, Schema},
-        physical_plan::empty::EmptyExec,
-    };
+    use datafusion::{arrow::datatypes::Field, physical_plan::empty::EmptyExec};
 
     use super::*;
+
+    #[test]
+    fn test_series_label_columns_follow_the_loader() {
+        let schema = Schema::new(vec![
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+            Field::new(HASH_LABEL, DataType::UInt64, false),
+            Field::new(VALUE_LABEL, DataType::Float64, false),
+            Field::new("path", DataType::Utf8View, true),
+            Field::new(NAME_LABEL, DataType::Utf8, true),
+            Field::new(BUCKET_LABEL, DataType::Utf8, true),
+            Field::new("instance", DataType::Utf8, true),
+            Field::new(EXEMPLARS_LABEL, DataType::Utf8, true),
+        ]);
+        let all = HashSet::new();
+        let labels = |selector, skip| SeriesLabels { selector, skip };
+        assert_eq!(
+            series_label_columns(&schema, &labels(&all, false), "rate"),
+            ["instance", "le", "path"]
+        );
+        // last_over_time keeps the metric name, like an offset would
+        assert_eq!(
+            series_label_columns(&schema, &labels(&all, false), "last_over_time"),
+            [NAME_LABEL, "instance", "le", "path"]
+        );
+        let selected: HashSet<String> = ["path".to_string()].into_iter().collect();
+        assert_eq!(
+            series_label_columns(&schema, &labels(&selected, false), "rate"),
+            ["le", "path"]
+        );
+        assert!(series_label_columns(&schema, &labels(&all, true), "rate").is_empty());
+    }
 
     #[test]
     fn test_shard_streams_empty_scan_yields_zero_chains() {

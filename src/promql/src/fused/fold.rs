@@ -46,11 +46,11 @@ pub(super) struct GroupEntry {
 
 /// How one series becomes per-step values: the range function, its window, and the slots.
 pub(crate) struct SeriesEval {
-    pub(super) func: Arc<dyn RangeFunc>,
+    pub(crate) func: Arc<dyn RangeFunc>,
     counter_kind: Option<ExtrapolationKind>,
-    pub(super) range: Duration,
-    pub(super) eval_ctx: EvalContext,
-    pub(super) timestamps: Vec<i64>,
+    pub(crate) range: Duration,
+    pub(crate) eval_ctx: EvalContext,
+    pub(crate) timestamps: Vec<i64>,
 }
 
 pub(super) struct FoldParams {
@@ -144,7 +144,7 @@ where
 
 /// Evaluates every partition's series and returns what `emit` makes of each, in partition
 /// order; dropping the future aborts the partitions.
-pub(super) async fn emit_sources<F, S, T>(
+pub(crate) async fn emit_sources<F, S, T>(
     sources: Vec<F>,
     eval: Arc<SeriesEval>,
     emit: SeriesEmitter<T>,
@@ -154,6 +154,13 @@ where
     S: SeriesStream + 'static,
     T: Send + 'static,
 {
+    let start_time = std::time::Instant::now();
+    let func_name = eval.func.name();
+    let trace_id = eval.eval_ctx.trace_id.clone();
+    log::info!(
+        "[trace_id: {trace_id}] [PromQL Timing] streaming {func_name}() started with {} shards",
+        sources.len(),
+    );
     let parts = sources
         .into_iter()
         .map(|source| {
@@ -162,8 +169,13 @@ where
         })
         .collect();
     let parts = run_partitions(parts).await?;
-    let series_count = parts.iter().map(|(_, series)| series).sum();
-    let series = parts.into_iter().flat_map(|(series, _)| series).collect();
+    let series_count: usize = parts.iter().map(|(_, series)| series).sum();
+    let series: Vec<T> = parts.into_iter().flat_map(|(series, _)| series).collect();
+    log::info!(
+        "[trace_id: {trace_id}] [PromQL Timing] streaming {func_name}() execution took: {:?}, emitted {} of {series_count} series",
+        start_time.elapsed(),
+        series.len(),
+    );
     Ok((series, series_count))
 }
 
