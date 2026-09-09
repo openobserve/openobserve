@@ -25,9 +25,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   of the row without owning its contents.
 -->
 <template>
-  <div class="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
-    <!-- < md the fixed 16rem box pushed the trailing controls under the page edge. -->
-    <div class="w-64 shrink-0 max-md:w-auto max-md:min-w-0 max-md:flex-1 max-md:shrink">
+  <div
+    class="flex min-w-0 flex-1 items-center gap-2 overflow-hidden max-md:flex-wrap max-md:overflow-visible"
+  >
+    <!-- < md the fixed 16rem box clipped the trailing controls; search takes its own row instead. -->
+    <div class="w-64 shrink-0 max-md:order-last max-md:w-full max-md:basis-full">
       <OSearchInput
         :model-value="search"
         :placeholder="placeholder"

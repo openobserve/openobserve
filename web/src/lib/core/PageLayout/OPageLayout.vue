@@ -111,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OContent
         :bleed="bleed"
         :y="padY"
-        class="flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden"
+        class="flex min-h-0 w-full flex-1 flex-col overflow-hidden"
       >
         <slot />
       </OContent>

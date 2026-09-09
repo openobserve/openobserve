@@ -290,7 +290,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            header, rows, in-frame toolbar and footer (count + "Showing X–Y of N"
            + records-per-page + pager) all match. OTable owns pagination, so we
            feed it the full sorted list and it paginates internally. -->
-      <div v-else class="h-full min-w-0 flex-1">
+      <div v-else class="h-full min-w-0 flex-1 max-md:h-auto max-md:min-h-0">
         <div class="bg-card-glass-bg h-full">
           <OTable
             ref="oTableRef"

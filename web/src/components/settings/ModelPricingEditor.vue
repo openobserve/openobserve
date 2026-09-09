@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OText>
               </div>
             </div>
-            <div class="flex flex-row gap-4 px-4 pt-2.5 pb-2">
+            <div class="flex flex-row gap-4 px-4 pt-2.5 pb-2 max-md:flex-col max-md:gap-2">
               <div class="flex-1">
                 <OFormInput
                   name="name"
@@ -399,7 +399,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <!-- Column headers (only when rows exist) -->
                       <div
                         v-if="tier.prices.length"
-                        class="price-table-head text-2xs grid grid-cols-[1fr_10rem_auto] gap-2 px-3 py-1.5 font-semibold tracking-[0.01em] opacity-45"
+                        class="price-table-head text-2xs grid grid-cols-[1fr_10rem_auto] gap-2 px-3 py-1.5 font-semibold tracking-[0.01em] opacity-45 max-md:grid-cols-[1fr_6rem_auto]"
                       >
                         <span>{{ t("modelPricing.usageKeyCol") }}</span>
                         <span>{{ t("modelPricing.pricePerMillionHeader") }}</span>
@@ -417,7 +417,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <div
                         v-for="(_entry, entryIdx) in tier.prices"
                         :key="entryIdx"
-                        class="price-row grid grid-cols-[1fr_10rem_auto] items-start gap-2 px-3 py-0.5"
+                        class="price-row grid grid-cols-[1fr_10rem_auto] items-start gap-2 px-3 py-0.5 max-md:grid-cols-[1fr_6rem_auto]"
                       >
                         <OFormInput
                           :name="`tiers[${idx}].prices[${entryIdx}].key`"
@@ -468,7 +468,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                       <!-- Add row (staging draft, form-owned) -->
                       <div
-                        class="price-add-row grid grid-cols-[1fr_10rem_auto] items-center gap-2 px-3 py-1"
+                        class="price-add-row grid grid-cols-[1fr_10rem_auto] items-center gap-2 px-3 py-1 max-md:grid-cols-[1fr_6rem_auto]"
                         :class="{
                           'price-add-row--no-top': !tier.prices.length,
                         }"

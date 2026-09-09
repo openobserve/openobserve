@@ -105,7 +105,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("chatHistory.title") }}
             </OButton>
           </div>
-          <O2AIChat ref="homeChat" :is-open="true" :header-height="0" :centered-start="true" />
+          <!-- max-md: the mobile Chats row is a sibling, so h-full would push the
+               composer past the clipped panel — flex instead. -->
+          <O2AIChat
+            ref="homeChat"
+            class="max-md:min-h-0 max-md:flex-1"
+            :is-open="true"
+            :header-height="0"
+            :centered-start="true"
+          />
           <ODrawer
             v-if="isMobile"
             v-model:open="mobileChatsOpen"

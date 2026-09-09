@@ -93,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <!-- Right: Table -->
-        <div class="h-full min-w-0 flex-1">
+        <div class="h-full min-w-0 flex-1 max-md:h-auto max-md:min-h-0">
           <div class="bg-card-glass-bg flex h-full flex-col">
             <!-- Alert List Table (shows all alert types including anomaly detection rows) -->
             <OTable

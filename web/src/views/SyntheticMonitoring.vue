@@ -103,7 +103,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
 
       <!-- RIGHT MAIN: filter bar + table -->
-      <div v-if="activeSection === 'checks'" class="flex min-w-0 flex-1 flex-col overflow-hidden">
+      <div
+        v-if="activeSection === 'checks'"
+        class="flex min-w-0 flex-1 flex-col overflow-hidden max-md:min-h-0"
+      >
         <!-- ── CHECKS TABLE ── -->
         <MonitorTable
           :mode="monitorTableMode"

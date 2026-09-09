@@ -5505,6 +5505,13 @@ export default defineComponent({
   height: calc(100% - 2.9rem) !important;
 }
 
+/* < md the toolbar wraps to two rows, so one row's worth of reserve clips the editor. */
+@media (max-width: 47.99rem) {
+  .logs-search-bar-component .query-editor-container {
+    height: calc(100% - 5rem) !important;
+  }
+}
+
 /* padding-left intentionally outranks the `px-1` utility on this button — that
    is the pre-existing computed result. */
 .logs-search-bar-component .region-dropdown-btn {

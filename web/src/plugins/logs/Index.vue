@@ -106,12 +106,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #after>
                 <div class="h-full">
                   <div class="bg-card-glass-bg relative-position h-full w-full">
+                    <!-- Scrolls: on a phone the ingestion empty state is taller than this pane. -->
                     <div
                       v-if="
                         !searchObj.loadingStream &&
                         searchObj.data.stream.streamLists.length == 0 &&
                         searchObj.loading == false
                       "
+                      class="h-full overflow-y-auto"
                     >
                       <LogsNoDataState
                         :ai-enabled="isAiEnabled"
@@ -135,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         searchObj.data.stream.streamLists.length > 0 &&
                         searchObj.data.stream.selectedStream.length == 0
                       "
-                      class="h-full"
+                      class="h-full overflow-y-auto"
                     >
                       <LogsNoStreamState
                         :org-id="store.state.selectedOrganization.identifier"
@@ -2308,9 +2310,9 @@ export default defineComponent({
         const queryLines = (queryValue || "").split("\n").length;
         const fnLines = (fnValue || "").split("\n").length;
         const hasMoreThanTwoLines = queryLines > 2 || fnLines > 2;
-        // Base (≤2 lines): 125px on mobile to clear the wrapped toolbar, else 83px.
-        const baseHeight = mobile ? 125 : 83;
-        const expandedHeight = mobile ? 165 : 130;
+        // Base (≤2 lines): 165px on mobile clears the two wrapped toolbar rows + editor, else 83px.
+        const baseHeight = mobile ? 165 : 83;
+        const expandedHeight = mobile ? 205 : 130;
 
         if (hasMoreThanTwoLines && splitterModel.value < expandedHeight) {
           splitterModel.value = expandedHeight;
