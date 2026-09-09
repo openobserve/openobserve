@@ -134,8 +134,11 @@ var TIP_BORDER = "\${theme:tooltip-border}";
 var HOT = 80;
 var COLD = 40;
 var FULL = 100;
-// Keeps the x:y pixel ratio near 2 at the widest desktop and under 1 on a narrow one, so the diagonal stays readable without leaving dead gutters.
-var PLOT_SIDE_MARGIN = "18%";
+// Axis chrome, reserved OUTSIDE the square: containLabel would fold the labels back in and make the solved side advisory.
+var AXIS_LEFT = 58;
+var AXIS_TOP = 24;
+var AXIS_BOTTOM = 52;
+var AXIS_RIGHT = 18;
 
 // ECharts drops any point outside a fixed axis range, so a hard max:100 would silently ERASE the over-committed cluster this chart exists to surface.
 var axisMax = FULL;
@@ -177,6 +180,25 @@ var radius = function (cores) {
 points.sort(function (a, b) {
   return a.cpuPct - b.cpuPct;
 });
+
+// Centres a SQUARE plot in whatever canvas it is given: both axes span the same 0..axisMax domain, so any other aspect draws the 45-degree diagonal at atan(h/w).
+var solveGrid = function (w, h) {
+  var side = Math.min(w - AXIS_LEFT - AXIS_RIGHT, h - AXIS_TOP - AXIS_BOTTOM);
+  if (side < 40) side = 40;
+  var slackX = w - AXIS_LEFT - AXIS_RIGHT - side;
+  var slackY = h - AXIS_TOP - AXIS_BOTTOM - side;
+  if (slackX < 0) slackX = 0;
+  if (slackY < 0) slackY = 0;
+  var halfX = Math.round(slackX / 2);
+  var halfY = Math.round(slackY / 2);
+  return {
+    left: AXIS_LEFT + halfX,
+    right: AXIS_RIGHT + (slackX - halfX),
+    top: AXIS_TOP + halfY,
+    bottom: AXIS_BOTTOM + (slackY - halfY),
+    containLabel: false,
+  };
+};
 
 var zone = function (x0, x1, y0, y1, fill, text, pos, labelColor) {
   return [
@@ -270,8 +292,9 @@ option = {
       );
     },
   },
-  // Proportional side margins: full-bleed stretches 1% of CPU to 3.1x the pixels of 1% of memory at 1920, while a fixed-width box pillarboxes the panel with dead gutters.
-  grid: { left: PLOT_SIDE_MARGIN, right: PLOT_SIDE_MARGIN, top: 24, bottom: 52, containLabel: true },
+  // Seeded square against a mid-range canvas so the FIRST paint is not skewed; o2_events.finished re-solves it against the real one.
+  // containLabel false deliberately: it folds the axis labels back inside the grid, which would make the solved square advisory.
+  grid: solveGrid(1180, 620),
   xAxis: {
     name: "CPU committed %",
     nameLocation: "middle",
@@ -340,11 +363,68 @@ option = {
       },
     },
   ],
+  // The handler below is serialized with NO closure, so the axis chrome has to cross as data rather than as captured vars.
+  o2_layout: { axisLeft: AXIS_LEFT, axisTop: AXIS_TOP, axisBottom: AXIS_BOTTOM, axisRight: AXIS_RIGHT },
   // Serialized across the sandbox and rebuilt by CustomChartRenderer in the PARENT, which is the only reason this can reach the page at all.
   o2_events: {
     // Announces the pick and lets CuratedPageView route it: location.assign here would tear down and reload the whole SPA.
     // Reaches the document off the chart's own DOM node: every global here would be a free identifier the sandbox never passes in.
     // No "<" and no "&" ANYWHERE in this body: DOMPurify.sanitize runs over the serialized function text, escaping "&" and TRUNCATING the function at "<".
+    // The sandbox cannot read the canvas — only \`data\` and \`echarts\` are in scope at build time — so the square is solved HERE, where a live chart exists.
+    // \`finished\` fires after every render including every resize(), which is what makes this responsive at all.
+    // No "<" and no "&" in this body either: it crosses the same DOMPurify pass as the click handler.
+    finished: function (params, chart) {
+      // ECharts returns a KNOWN component as an array but hands an unrecognised top-level key straight back as the object it was given.
+      var raw = chart.getOption().o2_layout;
+      var cfg = raw ? (raw.length === undefined ? raw : raw[0]) : null;
+      if (!cfg) return;
+      var w = chart.getWidth();
+      var h = chart.getHeight();
+      var side = Math.min(w - cfg.axisLeft - cfg.axisRight, h - cfg.axisTop - cfg.axisBottom);
+      // Clamped via Math.max, never a less-than test: that operator would be TRUNCATED by the DOMPurify pass this handler crosses.
+      side = Math.max(side, 40);
+      var slackX = Math.max(w - cfg.axisLeft - cfg.axisRight - side, 0);
+      var slackY = Math.max(h - cfg.axisTop - cfg.axisBottom - side, 0);
+      var halfX = Math.round(slackX / 2);
+      var halfY = Math.round(slackY / 2);
+      var next = {
+        left: cfg.axisLeft + halfX,
+        right: cfg.axisRight + (slackX - halfX),
+        top: cfg.axisTop + halfY,
+        bottom: cfg.axisBottom + (slackY - halfY),
+        containLabel: false,
+      };
+      // Re-entrancy guard: setOption paints, painting fires \`finished\` again, so an unconditional apply never settles.
+      // Counted rather than chained with a boolean-and, which DOMPurify would escape into an entity and break the parse.
+      var live = (chart.getOption().grid || [])[0] || {};
+      var same = 0;
+      if (live.left === next.left) same += 1;
+      if (live.right === next.right) same += 1;
+      if (live.top === next.top) same += 1;
+      if (live.bottom === next.bottom) same += 1;
+      if (same === 4) return;
+      // Deferred because ECharts rejects a setOption issued inside the render pass with "should not be called during main process".
+      // Re-measured inside the timer: CustomChartRenderer re-applies the STATIC seeded option on every data refresh, so the size
+      // captured above can already be stale by the time this runs, which paints the plot as a narrow strip.
+      setTimeout(function () {
+        var lw = chart.getWidth();
+        var lh = chart.getHeight();
+        var lside = Math.max(Math.min(lw - cfg.axisLeft - cfg.axisRight, lh - cfg.axisTop - cfg.axisBottom), 40);
+        var lx = Math.max(lw - cfg.axisLeft - cfg.axisRight - lside, 0);
+        var ly = Math.max(lh - cfg.axisTop - cfg.axisBottom - lside, 0);
+        var lhx = Math.round(lx / 2);
+        var lhy = Math.round(ly / 2);
+        chart.setOption({
+          grid: {
+            left: cfg.axisLeft + lhx,
+            right: cfg.axisRight + (lx - lhx),
+            top: cfg.axisTop + lhy,
+            bottom: cfg.axisBottom + (ly - lhy),
+            containLabel: false,
+          },
+        });
+      }, 100);
+    },
     click: function (params, chart) {
       if (!params.data) return;
       var meta = params.data.meta;
@@ -483,7 +563,8 @@ export const kubernetesPage: CuratedPageManifest = {
             unit: "percent",
             groupId: "kube-state",
             // 17px gridstack cells: h:39 is the tallest that still fits a 1440x900 viewport unscrolled, and it seats the square plot plus its axis chrome.
-            layout: { w: 192, h: 39 },
+            // w:120 of 192 leaves 72 for the resource overview beside it; the quadrant stays the hero, and flowLayout puts them on one row without an engine change.
+            layout: { w: 120, h: 39 },
             customChartContent: FLEET_QUADRANT_JS,
             variants: [
               {
@@ -522,6 +603,68 @@ export const kubernetesPage: CuratedPageManifest = {
                   {
                     query: `sum by (${CLUSTER}) (increase(kube_pod_container_status_restarts_total[1h]))`,
                     legend: "",
+                  },
+                ],
+              },
+            ],
+          },
+          "kube_node_status_allocatable",
+        ),
+        // The fleet's ABSOLUTE size, which no other tab reports: all 25 panels on
+        // Inventory / Nodes / Utilization are cluster-scoped, and the quadrant beside
+        // this one plots ratios per cluster. The subject here is the reserved-vs-used
+        // GAP — reserving 59% while burning 13% is the finding, and it is only visible
+        // with both bars on one axis.
+        panel(
+          {
+            id: "k8s_sm_fleet_resources",
+            titleKey: "infra.k8s.panel.fleetResources",
+            // "h-bar", not promql "bar": convertPromQLBarChart.ts:138 makes one ROW per
+            // series with the category axis taking the series name, so four bare sums with
+            // literal legends give four labelled rows. promql "bar" plots x as TIME.
+            type: "h-bar",
+            // One unit per panel, so cores and bytes cannot share a value axis: both rows
+            // are normalised to percent-of-capacity, which is also the comparison the
+            // panel is about.
+            unit: "percent",
+            groupId: "kube-state",
+            layout: { w: 72, h: 39 },
+            variants: [
+              {
+                // k8s_node_memory_usage / k8s_node_cpu_usage are kubeletstats and stop on a
+                // NotReady node; kept OUT of requiresStreams so the panel still reports
+                // capacity and reservation when a node drops. An absent usage query yields
+                // NO bar rather than a zero one (dataProcessor.ts maps an empty result to an
+                // empty series list), so a gap reads as a gap.
+                requiresStreams: [
+                  "kube_node_status_allocatable",
+                  "kube_pod_container_resource_requests",
+                ],
+                queryType: "promql",
+                // Instant for the same reason as the quadrant: each ratio divides two
+                // separate queries, and a range window would take numerator and denominator
+                // from different instants.
+                queryMode: "instant",
+                // Bare sum(), no `by (...)`: a fleet total needs no grouping.
+                // Declared BOTTOM-UP: an ECharts category y-axis draws index 0 at the
+                // bottom, so this order paints CPU reserved, CPU used, Memory reserved,
+                // Memory used from the top down.
+                queries: [
+                  {
+                    query: `sum(k8s_node_memory_usage) / sum(kube_node_status_allocatable{resource="memory"}) * 100`,
+                    legend: "Memory used",
+                  },
+                  {
+                    query: `sum(kube_pod_container_resource_requests{resource="memory"}) / sum(kube_node_status_allocatable{resource="memory"}) * 100`,
+                    legend: "Memory reserved",
+                  },
+                  {
+                    query: `sum(k8s_node_cpu_usage) / sum(kube_node_status_allocatable{resource="cpu"}) * 100`,
+                    legend: "CPU used",
+                  },
+                  {
+                    query: `sum(kube_pod_container_resource_requests{resource="cpu"}) / sum(kube_node_status_allocatable{resource="cpu"}) * 100`,
+                    legend: "CPU reserved",
                   },
                 ],
               },

@@ -43,7 +43,7 @@ const queriesOf = (id: string): string[] =>
   panel(id).variants.flatMap((v: any) => v.queries.map((q: any) => q.query as string));
 
 describe("kubernetes pack — shape", () => {
-  it("declares 3 groups, 3 pickers, 6 sections and 48 panels", () => {
+  it("declares 3 groups, 3 pickers, 6 sections and 49 panels", () => {
     expect(kubernetesPage.id).toBe("kubernetes");
     expect(kubernetesPage.groups.map((g: any) => g.id)).toEqual([
       "kubelet-node",
@@ -65,7 +65,7 @@ describe("kubernetes pack — shape", () => {
       "nodes",
       "workloads",
     ]);
-    expect(allPanels()).toHaveLength(48);
+    expect(allPanels()).toHaveLength(49);
   });
 
   it("pins the 24h staleness threshold like every v1 pack (§5.3)", () => {

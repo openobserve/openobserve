@@ -72,7 +72,8 @@ export interface PanelVariant {
 export interface CuratedPanelDef {
   id: string;
   titleKey: I18nKey;
-  type: "line" | "area-stacked" | "bar" | "metric" | "gauge" | "table" | "custom_chart";
+  /** "h-bar" is a CATEGORY bar (one row per series), unlike promql "bar" whose x axis is time. */
+  type: "line" | "area-stacked" | "bar" | "h-bar" | "metric" | "gauge" | "table" | "custom_chart";
   unit: string;
   /**
    * Suffix for `unit: "custom"`. A percentage hides magnitude — 46% of 92 cores and

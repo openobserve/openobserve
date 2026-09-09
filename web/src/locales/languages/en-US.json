@@ -16431,7 +16431,8 @@
         "jobsFailedTop": "Top 20 failed Jobs (now)",
         "volumeClaimsUnboundTop": "Top 20 unbound volume claims (now)",
         "cpuFree": "CPU cores free to schedule (now)",
-        "fleetQuadrant": "Fleet commitment quadrant - every cluster (now)"
+        "fleetQuadrant": "Fleet commitment quadrant - every cluster (now)",
+        "fleetResources": "Fleet resource overview - reserved vs used, % of capacity (now)"
       }
     }
   },
