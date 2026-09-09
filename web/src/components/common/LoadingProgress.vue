@@ -1,6 +1,5 @@
 <template>
   <div
-    data-test="loading-progress"
     class="absolute top-0 left-0 z-999 w-full transition-opacity duration-500 ease-out"
     :class="{
       'opacity-0': !loading && !isFadingOut,
