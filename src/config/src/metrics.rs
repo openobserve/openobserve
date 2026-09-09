@@ -1170,6 +1170,57 @@ pub static QUERY_DISK_CACHE_MISS_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
+pub static QUERY_DISK_CACHE_INLINE_DOWNLOAD_FILES_CONSIDERED: Lazy<IntCounterVec> =
+    Lazy::new(|| {
+        IntCounterVec::new(
+            Opts::new(
+                "query_disk_cache_inline_download_files_considered",
+                "query disk cache inline download files considered".to_owned() + HELP_SUFFIX,
+            )
+            .namespace(NAMESPACE)
+            .const_labels(create_const_labels()),
+            &["file_type"],
+        )
+        .expect("Metric created")
+    });
+pub static QUERY_DISK_CACHE_INLINE_DOWNLOAD_FILES_FETCHED: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "query_disk_cache_inline_download_files_fetched",
+            "query disk cache inline download files fetched".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["file_type", "status"],
+    )
+    .expect("Metric created")
+});
+pub static QUERY_DISK_CACHE_INLINE_DOWNLOAD_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "query_disk_cache_inline_download_bytes",
+            "query disk cache inline download bytes".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["file_type"],
+    )
+    .expect("Metric created")
+});
+pub static QUERY_DISK_CACHE_INLINE_DOWNLOAD_DURATION_SECONDS: Lazy<HistogramVec> =
+    Lazy::new(|| {
+        HistogramVec::new(
+            HistogramOpts::new(
+                "query_disk_cache_inline_download_duration_seconds",
+                "query disk cache inline download duration in seconds".to_owned() + HELP_SUFFIX,
+            )
+            .namespace(NAMESPACE)
+            .const_labels(create_const_labels()),
+            &["file_type"],
+        )
+        .expect("Metric created")
+    });
+
 // file downloader metrics
 pub static FILE_DOWNLOADER_NORMAL_QUEUE_SIZE: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
@@ -2068,6 +2119,24 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(QUERY_DISK_CACHE_MISS_COUNT.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(
+            QUERY_DISK_CACHE_INLINE_DOWNLOAD_FILES_CONSIDERED.clone(),
+        ))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(
+            QUERY_DISK_CACHE_INLINE_DOWNLOAD_FILES_FETCHED.clone(),
+        ))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(QUERY_DISK_CACHE_INLINE_DOWNLOAD_BYTES.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(
+            QUERY_DISK_CACHE_INLINE_DOWNLOAD_DURATION_SECONDS.clone(),
+        ))
         .expect("Metric registered");
     // file downloader metrics
     registry
