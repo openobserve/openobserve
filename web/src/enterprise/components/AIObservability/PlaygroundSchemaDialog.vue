@@ -27,6 +27,15 @@
       <OBanner v-if="dropped" variant="warning" data-test="ai-playground-schema-unsupported">
         {{ t("aiObservability.playground.schemaUnsupported") }}
       </OBanner>
+      <!-- Softer than a drop: the answer is JSON, only its shape is a request
+           rather than a guarantee, so a reader should not trust it blindly. -->
+      <OBanner
+        v-else-if="approximated"
+        variant="info"
+        data-test="ai-playground-schema-approximated"
+      >
+        {{ t("aiObservability.playground.schemaApproximatedHelp") }}
+      </OBanner>
       <OCheckbox
         v-model="enabled"
         :label="t('aiObservability.playground.schemaToggle')"
@@ -61,6 +70,10 @@ const props = defineProps<{
   /** The selected provider has no field to carry a schema, so one set here is
    *  kept on the variant and left out of the request. */
   dropped?: boolean;
+  /** The selected provider only has a JSON mode: the server sends that and
+   *  restates the schema in the prompt, so the shape is asked for, not
+   *  enforced. */
+  approximated?: boolean;
 }>();
 
 const emit = defineEmits<{

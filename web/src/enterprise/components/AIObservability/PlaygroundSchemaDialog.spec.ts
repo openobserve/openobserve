@@ -41,7 +41,9 @@ const OBanner = {
   template: '<div :data-test="dataTest"><slot /></div>',
 };
 
-function mountDialog(props: { schema?: string | null; dropped?: boolean } = {}) {
+function mountDialog(
+  props: { schema?: string | null; dropped?: boolean; approximated?: boolean } = {},
+) {
   return mount(PlaygroundSchemaDialog, {
     props: { open: true, schema: null, ...props },
     global: { stubs: { ODialog, OCheckbox, OTextarea, OBanner } },
@@ -49,6 +51,7 @@ function mountDialog(props: { schema?: string | null; dropped?: boolean } = {}) 
 }
 
 const WARNING = '[data-test="ai-playground-schema-unsupported"]';
+const APPROXIMATED = '[data-test="ai-playground-schema-approximated"]';
 
 describe("PlaygroundSchemaDialog", () => {
   it("starts off with the default schema in place, ready to be turned on", () => {
@@ -77,6 +80,17 @@ describe("PlaygroundSchemaDialog", () => {
   it("warns when the provider carries no schema", () => {
     expect(mountDialog({ dropped: true }).find(WARNING).exists()).toBe(true);
     expect(mountDialog({ dropped: false }).find(WARNING).exists()).toBe(false);
+  });
+
+  // JSON mode with the schema restated in the prompt is not a guarantee, and
+  // the person reading the output has to know the difference.
+  it("notes when the provider only approximates the schema", () => {
+    const wrapper = mountDialog({ approximated: true });
+    expect(wrapper.find(APPROXIMATED).exists()).toBe(true);
+    expect(wrapper.find(WARNING).exists()).toBe(false);
+    expect(mountDialog({ dropped: false, approximated: false }).find(APPROXIMATED).exists()).toBe(
+      false,
+    );
   });
 
   // The variant keeps the schema whatever the provider is, and swapping the
