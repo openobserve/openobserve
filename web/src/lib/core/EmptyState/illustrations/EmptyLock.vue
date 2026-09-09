@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         stroke-width="1.5"
         stroke-dasharray="5 4"
       />
-      <g fill="var(--color-border-default)" opacity="0.8">
+      <g fill="var(--color-primary-400)" opacity="0.55">
         <rect x="88" y="46" width="46" height="4" rx="2" />
         <rect x="88" y="56" width="64" height="4" rx="2" />
         <rect x="88" y="66" width="34" height="4" rx="2" />
