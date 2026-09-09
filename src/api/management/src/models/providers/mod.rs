@@ -61,7 +61,14 @@ pub struct ProviderResponseBody {
     pub org_id: String,
     pub name: String,
     pub provider_type: String,
+    /// Endpoint exactly as stored: the complete URL for providers that
+    /// configured one, and null for providers using the built-in default.
+    /// The provider form seeds its input from this, so a provider on the
+    /// default keeps an empty field and keeps tracking the default.
     pub endpoint: Option<String>,
+    /// Complete URL this provider calls, with the built-in default filled in
+    /// when `endpoint` is null. This is the field to display.
+    pub resolved_endpoint: String,
     pub default_model: String,
     pub available_models: Vec<String>,
     /// API key / auth config is masked in responses.
@@ -99,14 +106,33 @@ impl From<ProviderRequestBody> for infra::table::providers::Provider {
     }
 }
 
+/// Complete URL a provider calls, falling back to the stored value if the
+/// provider type is one this build cannot resolve. Responses must never fail on
+/// a row that is merely unusable, so this cannot return an error.
+#[cfg(feature = "enterprise")]
+fn resolved_endpoint_of(provider: &infra::table::providers::Provider) -> String {
+    o2_enterprise::enterprise::llm_evaluations::providers::resolve_endpoint_for_type(
+        &provider.provider_type,
+        provider.endpoint.as_deref(),
+    )
+    .unwrap_or_else(|_| provider.endpoint.clone().unwrap_or_default())
+}
+
+#[cfg(not(feature = "enterprise"))]
+fn resolved_endpoint_of(provider: &infra::table::providers::Provider) -> String {
+    provider.endpoint.clone().unwrap_or_default()
+}
+
 impl From<infra::table::providers::Provider> for ProviderResponseBody {
     fn from(value: infra::table::providers::Provider) -> Self {
+        let resolved_endpoint = resolved_endpoint_of(&value);
         Self {
             id: value.id,
             org_id: value.org_id,
             name: value.name,
             provider_type: value.provider_type,
             endpoint: value.endpoint,
+            resolved_endpoint,
             default_model: value.default_model,
             available_models: value.available_models,
             auth_config_masked: true,
@@ -149,6 +175,33 @@ mod tests {
         let resp = ProviderResponseBody::from(provider);
         assert!(resp.auth_config_masked);
         assert_eq!(resp.name, "OpenAI");
+    }
+
+    #[test]
+    fn test_provider_response_fills_in_the_default_endpoint() {
+        // `endpoint` stays null so the row keeps tracking the default, but the
+        // response still tells the UI which URL the provider actually calls.
+        let provider = infra::table::providers::Provider {
+            id: "abc".to_string(),
+            org_id: "org1".to_string(),
+            name: "OpenAI".to_string(),
+            provider_type: "openai".to_string(),
+            endpoint: None,
+            default_model: "gpt-4o".to_string(),
+            available_models: vec!["gpt-4o".to_string()],
+            auth_config: serde_json::json!({"api_key": "secret"}),
+            rate_limits: None,
+            is_default: false,
+            created_at: 1000,
+            updated_at: 2000,
+        };
+        let resp = ProviderResponseBody::from(provider);
+        assert!(resp.endpoint.is_none());
+        #[cfg(feature = "enterprise")]
+        assert_eq!(
+            resp.resolved_endpoint,
+            "https://api.openai.com/v1/chat/completions"
+        );
     }
 
     #[test]
