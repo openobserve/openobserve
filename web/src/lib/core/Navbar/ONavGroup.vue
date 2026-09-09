@@ -501,14 +501,15 @@ function onChildMouseenter(event: MouseEvent) {
               {{ t(block.labelKey) }}
             </div>
             <router-link
-              v-for="child in block.children"
+              v-for="(child, childIndex) in block.children"
               :key="childKey(child)"
               :data-test="childDataTest(child)"
               role="menuitem"
               :to="childTo(child)"
-              class="nav-group-item rounded-default focus-visible:ring-accent flex cursor-pointer items-center gap-2.5 px-3 py-1.5 text-sm transition-colors duration-150 outline-none select-none [text-decoration:none]! focus-visible:ring-2"
+              class="nav-group-item rounded-default focus-visible:ring-accent flex cursor-pointer items-center gap-2.5 px-3 py-1.5 text-sm transition-colors duration-150 outline-none select-none [text-decoration:none]! focus-visible:ring-inset focus-visible:ring-2"
               :class="[
                 flyoutTextClass,
+                childIndex > 0 ? 'mt-0.5' : '',
                 isChildActive(child)
                   ? 'bg-select-item-selected-bg font-medium'
                   : 'hover:bg-dropdown-item-hover-bg',
@@ -531,7 +532,7 @@ function onChildMouseenter(event: MouseEvent) {
             :data-test="childDataTest(block.child)"
             role="menuitem"
             :to="childTo(block.child)"
-            class="nav-group-item rounded-default focus-visible:ring-accent flex cursor-pointer items-center gap-2.5 px-3 py-1.5 text-sm transition-colors duration-150 outline-none select-none [text-decoration:none]! focus-visible:ring-2"
+            class="nav-group-item rounded-default focus-visible:ring-accent flex cursor-pointer items-center gap-2.5 px-3 py-1.5 text-sm transition-colors duration-150 outline-none select-none [text-decoration:none]! focus-visible:ring-inset focus-visible:ring-2"
             :class="[
               flyoutTextClass,
               // Matches the pt-4 a header gets, so leaving a run and starting
