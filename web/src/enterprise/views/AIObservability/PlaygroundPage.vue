@@ -282,6 +282,7 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
+import { computeUserOrgKey } from "@/utils/userOrgKey";
 import PlaygroundExpectedBar from "@/enterprise/components/AIObservability/PlaygroundExpectedBar.vue";
 import PlaygroundSampleDialog from "@/enterprise/components/AIObservability/PlaygroundSampleDialog.vue";
 import PlaygroundScorersMenu from "@/enterprise/components/AIObservability/PlaygroundScorersMenu.vue";
@@ -341,9 +342,6 @@ const router = useRouter();
 const store = useStore();
 
 const orgId = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
-// Org-only keys leak one user's drafts/session to the next login on a shared
-// browser profile — the email keeps each user's bench private within the org.
-const userKey = computed<string>(() => store.state.userInfo?.email ?? "");
 
 // ── state ─────────────────────────────────────────────────────────
 
@@ -474,13 +472,13 @@ onMounted(async () => {
   // Drop the old org-only (pre-user-scoping) keys so a stale prior user's
   // drafts/session can never resurface for whoever logs in next.
   removeLegacyStorage();
-  // First, and synchronously: the bench is the work, and it must be on screen
-  // before anything that can fail or take a round trip.
-  restoreSession();
+  // First, and before anything that can fail or take a round trip: the bench
+  // is the work, and it must be on screen as soon as possible.
+  await restoreSession();
   applyHandoff();
   await Promise.all([loadProviders(), loadDatasets(), loadScorers()]);
   applyEntryParams();
-  loadRecentDrafts();
+  await loadRecentDrafts();
   const snapshotId = String(route.query.snapshot ?? "");
   if (snapshotId) await openSharedSnapshot(snapshotId);
   if (initialDatasetId.value) sampleOpen.value = true;
@@ -1154,7 +1152,27 @@ const recentDrafts = ref<RecentDraftEntry[]>([]);
 /** Identifies the draft being worked on now; a new one starts on Reset. */
 const draftSessionId = ref(playgroundId("draft"));
 
-const storageKey = computed(() => `o2-playground-drafts:${orgId.value}:${userKey.value}`);
+// Same identity hash O2AIChat's history uses (computeUserOrgKey) — an org-only
+// key leaks one user's drafts/session to the next login on a shared browser
+// profile, so scoping must fold in the user too. Cached on the raw "email:org"
+// pair so an org/user switch recomputes it, and everything else keeps reusing
+// the resolved value without re-hashing on every read/write.
+let cachedUserOrgRaw = "";
+let cachedUserOrgKeyPromise: Promise<string> | null = null;
+
+function getUserOrgKey(): Promise<string> {
+  const email = store.state.userInfo?.email ?? "";
+  const raw = `${email}:${orgId.value}`;
+  if (raw !== cachedUserOrgRaw) {
+    cachedUserOrgRaw = raw;
+    cachedUserOrgKeyPromise = computeUserOrgKey(email, orgId.value);
+  }
+  return cachedUserOrgKeyPromise!;
+}
+
+async function storageKey(): Promise<string> {
+  return `o2-playground-drafts:${await getUserOrgKey()}`;
+}
 
 function removeLegacyStorage() {
   try {
@@ -1165,9 +1183,9 @@ function removeLegacyStorage() {
   }
 }
 
-function loadRecentDrafts() {
+async function loadRecentDrafts() {
   try {
-    const stored = localStorage.getItem(storageKey.value);
+    const stored = localStorage.getItem(await storageKey());
     recentDrafts.value = stored ? (JSON.parse(stored) as RecentDraftEntry[]) : [];
   } catch {
     recentDrafts.value = [];
@@ -1234,11 +1252,13 @@ interface StoredSession {
   results: PlaygroundResults;
 }
 
-const sessionKey = computed(() => `o2-playground-session:${orgId.value}:${userKey.value}`);
+async function sessionKey(): Promise<string> {
+  return `o2-playground-session:${await getUserOrgKey()}`;
+}
 
-function restoreSession() {
+async function restoreSession() {
   try {
-    const stored = localStorage.getItem(sessionKey.value);
+    const stored = localStorage.getItem(await sessionKey());
     if (!stored) return;
     const session = JSON.parse(stored) as StoredSession;
     if (!session?.draft?.variants?.length) return;
@@ -1253,7 +1273,7 @@ function restoreSession() {
   }
 }
 
-function saveSession() {
+async function saveSession() {
   try {
     const session: StoredSession = {
       id: draftSessionId.value,
@@ -1262,15 +1282,15 @@ function saveSession() {
       // never finishes.
       results: settledResults(results),
     };
-    localStorage.setItem(sessionKey.value, JSON.stringify(session));
+    localStorage.setItem(await sessionKey(), JSON.stringify(session));
   } catch {
     // A full or disabled localStorage costs the convenience, never the session.
   }
 }
 
-function clearSession() {
+async function clearSession() {
   try {
-    localStorage.removeItem(sessionKey.value);
+    localStorage.removeItem(await sessionKey());
   } catch {
     // Nothing to do — the next save overwrites it anyway.
   }
@@ -1296,7 +1316,7 @@ watch(running, (isRunning, wasRunning) => {
   if (wasRunning && !isRunning) saveSession();
 });
 
-function persistDraft() {
+async function persistDraft() {
   const summary = draftSummary(draft);
   if (!summary) return;
   const entry: RecentDraftEntry = {
@@ -1311,7 +1331,7 @@ function persistDraft() {
   const others = recentDrafts.value.filter((candidate) => candidate.id !== entry.id);
   recentDrafts.value = [entry, ...others].slice(0, 10);
   try {
-    localStorage.setItem(storageKey.value, JSON.stringify(recentDrafts.value));
+    localStorage.setItem(await storageKey(), JSON.stringify(recentDrafts.value));
   } catch {
     // A full or disabled localStorage costs the convenience, never the session.
   }
