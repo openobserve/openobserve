@@ -16,7 +16,7 @@
 use std::{sync::Arc, time::Duration};
 
 use config::meta::promql::value::*;
-use datafusion::error::Result;
+use datafusion::{arrow::datatypes::Schema, error::Result, prelude::SessionContext};
 use futures::future::pending;
 use infra::errors::ErrorCodes;
 use promql_parser::{
@@ -61,31 +61,32 @@ impl Engine {
         if matches!(modifier, Some(LabelModifier::Exclude(_))) {
             return Ok(None);
         }
-        let Some(scan) = self.selector_scan(vs, range).await? else {
+        let Some(scan) = self.selector_scan(vs, range, "MatrixSelector").await? else {
             return Ok(None);
         };
         let timeout = self.ctx.query_ctx.timeout;
-        // a second context would split series and evaluate rate windows on partial data
-        if let [(ctx, schema, scan_stats, _)] = scan.ctxs.as_slice() {
-            let run = fused::stream::fused_agg(
-                ctx,
-                schema,
-                scan.streaming_selector(),
-                fused::stream::FusedShape {
-                    op,
-                    func: func.clone(),
-                    range,
-                },
-                modifier,
-                &self.eval_ctx,
-            );
-            if let Some(value) = self.run_cancellable(run, timeout).await? {
-                self.ctx.scan_stats.write().await.add(scan_stats);
-                if self.result_type.is_none() {
-                    self.result_type = Some("matrix".to_string());
-                }
-                return Ok(Some(value));
+        let shape = fused::stream::FusedShape {
+            op,
+            func: func.clone(),
+            range,
+        };
+        let streamed = self
+            .stream_scan_guarded(&scan, |ctx, schema| {
+                fused::stream::fused_agg(
+                    ctx,
+                    schema,
+                    scan.streaming_selector(),
+                    shape,
+                    modifier,
+                    &self.eval_ctx,
+                )
+            })
+            .await?;
+        if let Some(value) = streamed {
+            if self.result_type.is_none() {
+                self.result_type = Some("matrix".to_string());
             }
+            return Ok(Some(value));
         }
 
         // the layout cannot stream: materialize on the contexts already created
@@ -111,7 +112,7 @@ impl Engine {
         range: Duration,
         func: Arc<dyn functions::RangeFunc>,
     ) -> Result<Option<Value>> {
-        let Some(scan) = self.selector_scan(vs, range).await? else {
+        let Some(scan) = self.selector_scan(vs, range, "MatrixSelector").await? else {
             return Ok(None);
         };
         if let Some((series, scanned)) = self.stream_range_func(&scan, func.clone(), range).await? {
@@ -141,24 +142,19 @@ impl Engine {
         &mut self,
         vs: &VectorSelector,
     ) -> Result<Option<Vec<RangeValue>>> {
-        let lookback = Duration::from_micros(self.ctx.lookback_delta as u64);
-        let Some(scan) = self.selector_scan(vs, lookback).await? else {
+        let lookback = self.ctx.lookback();
+        let Some(scan) = self.selector_scan(vs, lookback, "VectorSelector").await? else {
             return Ok(None);
         };
-        if self.result_type.is_none() {
-            self.result_type = Some("vector".to_string());
-        }
-        let func: Arc<dyn functions::RangeFunc> =
-            Arc::from(functions::fusable_range_func("last_over_time").expect("a range function"));
-        if let Some((series, _)) = self.stream_range_func(&scan, func, lookback).await? {
+        let func = functions::instant_lookback_func();
+        if let Some((mut series, _)) = self.stream_range_func(&scan, func, lookback).await? {
+            if self.result_type.is_none() {
+                self.result_type = Some("vector".to_string());
+            }
             // an instant vector carries no window: the lookback is the query's, not the selector's
-            let series = series
-                .into_iter()
-                .map(|series| RangeValue {
-                    time_window: None,
-                    ..series
-                })
-                .collect();
+            series
+                .iter_mut()
+                .for_each(|series| series.time_window = None);
             return Ok(Some(series));
         }
 
@@ -174,22 +170,17 @@ impl Engine {
         func: Arc<dyn functions::RangeFunc>,
         range: Duration,
     ) -> Result<Option<(Vec<RangeValue>, usize)>> {
-        // a second context would split series and evaluate windows on partial data
-        let [(ctx, schema, scan_stats, _)] = scan.ctxs.as_slice() else {
-            return Ok(None);
-        };
-        let label_cols = if self.skip_labels {
-            vec![]
-        } else {
-            series_label_columns(schema, &scan.label_selector, func.name())
-        };
-        let selector = scan.streaming_selector();
-        let eval = Arc::new(fused::RangeExpr::new(func, range, &self.eval_ctx));
-        let run = async {
+        self.stream_scan_guarded(scan, |ctx, schema| async move {
+            let label_cols = if self.skip_labels {
+                vec![]
+            } else {
+                series_label_columns(schema, &scan.label_selector, func.name())
+            };
+            let eval = Arc::new(fused::RangeExpr::new(func, range, &self.eval_ctx));
             match MergeSeriesStream::execute_partitioned(
                 ctx,
                 schema,
-                &selector,
+                &scan.streaming_selector(),
                 label_cols,
                 micros(range),
                 &self.eval_ctx,
@@ -199,11 +190,58 @@ impl Engine {
                 None => Ok(None),
                 Some(sources) => fused::eval_range(sources, eval).await.map(Some),
             }
+        })
+        .await
+    }
+
+    /// Runs `run` on the scan's single context under timeout and cancel, then accounts its stats.
+    async fn stream_scan_guarded<'s, T, Fut>(
+        &'s self,
+        scan: &'s SelectorScan,
+        run: impl FnOnce(&'s SessionContext, &'s Schema) -> Fut,
+    ) -> Result<Option<T>>
+    where
+        Fut: Future<Output = Result<Option<T>>>,
+    {
+        // a second context would split series and evaluate windows on partial data
+        let [(ctx, schema, scan_stats, _)] = scan.ctxs.as_slice() else {
+            return Ok(None);
         };
-        let Some(result) = self
-            .run_cancellable(run, self.ctx.query_ctx.timeout)
-            .await?
-        else {
+        let trace_id = &self.ctx.query_ctx.trace_id;
+        let mut abort_receiver = self
+            .ctx
+            .table_provider
+            .register_cancellation(trace_id)
+            .await?;
+        let run = run(ctx, schema);
+        tokio::pin!(run);
+        // a cancel or an expired budget wins over a fold that happens to be ready and aborts it
+        let result = tokio::select! {
+            biased;
+            _ = async {
+                match abort_receiver.as_mut() {
+                    Some(receiver) => {
+                        let _ = receiver.await;
+                    }
+                    None => pending::<()>().await,
+                }
+            } => {
+                log::info!("[trace_id {trace_id}] [PromQL] streaming query canceled");
+                Err(ErrorCodes::SearchCancelQuery(
+                    "[PromQL] streaming query canceled".to_string(),
+                )
+                .into())
+            }
+            _ = tokio::time::sleep(Duration::from_secs(self.ctx.query_ctx.timeout)) => {
+                log::error!("[trace_id {trace_id}] [PromQL] streaming query timeout");
+                Err(ErrorCodes::SearchTimeout(
+                    "[PromQL] streaming query timeout".to_string(),
+                )
+                .into())
+            }
+            ret = &mut run => ret,
+        };
+        let Some(result) = result? else {
             return Ok(None);
         };
         self.ctx.scan_stats.write().await.add(scan_stats);
@@ -216,6 +254,7 @@ impl Engine {
         &mut self,
         vs: &VectorSelector,
         range: Duration,
+        kind: &str,
     ) -> Result<Option<SelectorScan>> {
         let query_ctx = &self.ctx.query_ctx;
         // need_wal bails early: WAL would split series across contexts
@@ -229,7 +268,7 @@ impl Engine {
         {
             return Ok(None);
         }
-        let selector = named_selector(plain_selector(vs, "MatrixSelector")?, "MatrixSelector")?;
+        let selector = named_selector(plain_selector(vs, kind)?, kind)?;
         let table_name = selector.name.clone().unwrap();
 
         let offset = get_offset_modifier(selector.offset.clone());
@@ -262,48 +301,6 @@ impl Engine {
             label_selector,
             ctxs,
         }))
-    }
-
-    /// Runs the streaming fold under the query timeout and the host's cancel signal; dropping
-    /// the future aborts the partition folds.
-    async fn run_cancellable<T>(
-        &self,
-        run: impl Future<Output = Result<T>>,
-        timeout: u64,
-    ) -> Result<T> {
-        let trace_id = &self.ctx.query_ctx.trace_id;
-        let mut abort_receiver = self
-            .ctx
-            .table_provider
-            .register_cancellation(trace_id)
-            .await?;
-        tokio::pin!(run);
-        // a cancel or an expired budget wins over a fold that happens to be ready
-        tokio::select! {
-            biased;
-            _ = async {
-                match abort_receiver.as_mut() {
-                    Some(receiver) => {
-                        let _ = receiver.await;
-                    }
-                    None => pending::<()>().await,
-                }
-            } => {
-                log::info!("[trace_id {trace_id}] [PromQL] streaming fused agg canceled");
-                Err(ErrorCodes::SearchCancelQuery(
-                    "[PromQL] streaming fused agg canceled".to_string(),
-                )
-                .into())
-            }
-            _ = tokio::time::sleep(Duration::from_secs(timeout)) => {
-                log::error!("[trace_id {trace_id}] [PromQL] streaming fused agg timeout");
-                Err(ErrorCodes::SearchTimeout(
-                    "[PromQL] streaming fused agg timeout".to_string(),
-                )
-                .into())
-            }
-            ret = &mut run => ret,
-        }
     }
 }
 
@@ -450,13 +447,19 @@ mod tests {
     }
 
     fn engine(provider: StreamingProvider, timeout: u64) -> Engine {
+        engine_at(provider, timeout, BASE + 60 * SECOND, 60 * SECOND, None)
+    }
+
+    /// Steps from `start` to `BASE + 180 s`; `lookback` overrides the 5 min default.
+    fn engine_at(
+        provider: StreamingProvider,
+        timeout: u64,
+        start: i64,
+        step: i64,
+        lookback: Option<i64>,
+    ) -> Engine {
         enable_streaming();
-        let eval_ctx = EvalContext::new(
-            BASE + 60 * SECOND,
-            BASE + 180 * SECOND,
-            60 * SECOND,
-            "test_trace".into(),
-        );
+        let eval_ctx = EvalContext::new(start, BASE + 180 * SECOND, step, "test_trace".into());
         let mut ctx = PromqlContext::new(
             create_test_query_ctx("test_trace", "test_org", timeout),
             provider,
@@ -464,6 +467,9 @@ mod tests {
         );
         ctx.start = eval_ctx.start;
         ctx.end = eval_ctx.end;
+        if let Some(lookback) = lookback {
+            ctx.lookback_delta = lookback;
+        }
         Engine::new("test_trace", Arc::new(ctx), eval_ctx)
     }
 
@@ -485,7 +491,10 @@ mod tests {
 
     /// The generic instant path on its own: `eval_vector_selector` over the plain table.
     async fn generic_instant_selector(provider: StreamingProvider, selector: &str) -> Value {
-        let mut engine = engine(provider, 30);
+        generic_instant_selector_on(engine(provider, 30), selector).await
+    }
+
+    async fn generic_instant_selector_on(mut engine: Engine, selector: &str) -> Value {
         let promql_parser::parser::Expr::VectorSelector(vs) =
             promql_parser::parser::parse(selector).unwrap()
         else {
@@ -736,6 +745,50 @@ mod tests {
                 vec![name.clone(), ("instance".to_string(), "a".to_string())],
                 vec![name, ("instance".to_string(), "b".to_string())],
             ]
+        );
+    }
+
+    /// With a 10 s lookback over 20 s samples the steps hit the lower bound, miss, then the upper.
+    #[tokio::test]
+    async fn test_instant_selector_window_bounds_match_generic() {
+        let (start, step, lookback) = (BASE + 70 * SECOND, 45 * SECOND, Some(10 * SECOND));
+        for selector in ["m", "m offset -20s", "m{instance=\"a\"}"] {
+            let generic = engine_at(provider(false, false), 30, start, step, lookback);
+            let expected = generic_instant_selector_on(generic, selector).await;
+            let mut streaming = engine_at(provider(true, false), 30, start, step, lookback);
+            let expr = promql_parser::parser::parse(selector).unwrap();
+            let (streamed, _) = streaming.exec(&expr).await.unwrap();
+            assert_same_matrix(expected, streamed, selector);
+        }
+        let mut streaming = engine_at(provider(true, false), 30, start, step, lookback);
+        let expr = promql_parser::parser::parse("m{instance=\"a\"}").unwrap();
+        let (value, _) = streaming.exec(&expr).await.unwrap();
+        let series = canonical(value);
+        assert_eq!(series.len(), 1);
+        assert_eq!(
+            series[0].1,
+            vec![(BASE + 70 * SECOND, 9.0), (BASE + 160 * SECOND, 24.0)],
+            "the sample at 60 s is on the lower bound of [60 s, 70 s], 115 s sees none, 160 s is its own"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_instant_selector_with_no_matching_series_is_none() {
+        let value = eval_query(provider(true, false), 30, "m{instance=\"zzz\"}")
+            .await
+            .unwrap();
+        assert!(matches!(value, Value::None), "got {}", value.get_type());
+    }
+
+    #[tokio::test]
+    async fn test_instant_selector_without_a_metric_name_names_the_vector_selector() {
+        let err = eval_query(provider(true, false), 30, "{instance=\"a\"}")
+            .await
+            .unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("VectorSelector: metric name is required"),
+            "{err}"
         );
     }
 
