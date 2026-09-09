@@ -9794,6 +9794,8 @@
       "outputTokens": "Выходные токены",
       "out": "Исх",
       "totalCost": "Общая стоимость",
+      "scores": "Оценки",
+      "notScoredYet": "Ещё не оценено",
       "preview": "Предпросмотр",
       "input": "Вход",
       "output": "Вывод",
@@ -11108,6 +11110,10 @@
         "runSummary": "{trials} · {scorers}",
         "progress": "Прогресс задачи",
         "scoring": "Оценка",
+        "tasks": "Задачи",
+        "scores": "Оценки",
+        "taskDistribution": "{succeeded} успешно · {failed} с ошибками · {pending} в ожидании · {skipped} пропущено",
+        "scoreOutcomeDistribution": "{scored} с оценкой · {failed} с ошибками · {pending} в ожидании · {skipped} пропущено · {unscored} без оценки",
         "scoringDistribution": "{success} успешно · {failed} неудачно · {pending} ожидает · {skipped} пропущено",
         "compare": "Сравнить",
         "comparePicker": {
@@ -11851,6 +11857,8 @@
       "schemaInvalidJson": "Схема должна быть корректным JSON.",
       "schemaIgnored": "Схема · Игнорируется этим провайдером",
       "schemaUnsupported": "У этого провайдера нет поля структурированного вывода. Схема сохраняется в этом столбце, но не отправляется, и модель отвечает обычным текстом.",
+      "schemaApproximated": "Схема · Приближённая этим провайдером",
+      "schemaApproximatedHelp": "Этот провайдер поддерживает только JSON-режим, а не JSON-схему. Запрос отправляется в JSON-режиме со схемой, повторённой в промпте, поэтому ответ — JSON, но его структура не гарантируется.",
       "outputPlaceholder": "Вывод появится здесь — нажмите «Запустить».",
       "outputNotRun": "Не запущено",
       "retry": "Повторить",
@@ -11954,6 +11962,12 @@
   },
   "onlineEvals": {
     "versionPrefix": "v",
+    "traceScoreChip": {
+      "reasoning": "Почему",
+      "scoredAt": "Оценено {time}",
+      "moreCount": "+{count} ещё",
+      "allScores": "Все оценки ({count})"
+    },
     "importNameRequired": "Имя *",
     "importNewNameRequired": "Новое имя *",
     "importDataTypeRequired": "Тип данных *",
@@ -12224,8 +12238,10 @@
       "sectionTitle": "Провайдер",
       "nameLabel": "Имя",
       "typeLabel": "Тип провайдера",
-      "endpointLabel": "Эндпоинт",
-      "endpointPlaceholder": "Полный URL completions, например: https://your-host/v1/chat/completions",
+      "endpointLabel": "Базовый URL",
+      "endpointPlaceholder": "Базовый URL, например https://your-host/v1",
+      "endpointHelpDefault": "Оставьте пустым, чтобы использовать значение по умолчанию: {url}",
+      "endpointHelpRequired": "Обязательное поле — у этого провайдера нет базового URL по умолчанию.",
       "defaultModelLabel": "Модель по умолчанию",
       "availableModelsLabel": "Доступные модели",
       "apiKeyLabel": "API-ключ",
@@ -12234,7 +12250,6 @@
       "authSection": "Аутентификация",
       "authEditNote": "Учетные данные нельзя прочитать повторно. Чтобы проверить провайдера, требующего аутентификации, введите его API-ключ.",
       "cannotRename": "Нельзя переименовать после создания.",
-      "availableModelsHelp": "Необязательно. Разделённый запятыми список моделей, доступных у этого провайдера.",
       "saveError": "Не удалось сохранить провайдера",
       "nameRequired": "Имя провайдера обязательно",
       "typeRequired": "Тип провайдера обязателен",
@@ -12341,7 +12356,8 @@
         "nameRequired": "Имя обязательно",
         "nameFormat": "Используйте только строчные буквы, цифры и подчеркивания",
         "minRequired": "Мин обязательно",
-        "maxRequired": "Макс обязательно"
+        "maxRequired": "Макс обязательно",
+        "maxNotGreaterThanMin": "Максимум должен быть больше минимума."
       },
       "import": {
         "title": "Импортировать конфигурацию оценки",
@@ -12912,7 +12928,7 @@
     },
     "empty": {
       "title": "Пока нет LLM-провайдеров",
-      "description": "LLM-провайдеры хранят данные подключения (конечная точка + учётные данные) для языковых моделей, к которым обращаются ваши оценщики LLM Judge. Добавьте одного, чтобы начать выполнение оценок на основе судей."
+      "description": "LLM-провайдеры хранят данные подключения (базовый URL и учётные данные) для языковых моделей, к которым обращаются ваши LLM-судьи. Добавьте провайдера, чтобы начать проводить оценки с помощью LLM-судьи."
     }
   },
   "logs": {
@@ -16000,6 +16016,12 @@
     "aiQueueDetail": "Очередь",
     "aiQueueReview": "Просмотр очереди",
     "aiDatasetDetail": "Набор данных",
+    "aiExperimentCreate": "Новый эксперимент",
+    "aiExperimentCompare": "Сравнение экспериментов",
+    "aiExperimentDetail": "Эксперимент",
+    "aiRemoteTaskCreate": "Новая удалённая задача",
+    "aiRemoteTaskEdit": "Редактирование удалённой задачи",
+    "aiRemoteTaskDetail": "Удалённая задача",
     "notFound": "404 - Не найдено",
     "createReport": "Создать отчёт",
     "addCheck": "Добавить проверку",

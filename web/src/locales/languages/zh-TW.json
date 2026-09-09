@@ -9789,6 +9789,8 @@
       "outputTokens": "輸出令牌",
       "out": "輸出",
       "totalCost": "總成本",
+      "scores": "分數",
+      "notScoredYet": "尚未評分",
       "preview": "預覽",
       "input": "輸入",
       "output": "輸出",
@@ -11103,6 +11105,10 @@
         "runSummary": "{trials} · {scorers}",
         "progress": "任務進度",
         "scoring": "評分",
+        "tasks": "任務",
+        "scores": "分數",
+        "taskDistribution": "{succeeded} 個成功 · {failed} 個失敗 · {pending} 個待處理 · {skipped} 個已跳過",
+        "scoreOutcomeDistribution": "{scored} 個已評分 · {failed} 個失敗 · {pending} 個待處理 · {skipped} 個已跳過 · {unscored} 個未評分",
         "scoringDistribution": "{success} 成功 · {failed} 失敗 · {pending} 待處理 · {skipped} 跳過",
         "compare": "比較",
         "comparePicker": {
@@ -11846,6 +11852,8 @@
       "schemaInvalidJson": "結構描述必須是有效的 JSON。",
       "schemaIgnored": "結構描述 · 此提供者已忽略",
       "schemaUnsupported": "此提供者沒有結構化輸出欄位。結構描述會保留在此資料欄中，但不會傳送，模型將以純文字回答。",
+      "schemaApproximated": "結構描述 · 由此提供者近似",
+      "schemaApproximatedHelp": "此提供者僅支援 JSON 模式，不支援 JSON 結構描述。請求會以 JSON 模式傳送，並在提示中重述結構描述，因此回應會是 JSON，但不保證其形狀。",
       "outputPlaceholder": "輸出會顯示在此處 — 按一下執行。",
       "outputNotRun": "尚未執行",
       "retry": "重試",
@@ -11949,6 +11957,12 @@
   },
   "onlineEvals": {
     "versionPrefix": "v",
+    "traceScoreChip": {
+      "reasoning": "為什麼",
+      "scoredAt": "評分於 {time}",
+      "moreCount": "+{count} 更多",
+      "allScores": "全部分數 ({count})"
+    },
     "importNameRequired": "名稱 *",
     "importNewNameRequired": "新名稱 *",
     "importDataTypeRequired": "資料類型 *",
@@ -12219,8 +12233,10 @@
       "sectionTitle": "供應商",
       "nameLabel": "名稱",
       "typeLabel": "供應商類型",
-      "endpointLabel": "端點",
-      "endpointPlaceholder": "完整的 completions URL，例如 https://your-host/v1/chat/completions",
+      "endpointLabel": "基礎 URL",
+      "endpointPlaceholder": "基礎 URL，例如 https://your-host/v1",
+      "endpointHelpDefault": "留空以使用預設值：{url}",
+      "endpointHelpRequired": "必填 — 此提供者沒有預設的基礎 URL。",
       "defaultModelLabel": "預設模型",
       "availableModelsLabel": "可用模型",
       "apiKeyLabel": "API 金鑰",
@@ -12229,7 +12245,6 @@
       "authSection": "驗證",
       "authEditNote": "憑證無法讀回。若要測試需要驗證的提供者，請輸入其 API 金鑰。",
       "cannotRename": "建立後無法重新命名。",
-      "availableModelsHelp": "選用。此供應商上可用模型的逗號分隔清單。",
       "saveError": "儲存供應商失敗",
       "nameRequired": "Provider name is required",
       "typeRequired": "Provider type is required",
@@ -12336,7 +12351,8 @@
         "nameRequired": "Name is required",
         "nameFormat": "Use lowercase letters, numbers, and underscores only",
         "minRequired": "Min is required",
-        "maxRequired": "Max is required"
+        "maxRequired": "Max is required",
+        "maxNotGreaterThanMin": "最大值必須大於最小值"
       },
       "import": {
         "title": "匯入評分設定",
@@ -12907,7 +12923,7 @@
     },
     "empty": {
       "title": "尚無 LLM 供應商",
-      "description": "LLM 供應商儲存您的 LLM 評審評分器所呼叫語言模型的連線詳細資料（端點 + 憑證）。新增一個以開始執行基於評審的評估。"
+      "description": "LLM Providers 會儲存您的 LLM Judge 評分器所呼叫之語言模型的連線詳細資料（基礎 URL + 認證）。新增一個即可開始執行以評判為基礎的評估。"
     }
   },
   "logs": {
@@ -15995,6 +16011,12 @@
     "aiQueueDetail": "佇列",
     "aiQueueReview": "佇列檢閱",
     "aiDatasetDetail": "資料集",
+    "aiExperimentCreate": "新實驗",
+    "aiExperimentCompare": "比較實驗",
+    "aiExperimentDetail": "實驗",
+    "aiRemoteTaskCreate": "新遠端任務",
+    "aiRemoteTaskEdit": "編輯遠端任務",
+    "aiRemoteTaskDetail": "遠端任務",
     "notFound": "404 - 找不到頁面",
     "createReport": "建立報告",
     "addCheck": "新增檢查",

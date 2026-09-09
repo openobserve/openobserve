@@ -9794,6 +9794,8 @@
       "outputTokens": "출력 토큰",
       "out": "출력",
       "totalCost": "총 비용",
+      "scores": "점수",
+      "notScoredYet": "아직 채점되지 않음",
       "preview": "미리보기",
       "input": "입력",
       "output": "출력",
@@ -11108,6 +11110,10 @@
         "runSummary": "{trials} · {scorers}",
         "progress": "태스크 진행률",
         "scoring": "채점",
+        "tasks": "작업",
+        "scores": "점수",
+        "taskDistribution": "성공 {succeeded} · 실패 {failed} · 대기 {pending} · 건너뜀 {skipped}",
+        "scoreOutcomeDistribution": "채점 완료 {scored} · 실패 {failed} · 대기 {pending} · 건너뜀 {skipped} · 미채점 {unscored}",
         "scoringDistribution": "{success} 성공 · {failed} 실패 · {pending} 대기 · {skipped} 건너뜀",
         "compare": "비교",
         "comparePicker": {
@@ -11851,6 +11857,8 @@
       "schemaInvalidJson": "스키마는 유효한 JSON이어야 합니다.",
       "schemaIgnored": "스키마 · 이 공급자가 무시함",
       "schemaUnsupported": "이 공급자에는 구조화 출력 필드가 없습니다. 스키마는 이 열에 유지되지만 전송되지 않으며 모델은 일반 텍스트로 응답합니다.",
+      "schemaApproximated": "스키마 · 이 제공자에 의해 근사됨",
+      "schemaApproximatedHelp": "이 제공자는 JSON 스키마가 아닌 JSON 모드만 지원합니다. 요청은 스키마를 프롬프트에 다시 명시한 JSON 모드로 전송되므로, 응답은 JSON이지만 그 구조는 보장되지 않습니다.",
       "outputPlaceholder": "출력이 여기에 표시됩니다 — 실행을 누르세요.",
       "outputNotRun": "실행되지 않음",
       "retry": "재시도",
@@ -11954,6 +11962,12 @@
   },
   "onlineEvals": {
     "versionPrefix": "v",
+    "traceScoreChip": {
+      "reasoning": "이유",
+      "scoredAt": "{time}에 채점됨",
+      "moreCount": "+{count}개 더",
+      "allScores": "모든 점수 ({count})"
+    },
     "importNameRequired": "이름 *",
     "importNewNameRequired": "새 이름 *",
     "importDataTypeRequired": "데이터 유형 *",
@@ -12224,8 +12238,10 @@
       "sectionTitle": "제공자",
       "nameLabel": "이름",
       "typeLabel": "제공자 유형",
-      "endpointLabel": "끝점",
-      "endpointPlaceholder": "전체 completions URL, 예: https://your-host/v1/chat/completions",
+      "endpointLabel": "기본 URL",
+      "endpointPlaceholder": "기본 URL, 예: https://your-host/v1",
+      "endpointHelpDefault": "기본값을 사용하려면 비워 두세요: {url}",
+      "endpointHelpRequired": "필수 — 이 제공자에게는 기본 URL이 없습니다.",
       "defaultModelLabel": "기본 모델",
       "availableModelsLabel": "사용 가능한 모델",
       "apiKeyLabel": "API 키",
@@ -12234,7 +12250,6 @@
       "authSection": "인증",
       "authEditNote": "인증 정보는 다시 조회할 수 없습니다. 인증이 필요한 공급자를 테스트하려면 API 키를 입력하세요.",
       "cannotRename": "생성 후에는 이름을 변경할 수 없습니다.",
-      "availableModelsHelp": "선택 사항. 이 공급자에서 사용할 수 있는 모델의 쉼표로 구분된 목록입니다.",
       "saveError": "공급자를 저장하지 못했습니다.",
       "nameRequired": "Provider name is required",
       "typeRequired": "Provider type is required",
@@ -12341,7 +12356,8 @@
         "nameRequired": "Name is required",
         "nameFormat": "Use lowercase letters, numbers, and underscores only",
         "minRequired": "Min is required",
-        "maxRequired": "Max is required"
+        "maxRequired": "Max is required",
+        "maxNotGreaterThanMin": "최대값은 최소값보다 커야 합니다"
       },
       "import": {
         "title": "점수 구성 가져오기",
@@ -12912,7 +12928,7 @@
     },
     "empty": {
       "title": "LLM 공급자가 아직 없습니다",
-      "description": "LLM 제공자는 LLM 판사 채점자가 호출하는 언어 모델에 대한 연결 세부 정보 (엔드포인트+자격 증명) 를 저장합니다.하나를 추가하여 심사 기반 평가 실행을 시작하세요."
+      "description": "LLM 제공자는 LLM Judge 채점기가 호출하는 언어 모델의 연결 정보(기본 URL + 자격 증명)를 저장합니다. 하나를 추가하여 LLM Judge 기반 평가를 시작하세요."
     }
   },
   "logs": {
@@ -16000,6 +16016,12 @@
     "aiQueueDetail": "대기열",
     "aiQueueReview": "대기열 검토",
     "aiDatasetDetail": "데이터셋",
+    "aiExperimentCreate": "새 실험",
+    "aiExperimentCompare": "실험 비교",
+    "aiExperimentDetail": "실험",
+    "aiRemoteTaskCreate": "새 원격 작업",
+    "aiRemoteTaskEdit": "원격 작업 편집",
+    "aiRemoteTaskDetail": "원격 작업",
     "notFound": "404 - 찾을 수 없음",
     "createReport": "보고서 만들기",
     "addCheck": "체크 추가",

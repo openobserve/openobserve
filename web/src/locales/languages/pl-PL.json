@@ -9794,6 +9794,8 @@
       "outputTokens": "Tokeny wyjściowe",
       "out": "Wyjście",
       "totalCost": "Całkowity koszt",
+      "scores": "Oceny",
+      "notScoredYet": "Nie oceniono jeszcze",
       "preview": "Podgląd",
       "input": "Wejście",
       "output": "Wyjście",
@@ -11108,6 +11110,10 @@
         "runSummary": "{trials} · {scorers}",
         "progress": "Postęp zadania",
         "scoring": "Punktacja",
+        "tasks": "Zadania",
+        "scores": "Oceny",
+        "taskDistribution": "Udane: {succeeded} · Nieudane: {failed} · Oczekujące: {pending} · Pominięte: {skipped}",
+        "scoreOutcomeDistribution": "Ocenione: {scored} · Nieudane: {failed} · Oczekujące: {pending} · Pominięte: {skipped} · Bez oceny: {unscored}",
         "scoringDistribution": "{success} sukcesów · {failed} porażek · {pending} oczekujących · {skipped} pominiętych",
         "compare": "Porównaj",
         "comparePicker": {
@@ -11851,6 +11857,8 @@
       "schemaInvalidJson": "Schemat musi być poprawnym JSON.",
       "schemaIgnored": "Schemat · Ignorowany przez tego dostawcę",
       "schemaUnsupported": "Ten dostawca nie ma pola danych strukturalnych. Schemat pozostaje w tej kolumnie, ale nie jest wysyłany, a model odpowiada zwykłym tekstem.",
+      "schemaApproximated": "Schemat · Przybliżony przez tego dostawcę",
+      "schemaApproximatedHelp": "Ten dostawca obsługuje tylko tryb JSON, a nie schemat JSON. Żądanie jest wysyłane w trybie JSON, a schemat jest powtórzony w treści promptu, więc odpowiedź jest w formacie JSON, ale jej kształt nie jest gwarantowany.",
       "outputPlaceholder": "Wyjście pojawi się tutaj — naciśnij Uruchom.",
       "outputNotRun": "Nie uruchomiono",
       "retry": "Ponów",
@@ -11954,6 +11962,12 @@
   },
   "onlineEvals": {
     "versionPrefix": "v",
+    "traceScoreChip": {
+      "reasoning": "Dlaczego",
+      "scoredAt": "Oceniono {time}",
+      "moreCount": "+{count} więcej",
+      "allScores": "Wszystkie oceny ({count})"
+    },
     "importNameRequired": "Nazwa *",
     "importNewNameRequired": "Nowa nazwa *",
     "importDataTypeRequired": "Typ danych *",
@@ -12224,8 +12238,10 @@
       "sectionTitle": "Dostawca",
       "nameLabel": "Nazwa",
       "typeLabel": "Typ dostawcy",
-      "endpointLabel": "Endpoint",
-      "endpointPlaceholder": "Pełny adres URL completions, np. https://your-host/v1/chat/completions",
+      "endpointLabel": "Bazowy adres URL",
+      "endpointPlaceholder": "Bazowy adres URL, np. https://your-host/v1",
+      "endpointHelpDefault": "Pozostaw puste, aby użyć domyślnego: {url}",
+      "endpointHelpRequired": "Wymagane — ten dostawca nie ma domyślnego bazowego adresu URL.",
       "defaultModelLabel": "Domyślny model",
       "availableModelsLabel": "Dostępne modele",
       "apiKeyLabel": "Klucz API",
@@ -12234,7 +12250,6 @@
       "authSection": "Uwierzytelnianie",
       "authEditNote": "Poświadczenia nie mogą być odczytane ponownie. Aby przetestować dostawcę wymagającego uwierzytelnienia, wprowadź jego klucz API.",
       "cannotRename": "Nie można zmienić nazwy po utworzeniu.",
-      "availableModelsHelp": "Opcjonalnie. Lista modeli dostępnych u tego dostawcy oddzielona przecinkami.",
       "saveError": "Nie udało się zapisać dostawcy",
       "nameRequired": "Nazwa dostawcy jest wymagana",
       "typeRequired": "Typ dostawcy jest wymagany",
@@ -12341,7 +12356,8 @@
         "nameRequired": "Nazwa jest wymagana",
         "nameFormat": "Używaj tylko małych liter, cyfr i podkreśleń",
         "minRequired": "Min jest wymagane",
-        "maxRequired": "Maks jest wymagane"
+        "maxRequired": "Maks jest wymagane",
+        "maxNotGreaterThanMin": "Maksimum musi być większe niż minimum"
       },
       "import": {
         "title": "Importuj konfigurację wyników",
@@ -12912,7 +12928,7 @@
     },
     "empty": {
       "title": "Brak jeszcze dostawców LLM",
-      "description": "Dostawcy LLM przechowują szczegóły połączenia (punkt końcowy + poświadczenia) dla modeli językowych, które wywołują twoi oceniający LLM Judge. Dodaj jednego, aby rozpocząć oceny oparte na sędziach."
+      "description": "Dostawcy LLM przechowują dane połączenia (bazowy adres URL + poświadczenia) dla modeli językowych, z których korzystają Twoje moduły oceniające LLM Judge. Dodaj dostawcę, aby rozpocząć oceny oparte na sędzim."
     }
   },
   "logs": {
@@ -16000,6 +16016,12 @@
     "aiQueueDetail": "Kolejka",
     "aiQueueReview": "Przegląd kolejki",
     "aiDatasetDetail": "Zbiór danych",
+    "aiExperimentCreate": "Nowy eksperyment",
+    "aiExperimentCompare": "Porównaj eksperymenty",
+    "aiExperimentDetail": "Eksperyment",
+    "aiRemoteTaskCreate": "Nowe zadanie zdalne",
+    "aiRemoteTaskEdit": "Edytuj zadanie zdalne",
+    "aiRemoteTaskDetail": "Zadanie zdalne",
     "notFound": "404 - Nie znaleziono",
     "createReport": "Utwórz raport",
     "addCheck": "Dodaj test",
