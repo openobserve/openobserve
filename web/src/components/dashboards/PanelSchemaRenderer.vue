@@ -137,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           panelSchema.type != 'maps' &&
           panelSchema.type != 'table' &&
           !loading &&
-          !panelSchema.config?.curated_empty_means_healthy
+          !panelSchema.config?.curated_no_data_eligible
         "
         size="inline"
         icon="bar-chart"
