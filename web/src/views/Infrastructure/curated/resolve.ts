@@ -1064,6 +1064,7 @@ function buildPanel(
     legends_position: "bottom",
     unit: panel.unit,
     unit_custom: panel.def.unitCustom ?? null,
+    ...(panel.def.decimals === undefined ? {} : { decimals: panel.def.decimals }),
     // Rebuilt from the SUBSTITUTED query and the variant that won — the authored one carries tokens and variant 1's stream.
     drilldown: (panel.def.drilldown ?? []).map((entry) =>
       entry.name === "openInMetricsExplorer" && queries[0]
@@ -1131,27 +1132,44 @@ function buildPanel(
   };
 }
 
-/** Flow mixed widths across 192-column rows, wrapping on overflow (§5.5). */
+/**
+ * Flow mixed widths across 192-column rows, first-fit at the lowest free y (§5.5).
+ * Identical to a plain left-to-right wrap for uniform-height rows; the packing only
+ * shows when a short panel can sit in the column beside a taller neighbour.
+ */
 function flowLayout(
   siblings: ResolvedPanel[],
   index: number,
 ): { x: number; y: number; w: number; h: number } {
-  let x = 0;
-  let y = 0;
-  let rowHeight = 0;
+  const placed: Array<{ x: number; y: number; w: number; h: number }> = [];
   for (let i = 0; i <= index; i++) {
     const { w, h } = siblings[i].def.layout;
-    if (x + w > GRID_COLUMNS) {
-      x = 0;
-      y += rowHeight;
-      rowHeight = 0;
-    }
-    if (i === index) return { x, y, w, h };
-    x += w;
-    rowHeight = Math.max(rowHeight, h);
+    const spot = firstFreeSpot(placed, w, h);
+    if (i === index) return { ...spot, w, h };
+    placed.push({ ...spot, w, h });
   }
   const { w, h } = siblings[index].def.layout;
-  return { x, y, w, h };
+  return { x: 0, y: 0, w, h };
+}
+
+/** Lowest y, then leftmost x, where a w×h box clears every placed box and the grid edge. */
+function firstFreeSpot(
+  placed: Array<{ x: number; y: number; w: number; h: number }>,
+  w: number,
+  h: number,
+): { x: number; y: number } {
+  const ys = [0, ...placed.map((p) => p.y + p.h)].sort((a, b) => a - b);
+  const xs = [0, ...placed.map((p) => p.x + p.w)].sort((a, b) => a - b);
+  for (const y of ys) {
+    for (const x of xs) {
+      if (x + w > GRID_COLUMNS) continue;
+      const clash = placed.some(
+        (p) => x < p.x + p.w && p.x < x + w && y < p.y + p.h && p.y < y + h,
+      );
+      if (!clash) return { x, y };
+    }
+  }
+  return { x: 0, y: ys[ys.length - 1] ?? 0 };
 }
 
 function buildVariable(

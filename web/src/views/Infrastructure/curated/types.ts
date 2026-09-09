@@ -81,6 +81,12 @@ export interface CuratedPanelDef {
    * quantity names its unit rather than leaving the reader to infer the scale.
    */
   unitCustom?: string;
+  /**
+   * Value decimals; the renderer defaults to 2. A whole-number quantity wants 0, and
+   * on an h-bar it is load-bearing rather than cosmetic: the converter reserves a flat
+   * 4% right inset, so two redundant decimals on the widest axis label clip it.
+   */
+  decimals?: number;
   groupId: string;
   /**
    * Author JS for `type: "custom_chart"`, emitted as a TOP-LEVEL v8 field because

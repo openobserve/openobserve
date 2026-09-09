@@ -16429,7 +16429,8 @@
         "volumeClaimsUnboundTop": "Top 20 unbound volume claims (now)",
         "cpuFree": "CPU cores free to schedule (now)",
         "fleetQuadrant": "Fleet commitment quadrant - every cluster (now)",
-        "fleetResources": "Fleet resource overview - reserved vs used, % of capacity (now)"
+        "fleetCpu": "Fleet CPU - capacity vs reserved vs used, in cores (now)",
+        "fleetMemory": "Fleet memory - capacity vs reserved vs used (now)"
       }
     }
   },

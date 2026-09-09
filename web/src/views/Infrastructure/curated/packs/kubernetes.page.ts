@@ -563,7 +563,7 @@ export const kubernetesPage: CuratedPageManifest = {
             unit: "percent",
             groupId: "kube-state",
             // 17px gridstack cells: h:39 is the tallest that still fits a 1440x900 viewport unscrolled, and it seats the square plot plus its axis chrome.
-            // w:120 of 192 leaves 72 for the resource overview beside it; the quadrant stays the hero, and flowLayout puts them on one row without an engine change.
+            // w:120 of 192 leaves a 72-wide column for the CPU and memory panels stacked beside it; the quadrant stays the hero.
             layout: { w: 120, h: 39 },
             customChartContent: FLEET_QUADRANT_JS,
             variants: [
@@ -612,59 +612,99 @@ export const kubernetesPage: CuratedPageManifest = {
         ),
         // The fleet's ABSOLUTE size, which no other tab reports: all 25 panels on
         // Inventory / Nodes / Utilization are cluster-scoped, and the quadrant beside
-        // this one plots ratios per cluster. The subject here is the reserved-vs-used
-        // GAP — reserving 59% while burning 13% is the finding, and it is only visible
-        // with both bars on one axis.
+        // these two plots ratios per cluster. The subject here is the reserved-vs-used
+        // GAP against real capacity — 327 of 766 cores reserved while 69 burn is the
+        // finding, and a percentage alone hides whether that is a big fleet or a small one.
+        // CPU and memory are SEPARATE panels because a panel carries one unit, and cores
+        // cannot share a value axis with bytes without normalising both away to percent.
         panel(
           {
-            id: "k8s_sm_fleet_resources",
-            titleKey: "infra.k8s.panel.fleetResources",
+            id: "k8s_sm_fleet_cpu",
+            titleKey: "infra.k8s.panel.fleetCpu",
             // "h-bar", not promql "bar": convertPromQLBarChart.ts:138 makes one ROW per
-            // series with the category axis taking the series name, so four bare sums with
-            // literal legends give four labelled rows. promql "bar" plots x as TIME.
+            // series with the category axis taking the series name, so three bare sums with
+            // literal legends give three labelled rows. promql "bar" plots x as TIME.
             type: "h-bar",
-            // One unit per panel, so cores and bytes cannot share a value axis: both rows
-            // are normalised to percent-of-capacity, which is also the comparison the
-            // panel is about.
-            unit: "percent",
+            // Cores are a bare count with no unit in getUnitOptions, so the axis carries
+            // absolute cores and unitCustom names them — same idiom as k8s_ut_cpu_free.
+            unit: "custom",
+            unitCustom: " cores",
+            // A fleet is hundreds of whole cores, and the converter's flat 4% right inset
+            // clips the widest axis label if two redundant decimals ride on it.
+            decimals: 0,
             groupId: "kube-state",
-            layout: { w: 72, h: 39 },
+            // 20 + 19 = the quadrant's 39, so flowLayout stacks both in the free column beside it.
+            layout: { w: 72, h: 20 },
             variants: [
               {
-                // k8s_node_memory_usage / k8s_node_cpu_usage are kubeletstats and stop on a
-                // NotReady node; kept OUT of requiresStreams so the panel still reports
-                // capacity and reservation when a node drops. An absent usage query yields
-                // NO bar rather than a zero one (dataProcessor.ts maps an empty result to an
-                // empty series list), so a gap reads as a gap.
+                // k8s_node_cpu_usage is kubeletstats and stops on a NotReady node; kept OUT
+                // of requiresStreams so the panel still reports capacity and reservation when
+                // a node drops. An absent usage query yields NO bar rather than a zero one
+                // (dataProcessor.ts maps an empty result to an empty series list), so a gap
+                // reads as a gap.
                 requiresStreams: [
                   "kube_node_status_allocatable",
                   "kube_pod_container_resource_requests",
                 ],
                 queryType: "promql",
-                // Instant for the same reason as the quadrant: each ratio divides two
-                // separate queries, and a range window would take numerator and denominator
+                // Instant for the same reason as the quadrant: three bars read against each
+                // other come from three separate queries, and a range window would take them
                 // from different instants.
                 queryMode: "instant",
                 // Bare sum(), no `by (...)`: a fleet total needs no grouping.
                 // Declared BOTTOM-UP: an ECharts category y-axis draws index 0 at the
-                // bottom, so this order paints CPU reserved, CPU used, Memory reserved,
-                // Memory used from the top down.
+                // bottom, so this order paints Capacity, Reserved, Used from the top down.
                 queries: [
                   {
-                    query: `sum(k8s_node_memory_usage) / sum(kube_node_status_allocatable{resource="memory"}) * 100`,
-                    legend: "Memory used",
+                    query: `sum(k8s_node_cpu_usage)`,
+                    legend: "Used",
                   },
                   {
-                    query: `sum(kube_pod_container_resource_requests{resource="memory"}) / sum(kube_node_status_allocatable{resource="memory"}) * 100`,
-                    legend: "Memory reserved",
+                    query: `sum(kube_pod_container_resource_requests{resource="cpu"})`,
+                    legend: "Reserved",
+                  },
+                  // Capacity is the reference the other two are read against: on an absolute
+                  // axis a reserved bar alone says nothing about how much room is left.
+                  {
+                    query: `sum(kube_node_status_allocatable{resource="cpu"})`,
+                    legend: "Capacity",
+                  },
+                ],
+              },
+            ],
+          },
+          "kube_node_status_allocatable",
+        ),
+        panel(
+          {
+            id: "k8s_sm_fleet_memory",
+            titleKey: "infra.k8s.panel.fleetMemory",
+            type: "h-bar",
+            // RAW bytes, undivided: convertDataIntoUnitValue.ts scales to the largest
+            // 1024-divisor that fits, so dividing here would relabel TB as B.
+            unit: "bytes",
+            groupId: "kube-state",
+            layout: { w: 72, h: 19 },
+            variants: [
+              {
+                requiresStreams: [
+                  "kube_node_status_allocatable",
+                  "kube_pod_container_resource_requests",
+                ],
+                queryType: "promql",
+                queryMode: "instant",
+                queries: [
+                  {
+                    query: `sum(k8s_node_memory_usage)`,
+                    legend: "Used",
                   },
                   {
-                    query: `sum(k8s_node_cpu_usage) / sum(kube_node_status_allocatable{resource="cpu"}) * 100`,
-                    legend: "CPU used",
+                    query: `sum(kube_pod_container_resource_requests{resource="memory"})`,
+                    legend: "Reserved",
                   },
                   {
-                    query: `sum(kube_pod_container_resource_requests{resource="cpu"}) / sum(kube_node_status_allocatable{resource="cpu"}) * 100`,
-                    legend: "CPU reserved",
+                    query: `sum(kube_node_status_allocatable{resource="memory"})`,
+                    legend: "Capacity",
                   },
                 ],
               },
