@@ -538,7 +538,11 @@ describe("token substitution", () => {
 
   it("a bare-adjacent ${scope:x} expands to a whole {matcher} block", () => {
     const dashboard = build(resolve({}));
-    const fleetCpu = allQueries(dashboard).find((q) => q.includes("sum(k8s_node_cpu_usage"))!;
+    // Must be the SCOPED reader: the summary's fleet-total panel sums the same metric
+    // deliberately unscoped, and a bare metric-name match would find that one instead.
+    const fleetCpu = allQueries(dashboard).find(
+      (q) => q.includes("sum(k8s_node_cpu_usage") && q.includes("$cluster"),
+    )!;
     expect(fleetCpu).toContain('k8s_node_cpu_usage{k8s_cluster_name=~"$cluster"}');
   });
 

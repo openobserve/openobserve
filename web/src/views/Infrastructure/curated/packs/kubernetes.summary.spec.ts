@@ -24,12 +24,15 @@
 // allowlist, and panelValidation.ts / CUSTOM_QUERY_CHART_TYPES are panel-editor
 // only. What is not pinned here ships unchecked.
 
+import { readFileSync } from "node:fs";
+import { resolve as resolvePath } from "node:path";
 import * as acorn from "acorn";
 import DOMPurify from "dompurify";
 import * as walk from "acorn-walk";
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { kubernetesPage, FLEET_DRILLDOWN_EVENT, FLEET_DRILLDOWN_TAB } from "./kubernetes.page";
 import { validateUserCode } from "@/utils/dashboard/convertCustomChartData";
+import { processPromQLData } from "@/utils/dashboard/promql/shared/dataProcessor";
 import { b64DecodeUnicodeSafe } from "@/utils/zincutils";
 import { getUnitOptions } from "@/composables/dashboard/useColumnFormatting";
 import { raw } from "@/types/i18n";
@@ -37,8 +40,11 @@ import enLocale from "@/locales/languages/en-US.json";
 
 const SECTION_ID = "summary";
 
-/** The one panel this section exists to hold. */
+/** The hero: the per-cluster commitment scatter. */
 const PANEL_ID = "k8s_sm_fleet_quadrant";
+
+/** Its neighbour: the fleet-TOTAL reserved-vs-used bars, on the native chart path. */
+const RESOURCES_ID = "k8s_sm_fleet_resources";
 
 const section = () => {
   const found = kubernetesPage.sections.find((s: any) => s.id === SECTION_ID);
@@ -197,7 +203,7 @@ const SANDBOX_GLOBALS = new Set([
  * rebuilds them with `new Function` in the parent window, where the DOM exists.
  * Anywhere else in the body this list would be a render-time throw.
  */
-const PARENT_ONLY_GLOBALS = new Set(["CustomEvent"]);
+const PARENT_ONLY_GLOBALS = new Set(["CustomEvent", "setTimeout"]);
 
 const UNIT_VALUES = new Set(
   getUnitOptions(((k: string) => raw(k)) as any)
@@ -213,6 +219,9 @@ const KUBE_STATE_METRICS = [
   "kube_pod_container_status_restarts_total",
 ];
 
+/** The sidebar's "used" segment only: kube-state publishes requests, never actual burn. */
+const KUBELET_METRICS = ["k8s_node_cpu_usage"];
+
 describe("summary — shape", () => {
   it("is a section of the kubernetes pack", () => {
     expect(kubernetesPage.sections.map((s: any) => s.id)).toContain(SECTION_ID);
@@ -226,12 +235,14 @@ describe("summary — shape", () => {
     expect(ids[0], `${SECTION_ID} must be the landing tab`).toBe(SECTION_ID);
   });
 
-  it("holds exactly one panel", () => {
-    // The fault data (pending pods, restarts, failed pods) is FOLDED INTO the
-    // quadrant rather than split off into a neighbour: a second panel would make
-    // the reader join two views by cluster name by eye, which is the join the
-    // bubble chart exists to have already done.
-    expect(panels().map((p: any) => p.id)).toEqual([PANEL_ID]);
+  it("holds the quadrant and the fleet resource overview, in that order", () => {
+    // The fault data (pending pods, restarts, failed pods) stays FOLDED INTO the
+    // quadrant rather than split off: a third panel would make the reader join two
+    // views by cluster name by eye, which is the join the bubble chart exists to have
+    // already done. The resource overview earns its own panel for the opposite reason
+    // — it is fleet-TOTAL, carries no per-cluster dimension to join on, and its
+    // reserved-vs-used gap has no place on a commitment scatter.
+    expect(panels().map((p: any) => p.id)).toEqual([PANEL_ID, RESOURCES_ID]);
   });
 
   it("the panel is a custom_chart", () => {
@@ -362,11 +373,11 @@ describe("summary — the panel is an instant snapshot, never a range reduction"
 });
 
 describe("summary — the query set carries every encoding the chart claims", () => {
-  // Five queries reach the author JS as data[0]..data[4]: resolve.ts:1037 emits one
-  // v8 query per authored query and usePanelPromQLExecutor.ts:101,242 indexes the
-  // results by queryIndex. Precedent: k8s_ut_commit_trend has 2, hd_load has 3.
-  it("declares roughly the five designed queries", () => {
-    // A RANGE, not a frozen 5: query 4 (node/deployment counts) may ship as one
+  // Each query reaches the author JS as data[i]: resolve.ts:1037 emits one v8 query per
+  // authored query and usePanelPromQLExecutor.ts:101,242 indexes the results by queryIndex.
+  // Precedent: k8s_ut_commit_trend has 2, hd_load has 3.
+  it("declares the quadrant's five queries, the fleet totals having moved to their own panel", () => {
+    // A RANGE, not a frozen count: query 4 (node/deployment counts) may ship as one
     // label_replace'd query carrying a `kind` label or as two separate ones, and
     // that is the implementer's call. What must not happen is a panel that quietly
     // drops an encoding down to two or three queries.
@@ -402,10 +413,19 @@ describe("summary — the query set carries every encoding the chart claims", ()
     );
   });
 
-  it("every query anchors on a real kube-state metric", () => {
+  it("every query anchors on a real kube-state or kubeletstats metric", () => {
     for (const query of queriesOf(PANEL_ID)) {
-      const hit = KUBE_STATE_METRICS.some((metric) => query.includes(metric));
-      expect(hit, `no known kube-state family in: ${query}`).toBe(true);
+      const hit = [...KUBE_STATE_METRICS, ...KUBELET_METRICS].some((m) => query.includes(m));
+      expect(hit, `no known metric family in: ${query}`).toBe(true);
+    }
+  });
+
+  it("keeps kubeletstats OUT of requiresStreams so a NotReady fleet still renders", () => {
+    // k8s_node_cpu_usage is the sidebar's only "used" source and a NotReady node stops
+    // emitting it. Listing it as required would hide the WHOLE panel — quadrant included —
+    // exactly when a node is unhealthy, which is when the page matters most.
+    for (const variant of panel(PANEL_ID).variants as any[]) {
+      expect(variant.requiresStreams ?? []).not.toContain("k8s_node_cpu_usage");
     }
   });
 
@@ -455,8 +475,12 @@ describe("summary — the query set carries every encoding the chart claims", ()
     // each: on `sum by (a,b) (x) / sum by (a) (y)` a single non-global match reads
     // only [a,b] and the mismatched second clause — the one that breaks the join —
     // goes unseen.
+    // Only the RATIO queries: the sidebar's node count reads the same allocatable family but
+    // groups by cluster alone on purpose, and it joins nothing, so it is not a mismatch.
     const groupings = (metric: string): string[][] => {
-      const queries = queriesOf(PANEL_ID).filter((q) => q.includes(metric));
+      const queries = queriesOf(PANEL_ID).filter(
+        (q) => q.includes(metric) && /\bsum\s+by\b/.test(q),
+      );
       expect(queries.length, `no query reads ${metric}`).toBeGreaterThan(0);
       const out: string[][] = [];
       for (const query of queries) {
@@ -1247,5 +1271,386 @@ describe("summary — a bubble click ANNOUNCES the cluster, and never navigates 
   it("the bubbles show a pointer cursor, so the affordance is visible", () => {
     // A drill-down nothing signals is one nobody finds.
     expect(chartCode(PANEL_ID)).toContain('cursor: "pointer"');
+  });
+});
+
+describe("summary — the plot stays square at EVERY resolution", () => {
+  // Both axes span the same 0..axisMax domain, so the plot's pixel aspect IS the
+  // distortion: a 45-degree diagonal renders at atan(h/w). Measured on the shipped
+  // fixed 18% margin at 1920x1080: canvas 1760x624, plot 1126x548 = 2.06x, so the
+  // diagonal drew at 26 degrees. The distortion was 1.32x at 1280 and 1.0x at 1024,
+  // which is exactly why a FIXED percentage cannot be right at more than one width.
+
+  const frame = (rows: [Record<string, string>, number][]) => ({
+    result: rows.map(([metric, v]) => ({ metric, value: [0, String(v)] })),
+  });
+
+  const runFleet = (): any => {
+    const code = chartCode(PANEL_ID).replace(
+      /\$\{theme:([a-z0-9-]+)\}/gi,
+      (_m: string, name: string) => `token(${name})`,
+    );
+    const data = [
+      frame([
+        [{ cluster: "a", resource: "cpu" }, 400],
+        [{ cluster: "a", resource: "memory" }, 1600 * 1073741824],
+      ]),
+      frame([
+        [{ cluster: "a", resource: "cpu" }, 200],
+        [{ cluster: "a", resource: "memory" }, 800 * 1073741824],
+      ]),
+      frame([[{ cluster: "a", phase: "Running" }, 10]]),
+      frame([]),
+      frame([]),
+    ];
+    return new Function("data", "echarts", `${code}; return option;`)(data, {});
+  };
+
+  /**
+   * Drives o2_events.finished the way CustomChartRenderer does — through the SAME
+   * sanitize-and-rebuild round trip, so a truncated function fails here too.
+   */
+  const solve = (w: number, h: number, option = runFleet()) => {
+    const source = DOMPurify.sanitize(String(option.o2_events.finished));
+    const handler = new Function(`return ${source}`)();
+    let applied: any = null;
+    // A real chart reports the grid it is CURRENTLY showing, and the handler's guard reads it.
+    let grid: any = option.grid;
+    const chart = {
+      getWidth: () => w,
+      getHeight: () => h,
+      // o2_layout comes back as the BARE object: ECharts arrays only what it recognises
+      // as a component, and an unknown top-level key is handed straight back. Measured in
+      // the live app — stubbing it as an array is what hid the handler bailing out.
+      getOption: () => ({ o2_layout: option.o2_layout, grid: [grid] }),
+      setOption: (next: any) => {
+        applied = next;
+        grid = next.grid;
+      },
+    };
+    // The handler DEFERS its setOption out of the render pass, so the timers must run.
+    vi.useFakeTimers();
+    try {
+      handler({}, chart);
+      vi.runAllTimers();
+    } finally {
+      vi.useRealTimers();
+    }
+    return { applied, chart };
+  };
+
+  const plotOf = (w: number, h: number, applied: any) => ({
+    width: w - applied.grid.left - applied.grid.right,
+    height: h - applied.grid.top - applied.grid.bottom,
+  });
+
+  // The canvas sizes these viewports actually produce inside the curated page shell.
+  const VIEWPORTS: [string, number, number][] = [
+    ["1920x1080", 1760, 624],
+    ["1600x900", 1440, 504],
+    ["1440x900", 1280, 504],
+    ["1280x800", 1120, 424],
+    ["1024x768", 864, 392],
+  ];
+
+  it.each(VIEWPORTS)("renders a square plot at %s", (_label, w, h) => {
+    const { applied } = solve(w, h);
+    expect(applied, "the resize handler applied no layout").toBeTruthy();
+    const plot = plotOf(w, h, applied);
+    expect(plot.width).toBeGreaterThan(0);
+    expect(plot.height).toBeGreaterThan(0);
+    // 1.0 exactly is the target; the band is the tolerance the brief allows.
+    expect(plot.width / plot.height).toBeGreaterThanOrEqual(1);
+    expect(plot.width / plot.height).toBeLessThanOrEqual(1.2);
+  });
+
+  it.each(VIEWPORTS)("draws the 45-degree diagonal at 45 degrees at %s", (_label, w, h) => {
+    const { applied } = solve(w, h);
+    const plot = plotOf(w, h, applied);
+    const degrees = (Math.atan(plot.height / plot.width) * 180) / Math.PI;
+    expect(degrees).toBeGreaterThanOrEqual(40);
+    expect(degrees).toBeLessThanOrEqual(45.5);
+  });
+
+  it("stays square on a PORTRAIT canvas, where the surplus is height not width", () => {
+    // A width-bound plot must give the leftover height back as bottom margin, or it
+    // stretches vertically instead — the same bug mirrored.
+    const { applied } = solve(420, 700);
+    const plot = plotOf(420, 700, applied);
+    expect(plot.width / plot.height).toBeGreaterThanOrEqual(0.95);
+    expect(plot.width / plot.height).toBeLessThanOrEqual(1.05);
+  });
+
+  it("stays square on an ULTRAWIDE canvas instead of stretching to fill it", () => {
+    const { applied } = solve(2400, 700);
+    const plot = plotOf(2400, 700, applied);
+    expect(plot.width / plot.height).toBeGreaterThanOrEqual(0.95);
+    expect(plot.width / plot.height).toBeLessThanOrEqual(1.05);
+  });
+
+  it("re-solves on resize instead of keeping the size it first painted", () => {
+    // CustomChartRenderer.vue:201,215-216 calls chart.resize() but never re-runs the
+    // author JS, so a static option would keep the seeded margins forever.
+    const option = runFleet();
+    const wide = solve(1760, 624, option).applied;
+    const narrow = solve(900, 500, option).applied;
+    // The plot is left-anchored, so `left` is invariant by design; `right` is what tracks the
+    // canvas, and a static option would report the same margin at both sizes.
+    expect(narrow.grid.right).not.toBe(wide.grid.right);
+    const plot = (a: any, w: number, h: number) =>
+      (w - a.grid.left - a.grid.right) / (h - a.grid.top - a.grid.bottom);
+    expect(plot(wide, 1760, 624)).toBeCloseTo(1, 2);
+    expect(plot(narrow, 900, 500)).toBeCloseTo(1, 2);
+  });
+
+  it("stops re-entering: the same size twice applies exactly one layout", () => {
+    // setOption paints, painting fires `finished` again. Without the guard this is an
+    // infinite loop that pins a core and never settles.
+    const option = runFleet();
+    const source = DOMPurify.sanitize(String(option.o2_events.finished));
+    const handler = new Function(`return ${source}`)();
+    let calls = 0;
+    let grid: any = option.grid;
+    const chart: any = {
+      getWidth: () => 1760,
+      getHeight: () => 624,
+      // o2_layout comes back as the BARE object: ECharts arrays only what it recognises
+      // as a component, and an unknown top-level key is handed straight back. Measured in
+      // the live app — stubbing it as an array is what hid the handler bailing out.
+      getOption: () => ({ o2_layout: option.o2_layout, grid: [grid] }),
+      setOption: (next: any) => {
+        calls += 1;
+        grid = next.grid;
+      },
+    };
+    vi.useFakeTimers();
+    try {
+      handler({}, chart);
+      vi.runAllTimers();
+      // The re-paint the first setOption caused fires `finished` again; the guard reads the
+      // grid now on the chart and must recognise it as already solved.
+      handler({}, chart);
+      handler({}, chart);
+      vi.runAllTimers();
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(calls).toBe(1);
+  });
+
+  it("DEFERS its setOption out of the render pass ECharts forbids it in", () => {
+    // Measured in the live app: calling setOption synchronously inside `finished` logs
+    // "`setOption` should not be called during main process." and then throws
+    // 'Please set $action: "replace" to change `type`' — the sidebar never paints.
+    const option = runFleet();
+    const source = DOMPurify.sanitize(String(option.o2_events.finished));
+    const handler = new Function(`return ${source}`)();
+    let calls = 0;
+    const chart: any = {
+      getWidth: () => 1760,
+      getHeight: () => 624,
+      getOption: () => ({ o2_layout: option.o2_layout, grid: [option.grid] }),
+      setOption: () => {
+        calls += 1;
+      },
+    };
+    vi.useFakeTimers();
+    try {
+      handler({}, chart);
+      expect(calls, "setOption ran synchronously inside the render pass").toBe(0);
+      vi.runAllTimers();
+      expect(calls, "the deferred setOption never ran").toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("seeds a square plot too, so the very first paint is not distorted either", () => {
+    // The sandbox iframe owns no canvas, so the option is BUILT blind; `finished` only
+    // corrects it after the first render. A skewed seed is a visible flash.
+    const option = runFleet();
+    expect(option.grid.containLabel, "containLabel makes the computed margins advisory").toBe(
+      false,
+    );
+    const side = 1180 - option.grid.left - option.grid.right;
+    const tall = 620 - option.grid.top - option.grid.bottom;
+    expect(Math.abs(side - tall)).toBeLessThanOrEqual(2);
+  });
+
+  it("authors no fixed percentage margin, which cannot be square at two widths", () => {
+    // The regression this replaces: `PLOT_SIDE_MARGIN = "18%"` was 2.06x at 1920 and
+    // 1.0x at 1024. Any percent-valued grid side reintroduces exactly that.
+    const code = chartCode(PANEL_ID);
+    expect(code).not.toMatch(/grid:\s*\{[^}]*(left|right):\s*["'][\d.]+%["']/);
+  });
+
+  it("carries the layout inputs as DATA, since the handler crosses the sandbox with no scope", () => {
+    // o2_events handlers are serialized to a string and rebuilt by `new Function` in the
+    // parent (CustomChartRenderer.vue:118-124), so every closure they had is gone.
+    const cfg = runFleet().o2_layout;
+    for (const key of ["axisLeft", "axisTop", "axisBottom", "axisRight"]) {
+      expect(cfg[key], `o2_layout.${key} is missing`).toBeDefined();
+    }
+    expect(JSON.parse(JSON.stringify(cfg)), "o2_layout does not survive JSON").toEqual(cfg);
+  });
+
+  it("survives DOMPurify without truncation — no '<' and no '&' in the handler", () => {
+    // DOMPurify TRUNCATES the function at '<' and escapes '&', both silently: the chart
+    // goes blank with nothing in the console.
+    const source = String(runFleet().o2_events.finished);
+    expect(source).not.toContain("<");
+    expect(source).not.toContain("&");
+    expect(DOMPurify.sanitize(source)).toBe(source);
+  });
+
+  it("keeps the ES5 idiom both ECharts versions parse", () => {
+    // The sandbox runs 5.6.1 and the app paints with 6.1.0.
+    const source = String(runFleet().o2_events.finished);
+    expect(source).not.toMatch(/=>/);
+    expect(source).not.toMatch(/\b(let|const)\b/);
+    expect(source).not.toMatch(/\.\.\./);
+  });
+});
+
+describe("summary — the fleet resource overview is a NATIVE panel, not a second custom_chart", () => {
+  // The absolute fleet size no other tab reports: all 25 panels on Inventory / Nodes /
+  // Utilization are cluster-scoped, and the quadrant beside this one plots per-cluster
+  // RATIOS. Measured live 2026-09-09T01:23:43Z: CPU capacity 471.52 cores, reserved
+  // 276.34 (58.6%), used 62.47 (13.2%); memory capacity 2218.70 GB, reserved 1315.51
+  // (59.3%), used 1171.42 (52.8%); 10 clusters, 101 nodes, k8s_node_memory_usage
+  // answering for all 101.
+
+  it("renders through the platform chart path, so it inherits theming and tooltips", () => {
+    // The whole point of the rework: hand-drawn `graphic` elements inside the
+    // custom_chart carried none of the product's conventions.
+    expect(panel(RESOURCES_ID).customChartContent).toBeUndefined();
+    expect(panel(RESOURCES_ID).type).not.toBe("custom_chart");
+  });
+
+  it("is an h-bar, the one bar type whose category axis is the SERIES name", () => {
+    // promql `bar` is a TIME-SERIES bar: its x axis is timestamps, so four instant sums
+    // would plot as four points at one tick, not four labelled rows.
+    // convertPromQLBarChart.ts non-stacked branch pushes one category PER SERIES.
+    expect(panel(RESOURCES_ID).type).toBe("h-bar");
+  });
+
+  it("routes through the modular converter the app actually registers", () => {
+    // resolve.ts passes `type` through with no allowlist, so nothing else checks that
+    // the string names a type convertPromQLData will dispatch on. Read from the
+    // converter's own source because NEW_CHART_TYPES is a function-local const: an
+    // export would widen that module's API purely for this assertion.
+    const source = readFileSync(
+      resolvePath(__dirname, "../../../../utils/dashboard/convertPromQLData.ts"),
+      "utf8",
+    );
+    const list = source.slice(source.indexOf("NEW_CHART_TYPES"));
+    const routed = list.slice(0, list.indexOf("]"));
+    expect(routed, "h-bar is no longer routed to the modular converter").toContain(
+      `"${panel(RESOURCES_ID).type}"`,
+    );
+  });
+
+  it("normalises BOTH resources to percent, since one panel carries one unit", () => {
+    // Cores and bytes cannot share a value axis, and percent-of-capacity is also the
+    // comparison the panel exists to make.
+    expect(panel(RESOURCES_ID).unit).toBe("percent");
+    expect(UNIT_VALUES.has(panel(RESOURCES_ID).unit)).toBe(true);
+    for (const query of queriesOf(RESOURCES_ID)) {
+      expect(query, `not normalised to a percentage: ${query}`).toContain("* 100");
+      expect(query, "a percentage must divide by its own capacity").toContain(
+        "kube_node_status_allocatable",
+      );
+    }
+  });
+
+  it("reports used on BOTH rows, because the asymmetry read as a bug", () => {
+    // k8s_node_memory_usage EXISTS and covered all 101 nodes when measured, so showing
+    // used for CPU only was a presentation gap, not a data one.
+    const legends = panel(RESOURCES_ID).variants.flatMap((v: any) =>
+      v.queries.map((q: any) => q.legend as string),
+    );
+    // Declaration order is BOTTOM-UP because an ECharts category y-axis puts index 0 at
+    // the bottom (axisBuilder.ts sets no `inverse`), so this list reversed is what the
+    // reader sees top-to-bottom: CPU reserved, CPU used, Memory reserved, Memory used.
+    expect(legends).toEqual(["Memory used", "Memory reserved", "CPU used", "CPU reserved"]);
+    expect([...legends].reverse()).toEqual([
+      "CPU reserved",
+      "CPU used",
+      "Memory reserved",
+      "Memory used",
+    ]);
+  });
+
+  it("carries no by(...) at all, so it adds no cardinality debt", () => {
+    // A fleet total needs no grouping, which also sidesteps lintCardinality
+    // (resolve.ts:943) rather than adding a third deferred failure.
+    for (const query of queriesOf(RESOURCES_ID)) {
+      expect(query, `an unnecessary grouping: ${query}`).not.toMatch(/\bby\s*\(/);
+    }
+  });
+
+  it("carries no ${scope:} token, because the section declares no scopedBy", () => {
+    // A fleet TOTAL that honoured the cluster picker would stop being a fleet total.
+    for (const query of queriesOf(RESOURCES_ID)) {
+      expect(query).not.toContain("${scope:");
+    }
+  });
+
+  it("keeps kubeletstats OUT of requiresStreams so a NotReady node cannot hide it", () => {
+    // The usage metrics stop on a NotReady node; requiring them would blank the
+    // capacity and reservation bars exactly when a node has dropped.
+    for (const variant of panel(RESOURCES_ID).variants as any[]) {
+      expect(variant.requiresStreams).not.toContain("k8s_node_cpu_usage");
+      expect(variant.requiresStreams).not.toContain("k8s_node_memory_usage");
+      expect(variant.requiresStreams.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("pins the instant, since every bar divides two SEPARATE queries", () => {
+    for (const variant of panel(RESOURCES_ID).variants as any[]) {
+      expect(variant.queryMode).toBe("instant");
+      expect(variant.queryType).toBe("promql");
+    }
+  });
+
+  it("a missing `used` yields NO bar rather than a zero one", async () => {
+    // Verified against the real processor, not assumed: an empty `result` maps to an
+    // empty series list, so the h-bar branch pushes no category and no value. A false
+    // 0% would read as "nothing is running" on a fleet that is running fine.
+    const processed = await processPromQLData(
+      [{ result: [{ metric: {}, value: [0, "58.6"] }] }, { result: [] }] as any,
+      { queries: [{ config: {} }, { config: {} }] } as any,
+      { state: { timezone: "UTC", selectedOrganization: { identifier: "default" } } } as any,
+    );
+    expect(processed[0].series).toHaveLength(1);
+    expect(processed[1].series, "an absent usage query produced a bar").toHaveLength(0);
+  });
+
+  it("sits BESIDE the quadrant on one row, with the quadrant the wider of the two", () => {
+    // flowLayout wraps past GRID_COLUMNS (192), so 120 + 72 is one row with no engine change.
+    const quadrant = panel(PANEL_ID).layout;
+    const resources = panel(RESOURCES_ID).layout;
+    expect(quadrant.w + resources.w).toBeLessThanOrEqual(192);
+    expect(quadrant.w).toBeGreaterThan(resources.w);
+    // Equal heights, or flowLayout drops the shorter one onto its own row.
+    expect(resources.h).toBe(quadrant.h);
+  });
+
+  it("titles itself in resolvable en-US copy that names the comparison", () => {
+    const title = copy(panel(RESOURCES_ID).titleKey);
+    expect(title.trim().length).toBeGreaterThan(0);
+    expect(title.toLowerCase()).toContain("reserved");
+    expect(title.toLowerCase()).toContain("used");
+  });
+
+  it("carries a byUrl drilldown decoding to one of its OWN queries", () => {
+    // Lint rules 27/28: the shared panel() helper builds it from queries[0].
+    const drilldowns = (panel(RESOURCES_ID).drilldown ?? []) as any[];
+    expect(drilldowns.length).toBeGreaterThan(0);
+    const target = drilldowns[0].data?.url ?? drilldowns[0].url ?? "";
+    const decoded = b64DecodeUnicodeSafe(
+      new URL(target, "http://x").searchParams.get("query") ?? "",
+    );
+    expect(queriesOf(RESOURCES_ID)).toContain(decoded);
   });
 });
