@@ -139,19 +139,63 @@ pub async fn search(
 
     let start = query.start;
     let end = query.end;
+    let step = query.step;
     let trace_id = req.job.as_ref().unwrap().trace_id.to_string();
+    let org_id = &req.org_id;
 
     let mut results = Vec::new();
     if start == end {
         results.push(search_inner(req).await?);
     } else {
-        // cuts only pay off where the engine can stream
-        let with_cuts = cfg.search.feature_metrics_streaming_agg_enabled
-            && !query.query_exemplars
-            && !req.is_super_cluster;
-        let group = search_groups(req, with_cuts, "search").await?;
+        // 1. get max records stream
+        let start_ts = std::time::Instant::now();
+        let plan = match get_max_file_list(&trace_id, org_id, &query.query, start, end).await {
+            Ok(v) => v,
+            Err(e) => {
+                log::error!(
+                    "[trace_id {trace_id}] promql->search->grpc: get max records stream error: {e}"
+                );
+                return Err(e);
+            }
+        };
+        log::info!(
+            "[trace_id {trace_id}] promql->search->grpc: get max records stream, took: {} ms",
+            start_ts.elapsed().as_millis()
+        );
 
-        // search each group
+        // 2. generate search group with max records stream
+        let start_ts = std::time::Instant::now();
+        // cuts only pay off where the engine can stream
+        let cuts = if cfg.search.feature_metrics_streaming_agg_enabled
+            && !query.query_exemplars
+            && !req.is_super_cluster
+        {
+            search_group_cuts(start, end, step, &plan, wal_floor())
+        } else {
+            Vec::new()
+        };
+        let memory_limit = cfg.memory_cache.datafusion_max_size; // bytes
+        let group = match generate_search_groups(memory_limit, &plan, start, end, step, &cuts).await
+        {
+            Ok(v) => v,
+            Err(e) => {
+                log::error!(
+                    "[trace_id {trace_id}] promql->search->grpc: generate search group error: {e}"
+                );
+                return Err(e);
+            }
+        };
+        if group.len() > 1 {
+            log::info!(
+                "[trace_id {trace_id}] promql->search->grpc: get groups {group:?}, cuts {cuts:?}"
+            );
+        }
+        log::info!(
+            "[trace_id {trace_id}] promql->search->grpc: generate search group, took: {} ms",
+            start_ts.elapsed().as_millis()
+        );
+
+        // 3. search each group
         for (start, end) in group {
             let mut req = req.clone();
             req.need_wal = end >= wal_floor();
@@ -188,11 +232,14 @@ pub async fn data(
     req: &cluster_rpc::MetricsQueryRequest,
     tx: mpsc::Sender<Result<cluster_rpc::MetricsQueryResponse, tonic::Status>>,
 ) -> Result<()> {
+    let cfg = config::get_config();
     let query = req.query.as_ref().unwrap();
 
     let start = query.start;
     let end = query.end;
+    let step = query.step;
     let trace_id = req.job.as_ref().unwrap().trace_id.to_string();
+    let org_id = &req.org_id;
 
     let (data_tx, mut data_rx) = mpsc::channel::<(value::Value, String, ScanStats, i64)>(2);
     let data_trace_id = trace_id.clone();
@@ -236,9 +283,42 @@ pub async fn data(
         );
         return Ok(());
     }
-    let group = search_groups(req, false, "data").await?;
+    // 1. get max records stream
+    let plan = match get_max_file_list(&trace_id, org_id, &query.query, start, end).await {
+        Ok(v) => v,
+        Err(e) => {
+            log::error!(
+                "[trace_id {trace_id}] promql->data->grpc: get max records stream error: {e}"
+            );
+            return Err(e);
+        }
+    };
+    log::info!(
+        "[trace_id {trace_id}] promql->data->grpc: get max records stream, took: {} ms",
+        start_ts.elapsed().as_millis()
+    );
 
-    // search each group
+    // 2. generate search group with max records stream
+    let start_ts = std::time::Instant::now();
+    let memory_limit = cfg.memory_cache.datafusion_max_size; // bytes
+    let group = match generate_search_group(memory_limit, plan.files, start, end, step).await {
+        Ok(v) => v,
+        Err(e) => {
+            log::error!(
+                "[trace_id {trace_id}] promql->data->grpc: generate search group error: {e}"
+            );
+            return Err(e);
+        }
+    };
+    if group.len() > 1 {
+        log::info!("[trace_id {trace_id}] promql->data->grpc: get groups {group:?}");
+    }
+    log::info!(
+        "[trace_id {trace_id}] promql->data->grpc: generate data group, took: {} ms",
+        start_ts.elapsed().as_millis()
+    );
+
+    // 3. search each group
     for (start, end) in group {
         let mut req = req.clone();
         req.need_wal = end >= wal_floor();
@@ -335,62 +415,7 @@ pub async fn search_inner(
     Ok((value, result_type, scan_stats, took))
 }
 
-/// Plans a range query's groups: split at the streaming cuts when asked, then sized by memory.
-async fn search_groups(
-    req: &cluster_rpc::MetricsQueryRequest,
-    with_cuts: bool,
-    tag: &str,
-) -> Result<Vec<(i64, i64)>> {
-    let trace_id = req.job.as_ref().unwrap().trace_id.as_str();
-    let query = req.query.as_ref().unwrap();
-    let (start, end, step) = (query.start, query.end, query.step);
-
-    // 1. get max records stream
-    let start_ts = std::time::Instant::now();
-    let plan = match group_plan(trace_id, &req.org_id, &query.query, start, end).await {
-        Ok(v) => v,
-        Err(e) => {
-            log::error!(
-                "[trace_id {trace_id}] promql->{tag}->grpc: get max records stream error: {e}"
-            );
-            return Err(e);
-        }
-    };
-    log::info!(
-        "[trace_id {trace_id}] promql->{tag}->grpc: get max records stream, took: {} ms",
-        start_ts.elapsed().as_millis()
-    );
-
-    // 2. generate search group with max records stream
-    let start_ts = std::time::Instant::now();
-    let cuts = if with_cuts {
-        search_group_cuts(start, end, step, &plan, wal_floor())
-    } else {
-        Vec::new()
-    };
-    let memory_limit = config::get_config().memory_cache.datafusion_max_size; // bytes
-    let groups = match generate_search_groups(memory_limit, &plan, start, end, step, &cuts).await {
-        Ok(v) => v,
-        Err(e) => {
-            log::error!(
-                "[trace_id {trace_id}] promql->{tag}->grpc: generate search group error: {e}"
-            );
-            return Err(e);
-        }
-    };
-    if groups.len() > 1 {
-        log::info!(
-            "[trace_id {trace_id}] promql->{tag}->grpc: get groups {groups:?}, cuts {cuts:?}"
-        );
-    }
-    log::info!(
-        "[trace_id {trace_id}] promql->{tag}->grpc: generate search group, took: {} ms",
-        start_ts.elapsed().as_millis()
-    );
-    Ok(groups)
-}
-
-async fn group_plan(
+async fn get_max_file_list(
     trace_id: &str,
     org_id: &str,
     query: &str,
