@@ -171,6 +171,7 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
+import { DEFAULT_PROVIDER_BASE_URLS } from "@/utils/llmProviderBaseUrls";
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -273,15 +274,9 @@ async function loadProviders() {
   }
 }
 
-const DEFAULT_ENDPOINTS: Record<string, string> = {
-  openai: "api.openai.com",
-  deepseek: "api.deepseek.com",
-  anthropic: "api.anthropic.com",
-};
-
 function endpointFallback(provider: Provider) {
   const type = providerTypeOf(provider).toLowerCase();
-  return DEFAULT_ENDPOINTS[type] ?? "—";
+  return DEFAULT_PROVIDER_BASE_URLS[type] ?? "—";
 }
 
 function pushRouteAction(extra: Record<string, string | undefined>) {
