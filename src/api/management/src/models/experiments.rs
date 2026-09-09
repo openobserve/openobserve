@@ -688,7 +688,6 @@ impl From<RecordBatchResult> for SubmitExperimentRecordsResponseBody {
     }
 }
 
-
 #[derive(Clone, Debug, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PinnedExperimentScorerBody {
@@ -1009,7 +1008,6 @@ impl From<Experiment> for ExperimentResponseBody {
     }
 }
 
-
 impl From<ExperimentSummaryStatus> for ExperimentSummaryStatusBody {
     fn from(value: ExperimentSummaryStatus) -> Self {
         match value {
@@ -1023,7 +1021,6 @@ impl From<ExperimentSummaryStatus> for ExperimentSummaryStatusBody {
         }
     }
 }
-
 
 /// The result of a Baseline change, naming both ends of the move.
 #[derive(Clone, Debug, Serialize, ToSchema)]
