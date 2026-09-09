@@ -119,6 +119,10 @@ const syntheticsService = {
     return http().get(`/api/${orgIdentifier}/synthetics/${id}/runs/${runId}${params}`);
   },
 
+  /** Checks that reference `id` as a subtest — used to warn before deleting or unpublishing it. */
+  referencedBy: (orgIdentifier: string, id: string) =>
+    http().get(`/api/${orgIdentifier}/synthetics/${id}/referenced-by`),
+
   artifactUrl: (orgIdentifier: string, key: string, folderId?: string) => {
     // Fallback proxy URL. key format:
     // synthetics/{org}/{synthetics_id}/{yyyy}/{mm}/{dd}/{run_id}/{execution_id|job_id}/{filename}

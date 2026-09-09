@@ -16,6 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
 import type { BlockedReason, BrowserStep, ReplayPhase, StepReplayResult } from "@/types/synthetics";
 import type { StepDotState } from "./JourneySteps.vue";
@@ -27,6 +28,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import JourneySteps from "./JourneySteps.vue";
@@ -45,6 +47,8 @@ import ExtensionSetupDialog from "./ExtensionSetupDialog.vue";
 import { stepIsMissingTarget } from "@/utils/synthetics/stepTarget";
 import { journeyToWireSteps } from "@/utils/synthetics/mapRecordedStep";
 import { classifyPreflightFailure } from "@/utils/synthetics/replayFailure";
+import syntheticsService from "@/services/synthetics";
+import { composedStepId, type ChildJourney } from "@/utils/synthetics/expandJourney";
 
 const props = defineProps<{
   modelValue: BrowserStep[];
@@ -104,7 +108,30 @@ const props = defineProps<{
    * has no such panel, and the toolbar toggle is not rendered at all.
    */
   variablesPanelOpen?: boolean;
+  /** This journey's own check id — forwarded to `SubtestPicker` to exclude self-reference. */
+  ownCheckId?: string;
+  /** Executed step count of this journey — forwarded to `SubtestPicker`. */
+  ownStepCount?: number;
+  /** Configured run-time allowance for this journey, in ms — forwarded to `SubtestPicker`. */
+  journeyBudgetMs?: number;
+  /**
+   * The ONE cache of fetched child journeys, owned by the host (`CreateBrowserTest`).
+   *
+   * A prop, not a local cache: reading and expanding a subtest reference here
+   * shares the exact same `Map` instance the host mounts on load, so a child
+   * fetched to preview a reference row is immediately available to the
+   * executed-step count the host computes, and vice versa — there is exactly
+   * one cache in memory, never two that can drift apart.
+   */
+  childrenCache?: Map<string, ChildJourney>;
 }>();
+
+// Falls back to an empty Map for a host that has not wired the cache yet —
+// see the `childrenCache` prop doc. Every write still goes through
+// `props.childrenCache` when the host supplied one, so the single-cache
+// invariant holds whenever a real host is in play; this only keeps a bare
+// mount (tests, a host with no subtest support) from throwing.
+const childrenCache = computed(() => props.childrenCache ?? new Map<string, ChildJourney>());
 
 const emit = defineEmits<{
   "update:modelValue": [value: BrowserStep[]];
@@ -352,6 +379,8 @@ const multiSelectEnabled = computed(
 // All Chrome-extension messaging lives in the composable; this component only
 // reflects its reactive state and merges the result into the journey on stop.
 const { t } = useI18nTyped();
+const store = useStore();
+const org = computed(() => store.state.selectedOrganization.identifier as string);
 
 const recorder = useSyntheticsRecorder(t);
 const isRecording = recorder.isRecording;
@@ -922,6 +951,80 @@ function handleToggleExpand(row: BrowserStep) {
     expandedStepIds.value = expandedStepIds.value.filter((id) => id !== row.id);
   } else {
     expandedStepIds.value = [...expandedStepIds.value, row.id];
+    if (row.action === "subtest") ensureChildLoaded(row);
+  }
+}
+
+// ── Subtest reference row preview ───────────────────────────────────────
+// Fetch status is transient UI state, not a second cache of journeys — the
+// journeys themselves live only in `props.childrenCache`, the one Map the
+// host owns; this only remembers which ids are in flight or were refused.
+const loadingChildIds = ref<Set<string>>(new Set());
+const refusedChildIds = ref<Set<string>>(new Set());
+
+function isChildLoading(row: BrowserStep): boolean {
+  return !!row.subtest?.id && loadingChildIds.value.has(row.subtest.id);
+}
+
+function isChildRefused(row: BrowserStep): boolean {
+  return !!row.subtest?.id && refusedChildIds.value.has(row.subtest.id);
+}
+
+function childFor(row: BrowserStep) {
+  return row.subtest?.id ? childrenCache.value.get(row.subtest.id) : undefined;
+}
+
+/**
+ * Rows for the read-only preview table, keyed by the COMPOSED id.
+ *
+ * This is an OTable nested inside another OTable's expansion slot, and a
+ * child step id can collide with an authored one now that ids round-trip
+ * unchanged — the composed id is what keeps every row in the DOM unique.
+ */
+function childRowsFor(row: BrowserStep) {
+  const child = childFor(row);
+  if (!child) return [];
+  return child.steps.map((s) => ({
+    id: composedStepId(row.id, s.id),
+    action: s.action,
+    name: s.name,
+    detail: "",
+  }));
+}
+
+async function ensureChildLoaded(row: BrowserStep) {
+  const id = row.subtest?.id;
+  if (!id) return;
+  if (
+    childrenCache.value.has(id) ||
+    loadingChildIds.value.has(id) ||
+    refusedChildIds.value.has(id)
+  ) {
+    return;
+  }
+  loadingChildIds.value = new Set([...loadingChildIds.value, id]);
+  try {
+    const res = await syntheticsService.get(org.value, id);
+    const data = res.data ?? {};
+    // Same Map instance the host reads — writing into it is what keeps this
+    // the ONE cache rather than a second copy.
+    childrenCache.value.set(id, {
+      id,
+      name: data.name ?? "",
+      steps: (data.config?.steps ?? []) as BrowserStep[],
+    });
+  } catch (err: any) {
+    if (err?.response?.status === 403) {
+      refusedChildIds.value = new Set([...refusedChildIds.value, id]);
+      toast({ variant: "error", message: t("synthetics.journey.subtest.noAccessToast") });
+    } else {
+      console.error("[synthetics] failed to load subtest reference", err);
+      refusedChildIds.value = new Set([...refusedChildIds.value, id]);
+    }
+  } finally {
+    const next = new Set(loadingChildIds.value);
+    next.delete(id);
+    loadingChildIds.value = next;
   }
 }
 
@@ -1719,6 +1822,61 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
           :step-number="stepNumberOf(row)"
           @retry-replay="emit('replay-up-to', stepNumberOf(row))"
         />
+        <!-- Subtest reference — read-only preview of the child's steps, since
+             this row runs another check's steps in its place rather than
+             acting itself. Three states (§5.7): the fetch can be refused, so
+             loading and refused are rendered distinctly rather than one
+             spinner that a refused author would watch forever. -->
+        <div
+          v-if="(row as BrowserStep).action === 'subtest'"
+          class="mx-8 mt-3"
+          data-test="synthetics-journey-subtest-preview"
+        >
+          <OSkeleton
+            v-if="isChildLoading(row as BrowserStep)"
+            :rows="3"
+            data-test="synthetics-journey-subtest-loading"
+          />
+          <div
+            v-else-if="isChildRefused(row as BrowserStep)"
+            class="rounded-default bg-status-error-bg text-status-error-text flex items-center gap-2 px-3 py-2 text-sm"
+            role="alert"
+            data-test="synthetics-journey-subtest-refused"
+          >
+            <OIcon name="lock" size="sm" aria-hidden="true" />
+            <span>{{
+              t("synthetics.journey.subtest.noAccess", {
+                name: (row as BrowserStep).subtest?.name || (row as BrowserStep).name || "",
+              })
+            }}</span>
+          </div>
+          <div v-else-if="childFor(row as BrowserStep)" class="flex flex-col gap-2">
+            <div class="flex items-center gap-2">
+              <OBadge variant="default" size="sm" data-test="synthetics-journey-subtest-count">
+                {{
+                  t("synthetics.journey.subtest.stepsBadge", {
+                    count: childFor(row as BrowserStep)!.steps.length,
+                  })
+                }}
+              </OBadge>
+              <span
+                class="text-text-secondary text-xs"
+                data-test="synthetics-journey-subtest-ignored-env"
+              >
+                {{ t("synthetics.journey.subtest.ignoredEnv") }}
+              </span>
+            </div>
+            <JourneySteps
+              :data="childRowsFor(row as BrowserStep)"
+              mode="results"
+              action-key="action"
+              name-key="name"
+              detail-key="detail"
+              readonly
+            />
+          </div>
+        </div>
+
         <!-- `selector-error-message` is field-scoped, not step-scoped: it renders
              inside the step it describes, so naming that step again only crowds
              out the one sentence that says what to do. `selectorRequired` keeps
@@ -1726,6 +1884,9 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
         <BrowserJourneyStepEditor
           class="px-8 pt-3 pb-3"
           :step="row"
+          :own-check-id="ownCheckId"
+          :own-step-count="ownStepCount"
+          :journey-budget-ms="journeyBudgetMs"
           :action-error-message="
             (firstStepError && props.modelValue[0]?.id === row.id
               ? t('synthetics.validation.firstStepMustNavigate')

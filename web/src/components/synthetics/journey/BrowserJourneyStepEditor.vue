@@ -43,6 +43,7 @@ import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import type { CheckboxModelValue } from "@/lib/forms/Checkbox/OCheckbox.types";
 import BrowserJourneyLocator from "./BrowserJourneyLocator.vue";
 import BrowserJourneyAssertion from "./BrowserJourneyAssertion.vue";
+import SubtestPicker from "./SubtestPicker.vue";
 import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
 import OStep from "@/lib/navigation/Stepper/OStep.vue";
 
@@ -67,6 +68,12 @@ const props = defineProps<{
   selectorErrorMessage?: string;
   valueErrorMessage?: string;
   expectedErrorMessage?: string;
+  /** This journey's own check id, so `SubtestPicker` can exclude self-reference. */
+  ownCheckId?: string;
+  /** Executed step count of this journey as it stands — see `SubtestPicker`. */
+  ownStepCount?: number;
+  /** Configured run-time allowance for this journey, in ms; undefined uses the default. */
+  journeyBudgetMs?: number;
 }>();
 
 const emit = defineEmits<{
@@ -161,10 +168,32 @@ const actionComputed = computed({
   get: () => props.step.action,
   set: (v: BrowserStep["action"]) => {
     if (v !== props.step.action && props.step.wire) actionChangedFromRecorded.value = true;
-    // The click fields describe a click and nothing else, so they go the same way
-    // as the wire when the action changes — otherwise a right click renamed to a
-    // hover would still store `button: right` on a step that cannot use it.
-    update(v === "click" ? { action: v } : { action: v, button: undefined, clickCount: undefined });
+    if (v === "subtest") {
+      // A subtest step names no element and runs no action of its own — every
+      // execution field belongs to the OLD action and would misdescribe this one.
+      update({
+        action: v,
+        locator: undefined,
+        selector: undefined,
+        value: undefined,
+        assertion: undefined,
+        settle: undefined,
+        optional: undefined,
+        alwaysRun: undefined,
+        button: undefined,
+        clickCount: undefined,
+        subtest: undefined,
+      });
+    } else {
+      // The click fields describe a click and nothing else, so they go the same way
+      // as the wire when the action changes — otherwise a right click renamed to a
+      // hover would still store `button: right` on a step that cannot use it.
+      update(
+        v === "click"
+          ? { action: v, subtest: undefined }
+          : { action: v, button: undefined, clickCount: undefined, subtest: undefined },
+      );
+    }
     emit("action-edited");
   },
 });
@@ -419,6 +448,19 @@ const hasAdvancedChanges = computed(
         />
       </div>
 
+      <!-- A subtest step names no element and runs no action of its own — it
+           runs another check's steps in its place, so every execution field
+           below (target, value, timeout, settle, flags) is inapplicable. -->
+      <SubtestPicker
+        v-if="props.step.action === 'subtest'"
+        :model-value="props.step.subtest"
+        :own-check-id="ownCheckId"
+        :own-step-count="ownStepCount"
+        :journey-budget-ms="journeyBudgetMs"
+        data-test="synthetics-journey-step-subtest-picker"
+        @update:model-value="(ref) => update({ subtest: ref, name: props.step.name || ref?.name })"
+      />
+
       <!-- The discard is right; doing it silently was not (D9). -->
       <p
         v-if="actionChangedFromRecorded"
@@ -496,6 +538,7 @@ const hasAdvancedChanges = computed(
          Opens itself when the step carries a non-default, so nothing an author set
          is hidden from them. -->
     <OCollapsible
+      v-if="props.step.action !== 'subtest'"
       :default-open="hasAdvancedChanges"
       variant="sidebar"
       class="rounded-default bg-surface-panel mt-2 w-full max-w-200 border"

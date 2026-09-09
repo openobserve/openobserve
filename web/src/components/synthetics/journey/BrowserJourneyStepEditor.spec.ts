@@ -13,12 +13,25 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
 import type { BrowserStep } from "@/types/synthetics";
 import BrowserJourneyStepEditor from "./BrowserJourneyStepEditor.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import store from "@/test/unit/helpers/store";
 import en from "@/locales/languages/en-US.json";
+
+// A subtest step mounts SubtestPicker, which fetches its options on mount —
+// stubbed to resolve empty rather than reject, since none of these tests care
+// about its contents.
+vi.mock("@/services/synthetics", () => ({
+  default: {
+    listByFolderId: vi.fn().mockResolvedValue({ data: { checks: [] } }),
+    get: vi.fn(),
+    getRuns: vi.fn(),
+  },
+}));
 
 const i18n = createI18n({
   legacy: false,
@@ -37,7 +50,7 @@ function render(step: Partial<BrowserStep> = {}, props: Record<string, unknown> 
   };
   return mount(BrowserJourneyStepEditor, {
     props: { step: full, ...props },
-    global: { plugins: [i18n] },
+    global: { plugins: [i18n, store] },
   });
 }
 
@@ -143,7 +156,7 @@ describe("BrowserJourneyStepEditor inline field errors", () => {
     };
     return mount(BrowserJourneyStepEditor, {
       props: { step: full, ...errors },
-      global: { plugins: [i18n] },
+      global: { plugins: [i18n, store] },
     });
   }
 
@@ -560,5 +573,55 @@ describe("BrowserJourneyStepEditor click type", () => {
     expect(step.action).toBe("hover");
     expect(step.button).toBeUndefined();
     expect(step.clickCount).toBeUndefined();
+  });
+});
+
+// Task 13: turning a step into a subtest reference discards every execution
+// field it carried — a reference names another check, not an action — and
+// turning it back drops the reference the picker filled in.
+describe("BrowserJourneyStepEditor subtest action", () => {
+  it("clears the execution fields when a step becomes a subtest, and the reference when it stops being one", async () => {
+    const click: BrowserStep = {
+      id: "s2",
+      action: "click",
+      name: "Sign in",
+      value: "x",
+      optional: true,
+      locator: { candidates: [{ kind: "css", value: "#a" }] },
+    };
+    const w = mount(BrowserJourneyStepEditor, {
+      props: { step: click },
+      global: { plugins: [i18n, store] },
+    });
+    await w.findComponent(OSelect).vm.$emit("update:modelValue", "subtest");
+    const toSubtest = w.emitted("update:step")!.at(-1)![0] as BrowserStep;
+    expect(toSubtest.action).toBe("subtest");
+    expect(toSubtest.locator).toBeUndefined();
+    expect(toSubtest.value).toBeUndefined();
+    expect(toSubtest.optional).toBeUndefined();
+    expect(toSubtest.subtest).toBeUndefined(); // the picker fills this, not the action change
+
+    const ref: BrowserStep = {
+      id: "s2",
+      action: "subtest",
+      name: "Login",
+      subtest: { id: "login-test" },
+    };
+    const w2 = mount(BrowserJourneyStepEditor, {
+      props: { step: ref },
+      global: { plugins: [i18n, store] },
+    });
+    await w2.findComponent(OSelect).vm.$emit("update:modelValue", "click");
+    expect((w2.emitted("update:step")!.at(-1)![0] as BrowserStep).subtest).toBeUndefined();
+  });
+
+  it("renders the subtest picker only for a subtest step, in place of the target/value/advanced blocks", () => {
+    const w = render({ action: "subtest", subtest: { id: "login-test" } });
+    expect(w.find(test("synthetics-journey-step-subtest-picker")).exists()).toBe(true);
+    expect(w.find(test("synthetics-journey-step-locator")).exists()).toBe(false);
+    expect(w.find(test("synthetics-journey-step-group-advanced")).exists()).toBe(false);
+
+    const other = render({ action: "click" });
+    expect(other.find(test("synthetics-journey-step-subtest-picker")).exists()).toBe(false);
   });
 });
