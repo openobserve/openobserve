@@ -15,10 +15,9 @@
 
 use std::collections::HashSet;
 
-use promql_parser::{
-    parser::{Expr, VectorSelector},
-    util::ExprVisitor,
-};
+use promql_parser::{parser::Expr, util::ExprVisitor};
+
+use crate::utils::metric_name;
 
 pub struct MetricNameVisitor {
     pub(crate) name: HashSet<String>,
@@ -42,26 +41,19 @@ impl Default for MetricNameVisitor {
     }
 }
 
-fn get_name_from_expr(vector_selector: &VectorSelector) -> String {
-    match vector_selector.name.as_ref() {
-        Some(name) => name.clone(),
-        None => "".to_string(),
-    }
-}
-
 impl ExprVisitor for MetricNameVisitor {
     type Error = &'static str;
 
     fn pre_visit(&mut self, expr: &Expr) -> Result<bool, Self::Error> {
-        match expr {
-            Expr::VectorSelector(vector_selector) => {
-                self.name.insert(get_name_from_expr(vector_selector));
-            }
-            Expr::MatrixSelector(matrix_selector) => {
-                self.name.insert(get_name_from_expr(&matrix_selector.vs));
-            }
-            _ => {}
-        }
+        let selector = match expr {
+            Expr::VectorSelector(vector_selector) => vector_selector,
+            Expr::MatrixSelector(matrix_selector) => &matrix_selector.vs,
+            _ => return Ok(true),
+        };
+        // callers authorize and file-list these names, so a nameless selector must fail
+        // rather than degrade to "" — the engine rejects it in `named_selector` anyway
+        self.name
+            .insert(metric_name(selector).ok_or("metric name is required")?);
         Ok(true)
     }
 }
@@ -107,14 +99,36 @@ mod tests {
     }
 
     #[test]
-    fn test_name_visitor_no_name_label_selector_inserts_empty_string() {
-        // A selector with no explicit metric name (only label matchers) gives name = None
-        let promql = r#"{job="test"}"#;
+    fn test_name_visitor_resolves_name_label_matcher() {
+        let promql = r#"sum(rate({__name__="http_requests_total"}[1m]))"#;
         let ast = parser::parse(promql).unwrap();
         let mut visitor = MetricNameVisitor::new();
         promql_parser::util::walk_expr(&mut visitor, &ast).unwrap();
-        // name field is None → get_name_from_expr returns "" → inserted into set
-        assert!(visitor.name.contains(""));
+        assert!(visitor.name.contains("http_requests_total"));
+        assert_eq!(visitor.name.len(), 1);
+    }
+
+    #[test]
+    fn test_name_visitor_both_name_forms_agree() {
+        let bare = r#"sum(rate(http_requests_total{}[1m]))"#;
+        let labelled = r#"sum(rate({__name__="http_requests_total"}[1m]))"#;
+        let names = |promql| {
+            let ast = parser::parse(promql).unwrap();
+            let mut visitor = MetricNameVisitor::new();
+            promql_parser::util::walk_expr(&mut visitor, &ast).unwrap();
+            visitor.into_names()
+        };
+        assert_eq!(names(bare), names(labelled));
+    }
+
+    #[test]
+    fn test_name_visitor_no_name_label_selector_is_an_error() {
+        // Never yield "" here: callers build FGA objects and file-list lookups from these names
+        let promql = r#"{job="test"}"#;
+        let ast = parser::parse(promql).unwrap();
+        let mut visitor = MetricNameVisitor::new();
+        assert!(promql_parser::util::walk_expr(&mut visitor, &ast).is_err());
+        assert!(!visitor.name.contains(""));
     }
 
     #[test]

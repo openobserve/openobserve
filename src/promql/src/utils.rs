@@ -28,7 +28,24 @@ use datafusion::{
     prelude::{DataFrame, Expr, col, lit},
 };
 use hashbrown::HashSet;
-use promql_parser::label::{MatchOp, Matcher, Matchers};
+use promql_parser::{
+    label::{MatchOp, Matcher, Matchers},
+    parser::VectorSelector,
+};
+
+/// The stream a selector reads from: the bare metric name, else the `__name__` matcher.
+/// `None` means the selector names no stream, which every caller must reject rather than
+/// fall back to an empty name.
+pub fn metric_name(selector: &VectorSelector) -> Option<String> {
+    if let Some(name) = selector.name.as_ref() {
+        return Some(name.clone());
+    }
+    selector
+        .matchers
+        .find_matchers(NAME_LABEL)
+        .first()
+        .map(|mat| mat.value.clone())
+}
 
 /// The schema field a residual matcher filters on; `None` when
 /// `matcher_predicates` skips the matcher entirely.

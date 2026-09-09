@@ -41,6 +41,7 @@ use crate::{
     load_series::{LoadedMetrics, PartitionedMetrics, selector_load_data_from_datafusion},
     micros,
     promql::rewrite::remove_filter_all,
+    utils::metric_name,
 };
 
 /// One context per selected schema with its scan stats and whether the matchers still apply.
@@ -499,12 +500,7 @@ pub(super) fn named_selector(mut selector: VectorSelector, kind: &str) -> Result
     if selector.name.is_some() {
         return Ok(selector);
     }
-    let Some(name) = selector
-        .matchers
-        .find_matchers(NAME_LABEL)
-        .first()
-        .map(|mat| mat.value.clone())
-    else {
+    let Some(name) = metric_name(&selector) else {
         return Err(DataFusionError::Plan(format!(
             "{kind}: metric name is required"
         )));
