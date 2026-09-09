@@ -604,11 +604,8 @@ export default defineComponent({
       () =>
         props.data?.config?.curated_empty_means_healthy === true && props.data?.type !== "table",
     );
-    /** A curated promql table renders its own empty state; the overlay stands down. */
-    const curatedTableOwnsEmpty = computed(
-      () =>
-        props.data?.type === "table" && props.data?.config?.curated_empty_means_healthy === true,
-    );
+    /** Every table renders its own empty state through TableRenderer's #empty default, so the overlay would stack a second one on top. */
+    const curatedTableOwnsEmpty = computed(() => props.data?.type === "table");
     const curatedNoData = computed(
       () =>
         props.data?.config?.curated_no_data_eligible === true && curatedSeriesEmpty.value === true,

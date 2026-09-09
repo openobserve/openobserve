@@ -1859,6 +1859,19 @@ describe("PanelContainer", () => {
       expect(wrapper.find('[data-test="dashboard-panel-curated-no-data"]').exists()).toBe(false);
     });
 
+    // Ownership follows the panel TYPE, never the healthy-empty flag: that flag is
+    // set on one section only, so keying on it left every table elsewhere printing
+    // its own empty state and the overlay on top of it.
+    it("a plain TABLE stands the overlay down too, flag or no flag", async () => {
+      wrapper = createWrapper({
+        data: { ...eligible({}), type: "table" },
+        viewOnly: true,
+      });
+      const renderer = wrapper.findComponent({ name: "PanelSchemaRenderer" });
+      await settle(renderer, "No Data");
+      expect(wrapper.find('[data-test="dashboard-panel-curated-no-data"]').exists()).toBe(false);
+    });
+
     it("a tile resolving to a REAL 0 renders no no-data state — the two must look different", async () => {
       wrapper = createWrapper({ data: eligible(), viewOnly: true });
       const renderer = wrapper.findComponent({ name: "PanelSchemaRenderer" });
