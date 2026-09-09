@@ -1246,6 +1246,7 @@ pub struct ExperimentProgressBody {
     pub skipped: u64,
 }
 
+/// Slot counts over the pinned set; `pending` is `total` minus the slots that have finished.
 #[derive(Clone, Debug, Default, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ExperimentTaskOutcomesBody {
@@ -1256,6 +1257,7 @@ pub struct ExperimentTaskOutcomesBody {
     pub skipped: u64,
 }
 
+/// `completed` is scored plus failed; `total` also counts pending, skipped and unscored.
 #[derive(Clone, Debug, Default, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ExperimentScoreOutcomesBody {
