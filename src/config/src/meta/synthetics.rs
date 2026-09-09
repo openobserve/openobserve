@@ -565,6 +565,11 @@ pub struct SyntheticListItem {
     pub status: SyntheticStatus,
     pub last_check_at: Option<i64>,
     pub last_response_ms: Option<f64>,
+    /// Steps that execute (expanded), browser checks only — what bills and draws down the pool
+    /// (§5.11).
+    pub steps: Option<i32>,
+    /// How many checks embed this one as a subtest.
+    pub referenced_by: i32,
 }
 
 // ── Query params / responses ──────────────────────────────────────────────────

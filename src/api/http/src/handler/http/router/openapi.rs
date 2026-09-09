@@ -287,6 +287,7 @@ use crate::{
         synthetics::move_synthetics,
         synthetics::set_synthetic_enabled,
         synthetics::run_synthetic_now,
+        synthetics::get_referenced_by,
         synthetics::list_locations,
         synthetics::list_runs,
         synthetics::get_run_detail,

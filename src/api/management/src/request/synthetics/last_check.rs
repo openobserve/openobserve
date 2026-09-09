@@ -190,6 +190,8 @@ mod tests {
             status: SyntheticStatus::Unknown,
             last_check_at: Some(111),
             last_response_ms: Some(1.0),
+            steps: None,
+            referenced_by: 0,
         }
     }
 

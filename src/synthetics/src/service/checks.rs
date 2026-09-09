@@ -366,6 +366,38 @@ pub async fn list_synthetics(
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
 
+    let ids: Vec<String> = checks.iter().map(|m| m.id.clone()).collect();
+    let refs = synthetics_refs::refs_for_parents(conn, org_id, &ids)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+    let child_ids: Vec<String> = refs
+        .values()
+        .flatten()
+        .cloned()
+        .collect::<HashSet<_>>()
+        .into_iter()
+        .collect();
+    let counts = synthetics_refs::child_step_counts(conn, org_id, &child_ids)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+    let used_by: HashMap<String, i32> = synthetics_refs::list_parents_for_many(conn, org_id, &ids)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?
+        .into_iter()
+        .map(|(child, parents)| (child, parents.len() as i32))
+        .collect();
+    let own: HashMap<String, usize> = checks
+        .iter()
+        .map(|m| {
+            (
+                m.id.clone(),
+                serde_json::from_value::<BrowserConfig>(m.config.clone())
+                    .map(|c| c.steps.len())
+                    .unwrap_or(0),
+            )
+        })
+        .collect();
+
     // Translates stored KSUID PK (folders.id) back to the public slug
     // (folders.folder_id) so the API response matches the folder-list API.
     // Alerts/reports do this via a JOIN; synthetics does it with a lookup.
@@ -388,6 +420,14 @@ pub async fn list_synthetics(
                 slug
             }
         };
+        let (steps, referenced_by) = composition_fields(
+            &m.id,
+            m.check_type == SyntheticType::Browser,
+            &own,
+            &refs,
+            &counts,
+            &used_by,
+        );
         items.push(SyntheticListItem {
             id: m.id,
             org_id: m.org_id,
@@ -406,6 +446,8 @@ pub async fn list_synthetics(
             status: m.last_check_status,
             last_check_at: (m.last_triggered_at > 0).then_some(m.last_triggered_at),
             last_response_ms: None,
+            steps,
+            referenced_by,
         });
     }
 
@@ -619,4 +661,53 @@ pub async fn run_synthetic_now(org_id: &str, id: &str) -> anyhow::Result<()> {
     synthetics_checks::advance_schedule(conn, id, check.last_triggered_at, 0)
         .await
         .map_err(|e| anyhow::anyhow!("[synthetics] run_synthetic_now advance_schedule: {e}"))
+}
+
+/// A row's expanded step count (browser only, §5.11) and how many checks embed it as a subtest.
+fn composition_fields(
+    id: &str,
+    is_browser: bool,
+    own: &HashMap<String, usize>,
+    refs: &HashMap<String, Vec<String>>,
+    counts: &HashMap<String, usize>,
+    used_by: &HashMap<String, i32>,
+) -> (Option<i32>, i32) {
+    let referenced_by = used_by.get(id).copied().unwrap_or(0);
+    if !is_browser {
+        return (None, referenced_by);
+    }
+    let own_steps = own.get(id).copied().unwrap_or(0);
+    let expanded = match refs.get(id) {
+        Some(children) => {
+            config::meta::synthetics_composition::expanded_step_count(own_steps, children, counts)
+        }
+        None => own_steps,
+    };
+    (
+        Some(i32::try_from(expanded).unwrap_or(i32::MAX)),
+        referenced_by,
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use super::composition_fields;
+
+    #[test]
+    fn expanded_steps_and_referenced_by_are_attached_per_row() {
+        let own = HashMap::from([("p".to_string(), 4usize), ("a".to_string(), 13usize)]);
+        let refs = HashMap::from([("p".to_string(), vec!["a".to_string()])]);
+        let counts = HashMap::from([("a".to_string(), 13usize)]);
+        let used_by = HashMap::from([("a".to_string(), 1i32)]);
+        let (p_steps, p_used) = composition_fields("p", true, &own, &refs, &counts, &used_by);
+        assert_eq!((p_steps, p_used), (Some(16), 0));
+        let (a_steps, a_used) = composition_fields("a", true, &own, &refs, &counts, &used_by);
+        assert_eq!((a_steps, a_used), (Some(13), 1));
+        assert_eq!(
+            composition_fields("h", false, &own, &refs, &counts, &used_by),
+            (None, 0)
+        );
+    }
 }
