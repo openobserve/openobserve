@@ -253,10 +253,7 @@ const selectedProvider = computed(() =>
 
 const providerName = computed(() => selectedProvider.value?.name ?? "");
 
-/** How far the schema this variant carries actually reaches the model. Unknown
- *  to the provider list — a draft restored from another org — is treated as
- *  carrying it natively: the run is what finds out, and a warning on every
- *  unresolved provider would cry wolf. */
+/** A provider unknown to the list (a draft from another org) counts as native, or every unresolved provider would cry wolf. */
 const schemaSupport = computed(() => {
   const provider = selectedProvider.value;
   return responseSchemaSupport(provider?.providerType ?? provider?.provider_type);
@@ -264,11 +261,7 @@ const schemaSupport = computed(() => {
 const schemaDropped = computed(() => schemaSupport.value === "dropped");
 const schemaApproximated = computed(() => schemaSupport.value === "approximated");
 
-/** Icon-only, so variant, tint and tooltip are the whole message and move as
- *  one. Four states, not two: an accent tint on a provider that drops the
- *  schema claims "in force" about something the request never carries, and on
- *  one that only approximates it claims a guarantee the provider never made.
- *  The only other evidence is an answer that arrives as prose, or off-shape. */
+/** Icon-only, so tint and tooltip are the whole message: an accent tint on a dropped or approximated schema would claim a guarantee the provider never made. */
 const schemaButton = computed(() => {
   if (!props.variant.responseSchema) {
     return {

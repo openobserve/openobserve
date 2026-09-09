@@ -181,21 +181,7 @@ function providerKind(request: PlaygroundRunRequest): string {
   return (request.providerType ?? "").trim().toLowerCase();
 }
 
-/**
- * How faithfully a provider kind honours a response schema.
- *
- * - `native`: the schema is enforced by the provider (OpenAI `json_schema`,
- *   Ollama `format`).
- * - `approximated`: the provider only has a JSON mode. The server downgrades
- *   the request to it and restates the schema in the prompt, so the answer is
- *   JSON but its shape is asked for, not guaranteed.
- * - `dropped`: the provider has no structured-output field at all; the schema
- *   never leaves the client.
- *
- * Exported because the UI has to say so BEFORE a run: the only other evidence
- * is an answer that comes back as prose, or off-shape, for no stated reason.
- * Unknown kinds count as native, which is what the server falls back to.
- */
+/** `native` is enforced, `approximated` is JSON mode with the schema restated in the prompt, `dropped` never leaves the client. */
 export type ResponseSchemaSupport = "native" | "approximated" | "dropped";
 
 export function responseSchemaSupport(providerType?: string): ResponseSchemaSupport {

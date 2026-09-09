@@ -82,8 +82,7 @@ describe("PlaygroundSchemaDialog", () => {
     expect(mountDialog({ dropped: false }).find(WARNING).exists()).toBe(false);
   });
 
-  // JSON mode with the schema restated in the prompt is not a guarantee, and
-  // the person reading the output has to know the difference.
+  // JSON mode with the schema in the prompt is not a guarantee; the reader has to know.
   it("notes when the provider only approximates the schema", () => {
     const wrapper = mountDialog({ approximated: true });
     expect(wrapper.find(APPROXIMATED).exists()).toBe(true);
