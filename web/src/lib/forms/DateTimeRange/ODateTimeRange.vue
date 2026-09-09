@@ -553,7 +553,7 @@ const triggerClasses = computed(() => [
         <!-- ── ABSOLUTE TAB ──────────────────────────────────── -->
         <div
           v-if="activeTab === 'absolute'"
-          class="flex max-h-[70vh] flex-col gap-3 overflow-y-auto p-3"
+          class="flex max-h-[70vh] flex-col gap-3 overflow-y-auto p-3 max-lg:max-h-none max-lg:overflow-visible"
           data-test="datetimerange-absolute-panel"
         >
           <!-- Range calendar -->
