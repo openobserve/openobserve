@@ -24,9 +24,7 @@ import type { I18nKey } from "@/types/i18n";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OText from "@/lib/core/Typography/OText.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import DateTime from "@/components/DateTime.vue";
@@ -68,7 +66,6 @@ const {
   partialGroups,
   staleGroups,
   warnings,
-  lastDataUs,
   stripAutoExpand,
   presentGroupIds,
   refresh,
@@ -246,10 +243,6 @@ const staleDurations = computed(() =>
   })),
 );
 
-const lastDataDuration = computed(() =>
-  lastDataUs.value == null ? "" : humanDuration(lastDataUs.value),
-);
-
 function humanDuration(sinceUs: number): string {
   // Measured against the later of window-end and wall clock, so a trailing range never reports a negative age.
   const reference = Math.max(range.value.to, Date.now() * 1000);
@@ -381,12 +374,6 @@ const singleClusterName = computed(() => {
 });
 
 // The "no data" state and the phase-tile subtitle both render ON the tile (§6.3), so PanelContainer owns them.
-
-// ── Footer ──────────────────────────────────────────────────────────────────
-
-const checkedAtLabel = computed(() =>
-  checkedAtUs.value == null ? "" : formatUs(checkedAtUs.value),
-);
 
 /** Navigation only — it creates, copies, imports and forks nothing (§6.5). */
 const openDashboardsList = () => {
@@ -638,13 +625,6 @@ watch(
               :content="t('infra.curated.warnBanner.stats')"
             />
 
-            <OText
-              v-if="staleDurations.length === 0 && lastDataUs != null"
-              variant="meta"
-              data-test="curated-last-data"
-              >{{ t("infra.curated.lastData", { duration: lastDataDuration }) }}</OText
-            >
-
             <OCollapsible
               v-if="hasStrip"
               v-model="stripExpanded"
@@ -781,34 +761,6 @@ watch(
           </div>
         </template>
       </RenderDashboardCharts>
-
-      <div class="flex items-center justify-between gap-2 pt-2" data-test="curated-footer">
-        <div class="flex items-center gap-2">
-          <OText variant="meta">{{
-            t("infra.curated.footer", { time: raw(checkedAtLabel) })
-          }}</OText>
-          <OTooltip
-            :content="t('infra.curated.footerVersionTooltip', { version: manifest.contentVersion })"
-          >
-            <OIcon
-              name="info"
-              size="sm"
-              data-test="curated-footer-version"
-              :aria-label="
-                t('infra.curated.footerVersionTooltip', { version: manifest.contentVersion })
-              "
-            />
-          </OTooltip>
-        </div>
-        <OButton
-          variant="ghost"
-          size="sm-action"
-          data-test="curated-build-own"
-          @click="openDashboardsList"
-        >
-          {{ t("infra.curated.buildOwnDashboard") }}
-        </OButton>
-      </div>
     </div>
   </OPageLayout>
 </template>

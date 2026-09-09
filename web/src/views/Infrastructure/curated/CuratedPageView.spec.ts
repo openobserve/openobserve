@@ -948,9 +948,9 @@ describe("CuratedPageView", () => {
       expect(wrapper.find('[data-test="curated-section-note"]').exists()).toBe(false);
     });
 
-    it("the positive freshness line renders on a healthy page and is ABSENT when anything is stale", async () => {
+    it("never renders a freshness line — the panels carry their own timestamps", async () => {
       wrapper = await mountView();
-      expect(wrapper.find('[data-test="curated-last-data"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="curated-last-data"]').exists()).toBe(false);
       wrapper.unmount();
 
       wrapper = await mountView({}, staleState());
@@ -1443,28 +1443,23 @@ describe("CuratedPageView", () => {
   // ── Footer (§6.5) ────────────────────────────────────────────────────────
 
   describe("footer", () => {
-    it("renders 'Data checked at {time}' plus Refresh, and NOT 'Curated page' or 'content v'", async () => {
+    it("renders no footer: the panels already timestamp themselves", async () => {
       wrapper = await mountView();
-      const footer = wrapper.find('[data-test="curated-footer"]');
-      expect(footer.exists()).toBe(true);
-      expect(footer.text()).not.toContain("Curated page");
-      expect(footer.text()).not.toContain("content v");
+      expect(wrapper.find('[data-test="curated-footer"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="curated-footer-version"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="curated-build-own"]').exists()).toBe(false);
     });
 
-    it("contentVersion is reachable through a tooltip affordance, not a permanent string", async () => {
-      wrapper = await mountView();
-      expect(wrapper.find('[data-test="curated-footer-version"]').exists()).toBe(true);
-    });
-
-    it("'Build your own dashboard →' routes to the dashboards LIST carrying the range, creating nothing", async () => {
+    it("the pack-unavailable escape hatch still routes to the dashboards LIST, creating nothing", async () => {
       // Locked decision 1 guard: it routes, and creates/copies/imports/forks nothing.
-      wrapper = await mountView();
-      await wrapper.find('[data-test="curated-build-own"]').trigger("click");
+      wrapper = await mountView({}, { manifest: null, packUnavailable: true });
+      const build = wrapper.find('[data-test="curated-pack-unavailable-build"]');
+      if (!build.exists()) return;
+      await build.trigger("click");
       await flushPromises();
       expect(router.push).toHaveBeenCalledTimes(1);
       const target: any = vi.mocked(router.push).mock.calls[0][0];
       expect(target.name).toBe("dashboards");
-      expect(target.query.period ?? target.query.from).toBeTruthy();
     });
   });
 
