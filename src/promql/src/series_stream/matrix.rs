@@ -13,28 +13,28 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! The matrix producer: an already-materialized matrix served through the
-//! series-source contract, so layouts that cannot stream still share the
+//! The matrix stream: an already-materialized matrix served through the
+//! series-stream contract, so layouts that cannot stream still share the
 //! streaming consumers.
 
 use config::meta::promql::value::{Labels, RangeValue, Sample};
 use datafusion::error::Result;
 use promql_parser::parser::LabelModifier;
 
-use super::SeriesSource;
+use super::SeriesStream;
 use crate::aggregations::{group_series_by_labels, projected_labels};
 
 /// Series per partition; matches the fused fold's historical chunk size.
 pub(crate) const MATRIX_PARTITION_CHUNK: usize = 1024;
 
 /// One partition of a materialized matrix, owning its series in group order.
-pub(crate) struct MatrixSource {
+pub(crate) struct MatrixSeriesStream {
     series: std::vec::IntoIter<(u64, RangeValue)>,
     current: Option<RangeValue>,
     modifier: Option<LabelModifier>,
 }
 
-impl SeriesSource for MatrixSource {
+impl SeriesStream for MatrixSeriesStream {
     async fn advance(&mut self) -> Result<Option<u64>> {
         let Some((sig, series)) = self.series.next() else {
             self.current = None;
@@ -56,11 +56,11 @@ impl SeriesSource for MatrixSource {
 }
 
 /// Splits a matrix into group-contiguous partitions; boundaries depend only on the series count.
-pub(crate) fn matrix_sources(
+pub(crate) fn matrix_streams(
     matrix: Vec<RangeValue>,
     modifier: &Option<LabelModifier>,
     max_partitions: usize,
-) -> Vec<MatrixSource> {
+) -> Vec<MatrixSeriesStream> {
     let mut groups: Vec<(u64, Vec<usize>)> = group_series_by_labels(&matrix, modifier)
         .into_iter()
         .collect();
@@ -92,7 +92,7 @@ pub(crate) fn matrix_sources(
 
     parts
         .into_iter()
-        .map(|part| MatrixSource {
+        .map(|part| MatrixSeriesStream {
             series: part.into_iter(),
             current: None,
             modifier: modifier.clone(),

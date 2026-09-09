@@ -40,7 +40,7 @@ use crate::{
     fused::FusedAggOp,
     load_series::apply_time_window,
     micros,
-    series_source::stream::{StreamSource, build_shard_inputs},
+    series_stream::merge::{MergeSeriesStream, build_shard_inputs},
     utils::apply_matchers,
 };
 
@@ -111,7 +111,7 @@ pub(crate) async fn fused_agg(
     let group_cols = Arc::new(group_cols);
     let sources = shard_inputs
         .into_iter()
-        .map(|streams| StreamSource::start(streams, group_cols.clone(), selector.offset))
+        .map(|streams| MergeSeriesStream::start(streams, group_cols.clone(), selector.offset))
         .collect();
     let (value, series_count) = fold_sources(sources, params).await?;
 

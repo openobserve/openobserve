@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! The single fused fold: every series source partition folds its series into
+//! The single fused fold: every series stream partition folds its series into
 //! per-group accumulators, and the partitions merge in order at the end. The
 //! producers only decide how series arrive; the aggregation lives here once.
 
@@ -30,7 +30,7 @@ use super::{accumulator::FusedAccumulator, op::FusedAggOp};
 use crate::{
     functions::{RangeFunc, advance_sample_window},
     micros,
-    series_source::SeriesSource,
+    series_stream::SeriesStream,
 };
 
 pub(super) type GroupAccs = HashMap<u64, GroupEntry>;
@@ -75,7 +75,7 @@ pub(super) async fn fold_sources<F, S>(
 ) -> Result<(Value, usize)>
 where
     F: Future<Output = Result<S>> + Send + 'static,
-    S: SeriesSource + 'static,
+    S: SeriesStream + 'static,
 {
     let folds = sources
         .into_iter()
@@ -94,7 +94,7 @@ where
 }
 
 /// Folds one partition's series into its group accumulators, dropping each as it goes.
-async fn fold_partition<S: SeriesSource>(
+async fn fold_partition<S: SeriesStream>(
     mut source: S,
     params: Arc<FoldParams>,
 ) -> Result<(GroupAccs, usize)> {
@@ -237,9 +237,9 @@ mod tests {
     use crate::functions;
 
     /// Errors on its first series.
-    struct FailingSource;
+    struct FailingStream;
 
-    impl SeriesSource for FailingSource {
+    impl SeriesStream for FailingStream {
         async fn advance(&mut self) -> Result<Option<u64>> {
             Err(DataFusionError::Execution("partition failed".into()))
         }
@@ -252,12 +252,12 @@ mod tests {
     }
 
     /// Yields series forever; `finished` records whether it ever returned.
-    struct EndlessSource {
+    struct EndlessStream {
         samples: Vec<Sample>,
         finished: Arc<AtomicBool>,
     }
 
-    impl SeriesSource for EndlessSource {
+    impl SeriesStream for EndlessStream {
         async fn advance(&mut self) -> Result<Option<u64>> {
             Ok(Some(1))
         }
@@ -269,7 +269,7 @@ mod tests {
         }
     }
 
-    impl Drop for EndlessSource {
+    impl Drop for EndlessStream {
         fn drop(&mut self) {
             self.finished.store(true, Ordering::SeqCst);
         }
@@ -285,11 +285,11 @@ mod tests {
     async fn test_run_folds_fails_fast_and_aborts_the_rest() {
         let params = params();
         let dropped = Arc::new(AtomicBool::new(false));
-        let endless = EndlessSource {
+        let endless = EndlessStream {
             samples: vec![Sample::new(1_500_000, 1.0)],
             finished: dropped.clone(),
         };
-        let failing = FailingSource;
+        let failing = FailingStream;
         let folds = vec![
             Box::pin(fold_partition(endless, params.clone()))
                 as std::pin::Pin<Box<dyn Future<Output = Result<(GroupAccs, usize)>> + Send>>,

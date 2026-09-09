@@ -30,7 +30,7 @@ use super::{
 };
 use crate::{
     functions::{KEEP_METRIC_NAME_FUNC, RangeFunc},
-    series_source::matrix::matrix_sources,
+    series_stream::matrix::matrix_streams,
 };
 
 /// Evaluates a range function over an already-materialized matrix and folds
@@ -86,7 +86,7 @@ pub(crate) async fn fused_agg(
         .expect("range function input must have a time window")
         .range;
     let params = FoldParams::new(op, func, range, eval_ctx);
-    let sources = matrix_sources(matrix, param, config::get_config().limit.cpu_num)
+    let sources = matrix_streams(matrix, param, config::get_config().limit.cpu_num)
         .into_iter()
         .map(|source| std::future::ready(Ok(source)))
         .collect();
@@ -118,7 +118,7 @@ mod tests {
     use config::meta::promql::value::{Label, RangeValue, Sample, TimeWindow};
 
     use super::{super::test_support::*, *};
-    use crate::{aggregations, functions, series_source::matrix::MATRIX_PARTITION_CHUNK};
+    use crate::{aggregations, functions, series_stream::matrix::MATRIX_PARTITION_CHUNK};
 
     type GenericAgg = fn(&Option<LabelModifier>, Value, &EvalContext) -> Result<Value>;
 

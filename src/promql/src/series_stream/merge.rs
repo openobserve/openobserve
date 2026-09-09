@@ -13,8 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! The hash-sorted producer: shard plans over hash-sorted scans, and the per-shard source that
-//! merges a shard's ordered chains one series at a time.
+//! The merge stream: shard plans over hash-sorted scans, and the per-shard stream that merges a
+//! shard's ordered chains one series at a time.
 
 use std::{hash::Hasher, sync::Arc};
 
@@ -45,12 +45,12 @@ use datafusion::{
 };
 use futures::TryStreamExt;
 
-use super::SeriesSource;
+use super::SeriesStream;
 use crate::load_series::{LabelColumn, batch_run_len};
 
-/// One shard's series source; every chain holds one run per series, so the minimum head hash is the
+/// One shard's series stream; every chain holds one run per series, so the minimum head hash is the
 /// next series.
-pub(crate) struct StreamSource {
+pub(crate) struct MergeSeriesStream {
     cursors: Vec<ChainCursor>,
     group_cols: Arc<Vec<String>>,
     offset: i64,
@@ -59,7 +59,7 @@ pub(crate) struct StreamSource {
     samples: Vec<Sample>,
 }
 
-impl StreamSource {
+impl MergeSeriesStream {
     pub(crate) async fn start(
         streams: Vec<SendableRecordBatchStream>,
         group_cols: Arc<Vec<String>>,
@@ -104,7 +104,7 @@ impl StreamSource {
     }
 }
 
-impl SeriesSource for StreamSource {
+impl SeriesStream for MergeSeriesStream {
     async fn advance(&mut self) -> Result<Option<u64>> {
         let Some(hash) = self.cursors.iter().filter_map(ChainCursor::head_hash).min() else {
             self.current = None;
@@ -239,7 +239,7 @@ pub(crate) async fn build_shard_inputs(
                     .and(col(HASH_LABEL).lt_eq(lit(hi))),
             )?
             .select_columns(columns)?
-            // planning-only: proves the scan partitions hash-ordered; the shard source merges, not the SPM
+            // planning-only: proves the scan partitions hash-ordered; the shard stream merges, not the SPM
             .sort(vec![col(HASH_LABEL).sort(true, false)])?;
         let task_ctx = Arc::new(shard_df.task_ctx());
         let plan = shard_df.create_physical_plan().await?;
