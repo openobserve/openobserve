@@ -885,7 +885,7 @@
     "queryFailed": "Error en la consulta",
     "unknownError": "Error desconocido",
     "selectedLabel": "seleccionado",
-    "selectToFilter": "Seleccionar para filtrar",
+    "selectToFilter": "Seleccionar filtro",
     "clearSelection": "Limpiar selección",
     "includeModeHint": "Modo incluir (=)",
     "excludeModeHint": "Modo excluir (≠)",
@@ -6314,7 +6314,7 @@
       "frequencyPositiveNumber": "Alerta - {index}: La frecuencia debe ser un número positivo mayor que 0 y debe ser un número.",
       "cronExpressionString": "Alerta - {index}: La expresión cron debe ser una cadena.",
       "thresholdPositiveNumber": "Alerta - {index}: El umbral debe ser un número positivo mayor que 0 y debe ser un número.",
-      "silenceNonNegativeNumber": "Alerta - {index}: El silencio debe ser un número positivo mayor o igual que 0 y debe ser un número.",
+      "silenceNonNegativeNumber": "Alerta - {index}: El tiempo de espera debe ser un número mayor o igual a 0.",
       "frequencyTypeInvalid": "Alerta - {index}: El tipo de frecuencia debe ser 'minutes' o 'cron' y debe ser una cadena.",
       "cronExpressionInvalid": "Alerta - {index}: La expresión cron debe ser una expresión cron válida."
     },
@@ -6524,7 +6524,7 @@
       "nameInvalidChars": "No se permiten caracteres como :, ?, /, # ni espacios.",
       "templateRequired": "La plantilla es obligatoria.",
       "validEmails": "¡Agrega correos electrónicos válidos!",
-      "silenceNonNegative": "El silencio de notificaciones debe ser mayor o igual que 0",
+      "silenceNonNegative": "El tiempo de espera debe ser mayor o igual a 0",
       "pendingPeriodNonNegative": "El período de espera debe ser mayor o igual a 0",
       "periodPositive": "El período debe ser mayor que 0",
       "destinationRequired": "Se requiere al menos un destino.",
@@ -10793,7 +10793,8 @@
         "scoreConfigs": "Configuraciones de puntuación",
         "targetDataset": "Dataset de destino",
         "progress": "Progreso",
-        "updated": "Actualizado"
+        "updated": "Actualizado",
+        "actions": "Acciones"
       },
       "create": {
         "title": "Nueva cola",
@@ -10847,7 +10848,8 @@
           "refType": "Ref",
           "refId": "Referencia",
           "added": "Añadido",
-          "status": "Estado"
+          "status": "Estado",
+          "actions": "Acciones"
         },
         "status": {
           "pending": "Pendiente",
@@ -10959,6 +10961,8 @@
       "viewAll": "Ver experimentos",
       "baseline": "Línea base",
       "setBaseline": "Establecer línea base",
+      "baselineRequiresCompleted": "Solo una ejecución completada puede establecerse como línea base.",
+      "baselineError": "No se pudo actualizar la línea base.",
       "selectForComparison": "Seleccionar para comparación",
       "progress": "{done} de {total} espacios",
       "noScores": "No hay puntuaciones agregadas",
@@ -11069,8 +11073,10 @@
       "addToDataset": "Agregar",
       "detail": {
         "by": "por {user}",
-        "p50Latency": "Latencia P50",
+        "p50Latency": "Latencia P50 de la tarea",
         "totalCost": "Costo total",
+        "costBreakdown": "Tarea {task} · Puntuación {scoring}",
+        "partialCostBreakdown": "Tarea {task} · Puntuación {scoring} · Parcial",
         "highDispersion": "Casos de alta dispersión",
         "highDispersionHint": "Filas donde los intentos no coinciden",
         "scoredRows": "{scored}/{total} filas puntuadas",
@@ -11100,7 +11106,7 @@
           "run": "Ejecución"
         },
         "runSummary": "{trials} · {scorers}",
-        "progress": "Progreso",
+        "progress": "Progreso de la tarea",
         "scoring": "Puntuación",
         "scoringDistribution": "{success} exitosos · {failed} fallidos · {pending} pendientes · {skipped} omitidos",
         "compare": "Comparar",
@@ -11193,6 +11199,16 @@
           "typeCategorical": "Categórico",
           "typeBoolean": "Booleano",
           "threshold": "Umbral",
+          "thresholdTooltip": "Los valores de la línea base y del candidato que estén a menos de {percent} de diferencia entre sí se consideran sin cambios, no degradados ni mejorados.",
+          "outcomeDimensions": "Criterios de resultado",
+          "outcomeTooltipNone": "No hay columnas seleccionadas: todas las filas comparables se mostrarán como Sin comparar.",
+          "outcomeTooltipAll": "Todas las columnas elegibles determinan el resultado de cada fila.",
+          "outcomeTooltipPartial": "Solo {names} determinan el resultado de cada fila. Las demás columnas se muestran, pero no lo afectan.",
+          "allOutcomeDimensions": "Todas las columnas elegibles",
+          "noOutcomeDimensions": "Sin columnas",
+          "selectedOutcomeDimensions": "{count} columna | {count} columnas",
+          "outcomeDimensionUnavailable": "{name} (sin política de comparación)",
+          "dimensionExcludedHint": "Esta columna está excluida de los resultados. Selecciónela en Criterios de resultado para incluirla.",
           "measurePerRow": "Media por fila, entre ensayos",
           "dimensionImproved": "{count} fila mejorada | {count} filas mejoradas",
           "dimensionUnchanged": "{count} fila sin cambios | {count} filas sin cambios",
@@ -11274,8 +11290,8 @@
         },
         "searchPlaceholder": "Buscar elementos...",
         "csvImport": {
-          "button": "Subir CSV",
-          "title": "Subir elementos del dataset",
+          "button": "Importar elementos",
+          "title": "Importar elementos del conjunto de datos",
           "description": "Importa elementos del dataset desde un archivo CSV.",
           "fileLabel": "Archivo CSV",
           "placeholder": "Selecciona un archivo CSV",
@@ -12187,7 +12203,8 @@
       "remove": "Eliminar",
       "save": "Guardar",
       "saveAsDraft": "Guardar como borrador",
-      "createAndActivate": "Guardar y activar"
+      "createAndActivate": "Guardar y activar",
+      "testConnection": "Probar conexión"
     },
     "scorerTypeDialog": {
       "title": "Crear un nuevo marcador",
@@ -12213,15 +12230,19 @@
       "availableModelsLabel": "Modelos disponibles",
       "apiKeyLabel": "Clave de API",
       "apiKeyPlaceholder": "Introduce la clave de API",
-      "apiKeyHelp": "Se almacena cifrada en reposo y nunca se vuelve a leer. Deja en blanco al editar para conservar la clave existente.",
+      "apiKeyHelp": "La clave se almacena cifrada en reposo y no se vuelve a leer. Déjela en blanco al guardar los cambios para conservar la clave existente.",
       "authSection": "Autenticación",
-      "authEditNote": "Las credenciales no se pueden volver a leer. Vuelve a introducir la clave de API solo si quieres rotarla.",
+      "authEditNote": "Las credenciales no se pueden volver a leer. Para probar un proveedor que requiera autenticación, introduzca su clave de API.",
       "cannotRename": "No se puede renombrar después de la creación.",
       "availableModelsHelp": "Opcional. Lista separada por comas de los modelos disponibles en este proveedor.",
       "saveError": "No se pudo guardar el proveedor",
       "nameRequired": "Provider name is required",
       "typeRequired": "Provider type is required",
-      "defaultModelRequired": "Default model is required"
+      "defaultModelRequired": "Default model is required",
+      "testRunning": "Probando conexión...",
+      "testPassed": "Conectado",
+      "testFailed": "Conexión fallida",
+      "testError": "No se pudo probar la conexión"
     },
     "scoreConfig": {
       "gteSymbol": "≥",

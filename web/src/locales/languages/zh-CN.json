@@ -885,7 +885,7 @@
     "queryFailed": "查询失败",
     "unknownError": "未知错误",
     "selectedLabel": "已选择",
-    "selectToFilter": "选择以筛选",
+    "selectToFilter": "选择过滤器",
     "clearSelection": "清除选择",
     "includeModeHint": "包含模式 (=)",
     "excludeModeHint": "排除模式 (≠)",
@@ -6314,7 +6314,7 @@
       "frequencyPositiveNumber": "告警 - {index}：频率应为大于 0 的正数，并且应为数字。",
       "cronExpressionString": "告警 - {index}：Cron 表达式应为字符串。",
       "thresholdPositiveNumber": "告警 - {index}：阈值应为大于 0 的正数，并且应为数字。",
-      "silenceNonNegativeNumber": "告警 - {index}：静默时间应为大于或等于 0 的数字，并且应为数字。",
+      "silenceNonNegativeNumber": "告警 - {index}：冷却期应大于等于 0，且必须为数字。",
       "frequencyTypeInvalid": "告警 - {index}：频率类型必须为 'minutes' 或 'cron'，并且应为字符串。",
       "cronExpressionInvalid": "告警 - {index}：Cron 表达式应为有效的 cron 表达式。"
     },
@@ -6524,7 +6524,7 @@
       "nameInvalidChars": "不允许使用 :, ?, /, # 和空格等字符。",
       "templateRequired": "模板为必填项！",
       "validEmails": "请添加有效的电子邮件！",
-      "silenceNonNegative": "通知静默应大于或等于 0",
+      "silenceNonNegative": "冷却期应大于等于 0",
       "pendingPeriodNonNegative": "等待时长应大于或等于 0",
       "periodPositive": "周期应大于 0",
       "destinationRequired": "至少需要一个目标。",
@@ -10793,7 +10793,8 @@
         "scoreConfigs": "评分配置",
         "targetDataset": "目标数据集",
         "progress": "进度",
-        "updated": "已更新"
+        "updated": "已更新",
+        "actions": "操作"
       },
       "create": {
         "title": "新建队列",
@@ -10847,7 +10848,8 @@
           "refType": "参考",
           "refId": "参考",
           "added": "已添加",
-          "status": "状态"
+          "status": "状态",
+          "actions": "操作"
         },
         "status": {
           "pending": "待审",
@@ -10959,6 +10961,8 @@
       "viewAll": "查看实验",
       "baseline": "基线",
       "setBaseline": "设置基线",
+      "baselineRequiresCompleted": "只有已完成的运行才能设为基线",
+      "baselineError": "更新基线失败",
       "selectForComparison": "选择以进行比较",
       "progress": "{done}/{total} 个槽位",
       "noScores": "无汇总分数",
@@ -11069,8 +11073,10 @@
       "addToDataset": "添加",
       "detail": {
         "by": "由 {user}",
-        "p50Latency": "P50 延迟",
+        "p50Latency": "P50 任务延迟",
         "totalCost": "总成本",
+        "costBreakdown": "任务 {task} · 评分 {scoring}",
+        "partialCostBreakdown": "任务 {task} · 评分 {scoring} · 部分",
         "highDispersion": "高离散案例",
         "highDispersionHint": "试验结果不一致的行",
         "scoredRows": "已评分 {scored}/{total} 行",
@@ -11100,7 +11106,7 @@
           "run": "运行"
         },
         "runSummary": "{trials} · {scorers}",
-        "progress": "进度",
+        "progress": "任务进度",
         "scoring": "评分",
         "scoringDistribution": "{success} 成功 · {failed} 失败 · {pending} 待处理 · {skipped} 跳过",
         "compare": "比较",
@@ -11193,6 +11199,16 @@
           "typeCategorical": "分类",
           "typeBoolean": "布尔",
           "threshold": "阈值",
+          "thresholdTooltip": "基线与候选值的差异在 {percent} 以内时视为无变化，而非回退或改进。",
+          "outcomeDimensions": "结果判定条件",
+          "outcomeTooltipNone": "未选择任何列 — 每个可比较的行都将显示为“未比较”。",
+          "outcomeTooltipAll": "所有符合条件的列决定每行的结果。",
+          "outcomeTooltipPartial": "仅 {names} 决定每行的结果。其他列会显示但不会影响结果。",
+          "allOutcomeDimensions": "所有符合条件的列",
+          "noOutcomeDimensions": "无列",
+          "selectedOutcomeDimensions": "{count} 列 | {count} 列",
+          "outcomeDimensionUnavailable": "{name}（无比较策略）",
+          "dimensionExcludedHint": "此列已从结果判定中排除。在“结果判定条件”下选择它以将其包含在内。",
           "measurePerRow": "跨试验的每行均值",
           "dimensionImproved": "{count} 行改进 | {count} 行改进",
           "dimensionUnchanged": "{count} 行无变化 | {count} 行无变化",
@@ -11274,8 +11290,8 @@
         },
         "searchPlaceholder": "搜索条目...",
         "csvImport": {
-          "button": "上传 CSV",
-          "title": "上传数据集条目",
+          "button": "导入项",
+          "title": "导入数据集项",
           "description": "从 CSV 文件导入数据集条目。",
           "fileLabel": "CSV 文件",
           "placeholder": "选择 CSV 文件",
@@ -12187,7 +12203,8 @@
       "remove": "移除",
       "save": "保存",
       "saveAsDraft": "保存为草稿",
-      "createAndActivate": "保存并激活"
+      "createAndActivate": "保存并激活",
+      "testConnection": "测试连接"
     },
     "scorerTypeDialog": {
       "title": "创建新的评分器",
@@ -12213,15 +12230,19 @@
       "availableModelsLabel": "可用模型",
       "apiKeyLabel": "API 密钥",
       "apiKeyPlaceholder": "输入 API 密钥",
-      "apiKeyHelp": "在静态时加密存储且永不回读。编辑时留空可保留现有密钥。",
+      "apiKeyHelp": "密钥加密存储且无法再次读取。保存编辑时留空以保留现有密钥。",
       "authSection": "身份验证",
-      "authEditNote": "凭据无法回读。仅当您想轮换 API 密钥时才重新输入。",
+      "authEditNote": "凭据无法读取。要测试需要身份验证的提供商，请输入其 API 密钥。",
       "cannotRename": "创建后无法重命名。",
       "availableModelsHelp": "可选。此提供商上可用模型的逗号分隔列表。",
       "saveError": "无法保存提供商",
       "nameRequired": "Provider name is required",
       "typeRequired": "Provider type is required",
-      "defaultModelRequired": "Default model is required"
+      "defaultModelRequired": "Default model is required",
+      "testRunning": "正在测试连接...",
+      "testPassed": "已连接",
+      "testFailed": "连接失败",
+      "testError": "测试连接失败"
     },
     "scoreConfig": {
       "gteSymbol": "≥",

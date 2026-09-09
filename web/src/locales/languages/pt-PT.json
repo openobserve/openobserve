@@ -885,7 +885,7 @@
     "queryFailed": "Falha na consulta",
     "unknownError": "Erro desconhecido",
     "selectedLabel": "selecionados",
-    "selectToFilter": "Selecione para filtrar",
+    "selectToFilter": "Selecionar Filtro",
     "clearSelection": "Limpar seleção",
     "includeModeHint": "Modo incluir (=)",
     "excludeModeHint": "Modo excluir (≠)",
@@ -6314,7 +6314,7 @@
       "frequencyPositiveNumber": "Alerta - {index}: A frequência deve ser um número positivo maior que 0 e deve ser um número.",
       "cronExpressionString": "Alerta - {index}: A expressão Cron deve ser uma string.",
       "thresholdPositiveNumber": "Alerta - {index}: O limite deve ser um número positivo maior que 0 e deve ser um número.",
-      "silenceNonNegativeNumber": "Alerta - {index}: O silêncio deve ser um número positivo maior ou igual a 0 e deve ser um número.",
+      "silenceNonNegativeNumber": "Alerta - {index}: O período de cooldown deve ser um número maior ou igual a 0.",
       "frequencyTypeInvalid": "Alerta - {index}: O tipo de frequência deve ser 'minutes' ou 'cron' e deve ser uma string.",
       "cronExpressionInvalid": "Alerta - {index}: A expressão Cron deve ser uma expressão Cron válida."
     },
@@ -6524,7 +6524,7 @@
       "nameInvalidChars": "Caracteres como :, ?, /, # e espaços não são permitidos.",
       "templateRequired": "O modelo é obrigatório!",
       "validEmails": "Adicione e-mails válidos!",
-      "silenceNonNegative": "O silenciamento de notificações deve ser maior ou igual a 0",
+      "silenceNonNegative": "O período de cooldown deve ser maior ou igual a 0",
       "pendingPeriodNonNegative": "O período de espera deve ser maior ou igual a 0",
       "periodPositive": "O período deve ser maior que 0",
       "destinationRequired": "Pelo menos um destino é obrigatório.",
@@ -10793,7 +10793,8 @@
         "scoreConfigs": "Configurações de Pontuação",
         "targetDataset": "Dataset de Destino",
         "progress": "Progresso",
-        "updated": "Atualizado"
+        "updated": "Atualizado",
+        "actions": "Ações"
       },
       "create": {
         "title": "Nova Fila",
@@ -10847,7 +10848,8 @@
           "refType": "Ref",
           "refId": "Referência",
           "added": "Adicionado",
-          "status": "Status"
+          "status": "Status",
+          "actions": "Ações"
         },
         "status": {
           "pending": "Pendente",
@@ -10959,6 +10961,8 @@
       "viewAll": "Ver experimentos",
       "baseline": "Linha de base",
       "setBaseline": "Definir linha de base",
+      "baselineRequiresCompleted": "Somente uma execução concluída pode ser definida como linha de base",
+      "baselineError": "Falha ao atualizar a linha de base",
       "selectForComparison": "Selecionar para comparação",
       "progress": "{done} de {total} slots",
       "noScores": "Sem pontuações agregadas",
@@ -11069,8 +11073,10 @@
       "addToDataset": "Adicionar",
       "detail": {
         "by": "por {user}",
-        "p50Latency": "Latência P50",
+        "p50Latency": "Latência P50 da tarefa",
         "totalCost": "Custo Total",
+        "costBreakdown": "Tarefa {task} · Pontuação {scoring}",
+        "partialCostBreakdown": "Tarefa {task} · Pontuação {scoring} · Parcial",
         "highDispersion": "Casos de Alta Dispersão",
         "highDispersionHint": "Linhas em que as tentativas divergem",
         "scoredRows": "{scored}/{total} linhas pontuadas",
@@ -11100,7 +11106,7 @@
           "run": "Execução"
         },
         "runSummary": "{trials} · {scorers}",
-        "progress": "Progresso",
+        "progress": "Progresso da tarefa",
         "scoring": "Pontuação",
         "scoringDistribution": "{success} sucesso · {failed} falha · {pending} pendente · {skipped} ignorado",
         "compare": "Comparar",
@@ -11193,6 +11199,16 @@
           "typeCategorical": "Categórico",
           "typeBoolean": "Booleano",
           "threshold": "Limite",
+          "thresholdTooltip": "Os valores da linha de base e do candidato dentro de {percent} entre si são considerados inalterados, não regredidos nem melhorados.",
+          "outcomeDimensions": "Critérios de resultado",
+          "outcomeTooltipNone": "Nenhuma coluna está selecionada — cada linha comparável será exibida como Não Comparada.",
+          "outcomeTooltipAll": "Todas as colunas elegíveis determinam o resultado de cada linha.",
+          "outcomeTooltipPartial": "Somente {names} determinam o resultado de cada linha. Outras colunas são exibidas, mas não o afetam.",
+          "allOutcomeDimensions": "Todas as colunas elegíveis",
+          "noOutcomeDimensions": "Nenhuma coluna",
+          "selectedOutcomeDimensions": "{count} coluna | {count} colunas",
+          "outcomeDimensionUnavailable": "{name} (sem política de comparação)",
+          "dimensionExcludedHint": "Esta coluna está excluída dos resultados. Selecione-a em Critérios de resultado para incluí-la.",
           "measurePerRow": "Média por linha, ao longo das tentativas",
           "dimensionImproved": "{count} linha melhorou | {count} linhas melhoraram",
           "dimensionUnchanged": "{count} linha inalterada | {count} linhas inalteradas",
@@ -11274,8 +11290,8 @@
         },
         "searchPlaceholder": "Pesquisar Itens...",
         "csvImport": {
-          "button": "Enviar CSV",
-          "title": "Enviar Itens do Dataset",
+          "button": "Importar Itens",
+          "title": "Importar Itens do Conjunto de Dados",
           "description": "Importe itens do dataset a partir de um arquivo CSV.",
           "fileLabel": "Arquivo CSV",
           "placeholder": "Escolha um arquivo CSV",
@@ -12187,7 +12203,8 @@
       "remove": "Remover",
       "save": "Salvar",
       "saveAsDraft": "Salvar como Rascunho",
-      "createAndActivate": "Salvar e Ativar"
+      "createAndActivate": "Salvar e Ativar",
+      "testConnection": "Testar Conexão"
     },
     "scorerTypeDialog": {
       "title": "Crie um novo marcador",
@@ -12213,15 +12230,19 @@
       "availableModelsLabel": "Modelos disponíveis",
       "apiKeyLabel": "Chave de API",
       "apiKeyPlaceholder": "Insira a chave de API",
-      "apiKeyHelp": "Armazenada criptografada em repouso e nunca lida novamente. Deixe em branco ao editar para manter a chave existente.",
+      "apiKeyHelp": "Armazenada criptografada em repouso e nunca é lida novamente. Deixe em branco ao salvar as edições para manter a chave existente.",
       "authSection": "Autenticação",
-      "authEditNote": "As credenciais não podem ser lidas novamente. Insira a chave de API novamente apenas se quiser rotacioná-la.",
+      "authEditNote": "As credenciais não podem ser lidas novamente. Para testar um provedor que requer autenticação, insira a chave de API dele.",
       "cannotRename": "Não pode ser renomeado após a criação.",
       "availableModelsHelp": "Opcional. Lista separada por vírgulas de modelos disponíveis neste Provedor.",
       "saveError": "Falha ao salvar o provedor",
       "nameRequired": "Provider name is required",
       "typeRequired": "Provider type is required",
-      "defaultModelRequired": "Default model is required"
+      "defaultModelRequired": "Default model is required",
+      "testRunning": "Testando conexão...",
+      "testPassed": "Conectado",
+      "testFailed": "Falha na conexão",
+      "testError": "Falha ao testar a conexão"
     },
     "scoreConfig": {
       "gteSymbol": "≥",

@@ -885,7 +885,7 @@
     "queryFailed": "クエリが失敗しました",
     "unknownError": "不明なエラー",
     "selectedLabel": "選択済み",
-    "selectToFilter": "フィルターするには選択",
+    "selectToFilter": "フィルターを選択",
     "clearSelection": "選択をクリア",
     "includeModeHint": "含むモード（=）",
     "excludeModeHint": "除外モード（≠）",
@@ -6314,7 +6314,7 @@
       "frequencyPositiveNumber": "アラート - {index}: 頻度は0より大きい正の数値で、数値である必要があります。",
       "cronExpressionString": "アラート - {index}: Cron式は文字列である必要があります。",
       "thresholdPositiveNumber": "アラート - {index}: しきい値は0より大きい正の数値で、数値である必要があります。",
-      "silenceNonNegativeNumber": "アラート - {index}: サイレンスは0以上の正の数値で、数値である必要があります。",
+      "silenceNonNegativeNumber": "アラート - {index}: クールダウン期間は0以上で、数値である必要があります。",
       "frequencyTypeInvalid": "アラート - {index}: 頻度タイプは'minutes'または'cron'である必要があり、文字列である必要があります。",
       "cronExpressionInvalid": "アラート - {index}: Cron式は有効なCron式である必要があります。"
     },
@@ -6524,7 +6524,7 @@
       "nameInvalidChars": ":, ?, /, # やスペースなどの文字は使用できません。",
       "templateRequired": "テンプレートは必須です！",
       "validEmails": "有効なメールアドレスを追加してください！",
-      "silenceNonNegative": "通知のサイレンスは0以上である必要があります",
+      "silenceNonNegative": "クールダウン期間は0以上である必要があります",
       "pendingPeriodNonNegative": "保留期間は0以上である必要があります。",
       "periodPositive": "期間は0より大きい必要があります",
       "destinationRequired": "宛先が少なくとも1つ必要です。",
@@ -10793,7 +10793,8 @@
         "scoreConfigs": "スコア設定",
         "targetDataset": "ターゲットデータセット",
         "progress": "進捗",
-        "updated": "更新日時"
+        "updated": "更新日時",
+        "actions": "操作"
       },
       "create": {
         "title": "新規キュー",
@@ -10847,7 +10848,8 @@
           "refType": "参照",
           "refId": "参照",
           "added": "追加日時",
-          "status": "ステータス"
+          "status": "ステータス",
+          "actions": "操作"
         },
         "status": {
           "pending": "保留中",
@@ -10959,6 +10961,8 @@
       "viewAll": "実験を表示",
       "baseline": "ベースライン",
       "setBaseline": "ベースラインに設定",
+      "baselineRequiresCompleted": "ベースラインとして設定できるのは、完了した実行のみです",
+      "baselineError": "ベースラインの更新に失敗しました",
       "selectForComparison": "比較用に選択",
       "progress": "{done} / {total} スロット",
       "noScores": "集計スコアなし",
@@ -11069,8 +11073,10 @@
       "addToDataset": "追加",
       "detail": {
         "by": "{user}による",
-        "p50Latency": "P50レイテンシ",
+        "p50Latency": "P50 タスクレイテンシ",
         "totalCost": "総コスト",
+        "costBreakdown": "タスク {task} · スコアリング {scoring}",
+        "partialCostBreakdown": "タスク {task} · スコアリング {scoring} · 一部",
         "highDispersion": "高分散ケース",
         "highDispersionHint": "試行が一致しない行",
         "scoredRows": "{scored}/{total} 行がスコア済み",
@@ -11100,7 +11106,7 @@
           "run": "実行"
         },
         "runSummary": "{trials} · {scorers}",
-        "progress": "進捗",
+        "progress": "タスクの進捗",
         "scoring": "スコアリング",
         "scoringDistribution": "{success} 成功 · {failed} 失敗 · {pending} 保留 · {skipped} スキップ",
         "compare": "比較",
@@ -11193,6 +11199,16 @@
           "typeCategorical": "カテゴリ",
           "typeBoolean": "ブール",
           "threshold": "しきい値",
+          "thresholdTooltip": "ベースラインと候補の値が互いに{percent}以内の差であれば、悪化でも改善でもなく、変化なしと見なされます。",
+          "outcomeDimensions": "結果判定基準",
+          "outcomeTooltipNone": "列が選択されていません — 比較可能なすべての行は「未比較」と表示されます。",
+          "outcomeTooltipAll": "対象となるすべての列が、各行の結果判定を決定します。",
+          "outcomeTooltipPartial": "{names} のみが各行の結果判定を決定します。その他の列は表示されますが、結果には影響しません。",
+          "allOutcomeDimensions": "対象となるすべての列",
+          "noOutcomeDimensions": "列なし",
+          "selectedOutcomeDimensions": "{count} 列 | {count} 列",
+          "outcomeDimensionUnavailable": "{name}（比較ポリシーなし）",
+          "dimensionExcludedHint": "この列は結果判定から除外されています。「結果判定基準」で選択すると含めることができます。",
           "measurePerRow": "試行全体の行ごとの平均",
           "dimensionImproved": "{count} 行が改善 | {count} 行が改善",
           "dimensionUnchanged": "{count} 行は変化なし | {count} 行は変化なし",
@@ -11274,8 +11290,8 @@
         },
         "searchPlaceholder": "項目を検索...",
         "csvImport": {
-          "button": "CSVをアップロード",
-          "title": "データセット項目のアップロード",
+          "button": "アイテムをインポート",
+          "title": "データセットアイテムのインポート",
           "description": "CSVファイルからデータセット項目をインポートします。",
           "fileLabel": "CSVファイル",
           "placeholder": "CSVファイルを選択",
@@ -12187,7 +12203,8 @@
       "remove": "削除",
       "save": "[保存]",
       "saveAsDraft": "下書きとして保存",
-      "createAndActivate": "保存して有効化"
+      "createAndActivate": "保存して有効化",
+      "testConnection": "接続テスト"
     },
     "scorerTypeDialog": {
       "title": "新しいスコアラーを作成",
@@ -12213,15 +12230,19 @@
       "availableModelsLabel": "ご利用可能なモデル",
       "apiKeyLabel": "APIキー",
       "apiKeyPlaceholder": "APIキーを入力",
-      "apiKeyHelp": "保存時に暗号化され、読み取ることはできません。編集時に空欄のままにすると既存のキーが保持されます。",
+      "apiKeyHelp": "保存状態では暗号化されており、後から読み出すことはできません。既存のキーを保持するには、編集を保存する際は空欄のままにしてください。",
       "authSection": "認証",
-      "authEditNote": "認証情報は読み取ることができません。ローテーションする場合のみAPIキーを再入力してください。",
+      "authEditNote": "認証情報は後から読み出すことはできません。認証が必要なプロバイダをテストするには、そのAPIキーを入力してください。",
       "cannotRename": "作成後に名前を変更することはできません。",
       "availableModelsHelp": "任意。このプロバイダーで利用可能なモデルのカンマ区切りリスト。",
       "saveError": "プロバイダを保存できませんでした",
       "nameRequired": "Provider name is required",
       "typeRequired": "Provider type is required",
-      "defaultModelRequired": "Default model is required"
+      "defaultModelRequired": "Default model is required",
+      "testRunning": "接続テスト中...",
+      "testPassed": "接続済み",
+      "testFailed": "接続失敗",
+      "testError": "接続テストに失敗しました"
     },
     "scoreConfig": {
       "gteSymbol": "≥",
