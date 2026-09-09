@@ -295,7 +295,7 @@ onBeforeUnmount(() => {
 
 <template>
   <aside
-    class="border-border-default bg-surface-base flex h-full min-h-0 flex-col border-l px-0.5 pt-4 pb-1"
+    class="border-border-default bg-surface-base flex h-full min-h-0 flex-col border-s px-0.5 pt-4 pb-1"
     data-test="synthetics-check-variables-panel"
   >
     <!-- Header — pinned; h-8.5 matches the Journey toolbar row so the two
@@ -313,7 +313,7 @@ onBeforeUnmount(() => {
           <OIcon
             name="info"
             size="sm"
-            class="text-text-secondary ml-1 cursor-help"
+            class="text-text-secondary ms-1 cursor-help"
             data-test="synthetics-check-variables-panel-hint-icon"
           />
         </OTooltip>
@@ -367,7 +367,7 @@ onBeforeUnmount(() => {
             icon-left="add"
             variant="outline"
             size="icon"
-            class="ml-auto"
+            class="ms-auto"
             :aria-label="t('synthetics.authNetwork.addVariable')"
             data-test="synthetics-check-variables-panel-add-variable-btn"
             @click="openAdd"
@@ -466,7 +466,7 @@ onBeforeUnmount(() => {
                   />
                 </OTooltip>
               </span>
-              <div class="ml-auto flex shrink-0 items-center gap-1">
+              <div class="ms-auto flex shrink-0 items-center gap-1">
                 <OButton
                   icon-only
                   icon-left="edit"

@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span
             v-for="lane in lanes"
             :key="lane.label"
-            class="text-3xs text-text-secondary h-3 max-w-24 truncate pr-1 text-right font-mono leading-3"
+            class="text-3xs text-text-secondary h-3 max-w-24 truncate pe-1 text-right font-mono leading-3"
           >
             {{ lane.label }}
           </span>
@@ -151,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <div
                           v-for="(exec, eIdx) in group.executions"
                           :key="eIdx"
-                          class="flex items-center gap-1.5 py-0.5 pl-4"
+                          class="flex items-center gap-1.5 py-0.5 ps-4"
                         >
                           <span
                             class="h-2 w-2 shrink-0 rounded-full"

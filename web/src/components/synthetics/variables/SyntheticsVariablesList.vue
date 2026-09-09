@@ -82,7 +82,7 @@ already says which scope you are in, so there is no Environment column.
         <span class="font-mono" data-test="synthetics-variable-name">{{ row.name }}</span>
         <span
           v-if="shadowNoteFor(row)"
-          class="text-text-muted text-2xs ml-2"
+          class="text-text-muted text-2xs ms-2"
           data-test="synthetics-variable-shadow-note"
         >
           {{ shadowNoteFor(row) }}

@@ -35,7 +35,7 @@ Purely presentational — the panel owns the grouped fetch.
         />
       </OTooltip>
       <!-- Resets per visit by design: local state, never persisted. -->
-      <div v-if="filterOptions.length > 2" class="ml-auto">
+      <div v-if="filterOptions.length > 2" class="ms-auto">
         <OSelect
           :model-value="filter"
           :options="filterOptions"
