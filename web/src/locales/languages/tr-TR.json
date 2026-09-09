@@ -10794,7 +10794,7 @@
         "targetDataset": "Hedef Veri Seti",
         "progress": "İlerleme",
         "updated": "Güncellendi",
-        "actions": "İşlemler"
+        "actions": "Eylemler"
       },
       "create": {
         "title": "Yeni Kuyruk",
@@ -10849,7 +10849,7 @@
           "refId": "Referans",
           "added": "Eklendi",
           "status": "Durum",
-          "actions": "İşlemler"
+          "actions": "Eylemler"
         },
         "status": {
           "pending": "Beklemede",
@@ -10961,8 +10961,8 @@
       "viewAll": "Deneyleri görüntüle",
       "baseline": "Temel",
       "setBaseline": "Temeli belirle",
-      "baselineRequiresCompleted": "Yalnızca tamamlanmış bir çalıştırma temel olarak seçilebilir.",
-      "baselineError": "Temel güncellenemedi.",
+      "baselineRequiresCompleted": "Yalnızca tamamlanmış bir çalıştırma referans olarak ayarlanabilir",
+      "baselineError": "Referans güncellenemedi",
       "selectForComparison": "Karşılaştırma için seç",
       "progress": "{done}/{total} slot",
       "noScores": "Toplam puan yok",
@@ -11199,16 +11199,16 @@
           "typeCategorical": "Kategorik",
           "typeBoolean": "Boolean",
           "threshold": "Eşik",
-          "thresholdTooltip": "Temel ve aday değerler birbirine {percent} oranında yakınsa değişmemiş sayılır; gerilemiş veya iyileşmiş sayılmaz.",
-          "outcomeDimensions": "Sonuç Ölçütleri",
-          "outcomeTooltipNone": "Hiçbir sütun seçilmedi — karşılaştırılabilir her satır, Karşılaştırılmadı olarak gösterilir.",
-          "outcomeTooltipAll": "Uygun tüm sütunlar her satırın sonucunu belirler.",
-          "outcomeTooltipPartial": "Her satırın sonucunu yalnızca {names} belirler. Diğer sütunlar gösterilir ancak sonucu etkilemez.",
+          "thresholdTooltip": "Referans ve aday değerler birbirinin {percent} içindeyse değişmemiş sayılır; gerileme veya iyileşme olarak değerlendirilmez.",
+          "outcomeDimensions": "Sonuç ölçütleri",
+          "outcomeTooltipNone": "Hiçbir sütun seçilmedi — karşılaştırılabilir her satır Karşılaştırılmadı olarak görünür.",
+          "outcomeTooltipAll": "Tüm uygun sütunlar her satırın sonucunu belirler.",
+          "outcomeTooltipPartial": "Her satırın sonucunu yalnızca {names} belirler. Diğer sütunlar gösterilir ama sonucu etkilemez.",
           "allOutcomeDimensions": "Tüm uygun sütunlar",
           "noOutcomeDimensions": "Sütun yok",
           "selectedOutcomeDimensions": "{count} sütun | {count} sütun",
           "outcomeDimensionUnavailable": "{name} (karşılaştırma politikası yok)",
-          "dimensionExcludedHint": "Bu sütun sonuçlara dahil edilmez. Dahil etmek için Sonuç Ölçütleri altında seçin.",
+          "dimensionExcludedHint": "Bu sütun sonuç ölçütlerinin dışında tutulur. Dahil etmek için Sonuç ölçütleri altında seçin.",
           "measurePerRow": "Denemeler boyunca satır başına ortalama",
           "dimensionImproved": "{count} satır iyileşti | {count} satır iyileşti",
           "dimensionUnchanged": "{count} satır değişmedi | {count} satır değişmedi",
@@ -11291,7 +11291,7 @@
         "searchPlaceholder": "Öğelerde Ara...",
         "csvImport": {
           "button": "Öğeleri İçe Aktar",
-          "title": "Veri Kümesi Öğelerini İçe Aktar",
+          "title": "Veri Seti Öğelerini İçe Aktar",
           "description": "Bir CSV dosyasından veri kümesi öğelerini içe aktarın.",
           "fileLabel": "CSV dosyası",
           "placeholder": "Bir CSV dosyası seçin",
@@ -12230,9 +12230,9 @@
       "availableModelsLabel": "Mevcut modeller",
       "apiKeyLabel": "API Anahtarı",
       "apiKeyPlaceholder": "API anahtarını girin",
-      "apiKeyHelp": "Beklemedeyken şifreli olarak saklanır ve asla geri okunmaz. Düzenlemeleri kaydederken mevcut anahtarı korumak için bu alanı boş bırakın.",
+      "apiKeyHelp": "Bekleme sırasında şifreli saklanır ve asla geri okunmaz. Mevcut anahtarı korumak için değişiklikleri kaydederken boş bırakın.",
       "authSection": "Kimlik Doğrulama",
-      "authEditNote": "Kimlik bilgileri geri okunamaz. Kimlik doğrulama gerektiren bir sağlayıcıyı test etmek için API anahtarını girin.",
+      "authEditNote": "Kimlik bilgileri geri okunamaz. Kimlik doğrulaması gerektiren bir sağlayıcıyı test etmek için API anahtarını girin.",
       "cannotRename": "Oluşturulduktan sonra yeniden adlandırılamaz.",
       "availableModelsHelp": "İsteğe bağlı. Bu Sağlayıcıda kullanılabilen modellerin virgülle ayrılmış listesi.",
       "saveError": "Sağlayıcı kaydedilemedi",
@@ -12241,7 +12241,7 @@
       "defaultModelRequired": "Default model is required",
       "testRunning": "Bağlantı test ediliyor...",
       "testPassed": "Bağlandı",
-      "testFailed": "Bağlantı başarısız",
+      "testFailed": "Bağlantı başarısız oldu",
       "testError": "Bağlantı test edilemedi"
     },
     "scoreConfig": {
@@ -15717,7 +15717,6 @@
       "reservation": "Rezervasyon",
       "sliType": "SLI türü",
       "owner": "Sahip",
-      "folder": "Klasör",
       "streamPlaceholder": "Bir akış seçin"
     },
     "empty": {
@@ -15747,7 +15746,24 @@
       "sourceHint": "Çalışma süresi, bu uyarının tetiklenmediği ölçülen zamanın oranıdır. Değerlendirmediği zaman — duraklatılmış, susturulmuş veya başarısız — ölçülmemiştir ve asla çalışma süresi olarak sayılmaz.",
       "loadFailed": "Uygun uyarılar yüklenemedi",
       "noneEligible": "Bu kuruluşta henüz kaynak olarak kullanılabilecek bir uyarı yok.",
-      "ineligibleOption": "{name} — {reason}",
+      "ineligible": {
+        "notScheduled": "Zamanlanmamış",
+        "grouped": "Gruplu",
+        "notReferenceable": "Kullanılamaz",
+        "cron": "Cron zamanlaması",
+        "tooInfrequent": "Çok nadiren çalışıyor",
+        "silenced": "Susturması var",
+        "other": "Uygun değil",
+        "why": {
+          "notScheduled": "Gerçek zamanlı uyarılar, bir SLO'nun ihtiyaç duyduğu çalıştırma geçmişini tutmaz. Bunun yerine zamanlanmış bir uyarı kullanın.",
+          "grouped": "Bu uyarı gruba göre bölünmüştür ve bir çalıştırma hangi grupları kontrol ettiğini kaydetmez. Burada kullanmak için gruplama ölçütünü kaldırın.",
+          "notReferenceable": "SLO ve bileşik uyarılar kaynak olamaz. Düz zamanlanmış bir uyarı seçin.",
+          "cron": "Bu uyarı bir cron zamanlamasıyla çalışır; bu yüzden kontrolleri eşit aralıklarla yapılmaz ve çalışma süresi hesaplanamaz. Bunu sabit bir aralığa değiştirin.",
+          "tooInfrequent": "Bu uyarı {frequency} aralıklarla çalışır. Hiçbir zaman dilimi kontrol edilmeden kalmasın diye en az {slice} aralıklarla çalışması gerekir.",
+          "silenced": "Bu uyarı tetiklendikten sonra bir süre kontrol yapmaz; bu boşluk da her zaman kötü bir döneme denk geldiğinden SLO'yu olduğundan iyi gösterir. Sessizlik süresini 0 yapın."
+        },
+        "noFixedInterval": "sabit aralık yok"
+      },
       "groupingLocked": "Uyarı tabanlı bir SLI gruplanamaz: kullanılabilirlik defteri grup başına değil, uyarı başına bir çalıştırma kaydeder, bu nedenle dayanacak grup başına kapsam yoktur.",
       "sourceLink": "Kaynak uyarı",
       "preview": {
@@ -15855,6 +15871,42 @@
       "editTargetMissing": "Bu uyarı artık bu SLO'da değil.",
       "describeBurn": "Tükenme oranı > {critical}, {long} ve {short} boyunca",
       "describeBudget": "Tüketilen hata bütçesi > {critical}%"
+    },
+    "validation": {
+      "nameRequired": "SLO adı zorunludur",
+      "nameTooLong": "SLO adı en fazla 256 karakter olmalıdır",
+      "targetRequired": "Hedef zorunludur",
+      "targetRange": "Hedef 0'dan büyük ve 100'den küçük olmalıdır",
+      "targetPrecision": "Hedef en fazla 3 ondalık basamağa sahip olabilir",
+      "streamTypeRequired": "Akış türü zorunludur",
+      "streamRequired": "Akış zorunludur",
+      "goodExprRequired": "\"İyi olduğunda\" zorunludur",
+      "promqlGoodRequired": "İyi sorgu zorunludur",
+      "promqlTotalRequired": "Toplam sorgu gereklidir",
+      "aggregateRequired": "Toplama ifadesi gereklidir",
+      "comparatorRequired": "Karşılaştırıcı gereklidir",
+      "thresholdRequired": "Eşik değeri gereklidir",
+      "thresholdNumber": "Eşik değeri bir sayı olmalıdır",
+      "alertSourceRequired": "Kaynak uyarı gereklidir",
+      "groupedSlice": "Gruplandırılmış SLO'lar 5 dakikalık bir dilim kullanmalıdır",
+      "alertCannotGroup": "Uyarı tabanlı bir SLI gruplandırılamaz",
+      "frequencyRequired": "Sıklık gereklidir",
+      "frequencyPositive": "Sıklık en az 1 dakika olmalıdır",
+      "silenceRequired": "Sessizlik süresi gereklidir",
+      "silenceNonNegative": "Sessizlik süresi negatif olamaz",
+      "targetsRequired": "En az bir hedef veya iş akışı seçin",
+      "criticalRequired": "Eşik değeri gereklidir",
+      "criticalPositive": "Eşik değeri 0'dan büyük olmalıdır",
+      "budgetRange": "Tüketilen bütçe %100 veya daha az olmalıdır",
+      "longWindowRequired": "Uzun pencere gereklidir",
+      "shortWindowRequired": "Kısa pencere gereklidir",
+      "shortInsideLong": "Kısa pencere, uzun pencereden daha kısa olmalıdır"
+    },
+    "duration": {
+      "seconds": "{count} saniye | {count} saniye",
+      "minutes": "{count} dakika | {count} dakika",
+      "hours": "{count} saat | {count} saat",
+      "days": "{count} gün | {count} gün"
     }
   },
   "promql": {

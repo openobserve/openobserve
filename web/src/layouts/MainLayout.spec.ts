@@ -17,6 +17,10 @@ import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount } from "@vue/test-utils";
 import { defineComponent, ref, h } from "vue";
 import * as cookies from "@/utils/cookies";
+import { shouldPaywallRoute } from "@/utils/auth";
+import config from "@/aws-exports";
+
+const EXPIRED_MICROS = (Date.now() - 30 * 24 * 60 * 60 * 1000) * 1000;
 
 // ODialog stub mirrors the migrated public contract (v-model:open, size, show-close,
 // update:open / click:* emits). Mirrors stubs used in other migrated specs.
@@ -1737,16 +1741,36 @@ describe("MainLayout Methods and Functions", () => {
       expect(days).toBeLessThanOrEqual(7);
     });
 
-    it("should check trial period allowed paths", () => {
-      const isAllowedPath = (currentPath: string, allowedPaths: string[]) => {
-        return allowedPaths.some((path) => currentPath.includes(path));
-      };
+    // MainLayout's boot paywall calls this; "plans" 404s on a non-cloud build.
+    it("never paywalls a non-cloud build", () => {
+      (config as any).isCloud = "false";
+      expect(shouldPaywallRoute(EXPIRED_MICROS, "logs")).toBe(false);
+    });
 
-      const allowedPaths = ["iam", "users", "organizations"];
+    it("paywalls an expired cloud org on a paid route", () => {
+      (config as any).isCloud = "true";
+      expect(shouldPaywallRoute(EXPIRED_MICROS, "logs")).toBe(true);
+    });
 
-      expect(isAllowedPath("/iam/settings", allowedPaths)).toBe(true);
-      expect(isAllowedPath("/users/list", allowedPaths)).toBe(true);
-      expect(isAllowedPath("/dashboards", allowedPaths)).toBe(false);
+    // The nav lands on "settings", which redirects to general; both must pass.
+    it.each(["settings", "general"])("exempts %s so the org stays deletable", (name) => {
+      (config as any).isCloud = "true";
+      expect(shouldPaywallRoute(EXPIRED_MICROS, name)).toBe(false);
+    });
+
+    // Exact match: a route embedding an exempt name must not inherit the exemption.
+    it.each(["settingsExport", "generalReports", "iamAudit", "orgSettings"])(
+      "still paywalls %s",
+      (name) => {
+        (config as any).isCloud = "true";
+        expect(shouldPaywallRoute(EXPIRED_MICROS, name)).toBe(true);
+      },
+    );
+
+    it("does not paywall an org with no trial tracked", () => {
+      (config as any).isCloud = "true";
+      expect(shouldPaywallRoute(null, "logs")).toBe(false);
+      expect(shouldPaywallRoute("", "logs")).toBe(false);
     });
   });
 

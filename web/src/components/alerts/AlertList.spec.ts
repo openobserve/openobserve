@@ -864,6 +864,49 @@ describe("AlertList - router query behaviors", () => {
     expect(wrapper.vm.showAddAlertDialog).toBe(true);
     expect(pushSpy).toHaveBeenCalled();
   });
+
+  it("hideForm drops the editor's own params but keeps the rest of the query (e.g. page)", async () => {
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    wrapper.vm.router.currentRoute.value.query = {
+      action: "update",
+      alert_id: "a1",
+      name: "Alert 1",
+      page: "3",
+    };
+    const spy = vi.spyOn(router, "push");
+    await wrapper.vm.hideForm();
+
+    const pushedQuery = spy.mock.calls[0][0].query;
+    expect(pushedQuery.page).toBe("3");
+    expect(pushedQuery.action).toBeUndefined();
+    expect(pushedQuery.alert_id).toBeUndefined();
+  });
+});
+
+describe("AlertList - pagination restoration", () => {
+  it("restores the page saved before navigating away, surviving the initial async load", async () => {
+    // Drive the real fetch path (cache-miss -> getAlertsFn) rather than waitData()'s
+    // post-mount override, which double-assigns filteredResults and would trigger a
+    // second, spurious autoResetPageIndex after the legitimate one has already settled.
+    (store.state as any).organizationData.allAlertsListByFolderId = {};
+    alertsDB = Array.from({ length: 15 }, (_, i) => makeAlert(i + 1));
+    (store.state as any).alertListFilters = {
+      searchQuery: "",
+      filterQuery: "",
+      searchAcrossFolders: false,
+      perPage: 5,
+      currentPage: 3,
+    };
+    const wrapper: any = await mountAlertList();
+    await flushPromises();
+    await wrapper.vm.$nextTick();
+    // The reassert is scheduled via setTimeout(0) to run after TanStack's own deferred auto-reset — see AlertList.vue's watch(loading, ...).
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.vm.oTableRef.table.getState().pagination.pageIndex).toBe(2);
+  });
 });
 
 // 6. Search behaviors and debounce
@@ -1038,14 +1081,19 @@ describe("AlertList - micro validations", () => {
     expect(spy).toHaveBeenCalled();
   });
 
-  it("importAlert sets dialog and pushes route", async () => {
+  it("importAlert sets dialog and pushes route, preserving the rest of the query", async () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);
+    wrapper.vm.router.currentRoute.value.query = {
+      ...wrapper.vm.router.currentRoute.value.query,
+      page: "3",
+    };
     const spy = vi.spyOn(router, "push");
     wrapper.vm.importAlert();
     await flushPromises();
     expect(wrapper.vm.showImportAlertDialog).toBe(true);
     expect(spy).toHaveBeenCalled();
+    expect(spy.mock.calls[0][0].query.page).toBe("3");
   });
 
   it("updateFolderIdToBeCloned updates state", async () => {
