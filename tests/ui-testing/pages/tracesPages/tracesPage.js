@@ -94,6 +94,21 @@ export class TracesPage {
     this.llmThreadView = '.thread-view';
     this.traceTreeSpanContainer = '[data-test^="trace-tree-span-container-"]';
 
+    // ===== TRACE SCORE CHIPS SELECTORS =====
+    // Source: web/src/plugins/traces/TraceDetailsSidebar.vue (Row 2 LLM metrics row)
+    // + web/src/enterprise/components/onlineEvals/TraceScoreChips.vue. Row 2 is
+    // gated on v-if="isLLMSpan && llmMetrics && span.gen_ai_response_model"; the
+    // score chips render inside it (component registered for `scope="span"`).
+    this.llmMetricsRow = '[data-test="trace-details-sidebar"] .llm-metrics-row';
+    // The "Scores" label span carries NO data-test (verified) — assert its text
+    // scoped to the metrics row, matching the sibling metric-chip convention.
+    this.scoresLabelRow = '[data-test="trace-details-sidebar"] .llm-metrics-row';
+    this.scoreChip = '[data-test^="trace-score-chip-"]';
+    this.scoreChipsOverflow = '[data-test="trace-score-chips-overflow"]';
+    this.scoreChipsOverflowPanel = '[data-test="trace-score-chips-overflow-panel"]';
+    this.scoreChipsOverflowTitle = '[data-test="trace-score-chips-overflow-title"]';
+    this.scoresEmpty = '[data-test="trace-details-sidebar-scores-empty"]';
+
     // Service Graph (Enterprise)
     this.serviceGraphChart = '[data-test="service-graph-chart"]';
     this.serviceGraphRefreshButton = '[data-test="service-graph-refresh-btn"]';
@@ -2823,6 +2838,94 @@ export class TracesPage {
    */
   async expectThreadViewContains(text) {
     await expect(this.page.locator(this.llmThreadView)).toContainText(text, { timeout: 15000 });
+  }
+
+  // ===== TRACE SCORE CHIPS METHODS =====
+
+  /**
+   * Assert the LLM metrics row (Row 2) is visible in the trace-details sidebar —
+   * only rendered for an LLM span that carries `gen_ai_response_model`.
+   */
+  async expectLlmMetricsRowVisible() {
+    await expect(this.page.locator(this.llmMetricsRow)).toBeVisible({ timeout: 15000 });
+  }
+
+  /**
+   * Assert the "Scores" label is present within the LLM metrics row.
+   */
+  async expectScoresLabelVisible() {
+    await expect(this.page.locator(this.scoresLabelRow)).toContainText('Scores', { timeout: 15000 });
+  }
+
+  /**
+   * Assert no traces-search error message is rendered — the sidebar resolved to a
+   * healthy state (no error toast / error banner).
+   */
+  async expectNoTracesSearchError() {
+    await expect(this.page.locator(this.errorMessage)).not.toBeVisible();
+  }
+
+  /**
+   * Assert the empty "Not scored yet" tag renders inside the score-chips area.
+   */
+  async expectScoresEmptyVisible() {
+    await expect(this.page.locator(this.scoresEmpty)).toBeVisible({ timeout: 15000 });
+  }
+
+  /**
+   * Assert the empty tag contains `text` (i18n `traces.traceDetailsSidebar.notScoredYet`).
+   */
+  async expectScoresEmptyContains(text) {
+    await expect(this.page.locator(this.scoresEmpty)).toContainText(text, { timeout: 15000 });
+  }
+
+  /**
+   * Assert at least one score chip is rendered.
+   */
+  async expectScoreChipVisible() {
+    await expect(this.page.locator(this.scoreChip).first()).toBeVisible({ timeout: 15000 });
+  }
+
+  /**
+   * Assert the "+N more" overflow chip is visible.
+   */
+  async expectScoreChipsOverflowVisible() {
+    await expect(this.page.locator(this.scoreChipsOverflow)).toBeVisible({ timeout: 15000 });
+  }
+
+  /**
+   * Click the "+N more" overflow chip to open the all-scores panel.
+   */
+  async clickScoreChipsOverflow() {
+    await this.page.locator(this.scoreChipsOverflow).click();
+  }
+
+  /**
+   * Assert the all-scores overflow panel is visible.
+   */
+  async expectScoreChipsOverflowPanelVisible() {
+    await expect(this.page.locator(this.scoreChipsOverflowPanel)).toBeVisible({ timeout: 15000 });
+  }
+
+  /**
+   * Assert the overflow panel title contains `text` (i18n "All scores (N)").
+   */
+  async expectScoreChipsOverflowTitleContains(text) {
+    await expect(this.page.locator(this.scoreChipsOverflowTitle)).toContainText(text, { timeout: 15000 });
+  }
+
+  /**
+   * Hover the first score chip to open its detail tooltip.
+   */
+  async hoverScoreChip() {
+    await this.page.locator(this.scoreChip).first().hover();
+  }
+
+  /**
+   * Assert a tooltip (the score-detail tooltip) is visible after hovering a chip.
+   */
+  async expectScoreChipTooltipVisible() {
+    await expect(this.page.getByRole('tooltip')).toBeVisible({ timeout: 15000 });
   }
 
 }

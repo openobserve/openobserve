@@ -1,0 +1,21 @@
+{
+  "feature_slug": "trace-score-chips",
+  "feature_title": "Trace Score Chips",
+  "area": "Traces",
+  "edition": "both",
+  "needs_e2e": true,
+  "needs_api": true,
+  "spec_filename": "traceScoreChips.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Traces/traceScoreChips.spec.js",
+  "playwright_group": "Traces",
+  "source_files": [
+    "web/src/plugins/traces/TraceDetailsSidebar.vue",
+    "web/src/enterprise/components/onlineEvals/TraceScoreChips.vue",
+    "web/src/enterprise/components/onlineEvals/TraceScoreDetail.vue",
+    "web/src/enterprise/components/onlineEvals/composables/useTraceScoreChips.ts",
+    "web/src/enterprise/components/onlineEvals/utils/traceScoreSql.ts"
+  ],
+  "existing_tests_in_diff": true,
+  "skip": false,
+  "skip_reason": ""
+}

@@ -1,0 +1,7 @@
+[
+  { "title": "should render the Scores section in the LLM metrics row for an LLM span", "action": "new", "verifies": "the TraceScoreChips section mounts in the sidebar LLM metrics row for an LLM span and settles without error" },
+  { "title": "should render the empty 'Not scored yet' state when the span has no scores — not wired: TraceDetails.vue:1659-1669 (showAnnotateButtons gate)", "action": "new", "verifies": "the empty 'Not scored yet' tag renders when no scores exist (enterprise/cloud-gated)" },
+  { "title": "should render a score chip with config name and formatted value — not wired: useTraceScoreChips.ts:64-74 (_llm_scores data-gated)", "action": "new", "verifies": "one chip per scorer renders with config name and formatted value" },
+  { "title": "should fold >2 chips behind a '+N more' overflow listing all scores — not wired: TraceScoreChips.vue:109,124-125 (MAX_VISIBLE_CHIPS data-gated)", "action": "new", "verifies": "more than 2 chips fold behind a '+N more' dropdown listing all scores" },
+  { "title": "should show description / reasoning / scored-at on chip hover — not wired: TraceScoreChips.vue:50-52 + TraceScoreDetail.vue (data-gated)", "action": "new", "verifies": "hovering a chip opens the TraceScoreDetail tooltip with label, value, description, reasoning, and scored-at" }
+]

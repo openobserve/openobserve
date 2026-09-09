@@ -1,0 +1,29 @@
+{
+  "feature_slug": "trace-score-chips",
+  "feature_title": "Trace Score Chips",
+  "area": "Traces",
+  "edition": "both",
+  "needs_e2e": true,
+  "needs_api": true,
+  "spec_filename": "traceScoreChips.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Traces/traceScoreChips.spec.js",
+  "playwright_group": "Traces",
+  "source_files": [
+    "web/src/plugins/traces/TraceDetailsSidebar.vue",
+    "web/src/enterprise/components/onlineEvals/TraceScoreChips.vue",
+    "web/src/enterprise/components/onlineEvals/TraceScoreDetail.vue",
+    "web/src/enterprise/components/onlineEvals/composables/useTraceScoreChips.ts",
+    "web/src/enterprise/components/onlineEvals/utils/traceScoreSql.ts"
+  ],
+  "existing_tests_in_diff": true,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "The diff spans both editions. Enterprise-owned paths include o2_enterprise/src/enterprise/llm_evaluations/** (results, runner, score_configs, providers, scorers) and the web/src/enterprise/** online-evals / AIObservability layer (TraceScoreChips, ProviderFormPage, ExperimentDetailPage). OSS paths include src/api/management/** (models/experiments.rs, providers/mod.rs, score_configs), src/core/src/providers.rs, and web/src/components|services|utils|plugins/**. The enterprise Rust is #[cfg(feature = \"enterprise\")]-gated and the new score chips render inside the OSS trace details sidebar, so this is a linked OSS+ENT change.",
+    "skip": "Not skipped. Neither feature_hint.txt nor trigger_comment.txt contains a skip/opt-out marker, and the change is clearly user-facing (new score chips on the trace details sidebar, resolved-endpoint column in LLM provider settings, task/score outcome cards on the experiment detail page). needs_e2e is true.",
+    "e2e": "E2E is warranted because TraceDetailsSidebar.vue now renders the new TraceScoreChips component for LLM spans. A user can exercise real UI behavior: chips appear per evaluator score, overflow folds behind a '+N more' dropdown, and an empty state renders when no scores exist. That is a new, verifiable interaction flow.",
+    "area": "Traces. The new chips render in web/src/plugins/traces/TraceDetailsSidebar.vue, and the sibling E2E specs live in tests/ui-testing/playwright-tests/Traces/ (traceDetails.spec.js, tracesSearch.spec.js, etc.).",
+    "group": "Traces shard. The closest existing ci_matrix group is testfolder 'Traces' (actual_folder 'Traces', run_files includes traceDetails.spec.js), which is where a span/trace-detail spec belongs.",
+    "existing_tests": "One Playwright E2E spec is touched in the diff — tests/ui-testing/playwright-tests/Pipelines/pipelines-form-validation.spec.js — but it is a maintenance fix (gracefully skipping the enterprise-only destination form) and is unrelated to trace-score-chips, so it provides no coverage of the new feature. The many *.spec.ts files in the diff are Vitest unit tests and do not count as E2E coverage."
+  }
+}

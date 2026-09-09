@@ -1,0 +1,17 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/Traces/traceScoreChips.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Traces/traceGenAiParts.spec.js",
+    "tests/ui-testing/playwright-tests/Traces/traceDetails.spec.js",
+    "web/src/enterprise/components/onlineEvals/TraceScoreChips.spec.ts",
+    "web/src/enterprise/components/onlineEvals/composables/useTraceScoreChips.spec.ts"
+  ],
+  "needs_registration": true,
+  "registration": {
+    "file": "tests/ui-testing/ci-matrix/ci_matrix.json",
+    "group": "Traces",
+    "entry": "add \"traceScoreChips.spec.js\" to the Traces group run_files"
+  },
+  "rationale": "No existing E2E spec covers score chips. traceGenAiParts.spec.js exercises the same LLM-span + sidebar navigation but asserts GenAI v5 `parts` rendering, not evaluator score chips; traceDetails.spec.js covers generic trace-detail actions. The score chips are a distinct feature (a new component wired into TraceDetailsSidebar), and run-context explicitly designates spec_path Traces/traceScoreChips.spec.js, so a new spec in the Traces area (with @traces tags) is the least-duplicative fit. The Vitest unit specs (TraceScoreChips.spec.ts, useTraceScoreChips.spec.ts) already cover component-level overflow/formatting and do NOT count as E2E coverage. The broader diff (LLM provider settings, experiment detail outcome cards) is a separate feature area and is intentionally out of scope for this single-feature spec."
+}

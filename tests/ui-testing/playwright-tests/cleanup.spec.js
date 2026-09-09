@@ -349,6 +349,7 @@ test.describe("Pre-Test Cleanup", () => {
       [
         /^sdr_traces_/,                // sdr_traces_* (traces SDR test streams: redact/drop/hash × ingestion/query)
         /^trace_genai_parts_/,         // trace_genai_parts_* (GenAI v5 parts rendering test streams)
+        /^trace_score_chips_/,         // trace_score_chips_* (Trace Score Chips rendering test streams)
       ],
       ['default'],                     // protect the default traces stream
       { streamType: 'traces' }
