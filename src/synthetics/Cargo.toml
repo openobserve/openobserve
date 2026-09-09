@@ -36,6 +36,7 @@ sea-orm.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 svix-ksuid.workspace = true
+thiserror.workspace = true
 tokio.workspace = true
 tracing.workspace = true
 urlencoding.workspace = true

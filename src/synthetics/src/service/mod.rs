@@ -94,6 +94,8 @@ pub(crate) async fn set_parent_relation(_id: &str, _ty: &str, _parent: &str, _pa
 pub(crate) async fn remove_parent_relation(_id: &str, _ty: &str, _parent: &str, _parent_ty: &str) {}
 
 pub mod checks;
+pub mod composition;
+pub mod composition_lock;
 pub mod crypto;
 pub mod locations;
 pub mod runs;
@@ -179,6 +181,7 @@ mod tests {
 
         let source: String = [
             include_str!("checks.rs"),
+            include_str!("composition.rs"),
             include_str!("crypto.rs"),
             include_str!("locations.rs"),
             include_str!("runs.rs"),
@@ -199,7 +202,8 @@ mod tests {
              environment put/delete, batch) and the check update a promote writes through the \
              table layer"
         );
-        const NON_PUBLISH_READS: usize = 2; // `location_entry` and `super_cluster_enabled`
+        // `location_entry`, `super_cluster_enabled` and composition's write gate read without publishing
+        const NON_PUBLISH_READS: usize = 3;
         assert_eq!(
             guards,
             publishes + NON_PUBLISH_READS,
