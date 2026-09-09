@@ -499,6 +499,8 @@ export class LogsPage {
 
         // ===== V0.40 REGRESSION TEST LOCATORS =====
         this.logsSearchResultTableRows = '[data-test="logs-search-result-logs-table"] tbody tr[data-test^="o2-table-row-"]';
+        this.resultsSkeleton = '[data-test="logs-search-result-logs-table"] [data-test="o2-table-skeleton-body"]';
+        this.resultsLoadingBanner = '[data-test="logs-search-result-logs-table"] [data-test="o2-table-loading-banner"]';
         this.tableRowExpandMenu = '[data-test^="o2-table-expand-"]';
         this.logDetailsIncludeExcludeBtn = '[data-test="log-details-include-exclude-field-btn"]';
         this.timestampCells = '[data-test="o2-table-cell-_timestamp"]';
@@ -10678,6 +10680,14 @@ export class LogsPage {
     async expectLogsTableVisible() {
         await expect(this.page.locator(this.logsSearchResultLogsTable)).toBeVisible({ timeout: 30000 });
         testLogger.info('Logs table is visible');
+    }
+
+    /** Assert the settled results grid shows real rows, not the skeleton or a banner. */
+    async expectResultsGridSettledWithRows() {
+        await expect(this.page.locator(this.logsSearchResultTableRows).first()).toBeVisible({ timeout: 30000 });
+        await expect(this.page.locator(this.resultsSkeleton)).toHaveCount(0);
+        await expect(this.page.locator(this.resultsLoadingBanner)).toHaveCount(0);
+        testLogger.info('Results grid settled with rows, no skeleton or loading banner');
     }
 
     // ============================================================================
