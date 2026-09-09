@@ -76,6 +76,10 @@
       "action": "Chạy truy vấn",
       "actionDesc": "Tải sự kiện cho các bộ lọc đã chọn"
     },
+    "noAccess": {
+      "title": "Bạn không có quyền truy cập",
+      "description": "Contact your administrator if you believe you should have access."
+    },
     "noDashboards": {
       "title": "Tạo bảng điều khiển đầu tiên của bạn",
       "description": "Bảng điều khiển tập hợp chỉ số, nhật ký và trace của bạn vào một chế độ xem. Hãy tạo một bảng để bắt đầu.",

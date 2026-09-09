@@ -76,6 +76,10 @@
       "action": "執行查詢",
       "actionDesc": "載入所選篩選條件的事件"
     },
+    "noAccess": {
+      "title": "您沒有存取權限",
+      "description": "若您認為自己應有存取權限，請聯絡管理員。"
+    },
     "noDashboards": {
       "title": "建立您的第一個儀表板",
       "description": "儀表板將您的指標、日誌與追蹤整合於單一檢視中。建立一個以開始使用。",

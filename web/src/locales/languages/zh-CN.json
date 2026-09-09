@@ -76,6 +76,10 @@
       "action": "运行查询",
       "actionDesc": "加载所选过滤器的事件"
     },
+    "noAccess": {
+      "title": "您没有访问权限",
+      "description": "如果您认为自己应有访问权限，请联系您的管理员。"
+    },
     "noDashboards": {
       "title": "创建您的第一个仪表板",
       "description": "仪表盘将指标、日志和追踪汇总到一个视图中。创建一个即可开始使用。",

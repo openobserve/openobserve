@@ -76,6 +76,10 @@
       "action": "Sorgu çalıştır",
       "actionDesc": "Seçilen filtreler için olayları yükle"
     },
+    "noAccess": {
+      "title": "Erişiminiz yok",
+      "description": "Erişiminiz olması gerektiğini düşünüyorsanız yöneticinizle iletişime geçin."
+    },
     "noDashboards": {
       "title": "İlk panonuzu oluşturun",
       "description": "Gösterge panoları, metriklerinizi, günlüklerinizi ve izlerinizi tek bir görünümde bir araya getirir. Başlamak için bir tane oluşturun.",

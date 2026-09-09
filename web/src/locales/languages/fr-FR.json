@@ -76,6 +76,10 @@
       "action": "Exécuter une requête",
       "actionDesc": "Charger des événements pour les filtres sélectionnés"
     },
+    "noAccess": {
+      "title": "Vous n'avez pas accès",
+      "description": "Contactez votre administrateur si vous pensez que vous devriez avoir accès."
+    },
     "noDashboards": {
       "title": "Créez votre premier tableau de bord",
       "description": "Les tableaux de bord regroupent vos métriques, logs et traces dans une seule vue. Créez-en un pour commencer.",

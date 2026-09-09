@@ -76,6 +76,10 @@
       "action": "Abfrage ausführen",
       "actionDesc": "Ereignisse für die ausgewählten Filter laden"
     },
+    "noAccess": {
+      "title": "Sie haben keinen Zugriff",
+      "description": "Kontaktieren Sie Ihren Administrator, wenn Sie glauben, dass Sie Zugriff haben sollten."
+    },
     "noDashboards": {
       "title": "Erstelle dein erstes Dashboard",
       "description": "Dashboards bringen Ihre Metriken, Logs und Traces in einer Ansicht zusammen. Erstellen Sie eines, um loszulegen.",

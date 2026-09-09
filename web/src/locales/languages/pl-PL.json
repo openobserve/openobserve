@@ -76,6 +76,10 @@
       "action": "Uruchom zapytanie",
       "actionDesc": "Załaduj zdarzenia dla wybranych filtrów"
     },
+    "noAccess": {
+      "title": "Nie masz dostępu",
+      "description": "Skontaktuj się z administratorem, jeśli uważasz, że powinieneś mieć dostęp."
+    },
     "noDashboards": {
       "title": "Utwórz swój pierwszy dashboard",
       "description": "Pulpity łączą metryki, logi i trace w jednym widoku. Zbuduj jeden, aby rozpocząć.",
