@@ -128,6 +128,24 @@ pub async fn get_synthetic(org_id: &str, id: &str) -> anyhow::Result<Option<Synt
     Ok(check)
 }
 
+/// The folder slug a check currently lives in, in the same public form request
+/// bodies use — so a caller can tell an actual move from an unchanged round-trip.
+pub async fn folder_of(org_id: &str, id: &str) -> anyhow::Result<Option<String>> {
+    let conn = get_orm_client_ro().await;
+    let Some(check) = synthetics_checks::get(conn, org_id, id)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?
+    else {
+        return Ok(None);
+    };
+    Ok(Some(
+        folders::get_name_by_pk(&check.folder_id)
+            .await
+            .unwrap_or(None)
+            .unwrap_or(check.folder_id),
+    ))
+}
+
 /// Updates a synthetic. Recomputes `next_run_at` if the frequency changed so the
 /// scheduler fires on the correct schedule without waiting for the old window.
 pub async fn update_synthetic(

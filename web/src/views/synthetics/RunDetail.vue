@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <!-- Protocol runs (http/tcp/tls/ssh) have no steps/replay — dedicated view -->
   <ProtocolRunSummary
-    v-if="monitorType && monitorType !== 'browser'"
+    v-if="!overrideError && monitorType && monitorType !== 'browser'"
     :monitor-id="monitorId"
     :run-id="runIdParam"
     :execution-id="executionIdParam"
@@ -258,7 +258,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <span class="text-status-error-text text-sm font-bold">
                         {{ currentRun.errorType }}
                       </span>
+                      <OBadge
+                        v-if="errorSourceInfo"
+                        variant="error"
+                        size="sm"
+                        data-test="synthetics-run-detail-error-source"
+                      >
+                        {{ errorSourceInfo.label }}
+                      </OBadge>
                     </div>
+                    <p
+                      v-if="errorSourceInfo?.description"
+                      class="text-text-secondary mt-1 text-xs leading-relaxed"
+                      data-test="synthetics-run-detail-error-desc"
+                    >
+                      {{ errorSourceInfo.description }}
+                    </p>
                     <OButton
                       v-if="currentRun.errorStack"
                       variant="ghost-destructive"
@@ -595,7 +610,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import { computed, nextTick, ref, watch } from "vue";
-import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import { useRoute } from "vue-router";
 import { useStore } from "vuex";
 import syntheticsService from "@/services/synthetics";
@@ -659,6 +674,16 @@ const emit = defineEmits<{
 }>();
 
 // ── Props — enable embedding in ODrawer ──────────────────────────────────────
+/** A run that never executed (quota skip, reaper row): no ids to fetch, so the drawer renders it straight from the row. */
+interface OverrideError {
+  errorSource: string;
+  message: string;
+  timestamp: number;
+  location: string;
+  browser: string;
+  device: string;
+}
+
 interface Props {
   drawerMode?: boolean;
   overrideMonitorId?: string;
@@ -666,6 +691,7 @@ interface Props {
   overrideRunId?: string;
   overrideExecutionId?: string;
   overrideMonitorType?: string;
+  overrideError?: OverrideError | null;
 }
 const props = withDefaults(defineProps<Props>(), {
   drawerMode: false,
@@ -674,6 +700,7 @@ const props = withDefaults(defineProps<Props>(), {
   overrideRunId: "",
   overrideExecutionId: "",
   overrideMonitorType: "",
+  overrideError: null,
 });
 
 const { t } = useI18nTyped();
@@ -1017,6 +1044,7 @@ interface DisplayRun {
   errorType?: string;
   errorReason?: string;
   errorStack?: string;
+  errorSource?: string;
   failedStepLabel?: string;
   failedStepId?: number;
 }
@@ -1056,6 +1084,7 @@ function toDisplayRun(detail: SyntheticRunDetail | null): DisplayRun {
           errorType: detail.error ? detail.error.split(":")[0] : t("synthetics.results.error"),
           errorReason: detail.error || "",
           errorStack: detail.error || "",
+          errorSource: detail.errorSource,
           failedStepLabel: detail.failedStep
             ? t("synthetics.runDetail.failedAtStep", { step: detail.failedStep })
             : undefined,
@@ -1064,6 +1093,35 @@ function toDisplayRun(detail: SyntheticRunDetail | null): DisplayRun {
       : {}),
   };
 }
+
+/** Build the display row straight from an id-less error record (no fetch). */
+function errorToDisplayRun(o: OverrideError): DisplayRun {
+  return {
+    id: "",
+    // Raw prop, not displayMonitorName: that computed reads currentRun (built here) and would recurse.
+    monitorName: props.overrideMonitorName,
+    status: "error",
+    duration: 0,
+    browser: capitalizeEngine(o.browser),
+    device: o.device,
+    location: o.location,
+    timestamp: fmtTimestamp(o.timestamp),
+    url: "",
+    hasReplay: false,
+    errorType: o.message ? o.message.split(":")[0] : t("synthetics.results.error"),
+    errorReason: o.message || "",
+    errorStack: o.message || "",
+    errorSource: o.errorSource,
+  };
+}
+
+/** FE-authored label + (for quota) explanation, keyed on the record's source. */
+const ERROR_SOURCE_LABEL_KEYS: Record<string, I18nKey> = {
+  quota: "synthetics.runDetail.errorSourceQuota",
+  dispatch: "synthetics.runDetail.errorSourceDispatch",
+  queue: "synthetics.runDetail.errorSourceQueue",
+  probe: "synthetics.runDetail.errorSourceProbe",
+};
 
 // ── Attempts (C2) ─────────────────────────────────────────────────────────
 //
@@ -1222,7 +1280,9 @@ function openErrorFullscreen(id: number) {
 // Computed: current run from composable data
 const loading = computed(() => synthetics.loading.value);
 const currentRun = computed<DisplayRun>(() => {
-  return synthetics.runDetail.value ? toDisplayRun(synthetics.runDetail.value) : toDisplayRun(null);
+  if (synthetics.runDetail.value) return toDisplayRun(synthetics.runDetail.value);
+  if (props.overrideError) return errorToDisplayRun(props.overrideError);
+  return toDisplayRun(null);
 });
 
 const isFailed = computed(
@@ -1230,6 +1290,17 @@ const isFailed = computed(
 );
 
 const isErrorRun = computed(() => currentRun.value.status === "error");
+
+/** Friendly source label, and a full explanation for a quota skip. */
+const errorSourceInfo = computed<{ label: string; description: string | null } | null>(() => {
+  const src = currentRun.value.errorSource;
+  if (!src) return null;
+  const key = ERROR_SOURCE_LABEL_KEYS[src];
+  return {
+    label: key ? t(key) : src,
+    description: src === "quota" ? t("synthetics.runDetail.errorSourceQuotaDesc") : null,
+  };
+});
 
 // ── Display monitor name — prefers explicit prop, falls back to SQL result ──
 const displayMonitorName = computed(
@@ -1397,8 +1468,10 @@ const infoChips = computed<InfoChip[]>(() => [
 
 // ── Emit status to parent (for drawer header-right badge) ──────────────────
 watch(
-  () => synthetics.runDetail.value?.status ?? null,
-  (status) => {
+  () => [synthetics.runDetail.value?.status ?? null, props.overrideError] as const,
+  ([runStatus, override]) => {
+    // An id-less override is always an error; the fetched row's status wins.
+    const status = runStatus ?? (override ? "error" : null);
     if (!props.drawerMode || !status) return;
     const isErr = status === "error";
     const isF = status === "failed" || isErr;
@@ -1414,6 +1487,7 @@ watch(
       timestamp: currentRun.value.timestamp,
     });
   },
+  { immediate: true },
 );
 
 // ── Fetch data on mount / route change ────────────────────────────────────

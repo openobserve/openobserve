@@ -23,6 +23,11 @@ import searchService from "@/services/search";
 import { isCrossLinkingEnabledForStream } from "@/utils/crossLinking";
 import { isSafeNavigableUrl } from "@/utils/safeUrl";
 import { extractFields } from "@/utils/query/sqlUtils";
+import {
+  maxParenDepth,
+  SQL_PARSE_MAX_DEPTH,
+  stripWherePredicate,
+} from "@/utils/query/sqlComplexity";
 
 export function usePanelDrilldown({
   panelSchema,
@@ -297,9 +302,13 @@ export function usePanelDrilldown({
       const streamType = query?.fields?.stream_type;
       if (!executedQuery || !streamName) return;
 
+      // astify() is exponential in WHERE nesting; only SELECT/FROM are read below.
+      const parseTarget = stripWherePredicate(executedQuery);
+      if (maxParenDepth(parseTarget) > SQL_PARSE_MAX_DEPTH) return;
+
       let parsed: any;
       try {
-        parsed = parser.astify(executedQuery);
+        parsed = parser.astify(parseTarget);
       } catch {
         return;
       }

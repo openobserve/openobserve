@@ -46,7 +46,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           variant="outline"
           size="sm"
-          icon-left="cloud-upload"
           :disabled="!dataset"
           data-test="ai-dataset-detail-upload-csv"
           @click="openCsvImport"
@@ -241,11 +240,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :org-id="orgId"
               :experiments="experiments"
               :datasets="[dataset]"
-              :details="experimentDetails"
               :fixed-dataset-id="datasetId"
               :loading="loading"
               compact
               @open-filtered="openExperiments"
+              @refresh="refreshExperiments"
+              @baseline-changed="onBaselineChanged"
             />
           </OContent>
         </OTabPanel>
@@ -378,6 +378,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import { formatDistanceToNowStrict } from "date-fns";
+import useSmartBack from "@/composables/useSmartBack";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -412,11 +413,7 @@ import llmDatasetsService, {
   type LlmDatasetItem,
   type LlmDatasetItemSource,
 } from "@/services/llm-datasets.service";
-import llmExperimentsService, {
-  type ExperimentDetail,
-  type LlmExperiment,
-} from "@/services/llm-experiments.service";
-import { fetchExperimentDetails } from "./experimentDiscovery";
+import llmExperimentsService, { type LlmExperiment } from "@/services/llm-experiments.service";
 import { aiExperimentCreateRoute, aiExperimentsRoute } from "./experimentRoutes";
 
 defineOptions({ name: "AIDatasetDetailPage" });
@@ -433,7 +430,6 @@ const datasetId = computed<string>(() => String(route.params.id ?? ""));
 const dataset = ref<LlmDataset | null>(null);
 const items = ref<LlmDatasetItem[]>([]);
 const experiments = ref<LlmExperiment[]>([]);
-const experimentDetails = ref<Record<string, ExperimentDetail>>({});
 const loading = ref(false);
 const search = ref("");
 const activeTab = ref<"items" | "experiments">("items");
@@ -448,9 +444,13 @@ const pageSizeOptions = [20, 50, DATASET_ITEMS_MAX_PAGE_SIZE];
  *  item detail drawer. */
 const versionLabel = (version: number) => raw(`v${version}`);
 
+const { goBack: backToDatasets } = useSmartBack(() => ({
+  name: "aiDatasets",
+  query: { org_identifier: orgId.value },
+}));
 const backTarget = computed(() => ({
   label: t("aiObservability.nav.datasets"),
-  to: { name: "aiDatasets", query: { org_identifier: orgId.value } },
+  onClick: backToDatasets,
 }));
 
 const metaSubtitle = computed(() => {
@@ -549,17 +549,22 @@ async function refresh() {
   }
 }
 
+function onBaselineChanged(experiment: LlmExperiment, previousBaselineId: string | null) {
+  experiments.value = experiments.value.map((row) => {
+    if (row.id === experiment.id) return experiment;
+    if (previousBaselineId && row.id === previousBaselineId) return { ...row, isBaseline: false };
+    return row;
+  });
+}
+
 async function refreshExperiments() {
   try {
-    experiments.value = (await llmExperimentsService.list(orgId.value)).filter(
-      (experiment) => experiment.datasetId === datasetId.value,
-    );
-    experimentDetails.value = await fetchExperimentDetails(experiments.value, (experimentId) =>
-      llmExperimentsService.get(orgId.value, experimentId),
-    );
+    experiments.value = await llmExperimentsService.list(orgId.value, {
+      includeSummary: true,
+      datasetId: datasetId.value,
+    });
   } catch {
     experiments.value = [];
-    experimentDetails.value = {};
   }
 }
 

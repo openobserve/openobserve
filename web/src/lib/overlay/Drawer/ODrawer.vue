@@ -219,11 +219,14 @@ watchEffect((cleanup) => {
   window.addEventListener("resize", measureAnchor);
   cleanup(() => window.removeEventListener("resize", measureAnchor));
 });
-const anchorStyle = computed(() =>
-  anchorTop.value > 0
-    ? { top: `${anchorTop.value}px`, height: `calc(100% - ${anchorTop.value}px)` }
-    : {},
-);
+const anchorStyle = computed(() => {
+  const style: Record<string, string> = {};
+  if (anchorTop.value > 0) {
+    style.top = `${anchorTop.value}px`;
+    style.height = `calc(100% - ${anchorTop.value}px)`;
+  }
+  return style;
+});
 const overlayStyle = computed(() => ({ zIndex: overlayZIndex.value, ...anchorStyle.value }));
 
 const contentStyle = computed(() => {
