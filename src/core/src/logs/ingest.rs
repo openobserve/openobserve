@@ -139,7 +139,7 @@ pub async fn ingest(
     // The OSS build never writes these, so any write is external; blocking it keeps
     // hand-written rows out of metering if the deployment later goes enterprise.
     #[cfg(not(feature = "enterprise"))]
-    if is_enterprise_only_usage_stream(org_id, &stream_name) {
+    if is_enterprise_only_usage_stream(&stream_name) {
         return Err(Error::IngestionError(format!(
             "stream '{stream_name}' is reserved for enterprise usage reporting"
         )));
