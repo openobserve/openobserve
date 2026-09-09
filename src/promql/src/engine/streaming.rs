@@ -21,7 +21,7 @@
 use std::{sync::Arc, time::Duration};
 
 use config::meta::promql::value::*;
-use datafusion::{arrow::datatypes::Schema, error::Result, prelude::SessionContext};
+use datafusion::error::Result;
 use futures::future::pending;
 use infra::errors::ErrorCodes;
 use promql_parser::{
@@ -106,58 +106,58 @@ impl Engine {
             .map(Some)
     }
 
-    /// Streams `range_func(selector[range])`, bare or under `histogram_quantile(phi, ...)`, and
-    /// otherwise evaluates it generically on the same contexts; `None` only when the query shape
-    /// rules the streaming path out up front.
+    /// Streams `range_func(selector[range])` series by series, and otherwise evaluates it
+    /// generically on the same contexts; `None` only when the query shape rules the streaming
+    /// path out up front.
     pub(super) async fn try_streaming_range_func(
         &mut self,
         vs: &VectorSelector,
         range: Duration,
         func: Arc<dyn functions::RangeFunc>,
-        quantile: Option<f64>,
     ) -> Result<Option<Value>> {
         let Some(target) = self.streaming_target(vs, range).await? else {
             return Ok(None);
         };
         if let [(ctx, schema, scan_stats, _)] = target.ctxs.as_slice() {
-            let eval = Arc::new(fused::SeriesEval::new(func.clone(), range, &self.eval_ctx));
-            // the generic path evaluates an empty selector to None, not to an empty matrix
-            let value = match quantile {
-                None => self
-                    .stream_series(&target, ctx, schema, eval, fused::row_series)
-                    .await?
-                    .map(|(series, scanned)| match scanned {
-                        0 => Value::None,
-                        _ => Value::Matrix(series),
-                    }),
-                Some(phi) => match self
-                    .stream_series(&target, ctx, schema, eval, fused::column_series)
-                    .await?
-                {
-                    None => None,
-                    Some((_, 0)) => Some(functions::histogram_quantile(
-                        phi,
-                        Value::None,
-                        &self.eval_ctx,
-                    )?),
-                    Some((series, _)) => Some(functions::histogram_quantile_columnar(
-                        phi,
-                        &self.eval_ctx.timestamps(),
-                        series,
-                        &self.eval_ctx,
-                    )?),
-                },
+            let labels = SeriesLabels {
+                selector: &target.label_selector,
+                skip: self.skip_labels,
             };
-            if let Some(value) = value {
+            let label_cols = series_label_columns(schema, &labels, func.name());
+            let selector = target.streaming_selector();
+            let eval = Arc::new(fused::SeriesEval::new(func.clone(), range, &self.eval_ctx));
+            let run = async {
+                match shard_sources(
+                    ctx,
+                    schema,
+                    &selector,
+                    label_cols,
+                    micros(range),
+                    &self.eval_ctx,
+                )
+                .await?
+                {
+                    None => Ok(None),
+                    Some(sources) => fused::emit_sources(sources, eval).await.map(Some),
+                }
+            };
+            if let Some((series, scanned)) = self
+                .run_cancellable(run, self.ctx.query_ctx.timeout)
+                .await?
+            {
                 self.ctx.scan_stats.write().await.add(scan_stats);
                 if self.result_type.is_none() {
                     self.result_type = Some("matrix".to_string());
                 }
-                return Ok(Some(value));
+                // the generic path evaluates an empty selector to None, not to an empty matrix
+                return Ok(Some(match scanned {
+                    0 => Value::None,
+                    _ => Value::Matrix(series),
+                }));
             }
         }
 
-        // the layout cannot stream: evaluate the generic functions on the contexts already created
+        // the layout cannot stream: evaluate the generic function on the contexts already created
         let matrix = self
             .eval_matrix_selector(&target.selector, range, Some(target.ctxs))
             .await?;
@@ -166,39 +166,7 @@ impl Engine {
         } else {
             Value::Matrix(matrix)
         };
-        let value = functions::eval_range(input, func, &self.eval_ctx)?;
-        match quantile {
-            None => Ok(Some(value)),
-            Some(phi) => functions::histogram_quantile(phi, value, &self.eval_ctx).map(Some),
-        }
-    }
-
-    /// Plans the shard sources carrying the series labels and emits every series through `emit`,
-    /// under the query timeout; `None` when the layout cannot stream.
-    async fn stream_series<T: Send + 'static>(
-        &self,
-        target: &StreamingTarget,
-        ctx: &SessionContext,
-        schema: &Schema,
-        eval: Arc<fused::SeriesEval>,
-        emit: fused::SeriesEmitter<T>,
-    ) -> Result<Option<(Vec<T>, usize)>> {
-        let labels = SeriesLabels {
-            selector: &target.label_selector,
-            skip: self.skip_labels,
-        };
-        let label_cols = series_label_columns(schema, &labels, eval.func.name());
-        let selector = target.streaming_selector();
-        let lookback = micros(eval.range);
-        let run = async {
-            match shard_sources(ctx, schema, &selector, label_cols, lookback, &self.eval_ctx)
-                .await?
-            {
-                None => Ok(None),
-                Some(sources) => fused::emit_sources(sources, eval, emit).await.map(Some),
-            }
-        };
-        self.run_cancellable(run, self.ctx.query_ctx.timeout).await
+        functions::eval_range(input, func, &self.eval_ctx).map(Some)
     }
 
     /// Normalizes the selector and creates its contexts; `None` when a query-level gate rules
@@ -339,7 +307,6 @@ mod tests {
     /// Serves one hash-sorted context and can hand out an already-fired cancel signal.
     struct StreamingProvider {
         ctx: SessionContext,
-        schema: Arc<Schema>,
         calls: Arc<AtomicUsize>,
         canceled: bool,
         // a dropped sender reads as a cancel, so a live registration keeps it
@@ -360,7 +327,7 @@ mod tests {
             self.calls.fetch_add(1, Ordering::SeqCst);
             Ok(vec![(
                 self.ctx.clone(),
-                self.schema.clone(),
+                metrics_schema(),
                 ScanStats::default(),
                 true,
             )])
@@ -424,77 +391,6 @@ mod tests {
         }
         StreamingProvider {
             ctx,
-            schema: metrics_schema(),
-            calls: Default::default(),
-            canceled,
-            cancel: Default::default(),
-        }
-    }
-
-    fn histogram_schema() -> Arc<Schema> {
-        Arc::new(Schema::new(vec![
-            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
-            Field::new(HASH_LABEL, DataType::UInt64, false),
-            Field::new(VALUE_LABEL, DataType::Float64, false),
-            Field::new("instance", DataType::Utf8, true),
-            Field::new("le", DataType::Utf8, true),
-        ]))
-    }
-
-    /// Two histograms of three buckets sampled every 20 s as `h`; one bucket of `b` has a 60 s
-    /// gap, so a rate window there is empty. The hash-sorted table exists only when `streams`.
-    fn histogram_provider(streams: bool, canceled: bool) -> StreamingProvider {
-        let buckets: [(u64, &str, &str, f64); 6] = [
-            (1, "a", "0.5", 1.0),
-            (2, "a", "1", 2.0),
-            (3, "a", "+Inf", 3.0),
-            (11, "b", "0.5", 1.5),
-            (12, "b", "1", 2.5),
-            (13, "b", "+Inf", 3.5),
-        ];
-        let rows: Vec<(i64, u64, f64, &str, &str)> = buckets
-            .into_iter()
-            .flat_map(|(hash, instance, le, weight)| {
-                (0..10)
-                    .filter(move |step| hash != 12 || !(3..=5).contains(step))
-                    .map(move |step| {
-                        (
-                            BASE + step * 20 * SECOND,
-                            hash,
-                            (step * 3) as f64 * weight,
-                            instance,
-                            le,
-                        )
-                    })
-            })
-            .collect();
-        let batch = RecordBatch::try_new(
-            histogram_schema(),
-            vec![
-                Arc::new(Int64Array::from_iter_values(rows.iter().map(|row| row.0))),
-                Arc::new(UInt64Array::from_iter_values(rows.iter().map(|row| row.1))),
-                Arc::new(Float64Array::from_iter_values(rows.iter().map(|row| row.2))),
-                Arc::new(StringArray::from_iter_values(rows.iter().map(|row| row.3))),
-                Arc::new(StringArray::from_iter_values(rows.iter().map(|row| row.4))),
-            ],
-        )
-        .unwrap();
-        let table = || MemTable::try_new(histogram_schema(), vec![vec![batch.clone()]]).unwrap();
-        let mut config = SessionConfig::new().with_target_partitions(3);
-        config.options_mut().optimizer.prefer_existing_sort = true;
-        let ctx = SessionContext::new_with_config(config);
-        ctx.register_table("h", Arc::new(table())).unwrap();
-        if streams {
-            let sorted = table().with_sort_order(vec![vec![
-                col(HASH_LABEL).sort(true, false),
-                col(TIMESTAMP_COL_NAME).sort(true, false),
-            ]]);
-            ctx.register_table(format!("h{HASH_SORTED_TABLE_SUFFIX}"), Arc::new(sorted))
-                .unwrap();
-        }
-        StreamingProvider {
-            ctx,
-            schema: histogram_schema(),
             calls: Default::default(),
             canceled,
             cancel: Default::default(),
@@ -712,82 +608,6 @@ mod tests {
         let err = eval_query(provider(true, true), 30, "rate(m[1m])")
             .await
             .unwrap_err();
-        assert!(matches!(
-            infra::errors::Error::from(err),
-            infra::errors::Error::ErrorCode(ErrorCodes::SearchCancelQuery(_))
-        ));
-    }
-
-    /// The generic path: materialize the selector, evaluate the range function, then the row
-    /// `histogram_quantile`.
-    async fn generic_histogram_quantile(provider: StreamingProvider, query: &str) -> Value {
-        let mut engine = engine(provider, 30);
-        let promql_parser::parser::Expr::Call(call) = promql_parser::parser::parse(query).unwrap()
-        else {
-            panic!("{query} is not a call");
-        };
-        let promql_parser::parser::Expr::NumberLiteral(phi) = call.args.args[0].as_ref() else {
-            panic!("{query} has no literal phi");
-        };
-        let promql_parser::parser::Expr::Call(inner) = call.args.args[1].as_ref() else {
-            panic!("{query} is not over a call");
-        };
-        let promql_parser::parser::Expr::MatrixSelector(promql_parser::parser::MatrixSelector {
-            vs,
-            range,
-        }) = inner.args.args[0].as_ref()
-        else {
-            panic!("{query} is not over a matrix selector");
-        };
-        let matrix = engine.eval_matrix_selector(vs, *range, None).await.unwrap();
-        let input = if matrix.is_empty() {
-            Value::None
-        } else {
-            Value::Matrix(matrix)
-        };
-        let func = functions::fusable_range_func(inner.func.name).unwrap();
-        let input = functions::eval_range(input, func, &engine.eval_ctx).unwrap();
-        functions::histogram_quantile(phi.val, input, &engine.eval_ctx).unwrap()
-    }
-
-    /// `histogram_quantile` over a streamed range function consumes columns and must match the
-    /// row path, both when it streams and when it falls back on the same context.
-    #[tokio::test]
-    async fn test_histogram_quantile_matches_generic_streaming_and_materialized() {
-        for query in [
-            "histogram_quantile(0.9, rate(h[1m]))",
-            "histogram_quantile(0.5, increase(h[1m] offset 20s))",
-            "histogram_quantile(0.99, rate(h{instance=\"b\"}[40s]))",
-            "histogram_quantile(0.9, rate(h{instance=\"none\"}[1m]))",
-        ] {
-            let expected =
-                generic_histogram_quantile(histogram_provider(false, false), query).await;
-            let streamed = eval_query(histogram_provider(true, false), 30, query)
-                .await
-                .unwrap();
-            let materialized = eval_query(histogram_provider(false, false), 30, query)
-                .await
-                .unwrap();
-            // an empty selector is None on every path, which the matrix comparison cannot take
-            if matches!(expected, Value::None) {
-                assert!(matches!(streamed, Value::None), "streamed {query}");
-                assert!(matches!(materialized, Value::None), "materialized {query}");
-                continue;
-            }
-            assert_same_matrix(expected.clone(), streamed, &format!("streamed {query}"));
-            assert_same_matrix(expected, materialized, &format!("materialized {query}"));
-        }
-    }
-
-    #[tokio::test]
-    async fn test_histogram_quantile_takes_the_streaming_path() {
-        let err = eval_query(
-            histogram_provider(true, true),
-            30,
-            "histogram_quantile(0.9, rate(h[1m]))",
-        )
-        .await
-        .unwrap_err();
         assert!(matches!(
             infra::errors::Error::from(err),
             infra::errors::Error::ErrorCode(ErrorCodes::SearchCancelQuery(_))

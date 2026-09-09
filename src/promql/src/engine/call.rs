@@ -16,25 +16,15 @@
 //! PromQL function-call dispatch and argument helpers. Touches only
 //! `eval_ctx` besides recursing through `exec_expr`.
 
-use std::{str::FromStr, sync::Arc, time::Duration};
+use std::{str::FromStr, sync::Arc};
 
 use config::meta::promql::value::*;
 use datafusion::error::{DataFusionError, Result};
 use hashbrown::HashSet;
-use promql_parser::parser::{
-    Call, Expr as PromExpr, Function, FunctionArgs, MatrixSelector, VectorSelector,
-};
+use promql_parser::parser::{Expr as PromExpr, Function, FunctionArgs, MatrixSelector};
 
 use super::Engine;
 use crate::functions::{self, Func};
-
-/// The range function, its matrix selector and range, and the quantile when wrapped.
-type RangeCall<'a> = (
-    Box<dyn functions::RangeFunc>,
-    &'a VectorSelector,
-    Duration,
-    Option<f64>,
-);
 
 impl Engine {
     pub(super) async fn call_expr(
@@ -46,11 +36,12 @@ impl Engine {
             DataFusionError::NotImplemented(format!("Unsupported function: {}", func.name))
         })?;
 
-        // a range function over a plain matrix selector streams series by series, bare or under
-        // histogram_quantile
-        if let Some((range_func, vs, range, quantile)) = streamable_range_call(func_name, args)
+        // a range function over a plain matrix selector streams its series one at a time
+        if let Some(range_func) = func_name.range_func()
+            && let [arg] = args.args.as_slice()
+            && let PromExpr::MatrixSelector(MatrixSelector { vs, range }) = arg.as_ref()
             && let Some(value) = self
-                .try_streaming_range_func(vs, range, Arc::from(range_func), quantile)
+                .try_streaming_range_func(vs, *range, Arc::from(range_func))
                 .await?
         {
             return Ok(value);
@@ -406,31 +397,6 @@ impl Engine {
             }
         })
     }
-}
-
-/// `range_func(selector[range])`, bare or as `histogram_quantile(phi, range_func(selector[range]))`
-/// with a literal `phi`: the shapes that stream series by series.
-fn streamable_range_call(func: Func, args: &FunctionArgs) -> Option<RangeCall<'_>> {
-    let (func, arg, quantile) = match (func, args.args.as_slice()) {
-        (Func::HistogramQuantile, [phi, arg]) => {
-            let PromExpr::NumberLiteral(phi) = phi.as_ref() else {
-                return None;
-            };
-            let PromExpr::Call(Call { func, args }) = arg.as_ref() else {
-                return None;
-            };
-            let [arg] = args.args.as_slice() else {
-                return None;
-            };
-            (Func::from_str(func.name).ok()?, arg, Some(phi.val))
-        }
-        (func, [arg]) => (func, arg, None),
-        _ => return None,
-    };
-    let PromExpr::MatrixSelector(MatrixSelector { vs, range }) = arg.as_ref() else {
-        return None;
-    };
-    Some((func.range_func()?, vs, *range, quantile))
 }
 
 #[cfg(test)]

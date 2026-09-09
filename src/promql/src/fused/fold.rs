@@ -26,11 +26,7 @@ use datafusion::error::{DataFusionError, Result};
 use hashbrown::{HashMap, hash_map::Entry};
 use tokio::task::JoinSet;
 
-use super::{
-    accumulator::FusedAccumulator,
-    columnar::{ColumnarSeries, MISSING},
-    op::FusedAggOp,
-};
+use super::{accumulator::FusedAccumulator, op::FusedAggOp};
 use crate::{
     functions::{RangeFunc, advance_sample_window},
     micros,
@@ -57,9 +53,6 @@ pub(super) struct FoldParams {
     op: FusedAggOp,
     eval: SeriesEval,
 }
-
-/// Turns one evaluated series into the caller's representation; `None` drops it.
-pub(crate) type SeriesEmitter<T> = fn(&SeriesEval, Labels, &[Sample]) -> Option<T>;
 
 impl SeriesEval {
     pub(crate) fn new(func: Arc<dyn RangeFunc>, range: Duration, eval_ctx: &EvalContext) -> Self {
@@ -142,17 +135,15 @@ where
     Ok((value, series_count))
 }
 
-/// Evaluates every partition's series and returns what `emit` makes of each, in partition
-/// order; dropping the future aborts the partitions.
-pub(crate) async fn emit_sources<F, S, T>(
+/// Evaluates every partition's series and returns them whole, in partition order; dropping the
+/// future aborts the partitions.
+pub(crate) async fn emit_sources<F, S>(
     sources: Vec<F>,
     eval: Arc<SeriesEval>,
-    emit: SeriesEmitter<T>,
-) -> Result<(Vec<T>, usize)>
+) -> Result<(Vec<RangeValue>, usize)>
 where
     F: Future<Output = Result<S>> + Send + 'static,
     S: SeriesStream + 'static,
-    T: Send + 'static,
 {
     let start_time = std::time::Instant::now();
     let func_name = eval.func.name();
@@ -165,12 +156,12 @@ where
         .into_iter()
         .map(|source| {
             let eval = eval.clone();
-            async move { emit_partition(source.await?, eval, emit).await }
+            async move { emit_partition(source.await?, eval).await }
         })
         .collect();
     let parts = run_partitions(parts).await?;
     let series_count: usize = parts.iter().map(|(_, series)| series).sum();
-    let series: Vec<T> = parts.into_iter().flat_map(|(series, _)| series).collect();
+    let series: Vec<RangeValue> = parts.into_iter().flat_map(|(series, _)| series).collect();
     log::info!(
         "[trace_id: {trace_id}] [PromQL Timing] streaming {func_name}() execution took: {:?}, emitted {} of {series_count} series",
         start_time.elapsed(),
@@ -180,57 +171,31 @@ where
 }
 
 /// Emits one partition's series; like the generic evaluator, a series with no value is dropped.
-async fn emit_partition<S: SeriesStream, T>(
+async fn emit_partition<S: SeriesStream>(
     mut source: S,
     eval: Arc<SeriesEval>,
-    emit: SeriesEmitter<T>,
-) -> Result<(Vec<T>, usize)> {
+) -> Result<(Vec<RangeValue>, usize)> {
     let mut series = Vec::new();
     let mut series_count = 0;
     while source.advance().await?.is_some() {
         let labels = source.labels();
         let samples = source.consume().await?;
-        if let Some(emitted) = emit(&eval, labels, samples) {
-            series.push(emitted);
+        let mut values = Vec::with_capacity(eval.timestamps.len());
+        eval.eval_series(samples, |slot, value| {
+            values.push(Sample::new(eval.timestamps[slot], value));
+        });
+        if !values.is_empty() {
+            series.push(RangeValue {
+                labels,
+                samples: values,
+                exemplars: None,
+                time_window: Some(TimeWindow::new(eval.range)),
+            });
         }
         series_count += 1;
         tokio::task::consume_budget().await;
     }
     Ok((series, series_count))
-}
-
-/// The series as the generic evaluator would return it, or `None` when the function produced no
-/// value.
-pub(crate) fn row_series(
-    eval: &SeriesEval,
-    labels: Labels,
-    samples: &[Sample],
-) -> Option<RangeValue> {
-    let mut values = Vec::with_capacity(eval.timestamps.len());
-    eval.eval_series(samples, |slot, value| {
-        values.push(Sample::new(eval.timestamps[slot], value));
-    });
-    (!values.is_empty()).then(|| RangeValue {
-        labels,
-        samples: values,
-        exemplars: None,
-        time_window: Some(TimeWindow::new(eval.range)),
-    })
-}
-
-/// The series as one value per evaluation slot, or `None` when the function produced no value.
-pub(crate) fn column_series(
-    eval: &SeriesEval,
-    labels: Labels,
-    samples: &[Sample],
-) -> Option<ColumnarSeries> {
-    let mut values = vec![MISSING; eval.timestamps.len()];
-    let mut any = false;
-    eval.eval_series(samples, |slot, value| {
-        values[slot] = value;
-        any = true;
-    });
-    any.then_some(ColumnarSeries { labels, values })
 }
 
 /// Folds one partition's series into its group accumulators, dropping each as it goes.

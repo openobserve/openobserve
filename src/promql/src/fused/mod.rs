@@ -18,13 +18,12 @@
 //! evaluator's intermediate per-series materialization.
 
 mod accumulator;
-pub(crate) mod columnar;
 mod fold;
 pub(crate) mod matrix;
 mod op;
 pub(crate) mod stream;
 
-pub(crate) use fold::{SeriesEmitter, SeriesEval, column_series, emit_sources, row_series};
+pub(crate) use fold::{SeriesEval, emit_sources};
 pub(crate) use op::FusedAggOp;
 
 #[cfg(test)]
