@@ -851,6 +851,7 @@ async fn handle_composite_alert_trigger(
         Some(evaluated.level),
         now,
     );
+    trigger.end_time = Some(now);
 
     use sea_orm::{
         ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QuerySelect, TransactionTrait,
@@ -890,6 +891,7 @@ async fn handle_composite_alert_trigger(
 
     let mut delivery_retry_at = None;
     if evaluated.result {
+        scheduled_data.last_satisfied_at = Some(now);
         let delivery = if matches!(outcome, RunOutcome::Pending) {
             DeliveryDecision::SuppressedByPending
         } else {
