@@ -55,6 +55,7 @@ export interface V2WireStep {
   optional?: boolean;
   always_run?: boolean;
   timeout_ms?: number;
+  subtest?: { id: string };
 }
 
 /** UI action name → the v2 vocabulary the server accepts. */
@@ -69,6 +70,7 @@ const ACTION_TO_V2: Partial<Record<StepAction, string>> = {
   uncheck: "uncheck",
   upload: "upload",
   assert: "assert",
+  subtest: "subtest",
 };
 
 /**
@@ -136,6 +138,11 @@ export function buildV2Step(step: BrowserStep): V2WireStep {
   const wire: V2WireStep = { id: step.id, action };
 
   if (step.name) wire.name = step.name;
+
+  if (step.action === "subtest") {
+    wire.subtest = { id: step.subtest?.id ?? "" };
+    return wire;
+  }
 
   // camelCase in the editor, snake_case in storage — this is the only place that
   // boundary is crossed. Both are omitted at their default rather than written
