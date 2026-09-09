@@ -2118,6 +2118,13 @@ fn parse_search_results_to_timeseries(
 ) -> Result<Vec<o2_enterprise::enterprise::anomaly_detection::types::QueryDataPoint>> {
     use o2_enterprise::enterprise::anomaly_detection::types::QueryDataPoint;
 
+    // A truncated hit set would read as a sparse series and could revoke a healthy model.
+    if results.is_partial {
+        anyhow::bail!(
+            "[anomaly_detection {anomaly_id}] search returned partial results — not usable as evidence"
+        );
+    }
+
     let mut data_points = Vec::new();
     let mut skipped = 0usize;
 
@@ -2860,6 +2867,28 @@ mod tests {
     fn test_extract_value_from_hit_non_numeric_value_field_returns_error() {
         let hit = serde_json::json!({"value": "not_a_number"});
         assert!(extract_value_from_hit(&hit).is_err());
+    }
+
+    /// A truncated hit set fed to the trainer reads as a sparse series and can revoke a model.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_a_partial_search_result_is_an_error_not_evidence() {
+        let mut resp = config::meta::search::Response::default();
+        resp.is_partial = true;
+        let err = parse_search_results_to_timeseries(&resp, "a1").unwrap_err();
+        assert!(err.to_string().contains("partial"), "{err}");
+    }
+
+    /// The guard must reject only partiality, never an ordinary complete (even empty) response.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_a_complete_search_result_still_parses() {
+        let resp = config::meta::search::Response::default();
+        assert!(
+            parse_search_results_to_timeseries(&resp, "a1")
+                .unwrap()
+                .is_empty()
+        );
     }
 
     /// The key names here are a cross-crate contract:
