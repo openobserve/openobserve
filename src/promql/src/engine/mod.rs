@@ -163,6 +163,13 @@ impl Engine {
                     (Value::Float(left), Value::Matrix(right)) => {
                         binaries::vector_scalar_bin_op(expr, right, left, true).await?
                     }
+                    // a set operator keeps the other side when one side has no series at all
+                    (Value::None, Value::Matrix(right)) if expr.op.is_set_operator() => {
+                        binaries::vector_bin_op(expr, vec![], right)?
+                    }
+                    (Value::Matrix(left), Value::None) if expr.op.is_set_operator() => {
+                        binaries::vector_bin_op(expr, left, vec![])?
+                    }
                     (Value::None, Value::None) => Value::None,
                     _ => {
                         log::debug!(
@@ -635,6 +642,45 @@ pub(crate) mod tests {
         } else {
             panic!("Expected Value::Float");
         }
+    }
+
+    #[tokio::test]
+    async fn test_set_operators_keep_the_other_side_when_one_is_empty() {
+        let trace_id = "test_trace";
+        let query_ctx = create_test_query_ctx(trace_id, "test_org", 30);
+        // three steps, so the vector side is not folded into a scalar
+        let eval_ctx = EvalContext::new(
+            1640995200000000i64,
+            1640995320000000i64,
+            60000000i64,
+            trace_id.to_string(),
+        );
+        let eval = |query: &str| {
+            let ctx = Arc::new(PromqlContext::new(
+                query_ctx.clone(),
+                SimpleMockProvider,
+                vec![],
+            ));
+            let expr = promql_parser::parser::parse(query).unwrap();
+            let eval_ctx = eval_ctx.clone();
+            async move { Engine::new(trace_id, ctx, eval_ctx).exec_expr(&expr).await }
+        };
+
+        // `up` has no data on the mock provider, so the fallback vector must come through
+        let Value::Matrix(series) = eval("up or vector(0)").await.unwrap() else {
+            panic!("`or` with an empty left side must return the right side");
+        };
+        assert_eq!(series.len(), 1);
+        assert_eq!(series[0].samples.len(), 3);
+        assert!(series[0].samples.iter().all(|s| s.value == 0.0));
+
+        let Value::Matrix(series) = eval("vector(0) unless up").await.unwrap() else {
+            panic!("`unless` with an empty right side must return the left side");
+        };
+        assert_eq!(series.len(), 1);
+
+        let value = eval("vector(0) and up").await.unwrap();
+        assert!(matches!(value, Value::Matrix(series) if series.is_empty()));
     }
 
     #[tokio::test]
