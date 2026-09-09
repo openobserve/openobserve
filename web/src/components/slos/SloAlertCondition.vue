@@ -117,6 +117,8 @@
             type="number"
             step="0.1"
             width="xs"
+            :error="!!errors?.critical"
+            :error-message="errors?.critical || undefined"
             data-test="slos-sloalertcondition-critical"
           />
           <span>{{ t("slos.alert.inBothWindows") }}</span>
@@ -127,6 +129,8 @@
             suffix="h"
             :label="t('slos.alert.long')"
             label-position="inside"
+            :error="!!errors?.long"
+            :error-message="errors?.long || undefined"
             data-test="slos-sloalertcondition-long"
           />
           <OInput
@@ -136,6 +140,8 @@
             suffix="min"
             :label="t('slos.alert.short')"
             label-position="inside"
+            :error="!!errors?.short"
+            :error-message="errors?.short || undefined"
             data-test="slos-sloalertcondition-short"
           />
         </div>
@@ -152,6 +158,7 @@
             step="0.1"
             width="xs"
             :placeholder="t('slos.alert.none')"
+            data-test="slos-sloalertcondition-warning"
           />
           <span class="text-compact text-text-secondary">
             {{ t("slos.alert.warningShares") }}
@@ -172,8 +179,22 @@
         <span class="text-negative font-medium">{{ t("slos.alert.criticalIf") }}</span>
         <div class="flex flex-wrap items-center gap-2">
           <span>{{ t("slos.alert.budgetConsumed") }}</span>
-          <OSelect v-model="model.operator" :options="operatorOptions" width="xs" />
-          <OInput v-model.number="model.critical" type="number" step="1" width="xs" suffix="%" />
+          <OSelect
+            v-model="model.operator"
+            :options="operatorOptions"
+            width="xs"
+            data-test="slos-sloalertcondition-operator"
+          />
+          <OInput
+            v-model.number="model.critical"
+            type="number"
+            step="1"
+            width="xs"
+            suffix="%"
+            :error="!!errors?.critical"
+            :error-message="errors?.critical || undefined"
+            data-test="slos-sloalertcondition-critical"
+          />
         </div>
         <span class="text-warning font-medium">{{ t("slos.alert.warningIf") }}</span>
         <div class="flex flex-wrap items-center gap-2">
@@ -186,6 +207,7 @@
             width="xs"
             suffix="%"
             :placeholder="t('slos.alert.none')"
+            data-test="slos-sloalertcondition-warning"
           />
         </div>
       </div>
@@ -223,7 +245,11 @@ const model = defineModel<any>({ required: true });
  *
  *  On the SLO page the SLO is CONTEXT, not a choice: it comes from the page,
  *  the selector is not rendered, and the list is never fetched. */
-const props = defineProps<{ slo?: Slo | null }>();
+const props = defineProps<{
+  slo?: Slo | null;
+  /** Per-field messages from the parent form, empty until a submit is attempted. */
+  errors?: { critical?: I18nText; long?: I18nText; short?: I18nText };
+}>();
 
 const { t } = useI18nTyped();
 const store = useStore();
