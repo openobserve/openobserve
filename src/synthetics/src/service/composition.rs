@@ -435,4 +435,110 @@ mod tests {
         assert_eq!(left.len(), 1);
         assert_eq!(left[0].id, "p2");
     }
+
+    /// `create_table_from_entity` omits the migration's column DEFAULTs that
+    /// `synthetics_checks::create` relies on.
+    async fn db_with_synthetics_defaults() -> sea_orm::DatabaseConnection {
+        use sea_orm::{ConnectOptions, ConnectionTrait, Database, Schema};
+        let mut opts = ConnectOptions::new("sqlite::memory:".to_string());
+        opts.max_connections(1);
+        let db = Database::connect(opts).await.unwrap();
+        db.execute_unprepared("PRAGMA foreign_keys = ON")
+            .await
+            .unwrap();
+        db.execute_unprepared(
+            "CREATE TABLE synthetics (
+                id TEXT NOT NULL PRIMARY KEY,
+                org_id TEXT NOT NULL,
+                folder_id TEXT NOT NULL,
+                tz_offset INTEGER NOT NULL DEFAULT 0,
+                name TEXT NOT NULL,
+                synthetics_type TEXT NOT NULL,
+                target TEXT NOT NULL,
+                description TEXT NOT NULL DEFAULT '',
+                tags TEXT NOT NULL,
+                config TEXT NOT NULL,
+                frequency TEXT NOT NULL,
+                locations TEXT NOT NULL,
+                enabled BOOLEAN NOT NULL DEFAULT 1,
+                destinations TEXT NOT NULL,
+                settings TEXT NOT NULL,
+                secrets TEXT NOT NULL DEFAULT '{}',
+                next_run_at BIGINT NOT NULL DEFAULT 0,
+                last_triggered_at BIGINT NOT NULL DEFAULT 0,
+                last_check_status INTEGER NOT NULL DEFAULT 0,
+                consecutive_failures INTEGER NOT NULL DEFAULT 0,
+                last_alert_at BIGINT NOT NULL DEFAULT 0,
+                alerting BOOLEAN NOT NULL DEFAULT 0,
+                degraded_notified_at BIGINT NOT NULL DEFAULT 0,
+                owner TEXT NULL,
+                created_at BIGINT NOT NULL,
+                updated_at BIGINT NOT NULL
+            )",
+        )
+        .await
+        .unwrap();
+        let backend = db.get_database_backend();
+        let schema = Schema::new(backend);
+        db.execute(backend.build(
+            &schema.create_table_from_entity(infra::table::entity::synthetics_refs::Entity),
+        ))
+        .await
+        .unwrap();
+        db
+    }
+
+    fn referencing(id: &str, org_id: &str, child: &str) -> Synthetic {
+        Synthetic {
+            id: id.into(),
+            org_id: org_id.into(),
+            name: id.into(),
+            check_type: SyntheticType::Browser,
+            config: json!({ "steps": [ { "id": "r0", "action": "subtest", "subtest": { "id": child } } ] }),
+            ..Synthetic::default()
+        }
+    }
+
+    #[tokio::test]
+    async fn ensure_not_referenced_reports_full_blockers_and_respects_org_scope() {
+        let db = db_with_synthetics_defaults().await;
+
+        // Two blockers in org1, plus one in org2 that must never count toward org1's pre-pass.
+        let a =
+            synthetics_checks::create(&db, "org1", referencing("blocker-a", "org1", "child"), true)
+                .await;
+        assert!(a.is_ok(), "setup: blocker-a must be created: {a:?}");
+        let b =
+            synthetics_checks::create(&db, "org1", referencing("blocker-b", "org1", "child"), true)
+                .await;
+        assert!(b.is_ok(), "setup: blocker-b must be created: {b:?}");
+        let cross_org = synthetics_checks::create(
+            &db,
+            "org2",
+            referencing("other-org-parent", "org2", "child"),
+            true,
+        )
+        .await;
+        assert!(
+            cross_org.is_ok(),
+            "setup: other-org-parent must be created: {cross_org:?}"
+        );
+
+        // Referenced: the full blocker list travels back, not a truncated one, and the other
+        // org's parent is excluded.
+        let result = ensure_not_referenced(&db, "org1", &["child".to_string()]).await;
+        let mut ids: Vec<String> = match result {
+            Err(CompositionError::ReferencedBy(parents)) => {
+                parents.into_iter().map(|p| p.id).collect()
+            }
+            other => panic!("expected ReferencedBy, got {other:?}"),
+        };
+        ids.sort();
+        assert_eq!(ids, ["blocker-a", "blocker-b"]);
+
+        // Not referenced at all: the pre-pass clears it.
+        ensure_not_referenced(&db, "org1", &["lonely".to_string()])
+            .await
+            .unwrap();
+    }
 }
