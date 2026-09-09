@@ -1732,9 +1732,18 @@ async fn page_for_alert_firing(
                 .as_ref()
                 .and_then(|a| a.group_by.clone())
                 .unwrap_or_default();
-            config::meta::alerts::dispatch::rows_by_group_key(rows, &group_by)
-                .values()
-                .map(|row| {
+            let mut by_key: Vec<(String, _)> =
+                config::meta::alerts::dispatch::rows_by_group_key(rows, &group_by)
+                    .into_iter()
+                    .collect();
+            // Sorted on the group key, and it must stay sorted: that map is a `HashMap`, whose
+            // iteration order differs between processes, and the engine picks `by_team[0]` above
+            // the fan-out cap — so an arbitrary order is the same firing waking a different team
+            // on a different node. The group key is the identity a group already carries.
+            by_key.sort_by(|a, b| a.0.cmp(&b.0));
+            by_key
+                .iter()
+                .map(|(_, row)| {
                     o2_enterprise::enterprise::oncall::routing::dimensions_for_alert(
                         &semantic_groups,
                         &alert.query_condition,
