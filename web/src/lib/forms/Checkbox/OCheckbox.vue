@@ -140,13 +140,13 @@ const boxSizeClasses: Record<NonNullable<CheckboxProps["size"]>, string> = {
         // Checked
         color === 'primary' && 'data-[state=checked]:bg-checkbox-checked-bg',
         color === 'primary' && 'data-[state=checked]:border-checkbox-checked-border',
-        color === 'negative' && 'data-[state=checked]:bg-error-600',
-        color === 'negative' && 'data-[state=checked]:border-error-600',
+        color === 'negative' && 'data-[state=checked]:bg-error-500',
+        color === 'negative' && 'data-[state=checked]:border-error-500',
         // Indeterminate
         color === 'primary' && 'data-[state=indeterminate]:bg-checkbox-checked-bg',
         color === 'primary' && 'data-[state=indeterminate]:border-checkbox-checked-border',
-        color === 'negative' && 'data-[state=indeterminate]:bg-error-600',
-        color === 'negative' && 'data-[state=indeterminate]:border-error-600',
+        color === 'negative' && 'data-[state=indeterminate]:bg-error-500',
+        color === 'negative' && 'data-[state=indeterminate]:border-error-500',
         // Disabled
         'disabled:bg-checkbox-disabled-bg',
         'disabled:border-checkbox-disabled-border',
