@@ -827,8 +827,12 @@ mod tests {
 
     #[test]
     fn oss_usage_entry_points_return_before_enqueueing() {
-        let source = include_str!("lib.rs");
-        let gate = "#[cfg(not(feature = \"enterprise\"))]\n    return;";
+        // Whitespace-normalised so reindenting the source cannot fail this.
+        let source = include_str!("lib.rs")
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ");
+        let gate = "#[cfg(not(feature = \"enterprise\"))] return;";
         assert_eq!(
             source.matches(gate).count(),
             2,
