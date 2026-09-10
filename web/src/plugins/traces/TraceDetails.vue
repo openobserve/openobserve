@@ -35,8 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Standalone (routed) header: shared OPageHeader -->
         <OPageHeader
           v-if="mode === 'standalone'"
-          :title="traceTree[0]?.operationName || t('traces.loadingTrace')"
-          title-data-test="trace-details-operation-name"
+          title-overflow="visible"
           :back="
             showBackButton
               ? {
@@ -47,6 +46,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           class=""
         >
+          <!-- Operation names run long (SQL, URLs); the default header title never shrinks, so it never ellipsises. -->
+          <template #title>
+            <span
+              data-test="trace-details-operation-name"
+              class="block truncate"
+              :title="traceTree[0]?.operationName"
+            >
+              {{ traceTree[0]?.operationName || t("traces.loadingTrace") }}
+            </span>
+          </template>
+
           <template #subtitle>
             <div class="text-2xs text-text-secondary flex items-center space-x-2 whitespace-nowrap">
               <span>{{ formatTimestamp(traceStartTime, store.state.timezone) }}</span>
