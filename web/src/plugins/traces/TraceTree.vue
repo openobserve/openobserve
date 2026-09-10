@@ -157,7 +157,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                     :data-test="`trace-tree-span-select-btn-${(spans as any[])[virtualRow.index].spanId}`"
                   >
-                    <div class="span-name-section-content flex items-center truncate">
+                    <!-- w-full: content-sized, this box shrinks with its own text, so the service name's cap would resolve against the text it is meant to bound. -->
+                    <div
+                      class="span-name-section-content flex w-full min-w-0 items-center truncate"
+                    >
                       <OIcon
                         v-if="(spans as any[])[virtualRow.index].spanStatus === 'ERROR'"
                         name="error"
@@ -166,9 +169,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :title="t('traces.traceTree.errorSpan')"
                         :data-test="`trace-tree-span-error-icon-${(spans as any[])[virtualRow.index].spanId}`"
                       />
-                      <!-- shrink-0 + a cap, not plain shrink: flex shrinks items in proportion to their width, so a long operation name would eat the service name first. -->
+                      <!-- shrink-0 + a cap, not plain shrink: flex shrinks in proportion to width, so a long operation name would eat a short service name first. -->
                       <span
-                        class="mr-2 max-w-[40%] shrink-0 truncate text-sm font-bold font-medium"
+                        class="mr-2 max-w-[50%] shrink-0 truncate text-sm font-bold font-medium"
                         :class="{
                           'bg-table-highlight-bg text-table-highlight-text font-bold':
                             isHighlighted((spans as any[])[virtualRow.index].spanId),

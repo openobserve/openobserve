@@ -323,9 +323,16 @@ describe("TraceTree", () => {
       const serviceName = wrapper.find(`[data-test="trace-tree-span-service-name-${span.spanId}"]`);
       // shrink-0 + a cap: flex shrinks in proportion to width, so a long operation name would otherwise eat the service name first.
       expect(serviceName.classes()).toEqual(
-        expect.arrayContaining(["truncate", "shrink-0", "max-w-[40%]"]),
+        expect.arrayContaining(["truncate", "shrink-0", "max-w-[50%]"]),
       );
     }
+  });
+
+  it("should size the name row from the column, not from its own text", () => {
+    // Without w-full the row is content-sized and the service name's cap would
+    // bound it against its own text, truncating names that had room to spare.
+    const nameRow = wrapper.find(".span-name-section-content");
+    expect(nameRow.classes()).toEqual(expect.arrayContaining(["w-full", "min-w-0"]));
   });
 
   it("should render error icon for error spans", () => {
