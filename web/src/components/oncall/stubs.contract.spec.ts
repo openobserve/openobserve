@@ -187,7 +187,7 @@ function propsFromNamedType(
   file: string,
   source: string,
 ): Set<string> | null {
-  const bare = typeName.replace(/<.*/, "").trim();
+  const bare = typeName.split("<")[0].trim();
   const candidates = [
     join(dirname(file), `${basename(file, ".vue")}.types.ts`),
     ...readdirSync(dirname(file))
