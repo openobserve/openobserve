@@ -14,12 +14,15 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::meta::pipeline::components::{Edge, Node};
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set, TransactionTrait, prelude::Expr};
+use sea_orm::{
+    ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, Set, TransactionTrait, prelude::Expr,
+};
 use serde::{Deserialize, Serialize};
 
 use super::entity::{workflow_drafts, workflow_errors, workflow_run_data, workflows};
 use crate::{
     db::{get_orm_client_ro, get_orm_client_rw},
+    errors,
     table::entity::workflow_associations,
 };
 
@@ -27,6 +30,9 @@ use crate::{
 pub struct Workflow {
     pub id: String,
     pub org_id: String,
+    /// Primary key of the owning folder (`folders.id`), never the URL slug.
+    #[serde(default)]
+    pub folder_id: String,
     pub created_at: i64,
     pub updated_at: i64,
     pub created_by: String,
@@ -62,6 +68,7 @@ impl TryFrom<workflows::Model> for Workflow {
         let ret = Self {
             id: value.id,
             org_id: value.org_id,
+            folder_id: value.folder_id,
             created_at: value.created_at,
             updated_at: value.updated_at,
             created_by: value.created_by,
@@ -78,9 +85,11 @@ impl TryFrom<workflows::Model> for Workflow {
 impl TryFrom<workflow_drafts::Model> for Workflow {
     type Error = anyhow::Error;
     fn try_from(value: workflow_drafts::Model) -> Result<Self, Self::Error> {
+        // Drafts store no folder; the caller fills it from the published row.
         let ret = Self {
             id: value.id,
             org_id: value.org_id,
+            folder_id: String::new(),
             created_at: value.created_at,
             updated_at: value.updated_at,
             created_by: value.created_by,
@@ -195,6 +204,60 @@ pub async fn list_by_org(org_id: &str) -> Result<Vec<Workflow>, anyhow::Error> {
     Ok(ret)
 }
 
+/// Lists an org's workflows, optionally restricted to one folder.
+///
+/// `folder_pk` is the folder's primary key, not the slug from the URL.
+pub async fn list_by_org_folder(
+    org_id: &str,
+    folder_pk: Option<&str>,
+) -> Result<Vec<Workflow>, anyhow::Error> {
+    let client = get_orm_client_ro().await;
+    let mut query = workflows::Entity::find().filter(workflows::Column::OrgId.eq(org_id));
+    if let Some(pk) = folder_pk {
+        query = query.filter(workflows::Column::FolderId.eq(pk));
+    }
+    let entities = query.all(client).await?;
+    let mut ret = Vec::with_capacity(entities.len());
+    for e in entities {
+        ret.push(e.try_into()?);
+    }
+    Ok(ret)
+}
+
+/// Counts the workflows in a folder. Backs the folder delete guard, so it takes
+/// the folder's primary key.
+pub async fn count_by_folder(org_id: &str, folder_pk: &str) -> Result<u64, errors::Error> {
+    let client = get_orm_client_ro().await;
+    let count = workflows::Entity::find()
+        .filter(workflows::Column::OrgId.eq(org_id))
+        .filter(workflows::Column::FolderId.eq(folder_pk))
+        .count(client)
+        .await?;
+    Ok(count)
+}
+
+/// Moves workflows into `dst_folder_pk`, which must be a folder primary key.
+pub async fn move_to_folder(
+    org_id: &str,
+    workflow_ids: &[String],
+    dst_folder_pk: &str,
+) -> Result<(), anyhow::Error> {
+    if workflow_ids.is_empty() {
+        return Ok(());
+    }
+    let client = get_orm_client_rw().await;
+    workflows::Entity::update_many()
+        .col_expr(
+            workflows::Column::FolderId,
+            Expr::value(dst_folder_pk.to_string()),
+        )
+        .filter(workflows::Column::OrgId.eq(org_id))
+        .filter(workflows::Column::Id.is_in(workflow_ids.to_vec()))
+        .exec(client)
+        .await?;
+    Ok(())
+}
+
 pub async fn get_by_org_wid(
     org_id: &str,
     workflow_id: &str,
@@ -252,6 +315,7 @@ pub async fn save_workflow(workflow: Workflow) -> Result<(), anyhow::Error> {
     let model = workflows::ActiveModel {
         id: Set(workflow.id),
         org_id: Set(workflow.org_id),
+        folder_id: Set(workflow.folder_id),
         created_at: Set(now),
         updated_at: Set(now),
         created_by: Set(workflow.created_by),
@@ -694,6 +758,7 @@ pub async fn promote_draft_to_workflow(org_id: &str, draft: Workflow) -> Result<
     let model = workflows::ActiveModel {
         id: Set(draft.id),
         org_id: Set(draft.org_id),
+        folder_id: Set(draft.folder_id),
         created_at: Set(now),
         updated_at: Set(now),
         created_by: Set(draft.created_by),

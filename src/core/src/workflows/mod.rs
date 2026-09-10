@@ -16,6 +16,7 @@
 use std::collections::HashMap;
 
 use config::meta::{
+    folder::DEFAULT_FOLDER,
     pipeline::components::NodeData,
     self_reporting::usage::{RunOutcome, TriggerData, TriggerDataType},
 };
@@ -335,10 +336,29 @@ async fn validate_workflow(workflow: &Workflow, is_draft: bool) -> Result<(), an
     Ok(())
 }
 
-pub async fn save_workflow(workflow: Workflow) -> Result<(), anyhow::Error> {
+/// Saves a workflow into `folder_slug`, defaulting to the org's default folder.
+///
+/// The folder slug is resolved to a primary key here, so callers pass the
+/// user-facing id straight from the request.
+pub async fn save_workflow(
+    mut workflow: Workflow,
+    folder_slug: Option<&str>,
+) -> Result<(), anyhow::Error> {
     validate_workflow(&workflow, false).await?;
+    let slug = folder_slug.unwrap_or(DEFAULT_FOLDER);
+    workflow.folder_id = db::workflows::resolve_folder_pk(&workflow.org_id, slug).await?;
+
     db::workflows::save_workflow_record(workflow.clone()).await?;
-    set_ownership(&workflow.org_id, "workflows", Authz::new(&workflow.id)).await;
+    set_ownership(
+        &workflow.org_id,
+        "workflows",
+        Authz {
+            obj_id: workflow.id.clone(),
+            parent_type: "workflow_folder".to_string(),
+            parent: slug.to_string(),
+        },
+    )
+    .await;
     db::workflows::notify_workflow_upsert(&workflow).await?;
     Ok(())
 }
@@ -392,13 +412,48 @@ pub async fn enable_disable_workflow(
 pub async fn list_workflows(
     org_id: &str,
     permitted: Option<Vec<String>>,
+    folder_slug: Option<&str>,
 ) -> Result<Vec<Workflow>, anyhow::Error> {
-    let ret = workflows::list_by_org(org_id)
+    let ret = db::workflows::list_workflows(org_id, folder_slug)
         .await?
         .into_iter()
         .filter(|pipeline| is_permitted(&pipeline.id, org_id, permitted.as_ref()))
         .collect();
     Ok(ret)
+}
+
+/// Moves workflows into another folder, re-pointing their authorization parent.
+pub async fn move_workflows(
+    org_id: &str,
+    workflow_ids: &[String],
+    dst_folder_slug: &str,
+) -> Result<(), anyhow::Error> {
+    let mut previous = Vec::with_capacity(workflow_ids.len());
+    for id in workflow_ids {
+        if let Some(w) = db::workflows::get_workflow(org_id, id).await? {
+            previous.push((w.id.clone(), w.folder_id.clone()));
+        }
+    }
+
+    db::workflows::move_workflows(org_id, workflow_ids, dst_folder_slug).await?;
+
+    // Ownership follows the row: the old parent tuple would otherwise keep
+    // granting access through the folder the workflow just left.
+    for (id, old_folder) in previous {
+        remove_ownership(org_id, "workflows", Authz::new(&id)).await;
+        set_ownership(
+            org_id,
+            "workflows",
+            Authz {
+                obj_id: id,
+                parent_type: "workflow_folder".to_string(),
+                parent: dst_folder_slug.to_string(),
+            },
+        )
+        .await;
+        let _ = old_folder;
+    }
+    Ok(())
 }
 
 pub async fn list_drafts(

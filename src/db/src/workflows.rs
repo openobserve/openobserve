@@ -18,6 +18,7 @@ use std::{
     sync::{Arc, LazyLock},
 };
 
+use config::meta::folder::{DEFAULT_FOLDER, FolderType};
 use infra::{
     coordinator::get_coordinator,
     db::Event,
@@ -119,6 +120,65 @@ pub async fn get_workflow(
             .insert(workflow_id.to_string(), workflow.clone());
     }
     Ok(workflow)
+}
+
+/// Translates a user-facing folder slug into the folder primary key stored on
+/// `workflows.folder_id`, creating the org's default folder on first use.
+///
+/// An empty or absent slug means the default folder, which is what every
+/// pre-folders client sends.
+pub async fn resolve_folder_pk(org_id: &str, folder_slug: &str) -> Result<String, anyhow::Error> {
+    let slug = if folder_slug.trim().is_empty() {
+        DEFAULT_FOLDER
+    } else {
+        folder_slug
+    };
+
+    if slug == DEFAULT_FOLDER {
+        crate::folders::ensure_default_folder(org_id, FolderType::Workflows)
+            .await
+            .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+    }
+
+    infra::table::folders::get_pk_by_name(org_id, slug, FolderType::Workflows)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("folder not found: {slug}"))
+}
+
+/// Lists an org's workflows in one folder, or across the org when `folder_slug`
+/// is `None`.
+pub async fn list_workflows(
+    org_id: &str,
+    folder_slug: Option<&str>,
+) -> Result<Vec<Workflow>, anyhow::Error> {
+    match folder_slug {
+        Some(slug) => {
+            let pk = resolve_folder_pk(org_id, slug).await?;
+            infra::table::workflows::list_by_org_folder(org_id, Some(&pk)).await
+        }
+        None => infra::table::workflows::list_by_org_folder(org_id, None).await,
+    }
+}
+
+/// Moves workflows into another folder. `dst_folder_slug` is the user-facing id.
+pub async fn move_workflows(
+    org_id: &str,
+    workflow_ids: &[String],
+    dst_folder_slug: &str,
+) -> Result<(), anyhow::Error> {
+    if !infra::table::folders::exists(org_id, dst_folder_slug, FolderType::Workflows).await? {
+        return Err(anyhow::anyhow!("destination folder not found"));
+    }
+    let pk = resolve_folder_pk(org_id, dst_folder_slug).await?;
+    infra::table::workflows::move_to_folder(org_id, workflow_ids, &pk).await?;
+
+    // The cache keys on workflow id and now holds a stale folder, so drop the
+    // moved entries rather than trying to patch them.
+    let mut cache = CACHE.write().await;
+    for id in workflow_ids {
+        cache.remove(id);
+    }
+    Ok(())
 }
 
 pub async fn get_draft(org_id: &str, id: &str) -> Result<Option<Workflow>, anyhow::Error> {

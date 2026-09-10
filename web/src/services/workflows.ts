@@ -16,9 +16,12 @@
 import http from "./http";
 
 const workflows = {
-  // List all workflows for the org .
-  listWorkflows: (org_identifier: string) => {
-    const url = `/api/${org_identifier}/workflows`;
+  // List the org's workflows in one folder. Omitting `folder` lets the backend
+  // fall back to the default folder, which is what pre-folders clients sent.
+  listWorkflows: (org_identifier: string, folder?: string) => {
+    const url = `/api/${org_identifier}/workflows${
+      folder ? `?folder=${encodeURIComponent(folder)}` : ""
+    }`;
     return http().get(url);
   },
 

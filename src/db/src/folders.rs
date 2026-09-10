@@ -73,6 +73,10 @@ pub enum FolderError {
     #[error("Folder contains synthetics. Please move/delete synthetics from folder.")]
     DeleteWithSynthetics,
 
+    /// An error that occurs when trying to delete a folder that contains workflows.
+    #[error("Folder contains workflows. Please move/delete workflows from folder.")]
+    DeleteWithWorkflows,
+
     /// An error that occurs when trying to delete a folder that cannot be found.
     #[error("Folder not found")]
     NotFound,
@@ -239,6 +243,7 @@ pub async fn list_folders(
         FolderType::Alerts => OFGA_MODELS.get("alert_folders").unwrap().key,
         FolderType::Reports => OFGA_MODELS.get("report_folders").unwrap().key,
         FolderType::Synthetics => OFGA_MODELS.get("synthetic_folder").unwrap().key,
+        FolderType::Workflows => OFGA_MODELS.get("workflow_folder").unwrap().key,
     };
     #[cfg(not(feature = "enterprise"))]
     let folder_ofga_model = "";
@@ -337,6 +342,19 @@ pub async fn delete_folder(
                 }
             }
         }
+        FolderType::Workflows => {
+            // `folder_id` is the user-facing id from the URL; the workflows
+            // table stores the folder's primary key, so translate before
+            // counting. A missing folder falls through to the `exists` check
+            // below, which reports NotFound.
+            if let Some(folder_pk) =
+                table::folders::get_pk_by_name(org_id, folder_id, folder_type).await?
+            {
+                if table::workflows::count_by_folder(org_id, &folder_pk).await? > 0 {
+                    return Err(FolderError::DeleteWithWorkflows);
+                }
+            }
+        }
     };
 
     if !table::folders::exists(org_id, folder_id, folder_type).await? {
@@ -370,6 +388,7 @@ fn folder_type_ofga_name(folder_type: FolderType) -> &'static str {
         FolderType::Alerts => "alert_folders",
         FolderType::Reports => "report_folders",
         FolderType::Synthetics => "synthetic_folder",
+        FolderType::Workflows => "workflow_folder",
     }
 }
 
@@ -404,6 +423,10 @@ async fn permitted_folders(
         FolderType::Synthetics => (
             OFGA_MODELS.get("synthetic_folder").unwrap().key,
             OFGA_MODELS.get("synthetics").unwrap().key,
+        ),
+        FolderType::Workflows => (
+            OFGA_MODELS.get("workflow_folder").unwrap().key,
+            OFGA_MODELS.get("workflows").unwrap().key,
         ),
     };
 

@@ -25,6 +25,7 @@ use common::utils::sql::escape_like;
 use config::{
     ider,
     meta::{
+        folder::DEFAULT_FOLDER,
         search::{Query as SearchQuery, Request as SearchRequest},
         self_reporting::{error::NodeErrors, usage::TRIGGERS_STREAM},
         stream::StreamType,
@@ -39,11 +40,15 @@ use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::UserEmail;
 use search_service::{self as SearchService, query_range::get_settings_max_query_range};
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use serde_json::Value;
 
 use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::http::get_or_create_trace_id},
-    service::workflows::{self, InputMap},
+    service::{
+        auth::{check_folder_write_permissions, check_permissions},
+        workflows::{self, InputMap},
+    },
 };
 
 #[derive(Deserialize)]
@@ -190,8 +195,12 @@ pub async fn save_workflow(
 
     let is_draft: bool = is_draft.parse().unwrap_or(true);
 
+    // The query parameter is authoritative so one request cannot name two
+    // different destinations.
+    let folder = query.get("folder").map(|s| s.as_str()).unwrap_or(DEFAULT_FOLDER);
+
     if !is_draft {
-        match workflows::save_workflow(workflow).await {
+        match workflows::save_workflow(workflow, Some(folder)).await {
             Ok(()) => {
                 if payload.trigger_type == WorkflowTriggerType::IncidentEvent
                     && let Err(e) = db::workflows::associate_workflow(
@@ -246,6 +255,7 @@ pub async fn save_workflow(
     ),
     params(
         ("org_id" = String, Path, description = "Organization id"),
+        ("folder" = Option<String>, Query, description = "Folder ID to list within. The default folder is used when absent."),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = inline(Object)),
@@ -257,6 +267,7 @@ pub async fn save_workflow(
 pub async fn list_workflows(
     Path(org_id): Path<String>,
     Headers(_user_email): Headers<UserEmail>,
+    Query(query): Query<HashMap<String, String>>,
 ) -> Response {
     // Get List of allowed objects
     use o2_openfga::meta::mapping::OFGA_MODELS;
@@ -278,7 +289,10 @@ pub async fn list_workflows(
     };
     // Get List of allowed objects ends
 
-    let workflows = match workflows::list_workflows(&org_id, permitted.clone()).await {
+    let folder = query.get("folder").map(|s| s.as_str()).unwrap_or(DEFAULT_FOLDER);
+
+    let workflows = match workflows::list_workflows(&org_id, permitted.clone(), Some(folder)).await
+    {
         Ok(workflows) => workflows,
         Err(e) => return MetaHttpResponse::internal_error(e),
     };
@@ -321,6 +335,92 @@ pub async fn list_workflows(
 }
 
 /// DeleteWorkflows
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct MoveWorkflowsRequestBody {
+    /// IDs of the workflows to move.
+    pub workflow_ids: Vec<String>,
+    /// Destination folder id.
+    pub dst_folder_id: String,
+}
+
+#[utoipa::path(
+    patch,
+    path = "/v2/{org_id}/workflows/move",
+    context_path = "/api",
+    tag = "Workflows",
+    operation_id = "MoveWorkflows",
+    summary = "Move workflows to a different folder",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization id"),
+        ("folder" = Option<String>, Query, description = "Source folder ID (for RBAC)"),
+    ),
+    request_body(content = MoveWorkflowsRequestBody, description = "IDs and destination folder", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Moved"),
+        (status = 403, description = "Forbidden"),
+        (status = 500, description = "Error", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "update"})),
+    )
+)]
+pub async fn move_workflows(
+    Path(org_id): Path<String>,
+    Headers(user_email): Headers<UserEmail>,
+    Json(body): Json<MoveWorkflowsRequestBody>,
+) -> Response {
+    if body.workflow_ids.is_empty() {
+        return MetaHttpResponse::bad_request("workflow_ids cannot be empty");
+    }
+    if body.dst_folder_id.trim().is_empty() {
+        return MetaHttpResponse::bad_request("dst_folder_id cannot be empty");
+    }
+
+    // This route is bypass:true in the permission table, so the writes are
+    // authorized here: PUT on every workflow being moved, plus write access to
+    // the destination folder. Without both, a list+delete role could relocate
+    // workflows between folders it cannot write.
+    for id in &body.workflow_ids {
+        if !check_permissions(
+            id,
+            &org_id,
+            &user_email.user_id,
+            "workflows",
+            "PUT",
+            None,
+            false,
+            true,
+            false,
+        )
+        .await
+        {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
+    }
+
+    if !check_folder_write_permissions(
+        &org_id,
+        &user_email.user_id,
+        "workflow_folder",
+        &body.dst_folder_id,
+    )
+    .await
+    {
+        return MetaHttpResponse::forbidden("Forbidden");
+    }
+
+    match workflows::move_workflows(&org_id, &body.workflow_ids, &body.dst_folder_id).await {
+        Ok(()) => MetaHttpResponse::ok("workflows moved"),
+        Err(e) => {
+            log::error!("[workflows] move_workflows: {e}");
+            MetaHttpResponse::internal_error(e)
+        }
+    }
+}
 
 #[utoipa::path(
     delete,

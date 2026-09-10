@@ -50,6 +50,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <BetaBadge />
         </span>
       </template>
+      <template #sidebar>
+        <FolderList type="workflows" @update:activeFolderId="onFolderChange" />
+      </template>
       <template #actions>
         <!-- v1: only the Alert Fired trigger exists, so New Workflow goes
              straight to the editor (which pre-places the Alert Trigger). -->
@@ -191,6 +194,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                   </template>
                   <ODropdownItem
+                    :data-test="`workflow-list-${row.name}-move`"
+                    @select="openMoveDialog(row)"
+                  >
+                    <template #icon-left><OIcon size="sm" name="folder" /></template>
+                    {{ t("workflow.moveToFolder") }}
+                  </ODropdownItem>
+                  <ODropdownItem
                     :data-test="`workflow-list-${row.name}-delete`"
                     variant="destructive"
                     @select="openDeleteDialog(row)"
@@ -234,6 +244,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <component :is="Component" @saved="onEditorSaved" />
   </router-view>
 
+  <MoveAcrossFolders
+    v-model:open="showMoveDialog"
+    :activeFolderId="activeFolderId"
+    :moduleId="workflowIdsToMove"
+    type="workflows"
+    @updated="onMoveUpdated"
+    data-test="workflow-move-to-another-folder-dialog"
+  />
+
   <ConfirmDialog
     :title="confirmDialogMeta.title"
     :message="confirmDialogMeta.message"
@@ -244,12 +263,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, defineAsyncComponent, onMounted } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import FolderList from "@/components/common/sidebar/FolderList.vue";
+import { getFoldersListByType } from "@/utils/commons";
+const MoveAcrossFolders = defineAsyncComponent(
+  () => import("@/components/common/sidebar/MoveAcrossFolders.vue"),
+);
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import BetaBadge from "@/components/common/BetaBadge.vue";
@@ -270,6 +294,32 @@ import { hydrateWorkflow, triggerDef } from "@/plugins/workflows/useWorkflowCanv
 
 const { t } = useI18nTyped();
 const router = useRouter();
+const route = useRoute();
+
+// The folder lives in the URL so a folder view is linkable and survives a reload.
+const activeFolderId = computed(() => (route.query.folder as string) || "default");
+
+const showMoveDialog = ref(false);
+const workflowIdsToMove = ref<string[]>([]);
+
+const openMoveDialog = (row: any) => {
+  workflowIdsToMove.value = [row.id];
+  showMoveDialog.value = true;
+};
+
+const onMoveUpdated = () => {
+  showMoveDialog.value = false;
+  workflowIdsToMove.value = [];
+  getWorkflows();
+};
+
+const onFolderChange = (folderId: string) => {
+  if (folderId === activeFolderId.value) return;
+  router.push({
+    query: { ...route.query, org_identifier: orgId.value, folder: folderId },
+  });
+  getWorkflows();
+};
 const store = useStore();
 
 const currentRouteName = computed(() => router.currentRoute.value.name);
@@ -389,7 +439,7 @@ const getWorkflows = async () => {
   loading.value = true;
   forbidden.value = false;
   try {
-    const response = await workflowService.listWorkflows(orgId.value);
+    const response = await workflowService.listWorkflows(orgId.value, activeFolderId.value);
     // list handler returns a bare array of Workflow.
     const list = Array.isArray(response.data) ? response.data : (response.data?.list ?? []);
     workflows.value = list.map((wf: any, index: number) => ({
@@ -527,6 +577,10 @@ const onEditorSaved = async () => {
 };
 
 onMounted(async () => {
+  // FolderList reads the store, so the folders must be there before it renders.
+  await getFoldersListByType(store, "workflows").catch((err: unknown) =>
+    console.error("failed to load workflow folders", err),
+  );
   await getWorkflows();
   restorePageIndex();
 });
