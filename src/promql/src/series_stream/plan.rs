@@ -103,62 +103,6 @@ pub(crate) async fn execute_partitioned(
     ))
 }
 
-/// The `by()` columns in a stable order; `None` for `without()`, which needs the full label set.
-pub(crate) fn group_label_columns(
-    modifier: &Option<LabelModifier>,
-    schema: &Schema,
-    func_name: &str,
-) -> Option<Vec<String>> {
-    let include = match modifier {
-        None => return Some(vec![]),
-        Some(LabelModifier::Include(labels)) => &labels.labels,
-        Some(LabelModifier::Exclude(_)) => return None,
-    };
-    let mut cols: Vec<String> = include
-        .iter()
-        .filter(|name| {
-            let name = name.as_str();
-            name != TIMESTAMP_COL_NAME
-                && name != HASH_LABEL
-                && name != VALUE_LABEL
-                && name != EXEMPLARS_LABEL
-                // range functions strip the metric name before aggregation
-                && (name != NAME_LABEL || KEEP_METRIC_NAME_FUNC.contains(func_name))
-                && schema.field_with_name(name).is_ok()
-        })
-        .cloned()
-        .collect();
-    cols.sort();
-    cols.dedup();
-    Some(cols)
-}
-
-/// The label columns an emitted series carries, in the sorted order the materializing loader
-/// uses: string columns other than the hash and exemplars, narrowed by the label selector
-/// (which always keeps `le`), without the metric name unless the function keeps it.
-pub(crate) fn series_label_columns(
-    schema: &Schema,
-    label_selector: &HashSet<String>,
-    func_name: &str,
-) -> Vec<String> {
-    let mut cols: Vec<String> = schema
-        .fields()
-        .iter()
-        .filter(|field| matches!(field.data_type(), DataType::Utf8 | DataType::Utf8View))
-        .map(|field| field.name().clone())
-        .filter(|name| {
-            name != HASH_LABEL
-                && name != EXEMPLARS_LABEL
-                && (label_selector.is_empty()
-                    || label_selector.contains(name)
-                    || name == BUCKET_LABEL)
-                && (name != NAME_LABEL || KEEP_METRIC_NAME_FUNC.contains(func_name))
-        })
-        .collect();
-    cols.sort();
-    cols
-}
-
 /// Every partition's ordered input streams; `None` (logged) means a partition's plan cannot stream
 /// in order.
 async fn build_partition_inputs(
@@ -253,6 +197,62 @@ fn hash_ordered(plan: &Arc<dyn ExecutionPlan>) -> bool {
                 .downcast_ref::<Column>()
                 .is_some_and(|column| column.name() == HASH_LABEL)
     })
+}
+
+/// The `by()` columns in a stable order; `None` for `without()`, which needs the full label set.
+pub(crate) fn group_label_columns(
+    modifier: &Option<LabelModifier>,
+    schema: &Schema,
+    func_name: &str,
+) -> Option<Vec<String>> {
+    let include = match modifier {
+        None => return Some(vec![]),
+        Some(LabelModifier::Include(labels)) => &labels.labels,
+        Some(LabelModifier::Exclude(_)) => return None,
+    };
+    let mut cols: Vec<String> = include
+        .iter()
+        .filter(|name| {
+            let name = name.as_str();
+            name != TIMESTAMP_COL_NAME
+                && name != HASH_LABEL
+                && name != VALUE_LABEL
+                && name != EXEMPLARS_LABEL
+                // range functions strip the metric name before aggregation
+                && (name != NAME_LABEL || KEEP_METRIC_NAME_FUNC.contains(func_name))
+                && schema.field_with_name(name).is_ok()
+        })
+        .cloned()
+        .collect();
+    cols.sort();
+    cols.dedup();
+    Some(cols)
+}
+
+/// The label columns an emitted series carries, in the sorted order the materializing loader
+/// uses: string columns other than the hash and exemplars, narrowed by the label selector
+/// (which always keeps `le`), without the metric name unless the function keeps it.
+pub(crate) fn series_label_columns(
+    schema: &Schema,
+    label_selector: &HashSet<String>,
+    func_name: &str,
+) -> Vec<String> {
+    let mut cols: Vec<String> = schema
+        .fields()
+        .iter()
+        .filter(|field| matches!(field.data_type(), DataType::Utf8 | DataType::Utf8View))
+        .map(|field| field.name().clone())
+        .filter(|name| {
+            name != HASH_LABEL
+                && name != EXEMPLARS_LABEL
+                && (label_selector.is_empty()
+                    || label_selector.contains(name)
+                    || name == BUCKET_LABEL)
+                && (name != NAME_LABEL || KEEP_METRIC_NAME_FUNC.contains(func_name))
+        })
+        .collect();
+    cols.sort();
+    cols
 }
 
 #[cfg(test)]
