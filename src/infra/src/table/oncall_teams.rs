@@ -54,6 +54,14 @@ static TEAM_CACHE: LazyLock<RwHashMap<String, (Team, Instant)>> = LazyLock::new(
 static MEMBERS_CACHE: LazyLock<RwHashMap<String, (Vec<TeamMember>, Instant)>> =
     LazyLock::new(Default::default);
 
+/// Whether an org has any team at all, for the firing path.
+///
+/// On-call is on by default, so this is asked once per alert firing in every
+/// org — including the overwhelming majority that have never configured the
+/// feature and for whom the answer never changes.
+static ORG_HAS_TEAMS_CACHE: LazyLock<RwHashMap<String, (bool, Instant)>> =
+    LazyLock::new(Default::default);
+
 /// Deliberately shorter than `06` §6's five-minute budget.
 ///
 /// The budget is what the design tolerates; this is what the feature actually
@@ -63,13 +71,24 @@ static MEMBERS_CACHE: LazyLock<RwHashMap<String, (Vec<TeamMember>, Instant)>> =
 /// nothing.
 const TEAM_CACHE_TTL: Duration = Duration::from_secs(60);
 
+/// How long "this org has no teams" is believed without asking again.
+///
+/// Shorter than [`TEAM_CACHE_TTL`] because this is the one entry whose staleness
+/// makes the product look broken: an operator creating their first team and
+/// seeing nothing happen concludes on-call does not work. Team writes drop the
+/// entry on every node, so this only bounds the coordinator event that was lost.
+const NO_TEAMS_CACHE_TTL: Duration = Duration::from_secs(10);
+
 fn team_cache_key(org_id: &str, id: &str) -> String {
     format!("{org_id}/{id}")
 }
 
-/// Drops one team from the definition cache.
+/// Drops one team from the definition cache, and the org's "has any team"
+/// answer with it.
 pub fn invalidate_cache(org_id: &str, id: &str) {
     TEAM_CACHE.remove(&team_cache_key(org_id, id));
+    // Every create and delete comes through here, and those are what change this answer.
+    ORG_HAS_TEAMS_CACHE.remove(org_id);
 }
 
 /// Drops one team's roster.
@@ -167,7 +186,10 @@ pub async fn create(
         created_at: Set(now),
         updated_at: Set(now),
     };
-    Ok(to_team(model.insert(client).await?))
+    let team = to_team(model.insert(client).await?);
+    // The first team turns the feature on, and nobody should wait out a TTL for it.
+    invalidate_and_publish_team(org_id, &team.id).await;
+    Ok(team)
 }
 
 /// The destination names this team is talked to on, or `None` if it has never
@@ -372,6 +394,36 @@ pub async fn get_cached(org_id: &str, id: &str) -> Result<Option<Team>, errors::
         TEAM_CACHE.insert(key, (team.clone(), Instant::now()));
     }
     Ok(found)
+}
+
+/// Whether this org has any on-call team at all, served from
+/// [`ORG_HAS_TEAMS_CACHE`] when fresh.
+///
+/// The negative **is** cached, unlike a missing team in [`get_cached`], because
+/// it is the answer for nearly every org and it is asked on every firing. What
+/// makes that safe is that [`create`] publishes an invalidation, so the first
+/// team an org ever makes drops this entry on every node before the next firing
+/// reads it; [`NO_TEAMS_CACHE_TTL`] only covers the event that never arrived.
+pub async fn has_any_cached(org_id: &str) -> Result<bool, errors::Error> {
+    if let Some(entry) = ORG_HAS_TEAMS_CACHE.get(org_id) {
+        let (any, cached_at) = *entry;
+        let ttl = if any {
+            TEAM_CACHE_TTL
+        } else {
+            NO_TEAMS_CACHE_TTL
+        };
+        if cached_at.elapsed() < ttl {
+            return Ok(any);
+        }
+    }
+    let client = get_orm_client_rw().await;
+    let any = oncall_teams::Entity::find()
+        .filter(oncall_teams::Column::OrgId.eq(org_id))
+        .one(client)
+        .await?
+        .is_some();
+    ORG_HAS_TEAMS_CACHE.insert(org_id.to_string(), (any, Instant::now()));
+    Ok(any)
 }
 
 /// The roster, served from [`MEMBERS_CACHE`] when fresh.
