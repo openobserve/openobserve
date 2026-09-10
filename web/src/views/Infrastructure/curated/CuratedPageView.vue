@@ -20,7 +20,7 @@ import { computed, onBeforeUnmount, onMounted, provide, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import { raw, useI18nTyped } from "@/types/i18n";
-import type { I18nKey } from "@/types/i18n";
+import type { I18nKey, I18nText } from "@/types/i18n";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -227,10 +227,11 @@ const hasStrip = computed(
     hiddenGroups.value.length > 0 || partialGroups.value.length > 0 || staleGroups.value.length > 0,
 );
 
-const collapsedCapabilities = computed(() => {
+const collapsedCapabilities = computed<I18nText>(() => {
   const sentences = hiddenGroups.value.map((hidden) => t(hidden.group.capabilityKey));
-  if (sentences.length === 0) return "";
-  if (sentences.length <= 2) return sentences.join(" ");
+  if (sentences.length === 0) return raw("");
+  // Already-translated sentences: joining them widens to plain string, it does not untranslate them.
+  if (sentences.length <= 2) return raw(sentences.join(" "));
   return t("infra.curated.hiddenSummaryMore", {
     first: sentences[0],
     count: sentences.length - 1,

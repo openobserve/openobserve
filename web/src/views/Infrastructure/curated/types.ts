@@ -51,6 +51,14 @@ export interface RequirementGroup {
   anchorStream?: string;
 }
 
+/** A v8 drilldown entry as authored by `explorerDrilldown` (§6.6). */
+export interface CuratedDrilldown {
+  name: string;
+  type: string;
+  targetBlank?: boolean;
+  data?: { url: string };
+}
+
 export interface PanelVariant {
   /** Full stream set; satisfiable iff every name is present AND live (§5.2). */
   requiresStreams?: string[];
@@ -97,7 +105,7 @@ export interface CuratedPanelDef {
   variants: PanelVariant[];
   /** 192-col grid cell; x/y flow-computed per section (§5.5). */
   layout: { w: number; h: number };
-  drilldown?: unknown[];
+  drilldown?: CuratedDrilldown[];
   /**
    * Pickers this panel deliberately ignores though its section declares them —
    * a fleet-wide reading is the panel's POINT, not an oversight. Lint requires
