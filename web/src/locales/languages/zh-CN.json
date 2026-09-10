@@ -14306,7 +14306,6 @@
       "syntheticsTokensRefresh": "刷新令牌列表",
       "aiChatToggle": "切换 AI 聊天",
       "aiChatClose": "关闭 AI 聊天",
-      "aiChatExpand": "展开/折叠 AI 聊天",
       "logsSaveView": "另存为已保存视图",
       "logsExport": "将结果导出为 CSV",
       "tracesCopyUrl": "复制追踪分享链接",

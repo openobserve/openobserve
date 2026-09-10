@@ -14301,7 +14301,6 @@
       "syntheticsTokensRefresh": "重新整理 Token 清單",
       "aiChatToggle": "切換AI聊天",
       "aiChatClose": "關閉 AI 聊天",
-      "aiChatExpand": "展開/收合 AI 聊天",
       "logsSaveView": "另存為已儲存檢視",
       "logsExport": "匯出結果為CSV",
       "tracesCopyUrl": "複製追蹤分享網址",
