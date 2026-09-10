@@ -27,21 +27,13 @@
 <template>
   <OPageLayout
     :title="t('slos.title')"
-    icon="track-changes"
+    icon="target"
     :subtitle="t('slos.subtitle')"
     title-data-test="slos-slolist-title"
     bleed
   >
     <template #actions>
-      <!-- The provider behind the Terraform export, which is otherwise only
-           discoverable once the export dialog is already open. -->
-      <OButton
-        variant="primary"
-        size="sm-action"
-        icon-left="add"
-        data-test="slos-slolist-new"
-        @click="goToNew"
-      >
+      <OButton variant="primary" size="sm-action" data-test="slos-slolist-new" @click="goToNew">
         {{ t("slos.new") }}
       </OButton>
     </template>
@@ -54,6 +46,7 @@
     </template>
 
     <OTable
+      ref="oTableRef"
       v-model:selected-ids="selectedIds"
       selection="multiple"
       :data="visibleRows"
@@ -63,6 +56,7 @@
       :error="error"
       :page-size="25"
       :page-size-options="[25, 50, 100]"
+      :current-page="currentPage"
       :show-global-filter="false"
       table-id="slos-list"
       :persist-columns="true"
@@ -70,6 +64,7 @@
       :enable-column-resize="true"
       data-test="slos-slolist-table"
       @row-click="onRowClick"
+      @update:current-page="onPageChange"
     >
       <template #toolbar>
         <div class="flex w-full items-center gap-2">
@@ -155,6 +150,7 @@
             :loading="loading"
             selectable
             :selected-key="healthFilter"
+            default-key="total"
             @select="onStatSelect"
           />
         </div>
@@ -226,7 +222,7 @@
 
       <template #cell-window="{ row }">
         <span class="tabular-nums">{{ formatWindow(row.window_secs) }}</span>
-        <span class="text-text-secondary text-compact ml-1">{{ t("slos.rolling") }}</span>
+        <span class="text-text-secondary text-compact ms-1">{{ t("slos.rolling") }}</span>
       </template>
 
       <template #cell-tags="{ row }">
@@ -293,7 +289,7 @@
 
       <template #empty>
         <OEmptyState
-          icon="track-changes"
+          icon="target"
           :title="t('slos.empty.title')"
           :description="t('slos.empty.description')"
         >
@@ -402,8 +398,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { computed, onMounted, ref, watch } from "vue";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
@@ -422,6 +418,7 @@ import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -453,7 +450,8 @@ const route = useRoute();
 const store = useStore();
 
 const rows = ref<SloListItem[]>([]);
-const loading = ref(false);
+// Starts true: shows the skeleton instead of flashing empty on first render, and keeps the page-restore watch's `{once:true}` from firing on a spurious false→true edge before the real load ever settles.
+const loading = ref(true);
 const error = ref<string | null>(null);
 const search = ref("");
 const typeFilter = ref("all");
@@ -464,6 +462,15 @@ const selectedIds = ref<string[]>([]);
 const moveDialog = ref(false);
 const moveTarget = ref("");
 const pendingMove = ref<SloListItem[]>([]);
+const oTableRef: any = ref(null);
+
+// URL-synced so returning from add/edit/detail (Back/Update/Cancel) lands on the same page instead of resetting to page 1.
+const currentPage = ref(Number(route.query.page) || 1);
+const onPageChange = (page: number) => {
+  currentPage.value = page;
+  if (String(route.query.page ?? "1") === String(page)) return;
+  router.replace({ query: { ...route.query, page: String(page) } });
+};
 
 // The route is the source of truth for the active folder, so a reload or a
 // shared link lands on the same folder the rail is showing.
@@ -560,11 +567,11 @@ function folderName(folderId: string): string {
   return folders.find((f: any) => f.folderId === folderId)?.name || folderId;
 }
 
-const typeOptions = computed(() => [
-  { value: "all", label: t("slos.type.all"), icon: "format_list_bulleted" },
+const typeOptions = computed<{ value: string; label: I18nText; icon: IconName }[]>(() => [
+  { value: "all", label: t("slos.type.all"), icon: "format-list-bulleted" },
   { value: "count", label: t("slos.type.count"), icon: "functions" },
-  { value: "time_slice", label: t("slos.type.timeSlice"), icon: "timelapse" },
-  { value: "alert", label: t("slos.type.alert"), icon: "gpp_maybe" },
+  { value: "time_slice", label: t("slos.type.timeSlice"), icon: "timeline" },
+  { value: "alert", label: t("slos.type.alert"), icon: "shield-alert-outline" },
 ]);
 
 const columns = computed<OTableColumnDef<SloListItem>[]>(() => [
@@ -769,6 +776,18 @@ function onStatSelect(key: string | null) {
   healthFilter.value = key === "total" ? null : key;
 }
 
+// The first real load lands after mount and races TanStack's own auto-reset-on-data-change, which resolves through its own deferred microtask queue — setTimeout(0) runs strictly after that queue drains, so the restored page reliably wins.
+watch(
+  loading,
+  (isLoading) => {
+    if (isLoading) return;
+    setTimeout(() => {
+      oTableRef.value?.table?.setPageIndex(currentPage.value - 1);
+    }, 0);
+  },
+  { once: true },
+);
+
 // Both optional: refresh calls `load()` bare and falls back to the current org
 // and active folder — the folder-change path is the only caller that passes a
 // folder the refs have not caught up with yet.
@@ -837,20 +856,22 @@ async function doMove() {
   }
 }
 
+// Spreads the list's own query (page, folder, …) forward so the editor's `backTarget` has something to restore.
 function goToNew() {
-  router.push({ name: "addSlo", query: { org_identifier: org.value } });
+  router.push({ name: "addSlo", query: { ...route.query, org_identifier: org.value } });
 }
 
 function goToEdit(row: SloListItem) {
   router.push({
     name: "editSlo",
     params: { slo_id: row.id },
-    query: { org_identifier: org.value },
+    query: { ...route.query, org_identifier: org.value },
   });
 }
 
 function onRowClick(row: SloListItem) {
-  router.push(sloDetailRoute(row.id, org.value));
+  const target = sloDetailRoute(row.id, org.value);
+  router.push({ ...target, query: { ...route.query, ...target.query } });
 }
 
 async function toggleEnabled(row: SloListItem) {

@@ -16,11 +16,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!--
   Datasets — the first slice of the AI Observability "Annotate" section. Golden
-  (MVCC) datasets that the annotation workflow feeds into. Frontend-first: this
-  page reads llm-datasets.service.ts, which serves mock fixtures until the
-  backend API lands (see VITE_LLM_ANNOTATION_MOCK). No page-level date range —
-  datasets are configuration objects, not time-series — so it uses OPageLayout
-  directly rather than AiPageShell.
+  (MVCC) datasets that the annotation workflow feeds into, read live from
+  llm-datasets.service.ts. No page-level date range — datasets are
+  configuration objects, not time-series — so it uses OPageLayout directly
+  rather than AiPageShell.
 -->
 <template>
   <OPageLayout
@@ -44,6 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :columns="columns"
         row-key="id"
         :loading="loading"
+        :forbidden="forbidden"
         @row-click="openDetail"
         :footer-title="t('aiObservability.datasets.listTitle')"
         :global-filter="search"
@@ -280,6 +280,7 @@ function openDetail(row: LlmDataset) {
 
 const datasets = ref<LlmDataset[]>([]);
 const loading = ref(false);
+const forbidden = ref(false);
 const search = ref("");
 
 const numberedRows = useNumberedRows(datasets);
@@ -361,7 +362,7 @@ const columns = computed<OTableColumnDef[]>(() => [
     header: t("aiObservability.datasets.columns.actions"),
     accessorKey: "actions",
     sortable: false,
-    size: 96,
+    size: 128,
     pinned: "right" as const,
     meta: { align: "center", cellClass: "actions-column", actionCount: 2 },
   },
@@ -370,10 +371,15 @@ const columns = computed<OTableColumnDef[]>(() => [
 async function refresh() {
   if (!orgId.value) return;
   loading.value = true;
+  forbidden.value = false;
   try {
     datasets.value = await llmDatasetsService.list(orgId.value);
-  } catch {
-    toast({ variant: "error", message: t("aiObservability.datasets.loadError") });
+  } catch (err: any) {
+    forbidden.value = err?.response?.status === 403;
+    // The grouped access toast already reports a 403; a second red toast adds nothing.
+    if (!forbidden.value) {
+      toast({ variant: "error", message: t("aiObservability.datasets.loadError") });
+    }
   } finally {
     loading.value = false;
   }

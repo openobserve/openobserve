@@ -268,13 +268,15 @@ test.describe(
 
         test.describe.configure({ mode: 'parallel' });
 
-        let nodeOpened = false;
-
         test.beforeEach(async ({ page }, testInfo) => {
             testLogger.testStart(testInfo.title, testInfo.file);
             await navigateToBase(page);
             pm = new PageManager(page);
-            nodeOpened = await pm.pipelinesFormValidation.openFirstAssociateFunctionNode();
+            await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+            // Build a fresh Associate Function node so the drawer opens with no function selected.
+            await pm.pipelinesPage.openPipelineMenu();
+            await pm.pipelinesPage.addPipeline();
+            await pm.pipelinesPage.selectAndDragFunction();
         });
 
         // ── Test: open drawer without selecting function => error or save disabled
@@ -283,8 +285,6 @@ test.describe(
             'should show function-required error or disable save when no function is selected in Associate Function drawer',
             { tag: ['@domainFormValidation', '@P0', '@smoke'] },
             async ({ page }) => {
-                test.skip(!nodeOpened, 'No pipeline with Associate Function node found in this environment');
-
                 // Verify drawer is visible
                 await expect(
                     pm.pipelinesFormValidation.getAssociateFunctionDrawerLocator()
@@ -311,8 +311,6 @@ test.describe(
             'should change form mode when create-function toggle is activated',
             { tag: ['@domainFormValidation', '@P0', '@smoke'] },
             async ({ page }) => {
-                test.skip(!nodeOpened, 'No pipeline with Associate Function node found in this environment');
-
                 await expect(
                     pm.pipelinesFormValidation.getAssociateFunctionDrawerLocator()
                 ).toBeVisible({ timeout: 10000 });
@@ -362,39 +360,36 @@ test.describe(
             }
         });
 
-        // ── Test: empty name => name error or continue disabled ───────────────
+        // ── Test: empty name => name error or submit disabled ─────────────────
 
         test(
-            'should show name error or disable Continue when destination name is empty',
+            'should show name error or disable Save when destination name is empty',
             { tag: ['@domainFormValidation', '@P0', '@smoke'] },
             async ({ page }) => {
                 await pm.pipelinesFormValidation.navigateToAddDestination();
 
-                // Select HTTP type if available
-                const typeCard = pm.pipelinesFormValidation.getDestinationTypeCardHttpLocator();
-                if (await typeCard.isVisible({ timeout: 5000 })) {
-                    await typeCard.click();
-                }
-
-                // Attempt to continue without filling name
+                // The destination form is enterprise-only — skip gracefully if unavailable.
                 const continueBtn = pm.pipelinesFormValidation.getStep1ContinueBtnLocator();
-                if (await continueBtn.isVisible({ timeout: 5000 })) {
-                    await continueBtn.click();
+                const formVisible = await continueBtn.isVisible({ timeout: 5000 }).catch(() => false);
+                test.skip(!formVisible, 'Pipeline destination form not available in this environment (enterprise-only feature)');
 
-                    const errorVisible = await pm.pipelinesFormValidation
-                        .getAddDestinationNameErrorLocator()
-                        .isVisible({ timeout: 3000 })
-                        .catch(() => false);
+                // The type step has a default selection, so Continue always advances; the name lives on step 2.
+                await continueBtn.click();
 
-                    const continueDisabled = await continueBtn.isDisabled({ timeout: 1000 }).catch(() => false);
-
-                    expect(errorVisible || continueDisabled).toBe(true);
-                } else {
-                    // Step 1 continue btn not found — check submit btn disabled state
-                    const submitBtn = pm.pipelinesFormValidation.getAddDestinationSubmitBtnLocator();
-                    const submitDisabled = await submitBtn.isDisabled({ timeout: 3000 }).catch(() => true);
-                    expect(submitDisabled).toBe(true);
+                // The name is validated on submit, not while typing, so Save has to be attempted.
+                const submitBtn = pm.pipelinesFormValidation.getAddDestinationSubmitBtnLocator();
+                await submitBtn.waitFor({ state: 'visible', timeout: 8000 });
+                const submitDisabled = await submitBtn.isDisabled({ timeout: 1000 }).catch(() => false);
+                if (!submitDisabled) {
+                    await submitBtn.click();
                 }
+
+                const errorVisible = await pm.pipelinesFormValidation
+                    .getAddDestinationNameErrorLocator()
+                    .isVisible({ timeout: 3000 })
+                    .catch(() => false);
+
+                expect(errorVisible || submitDisabled).toBe(true);
             }
         );
 

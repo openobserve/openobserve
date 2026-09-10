@@ -52,17 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #actions>
         <OButton
           variant="outline"
-          size="sm-action"
-          icon-left="link"
-          data-test="error-header-copy-link-btn"
-          @click="copyPermalink"
-        >
-          {{ t("rum.errorDetail.copyLink") }}
-          <OTooltip :content="t('rum.errorDetail.copyLinkHint')" />
-        </OButton>
-        <OButton
-          variant="outline"
-          size="sm-action"
+          size="sm-toolbar"
           icon-left="content-copy"
           :disabled="!error.error_id"
           data-test="error-header-copy-id-btn"
@@ -71,6 +61,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("rum.errorDetail.copyEventId") }}
           <OTooltip :content="raw(error.error_id) || t('rum.errorDetail.copyEventId')" />
         </OButton>
+        <ShareButton
+          data-test="error-header-share-link-btn"
+          :url="shareUrl"
+          variant="outline"
+          size="icon-toolbar"
+          :tooltip="t('rum.errorDetail.copyLinkHint')"
+        />
       </template>
     </OPageHeader>
 
@@ -129,6 +126,8 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
+import ShareButton from "@/components/common/ShareButton.vue";
+import useRum from "@/composables/rum/useRum";
 
 const props = defineProps<{
   error: Record<string, any>;
@@ -136,6 +135,7 @@ const props = defineProps<{
 
 const { t } = useI18nTyped();
 const router = useRouter();
+const { shareUrl } = useRum();
 
 // "handled" is the only safe state — treat missing/other values as unhandled.
 const isUnhandled = computed(() => props.error.error_handling !== "handled");
@@ -157,13 +157,6 @@ const occurredAt = computed(() => {
 const copyErrorId = () => {
   copyToClipboard(props.error.error_id, t, {
     successMessage: t("rum.copiedToClipboard"),
-    timeout: 1500,
-  });
-};
-
-const copyPermalink = () => {
-  copyToClipboard(window.location.href, t, {
-    successMessage: t("rum.errorDetail.linkCopied"),
     timeout: 1500,
   });
 };

@@ -141,14 +141,14 @@ const validateDraft = async (): Promise<void> => {
     if (sequence !== validationSequence) return;
     preview.value = response.data;
     emit("validation", response.data);
-  } catch {
+  } catch (e: any) {
     if (sequence !== validationSequence) return;
     preview.value = {
       valid: false,
       canonical_expression: draft.value.composite_condition.expression,
       children: [],
       warnings: [],
-      errors: [{ code: "validation_unavailable" }],
+      errors: [{ code: e.response?.data?.message || "validation_unavailable" }],
       result: null,
       result_level: null,
     };
@@ -179,7 +179,7 @@ watch(
     <div class="flex min-w-0 flex-col gap-4">
       <div class="bg-card-glass-bg rounded-default border-border-default border">
         <div class="border-border-default flex items-center border-b px-3 py-2.5">
-          <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
+          <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
           <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">
             {{ t("alerts.composite.subAlerts") }} <span class="text-text-body">*</span>
           </span>
@@ -196,7 +196,7 @@ watch(
 
       <div class="bg-card-glass-bg rounded-default border-border-default border">
         <div class="border-border-default flex items-center border-b px-3 py-2.5">
-          <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
+          <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
           <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">
             {{ t("alerts.composite.triggerExpression") }} <span class="text-text-body">*</span>
           </span>
@@ -213,7 +213,7 @@ watch(
 
       <div class="bg-card-glass-bg rounded-default border-border-default border">
         <div class="border-border-default flex items-center border-b px-3 py-2.5">
-          <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
+          <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
           <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">
             {{ t("alerts.composite.settings") }}
           </span>

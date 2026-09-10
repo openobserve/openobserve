@@ -168,9 +168,11 @@ pub fn parse_timestamp_micro_from_value(v: &json::Value) -> Result<(i64, bool), 
         json::Value::String(s) => (parse_str_to_timestamp_micros(s)?, false),
         json::Value::Number(n) => {
             if n.is_i64() {
-                (n.as_i64().unwrap(), true)
+                let n = n.as_i64().unwrap();
+                (n, n > 0)
             } else if n.is_u64() {
-                (n.as_u64().unwrap() as i64, true)
+                let n = n.as_u64().unwrap() as i64;
+                (n, n > 0)
             } else if n.is_f64() {
                 (n.as_f64().unwrap() as i64, false)
             } else {

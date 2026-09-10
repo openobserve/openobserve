@@ -21,11 +21,11 @@ use sea_orm::{
 use serde::{Deserialize, Serialize};
 
 use super::{
-    super::{entity::search_job_partitions::*, get_lock},
+    super::entity::search_job_partitions::*,
     common::{OperatorType, Value},
 };
 use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{get_orm_client_ro, get_orm_client_rw},
     errors, orm_err,
 };
 
@@ -127,9 +127,7 @@ pub async fn submit_partitions(job_id: &str, jobs: Vec<Model>) -> Result<(), err
         return orm_err!("partitions array cannot be empty");
     }
 
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let tx = match client.begin().await {
         Ok(tx) => tx,
         Err(e) => return orm_err!(format!("submit partition job start transaction error: {e}")),
@@ -178,7 +176,7 @@ pub async fn submit_partitions(job_id: &str, jobs: Vec<Model>) -> Result<(), err
 }
 
 pub async fn get_partition_jobs(job_id: &str) -> Result<Vec<Model>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
 
     // sql: select * from search_job_partitions where job_id = job_id
     let res = Entity::find()
@@ -194,10 +192,7 @@ pub async fn get_partition_jobs(job_id: &str) -> Result<Vec<Model>, errors::Erro
 }
 
 pub async fn set(operator: SetOperator) -> Result<(), errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
 
     let mut query = Entity::update_many();
 
@@ -229,10 +224,7 @@ pub async fn set(operator: SetOperator) -> Result<(), errors::Error> {
 }
 
 pub async fn clean_deleted_partition_job(job_id: &str) -> Result<(), errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
 
     let res = Entity::delete_many()
         .filter(Column::JobId.eq(job_id))

@@ -125,11 +125,6 @@ export const useSearchAround = () => {
         queryFunction = b64EncodeUnicode(searchObj.data.tempFunctionContent) ?? "";
       }
 
-      let actionId = "";
-      if (searchObj.data.transformType === "action" && searchObj.data.selectedTransform?.id) {
-        actionId = searchObj.data.selectedTransform.id;
-      }
-
       let streamName = "";
       if (searchObj.data.stream.selectedStream.length > 1) {
         streamName = b64EncodeUnicode(searchObj.data.stream.selectedStream.join(",")) || "";
@@ -156,7 +151,6 @@ export const useSearchAround = () => {
           clusters: Object.prototype.hasOwnProperty.call(searchObj.meta, "clusters")
             ? searchObj.meta.clusters.join(",")
             : "",
-          action_id: actionId,
           is_multistream: searchObj.data.stream.selectedStream.length > 1,
           traceparent,
         })

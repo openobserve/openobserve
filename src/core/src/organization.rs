@@ -750,6 +750,25 @@ pub async fn create_org(
     }
 }
 
+/// Auto-provisioned orgs take their identifier verbatim from a URL path or an IdP claim, unlike
+/// [`create_org`] which validates the name and assigns a generated identifier. The identifier then
+/// flows into object store keys, headers and log lines, so restrict it to the same character set
+/// the rest of the system can carry safely.
+fn validate_auto_created_org_id(org_id: &str) -> Result<(), anyhow::Error> {
+    if org_id.is_empty() {
+        return Err(anyhow::anyhow!("Organization identifier cannot be empty"));
+    }
+    if !org_id
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+    {
+        return Err(anyhow::anyhow!(
+            "Organization identifier can only contain alphanumeric characters (A-Z, a-z, 0-9), hyphens, and underscores"
+        ));
+    }
+    Ok(())
+}
+
 /// Checks if the org exists, otherwise creates the org. Does not associate any user
 /// with the org, only saves the org in the meta and creates org tuples.
 pub async fn check_and_create_org(org_id: &str) -> Result<Organization, anyhow::Error> {
@@ -757,6 +776,7 @@ pub async fn check_and_create_org(org_id: &str) -> Result<Organization, anyhow::
     if let Some(org) = get_org(org_id).await {
         return Ok(org);
     }
+    validate_auto_created_org_id(org_id)?;
 
     let org = &Organization {
         identifier: org_id.to_owned(),
@@ -814,6 +834,7 @@ pub async fn check_and_create_org_without_ofga(
     if let Some(org) = get_org(org_id).await {
         return Ok(org);
     }
+    validate_auto_created_org_id(org_id)?;
 
     let org = &Organization {
         identifier: org_id.to_owned(),
@@ -1476,5 +1497,27 @@ mod tests {
     fn test_should_mask_token_no_org() {
         // Without an org context, masking is never applied
         assert!(!should_mask_token(None, "user@example.com"));
+    }
+
+    #[test]
+    fn test_validate_auto_created_org_id_accepts_identifiers() {
+        for org_id in ["default", "_meta", "acme-corp", "team_1", "Org2"] {
+            assert!(
+                validate_auto_created_org_id(org_id).is_ok(),
+                "expected {org_id} to be accepted"
+            );
+        }
+    }
+
+    #[test]
+    fn test_validate_auto_created_org_id_rejects_unsafe_identifiers() {
+        // Non-ascii, control bytes, path separators and spaces all reach object store keys,
+        // headers and log lines verbatim when an org is auto-provisioned.
+        for org_id in ["", "Q\u{b4}\u{ed}\u{cd}j", "a\u{11}b", "a/b", "a b", "a.b"] {
+            assert!(
+                validate_auto_created_org_id(org_id).is_err(),
+                "expected {org_id:?} to be rejected"
+            );
+        }
     }
 }

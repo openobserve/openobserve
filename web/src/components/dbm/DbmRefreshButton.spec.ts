@@ -61,23 +61,19 @@ describe("DbmRefreshButton", () => {
   });
 
   /**
-   * `shrink-0` pins the width inside the flex toolbar row. Table health puts a
-   * bare full-width input in the slot instead of that row and never carried the
-   * class; opting out has to keep it off, or that page's toolbar shifts.
+   * `shrink-0` pins the width inside the flex toolbar row.
    *
    * Asserted on BOTH the wrapper and the button. The staleness dot made this
    * control a flex row rather than a lone button, so the wrapper is what the
    * toolbar lays out now — but the button inside it must stay pinned too, or
-   * the dot can win the space and squash the control it annotates.
+   * the dot can win the space and squash the control it annotates. The button
+   * half now comes from OButton's icon sizes, which pin themselves.
    */
-  it("pins its width in a flex toolbar, and lets table health opt out", () => {
+  it("pins its width in a flex toolbar", () => {
     const pinned = mountButton();
+
     expect(pinned.classes()).toContain("shrink-0");
     expect(pinned.findComponent(OButton).classes()).toContain("shrink-0");
-
-    const loose = mountButton({ shrink: false });
-    expect(loose.classes()).not.toContain("shrink-0");
-    expect(loose.findComponent(OButton).classes()).not.toContain("shrink-0");
   });
 
   it("emits refresh on click so the page can force its reload", async () => {
@@ -152,17 +148,16 @@ describe("DbmRefreshButton last-refreshed", () => {
     expect(dot.classes()).not.toContain("bg-refresh-dot-critical");
   });
 
-  /** The age rides the button's own tooltip rather than costing toolbar width. */
+  // Before a load the button names the action alone; after one, the staleness reading rides the dot's tooltip.
   it("names the action alone before a load, and adds the age after one", () => {
     expect(mountButton().findAllComponents(OTooltip)[0].props("content")).toBe("Refresh");
 
     const loaded = mountButton({ lastRunAt: Date.now() });
-    // Two tooltips now — the dot's and the button's. The button's is last in
-    // tree order, since the dot is rendered before it.
+    // Two tooltips: the dot's (first in tree order) and the button's.
     const tooltips = loaded.findAllComponents(OTooltip);
     expect(tooltips).toHaveLength(2);
+    expect(String(tooltips[0].props("content"))).toContain("Last refreshed");
     expect(String(tooltips[1].props("content"))).toContain("Refresh");
-    expect(String(tooltips[1].props("content"))).toContain("Last refreshed");
   });
 
   /** The dot alone encodes nothing to a reader who has not learned the colours. */

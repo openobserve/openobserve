@@ -38,27 +38,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :data-test="dataTest"
   >
     <p
-      class="border-border-subtle bg-surface-panel text-text-label text-2xs border-b px-3 py-1.5 font-semibold tracking-wide uppercase"
+      class="border-border-subtle bg-surface-panel text-text-secondary text-2xs border-b px-3 py-1.5 font-semibold"
     >
       {{ title }}
     </p>
     <div
       v-for="check in checks"
       :key="check.id"
-      class="border-border-subtle flex items-start gap-2 px-3 py-1.5 not-last:border-b"
+      class="border-border-subtle flex flex-col gap-0.5 px-3 py-1.5 not-last:border-b"
       :data-test="`${rowTestPrefix}${check.id}`"
     >
-      <span
-        class="text-3xs mt-px grid size-3.5 shrink-0 place-items-center rounded-full font-bold text-white"
-        :class="STATUS_TONES[check.status]"
-      >
-        {{ STATUS_GLYPHS[check.status] }}
-      </span>
-      <span class="min-w-0 flex-1">
-        <span class="text-text-heading block text-xs font-semibold">{{ check.title }}</span>
-        <span class="text-text-secondary text-2xs mt-px block leading-relaxed">
-          {{ check.detail }}
+      <div class="flex items-center gap-2">
+        <span
+          class="text-3xs grid size-3.5 shrink-0 place-items-center rounded-full leading-none font-bold text-white"
+          :class="STATUS_TONES[check.status]"
+        >
+          {{ STATUS_GLYPHS[check.status] }}
         </span>
+        <span class="text-text-heading min-w-0 text-xs font-semibold">{{ check.title }}</span>
+      </div>
+      <span v-if="check.detail" class="text-text-secondary text-2xs ps-5.5 leading-relaxed">
+        {{ check.detail }}
       </span>
     </div>
   </div>

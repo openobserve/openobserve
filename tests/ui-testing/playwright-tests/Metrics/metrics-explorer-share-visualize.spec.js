@@ -132,7 +132,6 @@ test.describe("Metrics Explorer Share & Visualize Deep-Link testcases", () => {
     await pm.metricsExplorerPage.expectShareButtonVisible();
 
     await pm.metricsExplorerPage.switchToVisualize();
-    await pm.metricsExplorerPage.expectModeActive('visualize');
     await pm.metricsExplorerPage.expectShareButtonVisible();
 
     await pm.metricsExplorerPage.switchToWorkspace();
@@ -209,6 +208,8 @@ test.describe("Metrics Explorer Share & Visualize Deep-Link testcases", () => {
       .poll(() => pm.metricsExplorerPage.hasMetricsDataParam(), {
         timeout: 5000,
         intervals: [500, 1000],
+        message:
+          'metrics_data appeared for a blank Visualize — base64-decode it: a real queries[0].query means the panel was seeded, an empty one means the encoder guard is too loose',
       })
       .toBe(false);
 

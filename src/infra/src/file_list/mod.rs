@@ -74,7 +74,12 @@ pub trait FileList: Sync + Send + 'static {
     async fn batch_add(&self, files: &[FileKey]) -> Result<()>;
     async fn batch_add_with_id(&self, files: &[FileKey]) -> Result<()>;
     async fn batch_add_history(&self, files: &[FileKey]) -> Result<()>;
-    async fn update_dump_records(&self, dump_file: &FileKey, dumped_ids: &[i64]) -> Result<()>;
+    /// `dumped_ids` pairs each file_list id with its `date` so partitioned backends can prune.
+    async fn update_dump_records(
+        &self,
+        dump_file: &FileKey,
+        dumped_ids: &[(i64, String)],
+    ) -> Result<()>;
     async fn batch_process(&self, files: &[FileKey]) -> Result<()>;
     async fn batch_add_deleted(
         &self,
@@ -299,7 +304,7 @@ pub async fn batch_process(files: &[FileKey]) -> Result<()> {
 }
 
 #[inline]
-pub async fn update_dump_records(dump_file: &FileKey, dumped_ids: &[i64]) -> Result<()> {
+pub async fn update_dump_records(dump_file: &FileKey, dumped_ids: &[(i64, String)]) -> Result<()> {
     CLIENT.update_dump_records(dump_file, dumped_ids).await
 }
 

@@ -26,9 +26,13 @@ const mockGet = vi.fn();
 const mockListItems = vi.fn();
 const mockUpdateItem = vi.fn();
 const mockAddItem = vi.fn();
+const mockImportItems = vi.fn();
 const mockRemoveItem = vi.fn();
+const mockListExperiments = vi.fn();
 const mockToast = vi.fn();
 const mockConfirm = vi.fn();
+const mockRouterPush = vi.fn();
+const mockRouterBack = vi.fn();
 
 vi.mock("@/services/llm-datasets.service", () => ({
   default: {
@@ -36,9 +40,15 @@ vi.mock("@/services/llm-datasets.service", () => ({
     listItems: (...args: any[]) => mockListItems(...args),
     updateItem: (...args: any[]) => mockUpdateItem(...args),
     addItem: (...args: any[]) => mockAddItem(...args),
+    importItems: (...args: any[]) => mockImportItems(...args),
     removeItem: (...args: any[]) => mockRemoveItem(...args),
   },
+  DATASET_IMPORT_MAX_FILE_SIZE: 10 * 1024 * 1024,
   DATASET_ITEMS_MAX_PAGE_SIZE: 100,
+}));
+
+vi.mock("@/services/llm-experiments.service", () => ({
+  default: { list: (...args: any[]) => mockListExperiments(...args), get: vi.fn() },
 }));
 
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
@@ -54,7 +64,8 @@ vi.mock("vuex", () => ({
 }));
 
 vi.mock("vue-router", () => ({
-  useRoute: vi.fn(() => ({ params: { id: "dataset-1" } })),
+  useRoute: vi.fn(() => ({ params: { id: "dataset-1" }, query: {} })),
+  useRouter: vi.fn(() => ({ push: mockRouterPush, replace: vi.fn(), back: mockRouterBack })),
 }));
 
 vi.mock("vue-i18n", () => ({ useI18n: () => ({ t: (key: string) => key }) }));
@@ -62,7 +73,11 @@ vi.mock("vue-i18n", () => ({ useI18n: () => ({ t: (key: string) => key }) }));
 vi.mock("@/lib/core/PageLayout/OPageLayout.vue", () => ({
   default: {
     name: "OPageLayout",
-    template: `<div class="o-page-layout"><slot name="actions" /><slot /></div>`,
+    props: ["back"],
+    template: `<div class="o-page-layout">
+      <button v-if="back" data-test="app-page-header-back" @click="back.onClick?.()" />
+      <slot name="actions" /><slot />
+    </div>`,
   },
 }));
 
@@ -118,11 +133,13 @@ async function mountPage() {
         OTag: true,
         OTooltip: true,
         OSearchInput: true,
+        ExperimentBrowser: true,
         OEmptyState: true,
         ODrawer: true,
         OForm: true,
         OFormTextarea: true,
         OFormTagInput: true,
+        OFile: true,
       },
     },
   });
@@ -137,11 +154,39 @@ beforeEach(() => {
     .mockResolvedValue({ items: [item()], total: 1, from: 0, size: 20, hasMore: false });
   mockUpdateItem.mockReset().mockResolvedValue(item({ version: 3 }));
   mockAddItem.mockReset().mockResolvedValue(item());
+  mockImportItems
+    .mockReset()
+    .mockResolvedValue({ filename: "goldens.csv", importedCount: 2, skippedCount: 1 });
   mockRemoveItem.mockReset().mockResolvedValue(undefined);
+  mockListExperiments.mockReset().mockResolvedValue([]);
   mockToast.mockReset();
   mockConfirm.mockReset().mockResolvedValue(true);
 });
 
+describe("DatasetDetailPage navigation", () => {
+  it("uses real browser back when there's history to pop, instead of the bare Datasets list", async () => {
+    window.history.pushState({ back: "/previous" }, "", "/previous-fake-url");
+    const wrapper = await mountPage();
+    mockRouterPush.mockClear();
+
+    await wrapper.get('[data-test="app-page-header-back"]').trigger("click");
+
+    expect(mockRouterBack).toHaveBeenCalledTimes(1);
+    expect(mockRouterPush).not.toHaveBeenCalled();
+    window.history.replaceState(null, "");
+  });
+});
+
+describe("DatasetDetailPage experiments", () => {
+  it("requests summarized experiments for this dataset", async () => {
+    await mountPage();
+
+    expect(mockListExperiments).toHaveBeenCalledWith("test-org", {
+      includeSummary: true,
+      datasetId: "dataset-1",
+    });
+  });
+});
 describe("DatasetDetailPage item writes", () => {
   // The update endpoint replaces the row, so an edit that omits metadata wipes
   // the item's subset-filter dimensions.
@@ -180,6 +225,43 @@ describe("DatasetDetailPage item writes", () => {
       metadata: null,
       tags: [],
     });
+  });
+
+  it("adds a reference-free item without rewriting absence to an empty string", async () => {
+    const wrapper = await mountPage();
+    const state = (wrapper.vm as any).$.setupState;
+
+    state.openAddItem();
+    await state.saveItem({ input: "q", expectedOutput: "   ", tags: [] });
+    await flushPromises();
+
+    expect(mockAddItem).toHaveBeenCalledWith("test-org", "dataset-1", {
+      input: "q",
+      expectedOutput: undefined,
+      metadata: null,
+      tags: [],
+    });
+  });
+});
+
+describe("DatasetDetailPage CSV import", () => {
+  it("offers CSV upload from the item-tab header", async () => {
+    const wrapper = await mountPage();
+
+    expect(wrapper.find('[data-test="ai-dataset-detail-upload-csv"]').exists()).toBe(true);
+  });
+
+  it("imports the selected CSV and refreshes the dataset", async () => {
+    const wrapper = await mountPage();
+    const state = (wrapper.vm as any).$.setupState;
+    const file = new File(["input\nquestion"], "goldens.csv", { type: "text/csv" });
+
+    state.importFile = file;
+    await state.importCsv();
+    await flushPromises();
+
+    expect(mockImportItems).toHaveBeenCalledWith("test-org", "dataset-1", file);
+    expect(mockListItems).toHaveBeenCalledTimes(2);
   });
 });
 

@@ -307,5 +307,39 @@ describe("OToggleGroup", () => {
 
       wrapper.unmount();
     });
+
+    it("hides the indicator when the value matches no item", async () => {
+      const selected = ref("b");
+      const wrapper = mount(
+        {
+          components: { OToggleGroup, OToggleGroupItem },
+          setup: () => ({ selected }),
+          template: `
+            <OToggleGroup :model-value="selected">
+              <OToggleGroupItem v-for="value in ['a', 'b', 'c']" :key="value" :value="value">
+                {{ value }}
+              </OToggleGroupItem>
+            </OToggleGroup>`,
+        },
+        { attachTo: document.body },
+      );
+
+      const track = wrapper.get("[data-variant]").element as HTMLElement;
+      stubGeometry(track);
+      const indicator = () => track.firstElementChild as HTMLElement;
+
+      // The mount measure() ran before the geometry stub existed, so select a
+      // real item to get a first laid-out placement.
+      selected.value = "a";
+      await settle();
+      expect(indicator().classList.contains("opacity-100")).toBe(true);
+
+      // Nothing matches "zzz" — the pill must not stay painted over "a".
+      selected.value = "zzz";
+      await settle();
+      expect(indicator().classList.contains("opacity-0")).toBe(true);
+
+      wrapper.unmount();
+    });
   });
 });

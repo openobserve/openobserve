@@ -70,7 +70,7 @@ pub async fn ingest(
         };
         let mut data = match &value.event {
             json::Value::String(s) => {
-                serde_json::json!({"log":s.to_owned()})
+                json::json!({"log":s.to_owned()})
             }
             json::Value::Object(_) => value.event.to_owned(),
             _ => return Ok(HecStatus::InvalidFormat.into()),

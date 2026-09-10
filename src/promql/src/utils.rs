@@ -20,15 +20,51 @@ use config::{
     meta::promql::{BUCKET_LABEL, HASH_LABEL, NAME_LABEL, VALUE_LABEL},
 };
 use datafusion::{
-    arrow::datatypes::{DataType, Schema},
+    arrow::datatypes::{DataType, Field, Schema},
     common::ScalarValue,
     error::Result,
     functions::regex::regexp_like,
-    logical_expr::expr_fn::cast,
+    logical_expr::{expr_fn::cast, utils::disjunction},
     prelude::{DataFrame, Expr, col, lit},
 };
 use hashbrown::HashSet;
-use promql_parser::label::{MatchOp, Matchers};
+use promql_parser::{
+    label::{MatchOp, Matcher, Matchers},
+    parser::VectorSelector,
+};
+
+const OPTIMIZATION_STEP_LOOKBACK_MULTIPLIER: i64 = 5;
+const OPTIMIZATION_MAX_STEPS: i64 = 30;
+
+/// The stream a selector reads from: the bare metric name, else an `__name__` equality matcher.
+pub fn metric_name(selector: &VectorSelector) -> Option<String> {
+    if let Some(name) = selector.name.as_ref() {
+        return Some(name.clone());
+    }
+    // only `=` resolves to one stream; a regex or negated `__name__` names a set the engine
+    // cannot read, so it must fail rather than authorize a stream no one has
+    selector
+        .matchers
+        .find_matchers(NAME_LABEL)
+        .into_iter()
+        .find(|mat| matches!(mat.op, MatchOp::Equal))
+        .map(|mat| mat.value)
+}
+
+/// The schema field a residual matcher filters on; `None` when
+/// `matcher_predicates` skips the matcher entirely.
+pub fn matcher_residual_field<'a>(schema: &'a Schema, matcher: &Matcher) -> Option<&'a Field> {
+    // `__name__` is consumed by stream selection; the stored column may hold the
+    // pre-`format_stream_name` metric name (e.g. mixed case), so filtering on it
+    // would drop every row of a stream that was already selected by name.
+    if matcher.name == TIMESTAMP_COL_NAME
+        || matcher.name == VALUE_LABEL
+        || matcher.name == NAME_LABEL
+    {
+        return None;
+    }
+    schema.field_with_name(&matcher.name).ok()
+}
 
 /// Build the DataFusion predicates used for PromQL label matchers.
 ///
@@ -37,13 +73,7 @@ use promql_parser::label::{MatchOp, Matchers};
 pub fn matcher_predicates(schema: &Schema, matchers: &Matchers) -> Vec<Expr> {
     let mut predicates = Vec::new();
     for mat in matchers.matchers.iter() {
-        // `__name__` is consumed by stream selection; the stored column may hold the
-        // pre-`format_stream_name` metric name (e.g. mixed case), so filtering on it
-        // would drop every row of a stream that was already selected by name.
-        if mat.name == TIMESTAMP_COL_NAME || mat.name == VALUE_LABEL || mat.name == NAME_LABEL {
-            continue;
-        }
-        let Ok(field) = schema.field_with_name(&mat.name) else {
+        let Some(field) = matcher_residual_field(schema, mat) else {
             continue;
         };
         let field_type = field.data_type().clone();
@@ -59,7 +89,7 @@ pub fn matcher_predicates(schema: &Schema, matchers: &Matchers) -> Vec<Expr> {
         let predicate = match &mat.op {
             MatchOp::Equal => col(mat.name.clone()).eq(literal(mat.value.clone())),
             MatchOp::NotEqual => col(mat.name.clone()).not_eq(literal(mat.value.clone())),
-            MatchOp::Re(regex) => {
+            MatchOp::Re(regex) | MatchOp::NotRe(regex) => {
                 let regex = format!("^{}$", regex.as_str());
                 // DataFusion 54 can lower a regex on Utf8View to a mixed-type
                 // equality/LIKE expression. Cast only regex matchers until that
@@ -69,16 +99,12 @@ pub fn matcher_predicates(schema: &Schema, matchers: &Matchers) -> Vec<Expr> {
                 } else {
                     col(mat.name.clone())
                 };
-                regexp_like().call(vec![value, lit(regex)])
-            }
-            MatchOp::NotRe(regex) => {
-                let regex = format!("^{}$", regex.as_str());
-                let value = if field_type == DataType::Utf8View {
-                    cast(col(mat.name.clone()), DataType::Utf8)
+                let predicate = regexp_like().call(vec![value, lit(regex)]);
+                if matches!(mat.op, MatchOp::NotRe(_)) {
+                    predicate.not()
                 } else {
-                    col(mat.name.clone())
-                };
-                regexp_like().call(vec![value, lit(regex)]).not()
+                    predicate
+                }
             }
         };
         predicates.push(predicate);
@@ -141,6 +167,62 @@ pub fn apply_label_selector(
     Some(df)
 }
 
+/// Restricts `df` to the rows the evaluation can observe: per-step lookback
+/// windows when the steps are sparse enough, the contiguous
+/// `[start - lookback, end]` range otherwise.
+pub(crate) fn apply_time_window(
+    df: DataFrame,
+    start: i64,
+    end: i64,
+    step: i64,
+    lookback: i64,
+) -> Result<DataFrame> {
+    // Optimization: When step > lookback, we don't need to load all data in
+    // [start-lookback, end] Instead, we only need to load data windows around
+    // each evaluation point
+    let use_optimization = start != end
+        && step > 0
+        && step >= lookback * OPTIMIZATION_STEP_LOOKBACK_MULTIPLIER
+        && (((end - start) / step) + 1) < OPTIMIZATION_MAX_STEPS;
+    if use_optimization {
+        let num_steps = ((end - start) / step) + 1;
+        let eval_timestamps: Vec<i64> = (0..num_steps).map(|i| start + (step * i)).collect();
+
+        let mut conditions: Vec<Expr> = Vec::new();
+        for &eval_ts in &eval_timestamps {
+            let window_start = eval_ts - lookback;
+            let window_end = eval_ts;
+
+            conditions.push(
+                col(TIMESTAMP_COL_NAME)
+                    .gt_eq(lit(window_start))
+                    .and(col(TIMESTAMP_COL_NAME).lt_eq(lit(window_end))),
+            );
+        }
+
+        let filters = disjunction(conditions).unwrap();
+        df.filter(filters)
+    } else {
+        // Need to include lookback window before start for the first evaluation point
+        let query_start = start - lookback;
+        df.filter(
+            col(TIMESTAMP_COL_NAME)
+                .gt_eq(lit(query_start))
+                .and(col(TIMESTAMP_COL_NAME).lt_eq(lit(end))),
+        )
+    }
+}
+
+/// Length of the contiguous run of equal hashes starting at `start`.
+pub(crate) fn batch_run_len(hashes: &[u64], start: usize) -> usize {
+    let hash = hashes[start];
+    let mut end = start + 1;
+    while end < hashes.len() && hashes[end] == hash {
+        end += 1;
+    }
+    end - start
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
@@ -157,6 +239,14 @@ mod tests {
     use promql_parser::label::Matchers;
 
     use super::*;
+
+    #[test]
+    fn test_batch_run_len() {
+        let hashes = [7u64, 7, 7, 9, 9, 1];
+        assert_eq!(batch_run_len(&hashes, 0), 3);
+        assert_eq!(batch_run_len(&hashes, 3), 2);
+        assert_eq!(batch_run_len(&hashes, 5), 1);
+    }
 
     fn make_df() -> (DataFrame, ArrowSchema) {
         let schema = Arc::new(ArrowSchema::new(vec![Field::new(

@@ -175,4 +175,69 @@ describe("root store", () => {
       expect(store.state.alertLibrary.fileCache).toEqual({});
     });
   });
+
+  describe("correlated traces stream cache", () => {
+    const cache = () => store.state.organizationData.correlatedTracesStreams;
+
+    it("records a resolved trace and learns its stream", () => {
+      store.commit("resetOrganizationData");
+      store.commit("setCorrelatedTracesStream", {
+        traceId: "01a034c1aabc72f78880daf6c9755cff",
+        stream: "payments_traces",
+      });
+
+      expect(cache().byTraceId["01a034c1aabc72f78880daf6c9755cff"]).toEqual({
+        stream: "payments_traces",
+        range: undefined,
+      });
+      expect(cache().knownStreams).toEqual(["payments_traces"]);
+    });
+
+    it("keeps the indexed range alongside the stream when one was resolved", () => {
+      store.commit("resetOrganizationData");
+      store.commit("setCorrelatedTracesStream", {
+        traceId: "01a034c1aabc72f78880daf6c9755cff",
+        stream: "payments_traces",
+        range: { start_time: 1_700_000_000_000_000, end_time: 1_700_000_002_000_000 },
+      });
+
+      expect(cache().byTraceId["01a034c1aabc72f78880daf6c9755cff"]).toEqual({
+        stream: "payments_traces",
+        range: { start_time: 1_700_000_000_000_000, end_time: 1_700_000_002_000_000 },
+      });
+    });
+
+    it("does not duplicate a stream already learned", () => {
+      store.commit("resetOrganizationData");
+      store.commit("setCorrelatedTracesStream", { traceId: "a1", stream: "payments_traces" });
+      store.commit("setCorrelatedTracesStream", { traceId: "b2", stream: "payments_traces" });
+
+      expect(cache().knownStreams).toEqual(["payments_traces"]);
+      expect(Object.keys(cache().byTraceId)).toHaveLength(2);
+    });
+
+    it("clears byTraceId past the 1000-entry cap but keeps knownStreams", () => {
+      store.commit("resetOrganizationData");
+      for (let i = 0; i < 1000; i++) {
+        store.commit("setCorrelatedTracesStream", {
+          traceId: `id-${i}`,
+          stream: "payments_traces",
+        });
+      }
+      expect(Object.keys(cache().byTraceId)).toHaveLength(1000);
+
+      store.commit("setCorrelatedTracesStream", { traceId: "overflow", stream: "checkout_traces" });
+
+      expect(Object.keys(cache().byTraceId)).toEqual(["overflow"]);
+      expect(cache().knownStreams).toEqual(["payments_traces", "checkout_traces"]);
+    });
+
+    it("is wiped by resetOrganizationData (org switch)", () => {
+      store.commit("setCorrelatedTracesStream", { traceId: "a1", stream: "payments_traces" });
+      store.commit("resetOrganizationData");
+
+      expect(cache().byTraceId).toEqual({});
+      expect(cache().knownStreams).toEqual([]);
+    });
+  });
 });

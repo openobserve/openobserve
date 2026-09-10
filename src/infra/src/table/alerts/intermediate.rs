@@ -334,6 +334,14 @@ pub enum ConditionOperator {
     Contains,
     #[serde(rename = "not_contains")]
     NotContains,
+    #[serde(rename = "is_null")]
+    IsNull,
+    #[serde(rename = "is_not_null")]
+    IsNotNull,
+    #[serde(rename = "is_empty")]
+    IsEmpty,
+    #[serde(rename = "is_not_empty")]
+    IsNotEmpty,
 }
 
 impl From<MetaOperator> for ConditionOperator {
@@ -347,6 +355,10 @@ impl From<MetaOperator> for ConditionOperator {
             MetaOperator::LessThanEquals => Self::LessThanEquals,
             MetaOperator::Contains => Self::Contains,
             MetaOperator::NotContains => Self::NotContains,
+            MetaOperator::IsNull => Self::IsNull,
+            MetaOperator::IsNotNull => Self::IsNotNull,
+            MetaOperator::IsEmpty => Self::IsEmpty,
+            MetaOperator::IsNotEmpty => Self::IsNotEmpty,
         }
     }
 }
@@ -362,6 +374,10 @@ impl From<ConditionOperator> for MetaOperator {
             ConditionOperator::LessThanEquals => Self::LessThanEquals,
             ConditionOperator::Contains => Self::Contains,
             ConditionOperator::NotContains => Self::NotContains,
+            ConditionOperator::IsNull => Self::IsNull,
+            ConditionOperator::IsNotNull => Self::IsNotNull,
+            ConditionOperator::IsEmpty => Self::IsEmpty,
+            ConditionOperator::IsNotEmpty => Self::IsNotEmpty,
         }
     }
 }
@@ -568,6 +584,7 @@ pub enum StreamType {
     Logs,
     Metrics,
     Traces,
+    Profiles,
     EnrichmentTables,
     FileList,
     Metadata,
@@ -578,6 +595,7 @@ impl StreamType {
     const LOGS: &'static str = "logs";
     const METRICS: &'static str = "metrics";
     const TRACES: &'static str = "traces";
+    const PROFILES: &'static str = "profiles";
     const ENRICHMENT_TABLES: &'static str = "enrichment_tables";
     const FILE_LIST: &'static str = "file_list";
     const METADATA: &'static str = "metadata";
@@ -590,6 +608,7 @@ impl Display for StreamType {
             StreamType::Logs => StreamType::LOGS,
             StreamType::Metrics => StreamType::METRICS,
             StreamType::Traces => StreamType::TRACES,
+            StreamType::Profiles => StreamType::PROFILES,
             StreamType::EnrichmentTables => StreamType::ENRICHMENT_TABLES,
             StreamType::FileList => StreamType::FILE_LIST,
             StreamType::Metadata => StreamType::METADATA,
@@ -607,6 +626,7 @@ impl FromStr for StreamType {
             Self::LOGS => Ok(StreamType::Logs),
             Self::METRICS => Ok(StreamType::Metrics),
             Self::TRACES => Ok(StreamType::Traces),
+            Self::PROFILES => Ok(StreamType::Profiles),
             Self::ENRICHMENT_TABLES => Ok(StreamType::EnrichmentTables),
             Self::FILE_LIST => Ok(StreamType::FileList),
             Self::METADATA => Ok(StreamType::Metadata),
@@ -625,6 +645,7 @@ impl From<MetaStreamType> for StreamType {
             MetaStreamType::Logs => Self::Logs,
             MetaStreamType::Metrics => Self::Metrics,
             MetaStreamType::Traces => Self::Traces,
+            MetaStreamType::Profiles => Self::Profiles,
             MetaStreamType::ServiceGraph => Self::Metadata, // Map to Metadata for alerts
             MetaStreamType::EnrichmentTables => Self::EnrichmentTables,
             MetaStreamType::Filelist => Self::FileList,
@@ -640,6 +661,7 @@ impl From<StreamType> for MetaStreamType {
             StreamType::Logs => Self::Logs,
             StreamType::Metrics => Self::Metrics,
             StreamType::Traces => Self::Traces,
+            StreamType::Profiles => Self::Profiles,
             StreamType::EnrichmentTables => Self::EnrichmentTables,
             StreamType::FileList => Self::Filelist,
             StreamType::Metadata => Self::Metadata,

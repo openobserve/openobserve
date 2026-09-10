@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template v-slot:before>
           <!-- px-1 (4px), not 10px: the search bar's own content already carries
-               a 6px internal inset (toolbar p-1.5 + editor ml-1.5), so 4+6=10px
+               a 6px internal inset (toolbar p-1.5 + editor ms-1.5), so 4+6=10px
                lines the toolbar/editor up with the 10px field-list & results
                panels below. -->
           <div class="h-full w-full">
@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                      OFieldList) so they line up — they're controls, not scrolling
                      surfaces. -->
                 <div
-                  class="relative-position border-border-default bg-surface-panel h-full border-r pt-2.5"
+                  class="relative-position border-border-default bg-surface-panel h-full border-e pt-2.5"
                 >
                   <IndexList
                     v-if="searchObj.meta.showFields"
@@ -331,6 +331,7 @@ import {
   extractWhereClause,
 } from "@/utils/query/sqlUtils";
 import { buildColumnIdentifierAst, quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
+import { replaceSelectFieldList } from "@/utils/query/quickModeFieldList";
 import useNotifications from "@/composables/useNotifications";
 import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
 import SearchBar from "@/plugins/logs/SearchBar.vue";
@@ -552,7 +553,7 @@ export default defineComponent({
       useSearchStream(t);
 
     // Initialize patterns composable (completely separate from logs)
-    const { extractPatterns, patternsState } = usePatterns(t);
+    const { extractPatterns, patternsState, cancelPatterns } = usePatterns(t);
 
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
@@ -624,6 +625,7 @@ export default defineComponent({
       if (store.state.refreshIntervalID) clearInterval(store.state.refreshIntervalID);
 
       cancelQuery();
+      cancelPatterns();
 
       removeAiContextHandler();
       cleanupContextProvider();
@@ -881,7 +883,17 @@ export default defineComponent({
       return searchObj.meta.logsVisualizeToggle === "logs";
     }
 
+    // Search History and the AI chat only re-apply the query; the scheduler also runs it.
+    const RE_APPLY_QUERY_TYPES = ["search_history_re_apply", "ai_chat_query"];
+    const URL_DRIVEN_QUERY_TYPES = [...RE_APPLY_QUERY_TYPES, "search_scheduler"];
+
     const isRouteChanged = () => {
+      // Not kept alive: this fresh mount never fires the type watchers, so the cached searchObj would bury the URL query (#14283).
+      if (URL_DRIVEN_QUERY_TYPES.includes(router.currentRoute.value.query.type)) {
+        store.dispatch("logs/setIsInitialized", false);
+        return;
+      }
+
       if (
         !Object.hasOwn(router.currentRoute.value.query, "stream") ||
         !Object.hasOwn(router.currentRoute.value.query, "org_identifier")
@@ -909,6 +921,8 @@ export default defineComponent({
     // Setup logic for the logs tab
     async function setupLogsTab() {
       try {
+        // restoreUrlQueryParams() deletes a search_history_re_apply `type` off the route, so read it first.
+        const arrivalType = router.currentRoute.value.query.type;
         isRouteChanged();
         if (!store.state.logs.isInitialized) {
           searchObj.organizationIdentifier = store.state.selectedOrganization.identifier;
@@ -968,8 +982,12 @@ export default defineComponent({
           }
 
           if (isLogsTab()) {
-            searchObj.loading = true;
-            loadLogsData();
+            if (RE_APPLY_QUERY_TYPES.includes(arrivalType)) {
+              await applyReAppliedQuery();
+            } else {
+              searchObj.loading = true;
+              loadLogsData();
+            }
           } else if (searchObj.meta.logsVisualizeToggle === "patterns") {
             await loadPatternsData();
             await extractPatternsForCurrentQuery();
@@ -1109,6 +1127,16 @@ export default defineComponent({
       loadLogsData();
     }
 
+    // loadLogsData() minus getQueryData(): a re-applied query is loaded for the user to run, not run for them.
+    async function applyReAppliedQuery() {
+      searchObj.meta.searchApplied = false;
+      await getStreamList();
+      await getFunctions();
+      await extractFields();
+      refreshData();
+      searchObj.loading = false;
+    }
+
     // Helper function for handling the stream explorer
     async function handleStreamExplorer() {
       resetSearchObj();
@@ -1199,9 +1227,9 @@ export default defineComponent({
             const streams = searchObj.data.stream.selectedStream;
 
             streams.forEach((stream: string, index: number) => {
-              // Add UNION for all but the first SELECT statement
+              // BY NAME merges differing columns; ALL keeps events duplicated across streams.
               if (index > 0) {
-                searchObj.data.query += " UNION ";
+                searchObj.data.query += " UNION ALL BY NAME ";
               }
               searchObj.data.query += `SELECT [FIELD_LIST]${selectFields} FROM "${stream}" ${whereClause}`;
             });
@@ -1308,9 +1336,19 @@ export default defineComponent({
     };
     const showSearchHistoryfn = () => {
       // Search History is now its own route (was an `action=history` overlay).
+      // Forward the active stream type/name so the history shown there matches
+      // whichever telemetry type the user was viewing (logs/traces/metrics).
+      // With more than one stream selected there's no single name to forward
+      // without silently dropping the others, so leave history unscoped by
+      // stream in that case.
+      const selectedStreams = searchObj.data.stream.selectedStream;
       router.push({
         name: "searchHistory",
-        query: { org_identifier: store.state.selectedOrganization.identifier },
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+          stream_type: searchObj.data.stream.streamType,
+          stream: selectedStreams.length === 1 ? selectedStreams[0] : "",
+        },
       });
     };
 
@@ -1560,9 +1598,7 @@ export default defineComponent({
             .join(",");
         }
         if (searchObj.meta.sqlMode == true) {
-          searchObj.data.query = searchObj.data.query.replace(/SELECT\s+(.*?)\s+FROM/gi, () => {
-            return `SELECT ${field_list} FROM`;
-          });
+          searchObj.data.query = replaceSelectFieldList(searchObj.data.query, field_list);
           setQuery(searchObj.meta.quickMode);
           updateUrlQueryParams();
         }
@@ -1602,7 +1638,12 @@ export default defineComponent({
     watch(
       () => searchObj.data.stream.selectedStream,
       (streams: string[]) => {
-        if (store.state.zoConfig?.auto_query_enabled && Array.isArray(streams) && streams.length) {
+        if (
+          store.state.zoConfig?.auto_query_enabled &&
+          searchObj.data.stream.streamType === "logs" &&
+          Array.isArray(streams) &&
+          streams.length
+        ) {
           saveLogsStream(store.state.selectedOrganization.identifier, streams);
         }
       },
@@ -3218,25 +3259,16 @@ export default defineComponent({
         this.searchObj.data.queryResults.aggs = [];
 
         if (this.searchObj.meta.sqlMode && this.isLimitQuery(parsedSQL)) {
-          this.resetHistogramWithError(
-            this.t("logs.index.histogramUnavailableCtesDistinctJoinLimit"),
-            -1,
-          );
+          this.resetHistogramWithError(this.t("search.histogramUnavailableForQueries"), -1);
           this.searchObj.meta.histogramDirtyFlag = false;
         } else if (
           this.searchObj.meta.sqlMode &&
           (this.isDistinctQuery(parsedSQL) || this.isWithQuery(parsedSQL))
         ) {
-          this.resetHistogramWithError(
-            this.t("logs.index.histogramUnavailableCtesDistinctJoinLimit"),
-            -1,
-          );
+          this.resetHistogramWithError(this.t("search.histogramUnavailableForQueries"), -1);
           this.searchObj.meta.histogramDirtyFlag = false;
-        } else if (
-          this.searchObj.data.stream.selectedStream.length > 1 &&
-          this.searchObj.meta.sqlMode == true
-        ) {
-          this.resetHistogramWithError(this.t("logs.index.histogramNotAvailableMultiStream"));
+        } else if (this.searchObj.data.stream.selectedStream.length > 1) {
+          this.resetHistogramWithError(this.t("search.histogramUnavailableForQueries"), -1);
         } else if (this.searchObj.data.queryResults.is_histogram_eligible == false) {
           this.resetHistogramWithError(
             this.t("logs.index.histogramUnavailableCtesDistinctLimit"),

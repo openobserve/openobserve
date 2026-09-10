@@ -36,6 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :columns="columns"
           row-key="name"
           :loading="loading"
+          :forbidden="forbidden"
           :selected-ids="selectedKeyIds"
           selection="multiple"
           pagination="client"
@@ -89,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-row-action="edit"
               variant="ghost"
               size="icon-sm"
-              class="ml-1"
+              class="ms-1"
               :title="t('common.edit')"
               @click="editCipherKey(row)"
               icon-left="edit"
@@ -99,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-row-action="delete"
               variant="ghost-destructive"
               size="icon-sm"
-              class="ml-1"
+              class="ms-1"
               :title="t('common.delete')"
               @click="confirmDeleteCipherKey(row)"
               icon-left="delete"
@@ -184,6 +185,7 @@ export default defineComponent({
     const tabledata: any = ref([]);
     const showAddDialog = ref(false);
     const loading = ref(false);
+    const forbidden = ref(false);
     const filterQuery = ref("");
     const columns: OTableColumnDef[] = [
       {
@@ -293,6 +295,7 @@ export default defineComponent({
 
     const getData = () => {
       loading.value = true;
+      forbidden.value = false;
       const dismiss = toast({
         variant: "loading",
         message: t("settings.cipherKeysPage.loadingData"),
@@ -319,7 +322,8 @@ export default defineComponent({
         .catch((error) => {
           loading.value = false;
           dismiss();
-          if (error.status != 403) {
+          forbidden.value = error?.status === 403 || error?.response?.status === 403;
+          if (!forbidden.value) {
             toast({
               variant: "error",
               message: error.response?.data?.message || t("settings.cipherKeysPage.fetchFailed"),
@@ -481,6 +485,7 @@ export default defineComponent({
       store,
       router,
       loading,
+      forbidden,
       tabledata,
       columns,
       showAddDialog,

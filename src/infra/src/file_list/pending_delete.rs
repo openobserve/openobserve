@@ -30,6 +30,10 @@ pub async fn list() -> Vec<String> {
     PENDING_DELETE_FILES.read().await.iter().cloned().collect()
 }
 
+pub async fn len() -> usize {
+    PENDING_DELETE_FILES.read().await.len()
+}
+
 pub async fn filter(mut files: Vec<String>) -> Vec<String> {
     let pending = PENDING_DELETE_FILES.read().await;
     let removing = REMOVING_FILES.read().await;

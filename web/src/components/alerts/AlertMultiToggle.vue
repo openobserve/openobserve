@@ -16,11 +16,15 @@
 <!--
   Simple vs Multi alert choice (alerts_2.md M-9 / §5.4).
 
-  Rendered only when the alert has at least one Group By column — multi is a
-  deliberate monitor choice, never inferred from `by {host}` being present.
-  Turning it on for an existing grouped alert would silently change its paging
-  cadence and reset its silence fingerprints, which is exactly what the opt-in
-  exists to prevent.
+  For Custom (builder), rendered only when the alert has at least one Group
+  By column — multi is a deliberate monitor choice, never inferred from
+  `by {host}` being present. Turning it on for an existing grouped alert
+  would silently change its paging cadence and reset its silence
+  fingerprints, which is exactly what the opt-in exists to prevent.
+
+  The SQL tab has no group-by picker (that flow classifies the whole result
+  set as one aggregate value, see `onSqlMultiAlertChange`), so it renders
+  this choice unconditionally instead of gating on a group-by field.
 
   The switch is bound by `name=` only; the parent normalises the group-count
   gate when it flips, because M-10 rejects any count rule other than

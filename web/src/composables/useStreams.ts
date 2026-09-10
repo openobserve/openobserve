@@ -23,6 +23,11 @@ import type { TranslateFn, I18nText } from "@/types/i18n";
 
 const getStreamsPromise: any = ref(null);
 
+// Keep the HTTP status on the rejection: callers need it to tell a denial (403)
+// apart from any other failure, and a bare Error would drop it.
+const withResponse = (err: Error, source: any): Error =>
+  Object.assign(err, { response: source?.response, status: source?.status });
+
 const useStreams = (t: TranslateFn) => {
   const store = useStore();
 
@@ -124,7 +129,7 @@ const useStreams = (t: TranslateFn) => {
                 .catch((e: any) => {
                   getStreamsPromise.value = null;
                   dismiss();
-                  reject(new Error(e.message));
+                  reject(withResponse(new Error(e.message), e));
                 });
             } else {
               getStreamsPromise.value = StreamService.nameList(
@@ -134,7 +139,7 @@ const useStreams = (t: TranslateFn) => {
               );
               getStreamsPromise.value
                 .then((res: any) => {
-                  setStreams(streamName, res.data.list);
+                  setStreams(streamName, res.data.list, force);
                   const streamData = {
                     name: streamName,
                     list: res.data.list,
@@ -147,7 +152,7 @@ const useStreams = (t: TranslateFn) => {
                 .catch((e: any) => {
                   getStreamsPromise.value = null;
                   dismiss();
-                  reject(new Error(e.message));
+                  reject(withResponse(new Error(e.message), e));
                 });
             }
           } else {
@@ -158,7 +163,7 @@ const useStreams = (t: TranslateFn) => {
             }
           }
         } catch (e: any) {
-          reject(new Error(e.message));
+          reject(withResponse(new Error(e.message), e));
         }
       })();
     });
@@ -219,10 +224,10 @@ const useStreams = (t: TranslateFn) => {
             .catch((e: any) => {
               getStreamsPromise.value = null;
               dismiss();
-              reject(new Error(e.message));
+              reject(withResponse(new Error(e.message), e));
             });
         } catch (e: any) {
-          reject(new Error(e.message));
+          reject(withResponse(new Error(e.message), e));
         }
       })();
     });
@@ -262,7 +267,7 @@ const useStreams = (t: TranslateFn) => {
           try {
             await getStreams(streamType, false);
           } catch (e: any) {
-            reject(new Error(e.message));
+            reject(withResponse(new Error(e.message), e));
           }
         }
 
@@ -319,7 +324,7 @@ const useStreams = (t: TranslateFn) => {
             );
           }
         } catch (e: any) {
-          reject(new Error(e.message));
+          reject(withResponse(new Error(e.message), e));
         }
       })();
     });
@@ -371,7 +376,7 @@ const useStreams = (t: TranslateFn) => {
           return streamsCache[streamType].value?.list?.[streamIndex] || {};
         } catch (e: any) {
           // Use reject in Promise.all to catch errors specifically.
-          throw new Error(e.message);
+          throw withResponse(new Error(e.message), e);
         }
       }),
     );

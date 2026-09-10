@@ -18,12 +18,16 @@ These rules apply to ALL reviewers. Violating any of these will cause your findi
 This is **OpenObserve**, an open-source observability platform written in **Rust** (backend) and **Vue 3 / TypeScript** (frontend).
 
 - **Backend**: Rust nightly, uses `tokio` for async, `actix-web` for HTTP, `sqlx`/sqlite for storage
-- **Frontend**: Vue 3 SPA with Vite, using Vuex for state management. When reviewing changes under
-  `web/`, **read the tracked skills `.claude/skills/ui-architect/SKILL.md` (UI house rules) and
-  `.claude/skills/eslint-error-handling/SKILL.md` (lint/type-check playbook)** first — they are the
-  authoritative source for frontend conventions (build from the O2 component library, no
-  `any`/`!`/use-site `as`, type-clean + lint-clean, design tokens + i18n over hardcoded strings).
-  Flag deviations from them.
+- **Frontend**: Vue 3 SPA with Vite, using Vuex for state management. UI conventions live in the
+  tracked skills `.claude/skills/ui-architect/` (house rules) and
+  `.claude/skills/eslint-error-handling/SKILL.md` (lint/type-check playbook). The **Frontend UI
+  Reviewer** owns the judgment half of those rules and runs on every PR touching `web/src`;
+  other reviewers should stay in their own domain rather than duplicating it.
+- **The frontend gates are already red before you see the PR.** `local/no-hardcoded-px`,
+  `local/no-legacy-o2-tokens`, `lint:design:strict`, `lint:tokens`, `lint:token-purity`,
+  stylelint, prettier and `type-check:app` (`I18nText`/`I18nKey`) all fail the build on their own.
+  Never spend a finding on something a lint rule or a check script already catches — for any
+  reviewer, on any file type. A finding is only worth posting if a tool cannot produce it.
 - **Testing**: Rust unit tests with `cargo test`, E2E with Playwright
 - **Code quality**: `cargo clippy` for Rust, ESLint for TypeScript
 - **PR conventions**: Conventional commits (`feat:`, `fix:`, `perf:`, `refactor:`, `test:`, `docs:`, `ci:`, `build:`, `style:`)

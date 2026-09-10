@@ -117,7 +117,7 @@ test.describe("Dashboard Table Chart - Copy Cell Timestamp Formatting", () => {
       await firstCell.hover();
 
       // Click the copy button inside the cell
-      const copyBtn = firstCell.locator("[data-test^='o2-table-cell-copy-']").first();
+      const copyBtn = pm.dashboardPanelActions.getFirstTableCellCopyButton();
       await copyBtn.waitFor({ state: "visible", timeout: 5000 });
       await copyBtn.click({ force: true });
 
@@ -169,7 +169,7 @@ test.describe("Dashboard Table Chart - Copy Cell Timestamp Formatting", () => {
       const firstRow = pm.dashboardPanelActions.getTableDataRows().first();
       const firstCell = firstRow.locator("td").first();
       await firstCell.hover();
-      const copyBtn = firstCell.locator("[data-test^='o2-table-cell-copy-']").first();
+      const copyBtn = pm.dashboardPanelActions.getFirstTableCellCopyButton();
       await copyBtn.waitFor({ state: "visible", timeout: 5000 });
       await copyBtn.click({ force: true });
 
@@ -219,7 +219,7 @@ test.describe("Dashboard Table Chart - Copy Cell Timestamp Formatting", () => {
       const firstRow = pm.dashboardPanelActions.getTableDataRows().first();
       const secondCell = firstRow.locator("td").nth(1);
       await secondCell.hover();
-      const copyBtn = secondCell.locator("[data-test^='o2-table-cell-copy-']").first();
+      const copyBtn = pm.dashboardPanelActions.getFirstTableCellCopyButton();
       await copyBtn.waitFor({ state: "visible", timeout: 5000 });
       await copyBtn.click({ force: true });
 
@@ -305,7 +305,7 @@ test.describe("Dashboard Table Chart - Copy Cell Timestamp Formatting", () => {
       const firstRow = pm.dashboardPanelActions.getTableDataRows().first();
       const firstCell = firstRow.locator("td").first();
       await firstCell.hover();
-      const copyBtn = firstCell.locator("[data-test^='o2-table-cell-copy-']").first();
+      const copyBtn = pm.dashboardPanelActions.getFirstTableCellCopyButton();
       await copyBtn.waitFor({ state: "visible", timeout: 5000 });
       await copyBtn.click({ force: true });
 
@@ -352,7 +352,7 @@ test.describe("Dashboard Table Chart - Copy Cell Timestamp Formatting", () => {
       const firstRow = pm.dashboardPanelActions.getTableDataRows().first();
       const firstCell = firstRow.locator("td").first();
       await firstCell.hover();
-      const copyBtn = firstCell.locator("[data-test^='o2-table-cell-copy-']").first();
+      const copyBtn = pm.dashboardPanelActions.getFirstTableCellCopyButton();
       await copyBtn.waitFor({ state: "visible", timeout: 5000 });
       await copyBtn.click({ force: true });
 

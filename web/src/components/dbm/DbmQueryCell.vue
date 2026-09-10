@@ -32,10 +32,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div class="flex min-w-0 flex-col gap-px">
-    <span class="text-text-code min-w-0 truncate font-mono text-xs" :title="titleAttr">{{
-      text || raw("—")
-    }}</span>
-    <div class="text-text-label text-3xs flex min-w-0 items-center gap-1 truncate">
+    <span class="text-text-code min-w-0 truncate font-mono text-xs">
+      <OTooltip v-if="titleAttr" :content="raw(titleAttr)" />
+      {{ text || raw("—") }}
+    </span>
+    <div class="text-text-secondary text-3xs flex min-w-0 items-center gap-1 truncate">
       <OTag v-if="dbSystem" type="dbSystem" :value="dbSystem" size="xs" />
       <template v-for="item in shownItems" :key="item.key">
         <span class="opacity-45">·</span>
@@ -50,6 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { raw, type I18nText } from "@/types/i18n";
 
 /**

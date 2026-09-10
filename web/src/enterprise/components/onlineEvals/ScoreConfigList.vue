@@ -9,6 +9,7 @@
         :columns="columns"
         row-key="id"
         :loading="loading"
+        :forbidden="forbidden"
         :footer-title="t('onlineEvals.scoreConfig.listTitle')"
         :global-filter="search"
         :show-global-filter="false"
@@ -62,6 +63,7 @@
               :loading="loading"
               selectable
               :selected-key="selectedStatKey"
+              default-key="all"
               @select="onStatSelect"
             />
           </div>
@@ -125,7 +127,7 @@
             v-if="selectedIds.length > 0"
             variant="outline"
             size="sm"
-            class="ml-3"
+            class="ms-3"
             icon-left="download"
             data-test="score-config-bulk-export-btn"
             @click="handleBulkExport"
@@ -197,6 +199,7 @@ const props = defineProps<{
   scorers: Scorer[];
   search: string;
   loading?: boolean;
+  forbidden?: boolean;
 }>();
 
 const emit = defineEmits<{

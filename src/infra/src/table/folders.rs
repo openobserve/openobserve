@@ -20,12 +20,9 @@ use sea_orm::{
 };
 use svix_ksuid::{Ksuid, KsuidLike};
 
-use super::{
-    entity::folders::{ActiveModel, Column, Entity, Model},
-    get_lock,
-};
+use super::entity::folders::{ActiveModel, Column, Entity, Model};
 use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{get_orm_client_ro, get_orm_client_rw},
     errors::{self, FromStrError},
 };
 
@@ -56,7 +53,7 @@ pub async fn get(
     folder_id: &str,
     folder_type: FolderType,
 ) -> Result<Option<Folder>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let folder = get_model(client, org_id, folder_id, folder_type)
         .await
         .map(|f| f.map(Folder::from))?;
@@ -69,7 +66,7 @@ pub async fn get_by_name(
     folder_name: &str,
     folder_type: FolderType,
 ) -> Result<Option<Folder>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let folder = get_model_by_name(client, org_id, folder_name, folder_type)
         .await
         .map(|f| f.map(Folder::from))?;
@@ -91,7 +88,7 @@ pub async fn list_folders(
     org_id: &str,
     folder_type: FolderType,
 ) -> Result<Vec<Folder>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let folders = list_models(client, org_id, folder_type)
         .await?
         .into_iter()
@@ -108,9 +105,7 @@ pub async fn put(
     folder: Folder,
     folder_type: FolderType,
 ) -> Result<(Ksuid, Folder), errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
 
     let model = match get_model(client, org_id, &folder.folder_id, folder_type).await? {
         // If a folder with the given folder_id already exists, get that folder
@@ -145,11 +140,51 @@ pub async fn put(
         }
     };
 
-    let ksuid = Ksuid::from_base62(&model.id).map_err(|_| FromStrError {
-        value: model.id.clone(),
-        ty: "svix_ksuid::Ksuid".to_owned(),
-    })?;
-    Ok((ksuid, model.into()))
+    Ok((model_ksuid(&model)?, model.into()))
+}
+
+/// Creates the folder if `(org, type, folder_id)` is still free, otherwise returns the folder that
+/// is already there. The bool reports whether this call is the one that inserted it.
+///
+/// Callers that auto-create a folder cannot check-then-insert: concurrent requests to a fresh org
+/// all see no folder and all insert, and every loser hits the unique index. Losing that race is not
+/// an error here, so the insert is attempted first and a failure is only reported when the row is
+/// still absent afterwards.
+pub async fn get_or_create(
+    org_id: &str,
+    folder: Folder,
+    folder_type: FolderType,
+) -> Result<(Ksuid, Folder, bool), errors::Error> {
+    let client = get_orm_client_rw().await;
+    let folder_id = folder.folder_id.clone();
+
+    if let Some(model) = get_model(client, org_id, &folder_id, folder_type).await? {
+        return Ok((model_ksuid(&model)?, model.into(), false));
+    }
+
+    let active = ActiveModel {
+        id: Set(Ksuid::new(None, None).to_string()),
+        org: Set(org_id.to_owned()),
+        folder_id: Set(folder.folder_id),
+        r#type: Set::<i16>(folder_type_into_i16(folder_type)),
+        name: Set(folder.name),
+        description: Set(Some(folder.description).filter(|d| !d.is_empty())),
+        icon: Set(folder.icon.filter(|i| !i.is_empty())),
+    };
+
+    match active.insert(client).await {
+        Ok(model) => {
+            let model: Model = model.try_into_model()?;
+            Ok((model_ksuid(&model)?, model.into(), true))
+        }
+        // A concurrent caller may have inserted the same folder between the read above and this
+        // write. Re-read before deciding: the row being there now means the folder exists, which is
+        // all the caller wanted. Only a still-missing row makes this a real failure.
+        Err(e) => match get_model(client, org_id, &folder_id, folder_type).await? {
+            Some(model) => Ok((model_ksuid(&model)?, model.into(), false)),
+            None => Err(e.into()),
+        },
+    }
 }
 
 /// Deletes a folder with the given `folder_id` surrogate key.
@@ -158,9 +193,7 @@ pub async fn delete(
     folder_id: &str,
     folder_type: FolderType,
 ) -> Result<(), errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let model = get_model(client, org_id, folder_id, folder_type).await?;
 
     if let Some(model) = model {
@@ -180,7 +213,7 @@ pub async fn get_pk_by_name(
     name: &str,
     folder_type: FolderType,
 ) -> Result<Option<String>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     Ok(get_model(client, org_id, name, folder_type)
         .await?
         .map(|m| m.id))
@@ -191,7 +224,7 @@ pub async fn get_pk_by_name(
 /// Used to translate the stored PK back to the user-visible name when building
 /// API responses for anomaly detection configs.
 pub async fn get_name_by_pk(pk: &str) -> Result<Option<String>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     Ok(Entity::find_by_id(pk)
         .one(client)
         .await?
@@ -205,7 +238,7 @@ pub async fn get_name_by_pk(pk: &str) -> Result<Option<String>, errors::Error> {
 pub async fn get_name_and_display_name_by_pk(
     pk: &str,
 ) -> Result<Option<(String, String)>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     Ok(Entity::find_by_id(pk)
         .one(client)
         .await?
@@ -242,6 +275,17 @@ pub(crate) async fn get_model_by_name<C: ConnectionTrait>(
         .await
 }
 
+/// Parses the primary-key `id` column as a Ksuid.
+fn model_ksuid(model: &Model) -> Result<Ksuid, errors::Error> {
+    Ksuid::from_base62(&model.id).map_err(|_| {
+        FromStrError {
+            value: model.id.clone(),
+            ty: "svix_ksuid::Ksuid".to_owned(),
+        }
+        .into()
+    })
+}
+
 /// Lists all folder ORM models with the specified type.
 async fn list_models(
     db: &DatabaseConnection,
@@ -258,9 +302,7 @@ async fn list_models(
 
 /// Deletes all folders belonging to the given org.
 pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::delete_many()
         .filter(Column::Org.eq(org_id))
         .exec(client)

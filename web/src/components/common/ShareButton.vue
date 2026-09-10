@@ -25,10 +25,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click="handleShareClick"
     icon-left="share"
   >
-    <span v-if="showLabel" class="ml-1">{{ t("search.shareLink") }}</span>
+    <span v-if="showLabel" class="ms-1">{{ t("search.shareLink") }}</span>
     <OTooltip v-if="isWebUrlNotConfigured">
       <template #content
-        ><OIcon name="warning" size="sm" class="mr-1" />{{
+        ><OIcon name="warning" size="sm" class="me-1" />{{
           t("search.webUrlNotConfigured")
         }}</template
       >
@@ -208,7 +208,8 @@ export default defineComponent({
     };
 
     /**
-     * Handler for share button click
+     * Handler for share button click. Also the entry point for copy-URL keyboard
+     * shortcuts, which call it through a template ref — keep it exposed.
      * Safari: Uses polling mechanism to maintain user gesture context
      * Chrome/Firefox: Copies directly in API response
      */
@@ -220,6 +221,9 @@ export default defineComponent({
         });
         return;
       }
+
+      // Shortcuts call this directly, so the button's :disabled cannot gate them.
+      if (props.disabled || isWebUrlNotConfigured.value) return;
 
       // Start loading and fetch short URL
       isLoading.value = true;

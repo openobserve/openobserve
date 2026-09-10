@@ -21,7 +21,9 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
-use config::meta::model_pricing::{BUILT_IN_ORG, META_ORG, ModelPricingDefinition, PricingSource};
+use config::meta::model_pricing::{
+    BUILT_IN_ORG, META_ORG, MINUTES_PER_DAY, ModelPricingDefinition, PricingSource,
+};
 use db::model_pricing;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "enterprise")]
@@ -647,7 +649,8 @@ pub struct TestModelMatchRequest {
     #[serde(default)]
     pub usage: HashMap<String, i64>,
     /// Optional span timestamp in microseconds. When provided, only definitions
-    /// whose `valid_from` <= timestamp are considered.
+    /// whose `valid_from` <= timestamp are considered, and tiers restricted to
+    /// recurring UTC time-of-day windows (peak / off-peak) are resolved against it.
     #[serde(default)]
     pub timestamp: Option<i64>,
 }
@@ -712,7 +715,7 @@ pub async fn test_model_match(
     let matched = model_pricing::find_pricing_sync_at(&entries, &req.model_name, req.timestamp);
 
     let (tier, costs, total_cost) = if let Some(ref def) = matched {
-        let result = model_pricing::calculate_cost_from_definition(def, &req.usage);
+        let result = model_pricing::calculate_cost_from_definition(def, &req.usage, req.timestamp);
         let total = result.cost.get("total").copied().unwrap_or(0.0);
         let costs = result
             .cost
@@ -754,8 +757,17 @@ fn validate_definition(item: &ModelPricingDefinition) -> Result<(), String> {
     if item.tiers.is_empty() {
         return Err("At least one pricing tier is required".to_string());
     }
-    if item.tiers.iter().all(|t| t.condition.is_some()) {
-        return Err("At least one tier must have no condition (default fallback)".to_string());
+    // The fallback tier must be unrestricted: no usage condition *and* no UTC time
+    // window. Otherwise a span outside every window would have no tier to price with.
+    if item
+        .tiers
+        .iter()
+        .all(|t| t.condition.is_some() || !t.utc_windows.is_empty())
+    {
+        return Err(
+            "At least one tier must have no condition and no time window (default fallback)"
+                .to_string(),
+        );
     }
     for tier in &item.tiers {
         if let Some(ref cond) = tier.condition {
@@ -769,6 +781,20 @@ fn validate_definition(item: &ModelPricingDefinition) -> Result<(), String> {
                 return Err(format!(
                     "Tier '{}' condition value must be a finite number, got {}",
                     tier.name, cond.value
+                ));
+            }
+        }
+        for window in &tier.utc_windows {
+            if window.start_minute > MINUTES_PER_DAY || window.end_minute > MINUTES_PER_DAY {
+                return Err(format!(
+                    "Tier '{}' time window must be within 0-{} minutes past UTC midnight, got {}-{}",
+                    tier.name, MINUTES_PER_DAY, window.start_minute, window.end_minute
+                ));
+            }
+            if window.start_minute % MINUTES_PER_DAY == window.end_minute % MINUTES_PER_DAY {
+                return Err(format!(
+                    "Tier '{}' time window start and end are the same ({}); leave the window list empty for an always-on tier",
+                    tier.name, window.start_minute
                 ));
             }
         }
@@ -907,6 +933,7 @@ mod tests {
             name: "default".to_string(),
             condition: None,
             prices: Default::default(),
+            utc_windows: Vec::new(),
         }
     }
 
@@ -991,9 +1018,102 @@ mod tests {
                 ..Default::default()
             }),
             prices: Default::default(),
+            utc_windows: Vec::new(),
         }];
         let err = validate_definition(&def).unwrap_err();
         assert!(err.contains("At least one tier must have no condition"));
+    }
+
+    #[test]
+    fn test_validate_definition_all_time_windowed_tiers_fails() {
+        use config::meta::model_pricing::UtcTimeWindow;
+        let mut def = valid_definition();
+        // Peak + "off-peak" both windowed leaves no tier for a span outside both.
+        def.tiers = vec![
+            PricingTierDefinition {
+                name: "peak".to_string(),
+                utc_windows: vec![UtcTimeWindow::from_hm((1, 0), (4, 0))],
+                ..default_tier()
+            },
+            PricingTierDefinition {
+                name: "off-peak".to_string(),
+                utc_windows: vec![UtcTimeWindow::from_hm((10, 0), (1, 0))],
+                ..default_tier()
+            },
+        ];
+        let err = validate_definition(&def).unwrap_err();
+        assert!(err.contains("no condition and no time window"));
+    }
+
+    #[test]
+    fn test_validate_definition_windowed_tier_with_default_passes() {
+        use config::meta::model_pricing::UtcTimeWindow;
+        let mut def = valid_definition();
+        def.tiers = vec![
+            PricingTierDefinition {
+                name: "peak".to_string(),
+                utc_windows: vec![
+                    UtcTimeWindow::from_hm((1, 0), (4, 0)),
+                    UtcTimeWindow::from_hm((6, 0), (10, 0)),
+                ],
+                ..default_tier()
+            },
+            default_tier(),
+        ];
+        assert!(validate_definition(&def).is_ok());
+    }
+
+    #[test]
+    fn test_validate_definition_window_out_of_range_fails() {
+        use config::meta::model_pricing::UtcTimeWindow;
+        let mut def = valid_definition();
+        def.tiers = vec![
+            PricingTierDefinition {
+                name: "peak".to_string(),
+                utc_windows: vec![UtcTimeWindow {
+                    start_minute: 60,
+                    end_minute: 1441,
+                }],
+                ..default_tier()
+            },
+            default_tier(),
+        ];
+        let err = validate_definition(&def).unwrap_err();
+        assert!(err.contains("within 0-1440 minutes"));
+    }
+
+    #[test]
+    fn test_validate_definition_window_end_of_day_passes() {
+        use config::meta::model_pricing::UtcTimeWindow;
+        let mut def = valid_definition();
+        def.tiers = vec![
+            PricingTierDefinition {
+                name: "night".to_string(),
+                utc_windows: vec![UtcTimeWindow::from_hm((22, 0), (24, 0))],
+                ..default_tier()
+            },
+            default_tier(),
+        ];
+        assert!(validate_definition(&def).is_ok());
+    }
+
+    #[test]
+    fn test_validate_definition_degenerate_window_fails() {
+        use config::meta::model_pricing::UtcTimeWindow;
+        let mut def = valid_definition();
+        def.tiers = vec![
+            PricingTierDefinition {
+                name: "peak".to_string(),
+                utc_windows: vec![UtcTimeWindow {
+                    start_minute: 300,
+                    end_minute: 300,
+                }],
+                ..default_tier()
+            },
+            default_tier(),
+        ];
+        let err = validate_definition(&def).unwrap_err();
+        assert!(err.contains("start and end are the same"));
     }
 
     #[test]
@@ -1009,6 +1129,7 @@ mod tests {
                     ..Default::default()
                 }),
                 prices: Default::default(),
+                utc_windows: Vec::new(),
             },
             default_tier(),
         ];
@@ -1029,6 +1150,7 @@ mod tests {
                     ..Default::default()
                 }),
                 prices: Default::default(),
+                utc_windows: Vec::new(),
             },
             default_tier(),
         ];

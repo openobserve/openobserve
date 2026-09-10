@@ -11,7 +11,7 @@ recurring class of bug or drift in this codebase.
 ### 1. Every page/module header is `OPageHeader`
 
 **What.** The top of any routed view or module screen (title + icon + actions,
-optionally tabs/breadcrumb/back) is rendered by `OPageHeader`, never a
+optionally peer tabs and a back button) is rendered by `OPageHeader`, never a
 hand-rolled `<div class="header">…<h1>…` or a bespoke `q-toolbar`.
 
 ```vue
@@ -27,7 +27,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
     :subtitle="t('dashboard.subtitle')"
   >
     <template #actions>
-      <OButton variant="primary" size="sm" icon-left="add" @click="addDashboard">
+      <OButton variant="primary" size="sm" @click="addDashboard">
         {{ t("dashboard.add") }}
       </OButton>
     </template>
@@ -36,8 +36,9 @@ import OButton from "@/lib/core/Button/OButton.vue";
 ```
 
 **Why.** `OPageHeader` encodes a single header contract used app-wide: row 1 is
-a fixed-height band (icon tile + `<h1>` + right-aligned actions); row 2 shows
-**exactly one** of peer tabs, an ancestor breadcrumb, or a plain tagline. Every
+a fixed-height band (icon tile + `<h1>` + right-aligned actions, with the
+`subtitle` tagline under the title); row 2 is the full-width peer-tab strip.
+Tabs and a tagline coexist — most module index pages carry both. Every
 hand-built header silently re-litigates title font size, icon tile geometry,
 back-button placement, and the tab underline — and drifts. Reusing the component
 keeps the title's X/Y position identical as a user navigates list → detail →
@@ -49,16 +50,75 @@ edit, which is the whole point.
   the one-row-content contract — is documented in this rule (below), so you can
   use it correctly without opening the file.
 - Props: `title`, `subtitle`, `icon` (an `IconName` from
-  `@/lib/core/Icon/OIcon.icons`), `breadcrumb` (`BreadcrumbItem[]`),
-  `breadcrumbMaxInline`, `back` (`{ label, to | onClick, dataTest }`),
-  `tabsBelow`.
+  `@/lib/core/Icon/OIcon.icons`), `back` (`{ label, to | onClick, dataTest }`),
+  `tabsBelow`, `titleDataTest` (a `data-test` on the `<h1>`, so a page needn't
+  take over the `#title` slot just to attach a test hook), and `titleOverflow`
+  (`"truncate"` default | `"visible"` — pass `"visible"` when `#title` hosts an
+  interactive control, or the `<h1>`'s `overflow:hidden` swallows its focus ring).
+  There is **no breadcrumb prop** — `OPageHeader` has no breadcrumb affordance
+  and no `BreadcrumbItem` type exists; a sub-page uses `back` instead.
 - Slots: `title-prefix`, `title`, `subtitle`, `title-trail`, `actions`, `tabs`,
   `back`.
+- **Peer tabs need `tabs-below` — the slot alone is not enough.** `#tabs`
+  (`#header-tabs` on `OPageLayout`) defaults to rendering the strip *inline
+  beside the title*, which is the wrong place for Level-2 section nav: the title
+  block is `shrink-0`, so the strip's x-position moves with the title's width
+  and shifts under the cursor as you navigate between siblings. Pass
+  `tabs-below` to get the full-width row-2 strip every module uses. The four
+  alerting pages shipped inline for exactly this reason — nothing failed, they
+  just didn't look like the rest of the app.
+- **The header `icon` must be the SAME `IconName` the page's nav entry
+  declares** — see [navigation-menus](navigation-menus.md#icon-parity).
 - Put page actions in `#actions` using O2 components. Do not add your own
   `border-b`, height, or padding around it — the header owns its own chrome.
+- **The header's create CTA is label-only — no `+` icon.** Write
+  `<OButton variant="primary" size="sm">New alert</OButton>`, never
+  `icon-left="add"`. This applies to every New/Add/Create button in `#actions`,
+  on list and detail pages alike. See *The header create CTA carries no icon*
+  below for the boundary — utility actions and in-section adders are different.
 - **Do not** style `OPageHeader` from the outside with utility classes or a
   wrapper trying to change its internals. If it can't express what a page needs,
   that's a change to `OPageHeader` itself, not a per-page override.
+
+#### The header create CTA carries no icon
+
+The primary New/Add/Create button in `#actions` is **text only**:
+
+```vue
+<!-- ✅ -->
+<template #actions>
+  <OButton variant="primary" size="sm" data-test="alert-list-add-btn" @click="create">
+    {{ t("alerts.add") }}
+  </OButton>
+</template>
+
+<!-- ❌ never on a header CTA -->
+<OButton variant="primary" size="sm" icon-left="add">{{ t("alerts.add") }}</OButton>
+```
+
+**Why.** A page header has exactly one primary action, in a fixed, known place.
+The `+` adds no information there — the label already says what the button
+makes — and it competes with the module icon tile on the same row. The app had
+drifted both ways; the label-only form is the settled convention.
+
+**The boundary — three things this rule does NOT cover.** Do not strip these:
+
+| Keep the `+` on | Because | Example |
+|---|---|---|
+| **In-section adders** — a repeatable row-adder inside a form, `OFormSection` / `OEmptyState` / `ODialog` `#actions`, or any body content | Repeated affordance in a dense form; the `+` is what makes it scannable as "one more of these" | `+ Add header`, `+ Add condition`, `+ Add variable` |
+| **Icon-only buttons** (`size="icon-*"`, label in an `OTooltip`) | The `+` *is* the button's content — removing it leaves an empty square | `ViewDashboard`'s Add-panel toolbar button |
+| **Utility actions in the header** that are not create CTAs | Semantic icons are correct and expected there | Import → `upload-file`, Refresh → `refresh`, Edit → `edit` |
+
+So the rule is narrow and precise: **a generic `+` prefixed to a create CTA in
+`#actions`**. A *semantic* icon on a header button is fine — the SLO detail
+page's outline "New alert" uses the `notifications` bell to match its `shield`
+and `edit` siblings, and that stays.
+
+**Auditing this.** Grep alone over-reports: an `OFormSection` or `OEmptyState`
+`#actions` slot nested inside `OPageLayout` looks identical to a header slot. To
+find real violations, resolve each `<OButton icon-left="add">` to the component
+that **owns** the enclosing `<template #actions>` and keep only the ones owned by
+`OPageHeader` / `OPageLayout`.
 
 ### 2. Build from O2 components in `web/src/lib`
 

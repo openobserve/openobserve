@@ -39,22 +39,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   one, which is why they occupy two columns and never one.
 -->
 <template>
-  <DbmPageChrome
-    :title="t('dbm.activity.title')"
-    :subtitle="t(isLiveWindow ? 'dbm.activity.subtitle' : 'dbm.activity.subtitlePast')"
-    title-data-test="dbm-activity-title"
-    date-time-data-test="dbm-activity-date-time"
-    :tab-counts="tabCounts"
-    :range="range"
-    @date-change="onDateChange"
-  >
+  <DbmPageChrome title-data-test="dbm-activity-title" :tab-counts="tabCounts">
     <div class="flex min-h-0 flex-1 flex-col">
       <OTable
+        :enable-column-resize="true"
         :data="rows"
         :columns="columns"
         row-key="rowKey"
         :loading="loading"
         :frame="false"
+        :toolbar-bordered="false"
         :error="error"
         sorting="client"
         :show-global-filter="false"
@@ -81,12 +75,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #toolbar-trailing>
-          <DbmRefreshButton
-            :loading="loading"
-            :last-run-at="lastRunAt"
-            data-test="dbm-activity-refresh"
-            @refresh="onRefresh"
-          />
+          <div class="flex items-center gap-1.5">
+            <DbmRefreshButton
+              mode="status"
+              :loading="loading"
+              :last-run-at="lastRunAt"
+              data-test="dbm-activity-refresh"
+            />
+            <DateTime
+              auto-apply
+              menu-align="end"
+              :default-type="range.type"
+              :default-absolute-time="{ startTime: range.startTime, endTime: range.endTime }"
+              :default-relative-time="range.relativeTimePeriod ?? undefined"
+              data-test-name="dbm-activity-date-time"
+              class="h-8"
+              @on:date-change="onDateChange"
+            />
+            <DbmRefreshButton
+              mode="button"
+              :loading="loading"
+              data-test="dbm-activity-refresh"
+              @refresh="onRefresh"
+            />
+          </div>
         </template>
 
         <template #subheader>
@@ -109,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <span
               v-if="waitStrip.shown.length"
-              class="text-text-label text-3xs shrink-0 font-semibold tracking-wide uppercase"
+              class="text-text-secondary text-3xs shrink-0 font-semibold"
             >
               {{ t("dbm.activity.columns.waitEvent") }}
             </span>
@@ -127,7 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="text-text-secondary text-2xs font-mono tabular-nums">
                 {{ formatCount(bucket.sessions) }}
               </span>
-              <span v-if="bucket.share !== null" class="text-text-label text-3xs font-mono">
+              <span v-if="bucket.share !== null" class="text-text-secondary text-3xs font-mono">
                 {{ formatPercent(bucket.share, 0) }}
               </span>
             </span>
@@ -149,7 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                  missed, and the full three sentences ride in the tooltip so
                  they cost the table no rows. -->
             <span
-              class="text-text-label text-2xs flex shrink-0 items-center gap-1"
+              class="text-text-secondary text-2xs flex shrink-0 items-center gap-1"
               data-test="dbm-activity-disclosure"
             >
               <OIcon name="info-outline" class="size-3 shrink-0" />
@@ -320,6 +332,7 @@ import { useRoute, useRouter } from "vue-router";
 import DbmLockEmptyState, { type DbmLockCheck } from "@/components/dbm/DbmLockEmptyState.vue";
 import DbmPageChrome from "@/components/dbm/DbmPageChrome.vue";
 import DbmQueryCell from "@/components/dbm/DbmQueryCell.vue";
+import DateTime from "@/components/DateTime.vue";
 import DbmRefreshButton from "@/components/dbm/DbmRefreshButton.vue";
 import DbmScopeFilters from "@/components/dbm/DbmScopeFilters.vue";
 import DbmSubheaderBand from "@/components/dbm/DbmSubheaderBand.vue";

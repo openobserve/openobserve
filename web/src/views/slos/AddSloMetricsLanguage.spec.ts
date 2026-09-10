@@ -189,8 +189,40 @@ const activeLanguage = (w: Form, branch: "count" | "timeslice") =>
       w.find(`[data-test="slos-addslo-${branch}-language-${l}"]`).attributes("data-state") === "on",
   );
 
+/**
+ * Save, seeding the required fields a test has not set.
+ *
+ * These tests are about the PAYLOAD, not about identity or the objective — but
+ * the form refuses to submit while a required field is blank, so supplying one
+ * is setup rather than subject. Left out, every assertion below would fail as
+ * "no request was made" instead of naming what it actually checks.
+ */
 const save = async (w: Form) => {
+  await seedRequired(w);
   await w.find('[data-test="slos-addslo-save"]').trigger("click");
+  await flushPromises();
+};
+
+/** Fill any required field the test left empty, and only those. */
+const seedRequired = async (w: Form) => {
+  const name = w.find('[data-test="slos-addslo-name-field"]');
+  if (!(name.element as HTMLInputElement).value) await name.setValue("payload-fixture");
+
+  // Only rendered on the time-slice branch, and only that branch requires it.
+  const threshold = w.find('[data-test="slos-addslo-threshold-field"]');
+  if (threshold.exists() && !(threshold.element as HTMLInputElement).value) {
+    await threshold.setValue("1");
+  }
+
+  // Exactly one of these is mounted, and a PromQL count mounts neither.
+  for (const test of ["slos-addslo-stream", "slos-addslo-timeslice-stream"]) {
+    const picker = w
+      .findAllComponents(OSelect)
+      .find((c) => String(c.vm.$attrs["data-test"]) === test);
+    if (picker && !picker.props("modelValue")) {
+      picker.vm.$emit("update:modelValue", "fixture_stream");
+    }
+  }
   await flushPromises();
 };
 
@@ -373,6 +405,9 @@ describe("AddSlo — SQL or PromQL over a metrics stream", () => {
         // Required by the variant and seeded by the form, so it is part of the
         // shape even when the dropdown was never opened.
         comparator: "<",
+        // Required too, and supplied by `seedRequired` — a time slice with no
+        // threshold has no rule to apply.
+        threshold: 1,
       });
     });
 

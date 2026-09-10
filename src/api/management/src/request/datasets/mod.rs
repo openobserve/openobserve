@@ -13,17 +13,18 @@ use db::authz::{remove_ownership, set_ownership};
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::{
     auth::{UserEmail, is_ofga_object_visible},
-    llm_evaluations::datasets::{self, DatasetError, ImportDatasetItem},
+    llm_evaluations::datasets::{self, DatasetError, ImportDatasetItem, UpsertDatasetItems},
 };
 
 use crate::{
     common::meta::{authz::Authz, http::HttpResponse as MetaHttpResponse},
     models::datasets::{
         CreateDatasetRequestBody, DatasetItemResponseBody, DatasetItemVersionsResponseBody,
-        DatasetResponseBody, ImportDatasetItemsResponseBody, ListDatasetItemsQuery,
-        ListDatasetItemsResponseBody, ListDatasetsResponseBody,
-        PushAnnotationQueueItemToDatasetRequestBody, PushDatasetItemRequestBody,
-        PushDatasetItemResponseBody, UpdateDatasetItemRequestBody, UpdateDatasetRequestBody,
+        DatasetResponseBody, DatasetSnapshotRowsQuery, DatasetSnapshotRowsResponseBody,
+        ImportDatasetItemsResponseBody, ListDatasetItemsQuery, ListDatasetItemsResponseBody,
+        ListDatasetsResponseBody, PushAnnotationQueueItemToDatasetRequestBody,
+        PushDatasetItemRequestBody, PushDatasetItemResponseBody, UpdateDatasetItemRequestBody,
+        UpdateDatasetRequestBody, UpsertDatasetItemsRequestBody, UpsertDatasetItemsResponseBody,
     },
     request::annotation_queues::ensure_annotation_queue_score_configs_visible,
 };
@@ -49,6 +50,7 @@ fn dataset_error_response(value: DatasetError) -> Response {
         | DatasetError::MissingSourceStream
         | DatasetError::InvalidTraceStartTime
         | DatasetError::InvalidPageSize
+        | DatasetError::InvalidSnapshotVersion
         | DatasetError::InvalidTelemetryReference(_)
         | DatasetError::UnsupportedQueueItemScope) => {
             MetaHttpResponse::bad_request(error.to_string())
@@ -67,6 +69,17 @@ fn dataset_error_response(value: DatasetError) -> Response {
         }
         error @ (DatasetError::QueueItemNotReviewed | DatasetError::InconsistentReviewSource) => {
             MetaHttpResponse::conflict(error)
+        }
+        error @ (DatasetError::StaleRevision(_)
+        | DatasetError::DeletedItem(_)
+        | DatasetError::IdempotencyConflict) => MetaHttpResponse::conflict(error),
+        error @ (DatasetError::MissingIfRowId(_)
+        | DatasetError::DuplicateLogicalId(_)
+        | DatasetError::EmptyUpsert
+        | DatasetError::UpsertTooLarge) => MetaHttpResponse::bad_request(error.to_string()),
+        error @ DatasetError::MalformedStoredResponse(_) => {
+            log::error!("[Dataset] internal error: {error}");
+            MetaHttpResponse::internal_error("Internal server error")
         }
     }
 }
@@ -99,6 +112,38 @@ pub async fn list_dataset_items(
 ) -> Response {
     match datasets::list_items(&org_id, &dataset_id, query.into()).await {
         Ok(page) => MetaHttpResponse::json(ListDatasetItemsResponseBody::from(page)),
+        Err(err) => dataset_error_response(err),
+    }
+}
+
+/// GetDatasetSnapshotRows
+#[utoipa::path(
+    get,
+    path = "/{org_id}/datasets/{dataset_id}/rows",
+    context_path = "/api",
+    tag = "Datasets",
+    operation_id = "GetDatasetSnapshotRows",
+    summary = "Read the row set of a pinned Dataset Snapshot",
+    description = "Resolves the Dataset's MVCC history at `version` and returns one page of the live rows that Snapshot contains. Omitting `version` reads the current Snapshot and answers with the version it resolved. This is the read an Experiment pins at creation, so it is also how a client inspects the exact rows a historical Experiment ran against.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("dataset_id" = String, Path, description = "Dataset ID"),
+        DatasetSnapshotRowsQuery,
+    ),
+    responses(
+        (status = 200, body = inline(DatasetSnapshotRowsResponseBody)),
+        (status = 400, description = "Invalid page size or snapshot version", body = ()),
+        (status = 404, description = "Dataset not found", body = ()),
+    ),
+    extensions(("x-o2-ratelimit" = json!({"module": "Datasets", "operation": "list"}))),
+)]
+pub async fn get_dataset_snapshot_rows(
+    Path((org_id, dataset_id)): Path<(String, String)>,
+    Query(query): Query<DatasetSnapshotRowsQuery>,
+) -> Response {
+    match datasets::snapshot_rows(&org_id, &dataset_id, query.into(), None).await {
+        Ok(page) => MetaHttpResponse::json(DatasetSnapshotRowsResponseBody::from(page)),
         Err(err) => dataset_error_response(err),
     }
 }
@@ -299,6 +344,65 @@ pub async fn push_dataset_item(
 ) -> Response {
     match datasets::push_item(&org_id, &dataset_id, &user.user_id, body.into()).await {
         Ok(result) => MetaHttpResponse::json(PushDatasetItemResponseBody::from(result)),
+        Err(err) => dataset_error_response(err),
+    }
+}
+
+/// UpsertDatasetItems
+#[utoipa::path(
+    put,
+    path = "/{org_id}/datasets/{dataset_id}/items",
+    context_path = "/api",
+    tag = "Datasets",
+    operation_id = "UpsertDatasetItems",
+    summary = "Create or update Dataset Cases under client-supplied identity",
+    description = "Identity comes from `logicalId` alone and is never inferred from content. \
+                   An item that names an existing Case must carry the `ifRowId` it read; a \
+                   superseded revision returns 409 and writes nothing. A deleted Case returns \
+                   409 unless the item sets `restore`. The whole batch and its idempotency \
+                   record commit together.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("dataset_id" = String, Path, description = "Dataset ID"),
+    ),
+    request_body(content = inline(UpsertDatasetItemsRequestBody), description = "Dataset Cases to ensure"),
+    responses(
+        (status = 200, body = inline(UpsertDatasetItemsResponseBody)),
+        (status = 400, description = "Invalid upsert request", body = ()),
+        (status = 404, description = "Dataset not found", body = ()),
+        (status = 409, description = "Stale revision, deleted Case, or idempotency conflict", body = ()),
+    ),
+    extensions(("x-o2-ratelimit" = json!({"module": "Datasets", "operation": "update"}))),
+)]
+pub async fn upsert_dataset_items(
+    Path((org_id, dataset_id)): Path<(String, String)>,
+    Headers(user): Headers<UserEmail>,
+    axum::Json(body): axum::Json<UpsertDatasetItemsRequestBody>,
+) -> Response {
+    // The body is re-serialized rather than hashed from the raw bytes so two
+    // encodings of the same request agree on their canonical hash.
+    let canonical_request = match serde_json::to_value(&body) {
+        Ok(value) => value,
+        Err(error) => {
+            log::error!("[Dataset] failed to canonicalize upsert request: {error}");
+            return MetaHttpResponse::internal_error("Internal server error");
+        }
+    };
+    let request = UpsertDatasetItems {
+        items: body.items.into_iter().map(Into::into).collect(),
+        idempotency_key: body.idempotency_key,
+    };
+    match datasets::upsert_items(
+        &org_id,
+        &dataset_id,
+        &user.user_id,
+        request,
+        &canonical_request,
+    )
+    .await
+    {
+        Ok(result) => MetaHttpResponse::json(UpsertDatasetItemsResponseBody::from(result)),
         Err(err) => dataset_error_response(err),
     }
 }
@@ -557,8 +661,7 @@ fn parse_dataset_import_csv(bytes: &[u8]) -> Result<ParsedDatasetImport, String>
     }
     let input_index = header_index(&headers, "input")
         .ok_or_else(|| "CSV header must contain an 'input' column".to_string())?;
-    let expected_index = header_index(&headers, "expected_output")
-        .ok_or_else(|| "CSV header must contain an 'expected_output' column".to_string())?;
+    let expected_index = header_index(&headers, "expected_output");
     let tags_index = header_index(&headers, "tags");
 
     let mut items = Vec::new();
@@ -566,14 +669,21 @@ fn parse_dataset_import_csv(bytes: &[u8]) -> Result<ParsedDatasetImport, String>
     for record in reader.records() {
         let record = record.map_err(|error| format!("Failed to parse CSV: {error}"))?;
         let input = record.get(input_index).unwrap_or("").trim();
-        let expected_output = record.get(expected_index).unwrap_or("").trim();
-        if input.is_empty() || expected_output.is_empty() {
+        if input.is_empty() {
             skipped_count += 1;
             continue;
         }
         let input = parse_json_or_string(input);
-        let expected_output = parse_json_or_string(expected_output);
-        if !non_empty_import_value(&input) || !non_empty_import_value(&expected_output) {
+        let expected_output = expected_index
+            .and_then(|index| record.get(index))
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(parse_json_or_string);
+        if !non_empty_import_value(&input)
+            || expected_output
+                .as_ref()
+                .is_some_and(|value| !non_empty_import_value(value))
+        {
             skipped_count += 1;
             continue;
         }
@@ -664,7 +774,7 @@ mod tests {
     }
 
     #[test]
-    fn csv_import_accepts_quoted_json_and_skips_missing_goldens() {
+    fn csv_import_accepts_quoted_json_and_missing_reference_answers() {
         let parsed = parse_dataset_import_csv(
             br#"input,expected_output,tags
 "{""question"":""refund?""}","{""answer"":""30 days""}","[""policy"",""reviewed""]"
@@ -674,20 +784,25 @@ missing,,bad
         )
         .unwrap();
 
-        assert_eq!(parsed.items.len(), 2);
-        assert_eq!(parsed.skipped_count, 1);
+        assert_eq!(parsed.items.len(), 3);
+        assert_eq!(parsed.skipped_count, 0);
         assert_eq!(
             parsed.items[0].input,
             serde_json::json!({"question": "refund?"})
         );
         assert_eq!(parsed.items[0].tags, ["policy", "reviewed"]);
-        assert_eq!(parsed.items[1].input, "plain, question");
-        assert_eq!(parsed.items[1].tags, ["manual", "seed"]);
+        assert_eq!(parsed.items[1].input, "missing");
+        assert_eq!(parsed.items[1].expected_output, None);
+        assert_eq!(parsed.items[2].input, "plain, question");
+        assert_eq!(parsed.items[2].tags, ["manual", "seed"]);
     }
 
     #[test]
-    fn csv_import_requires_both_headers_and_valid_utf8() {
-        assert!(parse_dataset_import_csv(b"input\nquestion\n").is_err());
+    fn csv_import_requires_input_header_and_valid_utf8() {
+        let parsed = parse_dataset_import_csv(b"input\nquestion\n").unwrap();
+        assert_eq!(parsed.items.len(), 1);
+        assert_eq!(parsed.items[0].expected_output, None);
+        assert!(parse_dataset_import_csv(b"expected_output\nanswer\n").is_err());
         assert!(parse_dataset_import_csv(&[b'i', b'n', b'p', b'u', b't', b',', 0xff]).is_err());
     }
 
@@ -700,6 +815,9 @@ missing,,bad
 
         assert_eq!(parsed.items.len(), 1);
         assert_eq!(parsed.items[0].input, "line 1\nline 2");
-        assert_eq!(parsed.items[0].expected_output, "say \"hi\"");
+        assert_eq!(
+            parsed.items[0].expected_output,
+            Some(serde_json::json!("say \"hi\""))
+        );
     }
 }

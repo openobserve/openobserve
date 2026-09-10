@@ -18,149 +18,159 @@
           }}
         </span>
       </template>
-      <div class="py-4.5 [&_textarea]:max-h-55 [&_textarea]:overflow-y-auto [&_textarea]:font-mono">
-        <section class="mb-6">
-          <div class="border-dialog-header-border mb-3 flex items-center gap-2.5 border-b pb-2.5">
-            <span
-              class="text-text-secondary text-2xs bg-text-secondary/12 inline-flex h-5.5 w-5.5 items-center justify-center rounded-full font-mono font-bold"
-              >{{ t("onlineEvals.provider.sectionStep1") }}</span
-            >
-            <div class="text-text-heading m-0 text-sm font-semibold">
-              {{ t("onlineEvals.provider.sectionTitle") }}
-            </div>
+      <div class="provider-form__main flex min-h-0 flex-col gap-2 p-2">
+        <!-- Provider details -->
+        <section
+          class="card-container rounded-default border-border-default bg-surface-base shrink-0 overflow-hidden border"
+          data-test="provider-form-identity-section"
+        >
+          <div class="border-border-default flex items-center border-b px-3 py-2.5">
+            <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
+            <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
+              t("onlineEvals.provider.sectionTitle")
+            }}</span>
           </div>
-
-          <div class="grid grid-cols-2 gap-3.5 max-[56.25rem]:grid-cols-1">
-            <div class="mb-3">
-              <div class="text-text-heading mb-1 flex items-center text-xs font-semibold">
-                {{ t("onlineEvals.provider.nameLabel") }}
-                <span class="text-status-error-text ml-0.5">*</span>
-                <OIcon
-                  v-if="mode === 'edit'"
-                  name="lock"
-                  size="xs"
-                  class="text-text-secondary ml-1.5"
+          <div class="flex flex-col gap-3 px-4 py-3.5">
+            <div class="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3">
+              <div>
+                <OFormInput
+                  name="name"
+                  :label="t('onlineEvals.provider.nameLabel')"
+                  :placeholder="raw('Production OpenAI')"
+                  size="sm"
+                  required
+                  :disabled="mode === 'edit'"
+                  :help-text="mode === 'edit' ? t('onlineEvals.provider.cannotRename') : undefined"
+                  data-test="provider-form-name-input"
                 />
               </div>
-              <OFormInput
-                name="name"
-                :placeholder="raw('Production OpenAI')"
-                size="sm"
-                :disabled="mode === 'edit'"
-                data-test="provider-form-name-input"
-              />
-              <div v-if="mode === 'edit'" class="text-2xs text-text-secondary mt-1">
-                {{ t("onlineEvals.provider.cannotRename") }}
-              </div>
-            </div>
 
-            <div class="mb-3">
-              <div class="text-text-heading mb-1 flex items-center text-xs font-semibold">
-                {{ t("onlineEvals.provider.typeLabel") }}
-                <span class="text-status-error-text ml-0.5">*</span>
-                <OIcon
-                  v-if="mode === 'edit'"
-                  name="lock"
-                  size="xs"
-                  class="text-text-secondary ml-1.5"
+              <div>
+                <OFormSelect
+                  name="providerType"
+                  :label="t('onlineEvals.provider.typeLabel')"
+                  :options="providerTypeOptions"
+                  size="md"
+                  required
+                  :disabled="mode === 'edit'"
+                  data-test="provider-form-type-select"
                 />
               </div>
-              <OFormSelect
-                name="providerType"
-                :options="providerTypeOptions"
-                size="md"
-                :disabled="mode === 'edit'"
-                data-test="provider-form-type-select"
-              />
             </div>
-          </div>
 
-          <div class="mb-3">
-            <div class="text-text-heading mb-1 flex items-center text-xs font-semibold">
-              {{ t("onlineEvals.provider.endpointLabel") }}
-            </div>
-            <OFormInput
-              name="endpoint"
-              :placeholder="raw(endpointPlaceholder)"
-              size="sm"
-              data-test="provider-form-endpoint-input"
-            />
-          </div>
-
-          <div class="grid grid-cols-2 gap-3.5 max-[56.25rem]:grid-cols-1">
-            <div class="mb-3">
-              <div class="text-text-heading mb-1 flex items-center text-xs font-semibold">
-                {{ t("onlineEvals.provider.defaultModelLabel") }}
-                <span class="text-status-error-text ml-0.5">*</span>
+            <div class="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3">
+              <div>
+                <OFormInput
+                  name="defaultModel"
+                  :label="t('onlineEvals.provider.defaultModelLabel')"
+                  :placeholder="raw('gpt-4o-mini')"
+                  size="sm"
+                  required
+                  data-test="provider-form-default-model-input"
+                />
               </div>
+
+              <div>
+                <OFormInput
+                  name="availableModels"
+                  :label="t('onlineEvals.provider.availableModelsLabel')"
+                  :placeholder="raw('gpt-4o-mini, gpt-4.1')"
+                  size="sm"
+                  data-test="provider-form-available-models-input"
+                />
+              </div>
+            </div>
+
+            <div>
               <OFormInput
-                name="defaultModel"
-                :placeholder="raw('gpt-4o-mini')"
+                name="endpoint"
+                :label="t('onlineEvals.provider.endpointLabel')"
+                :placeholder="raw(endpointPlaceholder)"
                 size="sm"
-                data-test="provider-form-default-model-input"
+                :help-text="endpointHelpText"
+                data-test="provider-form-endpoint-input"
               />
-            </div>
-
-            <div class="mb-3">
-              <div class="text-text-heading mb-1 flex items-center text-xs font-semibold">
-                {{ t("onlineEvals.provider.availableModelsLabel") }}
-              </div>
-              <OFormInput
-                name="availableModels"
-                :placeholder="raw('gpt-4o-mini, gpt-4.1')"
-                size="sm"
-                data-test="provider-form-available-models-input"
-              />
-              <div class="text-2xs text-text-secondary mt-1">
-                {{ t("onlineEvals.provider.availableModelsHelp") }}
-              </div>
             </div>
           </div>
         </section>
 
-        <section class="mb-6">
-          <div class="border-dialog-header-border mb-3 flex items-center gap-2.5 border-b pb-2.5">
-            <span
-              class="text-text-secondary text-2xs bg-text-secondary/12 inline-flex h-5.5 w-5.5 items-center justify-center rounded-full font-mono font-bold"
-              >{{ t("onlineEvals.provider.sectionStep2") }}</span
+        <!-- Authentication -->
+        <section
+          class="card-container rounded-default border-border-default bg-surface-base shrink-0 overflow-hidden border"
+          data-test="provider-form-auth-section"
+        >
+          <div class="border-border-default flex items-center border-b px-3 py-2.5">
+            <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
+            <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
+              t("onlineEvals.provider.authSection")
+            }}</span>
+          </div>
+          <div class="flex flex-col gap-3 px-4 py-3.5">
+            <div
+              v-if="mode === 'edit'"
+              class="rounded-default text-2xs text-text-secondary border-status-info-text/30 bg-status-info-text/12 flex items-start gap-2 border px-3 py-2 leading-[1.4]"
             >
-            <div class="text-text-heading m-0 text-sm font-semibold">
-              {{ t("onlineEvals.provider.authSection") }}
+              <OIcon name="lock" size="xs" class="text-status-info-text mt-px shrink-0" />
+              <span>{{ t("onlineEvals.provider.authEditNote") }}</span>
             </div>
-          </div>
 
-          <div
-            v-if="mode === 'edit'"
-            class="provider-callout rounded-default text-2xs text-text-secondary border-status-info-text/30 bg-status-info-text/12 mb-3 flex items-start gap-2 border px-3 py-2 leading-[1.4]"
-          >
-            <OIcon name="lock" size="xs" class="text-status-info-text mt-px shrink-0" />
-            <span>{{ t("onlineEvals.provider.authEditNote") }}</span>
-          </div>
-
-          <div class="mb-3">
-            <div class="text-text-heading mb-1 flex items-center text-xs font-semibold">
-              {{ t("onlineEvals.provider.apiKeyLabel") }}
-              <span v-if="mode === 'create' && apiKeyRequired" class="text-status-error-text ml-0.5"
-                >*</span
-              >
-            </div>
-            <OFormInput
-              name="apiKey"
-              type="password"
-              size="sm"
-              :placeholder="t('onlineEvals.provider.apiKeyPlaceholder')"
-              data-test="provider-form-api-key-input"
-            />
-            <div class="text-2xs text-text-secondary mt-1">
-              {{ t("onlineEvals.provider.apiKeyHelp") }}
+            <div>
+              <OFormInput
+                name="apiKey"
+                type="password"
+                :label="t('onlineEvals.provider.apiKeyLabel')"
+                :required="mode === 'create' && apiKeyRequired"
+                size="sm"
+                :placeholder="t('onlineEvals.provider.apiKeyPlaceholder')"
+                :help-text="t('onlineEvals.provider.apiKeyHelp')"
+                data-test="provider-form-api-key-input"
+              />
             </div>
           </div>
         </section>
       </div>
 
       <footer
-        class="border-dialog-header-border bg-card-bg sticky bottom-0 z-1 flex shrink-0 items-center justify-end gap-2 border-t px-5.5 py-3"
+        class="border-border-default bg-surface-base sticky bottom-0 z-1 flex shrink-0 items-center justify-end gap-2 border-t px-5.5 py-3"
       >
+        <div
+          v-if="testState !== 'idle'"
+          class="me-auto flex min-w-0 items-center gap-2"
+          data-test="provider-form-test-result"
+        >
+          <span v-if="testState === 'running'" class="text-text-secondary text-xs">
+            {{ t("onlineEvals.provider.testRunning") }}
+          </span>
+          <template v-else>
+            <OTag :variant="testState === 'passed' ? 'success-soft' : 'error-soft'" dot>
+              {{
+                testState === "passed"
+                  ? t("onlineEvals.provider.testPassed")
+                  : t("onlineEvals.provider.testFailed")
+              }}
+            </OTag>
+            <span
+              v-if="testMessage"
+              class="truncate text-xs"
+              :class="testState === 'failed' ? 'text-status-error-text' : 'text-text-secondary'"
+              :title="testMessage"
+            >
+              {{ testMessage }}
+            </span>
+          </template>
+        </div>
+
+        <OButton
+          data-test="provider-form-test-btn"
+          type="button"
+          variant="outline"
+          size="sm-action"
+          :loading="testState === 'running'"
+          :disabled="isSubmitting"
+          @click="testConnection"
+        >
+          {{ t("onlineEvals.buttons.testConnection") }}
+        </OButton>
         <OButton
           data-test="provider-form-cancel-btn"
           type="button"
@@ -186,10 +196,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
@@ -197,6 +208,10 @@ import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import onlineEvalsService, { type Provider } from "@/services/online-evals.service";
+import {
+  DEFAULT_PROVIDER_BASE_URLS,
+  SUGGESTED_PROVIDER_BASE_URLS,
+} from "@/utils/llmProviderBaseUrls";
 import { availableModelsOf, defaultModelOf, providerTypeOf } from "../utils/evalEntity";
 import { showError, splitCsv } from "../utils/evalFormat";
 import { makeProviderFormSchema, type ProviderForm } from "./ProviderFormPage.schema";
@@ -236,30 +251,25 @@ const providerTypeOptions = computed(() => [
   { label: raw("OpenAI"), value: "openai" },
   { label: raw("DeepSeek"), value: "deepseek" },
   { label: raw("Anthropic"), value: "anthropic" },
-  { label: raw("Azure OpenAI"), value: "azure_openai" },
   { label: raw("Ollama"), value: "ollama" },
   { label: raw("vLLM"), value: "vllm" },
   { label: raw("OpenAI-compatible"), value: "openai_compatible" },
-  { label: t("ingestion.otherLabel"), value: "other" },
 ]);
-
-// Default API endpoint for each provider type, shown as a placeholder to hint
-// the expected URL. Providers without a canonical public endpoint (self-hosted
-// or generic) fall back to the static i18n placeholder.
-const DEFAULT_ENDPOINTS: Record<string, string> = {
-  openai: "https://api.openai.com/v1",
-  deepseek: "https://api.deepseek.com/v1",
-  anthropic: "https://api.anthropic.com/v1",
-  azure_openai: "https://{resource}.openai.azure.com/openai/deployments/{deployment}",
-  ollama: "http://localhost:11434/v1",
-  vllm: "http://localhost:8000/v1",
-};
 
 const endpointPlaceholder = computed(
   () =>
-    DEFAULT_ENDPOINTS[formValues.value.providerType] ||
+    DEFAULT_PROVIDER_BASE_URLS[formValues.value.providerType] ||
+    SUGGESTED_PROVIDER_BASE_URLS[formValues.value.providerType] ||
     t("onlineEvals.provider.endpointPlaceholder"),
 );
+
+// The help text must say what a blank field does: a real default, or plainly no fallback at all.
+const endpointHelpText = computed(() => {
+  const defaultUrl = DEFAULT_PROVIDER_BASE_URLS[formValues.value.providerType];
+  return defaultUrl
+    ? t("onlineEvals.provider.endpointHelpDefault", { url: defaultUrl })
+    : t("onlineEvals.provider.endpointHelpRequired");
+});
 
 function initForm(row: Provider | null): ProviderForm {
   if (!row) {
@@ -285,30 +295,35 @@ function initForm(row: Provider | null): ProviderForm {
   };
 }
 
+// Shared by save() and testConnection() — both send the same shape, just to
+// different endpoints. `value` carries the RAW field values (the schema
+// validates but does not transform), so trim/split here.
+function buildPayload(value: ProviderForm) {
+  return {
+    name: value.name.trim(),
+    providerType: value.providerType,
+    endpoint: value.endpoint.trim() || null,
+    defaultModel: value.defaultModel.trim(),
+    availableModels: splitCsv(value.availableModels),
+    // Backend expects an authConfig object; the form only collects an
+    // API key, which is the only auth secret the supported providers
+    // need today. Wrap it as { api_key: <value> }. Trim it — a pasted key
+    // with trailing whitespace/newline must not be sent verbatim.
+    authConfig: { api_key: value.apiKey.trim() },
+    // `isDefault` is not surfaced in the form. Always send false;
+    // backend defaults to non-default and the user manages default-ness
+    // (if ever needed) outside this create/edit flow.
+    isDefault: false,
+  };
+}
+
 // @submit handler — OForm only calls this once the whole schema passes, so the
-// schema (not a manual guard) gates the save. `value` carries the RAW field
-// values (the schema validates but does not transform), so trim/split here.
-// OForm awaits this promise → the Save button spinner spans the whole save
-// (no manual `isSaving` ref).
+// schema (not a manual guard) gates the save. OForm awaits this promise → the
+// Save button spinner spans the whole save (no manual `isSaving` ref).
 async function save(value: ProviderForm) {
   if (!props.orgId) return;
   try {
-    const payload = {
-      name: value.name.trim(),
-      providerType: value.providerType,
-      endpoint: value.endpoint.trim() || null,
-      defaultModel: value.defaultModel.trim(),
-      availableModels: splitCsv(value.availableModels),
-      // Backend expects an authConfig object; the form only collects an
-      // API key, which is the only auth secret the supported providers
-      // need today. Wrap it as { api_key: <value> }. Trim it — a pasted key
-      // with trailing whitespace/newline must not be sent verbatim.
-      authConfig: { api_key: value.apiKey.trim() },
-      // `isDefault` is not surfaced in the form. Always send false;
-      // backend defaults to non-default and the user manages default-ness
-      // (if ever needed) outside this create/edit flow.
-      isDefault: false,
-    };
+    const payload = buildPayload(value);
 
     if (props.mode === "edit" && props.row) {
       await onlineEvalsService.providers.update(props.orgId, props.row.id, payload);
@@ -322,6 +337,30 @@ async function save(value: ProviderForm) {
     emit("saved");
   } catch (err: any) {
     showError(err, t("onlineEvals.provider.saveError"));
+  }
+}
+
+const testState = ref<"idle" | "running" | "passed" | "failed">("idle");
+const testMessage = ref<string | null>(null);
+
+// The backend validates test settings independently of the save form.
+async function testConnection() {
+  if (!props.orgId) return;
+  testState.value = "running";
+  testMessage.value = null;
+  const value = formValues.value;
+  try {
+    const message = await onlineEvalsService.providers.testConfig(
+      props.orgId,
+      buildPayload(value),
+      props.mode === "edit" ? props.row?.id : undefined,
+    );
+    testState.value = "passed";
+    testMessage.value = raw(message);
+  } catch (err: any) {
+    testState.value = "failed";
+    testMessage.value =
+      raw(err?.response?.data?.message || err?.message) || t("onlineEvals.provider.testError");
   }
 }
 </script>

@@ -8,6 +8,7 @@ import { rangesFromServerError } from "@/utils/query/sqlDiagnostics";
 import CronExpressionParser from "cron-parser";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { isUnaryOperator } from "@/utils/alerts/conditionsFormatter";
 import type { I18nText } from "@/types/i18n";
 
 /**
@@ -167,14 +168,18 @@ export function validateAlert(alert: Alert, context?: AlertValidationContext): V
             } else {
               // Validate each condition item
               alert.query_condition.conditions.items.forEach((item, index) => {
-                if (!item.column || !item.operator || item.value === undefined) {
+                if (
+                  !item.column ||
+                  !item.operator ||
+                  (item.value === undefined && !isUnaryOperator(item.operator))
+                ) {
                   result.errors.push(
                     t("alerts.validation.conditionItemIncomplete", { index: index + 1 }),
                   );
                 }
 
                 const validOperators = ["=", ">", "<", ">=", "<=", "Contains", "NotContains"];
-                if (!validOperators.includes(item.operator)) {
+                if (!validOperators.includes(item.operator) && !isUnaryOperator(item.operator)) {
                   result.errors.push(
                     t("alerts.validation.invalidOperatorInConditionItem", {
                       operator: item.operator,
@@ -193,14 +198,21 @@ export function validateAlert(alert: Alert, context?: AlertValidationContext): V
               result.errors.push(t("alerts.validation.conditionsOrAndArray"));
             } else {
               conditions.forEach((condition, index) => {
-                if (!condition.column || !condition.operator || condition.value === undefined) {
+                if (
+                  !condition.column ||
+                  !condition.operator ||
+                  (condition.value === undefined && !isUnaryOperator(condition.operator))
+                ) {
                   result.errors.push(
                     t("alerts.validation.conditionIncomplete", { index: index + 1 }),
                   );
                 }
 
                 const validOperators = ["=", ">", "<", ">=", "<=", "Contains", "NotContains"];
-                if (!validOperators.includes(condition.operator)) {
+                if (
+                  !validOperators.includes(condition.operator) &&
+                  !isUnaryOperator(condition.operator)
+                ) {
                   result.errors.push(
                     t("alerts.validation.invalidOperatorInCondition", {
                       operator: condition.operator,

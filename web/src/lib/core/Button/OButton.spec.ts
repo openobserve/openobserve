@@ -258,11 +258,14 @@ describe("OButton", () => {
     expect(wrapper.classes()).not.toContain("transition-colors");
   });
 
-  it("applies unified focus glow (ring-[0.125rem]! ring-accent/25!) as base", () => {
+  it("applies the unified focus ring at full opacity, never a translucent accent", () => {
     const wrapper = mount(OButton);
     const classes = wrapper.classes().join(" ");
     expect(classes).toContain("focus-visible:ring-[0.125rem]!");
-    expect(classes).toContain("focus-visible:ring-accent/25!");
+    expect(classes).toContain("focus-visible:ring-focus-ring-accent!");
+    // accent/25 measured 1.38:1 light and 1.50:1 dark against the 3:1 SC 1.4.11 floor;
+    // an alpha here is a contrast regression, not a styling preference.
+    expect(classes).not.toContain("focus-visible:ring-accent/25!");
   });
 
   it("retains outline-none as part of base classes", () => {
@@ -284,6 +287,25 @@ describe("OButton", () => {
   it("applies focus-visible:ring-3 on every styled variant", () => {
     const wrapper = mount(OButton, { props: { variant: "destructive" } });
     expect(wrapper.classes().join(" ")).toContain("focus-visible:ring-3");
+  });
+
+  // --- Loading ---
+
+  // Regression: a child-mode OTooltip mounted mid-query anchored to an inline-flex wrapper that lost its box once loading ended, opening at (0,0)
+  it("keeps the slot wrapper display:contents while loading and only hides it", () => {
+    const wrapper = mount(OButton, { props: { loading: true }, slots: { default: "Save" } });
+    const content = wrapper.find("span.contents");
+    expect(content.exists()).toBe(true);
+    expect(content.classes()).toContain("invisible");
+    expect(content.classes()).not.toContain("inline-flex");
+    expect(content.attributes("style")).toBeUndefined();
+  });
+
+  it("does not hide the slot wrapper when not loading", () => {
+    const wrapper = mount(OButton, { slots: { default: "Save" } });
+    const content = wrapper.find("span.contents");
+    expect(content.exists()).toBe(true);
+    expect(content.classes()).not.toContain("invisible");
   });
 
   // --- data attributes ---

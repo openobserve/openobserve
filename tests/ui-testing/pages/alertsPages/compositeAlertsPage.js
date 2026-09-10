@@ -34,7 +34,124 @@ export class CompositeAlertsPage {
       referenceChip: '[data-test="alerts-composite-reference-chip"]',
       referenceConflict: '[data-test="alerts-composite-reference-conflict"]',
       referenceParent: (id) => `[data-test="alerts-composite-reference-parent-${id}"]`,
+      referenceClose: '[data-test="alerts-composite-reference-close"]',
     };
+  }
+
+  listCompositeTab() {
+    return this.page.locator(this.locators.listCompositeTab);
+  }
+
+  listBadge(id) {
+    return this.page.locator(this.locators.listBadge(id));
+  }
+
+  listChildCount(id) {
+    return this.page.locator(this.locators.listChildCount(id));
+  }
+
+  listReferenceCount(id) {
+    return this.page.locator(this.locators.listReferenceCount(id));
+  }
+
+  childNameCell(name) {
+    return this.page.getByText(name, { exact: false });
+  }
+
+  expressionSummary() {
+    return this.page.locator(this.locators.expressionSummary);
+  }
+
+  advancedExpression() {
+    return this.page.locator(this.locators.advancedExpression);
+  }
+
+  childSearch() {
+    return this.page.locator(this.locators.childSearch);
+  }
+
+  childOption(id) {
+    return this.page.locator(this.locators.childOption(id));
+  }
+
+  childCap() {
+    return this.page.locator(this.locators.childCap);
+  }
+
+  expressionUnused() {
+    return this.page.locator(this.locators.expressionUnused);
+  }
+
+  save() {
+    return this.page.locator(this.locators.save);
+  }
+
+  detailResult() {
+    return this.page.locator(this.locators.detailResult);
+  }
+
+  detailExpression() {
+    return this.page.locator(this.locators.detailExpression);
+  }
+
+  detailChildren() {
+    return this.page.locator(this.locators.detailChildren);
+  }
+
+  detailChild(id) {
+    return this.page.locator(this.locators.detailChild(id));
+  }
+
+  missingJob() {
+    return this.page.locator(this.locators.missingJob);
+  }
+
+  referenceChip() {
+    return this.page.locator(this.locators.referenceChip);
+  }
+
+  referenceParent(id) {
+    return this.page.locator(this.locators.referenceParent(id));
+  }
+
+  referenceClose() {
+    return this.page.locator(this.locators.referenceClose);
+  }
+
+  referenceConflict() {
+    return this.page.locator(this.locators.referenceConflict);
+  }
+
+  expressionAnd() {
+    return this.page.locator(this.locators.expressionAnd);
+  }
+
+  expressionOr() {
+    return this.page.locator(this.locators.expressionOr);
+  }
+
+  expressionNot() {
+    return this.page.locator(this.locators.expressionNot);
+  }
+
+  expressionOpenGroup() {
+    return this.page.locator(this.locators.expressionOpenGroup);
+  }
+
+  expressionCloseGroup() {
+    return this.page.locator(this.locators.expressionCloseGroup);
+  }
+
+  previewResult() {
+    return this.page.locator(this.locators.previewResult);
+  }
+
+  renamedChildText(text) {
+    return this.page.getByText(text);
+  }
+
+  bodyHasNoHorizontalOverflow() {
+    return this.page.locator('body').evaluate((body) => body.scrollWidth <= body.clientWidth);
   }
 
   async openCreate() {

@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTooltip :content="t('panel.add')" shortcut-id="dashboardAddPanel" />
           </OButton>
           <!-- <DateTimePicker 
-            class="ml-2"
+            class="ms-2"
             ref="refDateTime"
             v-model="selectedDate"
             /> -->
@@ -322,6 +322,7 @@ import { useRouter } from "vue-router";
 import { getDashboard, movePanelToAnotherTab, getFoldersList } from "../../utils/commons.ts";
 import { parseDuration, generateDurationLabel, getConsumableRelativeTime } from "../../utils/date";
 import { useRoute } from "vue-router";
+import { useListBackNavigation } from "@/composables/useListBackNavigation";
 import { deletePanel } from "../../utils/commons";
 import {
   getPanelTimeFromURL,
@@ -1026,25 +1027,23 @@ export default defineComponent({
     watch(
       () => route.query,
       (newQuery, oldQuery) => {
-        // CRITICAL FIX: Only recompute if relevant params changed
-        // Skip if only panel time params (pt-*) changed - those are handled separately
-        // Check if global time params (period, from, to) or other params changed
+        // Union of old+new keys so removed params (e.g. cell_* on drawer close) count too.
+        const changedKeys = new Set(
+          [...Object.keys(newQuery), ...Object.keys(oldQuery ?? {})].filter(
+            (key) => newQuery[key] !== oldQuery?.[key],
+          ),
+        );
+
         const globalTimeParamsChanged =
-          newQuery.period !== oldQuery.period ||
-          newQuery.from !== oldQuery.from ||
-          newQuery.to !== oldQuery.to;
+          changedKeys.has("period") || changedKeys.has("from") || changedKeys.has("to");
 
-        // Check if only panel time params changed
-        const onlyPanelParamsChanged =
-          Object.keys(newQuery).some(
-            (key) => key.startsWith("pt-") && newQuery[key] !== oldQuery?.[key],
-          ) && !globalTimeParamsChanged;
+        // pt-* (panel time) and cell_* (drawer) never affect panel times — don't refresh.
+        const onlyIgnorableParamsChanged =
+          changedKeys.size > 0 &&
+          [...changedKeys].every((key) => key.startsWith("pt-") || key.startsWith("cell_")) &&
+          !globalTimeParamsChanged;
 
-        // If only panel params changed, don't recompute (panel refresh handles it)
-        // If global time or other params changed, recompute all panel times
-        if (!onlyPanelParamsChanged) {
-          // Re-compute panel times when URL changes (e.g., panel time params updated)
-          // Use forceRefresh=false to preserve existing time references where possible
+        if (!onlyIgnorableParamsChanged) {
           computeAllPanelTimes();
         }
       },
@@ -1191,36 +1190,17 @@ export default defineComponent({
 
     // [END] date picker related variables
 
-    // back button → the dashboards list the user actually came from.
-    //
-    // Prefer real history: a dashboard opened from the Favorites pseudo-folder
-    // carries the folder it *lives in* in the URL, so rebuilding the list route
-    // from route.query.folder would drop the user into that folder instead of
-    // Favorites. Going back restores whichever list view they left.
-    //
-    // Only honour history when the previous entry is the dashboards list itself
-    // (deep links have no previous entry; arriving via add_panel or another
-    // module would send the "Dashboards" button somewhere it doesn't name), and
-    // fall back to the folder-scoped push otherwise. In-view URL syncs use
-    // router.replace, so tab/time-range changes never bury the list entry.
-    const goBackToDashboardList = () => {
-      const back = (router.options?.history?.state as any)?.back;
-      if (typeof back === "string") {
-        // endsWith rather than === so a deployment served under a base path
-        // (getPath() can be "/web/") still matches if the base ever leaks in.
-        const path = back.split(/[?#]/)[0].replace(/\/$/, "");
-        if (path === "/dashboards" || path.endsWith("/dashboards")) {
-          return router.back();
-        }
-      }
-      return router.push({
+    // Fallback-only: a dashboard opened from the Favorites pseudo-folder carries the folder it lives in, so rebuilding from route.query.folder here (rather than Favorites) is only reached when there's no real history to go back to.
+    const goBackToDashboardList = useListBackNavigation({
+      isListPath: (path) => path === "/dashboards" || path.endsWith("/dashboards"),
+      fallback: () => ({
         path: "/dashboards",
         query: {
           folder: route.query.folder ?? "default",
           org_identifier: store.state.selectedOrganization.identifier,
         },
-      });
-    };
+      }),
+    });
 
     //add panel
     const addPanelData = () => {

@@ -52,7 +52,7 @@ import { validateExpression } from "./composite/expression";
 /** Unsupported characters in an alert name. Requiredness = min 1 AND this regex. */
 export const ALERT_NAME_UNSUPPORTED_CHARS = /[:#?\s'"%&]+/;
 
-const isBlank = (v: unknown): boolean =>
+export const isBlank = (v: unknown): boolean =>
   v === undefined || v === null || (typeof v === "string" && v.trim() === "");
 
 // Step-B field schemas (Advanced / Deduplication / CompareWithPast wizard step
@@ -201,6 +201,22 @@ export const makeAddAlertSchema = (
             code: z.ZodIssueCode.custom,
             path: ["trigger_condition", "silence"],
             message: t("alerts.validation.silenceNonNegative"),
+          });
+        }
+        // Pending period is optional (blank = 0 = fire immediately), so unlike
+        // silence a blank value is NOT an error — only an explicit negative is.
+        // AlertSettings.vue owns the field for composite too, but this branch
+        // returns before reaching createAlertSettingsSchema below, so the rule
+        // is duplicated here (same message/path convention as makePendingPeriodSchema).
+        const pendingPeriod = val._ui?.pendingPeriod;
+        if (
+          !isBlank(pendingPeriod) &&
+          (Number.isNaN(Number(pendingPeriod)) || Number(pendingPeriod) < 0)
+        ) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["_ui", "pendingPeriod"],
+            message: t("alerts.validation.pendingPeriodNonNegative"),
           });
         }
         if (

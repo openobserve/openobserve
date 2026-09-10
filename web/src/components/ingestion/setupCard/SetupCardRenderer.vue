@@ -66,6 +66,8 @@ const props = defineProps<{
   logoUrl?: string;
   /** Optional dark-mode logo URL (manifest) — overrides the content dark logo. */
   logoUrlDark?: string;
+  /** Drop the hero — for a host page whose own header already names the card. */
+  hideHero?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -81,7 +83,7 @@ const { isDark } = useTheme();
 // The detected stream type drives the status copy + the "View …" destination.
 // traces / logs land in their explorers; metrics (which fan out into many
 // per-metric streams) link to the Streams page where those streams appear.
-const streamKind = computed(() => props.content.detect.streamType);
+const streamKind = computed(() => props.content.detect?.streamType);
 const isLogsStream = computed(() => streamKind.value === "logs");
 const isMetricsStream = computed(() => streamKind.value === "metrics");
 // Status-bar copy that names the data ("Checking for metrics…" / "No spans
@@ -142,13 +144,15 @@ const viewDataIcon = computed(() =>
 // detection filter is a SQL WHERE fragment — passed base64-encoded as the
 // search-bar query, matching how the rest of the app deep-links into search.
 const viewData = async () => {
+  const detectCfg = props.content.detect;
+  if (!detectCfg) return;
   // The destination Logs/Traces view reads its stream list from the cached
   // streams store. A stream this integration just created won't be in that
   // cache yet, so the deep-link can't select it. Force-refresh this stream type
   // first so the new stream is present before we navigate. Best-effort — if the
   // refetch fails we still navigate (the view runs its own fetch on load).
   try {
-    await getStreams(props.content.detect.streamType, false, false, true);
+    await getStreams(detectCfg.streamType, false, false, true);
   } catch {
     // ignore — navigate anyway
   }
@@ -166,7 +170,7 @@ const viewData = async () => {
     stream: watchedStream.value,
     period: "15m",
     refresh: "0",
-    query: b64EncodeUnicode(props.content.detect.filter) ?? "",
+    query: b64EncodeUnicode(detectCfg.filter) ?? "",
   };
   if (isLogsStream.value) {
     query.stream_type = "logs";
@@ -207,7 +211,7 @@ const streamNameError = computed(() =>
 const watchedStream = computed(() =>
   props.content.streamInput
     ? streamName.value.trim() || props.content.streamInput.default || "default"
-    : props.content.detect.streamName || "default",
+    : props.content.detect?.streamName || "default",
 );
 // ── free-form inputs (optional) ──────────────────────────────────────────────
 // Steps can declare `inputs` (e.g. SQL Server host/port on the configure step).
@@ -235,12 +239,12 @@ const subStream = (text?: string): string | undefined => {
 const detect = useStreamDetect({
   config: () => ({
     orgId: props.subs.org,
-    streamType: props.content.detect.streamType,
+    streamType: props.content.detect?.streamType ?? "logs",
     streamName: watchedStream.value,
     // Forward the match mode — without it, keyword detection (metrics, which fan
     // out into sqlserver_* streams) falls back to exact match and never connects.
-    match: props.content.detect.match,
-    filter: props.content.detect.filter,
+    match: props.content.detect?.match,
+    filter: props.content.detect?.filter ?? "",
   }),
   onConnect: () => fireConfetti(),
 });
@@ -315,6 +319,7 @@ const copied = ref<Record<string, boolean>>({});
 // itself is the completion signal.
 const actioned = ref<Record<string, boolean>>({});
 const isStepDone = (step: RichCardStep) => {
+  if (step.done !== undefined) return step.done;
   if (step.completeOn === "copy") return !!copied.value[step.id];
   if (step.completeOn === "action") return !!actioned.value[step.id];
   return detected.value;
@@ -501,7 +506,7 @@ function fireConfetti() {
   <div class="dirC-demo" :class="{ dark: isDark }" data-test="ai-rich-setup-card">
     <div class="dirC">
       <!-- Hero -->
-      <div class="c-hero">
+      <div v-if="!hideHero" class="c-hero">
         <div class="c-hero-head">
           <span class="ds-mono xl text-white" :class="{ logo: logoSrc }">
             <img
@@ -645,6 +650,16 @@ function fireConfetti() {
               </OToggleGroup>
             </div>
 
+            <!-- Page-supplied controls that CHOOSE this step's code (a client
+                 picker, an install shortcut) — above the block they drive. -->
+            <div
+              v-if="$slots[`step-${step.id}-controls`]"
+              class="step-slot"
+              :data-test="`ai-step-controls-${step.id}`"
+            >
+              <slot :name="`step-${step.id}-controls`" :step="step" />
+            </div>
+
             <OCodeBlock
               v-if="displayCode(step)"
               :lang="displayCode(step)?.lang"
@@ -652,7 +667,7 @@ function fireConfetti() {
               :filename="displayCode(step)?.filename"
               :code="subStream(displayCode(step)?.raw) || ''"
               :code-masked="subStream(displayCode(step)?.masked)"
-              data-test="ai-code"
+              :data-test="displayCode(step)?.dataTest ?? 'ai-code'"
               :reveal-tooltip="t('ingestion.setupCard.revealToken')"
               :hide-tooltip="t('ingestion.setupCard.hideToken')"
               @copy="onStepCopy(step, i)"
@@ -727,7 +742,7 @@ function fireConfetti() {
                   >{{ connectedHeadline
                   }}<span class="sb-sub"
                     >{{ t(countUnitKey, { count: detect.count.value }, detect.count.value)
-                    }}<template v-if="content.detect.modelLabel">
+                    }}<template v-if="content.detect?.modelLabel">
                       · {{ content.detect.modelLabel }}</template
                     ></span
                   ></span
@@ -946,7 +961,7 @@ function fireConfetti() {
             >{{ l.label }} {{ t("ingestion.setupCard.arrow") }}</a
           >
         </template>
-        <span v-if="content.slackUrl" class="ml-auto"
+        <span v-if="content.slackUrl" class="ms-auto"
           >{{ t("ingestion.setupCard.stuck") }}
           <a :href="safeHttpUrl(content.slackUrl)" target="_blank" rel="noopener noreferrer">{{
             t("ingestion.setupCard.askOnSlack")

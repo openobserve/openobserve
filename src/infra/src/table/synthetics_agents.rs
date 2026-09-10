@@ -29,12 +29,9 @@ use sea_orm::{
     ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Set, sea_query::Expr,
 };
 
-use super::{
-    entity::synthetics_agents::{ActiveModel, Column, Entity, Model},
-    get_lock,
-};
+use super::entity::synthetics_agents::{ActiveModel, Column, Entity, Model};
 use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{get_orm_client_ro, get_orm_client_rw},
     errors::{self, DbError, Error},
 };
 
@@ -103,8 +100,7 @@ async fn invalidate_and_publish(agent_id: &str) {
 /// Insert an agent row, or refresh version/capabilities/last_seen_at when the
 /// id already exists (idempotent re-register after restart).
 pub async fn register(record: &SyntheticsAgentRecord) -> Result<(), errors::Error> {
-    let _lock = get_lock().await;
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let existing = Entity::find_by_id(&record.id)
         .one(client)
         .await
@@ -143,11 +139,6 @@ pub async fn register(record: &SyntheticsAgentRecord) -> Result<(), errors::Erro
                 .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
         }
     }
-    // Release the SQLite write mutex BEFORE emitting. On a sqlite meta_store
-    // the coordinator's put() takes the *same* CLIENT_RW lock `get_lock()`
-    // returns, so emitting while holding it deadlocks the process — and the
-    // mutex is then held forever, hanging every later synthetics query.
-    drop(_lock);
     // Register is where capabilities change, so the cached copy is now stale.
     invalidate_and_publish(&record.id).await;
     Ok(())
@@ -159,8 +150,7 @@ pub async fn register(record: &SyntheticsAgentRecord) -> Result<(), errors::Erro
 /// lease, which is exactly the rate of the reads the cache serves. Callers that
 /// need a current `last_seen_at` use [`get`], not [`get_cached`].
 pub async fn touch(agent_id: &str, now_us: i64) -> Result<(), errors::Error> {
-    let _lock = get_lock().await;
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::update_many()
         .col_expr(Column::LastSeenAt, Expr::value(now_us))
         .filter(Column::Id.eq(agent_id))
@@ -174,7 +164,7 @@ pub async fn touch(agent_id: &str, now_us: i64) -> Result<(), errors::Error> {
 pub async fn list_by_location(
     location_id: &str,
 ) -> Result<Vec<SyntheticsAgentRecord>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let rows = Entity::find()
         .filter(Column::LocationId.eq(location_id))
         .order_by_desc(Column::LastSeenAt)
@@ -197,7 +187,7 @@ pub async fn list_by_locations(
     if location_ids.is_empty() {
         return Ok(std::collections::HashMap::new());
     }
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let rows = Entity::find()
         .filter(Column::LocationId.is_in(location_ids.to_vec()))
         .order_by_desc(Column::LastSeenAt)
@@ -226,7 +216,7 @@ pub async fn find_by_identity(
     location_id: &str,
     name: &str,
 ) -> Result<Option<SyntheticsAgentRecord>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let row = Entity::find()
         .filter(Column::OrgId.eq(org_id))
         .filter(Column::LocationId.eq(location_id))
@@ -245,7 +235,7 @@ pub async fn find_by_identity(
 pub async fn count_by_token(
     org_id: &str,
 ) -> Result<std::collections::HashMap<String, i64>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let rows: Vec<Option<String>> = Entity::find()
         .filter(Column::OrgId.eq(org_id))
         .select_only()
@@ -279,7 +269,7 @@ pub async fn get_cached(agent_id: &str) -> Result<Option<SyntheticsAgentRecord>,
 
 /// Reads an agent straight from the database, `last_seen_at` included.
 pub async fn get(agent_id: &str) -> Result<Option<SyntheticsAgentRecord>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let row = Entity::find_by_id(agent_id)
         .one(client)
         .await

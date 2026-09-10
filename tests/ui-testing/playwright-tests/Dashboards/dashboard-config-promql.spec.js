@@ -83,15 +83,19 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await expect(aggregationDropdown).toBeVisible();
 
     // Change aggregation to Max — full option label is "Max (maximum value)"
-    await aggregationDropdown.click();
-    await pm.dashboardPanelConfigs.getAggregationOption("Max (maximum value)").click();
+    await pm.dashboardPanelConfigs.selectConfigOption(
+      "dashboard-config-aggregation",
+      "Max (maximum value)"
+    );
     await pm.dashboardPanelActions.applyDashboardBtn();
     testLogger.info("Aggregation set to Max");
     await pm.dashboardPanelActions.waitForChartToRender().catch((e) => testLogger.warn("waitForChartToRender:", e.message));
 
     // Change aggregation to Avg — full option label is "Avg (average)"
-    await aggregationDropdown.click();
-    await pm.dashboardPanelConfigs.getAggregationOption("Avg (average)").click();
+    await pm.dashboardPanelConfigs.selectConfigOption(
+      "dashboard-config-aggregation",
+      "Avg (average)"
+    );
     await pm.dashboardPanelActions.applyDashboardBtn();
     testLogger.info("Aggregation set to Avg");
     await pm.dashboardPanelActions.waitForChartToRender().catch((e) => testLogger.warn("waitForChartToRender:", e.message));
@@ -115,19 +119,19 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await expect(tableModeDropdown).toBeVisible();
 
     // Switch to "Expanded Time series"
-    await pm.dashboardPanelConfigs.promqlTableModeTrigger.click();
-    const expandedOption = pm.dashboardPanelConfigs.getPromqlTableModeOption("Expanded Time series");
-    await expandedOption.waitFor({ state: "visible" });
-    await expandedOption.click();
+    await pm.dashboardPanelConfigs.selectConfigOption(
+      "dashboard-config-promql-table-mode",
+      "Expanded Time series"
+    );
     await pm.dashboardPanelActions.applyDashboardBtn();
     testLogger.info("PromQL table mode set to Expanded Time series");
     await pm.dashboardPanelActions.waitForChartToRender().catch((e) => testLogger.warn("waitForChartToRender:", e.message));
 
     // Switch to "Aggregate"
-    await pm.dashboardPanelConfigs.promqlTableModeTrigger.click();
-    const aggregateOption = pm.dashboardPanelConfigs.getPromqlTableModeOption("Aggregate");
-    await aggregateOption.waitFor({ state: "visible" });
-    await aggregateOption.click();
+    await pm.dashboardPanelConfigs.selectConfigOption(
+      "dashboard-config-promql-table-mode",
+      "Aggregate"
+    );
     await pm.dashboardPanelActions.applyDashboardBtn();
     testLogger.info("PromQL table mode set to Aggregate");
     await pm.dashboardPanelActions.waitForChartToRender().catch((e) => testLogger.warn("waitForChartToRender:", e.message));
@@ -151,18 +155,18 @@ test.describe("ConfigPanel — PromQL Settings", () => {
 
     // Sticky first column only appears when promql_table_mode is 'all' or 'expanded_timeseries'
     // Switch to "Aggregate" mode first to reveal the sticky column controls
-    const tableModeDropdown = pm.dashboardPanelConfigs.promqlTableMode;
-    await pm.dashboardPanelConfigs.scrollSidebarToElement(tableModeDropdown);
-    await tableModeDropdown.click();
-    await pm.dashboardPanelConfigs.getPromqlTableModeOption("Aggregate").click();
+    await pm.dashboardPanelConfigs.selectConfigOption(
+      "dashboard-config-promql-table-mode",
+      "Aggregate"
+    );
     testLogger.info("Table mode set to Aggregate — sticky column controls now visible");
 
     const stickyFirstCol = pm.dashboardPanelConfigs.stickyFirstColumn;
     await pm.dashboardPanelConfigs.scrollSidebarToElement(stickyFirstCol);
     await expect(stickyFirstCol).toBeVisible();
 
-    // Enable the toggle (click to turn on)
-    await stickyFirstCol.click();
+    // Enable the toggle, confirming it actually flipped before applying
+    await pm.dashboardPanelConfigs.setConfigToggle(stickyFirstCol, true);
     await pm.dashboardPanelActions.applyDashboardBtn();
     testLogger.info("Sticky first column enabled");
     await pm.dashboardPanelActions.waitForChartToRender().catch((e) => testLogger.warn("waitForChartToRender:", e.message));
@@ -170,10 +174,10 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying sticky first column toggle persists after save");
     await reopenPanelConfig(page, pm);
-    const toggle = pm.dashboardPanelConfigs.stickyFirstColumn;
-    await pm.dashboardPanelConfigs.scrollSidebarToElement(toggle);
-    const ariaChecked = await toggle.locator('[data-test$="-btn"]').getAttribute("aria-checked");
-    expect(ariaChecked).toBe("true");
+    await pm.dashboardPanelConfigs.expectConfigToggle(
+      pm.dashboardPanelConfigs.stickyFirstColumn,
+      true
+    );
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });
@@ -189,7 +193,7 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await expect(connectNullToggle).toBeVisible();
 
     // Enable connect null values
-    await connectNullToggle.click();
+    await pm.dashboardPanelConfigs.setConfigToggle(connectNullToggle, true);
     await pm.dashboardPanelActions.applyDashboardBtn();
     testLogger.info("Connect null values enabled");
     await pm.dashboardPanelActions.waitForChartToRender().catch((e) => testLogger.warn("waitForChartToRender:", e.message));
@@ -197,10 +201,10 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying connect null values persists after save");
     await reopenPanelConfig(page, pm);
-    const toggleAfter = pm.dashboardPanelConfigs.connectNullValuesToggle;
-    await pm.dashboardPanelConfigs.scrollSidebarToElement(toggleAfter);
-    const ariaChecked = await toggleAfter.locator('[data-test$="-btn"]').getAttribute("aria-checked");
-    expect(ariaChecked).toBe("true");
+    await pm.dashboardPanelConfigs.expectConfigToggle(
+      pm.dashboardPanelConfigs.connectNullValuesToggle,
+      true
+    );
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });
@@ -215,7 +219,7 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await pm.dashboardPanelConfigs.scrollSidebarToElement(wrapToggle);
     await expect(wrapToggle).toBeVisible();
 
-    await wrapToggle.click();
+    await pm.dashboardPanelConfigs.setConfigToggle(wrapToggle, true);
     await pm.dashboardPanelActions.applyDashboardBtn();
     testLogger.info("Wrap table cells enabled");
     await pm.dashboardPanelActions.waitForChartToRender().catch((e) => testLogger.warn("waitForChartToRender:", e.message));
@@ -223,10 +227,10 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying wrap table cells persists after save");
     await reopenPanelConfig(page, pm);
-    const toggleAfter = pm.dashboardPanelConfigs.wrapcell;
-    await pm.dashboardPanelConfigs.scrollSidebarToElement(toggleAfter);
-    const ariaChecked = await toggleAfter.locator('[data-test$="-btn"]').getAttribute("aria-checked");
-    expect(ariaChecked).toBe("true");
+    await pm.dashboardPanelConfigs.expectConfigToggle(
+      pm.dashboardPanelConfigs.wrapcell,
+      true
+    );
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });
@@ -240,32 +244,29 @@ test.describe("ConfigPanel — PromQL Settings", () => {
    * Extracted to avoid repeating the same 4 steps in every Aggregate test.
    */
   async function switchToAggregateMode(page, pm) {
-    const tableModeDropdown = pm.dashboardPanelConfigs.promqlTableMode;
-    await pm.dashboardPanelConfigs.scrollSidebarToElement(tableModeDropdown);
-    // Skip the switch if already in Aggregate mode — re-clicking the trigger then
-    // the same option adds unnecessary UI interactions that increase flakiness risk.
-    const triggerText = await pm.dashboardPanelConfigs.promqlTableModeTrigger.textContent();
-    if (triggerText && triggerText.includes('Aggregate')) {
+    const trigger = pm.dashboardPanelConfigs.promqlTableModeTrigger;
+    await pm.dashboardPanelConfigs.scrollSidebarToElement(trigger);
+
+    // Skip the switch if already in Aggregate mode — re-selecting is harmless but
+    // adds UI churn. Read the OSelect trigger's own `data-test-selected-label`
+    // rather than its textContent: textContent also carries the field's label and
+    // placeholder, so a substring match there can report the wrong mode.
+    if ((await trigger.getAttribute("data-test-selected-label")) === "Aggregate") {
       testLogger.info("Table mode already in Aggregate — skipping switch");
       return;
     }
-    await pm.dashboardPanelConfigs.promqlTableModeTrigger.click();
-    // Use atomic waitForFunction click — virtualised list items can detach between
-    // waitFor({state:'visible'}) and click(), causing intermittent "element detached" errors.
-    await page.waitForFunction(
-      () => {
-        const el = document.querySelector(
-          '[data-test="dashboard-config-promql-table-mode-option"][data-test-label="Aggregate"]'
-        );
-        if (!el) return false;
-        el.click();
-        return true;
-      },
-      { timeout: 15000 }
+
+    // selectConfigOption drives the trigger <button> (where `disabled` lives),
+    // proves the popover opened, and retries the whole open→click as a unit — which
+    // covers the virtualised option detaching between waitFor and click, the case
+    // the previous hand-rolled waitForFunction click was working around.
+    await pm.dashboardPanelConfigs.selectConfigOption(
+      "dashboard-config-promql-table-mode",
+      "Aggregate"
     );
-    // Wait for the dropdown to close before returning so callers can immediately
-    // interact with Aggregate-mode-specific fields.
-    await pm.dashboardPanelConfigs.getPromqlTableModeOption("Aggregate").waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+    await expect(trigger).toHaveAttribute("data-test-selected-label", "Aggregate", {
+      timeout: 10000,
+    });
     testLogger.info("Table mode switched to Aggregate");
   }
 
@@ -432,8 +433,7 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     testLogger.info("Sticky columns is initially enabled");
 
     // Enable sticky_first_column — sticky columns select should become disabled
-    await pm.dashboardPanelConfigs.scrollSidebarToElement(stickyFirstColToggle);
-    await stickyFirstColToggle.click();
+    await pm.dashboardPanelConfigs.setConfigToggle(stickyFirstColToggle, true);
     testLogger.info("Sticky first column toggle enabled");
 
     await pm.dashboardPanelConfigs.scrollSidebarToElement(stickyColsInput);
@@ -441,8 +441,7 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     testLogger.info("Sticky columns input is disabled");
 
     // Disable sticky_first_column — sticky columns select should be enabled again
-    await pm.dashboardPanelConfigs.scrollSidebarToElement(stickyFirstColToggle);
-    await stickyFirstColToggle.click();
+    await pm.dashboardPanelConfigs.setConfigToggle(stickyFirstColToggle, false);
     testLogger.info("Sticky first column toggle disabled");
 
     await pm.dashboardPanelConfigs.scrollSidebarToElement(stickyColsInput);
@@ -679,8 +678,10 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await expect(aggregationDropdown).toBeVisible();
     testLogger.info("Aggregation dropdown visible for donut chart");
 
-    await aggregationDropdown.click();
-    await pm.dashboardPanelConfigs.getAggregationOption("Min (minimum value)").click();
+    await pm.dashboardPanelConfigs.selectConfigOption(
+      "dashboard-config-aggregation",
+      "Min (minimum value)"
+    );
     await pm.dashboardPanelActions.applyDashboardBtn();
     testLogger.info("Aggregation set to Min on donut");
     await pm.dashboardPanelActions.waitForChartToRender().catch((e) => testLogger.warn("waitForChartToRender:", e.message));

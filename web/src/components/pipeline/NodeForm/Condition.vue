@@ -101,38 +101,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="text-status-warning-text mt-0.5 shrink-0"
                       />
                       <span>
-                        {{ t("pipeline.emptyValueGuideline") }}
-                        <span class="highlight text-text-link font-bold">{{ raw('""') }}</span
-                        >{{ t("pipeline.exampleColon") }}
-                        <span
-                          class="code rounded-default bg-code-bg text-code-text px-1 py-px font-mono"
-                          >{{ raw('app_name != ""') }}</span
-                        >
-                      </span>
-                    </div>
-                    <div class="flex items-start gap-2">
-                      <OIcon
-                        name="info"
-                        size="sm"
-                        class="text-status-warning-text mt-0.5 shrink-0"
-                      />
-                      <span>
-                        {{ t("pipeline.nullValueGuideline") }}
-                        <span class="highlight text-text-link font-bold">{{ raw("null") }}</span
-                        >{{ t("pipeline.exampleColon") }}
-                        <span
-                          class="code rounded-default bg-code-bg text-code-text px-1 py-px font-mono"
-                          >{{ raw("app_name != null") }}</span
-                        >
-                      </span>
-                    </div>
-                    <div class="flex items-start gap-2">
-                      <OIcon
-                        name="info"
-                        size="sm"
-                        class="text-status-warning-text mt-0.5 shrink-0"
-                      />
-                      <span>
                         {{ t("pipeline.customColumnGuideline") }}
                         <span class="highlight text-text-link font-bold">{{
                           t("pipeline.enterKey")

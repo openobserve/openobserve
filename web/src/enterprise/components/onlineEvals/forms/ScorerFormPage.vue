@@ -35,7 +35,7 @@
             data-test="scorer-form-identity-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
+              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
                 t("onlineEvals.scorer.identitySection")
               }}</span>
@@ -114,7 +114,7 @@
             data-test="scorer-form-judge-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
+              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
                 t("onlineEvals.scorer.judgeSection")
               }}</span>
@@ -150,7 +150,7 @@
                   <span class="bg-status-info-text h-2 w-2 shrink-0 rounded-full" />
                   <span class="text-text-secondary">
                     {{ t("onlineEvals.scorer.endpointLabel") }}
-                    <span class="font-mono">{{ providerEndpoint(selectedProvider) }}</span>
+                    <span class="font-mono">{{ resolvedEndpointOf(selectedProvider) || "—" }}</span>
                   </span>
                   <span class="text-text-secondary">·</span>
                   <span class="text-text-secondary">
@@ -289,7 +289,7 @@
                     @click="addExtraField"
                   >
                     {{ t("onlineEvals.scorer.extraFields.addButton") }}
-                    <span class="text-text-secondary ml-1 font-normal">
+                    <span class="text-text-secondary ms-1 font-normal">
                       ({{ formValues.extraMetadataFields.length }} / {{ MAX_EXTRA_FIELDS }})
                     </span>
                   </OButton>
@@ -315,7 +315,7 @@
             data-test="scorer-form-endpoint-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
+              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
                 t("onlineEvals.scorer.endpointSection")
               }}</span>
@@ -324,7 +324,7 @@
               <div>
                 <label class="text-text-heading mb-1 flex items-center text-xs font-semibold">
                   {{ t("onlineEvals.scorer.remoteUrlLabel") }}
-                  <span class="text-status-error-text ml-0.5">*</span>
+                  <span class="text-status-error-text ms-0.5">*</span>
                 </label>
                 <div class="scorer-url-bar grid grid-cols-[6.5rem_minmax(0,1fr)] gap-0">
                   <OFormSelect
@@ -385,7 +385,7 @@
             data-test="scorer-form-auth-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
+              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
                 t("onlineEvals.scorer.authSection")
               }}</span>
@@ -488,11 +488,11 @@
             data-test="scorer-form-headers-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
+              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
                 t("onlineEvals.scorer.headersSection")
               }}</span>
-              <span class="text-2xs text-text-secondary ml-auto italic">
+              <span class="text-2xs text-text-secondary ms-auto italic">
                 {{ t("onlineEvals.scorer.remoteHeaders.subtitle") }}
               </span>
             </div>
@@ -559,7 +559,7 @@
             data-test="scorer-form-body-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
+              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
                 t("onlineEvals.scorer.requestBodySection")
               }}</span>
@@ -690,7 +690,13 @@ import onlineEvalsService, {
   type Scorer,
   type ScorerType,
 } from "@/services/online-evals.service";
-import { dataTypeOf, defaultModelOf, entityId, valueOf } from "../utils/evalEntity";
+import {
+  dataTypeOf,
+  defaultModelOf,
+  entityId,
+  resolvedEndpointOf,
+  valueOf,
+} from "../utils/evalEntity";
 import { extractTemplateVariables, formatTemplateVariable, showError } from "../utils/evalFormat";
 import { useScorerTest } from "../composables/useScorerTest";
 import ScorerTestPanel from "./scorer/ScorerTestPanel.vue";
@@ -1222,17 +1228,6 @@ function initForm(row: Scorer | null, scorerType: ScorerType): ScorerForm {
     ...auth,
     customHeaders: readCustomHeaders(row.params?.custom_headers),
   };
-}
-
-function providerEndpoint(provider: Provider) {
-  return provider.endpoint || providerHostFallback(provider);
-}
-
-function providerHostFallback(provider: Provider) {
-  const type = String(valueOf(provider, "providerType", "provider_type") || "").toLowerCase();
-  if (type === "openai") return "api.openai.com";
-  if (type === "anthropic") return "api.anthropic.com";
-  return "—";
 }
 
 async function handleScoreConfigSelection() {

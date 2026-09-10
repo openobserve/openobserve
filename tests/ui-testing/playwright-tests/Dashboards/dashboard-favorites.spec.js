@@ -1,13 +1,21 @@
-import { test as base, expect } from "../baseFixtures.js";
+const {
+  test,
+  navigateToBase,
+} = require("../utils/enhanced-baseFixtures.js");
 import logData from "../../fixtures/log.json";
-import { login } from "./utils/dashLogin.js";
 import { waitForDashboardPage } from "./utils/dashCreation.js";
 import PageManager from "../../pages/page-manager";
 const testLogger = require("../utils/test-logger.js");
 
-export const test = base;
+// Cleanup is best-effort (a folder outlives a crashed run) and the alpha org is
+// shared, so a bare Date.now() can collide with a leftover and make the
+// cross-folder search ambiguous. Prefixes keep neither name a substring of the
+// other, which both the cross-folder search and the current-folder filter rely on.
+const uniqueName = (prefix) =>
+  `${prefix}_${Math.random().toString(36).slice(2, 8)}_${Date.now()}`;
 
-test.describe.configure({ mode: "parallel" });
+// Favorites live in ONE per-user, org-wide settings row that every worker rewrites wholesale, so parallel tests lose each other's updates.
+test.describe.configure({ mode: "serial" });
 
 // Favorites are a per-user setting surfaced through a `__favorites__`
 // pseudo-folder in the rail — not a real backend folder. These tests cover the
@@ -17,17 +25,20 @@ test.describe.configure({ mode: "parallel" });
 //   3. bulk-deleting from Favorites left a ghost row in the source folder
 //      (folder navigation is cache-first)
 test.describe("dashboard favorites testcases", () => {
-  // Each test seeds its own folder + dashboard so shards can run in parallel
-  // without contending over shared favorites state (favorites are per-user,
-  // and the suite logs in as the same user).
   let pm;
   let folderName;
   let dashboardName;
 
-  test.beforeEach(async ({ page }) => {
-    testLogger.debug("Test setup - beforeEach hook executing");
-    await login(page);
-    await page.waitForTimeout(1000);
+  test.beforeEach(async ({ page }, testInfo) => {
+    testLogger.testStart(testInfo.title, testInfo.file);
+
+    // Serial mode reuses these across tests, so a beforeEach that dies partway
+    // would otherwise leave afterEach cleaning up the PREVIOUS test's folder.
+    pm = undefined;
+    folderName = undefined;
+    dashboardName = undefined;
+
+    await navigateToBase(page);
     // No ingestion here: favorites tests never touch the ingested stream
     // (no panels/search involved), so seeding one is pure setup cost.
 
@@ -40,7 +51,7 @@ test.describe("dashboard favorites testcases", () => {
     await waitForDashboardPage(page);
 
     folderName = pm.dashboardFolder.generateUniqueFolderName("fav");
-    dashboardName = "Dash_" + Date.now();
+    dashboardName = uniqueName("Dash");
 
     await pm.dashboardFolder.createFolder(folderName);
     await pm.dashboardFolder.searchFolder(folderName);
@@ -82,6 +93,7 @@ test.describe("dashboard favorites testcases", () => {
     // ...but must not delete the dashboard itself.
     await pm.dashboardFolder.searchFolder(folderName);
     await pm.dashboardFolder.openFolderByName(folderName);
+    await pm.dashboardFavorites.waitForFavoritesViewExited();
     await pm.dashboardFavorites.searchDashboard(dashboardName);
     await pm.dashboardFavorites.verifyDashboardVisible(dashboardName);
     await pm.dashboardFavorites.verifyIsNotFavorite(dashboardName);
@@ -94,6 +106,11 @@ test.describe("dashboard favorites testcases", () => {
     // Favorites live in a user setting, not local component state.
     await page.reload();
     await waitForDashboardPage(page);
+
+    // The reloaded page only commits its landing folder once onMounted's
+    // folders/favorites fetches resolve; the row rendering is the observable
+    // proof that happened, and clicking the rail before it is discarded.
+    await pm.dashboardFavorites.verifyDashboardVisible(dashboardName);
 
     await pm.dashboardFavorites.openFavoritesFolder();
     await pm.dashboardFavorites.verifyDashboardVisible(dashboardName);
@@ -158,6 +175,7 @@ test.describe("dashboard favorites testcases", () => {
     // refetch and mask the stale-cache bug this test exists to catch.
     await pm.dashboardFolder.searchFolder(folderName);
     await pm.dashboardFolder.openFolderByName(folderName);
+    await pm.dashboardFavorites.waitForFavoritesViewExited();
     await pm.dashboardFavorites.verifyDashboardNotPresent(dashboardName);
   });
 
@@ -173,7 +191,7 @@ test.describe("dashboard favorites testcases", () => {
     // can prove the search reached past the favorites list. Named so neither
     // dashboard's name is a substring of the other, keeping both the
     // cross-folder search and the current-folder filter unambiguous.
-    const otherDashboardName = "DashB_" + Date.now();
+    const otherDashboardName = uniqueName("DashB");
     await pm.dashboardCreate.createDashboard(otherDashboardName);
     await pm.dashboardCreate.backToDashboardList();
     await waitForDashboardPage(page);
@@ -197,7 +215,7 @@ test.describe("dashboard favorites testcases", () => {
   test("should restore the favorites-only list after clearing a cross-folder search", async ({
     page,
   }) => {
-    const otherDashboardName = "DashB_" + Date.now();
+    const otherDashboardName = uniqueName("DashB");
     await pm.dashboardCreate.createDashboard(otherDashboardName);
     await pm.dashboardCreate.backToDashboardList();
     await waitForDashboardPage(page);
@@ -224,7 +242,7 @@ test.describe("dashboard favorites testcases", () => {
   test("should expose a clear button for a current-folder search and restore the full list", async ({
     page,
   }) => {
-    const otherDashboardName = "DashB_" + Date.now();
+    const otherDashboardName = uniqueName("DashB");
     await pm.dashboardCreate.createDashboard(otherDashboardName);
     await pm.dashboardCreate.backToDashboardList();
     await waitForDashboardPage(page);
@@ -244,7 +262,11 @@ test.describe("dashboard favorites testcases", () => {
     await pm.dashboardFavorites.verifyDashboardVisible(otherDashboardName);
   });
 
-  test.afterEach(async ({ page }) => {
+  test.afterEach(async () => {
+    // Setup may have failed before `pm` existed; without this the real
+    // beforeEach error is buried under a TypeError from this hook.
+    if (!pm || !folderName) return;
+
     // Un-favorite before deleting the folder. Deleting a folder does not
     // prune favorites for the dashboards inside it, so without this, tests
     // that favorite a dashboard but don't themselves delete it (add /

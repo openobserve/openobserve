@@ -84,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <div class="mb-1.5 flex items-center gap-1.5 px-1">
                 <OIcon name="location-on" size="sm" class="text-info" />
-                <span class="text-text-secondary text-2xs font-semibold tracking-wide uppercase">
+                <span class="text-text-secondary text-2xs font-semibold">
                   {{ t("alert_dependencies.sectionDestinations") }}
                 </span>
                 <OTag type="countChip" value="neutral">{{ chain.destinations.length }}</OTag>
@@ -139,7 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <div class="mb-1.5 flex items-center gap-1.5 px-1">
               <OIcon name="shield-alert-outline" size="sm" class="text-status-positive" />
-              <span class="text-text-secondary text-2xs font-semibold tracking-wide uppercase">
+              <span class="text-text-secondary text-2xs font-semibold">
                 {{ t("alert_dependencies.sectionAlerts") }}
               </span>
               <OTag type="countChip" value="neutral">{{ chain.alerts.length }}</OTag>

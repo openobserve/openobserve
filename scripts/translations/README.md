@@ -53,6 +53,7 @@ no API calls, needs no API key, and installs nothing, so it costs a few seconds.
 The list lives in `LANGUAGE_NAMES` in `translator.py` — that dict is the single
 source of truth for both the locale codes and the language names used in the prompt.
 
+- 🇸🇦 Arabic (ar-SA)
 - 🇹🇷 Turkish (tr-TR)
 - 🇨🇳 Simplified Chinese (zh-CN)
 - 🇹🇼 Traditional Chinese (zh-TW)
@@ -68,17 +69,21 @@ source of truth for both the locale codes and the language names used in the pro
 - 🇵🇱 Polish (pl-PL)
 - 🇻🇳 Vietnamese (vi-VN)
 
-RTL languages (Arabic, Persian) are deliberately excluded until the web app has
-`dir="rtl"` support — see the note in `translator.py`.
-
 ## How It Works
 
 1. **Source File**: All translations originate from `web/src/locales/languages/en-US.json`
 2. **Translation**: New/changed keys are translated by DeepSeek, in batches, with
    interpolation placeholders (`{count}`, `%s`, `@:linked.key`) and vue-i18n
    literal escapes (`{'{'}`, `{'@'}`) validated per string
-3. **Preservation**: Existing translations are never overwritten unless their English source changed
-4. **Nested Support**: Handles nested JSON structures correctly
+3. **Context**: every string is sent together with its i18n key path (so a bare
+   "Open" under `alerts.incidents.statusOpen` translates as a status, not a verb)
+   and the prompt carries the `TERMS` glossary (an "event" is a record, not a
+   party; a "stream" is a data stream, not a brook — plus per-locale pinned
+   renderings like zh-CN `event` → `事件`) and the locale's own established
+   module names mined from its `menu.*` translations (zh-CN: Alerts → 告警,
+   Pipelines → 流水线, Dashboards → 仪表盘)
+4. **Preservation**: Existing translations are never overwritten unless their English source changed
+5. **Nested Support**: Handles nested JSON structures correctly
 
 A translation is rejected (and retried on the next run) when it is empty, drops or
 adds an interpolation token, changes the `|` plural-form count, or is something
@@ -332,6 +337,7 @@ scripts/translations/
 
 web/src/locales/languages/
 ├── en-US.json           # Source file (English)
+├── ar-SA.json           # Arabic translations
 ├── tr-TR.json           # Turkish translations
 ├── zh-CN.json           # Chinese translations
 ├── fr-FR.json           # French translations
@@ -417,7 +423,7 @@ lose it, nothing breaks; the run simply re-bills those strings.
 ### Two PRs Conflict in the Generated Locale Files
 
 **Symptom:** two open PRs both changed `en-US.json`; the second to merge has conflicts
-in the 14 locale files and in `.translation_state.json`.
+in the 15 locale files and in `.translation_state.json`.
 
 This is inherent to generating in each PR rather than in one serialised bot PR. Both
 branches rewrote the same generated files. Generating at merge time rather than on
@@ -482,6 +488,12 @@ ModuleNotFoundError: No module named 'openai'
 - Review translations before merging PRs
 - Consider manual review for critical UI text
 - Native speakers should review translations
+- An ambiguous or unstable term belongs in the `TERMS` table in `translator.py`:
+  its `sense` line fixes the meaning for every language at once, and an optional
+  per-locale entry (zh-CN `event` → `事件`) pins one language's rendering. This
+  only affects future translations; an already-translated key is re-sent only
+  when its English source changes (edit the existing translation by hand, or
+  remove the key's hash from `.translation_state.json` to force a re-run)
 
 ### Build Has Old Translations
 
@@ -523,7 +535,7 @@ check that PR:
 
 4. **Click "Merge when ready".** Now the workflow:
    - Triggers, because `en-US.json` differs from the base branch
-   - Translates only the **new or modified** keys to all 14 languages
+   - Translates only the **new or modified** keys to all 15 languages
    - Pushes `fr-FR.json`, `es-ES.json`, etc. plus `.translation_state.json` onto your branch
    - That one push re-runs your PR's checks; then it queues and merges
 
@@ -573,7 +585,7 @@ source of truth that keeps subsequent runs incremental.
 ## Cost Considerations
 
 Translation is billed per token by DeepSeek. The whole `en-US.json` is ~10,700
-strings; a full 14-language rebuild is a one-time cost, and day-to-day runs only
+strings; a full 15-language rebuild is a one-time cost, and day-to-day runs only
 translate the handful of new/changed keys in a given PR.
 
 ### Cost Optimization:

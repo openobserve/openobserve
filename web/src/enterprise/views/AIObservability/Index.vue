@@ -21,12 +21,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   picks the route the rail/breadcrumb highlight.
 -->
 <template>
-  <OPageLayout bleed :sidebar-width="230">
+  <OPageLayout bleed :sidebar-width="railCollapsed ? RAIL_COLLAPSED_WIDTH : RAIL_WIDTH">
     <template #sidebar>
       <SectionRail
+        v-model:collapsed="railCollapsed"
         :groups="sectionGroups"
         :active-key="activeSection"
         :title="t('aiObservability.title')"
+        :icon="AI_ICON"
+        collapsible
       />
     </template>
 
@@ -37,13 +40,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref, watch } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRoute } from "vue-router";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import SectionRail from "@/components/common/SectionRail.vue";
 import type { SectionHubGroup, SectionHubItem } from "@/components/common/SectionHub.vue";
+import { navSection } from "./navSection";
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
+import config from "@/aws-exports";
+
+/** The same mark the primary nav uses for this module, so the collapsed rail
+ *  still says which module it belongs to. */
+const AI_ICON: IconName = "auto-awesome";
+
+// Wide enough for one icon plus the pill's own inset; the expanded width is
+// unchanged from before the toggle existed.
+const RAIL_WIDTH = 230;
+const RAIL_COLLAPSED_WIDTH = 52;
+const RAIL_STORAGE_KEY = "o2-ai-rail-collapsed";
+
+// Remembered per browser: a rail you collapsed should not reopen every time you
+// leave the module. Storage can throw (private mode), and the rail opening
+// expanded is a fine outcome when it does.
+function readCollapsed(): boolean {
+  try {
+    return window.localStorage.getItem(RAIL_STORAGE_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+const railCollapsed = ref(readCollapsed());
+
+watch(railCollapsed, (value) => {
+  try {
+    window.localStorage.setItem(RAIL_STORAGE_KEY, String(value));
+  } catch {
+    // Unavailable storage keeps the toggle working for this session only.
+  }
+});
 
 defineOptions({ name: "AIObservabilityShell" });
 
@@ -61,133 +98,148 @@ function evalLink(tab: EvalTab) {
   return { name: "aiEvaluations", query: { ...orgQuery.value, tab } };
 }
 
-// Section key for the rail's `active-key`. Evaluations sub-pages share the
-// route name `aiEvaluations`; `?tab=` distinguishes them so we map it down
-// to the rail's per-item keys.
-const activeSection = computed<string>(() => {
-  if (route.name === "aiLLMInsights") return "llmInsights";
-  if (route.name === "aiSessions") return "sessions";
-  if (route.name === "aiAgentGraph") return "agentGraph";
-  if (route.name === "aiAgentBehavior") return "agentBehavior";
-  if (route.name === "aiDiscovery") return "discovery";
-  if (
-    route.name === "aiQueues" ||
-    route.name === "aiQueueDetail" ||
-    route.name === "aiQueueWorkbench"
-  )
-    return "queues";
-  if (route.name === "aiDatasets") return "datasets";
-  if (route.name === "aiEvaluations") {
-    const tab = (route.query.tab as string) || "quality";
-    return tab;
-  }
-  return "";
-});
+const activeSection = computed<string>(() => navSection(route.name, route.query.tab));
+
+// Only Monitor's LLM Insights + Sessions have OSS-registered routes (see
+// web/src/composables/router.ts) — the rest of Monitor (Agent Graph/Behavior)
+// and every other group need the real enterprise/cloud backend, so on a true
+// OSS build the rail must not link anywhere else; it would 404.
+const OSS_AVAILABLE_KEYS = new Set(["llmInsights", "sessions"]);
+const isEnterpriseOrCloud = config.isEnterprise == "true" || config.isCloud == "true";
 
 // Single source of truth for the rail items (groups) AND the breadcrumb
 // switcher. Order here is the order shown in the rail.
-const sectionItems = computed<(SectionHubItem & { group: string })[]>(() => [
-  {
-    key: "llmInsights",
-    label: t("aiObservability.nav.llmInsights"),
-    icon: "dashboard",
-    to: { name: "aiLLMInsights", query: orgQuery.value },
-    dataTest: "ai-secondary-nav-llm-insights",
-    group: "Monitor",
-  },
-  {
-    key: "sessions",
-    label: t("aiObservability.nav.sessions"),
-    icon: "forum",
-    to: { name: "aiSessions", query: orgQuery.value },
-    dataTest: "ai-secondary-nav-sessions",
-    group: "Monitor",
-  },
-  {
-    key: "agentGraph",
-    label: t("aiObservability.nav.agentGraph"),
-    icon: "hub",
-    to: { name: "aiAgentGraph", query: orgQuery.value },
-    dataTest: "ai-secondary-nav-agent-graph",
-    group: "Monitor",
-  },
-  {
-    key: "agentBehavior",
-    label: t("aiObservability.nav.agentBehavior"),
-    icon: "troubleshoot",
-    to: { name: "aiAgentBehavior", query: orgQuery.value },
-    dataTest: "ai-secondary-nav-agent-behavior",
-    group: "Monitor",
-  },
-  {
-    key: "discovery",
-    label: t("aiObservability.nav.discovery"),
-    icon: "saved-search",
-    to: { name: "aiDiscovery", query: orgQuery.value },
-    dataTest: "ai-secondary-nav-discovery",
-    group: "Annotate",
-  },
-  {
-    key: "queues",
-    label: t("aiObservability.nav.queues"),
-    icon: "fact-check",
-    to: { name: "aiQueues", query: orgQuery.value },
-    dataTest: "ai-secondary-nav-queues",
-    group: "Annotate",
-  },
-  {
-    key: "datasets",
-    label: t("aiObservability.nav.datasets"),
-    icon: "table-chart",
-    to: { name: "aiDatasets", query: orgQuery.value },
-    dataTest: "ai-secondary-nav-datasets",
-    group: "Annotate",
-  },
-  {
-    key: "quality",
-    label: t("aiObservability.nav.quality"),
-    icon: "star-rate",
-    to: evalLink("quality"),
-    dataTest: "ai-secondary-nav-quality",
-    group: "Evaluate",
-  },
-  {
-    key: "jobs",
-    label: t("aiObservability.nav.evalJobs"),
-    icon: "event",
-    to: evalLink("jobs"),
-    dataTest: "ai-secondary-nav-eval-jobs",
-    group: "Evaluate",
-  },
-  {
-    key: "scorers",
-    label: t("aiObservability.nav.scorers"),
-    icon: "rule",
-    to: evalLink("scorers"),
-    dataTest: "ai-secondary-nav-scorers",
-    group: "Evaluate",
-  },
-  {
-    key: "scoreConfigs",
-    label: t("aiObservability.nav.scoreConfigs"),
-    icon: "tune",
-    to: evalLink("scoreConfigs"),
-    dataTest: "ai-secondary-nav-score-configs",
-    group: "Evaluate",
-  },
-]);
+const sectionItems = computed<(SectionHubItem & { group: string })[]>(() =>
+  [
+    {
+      key: "llmInsights",
+      label: t("aiObservability.nav.llmInsights"),
+      icon: "dashboard",
+      to: { name: "aiLLMInsights", query: orgQuery.value },
+      dataTest: "ai-secondary-nav-llm-insights",
+      group: "Monitor",
+    },
+    {
+      key: "sessions",
+      label: t("aiObservability.nav.sessions"),
+      icon: "forum",
+      to: { name: "aiSessions", query: orgQuery.value },
+      dataTest: "ai-secondary-nav-sessions",
+      group: "Monitor",
+    },
+    {
+      key: "agentGraph",
+      label: t("aiObservability.nav.agentGraph"),
+      icon: "hub",
+      to: { name: "aiAgentGraph", query: orgQuery.value },
+      dataTest: "ai-secondary-nav-agent-graph",
+      group: "Monitor",
+    },
+    {
+      key: "agentBehavior",
+      label: t("aiObservability.nav.agentBehavior"),
+      icon: "troubleshoot",
+      to: { name: "aiAgentBehavior", query: orgQuery.value },
+      dataTest: "ai-secondary-nav-agent-behavior",
+      group: "Monitor",
+    },
+    {
+      key: "discovery",
+      label: t("aiObservability.nav.discovery"),
+      icon: "saved-search",
+      to: { name: "aiDiscovery", query: orgQuery.value },
+      dataTest: "ai-secondary-nav-discovery",
+      group: "Annotate",
+    },
+    {
+      key: "queues",
+      label: t("aiObservability.nav.queues"),
+      icon: "fact-check",
+      to: { name: "aiQueues", query: orgQuery.value },
+      dataTest: "ai-secondary-nav-queues",
+      group: "Annotate",
+    },
+    {
+      key: "datasets",
+      label: t("aiObservability.nav.datasets"),
+      icon: "table-chart",
+      to: { name: "aiDatasets", query: orgQuery.value },
+      dataTest: "ai-secondary-nav-datasets",
+      group: "Annotate",
+    },
+    {
+      key: "playground",
+      label: t("aiObservability.nav.playground"),
+      icon: "play-circle",
+      to: { name: "aiPlayground", query: orgQuery.value },
+      dataTest: "ai-secondary-nav-playground",
+      group: "Experiment",
+    },
+    {
+      key: "experiments",
+      label: t("aiObservability.nav.experiments"),
+      icon: "science",
+      to: { name: "aiExperiments", query: orgQuery.value },
+      dataTest: "ai-secondary-nav-experiments",
+      group: "Experiment",
+    },
+    {
+      key: "remoteTasks",
+      label: t("aiObservability.nav.remoteTasks"),
+      icon: "cloud-upload",
+      to: { name: "aiRemoteTasks", query: orgQuery.value },
+      dataTest: "ai-secondary-nav-remote-tasks",
+      group: "Experiment",
+    },
+    {
+      key: "quality",
+      label: t("aiObservability.nav.quality"),
+      icon: "star-rate",
+      to: evalLink("quality"),
+      dataTest: "ai-secondary-nav-quality",
+      group: "Evaluate",
+    },
+    {
+      key: "jobs",
+      label: t("aiObservability.nav.evalJobs"),
+      icon: "event",
+      to: evalLink("jobs"),
+      dataTest: "ai-secondary-nav-eval-jobs",
+      group: "Evaluate",
+    },
+    {
+      key: "scorers",
+      label: t("aiObservability.nav.scorers"),
+      icon: "rule",
+      to: evalLink("scorers"),
+      dataTest: "ai-secondary-nav-scorers",
+      group: "Evaluate",
+    },
+    {
+      key: "scoreConfigs",
+      label: t("aiObservability.nav.scoreConfigs"),
+      icon: "tune",
+      to: evalLink("scoreConfigs"),
+      dataTest: "ai-secondary-nav-score-configs",
+      group: "Evaluate",
+    },
+  ].filter((item) => isEnterpriseOrCloud || OSS_AVAILABLE_KEYS.has(item.key)),
+);
 
 const activeSectionItem = computed(() =>
   sectionItems.value.find((i) => i.key === activeSection.value),
 );
 
-// Group order: Monitor, then Evaluate, then Annotate at the bottom.
-const sectionGroupOrder = ["Monitor", "Evaluate", "Annotate"];
+// Group order: Monitor, then Evaluate, then Experiment, then Annotate at the
+// bottom. Experiment is its own section (not an Evaluate sub-item) because an
+// experiment is a run you author, not a scoring config you maintain.
+const sectionGroupOrder = ["Monitor", "Evaluate", "Experiment", "Annotate"];
 
 const groupLabels = computed<Record<string, I18nText>>(() => ({
   Monitor: t("aiObservability.sections.monitor"),
   Annotate: t("aiObservability.sections.annotate"),
   Evaluate: t("aiObservability.sections.evaluate"),
+  Experiment: t("aiObservability.sections.experiment"),
 }));
 
 const sectionGroups = computed<SectionHubGroup[]>(() => {

@@ -79,6 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           table-id="pipelines-backfill-jobs-list"
           row-key="job_id"
           :loading="loading"
+          :forbidden="forbidden"
           pagination="client"
           :page-size="selectedPerPage"
           :page-size-options="perPageOptionsList"
@@ -104,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Bottom footer -->
           <template #bottom="{ totalRows }">
-            <div class="mr-4 flex items-center py-2 text-xs font-normal">
+            <div class="me-4 flex items-center py-2 text-xs font-normal">
               {{ t("pipeline.backfillJobLabel", { count: totalRows }, totalRows) }}
             </div>
           </template>
@@ -136,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ row.progress_percent }}%
                 </OProgressBar>
               </div>
-              <div class="text-text-body w-24 shrink-0 pr-2 text-xs whitespace-nowrap">
+              <div class="text-text-body w-24 shrink-0 pe-2 text-xs whitespace-nowrap">
                 <template v-if="row.chunks_total">
                   {{ row.chunks_completed || 0 }}/{{ row.chunks_total }}
                   {{ t("pipeline.chunksUnit") }}
@@ -284,7 +285,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div>
           <div class="text-text-label mb-2 text-xs">{{ t("pipeline.errorMessageLabel") }}</div>
           <div
-            class="rounded-default bg-banner-error-soft-bg border-l-status-negative text-compact text-banner-error-soft-text border-l-3 p-3 font-mono leading-[1.6] wrap-break-word whitespace-pre-wrap"
+            class="rounded-default bg-banner-error-soft-bg border-s-status-negative text-compact text-banner-error-soft-text border-s-3 p-3 font-mono leading-[1.6] wrap-break-word whitespace-pre-wrap"
           >
             {{ errorDialogData.error }}
           </div>
@@ -334,6 +335,7 @@ const { t } = useI18nTyped();
 const qTableRef = ref();
 
 const loading = ref(false);
+const forbidden = ref(false);
 const jobs = ref<BackfillJob[]>([]);
 const showDetailsDialog = ref(false);
 const selectedJobId = ref("");
@@ -431,6 +433,7 @@ onMounted(() => {
 
 const loadJobs = async () => {
   loading.value = true;
+  forbidden.value = false;
 
   try {
     const response = await backfillService.listBackfillJobs({
@@ -440,10 +443,14 @@ const loadJobs = async () => {
     loadPipelineOptions();
   } catch (error: any) {
     console.error("Error loading backfill jobs:", error);
-    toast({
-      variant: "error",
-      message: t("toastMessages.pipelines.failedToLoadBackfillJobs"),
-    });
+    forbidden.value = error?.response?.status === 403;
+    // The grouped access toast already reports a 403; a second red toast adds nothing.
+    if (!forbidden.value) {
+      toast({
+        variant: "error",
+        message: t("toastMessages.pipelines.failedToLoadBackfillJobs"),
+      });
+    }
   } finally {
     loading.value = false;
   }

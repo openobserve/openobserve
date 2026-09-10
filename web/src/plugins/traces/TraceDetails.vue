@@ -35,8 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Standalone (routed) header: shared OPageHeader -->
         <OPageHeader
           v-if="mode === 'standalone'"
-          :title="traceTree[0]?.operationName || t('traces.loadingTrace')"
-          title-data-test="trace-details-operation-name"
+          title-overflow="visible"
           :back="
             showBackButton
               ? {
@@ -47,11 +46,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           class=""
         >
+          <!-- Operation names run long (SQL, URLs); the default header title never shrinks, so it never ellipsises. -->
+          <template #title>
+            <span
+              data-test="trace-details-operation-name"
+              class="block truncate"
+              :title="traceTree[0]?.operationName"
+            >
+              {{ traceTree[0]?.operationName || t("traces.loadingTrace") }}
+            </span>
+          </template>
+
           <template #subtitle>
             <div class="text-2xs text-text-secondary flex items-center space-x-2 whitespace-nowrap">
               <span>{{ formatTimestamp(traceStartTime, store.state.timezone) }}</span>
               <div class="bg-text-label h-4 w-px py-0" />
-              <span class="mr-1">
+              <span class="me-1">
                 {{ t("traces.traceId") }}:
                 <span
                   data-test="trace-details-trace-id"
@@ -75,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Session ID (LLM traces) -->
               <template v-if="sessionId">
                 <div class="bg-text-label h-4 w-px py-0" />
-                <span class="mr-1">
+                <span class="me-1">
                   {{ t("traces.traceDetails.sessionId") }}:
                   <span
                     data-test="trace-details-session-id"
@@ -98,7 +108,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="bg-text-label h-4 w-px py-0" />
               <!-- Span Count Badge -->
               <span class="inline-flex">
-                <OTag type="logsResultChip" value="neutral" data-test="trace-details-spans-count">
+                <!-- sm + py-1! keeps both count chips at 1.1875rem: anything over the header's fixed 1.25rem subtitle band grows into the title's descenders. -->
+                <OTag
+                  type="logsResultChip"
+                  value="neutral"
+                  size="sm"
+                  data-test="trace-details-spans-count"
+                  class="py-1!"
+                >
                   <span data-test="span-count-text">
                     {{ formatLargeNumber(effectiveSpanList.length) }}
                     {{ t("traces.spansLabel") }}
@@ -114,7 +131,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OTag
                   type="logsResultChip"
                   value="error"
+                  size="sm"
                   data-test="trace-details-error-spans-count"
+                  class="py-1!"
                 >
                   <span
                     >{{ formatLargeNumber(errorSpansCount) }} {{ t("traces.errorsLabel") }}</span
@@ -201,7 +220,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Embedded (logs) header -->
         <header
           v-else
-          class="bg-surface-base flex! h-auto items-center justify-between py-0.5 pl-1"
+          class="bg-surface-base flex! h-auto items-center justify-between py-0.5 ps-1"
         >
           <div class="flex w-fit! items-center space-x-4">
             <!-- Back button -->
@@ -210,7 +229,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="trace-details-back-btn"
               variant="ghost-muted"
               size="icon-xs"
-              class="mr-1.5"
+              class="me-1.5"
               @click="handleBackOrClose"
             >
               <OIcon name="arrow-back" size="sm" />
@@ -238,7 +257,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <span>{{ formatTimestamp(traceStartTime, store.state.timezone) }}</span>
                 <div class="bg-text-label h-4 w-px py-0" />
-                <span class="mr-1">
+                <span class="me-1">
                   {{ t("traces.traceId") }}:
                   <span
                     v-if="mode === 'embedded'"
@@ -272,7 +291,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- Session ID (LLM traces) -->
                 <template v-if="sessionId">
                   <div class="bg-text-label h-4 w-px py-0" />
-                  <span class="mr-1">
+                  <span class="me-1">
                     {{ t("traces.traceDetails.sessionId") }}:
                     <span
                       data-test="trace-details-session-id"
@@ -319,7 +338,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="bg-text-label h-4 w-px py-0" />
 
               <!-- Error Count Badge -->
-              <span class="mr-[0.85rem] inline-flex">
+              <span class="me-[0.85rem] inline-flex">
                 <OTag
                   type="logsResultChip"
                   value="error"
@@ -341,7 +360,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="trace-details-apply-filters-btn-right"
               variant="outline"
               size="xs"
-              class="mr-2.5"
+              class="me-2.5"
               @click="openFilterPopover"
             >
               <template #icon-left><OIcon name="filter-alt" size="xs" /></template>
@@ -367,7 +386,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="trace-details-share-link-btn"
               :url="traceDetailsShareURL"
               variant="outline"
-              buttonClass="mr-1!"
+              buttonClass="me-1!"
               size="icon-xs"
             />
 
@@ -377,7 +396,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="trace-details-close-btn"
               variant="ghost"
               size="icon-xs"
-              class="mr-1!"
+              class="me-1!"
               @click="handleBackOrClose"
             >
               <OIcon name="close" size="sm" />
@@ -392,7 +411,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="border-border-default bg-card-glass-bg! flex items-center justify-between border-b bg-white py-0"
         >
           <div
-            class="trace-details-view-tabs ml-[0.325rem] flex items-center space-x-4 py-[0.325rem]"
+            class="trace-details-view-tabs ms-[0.325rem] flex items-center space-x-4 py-[0.325rem]"
           >
             <!--
               Tabs are data-driven from `traceTabs` so they can be dragged to
@@ -421,11 +440,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OToggleGroup>
           </div>
 
-          <div class="flex items-center gap-2 space-x-2 pr-[0.325rem]">
+          <div class="flex items-center gap-2 space-x-2 pe-[0.325rem]">
             <!-- Unified Search Input Group -->
             <div
               v-if="activeTab !== 'flame-graph' && activeTab !== 'map' && activeTab !== 'thread'"
-              class="unified-search-group rounded-default dark:bg-surface-base dark:hover:border-theme-accent dark:focus-within:border-theme-accent mr-1! flex w-fit items-stretch gap-1 transition-colors duration-200"
+              class="unified-search-group rounded-default dark:bg-surface-base dark:hover:border-theme-accent dark:focus-within:border-theme-accent me-1! flex w-fit items-stretch gap-1 transition-colors duration-200"
             >
               <div class="log-stream-search-input">
                 <OSearchInput
@@ -452,7 +471,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span class="text-text-secondary mx-0.5">/</span>
                   <span class="text-text-secondary">{{ searchResults }}</span>
                 </div>
-                <div class="ml-1 flex h-full items-center">
+                <div class="ms-1 flex h-full items-center">
                   <OButton
                     data-test="trace-details-search-prev-btn"
                     :disabled="!searchResults || currentIndex === 0"
@@ -491,7 +510,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :title="selectedStreamsString"
                 class="w-44!"
               />
-              <span class="traces-view-logs-btn pl-1">
+              <span class="traces-view-logs-btn ps-1">
                 <!-- Single button with wrapper for tooltip functionality -->
                 <span class="inline-block" tabindex="0">
                   <OButton
@@ -522,7 +541,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="trace-details-view-session-replay-btn"
               variant="outline"
               size="sm"
-              class="ml-1"
+              class="ms-1"
               @click="redirectToSessionReplay"
             >
               <template #icon-left>
@@ -595,6 +614,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :isSidebarOpen="!!(isSidebarOpen && (selectedSpanId || showTraceDetails))"
                         @toggle-collapse="toggleSpanCollapse"
                         @select-span="updateSelectedSpan"
+                        @select-span-event="onSelectSpanEvent"
                         @hover-span="onHoverSpan"
                         @unhover-span="onUnhoverSpan"
                         @update-current-index="handleIndexUpdate"
@@ -607,7 +627,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 v-if="isSidebarOpen && (selectedSpanId || showTraceDetails)"
-                class="border-l-solid border-l-card-glass-border min-h-0 shrink-0 overflow-x-hidden overflow-y-auto border-l transition-all duration-300"
+                class="border-s-solid border-s-card-glass-border min-h-0 shrink-0 overflow-x-hidden overflow-y-auto border-s transition-all duration-300"
                 :class="isTimelineExpanded ? '' : 'full'"
                 :style="{
                   width: `calc(100% - ${leftWidth}px)`,
@@ -622,6 +642,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :service-streams-enabled="serviceStreamsEnabled"
                   :parent-mode="mode"
                   :activeTab="sidebarActiveTab"
+                  :focusEventIndex="focusedEventIndex"
                   :selected-log-streams="searchObj.data.traceDetails.selectedLogStreams"
                   :show-log-stream-selector="showLogStreamSelector"
                   :show-evaluate-button="canManualEvaluate"
@@ -633,7 +654,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @open-trace="openTraceLink"
                   @add-filter="addFilterFromSidebar"
                   @apply-filter-immediately="applyFilterImmediately"
-                  @update:activeTab="sidebarActiveTab = $event as string"
+                  @update:activeTab="onSidebarTabChange($event as string)"
                 />
               </div>
             </div>
@@ -685,6 +706,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :service-streams-enabled="serviceStreamsEnabled"
                   :parent-mode="mode"
                   :activeTab="sidebarActiveTab"
+                  :focusEventIndex="focusedEventIndex"
                   :selected-log-streams="searchObj.data.traceDetails.selectedLogStreams"
                   :show-log-stream-selector="showLogStreamSelector"
                   :show-evaluate-button="canManualEvaluate"
@@ -696,7 +718,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @open-trace="openTraceLink"
                   @add-filter="addFilterFromSidebar"
                   @apply-filter-immediately="applyFilterImmediately"
-                  @update:activeTab="sidebarActiveTab = $event as string"
+                  @update:activeTab="onSidebarTabChange($event as string)"
                 />
               </div>
             </div>
@@ -752,7 +774,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 v-if="isSidebarOpen && (selectedSpanId || showTraceDetails)"
-                class="border-l-solid border-l-card-glass-border h-full overflow-hidden border-l"
+                class="border-s-solid border-s-card-glass-border h-full overflow-hidden border-s"
                 style="width: 40%; min-width: 18.75rem"
               >
                 <TraceDetailsSidebar
@@ -764,6 +786,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :service-streams-enabled="serviceStreamsEnabled"
                   :parent-mode="mode"
                   :activeTab="sidebarActiveTab"
+                  :focusEventIndex="focusedEventIndex"
                   :selected-log-streams="searchObj.data.traceDetails.selectedLogStreams"
                   :show-log-stream-selector="showLogStreamSelector"
                   :show-evaluate-button="canManualEvaluate"
@@ -775,7 +798,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @open-trace="openTraceLink"
                   @add-filter="addFilterFromSidebar"
                   @apply-filter-immediately="applyFilterImmediately"
-                  @update:activeTab="sidebarActiveTab = $event as string"
+                  @update:activeTab="onSidebarTabChange($event as string)"
                 />
               </div>
             </div>
@@ -914,6 +937,7 @@ import {
 } from "@/utils/traces/treeVisualizationEngine";
 import { SPAN_KIND_MAP } from "@/utils/traces/constants";
 import useResizer from "@/composables/useResizer";
+import useSmartBack from "@/composables/useSmartBack";
 import { copyToClipboard } from "@/utils/clipboard";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import useStreams from "@/composables/useStreams";
@@ -1264,7 +1288,6 @@ export default defineComponent({
       hConnectorWidth: 20,
       dotConnectorWidth: 6,
       dotConnectorHeight: 6,
-      colors: ["#b7885e", "#1ab8be", "#ffcb99", "#f89570", "#839ae2"],
     };
     const parentContainer = ref<HTMLElement | null>(null);
     const traceScrollContainer = ref<HTMLElement | null>(null);
@@ -2087,15 +2110,64 @@ export default defineComponent({
     const hoveredSpanId = ref("");
     const effectiveSpanId = computed(() => hoveredSpanId.value || selectedSpanId.value);
 
+    /**
+     * A sidebar tab requested explicitly by an interaction, as opposed to the
+     * default the watcher below picks. Keyed to the span it was requested for
+     * and drained on every watcher fire, so a request that is never consumed
+     * (e.g. re-clicking a marker on the already-selected span, which does not
+     * change `selectedSpanId` and so never reaches this watcher) cannot
+     * outlive the selection it belonged to and hijack a later, unrelated one.
+     *
+     * The watcher runs on the flush after `selectedSpanId` changes, i.e. after
+     * the handler that changed it has returned — so a handler cannot simply
+     * assign `sidebarActiveTab` and expect it to survive. Recording the intent
+     * here removes the ordering question entirely: whichever runs first, the
+     * explicit tab wins and the default is skipped.
+     */
+    const pendingSidebarTab = ref<{ spanId: string; tab: string } | null>(null);
+
+    /**
+     * The span whose Events tab was opened by a marker click.
+     *
+     * A marker-driven Events view belongs to one span — navigating to another
+     * span should fall back to that span's default tab. A manually chosen tab
+     * is different: like every other tab, it persists across span navigation.
+     * Comparing `sidebarActiveTab` to "events" cannot tell the two apart,
+     * because the Events tab is always present and always selectable by hand.
+     */
+    const markerEventsSpanId = ref<string | null>(null);
+
     // Set the default sidebar tab on the first span selection,
     // and re-evaluate when the current tab no longer exists for the new span
     // (e.g. moving from LLM span with "preview" to a non-LLM span).
     watch(selectedSpanId, (newSpanId, oldSpanId) => {
-      if (newSpanId && spanMap.value[newSpanId]) {
-        const canPreview = hasTracePreview(spanMap.value[newSpanId]);
-        if (!oldSpanId || (sidebarActiveTab.value === "preview" && !canPreview)) {
-          sidebarActiveTab.value = canPreview ? "preview" : "attributes";
-        }
+      // Drain first, always: a request that was never consumed must not
+      // survive to hijack the next selection.
+      const pending = pendingSidebarTab.value;
+      pendingSidebarTab.value = null;
+
+      // A marker-driven Events view is scoped to its own span. Once the
+      // selection moves elsewhere it no longer applies, so retire it and let
+      // the default apply — but only for a view a marker opened, never for a
+      // tab the user chose by hand.
+      const leavingMarkerEvents =
+        markerEventsSpanId.value !== null && markerEventsSpanId.value !== newSpanId;
+      if (leavingMarkerEvents) markerEventsSpanId.value = null;
+
+      if (!newSpanId || !spanMap.value[newSpanId]) return;
+
+      if (pending && pending.spanId === newSpanId) {
+        sidebarActiveTab.value = pending.tab;
+        return;
+      }
+
+      const canPreview = hasTracePreview(spanMap.value[newSpanId]);
+      if (
+        !oldSpanId ||
+        leavingMarkerEvents ||
+        (sidebarActiveTab.value === "preview" && !canPreview)
+      ) {
+        sidebarActiveTab.value = canPreview ? "preview" : "attributes";
       }
     });
 
@@ -2775,6 +2847,38 @@ export default defineComponent({
       });
     };
 
+    const focusedEventIndex = ref<number | null>(null);
+
+    /**
+     * A waterfall marker click. Selecting the span hides the timeline the
+     * marker lived on, so route the event's index into the sidebar and open the
+     * Events tab, which carries its own span-scoped mini-timeline.
+     */
+    const onSelectSpanEvent = (payload: { spanId: string; eventIndex: number }) => {
+      // Record the tab before the selection, so the watcher this triggers sees
+      // the request rather than overwriting it with the default.
+      pendingSidebarTab.value = { spanId: payload.spanId, tab: "events" };
+      markerEventsSpanId.value = payload.spanId;
+      updateSelectedSpan(payload.spanId);
+      sidebarActiveTab.value = "events";
+      // Re-assign through null so clicking the same marker twice re-triggers
+      // the sidebar's watcher.
+      focusedEventIndex.value = null;
+      nextTick(() => {
+        focusedEventIndex.value = payload.eventIndex;
+      });
+    };
+
+    /**
+     * An explicit tab choice from the sidebar. Clears marker provenance: once
+     * the user has picked a tab themselves, it persists across span
+     * navigation like any other.
+     */
+    const onSidebarTabChange = (tab: string) => {
+      sidebarActiveTab.value = tab;
+      markerEventsSpanId.value = null;
+    };
+
     const updateSelectedSpan = (spanId: string, swichToWaterfall: boolean = false) => {
       hoveredSpanId.value = ""; // clear any hover state on click
       showTraceDetails.value = false;
@@ -2853,10 +2957,13 @@ export default defineComponent({
       window.open(route.href, "_blank");
     };
 
-    const routeToTracesList = () => {
-      // Only navigate if in standalone mode
-      if (props.mode !== "standalone") return;
-
+    // Real browser back when there's history to pop — this trace can be
+    // reached from many AI Observability pages (Sessions, Discovery, Queue
+    // Workbench, Experiments, Eval Jobs, LLM Insights) as well as the plain
+    // Traces search, and router.back() returns to whichever one it actually
+    // was, filters and all. The hand-built push below only fires as a
+    // fallback (direct link / reload, no history to pop).
+    const { goBack: backToTracesList } = useSmartBack(() => {
       const query = cloneDeep(router.currentRoute.value.query);
       delete query.trace_id;
 
@@ -2867,12 +2974,13 @@ export default defineComponent({
         query.to = searchObj.data.datetime.endTime.toString();
       }
 
-      router.push({
-        name: "traces",
-        query: {
-          ...query,
-        },
-      });
+      return { name: "traces", query: { ...query } };
+    });
+
+    const routeToTracesList = () => {
+      // Only navigate if in standalone mode
+      if (props.mode !== "standalone") return;
+      backToTracesList();
     };
 
     const openTraceLink = async () => {
@@ -2914,6 +3022,8 @@ export default defineComponent({
       traceTabs,
       onTabReorder,
       sidebarActiveTab,
+      pendingSidebarTab,
+      markerEventsSpanId,
       traceTree,
       collapseMapping,
       traceRootSpan,
@@ -2968,6 +3078,9 @@ export default defineComponent({
       showTraceDetails,
       traceDetails,
       updateSelectedSpan,
+      onSelectSpanEvent,
+      onSidebarTabChange,
+      focusedEventIndex,
       routeToTracesList,
       handleExpandToFullView,
       openTraceLink,

@@ -76,6 +76,8 @@ type NormalizedOption = {
   badge?: string;
   /** Tooltip for the badge. Use when the badge is abbreviated (e.g. `C` → "Counter"). */
   badgeTitle?: string;
+  /** Tints the badge neutral instead of positive, e.g. a badge naming why a disabled row is disabled. */
+  badgeMuted?: boolean;
   /**
    * Per-option badge colours, e.g. `{ color, background }`. A styled badge renders
    * as a filled pill in that option's own colour, right-aligned into a single
@@ -217,6 +219,7 @@ function normalizeOption(input: unknown): NormalizedOption | null {
       option["badgeStyle"] && typeof option["badgeStyle"] === "object"
         ? (option["badgeStyle"] as Record<string, string>)
         : undefined,
+    badgeMuted: option["badgeMuted"] === true,
   };
 }
 
@@ -1107,7 +1110,7 @@ const fieldWidthClass = computed(() => {
                     'bg-select-bg',
                     hasError
                       ? 'border-select-border-error focus:ring-select-border-error/30 data-[state=open]:ring-select-border-error/30 focus:ring-[0.125rem] data-[state=open]:ring-[0.125rem]'
-                      : 'border-select-border hover:border-select-border-hover focus:border-select-border-focus focus:ring-accent/25 data-[state=open]:border-select-border-focus data-[state=open]:ring-accent/25 focus:ring-[0.125rem] data-[state=open]:ring-[0.125rem]',
+                      : 'border-select-border hover:border-select-border-hover focus:border-select-border-focus focus:ring-focus-ring-accent data-[state=open]:border-select-border-focus data-[state=open]:ring-focus-ring-accent focus:ring-[0.125rem] data-[state=open]:ring-[0.125rem]',
                     /* Keep the red error border on focus; focus border color applies only when there's no error. */
                     'focus:outline-none',
                     'transition-[color,background-color,border-color,box-shadow] duration-150',
@@ -1561,13 +1564,17 @@ const fieldWidthClass = computed(() => {
                                 >
                                 <span
                                   v-if="filteredOptions[vRow.index].badge"
-                                  class="rounded-default text-status-positive border-status-positive shrink-0 border border-solid"
+                                  class="rounded-default shrink-0 border border-solid"
                                   :class="[
+                                    // `pointer-events-auto` keeps a muted badge's tooltip reachable despite the row's own `pointer-events-none`.
+                                    filteredOptions[vRow.index].badgeMuted
+                                      ? 'text-text-secondary border-border-default pointer-events-auto'
+                                      : 'text-status-positive border-status-positive',
                                     filteredOptions[vRow.index].badgeTitle
                                       ? 'cursor-help'
                                       : undefined,
                                     filteredOptions[vRow.index].badgeStyle
-                                      ? 'ml-auto inline-flex h-[1.125rem] min-w-[1.125rem] items-center justify-center border-current px-1 text-xs leading-none font-semibold'
+                                      ? 'ms-auto inline-flex h-[1.125rem] min-w-[1.125rem] items-center justify-center border-current px-1 text-xs leading-none font-semibold'
                                       : 'text-3xs px-1 py-px leading-tight font-medium',
                                   ]"
                                   :title="filteredOptions[vRow.index].badgeTitle"
@@ -1712,7 +1719,7 @@ const fieldWidthClass = computed(() => {
                   'bg-select-bg',
                   hasError
                     ? 'border-select-border-error focus:ring-select-border-error/30 data-[state=open]:ring-select-border-error/30 focus:ring-[0.125rem] data-[state=open]:ring-[0.125rem]'
-                    : 'border-select-border hover:border-select-border-hover focus:border-select-border-focus focus:ring-accent/25 data-[state=open]:border-select-border-focus data-[state=open]:ring-accent/25 focus:ring-[0.125rem] data-[state=open]:ring-[0.125rem]',
+                    : 'border-select-border hover:border-select-border-hover focus:border-select-border-focus focus:ring-focus-ring-accent data-[state=open]:border-select-border-focus data-[state=open]:ring-focus-ring-accent focus:ring-[0.125rem] data-[state=open]:ring-[0.125rem]',
                   /* Keep the red error border on focus; focus border color applies only when there's no error. */
                   'focus:outline-none',
                   'transition-[color,background-color,border-color,box-shadow] duration-150',
@@ -1868,6 +1875,10 @@ const fieldWidthClass = computed(() => {
                 :disabled="opt.disabled"
               />
             </template>
+
+            <div v-else-if="!slots.default" class="text-select-placeholder px-3 py-2 text-sm">
+              <slot name="empty">{{ t("components.select.noOptionsFound") }}</slot>
+            </div>
 
             <slot />
           </SelectViewport>

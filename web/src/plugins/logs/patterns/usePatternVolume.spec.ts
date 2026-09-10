@@ -222,7 +222,7 @@ describe("buildPatternVolumeContext", () => {
     expect(ctx).toMatchObject({ startUs: 1_000, endUs: 2_000 });
   });
 
-  // A VRL function or action can drop rows, and regions/clusters decide which
+  // A VRL function can drop rows, and regions/clusters decide which
   // nodes answer — losing them would count a different population.
   it("carries the extraction request's full scope", () => {
     const ctx = buildPatternVolumeContext({
@@ -230,7 +230,7 @@ describe("buildPatternVolumeContext", () => {
       streamName: "logs",
       window,
       lastQuery: {
-        query: { sql: "SELECT * FROM logs", query_fn: "vrl", action_id: "act" },
+        query: { sql: "SELECT * FROM logs", query_fn: "vrl" },
         regions: ["r1"],
         clusters: ["c1"],
       },
@@ -242,7 +242,6 @@ describe("buildPatternVolumeContext", () => {
       endUs: 2,
       baseSql: "SELECT * FROM logs",
       queryFn: "vrl",
-      actionId: "act",
       regions: ["r1"],
       clusters: ["c1"],
     });

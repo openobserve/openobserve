@@ -177,6 +177,8 @@ pub struct ScorerResponseBody {
     pub produces_score_config_version: Option<i32>,
     pub template: String,
     pub variables: Vec<String>,
+    /// True when the scorer contract declares the `expected_output` variable.
+    pub reference_based: bool,
     pub output_schema: Option<Value>,
     pub params: Value,
     pub is_active: bool,
@@ -388,6 +390,10 @@ impl From<ScorerUpdateRequestBody> for infra::table::scorers::Scorer {
 
 impl From<infra::table::scorers::Scorer> for ScorerResponseBody {
     fn from(value: infra::table::scorers::Scorer) -> Self {
+        let reference_based = matches!(
+            o2_enterprise::enterprise::llm_evaluations::scorers::reference_requirement(&value),
+            o2_enterprise::enterprise::llm_evaluations::scorers::ScorerReferenceRequirement::ExpectedOutput
+        );
         Self {
             id: value.id,
             entity_id: value.entity_id,
@@ -400,6 +406,7 @@ impl From<infra::table::scorers::Scorer> for ScorerResponseBody {
             produces_score_config_version: value.produces_score_config_version,
             template: value.template.clone(),
             variables: extract_template_variables(&value.template),
+            reference_based,
             output_schema: value.output_schema,
             params: value.params,
             is_active: value.is_active,
@@ -458,11 +465,22 @@ mod tests {
         assert_eq!(resp.scorer_type, "llm_judge");
         assert_eq!(resp.version, 1);
         assert_eq!(resp.produces_score_config_version, Some(1));
+        assert!(!resp.reference_based);
         assert_eq!(
             resp.variables,
             vec!["input".to_string(), "output".to_string()]
         );
         assert!(resp.is_active);
+    }
+
+    #[test]
+    fn scorer_response_exposes_reference_requirement() {
+        let mut scorer = sample_scorer();
+        scorer.template = "Compare {{ output }} with {{ expected_output }}".to_string();
+
+        let response = ScorerResponseBody::from(scorer);
+
+        assert!(response.reference_based);
     }
 
     #[test]

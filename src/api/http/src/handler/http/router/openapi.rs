@@ -18,8 +18,7 @@ use config::{get_config, meta::stream::StreamType};
 use o2_ratelimit::dataresource::default_rules::OpenapiInfo;
 use openobserve_api_ingest::request::{clusters, logs, metrics, rum};
 use openobserve_api_management::request::{
-    actions, gen_ai, keys, kv, service_accounts, service_streams, short_url, status, stream,
-    synthetics,
+    gen_ai, keys, kv, service_accounts, service_streams, short_url, status, stream, synthetics,
 };
 use openobserve_api_pipelines::request::{enrichment_table, functions, pipeline, pipelines};
 use openobserve_api_search::search::patterns;
@@ -80,6 +79,7 @@ use crate::{
         openobserve_api_search::traces::user::get_latest_users,
         openobserve_api_search::traces::details::get_trace_details,
         openobserve_api_search::traces::time_index::get_trace_time_range,
+        openobserve_api_search::traces::time_index::get_org_trace_time_range,
         openobserve_api_search::traces::dag::get_trace_dag,
         metrics::ingest::json,
         openobserve_api_search::promql::remote_write,
@@ -224,12 +224,6 @@ use crate::{
         openobserve_api_management::request::dashboards::reports::enable_report_v2,
         openobserve_api_management::request::dashboards::reports::trigger_report_v2,
         openobserve_api_management::request::dashboards::reports::move_reports,
-        actions::action::upload_zipped_action,
-        actions::action::delete_action,
-        actions::action::serve_action_zip,
-        actions::action::update_action_details,
-        actions::action::list_actions,
-        actions::action::get_action_from_id,
         openobserve_api_management::request::authz::fga::create_role,
         openobserve_api_management::request::authz::fga::delete_role,
         openobserve_api_management::request::authz::fga::get_roles,
@@ -290,6 +284,7 @@ use crate::{
         synthetics::get_synthetic,
         synthetics::update_synthetic,
         synthetics::delete_synthetic,
+        synthetics::move_synthetics,
         synthetics::set_synthetic_enabled,
         synthetics::run_synthetic_now,
         synthetics::list_locations,
@@ -533,10 +528,70 @@ use crate::{
 )]
 pub struct ApiDoc;
 
+#[cfg(feature = "enterprise")]
+#[derive(OpenApi)]
+#[openapi(paths(
+    openobserve_api_management::request::experiments::preview_experiment,
+    openobserve_api_management::request::experiments::create_experiment,
+    openobserve_api_management::request::experiments::list_experiments,
+    openobserve_api_management::request::experiments::compare_experiments,
+    openobserve_api_management::request::experiments::get_experiment,
+    openobserve_api_management::request::experiments::list_experiment_result_rows,
+    openobserve_api_management::request::experiments::get_experiment_row,
+    openobserve_api_management::request::experiments::retry_experiment_slot,
+    openobserve_api_management::request::experiments::cancel_experiment,
+    openobserve_api_management::request::experiments::retry_experiment,
+    openobserve_api_management::request::experiments::clone_experiment,
+    openobserve_api_management::request::experiments::delete_experiment,
+    openobserve_api_management::request::experiments::set_experiment_baseline,
+    openobserve_api_management::request::experiments::clear_experiment_baseline,
+    openobserve_api_management::request::playground::share_playground_snapshot,
+    openobserve_api_management::request::playground::get_playground_snapshot,
+    openobserve_api_management::request::playground::run_playground_cell,
+    openobserve_api_management::request::playground::score_playground_cell,
+    openobserve_api_management::request::remote_tasks::list_remote_tasks,
+    openobserve_api_management::request::remote_tasks::create_remote_task,
+    openobserve_api_management::request::remote_tasks::test_remote_task,
+    openobserve_api_management::request::remote_tasks::get_remote_task,
+    openobserve_api_management::request::remote_tasks::list_remote_task_versions,
+    openobserve_api_management::request::remote_tasks::get_remote_task_stats,
+    openobserve_api_management::request::remote_tasks::save_remote_task_draft,
+    openobserve_api_management::request::remote_tasks::get_remote_task_draft,
+    openobserve_api_management::request::remote_tasks::discard_remote_task_draft,
+    openobserve_api_management::request::remote_tasks::publish_remote_task,
+    openobserve_api_management::request::remote_tasks::delete_remote_task,
+    openobserve_api_management::request::remote_tasks::test_run_remote_task,
+    openobserve_api_management::request::remote_tasks::replace_remote_task_auth_secret,
+    openobserve_api_management::request::remote_tasks::revoke_remote_task_auth_secret,
+    openobserve_api_management::request::remote_tasks::replace_remote_task_header_secret,
+    openobserve_api_management::request::remote_tasks::revoke_remote_task_header_secret,
+    openobserve_api_management::request::remote_tasks::get_remote_task_signing_status,
+    openobserve_api_management::request::remote_tasks::rotate_remote_task_signing_secret,
+    openobserve_api_management::request::remote_tasks::test_remote_task_signing_candidate,
+    openobserve_api_management::request::remote_tasks::activate_remote_task_signing_candidate,
+    openobserve_api_management::request::remote_tasks::end_remote_task_signing_grace,
+    openobserve_api_management::request::remote_tasks::revoke_remote_task_signing_secret,
+))]
+#[openapi(components(schemas(
+    openobserve_api_management::models::experiments::ExperimentResultRowSortBody,
+)))]
+struct EnterpriseExperimentApiDoc;
+
 pub struct SecurityAddon;
 
 impl Modify for SecurityAddon {
     fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
+        #[cfg(feature = "enterprise")]
+        {
+            let enterprise = EnterpriseExperimentApiDoc::openapi();
+            openapi.paths.paths.extend(enterprise.paths.paths);
+            if let (Some(components), Some(enterprise_components)) =
+                (openapi.components.as_mut(), enterprise.components)
+            {
+                components.schemas.extend(enterprise_components.schemas);
+                components.responses.extend(enterprise_components.responses);
+            }
+        }
         let cfg = get_config();
         if !cfg.common.base_uri.is_empty() {
             openapi.servers = Some(vec![utoipa::openapi::Server::new(&cfg.common.base_uri)]);
@@ -622,4 +677,90 @@ pub async fn openapi_info() -> OpenapiInfo {
     }
 
     tag_operations
+}
+
+#[cfg(all(test, feature = "enterprise"))]
+mod experiment_tests {
+    use super::*;
+
+    #[test]
+    fn coordinate_retry_is_registered_in_openapi() {
+        let api = EnterpriseExperimentApiDoc::openapi();
+        let path = api
+            .paths
+            .paths
+            .get("/api/{org_id}/experiments/{experiment_id}/rows/{row_id}/trials/{trial_index}/retry")
+            .expect("coordinate retry path must be documented");
+        assert_eq!(
+            path.post
+                .as_ref()
+                .and_then(|operation| operation.operation_id.as_deref()),
+            Some("RetryExperimentSlot")
+        );
+        let row_detail = api
+            .paths
+            .paths
+            .get("/api/{org_id}/experiments/{experiment_id}/rows/{row_id}")
+            .and_then(|path| path.get.as_ref())
+            .expect("row detail path must be documented");
+        assert!(row_detail.responses.responses.contains_key("403"));
+
+        let comparison = api
+            .paths
+            .paths
+            .get("/api/{org_id}/experiments/compare")
+            .and_then(|path| path.get.as_ref())
+            .expect("comparison path must be documented");
+        assert_eq!(
+            comparison.operation_id.as_deref(),
+            Some("CompareExperiments")
+        );
+        assert!(comparison.responses.responses.contains_key("400"));
+        assert!(comparison.responses.responses.contains_key("403"));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use utoipa::OpenApi;
+
+    use super::ApiDoc;
+
+    // Handlers that gained a folder-destination authorization check must
+    // advertise the 403 it returns, or clients cannot distinguish it from a bug.
+    // The /{org}/anomaly_detection pair is annotated but enterprise-gated, so it
+    // is absent from this ApiDoc and cannot be asserted from an OSS build.
+    #[test]
+    fn folder_scoped_writes_document_forbidden() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let paths = spec.get("paths").unwrap().as_object().unwrap();
+
+        let cases: &[(&str, &str)] = &[
+            ("/api/v2/{org_id}/alerts", "post"),
+            ("/api/v2/{org_id}/alerts/{alert_id}", "put"),
+            ("/api/v2/{org_id}/alerts/{alert_id}/clone", "post"),
+            ("/api/v2/{org_id}/alerts/move", "patch"),
+            ("/api/{org_id}/slos", "post"),
+            ("/api/{org_id}/slos/{slo_id}", "put"),
+            ("/api/{org_id}/slos/move", "post"),
+            ("/api/{org_id}/synthetics/{id}", "put"),
+            ("/api/v2/{org_id}/synthetics/move", "patch"),
+            ("/api/v2/{org_id}/reports/{report_id}", "put"),
+            ("/api/v2/{org_id}/reports/move", "patch"),
+            ("/api/{org_id}/folders/dashboards/{dashboard_id}", "put"),
+            ("/api/{org_id}/dashboards/move", "patch"),
+        ];
+
+        let mut missing = Vec::new();
+        for (path, method) in cases {
+            let Some(item) = paths.get(*path).and_then(|p| p.get(*method)) else {
+                missing.push(format!("{method} {path}: not found in spec"));
+                continue;
+            };
+            if item.get("responses").and_then(|r| r.get("403")).is_none() {
+                missing.push(format!("{method} {path}: no 403 documented"));
+            }
+        }
+        assert!(missing.is_empty(), "{missing:#?}");
+    }
 }

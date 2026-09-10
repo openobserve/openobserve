@@ -203,9 +203,19 @@ export default defineComponent({
         await nextTick();
         await nextTick();
         chart?.resize();
+        applySvgPrintViewBox();
       } catch (e) {
         console.error("Error during resizing", e);
       }
+    };
+
+    // print-only: viewBox lets print CSS scale the SVG to the narrower page instead of clipping it (ECharts' SVG renderer omits it)
+    const applySvgPrintViewBox = () => {
+      if (!store.state.printMode || props.renderType !== "svg") return;
+      const svg = chartRef.value?.querySelector("svg");
+      const w = Number(svg?.getAttribute("width"));
+      const h = Number(svg?.getAttribute("height"));
+      if (svg && w > 0 && h > 0) svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
     };
 
     // currently hovered series state
@@ -491,6 +501,8 @@ export default defineComponent({
         key: "dataZoomSelect",
         dataZoomSelectActive: true,
       });
+
+      applySvgPrintViewBox();
     };
 
     // dispatch tooltip action for all charts
@@ -678,13 +690,6 @@ export default defineComponent({
       chart?.dispose();
       chart = null;
 
-      // Clean up intersection observer
-      if (chartRef.value && isChartVisibleObserver) {
-        isChartVisibleObserver.unobserve(chartRef.value);
-        isChartVisibleObserver.disconnect();
-        isChartVisibleObserver = null;
-      }
-
       // Clear chart reference
       if (chartRef.value) {
         chartRef.value = null;
@@ -718,11 +723,9 @@ export default defineComponent({
     });
 
     onUnmounted(() => {
-      if (chartRef.value) {
-        // unobserve chart
-        isChartVisibleObserver?.unobserve(chartRef.value);
-        isChartVisibleObserver?.disconnect();
-      }
+      // Never guard on chartRef: Vue nulls template refs before unmounted hooks run.
+      isChartVisibleObserver?.disconnect();
+      isChartVisibleObserver = null;
 
       cleanupChart();
     });
@@ -776,6 +779,7 @@ export default defineComponent({
         try {
           await nextTick();
           chart?.resize();
+          applySvgPrintViewBox();
         } catch (e) {
           console.error("Error while resizing", e);
         }

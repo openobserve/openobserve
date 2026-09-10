@@ -35,13 +35,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   renderer through its pre-fetched-results injection path.
 -->
 <template>
-  <section class="card-container border-border-default rounded-surface flex flex-col border p-3">
-    <h3 class="text-text-heading mb-1 text-sm font-medium">{{ title }}</h3>
-    <OSkeleton v-if="loading" variant="button" class="h-55 w-full" />
+  <LLMPanelCard :title="title">
+    <OSkeleton v-if="loading" variant="button" class="h-55 w-full p-3" />
     <div v-else-if="!hasSeries" class="text-text-muted flex h-55 items-center justify-center">
       {{ emptyLabel }}
     </div>
-    <div v-else class="h-55 w-full">
+    <div v-else class="h-55 w-full p-2">
       <PanelSchemaRenderer
         :panel-schema="panelSchema"
         :selected-time-obj="selectedTimeObj"
@@ -52,12 +51,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data-test="panelDataTest"
       />
     </div>
-  </section>
+  </LLMPanelCard>
 </template>
 
 <script setup lang="ts">
 import { defineAsyncComponent } from "vue";
 
+import LLMPanelCard from "@/plugins/traces/LLMPanelCard.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import type { I18nText } from "@/types/i18n";
 import type { buildInjectedHistoryData } from "@/utils/dbm/historyPanelSchema";

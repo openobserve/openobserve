@@ -55,8 +55,8 @@ WHERE id = $4 AND claim_epoch = $5 AND status = $6;"#;
 
 const COMPLETE_CLAIM_QUERY: &str = r#"UPDATE scheduled_jobs
 SET status = $1, retries = $2, next_run_at = $3,
-    is_realtime = $4, is_silenced = $5, data = $6
-WHERE id = $7 AND claim_epoch = $8 AND status = $9;"#;
+    is_realtime = $4, is_silenced = $5, end_time = $6, data = $7
+WHERE id = $8 AND claim_epoch = $9 AND status = $10;"#;
 
 pub struct SqliteScheduler {}
 
@@ -77,7 +77,6 @@ impl super::Scheduler for SqliteScheduler {
     /// Creates the Scheduled Jobs table
     async fn create_table(&self) -> Result<()> {
         let client = CLIENT_RW.clone();
-        let client = client.lock().await;
         sqlx::query(
             r#"
 CREATE TABLE IF NOT EXISTS scheduled_jobs
@@ -98,7 +97,7 @@ CREATE TABLE IF NOT EXISTS scheduled_jobs
 );
             "#,
         )
-        .execute(&*client)
+        .execute(&client)
         .await?;
 
         // create data column for old version <= 0.10.9
@@ -175,7 +174,6 @@ SELECT COUNT(*) as num FROM scheduled_jobs WHERE module = $1;"#,
     /// Pushes a Trigger job into the queue
     async fn push(&self, trigger: Trigger) -> Result<()> {
         let client = CLIENT_RW.clone();
-        let client = client.lock().await;
         let mut tx = client.begin().await?;
 
         if let Err(e) = sqlx::query(
@@ -224,14 +222,13 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
     /// Deletes the Trigger job matching the given parameters
     async fn delete(&self, org: &str, module: TriggerModule, key: &str) -> Result<()> {
         let client = CLIENT_RW.clone();
-        let client = client.lock().await;
         sqlx::query(
             r#"DELETE FROM scheduled_jobs WHERE org = $1 AND module_key = $2 AND module = $3;"#,
         )
         .bind(org)
         .bind(key)
         .bind(&module)
-        .execute(&*client)
+        .execute(&client)
         .await?;
 
         drop(client);
@@ -259,7 +256,6 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
         data: Option<&str>,
     ) -> Result<()> {
         let client = CLIENT_RW.clone();
-        let client = client.lock().await;
         let query = match data {
             Some(data) => {
                 sqlx::query(
@@ -283,7 +279,7 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
                 .bind(&module)
             },
         };
-        query.execute(&*client).await?;
+        query.execute(&client).await?;
 
         drop(client);
 
@@ -295,7 +291,6 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
 
     async fn update_trigger(&self, trigger: Trigger, clone: bool) -> Result<()> {
         let client = CLIENT_RW.clone();
-        let client = client.lock().await;
         let query = if clone {
             sqlx::query(
                 r#"UPDATE scheduled_jobs
@@ -330,7 +325,7 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
             .bind(&trigger.module)
         };
 
-        query.execute(&*client).await?;
+        query.execute(&client).await?;
 
         // release lock
         drop(client);
@@ -381,12 +376,11 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
                 .join(",")
         );
         let client = CLIENT_RW.clone();
-        let client = client.lock().await;
         sqlx::query(&sql)
             .bind(TriggerModule::Report)
             .bind(report_max_time)
             .bind(alert_max_time)
-            .execute(&*client)
+            .execute(&client)
             .await?;
 
         Ok(())
@@ -410,7 +404,6 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
                 .num_microseconds()
                 .ok_or_else(|| Error::Message("alert timeout overflow".into()))?;
         let client = CLIENT_RW.clone();
-        let client = client.lock().await;
         let result = sqlx::query(KEEP_ALIVE_CLAIM_QUERY)
             .bind(TriggerModule::Report)
             .bind(report_max_time)
@@ -418,25 +411,25 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
             .bind(claim.id)
             .bind(claim.claim_epoch)
             .bind(TriggerStatus::Processing)
-            .execute(&*client)
+            .execute(&client)
             .await?;
         Ok(result.rows_affected() == 1)
     }
 
     async fn complete_claim(&self, trigger: Trigger) -> Result<bool> {
         let client = CLIENT_RW.clone();
-        let client = client.lock().await;
         let result = sqlx::query(COMPLETE_CLAIM_QUERY)
             .bind(&trigger.status)
             .bind(trigger.retries)
             .bind(trigger.next_run_at)
             .bind(trigger.is_realtime)
             .bind(trigger.is_silenced)
+            .bind(trigger.end_time)
             .bind(&trigger.data)
             .bind(trigger.id)
             .bind(trigger.claim_epoch)
             .bind(TriggerStatus::Processing)
-            .execute(&*client)
+            .execute(&client)
             .await?;
         Ok(result.rows_affected() == 1)
     }
@@ -457,7 +450,6 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
         module: Option<TriggerModule>,
     ) -> Result<Vec<Trigger>> {
         let client = CLIENT_RW.clone();
-        let client = client.lock().await;
 
         let now = now_micros();
         let report_max_time = now
@@ -494,7 +486,7 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
             q = q.bind(m);
         }
         q = q.bind(concurrency);
-        let jobs: Vec<Trigger> = q.fetch_all(&*client).await?;
+        let jobs: Vec<Trigger> = q.fetch_all(&client).await?;
         Ok(jobs)
     }
 
@@ -562,7 +554,6 @@ WHERE org = $1 AND module = $2 AND module_key = $3;"#;
     /// retries >= threshold set through environment
     async fn clean_complete(&self) -> Result<()> {
         let client = CLIENT_RW.clone();
-        let client = client.lock().await;
         let (include_max, mut max_retries) = get_scheduler_max_retries();
         if include_max {
             max_retries += 1;
@@ -574,7 +565,7 @@ WHERE org = $1 AND module = $2 AND module_key = $3;"#;
         .bind(TriggerStatus::Completed)
         .bind(max_retries)
         .bind(TriggerModule::Alert)
-        .execute(&*client)
+        .execute(&client)
         .await?;
         Ok(())
     }
@@ -587,7 +578,6 @@ WHERE org = $1 AND module = $2 AND module_key = $3;"#;
     /// - Update their status back to "Waiting" and increase their "retries" by 1
     async fn watch_timeout(&self) -> Result<()> {
         let client = CLIENT_RW.clone();
-        let client = client.lock().await;
         let now = now_micros();
         sqlx::query(
             r#"UPDATE scheduled_jobs
@@ -598,7 +588,7 @@ WHERE status = $2 AND end_time <= $3;
         .bind(TriggerStatus::Waiting)
         .bind(TriggerStatus::Processing)
         .bind(now)
-        .execute(&*client)
+        .execute(&client)
         .await?;
         Ok(())
     }
@@ -630,9 +620,8 @@ SELECT COUNT(*) as num FROM scheduled_jobs;"#,
 
     async fn clear(&self) -> Result<()> {
         let client = CLIENT_RW.clone();
-        let client = client.lock().await;
         match sqlx::query(r#"DELETE FROM scheduled_jobs;"#)
-            .execute(&*client)
+            .execute(&client)
             .await
         {
             Ok(_) => log::info!("[SCHEDULER] scheduled_jobs table cleared"),

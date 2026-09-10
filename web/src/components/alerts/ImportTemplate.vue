@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- Output Section with Template-specific Error Display -->
     <template #output-content>
-      <div class="border-border-default flex h-full w-full min-w-100 flex-col border-l">
+      <div class="border-border-default flex h-full w-full min-w-100 flex-col border-s">
         <div
           v-if="templateErrorsToDisplay.length > 0 || tempalteCreators.length > 0"
           class="text-text-heading shrink-0 py-3 text-center text-sm font-semibold"
@@ -151,10 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <div class="error-section mb-2.5 p-2.5" v-if="tempalteCreators.length > 0">
-            <div
-              class="text-primary mb-2.5 text-base uppercase"
-              data-test="template-import-creation-title"
-            >
+            <div class="text-primary mb-2.5 text-base" data-test="template-import-creation-title">
               {{ t("alert_templates.templateCreationTitle") }}
             </div>
             <div

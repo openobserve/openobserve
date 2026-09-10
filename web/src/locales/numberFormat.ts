@@ -18,6 +18,7 @@ import { getLanguage } from "@/utils/cookies";
 // App language codes are not all valid BCP-47, so map them for Intl.NumberFormat.
 export const APP_LOCALE_TO_BCP47: Record<string, string> = {
   "en-us": "en-US",
+  ar: "ar-SA-u-nu-latn",
   "tr-turk": "tr-TR",
   "zh-cn": "zh-CN",
   "zh-tw": "zh-TW",
@@ -42,7 +43,9 @@ const resolveAppLanguage = (): string => {
   if (cookieLanguage) return cookieLanguage;
 
   const navLanguage = (navigator.language || "").toLowerCase();
-  const match = Object.keys(APP_LOCALE_TO_BCP47).find((code) => navLanguage.indexOf(code) > -1);
+  const match = Object.keys(APP_LOCALE_TO_BCP47).find(
+    (code) => navLanguage === code || navLanguage.startsWith(`${code}-`),
+  );
   return match ?? "en-us";
 };
 

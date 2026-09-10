@@ -14,6 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use infra::table::score_configs::ScoreConfigDataType;
+use openobserve_core::llm_evaluations::score_configs::{
+    EnsureOutcome, EnsureScoreConfig, EnsuredScoreConfig,
+};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -50,6 +53,74 @@ pub struct ScoreConfigUpdateRequestBody {
     pub categories: Option<serde_json::Value>,
     #[serde(default)]
     pub healthy_threshold: Option<serde_json::Value>,
+}
+
+/// HTTP request body for ensuring a Score Config exists.
+///
+/// Safe to send on every run: identical parameters change nothing, a changed
+/// range or category set appends a version, and a different data type is
+/// refused.
+#[derive(Clone, Debug, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct EnsureScoreConfigRequestBody {
+    pub name: String,
+    #[schema(value_type = String)]
+    pub data_type: ScoreConfigDataType,
+    #[serde(default)]
+    pub description: Option<String>,
+    #[serde(default)]
+    pub numeric_range: Option<serde_json::Value>,
+    #[serde(default)]
+    pub categories: Option<serde_json::Value>,
+    #[serde(default)]
+    pub healthy_threshold: Option<serde_json::Value>,
+}
+
+#[derive(Clone, Copy, Debug, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum EnsureOutcomeBody {
+    Created,
+    Unchanged,
+    VersionBumped,
+}
+
+#[derive(Clone, Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct EnsureScoreConfigResponseBody {
+    pub outcome: EnsureOutcomeBody,
+    pub config: ScoreConfigResponseBody,
+}
+
+impl From<EnsureScoreConfigRequestBody> for EnsureScoreConfig {
+    fn from(value: EnsureScoreConfigRequestBody) -> Self {
+        Self {
+            name: value.name,
+            data_type: value.data_type,
+            description: value.description,
+            numeric_range: value.numeric_range,
+            categories: value.categories,
+            healthy_threshold: value.healthy_threshold,
+        }
+    }
+}
+
+impl From<EnsureOutcome> for EnsureOutcomeBody {
+    fn from(value: EnsureOutcome) -> Self {
+        match value {
+            EnsureOutcome::Created => Self::Created,
+            EnsureOutcome::Unchanged => Self::Unchanged,
+            EnsureOutcome::VersionBumped => Self::VersionBumped,
+        }
+    }
+}
+
+impl From<EnsuredScoreConfig> for EnsureScoreConfigResponseBody {
+    fn from(value: EnsuredScoreConfig) -> Self {
+        Self {
+            outcome: value.outcome.into(),
+            config: value.config.into(),
+        }
+    }
 }
 
 /// HTTP response body for a Score Config.

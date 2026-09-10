@@ -17,14 +17,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed } from "vue";
 import { useI18nTyped } from "@/types/i18n";
-import type { BrowserCheck } from "@/types/synthetics";
+import type { BrowserCheck, SyntheticCheckType } from "@/types/synthetics";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 
 const { t } = useI18nTyped();
 
 const props = defineProps<{
   check: BrowserCheck;
-  checkType?: "browser" | "api";
+  checkType?: SyntheticCheckType;
 }>();
 const emit = defineEmits<{ "update:check": [value: BrowserCheck] }>();
 
@@ -57,7 +57,7 @@ const sessionReplay = computed({
           :label="t('synthetics.rum.collectRUM')"
           data-test="synthetics-check-rum-collect-switch"
         />
-        <p class="text-text-secondary mt-1 pl-9 text-xs!">
+        <p class="text-text-secondary mt-1 ps-9 text-xs!">
           {{ t("synthetics.rum.collectRUMDesc") }}
         </p>
       </div>

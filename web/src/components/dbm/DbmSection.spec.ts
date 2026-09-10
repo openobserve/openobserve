@@ -35,11 +35,12 @@ describe("DbmSection", () => {
     expect(wrapper.element.tagName).toBe("SECTION");
     expect(wrapper.classes()).toEqual(
       expect.arrayContaining([
-        "card-container",
+        "bg-card-glass-bg",
         "border-border-default",
-        "rounded-surface",
+        "rounded-default",
         "flex",
         "flex-col",
+        "overflow-hidden",
         "border",
       ]),
     );
@@ -49,7 +50,7 @@ describe("DbmSection", () => {
     const heading = mountSection().get("h3");
     expect(heading.text()).toBe("Query plans");
     expect(heading.classes()).toEqual(
-      expect.arrayContaining(["text-text-heading", "text-sm", "font-medium"]),
+      expect.arrayContaining(["text-text-heading", "text-compact", "font-medium"]),
     );
   });
 
@@ -60,9 +61,9 @@ describe("DbmSection", () => {
    * actually uses, and nothing else.
    */
   it.each([
-    ["baseline", "flex flex-wrap items-baseline gap-2 p-3 pb-1"],
-    ["center", "flex flex-wrap items-center gap-2 p-3 pb-1"],
-    ["between", "flex items-center justify-between gap-2 p-3 pb-1"],
+    ["baseline", "border-border-default flex flex-wrap items-baseline gap-2 border-b px-3 py-2"],
+    ["center", "border-border-default flex flex-wrap items-center gap-2 border-b px-3 py-2"],
+    ["between", "border-border-default flex items-center justify-between gap-2 border-b px-3 py-2"],
   ])("lays the header out for headerAlign=%s", (headerAlign, expected) => {
     const header = mountSection({ headerAlign }).get("h3").element.parentElement;
     expect(header?.getAttribute("class")).toBe(expected);
@@ -71,7 +72,9 @@ describe("DbmSection", () => {
   /** Baseline is the common case, so it is what an unqualified section gets. */
   it("defaults to the baseline header", () => {
     const header = mountSection().get("h3").element.parentElement;
-    expect(header?.getAttribute("class")).toBe("flex flex-wrap items-baseline gap-2 p-3 pb-1");
+    expect(header?.getAttribute("class")).toBe(
+      "border-border-default flex flex-wrap items-baseline gap-2 border-b px-3 py-2",
+    );
   });
 
   /**

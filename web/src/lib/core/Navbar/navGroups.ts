@@ -133,12 +133,9 @@ export const NAV_GROUPS: NavGroupDef[] = [
     children: [
       // ── Alerts ──────────────────────────────────────────────────────────
       // These four are the alerting cluster, and they carry a peer tab strip
-      // (AlertSectionTabs) on every one of their pages. Same ORDER in both, and
-      // one header here — a rail that disagreed with the tabs would make the
-      // two feel like different places. Labels differ on purpose: the rail
-      // names a destination out of context ("Notification Destinations"), the
-      // strip names it inside one ("Destinations"), which is why both keys
-      // exist.
+      // (AlertSectionTabs) on every one of their pages. Same ORDER and same
+      // LABEL in both — a rail that disagreed with the tabs would make the
+      // two feel like different places.
       //
       // Destinations and Templates moved out of Settings: they are alerting
       // configuration, not deployment configuration. None of the three have a
@@ -168,7 +165,7 @@ export const NAV_GROUPS: NavGroupDef[] = [
         requires: "alertList",
         categoryKey: "menu.alerts",
       },
-      // The curated catalog you install alerts FROM — gated the same way, so
+      // The curated catalog you add alerts FROM — gated the same way, so
       // hiding Alerts hides the place to get more. Last, like its tab: you go
       // looking for it once, then work in the other three.
       {
@@ -277,7 +274,7 @@ export const NAV_GROUPS: NavGroupDef[] = [
     titleKey: "menu.data",
     icon: "database",
     parentLink: "/streams",
-    absorbs: ["streams", "pipeline", "ingestion"],
+    absorbs: ["streams", "pipeline", "ingestion", "workflows"],
     // Data follows the Reliability tile — after Infra, which names the same
     // anchor and is declared ahead of it. This is load-bearing: without it Data
     // lands at its own first absorbed item (pipeline/streams), near the TOP of
@@ -293,6 +290,11 @@ export const NAV_GROUPS: NavGroupDef[] = [
         requires: "pipeline",
         gate: "streamPipelines",
       },
+      // Sits with Pipelines — the two are the same kind of thing (a flow canvas)
+      // and share the canvas code. `requires` keys off the top-level entry
+      // MainLayout adds/removes from `workflows_enabled`, so the flag still owns
+      // visibility and no gate is duplicated here.
+      { titleKey: "menu.workflows", icon: "schema", name: "workflows", requires: "workflows" },
       { titleKey: "function.header", icon: "function", name: "functionList", requires: "pipeline" },
       {
         titleKey: "function.enrichmentTables",

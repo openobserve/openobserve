@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Main Panel -->
         <main
           data-test="main-content"
-          class="bg-surface-chrome-deeper flex min-h-0 flex-col pr-2 pb-2"
+          class="bg-surface-chrome-deeper flex min-h-0 flex-col pe-2 pb-2"
           :style="{
             width: !store.state.isAiChatEnabled
               ? '100%'
@@ -128,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             // The chat is a floating card in both modes — match the main content
             // card's right/bottom gap (+ rounded-surface corners) so they read as
             // the same card. Expanding only widens it; it never overlays the header.
-            'pr-2 pb-2',
+            'pe-2 pb-2',
           ]"
           :style="[
             {
@@ -179,8 +179,7 @@ import {
   useLocalUserInfo,
   getImageURL,
   invalidateLoginData,
-  getDueDays,
-  trialPeriodAllowedPath,
+  shouldPaywallRoute,
   emptyDataAllowedPaths,
 } from "../utils/zincutils";
 
@@ -348,13 +347,6 @@ export default defineComponent({
       : undefined;
     const selectedOrg = ref(store.state.selectedOrganization);
     const userClickedOrg = ref(store.state.selectedOrganization);
-    const isActionsEnabled = computed(() => {
-      return (
-        (config.isEnterprise == "true" || config.isCloud == "true") &&
-        store.state.zoConfig.actions_enabled
-      );
-    });
-
     const isIncidentsEnabled = computed(() => {
       return (
         (config.isEnterprise == "true" || config.isCloud == "true") &&
@@ -384,6 +376,14 @@ export default defineComponent({
         Boolean(store.state.zoConfig?.online_evals_enabled)
       );
     });
+
+    // The AI Observability menu entry itself ships on true OSS builds too —
+    // Monitor (LLM Insights + Sessions) needs no backend flag, unlike the rest
+    // of the module. AIObservabilityShell (Index.vue) shows only the Monitor
+    // group there; Evaluate/Experiment/Annotate/Agent Graph/Agent Behavior stay
+    // behind `isOnlineEvalsEnabled` as before.
+    const isOssBuild = !(config.isEnterprise == "true" || config.isCloud == "true");
+    const isAiObservabilityMenuVisible = computed(() => isOnlineEvalsEnabled.value || isOssBuild);
 
     // Backend `/config` flag `synthetics_enabled` — `ZO_SYNTHETICS_ENABLED`, and
     // no longer an enterprise build check: synthetics ships in OSS, and only the
@@ -500,6 +500,10 @@ export default defineComponent({
         code: "en-us",
       },
       {
+        label: raw("العربية"),
+        code: "ar",
+      },
+      {
         label: raw("Türkçe"),
         code: "tr-turk",
       },
@@ -613,12 +617,17 @@ export default defineComponent({
       !Object.prototype.hasOwnProperty.call(store.state.zoConfig, "version") ||
       store.state.zoConfig.version == "";
 
+    // Which org the full config was fetched for — the response carries
+    // org-scoped fields (e.g. per-user permission flags), so an org switch
+    // must refetch even when a config is already loaded.
+    let fullConfigOrg = "";
+
     // The full config endpoint is authenticated and org-scoped; on a fresh
     // session the org can resolve after this component mounts.
     watch(
       () => store.state.selectedOrganization?.identifier,
       (identifier) => {
-        if (identifier && needsFullConfig()) {
+        if (identifier && (needsFullConfig() || identifier !== fullConfigOrg)) {
           getConfig();
         }
       },
@@ -661,33 +670,14 @@ export default defineComponent({
       }
     };
 
-    const updateActionsMenu = () => {
-      if (isActionsEnabled.value) {
-        const incidentIndex = linksList.value.findIndex((link) => link.name === "incidentList");
-
-        const actionExists = linksList.value.some((link) => link.name === "actionScripts");
-
-        if (incidentIndex !== -1 && !actionExists) {
-          linksList.value.splice(incidentIndex + 1, 0, {
-            title: t("menu.actions"),
-            icon: "code",
-            link: "/actions",
-            name: "actionScripts",
-          });
-        }
-      }
-    };
-
-    // Insert the Workflows entry after Actions (fallback: Alerts). Idempotent.
+    // Insert the Workflows entry after Alerts. Idempotent.
     const updateWorkflowsMenu = () => {
       const existingIndex = linksList.value.findIndex((link) => link.name === "workflows");
 
       if (isWorkflowsEnabled.value) {
         if (existingIndex !== -1) return;
 
-        const actionIndex = linksList.value.findIndex((link) => link.name === "actionScripts");
-        const alertIndex = linksList.value.findIndex((link) => link.name === "alertList");
-        const anchor = actionIndex !== -1 ? actionIndex : alertIndex;
+        const anchor = linksList.value.findIndex((link) => link.name === "alertList");
         if (anchor === -1) return;
 
         linksList.value.splice(anchor + 1, 0, {
@@ -718,7 +708,7 @@ export default defineComponent({
         (link: any) => link.name === "aiObservability",
       );
 
-      if (isOnlineEvalsEnabled.value) {
+      if (isAiObservabilityMenuVisible.value) {
         if (existingIndex !== -1) return;
         const tracesIndex = linksList.value.findIndex((link: any) => link.name === "traces");
         const insertAt = tracesIndex === -1 ? linksList.value.length : tracesIndex + 1;
@@ -735,7 +725,7 @@ export default defineComponent({
 
     // If `/config` resolves after this component mounted (or if the flag
     // ever flips at runtime), keep the menu in sync.
-    watch(isOnlineEvalsEnabled, () => updateAIObservabilityMenu(), { immediate: false });
+    watch(isAiObservabilityMenuVisible, () => updateAIObservabilityMenu(), { immediate: false });
 
     const updateSyntheticMenu = () => {
       const existingIndex = linksList.value.findIndex((l: any) => l.name === "synthetics");
@@ -770,7 +760,6 @@ export default defineComponent({
 
     const filterMenus = () => {
       updateIncidentsMenu();
-      updateActionsMenu();
       updateWorkflowsMenu();
       updateSyntheticMenu();
       updateAIObservabilityMenu();
@@ -1131,21 +1120,17 @@ export default defineComponent({
         await useHomeDashboard(t).load(store.state?.selectedOrganization?.identifier);
 
         if (
-          orgSettings?.data?.data?.free_trial_expiry != null &&
-          orgSettings?.data?.data?.free_trial_expiry != ""
+          shouldPaywallRoute(
+            orgSettings?.data?.data?.free_trial_expiry,
+            router.currentRoute.value.name,
+          )
         ) {
-          const trialDueDays = getDueDays(orgSettings?.data?.data?.free_trial_expiry);
-          if (
-            trialDueDays <= 0 &&
-            trialPeriodAllowedPath.indexOf(router.currentRoute.value.name) == -1
-          ) {
-            router.push({
-              name: "plans",
-              query: {
-                org_identifier: selectedOrg.value.identifier,
-              },
-            });
-          }
+          router.push({
+            name: "plans",
+            query: {
+              org_identifier: selectedOrg.value.identifier,
+            },
+          });
         }
       } catch (error: any) {
         // Handle permission errors gracefully (403 = Forbidden)
@@ -1188,6 +1173,7 @@ export default defineComponent({
           }
 
           store.dispatch("setConfig", res.data);
+          fullConfigOrg = orgIdentifier;
           await nextTick();
 
           filterMenus();
@@ -1269,6 +1255,8 @@ export default defineComponent({
     };
 
     const toggleAIChat = () => {
+      // ai_enabled arrives with the async /config response, so it can't gate registration.
+      if (!store.state.zoConfig.ai_enabled) return;
       // On the home page, switch to the AI tab instead of opening the side panel
       if (router.currentRoute.value.name === "home") {
         window.dispatchEvent(new CustomEvent("o2:home-switch-tab", { detail: "ai" }));
@@ -1381,7 +1369,10 @@ export default defineComponent({
     };
 
     // ── Global shortcuts: AI Chat ─────────────────────────────────────────
-    useShortcuts([{ id: "aiChatToggle", handler: () => toggleAIChat() }]);
+    // O2 AI is enterprise-only: on OSS the Ctrl+B binding must not exist at all.
+    if (config.isEnterprise == "true") {
+      useShortcuts([{ id: "aiChatToggle", handler: () => toggleAIChat() }]);
+    }
 
     return {
       isDark,
@@ -1426,7 +1417,6 @@ export default defineComponent({
       userClickedOrg,
       verifyStreamExist,
       filterMenus,
-      updateActionsMenu,
       getConfig,
       setRumUser,
       openPredefinedThemes,

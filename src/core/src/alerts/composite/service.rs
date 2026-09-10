@@ -16,12 +16,11 @@ use config::meta::{
 };
 use db::authz::{remove_ownership, set_ownership};
 use infra::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{get_orm_client_ro, get_orm_client_rw},
     scheduler,
     table::{
         alert_composites,
         entity::{alert_composite_children, alert_composites as composite_entity},
-        get_lock,
     },
 };
 #[cfg(feature = "enterprise")]
@@ -72,6 +71,7 @@ pub struct CompositeCreate {
     pub tags: Vec<String>,
     pub owner: Option<String>,
     pub last_edited_by: Option<String>,
+    pub pending_period_sec: i64,
 }
 
 /// Errors the composite service surfaces to the API layer; each variant maps to
@@ -108,6 +108,8 @@ pub enum CompositeServiceError {
     Database(#[from] sea_orm::DbErr),
     #[error(transparent)]
     Scheduler(#[from] anyhow::Error),
+    #[error("Pending period must be >= 0")]
+    NegativePendingPeriod,
 }
 
 pub async fn create_composite(
@@ -151,9 +153,7 @@ pub async fn set_composite_enabled(
         ensure_mutation_allowed()?;
     }
     use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, sea_query::Expr};
-    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
+    let db = get_orm_client_rw().await;
     let result = composite_entity::Entity::update_many()
         .col_expr(composite_entity::Column::Enabled, Expr::value(enabled))
         .col_expr(
@@ -164,8 +164,6 @@ pub async fn set_composite_enabled(
         .filter(composite_entity::Column::Id.eq(id))
         .exec(db)
         .await?;
-    // released before the scheduler follow-ups below, which take this lock themselves
-    drop(_lock);
     if result.rows_affected != 1 {
         return Err(CompositeServiceError::NotFound);
     }
@@ -193,7 +191,7 @@ async fn increment_and_advance(
     next_run_at: i64,
 ) -> Result<(), CompositeServiceError> {
     ensure_mutation_allowed()?;
-    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let db = get_orm_client_rw().await;
     alert_composites::increment_evaluation_generation(db, org, id).await?;
     match scheduler::get(org, TriggerModule::CompositeAlert, id).await {
         Ok(mut trigger) => {
@@ -221,7 +219,7 @@ pub async fn move_composite(
 ) -> Result<(), CompositeServiceError> {
     ensure_mutation_allowed()?;
     use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, sea_query::Expr};
-    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let db = get_orm_client_rw().await;
     // Resolve the current folder for the authorization check and OpenFGA
     // relation rewrite below, mirroring alert::move_to_folder.
     #[cfg(feature = "enterprise")]
@@ -247,8 +245,6 @@ pub async fn move_composite(
     {
         return Err(CompositeServiceError::PermissionDenied);
     }
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
     let result = composite_entity::Entity::update_many()
         .col_expr(composite_entity::Column::FolderId, Expr::value(folder_id))
         .col_expr(composite_entity::Column::LastEditedBy, Expr::value(editor))
@@ -265,7 +261,6 @@ pub async fn move_composite(
         .exec(db)
         .await?;
     // released before the OpenFGA relation rewrites below
-    drop(_lock);
     #[cfg(feature = "enterprise")]
     if get_openfga_config().enabled {
         set_parent_relation(
@@ -325,6 +320,7 @@ pub async fn clone_composite(
             .unwrap_or_default(),
         owner: current.owner,
         last_edited_by: Some(editor),
+        pending_period_sec: current.pending_period_sec,
     })
     .await
 }
@@ -335,6 +331,9 @@ async fn persist(
 ) -> Result<composite_entity::Model, CompositeServiceError> {
     let parsed = parse_expr(&request.expression)
         .map_err(|error| CompositeServiceError::InvalidExpression(error.to_string()))?;
+    if request.pending_period_sec < 0 {
+        return Err(CompositeServiceError::NegativePendingPeriod);
+    }
     let references = collect_references(&parsed).map_err(map_expression_error)?;
     validate_children(&references).map_err(map_expression_error)?;
     let expression = canonical_expression(&parsed);
@@ -342,7 +341,7 @@ async fn persist(
     let graph_guard = composite_graph_lock::lock(&request.org)
         .await
         .map_err(|error| CompositeServiceError::Lock(error.to_string()))?;
-    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let db = get_orm_client_rw().await;
     let mutation = persist_under_lock(db, &id, request, expression, references, update).await;
     let unlock = graph_guard
         .release()
@@ -412,6 +411,7 @@ async fn persist_under_lock(
         last_edited_by: Set(request.last_edited_by),
         updated_at: Set(Some(config::utils::time::now_micros())),
         evaluation_generation: Set(0),
+        pending_period_sec: Set(request.pending_period_sec),
     };
     let children = resolved
         .into_iter()
@@ -550,7 +550,7 @@ pub async fn get_composite(
     org: &str,
     id: &str,
 ) -> Result<Option<alert_composites::CompositeWithChildren>, CompositeServiceError> {
-    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let db = get_orm_client_ro().await;
     Ok(alert_composites::get_by_id(db, org, id).await?)
 }
 
@@ -724,7 +724,7 @@ pub async fn validate_composite_graph(
     let parsed = parse_expr(expression).map_err(map_expression_error)?;
     let references = collect_references(&parsed).map_err(map_expression_error)?;
     validate_children(&references).map_err(map_expression_error)?;
-    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let db = get_orm_client_rw().await;
     let resolved = resolve_children(db, org, &references).await?;
     let mut graph = alert_composites::load_graph(db, org).await?;
     let candidate_id = composite_id.unwrap_or("__composite_preview__");
@@ -747,7 +747,7 @@ pub async fn delete_composite(org: &str, id: &str) -> Result<(), CompositeServic
     let graph_guard = composite_graph_lock::lock(org)
         .await
         .map_err(|error| CompositeServiceError::Lock(error.to_string()))?;
-    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let db = get_orm_client_rw().await;
     let result = async {
         let parents =
             alert_composites::list_parents(db, org, alert_composites::ChildKind::Composite, id)
@@ -837,7 +837,7 @@ pub async fn startup_preflight() -> anyhow::Result<()> {
         return Ok(());
     }
 
-    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let db = get_orm_client_ro().await;
     let definition_count = alert_composites::count_all(db).await? as usize;
     // `list` (not `len_module`) so a scheduler read failure fails the preflight
     // closed rather than silently reporting zero jobs.

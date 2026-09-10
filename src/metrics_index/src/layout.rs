@@ -20,10 +20,22 @@
 use arrow_schema::{DataType, Schema};
 use config::{
     FileFormat, get_config,
-    meta::{promql::HASH_LABEL, stream::StreamType},
+    meta::{
+        promql::HASH_LABEL,
+        stream::{FileKey, StreamType},
+    },
 };
 
 pub const METRICS_INDEX_ROW_COUNT: &str = "__oo_midx_row_count";
+/// Format version a writer stamps into the `.midx` schema; readers reject newer ones.
+pub const METRICS_INDEX_VERSION: u32 = 1;
+pub const METRICS_INDEX_VERSION_KEY: &str = "o2:midx_version";
+/// Row count of the data file the sidecar was written for; readers refuse a mismatch.
+pub const METRICS_INDEX_PARENT_RECORDS_KEY: &str = "o2:parent_records";
+/// Parquet only; absent for Vortex data files, whose access plan needs no row groups.
+pub const METRICS_INDEX_ROW_GROUP_SIZE_KEY: &str = "o2:row_group_size";
+/// Comma-joined `METRICS_HASH_EXCLUDED_LABELS` at write time; informational, readers ignore it.
+pub const METRICS_INDEX_EXCLUDED_LABELS_KEY: &str = "o2:excluded_labels";
 
 /// [`metrics_index_enabled`] narrowed to one stream: the layout also
 /// needs a `__hash__` column of type `UInt64` (remote-write / OTLP metrics).
@@ -35,15 +47,10 @@ pub fn metrics_index_stream(stream_type: StreamType, schema: &Schema) -> bool {
 }
 
 /// True when `stream_type` uses the metrics index layout
-/// (`ZO_METRICS_INDEX_ENABLED`): Parquet metrics files ordered by
+/// (`ZO_METRICS_INDEX_ENABLED`): metrics files ordered by
 /// `(__hash__, _timestamp)`, so readers must not assume a `_timestamp` order.
 pub fn metrics_index_enabled(stream_type: StreamType) -> bool {
-    if stream_type != StreamType::Metrics {
-        return false;
-    }
-    let cfg = get_config();
-    cfg.compact.metrics_index_enabled
-        && cfg.common.file_format.for_stream(stream_type) == FileFormat::Parquet
+    stream_type == StreamType::Metrics && get_config().compact.metrics_index_enabled
 }
 
 /// Metrics-specific physical layout encoded in a file-name prefix so readers
@@ -51,18 +58,24 @@ pub fn metrics_index_enabled(stream_type: StreamType) -> bool {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MetricsFileLayout {
     /// File ordered by `(__hash__ ASC, _timestamp ASC)` but not finalized:
-    /// written by the ingester and by incremental compactor merges of the
-    /// still-open hour (`hash-sorted-v1-{id}.parquet`).
+    /// written as Parquet by the ingester and in the configured format by
+    /// incremental compactor merges of the still-open hour
+    /// (`hash-sorted-v1-{id}.parquet` or `.vortex`).
     HashSorted,
+    /// One file ordered by `(__hash__ ASC, _timestamp ASC)` that an open-hour compactor
+    /// round merged from pending ingester files; later rounds leave it alone and the
+    /// hour-end merge takes it once more (`hash-merged-v1-{id}.parquet` or `.vortex`).
+    HashMerged,
     /// Size-bounded file ordered by `(__hash__ ASC, _timestamp ASC)` with a
     /// `.midx` metrics index (see [`MetricsFileLayout::metrics_index_path`]);
     /// written by the compactor's hour-end merge
-    /// (`indexed-v1-{id}.parquet`).
+    /// (`indexed-v1-{id}.parquet` or `.vortex`).
     Indexed,
 }
 
 impl MetricsFileLayout {
     const HASH_SORTED_PREFIX: &'static str = "hash-sorted-v1-";
+    const HASH_MERGED_PREFIX: &'static str = "hash-merged-v1-";
     const INDEXED_PREFIX: &'static str = "indexed-v1-";
     const METRICS_INDEX_DIR: &'static str = "midx";
     const METRICS_INDEX_EXT: &'static str = ".midx";
@@ -72,6 +85,7 @@ impl MetricsFileLayout {
         let file_name = path.rsplit('/').next().unwrap_or(path);
         for (prefix, layout) in [
             (Self::HASH_SORTED_PREFIX, Self::HashSorted),
+            (Self::HASH_MERGED_PREFIX, Self::HashMerged),
             (Self::INDEXED_PREFIX, Self::Indexed),
         ] {
             if let Some(id) = file_name.strip_prefix(prefix)
@@ -85,9 +99,20 @@ impl MetricsFileLayout {
         None
     }
 
+    /// Whether `path` names a `(__hash__, _timestamp)` ordered metrics file.
+    pub fn is_hash_ordered(path: &str) -> bool {
+        Self::of(path).is_some()
+    }
+
+    /// Whether every file is hash-ordered; one legacy file voids the ordering guarantee.
+    pub fn all_hash_ordered(files: &[FileKey]) -> bool {
+        files.iter().all(|file| Self::is_hash_ordered(&file.key))
+    }
+
     fn prefix(self) -> &'static str {
         match self {
             Self::HashSorted => Self::HASH_SORTED_PREFIX,
+            Self::HashMerged => Self::HASH_MERGED_PREFIX,
             Self::Indexed => Self::INDEXED_PREFIX,
         }
     }
@@ -110,7 +135,7 @@ impl MetricsFileLayout {
     /// The `.midx` metrics-index object of an indexed metrics data file. Stored like
     /// the Tantivy index — under its own root instead of next to the data —
     /// but in a distinct tree:
-    /// `files/{org}/metrics/{stream}/{date}/{hour}/indexed-v1-{id}.parquet`
+    /// `files/{org}/metrics/{stream}/{date}/{hour}/indexed-v1-{id}.vortex`
     /// -> `files/{org}/midx/{stream}/{date}/{hour}/indexed-v1-{id}.midx`.
     pub fn metrics_index_path(path: &str) -> Option<String> {
         if Self::of(path) != Some(Self::Indexed) {
@@ -159,6 +184,19 @@ mod metrics_file_layout_tests {
         assert_eq!(
             MetricsFileLayout::of("hash-sorted-v1-7099.vortex"),
             Some(MetricsFileLayout::HashSorted)
+        );
+        assert_eq!(
+            MetricsFileLayout::of("hash-merged-v1-77.parquet"),
+            Some(MetricsFileLayout::HashMerged)
+        );
+        assert!(MetricsFileLayout::is_hash_ordered(
+            "hash-merged-v1-77.vortex"
+        ));
+        assert_eq!(
+            MetricsFileLayout::metrics_index_path(
+                "files/o/metrics/s/2026/08/18/10/hash-merged-v1-77.parquet"
+            ),
+            None
         );
         assert_eq!(
             MetricsFileLayout::of("indexed-v1-456.vortex"),

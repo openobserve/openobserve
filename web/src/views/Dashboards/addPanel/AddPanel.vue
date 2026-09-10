@@ -173,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click.self="handleCloseAddVariable"
     >
       <div
-        class="add-variable-drawer-panel border-border-default bg-surface-base h-screen w-180 overflow-hidden rounded-none! border-l pt-2 pl-2 shadow-sm"
+        class="add-variable-drawer-panel border-border-default bg-surface-base h-screen w-180 overflow-hidden rounded-none! border-s ps-2 pt-2 shadow-sm"
       >
         <AddSettingVariable
           @save="handleSaveVariable"
@@ -615,6 +615,11 @@ export default defineComponent({
           }
         } catch (e) {
           console.error("Error while parsing panel data", e);
+        }
+
+        const queryCount = dashboardPanelData.data.queries?.length ?? 0;
+        if (dashboardPanelData.layout.currentQueryIndex >= queryCount) {
+          dashboardPanelData.layout.currentQueryIndex = queryCount > 0 ? queryCount - 1 : 0;
         }
 
         // Set the VRL toggle for the active query: on iff it has a VRL function.

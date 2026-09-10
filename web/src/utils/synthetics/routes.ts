@@ -82,6 +82,11 @@ export function syntheticsEditRoute(ctx: SyntheticsNavContext, id: string): Rout
   return { name: "synthetics-edit", params: { id }, query: baseQuery(ctx) };
 }
 
+/** The full-page status-page editor. Carries the org so a shared link resolves it. */
+export function statusPageEditRoute(ctx: SyntheticsNavContext, id: string): RouteLocationRaw {
+  return { name: "synthetics-status-page-edit", params: { id }, query: baseQuery(ctx) };
+}
+
 /**
  * A monitor's results page.
  *

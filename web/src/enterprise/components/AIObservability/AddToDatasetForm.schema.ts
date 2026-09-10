@@ -15,9 +15,8 @@
 
 // Validation schema for the Add To Dataset drawer (AddToDatasetDrawer.vue).
 // Same useOForm + co-located Zod pattern as DatasetForm / DatasetItemForm.
-// There is no `input` field: the server re-reads and purifies the input from
-// the trace reference, so the human only supplies the golden answer — and a
-// golden with no answer is not a golden, hence both fields are required.
+// There is no `input` field: the server re-reads and purifies it from the trace
+// reference. Expected output may be omitted for reference-free evaluation.
 
 import { z } from "zod";
 
@@ -40,9 +39,6 @@ export const addToDatasetDefaults = (): AddToDatasetForm => ({
 export const makeAddToDatasetSchema = (t: (_key: string) => string) =>
   z.object({
     datasetId: z.string().min(1, t("aiObservability.traceActions.dataset.errors.dataset")),
-    expectedOutput: z
-      .string()
-      .trim()
-      .min(1, t("aiObservability.traceActions.dataset.errors.expectedOutput")),
+    expectedOutput: z.string(),
     tags: z.array(z.string()),
   });

@@ -1,3 +1,5 @@
+use infra::db::{get_orm_client_ro, get_orm_client_rw};
+
 use super::*;
 
 // ── Location registry (synthetics_locations table) ───────────────────────────
@@ -108,9 +110,13 @@ pub async fn list_locations_for_org(org_id: &str) -> anyhow::Result<SyntheticsCa
 
     // One org-wide checks fetch, bucketed per location below — avoids a
     // JSON-contains query per row (locations arrays are filtered in Rust).
-    let checks = synthetics_checks::list(db()?, org_id, &ListSyntheticsParams::default())
-        .await
-        .unwrap_or_default();
+    let checks = synthetics_checks::list(
+        get_orm_client_rw().await,
+        org_id,
+        &ListSyntheticsParams::default(),
+    )
+    .await
+    .unwrap_or_default();
 
     // One agents query for every location, not one per location. The checks
     // fetch above was already hoisted out of this loop for the same reason.
@@ -542,9 +548,10 @@ pub async fn location_detail(org_id: &str, id: &str) -> anyhow::Result<LocationD
     let agents = synthetics_agents::list_by_location(&row.id)
         .await
         .unwrap_or_default();
-    let checks = synthetics_checks::list_referencing_location(db()?, org_id, &row.id)
-        .await
-        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+    let checks =
+        synthetics_checks::list_referencing_location(get_orm_client_rw().await, org_id, &row.id)
+            .await
+            .map_err(|e| anyhow::anyhow!(e.to_string()))?;
 
     let now = config::utils::time::now_micros();
     let window = agent_liveness_window_us();
@@ -613,7 +620,7 @@ pub async fn update_location(
 /// Deletes a location — rejected while any synthetic still references it.
 pub async fn delete_location(org_id: &str, is_root: bool, id: &str) -> anyhow::Result<()> {
     location_for_write(org_id, is_root, id).await?;
-    let conn = db()?;
+    let conn = get_orm_client_ro().await;
     let refs = synthetics_checks::count_referencing_location(conn, id)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;

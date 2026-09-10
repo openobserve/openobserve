@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm-action"
           :disabled="!hasPendingChanges"
           @click="applyDimensionChanges"
-          class="ml-2"
+          class="ms-2"
           data-test="apply-dimension-filters"
         >
           {{ t("common.apply") }}
@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="border-card-glass-border flex justify-end border-b border-solid p-2"
           >
             <OButton variant="ghost" size="sm-action" @click="loadDashboard" :loading="loading">
-              <OIcon name="refresh" size="xs" class="mr-1" />
+              <OIcon name="refresh" size="xs" class="me-1" />
               {{ t("common.refresh") }}
             </OButton>
           </div>
@@ -179,17 +179,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 collapsedGroups.has(group.id) ? 'chevron-right' : 'expand-more'
                               "
                               size="sm"
-                              class="mr-0.5"
+                              class="me-0.5"
                             />
                             <OIcon
                               v-if="typeof group.icon === 'string'"
                               :name="group.icon"
                               size="xs"
-                              class="mr-0.5"
+                              class="me-0.5"
                             />
                             <component v-else :is="group.icon" />
                             <span>{{ t(group.labelKey) }}</span>
-                            <OTag type="fieldTag" class="ml-1">{{ group.streams.length }}</OTag>
+                            <OTag type="fieldTag" class="ms-1">{{ group.streams.length }}</OTag>
                           </div>
                           <div class="flex gap-1">
                             <OButton
@@ -239,7 +239,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </template>
                   </template>
                   <div v-else class="px-2 pt-3 text-center">
-                    <OIcon name="info" size="sm" class="mr-1 align-middle" />
+                    <OIcon name="info" size="sm" class="me-1 align-middle" />
                     {{ t("search.noResult") }}
                   </div>
                 </div>
@@ -317,7 +317,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OTag
                         type="tabChip"
                         :value="activeMetricGroupTab === group.id ? 'active' : 'inactive'"
-                        class="ml-1"
+                        class="ms-1"
                         :class="{
                           'opacity-40':
                             (groupedSelectedMetricStreams.byGroup[group.id]?.length ?? 0) === 0,
@@ -354,7 +354,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       {{ error || t("correlation.metricsErrorDetails") }}
                     </div>
                     <OButton variant="ghost" size="sm-action" @click="loadDashboard">
-                      <OIcon name="refresh" size="xs" class="mr-1" />
+                      <OIcon name="refresh" size="xs" class="me-1" />
                       {{ t("correlation.retryButton") }}
                     </OButton>
                   </div>
@@ -412,7 +412,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ tracesError || t("correlation.tracesErrorDetails") }}
             </div>
             <OButton variant="ghost" size="sm-action" @click="loadCorrelatedTraces">
-              <OIcon name="refresh" size="xs" class="mr-1" />
+              <OIcon name="refresh" size="xs" class="me-1" />
               {{ t("correlation.retryButton") }}
             </OButton>
           </div>
@@ -458,7 +458,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     t("correlation.tracesFromService", { service: serviceName })
                   }}</span>
                 </div>
-                <div class="ml-auto flex items-center gap-2">
+                <div class="ms-auto flex items-center gap-2">
                   <OButton
                     variant="ghost"
                     size="sm-action"
@@ -466,7 +466,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="correlation-view-traces-page"
                     class="text-xs"
                   >
-                    <OIcon name="open-in-new" size="xs" class="mr-1" />
+                    <OIcon name="open-in-new" size="xs" class="me-1" />
                     {{ t("correlation.viewInTraces") }}
                     <OTooltip :content="t('correlation.viewInTraces')" side="top" />
                   </OButton>
@@ -553,7 +553,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="border-card-glass-border flex justify-end border-b border-solid p-2"
         >
           <OButton variant="ghost" size="sm-action" @click="loadDashboard" :loading="loading">
-            <OIcon name="refresh" size="xs" class="mr-1" />
+            <OIcon name="refresh" size="xs" class="me-1" />
             {{ t("common.refresh") }}
           </OButton>
         </div>
@@ -636,17 +636,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <OIcon
                             :name="collapsedGroups.has(group.id) ? 'chevron-right' : 'expand-more'"
                             size="sm"
-                            class="mr-0.5"
+                            class="me-0.5"
                           />
                           <OIcon
                             v-if="typeof group.icon === 'string'"
                             :name="group.icon"
                             size="xs"
-                            class="mr-0.5"
+                            class="me-0.5"
                           />
                           <component v-else :is="group.icon" />
                           <span>{{ t(group.labelKey) }}</span>
-                          <OTag type="fieldTag" class="ml-1">{{ group.streams.length }}</OTag>
+                          <OTag type="fieldTag" class="ms-1">{{ group.streams.length }}</OTag>
                         </div>
                         <div class="flex gap-1">
                           <OButton
@@ -696,7 +696,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                 </template>
                 <div v-else class="px-2 pt-3 text-center">
-                  <OIcon name="info" size="sm" class="mr-1 align-middle" />
+                  <OIcon name="info" size="sm" class="me-1 align-middle" />
                   {{ t("search.noResult") }}
                 </div>
               </div>
@@ -774,7 +774,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OTag
                       type="tabChip"
                       :value="activeMetricGroupTab === group.id ? 'active' : 'inactive'"
-                      class="ml-1"
+                      class="ms-1"
                       :class="{
                         'opacity-40':
                           (groupedSelectedMetricStreams.byGroup[group.id]?.length ?? 0) === 0,
@@ -811,7 +811,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ error || t("correlation.metricsErrorDetails") }}
                   </div>
                   <OButton variant="ghost" size="sm-action" @click="loadDashboard">
-                    <OIcon name="refresh" size="xs" class="mr-1" />
+                    <OIcon name="refresh" size="xs" class="me-1" />
                     {{ t("correlation.retryButton") }}
                   </OButton>
                 </div>
@@ -854,7 +854,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div class="text-text-secondary text-sm">{{ tracesError }}</div>
           <OButton variant="outline" size="sm-action" class="mt-4" @click="loadCorrelatedTraces">
-            <OIcon name="refresh" size="xs" class="mr-1" />
+            <OIcon name="refresh" size="xs" class="me-1" />
             {{ t("correlation.retryButton") }}
           </OButton>
         </div>
@@ -903,7 +903,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTag type="fieldTag" value="primary">
                 {{ tracesForDimensions.length }} {{ t("menu.traces") }}
               </OTag>
-              <div class="ml-auto flex items-center gap-2">
+              <div class="ms-auto flex items-center gap-2">
                 <OButton
                   variant="ghost"
                   size="sm-action"
@@ -911,7 +911,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="correlation-view-traces-page"
                   class="text-xs"
                 >
-                  <OIcon name="open-in-new" size="xs" class="mr-1" />
+                  <OIcon name="open-in-new" size="xs" class="me-1" />
                   {{ t("correlation.viewInTraces") }}
                   <OTooltip :content="t('correlation.viewInTraces')" side="top" />
                 </OButton>
@@ -987,11 +987,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-if="typeof group.icon === 'string'"
                   :name="group.icon"
                   size="xs"
-                  class="mr-0.5"
+                  class="me-0.5"
                 />
                 <component v-else :is="group.icon" />
                 <span>{{ t(group.labelKey) }}</span>
-                <OTag type="fieldTag" class="ml-1">{{ group.streams.length }}</OTag>
+                <OTag type="fieldTag" class="ms-1">{{ group.streams.length }}</OTag>
               </div>
               <div class="flex gap-1">
                 <OButton
@@ -1038,7 +1038,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- No results message -->
       <div v-else class="px-2 pt-3 text-center">
-        <OIcon name="info" size="sm" class="mr-1 align-middle" />
+        <OIcon name="info" size="sm" class="me-1 align-middle" />
         {{ t("search.noResult") }}
       </div>
     </div>
@@ -1051,7 +1051,7 @@ import OCard from "@/lib/core/Card/OCard.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
-import { ref, computed, watch, defineAsyncComponent, provide, nextTick } from "vue";
+import { ref, computed, watch, defineAsyncComponent, provide, nextTick, onUnmounted } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
@@ -1168,6 +1168,17 @@ const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } = useH
 
 // Track in-flight dimension-based trace stream so it can be cancelled on re-fetch
 let currentTracesStreamTraceId: string | null = null;
+
+// The in-flight traces stream outlives this component otherwise; cancel it on unmount.
+onUnmounted(() => {
+  if (currentTracesStreamTraceId) {
+    cancelStreamQueryBasedOnRequestId({
+      trace_id: currentTracesStreamTraceId,
+      org_id: currentOrgIdentifier.value,
+    });
+    currentTracesStreamTraceId = null;
+  }
+});
 
 // Resolved group definitions and their ids (reactive to prop changes)
 const groupDefs = computed(() => {

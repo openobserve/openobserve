@@ -18,6 +18,8 @@ export default class DashboardVariables {
     this.variableOptionByValue = (name, value) => page.locator(`[data-test="variable-selector-${name}-inner-option"][data-test-value="${value}"]`);
     this.variablePopover = (name) => page.locator(`[data-test="variable-selector-${name}-inner-popover"]`);
     this.variableWrapper = (name) => page.locator(`[data-test="variable-selector-${name}-inner"]`);
+    // OSpinner (role="status") shown inside a selector while its options load.
+    this.variableLoadingSpinner = (name) => page.locator(`[data-test="variable-selector-${name}"] [role="status"]`);
     // HTML panel editor (Monaco) locators
     this.htmlEditor = page.locator('[data-test="dashboard-html-editor"]');
     // Ad-hoc (dynamic) filter variable selector controls
@@ -193,11 +195,67 @@ export default class DashboardVariables {
     // if (!customValueSearch) {
     const saveBtn = this.page.locator('[data-test="dashboard-variable-save-btn"]');
     await saveBtn.waitFor({ state: "visible", timeout: 10000 });
-    await saveBtn.click();
+
+    // AddSettingVariable.vue's save button submits the form by id
+    // (type="submit" form="add-setting-variable-form"), so a click issued while
+    // that wiring is still settling silently no-ops: onSubmit never runs, no
+    // dashboard PUT goes out, and the wait below expires with the form still on
+    // screen. Gate the retry on the REQUEST rather than the row — a request that
+    // has been sent but not yet answered already proves the click landed, so a
+    // slow save can never be mistaken for a lost one and re-submitted.
+    const isVariableSaveCall = (target) =>
+      /\/api\/[^/]+\/dashboards\//.test(target.url()) &&
+      (target.method?.() ?? target.request().method()) === "PUT";
+
+    const submitAttempts = 3;
+    let saveRequest = null;
+
+    for (let attempt = 1; attempt <= submitAttempts; attempt++) {
+      const requestPromise = this.page
+        .waitForRequest(isVariableSaveCall, { timeout: 10000 })
+        .catch(() => null);
+
+      await saveBtn.click();
+
+      // Race the request against the form closing: in isFromAddPanel mode the save
+      // emits instead of calling the API, so waiting out the request timeout on
+      // every attempt would burn 30s before the row wait below ever runs.
+      saveRequest = await Promise.race([
+        requestPromise,
+        saveBtn
+          .waitFor({ state: "hidden", timeout: 10000 })
+          .then(() => null)
+          .catch(() => null),
+      ]);
+      if (saveRequest) break;
+
+      // Nothing hit the wire. If the form is gone the save landed some other
+      // way (or the drawer was torn down) — let the row wait below adjudicate.
+      if (!(await saveBtn.isVisible().catch(() => false))) break;
+    }
 
     // Wait for save to complete — variable row appears in the list once save + handleSaveVariable finished
     // This ensures: API call done → emit("save") → loadDashboard triggered → isAddVariable = false
-    await this.editVariableBtn(name).waitFor({ state: 'visible', timeout: 15000 });
+    await this.editVariableBtn(name)
+      .waitFor({ state: "visible", timeout: 15000 })
+      .catch(async (e) => {
+        // A rejected save (duplicate name, failed validation) leaves the form up
+        // and reports itself only as a toast. Surface that text instead of the
+        // opaque "waiting for dashboard-edit-variable-<name>" timeout.
+        const toast = await this.getErrorToastLocator()
+          .first()
+          .textContent({ timeout: 1000 })
+          .catch(() => null);
+        const formStillOpen = await saveBtn.isVisible().catch(() => false);
+        throw new Error(
+          `addDashboardVariable("${name}"): variable never appeared in the list after save` +
+            (!saveRequest && formStillOpen
+              ? " (form still open and no dashboard PUT reached the network — submit was rejected or lost)"
+              : "") +
+            (toast ? `; error toast: ${toast.trim()}` : "") +
+            `. ${e.message}`
+        );
+      });
 
     // Click the close button and wait for the drawer to fully close
     await this.settingsDrawerCloseBtn.waitFor({ state: 'visible', timeout: 5000 });
@@ -207,36 +265,99 @@ export default class DashboardVariables {
   }
 
   /**
-   * Click the trigger to open a variable's dropdown
+   * Open a variable's dropdown, retrying the click until the popover is actually up.
+   * A single click is not enough: a selector whose options are still loading
+   * re-renders on arrival and swallows the pointer event, so the popover never
+   * opens and every downstream wait burns its full timeout.
    * @param {string} variableName - Variable name
    */
   async clickVariableTrigger(variableName) {
     const trigger = this.variableTrigger(variableName);
-    await trigger.waitFor({ state: 'visible', timeout: 10000 });
-    await trigger.click();
-    await this.variablePopover(variableName).waitFor({ state: 'visible', timeout: 5000 });
+    const popover = this.variablePopover(variableName);
+    await trigger.waitFor({ state: "visible", timeout: 15000 });
+
+    await expect
+      .poll(
+        async () => {
+          if (await popover.isVisible().catch(() => false)) return true;
+          await trigger.click({ timeout: 5000 }).catch(() => {});
+          return await popover
+            .waitFor({ state: "visible", timeout: 3000 })
+            .then(() => true)
+            .catch(() => false);
+        },
+        { timeout: 20000, intervals: [500, 1000, 1500, 2000, 2000] }
+      )
+      .toBe(true);
   }
 
   /**
-   * Fill the search input inside an already-open variable dropdown
+   * Type a search term into a variable's dropdown and wait for the refetch it triggers.
+   * Re-opens the dropdown when the input is gone — a values response landing between
+   * two fills re-renders the selector and detaches the input mid-action.
    * @param {string} variableName - Variable name
    * @param {string} term - Search term
    */
   async fillVariableSearch(variableName, term) {
     const searchInput = this.variableSearchInput(variableName);
-    await searchInput.waitFor({ state: 'visible', timeout: 5000 });
+
+    if (!(await searchInput.isVisible().catch(() => false))) {
+      await this.clickVariableTrigger(variableName);
+      await searchInput.waitFor({ state: "visible", timeout: 10000 });
+    }
+
+    // Resolves on response headers, so it is unaffected by whether the SSE body
+    // can be read back through CDP — a search that legitimately hits cache and
+    // issues no request just falls through to the caller's own wait.
+    const valuesRequest = this.page
+      .waitForResponse((r) => r.url().includes("_values_stream"), { timeout: 15000 })
+      .catch(() => null);
+
     await searchInput.fill(term);
+    await valuesRequest;
   }
 
   /**
-   * Select an option from an open variable dropdown by its exact value
+   * Select an option from an open variable dropdown by its exact value.
+   * The option list is backed by a query over just-ingested data, so a missing
+   * option means "not indexed yet" as often as "not there" — re-issue the values
+   * query by reopening the dropdown until it shows up.
    * @param {string} variableName - Variable name
    * @param {string} value - Option value (data-test-value attribute)
    */
   async selectVariableOption(variableName, value) {
     const option = this.variableOptionByValue(variableName, value);
-    await option.waitFor({ state: 'visible', timeout: 10000 });
+    const searchInput = this.variableSearchInput(variableName);
+
+    await expect
+      .poll(
+        async () => {
+          if (await option.isVisible().catch(() => false)) return true;
+          await this.page.keyboard.press("Escape").catch(() => {});
+          await this.clickVariableTrigger(variableName).catch(() => {});
+          if (await searchInput.isVisible().catch(() => false)) {
+            await this.fillVariableSearch(variableName, value).catch(() => {});
+          }
+          return await option.isVisible().catch(() => false);
+        },
+        { timeout: 30000, intervals: [1000, 2000, 3000, 5000, 5000] }
+      )
+      .toBe(true);
+
     await option.click();
+  }
+
+  /**
+   * Close a variable's dropdown and wait for the popover to be gone.
+   * A multi-select selector stays open after a value is picked, and its portal
+   * then eats clicks aimed at the editor behind it.
+   * @param {string} variableName - Variable name
+   */
+  async closeVariableDropdown(variableName) {
+    const popover = this.variablePopover(variableName);
+    if (!(await popover.isVisible().catch(() => false))) return;
+    await this.page.keyboard.press("Escape").catch(() => {});
+    await popover.waitFor({ state: "hidden", timeout: 10000 }).catch(() => {});
   }
 
   // Dynamic function to fill input by label

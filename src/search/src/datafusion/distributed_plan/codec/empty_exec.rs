@@ -94,7 +94,10 @@ pub fn try_encode(node: Arc<dyn ExecutionPlan>, buf: &mut Vec<u8>) -> Result<()>
 
 #[cfg(test)]
 mod tests {
-    use datafusion::arrow::datatypes::{DataType, Field, Schema};
+    use datafusion::{
+        arrow::datatypes::{DataType, Field, Schema},
+        common::TableReference,
+    };
     use datafusion_proto::bytes::{
         physical_plan_from_bytes_with_extension_codec, physical_plan_to_bytes_with_extension_codec,
     };
@@ -103,9 +106,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_datafusion_codec() -> Result<()> {
+        let stream_name = "node_memory_MemTotal_bytes";
+        let plan_table_name = TableReference::bare(stream_name).to_quoted_string();
         let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, false)]));
         let plan: Arc<dyn ExecutionPlan> = Arc::new(NewEmptyExec::new(
-            "test",
+            &plan_table_name,
             Arc::clone(&schema),
             Some(&vec![0]),
             &[],
@@ -133,6 +138,10 @@ mod tests {
         assert_eq!(plan.limit(), plan2.limit());
         assert_eq!(plan.full_schema(), plan2.full_schema());
         assert_eq!(plan.sort_order(), plan2.sort_order());
+        assert_eq!(
+            TableReference::from(plan2.name()),
+            TableReference::bare(stream_name)
+        );
 
         Ok(())
     }

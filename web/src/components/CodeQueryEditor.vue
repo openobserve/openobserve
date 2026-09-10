@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="relative flex h-full w-full flex-col" v-bind="$attrs">
+  <div class="relative flex h-full w-full flex-col" dir="ltr" v-bind="$attrs">
     <div
       data-test="query-editor"
       class="logs-query-editor bg-card-glass-bg min-h-0 flex-1"
@@ -596,15 +596,17 @@ export default defineComponent({
         emit("run-query");
       };
 
-      editorObj.createContextKey("ctrlenter", true);
-      editorObj.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, runQuery, "ctrlenter");
+      // Handled here rather than via addCommand: monaco's addCommand discards the
+      // disposable it gets back, so its CommandsRegistry entry outlives the editor.
+      editorObj.onKeyDown((e: any) => {
+        if (e.keyCode === monaco.KeyCode.Enter && (e.ctrlKey || e.metaKey)) {
+          e.preventDefault();
+          e.stopPropagation();
+          runQuery();
+        }
+      });
       editorObj.onDidFocusEditorWidget(() => {
         emit("focus");
-
-        // added hack to handle case where ctrl+enter / cmd+enter stops working after
-        // user click on the result row and open sidebase or opensidebar from schedule search
-        // This is because the editor loses focus and the context key "ctrlenter" is not active anymore, so we need to re-add the command on focus
-        editorObj.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, runQuery, "ctrlenter");
       });
 
       editorObj.onDidBlurEditorWidget(() => {

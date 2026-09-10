@@ -37,6 +37,7 @@ vi.mock("@vue-flow/core", async () => {
     setCenter: vi.fn(),
     removeEdges: vi.fn(),
     getSelectedEdges: ref([]),
+    getSelectedNodes: ref([]),
     viewport: ref({ x: 0, y: 0, zoom: 1 }),
     dimensions: ref({ width: 1000, height: 600 }),
   };
@@ -44,7 +45,7 @@ vi.mock("@vue-flow/core", async () => {
     __state: state,
     VueFlow: {
       name: "VueFlow",
-      props: ["nodes", "edges", "defaultViewport", "minZoom", "maxZoom"],
+      props: ["nodes", "edges", "defaultViewport", "minZoom", "maxZoom", "deleteKeyCode"],
       emits: [
         "update:nodes",
         "update:edges",
@@ -54,6 +55,10 @@ vi.mock("@vue-flow/core", async () => {
         "node-change",
         "nodes-change",
         "edges-change",
+        "node-mouse-enter",
+        "node-mouse-leave",
+        "edge-mouse-enter",
+        "edge-mouse-leave",
       ],
       data() {
         return {
@@ -69,6 +74,7 @@ vi.mock("@vue-flow/core", async () => {
             data: { foo: "bar" },
             markerEnd: "url(#arrow)",
             style: { stroke: "grey" },
+            selected: true,
           },
         };
       },
@@ -99,6 +105,7 @@ vi.mock("@vue-flow/core", async () => {
       fitView: state.fitView,
       setCenter: state.setCenter,
       getSelectedEdges: state.getSelectedEdges,
+      getSelectedNodes: state.getSelectedNodes,
       removeEdges: state.removeEdges,
       viewport: state.viewport,
       dimensions: state.dimensions,
@@ -144,6 +151,9 @@ vi.mock("@/components/flow/FlowEdge.vue", () => ({
       "data",
       "markerEnd",
       "style",
+      "selected",
+      "insertable",
+      "label",
     ],
     template: '<div class="mock-flow-edge" />',
   },
@@ -171,7 +181,10 @@ vi.mock("@/plugins/workflows/useWorkflowCanvas", async () => {
     onDrop: vi.fn(),
     onDragOver: vi.fn(),
     openTriggerPicker: vi.fn(),
+    openActionPicker: vi.fn(),
+    openStepPicker: vi.fn(),
     openInsertPicker: vi.fn(),
+    requestDeleteNode: vi.fn(),
   };
   return {
     default: () => api,
@@ -181,6 +194,24 @@ vi.mock("@/plugins/workflows/useWorkflowCanvas", async () => {
     undoWorkflow: vi.fn(),
     redoWorkflow: vi.fn(),
     tidyWorkflowLayout: vi.fn(),
+    // The canvas asks this for each edge's Branch-arm label; only "e1" is rendered.
+    edgeBranchLabel: (edgeId: string) => (edgeId === "e1" ? "Severe (>=1000)" : ""),
+    // A Branch's arms drive one append `+` each, so the canvas resolves its stable
+    // handle ids through the real helper's contract.
+    NEW_BRANCH_PATH_HANDLE: "__new_path__",
+    branchHandles: (node: any) => {
+      if (node?.data?.node_type !== "branch") return [];
+      const cases = node?.data?.cases;
+      if (!Array.isArray(cases) || !cases.length) return [];
+      return [...cases.map((c: any, i: number) => c?.handle || `case-${i}`), "else"];
+    },
+    // The canvas asks for a node's io_type to decide which leaves can offer an
+    // "append step" point — a terminal (output) node cannot. Only ioType is read.
+    nodeMeta: (nodeType: string) => {
+      if (nodeType === "destination") return { ioType: "output" };
+      if (nodeType === "workflow_trigger") return { ioType: "input" };
+      return { ioType: "default" };
+    },
   };
 });
 
@@ -341,18 +372,36 @@ describe("WorkflowCanvas", () => {
         style: { stroke: "grey" },
       });
     });
+
+    it("passes the resolved Branch-arm label onto FlowEdge", () => {
+      wrapper = mountCanvas();
+      expect(wrapper.findComponent({ name: "FlowEdge" }).props("label")).toBe("Severe (>=1000)");
+    });
+
+    // Without this the click-selected edge looks identical to every other edge,
+    // so users conclude edges cannot be selected or deleted at all.
+    it("passes VueFlow's selected flag onto FlowEdge so selection is visible", () => {
+      wrapper = mountCanvas();
+      expect(wrapper.findComponent({ name: "FlowEdge" }).props("selected")).toBe(true);
+    });
   });
 
-  // The empty canvas now offers a clickable start node (which opens the trigger
-  // picker) in place of the old hint text.
+  // Two DIFFERENT start surfaces, and which one shows is the contract:
+  //   • empty canvas          → the two-slot SCAFFOLD (Trigger + Action)
+  //   • trigger missing, but
+  //     steps already placed  → the single "Choose a Trigger" card
   describe("empty-canvas start node", () => {
     const startNode = (w: any) => w.find('[data-test="workflow-flow-start-node"]');
+    const scaffold = (w: any) => w.find('[data-test="workflow-flow-start-scaffold"]');
 
-    it("shows the start node when the canvas has no nodes", () => {
+    it("shows the two-slot scaffold when the canvas has no nodes", () => {
       wrapper = mountCanvas();
-      const node = startNode(wrapper);
-      expect(node.exists()).toBe(true);
-      expect(node.text()).toBe("Choose a Trigger");
+      expect(scaffold(wrapper).exists()).toBe(true);
+      // Both slots are offered up front, so the trigger isn't a dead end.
+      expect(wrapper.find('[data-test="workflow-flow-start-trigger"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="workflow-flow-start-action"]').exists()).toBe(true);
+      // The single "trigger missing" card belongs to the non-empty case only.
+      expect(startNode(wrapper).exists()).toBe(false);
     });
 
     it("hides the start node once a node exists", async () => {
@@ -360,15 +409,36 @@ describe("WorkflowCanvas", () => {
       wrapper = mountCanvas();
       await nextTick();
       expect(startNode(wrapper).exists()).toBe(false);
+      expect(scaffold(wrapper).exists()).toBe(false);
     });
 
-    it("re-shows the start node when the last node is removed", async () => {
+    // The scaffold has no node to hang off, so it is SCREEN-anchored (centred in the
+    // pane, below the top edge) — not pinned to flow origin, which sits at the pane's
+    // top-left corner under the default viewport and puts the cards half off-screen.
+    it("centres the scaffold in the pane, below the top edge", () => {
+      vf.viewport.value = { x: 0, y: 0, zoom: 1 };
+      wrapper = mountCanvas();
+      const style = scaffold(wrapper).attributes("style") || "";
+      // pane is 1000 wide in the mock → centre is 500px
+      expect(style).toContain("--wf-ox: 500px");
+      expect(style).toMatch(/--wf-oy:\s*(?!0px)\d/);
+    });
+
+    it("keeps the scaffold screen-anchored when the canvas is panned", () => {
+      vf.viewport.value = { x: 240, y: -180, zoom: 1 };
+      wrapper = mountCanvas();
+      const style = scaffold(wrapper).attributes("style") || "";
+      // panning the flow must not drag the scaffold off-centre
+      expect(style).toContain("--wf-ox: 500px");
+    });
+
+    it("re-shows the scaffold when the last node is removed", async () => {
       wfObj.currentSelectedWorkflow.nodes = [triggerNode()];
       wrapper = mountCanvas();
       await nextTick();
       wfObj.currentSelectedWorkflow.nodes = [];
       await nextTick();
-      expect(startNode(wrapper).exists()).toBe(true);
+      expect(scaffold(wrapper).exists()).toBe(true);
     });
 
     it("re-shows the start node when the trigger is deleted mid-graph (steps remain)", async () => {
@@ -491,6 +561,456 @@ describe("WorkflowCanvas", () => {
       vf.nodesInitializedCb();
 
       expect(vf.setViewport).not.toHaveBeenCalled();
+    });
+  });
+
+  // Append `+` (option A): straight-down for every non-terminal node, but a node
+  // whose centre slot is taken by a child reveals it on HOVER only; a leaf and a
+  // free-centre (fanned-out) node keep it persistent.
+  describe("append + (Option C: nothing at rest, node hover reveals)", () => {
+    beforeEach(() => vf.findNode.mockReturnValue({ dimensions: { width: 200 } }));
+    const count = (w: any) => w.findAll('[data-test="workflow-flow-append-add"]').length;
+
+    it("shows no append + at rest and reveals only the hovered node's", async () => {
+      wfObj.currentSelectedWorkflow = {
+        nodes: [
+          { id: "t1", position: { x: 100, y: 40 }, data: { node_type: "workflow_trigger" } },
+          { id: "c1", position: { x: 100, y: 240 }, data: { node_type: "condition" } },
+        ],
+        edges: [{ id: "e1", source: "t1", target: "c1" }],
+      };
+      wrapper = mountCanvas();
+      await nextTick();
+      expect(count(wrapper)).toBe(0); // quiet at rest — even the leaf c1
+
+      flow(wrapper).vm.$emit("node-mouse-enter", { node: { id: "c1" } });
+      await nextTick();
+      expect(count(wrapper)).toBe(1); // only the hovered node's +
+
+      flow(wrapper).vm.$emit("node-mouse-enter", { node: { id: "t1" } });
+      await nextTick();
+      expect(count(wrapper)).toBe(1); // still just one — the newly hovered node
+    });
+
+    it("never offers a + on a terminal (output) node", async () => {
+      wfObj.currentSelectedWorkflow = {
+        nodes: [
+          { id: "t1", position: { x: 100, y: 40 }, data: { node_type: "workflow_trigger" } },
+          { id: "d1", position: { x: 100, y: 240 }, data: { node_type: "destination" } },
+        ],
+        edges: [{ id: "e1", source: "t1", target: "d1" }],
+      };
+      wrapper = mountCanvas();
+      await nextTick();
+      flow(wrapper).vm.$emit("node-mouse-enter", { node: { id: "d1" } });
+      await nextTick();
+      expect(count(wrapper)).toBe(0); // d1 is terminal → never a +
+    });
+  });
+
+  // P0 — a Branch's append `+` used to open the step picker with the literal
+  // handle "out", so every step added from it produced an edge with NO
+  // source_handle and the workflow failed its own path validation.
+  describe("append + on a Branch: one per arm, each carrying its own handle", () => {
+    beforeEach(() => vf.findNode.mockReturnValue({ dimensions: { width: 200 } }));
+    const points = (w: any) => w.findAll('[data-test="workflow-flow-append-add"]');
+    const branchWorkflow = () => {
+      wfObj.currentSelectedWorkflow = {
+        nodes: [
+          { id: "t1", position: { x: 100, y: 40 }, data: { node_type: "workflow_trigger" } },
+          {
+            id: "b1",
+            position: { x: 100, y: 240 },
+            data: {
+              node_type: "branch",
+              cases: [{ handle: "case-0" }, { handle: "case-1" }],
+            },
+          },
+        ],
+        edges: [{ id: "e1", source: "t1", target: "b1" }],
+      };
+    };
+
+    it("reveals one append + per declared arm (3 paths → 3 points)", async () => {
+      branchWorkflow();
+      wrapper = mountCanvas();
+      await nextTick();
+      flow(wrapper).vm.$emit("node-mouse-enter", { node: { id: "b1" } });
+      await nextTick();
+      expect(points(wrapper)).toHaveLength(3);
+    });
+
+    it('opens the step picker with THAT arm\'s handle, never "out"', async () => {
+      branchWorkflow();
+      wrapper = mountCanvas();
+      await nextTick();
+      flow(wrapper).vm.$emit("node-mouse-enter", { node: { id: "b1" } });
+      await nextTick();
+      const buttons = wrapper.findAllComponents({ name: "FlowAddButton" });
+      await buttons[0].vm.$emit("click", { clientX: 1, clientY: 2 });
+      await buttons[2].vm.$emit("click", { clientX: 1, clientY: 2 });
+      const calls = api.openStepPicker.mock.calls;
+      expect(calls[0][0]).toBe("b1");
+      expect(calls[0][1]).toBe("case-0");
+      expect(calls[1][1]).toBe("else");
+    });
+
+    it("gives each arm's + a distinct horizontal offset so they do not stack", async () => {
+      branchWorkflow();
+      wrapper = mountCanvas();
+      await nextTick();
+      flow(wrapper).vm.$emit("node-mouse-enter", { node: { id: "b1" } });
+      await nextTick();
+      const lefts = points(wrapper).map((p: any) => p.attributes("style"));
+      expect(new Set(lefts).size).toBe(3);
+    });
+
+    it("a deleted middle path keeps stable handles on the + points", async () => {
+      wfObj.currentSelectedWorkflow = {
+        nodes: [
+          { id: "t1", position: { x: 100, y: 40 }, data: { node_type: "workflow_trigger" } },
+          {
+            id: "b1",
+            position: { x: 100, y: 240 },
+            data: {
+              node_type: "branch",
+              cases: [{ handle: "case-0" }, { handle: "case-2" }],
+            },
+          },
+        ],
+        edges: [{ id: "e1", source: "t1", target: "b1" }],
+      };
+      wrapper = mountCanvas();
+      await nextTick();
+      flow(wrapper).vm.$emit("node-mouse-enter", { node: { id: "b1" } });
+      await nextTick();
+      const buttons = wrapper.findAllComponents({ name: "FlowAddButton" });
+      await buttons[1].vm.$emit("click", { clientX: 1, clientY: 2 });
+      expect(api.openStepPicker.mock.calls[0][1]).toBe("case-2");
+    });
+
+    // The arm `+` hangs directly under its handle, so its connector graphic would
+    // otherwise swallow the mousedown that STARTS a wiring drag — the affordance
+    // for adding a step must never block the gesture for connecting one.
+    it("lets pointer events through the + connector so the handle under it stays draggable", async () => {
+      branchWorkflow();
+      wrapper = mountCanvas();
+      await nextTick();
+      flow(wrapper).vm.$emit("node-mouse-enter", { node: { id: "b1" } });
+      await nextTick();
+      const pt = wrapper.find('[data-test="workflow-flow-append-add"]');
+      expect(pt.classes()).toContain("pointer-events-none");
+      // ...but the button inside it must still be clickable.
+      const btn = wrapper.findComponent({ name: "FlowAddButton" });
+      expect(btn.classes()).toContain("pointer-events-auto");
+    });
+
+    // A wired arm already leads somewhere; re-offering its `+` made a fully wired
+    // 3-arm Branch sprout 3 MORE arrows on hover — the reported "always three".
+    it("omits the + for an arm that is already wired", async () => {
+      wfObj.currentSelectedWorkflow = {
+        nodes: [
+          { id: "t1", position: { x: 100, y: 40 }, data: { node_type: "workflow_trigger" } },
+          {
+            id: "b1",
+            position: { x: 100, y: 240 },
+            data: {
+              node_type: "branch",
+              cases: [{ handle: "case-0" }, { handle: "case-1" }],
+            },
+          },
+          { id: "d1", position: { x: 0, y: 440 }, data: { node_type: "destination" } },
+        ],
+        edges: [
+          { id: "e1", source: "t1", target: "b1" },
+          { id: "e2", source: "b1", target: "d1", sourceHandle: "case-0" },
+        ],
+      };
+      wrapper = mountCanvas();
+      await nextTick();
+      flow(wrapper).vm.$emit("node-mouse-enter", { node: { id: "b1" } });
+      await nextTick();
+      const pts = points(wrapper);
+      expect(pts).toHaveLength(2);
+      // Each + must sit ON its own arm's handle (case-1 is the middle of three, so the
+      // node centre), not spread as if the unwired arms were the only ones.
+      expect(pts[0].attributes("style")).toContain("--wf-ox: 200px");
+      const buttons = wrapper.findAllComponents({ name: "FlowAddButton" });
+      await buttons[0].vm.$emit("click", { clientX: 1, clientY: 2 });
+      expect(api.openStepPicker.mock.calls[0][1]).toBe("case-1");
+    });
+
+    it("still offers a + for a new path when every arm is wired", async () => {
+      wfObj.currentSelectedWorkflow = {
+        nodes: [
+          { id: "t1", position: { x: 100, y: 40 }, data: { node_type: "workflow_trigger" } },
+          {
+            id: "b1",
+            position: { x: 100, y: 240 },
+            data: {
+              node_type: "branch",
+              cases: [{ handle: "case-0" }, { handle: "case-1" }],
+            },
+          },
+          { id: "d1", position: { x: 0, y: 440 }, data: { node_type: "destination" } },
+          { id: "d2", position: { x: 200, y: 440 }, data: { node_type: "destination" } },
+          { id: "d3", position: { x: 400, y: 440 }, data: { node_type: "destination" } },
+        ],
+        edges: [
+          { id: "e1", source: "t1", target: "b1" },
+          { id: "e2", source: "b1", target: "d1", sourceHandle: "case-0" },
+          { id: "e3", source: "b1", target: "d2", sourceHandle: "case-1" },
+          { id: "e4", source: "b1", target: "d3", sourceHandle: "else" },
+        ],
+      };
+      wrapper = mountCanvas();
+      await nextTick();
+      flow(wrapper).vm.$emit("node-mouse-enter", { node: { id: "b1" } });
+      await nextTick();
+      // Every other node type keeps its + when wired; a Branch losing its only canvas
+      // affordance made a further path unreachable without opening the drawer.
+      const pts = points(wrapper);
+      expect(pts).toHaveLength(1);
+      // Not the node centre — that is the middle arm's edge and its own mid-edge +.
+      expect(pts[0].attributes("style")).not.toContain("--wf-ox: 200px");
+    });
+
+    // A case-less Branch declares no handles at all now, so its + must MINT a
+    // path — an "out" + here would wire a handle-less edge the backend rejects.
+    it("a case-less branch offers one + that mints a path instead of legacy arms", async () => {
+      wfObj.currentSelectedWorkflow = {
+        nodes: [
+          { id: "t1", position: { x: 100, y: 40 }, data: { node_type: "workflow_trigger" } },
+          { id: "b1", position: { x: 100, y: 240 }, data: { node_type: "branch" } },
+        ],
+        edges: [{ id: "e1", source: "t1", target: "b1" }],
+      };
+      wrapper = mountCanvas();
+      await nextTick();
+      flow(wrapper).vm.$emit("node-mouse-enter", { node: { id: "b1" } });
+      await nextTick();
+      const pts = points(wrapper);
+      expect(pts).toHaveLength(1);
+      const buttons = wrapper.findAllComponents({ name: "FlowAddButton" });
+      await buttons[0].vm.$emit("click", { clientX: 1, clientY: 2 });
+      expect(api.openStepPicker.mock.calls[0][1]).toBe("__new_path__");
+    });
+
+    it('a NON-branch node still gets exactly one + carrying "out"', async () => {
+      wfObj.currentSelectedWorkflow = {
+        nodes: [
+          { id: "t1", position: { x: 100, y: 40 }, data: { node_type: "workflow_trigger" } },
+          { id: "c1", position: { x: 100, y: 240 }, data: { node_type: "condition" } },
+        ],
+        edges: [{ id: "e1", source: "t1", target: "c1" }],
+      };
+      wrapper = mountCanvas();
+      await nextTick();
+      flow(wrapper).vm.$emit("node-mouse-enter", { node: { id: "c1" } });
+      await nextTick();
+      expect(points(wrapper)).toHaveLength(1);
+      const button = wrapper.findComponent({ name: "FlowAddButton" });
+      await button.vm.$emit("click", { clientX: 1, clientY: 2 });
+      expect(api.openStepPicker.mock.calls[0][1]).toBe("out");
+    });
+  });
+
+  describe("edge insert + (Option C: revealed by endpoint-node hover)", () => {
+    beforeEach(() => vf.findNode.mockReturnValue({ dimensions: { width: 200 } }));
+    const insertable = (w: any) => w.findComponent({ name: "FlowEdge" }).props("insertable");
+
+    it("hides the mid-edge + until an endpoint node is hovered", async () => {
+      // The mocked VueFlow renders edge-custom for edge id "e1"; wire e1 to n1→n2.
+      wfObj.currentSelectedWorkflow = {
+        nodes: [
+          { id: "n1", position: { x: 100, y: 40 }, data: { node_type: "condition" } },
+          { id: "n2", position: { x: 100, y: 240 }, data: { node_type: "condition" } },
+        ],
+        edges: [{ id: "e1", source: "n1", target: "n2" }],
+      };
+      wrapper = mountCanvas();
+      await nextTick();
+      expect(insertable(wrapper)).toBe(false); // quiet at rest
+
+      flow(wrapper).vm.$emit("node-mouse-enter", { node: { id: "n1" } });
+      await nextTick();
+      expect(insertable(wrapper)).toBe(true); // source hovered → revealed
+
+      flow(wrapper).vm.$emit("node-mouse-enter", { node: { id: "n2" } });
+      await nextTick();
+      expect(insertable(wrapper)).toBe(true); // target hovered → still revealed
+    });
+
+    it("reveals the mid-edge + when the edge line itself is hovered", async () => {
+      wfObj.currentSelectedWorkflow = {
+        nodes: [
+          { id: "n1", position: { x: 100, y: 40 }, data: { node_type: "condition" } },
+          { id: "n2", position: { x: 100, y: 240 }, data: { node_type: "condition" } },
+        ],
+        edges: [{ id: "e1", source: "n1", target: "n2" }],
+      };
+      wrapper = mountCanvas();
+      await nextTick();
+      expect(insertable(wrapper)).toBe(false); // no node hovered
+
+      flow(wrapper).vm.$emit("edge-mouse-enter", { edge: { id: "e1" } });
+      await nextTick();
+      expect(insertable(wrapper)).toBe(true); // edge line hovered → revealed
+    });
+  });
+
+  describe("Option C reveal timing + keep-alive (15s delay)", () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+      vf.findNode.mockReturnValue({ dimensions: { width: 200 } });
+    });
+    afterEach(() => vi.useRealTimers());
+
+    const count = (w: any) => w.findAll('[data-test="workflow-flow-append-add"]').length;
+    const insertable = (w: any) => w.findComponent({ name: "FlowEdge" }).props("insertable");
+    const oneNode = () => {
+      wfObj.currentSelectedWorkflow = {
+        nodes: [{ id: "n1", position: { x: 100, y: 40 }, data: { node_type: "condition" } }],
+        edges: [],
+      };
+    };
+    const twoNodesOneEdge = () => {
+      wfObj.currentSelectedWorkflow = {
+        nodes: [
+          { id: "n1", position: { x: 100, y: 40 }, data: { node_type: "condition" } },
+          { id: "n2", position: { x: 100, y: 240 }, data: { node_type: "condition" } },
+        ],
+        edges: [{ id: "e1", source: "n1", target: "n2" }],
+      };
+    };
+
+    // The long delay only covers travel to the `+`; moving to another node must swap
+    // the reveal at once rather than leaving two nodes lit for 15s.
+    it("drops the previous node's + as soon as another node is hovered", async () => {
+      twoNodesOneEdge();
+      wrapper = mountCanvas();
+      flow(wrapper).vm.$emit("node-mouse-enter", { node: { id: "n1" } });
+      await nextTick();
+      expect(count(wrapper)).toBe(1);
+
+      flow(wrapper).vm.$emit("node-mouse-leave");
+      flow(wrapper).vm.$emit("node-mouse-enter", { node: { id: "n2" } });
+      await nextTick();
+      const pts = wrapper.findAll('[data-test="workflow-flow-append-add"]');
+      expect(pts).toHaveLength(1);
+      expect(pts[0].attributes("style")).toContain("--wf-oy: 294px");
+    });
+
+    it("holds the node's + for the full delay after leaving, then hides", async () => {
+      oneNode();
+      wrapper = mountCanvas();
+      flow(wrapper).vm.$emit("node-mouse-enter", { node: { id: "n1" } });
+      await nextTick();
+      expect(count(wrapper)).toBe(1);
+
+      flow(wrapper).vm.$emit("node-mouse-leave");
+      vi.advanceTimersByTime(14999);
+      await nextTick();
+      expect(count(wrapper)).toBe(1); // still up just before the delay elapses
+
+      vi.advanceTimersByTime(1);
+      await nextTick();
+      expect(count(wrapper)).toBe(0); // hidden once the delay elapses
+    });
+
+    it("cancels the node hide when the cursor lands on the append +", async () => {
+      oneNode();
+      wrapper = mountCanvas();
+      flow(wrapper).vm.$emit("node-mouse-enter", { node: { id: "n1" } });
+      await nextTick();
+
+      flow(wrapper).vm.$emit("node-mouse-leave"); // hide scheduled
+      vi.advanceTimersByTime(100);
+      // Cursor reaches the + chip mid-travel — its mouseenter freezes the timer.
+      await wrapper.find('[data-test="workflow-flow-append-add"]').trigger("mouseenter");
+      vi.advanceTimersByTime(15000);
+      await nextTick();
+      expect(count(wrapper)).toBe(1); // still visible — never hid
+    });
+
+    it("holds the edge + for the full delay after the edge line is left, then hides", async () => {
+      twoNodesOneEdge();
+      wrapper = mountCanvas();
+      flow(wrapper).vm.$emit("edge-mouse-enter", { edge: { id: "e1" } });
+      await nextTick();
+      expect(insertable(wrapper)).toBe(true);
+
+      flow(wrapper).vm.$emit("edge-mouse-leave");
+      vi.advanceTimersByTime(14999);
+      await nextTick();
+      expect(insertable(wrapper)).toBe(true);
+
+      vi.advanceTimersByTime(1);
+      await nextTick();
+      expect(insertable(wrapper)).toBe(false);
+    });
+
+    it("keeps the edge + alive when the cursor moves onto it (insert-enter)", async () => {
+      twoNodesOneEdge();
+      wrapper = mountCanvas();
+      flow(wrapper).vm.$emit("edge-mouse-enter", { edge: { id: "e1" } });
+      await nextTick();
+
+      flow(wrapper).vm.$emit("edge-mouse-leave"); // hide scheduled
+      vi.advanceTimersByTime(100);
+      wrapper.findComponent({ name: "FlowEdge" }).vm.$emit("insert-enter"); // onto the +
+      vi.advanceTimersByTime(15000);
+      await nextTick();
+      expect(insertable(wrapper)).toBe(true); // frozen while on the chip
+
+      wrapper.findComponent({ name: "FlowEdge" }).vm.$emit("insert-leave"); // off the +
+      vi.advanceTimersByTime(15000);
+      await nextTick();
+      expect(insertable(wrapper)).toBe(false); // released → hides
+    });
+  });
+
+  // Keyboard delete must funnel through the SAME confirm flow as the trash button:
+  // VueFlow's default delete-key handling removes selected elements directly, which
+  // silently destroyed a just-configured node (still selected after its drawer closed).
+  describe("keyboard node delete goes through the confirm flow", () => {
+    const keydown = (key: string) =>
+      window.dispatchEvent(new KeyboardEvent("keydown", { key, cancelable: true }));
+
+    beforeEach(() => {
+      vf.getSelectedEdges.value = [];
+      vf.getSelectedNodes.value = [];
+      wfObj.readOnly = false;
+    });
+
+    it("🔑 disables VueFlow's built-in delete keys (delete-key-code null)", () => {
+      wrapper = mountCanvas();
+      expect(flow(wrapper).props("deleteKeyCode")).toBeNull();
+    });
+
+    it("🔑 Backspace on a selected node asks for confirmation instead of deleting", () => {
+      wrapper = mountCanvas();
+      vf.getSelectedNodes.value = [{ id: "n1" }];
+      keydown("Backspace");
+      expect(api.requestDeleteNode).toHaveBeenCalledWith("n1");
+      expect(vf.removeEdges).not.toHaveBeenCalled();
+    });
+
+    it("Delete triggers the same confirm; a selected edge still wins (direct removal)", () => {
+      wrapper = mountCanvas();
+      vf.getSelectedEdges.value = [{ id: "e1" }];
+      vf.getSelectedNodes.value = [{ id: "n1" }];
+      keydown("Delete");
+      expect(vf.removeEdges).toHaveBeenCalledWith(["e1"]);
+      expect(api.requestDeleteNode).not.toHaveBeenCalled();
+    });
+
+    it("is inert on the read-only Runs canvas", () => {
+      wrapper = mountCanvas();
+      wfObj.readOnly = true;
+      vf.getSelectedNodes.value = [{ id: "n1" }];
+      keydown("Backspace");
+      expect(api.requestDeleteNode).not.toHaveBeenCalled();
     });
   });
 });

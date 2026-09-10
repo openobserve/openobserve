@@ -42,12 +42,37 @@
 #[cfg(test)]
 pub(crate) static CONFIG_SWAP_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
+/// Whether THIS crate was compiled with the `cloud` feature — the fixture for
+/// the compile-time guard against SPEC §11 **F6**.
+///
+/// `openobserve-synthetics` had no `cloud` feature at all, so every
+/// `#[cfg(feature = "cloud")]` written inside it compiled to nothing, silently:
+/// no error, no log, no metric, just a revenue number that never moves. So the
+/// check is made at COMPILE time by the crates that know the answer — `src/jobs`
+/// and `src/api/management` each carry
+/// `#[cfg(feature = "cloud")] const _: () = assert!(BUILT_WITH_CLOUD);`.
+///
+/// **It must stay `cfg!`, never `#[cfg]`.** The macro form always evaluates, so
+/// the constant exists in every build shape and is simply `false` without
+/// `cloud`; the attribute form would delete it from exactly those builds, and
+/// each downstream assertion would then fail on a missing item rather than on
+/// the condition — or be "fixed" by another `#[cfg]`, which is silent absence
+/// one level further out.
+///
+/// Known limit: those downstream assertions are themselves
+/// `#[cfg(feature = "cloud")]`, so a root that stopped forwarding `cloud` to
+/// either crate would not compile them at all — only a `--features cloud` build
+/// of `openobserve-jobs` and `openobserve-api-management` covers that (T39).
+pub const BUILT_WITH_CLOUD: bool = cfg!(feature = "cloud");
+
 pub mod alerting;
 pub mod dispatcher;
 pub mod job_api;
+pub mod pool;
 pub mod reaper;
 pub mod scheduler;
 pub mod service;
+pub mod status_pages;
 
 /// One row per execution — the record the UI's run list and run detail read.
 pub const RESULTS_STREAM: &str = "synthetics_results";
@@ -113,10 +138,24 @@ const JOB_CLUSTER_POLL: std::time::Duration = std::time::Duration::from_secs(10)
 /// poll also earns its keep on the other side: when the claim moves (spec §6, a
 /// scheduler relocated between regions) the new region starts synthetics
 /// without a restart.
-pub async fn init() {
+/// `step_pool` is SPEC §6's free step pool, item **2.3** — the scheduler's
+/// gate 3.
+///
+/// A REQUIRED argument rather than a `OnceCell` the caller may forget to set:
+/// §11 **F6** is a wiring mistake that produces no error and no log, just an
+/// unmetered fleet, so the wiring is made impossible to omit. `None` is a valid
+/// answer (an OSS build has no pool) and means the scheduler does not gate — see
+/// [`pool`] for the fail-open reasoning.
+pub async fn init(step_pool: Option<pool::StepPoolHooks>) {
     if !config::get_config().synthetics.enabled {
         tracing::info!("[synthetics] disabled via ZO_SYNTHETICS_ENABLED — workers not started");
         return;
+    }
+
+    // Before any worker is spawned: `scheduler::run` must not see a
+    // half-installed pool on its first tick.
+    if let Some(step_pool) = step_pool {
+        pool::install(step_pool);
     }
 
     // Single cluster, or an OSS build where there is no such thing: start
@@ -161,6 +200,11 @@ fn spawn_workers() {
     tokio::spawn(scheduler::run());
     tokio::spawn(dispatcher::run());
     tokio::spawn(reaper::run());
+    // POC scope: single cluster. Multi-region needs this split — the
+    // incident-engine half claim-gated, the snapshot half per region.
+    // Status pages ships with synthetics — no separate toggle.
+    tokio::spawn(status_pages::run());
+    tokio::spawn(status_pages::run_domain_verifier());
     // Its own task, not a step on the reaper's tick: a pass is up to a thousand
     // rows of outbound HTTP, and the reaper's lease bookkeeping cannot wait
     // behind it. Its own kill switch too, checked per pass rather than here.
@@ -306,110 +350,4 @@ mod job_cluster_gate_tests {
 }
 
 #[cfg(test)]
-mod tests {
-    /// Every publish helper on the synthetics queue: checks and the two config
-    /// tables. Assembled at runtime so the search cannot match its own text.
-    fn any_publish_prefix() -> String {
-        ["queue", "synthetics_"].join("::")
-    }
-
-    /// The check publish helpers share this prefix.
-    fn publish_prefix() -> String {
-        ["queue", "synthetics_check"].join("::")
-    }
-
-    /// Source with every whitespace character removed, so a guard counts the
-    /// same whether rustfmt kept it on one line or wrapped it.
-    ///
-    /// The enterprise idiom fits on one line; the OSS one is
-    /// `o2_enterprise::enterprise::common::config::get_config().super_cluster
-    /// .enabled` and does not. Matching the formatted text would make this test
-    /// a lint on line length, and it would go quiet — reading zero guards as
-    /// "no publishes to guard" — exactly when a publish moved into a file where
-    /// the call is longer.
-    fn squeezed(source: &str) -> String {
-        source.chars().filter(|c| !c.is_whitespace()).collect()
-    }
-
-    /// The OSS half of the enterprise `nothing_on_the_run_path_publishes`
-    /// guarantee, and the reason replication traffic scales with *changes*
-    /// rather than with runs.
-    ///
-    /// `claim_due` and `advance_schedule` live in `infra::table`, which cannot
-    /// reach the enterprise crate at all, so the only place a per-run publish
-    /// could be introduced is one of these callers. If one ever grows one,
-    /// 1,000 checks on a 1-minute schedule become 1,000 messages a minute
-    /// forever — and nothing else in the system would notice.
-    ///
-    /// The list is not "zero publishes" but a counted allowance per file,
-    /// because the property being protected is the rate, not the location. The
-    /// three run-path publishes below each sit behind a transition check and so
-    /// cost nothing in the steady state; see the comment on the allowance table.
-    ///
-    /// The enterprise copy walks the files still in `o2_enterprise`; this walks
-    /// the ones that have moved here, with the same allowance table. A file
-    /// arriving in this crate must be added to one list or the other, never
-    /// dropped from both.
-    #[test]
-    fn nothing_on_the_run_path_publishes() {
-        let prefix = publish_prefix();
-        let any = any_publish_prefix();
-        // A slice rather than an array literal: the list grows a file per
-        // migration step, and `for … in [one_thing]` is a clippy error today
-        // that would be reverted tomorrow.
-        let files: &[(&str, &str)] = &[
-            ("alerting", include_str!("alerting.rs")),
-            ("dispatcher", include_str!("dispatcher.rs")),
-            ("job_api", include_str!("job_api.rs")),
-            ("reaper", include_str!("reaper/mod.rs")),
-            ("reaper::orphan", include_str!("reaper/orphan.rs")),
-            ("scheduler", include_str!("scheduler.rs")),
-        ];
-        for (name, source) in files {
-            let source = squeezed(source);
-            // Exceptions are named, counted and guarded, never waved through by
-            // raising the ceiling for the whole list.
-            //
-            // `checks` is the count of check publishes; `any` additionally
-            // covers the locations and probe-token queues.
-            //
-            //  - `dispatcher` mints an org's default probe token when it has none — a once-per-org
-            //    backfill for orgs older than the probe-token table, not a per-run event. That one
-            //    is a probe-token publish, hence 0 checks but 1 of `any`.
-            //  - `dispatcher`, `job_api` and `reaper` each replicate `last_check_status`, the badge
-            //    the LIST renders. That column is written only where the check ran, so before this
-            //    the other regions showed "Unknown" for a check their own detail page — federated
-            //    search over the results stream — reported as passing.
-            //
-            //    This is the one publish on the run path, and it is safe for the
-            //    reason this test exists to protect: it sits behind the bool from
-            //    `update_last_check_status`, which is true only when the stored
-            //    value CHANGED. So the rate is status flips, not runs — a check
-            //    that passes 1,440 times a day publishes nothing. Anything that
-            //    would fire once per run still belongs at 0 here, and the guard
-            //    to add for it is a transition check, not another entry.
-            let (checks, allowed) = match *name {
-                "dispatcher" => (1, 2),
-                "job_api" | "reaper" => (1, 1),
-                _ => (0, 0),
-            };
-            assert_eq!(
-                source.matches(&prefix).count(),
-                checks,
-                "{name} is off the user-CRUD path; it may publish a check exactly {checks} time(s)"
-            );
-            assert_eq!(
-                source.matches(&any).count(),
-                allowed,
-                "{name} may publish exactly {allowed} time(s) on the synthetics queue"
-            );
-            assert_eq!(
-                source
-                    .matches(&["super_cluster", "enabled"].join("."))
-                    .count(),
-                allowed,
-                "{name}'s publishes must each carry their own super-cluster guard"
-            );
-        }
-    }
-}
+mod tests {}

@@ -9,7 +9,9 @@ import {
   onMounted,
   provide,
   ref,
+  shallowRef,
   watch,
+  watchEffect,
 } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useTableColumnPersistence } from "./composables/useTableColumnPersistence";
@@ -42,6 +44,7 @@ import OTablePagination from "./sub-components/OTablePagination.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTableEmpty from "./sub-components/OTableEmpty.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTableLoading from "./sub-components/OTableLoading.vue";
 import OTableError from "./sub-components/OTableError.vue";
 import { PIVOT_TABLE_TOTAL_COLUMN_WIDTH } from "@/utils/dashboard/constants";
@@ -53,6 +56,7 @@ const props = withDefaults(defineProps<OTableProps<TData>>(), {
   pageSizeOptions: () => [20, 50, 100, 250, 500],
   sorting: "client",
   selection: "none",
+  showSelectAll: true,
   expansion: "none",
   virtualScroll: false,
   virtualScrollItemSize: 48,
@@ -70,6 +74,7 @@ const props = withDefaults(defineProps<OTableProps<TData>>(), {
   // content, and CRUD listing tables sit flush to the edges. Row dividers (the
   // `bordered` row-bottom hairlines) stay; only the surrounding border is gone.
   frame: false,
+  toolbarBordered: true,
   striped: false,
   stickyHeader: true,
   wrap: false,
@@ -298,58 +303,100 @@ const tableData = computed<TData[]>(() => {
   return source ? source.slice() : [];
 });
 
+// ── Windowed row model ──────────────────────────────────────────
+// TanStack builds a Row object per data row independent of virtual scroll,
+// which only bounds DOM nodes — 100k+ rows freeze the tab and ~1M rows OOM it.
+// When `windowRowModel` applies, only the virtualizer's visible slice enters
+// the row model; the watcher further down keeps the bounds in step with the
+// virtualizer. `activeClientFilters` is synced after the table exists because
+// filter state lives inside useTableCore.
+const ROW_WINDOW_FALLBACK = 200;
+const rowWindowStart = shallowRef(0);
+const rowWindowEnd = shallowRef(ROW_WINDOW_FALLBACK);
+const activeClientFilters = shallowRef(false);
+
+const rowModelWindowed = computed(
+  () =>
+    !!props.windowRowModel &&
+    !!props.virtualScroll &&
+    props.pagination === "none" &&
+    props.sorting !== "client" &&
+    props.expansion === "none" &&
+    !props.wrap &&
+    !tree.enabled.value &&
+    !activeClientFilters.value,
+);
+
+// Cached so repeated reads of the table's `data` option see a stable array
+// identity; a fresh slice per read would re-trigger TanStack's reactive
+// options merge on every access.
+const windowedTableData = computed<TData[]>(() => {
+  const data = tableData.value;
+  if (rowModelWindowed.value) {
+    return data.slice(rowWindowStart.value, rowWindowEnd.value);
+  }
+  return data;
+});
+
 // ── Core table instance ─────────────────────────────────────────
-const { table, effectiveColumns, columnOrder, userReorderedColumns, columnSizing, columnSizeVars } =
-  useTableCore<TData>(
-    {
-      get data() {
-        return tableData.value;
-      },
-      get columns() {
-        return props.columns;
-      },
-      get pageSize() {
-        return props.pageSize;
-      },
-      get currentPage() {
-        return props.currentPage;
-      },
-      showIndex: props.showIndex,
-      sortBy: props.sortBy,
-      sortOrder: props.sortOrder,
-      sortFieldMap: props.sortFieldMap,
-      get globalFilter() {
-        return globalFilterLocal.value;
-      },
-      rowKey: props.rowKey,
-      // Getters, not snapshots: TanStack reads `enableColumnResizing` off these,
-      // so a snapshot freezes resize at whatever the flag was on first mount.
-      get enableColumnResize() {
-        return props.enableColumnResize;
-      },
-      get enableColumnReorder() {
-        return props.enableColumnReorder;
-      },
-      enableColumnPin: props.enableColumnPin,
-      get columnVisibility() {
-        return internalColumnVisibility.value;
-      },
-      defaultColumns: props.defaultColumns,
-      initialColumnSizes: persistence.loadColumnSizes(),
-      getSubRows: props.getSubRows,
-      pagination: props.pagination,
-      sorting: props.sorting,
-      rowHeight: props.rowHeight,
-      filterMode: props.filterMode,
-      get horizontalScroll() {
-        return props.horizontalScroll;
-      },
-      get keepPageOnDataChange() {
-        return props.keepPageOnDataChange;
-      },
+const {
+  table,
+  effectiveColumns,
+  columnOrder,
+  userReorderedColumns,
+  columnSizing,
+  columnSizeVars,
+  columnFilters,
+} = useTableCore<TData>(
+  {
+    get data() {
+      return windowedTableData.value;
     },
-    emit,
-  );
+    get columns() {
+      return props.columns;
+    },
+    get pageSize() {
+      return props.pageSize;
+    },
+    get currentPage() {
+      return props.currentPage;
+    },
+    showIndex: props.showIndex,
+    sortBy: props.sortBy,
+    sortOrder: props.sortOrder,
+    sortFieldMap: props.sortFieldMap,
+    get globalFilter() {
+      return globalFilterLocal.value;
+    },
+    rowKey: props.rowKey,
+    // Getters, not snapshots: TanStack reads `enableColumnResizing` off these,
+    // so a snapshot freezes resize at whatever the flag was on first mount.
+    get enableColumnResize() {
+      return props.enableColumnResize;
+    },
+    get enableColumnReorder() {
+      return props.enableColumnReorder;
+    },
+    enableColumnPin: props.enableColumnPin,
+    get columnVisibility() {
+      return internalColumnVisibility.value;
+    },
+    defaultColumns: props.defaultColumns,
+    initialColumnSizes: persistence.loadColumnSizes(),
+    getSubRows: props.getSubRows,
+    pagination: props.pagination,
+    sorting: props.sorting,
+    rowHeight: props.rowHeight,
+    filterMode: props.filterMode,
+    get horizontalScroll() {
+      return props.horizontalScroll;
+    },
+    get keepPageOnDataChange() {
+      return props.keepPageOnDataChange;
+    },
+  },
+  emit,
+);
 
 // ── Column resize reset ─────────────────────────────────────────
 const hasResizedColumns = computed(() => Object.keys(table.getState().columnSizing).length > 0);
@@ -592,7 +639,36 @@ const {
   // table. Keep its raw offset stable when wrapped rows are remeasured so a
   // query refresh cannot move the owning page's scrollbar.
   preserveScrollOffsetOnRowResize: () => !!props.scrollEl && useDynamicRowHeight.value,
+  // Windowed row model: scrollbar and spacers span the full dataset even though
+  // only the visible slice is materialized.
+  totalCount: () => (rowModelWindowed.value ? tableData.value.length : undefined),
 });
+
+watchEffect(() => {
+  activeClientFilters.value = columnFilters.value.length > 0 || !!globalFilterLocal.value;
+});
+
+// Keep the row-model window in step with the virtualizer. A sync watcher (not a
+// computed) keeps the model out of the virtualizer's own dependency chain:
+// its count reads tableData, never the windowed model.
+watch(
+  [virtualRows, rowModelWindowed],
+  ([items, windowed]) => {
+    if (!windowed) {
+      rowWindowStart.value = 0;
+      rowWindowEnd.value = ROW_WINDOW_FALLBACK;
+      return;
+    }
+    if (!items.length) {
+      rowWindowStart.value = 0;
+      rowWindowEnd.value = ROW_WINDOW_FALLBACK;
+      return;
+    }
+    rowWindowStart.value = items[0].index;
+    rowWindowEnd.value = items[items.length - 1].index + 1;
+  },
+  { immediate: true },
+);
 
 const isVirtual = computed(() => props.virtualScroll && displayRows.value.length > 0);
 
@@ -955,8 +1031,18 @@ useTableRowShortcuts(scrollContainerRef);
 // with a "Loading…" banner over them (that pattern lets consumers'
 // progressive data mutations leak through visually). Consumers that want
 // refetch-without-replacing-content should use the `streaming` prop.
+// A denied fetch and a genuinely empty list are both zero rows; only the caller
+// knows which, so `forbidden` decides and takes precedence over the empty state.
+const showForbidden = computed(
+  () => !heldLoading.value && !!props.forbidden && displayRows.value.length === 0,
+);
 const showEmpty = computed(
-  () => !heldLoading.value && !props.streaming && !props.error && displayRows.value.length === 0,
+  () =>
+    !heldLoading.value &&
+    !props.streaming &&
+    !props.error &&
+    !showForbidden.value &&
+    displayRows.value.length === 0,
 );
 const showError = computed(() => !heldLoading.value && !!props.error);
 const showLoadingOverlay = computed(() => heldLoading.value);
@@ -1026,6 +1112,8 @@ defineExpose({
     }
   },
   getRows: () => {
+    // Windowed model only holds the visible slice; the full dataset lives in tableData.
+    if (rowModelWindowed.value) return [...tableData.value];
     return table.getRowModel().rows.map((r) => r.original);
   },
 });
@@ -1053,7 +1141,10 @@ defineExpose({
       <!-- ── Custom toolbar slot (rendered INSIDE the frame, above the table) ── -->
       <div
         v-if="slots.toolbar || slots['toolbar-trailing']"
-        class="px-page-edge border-table-row-divider flex items-center gap-2 border-b py-2"
+        :class="[
+          'px-page-edge flex items-center gap-2 py-2',
+          props.toolbarBordered ? 'border-table-row-divider border-b' : '',
+        ]"
         data-test="o2-table-toolbar"
       >
         <slot name="toolbar" />
@@ -1092,7 +1183,7 @@ defineExpose({
             :value="globalFilterLocal"
             type="text"
             :placeholder="props.globalFilterPlaceholder ?? t('common.searchEllipsis')"
-            class="text-primary placeholder-text-disabled w-full border-none bg-transparent py-1 pr-2 pl-7 text-sm outline-none"
+            class="text-primary placeholder-text-disabled w-full border-none bg-transparent py-1 ps-7 pe-2 text-sm outline-none"
             data-test="o2-table-global-filter-input"
             @input="handleGlobalFilterChange(($event.target as HTMLInputElement).value)"
           />
@@ -1213,6 +1304,7 @@ defineExpose({
             :table="table"
             :column-order="columnOrder"
             :selection-multiple="selection.isMultiple.value"
+            :show-select-all="showSelectAll"
             :is-all-selected="selection.isAllSelected()"
             :is-indeterminate="selection.isIndeterminate()"
             :expansion-enabled="expansion.isEnabled.value"
@@ -1270,6 +1362,7 @@ defineExpose({
             :clickable="isRowClickable"
             :selection-enabled="selection.isEnabled.value"
             :selection-multiple="selection.isMultiple.value"
+            :show-select-all="showSelectAll"
             :is-row-selected-fn="(row: TData) => selection.isRowSelected(row)"
             :is-row-selectable="props.isRowSelectable"
             :expansion-enabled="expansion.isEnabled.value"
@@ -1296,6 +1389,7 @@ defineExpose({
             :global-filter-active="!!globalFilterLocal"
             :row-key="props.rowKey"
             :virtual-rows="isVirtual ? virtualRows : undefined"
+            :row-index-offset="rowModelWindowed ? rowWindowStart : 0"
             :total-size="isVirtual ? totalSize : undefined"
             :base-offset="isVirtual ? baseOffset : undefined"
             :measure-element="isVirtual ? measureElement : undefined"
@@ -1353,6 +1447,16 @@ defineExpose({
                 :column="caProps.column"
                 :value="caProps.value"
                 :active="caProps.active"
+              />
+            </template>
+
+            <!-- Inline actions beside the copy button -->
+            <template v-if="slots['copy-actions']" #copy-actions="ccaProps">
+              <slot
+                name="copy-actions"
+                :column-id="ccaProps.columnId"
+                :row="ccaProps.row"
+                :value="ccaProps.value"
               />
             </template>
           </OTableBody>
@@ -1438,8 +1542,13 @@ defineExpose({
           </tfoot>
         </table>
 
+        <!-- ── Access Denied State ───────────────────────────── -->
+        <OTableEmpty v-if="showForbidden" :floor="!props.fillHeight" data-test="o2-table-forbidden">
+          <OEmptyState size="hero" preset="no-access" />
+        </OTableEmpty>
+
         <!-- ── Empty State ───────────────────────────────────── -->
-        <OTableEmpty v-if="showEmpty" :message="props.emptyMessage" :floor="!props.fillHeight">
+        <OTableEmpty v-else-if="showEmpty" :message="props.emptyMessage" :floor="!props.fillHeight">
           <template v-if="slots.empty" #default>
             <slot name="empty" />
           </template>

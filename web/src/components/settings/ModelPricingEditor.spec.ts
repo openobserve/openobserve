@@ -65,6 +65,9 @@ const mockStore = {
   state: {
     theme: "light",
     selectedOrganization: { identifier: "test-org" },
+    // "UTC" keeps the local-time window hints quiet by default; individual
+    // tests override to a real zone to exercise the conversion.
+    timezone: "UTC",
   },
 };
 
@@ -167,6 +170,7 @@ const row = (key: string, value: number) => ({ key, value });
 const tier = (overrides: Record<string, any> = {}) => ({
   name: "Default",
   condition: null,
+  utc_windows: [] as any[],
   prices: [] as any[],
   draftKey: "",
   draftValue: 0,
@@ -190,6 +194,7 @@ describe("ModelPricingEditor.vue", () => {
     // reset store theme defaults
     mockStore.state.theme = "light";
     mockStore.state.selectedOrganization = { identifier: "test-org" };
+    mockStore.state.timezone = "UTC";
   });
 
   afterEach(() => {
@@ -365,6 +370,308 @@ describe("ModelPricingEditor.vue", () => {
 
     it("ignores an empty price key (blank/draft row)", () => {
       expect(keyIssue("")).toBe("");
+    });
+  });
+
+  describe("Schema validation: UTC time windows", () => {
+    const schema = makeModelPricingSchema(i18n.global.t as any);
+    // Isolate the window rules (path tiers[i].utc_windows[w].start|end).
+    const windowIssue = (start: string, end: string, bound: "start" | "end") => {
+      const res = schema.safeParse({
+        name: "X",
+        match_pattern: "gpt",
+        tiers: [
+          { name: "Default", condition: null, prices: [{ key: "input", value: 1 }] },
+          { name: "Peak", condition: null, utc_windows: [{ start, end }], prices: [] },
+        ],
+      });
+      return res.success
+        ? ""
+        : (res.error.issues.find(
+            (iss: any) =>
+              iss.path[0] === "tiers" && iss.path[2] === "utc_windows" && iss.path[4] === bound,
+          )?.message ?? "");
+    };
+
+    it("accepts a well-formed HH:MM window", () => {
+      expect(windowIssue("01:00", "04:00", "start")).toBe("");
+      expect(windowIssue("01:00", "04:00", "end")).toBe("");
+    });
+
+    it("accepts a window that wraps past midnight", () => {
+      expect(windowIssue("22:00", "02:00", "start")).toBe("");
+      expect(windowIssue("22:00", "02:00", "end")).toBe("");
+    });
+
+    it("rejects a malformed start bound", () => {
+      expect(windowIssue("25:00", "04:00", "start")).toContain("HH:MM");
+    });
+
+    it("rejects a malformed end bound", () => {
+      expect(windowIssue("01:00", "4pm", "end")).toContain("HH:MM");
+    });
+
+    it("rejects a window whose bounds are equal", () => {
+      expect(windowIssue("01:00", "01:00", "end")).toContain("start and end must differ");
+    });
+  });
+
+  describe("UTC time windows (peak / off-peak pricing)", () => {
+    it("converts HH:MM bounds to minutes past UTC midnight at submit", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      fillValid(wrapper, [
+        tier({ prices: [row("input", 660)] }),
+        tier({
+          name: "Peak",
+          prices: [row("input", 1320)],
+          utc_windows: [
+            { start: "01:00", end: "04:00" },
+            { start: "06:00", end: "10:00" },
+          ],
+        }),
+      ]);
+      await nextTick();
+      await getForm(wrapper).handleSubmit();
+      await flushPromises();
+
+      const payload = mockService.create.mock.calls[0][1];
+      expect(payload.tiers[0].utc_windows).toEqual([]);
+      expect(payload.tiers[1].utc_windows).toEqual([
+        { start_minute: 60, end_minute: 240 },
+        { start_minute: 360, end_minute: 600 },
+      ]);
+      // A window-only tier carries no usage condition.
+      expect(payload.tiers[1].condition).toBeNull();
+    });
+
+    it("shows each window converted to the user's timezone", async () => {
+      mockStore.state.timezone = "Asia/Kolkata"; // UTC+5:30, no DST
+      const wrapper = createWrapper();
+      await flushPromises();
+      fillValid(wrapper, [
+        tier({ prices: [row("input", 1)] }),
+        tier({
+          name: "Peak",
+          prices: [row("input", 2)],
+          utc_windows: [{ start: "01:00", end: "04:00" }],
+        }),
+      ]);
+      await nextTick();
+
+      const hint = wrapper.find('[data-test="model-pricing-tier-window-local-hint-1-0"]');
+      expect(hint.exists()).toBe(true);
+      expect(hint.text()).toContain("06:30–09:30");
+    });
+
+    it("hides the local-time hint when the user's timezone is UTC", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      fillValid(wrapper, [
+        tier({ prices: [row("input", 1)] }),
+        tier({
+          name: "Peak",
+          prices: [row("input", 2)],
+          utc_windows: [{ start: "01:00", end: "04:00" }],
+        }),
+      ]);
+      await nextTick();
+
+      expect(wrapper.find('[data-test="model-pricing-tier-window-local-hint-1-0"]').exists()).toBe(
+        false,
+      );
+    });
+
+    it("renders the live 24h hours bar for a tier with parseable windows", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      fillValid(wrapper, [
+        tier({ prices: [row("input", 1)] }),
+        tier({
+          name: "Peak",
+          prices: [row("input", 2)],
+          utc_windows: [
+            { start: "01:00", end: "04:00" },
+            { start: "06:00", end: "10:00" },
+          ],
+        }),
+      ]);
+      await nextTick();
+
+      const bar = wrapper.find('[data-test="model-pricing-tier-window-bar-1"]');
+      expect(bar.exists()).toBe(true);
+      expect(bar.findAll("[data-test^='utc-hours-bar-segment-']")).toHaveLength(2);
+    });
+
+    it("hides the hours bar while no window row parses to a drawable range", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      fillValid(wrapper, [
+        tier({ prices: [row("input", 1)] }),
+        tier({
+          name: "Peak",
+          prices: [row("input", 2)],
+          // Unparseable + degenerate — nothing the preview can draw yet.
+          utc_windows: [
+            { start: "", end: "04:00" },
+            { start: "05:00", end: "05:00" },
+          ],
+        }),
+      ]);
+      await nextTick();
+
+      expect(wrapper.find('[data-test="model-pricing-tier-window-bar-1"]').exists()).toBe(false);
+      // The window rows themselves still render for editing.
+      expect(wrapper.find('[data-test="model-pricing-tier-window-start-1-0"]').exists()).toBe(true);
+    });
+
+    it("sends a midnight-wrapping window as start > end", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      fillValid(wrapper, [
+        tier({ prices: [row("input", 1)] }),
+        tier({
+          name: "Night",
+          prices: [row("input", 2)],
+          utc_windows: [{ start: "22:00", end: "02:00" }],
+        }),
+      ]);
+      await nextTick();
+      await getForm(wrapper).handleSubmit();
+      await flushPromises();
+
+      const payload = mockService.create.mock.calls[0][1];
+      expect(payload.tiers[1].utc_windows).toEqual([{ start_minute: 1320, end_minute: 120 }]);
+    });
+
+    it("blocks submit when a non-default tier has neither a condition nor a window", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      fillValid(wrapper, [
+        tier({ prices: [row("input", 1)] }),
+        tier({ name: "Orphan", prices: [row("input", 2)] }),
+      ]);
+      await nextTick();
+      await getForm(wrapper).handleSubmit();
+      await flushPromises();
+
+      expect(mockService.create).not.toHaveBeenCalled();
+      expect(mockToastFn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          variant: "error",
+          message: expect.stringContaining("Orphan"),
+        }),
+      );
+    });
+
+    it("addWindow / removeWindow mutate the form-owned tier", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      fillValid(wrapper, [
+        tier({ prices: [row("input", 1)] }),
+        tier({ name: "Peak", condition: null, prices: [row("input", 2)] }),
+      ]);
+      await nextTick();
+
+      (wrapper.vm as any).addWindow(1);
+      await nextTick();
+      let tiers = getForm(wrapper).state.values.tiers;
+      expect(tiers[1].utc_windows).toEqual([{ start: "01:00", end: "04:00" }]);
+
+      (wrapper.vm as any).removeWindow(1, 0);
+      await nextTick();
+      tiers = getForm(wrapper).state.values.tiers;
+      expect(tiers[1].utc_windows).toEqual([]);
+    });
+
+    it("addCondition / removeCondition toggle the usage condition", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      fillValid(wrapper, [
+        tier({ prices: [row("input", 1)] }),
+        tier({
+          name: "Peak",
+          prices: [row("input", 2)],
+          utc_windows: [{ start: "01:00", end: "04:00" }],
+        }),
+      ]);
+      await nextTick();
+
+      (wrapper.vm as any).addCondition(1);
+      await nextTick();
+      expect(getForm(wrapper).state.values.tiers[1].condition).toEqual({
+        usage_key: "input",
+        operator: "gt",
+        value: 200000,
+      });
+
+      (wrapper.vm as any).removeCondition(1);
+      await nextTick();
+      expect(getForm(wrapper).state.values.tiers[1].condition).toBeNull();
+    });
+
+    it("hydrates a window-only tier from the API without inventing a condition", async () => {
+      mockService.get.mockResolvedValue({
+        data: {
+          id: "ds",
+          name: "DeepSeek V4 Pro",
+          match_pattern: "(?i)deepseek-v4-pro",
+          enabled: true,
+          tiers: [
+            { name: "Off-Peak", condition: null, prices: { input: 0.00000066 } },
+            {
+              name: "Peak",
+              condition: null,
+              utc_windows: [
+                { start_minute: 60, end_minute: 240 },
+                { start_minute: 360, end_minute: 600 },
+              ],
+              prices: { input: 0.00000132 },
+            },
+          ],
+        },
+      });
+      const wrapper = createWrapper({ query: { id: "ds" } });
+      await flushPromises();
+
+      const tiers = getForm(wrapper).state.values.tiers;
+      expect(tiers[0].utc_windows).toEqual([]);
+      expect(tiers[1].condition).toBeNull();
+      expect(tiers[1].utc_windows).toEqual([
+        { start: "01:00", end: "04:00" },
+        { start: "06:00", end: "10:00" },
+      ]);
+    });
+
+    it("round-trips an end-of-day bound of 1440 as 00:00", async () => {
+      mockService.get.mockResolvedValue({
+        data: {
+          id: "n",
+          name: "Night",
+          match_pattern: "night",
+          enabled: true,
+          tiers: [
+            { name: "Default", condition: null, prices: { input: 0.000001 } },
+            {
+              name: "Late",
+              condition: null,
+              utc_windows: [{ start_minute: 1320, end_minute: 1440 }],
+              prices: { input: 0.000002 },
+            },
+          ],
+        },
+      });
+      const wrapper = createWrapper({ query: { id: "n" } });
+      await flushPromises();
+
+      const tiers = getForm(wrapper).state.values.tiers;
+      expect(tiers[1].utc_windows).toEqual([{ start: "22:00", end: "00:00" }]);
+
+      await getForm(wrapper).handleSubmit();
+      await flushPromises();
+      const payload = mockService.update.mock.calls[0][2];
+      // 22:00 -> 00:00 still means "22:00 to end of day" via the wrap rule.
+      expect(payload.tiers[1].utc_windows).toEqual([{ start_minute: 1320, end_minute: 0 }]);
     });
   });
 
@@ -761,10 +1068,12 @@ describe("ModelPricingEditor.vue", () => {
       expect(payload.match_pattern).toBe("gpt-4o");
       expect(Array.isArray(payload.tiers)).toBe(true);
 
-      // EXACT tier shape — only {condition, name, prices}; NO draftKey/draftValue leak
+      // EXACT tier shape — only {condition, name, prices, utc_windows}; NO
+      // draftKey/draftValue leak
       const t0 = payload.tiers[0];
-      expect(Object.keys(t0).sort()).toEqual(["condition", "name", "prices"]);
+      expect(Object.keys(t0).sort()).toEqual(["condition", "name", "prices", "utc_windows"]);
       expect(t0.condition).toBeNull(); // default (first) tier
+      expect(t0.utc_windows).toEqual([]); // default tier is never time-restricted
       expect(typeof t0.name).toBe("string");
 
       // prices is a per-token MAP of numbers (committed row + committed draft)

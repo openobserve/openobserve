@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
     </OToggleGroup>
 
-    <div class="ml-auto flex items-center gap-1.5">
+    <div class="ms-auto flex items-center gap-1.5">
       <label for="rum-errors-filter-service" class="whitespace-nowrap">{{
         t("rum.service")
       }}</label>

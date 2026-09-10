@@ -31,10 +31,7 @@ use sea_orm::{
     TransactionTrait,
 };
 
-use super::{
-    entity::{slo_budget, slo_budget_charges},
-    get_lock,
-};
+use super::entity::{slo_budget, slo_budget_charges};
 use crate::errors::Error;
 
 /// Charge states, as stored.
@@ -105,9 +102,6 @@ pub async fn charge(
     rows: i64,
     cap: i64,
 ) -> Result<(), ChargeError> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
     for _ in 0..CAS_RETRIES {
         let current = get(db, org).await?;
         let (version, active, residual) = match &current {
@@ -204,9 +198,6 @@ pub async fn retire(
     generation: i32,
     expires_at: i64,
 ) -> Result<(), ChargeError> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
     for _ in 0..CAS_RETRIES {
         let Some(budget) = get(db, org).await? else {
             return Ok(());
@@ -265,9 +256,6 @@ pub async fn expire_residuals(
     org: &str,
     now: i64,
 ) -> Result<i64, ChargeError> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
     for _ in 0..CAS_RETRIES {
         let Some(budget) = get(db, org).await? else {
             return Ok(0);
@@ -321,9 +309,6 @@ pub async fn expire_residuals(
 /// No CAS: the org is going away, so there is no concurrent charge whose
 /// arithmetic this could invalidate.
 pub async fn delete_by_org(db: &DatabaseConnection, org: &str) -> Result<(), Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
     let txn = db.begin().await?;
     slo_budget_charges::Entity::delete_many()
         .filter(slo_budget_charges::Column::Org.eq(org))

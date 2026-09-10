@@ -18,9 +18,8 @@ use sea_orm::{
 };
 use serde::{Deserialize, Serialize};
 
-use super::get_lock;
 use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{get_orm_client_ro, get_orm_client_rw},
     errors,
     table::entity::score_configs::{ActiveModel, Column, Entity, Model},
 };
@@ -101,7 +100,7 @@ impl From<Model> for ScoreConfig {
 }
 
 pub async fn create_table() -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let builder = client.get_database_backend();
 
     let schema = Schema::new(builder);
@@ -116,8 +115,6 @@ pub async fn create_table() -> Result<(), errors::Error> {
 }
 
 pub async fn add(config: &ScoreConfig) -> Result<(), errors::Error> {
-    let _lock = get_lock().await;
-
     let record = ActiveModel {
         id: Set(config.id.clone()),
         org_id: Set(config.org_id.clone()),
@@ -134,15 +131,13 @@ pub async fn add(config: &ScoreConfig) -> Result<(), errors::Error> {
         updated_at: Set(config.updated_at),
     };
 
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::insert(record).exec(client).await?;
 
     Ok(())
 }
 
 pub async fn update(config: &ScoreConfig) -> Result<(), errors::Error> {
-    let _lock = get_lock().await;
-
     let record = ActiveModel {
         id: Set(config.id.clone()),
         org_id: Set(config.org_id.clone()),
@@ -159,14 +154,14 @@ pub async fn update(config: &ScoreConfig) -> Result<(), errors::Error> {
         updated_at: Set(config.updated_at),
     };
 
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::update(record).exec(client).await?;
 
     Ok(())
 }
 
 pub async fn get(id: &str) -> Result<Option<ScoreConfig>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
 
     let record = Entity::find()
         .filter(Column::Id.eq(id))
@@ -181,7 +176,7 @@ pub async fn get_by_entity_id(
     org_id: &str,
     entity_id: &str,
 ) -> Result<Option<ScoreConfig>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
 
     let record = Entity::find()
         .filter(Column::OrgId.eq(org_id))
@@ -200,7 +195,7 @@ pub async fn get_by_entity_id_and_version(
     entity_id: &str,
     version: i32,
 ) -> Result<Option<ScoreConfig>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
 
     let record = Entity::find()
         .filter(Column::OrgId.eq(org_id))
@@ -217,7 +212,7 @@ pub async fn get_by_active_name(
     org_id: &str,
     name: &str,
 ) -> Result<Option<ScoreConfig>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
 
     let record = Entity::find()
         .filter(Column::OrgId.eq(org_id))
@@ -235,7 +230,7 @@ pub async fn get_versions(
     org_id: &str,
     entity_id: &str,
 ) -> Result<Vec<ScoreConfig>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
 
     let records = Entity::find()
         .filter(Column::OrgId.eq(org_id))
@@ -251,7 +246,7 @@ pub async fn get_versions(
 }
 
 pub async fn get_all_by_org(org_id: &str) -> Result<Vec<ScoreConfig>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
 
     // Get the latest version per logical entity.
     let records: Vec<Model> = Entity::find()
@@ -274,9 +269,7 @@ pub async fn get_all_by_org(org_id: &str) -> Result<Vec<ScoreConfig>, errors::Er
 }
 
 pub async fn delete(entity_id: &str, org_id: &str) -> Result<(), errors::Error> {
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     // Deactivate all versions
     let records = Entity::find()
         .filter(Column::OrgId.eq(org_id))
@@ -297,9 +290,7 @@ pub async fn delete(entity_id: &str, org_id: &str) -> Result<(), errors::Error> 
 }
 
 pub async fn delete_all_by_org(org_id: &str) -> Result<(), errors::Error> {
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::delete_many()
         .filter(Column::OrgId.eq(org_id))
         .exec(client)
@@ -309,7 +300,7 @@ pub async fn delete_all_by_org(org_id: &str) -> Result<(), errors::Error> {
 }
 
 pub async fn exists(id: &str) -> Result<bool, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let record = Entity::find().filter(Column::Id.eq(id)).one(client).await?;
 
     Ok(record.is_some())
@@ -317,7 +308,7 @@ pub async fn exists(id: &str) -> Result<bool, errors::Error> {
 
 /// Returns the latest version number for a given entity, or 0 if none exist.
 pub async fn get_latest_version(org_id: &str, entity_id: &str) -> Result<i32, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
 
     let model = Entity::find()
         .filter(Column::OrgId.eq(org_id))

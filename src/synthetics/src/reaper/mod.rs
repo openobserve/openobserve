@@ -32,23 +32,21 @@
 //!
 //! [`orphan`] lives here as a sibling because it answers the same question from the other side —
 //! checks that produced no job at all — but it runs in its OWN task, spawned by `synthetics::init`.
-//! Its scan does up to a thousand rows of outbound HTTP, and the invariant above cannot be left
-//! waiting behind that.
+//! Its scan is a thousand-row table read, and the invariant above cannot be left waiting behind
+//! that.
 
 pub mod orphan;
 
 use std::time::Duration;
 
+use config::meta::self_reporting::usage::{RunOutcome, TriggerData, TriggerDataType};
 use infra::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::get_orm_client_rw,
     table::{org_ingestion_tokens, synthetics_checks, synthetics_jobs, synthetics_runs},
 };
 
-use crate::MAX_DISPATCH_ATTEMPTS as MAX_ATTEMPTS;
+use crate::{MAX_DISPATCH_ATTEMPTS as MAX_ATTEMPTS, alerting::ERROR_SOURCE_DISPATCH};
 const TICK: Duration = Duration::from_secs(30);
-
-/// "Internal" meta org that OO uses for platform-level self-reporting streams.
-const META_ORG: &str = "_meta";
 
 pub async fn run() {
     tracing::info!("[synthetics reaper] started");
@@ -56,7 +54,7 @@ pub async fn run() {
     loop {
         tokio::time::sleep(TICK).await;
 
-        let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+        let db = get_orm_client_rw().await;
 
         let now_us = config::utils::time::now_micros();
 
@@ -216,28 +214,6 @@ async fn handle_dead_letter(
         }
     }
 
-    // Fetch ingest token — needed for both stream writes.
-    let ingest_token = match org_ingestion_tokens::find_default_enabled(&row.org_id).await {
-        Ok(found) => match found {
-            Some(t) => t.token,
-            None => {
-                tracing::warn!(
-                    org_id = %row.org_id,
-                    "[synthetics reaper] no enabled ingest token — skipping stream writes"
-                );
-                return;
-            }
-        },
-        Err(e) => {
-            tracing::error!(
-                org_id = %row.org_id,
-                "[synthetics reaper] ingest token lookup failed: {e}"
-            );
-            return;
-        }
-    };
-
-    let api_endpoint = config::meta::synthetics::api_endpoint();
     // Say which of the three failures this was. "No probe ever claimed the job"
     // points at a dead agent or a location nothing polls; the other two point at
     // a probe that took the job and stopped talking. They need different
@@ -258,8 +234,34 @@ async fn handle_dead_letter(
         }
     };
 
+    // Above the token lookup, which returns early: the triggers half needs no token.
+    usage_reporting::publish_triggers_usage(dead_letter_trigger(row, now_us, &error_msg));
+
+    let ingest_token = match org_ingestion_tokens::find_default_enabled(&row.org_id).await {
+        Ok(found) => match found {
+            Some(t) => t.token,
+            None => {
+                tracing::warn!(
+                    org_id = %row.org_id,
+                    "[synthetics reaper] no enabled ingest token — the dead letter's result \
+                     row was not recorded"
+                );
+                return;
+            }
+        },
+        Err(e) => {
+            tracing::error!(
+                org_id = %row.org_id,
+                "[synthetics reaper] ingest token lookup failed, the dead letter's result row \
+                 was not recorded: {e}"
+            );
+            return;
+        }
+    };
+
+    let api_endpoint = config::meta::synthetics::api_endpoint();
+
     write_results_stream(row, &ingest_token, &api_endpoint, now_us, &error_msg).await;
-    write_triggers_stream(row, &ingest_token, &api_endpoint, now_us, &error_msg).await;
 }
 
 async fn write_results_stream(
@@ -286,7 +288,7 @@ async fn write_results_stream(
         "location": row.location,
         "status": "error",
         // A7: the job was dead-lettered without a probe ever running it.
-        "error_source": "dispatch",
+        "error_source": ERROR_SOURCE_DISPATCH,
         "error": error_msg,
         "response_time_ms": 0,
         "dispatch_attempt": row.dispatch_attempts
@@ -310,44 +312,85 @@ async fn write_results_stream(
     }
 }
 
-/// Writes to both the org's triggers stream and the _meta org triggers stream.
-async fn write_triggers_stream(
+/// The `triggers` row one dead letter leaves — the half an alert rule reads.
+///
+/// `retries` is where `dispatch_attempts` survives the translation: `TriggerData`
+/// has no field of that name.
+fn dead_letter_trigger(
     row: &synthetics_jobs::DeadLetteredRow,
-    ingest_token: &str,
-    api_endpoint: &str,
     now_us: i64,
-    error_msg: &str,
-) {
-    let trigger_record = serde_json::json!([{
-        "_timestamp": now_us,
-        "org": row.org_id,
-        "module": "synthetics",
-        "key": format!("{}/{}", row.synthetics_name, row.synthetics_id),
-        "next_run_at": 0,
-        "is_realtime": false,
-        "is_silenced": false,
-        "status": "failed",
-        "start_time": now_us,
-        "end_time": now_us,
-        "dispatch_attempts": row.dispatch_attempts,
-        "error": error_msg
-    }]);
+    error: &str,
+) -> TriggerData {
+    TriggerData {
+        _timestamp: now_us,
+        org: row.org_id.clone(),
+        module: TriggerDataType::Synthetics,
+        key: format!("{}/{}", row.synthetics_name, row.synthetics_id),
+        status: RunOutcome::Error,
+        start_time: now_us,
+        end_time: now_us,
+        retries: row.dispatch_attempts,
+        error: Some(error.to_string()),
+        // `orphan`, `dispatch`, `quota` and `trial` share this stream and this `status`.
+        synthetics_error_source: Some(ERROR_SOURCE_DISPATCH.to_string()),
+        synthetics_location: Some(row.location.clone()),
+        ..TriggerData::default()
+    }
+}
 
-    let client = reqwest::Client::new();
-    for org in [row.org_id.as_str(), META_ORG] {
-        let url = format!("{}/api/{}/triggers/_json", api_endpoint, org);
-        if let Err(e) = client
-            .post(&url)
-            .basic_auth("ingest", Some(ingest_token))
-            .json(&trigger_record)
-            .send()
-            .await
-        {
-            tracing::error!(
-                synthetics_id = %row.synthetics_id,
-                org = %org,
-                "[synthetics reaper] triggers stream write failed: {e}"
-            );
+#[cfg(test)]
+mod tests {
+    use config::meta::self_reporting::usage::{RunOutcome, TriggerDataType};
+    use infra::table::synthetics_jobs::{DeadLetterReason, DeadLetteredRow};
+
+    use super::dead_letter_trigger;
+    use crate::alerting::ERROR_SOURCE_DISPATCH;
+
+    fn dead_lettered_row() -> DeadLetteredRow {
+        DeadLetteredRow {
+            id: "job_1".to_string(),
+            synthetics_id: "chk_1".to_string(),
+            synthetics_name: "checkout journey".to_string(),
+            org_id: "acme".to_string(),
+            location: "us-east-1".to_string(),
+            scheduled_ts: 1_787_665_631_000_000,
+            steps_configured: 14,
+            browser_devices: None,
+            dispatch_attempts: 3,
+            run_id: "run_1".to_string(),
+            metadata: String::new(),
+            reason: DeadLetterReason::AttemptsExhausted,
         }
+    }
+
+    /// §11.3: all three failure paths share one stream and one status, separable only by source.
+    #[test]
+    fn the_dispatch_dead_letter_keeps_every_field_its_json_carried() {
+        let row = dead_lettered_row();
+        let trigger = dead_letter_trigger(&row, 42, "no dispatch attempts left");
+
+        assert_eq!(
+            trigger.synthetics_error_source.as_deref(),
+            Some(ERROR_SOURCE_DISPATCH)
+        );
+        assert_eq!(
+            trigger.retries, row.dispatch_attempts,
+            "`TriggerData` has no field named `dispatch_attempts`, so the count survives the \
+             translation only as `retries`",
+        );
+        assert_eq!(trigger.module, TriggerDataType::Synthetics);
+        assert_eq!(trigger.status, RunOutcome::Error);
+        assert_eq!(trigger.org, "acme");
+        assert_eq!(trigger.key, "checkout journey/chk_1");
+        assert_eq!(trigger.error.as_deref(), Some("no dispatch attempts left"));
+        assert_eq!(trigger._timestamp, 42);
+        assert_eq!(trigger.start_time, 42);
+        assert_eq!(trigger.end_time, 42);
+
+        let wire = serde_json::to_value(&trigger).expect("the dead-letter row must serialize");
+        assert_eq!(
+            wire["status"], "error",
+            "an alert rule matches the SERIALIZED value, and this row writes `failed` today",
+        );
     }
 }

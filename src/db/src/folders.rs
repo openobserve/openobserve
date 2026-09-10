@@ -23,10 +23,7 @@ use config::{
         synthetics::ListSyntheticsParams,
     },
 };
-use infra::{
-    db::{ORM_CLIENT, connect_to_orm},
-    table,
-};
+use infra::{db::get_orm_client_rw, table};
 #[cfg(feature = "enterprise")]
 use o2_openfga::meta::mapping::OFGA_MODELS;
 
@@ -120,13 +117,57 @@ pub async fn save_folder(
     }
 
     let (_id, folder) = table::folders::put(org_id, None, folder, folder_type).await?;
-    let folder_type_ofga = match folder_type {
-        FolderType::Dashboards => "folders",
-        FolderType::Alerts => "alert_folders",
-        FolderType::Reports => "report_folders",
-        FolderType::Synthetics => "synthetic_folder",
-    };
+    let folder_type_ofga = folder_type_ofga_name(folder_type);
     set_ownership(org_id, folder_type_ofga, Authz::new(&folder.folder_id)).await;
+
+    #[cfg(feature = "enterprise")]
+    if o2_enterprise::enterprise::common::config::get_config()
+        .super_cluster
+        .enabled
+    {
+        let _ = o2_enterprise::enterprise::super_cluster::queue::folders_create(
+            org_id,
+            _id,
+            &folder.folder_id,
+            folder_type,
+            &folder.name,
+            Some(folder.description.as_str()).filter(|d| !d.is_empty()),
+        )
+        .await;
+    }
+
+    Ok(folder)
+}
+
+/// Returns the org's default folder of the given type, creating it if this is the first use.
+///
+/// Safe to call concurrently: the folder is created idempotently, so a request that loses the race
+/// still gets the folder rather than a unique-constraint failure. Ownership and the super-cluster
+/// event only fire for the caller that actually inserted it.
+#[tracing::instrument]
+pub async fn ensure_default_folder(
+    org_id: &str,
+    folder_type: FolderType,
+) -> Result<Folder, FolderError> {
+    let default_folder = Folder {
+        folder_id: DEFAULT_FOLDER.to_owned(),
+        name: DEFAULT_FOLDER.to_owned(),
+        description: DEFAULT_FOLDER.to_owned(),
+        icon: None,
+    };
+
+    let (_id, folder, created) =
+        table::folders::get_or_create(org_id, default_folder, folder_type).await?;
+    if !created {
+        return Ok(folder);
+    }
+
+    set_ownership(
+        org_id,
+        folder_type_ofga_name(folder_type),
+        Authz::new(&folder.folder_id),
+    )
+    .await;
 
     #[cfg(feature = "enterprise")]
     if o2_enterprise::enterprise::common::config::get_config()
@@ -249,7 +290,7 @@ pub async fn delete_folder(
     folder_id: &str,
     folder_type: FolderType,
 ) -> Result<(), FolderError> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     match folder_type {
         FolderType::Dashboards => {
             let params = ListDashboardsParams::new(org_id).with_folder_id(folder_id);
@@ -303,12 +344,7 @@ pub async fn delete_folder(
     }
 
     table::folders::delete(org_id, folder_id, folder_type).await?;
-    let folder_type_ofga = match folder_type {
-        FolderType::Dashboards => "folders",
-        FolderType::Alerts => "alert_folders",
-        FolderType::Reports => "report_folders",
-        FolderType::Synthetics => "synthetic_folder",
-    };
+    let folder_type_ofga = folder_type_ofga_name(folder_type);
     remove_ownership(org_id, folder_type_ofga, Authz::new(folder_id)).await;
 
     #[cfg(feature = "enterprise")]
@@ -325,6 +361,16 @@ pub async fn delete_folder(
     }
 
     Ok(())
+}
+
+/// OpenFGA object type that owns folders of the given kind.
+fn folder_type_ofga_name(folder_type: FolderType) -> &'static str {
+    match folder_type {
+        FolderType::Dashboards => "folders",
+        FolderType::Alerts => "alert_folders",
+        FolderType::Reports => "report_folders",
+        FolderType::Synthetics => "synthetic_folder",
+    }
 }
 
 #[cfg(not(feature = "enterprise"))]

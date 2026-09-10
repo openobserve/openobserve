@@ -197,6 +197,14 @@ const useRoutes = () => {
         titleKey: "routeTitles.loginCallback",
       },
     },
+    {
+      path: "/slack/oauth/callback",
+      name: "slackOAuthCallback",
+      component: () => import("@/views/SlackOAuthCallback.vue"),
+      meta: {
+        titleKey: "routeTitles.slackOAuthCallback",
+      },
+    },
   ];
 
   const homeChildRoutes = [
@@ -207,17 +215,6 @@ const useRoutes = () => {
       meta: {
         keepAlive: true,
         titleKey: "menu.home",
-      },
-    },
-    // TEMPORARY: preview route for the OEmptyState design sample. Remove once
-    // the empty-state design is approved (along with src/views/EmptyStateDemo.vue).
-    {
-      path: "empty-state-demo",
-      name: "emptyStateDemo",
-      component: () => import("@/views/EmptyStateDemo.vue"),
-      meta: {
-        keepAlive: false,
-        titleKey: "routeTitles.emptyStateDemo",
       },
     },
     {
@@ -915,6 +912,7 @@ const useRoutes = () => {
       },
     },
     {
+      // Correlation engine is enterprise/cloud-only: bounce to Alerts on OSS — mirrors anomaly/alert-sources guards.
       path: "alerts/import-semantic-groups",
       name: "importSemanticGroups",
       component: () => import("@/components/alerts/ImportSemanticGroups.vue"),
@@ -922,6 +920,12 @@ const useRoutes = () => {
         titleKey: "correlation.importSemanticGroups.title",
       },
       beforeEnter(to: any, from: any, next: any) {
+        const store = (window as any).store;
+        const isOss = store?.state?.zoConfig?.build_type === "opensource";
+        if (isOss || (config.isEnterprise !== "true" && config.isCloud !== "true")) {
+          next({ name: "alertList", query: { org_identifier: to.query.org_identifier } });
+          return;
+        }
         routeGuard(to, from, next);
       },
     },

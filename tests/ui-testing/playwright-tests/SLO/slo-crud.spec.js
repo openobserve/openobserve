@@ -454,7 +454,7 @@ test.describe('SLO CRUD lifecycle', { tag: ['@slo', '@sloCrud', '@all'] }, () =>
     await pm.sloListPage.search('definitely-no-such-slo-zzzz');
     await pm.sloListPage.expectRowAbsent(name);
     // The table itself must survive an empty result.
-    await expect(page.locator(pm.sloListPage.locators.table)).toBeVisible();
+    await expect(pm.sloListPage.getTable()).toBeVisible();
   });
 
   test('the pause state survives a reload', {
@@ -467,7 +467,7 @@ test.describe('SLO CRUD lifecycle', { tag: ['@slo', '@sloCrud', '@all'] }, () =>
 
     await pm.sloListPage.goto(ORG);
     await pm.sloListPage.expectRowVisible(name);
-    const toggle = page.locator(pm.sloListPage.toggleButton(name));
+    const toggle = pm.sloListPage.getToggle(name);
     const before = await toggle.getAttribute('aria-pressed');
 
     await pm.sloListPage.expectToggleFlips(name);
@@ -475,7 +475,7 @@ test.describe('SLO CRUD lifecycle', { tag: ['@slo', '@sloCrud', '@all'] }, () =>
     // Reload: the flip must have reached the server, not just the component.
     await page.reload();
     await pm.sloListPage.expectRowVisible(name);
-    await expect(page.locator(pm.sloListPage.toggleButton(name)))
+    await expect(pm.sloListPage.getToggle(name))
       .not.toHaveAttribute('aria-pressed', before ?? '', { timeout: 20000 });
   });
 

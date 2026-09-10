@@ -17,9 +17,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!--
   DbmDisclosureLine — a caveat about the numbers, stated in the reading path.
 
-  `items-start` rather than `items-center`, and the icon nudged down a hair:
+  `items-start` rather than `items-center`, with the icon nudged down to the
+  centre of the FIRST line (`mt-1` centres a 12px glyph in the 20px line box):
   these lines WRAP, and a centred glyph on a two-line caveat floats into the gap
-  between the lines instead of marking where the sentence begins.
+  between the lines instead of marking where the sentence begins. Aligned to the
+  first line, it sits on the text on a one-liner and still marks the start on a
+  wrapped one.
 
   Never a tooltip. A reader who does not see the caveat reads a lifetime counter
   as a per-window one — which is a wrong number, not a missing nicety — so it
@@ -27,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div class="text-text-secondary text-2xs flex items-start gap-1.5" :data-test="dataTest">
-    <OIcon :name="icon" class="mt-px shrink-0" size="xs" />
+    <OIcon :name="icon" class="relative top-1 shrink-0" size="xs" />
     <span><slot /></span>
   </div>
 </template>

@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
               </OFile>
             </div>
-            <div class="col-md-4 w-full pl-2 text-right">
+            <div class="col-md-4 w-full ps-2 text-right">
               <OButton
                 v-if="diffData"
                 variant="primary"
@@ -146,7 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         v-if="group.normalize"
                         type="normalizeState"
                         value="true"
-                        class="ml-1"
+                        class="ms-1"
                       />
                     </span>
                   </div>
@@ -330,7 +330,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ field }}
             <template #trailing>
-              <OIcon v-if="isNewField(field)" name="add" size="xs" class="ml-1" />
+              <OIcon v-if="isNewField(field)" name="add" size="xs" class="ms-1" />
             </template>
           </OTag>
         </div>

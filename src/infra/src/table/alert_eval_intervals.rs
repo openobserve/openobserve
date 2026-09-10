@@ -28,9 +28,9 @@
 use config::meta::alerts::{level::AlertLevel, state::EvalLedgerWrite};
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, Set};
 
-use super::{entity::alert_eval_intervals, get_lock};
+use super::entity::alert_eval_intervals;
 use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{get_orm_client_ro, get_orm_client_rw},
     errors,
 };
 
@@ -175,7 +175,7 @@ pub async fn list_overlapping(
     range_start_us: i64,
     range_end_us: i64,
 ) -> Result<Vec<AlertEvalInterval>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     list_overlapping_with(client, alert_id, range_start_us, range_end_us).await
 }
 
@@ -216,7 +216,7 @@ pub async fn list_overlapping_with<C: sea_orm::ConnectionTrait>(
 /// behaviour before this instant, so measuring earlier would fabricate coverage
 /// out of retention's blind spot.
 pub async fn earliest_from_us(alert_id: &str) -> Result<Option<i64>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     earliest_from_us_with(client, alert_id).await
 }
 
@@ -241,10 +241,7 @@ pub async fn earliest_from_us_with<C: sea_orm::ConnectionTrait>(
 /// cutoff but began long before it — survives. Deleting on `from_us` would
 /// delete the interval an alert has been sitting in for months.
 pub async fn delete_before(cutoff_us: i64) -> Result<u64, errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     delete_before_with(client, cutoff_us).await
 }
 
@@ -263,10 +260,7 @@ pub async fn delete_before_with<C: sea_orm::ConnectionTrait>(
 /// Remove an alert's whole ledger. Called when the alert is deleted — these
 /// rows are owned by the alert's lifecycle, exactly like its state rows.
 pub async fn delete_by_alert(alert_id: &str) -> Result<(), errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     delete_by_alert_with(client, alert_id).await
 }
 

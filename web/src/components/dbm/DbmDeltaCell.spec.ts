@@ -16,6 +16,7 @@
 import { mount } from "@vue/test-utils";
 import { describe, expect, it } from "vitest";
 
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import i18n from "@/locales";
 import type { DbmDelta } from "@/utils/dbm/insights";
 
@@ -138,7 +139,10 @@ describe("DbmDeltaCell", () => {
       const wrapper = mountWith({ state: "new", current: 500 });
       // The caveat is the point: "new to this list" is first RANK ENTRY, not a
       // newly written query, and the hover has to say so or the chip misleads.
-      expect(wrapper.attributes("title")).toContain("wasn't among the heaviest earlier");
+      // The hover rides OTooltip's content, not a native title attribute.
+      expect(String(wrapper.findComponent(OTooltip).props("content"))).toContain(
+        "wasn't among the heaviest earlier",
+      );
     });
 
     it("shows both windows' values when they are supplied", () => {
@@ -146,8 +150,9 @@ describe("DbmDeltaCell", () => {
         { state: "changed", current: 200, previous: 100, ratio: 1 },
         { currentLabel: "200ms", previousLabel: "100ms" },
       );
-      expect(wrapper.attributes("title")).toContain("100ms");
-      expect(wrapper.attributes("title")).toContain("200ms");
+      const content = String(wrapper.findComponent(OTooltip).props("content"));
+      expect(content).toContain("100ms");
+      expect(content).toContain("200ms");
     });
   });
 });

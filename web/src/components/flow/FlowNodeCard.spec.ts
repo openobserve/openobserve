@@ -146,6 +146,133 @@ describe("FlowNodeCard", () => {
     });
   });
 
+  // Multi-handle source nodes (workflow Branch: true/false, N-way Switch). This
+  // card is SHARED with the Pipelines canvas, so the multi-handle support must be
+  // ADDITIVE — omitting `outputHandles` has to keep today's single id="output"
+  // handle or every pipeline node regresses.
+  describe("handles: multiple source handles (outputHandles)", () => {
+    const sourceHandles = (w: any) => w.findAll('[data-handle-type="source"]');
+
+    it("renders one source handle per declared outputHandle", () => {
+      wrapper = mountCard({ outputHandles: [{ id: "true" }, { id: "false" }] });
+      expect(sourceHandles(wrapper)).toHaveLength(2);
+    });
+
+    it("gives each source handle its declared id, in order", () => {
+      wrapper = mountCard({ outputHandles: [{ id: "true" }, { id: "false" }] });
+      const ids = sourceHandles(wrapper).map((h: any) => h.attributes("data-handle-id"));
+      expect(ids).toEqual(["true", "false"]);
+    });
+
+    it("generalises past two — an N-way switch renders N source handles", () => {
+      wrapper = mountCard({
+        outputHandles: [{ id: "case-0" }, { id: "case-1" }, { id: "case-2" }, { id: "else" }],
+      });
+      expect(sourceHandles(wrapper).map((h: any) => h.attributes("data-handle-id"))).toEqual([
+        "case-0",
+        "case-1",
+        "case-2",
+        "else",
+      ]);
+    });
+
+    it("still honours hasOutput=false — a terminal node has no source handle", () => {
+      wrapper = mountCard({ hasOutput: false, outputHandles: [{ id: "true" }, { id: "false" }] });
+      expect(sourceHandles(wrapper)).toHaveLength(0);
+    });
+
+    // Pipelines compatibility: these three are the CURRENT behaviour and must keep
+    // passing after the prop lands.
+    it("PIPELINE COMPAT: renders exactly one source handle when outputHandles is omitted", () => {
+      wrapper = mountCard();
+      expect(sourceHandles(wrapper)).toHaveLength(1);
+      expect(sourceHandles(wrapper)[0].attributes("data-handle-id")).toBe("output");
+    });
+
+    it('PIPELINE COMPAT: an empty outputHandles array still yields the single "output" handle', () => {
+      wrapper = mountCard({ outputHandles: [] });
+      expect(sourceHandles(wrapper)).toHaveLength(1);
+      expect(sourceHandles(wrapper)[0].attributes("data-handle-id")).toBe("output");
+    });
+
+    it("emits outputClick with the handle id so the wrapper knows WHICH branch was clicked", async () => {
+      wrapper = mountCard({ outputHandles: [{ id: "true" }, { id: "false" }] });
+      await sourceHandles(wrapper)[1].trigger("click");
+      const emitted = wrapper.emitted("outputClick");
+      expect(emitted).toBeTruthy();
+      expect(emitted[0][1]).toBe("false");
+    });
+  });
+
+  // P0 — every fan-out handle used to render at the SAME coordinates (VueFlow pins
+  // `.vue-flow__handle-bottom` at left:50%), so a Branch's arms were physically
+  // unclickable and no drag could ever name an arm. Each handle must carry its own
+  // offset.
+  describe("handles: fan-out handles are spread, not stacked", () => {
+    const sourceHandles = (w: any) => w.findAll('[data-handle-type="source"]');
+    const offsets = (w: any) => sourceHandles(w).map((h: any) => h.attributes("style") || "");
+
+    it("gives each of a 3-arm branch a DISTINCT offset", () => {
+      wrapper = mountCard({ outputHandles: [{ id: "case-0" }, { id: "case-1" }, { id: "else" }] });
+      const seen = offsets(wrapper);
+      expect(seen).toHaveLength(3);
+      expect(new Set(seen).size).toBe(3);
+    });
+
+    it("spreads them evenly across the card at (i+1)/(n+1)", () => {
+      wrapper = mountCard({ outputHandles: [{ id: "case-0" }, { id: "case-1" }, { id: "else" }] });
+      const seen = offsets(wrapper);
+      expect(seen[0]).toContain("25%");
+      expect(seen[1]).toContain("50%");
+      expect(seen[2]).toContain("75%");
+    });
+
+    it("two arms sit at a third and two thirds", () => {
+      wrapper = mountCard({ outputHandles: [{ id: "true" }, { id: "false" }] });
+      const seen = offsets(wrapper);
+      expect(new Set(seen).size).toBe(2);
+      expect(seen[0]).toContain("33.333");
+      expect(seen[1]).toContain("66.666");
+    });
+
+    it("degrades to many arms — 8 handles are still all distinct and inside the card", () => {
+      const many = Array.from({ length: 8 }, (_, i) => ({ id: `case-${i}` }));
+      wrapper = mountCard({ outputHandles: many });
+      const seen = offsets(wrapper);
+      expect(seen).toHaveLength(8);
+      expect(new Set(seen).size).toBe(8);
+      for (const s of seen) {
+        const pct = Number(/(-?[\d.]+)%/.exec(s)?.[1]);
+        expect(pct).toBeGreaterThan(0);
+        expect(pct).toBeLessThan(100);
+      }
+    });
+
+    // The offset is keyed off the handle's POSITION AMONG THE RENDERED ARMS, but the
+    // arms themselves are stable ids with gaps (case-0, case-2, else) — a gap must
+    // not collapse two handles onto each other.
+    it("a deleted middle path (case-0, case-2, else) still yields three distinct offsets", () => {
+      wrapper = mountCard({ outputHandles: [{ id: "case-0" }, { id: "case-2" }, { id: "else" }] });
+      const seen = offsets(wrapper);
+      expect(new Set(seen).size).toBe(3);
+      expect(sourceHandles(wrapper).map((h: any) => h.attributes("data-handle-id"))).toEqual([
+        "case-0",
+        "case-2",
+        "else",
+      ]);
+    });
+
+    it("PIPELINE COMPAT: a single-output node gets NO offset override at all", () => {
+      wrapper = mountCard();
+      expect(sourceHandles(wrapper)[0].attributes("style")).toBeFalsy();
+    });
+
+    it("PIPELINE COMPAT: an empty outputHandles array also gets no offset override", () => {
+      wrapper = mountCard({ outputHandles: [] });
+      expect(sourceHandles(wrapper)[0].attributes("style")).toBeFalsy();
+    });
+  });
+
   describe("handles: position", () => {
     it("defaults the input handle to top and the output handle to bottom", () => {
       wrapper = mountCard();

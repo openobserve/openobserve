@@ -66,7 +66,8 @@ enum Role {
   ROUTER = 4;
   SCHEDULER = 5;
   FLATTEN_COMPACTOR = 6;
-  SCRIPT_SERVER = 7;
+  reserved 7;  // was SCRIPT_SERVER (action scripts, removed)
+  reserved "SCRIPT_SERVER";
 }
 
 // Role group enum

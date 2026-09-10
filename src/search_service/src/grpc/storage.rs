@@ -185,7 +185,6 @@ pub async fn search(
                     &f.key,
                     f.meta.compressed_size,
                     f.meta.max_ts,
-                    f.meta.records,
                 )
             })
             .collect_vec(),
@@ -273,7 +272,6 @@ pub async fn search(
         file_stat_cache,
         index_condition,
         fst_fields,
-        || {},
     )
     .await?;
 

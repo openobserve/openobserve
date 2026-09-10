@@ -25,12 +25,9 @@ use sea_orm::{
 };
 
 use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{get_orm_client_ro, get_orm_client_rw},
     errors::{Error, TemplateError},
-    table::{
-        entity::templates::{ActiveModel, Column, Entity, Model},
-        get_lock,
-    },
+    table::entity::templates::{ActiveModel, Column, Entity, Model},
 };
 
 const DEFAULT_ORG: &str = "default";
@@ -61,10 +58,7 @@ impl TryFrom<Model> for Template {
 }
 
 pub async fn put(template: Template) -> Result<Template, Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let title = match &template.template_type {
         TemplateType::Email { title } => Some(title.to_string()),
         _ => None,
@@ -93,7 +87,7 @@ pub async fn put(template: Template) -> Result<Template, Error> {
 }
 
 pub async fn get(org_id: &str, name: &str) -> Result<Option<Template>, Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     match get_model(client, org_id, name).await? {
         Some(model) => Ok(Some(Template::try_from(model)?)),
         None => Ok(None),
@@ -101,7 +95,7 @@ pub async fn get(org_id: &str, name: &str) -> Result<Option<Template>, Error> {
 }
 
 pub async fn list(org_id: &str) -> Result<Vec<Template>, Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let templates = list_models(client, Some(org_id))
         .await?
         .into_iter()
@@ -111,7 +105,7 @@ pub async fn list(org_id: &str) -> Result<Vec<Template>, Error> {
 }
 
 pub async fn list_all() -> Result<Vec<(String, Template)>, Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let templates = list_models(client, None)
         .await?
         .into_iter()
@@ -121,10 +115,7 @@ pub async fn list_all() -> Result<Vec<(String, Template)>, Error> {
 }
 
 pub async fn delete(org_id: &str, name: &str) -> Result<(), Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let model = get_model(client, org_id, name).await?;
 
     if let Some(model) = model {
@@ -162,8 +153,7 @@ async fn list_models(
 
 /// Deletes all templates belonging to the given org.
 pub async fn delete_by_org(org_id: &str) -> Result<(), Error> {
-    let _lock = get_lock().await;
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::delete_many()
         .filter(Column::Org.eq(org_id))
         .exec(client)

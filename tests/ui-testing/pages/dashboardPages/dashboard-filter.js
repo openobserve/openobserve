@@ -488,7 +488,17 @@ export default class DashboardFilter {
         .locator(`[data-test="dashboard-add-condition-condition-${idx}"]`)
         .last();
       await conditionSelector.waitFor({ state: "visible", timeout: 5000 });
-      await conditionSelector.click();
+      // The popover opened by the label click above is still animating in, and
+      // its Reka popper wrapper swallows pointer events until it settles — the
+      // plain click then fails actionability, and by the retry the tab has been
+      // re-mounted and detached. Force past the interception check, then gate on
+      // the operator dropdown (Step 5's target) actually being mounted.
+      await conditionSelector.click({ force: true, timeout: 10000 });
+      await this.page
+        .locator('[data-test="dashboard-add-condition-operator"]')
+        .last()
+        .waitFor({ state: "visible", timeout: 10000 })
+        .catch(() => {});
     }
 
     // Step 5: Select operator (dropdown appears in portal, use page scope)

@@ -15,16 +15,11 @@
 
 use std::time::Duration;
 
-use config::meta::promql::value::{EvalContext, Sample, Value};
-use datafusion::error::Result;
+use config::meta::promql::value::Sample;
 
 use crate::{common::linear_regression, functions::RangeFunc};
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#deriv
-pub(crate) fn deriv(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
-    super::eval_range(data, DerivFunc::new(), eval_ctx)
-}
-
 pub struct DerivFunc;
 
 impl DerivFunc {
@@ -55,9 +50,14 @@ impl RangeFunc for DerivFunc {
 mod tests {
     use std::time::Duration;
 
-    use config::meta::promql::value::{Labels, RangeValue, TimeWindow};
+    use config::meta::promql::value::{EvalContext, Labels, RangeValue, TimeWindow, Value};
+    use datafusion::error::Result;
 
     use super::*;
+
+    fn deriv(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
+        crate::functions::eval_range(data, DerivFunc::new(), eval_ctx)
+    }
     // Test helper
     fn deriv_test_helper(data: Value) -> Result<Value> {
         let eval_ctx = EvalContext::new(3000, 3000, 0, "test".to_string());

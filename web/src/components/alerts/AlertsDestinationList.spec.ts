@@ -27,12 +27,6 @@ vi.mock("@/services/alert_templates", () => ({
   },
 }));
 
-vi.mock("@/composables/useActions", () => ({
-  default: () => ({
-    getAllActions: vi.fn().mockResolvedValue({}),
-  }),
-}));
-
 vi.mock("@/utils/zincutils", async (importOriginal) => {
   const actual = (await importOriginal()) as any;
   return {
@@ -67,6 +61,13 @@ import router from "@/test/unit/helpers/router";
 
 // ── stubs ────────────────────────────────────────────────────────────────────
 
+const cellValue = (columns: any[], id: string, row: any) => {
+  const col = columns.find((c) => c.id === id);
+  if (col?.accessorFn) return col.accessorFn(row);
+  if (col?.accessorKey) return row[col.accessorKey];
+  return "";
+};
+
 const OTableStub = {
   name: "OTable",
   props: {
@@ -77,6 +78,14 @@ const OTableStub = {
     selection: { default: "none" },
   },
   emits: ["update:selected-ids"],
+  methods: {
+    urlOf(row: any) {
+      return cellValue(this.columns, "url", row);
+    },
+    methodOf(row: any) {
+      return cellValue(this.columns, "method", row);
+    },
+  },
   template: `
     <div data-test="o-table-stub">
       <slot name="toolbar" />
@@ -84,6 +93,12 @@ const OTableStub = {
       <slot name="actions" />
       <slot name="bottom" :totalRows="data ? data.length : 0" />
       <template v-for="row in data" :key="row.name">
+        <div :data-test="'destination-url-' + row.name">
+          <slot name="cell-url" :row="row">{{ urlOf(row) }}</slot>
+        </div>
+        <div :data-test="'destination-method-' + row.name">
+          <slot name="cell-method" :row="row">{{ methodOf(row) }}</slot>
+        </div>
         <slot name="cell-type" :row="row" />
         <slot name="cell-actions" :row="row" />
       </template>
@@ -481,6 +496,161 @@ describe("AlertsDestinationList", () => {
       wrapper = mountComponent();
       await flushPromises();
       expect(wrapper.find('[data-test="destination-import"]').exists()).toBe(true);
+    });
+  });
+
+  // Email destinations store recipients in emails[]; URL shows them and Method stays blank.
+  describe("email destination URL and method cells", () => {
+    const emailDest = makeDestination(4, {
+      name: "email-ops",
+      type: "email",
+      url: "",
+      method: "post",
+      emails: ["alerts@example.com", "oncall@example.com"],
+    });
+
+    beforeEach(async () => {
+      (destinationService.list as any).mockResolvedValue({
+        data: [makeDestination(1), emailDest],
+      });
+      wrapper = mountComponent();
+      await flushPromises();
+    });
+
+    it("renders email recipients in the URL cell instead of an empty URL", () => {
+      const urlCell = wrapper!.find('[data-test="destination-url-email-ops"]');
+      expect(urlCell.exists()).toBe(true);
+      expect(urlCell.text()).toBe("alerts@example.com, oncall@example.com");
+    });
+
+    it("does not render a meaningless post method for email destinations", () => {
+      const methodCell = wrapper!.find('[data-test="destination-method-email-ops"]');
+      expect(methodCell.exists()).toBe(true);
+      expect(methodCell.text().toLowerCase()).not.toBe("post");
+      expect(methodCell.text().trim()).toBe("");
+    });
+
+    it("still renders URL and method for HTTP destinations", () => {
+      expect(wrapper!.find('[data-test="destination-url-destination-1"]').text()).toBe(
+        "https://example.com/hook-1",
+      );
+      expect(wrapper!.find('[data-test="destination-method-destination-1"]').text()).toBe("POST");
+    });
+
+    it("labels the column URL / Recipients, not URL", () => {
+      const table = wrapper!.findComponent({ name: "OTable" });
+      const urlCol = table.props("columns").find((c: any) => c.id === "url");
+      expect(urlCol?.header).toBe("URL / Recipients");
+    });
+  });
+
+  // ── pagination restoration ──────────────────────────────────────────────────
+  // OTable is stubbed in this harness (see OTableStub above), so the actual
+  // TanStack pageIndex restoration (setTimeout(0) + table.setPageIndex) cannot
+  // be exercised end-to-end here. These tests cover what IS reachable: seeding
+  // currentPage from the URL, and that navigating to/from the add/edit/import
+  // views preserves the `page` query param instead of stripping it.
+
+  describe("pagination restoration", () => {
+    it("seeds currentPage from the URL's page query param", async () => {
+      (router as any).currentRoute.value.query = { page: "3" };
+      wrapper = mountComponent();
+      await flushPromises();
+
+      expect((wrapper.vm as any).currentPage).toBe(3);
+    });
+
+    it("defaults currentPage to 1 when no page query param is present", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+
+      expect((wrapper.vm as any).currentPage).toBe(1);
+    });
+
+    it("onPageChange updates currentPage and replaces the URL, preserving other query params", async () => {
+      (router as any).currentRoute.value.query = { org_identifier: "test-org" };
+      wrapper = mountComponent();
+      await flushPromises();
+      const replaceSpy = vi.spyOn(router, "replace");
+
+      (wrapper.vm as any).onPageChange(3);
+
+      expect((wrapper.vm as any).currentPage).toBe(3);
+      expect(replaceSpy).toHaveBeenCalledWith({
+        query: { org_identifier: "test-org", page: "3" },
+      });
+    });
+
+    it("onPageChange is a no-op on the URL when the page hasn't actually changed", async () => {
+      (router as any).currentRoute.value.query = { page: "1" };
+      wrapper = mountComponent();
+      await flushPromises();
+      const replaceSpy = vi.spyOn(router, "replace");
+
+      (wrapper.vm as any).onPageChange(1);
+
+      expect(replaceSpy).not.toHaveBeenCalled();
+    });
+
+    it("editDestination(null) preserves the page query param when opening the add form", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      (router as any).currentRoute.value.query = { page: "3", org_identifier: "test-org" };
+      const pushSpy = vi.spyOn(router, "push");
+
+      (wrapper.vm as any).editDestination(null);
+
+      const pushedQuery = pushSpy.mock.calls[0][0].query;
+      expect(pushedQuery.page).toBe("3");
+      expect(pushedQuery.action).toBe("add");
+    });
+
+    it("editDestination(row) preserves the page query param when opening the edit form", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      (router as any).currentRoute.value.query = { page: "3", org_identifier: "test-org" };
+      const pushSpy = vi.spyOn(router, "push");
+      const dest = (wrapper.vm as any).destinations[0];
+
+      (wrapper.vm as any).editDestination(dest);
+
+      const pushedQuery = pushSpy.mock.calls[0][0].query;
+      expect(pushedQuery.page).toBe("3");
+      expect(pushedQuery.action).toBe("update");
+      expect(pushedQuery.name).toBe(dest.name);
+    });
+
+    it("toggleDestinationEditor drops action/name but keeps page when closing the editor", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      (wrapper.vm as any).showDestinationEditor = true;
+      (router as any).currentRoute.value.query = {
+        action: "update",
+        name: "destination-1",
+        page: "3",
+        org_identifier: "test-org",
+      };
+      const pushSpy = vi.spyOn(router, "push");
+
+      (wrapper.vm as any).toggleDestinationEditor();
+
+      const pushedQuery = pushSpy.mock.calls[0][0].query;
+      expect(pushedQuery.page).toBe("3");
+      expect(pushedQuery.action).toBeUndefined();
+      expect(pushedQuery.name).toBeUndefined();
+    });
+
+    it("importDestination preserves the page query param", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      (router as any).currentRoute.value.query = { page: "3", org_identifier: "test-org" };
+      const pushSpy = vi.spyOn(router, "push");
+
+      (wrapper.vm as any).importDestination();
+
+      const pushedQuery = pushSpy.mock.calls[0][0].query;
+      expect(pushedQuery.page).toBe("3");
+      expect(pushedQuery.action).toBe("import");
     });
   });
 });

@@ -95,13 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </ODropdownItem>
       </ODropdown>
       <!-- new dashboard button -->
-      <OButton
-        variant="primary"
-        size="sm"
-        icon-left="add"
-        data-test="dashboard-new"
-        @click="addDashboard"
-      >
+      <OButton variant="primary" size="sm" data-test="dashboard-new" @click="addDashboard">
         {{ t(`dashboard.add`) }}
       </OButton>
     </template>
@@ -128,6 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :columns="columns"
             row-key="id"
             :loading="loading"
+            :forbidden="forbidden"
             :frame="false"
             :default-columns="false"
             show-index
@@ -136,6 +131,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :footer-title="t('dashboard.header')"
             :page-size="20"
             :page-size-options="[20, 50, 100, 250, 500]"
+            :current-page="currentPage"
+            @update:current-page="onPageChange"
             selection="multiple"
             v-model:selected-ids="selectedIds"
             :enable-column-resize="true"
@@ -165,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OToggleGroup
                         :model-value="searchAcrossFolders ? 'all' : 'this'"
                         type="single"
-                        class="mr-1 self-center"
+                        class="me-1 self-center"
                         @update:model-value="(v) => (searchAcrossFolders = v === 'all')"
                       >
                         <OToggleGroupItem
@@ -264,7 +261,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #cell-folder="{ row }">
               <button
                 type="button"
-                class="bg-surface-subtle text-text-body hover:bg-surface-subtle-hover hover:text-text-body focus-visible:ring-accent/25 inline-flex max-w-full items-center gap-1 rounded-full px-2 py-0.5 text-xs leading-5 transition-colors outline-none focus-visible:ring-4 focus-visible:ring-inset"
+                class="bg-surface-subtle text-text-body hover:bg-surface-subtle-hover hover:text-text-body focus-visible:ring-focus-ring-accent inline-flex max-w-full items-center gap-1 rounded-full px-2 py-0.5 text-xs leading-5 transition-colors outline-none focus-visible:ring-4 focus-visible:ring-inset"
                 @click.stop="updateActiveFolderId(row.folder_id)"
               >
                 <OIcon name="folder-outline" size="xs" />
@@ -358,7 +355,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ resultTotal || 0 }} {{ t("dashboard.header") }}
                 </div>
                 <div v-if="selectedIds.length > 0" class="bulk-action-bar flex items-center gap-2">
-                  <span class="text-text-body mr-1 text-sm">{{
+                  <span class="text-text-body me-1 text-sm">{{
                     t("dashboard.dashboards.selected", { count: selectedIds.length })
                   }}</span>
                   <OButton
@@ -662,6 +659,14 @@ export default defineComponent({
     const selectedIds = ref<string[]>([]);
     const { track } = useReo();
 
+    // URL-synced so returning from a dashboard (Back/Update/Cancel) lands on the same page instead of resetting to page 1.
+    const currentPage = ref(Number(route.query.page) || 1);
+    const onPageChange = (page: number) => {
+      currentPage.value = page;
+      if (String(route.query.page ?? "1") === String(page)) return;
+      router.replace({ query: { ...route.query, page: String(page) } });
+    };
+
     const { showPositiveNotification, showErrorNotification } = useNotifications();
 
     const { isHome, setHomeDashboard, clearHomeDashboard, homeDashboard } = useHomeDashboard(t);
@@ -871,8 +876,12 @@ export default defineComponent({
     const selectedDashboardIds = computed(() => selectedIds.value);
 
     onMounted(async () => {
-      //get folders list
-      await getFoldersList(store);
+      // Awaited so the landing decision settles after FolderList's async init emission.
+      try {
+        await getFoldersList(store);
+      } catch {
+        // Already reported by the grouped access toast; the empty rail stands in.
+      }
 
       // Load favorites BEFORE picking the landing view — the favorites-first
       // landing below depends on knowing whether any exist.
@@ -918,6 +927,7 @@ export default defineComponent({
           router.push({
             path: "/dashboards",
             query: {
+              ...route.query,
               org_identifier: store.state.selectedOrganization.identifier,
               folder: activeFolderId.value,
             },
@@ -928,21 +938,27 @@ export default defineComponent({
         // String() matches JS's own null→"null" key coercion (behavior-neutral).
         loading.value =
           !store.state.organizationData.allDashboardList[String(activeFolderId.value)];
+        forbidden.value = false;
         try {
           const response = await getAllDashboardsByFolderId(store, activeFolderId.value);
 
           dashboardList.value = response || [];
         } catch (error) {
           console.error("Error loading dashboards:", error);
-          showErrorNotification(
-            raw(asCaughtError(error).message || t("dashboard.dashboards.failedToLoadFolder")),
-          );
+          forbidden.value = asCaughtError(error).response?.status === 403;
+          // The grouped access toast already reports a 403; a second red toast adds nothing.
+          if (!forbidden.value) {
+            showErrorNotification(
+              raw(asCaughtError(error).message || t("dashboard.dashboards.failedToLoadFolder")),
+            );
+          }
         } finally {
           loading.value = false;
           searchAcrossFolders.value = false;
           router.push({
             path: "/dashboards",
             query: {
+              ...route.query,
               org_identifier: store.state.selectedOrganization.identifier,
               folder: activeFolderId.value,
             },
@@ -984,12 +1000,7 @@ export default defineComponent({
             const searchResults = await fetchSearchResults.execute(searchQuery.value);
             filteredResults.value = toRaw(searchResults);
           } catch (error) {
-            // Latent bug preserved: `!x === "AbortError"` compares a boolean to a
-            // string, so this body never runs. Kept as-is to avoid changing
-            // runtime behavior in a type-only fix; the mistaken comparison is
-            // what makes this branch dead, not the types.
-            // @ts-expect-error -- intentional no-op comparison (boolean vs string), see note
-            if (!asCaughtError(error).name === "AbortError") {
+            if (asCaughtError(error).name !== "AbortError") {
               filteredResults.value = [];
               // Handle error state
             }
@@ -1162,6 +1173,19 @@ export default defineComponent({
     // Start in the loading state so the table shows the skeleton on first
     // render instead of briefly flashing the empty state before the fetch.
     const loading = ref(true);
+    // Only the dashboards fetch is authoritative on access; the folder list is not.
+    const forbidden = ref(false);
+    // The first real load lands after mount and races TanStack's own auto-reset-on-data-change, which resolves through its own deferred microtask queue — setTimeout(0) runs strictly after that queue drains, so the restored page reliably wins.
+    watch(
+      loading,
+      (isLoading) => {
+        if (isLoading) return;
+        setTimeout(() => {
+          oTableRef.value?.table?.setPageIndex(currentPage.value - 1);
+        }, 0);
+      },
+      { once: true },
+    );
     const getDashboards = async () => {
       const dismiss = toast({
         variant: "loading",
@@ -1732,6 +1756,7 @@ export default defineComponent({
       dashboard,
       columns,
       loading,
+      forbidden,
       showAddDashboardDialog,
       showAddDashboardFromGitHub,
       addDashboard,
@@ -1778,6 +1803,8 @@ export default defineComponent({
       filteredFolders,
       updateActiveFolderId,
       selectedIds,
+      currentPage,
+      onPageChange,
       multipleExportDashboard,
       showExportDialog,
       dashboardsToExport,

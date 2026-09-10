@@ -31,15 +31,31 @@ Item order inside a file/module, top to bottom (clippy's default grouping):
 
 ## Comments
 
-- Default is no comment. Write one only for a non-obvious constraint the code
-  itself cannot express.
-- One line is the norm. Do not write multi-line comment essays, narration of
-  what the code does, or notes about the change itself ("now we correctly...").
-- `///` doc comments on public APIs: one summary sentence; add more only for
-  real caveats, never to restate the signature.
+STRICT, and enforced in review — a comment that breaks these is deleted, not
+reworded:
+
+- **One line, or none.** A comment is at most a single line. No multi-line
+  comment blocks in code (the license header is the only exception). If the
+  point needs more than one line, it does not belong in a comment.
+- **Only logical comments — explain WHY.** The single allowed reason to write a
+  comment is to state a non-obvious constraint, invariant, or gotcha the code
+  itself cannot express. If a comment is not explaining logic, do not write it;
+  no comment is better than a filler one.
+- **Banned outright** (remove on sight): styling/visual narration (layout,
+  spacing, `px`, "matches the header height"), change/modification notes ("now
+  we...", "changed to...", "was X"), and narration that restates what the code
+  plainly does.
+- `///` / JSDoc doc comments on public APIs: one summary sentence, and only when
+  the behaviour is non-obvious; never to restate the signature.
 
 ## PR conventions
 
+- CI runs on a PR only while it carries the `ready-for-ci` label and is not a draft
+  (no label or draft = nothing runs except `ci-gate`, and no red checks). Add the
+  label when you want the run, not when you open the PR; clicking "Merge when
+  ready" adds it automatically if it is missing. Which suites run is decided by
+  path detection, never by a label. The merge queue only compiles and unit-tests the merged code, so the
+  labelled PR run is the one that has to be green.
 - PR titles starting with `feat:` require `Design at: #xxx` as the FIRST line
   of the description (enforced by `.github/workflows/feat-design-checker.yml`);
   `fix:`/`chore:`/`test:` PRs skip the check.

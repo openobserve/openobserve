@@ -16,6 +16,7 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import TraceDetails from "@/plugins/traces/TraceDetails.vue";
+import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
@@ -332,6 +333,17 @@ describe("TraceDetails", () => {
       expect(operationName.text()).toContain(
         tracesMockData.tracesDetails.traceSpans.hits[0].operation_name,
       );
+    });
+
+    it("should constrain the operation name so a long one ellipsises", () => {
+      const operationName = wrapper.find('[data-test="trace-details-operation-name"]');
+
+      expect(operationName.classes()).toContain("truncate");
+      expect(operationName.attributes("title")).toBe(
+        tracesMockData.tracesDetails.traceSpans.hits[0].operation_name,
+      );
+      // The ellipsis only fires if the header also lets the title block shrink.
+      expect(wrapper.findComponent(OPageHeader).props("titleOverflow")).toBe("visible");
     });
 
     it("should display trace ID in toolbar", () => {
@@ -1755,6 +1767,21 @@ describe("TraceDetails", () => {
       routerPushSpy.mockRestore();
     });
 
+    it("uses real browser back when there's history to pop, instead of the hardcoded traces route", () => {
+      window.history.pushState({ back: "/previous" }, "", "/previous-fake-url");
+      const routerBackSpy = vi.spyOn(router, "back");
+      const routerPushSpy = vi.spyOn(router, "push");
+
+      wrapper.vm.routeToTracesList();
+
+      expect(routerBackSpy).toHaveBeenCalledTimes(1);
+      expect(routerPushSpy).not.toHaveBeenCalled();
+
+      routerBackSpy.mockRestore();
+      routerPushSpy.mockRestore();
+      window.history.replaceState(null, "");
+    });
+
     it("should not navigate when in embedded mode", () => {
       const embeddedWrapper = mount(TraceDetails, {
         attachTo: "#app",
@@ -2698,6 +2725,98 @@ describe("TraceDetails", () => {
       await wrapper.vm.$nextTick();
 
       expect(wrapper.vm.sidebarActiveTab).toBe("attributes");
+    });
+
+    // Regression: onSelectSpanEvent set sidebarActiveTab synchronously, but
+    // selectedSpanId is a computed over the store, so its watcher ran on the
+    // next flush and — with no span previously selected (`!oldSpanId`) —
+    // overwrote the tab with the default. Measured in a browser: the sidebar
+    // opened on "attributes" every time.
+    it("should keep sidebarActiveTab as 'events' after a marker click", async () => {
+      const spanId = tracesMockData.tracesDetails.traceSpans.hits[0].span_id;
+
+      wrapper.vm.onSelectSpanEvent({ spanId, eventIndex: 2 });
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.sidebarActiveTab).toBe("events");
+    });
+
+    it("should still apply the default tab for an ordinary span click", async () => {
+      const spanId = tracesMockData.tracesDetails.traceSpans.hits[0].span_id;
+
+      wrapper.vm.updateSelectedSpan(spanId);
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.sidebarActiveTab).toBe("attributes");
+    });
+
+    // Regression: the pending tab was only cleared inside the watcher's spanMap
+    // guard. Re-clicking a marker on the already-selected span does not change
+    // selectedSpanId, so the watcher never fired and the flag survived to
+    // hijack the next ordinary selection.
+    it("should not let a stale marker request hijack the next span click", async () => {
+      const spanId = tracesMockData.tracesDetails.traceSpans.hits[0].span_id;
+      const otherSpanId = tracesMockData.tracesDetails.traceSpans.hits[1].span_id;
+
+      // Select the span, then click a marker on that same span — no id change.
+      wrapper.vm.updateSelectedSpan(spanId);
+      await wrapper.vm.$nextTick();
+      wrapper.vm.onSelectSpanEvent({ spanId, eventIndex: 0 });
+      await wrapper.vm.$nextTick();
+      expect(wrapper.vm.sidebarActiveTab).toBe("events");
+
+      // A later, unrelated span click must land on the default tab.
+      wrapper.vm.updateSelectedSpan(otherSpanId);
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.sidebarActiveTab).toBe("attributes");
+    });
+
+    it("should drain a marker request aimed at a span that is not loaded", async () => {
+      const spanId = tracesMockData.tracesDetails.traceSpans.hits[0].span_id;
+
+      wrapper.vm.onSelectSpanEvent({ spanId: "span-not-in-map", eventIndex: 0 });
+      await wrapper.vm.$nextTick();
+
+      wrapper.vm.updateSelectedSpan(spanId);
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.sidebarActiveTab).toBe("attributes");
+    });
+
+    // Regression: the reset was keyed on the tab being named "events", which
+    // also caught a user who opened Events by hand. Every other tab persists
+    // across span navigation; a manually chosen Events tab must too.
+    it("should keep a manually chosen Events tab when navigating to another span", async () => {
+      const spanId = tracesMockData.tracesDetails.traceSpans.hits[0].span_id;
+      const otherSpanId = tracesMockData.tracesDetails.traceSpans.hits[1].span_id;
+
+      wrapper.vm.updateSelectedSpan(spanId);
+      await wrapper.vm.$nextTick();
+      wrapper.vm.onSidebarTabChange("events");
+      await wrapper.vm.$nextTick();
+
+      wrapper.vm.updateSelectedSpan(otherSpanId);
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.sidebarActiveTab).toBe("events");
+    });
+
+    // A manual choice after a marker click clears the marker's provenance, so
+    // that choice persists too rather than being reset on the next navigation.
+    it("should keep a tab chosen by hand after a marker click", async () => {
+      const spanId = tracesMockData.tracesDetails.traceSpans.hits[0].span_id;
+      const otherSpanId = tracesMockData.tracesDetails.traceSpans.hits[1].span_id;
+
+      wrapper.vm.onSelectSpanEvent({ spanId, eventIndex: 0 });
+      await wrapper.vm.$nextTick();
+      wrapper.vm.onSidebarTabChange("links");
+      await wrapper.vm.$nextTick();
+
+      wrapper.vm.updateSelectedSpan(otherSpanId);
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.sidebarActiveTab).toBe("links");
     });
   });
 

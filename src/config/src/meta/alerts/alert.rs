@@ -129,6 +129,9 @@ pub struct Alert {
     /// they did before Feature 2 (G5).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tags: Vec<String>,
+
+    #[serde(default)]
+    pub pending_period_sec: i64,
 }
 
 impl MemorySize for Alert {
@@ -192,6 +195,7 @@ impl Default for Alert {
             workflows: vec![],
             priority: None,
             tags: vec![],
+            pending_period_sec: 0,
         }
     }
 }
@@ -213,8 +217,6 @@ impl Alert {
     /// Use this function instead of `get_last_satisfied_at_from_table` to get the actual timestamp.
     pub fn get_last_satisfied_at(&self, trigger: Option<&Trigger>) -> Option<i64> {
         if let Some(data) = trigger.map(|trigger| trigger.data.as_str()) {
-            log::info!("Trigger data: {data}");
-
             // last_satisfied_at is now supposed to be part of the trigger data
             // but it was previously stored in the alert table. So, in case the trigger
             // data is not yet updated, we fallback to the value in the alert table.

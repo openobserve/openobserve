@@ -196,6 +196,10 @@ pub struct Alert {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schema(read_only)]
     pub scheduler_job_present: Option<bool>,
+
+    #[serde(default)]
+    #[schema(example = 10)]
+    pub pending_period_sec: i64,
 }
 
 /// Configuration for when and how an alert should be triggered.
@@ -507,6 +511,10 @@ pub enum Operator {
     LessThanEquals,
     Contains,
     NotContains,
+    IsNull,
+    IsNotNull,
+    IsEmpty,
+    IsNotEmpty,
 }
 
 #[derive(Hash, Clone, Copy, Debug, Eq, PartialEq, Deserialize, Serialize, ToSchema)]
@@ -532,6 +540,7 @@ pub enum StreamType {
     Logs,
     Metrics,
     Traces,
+    Profiles,
     #[serde(rename = "enrichment_tables")]
     EnrichmentTables,
     #[serde(rename = "file_list")]
@@ -578,6 +587,7 @@ impl From<(meta_alerts::alert::Alert, Option<Trigger>)> for Alert {
             priority: alert.priority,
             tags: alert.tags,
             scheduler_job_present: None,
+            pending_period_sec: alert.pending_period_sec,
         }
     }
 }
@@ -703,6 +713,10 @@ impl From<meta_alerts::Operator> for Operator {
             meta_alerts::Operator::LessThanEquals => Self::LessThanEquals,
             meta_alerts::Operator::Contains => Self::Contains,
             meta_alerts::Operator::NotContains => Self::NotContains,
+            meta_alerts::Operator::IsNull => Self::IsNull,
+            meta_alerts::Operator::IsNotNull => Self::IsNotNull,
+            meta_alerts::Operator::IsEmpty => Self::IsEmpty,
+            meta_alerts::Operator::IsNotEmpty => Self::IsNotEmpty,
         }
     }
 }
@@ -731,6 +745,7 @@ impl From<meta_stream::StreamType> for StreamType {
             meta_stream::StreamType::Logs => Self::Logs,
             meta_stream::StreamType::Metrics => Self::Metrics,
             meta_stream::StreamType::Traces => Self::Traces,
+            meta_stream::StreamType::Profiles => Self::Profiles,
             meta_stream::StreamType::ServiceGraph => Self::Metadata, // ServiceGraph not
             // alertable, map to
             // Metadata
@@ -770,6 +785,7 @@ impl From<Alert> for meta_alerts::alert::Alert {
         alert.workflows = value.workflows;
         alert.priority = value.priority;
         alert.tags = value.tags;
+        alert.pending_period_sec = value.pending_period_sec;
 
         alert
     }
@@ -896,6 +912,10 @@ impl From<Operator> for meta_alerts::Operator {
             Operator::LessThanEquals => Self::LessThanEquals,
             Operator::Contains => Self::Contains,
             Operator::NotContains => Self::NotContains,
+            Operator::IsNull => Self::IsNull,
+            Operator::IsNotNull => Self::IsNotNull,
+            Operator::IsEmpty => Self::IsEmpty,
+            Operator::IsNotEmpty => Self::IsNotEmpty,
         }
     }
 }
@@ -924,6 +944,7 @@ impl From<StreamType> for meta_stream::StreamType {
             StreamType::Logs => Self::Logs,
             StreamType::Metrics => Self::Metrics,
             StreamType::Traces => Self::Traces,
+            StreamType::Profiles => Self::Profiles,
             StreamType::EnrichmentTables => Self::EnrichmentTables,
             StreamType::Filelist => Self::Filelist,
             StreamType::Metadata => Self::Metadata,

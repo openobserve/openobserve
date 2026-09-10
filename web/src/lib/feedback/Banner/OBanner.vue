@@ -30,6 +30,14 @@ interface Props {
    */
   role?: "status" | "alert" | "banner";
   dataTest?: string;
+  /**
+   * Wrap the content instead of overflowing — preserves newlines/spaces and
+   * lets a long unbroken run (a raw error message, JSON) break. Off by
+   * default: every existing caller keeps its current layout unless it opts
+   * in, since forcing this everywhere would change banners that intentionally
+   * stay on one line.
+   */
+  preserveWhitespace?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -38,6 +46,7 @@ const props = withDefaults(defineProps<Props>(), {
   inlineActions: false,
   bar: false,
   center: false,
+  preserveWhitespace: false,
 });
 
 const slots = useSlots();
@@ -60,7 +69,7 @@ const variantClass = computed(() => {
     case "success":
       return "bg-banner-success-bg border border-banner-success-border text-banner-success-text";
     case "warning":
-      return "bg-banner-warning-bg border border-banner-warning-border border-l-4 border-l-banner-warning-border text-banner-warning-text";
+      return "bg-banner-warning-bg border border-banner-warning-border border-s-4 border-s-banner-warning-border text-banner-warning-text";
     case "error":
       return "bg-banner-error-bg text-banner-error-text";
     // Marketing gold, shared with the standalone webinar bar so the two match.
@@ -68,7 +77,7 @@ const variantClass = computed(() => {
       return "bg-promo-webinar-accent text-promo-webinar-text";
     // Tinted error for hints/insights — solid `error` stays for hard failures.
     case "error-soft":
-      return "bg-banner-error-soft-bg border border-banner-error-soft-border border-l-4 border-l-banner-error-soft-border text-banner-error-soft-text";
+      return "bg-banner-error-soft-bg border border-banner-error-soft-border border-s-4 border-s-banner-error-soft-border text-banner-error-soft-text";
     default:
       return "bg-banner-default-bg text-banner-default-text";
   }
@@ -119,7 +128,13 @@ const barVariantClass = computed(() => {
     <div
       :class="[
         'flex flex-row gap-3',
-        bar ? (center ? 'min-w-0 items-center' : 'min-w-0 flex-1 items-center') : 'items-start',
+        bar
+          ? center
+            ? 'min-w-0 items-center'
+            : 'min-w-0 flex-1 items-center'
+          : preserveWhitespace
+            ? 'min-w-0 items-start'
+            : 'items-start',
         inlineActions && !bar ? 'flex-1' : '',
       ]"
     >
@@ -129,7 +144,12 @@ const barVariantClass = computed(() => {
         </slot>
       </div>
 
-      <div :class="bar ? 'text-compact' : 'flex-1 text-sm'">
+      <div
+        :class="[
+          bar ? 'text-compact' : 'flex-1 text-sm',
+          preserveWhitespace ? 'min-w-0 wrap-break-word whitespace-pre-wrap' : '',
+        ]"
+      >
         <slot />
         <template v-if="showContentProp">{{ content }}</template>
       </div>

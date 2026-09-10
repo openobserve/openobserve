@@ -34,11 +34,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model="splitterModel"
       unit="px"
       :horizontal="false"
-      before-class="border-r border-border-default"
+      before-class="border-e border-border-default"
       class="min-h-0 flex-1"
     >
       <template v-slot:before>
-        <div class="h-full w-full pt-2 pb-2.5 pl-2.5">
+        <div class="h-full w-full ps-2.5 pt-2 pb-2.5">
           <div class="h-full overflow-y-auto">
             <OTabs v-model="billingtab" orientation="vertical">
               <ORouteTab
@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex h-full w-full flex-col pt-2">
           <div
             v-if="isUsageRoute"
-            class="mr-3 mb-2 ml-2 flex shrink-0 items-center justify-end gap-2 overflow-y-auto px-3 py-2"
+            class="ms-2 me-3 mb-2 flex shrink-0 items-center justify-end gap-2 overflow-y-auto px-3 py-2"
           >
             <!-- The billing-cycle range dropdown only applies to the totals
                  view. When self-usage reporting is on, the daily view renders
@@ -120,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="mx-0 mt-1 h-10 p-0"
               >
                 <template v-slot:prepend>
-                  <OIcon name="schedule" size="xs" class="mt-1 mr-2" @click.stop.prevent />
+                  <OIcon name="schedule" size="xs" class="me-2 mt-1" @click.stop.prevent />
                 </template>
               </OSelect>
             </div>
@@ -144,7 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
           </div>
-          <div class="flex min-h-0 flex-1 gap-2.5 pr-2.5 pb-2.5">
+          <div class="flex min-h-0 flex-1 gap-2.5 pe-2.5 pb-2.5">
             <div
               v-if="isUsageRoute && billingMembers.length > 0"
               class="h-full w-65 shrink-0"

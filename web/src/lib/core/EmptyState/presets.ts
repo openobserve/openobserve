@@ -55,6 +55,14 @@ export interface EmptyStatePreset {
 }
 
 export const emptyStatePresets = {
+  // --- access denied (a 403 on the data this view lists) -------------------
+  "no-access": {
+    illustration: "lock",
+    variant: "neutral",
+    titleKey: "emptyState.noAccess.title",
+    descriptionKey: "emptyState.noAccess.description",
+    actions: [],
+  },
   // --- no results (a search/filter/time-range returned nothing) ------------
   "no-search-results": {
     illustration: "no-results",
@@ -799,6 +807,34 @@ export const emptyStatePresets = {
       },
     ],
   },
+  "no-experiments": {
+    illustration: "query",
+    variant: "create",
+    titleKey: "emptyState.noExperiments.title",
+    descriptionKey: "emptyState.noExperiments.description",
+    actions: [
+      {
+        id: "create",
+        icon: "add",
+        titleKey: "emptyState.noExperiments.action",
+        descriptionKey: "emptyState.noExperiments.actionDesc",
+      },
+    ],
+  },
+  "no-remote-tasks": {
+    illustration: "connect",
+    variant: "create",
+    titleKey: "emptyState.noRemoteTasks.title",
+    descriptionKey: "emptyState.noRemoteTasks.description",
+    actions: [
+      {
+        id: "create",
+        icon: "add",
+        titleKey: "emptyState.noRemoteTasks.action",
+        descriptionKey: "emptyState.noRemoteTasks.actionDesc",
+      },
+    ],
+  },
   "no-eval-jobs": {
     illustration: "schedule",
     variant: "create",
@@ -882,6 +918,7 @@ export const presetNouns: Partial<Record<EmptyStatePresetName, string>> = {
   "no-regex-patterns": "emptyState.nouns.regexPatterns",
   "no-scorers": "emptyState.nouns.scorers",
   "no-eval-jobs": "emptyState.nouns.evalJobs",
+  "no-experiments": "emptyState.nouns.experiments",
   "no-score-configs": "emptyState.nouns.scoreConfigs",
   "no-pipeline-history": "emptyState.nouns.pipelineHistory",
   "no-synthetic-monitors": "emptyState.nouns.monitors",

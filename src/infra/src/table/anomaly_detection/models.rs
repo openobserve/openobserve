@@ -36,7 +36,6 @@ type Result<T> = std::result::Result<T, Error>;
 /// object storage.  Returns the inserted row so callers can inspect the stored
 /// values.
 pub async fn insert<C: ConnectionTrait>(conn: &C, model: Model) -> Result<Model> {
-    let _lock = super::super::get_lock().await;
     let anomaly_id = model.anomaly_id.clone();
     let version = model.version;
     log::info!("[anomaly_detection_models] insert: anomaly_id={anomaly_id} version={version}");
@@ -55,7 +54,6 @@ pub async fn list_by_anomaly_id_desc<C: ConnectionTrait>(
     conn: &C,
     anomaly_id: &str,
 ) -> Result<Vec<Model>> {
-    let _lock = super::super::get_lock().await;
     let models = anomaly_detection_models::Entity::find()
         .filter(anomaly_detection_models::Column::AnomalyId.eq(anomaly_id))
         .order_by_desc(anomaly_detection_models::Column::Version)
@@ -71,7 +69,6 @@ pub async fn delete_by_key<C: ConnectionTrait>(
     anomaly_id: &str,
     version: i64,
 ) -> Result<()> {
-    let _lock = super::super::get_lock().await;
     anomaly_detection_models::Entity::delete_many()
         .filter(anomaly_detection_models::Column::AnomalyId.eq(anomaly_id))
         .filter(anomaly_detection_models::Column::Version.eq(version))

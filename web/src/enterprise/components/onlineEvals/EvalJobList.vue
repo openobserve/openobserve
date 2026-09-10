@@ -9,6 +9,7 @@
         :columns="columns"
         row-key="id"
         :loading="loading"
+        :forbidden="forbidden"
         :footer-title="t('onlineEvals.job.listTitle')"
         :global-filter="search"
         :show-global-filter="false"
@@ -58,6 +59,7 @@
               :loading="loading"
               selectable
               :selected-key="selectedStatKey"
+              default-key="all"
               @select="onStatSelect"
             />
           </div>
@@ -83,7 +85,7 @@
             v-if="selectedIds.length > 0"
             variant="outline-destructive"
             size="sm"
-            class="ml-3"
+            class="ms-3"
             icon-left="delete"
             data-test="eval-job-bulk-delete-btn"
             :loading="actionLoading"
@@ -184,6 +186,7 @@ const props = defineProps<{
   rows: EvalJob[];
   search: string;
   loading?: boolean;
+  forbidden?: boolean;
   /** A bulk action (e.g. delete-selected) is in flight — shows the table overlay. */
   actionLoading?: boolean;
   /** ID of the job whose activate/pause request is currently in flight. */
@@ -326,38 +329,28 @@ const statusCounts = computed(() => {
   const rows = props.rows || [];
   let active = 0;
   let paused = 0;
-  let degraded = 0;
   let draft = 0;
-  let archived = 0;
   for (const r of rows) {
     const s = statusOf(r);
     if (s === "active") active += 1;
     else if (s === "paused") paused += 1;
-    else if (s === "degraded") degraded += 1;
     else if (s === "draft") draft += 1;
-    else if (s === "archived") archived += 1;
   }
-  return { active, paused, degraded, draft, archived, total: rows.length };
+  return { active, paused, draft, total: rows.length };
 });
 // The strip is the ONLY status filter (the redundant dropdown was removed), so it
-// carries every backend status. Attention-first order (degraded, paused, active,
-// then the inert draft/archived), "All" last — matching the Alerts / Incidents
-// strip. Tones echo the evalStatus chip exactly (degraded = orange, not red).
+// carries every status the UI can actually produce. "degraded" and "archived"
+// are both excluded on purpose: nothing in the product currently transitions a
+// job into either status (no health-check sets degraded; there's no archive
+// action in the UI), so their tiles would always read zero. Attention-first
+// order (paused, active, then the inert draft), "All" last — matching the
+// Alerts / Incidents strip.
 const summaryStats = computed<StatItem[]>(() => {
   const c = statusCounts.value;
   const has = c.total > 0;
   const v = (n: number): string | number => (has ? n : "—");
   const share = has ? c.total : undefined;
   return [
-    {
-      key: "degraded",
-      label: t("onlineEvals.jobStatus.degraded"),
-      value: v(c.degraded),
-      icon: "error-outline",
-      tone: "orange",
-      max: share,
-      dataTest: "eval-job-summary-degraded",
-    },
     {
       key: "paused",
       label: t("onlineEvals.jobStatus.paused"),
@@ -384,15 +377,6 @@ const summaryStats = computed<StatItem[]>(() => {
       tone: "neutral",
       max: share,
       dataTest: "eval-job-summary-draft",
-    },
-    {
-      key: "archived",
-      label: t("onlineEvals.jobStatus.archived"),
-      value: v(c.archived),
-      icon: "inventory-2",
-      tone: "neutral",
-      max: share,
-      dataTest: "eval-job-summary-archived",
     },
     {
       key: "all",

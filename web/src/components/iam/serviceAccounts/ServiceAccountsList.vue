@@ -42,6 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :columns="columns"
           row-key="email"
           :loading="loading"
+          :forbidden="forbidden"
           pagination="client"
           :page-size="20"
           :page-size-options="[20, 50, 100, 250, 500]"
@@ -104,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="service-accounts-system-badge"
                 type="serviceAccountKind"
                 value="system"
-                class="ml-2"
+                class="ms-2"
               />
             </template>
             <template v-else-if="isSyntheticSA(row.email)">
@@ -318,7 +319,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="service-accounts-list-token-download-btn"
               variant="outline"
               size="icon-md"
-              class="ml-2"
+              class="ms-2"
               :title="t('serviceAccounts.downloadToken')"
               @click.stop="downloadTokenAsFile(serviceToken)"
             >
@@ -748,6 +749,7 @@ export default defineComponent({
       deleteUserEmailIdentifier.value = row.email;
     };
     const loading = ref(false);
+    const forbidden = ref(false);
     const getServiceAccountsUsers = async () => {
       const dismiss = toast({
         variant: "loading",
@@ -756,6 +758,7 @@ export default defineComponent({
       });
 
       loading.value = true;
+      forbidden.value = false;
       return new Promise((resolve, reject) => {
         service_accounts
           .list(store.state.selectedOrganization.identifier)
@@ -779,7 +782,8 @@ export default defineComponent({
 
             resolve(true);
           })
-          .catch(() => {
+          .catch((err: any) => {
+            forbidden.value = err?.response?.status === 403;
             dismiss();
             reject(false);
           })
@@ -1093,6 +1097,7 @@ export default defineComponent({
       serviceAccountsState,
       columns,
       loading,
+      forbidden,
       orgData,
       confirmDelete,
       serviceAccounts,

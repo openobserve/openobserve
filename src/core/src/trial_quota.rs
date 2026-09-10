@@ -13,14 +13,20 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Trial Quota Service — in-memory quota counter with DB persistence.
+//! Trial Quota Service — in-memory quota counters with DB persistence.
 //!
-//! Free tier: every org gets a single shared lifetime pool of free credits.
-//! All features (AI chat, incidents, etc.) deduct from the same pool.
-//! The pool never resets — once consumed, the org must subscribe to continue.
+//! Free tier: every org gets a lifetime free grant **per pool**.
 //! Pay-as-you-go: when free credits are exhausted and the org has an active
 //! Stripe subscription, AI metering prices are auto-added to the subscription
 //! and usage is reported to the _usage stream for billing.
+//!
+//! ## Pools
+//!
+//! [`TrialQuotaPool::AiCredits`] and the two synthetics step pools are
+//! independent: every counter, limit, DB read and HA message is keyed
+//! `(org, pool)`, so spending one grant cannot drain the other, and
+//! [`TrialQuotaFeature::pool`] is the only feature-to-pool mapping. No
+//! migration — a pool is just a fixed set of `trial_quota_usage.feature` keys.
 //!
 //! ## Architecture
 //!
@@ -51,17 +57,19 @@ use config::{
     },
     utils::json,
 };
+use openobserve_synthetics::pool::StepRemaining;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 use utoipa::ToSchema;
 
-/// Per-org total usage counter. Single AtomicU64 per org — no cross-key locks.
-/// This is the hot-path structure used by `try_deduct`.
+/// Per-`(org, pool)` total usage counter, keyed by [`scope`] — one AtomicU64
+/// per scope, no cross-key locks. Keyed by scope and not by org: one counter
+/// per org made the two pools drain each other.
 static ORG_USAGE: Lazy<RwLock<HashMap<String, AtomicU64>>> =
     Lazy::new(|| RwLock::new(HashMap::new()));
 
-/// Explicit per-organization limits. Missing organizations use the
-/// deployment-wide default.
+/// Explicit per-`(org, pool)` limits, keyed by [`scope`]. Missing scopes use the
+/// pool's deployment-wide default ([`TrialQuotaPool::default_limit`]).
 static ORG_LIMITS: Lazy<RwLock<HashMap<String, u64>>> = Lazy::new(|| RwLock::new(HashMap::new()));
 
 /// Bounded channel for deduction records pending DB flush.
@@ -91,11 +99,118 @@ static INIT_WATERMARK: AtomicI64 = AtomicI64::new(0);
 /// The checkpoints at which quota notification emails are sent.
 const QUOTA_CHECKPOINTS: &[u8] = &[80, 90, 95, 100];
 
-/// A deduction record buffered for periodic DB flush.
+/// A usage record buffered for periodic DB flush. `cost` is signed to match the
+/// counters it feeds; every producer today passes a non-negative value.
 struct FlushRecord {
     org_id: String,
     feature_key: String,
     cost: i64,
+}
+
+/// A lifetime free grant, and the unit of isolation between features. Every counter, limit and DB
+/// read is keyed per `(org, pool)` via [`scope`]: an org that spends its AI credits must not
+/// thereby lose its synthetics budget.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum TrialQuotaPool {
+    /// AI chat, incident analysis and incident re-analysis. The original pool.
+    AiCredits,
+    /// Browser-check steps — SPEC §6.1. One-time, never resets (E23).
+    SyntheticsBrowserSteps,
+    /// Protocol-check steps — SPEC §6.1. One-time, never resets (E23). Separate
+    /// from the browser grant because a browser step costs ~52x a protocol one,
+    /// so a shared pool let the org's mix decide our free-tier cost.
+    SyntheticsProtocolSteps,
+}
+
+impl TrialQuotaPool {
+    /// Every variant. A new pool missing here is invisible to every scan built on it.
+    pub const ALL_POOLS: &'static [TrialQuotaPool] = &[
+        TrialQuotaPool::AiCredits,
+        TrialQuotaPool::SyntheticsBrowserSteps,
+        TrialQuotaPool::SyntheticsProtocolSteps,
+    ];
+
+    /// Stable identifier used in the [`scope`] key and on the HA wire.
+    pub fn key(&self) -> &'static str {
+        match self {
+            TrialQuotaPool::AiCredits => "ai_credits",
+            TrialQuotaPool::SyntheticsBrowserSteps => "synthetics_browser_steps",
+            TrialQuotaPool::SyntheticsProtocolSteps => "synthetics_protocol_steps",
+        }
+    }
+
+    pub fn from_key(key: &str) -> Option<Self> {
+        match key {
+            "ai_credits" => Some(TrialQuotaPool::AiCredits),
+            "synthetics_browser_steps" => Some(TrialQuotaPool::SyntheticsBrowserSteps),
+            // Pre-split key. Resolved to PROTOCOL so an existing balance keeps
+            // draining the cheap grant rather than handing out free browser steps.
+            "synthetics_steps" | "synthetics_protocol_steps" => {
+                Some(TrialQuotaPool::SyntheticsProtocolSteps)
+            }
+            _ => None,
+        }
+    }
+
+    /// Which pool a `trial_quota_usage.feature` value belongs to. `None` for a
+    /// key a NEWER node wrote: guessing would spend one grant on another's usage.
+    pub fn from_key_of_feature(feature: &str) -> Option<Self> {
+        Self::ALL_POOLS
+            .iter()
+            .copied()
+            .find(|pool| pool.feature_keys().contains(&feature))
+    }
+
+    pub fn is_synthetics(self) -> bool {
+        matches!(
+            self,
+            TrialQuotaPool::SyntheticsBrowserSteps | TrialQuotaPool::SyntheticsProtocolSteps
+        )
+    }
+
+    /// Every `trial_quota_usage.feature` value that spends from this pool; each
+    /// per-pool query uses this set as an `IN` filter. MUST stay in sync with
+    /// [`TrialQuotaFeature::pool`] (`every_feature_is_listed_by_its_own_pool`).
+    pub fn feature_keys(&self) -> &'static [&'static str] {
+        match self {
+            TrialQuotaPool::AiCredits => &["ai_chat", "new_incident", "incident_reanalysis"],
+            TrialQuotaPool::SyntheticsBrowserSteps => &["synthetics_browser_steps"],
+            // `synthetics_steps` is the pre-split feature key: existing rows keep
+            // counting here, so no migration is needed and no balance is reset.
+            TrialQuotaPool::SyntheticsProtocolSteps => {
+                &["synthetics_protocol_steps", "synthetics_steps"]
+            }
+        }
+    }
+
+    /// The row [`set_limit_for_pool`] upserts so that an org with no prior usage
+    /// in this pool can still be given an explicit limit.
+    fn seed_feature(&self) -> &'static str {
+        // `feature_keys` is never empty; the fallback only avoids a panic.
+        self.feature_keys().first().copied().unwrap_or("ai_chat")
+    }
+
+    /// The deployment-wide default grant for this pool.
+    ///
+    /// ⚠️ §8.3 / §11 **F4**, UNRESOLVED: this pool is REGION-LOCAL — no
+    /// super-cluster handler for `trial_quota_usage`, and the HA queue is local
+    /// NATS — so in an N-region super cluster one org holds N independent
+    /// grants of this size. Item 2.6 owns the fix; nothing here may assume it.
+    pub fn default_limit(&self) -> u64 {
+        let cfg = o2_enterprise::enterprise::common::config::get_config();
+        match self {
+            TrialQuotaPool::AiCredits => cfg.cloud.ai_free_credit_pool,
+            TrialQuotaPool::SyntheticsBrowserSteps => cfg.cloud.synthetics_free_browser_step_pool,
+            TrialQuotaPool::SyntheticsProtocolSteps => cfg.cloud.synthetics_free_protocol_step_pool,
+        }
+    }
+}
+
+/// The key both [`ORG_USAGE`] and [`ORG_LIMITS`] use. `\u{1f}` (ASCII unit
+/// separator) rather than `/` or `:`: an org id is user-chosen, and a separator
+/// it can contain would let two different scopes collide into one pool.
+fn scope(org_id: &str, pool: TrialQuotaPool) -> String {
+    format!("{org_id}\u{1f}{}", pool.key())
 }
 
 /// Trial quota feature variants — extensible for future metered features
@@ -104,6 +219,10 @@ pub enum TrialQuotaFeature {
     AiChat,
     NewIncident,
     IncidentReAnalysis,
+    /// One unit is one EXECUTED browser step, so a 14-step journey over 2 combos costs 28.
+    SyntheticsBrowserSteps,
+    /// One unit is one EXECUTED protocol step.
+    SyntheticsProtocolSteps,
 }
 
 impl TrialQuotaFeature {
@@ -113,25 +232,45 @@ impl TrialQuotaFeature {
             TrialQuotaFeature::AiChat => "ai_chat",
             TrialQuotaFeature::NewIncident => "new_incident",
             TrialQuotaFeature::IncidentReAnalysis => "incident_reanalysis",
+            TrialQuotaFeature::SyntheticsBrowserSteps => "synthetics_browser_steps",
+            TrialQuotaFeature::SyntheticsProtocolSteps => "synthetics_protocol_steps",
         }
     }
 
-    /// Get the credit cost for this feature from enterprise config
+    /// Which one-time grant this feature spends from — SPEC §9 item 2.1.
+    pub fn pool(&self) -> TrialQuotaPool {
+        match self {
+            TrialQuotaFeature::AiChat
+            | TrialQuotaFeature::NewIncident
+            | TrialQuotaFeature::IncidentReAnalysis => TrialQuotaPool::AiCredits,
+            TrialQuotaFeature::SyntheticsBrowserSteps => TrialQuotaPool::SyntheticsBrowserSteps,
+            TrialQuotaFeature::SyntheticsProtocolSteps => TrialQuotaPool::SyntheticsProtocolSteps,
+        }
+    }
+
+    /// Credit cost of ONE unit. Synthetics is fixed at 1 and the caller
+    /// multiplies ([`try_deduct_units`]): the §6.1 grant is denominated in
+    /// STEPS, so a configurable per-step cost would silently rescale it.
     pub fn cost(&self) -> u64 {
         let cfg = o2_enterprise::enterprise::common::config::get_config();
         match self {
             TrialQuotaFeature::AiChat => cfg.cloud.ai_credit_cost_chat,
             TrialQuotaFeature::NewIncident => cfg.cloud.ai_credit_cost_incident,
             TrialQuotaFeature::IncidentReAnalysis => cfg.cloud.ai_credit_cost_incident_reanalysis,
+            TrialQuotaFeature::SyntheticsBrowserSteps
+            | TrialQuotaFeature::SyntheticsProtocolSteps => 1,
         }
     }
 
-    /// Get the corresponding UsageEvent variant
-    pub fn usage_event(&self) -> UsageEvent {
+    /// The feature-breakdown `UsageEvent`, or `None` where this path does not emit one.
+    pub fn usage_event(&self) -> Option<UsageEvent> {
         match self {
-            TrialQuotaFeature::AiChat => UsageEvent::AiChat,
-            TrialQuotaFeature::NewIncident => UsageEvent::NewIncident,
-            TrialQuotaFeature::IncidentReAnalysis => UsageEvent::IncidentReAnalysis,
+            TrialQuotaFeature::AiChat => Some(UsageEvent::AiChat),
+            TrialQuotaFeature::NewIncident => Some(UsageEvent::NewIncident),
+            TrialQuotaFeature::IncidentReAnalysis => Some(UsageEvent::IncidentReAnalysis),
+            // Synthetics emits from `job_api::events_for_ack`, never here.
+            TrialQuotaFeature::SyntheticsBrowserSteps
+            | TrialQuotaFeature::SyntheticsProtocolSteps => None,
         }
     }
 }
@@ -161,109 +300,223 @@ impl std::fmt::Display for QuotaExhaustedError {
 
 impl std::error::Error for QuotaExhaustedError {}
 
-/// Get the organization's shared pool limit, falling back to deployment config.
-fn get_pool_limit(org_id: &str) -> u64 {
-    let default_limit = o2_enterprise::enterprise::common::config::get_config()
-        .cloud
-        .ai_free_credit_pool;
-    let org_limit = ORG_LIMITS.read().unwrap().get(org_id).copied();
-    org_limit.unwrap_or(default_limit)
+/// Get one pool's limit for an organization, falling back to the pool's
+/// deployment-wide default. ⚠️ The value is REGION-LOCAL — see
+/// [`TrialQuotaPool::default_limit`].
+fn get_pool_limit(org_id: &str, pool: TrialQuotaPool) -> u64 {
+    let org_limit = ORG_LIMITS
+        .read()
+        .unwrap()
+        .get(&scope(org_id, pool))
+        .copied();
+    org_limit.unwrap_or_else(|| pool.default_limit())
 }
 
-/// Get total usage across all features for an org (single atomic read)
-fn get_org_total_used(org_id: &str) -> u64 {
+/// Get total usage in one pool for an org (single atomic read).
+fn get_pool_used(org_id: &str, pool: TrialQuotaPool) -> u64 {
     let map = ORG_USAGE.read().unwrap();
-    map.get(org_id)
+    map.get(&scope(org_id, pool))
         .map(|v| v.load(Ordering::Relaxed))
         .unwrap_or(0)
 }
 
-/// Ensure the per-org atomic counter exists.
-/// If the org is new, inserts an AtomicU64(0) under a brief write lock.
-fn ensure_org_counter(org_id: &str) {
+/// Ensure the per-`(org, pool)` atomic counter exists.
+fn ensure_scope_counter(key: &str) {
     {
         let map = ORG_USAGE.read().unwrap();
-        if map.contains_key(org_id) {
+        if map.contains_key(key) {
             return;
         }
     }
     // Use entry() instead of direct insert because another thread may have
     // inserted between us dropping the read lock above and acquiring this write lock.
     let mut map = ORG_USAGE.write().unwrap();
-    map.entry(org_id.to_string())
+    map.entry(key.to_string())
         .or_insert_with(|| AtomicU64::new(0));
 }
 
-/// Atomically add a delta to the org's in-memory counter.
-/// Used by the HA consumer to apply remote deductions.
-fn add_to_org_counter(org_id: &str, delta: u64) {
-    ensure_org_counter(org_id);
+/// Atomically apply a SIGNED delta to one pool's counter, saturating at zero: the
+/// only negative delta left is one an older node broadcasts over HA, and wrapping
+/// `u64` would leave an org at 18 quintillion units that can never run again.
+fn apply_to_pool_counter(org_id: &str, pool: TrialQuotaPool, delta: i64) -> u64 {
+    let key = scope(org_id, pool);
+    ensure_scope_counter(&key);
     let map = ORG_USAGE.read().unwrap();
-    if let Some(counter) = map.get(org_id) {
-        counter.fetch_add(delta, Ordering::Relaxed);
+    let Some(counter) = map.get(&key) else {
+        return 0;
+    };
+    loop {
+        let current = counter.load(Ordering::Relaxed);
+        let next = if delta >= 0 {
+            current.saturating_add(delta.unsigned_abs())
+        } else {
+            current.saturating_sub(delta.unsigned_abs())
+        };
+        if counter
+            .compare_exchange(current, next, Ordering::AcqRel, Ordering::Relaxed)
+            .is_ok()
+        {
+            return next;
+        }
     }
 }
 
-fn set_cached_limit(org_id: &str, usage_limit: u64) {
+fn set_cached_limit(org_id: &str, pool: TrialQuotaPool, usage_limit: u64) {
     ORG_LIMITS
         .write()
         .unwrap()
-        .insert(org_id.to_string(), usage_limit);
+        .insert(scope(org_id, pool), usage_limit);
 }
 
-/// HA message broadcast to other nodes after a deduction or limit update.
+/// HA message broadcast to other nodes after a deduction, an adjustment or a
+/// limit update.
+///
+/// Wire-compatible with nodes predating pool scoping: `pool` and `delta` are
+/// `#[serde(default)]`, so an OLD `{cost: 50}` reads as `+50` on AI credits —
+/// the only senders then — and a NEW message puts the POSITIVE part of `delta`
+/// in `cost` so an un-upgraded node still applies deductions. A refund it
+/// ignores, staying high until it reloads from the DB: safe direction.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TrialQuotaHaMsg {
     pub org_id: String,
+    /// The POSITIVE part of `delta`, for nodes that predate `delta`.
     pub cost: u64,
     #[serde(default)]
     pub usage_limit: Option<u64>,
+    /// [`TrialQuotaPool::key`]. Absent ⇒ `ai_credits` (see the type doc).
+    #[serde(default)]
+    pub pool: Option<String>,
+    /// The SIGNED movement. Absent or zero ⇒ fall back to `cost`.
+    #[serde(default)]
+    pub delta: i64,
     pub source_node: Node,
     /// Microsecond timestamp of when the deduction happened.
     /// Used to skip messages older than the DB snapshot loaded at init.
     pub timestamp: i64,
 }
 
-/// Persist and publish an explicit lifetime credit limit for an organization.
-/// Credit usage continues to use the existing in-memory counter and batched DB flush.
-pub async fn set_limit(org_id: &str, usage_limit: u64) -> Result<(), anyhow::Error> {
-    let previous_limit = get_pool_limit(org_id);
-    let db_limit = i64::try_from(usage_limit)
-        .map_err(|_| anyhow::anyhow!("AI credit limit exceeds the supported maximum"))?;
-    infra::table::trial_quota_usage::set_usage_limit_for_org(org_id, db_limit).await?;
-    if usage_limit > previous_limit {
-        reset_checkpoint(org_id).await;
+impl TrialQuotaHaMsg {
+    /// Which pool this moves: absent means AI credits, unknown means a NEWER node's.
+    pub fn resolved_pool(&self) -> Option<TrialQuotaPool> {
+        match self.pool.as_deref() {
+            None => Some(TrialQuotaPool::AiCredits),
+            Some(key) => TrialQuotaPool::from_key(key),
+        }
     }
-    set_cached_limit(org_id, usage_limit);
+
+    /// The signed movement, reading `cost` when `delta` is absent.
+    pub fn resolved_delta(&self) -> i64 {
+        if self.delta != 0 {
+            self.delta
+        } else {
+            i64::try_from(self.cost).unwrap_or(i64::MAX)
+        }
+    }
+}
+
+/// Build the HA message for one signed movement of one pool.
+fn ha_msg(
+    org_id: &str,
+    pool: TrialQuotaPool,
+    delta: i64,
+    usage_limit: Option<u64>,
+) -> TrialQuotaHaMsg {
+    TrialQuotaHaMsg {
+        org_id: org_id.to_string(),
+        cost: u64::try_from(delta.max(0)).unwrap_or(0),
+        usage_limit,
+        pool: Some(pool.key().to_string()),
+        delta,
+        source_node: LOCAL_NODE.clone(),
+        timestamp: config::utils::time::now_micros(),
+    }
+}
+
+/// Apply one remote HA message to the counters; `None` for a pool this build lacks.
+fn apply_ha_msg(msg: &TrialQuotaHaMsg) -> Option<(TrialQuotaPool, u64, u64)> {
+    let pool = msg.resolved_pool()?;
+    if let Some(usage_limit) = msg.usage_limit {
+        set_cached_limit(&msg.org_id, pool, usage_limit);
+    }
+    let old = get_pool_used(&msg.org_id, pool);
+    let delta = msg.resolved_delta();
+    let new_total = if delta != 0 {
+        apply_to_pool_counter(&msg.org_id, pool, delta)
+    } else {
+        old
+    };
+    Some((pool, old, new_total))
+}
+
+/// Ack even a message this node discards: an un-acked HA delta is redelivered forever.
+async fn ack_ha_msg(msg: &infra::queue::Message) {
+    if let Err(e) = msg.ack().await {
+        log::error!("[TRIAL_QUOTA] Failed to ack HA message: {e}");
+    }
+}
+
+/// Persist and publish an explicit limit for one of an organization's pools (§6.2). Re-opens an
+/// exhausted org immediately and everywhere — DB write, local cache, HA broadcast — with **no
+/// restart** (T32/E17).
+pub async fn set_limit_for_pool(
+    org_id: &str,
+    pool: TrialQuotaPool,
+    usage_limit: u64,
+) -> Result<(), anyhow::Error> {
+    let previous_limit = get_pool_limit(org_id, pool);
+    let db_limit = i64::try_from(usage_limit)
+        .map_err(|_| anyhow::anyhow!("credit limit exceeds the supported maximum"))?;
+    infra::table::trial_quota_usage::set_usage_limit_for_org(
+        org_id,
+        pool.seed_feature(),
+        pool.feature_keys(),
+        db_limit,
+    )
+    .await?;
+    if usage_limit > previous_limit {
+        reset_checkpoint(org_id, pool.feature_keys()).await;
+    }
+    set_cached_limit(org_id, pool, usage_limit);
 
     if !LOCAL_NODE.is_single_node()
-        && let Err(err) = publish_ha_msg(&TrialQuotaHaMsg {
-            org_id: org_id.to_string(),
-            cost: 0,
-            usage_limit: Some(usage_limit),
-            source_node: LOCAL_NODE.clone(),
-            timestamp: config::utils::time::now_micros(),
-        })
-        .await
+        && let Err(err) = publish_ha_msg(&ha_msg(org_id, pool, 0, Some(usage_limit))).await
     {
         log::warn!(
-            "[TRIAL_QUOTA] Failed to broadcast limit update for org={org_id}; periodic reconciliation will apply it: {err}"
+            "[TRIAL_QUOTA] Failed to broadcast limit update for org={org_id} pool={}; periodic reconciliation will apply it: {err}",
+            pool.key(),
         );
     }
     Ok(())
 }
 
+/// Persist and publish an explicit lifetime AI credit limit for an org — the
+/// AI-pool spelling of [`set_limit_for_pool`], which is what the `_meta` admin
+/// endpoint means by "credits".
+pub async fn set_limit(org_id: &str, usage_limit: u64) -> Result<(), anyhow::Error> {
+    set_limit_for_pool(org_id, TrialQuotaPool::AiCredits, usage_limit).await
+}
+
 /// Reconcile explicit limits from the database. This runs on the existing
 /// flush interval so missed or out-of-order HA messages remain short-lived.
+///
+/// Folded per POOL, not per org: taking the max across ALL of an org's rows
+/// would let a raised AI limit silently raise the synthetics grant.
 pub async fn refresh_limits_from_db() {
     match infra::table::trial_quota_usage::load_all_usage_limits().await {
-        Ok(limits) => {
-            let limits = limits
-                .into_iter()
-                .filter_map(|(org_id, limit)| {
-                    u64::try_from(limit).ok().map(|limit| (org_id, limit))
-                })
-                .collect();
+        Ok(rows) => {
+            let mut limits: HashMap<String, u64> = HashMap::new();
+            for (org_id, feature, limit) in rows {
+                let Some(pool) = TrialQuotaPool::from_key_of_feature(&feature) else {
+                    continue;
+                };
+                let Ok(limit) = u64::try_from(limit) else {
+                    continue;
+                };
+                limits
+                    .entry(scope(&org_id, pool))
+                    .and_modify(|current| *current = (*current).max(limit))
+                    .or_insert(limit);
+            }
             *ORG_LIMITS.write().unwrap() = limits;
         }
         Err(err) => {
@@ -272,111 +525,148 @@ pub async fn refresh_limits_from_db() {
     }
 }
 
-/// Try to deduct credits from the org's shared pool for a feature.
+/// Try to deduct one unit of a feature from its org pool.
 ///
 /// Returns `Ok(remaining)` on success, or `Err(QuotaExhaustedError)` when
-/// the shared pool is depleted.
+/// the pool is depleted.
 ///
-/// The limit check is against the total usage across ALL features for the org,
-/// not per-feature. The per-feature counter is still tracked for breakdown.
+/// The limit check is against total usage across every feature IN THAT POOL,
+/// not per-feature and not across pools; the DB still tracks per feature.
 pub async fn try_deduct(
     org_id: &str,
     feature: TrialQuotaFeature,
 ) -> Result<u64, Box<dyn std::error::Error + Send + Sync>> {
-    let cost = feature.cost();
-    let pool_limit = get_pool_limit(org_id);
-
     log::info!(
-        "[TRIAL_QUOTA] try_deduct called: org={} feature={} cost={} pool_limit={}",
-        org_id,
-        feature,
-        cost,
-        pool_limit,
+        "[TRIAL_QUOTA] try_deduct called: org={org_id} feature={feature} cost={} pool_limit={}",
+        feature.cost(),
+        get_pool_limit(org_id, feature.pool()),
     );
+    try_deduct_units(org_id, feature, 1)
+        .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)
+}
 
-    // Ensure the org has an atomic counter
-    ensure_org_counter(org_id);
+/// Deduct `units x feature.cost()` from the feature's pool, all or nothing.
+/// Returns the REMAINING units in the pool on success.
+pub fn try_deduct_units(
+    org_id: &str,
+    feature: TrialQuotaFeature,
+    units: u64,
+) -> Result<u64, QuotaExhaustedError> {
+    let pool = feature.pool();
+    let cost = feature.cost().saturating_mul(units);
+    let pool_limit = get_pool_limit(org_id, pool);
+    let key = scope(org_id, pool);
 
-    // Single atomic CAS loop on the org-level total — no cross-key locks.
-    // The RwLockReadGuard must be dropped before any .await, so the entire
-    // CAS loop runs synchronously, then we do async work after.
-    let deduct_result = {
-        let map = ORG_USAGE.read().unwrap();
-        let counter = map.get(org_id).unwrap(); // safe: ensure_org_counter just ran
+    ensure_scope_counter(&key);
 
-        loop {
-            let current = counter.load(Ordering::Relaxed);
-            let new_total = current + cost;
-            if new_total > pool_limit {
-                log::info!(
-                    "[TRIAL_QUOTA] quota exhausted: org={} feature={} current_used={} cost={} pool_limit={}",
-                    org_id,
-                    feature,
-                    current,
-                    cost,
-                    pool_limit,
-                );
-                break Err(QuotaExhaustedError {
-                    usage_count: current,
-                    usage_limit: pool_limit,
-                });
-            }
-            // Atomic compare-and-swap: only succeeds if no one else incremented
-            if counter
-                .compare_exchange(current, new_total, Ordering::AcqRel, Ordering::Relaxed)
-                .is_ok()
-            {
-                log::info!(
-                    "[TRIAL_QUOTA] deducted: org={} feature={} cost={} total_used={}/{} remaining={}",
-                    org_id,
-                    feature,
-                    cost,
-                    new_total,
-                    pool_limit,
-                    pool_limit - new_total,
-                );
-                break Ok(new_total);
-            }
-            // CAS failed — another thread incremented first, retry
+    let map = ORG_USAGE.read().unwrap();
+    let Some(counter) = map.get(&key) else {
+        // Unreachable (`ensure_scope_counter` just ran). Treated as "no room"
+        // rather than unwrapped: a panic here kills the scheduler tick.
+        return Err(QuotaExhaustedError {
+            usage_count: 0,
+            usage_limit: pool_limit,
+        });
+    };
+
+    loop {
+        let current = counter.load(Ordering::Relaxed);
+        let new_total = current.saturating_add(cost);
+        if new_total > pool_limit {
+            log::info!(
+                "[TRIAL_QUOTA] quota exhausted: org={org_id} pool={} feature={feature} current_used={current} cost={cost} pool_limit={pool_limit}",
+                pool.key(),
+            );
+            return Err(QuotaExhaustedError {
+                usage_count: current,
+                usage_limit: pool_limit,
+            });
         }
-    }; // RwLockReadGuard dropped here
-
-    match deduct_result {
-        Err(e) => Err(Box::new(e) as Box<dyn std::error::Error + Send + Sync>),
-        Ok(new_total) => {
-            // Buffer the deduction for periodic DB flush (non-blocking)
-            if let Err(e) = FLUSH_TX.try_send(FlushRecord {
-                org_id: org_id.to_string(),
-                feature_key: feature.feature_key().to_string(),
-                cost: cost as i64,
-            }) {
-                log::warn!(
-                    "[TRIAL_QUOTA] Flush channel full, dropping record for org={}: {e}",
-                    org_id
-                );
-            }
-
-            // Broadcast delta to other nodes via NATS queue
-            // Skip if single node — no other nodes to sync with
-            if !LOCAL_NODE.is_single_node() {
-                let msg = TrialQuotaHaMsg {
-                    org_id: org_id.to_string(),
-                    cost,
-                    usage_limit: None,
-                    source_node: LOCAL_NODE.clone(),
-                    timestamp: config::utils::time::now_micros(),
-                };
-                if let Err(e) = publish_ha_msg(&msg).await {
-                    log::warn!(
-                        "[TRIAL_QUOTA] Failed to broadcast delta for org={}: {e}",
-                        org_id
-                    );
-                }
-            }
-
-            Ok(pool_limit - new_total)
+        if counter
+            .compare_exchange(current, new_total, Ordering::AcqRel, Ordering::Relaxed)
+            .is_ok()
+        {
+            drop(map);
+            log::debug!(
+                "[TRIAL_QUOTA] deducted: org={org_id} pool={} feature={feature} cost={cost} total_used={new_total}/{pool_limit}",
+                pool.key(),
+            );
+            let signed = i64::try_from(cost).unwrap_or(i64::MAX);
+            buffer_flush(org_id, feature, signed);
+            broadcast_delta_detached(org_id, pool, signed);
+            return Ok(pool_limit - new_total);
         }
     }
+}
+
+/// Buffer one SIGNED usage movement for the periodic DB flush.
+///
+/// ⚠️ §11 **F8**: the channel is bounded at 10,000 and `try_send` DROPS on
+/// overflow. Only the DB half is lost — this node keeps enforcing the right
+/// number until it restarts, when `init_from_db` reloads a total short by the
+/// dropped amount and the org silently gets those units back. Under a one-time
+/// grant that is permanent. Nothing replays it (fire-and-forget, no ack) and
+/// nothing reconciles it; **A5** pages on the drop.
+fn buffer_flush(org_id: &str, feature: TrialQuotaFeature, cost: i64) {
+    if let Err(e) = FLUSH_TX.try_send(FlushRecord {
+        org_id: org_id.to_string(),
+        feature_key: feature.feature_key().to_string(),
+        cost,
+    }) {
+        record_flush_drop(org_id, feature, cost, &e);
+    }
+}
+
+/// SPEC §9B.1 row 9 / §9B.2 alert **A5** — one pool movement lost on its way
+/// to the database.
+///
+/// The `log::error!` alone cannot be alerted on: A5 is a threshold on a number
+/// that is normally zero, which needs a series. Labelled by
+/// `trial_quota_usage.feature` so §6.1's one-time synthetics grant alerts
+/// separately from AI credits — an AI credit lost to a full channel comes back,
+/// a synthetics step does not — and NOT by org, since org ids are
+/// customer-chosen. This only COUNTS the loss; §11 **F8** is still open.
+fn record_flush_drop(
+    org_id: &str,
+    feature: TrialQuotaFeature,
+    cost: i64,
+    error: &dyn std::fmt::Display,
+) {
+    config::metrics::TRIAL_QUOTA_FLUSH_DROPS_TOTAL
+        .with_label_values(&[feature.feature_key()])
+        .inc();
+    // A5: ERROR because under a one-time grant the loss is permanent.
+    log::error!(
+        "[TRIAL_QUOTA] Flush channel full, DROPPING pool record for org={org_id} feature={feature} cost={cost}: {error}"
+    );
+}
+
+/// Broadcast a signed pool movement to the other nodes. Skipped in single-node
+/// mode — there is nobody to tell.
+async fn broadcast_delta(org_id: &str, pool: TrialQuotaPool, delta: i64) {
+    if LOCAL_NODE.is_single_node() || delta == 0 {
+        return;
+    }
+    if let Err(e) = publish_ha_msg(&ha_msg(org_id, pool, delta, None)).await {
+        log::warn!(
+            "[TRIAL_QUOTA] Failed to broadcast delta for org={org_id} pool={}: {e}",
+            pool.key(),
+        );
+    }
+}
+
+/// Broadcast a signed pool movement from a synchronous caller. `try_current`
+/// rather than `Handle::current`: a unit test moving the counter has no
+/// reactor, and a panic there would fail the test for the wrong reason.
+fn broadcast_delta_detached(org_id: &str, pool: TrialQuotaPool, delta: i64) {
+    if LOCAL_NODE.is_single_node() || delta == 0 {
+        return;
+    }
+    let Ok(handle) = tokio::runtime::Handle::try_current() else {
+        return;
+    };
+    let org_id = org_id.to_string();
+    handle.spawn(async move { broadcast_delta(&org_id, pool, delta).await });
 }
 
 // ---------------------------------------------------------------------------
@@ -498,18 +788,14 @@ pub async fn subscribe_ha_queue() {
             Ok(m) => m,
             Err(e) => {
                 log::error!("[TRIAL_QUOTA] Failed to deserialize HA message: {e}");
-                if let Err(e) = msg.ack().await {
-                    log::error!("[TRIAL_QUOTA] Failed to ack HA message: {e}");
-                }
+                ack_ha_msg(&msg).await;
                 continue;
             }
         };
 
         // Skip messages from self — we already applied the deduction locally
         if ha_msg.source_node.eq(&LOCAL_NODE) {
-            if let Err(e) = msg.ack().await {
-                log::error!("[TRIAL_QUOTA] Failed to ack HA message: {e}");
-            }
+            ack_ha_msg(&msg).await;
             continue;
         }
 
@@ -522,34 +808,32 @@ pub async fn subscribe_ha_queue() {
                 ha_msg.timestamp,
                 watermark,
             );
-            if let Err(e) = msg.ack().await {
-                log::error!("[TRIAL_QUOTA] Failed to ack HA message: {e}");
-            }
+            ack_ha_msg(&msg).await;
             continue;
         }
 
-        if let Some(usage_limit) = ha_msg.usage_limit {
-            set_cached_limit(&ha_msg.org_id, usage_limit);
-        }
-
-        let old = get_org_total_used(&ha_msg.org_id);
-        if ha_msg.cost > 0 {
-            add_to_org_counter(&ha_msg.org_id, ha_msg.cost);
-        }
-        let new_total = get_org_total_used(&ha_msg.org_id);
+        let Some((pool, old, new_total)) = apply_ha_msg(&ha_msg) else {
+            log::warn!(
+                "[TRIAL_QUOTA] Ignoring HA message for pool {:?}, which this build does not \
+                 have: org={}",
+                ha_msg.pool,
+                ha_msg.org_id,
+            );
+            ack_ha_msg(&msg).await;
+            continue;
+        };
 
         log::info!(
-            "[TRIAL_QUOTA] HA sync: org={} delta={} limit={:?} total {}->{}",
+            "[TRIAL_QUOTA] HA sync: org={} pool={} delta={} limit={:?} total {}->{}",
             ha_msg.org_id,
-            ha_msg.cost,
+            pool.key(),
+            ha_msg.resolved_delta(),
             ha_msg.usage_limit,
             old,
             new_total,
         );
 
-        if let Err(e) = msg.ack().await {
-            log::error!("[TRIAL_QUOTA] Failed to ack HA message: {e}");
-        }
+        ack_ha_msg(&msg).await;
     }
 
     log::warn!("[TRIAL_QUOTA] HA queue subscriber ended");
@@ -559,21 +843,32 @@ pub async fn subscribe_ha_queue() {
 // Query helpers
 // ---------------------------------------------------------------------------
 
-/// Get remaining credits in the org's shared pool
+pub fn get_remaining_for_pool(org_id: &str, pool: TrialQuotaPool) -> u64 {
+    get_pool_limit(org_id, pool).saturating_sub(get_pool_used(org_id, pool))
+}
+
+pub fn get_used_for_pool(org_id: &str, pool: TrialQuotaPool) -> u64 {
+    get_pool_used(org_id, pool)
+}
+
+/// Get one pool's limit for an org, falling back to the deployment-wide default.
+pub fn get_limit_for_pool(org_id: &str, pool: TrialQuotaPool) -> u64 {
+    get_pool_limit(org_id, pool)
+}
+
+/// Get remaining credits in the org's AI pool.
 pub fn get_remaining(org_id: &str) -> u64 {
-    let limit = get_pool_limit(org_id);
-    let used = get_org_total_used(org_id);
-    limit.saturating_sub(used)
+    get_remaining_for_pool(org_id, TrialQuotaPool::AiCredits)
 }
 
-/// Get total credits used across all features for an org
+/// Get total AI credits used across the AI features for an org.
 pub fn get_used(org_id: &str) -> u64 {
-    get_org_total_used(org_id)
+    get_used_for_pool(org_id, TrialQuotaPool::AiCredits)
 }
 
-/// Get the pool limit for an organization, falling back to the deployment-wide default.
+/// Get the AI pool limit for an org, falling back to the deployment default.
 pub fn get_limit(org_id: &str) -> u64 {
-    get_pool_limit(org_id)
+    get_limit_for_pool(org_id, TrialQuotaPool::AiCredits)
 }
 
 /// Serializable request body for AI usage events.
@@ -663,17 +958,21 @@ fn record_usage_internal(
         node_name: None,
         dashboard_info: None,
         peak_memory_usage: None,
+        region: None,
     };
 
     // Feature breakdown event (informational, not billed)
-    let feature_event = UsageData {
-        event: feature.usage_event(),
-        size: 1.0,
-        unit: "count".to_string(),
-        ..credit_event.clone()
-    };
+    let mut events = vec![credit_event.clone()];
+    if let Some(event) = feature.usage_event() {
+        events.push(UsageData {
+            event,
+            size: 1.0,
+            unit: "count".to_string(),
+            ..credit_event
+        });
+    }
 
-    usage_reporting::report_usage(vec![credit_event, feature_event]);
+    usage_reporting::report_usage(events);
 }
 
 /// Record free credit usage (all orgs). Writes `AiFreeCredits` — not billed.
@@ -696,34 +995,51 @@ pub struct AiUsageResponse {
     pub requires_additional_credits: bool,
 }
 
-/// Get AI usage info for an org (for the usage API endpoint).
-/// Reports the single shared pool across all AI features.
-/// Uses the greater of persisted and in-memory usage to include pending flushes.
-///
-/// Mode is derived from actual state:
-/// - `"free"`: credits remaining in pool
-/// - `"pay_as_you_go"`: credits exhausted + active subscription
-/// - `"exhausted"`: credits exhausted + no subscription
-pub async fn get_usage(org_id: &str) -> AiUsageResponse {
-    let limit = get_pool_limit(org_id);
-    let in_memory_used = get_org_total_used(org_id);
+/// One pool's usage for an org. Field names are unit-neutral because AI counts
+/// credits and synthetics counts steps.
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct PoolUsageResponse {
+    /// Stable pool identifier — one of [`TrialQuotaPool::ALL_POOLS`]' keys.
+    pub pool: String,
+    /// `"free"` | `"pay_as_you_go"` | `"exhausted"`.
+    pub mode: String,
+    pub used: u64,
+    pub limit: u64,
+    pub remaining: u64,
+    pub requires_additional_credits: bool,
+}
 
-    // Read from DB for accuracy
-    let db_used = match infra::table::trial_quota_usage::get_total_usage_for_org(org_id).await {
+/// The exhaustion policy is a property of the org's billing, not of the pool, so the AI-named
+/// resolver below is correct for every pool.
+pub async fn get_pool_usage(org_id: &str, pool: TrialQuotaPool) -> PoolUsageResponse {
+    let limit = get_pool_limit(org_id, pool);
+    let in_memory_used = get_pool_used(org_id, pool);
+    // Scoped to THIS pool's feature rows: summing every row of the org would
+    // report synthetics step consumption as AI credits used.
+    let db_used = match infra::table::trial_quota_usage::get_total_usage_for_org(
+        org_id,
+        pool.feature_keys(),
+    )
+    .await
+    {
         Ok(total) => {
             log::info!(
-                "[TRIAL_QUOTA] get_usage: org={} db_total={} in_memory_total={} pool_limit={}",
+                "[TRIAL_QUOTA] get_pool_usage: org={} pool={} db_total={} in_memory_total={} pool_limit={}",
                 org_id,
+                pool.key(),
                 total,
                 in_memory_used,
                 limit,
             );
-            total as u64
+            // Clamped: a refund flushes as a NEGATIVE delta with no portable
+            // SQL floor, and `as u64` on it reads as 18 quintillion used.
+            total.max(0) as u64
         }
         Err(e) => {
             log::warn!(
-                "[TRIAL_QUOTA] get_usage: org={} DB read failed (falling back to cache={}): {e}",
+                "[TRIAL_QUOTA] get_pool_usage: org={} pool={} DB read failed (falling back to cache={}): {e}",
                 org_id,
+                pool.key(),
                 in_memory_used,
             );
             in_memory_used
@@ -751,22 +1067,43 @@ pub async fn get_usage(org_id: &str) -> AiUsageResponse {
         Some(_) => "exhausted",
     };
 
-    AiUsageResponse {
+    PoolUsageResponse {
+        pool: pool.key().to_string(),
         mode: mode.to_string(),
-        credits_used: used,
-        credits_limit: limit,
-        credits_remaining: remaining,
+        used,
+        limit,
+        remaining,
         requires_additional_credits,
     }
 }
 
+impl From<PoolUsageResponse> for AiUsageResponse {
+    fn from(usage: PoolUsageResponse) -> Self {
+        Self {
+            mode: usage.mode,
+            credits_used: usage.used,
+            credits_limit: usage.limit,
+            credits_remaining: usage.remaining,
+            requires_additional_credits: usage.requires_additional_credits,
+        }
+    }
+}
+
+/// AI usage in the `credits_*` field names the AI route and UI consume.
+pub async fn get_usage(org_id: &str) -> AiUsageResponse {
+    get_pool_usage(org_id, TrialQuotaPool::AiCredits)
+        .await
+        .into()
+}
+
 /// Get the current usage percentage for an org (0–100, clamped).
 pub fn get_quota_percentage(org_id: &str) -> u8 {
-    let limit = get_pool_limit(org_id);
+    let pool = TrialQuotaPool::AiCredits;
+    let limit = get_pool_limit(org_id, pool);
     if limit == 0 {
         return 100;
     }
-    let used = get_org_total_used(org_id);
+    let used = get_pool_used(org_id, pool);
     let pct = (used * 100 / limit).min(100);
     pct as u8
 }
@@ -798,11 +1135,15 @@ pub fn pending_checkpoint_from(pct: u8, already_notified: u8) -> Option<u8> {
     highest_reached
 }
 
-/// Atomically mark a checkpoint as notified for an org in the DB.
+/// Atomically mark ONE pool's checkpoint as notified for an org in the DB.
 /// Returns true if this pod won the update (no other pod set it first).
-pub async fn mark_checkpoint_notified(org_id: &str, checkpoint: u8) -> bool {
-    match infra::table::trial_quota_usage::update_notified_checkpoint(org_id, checkpoint as i16)
-        .await
+pub async fn mark_checkpoint_notified(org_id: &str, checkpoint: u8, features: &[&str]) -> bool {
+    match infra::table::trial_quota_usage::update_notified_checkpoint(
+        org_id,
+        checkpoint as i16,
+        features,
+    )
+    .await
     {
         Ok(updated) => updated,
         Err(e) => {
@@ -812,11 +1153,46 @@ pub async fn mark_checkpoint_notified(org_id: &str, checkpoint: u8) -> bool {
     }
 }
 
-/// Reset checkpoint tracking for an org (e.g., when credits are refilled).
-pub async fn reset_checkpoint(org_id: &str) {
-    if let Err(e) = infra::table::trial_quota_usage::reset_notified_checkpoint(org_id).await {
-        log::error!("[AI_QUOTA] Failed to reset checkpoint for org={org_id}: {e}");
+/// Reset checkpoint tracking for ONE pool of an org (e.g., when its grant is raised).
+pub async fn reset_checkpoint(org_id: &str, features: &[&str]) {
+    if let Err(e) =
+        infra::table::trial_quota_usage::reset_notified_checkpoint(org_id, features).await
+    {
+        log::error!("[TRIAL_QUOTA] Failed to reset checkpoint for org={org_id}: {e}");
     }
+}
+
+/// Fold `trial_quota_usage` rows into per-`(org, pool)` totals and limits, both
+/// keyed by [`scope`]. Split out of [`init_from_db`] so the row-to-pool
+/// decision is testable without a database.
+fn fold_db_records(
+    records: &[infra::table::entity::trial_quota_usage::Model],
+) -> (HashMap<String, u64>, HashMap<String, u64>) {
+    // Sum per-feature counts into per-POOL totals; folding per ORG is what made
+    // the two grants one.
+    let mut totals: HashMap<String, u64> = HashMap::new();
+    let mut limits: HashMap<String, u64> = HashMap::new();
+    for record in records {
+        // A row this build does not recognise belongs to a pool it does not
+        // have; counting it against another pool spends the wrong grant.
+        let Some(pool) = TrialQuotaPool::from_key_of_feature(&record.feature) else {
+            continue;
+        };
+        let key = scope(&record.org_id, pool);
+        // A refund flushes as a NEGATIVE delta added verbatim, so a row can sit
+        // below zero. Read as zero rather than wrapped into an astronomical
+        // `u64` that would exhaust the org forever.
+        *totals.entry(key.clone()).or_default() += record.usage_count.max(0) as u64;
+        if let Some(limit) = record.usage_limit
+            && let Ok(limit) = u64::try_from(limit)
+        {
+            limits
+                .entry(key)
+                .and_modify(|current| *current = (*current).max(limit))
+                .or_insert(limit);
+        }
+    }
+    (totals, limits)
 }
 
 /// Initialize quota from DB on node startup.
@@ -829,29 +1205,15 @@ pub async fn init_from_db() {
             let max_updated_at = records.iter().map(|r| r.updated_at).max().unwrap_or(0);
             INIT_WATERMARK.store(max_updated_at, Ordering::Relaxed);
 
-            // Sum per-feature counts into per-org totals and load explicit limits.
-            let mut org_totals: HashMap<String, u64> = HashMap::new();
-            let mut org_limits: HashMap<String, u64> = HashMap::new();
-            for record in &records {
-                *org_totals.entry(record.org_id.clone()).or_default() += record.usage_count as u64;
-                if let Some(limit) = record.usage_limit
-                    && let Ok(limit) = u64::try_from(limit)
-                {
-                    org_limits
-                        .entry(record.org_id.clone())
-                        .and_modify(|current| *current = (*current).max(limit))
-                        .or_insert(limit);
-                }
-            }
+            let (scope_totals, scope_limits) = fold_db_records(&records);
 
-            // Populate ORG_USAGE with totals
             {
                 let mut map = ORG_USAGE.write().unwrap();
-                for (org_id, total) in org_totals {
-                    map.insert(org_id, AtomicU64::new(total));
+                for (key, total) in scope_totals {
+                    map.insert(key, AtomicU64::new(total));
                 }
             }
-            *ORG_LIMITS.write().unwrap() = org_limits;
+            *ORG_LIMITS.write().unwrap() = scope_limits;
 
             log::info!(
                 "[TRIAL_QUOTA] Loaded {} quota records from DB, watermark={}",
@@ -865,9 +1227,1025 @@ pub async fn init_from_db() {
     }
 }
 
+/// One org's synthetics spend and the grant it was spent against, per pool.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct SyntheticsQuota {
+    pub browser_used: u64,
+    pub browser_limit: u64,
+    pub protocol_used: u64,
+    pub protocol_limit: u64,
+}
+
+/// Every `trial_quota_usage.feature` value that spends from a synthetics pool.
+///
+/// Composed from the pools' own `feature_keys`, never hand-written: it has to
+/// carry the pre-split `synthetics_steps`, or an org whose protocol usage
+/// predates the split reads `used = 0` and is handed the grant a second time.
+pub fn all_synthetics_features() -> Vec<&'static str> {
+    TrialQuotaPool::ALL_POOLS
+        .iter()
+        .filter(|pool| pool.is_synthetics())
+        .flat_map(|pool| pool.feature_keys().iter().copied())
+        .collect()
+}
+
+/// Steps left in each requested org's synthetics grants — SPEC §6.6, ONE read.
+///
+/// An org missing from the answer is UNGATED at the scheduler, so a failed read
+/// returns nothing at all rather than a map of zeroes.
+pub async fn synthetics_remaining_for_orgs(org_ids: Vec<String>) -> HashMap<String, StepRemaining> {
+    let Some(rows) = read_synthetics_rows(&org_ids).await else {
+        return HashMap::new();
+    };
+    fold_synthetics_remaining(&org_ids, &rows)
+}
+
+/// Each requested org's synthetics spend and grant, for the `_meta` org listing — SPEC §11 #5.
+///
+/// A failed read answers with nothing: this node's own counters are not the source of truth.
+pub async fn synthetics_quota_for_orgs(org_ids: Vec<String>) -> HashMap<String, SyntheticsQuota> {
+    let Some(rows) = read_synthetics_rows(&org_ids).await else {
+        return HashMap::new();
+    };
+    fold_synthetics_quota(&org_ids, &rows)
+}
+
+/// The rows both batched readers fold — `None` when the table cannot be reached.
+async fn read_synthetics_rows(
+    org_ids: &[String],
+) -> Option<Vec<infra::table::entity::trial_quota_usage::Model>> {
+    let conn = infra::db::get_orm_client_ro().await;
+    let rows = match infra::table::trial_quota_usage::get_for_orgs(
+        conn,
+        org_ids,
+        &all_synthetics_features(),
+    )
+    .await
+    {
+        Ok(rows) => rows,
+        Err(e) => {
+            log::error!("[TRIAL_QUOTA] synthetics counter read failed: {e}");
+            return None;
+        }
+    };
+    Some(rows)
+}
+
+pub(crate) fn fold_synthetics_remaining(
+    org_ids: &[String],
+    rows: &[infra::table::entity::trial_quota_usage::Model],
+) -> HashMap<String, StepRemaining> {
+    fold_synthetics_quota(org_ids, rows)
+        .into_iter()
+        .map(|(org_id, quota)| {
+            (
+                org_id,
+                // A lowered limit leaves usage above it, so a plain subtraction is a panic.
+                StepRemaining {
+                    browser: quota.browser_limit.saturating_sub(quota.browser_used),
+                    protocol: quota.protocol_limit.saturating_sub(quota.protocol_used),
+                },
+            )
+        })
+        .collect()
+}
+
+/// The spend and the grant every requested org's rows resolve to, per pool — the one place
+/// either reader decides what an org's effective limit is.
+pub(crate) fn fold_synthetics_quota(
+    org_ids: &[String],
+    rows: &[infra::table::entity::trial_quota_usage::Model],
+) -> HashMap<String, SyntheticsQuota> {
+    let mut used: HashMap<(&str, TrialQuotaPool), u64> = HashMap::new();
+    let mut limits: HashMap<(&str, TrialQuotaPool), u64> = HashMap::new();
+    for row in rows {
+        let Some(pool) = TrialQuotaPool::from_key_of_feature(&row.feature) else {
+            continue;
+        };
+        // The limit is an admin override that outlives every reset, so it is read either way.
+        if let Some(limit) = row.usage_limit.and_then(|l| u64::try_from(l).ok()) {
+            limits
+                .entry((row.org_id.as_str(), pool))
+                .and_modify(|current| *current = (*current).max(limit))
+                .or_insert(limit);
+        }
+        let entry = used.entry((row.org_id.as_str(), pool)).or_default();
+        *entry = entry.saturating_add(u64::try_from(row.usage_count).unwrap_or(0));
+    }
+
+    org_ids
+        .iter()
+        .map(|org_id| {
+            let spent = |pool| {
+                // The row's override beats `ORG_LIMITS`, which is empty until the first refresh.
+                let limit = limits
+                    .get(&(org_id.as_str(), pool))
+                    .copied()
+                    .unwrap_or_else(|| get_pool_limit(org_id, pool));
+                (
+                    used.get(&(org_id.as_str(), pool)).copied().unwrap_or(0),
+                    limit,
+                )
+            };
+            let (browser_used, browser_limit) = spent(TrialQuotaPool::SyntheticsBrowserSteps);
+            let (protocol_used, protocol_limit) = spent(TrialQuotaPool::SyntheticsProtocolSteps);
+            (
+                org_id.clone(),
+                SyntheticsQuota {
+                    browser_used,
+                    browser_limit,
+                    protocol_used,
+                    protocol_limit,
+                },
+            )
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // These exercise process-global counters, so every test owns a UNIQUE org
+    // id — sharing one makes them order-dependent under `cargo test`'s
+    // parallelism.
+
+    /// A per-test org with an explicit pool size, not the deployment default.
+    fn steps_org(name: &str, limit: u64) -> String {
+        let org_id = format!("pool-test-{name}");
+        set_cached_limit(&org_id, TrialQuotaPool::SyntheticsBrowserSteps, limit);
+        org_id
+    }
+
+    /// Position of a pool in `ALL_POOLS`, exhaustive so a new variant must claim an index here.
+    fn ordinal(pool: TrialQuotaPool) -> usize {
+        match pool {
+            TrialQuotaPool::AiCredits => 0,
+            TrialQuotaPool::SyntheticsBrowserSteps => 1,
+            TrialQuotaPool::SyntheticsProtocolSteps => 2,
+        }
+    }
+
+    const STEPS: TrialQuotaFeature = TrialQuotaFeature::SyntheticsBrowserSteps;
+
+    /// The argument text of the first `needle` call in `body`, matched by paren balance.
+    fn call_args<'a>(body: &'a str, needle: &str) -> &'a str {
+        let at = body
+            .find(needle)
+            .unwrap_or_else(|| panic!("`{needle}` must be called here"))
+            + needle.len();
+        let mut depth = 1usize;
+        for (offset, ch) in body[at..].char_indices() {
+            match ch {
+                '(' => depth += 1,
+                ')' if depth == 1 => return &body[at..at + offset],
+                ')' => depth -= 1,
+                _ => {}
+            }
+        }
+        panic!("`{needle}` call is never closed");
+    }
+
+    /// rustfmt is free to break an argument list across lines, so every scan of one compares
+    /// against this.
+    fn without_whitespace(text: &str) -> String {
+        text.chars().filter(|c| !c.is_whitespace()).collect()
+    }
+
+    /// Every `.rs` file under the workspace `src/` that mentions one of `needles`, comments
+    /// stripped.
+    fn workspace_code_mentioning(needles: &[String]) -> Vec<(String, String)> {
+        let mut found = Vec::new();
+        let mut stack = vec![std::path::PathBuf::from(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/.."
+        ))];
+        while let Some(dir) = stack.pop() {
+            let Ok(entries) = std::fs::read_dir(&dir) else {
+                continue;
+            };
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    stack.push(path);
+                    continue;
+                }
+                if path.extension().and_then(|ext| ext.to_str()) != Some("rs") {
+                    continue;
+                }
+                let Ok(text) = std::fs::read_to_string(&path) else {
+                    continue;
+                };
+                if !needles.iter().any(|needle| text.contains(needle.as_str())) {
+                    continue;
+                }
+                let code = text
+                    .lines()
+                    .filter(|line| !line.trim_start().starts_with("//"))
+                    .collect::<Vec<_>>()
+                    .join("\n");
+                found.push((path.display().to_string(), code));
+            }
+        }
+        found
+    }
+
+    /// Every workspace call of `needles` as `(path, argument text)`; a definition proves nothing
+    /// about what a caller passes, so the `fn` that declares one is skipped.
+    fn workspace_call_sites(needles: &[String]) -> Vec<(String, String)> {
+        let mut sites = Vec::new();
+        for (path, code) in &workspace_code_mentioning(needles) {
+            for needle in needles {
+                let mut rest = code.as_str();
+                while let Some(at) = rest.find(needle.as_str()) {
+                    let start = code.len() - rest.len() + at;
+                    rest = &rest[at..];
+                    if !code[..start].trim_end().ends_with("fn") {
+                        sites.push((path.clone(), call_args(rest, needle).to_string()));
+                    }
+                    rest = &rest[needle.len()..];
+                }
+            }
+        }
+        sites
+    }
+
+    /// `TrialQuotaFeature::pool` and `TrialQuotaPool::feature_keys` MUST agree,
+    /// or a feature deducts from one pool and reports into another in the table.
+    #[test]
+    fn every_feature_is_listed_by_its_own_pool() {
+        for feature in [
+            TrialQuotaFeature::AiChat,
+            TrialQuotaFeature::NewIncident,
+            TrialQuotaFeature::IncidentReAnalysis,
+            TrialQuotaFeature::SyntheticsBrowserSteps,
+            TrialQuotaFeature::SyntheticsProtocolSteps,
+        ] {
+            let pool = feature.pool();
+            assert!(
+                pool.feature_keys().contains(&feature.feature_key()),
+                "{feature} deducts from {} but is not one of its feature_keys",
+                pool.key(),
+            );
+            assert_eq!(
+                TrialQuotaPool::from_key_of_feature(feature.feature_key()),
+                Some(pool),
+                "{feature} must resolve back to its own pool from the DB key",
+            );
+        }
+
+        // A key listed by two pools resolves to the first, and the other's counter is never read.
+        for pool in TrialQuotaPool::ALL_POOLS {
+            for key in pool.feature_keys() {
+                assert_eq!(
+                    TrialQuotaPool::from_key_of_feature(key),
+                    Some(*pool),
+                    "`{key}` is listed by {} but resolves elsewhere",
+                    pool.key(),
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn ai_and_synthetics_pools_do_not_drain_each_other() {
+        let org_id = format!("pool-test-{}", "isolation");
+        set_cached_limit(&org_id, TrialQuotaPool::SyntheticsBrowserSteps, 100);
+        set_cached_limit(&org_id, TrialQuotaPool::AiCredits, 100);
+
+        assert!(try_deduct_units(&org_id, STEPS, 100).is_ok());
+        assert_eq!(
+            get_remaining_for_pool(&org_id, TrialQuotaPool::SyntheticsBrowserSteps),
+            0
+        );
+
+        assert_eq!(
+            get_remaining_for_pool(&org_id, TrialQuotaPool::AiCredits),
+            100
+        );
+        assert!(try_deduct_units(&org_id, TrialQuotaFeature::AiChat, 1).is_ok());
+
+        assert_eq!(
+            get_used_for_pool(&org_id, TrialQuotaPool::SyntheticsBrowserSteps),
+            100
+        );
+    }
+
+    #[test]
+    fn scope_keys_cannot_collide_across_orgs_or_pools() {
+        assert_ne!(
+            scope("acme", TrialQuotaPool::AiCredits),
+            scope("acme", TrialQuotaPool::SyntheticsBrowserSteps),
+        );
+        assert_ne!(
+            scope("acme", TrialQuotaPool::AiCredits),
+            scope("acme_ai_credits", TrialQuotaPool::AiCredits),
+        );
+    }
+
+    /// §4.2: this path must emit NO step event. It cannot know browser from
+    /// protocol, and guessing would invoice at the wrong rate — the real events
+    /// come from `job_api::events_for_ack`.
+    #[test]
+    fn synthetics_feature_emits_no_step_event_of_its_own() {
+        assert_eq!(STEPS.usage_event(), None);
+        assert_eq!(STEPS.feature_key(), "synthetics_browser_steps");
+        assert_eq!(STEPS.pool(), TrialQuotaPool::SyntheticsBrowserSteps);
+        // One unit is one step; any per-step cost but 1 rescales the §6.1 grant.
+        assert_eq!(STEPS.cost(), 1);
+    }
+
+    /// All or nothing: a partial deduct would start a run the grant cannot pay for.
+    #[test]
+    fn a_deduct_that_does_not_fit_takes_nothing() {
+        let org_id = steps_org("partial", 10);
+        assert!(try_deduct_units(&org_id, STEPS, 14).is_err());
+        assert_eq!(
+            get_used_for_pool(&org_id, TrialQuotaPool::SyntheticsBrowserSteps),
+            0
+        );
+        assert!(try_deduct_units(&org_id, STEPS, 10).is_ok());
+        assert_eq!(
+            get_remaining_for_pool(&org_id, TrialQuotaPool::SyntheticsBrowserSteps),
+            0
+        );
+    }
+
+    /// T32 / E17 — raising the limit re-opens the org immediately, with no
+    /// restart and no re-init.
+    #[test]
+    fn t32_raising_the_limit_reopens_an_exhausted_org_without_a_restart() {
+        let org_id = steps_org("t32", 10);
+        assert!(try_deduct_units(&org_id, STEPS, 10).is_ok());
+        assert!(try_deduct_units(&org_id, STEPS, 1).is_err());
+
+        set_cached_limit(&org_id, TrialQuotaPool::SyntheticsBrowserSteps, 50);
+        assert!(try_deduct_units(&org_id, STEPS, 1).is_ok());
+        assert_eq!(
+            get_remaining_for_pool(&org_id, TrialQuotaPool::SyntheticsBrowserSteps),
+            39
+        );
+    }
+
+    #[test]
+    fn t32_the_ha_queue_carries_the_new_limit_to_every_other_node() {
+        let org_id = steps_org("t32-ha", 10);
+        assert!(try_deduct_units(&org_id, STEPS, 10).is_ok());
+        assert!(try_deduct_units(&org_id, STEPS, 1).is_err());
+
+        apply_ha_msg(&TrialQuotaHaMsg {
+            org_id: org_id.clone(),
+            cost: 0,
+            usage_limit: Some(50),
+            pool: Some(TrialQuotaPool::SyntheticsBrowserSteps.key().to_string()),
+            delta: 0,
+            source_node: LOCAL_NODE.clone(),
+            timestamp: 1,
+        })
+        .expect("a pool this build has must be applied");
+
+        assert_eq!(
+            get_limit_for_pool(&org_id, TrialQuotaPool::SyntheticsBrowserSteps),
+            50
+        );
+        assert!(try_deduct_units(&org_id, STEPS, 1).is_ok());
+        assert_eq!(
+            get_limit_for_pool(&org_id, TrialQuotaPool::AiCredits),
+            TrialQuotaPool::AiCredits.default_limit(),
+        );
+    }
+
+    /// T33 / E23 — the pool is one-time, so a month boundary does nothing.
+    ///
+    /// The pool API takes no time input at all, so the only way a boundary could
+    /// reset it is code that reads one; the next test pins that absence.
+    #[test]
+    fn t33_a_month_boundary_leaves_the_one_time_pool_unchanged() {
+        let org_id = steps_org("t33", 100);
+        assert!(try_deduct_units(&org_id, STEPS, 60).is_ok());
+        let before = get_used_for_pool(&org_id, TrialQuotaPool::SyntheticsBrowserSteps);
+
+        // None of these reads takes a timestamp, so none of them can reset.
+        assert_eq!(
+            get_used_for_pool(&org_id, TrialQuotaPool::SyntheticsBrowserSteps),
+            before
+        );
+        assert_eq!(
+            get_remaining_for_pool(&org_id, TrialQuotaPool::SyntheticsBrowserSteps),
+            40
+        );
+        assert_eq!(
+            get_limit_for_pool(&org_id, TrialQuotaPool::SyntheticsBrowserSteps),
+            100
+        );
+        // A grant that reset would let 60 more through on top of 60.
+        assert!(try_deduct_units(&org_id, STEPS, 41).is_err());
+        assert!(try_deduct_units(&org_id, STEPS, 40).is_ok());
+        assert_eq!(
+            get_remaining_for_pool(&org_id, TrialQuotaPool::SyntheticsBrowserSteps),
+            0
+        );
+    }
+
+    fn ha(cost: u64, pool: Option<&str>, delta: i64) -> TrialQuotaHaMsg {
+        TrialQuotaHaMsg {
+            org_id: "acme".to_string(),
+            cost,
+            usage_limit: None,
+            pool: pool.map(str::to_string),
+            delta,
+            source_node: LOCAL_NODE.clone(),
+            timestamp: 1,
+        }
+    }
+
+    /// A node predating item 2.1 sends neither field; it meant an AI deduction.
+    #[test]
+    fn an_ha_message_without_a_pool_reads_as_ai_credits() {
+        let msg = ha(50, None, 0);
+        assert_eq!(msg.resolved_pool(), Some(TrialQuotaPool::AiCredits));
+        assert_eq!(msg.resolved_delta(), 50);
+    }
+
+    /// A rolling deploy puts a newer node's pool key on this node's queue, and a limit
+    /// defaulted to AI credits hands the org that pool's whole allowance in AI spend.
+    #[test]
+    fn an_ha_message_for_an_unknown_pool_is_ignored_not_defaulted() {
+        let msg = ha(1, Some("something_new"), 1);
+        assert_eq!(msg.resolved_pool(), None);
+
+        let org_id = "pool-test-ha-unknown-pool";
+        let before = get_limit_for_pool(org_id, TrialQuotaPool::AiCredits);
+        assert!(
+            apply_ha_msg(&TrialQuotaHaMsg {
+                org_id: org_id.to_string(),
+                cost: 0,
+                usage_limit: Some(150_000),
+                pool: Some("a_pool_a_newer_node_has".to_string()),
+                delta: 1,
+                source_node: LOCAL_NODE.clone(),
+                timestamp: 1,
+            })
+            .is_none(),
+            "an unknown pool key must not be applied to any pool this build does have",
+        );
+        assert_eq!(
+            get_limit_for_pool(org_id, TrialQuotaPool::AiCredits),
+            before,
+            "the AI grant was resized by a message that was never about it",
+        );
+        assert_eq!(get_used_for_pool(org_id, TrialQuotaPool::AiCredits), 0);
+    }
+
+    #[test]
+    fn an_ha_refund_travels_as_a_negative_delta() {
+        let msg = ha_msg("acme", TrialQuotaPool::SyntheticsBrowserSteps, -10, None);
+        assert_eq!(msg.delta, -10);
+        // `cost` is the positive part, so an old node applies nothing, not a charge.
+        assert_eq!(msg.cost, 0);
+        assert_eq!(msg.resolved_delta(), -10);
+        assert_eq!(
+            msg.resolved_pool(),
+            Some(TrialQuotaPool::SyntheticsBrowserSteps)
+        );
+    }
+
+    #[test]
+    fn an_ha_deduction_is_readable_by_a_node_that_predates_pool_scoping() {
+        let msg = ha_msg("acme", TrialQuotaPool::SyntheticsBrowserSteps, 14, None);
+        assert_eq!(
+            msg.cost, 14,
+            "an old node reads `cost` and must see the deduction"
+        );
+        assert_eq!(msg.delta, 14);
+    }
+
+    #[test]
+    fn applying_a_remote_delta_moves_only_that_pool() {
+        let org_id = steps_org("ha-delta", 1_000);
+        apply_ha_msg(&TrialQuotaHaMsg {
+            org_id: org_id.clone(),
+            cost: 14,
+            usage_limit: None,
+            pool: Some(TrialQuotaPool::SyntheticsBrowserSteps.key().to_string()),
+            delta: 14,
+            source_node: LOCAL_NODE.clone(),
+            timestamp: 1,
+        })
+        .expect("a pool this build has must be applied");
+        assert_eq!(
+            get_used_for_pool(&org_id, TrialQuotaPool::SyntheticsBrowserSteps),
+            14
+        );
+        assert_eq!(get_used_for_pool(&org_id, TrialQuotaPool::AiCredits), 0);
+    }
+
+    /// The two pools have their OWN deployment-wide defaults (item 2.5), and
+    /// every other pool test installs an explicit limit, so nothing else covers
+    /// this path — a synthetics grant sized from the AI knob would be a tenth.
+    #[test]
+    fn each_pool_has_its_own_deployment_default() {
+        // A never-configured org, so nothing in ORG_LIMITS answers for it.
+        let org_id = "pool-test-defaults-never-configured";
+        let cfg = o2_enterprise::enterprise::common::config::get_config();
+
+        assert_eq!(
+            get_limit_for_pool(org_id, TrialQuotaPool::SyntheticsBrowserSteps),
+            cfg.cloud.synthetics_free_browser_step_pool,
+        );
+        assert_eq!(
+            get_limit_for_pool(org_id, TrialQuotaPool::SyntheticsProtocolSteps),
+            cfg.cloud.synthetics_free_protocol_step_pool,
+        );
+        assert_eq!(
+            get_limit_for_pool(org_id, TrialQuotaPool::AiCredits),
+            cfg.cloud.ai_free_credit_pool,
+        );
+        // §6.1: 10,000 browser steps and 20,000 protocol; the AI pool is 1,000 credits.
+        assert_eq!(cfg.cloud.synthetics_free_browser_step_pool, 10_000);
+        assert_eq!(cfg.cloud.synthetics_free_protocol_step_pool, 20_000);
+        // The three grants must not collapse onto one knob.
+        assert_ne!(
+            cfg.cloud.synthetics_free_browser_step_pool,
+            cfg.cloud.synthetics_free_protocol_step_pool,
+        );
+        assert_ne!(
+            cfg.cloud.synthetics_free_browser_step_pool,
+            cfg.cloud.ai_free_credit_pool,
+        );
+        assert_ne!(
+            cfg.cloud.synthetics_free_protocol_step_pool,
+            cfg.cloud.ai_free_credit_pool,
+        );
+    }
+
+    fn db_row(
+        org_id: &str,
+        feature: &str,
+        usage_count: i64,
+    ) -> infra::table::entity::trial_quota_usage::Model {
+        infra::table::entity::trial_quota_usage::Model {
+            org_id: org_id.to_string(),
+            feature: feature.to_string(),
+            usage_count,
+            usage_limit: None,
+            updated_at: 0,
+            notified_checkpoint: 0,
+        }
+    }
+
+    /// A node that reloads its counters folded per ORG has one pool again the
+    /// moment it restarts, and nothing at runtime would say so.
+    #[test]
+    fn the_startup_fold_keeps_the_pools_apart() {
+        let rows = vec![
+            db_row("acme", "ai_chat", 40),
+            db_row("acme", "new_incident", 50),
+            db_row("acme", "synthetics_browser_steps", 900),
+            db_row("acme", "synthetics_protocol_steps", 700),
+        ];
+        let (totals, _) = fold_db_records(&rows);
+
+        assert_eq!(
+            totals.get(&scope("acme", TrialQuotaPool::AiCredits)),
+            Some(&90),
+            "the AI pool sums its own features and nothing else",
+        );
+        assert_eq!(
+            totals.get(&scope("acme", TrialQuotaPool::SyntheticsBrowserSteps)),
+            Some(&900),
+        );
+        assert_eq!(
+            totals.get(&scope("acme", TrialQuotaPool::SyntheticsProtocolSteps)),
+            Some(&700),
+            "the two step grants are independent — one must not fold into the other",
+        );
+    }
+
+    /// The pre-split `synthetics_steps` feature key. Existing rows must keep
+    /// counting rather than resetting every org to a fresh grant, and they land
+    /// on PROTOCOL so nobody is handed free browser capacity they never earned.
+    #[test]
+    fn the_startup_fold_reads_the_pre_split_key_as_protocol() {
+        let rows = vec![db_row("acme", "synthetics_steps", 900)];
+        let (totals, _) = fold_db_records(&rows);
+
+        assert_eq!(
+            totals.get(&scope("acme", TrialQuotaPool::SyntheticsProtocolSteps)),
+            Some(&900),
+        );
+        assert_eq!(
+            totals.get(&scope("acme", TrialQuotaPool::SyntheticsBrowserSteps)),
+            None,
+            "a legacy balance must not become free browser steps",
+        );
+    }
+
+    /// Folding a NEWER node's unknown `feature` into a pool at random spends
+    /// that pool's grant on usage that was never its own.
+    #[test]
+    fn the_startup_fold_skips_a_feature_it_does_not_recognise() {
+        let rows = vec![
+            db_row("acme", "ai_chat", 40),
+            db_row("acme", "some_future_feature", 5_000),
+        ];
+        let (totals, _) = fold_db_records(&rows);
+
+        assert_eq!(
+            totals.get(&scope("acme", TrialQuotaPool::AiCredits)),
+            Some(&40),
+        );
+        assert_eq!(
+            totals.len(),
+            1,
+            "the unknown feature belongs to no pool here"
+        );
+    }
+
+    /// A refund flushes as a negative delta added verbatim, so a row can sit
+    /// below zero; `as u64` on that is an org exhausted forever, by a refund.
+    #[test]
+    fn the_startup_fold_reads_a_negative_row_as_zero() {
+        let rows = vec![db_row("acme", "synthetics_browser_steps", -12)];
+        let (totals, _) = fold_db_records(&rows);
+        assert_eq!(
+            totals.get(&scope("acme", TrialQuotaPool::SyntheticsBrowserSteps)),
+            Some(&0),
+        );
+    }
+
+    /// An explicit limit belongs to the pool whose feature row carries it, or
+    /// raising the AI credit limit also raises the one-time step grant.
+    #[test]
+    fn the_startup_fold_keeps_explicit_limits_in_their_own_pool() {
+        let mut ai = db_row("acme", "ai_chat", 0);
+        ai.usage_limit = Some(50_000);
+        let steps = db_row("acme", "synthetics_steps", 0);
+        let (_, limits) = fold_db_records(&[ai, steps]);
+
+        assert_eq!(
+            limits.get(&scope("acme", TrialQuotaPool::AiCredits)),
+            Some(&50_000),
+        );
+        assert_eq!(
+            limits.get(&scope("acme", TrialQuotaPool::SyntheticsBrowserSteps)),
+            None,
+            "the step grant keeps its deployment default",
+        );
+    }
+
+    /// A pool missing from `ALL_POOLS` is unreachable from `from_key_of_feature`, so its rows
+    /// are never read and every org reads `used = 0` for it forever.
+    #[test]
+    fn all_pools_lists_every_variant_exactly_once() {
+        let listed = TrialQuotaPool::ALL_POOLS.len();
+        let mut seen = vec![None; listed];
+        for pool in TrialQuotaPool::ALL_POOLS {
+            let at = ordinal(*pool);
+            assert!(
+                seen[at].is_none(),
+                "{} shares index {at} with {:?} — ALL_POOLS lists a pool twice",
+                pool.key(),
+                seen[at],
+            );
+            seen[at] = Some(*pool);
+        }
+        assert!(
+            seen.iter().all(Option::is_some),
+            "the {listed} pools in ALL_POOLS do not cover the indices 0..{listed}",
+        );
+    }
+
+    /// A pool absent from `ALL_POOLS` or unresolvable by its own key is invisible to every scan.
+    #[test]
+    fn every_pool_round_trips_and_unknown_keys_are_rejected() {
+        for pool in TrialQuotaPool::ALL_POOLS {
+            assert_eq!(
+                TrialQuotaPool::from_key(pool.key()),
+                Some(*pool),
+                "{} must resolve back to its own variant",
+                pool.key(),
+            );
+            assert_eq!(
+                pool.is_synthetics(),
+                pool.key().starts_with("synthetics"),
+                "{} is classified against its own key, so a new pool cannot slip through \
+                 unclassified and read as 0 usage forever",
+                pool.key(),
+            );
+        }
+        assert_eq!(TrialQuotaPool::from_key("ingest"), None);
+        // A key a NEWER node writes must not be folded into a pool this build has.
+        assert_eq!(TrialQuotaPool::from_key_of_feature("future_feature"), None);
+
+        // Diverge from a key the upsert writes and the row is folded by no pool at all, so
+        // every org reads `used = 0` against that grant forever — and the write still succeeds.
+        for feature in [
+            infra::table::trial_quota_usage::SYNTHETICS_BROWSER_FEATURE,
+            infra::table::trial_quota_usage::SYNTHETICS_PROTOCOL_FEATURE,
+        ] {
+            let pool = TrialQuotaPool::from_key_of_feature(feature)
+                .unwrap_or_else(|| panic!("`{feature}` is written but owned by no pool"));
+            assert!(
+                pool.feature_keys().contains(&feature),
+                "`{feature}` resolves to {} but is not one of its keys",
+                pool.key(),
+            );
+            assert!(pool.is_synthetics(), "`{feature}` must be a synthetics key");
+        }
+    }
+
+    /// Omit the pre-split key and every org whose protocol usage predates the split is re-granted.
+    #[test]
+    fn all_synthetics_features_includes_the_pre_split_key() {
+        let mut features = all_synthetics_features();
+        let mut expected: Vec<&str> = TrialQuotaPool::SyntheticsBrowserSteps
+            .feature_keys()
+            .iter()
+            .chain(TrialQuotaPool::SyntheticsProtocolSteps.feature_keys())
+            .copied()
+            .collect();
+        features.sort_unstable();
+        expected.sort_unstable();
+        assert_eq!(
+            features, expected,
+            "the read's IN filter must be composed from the pools' own feature_keys, so a key \
+             added to a pool cannot be forgotten here",
+        );
+        assert!(
+            features.contains(&"synthetics_steps"),
+            "without the pre-split key an org whose protocol usage predates the split reads \
+             used = 0 and is handed the whole grant a second time",
+        );
+    }
+
+    /// Absent from the map means UNGATED at the gate, so "has not used it yet" must not land there.
+    #[test]
+    fn fold_synthetics_remaining_gives_every_requested_org_an_entry() {
+        let org_id = steps_org("fold-empty", 700);
+        set_cached_limit(&org_id, TrialQuotaPool::SyntheticsProtocolSteps, 900);
+
+        let remaining = fold_synthetics_remaining(std::slice::from_ref(&org_id), &[]);
+        let r = remaining
+            .get(&org_id)
+            .expect("an org with no rows has not used the feature — it is not absent");
+        assert_eq!(r.browser, 700);
+        assert_eq!(r.protocol, 900);
+    }
+
+    /// E14's force-deduct lets `usage_count` pass `usage_limit`, so the subtraction must saturate.
+    #[test]
+    fn fold_synthetics_remaining_saturates_when_used_exceeds_the_limit() {
+        let org_id = steps_org("fold-saturate", 10);
+        set_cached_limit(&org_id, TrialQuotaPool::SyntheticsProtocolSteps, 10);
+        let rows = vec![
+            db_row(&org_id, "synthetics_browser_steps", 4_000),
+            db_row(&org_id, "synthetics_protocol_steps", 11),
+        ];
+
+        let remaining = fold_synthetics_remaining(std::slice::from_ref(&org_id), &rows);
+        let r = remaining.get(&org_id).expect("the org was requested");
+        assert_eq!(
+            r.browser, 0,
+            "a wrapping subtraction hands an over-spent org 18 quintillion free steps",
+        );
+        assert_eq!(r.protocol, 0);
+    }
+
+    /// Both protocol feature keys spend one grant, and a browser row spends neither of them.
+    #[test]
+    fn fold_synthetics_remaining_sums_a_pools_feature_rows() {
+        let org_id = steps_org("fold-sum", 500);
+        set_cached_limit(&org_id, TrialQuotaPool::SyntheticsProtocolSteps, 1_000);
+        let rows = vec![
+            db_row(&org_id, "synthetics_steps", 300),
+            db_row(&org_id, "synthetics_protocol_steps", 200),
+            db_row(&org_id, "synthetics_browser_steps", 100),
+        ];
+
+        let remaining = fold_synthetics_remaining(std::slice::from_ref(&org_id), &rows);
+        let r = remaining.get(&org_id).expect("the org was requested");
+        assert_eq!(
+            r.protocol, 500,
+            "both protocol feature keys draw down one grant, or the split hands out two",
+        );
+        assert_eq!(
+            r.browser, 400,
+            "a browser row must not spend the protocol grant"
+        );
+    }
+
+    /// `ORG_LIMITS` is empty for ~10s after a restart, so the row's own override is the truth.
+    #[test]
+    fn fold_synthetics_remaining_prefers_the_rows_own_limit() {
+        let org_id = steps_org("fold-override", 100);
+        set_cached_limit(&org_id, TrialQuotaPool::SyntheticsProtocolSteps, 100);
+        let mut browser = db_row(&org_id, "synthetics_browser_steps", 50);
+        browser.usage_limit = Some(5_000);
+        // The protocol pool's two feature rows, with the raise recorded on only one of them.
+        let mut protocol = db_row(&org_id, "synthetics_protocol_steps", 50);
+        protocol.usage_limit = Some(9_000);
+        let mut pre_split = db_row(&org_id, "synthetics_steps", 0);
+        pre_split.usage_limit = Some(5_000);
+
+        let remaining = fold_synthetics_remaining(
+            std::slice::from_ref(&org_id),
+            &[browser, protocol, pre_split],
+        );
+        let r = remaining.get(&org_id).expect("the org was requested");
+        assert_eq!(
+            r.browser, 4_950,
+            "a just-raised limit must not be judged against a stale process-global cache",
+        );
+        assert_eq!(
+            r.protocol, 8_950,
+            "the read has no ORDER BY, so a last-row-wins limit hands the gate whichever of a \
+             pool's rows arrived last while the org API reports the larger",
+        );
+    }
+
+    /// Defect #5: the listing reports USED and LIMIT, so the grant it names must be the one the
+    /// same rows' spend was measured against — the row's own override, not a stale cache.
+    #[test]
+    fn fold_synthetics_quota_reports_each_pools_spend_against_its_own_grant() {
+        let org_id = steps_org("quota-pools", 4_000);
+        set_cached_limit(&org_id, TrialQuotaPool::SyntheticsProtocolSteps, 1_000);
+        // The pool's two rows carry different grants, so first-, last- and min-wins each differ.
+        let mut pre_split = db_row(&org_id, "synthetics_steps", 300);
+        pre_split.usage_limit = Some(5_000);
+        let mut protocol = db_row(&org_id, "synthetics_protocol_steps", 200);
+        protocol.usage_limit = Some(9_000);
+        let rows = vec![
+            db_row(&org_id, "synthetics_browser_steps", 900),
+            pre_split,
+            protocol,
+        ];
+
+        let quota = fold_synthetics_quota(std::slice::from_ref(&org_id), &rows);
+        let q = quota.get(&org_id).expect("the org was requested");
+        assert_eq!(
+            (q.browser_used, q.browser_limit),
+            (900, 4_000),
+            "a pool's spend is its own rows against its own grant; the two must come from the \
+             same pool",
+        );
+        assert_eq!(
+            (q.protocol_used, q.protocol_limit),
+            (500, 9_000),
+            "both protocol feature keys draw down one grant, and an admin's row-level raise is \
+             the grant they were spent against — the cache still says 1,000; the read has no \
+             ORDER BY, so anything but the largest of a pool's rows reports a grant the gate is \
+             not enforcing",
+        );
+    }
+
+    /// E14's force-deduct lets `usage_count` pass `usage_limit`, and the admin sizing the next
+    /// grant needs the org's real spend, not the grant it already spent past.
+    #[test]
+    fn fold_synthetics_quota_reports_the_spend_past_an_exhausted_grant() {
+        let org_id = steps_org("quota-saturate", 10);
+        set_cached_limit(&org_id, TrialQuotaPool::SyntheticsProtocolSteps, 10);
+        let rows = vec![
+            db_row(&org_id, "synthetics_browser_steps", 4_000),
+            db_row(&org_id, "synthetics_protocol_steps", 11),
+        ];
+
+        let quota = fold_synthetics_quota(std::slice::from_ref(&org_id), &rows);
+        let q = quota.get(&org_id).expect("the org was requested");
+        assert_eq!(
+            (q.browser_used, q.browser_limit),
+            (4_000, 10),
+            "`used` written as `limit - remaining` saturates to the limit here, so the listing \
+             reports a spend of 10 for an org that spent 4,000",
+        );
+        assert_eq!((q.protocol_used, q.protocol_limit), (11, 10));
+    }
+
+    /// An org with no rows has not used the feature; a listing that leaves it out shows a blank
+    /// where the grant is.
+    #[test]
+    fn fold_synthetics_quota_gives_every_requested_org_an_entry() {
+        let org_id = steps_org("quota-empty", 700);
+        set_cached_limit(&org_id, TrialQuotaPool::SyntheticsProtocolSteps, 900);
+        let other = steps_org("quota-other", 5);
+
+        let quota = fold_synthetics_quota(
+            std::slice::from_ref(&org_id),
+            &[db_row(&other, "synthetics_browser_steps", 4)],
+        );
+
+        assert_eq!(
+            quota.len(),
+            1,
+            "the fold answers about the orgs it was handed; an extra entry is a row for an org \
+             this page never asked about",
+        );
+        let q = quota
+            .get(&org_id)
+            .expect("an org with no rows has not used the feature — it is not absent");
+        assert_eq!((q.browser_used, q.browser_limit), (0, 700));
+        assert_eq!((q.protocol_used, q.protocol_limit), (0, 900));
+    }
+
+    /// Defect #5: the listing's numbers are the table's, and the node's own counter cannot move
+    /// them.
+    #[test]
+    fn the_quota_a_listing_reports_follows_the_row_not_the_node() {
+        let org_id = steps_org("quota-follows-db", 4_000);
+        set_cached_limit(&org_id, TrialQuotaPool::SyntheticsProtocolSteps, 1_000);
+        apply_to_pool_counter(&org_id, TrialQuotaPool::SyntheticsBrowserSteps, 7);
+        let mut browser = db_row(&org_id, "synthetics_browser_steps", 900);
+        browser.usage_limit = Some(6_000);
+        // The larger of the pool's two grants comes FIRST here and last in the fold's own test.
+        let mut protocol = db_row(&org_id, "synthetics_protocol_steps", 200);
+        protocol.usage_limit = Some(9_000);
+        let mut pre_split = db_row(&org_id, "synthetics_steps", 300);
+        pre_split.usage_limit = Some(5_000);
+        let rows = vec![browser, protocol, pre_split];
+
+        let quota = fold_synthetics_quota(std::slice::from_ref(&org_id), &rows);
+        let q = quota.get(&org_id).expect("the org was requested");
+        assert_eq!(
+            q.browser_used, 900,
+            "this node's counter says 7 and the next node's says 0; the row is the only number \
+             they agree on",
+        );
+
+        let remaining = fold_synthetics_remaining(std::slice::from_ref(&org_id), &rows);
+        let r = remaining.get(&org_id).expect("the org was requested");
+        // Every pool here is under its grant, so the two halves must add back up to it.
+        assert_eq!(
+            (q.browser_used + r.browser, q.browser_limit),
+            (6_000, 6_000),
+            "an org under its grant spends the row's own override, not the 4,000 the cache \
+             still holds; a pair that does not add up means the two folds resolved different \
+             limits from one row",
+        );
+        assert_eq!(
+            (q.protocol_used + r.protocol, q.protocol_limit),
+            (9_000, 9_000),
+            "the raise is recorded on one of the pool's two rows, and the gate and the listing \
+             must find the same one",
+        );
+    }
+
+    /// **A5.** A dropped flush record is counted under its own pool's label.
+    /// Reached through a function pointer so the call does not count towards
+    /// `every_dropped_pool_record_is_counted` below.
+    #[test]
+    fn a_dropped_pool_record_is_counted_against_its_own_pool() {
+        let record: fn(&str, TrialQuotaFeature, i64, &dyn std::fmt::Display) = record_flush_drop;
+        let dropped = |feature: TrialQuotaFeature| {
+            config::metrics::TRIAL_QUOTA_FLUSH_DROPS_TOTAL
+                .with_label_values(&[feature.feature_key()])
+                .get()
+        };
+
+        let before = (
+            dropped(TrialQuotaFeature::SyntheticsBrowserSteps),
+            dropped(TrialQuotaFeature::AiChat),
+        );
+        record(
+            "acme",
+            TrialQuotaFeature::SyntheticsBrowserSteps,
+            14,
+            &"channel full",
+        );
+
+        assert_eq!(
+            dropped(TrialQuotaFeature::SyntheticsBrowserSteps) - before.0,
+            1,
+            "A5's counter did not move for the pool that lost the record",
+        );
+        assert_eq!(
+            dropped(TrialQuotaFeature::AiChat) - before.1,
+            0,
+            "the drop was attributed to the wrong pool — a synthetics step lost under a \
+             ONE-TIME grant is permanent, an AI credit is not",
+        );
+    }
+
+    /// Every caller resets ONE pool; an argument that spans them all is the org-wide wipe again,
+    /// wearing a feature filter.
+    #[test]
+    fn no_call_site_resets_a_checkpoint_across_pools() {
+        // Assembled at runtime so this test's own source is not itself a call site.
+        let needle = ["reset", "_checkpoint("].concat();
+        let cross_pool = ["all_synthetics_features", "ALL_POOLS", "flat_map", "&[]"];
+        let sites = workspace_call_sites(std::slice::from_ref(&needle));
+        for (path, args) in &sites {
+            let features = without_whitespace(args.split_once(',').map_or("", |(_, rest)| rest));
+            assert!(
+                !features.is_empty() && !cross_pool.iter().any(|shape| features.contains(shape)),
+                "{path}: `{args}` clears the watermark of every pool the org has, not the one \
+                 whose limit moved",
+            );
+        }
+        assert!(
+            !sites.is_empty(),
+            "the scan inspected no call site at all, so the ban above cannot fail",
+        );
+    }
 
     // --- pending_checkpoint_from ---
     // QUOTA_CHECKPOINTS = [80, 90, 95, 100]

@@ -312,3 +312,11 @@ strings in `navGroups.ts` (flyout children may also use feature namespaces like
 - [ ] Reachable from exactly **one** nav surface.
 - [ ] Gate expressed identically across route + nav entry (+ SectionRail
       `visible` / flyout `gate`).
+- [ ] <a id="icon-parity"></a>**Icon parity** — the `icon` on the page's
+      `OPageLayout`/`OPageHeader` is the SAME `IconName` string as the nav
+      entry's (`navGroups.ts`, `linksList`, `settingsItems`, or the section
+      rail). The rail is how a user learns what the module's mark means; a
+      different glyph in the header reads as a different place. SLOs drifted
+      this way — `navGroups.ts` said `target` while every SLO view said
+      `track-changes`. Grep the nav entry for the route `name` and copy its
+      `icon` verbatim; if a page needs a different mark, change BOTH.

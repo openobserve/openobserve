@@ -5,6 +5,7 @@ import i18n from "@/locales";
 import { createRouter, createWebHistory } from "vue-router";
 import { nextTick } from "vue";
 import AppSessions from "./AppSessions.vue";
+import ShareButton from "@/components/common/ShareButton.vue";
 import searchService from "@/services/search";
 
 // Mock the composables
@@ -535,6 +536,16 @@ describe("AppSessions.vue", () => {
       expect(routerPushSpy).toHaveBeenCalled();
 
       routerPushSpy.mockRestore();
+    });
+
+    it("shares the live URL, so the link carries whatever filters the page pushed", async () => {
+      await router.push({ path: "/", query: { period: "15m", health: "errors" } });
+      await flushPromises();
+
+      const shareButton = wrapper.findComponent(ShareButton);
+
+      expect(shareButton.exists()).toBe(true);
+      expect(shareButton.props("url")).toBe(`${window.location.origin}/?period=15m&health=errors`);
     });
   });
 

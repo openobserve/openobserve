@@ -25,7 +25,7 @@ use sea_orm::{
     Set,
 };
 
-use super::{entity::slo_backfill_jobs, get_lock};
+use super::entity::slo_backfill_jobs;
 use crate::errors::Error;
 
 pub const STATE_QUEUED: i32 = 1;
@@ -60,9 +60,6 @@ pub async fn queue(
         return Ok(());
     }
 
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
     slo_backfill_jobs::ActiveModel {
         slo_id: Set(slo_id.to_string()),
         definition_generation: Set(generation),
@@ -91,9 +88,6 @@ pub async fn record_progress(
     let Some(model) = get(db, slo_id, generation).await? else {
         return Ok(());
     };
-
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
 
     let previous = model.rows_written;
     let mut active = model.into_active_model();
@@ -136,9 +130,6 @@ async fn set_state(
         return Ok(());
     };
 
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
     let mut active = model.into_active_model();
     active.state = Set(state);
     if let Some(e) = error {
@@ -150,9 +141,6 @@ async fn set_state(
 
 /// Drop every job for an SLO — used when the SLO itself is deleted.
 pub async fn delete_all(db: &DatabaseConnection, slo_id: &str) -> Result<(), Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
     slo_backfill_jobs::Entity::delete_many()
         .filter(slo_backfill_jobs::Column::SloId.eq(slo_id))
         .exec(db)
@@ -170,9 +158,6 @@ pub async fn delete_by_org(db: &DatabaseConnection, org: &str) -> Result<(), Err
     if slo_ids.is_empty() {
         return Ok(());
     }
-
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
 
     slo_backfill_jobs::Entity::delete_many()
         .filter(slo_backfill_jobs::Column::SloId.is_in(slo_ids))

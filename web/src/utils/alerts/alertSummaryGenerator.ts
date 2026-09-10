@@ -197,6 +197,21 @@ export function generateAlertSummary(
     );
   }
 
+  // Pending period (only if configured and not real-time — the form field is
+  // unreachable/forced to 0 on realtime, same rule the backend enforces).
+  // Always shown once a value exists, same as cooldown: 0 is a valid,
+  // meaningful "fires immediately" state, not "unconfigured".
+  if (
+    !isRealTime &&
+    formData.pending_period_sec !== undefined &&
+    formData.pending_period_sec >= 0
+  ) {
+    const timeText = getPendingPeriodText(formData.pending_period_sec, translate);
+    parts.push(
+      `✓ ${translate("alerts.summary.pendingPeriod")}: ${clickable(timeText, "pending_period")}`,
+    );
+  }
+
   // Build the final summary with plain English first, then bullet points
   const bulletPoints = parts.join("\n");
 
@@ -317,6 +332,23 @@ function getSilenceText(silence: number, t: SummaryTranslate): string {
 }
 
 /**
+ * Get pending period text (e.g., "10 minutes before firing", "2 hours before
+ * firing"). Unlike cooldown's "No cooldown", the zero-value phrase reads as
+ * the actual behavior ("fires immediately") rather than "not configured" —
+ * pending period defaults to 0 and that is a deliberate, meaningful setting.
+ */
+function getPendingPeriodText(pendingPeriod: number, t: SummaryTranslate): string {
+  if (pendingPeriod === 0) return t("alerts.summary.firesImmediately");
+  if (pendingPeriod < 60)
+    return t("alerts.summary.beforeFiring", { duration: minutesText(pendingPeriod, t) });
+
+  const hours = Math.floor(pendingPeriod / 60);
+  const remainingMinutes = pendingPeriod % 60;
+  const duration = remainingMinutes === 0 ? hoursText(hours, t) : `${hours}h ${remainingMinutes}m`;
+  return t("alerts.summary.beforeFiring", { duration });
+}
+
+/**
  * "1 minute" / "30 minutes", as a plural MESSAGE.
  *
  * `t(key, named, choice)` rather than `n === 1 ? singular : plural`: how many
@@ -391,6 +423,19 @@ function generatePlainEnglishSummary(
           },
         ),
       );
+
+      // Add pending period phrase if configured (0 = fires immediately, the
+      // implicit default the sentence above already describes — no extra
+      // clause needed). Placed BEFORE cooldown: this gates the first fire,
+      // cooldown suppresses repeats after that.
+      const pendingPeriod = formData.pending_period_sec;
+      if (pendingPeriod && pendingPeriod > 0) {
+        const duration =
+          pendingPeriod < 60
+            ? minutesText(pendingPeriod, t)
+            : hoursText(Math.floor(pendingPeriod / 60), t);
+        parts.push(t("alerts.summary.plainEnglish.pendingPeriodClause", { duration }));
+      }
 
       // Add cooldown phrase if configured
       const silence = formData.trigger_condition?.silence;

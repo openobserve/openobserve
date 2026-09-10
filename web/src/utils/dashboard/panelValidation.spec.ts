@@ -158,6 +158,19 @@ describe("panelValidation", () => {
       expect(errors).toEqual([]);
     });
 
+    it("accepts a numeric layout.i of 0", () => {
+      const tabs = [
+        {
+          ...validDashboard.tabs[0],
+          panels: [
+            { ...validDashboard.tabs[0].panels[0], layout: { i: 0, x: 0, y: 0, w: 12, h: 6 } },
+          ],
+        },
+      ];
+      const errors = validateDashboardJson(gt, { ...validDashboard, tabs });
+      expect(errors).toEqual([]);
+    });
+
     it("returns error for null dashboard", () => {
       const errors = validateDashboardJson(gt, null);
       expect(errors).toContain("Dashboard JSON is empty or invalid");

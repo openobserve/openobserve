@@ -69,6 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :show-global-filter="false"
           :default-columns="false"
           :loading="loadingState"
+          :forbidden="forbidden"
           :enable-column-resize="true"
           :persist-columns="true"
           table-id="streams-log-stream-list"
@@ -210,7 +211,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <template v-if="!filterQuery" #extra>
                   <div class="flex flex-wrap items-center justify-center gap-2">
-                    <span class="text-text-secondary mr-1 text-sm font-semibold">
+                    <span class="text-text-secondary me-1 text-sm font-semibold">
                       {{ t("logStream.emptyOr") }}
                     </span>
                     <EmptyStateIngestionChip
@@ -291,7 +292,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   icon-left="delete"
                   variant="outline-destructive"
                   size="sm-action"
-                  class="ml-4"
+                  class="ms-4"
                   :disabled="isDeleting"
                   @click="confirmBatchDeleteAction"
                 >
@@ -450,6 +451,7 @@ export default defineComponent({
     const duplicateStreamList: Ref<any[]> = ref([]);
     const selectedStreamType = ref("logs");
     const loadingState = ref(true);
+    const forbidden = ref(false);
     const searchKeyword = ref("");
     const deleteAssociatedAlertsPipelines = ref(true);
     const streamActiveTab = ref("logs");
@@ -650,6 +652,7 @@ export default defineComponent({
     const getLogStream = (_refresh?: boolean) => {
       if (store.state.selectedOrganization != null) {
         loadingState.value = true;
+        forbidden.value = false;
         previousOrgIdentifier.value = store.state.selectedOrganization.identifier;
         const dismiss = toast({
           variant: "loading",
@@ -718,7 +721,8 @@ export default defineComponent({
             dismiss();
           })
           .catch((err) => {
-            if (err.response?.status != 403) {
+            forbidden.value = err?.response?.status === 403;
+            if (!forbidden.value) {
               toast({
                 variant: "error",
                 message: err.response?.data?.message || t("logStream.errorWhileFetchingStreams"),
@@ -1265,6 +1269,7 @@ export default defineComponent({
       streamsEmptyActions,
       onStreamsEmptyStateAction,
       loadingState,
+      forbidden,
       isDeleting,
       searchKeyword,
       deleteAssociatedAlertsPipelines,

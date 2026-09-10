@@ -67,7 +67,7 @@ use config::utils::schema::format_stream_name;
 use crate::{
     alerts::alert::AlertExt,
     common::meta::{
-        http::{ERROR_HEADER, HttpResponse as MetaHttpResponse},
+        http::{ERROR_HEADER, HttpResponse as MetaHttpResponse, error_header_value},
         stream::SchemaRecords,
         traces::{Event, Span, SpanLink, SpanLinkContext, SpanRefType},
     },
@@ -351,6 +351,11 @@ fn resource_attribute_key(raw_key: String) -> String {
     } else {
         service_key
     }
+}
+
+// Clock skew can deliver end < start; saturate instead of wrapping to ~585M years.
+fn span_duration_micros(start_time_nanos: u64, end_time_nanos: u64) -> u64 {
+    end_time_nanos.saturating_sub(start_time_nanos) / 1000
 }
 
 pub async fn otlp_proto(
@@ -757,7 +762,7 @@ pub async fn handle_otlp_request(
                     operation_name: span.name.clone(),
                     start_time,
                     end_time,
-                    duration: (end_time - start_time) / 1000, // microseconds
+                    duration: span_duration_micros(start_time, end_time),
                     reference: span_ref.clone(),
                     service_name: service_name.clone(),
                     attributes: span_att_map.clone(),
@@ -798,9 +803,9 @@ pub async fn handle_otlp_request(
                         http::StatusCode::INTERNAL_SERVER_ERROR,
                         [(
                             ERROR_HEADER,
-                            format!(
+                            error_header_value(&format!(
                                 "[trace_id: {trace_id}] stream did not receive a valid json object"
-                            ),
+                            )),
                         )],
                         Json(MetaHttpResponse::error(
                             http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -873,18 +878,10 @@ pub async fn handle_otlp_request(
                                     log::error!(
                                         "[TRACES:OTLP] stream did not receive a valid json object"
                                     );
-                                    return Ok((
+                                    return Ok(MetaHttpResponse::error_with_header(
                                         http::StatusCode::INTERNAL_SERVER_ERROR,
-                                        [(
-                                            ERROR_HEADER,
-                                            "stream did not receive a valid json object",
-                                        )],
-                                        Json(MetaHttpResponse::error(
-                                            http::StatusCode::INTERNAL_SERVER_ERROR,
-                                            "stream did not receive a valid json object",
-                                        )),
-                                    )
-                                        .into_response());
+                                        "stream did not receive a valid json object",
+                                    ));
                                 }
                             };
                             normalize_llm_field_types(&mut record_val);
@@ -1036,15 +1033,10 @@ pub async fn handle_otlp_request(
         } else {
             http::StatusCode::INTERNAL_SERVER_ERROR
         };
-        return Ok((
+        return Ok(MetaHttpResponse::error_with_header(
             status_code,
-            [(ERROR_HEADER, format!("error while writing trace data: {e}"))],
-            Json(MetaHttpResponse::error(
-                status_code,
-                format!("error while writing trace data: {e}"),
-            )),
-        )
-            .into_response());
+            format!("error while writing trace data: {e}"),
+        ));
     }
 
     #[cfg(feature = "enterprise")]
@@ -1253,9 +1245,9 @@ pub async fn ingest_json(
                     http::StatusCode::INTERNAL_SERVER_ERROR,
                     [(
                         ERROR_HEADER,
-                        format!(
+                        error_header_value(&format!(
                             "[trace_id: {trace_id}] stream did not receive a valid json object"
-                        ),
+                        )),
                     )],
                     Json(MetaHttpResponse::error(
                         http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -1401,15 +1393,10 @@ pub async fn ingest_json(
         } else {
             http::StatusCode::INTERNAL_SERVER_ERROR
         };
-        return Ok((
+        return Ok(MetaHttpResponse::error_with_header(
             status_code,
-            [(ERROR_HEADER, format!("error while writing trace data: {e}"))],
-            Json(MetaHttpResponse::error(
-                status_code,
-                format!("error while writing trace data: {e}"),
-            )),
-        )
-            .into_response());
+            format!("error while writing trace data: {e}"),
+        ));
     }
 
     #[cfg(feature = "enterprise")]
@@ -1741,6 +1728,7 @@ mod tests {
     use config::utils::json::json;
     use opentelemetry_proto::tonic::trace::v1::{Status, status::StatusCode};
 
+    use super::span_duration_micros;
     use crate::ingestion::grpc::get_val_for_attr;
 
     #[test]
@@ -2155,8 +2143,7 @@ mod tests {
     fn test_duration_calculation() {
         let start_time = 1_640_995_200_000_000_000u64;
         let end_time = 1_640_995_201_500_000_000u64; // 1.5 seconds later
-        let duration_micros = (end_time - start_time) / 1000;
-        assert_eq!(duration_micros, 1_500_000); // 1.5 seconds in microseconds
+        assert_eq!(span_duration_micros(start_time, end_time), 1_500_000);
     }
 
     // Test attribute key transformation for blocked fields
@@ -2798,21 +2785,17 @@ mod tests {
 
     #[test]
     fn test_span_duration_edge_cases() {
-        // Test same start and end time (zero duration)
         let start_time = 1_640_995_200_000_000_000u64;
-        let end_time = start_time;
-        let duration = (end_time - start_time) / 1000;
-        assert_eq!(duration, 0);
+        assert_eq!(span_duration_micros(start_time, start_time), 0);
+        assert_eq!(span_duration_micros(start_time, start_time + 1), 0);
+        assert_eq!(span_duration_micros(start_time, start_time + 1000), 1);
+    }
 
-        // Test very small duration (1 nanosecond)
-        let end_time_small = start_time + 1;
-        let duration_small = (end_time_small - start_time) / 1000;
-        assert_eq!(duration_small, 0); // Less than 1 microsecond rounds to 0
-
-        // Test 1 microsecond duration
-        let end_time_micro = start_time + 1000;
-        let duration_micro = (end_time_micro - start_time) / 1000;
-        assert_eq!(duration_micro, 1);
+    #[test]
+    fn test_span_duration_end_before_start_saturates_to_zero() {
+        let start_time = 1_640_995_200_000_000_000u64;
+        assert_eq!(span_duration_micros(start_time, start_time - 50_000_000), 0);
+        assert_eq!(span_duration_micros(start_time, 0), 0);
     }
 
     // Test span status extraction with attributes

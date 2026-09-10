@@ -134,6 +134,44 @@ describe("TraceServiceCell", () => {
       );
     });
 
+    it("should prefer inferred service system when available", () => {
+      wrapper = mount(TraceServiceCell, {
+        props: {
+          item: makeItem({
+            service_name: "sso",
+            infer_service_system: "mysql",
+            infer_service_type: "database",
+          }),
+        },
+        global: { plugins: [store] },
+      });
+
+      expect(vi.mocked(getServiceIconDataUrl)).toHaveBeenCalledWith(
+        "mysql",
+        expect.any(Boolean),
+        "#9e9e9e",
+      );
+    });
+
+    it("should use inferred service type when system is unavailable", () => {
+      wrapper = mount(TraceServiceCell, {
+        props: {
+          item: makeItem({
+            service_name: "sso",
+            infer_service_type: "database",
+          }),
+        },
+        global: { plugins: [store] },
+      });
+
+      expect(vi.mocked(getServiceIconDataUrl)).toHaveBeenCalledWith(
+        "sso",
+        expect.any(Boolean),
+        "#9e9e9e",
+        "database",
+      );
+    });
+
     it("should use fallback color #9e9e9e for unknown service", () => {
       wrapper = mount(TraceServiceCell, {
         props: { item: makeItem({ service_name: "unknown-svc" }) },

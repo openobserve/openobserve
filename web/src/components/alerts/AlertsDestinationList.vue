@@ -22,37 +22,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('alerts.header')"
       title-data-test="alert-destinations-list-title"
       icon="shield-alert-outline"
+      :subtitle="t('alerts.subtitle')"
+      tabs-below
     >
-      <!-- Section-level title, identical on all four alerting pages, so the
-           peer tabs anchor at the same x — see AlertList.vue for the rationale.
-           Subtitle-free for the same reason. -->
       <template #header-tabs>
         <AlertSectionTabs />
       </template>
 
       <template #actions>
-        <OToggleGroup
-          :model-value="activeTab"
-          @update:model-value="
-            (v) => {
-              activeTab = v as 'all' | 'prebuilt' | 'custom';
-            }
-          "
-          data-test="destination-list-tabs"
-        >
-          <OToggleGroupItem value="all" size="sm" data-test="destination-tab-all">
-            <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
-            {{ t("alert_destinations.filterAll") }}
-          </OToggleGroupItem>
-          <OToggleGroupItem value="prebuilt" size="sm" data-test="destination-tab-prebuilt">
-            <template #icon-left><OIcon name="auto-awesome" size="sm" /></template>
-            {{ t("alert_destinations.filterPrebuilt") }}
-          </OToggleGroupItem>
-          <OToggleGroupItem value="custom" size="sm" data-test="destination-tab-custom">
-            <template #icon-left><OIcon name="settings" size="sm" /></template>
-            {{ t("alert_destinations.filterCustom") }}
-          </OToggleGroupItem>
-        </OToggleGroup>
         <OButton
           variant="outline"
           size="sm"
@@ -71,16 +48,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <div class="bg-card-glass-bg min-h-0 flex-1">
         <OTable
+          ref="oTableRef"
           data-test="alert-destinations-list-table"
           :data="visibleRows"
           :columns="columns"
           row-key="name"
           :loading="loading"
+          :forbidden="forbidden"
           :selected-ids="selectedDestinationIds"
           selection="multiple"
           pagination="client"
           :page-size="20"
           :page-size-options="[5, 10, 20, 50, 100]"
+          :current-page="currentPage"
           :footer-title="t('alert_destinations.header')"
           sorting="client"
           :default-columns="false"
@@ -90,14 +70,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           show-index
           :show-global-filter="false"
           @update:selected-ids="handleSelectedIdsUpdate"
+          @update:current-page="onPageChange"
         >
           <template #toolbar>
-            <OSearchInput
-              v-model="filterQuery"
-              data-test="destination-list-search-input"
-              class="flex-1"
-              :placeholder="t('alert_destinations.search')"
-            />
+            <div class="flex w-full items-center gap-2">
+              <OToggleGroup
+                :model-value="activeTab"
+                @update:model-value="
+                  (v) => {
+                    activeTab = v as 'all' | 'prebuilt' | 'custom';
+                  }
+                "
+                data-test="destination-list-tabs"
+              >
+                <OToggleGroupItem value="all" size="sm" data-test="destination-tab-all">
+                  <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
+                  {{ t("alert_destinations.filterAll") }}
+                </OToggleGroupItem>
+                <OToggleGroupItem value="prebuilt" size="sm" data-test="destination-tab-prebuilt">
+                  <template #icon-left><OIcon name="auto-awesome" size="sm" /></template>
+                  {{ t("alert_destinations.filterPrebuilt") }}
+                </OToggleGroupItem>
+                <OToggleGroupItem value="custom" size="sm" data-test="destination-tab-custom">
+                  <template #icon-left><OIcon name="settings" size="sm" /></template>
+                  {{ t("alert_destinations.filterCustom") }}
+                </OToggleGroupItem>
+              </OToggleGroup>
+              <OSearchInput
+                v-model="filterQuery"
+                data-test="destination-list-search-input"
+                class="flex-1"
+                :placeholder="t('alert_destinations.search')"
+              />
+            </div>
           </template>
           <template #toolbar-trailing>
             <OButton
@@ -301,7 +306,7 @@ import destinationService from "@/services/alert_destination";
 import templateService from "@/services/alert_templates";
 import { useStore } from "vuex";
 import ConfirmDialog from "../ConfirmDialog.vue";
-import { useRouter } from "vue-router";
+import { useRouter, useRoute } from "vue-router";
 import type { DestinationPayload } from "@/ts/interfaces";
 import { usePrebuiltDestinations } from "@/composables/usePrebuiltDestinations";
 import type { Template } from "@/ts/interfaces/index";
@@ -314,7 +319,6 @@ import useDependencyGraph, {
   depNodeId,
 } from "@/composables/alerts/useDependencyGraph";
 import type { DepNodeKind } from "@/composables/alerts/useDependencyGraph";
-import useActions from "@/composables/useActions";
 import { useReo } from "@/services/reodotdev_analytics";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -360,10 +364,15 @@ export default defineComponent({
     const editingDestination: Ref<DestinationPayload | null> = ref(null);
     const { t } = useI18nTyped();
     const { graph: depGraph, loadGraph: loadDepGraph } = useDependencyGraph();
-    const { getAllActions } = useActions();
     const { track } = useReo();
 
     const { detectPrebuiltType, availableTypes } = usePrebuiltDestinations();
+
+    // Email destinations store recipients in emails[], not url. Method is HTTP-only.
+    const destinationUrl = (row: DestinationPayload): string =>
+      row.type === "email" ? (row.emails ?? []).join(", ") : (row.url ?? "");
+    const destinationMethod = (row: DestinationPayload): string =>
+      row.type === "email" ? "" : (row.method ?? "");
 
     const columns: OTableColumnDef[] = [
       {
@@ -389,8 +398,8 @@ export default defineComponent({
       },
       {
         id: "url",
-        header: t("alert_destinations.url"),
-        accessorKey: "url",
+        header: t("alert_destinations.urlOrRecipients"),
+        accessorFn: destinationUrl,
         resizable: true,
         hideable: true,
         size: COL.url,
@@ -409,7 +418,7 @@ export default defineComponent({
       {
         id: "method",
         header: t("alert_destinations.method"),
-        accessorKey: "method",
+        accessorFn: destinationMethod,
         sortable: true,
         resizable: true,
         hideable: true,
@@ -447,9 +456,19 @@ export default defineComponent({
     const showDestinationEditor = ref(false);
     const showImportDestination = ref(false);
     const router = useRouter();
+    const route = useRoute();
     const filterQuery = ref("");
     const resultTotal = ref(0);
     const deletingDestinations = ref(new Set<string>());
+    const oTableRef: any = ref(null);
+
+    // URL-synced so returning from add/edit/import (Back/Update/Cancel) lands on the same page instead of resetting to page 1.
+    const currentPage = ref(Number(route.query.page) || 1);
+    const onPageChange = (page: number) => {
+      currentPage.value = page;
+      if (String(route.query.page ?? "1") === String(page)) return;
+      router.replace({ query: { ...route.query, page: String(page) } });
+    };
 
     const selectedDestinationIds = computed(() =>
       selectedDestinations.value.map((d: any) => d.name),
@@ -467,7 +486,6 @@ export default defineComponent({
     onBeforeMount(() => {
       getDestinations();
       getTemplates();
-      getActions();
     });
 
     watch(
@@ -483,24 +501,6 @@ export default defineComponent({
     onMounted(() => {
       updateRoute();
     });
-
-    const getActions = async () => {
-      const dismiss = toast({
-        variant: "loading",
-        message: t("toastMessages.alerts.pleaseWaitWhileLoadingAlertDestination"),
-        timeout: 0,
-      });
-      if (store.state.organizationData.actions.length == 0) {
-        await getAllActions()
-          .catch(() => {
-            toast({
-              variant: "error",
-              message: t("toastMessages.alerts.errorWhileLoadingActions"),
-            });
-          })
-          .finally(() => dismiss());
-      }
-    };
 
     // A delete is one row leaving a list the server has already confirmed. Splice
     // it out and prune the shared dependency graph rather than refetching: a
@@ -530,6 +530,18 @@ export default defineComponent({
     };
 
     const loading = ref(false);
+    const forbidden = ref(false);
+    // The first real load lands after mount and races TanStack's own auto-reset-on-data-change, which resolves through its own deferred microtask queue — setTimeout(0) runs strictly after that queue drains, so the restored page reliably wins.
+    watch(
+      loading,
+      (isLoading) => {
+        if (isLoading) return;
+        setTimeout(() => {
+          oTableRef.value?.table?.setPageIndex(currentPage.value - 1);
+        }, 0);
+      },
+      { once: true },
+    );
     const getDestinations = () => {
       const dismiss = toast({
         variant: "loading",
@@ -537,6 +549,7 @@ export default defineComponent({
         timeout: 0,
       });
       loading.value = true;
+      forbidden.value = false;
       destinationService
         .list({
           page_num: 1,
@@ -548,10 +561,7 @@ export default defineComponent({
         })
         .then((res) => {
           res.data = res.data.filter(
-            (destination: any) =>
-              destination.type == "http" ||
-              destination.type == "email" ||
-              destination.type === "action",
+            (destination: any) => destination.type == "http" || destination.type == "email",
           );
           resultTotal.value = res.data.length;
           destinations.value = res.data;
@@ -563,7 +573,8 @@ export default defineComponent({
           updateRoute();
         })
         .catch((err) => {
-          if (err.response.status != 403) {
+          forbidden.value = err?.response?.status === 403;
+          if (!forbidden.value) {
             toast({
               variant: "error",
               message: t("toastMessages.alerts.errorWhilePullingDestinations"),
@@ -602,9 +613,11 @@ export default defineComponent({
       toggleDestinationEditor();
       resetEditingDestination();
       if (!destination) {
+        const { name: _name, ...restQuery } = router.currentRoute.value.query;
         router.push({
           name: "alertDestinations",
           query: {
+            ...restQuery,
             action: "add",
             org_identifier: store.state.selectedOrganization.identifier,
           },
@@ -614,6 +627,7 @@ export default defineComponent({
         router.push({
           name: "alertDestinations",
           query: {
+            ...router.currentRoute.value.query,
             action: "update",
             name: destination.name,
             org_identifier: store.state.selectedOrganization.identifier,
@@ -664,13 +678,16 @@ export default defineComponent({
     };
     const toggleDestinationEditor = () => {
       showDestinationEditor.value = !showDestinationEditor.value;
-      if (!showDestinationEditor.value)
+      if (!showDestinationEditor.value) {
+        const { action: _action, name: _name, ...restQuery } = router.currentRoute.value.query;
         router.push({
           name: "alertDestinations",
           query: {
+            ...restQuery,
             org_identifier: store.state.selectedOrganization.identifier,
           },
         });
+      }
     };
     const filterData = (rows: any, terms: any) => {
       var filtered = [];
@@ -707,9 +724,11 @@ export default defineComponent({
     };
     const importDestination = () => {
       showImportDestination.value = true;
+      const { name: _name, ...restQuery } = router.currentRoute.value.query;
       router.push({
         name: "alertDestinations",
         query: {
+          ...restQuery,
           action: "import",
           org_identifier: store.state.selectedOrganization.identifier,
         },
@@ -738,8 +757,6 @@ export default defineComponent({
         return t("alert_destinations.customWebhook");
       } else if (destination.type === "email") {
         return t("alert_destinations.customEmail");
-      } else if (destination.type === "action") {
-        return t("alert_destinations.customAction");
       }
       return t("alert_destinations.custom");
     };
@@ -748,7 +765,7 @@ export default defineComponent({
     // "prebuilt" matches any destination detectable as a prebuilt type
     // (Slack/Opsgenie/PagerDuty/ServiceNow/etc., identified via the
     // `prebuilt_type` metadata or URL/template pattern); "custom" is the
-    // negation, capturing user-defined HTTP/Email/Action destinations.
+    // negation, capturing user-defined HTTP/Email destinations.
     const activeTab = ref<"all" | "prebuilt" | "custom">("all");
 
     const visibleRows = computed(() => {
@@ -897,6 +914,7 @@ export default defineComponent({
       editDestination,
       getImageURL,
       loading,
+      forbidden,
       conformDeleteDestination,
       filterQuery,
       filterData,
@@ -915,7 +933,6 @@ export default defineComponent({
       showImportDestination,
       importDestination,
       store,
-      getActions,
       getTemplates,
       updateRoute,
       getDestinationByName,
@@ -932,6 +949,9 @@ export default defineComponent({
       getPrebuiltTypeName,
       getCustomDestinationLabel,
       isDefaultPrebuiltTemplate,
+      oTableRef,
+      currentPage,
+      onPageChange,
     };
   },
 });

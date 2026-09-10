@@ -149,6 +149,40 @@ async fn validate_source_stream(
     ensure_source_stream_exists(&job.stream, !schema.fields().is_empty())
 }
 
+fn ensure_scorer_is_online_compatible(scorer: &table::scorers::Scorer) -> Result<(), EvalJobError> {
+    use o2_enterprise::enterprise::llm_evaluations::scorers::{
+        ScorerReferenceRequirement, reference_requirement,
+    };
+
+    if reference_requirement(scorer) == ScorerReferenceRequirement::ExpectedOutput {
+        return Err(EvalJobError::InvalidJob(format!(
+            "Scorer '{}' references expected_output and cannot be attached to an Online Eval Job; use an Experiment target instead",
+            scorer.name
+        )));
+    }
+    Ok(())
+}
+
+async fn validate_online_scorers(
+    org_id: &str,
+    scorer_refs: &[config::meta::pipeline::components::ScorerRef],
+) -> Result<(), EvalJobError> {
+    for scorer_ref in scorer_refs {
+        let scorer = match scorer_ref.version {
+            Some(version) => {
+                table::scorers::get_by_entity_id_and_version(org_id, &scorer_ref.id, version)
+                    .await?
+            }
+            None => table::scorers::get_by_entity_id(org_id, &scorer_ref.id).await?,
+        }
+        .ok_or_else(|| {
+            EvalJobError::InvalidJob(format!("Scorer '{}' was not found", scorer_ref.id))
+        })?;
+        ensure_scorer_is_online_compatible(&scorer)?;
+    }
+    Ok(())
+}
+
 #[tracing::instrument(skip(job))]
 pub async fn create_job(
     org_id: &str,
@@ -169,6 +203,7 @@ pub async fn create_job(
         .map_err(|e| EvalJobError::InvalidJob(e.to_string()))?;
     job.validate()
         .map_err(|e| EvalJobError::InvalidJob(e.to_string()))?;
+    validate_online_scorers(org_id, &job.scorers).await?;
     validate_source_stream(org_id, &job).await?;
 
     let now = Utc::now().timestamp_millis();
@@ -198,6 +233,7 @@ pub async fn update_job(
         .map_err(|e| EvalJobError::InvalidJob(e.to_string()))?;
     job.validate()
         .map_err(|e| EvalJobError::InvalidJob(e.to_string()))?;
+    validate_online_scorers(org_id, &job.scorers).await?;
     validate_source_stream(org_id, &job).await?;
     if existing.status == "active" {
         job.validate_for_activation()
@@ -305,6 +341,7 @@ pub async fn transition_status(
             .validate_for_activation()
             .map_err(|e| EvalJobError::InvalidJob(e.to_string()))?;
         validate_source_stream(org_id, &target).await?;
+        validate_online_scorers(org_id, &target.scorers).await?;
     }
     let pipeline_id = reconciler::reconcile(&target)
         .await
@@ -338,6 +375,7 @@ pub async fn manual_evaluate(
     }
     job.validate()
         .map_err(|e| EvalJobError::InvalidJob(e.to_string()))?;
+    validate_online_scorers(org_id, &job.scorers).await?;
     validate_source_stream(org_id, &job).await?;
 
     let target_id = normalize_manual_target_id(&body.target_id)?;
@@ -538,6 +576,34 @@ mod tests {
                 .unwrap_err()
                 .to_string(),
             "Invalid eval job: endTime must be greater than startTime"
+        );
+    }
+
+    #[test]
+    fn reference_based_scorers_are_rejected_for_online_jobs() {
+        let scorer = table::scorers::Scorer {
+            id: "version-1".to_string(),
+            entity_id: "scorer-1".to_string(),
+            org_id: "org-1".to_string(),
+            name: "reference judge".to_string(),
+            version: 1,
+            scorer_type: table::scorers::ScorerType::LlmJudge,
+            description: None,
+            produces_score_config_id: None,
+            produces_score_config_version: None,
+            template: "Compare {{ output }} with {{ expected_output }}".to_string(),
+            output_schema: None,
+            params: serde_json::json!({}),
+            is_active: true,
+            created_at: 1,
+            updated_at: 1,
+        };
+
+        let error = ensure_scorer_is_online_compatible(&scorer).unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("use an Experiment target instead")
         );
     }
 }

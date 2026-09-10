@@ -51,11 +51,11 @@ describe("DbmMetricTiles", () => {
     expect(tiles[0].classes()).toEqual(
       expect.arrayContaining([
         "border-border-subtle",
-        "border-r",
+        "border-e",
         "border-b",
         "px-3",
         "py-2",
-        "last:border-r-0",
+        "last:border-e-0",
       ]),
     );
     expect(tiles[0].attributes("data-test")).toBe("dbm-detail-stat-p95");
@@ -99,7 +99,7 @@ describe("DbmMetricTiles", () => {
     expect(tile.text()).not.toContain("p95");
     expect(tile.text()).not.toContain("2× more");
     expect(tile.get("div").classes()).toEqual(
-      expect.arrayContaining(["text-text-label", "text-3xs", "font-semibold", "uppercase"]),
+      expect.arrayContaining(["text-text-secondary", "text-3xs", "font-semibold"]),
     );
   });
 

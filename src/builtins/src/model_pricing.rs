@@ -179,6 +179,61 @@ mod tests {
         assert!(ts >= 0);
     }
 
+    /// The built-in source (`llm_pricing.json`) lives in a separate repo, so this
+    /// pins the exact JSON shape a peak/off-peak entry uses — DeepSeek V4 here.
+    #[test]
+    fn test_parse_built_in_entry_with_utc_windows() {
+        let json = r#"[
+          {
+            "name": "DeepSeek V4 Pro",
+            "provider": "DeepSeek",
+            "description": "DeepSeek V4 Pro",
+            "match_pattern": "(?i)deepseek-v4-pro",
+            "tiers": [
+              {
+                "name": "Off-Peak",
+                "prices": { "input": 6.6e-07, "output": 1.98e-06 }
+              },
+              {
+                "name": "Peak (01:00-04:00, 06:00-10:00 UTC)",
+                "utc_windows": [
+                  { "start_minute": 60, "end_minute": 240 },
+                  { "start_minute": 360, "end_minute": 600 }
+                ],
+                "prices": { "input": 1.32e-06, "output": 3.96e-06 }
+              }
+            ]
+          }
+        ]"#;
+
+        let entries: Vec<BuiltInModelPricingEntry> = serde_json::from_str(json).unwrap();
+        assert_eq!(entries.len(), 1);
+        let tiers = &entries[0].tiers;
+        assert_eq!(tiers.len(), 2);
+
+        // The unrestricted off-peak tier is listed FIRST on purpose: a binary that
+        // predates `utc_windows` ignores the field, and its fallback lookup picks the
+        // first tier with no condition — which must be the cheaper off-peak rate.
+        assert!(tiers[0].utc_windows.is_empty());
+        assert!(tiers[0].condition.is_none());
+
+        assert_eq!(tiers[1].utc_windows.len(), 2);
+        assert_eq!(tiers[1].utc_windows[0].start_minute, 60);
+        assert_eq!(tiers[1].utc_windows[0].end_minute, 240);
+        assert_eq!(tiers[1].utc_windows[1].start_minute, 360);
+        assert_eq!(tiers[1].utc_windows[1].end_minute, 600);
+
+        // Peak is exactly double off-peak on every priced key.
+        for key in ["input", "output"] {
+            let off = tiers[0].prices[key];
+            let peak = tiers[1].prices[key];
+            assert!(
+                (peak - off * 2.0).abs() < 1e-15,
+                "{key}: {peak} != 2 * {off}"
+            );
+        }
+    }
+
     #[test]
     fn test_sync_result_fields() {
         let r = SyncResult {

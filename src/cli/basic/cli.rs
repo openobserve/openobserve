@@ -20,10 +20,7 @@ use clap::{Arg, ArgAction, Command};
 use common::{infra::config::USERS, meta};
 use config::{DEFAULT_ORG, utils::file::set_permission};
 use db;
-use infra::{
-    db::{ORM_CLIENT, connect_to_orm},
-    file_list as infra_file_list, table,
-};
+use infra::{db::get_orm_client_rw, file_list as infra_file_list, table};
 use openobserve_core::users;
 
 use crate::{
@@ -54,7 +51,7 @@ fn create_cli_app() -> Command {
                 .about("reset openobserve data")
                 .arg(arg!("component", 'c', "component", "reset data of the component: root, user, alert, dashboard, function, stream-stats, file-list-jobs, index-updated-at", true))
                 .arg(arg!("time", 't', "time", "timestamp in microseconds, used by file-list-jobs (default: 0) and index-updated-at (default: stream min data date)"))
-                .arg(arg!("stream", 's', "stream", "stream key org/stream_type/stream_name, used by file-list-jobs and index-updated-at (default: all streams)")),
+                .arg(arg!("stream", 's', "stream", "stream key org/stream_type/stream_name, used by stream-stats, file-list-jobs and index-updated-at (default: all streams)")),
             Command::new("import")
                 .about("import openobserve data").args(dataArgs()),
             Command::new("export")
@@ -277,23 +274,27 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                     table::dashboards::delete_all().await?;
                 }
                 "report" => {
-                    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+                    let conn = get_orm_client_rw().await;
                     db::dashboards::reports::reset(conn).await?;
                 }
                 "function" => {
                     db::functions::reset().await?;
                 }
                 "stream-stats" => {
-                    // reset stream stats update offset
-                    db::compact::stats::set_offset(0, None).await?;
-                    // reset stream stats table data
-                    infra_file_list::reset_stream_stats().await?;
-                    // load stream list
-                    db::schema::cache().await?;
-                    // update stats from file list
-                    compaction::stats::update_stats_from_file_list()
-                        .await
-                        .expect("file list remote calculate stats failed");
+                    if let Some(stream) = command.get_one::<String>("stream") {
+                        super::stream::reset_stream_stats(stream).await?;
+                    } else {
+                        // reset stream stats update offset
+                        db::compact::stats::set_offset(0, None).await?;
+                        // reset stream stats table data
+                        infra_file_list::reset_stream_stats().await?;
+                        // load stream list
+                        db::schema::cache().await?;
+                        // update stats from file list
+                        compaction::stats::update_stats_from_file_list()
+                            .await
+                            .expect("file list remote calculate stats failed");
+                    }
                 }
                 "file-list-jobs" => {
                     let time = command

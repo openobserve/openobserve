@@ -29,12 +29,9 @@ use sea_orm::{
     ColumnTrait, EntityTrait, QueryFilter, Set, SqlErr, TransactionTrait, sea_query::Expr,
 };
 
-use super::{
-    entity::synthetics_probe_tokens::{ActiveModel, Column, Entity, Model},
-    get_lock,
-};
+use super::entity::synthetics_probe_tokens::{ActiveModel, Column, Entity, Model};
 use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{get_orm_client_ro, get_orm_client_rw},
     errors::{self, DbError, Error},
 };
 
@@ -129,7 +126,6 @@ pub fn generate_token() -> String {
 /// Insert a new probe token row. Fails with a clear message if a token with the
 /// same `(org_id, name)` already exists (the unique constraint).
 pub async fn add(record: &SyntheticsProbeTokenRecord) -> Result<(), errors::Error> {
-    let _lock = get_lock().await;
     let model = ActiveModel {
         id: Set(record.id.clone()),
         org_id: Set(record.org_id.clone()),
@@ -146,14 +142,9 @@ pub async fn add(record: &SyntheticsProbeTokenRecord) -> Result<(), errors::Erro
         created_at: Set(record.created_at),
         updated_at: Set(record.updated_at),
     };
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     match Entity::insert(model).exec(client).await {
         Ok(_) => {
-            // Release the SQLite write mutex BEFORE emitting. On a sqlite meta_store
-            // the coordinator's put() takes the *same* CLIENT_RW lock `get_lock()`
-            // returns, so emitting while holding it deadlocks the process — and the
-            // mutex is then held forever, hanging every later synthetics query.
-            drop(_lock);
             // A new token can become the org default, so both caches are stale.
             invalidate_and_publish(&record.org_id).await;
             Ok(())
@@ -182,7 +173,7 @@ pub async fn find_global(token: &str) -> Result<Option<SyntheticsProbeTokenRecor
         return Ok(entry.0.clone());
     }
 
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let record = Entity::find()
         .filter(Column::Token.eq(token))
         .filter(Column::Enabled.eq(true))
@@ -206,7 +197,7 @@ pub async fn find_default(
         return Ok(entry.0.clone());
     }
 
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let record = Entity::find()
         .filter(Column::OrgId.eq(org_id))
         .filter(Column::IsDefault.eq(true))
@@ -224,7 +215,7 @@ pub async fn find_default(
 /// Callers mask the token value before returning it to a UI.
 pub async fn list_by_org(org_id: &str) -> Result<Vec<SyntheticsProbeTokenRecord>, errors::Error> {
     use sea_orm::{Order, QueryOrder};
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let records = Entity::find()
         .filter(Column::OrgId.eq(org_id))
         .order_by(Column::IsDefault, Order::Desc)
@@ -243,7 +234,7 @@ pub async fn get_by_name(
     org_id: &str,
     name: &str,
 ) -> Result<Option<SyntheticsProbeTokenRecord>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let record = Entity::find()
         .filter(Column::OrgId.eq(org_id))
         .filter(Column::Name.eq(name))
@@ -270,9 +261,8 @@ pub async fn get_by_name(
 /// middleware on every probe request, and an uncached validator is a cheap way
 /// to generate load from outside.
 pub async fn set_enabled(org_id: &str, name: &str, enabled: bool) -> Result<(), errors::Error> {
-    let _lock = get_lock().await;
     let now = chrono::Utc::now().timestamp_micros();
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::update_many()
         .col_expr(Column::Enabled, Expr::value(enabled))
         .col_expr(Column::UpdatedAt, Expr::value(now))
@@ -281,11 +271,6 @@ pub async fn set_enabled(org_id: &str, name: &str, enabled: bool) -> Result<(), 
         .exec(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
-    // Release the SQLite write mutex BEFORE emitting. On a sqlite meta_store
-    // the coordinator's put() takes the *same* CLIENT_RW lock `get_lock()`
-    // returns, so emitting while holding it deadlocks the process — and the
-    // mutex is then held forever, hanging every later synthetics query.
-    drop(_lock);
     invalidate_and_publish(org_id).await;
     Ok(())
 }
@@ -295,9 +280,8 @@ pub async fn set_enabled(org_id: &str, name: &str, enabled: bool) -> Result<(), 
 /// previous default stays valid during a rotation overlap window until it is
 /// explicitly disabled.
 pub async fn set_default(org_id: &str, name: &str) -> Result<(), errors::Error> {
-    let _lock = get_lock().await;
     let now = chrono::Utc::now().timestamp_micros();
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let txn = client
         .begin()
         .await
@@ -320,11 +304,6 @@ pub async fn set_default(org_id: &str, name: &str) -> Result<(), errors::Error> 
     txn.commit()
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
-    // Release the SQLite write mutex BEFORE emitting. On a sqlite meta_store
-    // the coordinator's put() takes the *same* CLIENT_RW lock `get_lock()`
-    // returns, so emitting while holding it deadlocks the process — and the
-    // mutex is then held forever, hanging every later synthetics query.
-    drop(_lock);
     invalidate_and_publish(org_id).await;
     Ok(())
 }

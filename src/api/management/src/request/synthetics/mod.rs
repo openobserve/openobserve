@@ -30,7 +30,7 @@ use crate::service::auth::UserEmail;
 // rather than relying on it — per-resource RBAC is enterprise, and an OSS build
 // must not 403 its way through a feature it ships.
 #[cfg(feature = "enterprise")]
-use crate::service::auth::check_permissions;
+use crate::service::auth::{check_folder_write_permissions, check_permissions};
 
 // ── Local query / body types ──────────────────────────────────────────────────
 
@@ -450,6 +450,7 @@ pub async fn get_synthetic(
     request_body(content = config::meta::synthetics::Synthetic, description = "Updated synthetic definition", content_type = "application/json"),
     responses(
         (status = 200, description = "Updated",   content_type = "application/json", body = config::meta::synthetics::Synthetic),
+        (status = 403, description = "Forbidden"),
         (status = 404, description = "Not found"),
         (status = 500, description = "Error",     content_type = "application/json", body = Object),
     ),
@@ -476,6 +477,29 @@ pub async fn update_synthetic(
     {
         return MetaHttpResponse::forbidden("Forbidden");
     }
+
+    // An update that changes folder_id is also a move, so the destination needs
+    // its own check — the gate above only covers `?folder=`. Compared against the
+    // stored folder because a plain edit round-trips the current one unchanged.
+    #[cfg(feature = "enterprise")]
+    if !body.folder_id.is_empty() {
+        let current = openobserve_synthetics::service::folder_of(&org_id, &id)
+            .await
+            .ok()
+            .flatten();
+        if current.as_deref() != Some(body.folder_id.as_str())
+            && !check_folder_write_permissions(
+                &org_id,
+                &user_email.user_id,
+                "synthetic_folder",
+                &body.folder_id,
+            )
+            .await
+        {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
+    }
+
     match openobserve_synthetics::service::update_synthetic(&org_id, &id, body).await {
         Ok(check) => MetaHttpResponse::json(check),
         Err(e) => {
@@ -597,6 +621,7 @@ pub async fn delete_synthetics_bulk(
     request_body(content = MoveSyntheticsRequestBody, description = "IDs and destination folder", content_type = "application/json"),
     responses(
         (status = 200, description = "Moved"),
+        (status = 403, description = "Forbidden"),
         (status = 500, description = "Error", content_type = "application/json", body = Object),
     ),
 )]
@@ -629,6 +654,19 @@ pub async fn move_synthetics(
             return MetaHttpResponse::forbidden("Forbidden");
         }
     }
+
+    #[cfg(feature = "enterprise")]
+    if !check_folder_write_permissions(
+        &org_id,
+        &user_email.user_id,
+        "synthetic_folder",
+        &body.dst_folder_id,
+    )
+    .await
+    {
+        return MetaHttpResponse::forbidden("Forbidden");
+    }
+
     match openobserve_synthetics::service::move_synthetics(
         &org_id,
         &body.synthetic_ids,
@@ -901,15 +939,22 @@ pub async fn job_ack(
             Err(e) => return MetaHttpResponse::bad_request(e.to_string()),
         };
         let mut results = Vec::with_capacity(req.acks.len());
+        // One send for the WHOLE batch: `report_usage` spawns a task per call.
+        let mut usage = Vec::new();
         for ack in req.acks {
             let job_id = ack.job_id.clone();
             match process_ack(ack, &org_id).await {
-                Ok(resp) => results.push(serde_json::json!({
-                    "job_id": job_id,
-                    "ok": true,
-                    "run_complete": resp.run_complete,
-                })),
+                Ok(mut resp) => {
+                    usage.append(&mut resp.usage_events);
+                    results.push(serde_json::json!({
+                        "job_id": job_id,
+                        "ok": true,
+                        "run_complete": resp.run_complete,
+                    }));
+                }
                 Err(e) => {
+                    // No response, so no events: `ack_complete` is what
+                    // authorises a bill (spec §4.1 step 3c).
                     tracing::error!(job_id = %job_id, "[synthetics] job_ack: {e}");
                     results.push(serde_json::json!({
                         "job_id": job_id,
@@ -919,6 +964,7 @@ pub async fn job_ack(
                 }
             }
         }
+        report_step_usage(usage);
         return MetaHttpResponse::json(serde_json::json!({ "results": results }));
     }
 
@@ -929,7 +975,10 @@ pub async fn job_ack(
         }
     };
     match process_ack(req, &org_id).await {
-        Ok(resp) => MetaHttpResponse::json(resp),
+        Ok(mut resp) => {
+            report_step_usage(std::mem::take(&mut resp.usage_events));
+            MetaHttpResponse::json(resp)
+        }
         Err(e) => {
             let msg = e.to_string();
             if msg.starts_with("forbidden") {
@@ -941,9 +990,65 @@ pub async fn job_ack(
     }
 }
 
-/// Runs one job ack through the enterprise service plus the per-ack side
-/// effects (telemetry, run-complete notification). Shared by the single and
-/// batch forms of `job_ack`.
+/// Emits the synthetics step-billing usage rows an ack produced — SPEC §4.1
+/// step 3g.
+///
+/// Deliberately NOT a `OnceCell` callback from `openobserve_synthetics::init()`:
+/// `init()` runs only under `if LOCAL_NODE.is_scheduler()` while acks are served
+/// on API nodes, so the cell would be unset and the emit silently do nothing (F6).
+///
+/// Fail-open: `report_usage` spawns and returns, and a probe that did its work
+/// is owed its 200 whether or not the usage queue accepted the row.
+///
+/// Deliberately branchless — an empty-vector early return is unreachable from a
+/// unit test, so a mutation turning it into "never send" survived once here.
+fn report_step_usage(usage: Vec<config::meta::self_reporting::usage::UsageData>) {
+    record_step_usage_metrics(&usage);
+    usage_reporting::report_usage(usage);
+}
+
+/// SPEC §9B.1 rows 1-5 — the Prometheus half of the step-billing signals.
+///
+/// A deliberate SECOND copy of four numbers the usage stream already carries
+/// (the stream stays the invoice's source of truth). `report_usage` returns
+/// `()`, so comparing this counter against the stream is the only thing that
+/// detects the fire-and-forget path losing rows; a counter at zero means nothing
+/// reached this function at all.
+///
+/// It cannot see failures AFTER the hand-off — a queue rejecting every row still
+/// advances it. Those are `zo_usage_enqueue_failures_total`, counted in
+/// `usage_reporting::publish_usage`, which does get a `Result` back.
+fn record_step_usage_metrics(usage: &[config::meta::self_reporting::usage::UsageData]) {
+    use config::meta::self_reporting::usage::UsageEvent;
+
+    for row in usage {
+        // `size` is the count itself (§4.2), `f64` on the wire against a `u64`
+        // counter. Every producer today is a widened `u32`/`u64`, so the floor
+        // guards a future negative one, not a case that fires now.
+        let size = if row.size > 0.0 { row.size as u64 } else { 0 };
+        match row.event {
+            // §4.3's executed/defined ratio is one PromQL division only if these share a counter.
+            UsageEvent::SyntheticsBrowserSteps
+            | UsageEvent::SyntheticsProtocolSteps
+            | UsageEvent::_SyntheticsStepsDefined => {
+                config::metrics::SYNTHETICS_STEPS_TOTAL
+                    .with_label_values(&[row.org_id.as_str(), row.event.to_string().as_str()])
+                    .inc_by(size);
+            }
+            // Milliseconds, so its own counter — see the metric's own note.
+            UsageEvent::_SyntheticsBrowserMs => {
+                config::metrics::SYNTHETICS_BROWSER_MS_TOTAL
+                    .with_label_values(&[row.org_id.as_str()])
+                    .inc_by(size);
+            }
+            // A NEW synthetics event is silently uncounted until it is added above.
+            _ => {}
+        }
+    }
+}
+
+/// Runs one job ack through the enterprise service plus the per-ack side effects
+/// (telemetry, run-complete notification). Shared by both forms of `job_ack`.
 async fn process_ack(
     req: openobserve_synthetics::job_api::AckRequest,
     token_org: &str,
@@ -1587,5 +1692,218 @@ pub async fn list_locations(Path(_org_id): Path<String>) -> Response {
             MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
                 .into_response()
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use config::meta::self_reporting::usage::{UsageData, UsageEvent};
+    use openobserve_synthetics::job_api::{AckResponse, AlertDecision};
+
+    fn ack_response(usage_events: Vec<UsageData>) -> AckResponse {
+        AckResponse {
+            run_complete: false,
+            run_status: None,
+            job_count: 1,
+            org_id: "acme".to_string(),
+            job_id: "job_1".to_string(),
+            run_id: "run_1".to_string(),
+            synthetics_id: "chk_1".to_string(),
+            synthetics_name: "checkout".to_string(),
+            synthetic_type: "browser".to_string(),
+            target: "https://example.com".to_string(),
+            destinations: Vec::new(),
+            location: "us-east-1".to_string(),
+            pool: "aws-browser".to_string(),
+            trigger_type: "scheduled".to_string(),
+            alert: AlertDecision::Silent,
+            status_reason: None,
+            consecutive_failures: 0,
+            failing_locations: Vec::new(),
+            passing_locations: Vec::new(),
+            usage_events,
+        }
+    }
+
+    fn steps(size: f64) -> UsageData {
+        UsageData {
+            event: UsageEvent::SyntheticsBrowserSteps,
+            size,
+            ..UsageData::init_for_reflection()
+        }
+    }
+
+    /// SPEC §4.1 step 3g. A batch is one probe's lease cycle: every ack in it
+    /// that billed must be reported, in order, in ONE send. An ack that ERRORED
+    /// contributes nothing — it produced no `AckResponse`, and `ack_complete` is
+    /// what authorises a bill (§4.1 step 3c).
+    #[test]
+    fn a_batch_reports_the_usage_of_every_ack_in_it() {
+        let batch: Vec<anyhow::Result<AckResponse>> = vec![
+            Ok(ack_response(vec![steps(14.0), steps(14.0)])),
+            Err(anyhow::anyhow!("job not found")),
+            // A private-venue or duplicate ack: succeeded, billed nothing.
+            Ok(ack_response(Vec::new())),
+            Ok(ack_response(vec![steps(28.0)])),
+        ];
+
+        let mut usage = Vec::new();
+        for mut resp in batch.into_iter().flatten() {
+            usage.append(&mut resp.usage_events);
+        }
+
+        assert_eq!(
+            usage.iter().map(|u| u.size).collect::<Vec<_>>(),
+            vec![14.0, 14.0, 28.0],
+            "every billed ack in the batch, in order, and nothing from the errored one"
+        );
+    }
+
+    // SPEC §9B.1 rows 1-5. Deterministic without a mutex: these counters are
+    // labelled per org, so each test reads back only the label values it wrote.
+
+    /// The four counts one ack can carry, read back from the labelled counters.
+    fn recorded(org: &str) -> (u64, u64, u64, u64) {
+        let steps = |event: &str| {
+            config::metrics::SYNTHETICS_STEPS_TOTAL
+                .with_label_values(&[org, event])
+                .get()
+        };
+        (
+            steps("SyntheticsBrowserSteps"),
+            steps("SyntheticsProtocolSteps"),
+            steps("_SyntheticsStepsDefined"),
+            config::metrics::SYNTHETICS_BROWSER_MS_TOTAL
+                .with_label_values(&[org])
+                .get(),
+        )
+    }
+
+    /// Reached through a function pointer so these calls do not count towards
+    /// `the_emit_hand_off_counts_what_it_sends`, which counts call sites by name.
+    fn record(usage: &[UsageData]) {
+        let record_metrics: fn(&[UsageData]) = super::record_step_usage_metrics;
+        record_metrics(usage);
+    }
+
+    fn usage_row(org: &str, event: UsageEvent, size: f64) -> UsageData {
+        UsageData {
+            org_id: org.to_string(),
+            event,
+            size,
+            ..UsageData::init_for_reflection()
+        }
+    }
+
+    /// **§9B.1 rows 1, 2, 3 and 5.** Every count lands under its own label, and
+    /// under the right one.
+    ///
+    /// The three sizes differ deliberately: §4.3's `executed / defined` recorded
+    /// upside down is what two equal numbers would hide.
+    #[test]
+    fn the_emit_counters_record_each_count_under_its_own_label() {
+        let org = "o9b1-billable";
+        let before = recorded(org);
+
+        record(&[
+            usage_row(org, UsageEvent::SyntheticsBrowserSteps, 4.0),
+            usage_row(org, UsageEvent::_SyntheticsStepsDefined, 14.0),
+            usage_row(org, UsageEvent::_SyntheticsBrowserMs, 9_100.0),
+        ]);
+
+        let after = recorded(org);
+        assert_eq!(after.0 - before.0, 4, "browser steps");
+        assert_eq!(after.1 - before.1, 0, "this ack carried no protocol steps");
+        assert_eq!(after.2 - before.2, 14, "defined steps");
+        assert_eq!(after.3 - before.3, 9_100, "browser milliseconds");
+    }
+
+    /// **§9B.1 row 4.** Browser and protocol steps meter at different rates; folding hides the mix.
+    #[test]
+    fn both_step_events_reach_the_step_counter() {
+        let org = "o9b1-both";
+        let before = recorded(org);
+
+        record(&[
+            usage_row(org, UsageEvent::SyntheticsBrowserSteps, 4.0),
+            usage_row(org, UsageEvent::SyntheticsProtocolSteps, 9.0),
+        ]);
+
+        let after = recorded(org);
+        assert_eq!(after.0 - before.0, 4, "browser steps");
+        assert_eq!(after.1 - before.1, 9, "protocol steps");
+    }
+
+    /// Milliseconds and steps are different units, so `browser_ms` must never
+    /// reach the step counter: dashboards sum a counter across its label values,
+    /// and here that would read as "this org executed nine thousand steps".
+    #[test]
+    fn browser_milliseconds_never_reach_the_step_counter() {
+        let org = "o9b1-units";
+        let before = recorded(org);
+
+        record(&[usage_row(org, UsageEvent::_SyntheticsBrowserMs, 9_100.0)]);
+
+        let after = recorded(org);
+        assert_eq!((after.0, after.1, after.2), (before.0, before.1, before.2));
+        // …nor under a `_SyntheticsBrowserMs` label value of the step counter,
+        // which `recorded` does not read but a dashboard summing the family does.
+        assert_eq!(
+            config::metrics::SYNTHETICS_STEPS_TOTAL
+                .with_label_values(&[org, "_SyntheticsBrowserMs"])
+                .get(),
+            0,
+        );
+        assert_eq!(after.3 - before.3, 9_100);
+    }
+
+    /// `report_usage` is shared with every other billed dimension, so a row that
+    /// is not one of §4.2's four must contribute nothing rather than open a label
+    /// value named after it. The foreign event's OWN label value is asserted, not
+    /// just the four: reading only the four let a mutant that dropped the `match`
+    /// pass, counting every row under its own event name.
+    #[test]
+    fn a_non_synthetics_row_is_not_counted_as_steps() {
+        let org = "o9b1-foreign";
+        let before = recorded(org);
+        let foreign = |event: UsageEvent| {
+            config::metrics::SYNTHETICS_STEPS_TOTAL
+                .with_label_values(&[org, event.to_string().as_str()])
+                .get()
+        };
+
+        record(&[
+            usage_row(org, UsageEvent::Ingestion, 1_000.0),
+            usage_row(org, UsageEvent::AiCredits, 5.0),
+        ]);
+
+        assert_eq!(
+            recorded(org),
+            before,
+            "none of the four synthetics counts moved"
+        );
+        for event in [UsageEvent::Ingestion, UsageEvent::AiCredits] {
+            assert_eq!(
+                foreign(event),
+                0,
+                "{event} opened a label value on the synthetics step counter",
+            );
+        }
+    }
+
+    /// Counting is per org — A1 asks about THIS org's drift from its own
+    /// trailing baseline, which an aggregate cannot answer.
+    #[test]
+    fn each_org_is_counted_separately() {
+        let (a, b) = ("o9b1-org-a", "o9b1-org-b");
+        let (before_a, before_b) = (recorded(a), recorded(b));
+
+        record(&[
+            usage_row(a, UsageEvent::SyntheticsBrowserSteps, 3.0),
+            usage_row(b, UsageEvent::SyntheticsBrowserSteps, 7.0),
+        ]);
+
+        assert_eq!(recorded(a).0 - before_a.0, 3);
+        assert_eq!(recorded(b).0 - before_b.0, 7);
     }
 }

@@ -42,24 +42,20 @@ test.describe("ConfigPanel — Mark Line Settings", () => {
     await expect(valueInput).toBeVisible();
     testLogger.info("Value input visible for yAxis type");
 
-    // Switch to average — value input should hide
-    await typeSelect.click();
-    await pm.dashboardPanelConfigs.getMarklineTypeOption(0, "Average").waitFor({ state: 'visible', timeout: 10000 });
-    await pm.dashboardPanelConfigs.getMarklineTypeOption(0, "Average").click();
-    // Wait for dropdown to close before checking value input visibility
-    await pm.dashboardPanelConfigs.getMarklineTypeOption(0, "Average").waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+    // Switch to average — value input should hide. selectMarklineType only returns
+    // once the trigger reports the new type, so the v-if driving the value input
+    // has definitely been re-evaluated by the time we assert on it.
+    await pm.dashboardPanelConfigs.selectMarklineType(0, "Average");
     await expect(valueInput).not.toBeVisible();
     testLogger.info("Value input hidden for Average type");
 
     // Switch back to yAxis — value input re-appears, fill it
-    await typeSelect.click();
-    await pm.dashboardPanelConfigs.getMarklineTypeOption(0, "Y-Axis").waitFor({ state: 'visible', timeout: 10000 });
-    await pm.dashboardPanelConfigs.getMarklineTypeOption(0, "Y-Axis").click();
-    // Wait for dropdown to close before interacting with value input
-    await pm.dashboardPanelConfigs.getMarklineTypeOption(0, "Y-Axis").waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+    await pm.dashboardPanelConfigs.selectMarklineType(0, "Y-Axis");
     await expect(valueInput).toBeVisible();
-    await valueInput.locator('[data-test$="-field"]').fill("100");
-    await pm.dashboardPanelConfigs.getMarklineName(0).locator('[data-test$="-field"]').fill("threshold");
+    const valueField = valueInput.locator('[data-test$="-field"]');
+    await valueField.fill("100");
+    await expect(valueField).toHaveValue("100", { timeout: 5000 });
+    await pm.dashboardPanelConfigs.setMarklineName(0, "threshold");
     testLogger.info("Mark line configured: yAxis, value=100, label=threshold");
 
     await pm.dashboardPanelActions.applyDashboardBtn();
@@ -92,31 +88,22 @@ test.describe("ConfigPanel — Mark Line Settings", () => {
     const addBtn = pm.dashboardPanelConfigs.marklineAddBtn;
     await pm.dashboardPanelConfigs.scrollSidebarToElement(addBtn);
 
-    // Add first mark line
+    // Add first mark line. selectMarklineType scrolls the row's trigger into the
+    // sidebar viewport itself, and only returns once the dropdown has closed again
+    // — so the name fill below cannot land on an open option list.
     await addBtn.click();
     const type0 = pm.dashboardPanelConfigs.getMarklineTypeSelect(0);
     await type0.waitFor({ state: 'visible', timeout: 10000 });
-    // Scroll into sidebar viewport — waitFor only checks CSS visibility, not scroll position.
-    await pm.dashboardPanelConfigs.scrollSidebarToElement(type0);
-    await type0.click();
-    await pm.dashboardPanelConfigs.getMarklineTypeOption(0, "Average").waitFor({ state: 'visible', timeout: 10000 });
-    await pm.dashboardPanelConfigs.getMarklineTypeOption(0, "Average").click();
-    // Wait for dropdown to close before filling name — avoids interaction with open dropdown
-    await pm.dashboardPanelConfigs.getMarklineTypeOption(0, "Average").waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
-    await pm.dashboardPanelConfigs.getMarklineName(0).locator('[data-test$="-field"]').fill("avg");
+    await pm.dashboardPanelConfigs.selectMarklineType(0, "Average");
+    await pm.dashboardPanelConfigs.setMarklineName(0, "avg");
 
     // Add second mark line
     await pm.dashboardPanelConfigs.scrollSidebarToElement(addBtn);
     await addBtn.click();
     const type1 = pm.dashboardPanelConfigs.getMarklineTypeSelect(1);
     await type1.waitFor({ state: 'visible', timeout: 10000 });
-    await pm.dashboardPanelConfigs.scrollSidebarToElement(type1);
-    await type1.click();
-    await pm.dashboardPanelConfigs.getMarklineTypeOption(1, "Max").waitFor({ state: 'visible', timeout: 10000 });
-    await pm.dashboardPanelConfigs.getMarklineTypeOption(1, "Max").click();
-    // Wait for dropdown to close before asserting state
-    await pm.dashboardPanelConfigs.getMarklineTypeOption(1, "Max").waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
-    await pm.dashboardPanelConfigs.getMarklineName(1).locator('[data-test$="-field"]').fill("max");
+    await pm.dashboardPanelConfigs.selectMarklineType(1, "Max");
+    await pm.dashboardPanelConfigs.setMarklineName(1, "max");
 
     await expect(pm.dashboardPanelConfigs.getMarklineTypeTrigger(0)).toHaveAttribute('data-test-selected-value', 'average');
     await expect(pm.dashboardPanelConfigs.getMarklineTypeTrigger(1)).toHaveAttribute('data-test-selected-value', 'max');

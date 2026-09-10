@@ -41,7 +41,10 @@ use config::{
     },
     utils::{json, time::now_micros},
 };
-use infra::table::{slo as slo_table, slos as slos_table};
+use infra::{
+    db::{get_orm_client_ro, get_orm_client_rw},
+    table::{slo as slo_table, slos as slos_table},
+};
 
 use super::{
     ingest::{
@@ -70,9 +73,7 @@ pub enum PassOutcome {
 /// Run one SLI ingest pass for `slo`.
 pub async fn run_pass(slo: &Slo, now_secs: i64) -> Result<PassOutcome, anyhow::Error> {
     let cfg = get_config();
-    let db = infra::db::ORM_CLIENT
-        .get()
-        .ok_or_else(|| anyhow::anyhow!("database not initialized"))?;
+    let db = get_orm_client_ro().await;
 
     let status = slo_table::load_status(db, &slo.id, "").await?;
     // A status row whose generation has already moved on means this pass was
@@ -172,7 +173,7 @@ pub async fn run_pass(slo: &Slo, now_secs: i64) -> Result<PassOutcome, anyhow::E
 
     write_slices(&slo.org, &result.slices, now_secs).await?;
 
-    let outcome = commit_status(db, slo, &result, range.end, now_secs).await?;
+    let outcome = commit_status(slo, &result, range.end, now_secs).await?;
     if let slo_table::WriteOutcome::FencedByGeneration { expected, found } = outcome {
         return Ok(PassOutcome::Fenced { expected, found });
     }
@@ -773,12 +774,13 @@ async fn write_slices(org: &str, slices: &[SliceRow], now_secs: i64) -> Result<(
 
 /// Fold the pass's slices into the running aggregate, CAS-fenced.
 async fn commit_status(
-    db: &sea_orm::DatabaseConnection,
     slo: &Slo,
     result: &PassResult,
     watermark_end: i64,
     now_secs: i64,
 ) -> Result<slo_table::WriteOutcome, anyhow::Error> {
+    // SQLite opens the read-only pool with read_only(true), and this path always writes.
+    let db = get_orm_client_rw().await;
     let mut by_group: std::collections::BTreeMap<String, (f64, f64, i32)> = Default::default();
     for s in &result.slices {
         let e = by_group.entry(s.group_key.clone()).or_insert((0.0, 0.0, 0));
@@ -896,9 +898,7 @@ pub async fn run_range(
     writer: config::meta::slo::slice::Writer,
 ) -> Result<usize, anyhow::Error> {
     let cfg = get_config();
-    let db = infra::db::ORM_CLIENT
-        .get()
-        .ok_or_else(|| anyhow::anyhow!("database not initialized"))?;
+    let db = get_orm_client_rw().await;
 
     let group_by = slo.definition.group_by.clone().unwrap_or_default();
     let params = PassParams {

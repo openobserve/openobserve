@@ -15,6 +15,18 @@
 
 import http from "./http";
 
+export interface SlackOAuthConnection {
+  webhookUrl: string;
+  channel: string;
+  channelId: string;
+  teamId: string;
+  teamName: string;
+}
+
+export interface SlackOAuthStartResponse {
+  authorizationUrl: string;
+}
+
 const destination = {
   create: ({ org_identifier, data, module }: any) => {
     let url = `/api/${org_identifier}/alerts/destinations`;
@@ -55,6 +67,23 @@ const destination = {
   test: ({ org_identifier, data }: any) => {
     return http().post(`/api/${org_identifier}/alerts/destinations/test`, data);
   },
+  startSlackOAuth: ({ org_identifier }: { org_identifier: string }) =>
+    http().post<SlackOAuthStartResponse>(
+      `/api/${encodeURIComponent(org_identifier)}/alerts/destinations/slack/oauth/start`,
+    ),
+  exchangeSlackOAuth: ({
+    org_identifier,
+    code,
+    state,
+  }: {
+    org_identifier: string;
+    code: string;
+    state: string;
+  }) =>
+    http().post<SlackOAuthConnection>(
+      `/api/${encodeURIComponent(org_identifier)}/alerts/destinations/slack/oauth/exchange`,
+      { code, state },
+    ),
   // Renders a content-template spec/saved template and DISPATCHES it to the
   // named destination's real channel, marked `[TEST] `. See Task 15 — unlike
   // `test()` above (which only exercises raw URL/webhook connectivity), this

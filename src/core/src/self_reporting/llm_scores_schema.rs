@@ -19,9 +19,9 @@ use anyhow::Result;
 use config::{
     meta::{
         self_reporting::llm_scores::{self, LlmScoreRecord},
-        stream::StreamType,
+        stream::{StreamSettings, StreamType},
     },
-    utils::schema::schema_eq,
+    utils::{schema::schema_eq, time::now_micros},
 };
 use dashmap::DashSet;
 
@@ -48,13 +48,63 @@ pub async fn ensure_llm_scores_stream_initialized(org_id: &str) -> Result<()> {
         return Ok(());
     }
 
-    if let Err(e) = initialize_llm_scores_stream_schema(org_id).await {
-        log::warn!(
-            "[LLM-SCORES] Failed to initialize _llm_scores stream schema for org {org_id}: {e}"
-        );
-    }
+    let schema_initialized = initialize_llm_scores_stream_schema(org_id)
+        .await
+        .inspect_err(|e| {
+            log::warn!(
+                "[LLM-SCORES] Failed to initialize _llm_scores stream schema for org {org_id}: {e}"
+            );
+        })
+        .is_ok();
+    let experiment_index_initialized = initialize_experiment_id_index(org_id)
+        .await
+        .inspect_err(|e| {
+            log::warn!(
+                "[LLM-SCORES] Failed to initialize experiment_id index for org {org_id}: {e}"
+            );
+        })
+        .is_ok();
+
+    retain_initialization_marker(org_id, schema_initialized && experiment_index_initialized);
 
     Ok(())
+}
+
+fn retain_initialization_marker(org_id: &str, initialized: bool) {
+    if !initialized {
+        INITIALIZED_ORGS.remove(org_id);
+    }
+}
+
+async fn initialize_experiment_id_index(org_id: &str) -> Result<()> {
+    let mut settings =
+        infra::schema::get_settings(org_id, llm_scores::LLM_SCORES_STREAM, StreamType::Logs)
+            .await
+            .map(|settings| (*settings).clone())
+            .unwrap_or_default();
+    if !add_experiment_id_index(&mut settings, now_micros()) {
+        return Ok(());
+    }
+    schema::save_stream_settings(
+        org_id,
+        llm_scores::LLM_SCORES_STREAM,
+        StreamType::Logs,
+        settings,
+    )
+    .await?;
+    Ok(())
+}
+
+fn add_experiment_id_index(settings: &mut StreamSettings, now: i64) -> bool {
+    const FIELD: &str = "experiment_id";
+    if settings.index_fields.iter().any(|field| field == FIELD) {
+        return false;
+    }
+    settings.index_fields.push(FIELD.to_string());
+    settings
+        .index_fields_updated_at
+        .insert(FIELD.to_string(), now);
+    true
 }
 
 async fn initialize_llm_scores_stream_schema(org_id: &str) -> Result<()> {
@@ -105,11 +155,11 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_ensure_llm_scores_stream_initialized_marks_org() {
+    async fn test_ensure_llm_scores_stream_initialized_returns_ok() {
         let test_org = "test_llm_scores_org_1";
         let result = ensure_llm_scores_stream_initialized(test_org).await;
         assert!(result.is_ok());
-        assert!(INITIALIZED_ORGS.contains(test_org));
+        INITIALIZED_ORGS.remove(test_org);
     }
 
     #[tokio::test]
@@ -141,6 +191,11 @@ mod tests {
         assert!(obj.contains_key("trace_id"));
         assert!(obj.contains_key("session_id"));
         assert!(obj.contains_key("experiment_id"));
+        assert!(obj.contains_key("row_id"));
+        assert!(obj.contains_key("trial_index"));
+        assert!(obj.contains_key("record_ts"));
+        assert!(obj.contains_key("status"));
+        assert!(obj.contains_key("skip_reason"));
         assert!(obj.contains_key("level"));
         assert!(obj.contains_key("name"));
         assert!(obj.contains_key("value_numeric"));
@@ -172,6 +227,11 @@ mod tests {
         assert!(schema.field_with_name("value_categorical").is_ok());
         assert!(schema.field_with_name("value_boolean").is_ok());
         assert!(schema.field_with_name("ref_timestamp").is_ok());
+        assert!(schema.field_with_name("row_id").is_ok());
+        assert!(schema.field_with_name("trial_index").is_ok());
+        assert!(schema.field_with_name("record_ts").is_ok());
+        assert!(schema.field_with_name("status").is_ok());
+        assert!(schema.field_with_name("skip_reason").is_ok());
         assert!(schema.field_with_name("score_config_row_id").is_ok());
         assert!(schema.field_with_name("review_submission_id").is_ok());
         assert!(schema.field_with_name("queue_id").is_ok());
@@ -182,5 +242,32 @@ mod tests {
                 .is_ok()
         );
         assert!(schema.field_with_name("review_submission_comments").is_ok());
+    }
+
+    #[test]
+    fn experiment_id_index_is_added_once_with_its_update_time() {
+        let mut settings = StreamSettings::default();
+
+        assert!(add_experiment_id_index(&mut settings, 123));
+        assert!(!add_experiment_id_index(&mut settings, 456));
+        assert_eq!(settings.index_fields, vec!["experiment_id"]);
+        assert_eq!(
+            settings.index_fields_updated_at.get("experiment_id"),
+            Some(&123)
+        );
+    }
+
+    #[test]
+    fn failed_initialization_releases_the_org_for_retry() {
+        let org_id = "retry-llm-score-initialization";
+        INITIALIZED_ORGS.insert(org_id.to_string());
+
+        retain_initialization_marker(org_id, false);
+
+        assert!(!INITIALIZED_ORGS.contains(org_id));
+        assert!(INITIALIZED_ORGS.insert(org_id.to_string()));
+        retain_initialization_marker(org_id, true);
+        assert!(INITIALIZED_ORGS.contains(org_id));
+        INITIALIZED_ORGS.remove(org_id);
     }
 }

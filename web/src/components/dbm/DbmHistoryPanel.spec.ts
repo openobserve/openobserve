@@ -57,19 +57,20 @@ describe("DbmHistoryPanel", () => {
   it("renders the card and its heading", () => {
     const wrapper = mountPanel();
 
-    expect(wrapper.element.tagName).toBe("SECTION");
+    // Card is LLMPanelCard (a div) so both history charts share the dashboard panels' shell.
+    expect(wrapper.element.tagName).toBe("DIV");
     expect(wrapper.classes()).toEqual(
       expect.arrayContaining([
-        "card-container",
+        "bg-card-glass-bg",
         "border-border-default",
-        "rounded-surface",
+        "rounded-default",
         "flex",
         "flex-col",
+        "overflow-hidden",
         "border",
-        "p-3",
       ]),
     );
-    expect(wrapper.get("h3").text()).toBe("Latency");
+    expect(wrapper.get(".text-text-heading").text()).toBe("Latency");
   });
 
   /**
@@ -121,7 +122,7 @@ describe("DbmHistoryPanel", () => {
    */
   it("holds one height across all three states", async () => {
     expect(mountPanel({ loading: true }).get("[data-stub='skeleton']").classes()).toContain("h-55");
-    expect(mountPanel({ hasSeries: false }).get(".flex.items-center").classes()).toContain("h-55");
+    expect(mountPanel({ hasSeries: false }).get(".justify-center").classes()).toContain("h-55");
 
     const drawn = mountPanel();
     await flushPromises();

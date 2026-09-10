@@ -40,25 +40,44 @@ static SUPER_CLUSTER: OnceCell<Box<dyn Db>> = OnceCell::const_new();
 
 pub const SQLITE_STORE: &str = "sqlite";
 
-pub static ORM_CLIENT: OnceCell<DatabaseConnection> = OnceCell::const_new();
-pub static ORM_CLIENT_DDL: OnceCell<DatabaseConnection> = OnceCell::const_new();
+static ORM_CLIENT_RO: OnceCell<DatabaseConnection> = OnceCell::const_new();
+pub(crate) static ORM_CLIENT_RW: OnceCell<DatabaseConnection> = OnceCell::const_new();
+static ORM_CLIENT_DDL: OnceCell<DatabaseConnection> = OnceCell::const_new();
 
-pub async fn connect_to_orm() -> DatabaseConnection {
+/// ORM client for reads.
+pub async fn get_orm_client_ro() -> &'static DatabaseConnection {
+    ORM_CLIENT_RO.get_or_init(connect_to_orm_ro).await
+}
+
+/// ORM client for writes. On SQLite they serialize on a single connection.
+pub async fn get_orm_client_rw() -> &'static DatabaseConnection {
+    ORM_CLIENT_RW.get_or_init(connect_to_orm_rw).await
+}
+
+/// ORM client for schema migrations.
+pub async fn get_orm_client_ddl() -> &'static DatabaseConnection {
+    ORM_CLIENT_DDL.get_or_init(connect_to_orm_ddl).await
+}
+
+async fn connect_to_orm_ro() -> DatabaseConnection {
     match get_config().common.meta_store.as_str().into() {
         MetaStore::PostgreSQL => {
-            let pool = postgres::CLIENT.clone();
-            SqlxPostgresConnector::from_sqlx_postgres_pool(pool)
+            SqlxPostgresConnector::from_sqlx_postgres_pool(postgres::CLIENT_RO.clone())
         }
-        _ => {
-            // clone the pool handle directly, NOT through the CLIENT_RW mutex:
-            // callers may lazily initialize ORM_CLIENT while already holding
-            // `table::get_lock()`, and locking here again would self-deadlock
-            SqlxSqliteConnector::from_sqlx_sqlite_pool(sqlite::CLIENT_RW_POOL.clone())
-        }
+        _ => SqlxSqliteConnector::from_sqlx_sqlite_pool(sqlite::CLIENT_RO.clone()),
     }
 }
 
-pub async fn connect_to_orm_ddl() -> DatabaseConnection {
+async fn connect_to_orm_rw() -> DatabaseConnection {
+    match get_config().common.meta_store.as_str().into() {
+        MetaStore::PostgreSQL => {
+            SqlxPostgresConnector::from_sqlx_postgres_pool(postgres::CLIENT_RW.clone())
+        }
+        _ => SqlxSqliteConnector::from_sqlx_sqlite_pool(sqlite::CLIENT_RW.clone()),
+    }
+}
+
+async fn connect_to_orm_ddl() -> DatabaseConnection {
     match get_config().common.meta_store.as_str().into() {
         MetaStore::PostgreSQL => {
             let pool = postgres::CLIENT_DDL.clone();
@@ -66,7 +85,7 @@ pub async fn connect_to_orm_ddl() -> DatabaseConnection {
         }
         _ => {
             // for sqlite, there is no separate ddl client, use the common one
-            SqlxSqliteConnector::from_sqlx_sqlite_pool(sqlite::CLIENT_RW_POOL.clone())
+            SqlxSqliteConnector::from_sqlx_sqlite_pool(sqlite::CLIENT_RW.clone())
         }
     }
 }
@@ -455,14 +474,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn connect_to_orm_never_takes_the_sqlite_write_mutex() {
-        // Regression: a task may lazily initialize ORM_CLIENT while already
-        // holding table::get_lock() (the CLIENT_RW mutex). connect_to_orm must
-        // clone the pool handle without locking CLIENT_RW itself, or the first
-        // cold-start write from any entry point self-deadlocks forever.
-        let _guard = sqlite::CLIENT_RW.lock().await;
-        tokio::time::timeout(std::time::Duration::from_secs(5), connect_to_orm())
-            .await
-            .expect("connect_to_orm deadlocked on the held CLIENT_RW mutex");
+    async fn write_pool_is_single_connection_on_sqlite() {
+        // a second write connection reintroduces SQLITE_BUSY_SNAPSHOT (517)
+        assert_eq!(sqlite::CLIENT_RW.options().get_max_connections(), 1);
     }
 }

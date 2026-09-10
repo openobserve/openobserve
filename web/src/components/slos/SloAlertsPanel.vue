@@ -59,14 +59,24 @@
       />
     </div>
 
-    <div
+    <OEmptyState
       v-else-if="!alerts.length"
-      class="text-text-secondary flex flex-col gap-1 py-6 text-center"
+      size="block"
+      illustration="alert"
+      :title="t('slos.alerts.emptyTitle')"
+      :description="t('slos.alerts.emptyHint')"
       data-test="slo-alerts-empty"
     >
-      <span class="text-sm font-medium">{{ t("slos.alerts.emptyTitle") }}</span>
-      <span class="text-compact">{{ t("slos.alerts.emptyHint") }}</span>
-    </div>
+      <template #actions>
+        <EmptyStateActionCard
+          icon="add"
+          :label="t('slos.alerts.add')"
+          :sublabel="t('slos.alerts.emptyActionDesc')"
+          data-test="slo-alerts-empty-add"
+          @click="startCreate"
+        />
+      </template>
+    </OEmptyState>
 
     <ul v-else class="flex flex-col gap-2" data-test="slo-alerts-list">
       <li
@@ -105,6 +115,8 @@ import { useI18nTyped } from "@/types/i18n";
 
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import SloAlertForm from "@/components/slos/SloAlertForm.vue";
 import alertsService from "@/services/alerts";

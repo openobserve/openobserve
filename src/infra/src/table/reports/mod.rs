@@ -60,10 +60,9 @@ pub async fn get_by_name<C: ConnectionTrait + TransactionTrait>(
     folder_snowflake_id: &str,
     report_name: &str,
 ) -> Result<Option<(MetaFolder, MetaReport)>, Error> {
-    let _lock = super::get_lock().await;
     let txn = conn.begin().await?;
     let Some(models) = queries::SelectReportAndJoinRelationsResult::get(
-        conn,
+        &txn,
         org_id,
         folder_snowflake_id,
         report_name,
@@ -81,10 +80,9 @@ pub async fn get_by_id<C: ConnectionTrait + TransactionTrait>(
     conn: &C,
     report_id: &str,
 ) -> Result<Option<(MetaFolder, MetaReport)>, Error> {
-    let _lock = super::get_lock().await;
     let txn = conn.begin().await?;
     let Some(models) =
-        queries::SelectReportAndJoinRelationsResult::get_by_id(conn, report_id).await?
+        queries::SelectReportAndJoinRelationsResult::get_by_id(&txn, report_id).await?
     else {
         return Ok(None);
     };
@@ -105,7 +103,6 @@ pub async fn create_report<C: ConnectionTrait + TransactionTrait>(
     report: MetaReport,
     report_id: Option<Ksuid>,
 ) -> Result<(String, MetaReport), Error> {
-    let _lock = super::get_lock().await;
     let txn = conn.begin().await?;
 
     let report_id = report_id
@@ -201,7 +198,6 @@ pub async fn update_report<C: ConnectionTrait + TransactionTrait>(
     new_folder_snowflake_id: Option<&str>,
     report: MetaReport,
 ) -> Result<String, Error> {
-    let _lock = super::get_lock().await;
     let txn = conn.begin().await?;
 
     let Some(models) = queries::SelectReportAndJoinRelationsResult::get(
@@ -304,7 +300,6 @@ pub async fn delete_by_id<C: ConnectionTrait + TransactionTrait>(
     conn: &C,
     report_id: &str,
 ) -> Result<String, Error> {
-    let _lock = super::get_lock().await;
     let txn = conn.begin().await?;
     let Some(report_model) = reports::Entity::find()
         .filter(reports::Column::Id.eq(report_id))
@@ -328,11 +323,10 @@ pub async fn update_by_id<C: ConnectionTrait + TransactionTrait>(
     new_folder_snowflake_id: Option<&str>,
     report: MetaReport,
 ) -> Result<String, Error> {
-    let _lock = super::get_lock().await;
     let txn = conn.begin().await?;
 
     let Some(models) =
-        queries::SelectReportAndJoinRelationsResult::get_by_id(conn, report_id).await?
+        queries::SelectReportAndJoinRelationsResult::get_by_id(&txn, report_id).await?
     else {
         return Err(Error::ReportNotFound);
     };
@@ -423,10 +417,9 @@ pub async fn delete_by_name<C: ConnectionTrait + TransactionTrait>(
     folder_snowflake_id: &str,
     report_name: &str,
 ) -> Result<String, Error> {
-    let _lock = super::get_lock().await;
     let txn = conn.begin().await?;
     let Some((_folder_model, Some(report_model))) =
-        queries::get_report_from_folder(conn, org_id, folder_snowflake_id, report_name).await?
+        queries::get_report_from_folder(&txn, org_id, folder_snowflake_id, report_name).await?
     else {
         return Ok(String::new());
     };
@@ -438,17 +431,13 @@ pub async fn delete_by_name<C: ConnectionTrait + TransactionTrait>(
 
 /// Delete all reports.
 pub async fn delete_all<C: ConnectionTrait>(conn: &C) -> Result<(), Error> {
-    let _lock = super::get_lock().await;
     reports::Entity::delete_many().exec(conn).await?;
     Ok(())
 }
 
 /// Deletes all reports belonging to the given org.
 pub async fn delete_by_org(org_id: &str) -> Result<(), Error> {
-    let _lock = super::get_lock().await;
-    let client = crate::db::ORM_CLIENT
-        .get_or_init(crate::db::connect_to_orm)
-        .await;
+    let client = crate::db::get_orm_client_rw().await;
     reports::Entity::delete_many()
         .filter(reports::Column::Org.eq(org_id))
         .exec(client)
@@ -461,7 +450,6 @@ pub async fn list_reports<C: ConnectionTrait>(
     conn: &C,
     params: &ListReportsParams,
 ) -> Result<Vec<ListReportsQueryResult>, Error> {
-    let _lock = super::get_lock().await;
     let reports = queries::ListReportsQueryResult::get(conn, params).await?;
     Ok(reports)
 }

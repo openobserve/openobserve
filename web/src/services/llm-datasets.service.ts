@@ -21,7 +21,8 @@ import http from "@/services/http";
 // branch; the list view consumes ONLY the normalized (camelCase) shape below so
 // the eventual snake_case API response is absorbed here, not in the UI.
 
-/** Per-source item counts. Aggregated from `llm_dataset_items.source`. */
+/** Per-source item counts. Aggregated server-side from `llm_dataset_items.source`,
+ *  counting each logical item once rather than once per stored revision. */
 export interface LlmDatasetSourceCounts {
   trace: number;
   annotation: number;
@@ -36,11 +37,13 @@ export interface LlmDataset {
   description: string | null;
   /** Dataset-wide MVCC sequence — bumped on every item insert/edit/delete. */
   globalVersion: number;
-  /** Count of live (non-deleted) items. Derived server-side; 0 until wired. */
+  /** Count of live (non-deleted) items. Derived server-side per read; the
+   *  Dataset row stores no counter, so this cannot drift. */
   itemCount: number;
   /** User-authored labels stored on the Dataset itself. */
   tags: string[];
-  /** Live-item counts by origin. Aggregated from `source` (TODO(BE)). */
+  /** Live-item counts by origin. These can sum to less than `itemCount` if an
+   *  item carries a source this UI does not name yet. */
   sources: LlmDatasetSourceCounts;
   createdBy?: string;
   createdAt?: number;
@@ -70,8 +73,8 @@ export interface LlmDatasetItem {
   input: string;
   /** Same input with the message envelope unwrapped, for display. */
   inputPreview: string;
-  /** The golden answer. Required and never empty. */
-  expectedOutput: string;
+  /** Optional reference answer. Null means this is a reference-free row. */
+  expectedOutput: string | null;
   /** Untouched API values — re-sent verbatim when the text wasn't edited, so a
    *  structured input (a messages array) never collapses into a string. */
   rawInput: unknown;
@@ -101,7 +104,7 @@ export interface LlmDatasetItem {
  *  their original structure. */
 export interface LlmDatasetItemPayload {
   input: unknown;
-  expectedOutput: unknown;
+  expectedOutput?: unknown;
   tags?: string[];
   metadata?: Record<string, unknown> | null;
 }
@@ -113,7 +116,7 @@ export interface LlmTelemetryItemPayload {
   sourceStream: string;
   /** Positive lower bound used to retrieve the reference, in MICROSECONDS. */
   refTraceStartTime: number;
-  expectedOutput: string;
+  expectedOutput?: string;
   tags?: string[];
   metadata?: Record<string, unknown> | null;
 }
@@ -133,8 +136,16 @@ export interface ListDatasetItemsParams {
   includeDeleted?: boolean;
 }
 
+export interface LlmDatasetImportResult {
+  filename: string;
+  importedCount: number;
+  skippedCount: number;
+}
+
 /** The items API's page-size ceiling (`size` is validated to 1..100). */
 export const DATASET_ITEMS_MAX_PAGE_SIZE = 100;
+/** The CSV import endpoint rejects uploads larger than 10 MiB. */
+export const DATASET_IMPORT_MAX_FILE_SIZE = 10 * 1024 * 1024;
 
 const base = (org: string) => `/api/${org}/datasets`;
 const itemsBase = (org: string, datasetId: string) => `${base(org)}/${datasetId}/items`;
@@ -204,7 +215,7 @@ function normalizeItem(d: any): LlmDatasetItem {
     datasetId: d.datasetId ?? d.dataset_id ?? "",
     input: itemText(input),
     inputPreview: messageText(input) ?? itemText(input),
-    expectedOutput: itemText(expectedOutput),
+    expectedOutput: expectedOutput == null ? null : itemText(expectedOutput),
     rawInput: input,
     rawExpectedOutput: expectedOutput,
     source: (d.source ?? "manual") as LlmDatasetItemSource,
@@ -224,8 +235,6 @@ function normalizeItem(d: any): LlmDatasetItem {
 }
 
 const llmDatasetsService = {
-  // Dataset-level CRUD is bound to the real API. The response has no
-  // itemCount/sources yet, so normalize() defaults those aggregates.
   async list(orgId: string): Promise<LlmDataset[]> {
     const res = await http().get(base(orgId));
     const rows = Array.isArray(res.data) ? res.data : (res.data?.list ?? []);
@@ -299,7 +308,7 @@ const llmDatasetsService = {
       refId: payload.refId,
       sourceStream: payload.sourceStream,
       refTraceStartTime: payload.refTraceStartTime,
-      expectedOutput: payload.expectedOutput,
+      ...(payload.expectedOutput === undefined ? {} : { expectedOutput: payload.expectedOutput }),
       metadata: payload.metadata ?? null,
       tags: payload.tags ?? [],
     });
@@ -317,7 +326,7 @@ const llmDatasetsService = {
     const res = await http().post(itemsBase(orgId, datasetId), {
       entryPoint: "manual",
       input: payload.input,
-      expectedOutput: payload.expectedOutput,
+      ...(payload.expectedOutput === undefined ? {} : { expectedOutput: payload.expectedOutput }),
       metadata: payload.metadata ?? null,
       tags: payload.tags ?? [],
     });
@@ -334,7 +343,7 @@ const llmDatasetsService = {
   ): Promise<LlmDatasetItem> {
     const res = await http().put(`${itemsBase(orgId, datasetId)}/${itemId}`, {
       input: payload.input,
-      expectedOutput: payload.expectedOutput,
+      ...(payload.expectedOutput === undefined ? {} : { expectedOutput: payload.expectedOutput }),
       metadata: payload.metadata ?? null,
       tags: payload.tags ?? [],
     });
@@ -344,6 +353,20 @@ const llmDatasetsService = {
   /** Soft delete — appends a tombstone, so the response is the tombstone row. */
   async removeItem(orgId: string, datasetId: string, itemId: string): Promise<void> {
     await http().delete(`${itemsBase(orgId, datasetId)}/${itemId}`);
+  },
+
+  async importItems(orgId: string, datasetId: string, file: File): Promise<LlmDatasetImportResult> {
+    const formData = new FormData();
+    formData.append("file", file);
+    const res = await http().post(`${itemsBase(orgId, datasetId)}/import`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    const data = res.data ?? {};
+    return {
+      filename: data.filename ?? file.name,
+      importedCount: Number(data.importedCount ?? data.imported_count ?? 0),
+      skippedCount: Number(data.skippedCount ?? data.skipped_count ?? 0),
+    };
   },
 
   async create(orgId: string, payload: LlmDatasetPayload): Promise<LlmDataset> {

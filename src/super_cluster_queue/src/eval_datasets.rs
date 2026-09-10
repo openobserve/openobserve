@@ -6,7 +6,7 @@
 // (at your option) any later version.
 
 use infra::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::get_orm_client_rw,
     errors::{Error, Result},
     table::entity::{llm_dataset_items as dataset_items, llm_datasets as datasets},
 };
@@ -50,7 +50,7 @@ async fn apply_put(dataset: datasets::Model, items: Vec<dataset_items::Model>) -
         ));
     }
 
-    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let db = get_orm_client_rw().await;
     let txn = db.begin().await?;
     match datasets::Entity::find_by_id(&dataset.id).one(&txn).await? {
         Some(current) if current.org_id != dataset.org_id => {
@@ -108,7 +108,7 @@ async fn apply_put(dataset: datasets::Model, items: Vec<dataset_items::Model>) -
 }
 
 async fn apply_delete(org_id: &str, dataset_id: &str) -> Result<()> {
-    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let db = get_orm_client_rw().await;
     let txn = db.begin().await?;
     dataset_items::Entity::delete_many()
         .filter(dataset_items::Column::OrgId.eq(org_id))

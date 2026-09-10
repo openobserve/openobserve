@@ -30,6 +30,7 @@ if (import.meta.env.DEV && !form) {
         :max="props.max"
         :step="props.step"
         :with-seconds="props.withSeconds"
+        :format24="props.format24"
         :help-text="props.helpText"
         :clearable="props.clearable"
         :readonly="props.readonly"

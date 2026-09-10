@@ -34,10 +34,9 @@ use super::{
     distinct_values::{self, OriginType},
     entity::{dashboards, folders, reports},
     folders::folder_type_into_i16,
-    get_lock,
 };
 use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{get_orm_client_ro, get_orm_client_rw},
     errors::{self, GetDashboardError},
 };
 
@@ -118,7 +117,7 @@ pub async fn get_from_folder(
     folder_id: &str,
     dashboard_id: &str,
 ) -> Result<Option<Dashboard>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let model = get_model_from_folder(client, org_id, folder_id, dashboard_id)
         .await?
         .and_then(|(_folder, maybe_dash)| maybe_dash);
@@ -140,7 +139,7 @@ pub async fn get_by_id(
     org_id: &str,
     dashboard_id: &str,
 ) -> Result<Option<(Folder, Dashboard)>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let Some((folder_m, dash_m)) = get_model_by_id(client, org_id, dashboard_id).await? else {
         return Ok(None);
     };
@@ -151,7 +150,7 @@ pub async fn get_by_id(
 
 /// Lists dashboards.
 pub async fn list(params: ListDashboardsParams) -> Result<Vec<(Folder, Dashboard)>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let dashboards = list_models(client, params)
         .await?
         .into_iter()
@@ -166,7 +165,7 @@ pub async fn list(params: ListDashboardsParams) -> Result<Vec<(Folder, Dashboard
 
 /// Lists all existing dashboards
 pub async fn list_all() -> Result<Vec<(String, Dashboard)>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let dashboards = list_all_models(client)
         .await?
         .into_iter()
@@ -188,7 +187,7 @@ pub async fn put(
     mut dashboard: Dashboard,
     clone: bool,
 ) -> Result<Dashboard, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
 
     // Get the fields that will be inserted into or updated in the database.
     let dashboard_id = dashboard
@@ -221,9 +220,6 @@ pub async fn put(
     }
     let updated_at = dashboard.updated_at;
     let data = inner_data_as_json(dashboard)?;
-
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
 
     // Try to get the new folder if the dashboard is being moved to a new folder.
     let maybe_new_folder_model = if let Some(new_folder_id) = new_folder_id {
@@ -309,10 +305,7 @@ pub async fn delete_from_folder(
     folder_id: &str,
     dashboard_id: &str,
 ) -> Result<(), errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let txn = ORM_CLIENT.get_or_init(connect_to_orm).await.begin().await?;
+    let txn = get_orm_client_rw().await.begin().await?;
     let maybe_dashboard_model = get_model_from_folder(&txn, org_id, folder_id, dashboard_id)
         .await?
         .and_then(|(_folder, maybe_dash)| maybe_dash);
@@ -337,7 +330,7 @@ pub async fn delete_from_folder(
 
 /// Deletes all dashboards.
 pub async fn delete_all() -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
 
     let dashboards = list_all().await?;
     let ids: Vec<_> = dashboards
@@ -348,10 +341,6 @@ pub async fn delete_all() -> Result<(), errors::Error> {
     for id in ids {
         distinct_values::batch_remove(OriginType::Dashboard, id).await?;
     }
-
-    // make sure only one client is writing to the database(only for sqlite)
-    // NOTE: acquired after batch_remove() calls above, which take this lock internally
-    let _lock = get_lock().await;
 
     dashboards::Entity::delete_many().exec(client).await?;
     Ok(())
@@ -543,10 +532,7 @@ fn inner_data_as_json(dashboard: Dashboard) -> Result<JsonValue, errors::Error> 
 
 /// Deletes all dashboards belonging to the given org (via folder join).
 pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     // Collect folder PKs for this org
     let folder_ids: Vec<String> = folders::Entity::find()
         .filter(folders::Column::Org.eq(org_id))
