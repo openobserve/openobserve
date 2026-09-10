@@ -93,6 +93,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     cache_instance_id(&get_or_create_instance_id().await?);
 
+    // _meta used to appear only once self-reporting wrote its first stream into it,
+    // so a deployment that reports nothing never had the org its history pages read.
+    crate::organization::check_and_create_org(config::META_ORG_ID).await?;
+
     wal::init()?;
     // because of asynchronous, we need to wait for a while
     tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
