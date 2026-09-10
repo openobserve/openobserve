@@ -17,7 +17,7 @@ use std::time::Duration;
 
 use config::meta::promql::value::Sample;
 
-use crate::{common::std_deviation, functions::RangeFunc};
+use crate::{common::variance, functions::RangeFunc};
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#stddev_over_time
 pub struct StddevOverTimeFunc;
@@ -34,11 +34,7 @@ impl RangeFunc for StddevOverTimeFunc {
     }
 
     fn exec(&self, samples: &[Sample], _eval_ts: i64, _range: &Duration) -> Option<f64> {
-        if samples.is_empty() {
-            return None;
-        }
-        let sample_values: Vec<f64> = samples.iter().map(|s| s.value).collect();
-        std_deviation(&sample_values)
+        variance(samples.iter().map(|sample| sample.value)).map(f64::sqrt)
     }
 }
 

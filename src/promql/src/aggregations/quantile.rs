@@ -19,7 +19,7 @@ use hashbrown::HashMap;
 
 use crate::{
     aggregations::{Accumulate, AggFunc},
-    common::quantile as calculate_quantile,
+    common::quantile_in_place as calculate_quantile,
 };
 
 /// Note: quantile aggregates all series into a single result (no label grouping)
@@ -115,12 +115,12 @@ impl Accumulate for QuantileAccumulate {
     fn evaluate(self: Box<Self>) -> Vec<Sample> {
         self.values
             .into_iter()
-            .filter_map(|(timestamp, values)| {
+            .filter_map(|(timestamp, mut values)| {
                 if values.is_empty() {
                     return Some(Sample::new(timestamp, f64::NAN));
                 }
                 // Calculate quantile
-                calculate_quantile(&values, self.qtile)
+                calculate_quantile(&mut values, self.qtile)
                     .map(|quantile_val| Sample::new(timestamp, quantile_val))
             })
             .collect()
@@ -194,24 +194,24 @@ mod tests {
     #[test]
     fn test_quantile_calculation() {
         // Test the core quantile calculation logic
-        let values = vec![10.0, 20.0, 30.0];
+        let mut values = vec![10.0, 20.0, 30.0];
         let qtile = 0.5; // 50th percentile
 
-        let quantile_value = calculate_quantile(&values, qtile).unwrap();
+        let quantile_value = calculate_quantile(&mut values, qtile).unwrap();
         assert_eq!(quantile_value, 20.0); // 50th percentile should be 20.0
     }
 
     #[test]
     fn test_quantile_edge_cases() {
         // Test edge cases for quantile calculation
-        let values = vec![10.0, 20.0, 30.0];
+        let mut values = vec![10.0, 20.0, 30.0];
 
         // 0th percentile (minimum)
-        let min_value = calculate_quantile(&values, 0.0).unwrap();
+        let min_value = calculate_quantile(&mut values, 0.0).unwrap();
         assert_eq!(min_value, 10.0);
 
         // 100th percentile (maximum)
-        let max_value = calculate_quantile(&values, 1.0).unwrap();
+        let max_value = calculate_quantile(&mut values, 1.0).unwrap();
         assert_eq!(max_value, 30.0);
     }
 }

@@ -13,13 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::promql::value::Sample;
-use hashbrown::HashMap;
-
-use crate::{
-    aggregations::{Accumulate, AggFunc},
-    common::std_deviation2,
-};
+use super::{AggFunc, dispersion::DispersionAccumulator};
 
 pub struct Stddev;
 
@@ -29,62 +23,12 @@ impl AggFunc for Stddev {
     }
 
     fn build(&self) -> Box<dyn super::Accumulate> {
-        Box::new(StddevAccumulate::new())
+        Box::new(DispersionAccumulator::new(true))
     }
 
-    // Buffers every sample; merging partials would re-copy them at each
-    // reduction level.
+    // Buffered values would be copied again at every parallel reduction level.
     fn mergeable(&self) -> bool {
         false
-    }
-}
-
-pub struct StddevAccumulate {
-    // Store all values per timestamp for std deviation calculation
-    values: HashMap<i64, Vec<f64>>,
-}
-
-impl StddevAccumulate {
-    fn new() -> Self {
-        StddevAccumulate {
-            values: HashMap::new(),
-        }
-    }
-}
-
-impl Accumulate for StddevAccumulate {
-    fn accumulate(&mut self, sample: &Sample) {
-        let entry = self.values.entry(sample.timestamp).or_default();
-        entry.push(sample.value);
-    }
-
-    fn merge(&mut self, other: Box<dyn Accumulate>) {
-        let other = other.into_any().downcast::<Self>().expect("same type");
-        for (timestamp, values) in other.values {
-            self.values.entry(timestamp).or_default().extend(values);
-        }
-    }
-
-    fn into_any(self: Box<Self>) -> Box<dyn std::any::Any> {
-        self
-    }
-
-    fn evaluate(self: Box<Self>) -> Vec<Sample> {
-        self.values
-            .into_iter()
-            .filter_map(|(timestamp, values)| {
-                if values.is_empty() {
-                    return None;
-                }
-                // Calculate mean
-                let sum: f64 = values.iter().sum();
-                let count = values.len() as i64;
-                let mean = sum / count as f64;
-
-                // Calculate standard deviation
-                std_deviation2(&values, mean, count).map(|stddev| Sample::new(timestamp, stddev))
-            })
-            .collect()
     }
 }
 

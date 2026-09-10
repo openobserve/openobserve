@@ -307,43 +307,15 @@ where
             }
             let time_window = metric.time_window.as_ref().unwrap();
             let range = time_window.range;
-            let range_micros = micros(range);
             let mut result_samples = Vec::with_capacity(timestamps.len());
-            let mut start_index = 0;
-            let mut end_index = 0;
-            let counter = CounterSeries::try_new(
+            evaluate_series_range(
                 &metric.samples,
-                func.counter_extrapolation(),
+                &func,
+                range,
                 eval_ctx,
-                range_micros,
+                &timestamps,
+                |slot, value| result_samples.push(Sample::new(timestamps[slot], value)),
             );
-
-            // For each eval timestamp, compute the function value
-            for &eval_ts in &timestamps {
-                // Find samples in the window [eval_ts - range, eval_ts]
-                let window_start = eval_ts - range_micros;
-                let window_end = eval_ts;
-
-                let window_samples = advance_sample_window(
-                    &metric.samples,
-                    window_start,
-                    window_end,
-                    &mut start_index,
-                    &mut end_index,
-                );
-
-                if window_samples.is_empty() {
-                    continue;
-                }
-
-                let value = match &counter {
-                    Some(counter) => counter.extrapolate(start_index, end_index, eval_ts, range),
-                    None => func.exec(window_samples, eval_ts, &range),
-                };
-                if let Some(value) = value {
-                    result_samples.push(Sample::new(eval_ts, value));
-                }
-            }
 
             if !result_samples.is_empty() {
                 Some(RangeValue {
@@ -364,6 +336,44 @@ where
         results.len()
     );
     Ok(Value::Matrix(results))
+}
+
+pub(crate) fn evaluate_series_range<F: RangeFunc + ?Sized>(
+    samples: &[Sample],
+    func: &F,
+    range: Duration,
+    eval_ctx: &EvalContext,
+    timestamps: &[i64],
+    mut emit: impl FnMut(usize, f64),
+) {
+    let range_micros = micros(range);
+    let mut start_index = 0;
+    let mut end_index = 0;
+    let counter = CounterSeries::try_new(
+        samples,
+        func.counter_extrapolation(),
+        eval_ctx,
+        range_micros,
+    );
+    for (slot, &eval_ts) in timestamps.iter().enumerate() {
+        let window_samples = advance_sample_window(
+            samples,
+            eval_ts - range_micros,
+            eval_ts,
+            &mut start_index,
+            &mut end_index,
+        );
+        if window_samples.is_empty() {
+            continue;
+        }
+        let value = match &counter {
+            Some(counter) => counter.extrapolate(start_index, end_index, eval_ts, range),
+            None => func.exec(window_samples, eval_ts, &range),
+        };
+        if let Some(value) = value {
+            emit(slot, value);
+        }
+    }
 }
 
 /// Advance two indices through sorted samples for monotonically increasing
@@ -392,6 +402,58 @@ pub(crate) fn advance_sample_window<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_series_range_matches_independent_window_selection() {
+        let samples = [
+            Sample::new(0, 5.0),
+            Sample::new(1_000_000, 8.0),
+            Sample::new(2_000_000, 2.0),
+            Sample::new(5_000_000, 9.0),
+        ];
+        let ctx = EvalContext::new(3_000_000, 8_000_000, 1_000_000, "test".into());
+        let timestamps = ctx.timestamps();
+        let range = Duration::from_secs(2);
+        for name in [
+            "rate",
+            "increase",
+            "delta",
+            "last_over_time",
+            "avg_over_time",
+        ] {
+            let func = fusable_range_func(name).unwrap();
+            let mut actual = Vec::new();
+            evaluate_series_range(&samples, &func, range, &ctx, &timestamps, |slot, value| {
+                actual.push((slot, value))
+            });
+            let expected: Vec<_> = timestamps
+                .iter()
+                .enumerate()
+                .filter_map(|(slot, &ts)| {
+                    let window: Vec<_> = samples
+                        .iter()
+                        .copied()
+                        .filter(|sample| {
+                            sample.timestamp >= ts - micros(range) && sample.timestamp <= ts
+                        })
+                        .collect();
+                    if window.is_empty() {
+                        return None;
+                    }
+                    func.exec(&window, ts, &range).map(|value| (slot, value))
+                })
+                .collect();
+            assert_eq!(actual.len(), expected.len(), "{name}");
+            for ((slot, value), (expected_slot, expected_value)) in actual.into_iter().zip(expected)
+            {
+                assert_eq!(slot, expected_slot, "{name}");
+                assert!(
+                    (value - expected_value).abs() < 1e-12,
+                    "{name}: {value} != {expected_value}"
+                );
+            }
+        }
+    }
 
     #[test]
     fn test_func_enum_parsing_known_functions() {

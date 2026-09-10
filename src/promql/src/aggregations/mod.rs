@@ -30,6 +30,7 @@ mod avg;
 mod bottomk;
 mod count;
 mod count_values;
+mod dispersion;
 mod group;
 mod max;
 mod min;

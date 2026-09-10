@@ -13,13 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::promql::value::Sample;
-use hashbrown::HashMap;
-
-use crate::{
-    aggregations::{Accumulate, AggFunc},
-    common::std_variance2,
-};
+use super::{AggFunc, dispersion::DispersionAccumulator};
 
 pub struct Stdvar;
 
@@ -29,62 +23,12 @@ impl AggFunc for Stdvar {
     }
 
     fn build(&self) -> Box<dyn super::Accumulate> {
-        Box::new(StdvarAccumulate::new())
+        Box::new(DispersionAccumulator::new(false))
     }
 
-    // Buffers every sample; merging partials would re-copy them at each
-    // reduction level.
+    // Buffered values would be copied again at every parallel reduction level.
     fn mergeable(&self) -> bool {
         false
-    }
-}
-
-pub struct StdvarAccumulate {
-    // Store all values per timestamp for variance calculation
-    values: HashMap<i64, Vec<f64>>,
-}
-
-impl StdvarAccumulate {
-    fn new() -> Self {
-        StdvarAccumulate {
-            values: HashMap::new(),
-        }
-    }
-}
-
-impl Accumulate for StdvarAccumulate {
-    fn accumulate(&mut self, sample: &Sample) {
-        let entry = self.values.entry(sample.timestamp).or_default();
-        entry.push(sample.value);
-    }
-
-    fn merge(&mut self, other: Box<dyn Accumulate>) {
-        let other = other.into_any().downcast::<Self>().expect("same type");
-        for (timestamp, values) in other.values {
-            self.values.entry(timestamp).or_default().extend(values);
-        }
-    }
-
-    fn into_any(self: Box<Self>) -> Box<dyn std::any::Any> {
-        self
-    }
-
-    fn evaluate(self: Box<Self>) -> Vec<Sample> {
-        self.values
-            .into_iter()
-            .filter_map(|(timestamp, values)| {
-                if values.is_empty() {
-                    return None;
-                }
-                // Calculate mean
-                let sum: f64 = values.iter().sum();
-                let count = values.len() as i64;
-                let mean = sum / count as f64;
-
-                // Calculate variance
-                std_variance2(&values, mean, count).map(|variance| Sample::new(timestamp, variance))
-            })
-            .collect()
     }
 }
 
