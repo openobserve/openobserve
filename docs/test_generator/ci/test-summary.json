@@ -1,0 +1,17 @@
+[
+  {
+    "title": "should reset field list pagination to page 1 when switching to another stream via the dropdown",
+    "action": "new",
+    "verifies": "selecting a different stream via the dropdown snaps the field-list pagination back to page 1 (page 1 primary, page 2 ghost)"
+  },
+  {
+    "title": "should reset field list pagination to page 1 when selecting a stream via quick pick",
+    "action": "new",
+    "verifies": "re-selecting a stream via the no-stream quick pick resets the field-list pagination to page 1"
+  },
+  {
+    "title": "should reset field list pagination to page 1 when the field list search term changes",
+    "action": "new",
+    "verifies": "typing a new field-list search term resets the field-list pagination to page 1"
+  }
+]

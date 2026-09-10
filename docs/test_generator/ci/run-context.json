@@ -1,0 +1,17 @@
+{
+  "feature_slug": "logs-index-stream-change-pagination-reset",
+  "feature_title": "Logs Index Stream Change Resets Pagination",
+  "area": "Logs",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "logsPaginationReset.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Logs/logsPaginationReset.spec.js",
+  "playwright_group": "Logs-Core",
+  "source_files": [
+    "web/src/plugins/logs/IndexList.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": ""
+}

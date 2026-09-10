@@ -47,6 +47,11 @@ export class LogsPage {
         this.allFieldsToggleBtn = '[data-test="logs-page-all-fields-btn"], [data-test="logs-all-fields-btn"], [data-test="logs-page-user-defined-fields-btn-all_fields_slot"], [data-test="logs-user-defined-fields-btn-all_fields_slot"]';
         this.interestingFieldsToggleBtn = '[data-test="logs-page-interesting-fields-btn"], [data-test="logs-interesting-fields-btn"], [data-test="logs-page-user-defined-fields-btn-interesting_fields_slot"], [data-test="logs-user-defined-fields-btn-interesting_fields_slot"]';
         this.fieldListResetIcon = '[data-test="logs-page-fields-list-reset-icon"]';
+        // FieldListPagination numbered page button (page N). Active-page detection is
+        // via data-o2-variant (primary = active, ghost = inactive) — no aria-current.
+        this.fieldListPaginationPageButton = (pageNum) => `[data-test="logs-page-fields-list-pagination-page-${pageNum}-button"]`;
+        // Field-list search input (OInput auto-derived `-field` inner native input).
+        this.fieldListSearchInput = '[data-test="o-field-list-search-field"]';
         this.sqlModeToggle = '[data-test="logs-search-bar-sql-mode-toggle-btn"]';
         // OSwitch renders the wrapper data-test on a div and the toggle state on an inner
         // <button data-state="checked|unchecked"> — drill into that button via data-state attr.
@@ -11990,6 +11995,23 @@ export class LogsPage {
     }
 
     /**
+     * Ingests the 70_fields.json fixture (111 distinct fields) into a named stream.
+     * A single record carries the full 111-field schema, so one ingestion is enough
+     * for the field list to paginate (pageSize 25 → 5 pages). Parametrized so tests
+     * can create uniquely-named streams; mirrors SanityPage.ingest70FieldsData()
+     * which hardcodes e2e_automate.
+     * @param {string} streamName
+     * @returns {Promise<object>} ingestion result from ingestData
+     */
+    async ingest70FieldsData(streamName) {
+        testLogger.info(`Ingesting 70_fields.json into stream: ${streamName}`);
+        const data = JSON.parse(
+            fs.readFileSync(path.join(__dirname, '../../../test-data/70_fields.json'), 'utf8'),
+        );
+        return this.ingestData(streamName, data);
+    }
+
+    /**
      * Deselects a stream from the logs stream selector's checkbox zone.
      *
      * The logs stream OSelect runs in multi-mode with rowClickSingleSelect=true.
@@ -12179,5 +12201,65 @@ export class LogsPage {
             );
         }
         testLogger.info('Field list loaded after stream selection');
+    }
+
+    /**
+     * Waits for the field-list pagination footer (page-1 button) to be visible.
+     */
+    async waitForFieldListPaginationVisible() {
+        const firstPageBtn = this.page.locator(this.fieldListPaginationPageButton(1));
+        await firstPageBtn.waitFor({ state: 'visible', timeout: 20000 });
+        testLogger.info('Field list pagination is visible');
+    }
+
+    /**
+     * Clicks a numbered field-list pagination page button.
+     * @param {number} pageNum
+     */
+    async clickFieldListPaginationPage(pageNum) {
+        const btn = this.page.locator(this.fieldListPaginationPageButton(pageNum));
+        await btn.waitFor({ state: 'visible', timeout: 10000 });
+        await btn.click();
+        testLogger.info(`Clicked field list pagination page ${pageNum}`);
+    }
+
+    /**
+     * Asserts a field-list pagination page button is the active (primary) page.
+     * Active-page detection is via data-o2-variant (primary vs ghost) — there is
+     * no dedicated aria-current data-test on the page buttons.
+     * @param {number} pageNum
+     */
+    async expectFieldListPaginationPageActive(pageNum) {
+        const btn = this.page.locator(this.fieldListPaginationPageButton(pageNum));
+        await expect(
+            btn,
+            `Field list pagination page ${pageNum} should be active (data-o2-variant="primary")`,
+        ).toHaveAttribute('data-o2-variant', 'primary', { timeout: 10000 });
+        testLogger.info(`Field list pagination page ${pageNum} is active`);
+    }
+
+    /**
+     * Asserts a field-list pagination page button is inactive (ghost).
+     * @param {number} pageNum
+     */
+    async expectFieldListPaginationPageInactive(pageNum) {
+        const btn = this.page.locator(this.fieldListPaginationPageButton(pageNum));
+        await expect(
+            btn,
+            `Field list pagination page ${pageNum} should be inactive (data-o2-variant="ghost")`,
+        ).toHaveAttribute('data-o2-variant', 'ghost', { timeout: 10000 });
+        testLogger.info(`Field list pagination page ${pageNum} is inactive`);
+    }
+
+    /**
+     * Types into the field-list search input. The filterField watcher resets
+     * pagination to page 1 when the term changes.
+     * @param {string} term
+     */
+    async typeFieldListSearch(term) {
+        const input = this.page.locator(this.fieldListSearchInput);
+        await input.waitFor({ state: 'visible', timeout: 10000 });
+        await input.fill(term);
+        testLogger.info(`Typed field list search term: ${term}`);
     }
 }

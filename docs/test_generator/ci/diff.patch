@@ -1,0 +1,28 @@
+===== COMPLETE LIST OF CHANGED FILES (1 files) =====
+# AUTHORITATIVE: this list is never truncated. The diff BODY below may be trimmed for
+# very large PRs, so decide WHICH files/areas changed (e.g. web/src frontend) from THIS list.
+web/src/plugins/logs/IndexList.vue
+===== END CHANGED FILES =====
+
+diff --git a/web/src/plugins/logs/IndexList.vue b/web/src/plugins/logs/IndexList.vue
+index 990aa85be4f..28da1bfc93f 100644
+--- a/web/src/plugins/logs/IndexList.vue
++++ b/web/src/plugins/logs/IndexList.vue
+@@ -717,6 +717,17 @@ export default defineComponent({
+       },
+     );
+ 
++    // Reset to page 1 whenever the selected stream(s) change. Covers the SQL
++    // Mode path too: useSearchBar's onStreamChange swaps selectedStreamFields
++    // directly and has no reference to this component's local pagination state.
++    watch(
++      () => searchObj.data.stream.selectedStream,
++      () => {
++        resetPagination();
++      },
++      { deep: true },
++    );
++
+     // Close the stream-select dropdown whenever the Source Details drawer opens
+     // so the open popover does not obscure the drawer in both single and multi-select mode.
+     watch(

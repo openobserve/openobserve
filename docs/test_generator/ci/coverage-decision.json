@@ -1,0 +1,12 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/Logs/logsPaginationReset.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Logs/pagination.spec.js",
+    "tests/ui-testing/playwright-tests/GeneralTests/sanity.spec.js",
+    "tests/ui-testing/playwright-tests/Logs/logsQuickPick.spec.js"
+  ],
+  "needs_registration": true,
+  "registration_hint": "Add \"logsPaginationReset.spec.js\" to the Logs-Core group's run_files array in tests/ui-testing/ci-matrix/ci_matrix.json (playwright_group = Logs-Core).",
+  "rationale": "No existing spec covers the headline behavior. pagination.spec.js tests the query-RESULT per-page dropdown (results grid), not the field-list (IndexList) pagination footer. sanity.spec.js's displayPaginationForSchema() clicks field-list pages 2/3/4/first on a SINGLE stream (e2e_automate) but never changes streams, so it does not exercise the reset-on-stream-change path that the new deep watcher (IndexList.vue) adds. logsQuickPick.spec.js covers quick-pick selection but not pagination reset. The feature is its own area/behavior with no existing spec to append to, so a new spec is required."
+}

@@ -294,6 +294,7 @@ test.describe("Pre-Test Cleanup", () => {
         /^e2e_highlighting_test$/,     // e2e_highlighting_test (Bug #9754 logs highlighting test stream from logs-9754.spec.js)
         /^e2e_streamcreation_/,        // e2e_streamcreation_* (Stream creation UI test streams)
         /^e2e_qp_more_stream_/,        // e2e_qp_more_stream_* (logsQuickPick.spec.js more-footer seed streams)
+        /^e2e_pag_reset_/,             // e2e_pag_reset_a_*/e2e_pag_reset_b_* (logsPaginationReset.spec.js pagination-reset streams)
         /^e2e_MyUpperStream/i,         // e2e_MyUpperStream* (Stream name casing test streams)
         /^e2e_mylowerstream/i,         // e2e_mylowerstream* (Stream name casing test streams)
         /^[a-z]{8,9}$/,                // Random 8-9 char lowercase strings

@@ -1,0 +1,25 @@
+{
+  "feature_slug": "logs-index-stream-change-pagination-reset",
+  "feature_title": "Logs Index Stream Change Resets Pagination",
+  "area": "Logs",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "logsPaginationReset.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Logs/logsPaginationReset.spec.js",
+  "playwright_group": "Logs-Core",
+  "source_files": [
+    "web/src/plugins/logs/IndexList.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "The only changed path is web/src/plugins/logs/IndexList.vue, which lives in the open-source web frontend tree. No paths fall under enterprise/, o2_enterprise/, or src/enterprise/, and no enterprise keywords (cipher, SSO, SAML, RBAC, SDR, etc.) appear in the path or the changed code, so this is an OSS change.",
+    "skip": "Not skipped. No explicit opt-out is present (trigger_comment and feature_hint are empty, no tests-added label indicated), and the change is user-facing rather than docs/CI-only: it alters the logs index view's pagination behavior.",
+    "e2e": "E2E is warranted. The diff adds a deep watcher on searchObj.data.stream.selectedStream that calls resetPagination(), so switching streams now resets the logs list back to page 1 in both regular and SQL Mode. That is a user-exercisable interaction that should be verified in the browser.",
+    "area": "Logs. The changed file is the logs index list component under web/src/plugins/logs/, and the behavior (stream selection + pagination in the logs table) belongs to the Logs product area where sibling specs already live.",
+    "group": "Logs-Core. This shard (actual_folder Logs) already contains the closest related specs such as pagination.spec.js and logspage.spec.js, so the new stream-change pagination-reset spec fits naturally there.",
+    "existing_tests": "No E2E specs in the diff. The only changed file is a web/src Vue component (web/src/plugins/logs/IndexList.vue); there are no Playwright E2E specs under tests/ui-testing/playwright-tests/, so existing_tests_in_diff is false."
+  }
+}
