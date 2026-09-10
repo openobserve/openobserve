@@ -182,8 +182,13 @@ function propsFromTypeBody(body: string): Set<string> {
   return names;
 }
 
-function propsFromNamedType(typeName: string, file: string, source: string): Set<string> | null {
-  const bare = typeName.split("<")[0].trim();
+function propsFromNamedType(
+  typeName: string,
+  file: string,
+  source: string,
+): Set<string> | null {
+  const angleIndex = typeName.indexOf("<");
+  const bare = (angleIndex === -1 ? typeName : typeName.slice(0, angleIndex)).trim();
   const candidates = [
     join(dirname(file), `${basename(file, ".vue")}.types.ts`),
     ...readdirSync(dirname(file))
