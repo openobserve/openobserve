@@ -283,7 +283,7 @@
                   v-if="activeDetailTab === 'activity'"
                   variant="ghost-primary"
                   size="sm"
-                  class="ml-auto"
+                  class="ms-auto"
                   data-test="oncall-response-activity-toggle-all"
                   @click="showAllActivity = !showAllActivity"
                 >

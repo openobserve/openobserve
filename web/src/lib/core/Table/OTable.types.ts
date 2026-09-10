@@ -38,23 +38,23 @@ export interface OTableSection<TData = any> {
  * `table-fixed`), so it is expressed as a child variant on the `<tr>`.
  */
 export const ROW_RAIL_TONE_CLASS: Record<RowRailTone, string> = {
-  p1: "[&>td:first-child]:border-l-4 [&>td:first-child]:border-l-priority-p1",
-  p2: "[&>td:first-child]:border-l-4 [&>td:first-child]:border-l-priority-p2",
-  p3: "[&>td:first-child]:border-l-4 [&>td:first-child]:border-l-priority-p3",
-  p4: "[&>td:first-child]:border-l-4 [&>td:first-child]:border-l-priority-p4",
-  p5: "[&>td:first-child]:border-l-4 [&>td:first-child]:border-l-priority-p5",
+  p1: "[&>td:first-child]:border-s-4 [&>td:first-child]:border-s-priority-p1",
+  p2: "[&>td:first-child]:border-s-4 [&>td:first-child]:border-s-priority-p2",
+  p3: "[&>td:first-child]:border-s-4 [&>td:first-child]:border-s-priority-p3",
+  p4: "[&>td:first-child]:border-s-4 [&>td:first-child]:border-s-priority-p4",
+  p5: "[&>td:first-child]:border-s-4 [&>td:first-child]:border-s-priority-p5",
   // Status tones use the SAME tokens as the matching OStatCard tone, so a rail
   // and the stat tile that filters to it are provably one colour.
-  success: "[&>td:first-child]:border-l-4 [&>td:first-child]:border-l-icon-chip-success-text",
-  warning: "[&>td:first-child]:border-l-4 [&>td:first-child]:border-l-icon-chip-warning-text",
-  error: "[&>td:first-child]:border-l-4 [&>td:first-child]:border-l-icon-chip-error-text",
-  info: "[&>td:first-child]:border-l-4 [&>td:first-child]:border-l-icon-chip-info-text",
-  primary: "[&>td:first-child]:border-l-4 [&>td:first-child]:border-l-icon-chip-primary-text",
-  orange: "[&>td:first-child]:border-l-4 [&>td:first-child]:border-l-icon-chip-orange-text",
-  blue: "[&>td:first-child]:border-l-4 [&>td:first-child]:border-l-badge-blue-soft-text",
-  teal: "[&>td:first-child]:border-l-4 [&>td:first-child]:border-l-badge-teal-soft-text",
-  purple: "[&>td:first-child]:border-l-4 [&>td:first-child]:border-l-badge-purple-soft-text",
-  neutral: "[&>td:first-child]:border-l-4 [&>td:first-child]:border-l-border-default",
+  success: "[&>td:first-child]:border-s-4 [&>td:first-child]:border-s-icon-chip-success-text",
+  warning: "[&>td:first-child]:border-s-4 [&>td:first-child]:border-s-icon-chip-warning-text",
+  error: "[&>td:first-child]:border-s-4 [&>td:first-child]:border-s-icon-chip-error-text",
+  info: "[&>td:first-child]:border-s-4 [&>td:first-child]:border-s-icon-chip-info-text",
+  primary: "[&>td:first-child]:border-s-4 [&>td:first-child]:border-s-icon-chip-primary-text",
+  orange: "[&>td:first-child]:border-s-4 [&>td:first-child]:border-s-icon-chip-orange-text",
+  blue: "[&>td:first-child]:border-s-4 [&>td:first-child]:border-s-badge-blue-soft-text",
+  teal: "[&>td:first-child]:border-s-4 [&>td:first-child]:border-s-badge-teal-soft-text",
+  purple: "[&>td:first-child]:border-s-4 [&>td:first-child]:border-s-badge-purple-soft-text",
+  neutral: "[&>td:first-child]:border-s-4 [&>td:first-child]:border-s-border-default",
 };
 
 /** Tone → utility classes for a de-emphasised row. */

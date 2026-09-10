@@ -183,7 +183,7 @@
                         {{ describeTarget(target, t, rotationNameOf(target)) }}
                         <button
                           type="button"
-                          class="ml-1"
+                          class="ms-1"
                           :aria-label="t('oncall.removeTarget')"
                           :data-test="`oncall-policy-target-remove-${current.priority}-${stepIndex}-${ti}`"
                           @click="step.targets.splice(ti, 1)"

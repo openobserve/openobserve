@@ -2198,14 +2198,14 @@ describe("OTable row rail + row tone", () => {
     wrapper = mountWith({ rowRailTone: (row: TestRow) => (row.id === 1 ? "p1" : null) });
     await nextTick();
     const rows = wrapper.findAll("tbody tr");
-    expect(rows[0].classes().join(" ")).toContain("border-l-priority-p1");
-    expect(rows[1].classes().join(" ")).not.toContain("border-l-priority-p1");
+    expect(rows[0].classes().join(" ")).toContain("border-s-priority-p1");
+    expect(rows[1].classes().join(" ")).not.toContain("border-s-priority-p1");
   });
 
   it.each([
-    ["p3", "border-l-priority-p3"],
-    ["error", "border-l-icon-chip-error-text"],
-    ["neutral", "border-l-border-default"],
+    ["p3", "border-s-priority-p3"],
+    ["error", "border-s-icon-chip-error-text"],
+    ["neutral", "border-s-border-default"],
   ])("rails tone %s with its own token", async (tone, expected) => {
     wrapper = mountWith({ rowRailTone: () => tone });
     await nextTick();
@@ -2230,7 +2230,7 @@ describe("OTable row rail + row tone", () => {
     });
     await nextTick();
     const classes = wrapper.find("tbody tr").classes().join(" ");
-    expect(classes).toContain("border-l-priority-p2");
+    expect(classes).toContain("border-s-priority-p2");
     expect(classes).toContain("bg-surface-panel");
     expect(classes).toContain("custom-1");
   });
@@ -2239,7 +2239,7 @@ describe("OTable row rail + row tone", () => {
     wrapper = mountWith({});
     await nextTick();
     const classes = wrapper.find("tbody tr").classes().join(" ");
-    expect(classes).not.toContain("border-l-");
+    expect(classes).not.toContain("border-s-");
     expect(classes).not.toContain("bg-surface-panel");
   });
 });

@@ -219,7 +219,7 @@
             <OButton
               variant="ghost"
               size="icon"
-              class="ml-1"
+              class="ms-1"
               icon-left="add"
               :aria-label="t('oncall.addShiftRule')"
               data-test="oncall-schedule-rule-add"

@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       variant="ghost"
       size="icon-toolbar"
       data-test="header-mobile-menu-toggle"
-      class="ml-1 shrink-0"
+      class="ms-1 shrink-0"
       :aria-label="t('menu.toggleNavigation')"
       @click="toggleMenu"
     >

@@ -180,7 +180,7 @@ const pillSide = (offset: number) => (offset > 0.85 ? "-translate-x-full -ms-1.5
           <span
             v-for="(guide, index) in guides"
             :key="`guide-${index}`"
-            class="border-border-default absolute inset-y-0 border-l"
+            class="border-border-default absolute inset-y-0 border-s"
             :style="inlineStart(guide)"
             aria-hidden="true"
           />

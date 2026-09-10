@@ -280,10 +280,7 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import OInput from "@/lib/forms/Input/OInput.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
-import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import alertsService from "@/services/alerts";
 import {
@@ -302,14 +299,8 @@ import type {
   TeamRungSummary,
   UnroutedSignal,
 } from "@/ts/interfaces/oncall";
-import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
-import {
-  identityDimensions,
-  isOnCallUnavailable,
-  normalizeDimensionValue,
-  ownershipPath,
-} from "@/utils/oncall";
+import { identityDimensions, isOnCallUnavailable } from "@/utils/oncall";
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -385,19 +376,6 @@ const openSignalCount = computed(
 function setTab(value: unknown) {
   if (value === "rules" || value === "signals") tab.value = value;
 }
-
-const teamOptions = computed(() =>
-  teams.value.map((team) => ({ label: raw(team.name), value: team.id })),
-);
-
-const dimensionOptions = computed(() =>
-  aliases.value.map((alias) => ({ label: raw(alias.display || alias.id), value: alias.id })),
-);
-
-const dialogTitle = computed<I18nText>(() => {
-  if (claimingSignal.value) return t("oncall.claimRuleTitle");
-  return editingRule.value ? t("oncall.editOwnershipRule") : t("oncall.addOwnershipRule");
-});
 
 function failed(err: unknown, fallback: Parameters<typeof toast>[0]["message"]) {
   const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;

@@ -173,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="subsection-label text-text-secondary mb-2 flex items-center text-xs font-semibold"
               >
                 <span>{{ t("alerts.oncallTeam") }}</span>
-                <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
+                <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
                 <OTooltip :content="t('alerts.oncallTeamTooltip')" side="right" />
               </div>
               <OFormSelect

@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="reachOf(primary.user_email)"
                 :variant="reachOf(primary.user_email) === 'landed' ? 'success-soft' : 'error-soft'"
                 size="sm"
-                class="ml-auto shrink-0"
+                class="ms-auto shrink-0"
                 data-test="oncall-who-is-on-primary-reach"
               >
                 {{ reachLabel(primary.user_email) }}
@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="reachOf(entry.user_email)"
                 :variant="reachOf(entry.user_email) === 'landed' ? 'success-soft' : 'error-soft'"
                 size="sm"
-                class="ml-auto shrink-0"
+                class="ms-auto shrink-0"
                 :data-test="`oncall-who-is-on-reach-${entry.user_email}`"
               >
                 {{ reachLabel(entry.user_email) }}
