@@ -95,11 +95,11 @@ describe("McpServerCard", () => {
 
   // The card is a host for the shared setup card, not a layout of its own.
   describe("layout", () => {
-    it("renders two steps through the shared setup card, with no hero of its own", () => {
+    it("renders three steps through the shared setup card, with no hero of its own", () => {
       const wrapper = mountCard();
 
       expect(wrapper.findComponent({ name: "SetupCardRenderer" }).exists()).toBe(true);
-      expect(wrapper.findAllComponents({ name: "OStep" })).toHaveLength(2);
+      expect(wrapper.findAllComponents({ name: "OStep" })).toHaveLength(3);
       // The IAM page header already names the card.
       expect(wrapper.find(".c-hero").exists()).toBe(false);
     });
@@ -110,6 +110,30 @@ describe("McpServerCard", () => {
       expect(codeBlock(wrapper, "ai-integrations-mcp-endpoint").props("code")).toBe(
         "https://o2.example.com/api/default/mcp",
       );
+    });
+  });
+
+  describe("skills", () => {
+    it("offers the OpenObserve skill install command as the last step", () => {
+      const wrapper = mountCard();
+
+      expect(codeBlock(wrapper, "ai-integrations-mcp-skills-cmd").props("code")).toBe(
+        "npx skills add openobserve/skills --skill openobserve",
+      );
+    });
+
+    it("opens the skills repo in a new tab without an opener", async () => {
+      const open = vi.spyOn(window, "open").mockReturnValue(null);
+      const wrapper = mountCard();
+
+      await wrapper.find('[data-test="ai-integrations-mcp-skills-repo-btn"]').trigger("click");
+
+      expect(open).toHaveBeenCalledWith(
+        "https://github.com/openobserve/skills",
+        "_blank",
+        "noopener,noreferrer",
+      );
+      open.mockRestore();
     });
   });
 

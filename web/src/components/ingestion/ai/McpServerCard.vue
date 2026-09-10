@@ -89,6 +89,10 @@ const authSettled = computed(() => authMode.value === "oauth" || !!credential.va
 const TOKEN_PLACEHOLDER = "Basic <base64 of service-account-email:token>";
 const MASKED_AUTH = "Basic ••••••••••••••••";
 
+const SKILLS_REPO_URL = "https://github.com/openobserve/skills";
+// No -a flag: the CLI then asks which agents to install to, so one command serves every client.
+const SKILLS_INSTALL_CMD = "npx skills add openobserve/skills --skill openobserve";
+
 // The Authorization header VALUE injected into token-mode snippets. OAuth mode
 // passes null so build() omits the header entirely.
 const tokenAuthValue = computed(() =>
@@ -400,6 +404,18 @@ const content = computed<RichCardContent>(() => ({
       note: t(activeClient.value.descKey),
       completeOn: "copy",
     },
+    {
+      id: "skills",
+      title: t("ingestion.mcp.skillsLabel", { brand: raw("OpenObserve") }),
+      description: t("ingestion.mcp.skillsHint", { brand: raw("OpenObserve") }),
+      chip: { kind: "terminal", labelKey: "ingestion.setupCard.chipTerminal" },
+      code: {
+        lang: "bash",
+        raw: SKILLS_INSTALL_CMD,
+        dataTest: "ai-integrations-mcp-skills-cmd",
+      },
+      completeOn: "copy",
+    },
   ],
   docUrl: props.docUrl,
 }));
@@ -436,6 +452,10 @@ const goToServiceAccounts = () => {
     name: "serviceAccounts",
     query: { org_identifier: store.state.selectedOrganization?.identifier },
   });
+};
+
+const openSkillsRepo = () => {
+  window.open(SKILLS_REPO_URL, "_blank", "noopener,noreferrer");
 };
 </script>
 
@@ -613,6 +633,19 @@ const goToServiceAccounts = () => {
           {{ t("ingestion.mcp.installOneClick", { client: t(activeClient.labelKey) }) }}
         </OButton>
       </div>
+    </template>
+
+    <template #step-skills>
+      <OButton
+        variant="ghost"
+        size="sm-action"
+        icon-left="open-in-new"
+        class="self-start"
+        data-test="ai-integrations-mcp-skills-repo-btn"
+        @click="openSkillsRepo"
+      >
+        {{ t("ingestion.mcp.skillsRepo", { host: raw("GitHub") }) }}
+      </OButton>
     </template>
   </SetupCardRenderer>
 </template>

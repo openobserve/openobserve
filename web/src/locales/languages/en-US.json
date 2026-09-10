@@ -3720,7 +3720,10 @@
         "hermes": "Add to ~/.hermes/config.yaml (YAML), then run /reload-mcp.",
         "codex": "Add to ~/.codex/config.toml (TOML), then restart Codex."
       },
-      "installOneClick": "Add to {client}"
+      "installOneClick": "Add to {client}",
+      "skillsLabel": "Add the {brand} skill (optional)",
+      "skillsHint": "Teaches your AI assistant how to query, alert and build dashboards in {brand}, so it gets more out of the MCP tools. Run it in your project, then pick the agents to install to.",
+      "skillsRepo": "View the skills on {host}"
     },
     "manageTokensBtnLabel": "Manage Tokens",
     "orgLevelExplanation": "These are organization-level ingestion tokens. They are not tied to individual users and will continue working even if the user who created them leaves the organization. Tokens can only be used on ingestion endpoints.",
