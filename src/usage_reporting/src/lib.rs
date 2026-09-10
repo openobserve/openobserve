@@ -218,7 +218,6 @@ pub async fn flush() {
     shutdown(cfg.limit.usage_reporting_thread_num).await;
 }
 
-/// Counts the request in Prometheus, then records usage; the enterprise build alone records usage.
 #[cfg_attr(not(feature = "enterprise"), allow(unreachable_code, unused_variables))]
 pub async fn report_request_usage_stats(
     stats: RequestStats,
@@ -828,8 +827,12 @@ mod tests {
 
     #[test]
     fn oss_usage_entry_points_return_before_enqueueing() {
-        let source = include_str!("lib.rs");
-        let gate = "#[cfg(not(feature = \"enterprise\"))]\n    return;";
+        // Whitespace-normalised so reindenting the source cannot fail this.
+        let source = include_str!("lib.rs")
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ");
+        let gate = "#[cfg(not(feature = \"enterprise\"))] return;";
         assert_eq!(
             source.matches(gate).count(),
             2,
