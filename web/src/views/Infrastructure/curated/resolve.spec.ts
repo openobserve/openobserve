@@ -44,7 +44,7 @@ const NOW_US = 1_800_000_000_000_000;
 const HOUR_US = 60 * 60 * 1_000_000;
 const DAY_US = 24 * HOUR_US;
 
-/** The 3h page range the v1 packs default to, in µs. */
+/** The 3h page range the packs default to, in µs. */
 const RANGE = { start: NOW_US - 3 * HOUR_US, end: NOW_US };
 
 interface StreamFixture {
@@ -463,7 +463,7 @@ describe("§5.4 concept resolution — rung by rung", () => {
 });
 
 describe("§3.3.1 id pinning — the packs name real groups", () => {
-  it("every id the v1 packs name exists in the committed defaults snapshot", () => {
+  it("every id the packs name exists in the committed defaults snapshot", () => {
     for (const id of [GROUP.namespace, GROUP.pod, GROUP.node, GROUP.cluster, GROUP.host]) {
       expect(groups.some((g) => g.id === id)).toBe(true);
     }
@@ -1231,7 +1231,7 @@ describe("§5.5 scope pickers", () => {
     expect((dashboard.variables?.list ?? []).some((v: any) => v.name === "cluster")).toBe(false);
   });
 
-  it("(d) every v1 picker's built variable carries omitWhenValuesEmpty: true", () => {
+  it("(d) every picker's built variable carries omitWhenValuesEmpty: true", () => {
     const dashboard = build(resolve({}));
     const list = dashboard.variables?.list ?? [];
     expect(list.length).toBeGreaterThan(0);
@@ -1300,13 +1300,18 @@ describe("§5.5 buildDashboard", () => {
     const dashboard = build(resolve({}));
     expect(dashboard.version).toBe(8);
     expect(dashboard.tabs.map((t: any) => t.tabId)).toEqual([
-      "summary",
       "overview",
+      "inventory",
       "health",
       "utilization",
       "nodes",
       "workloads",
     ]);
+  });
+
+  it("gives every tab the section id as its NAME, so ?tab= never contradicts the label", () => {
+    // The displayed name is the value a reader copies out of the URL; a divergence makes ?tab= unreadable.
+    for (const tab of build(resolve({})).tabs) expect(tab.name).toBe(tab.tabId);
   });
 
   it("drops a section whose panels ALL hid — the tab list never shows an empty tab", () => {
@@ -1373,15 +1378,76 @@ describe("§5.5 buildDashboard", () => {
     expect(byName.pod.selectAllValueForMultiSelect).toBe("all");
   });
 
-  it("a chained picker carries an IN filter row referencing the PARENT's resolved field", () => {
+  it("a chained picker carries one IN filter row per parent, each field spelled for its OWN stream", () => {
     const dashboard = build(resolve({}));
     const pod = (dashboard.variables?.list ?? []).find((v: any) => v.name === "pod");
+    // Namespace alone does not identify a pod: `openobserve` exists in several
+    // clusters, so filtering on it returned every cluster's pods.
     expect(pod.query_data.filter).toEqual([
+      { name: "k8s_cluster", operator: "IN", value: "$cluster" },
+      { name: "namespace", operator: "IN", value: "$namespace" },
+    ]);
+  });
+
+  it("a single-parent picker still emits exactly one clause — no multi-parent regression", () => {
+    const dashboard = build(resolve({}));
+    const namespace = (dashboard.variables?.list ?? []).find((v: any) => v.name === "namespace");
+    expect(namespace.query_data.filter).toEqual([
+      { name: "k8s_cluster", operator: "IN", value: "$cluster" },
+    ]);
+    const cluster = (dashboard.variables?.list ?? []).find((v: any) => v.name === "cluster");
+    expect(cluster.query_data.filter).toEqual([]);
+  });
+
+  it("EVERY parent clause is re-spelled for the child's stream, not copied from the parent", () => {
+    // Both parents resolve against kube-state, so a resolver that reused the
+    // parent's own field verbatim would name `namespace` on a kubeletstats stream
+    // that spells it k8s_namespace_name — an empty list, not an error.
+    const manifest = {
+      ...kubernetesPage,
+      scopePickers: kubernetesPage.scopePickers.map((picker: any) =>
+        picker.name === "pod"
+          ? {
+              ...picker,
+              valuesFrom: {
+                groupId: "kubelet-pod",
+                stream: "k8s_pod_memory_usage",
+                streamType: "metrics",
+              },
+            }
+          : picker,
+      ),
+    };
+    const dashboard: any = buildDashboard(manifest as any, resolve({ manifest }), {}, {
+      timezone: "UTC",
+      nowUs: NOW_US,
+    } as any);
+    const pod = dashboard.variables.list.find((v: any) => v.name === "pod");
+    expect(pod.query_data.stream).toBe("k8s_pod_memory_usage");
+    expect(pod.query_data.filter).toEqual([
+      { name: "k8s_cluster", operator: "IN", value: "$cluster" },
       { name: "k8s_namespace_name", operator: "IN", value: "$namespace" },
     ]);
   });
 
-  it("showDynamicFilters is false in v1 — curated pages are not explorers", () => {
+  it("a multi-parent child drops only the clause whose parent was omitted", () => {
+    // The dangling-reference rule, per clause: losing cluster must not cost the
+    // namespace narrowing that still has a live parent to point at.
+    const resolution: any = resolve({});
+    const pruned = {
+      ...resolution,
+      pickers: resolution.pickers.filter((p: any) => p.def.name !== "cluster"),
+    };
+    const dashboard: any = build(pruned);
+    const names = new Set(dashboard.variables.list.map((v: any) => v.name));
+    expect(names.has("cluster")).toBe(false);
+    const pod = dashboard.variables.list.find((v: any) => v.name === "pod");
+    expect(pod.query_data.filter).toEqual([
+      { name: "namespace", operator: "IN", value: "$namespace" },
+    ]);
+  });
+
+  it("showDynamicFilters is false — curated pages are not explorers", () => {
     expect(build(resolve({})).variables.showDynamicFilters).toBe(false);
   });
 
@@ -1517,8 +1583,8 @@ describe("§5.5 buildDashboard", () => {
     // The tile moved collectors, so its node token must resolve through kube-state's
     // override — the kubeletstats spelling would group by a label that is not there.
     const dashboard = build(resolve({}));
-    const overviewTab = dashboard.tabs.find((t: any) => t.tabId === "overview");
-    const [query] = overviewTab.panels
+    const inventoryTab = dashboard.tabs.find((t: any) => t.tabId === "inventory");
+    const [query] = inventoryTab.panels
       .find((p: any) => p.id === "k8s_ov_nodes")
       .queries.map((q: any) => q.query);
     expect(query).toContain("count by (node)");
@@ -1528,8 +1594,8 @@ describe("§5.5 buildDashboard", () => {
 
   it("carries the per-panel drilldown from the def", () => {
     const dashboard = build(resolve({}));
-    const overviewTab = dashboard.tabs.find((t: any) => t.tabId === "overview");
-    const panel = overviewTab.panels.find((p: any) => p.id === "k8s_ov_nodes");
+    const inventoryTab = dashboard.tabs.find((t: any) => t.tabId === "inventory");
+    const panel = inventoryTab.panels.find((p: any) => p.id === "k8s_ov_nodes");
     expect(Array.isArray(panel.config.drilldown)).toBe(true);
     expect(panel.config.drilldown.length).toBeGreaterThan(0);
   });
@@ -1557,17 +1623,17 @@ describe("layout flow — 192-col rows", () => {
     }
   });
 
-  it("FMP pin (finding 3): the six Overview tiles fill row 1; every h:16 chart is below it", () => {
+  it("FMP pin (finding 3): the six Inventory tiles fill row 1; every h:16 chart is below it", () => {
     // The tile row's w:32 × 6 is load-bearing for first-meaningful-paint, not
     // cosmetic — a later panel insertion that pushes a chart into row 1 fails here.
-    const overview = build(resolve({})).tabs.find((t: any) => t.tabId === "overview");
-    const tiles = overview.panels.filter((p: any) => p.layout.h === 6);
+    const inventory = build(resolve({})).tabs.find((t: any) => t.tabId === "inventory");
+    const tiles = inventory.panels.filter((p: any) => p.layout.h === 6);
     expect(tiles).toHaveLength(6);
     expect(tiles.map((p: any) => p.layout.y)).toEqual([0, 0, 0, 0, 0, 0]);
     expect(tiles.map((p: any) => p.layout.x).sort((a: number, b: number) => a - b)).toEqual([
       0, 32, 64, 96, 128, 160,
     ]);
-    for (const chart of overview.panels.filter((p: any) => p.layout.h === 16)) {
+    for (const chart of inventory.panels.filter((p: any) => p.layout.h === 16)) {
       expect(chart.layout.y).toBeGreaterThan(0);
     }
   });
@@ -1575,19 +1641,19 @@ describe("layout flow — 192-col rows", () => {
   it("forwards a panel's decimals into config, and omits the key when unset", () => {
     // A `decimals` the resolver drops leaves the renderer on its default 2, which is
     // what clipped "800.00 cores" — the declaration is only worth anything if it lands.
-    const summary = build(resolve({})).tabs.find((t: any) => t.tabId === "summary");
-    const cfg = (id: string) => summary.panels.find((p: any) => p.id === id).config;
+    const overview = build(resolve({})).tabs.find((t: any) => t.tabId === "overview");
+    const cfg = (id: string) => overview.panels.find((p: any) => p.id === id).config;
     expect(cfg("k8s_sm_fleet_cpu").decimals).toBe(0);
     expect(cfg("k8s_sm_fleet_memory")).not.toHaveProperty("decimals");
   });
 
   it("packs a short panel into the free column beside a taller one", () => {
-    // The Summary stack: the quadrant is h:39 and the two bar panels h:20 + h:19, so a
+    // The Overview stack: the quadrant is h:39 and the two bar panels h:20 + h:19, so a
     // plain left-to-right wrap would drop the memory panel to y=39 UNDER the quadrant
     // instead of under the CPU panel. This is the only section that exercises the
     // packing, and the one whose arrangement was asked for explicitly.
-    const summary = build(resolve({})).tabs.find((t: any) => t.tabId === "summary");
-    const at = (id: string) => summary.panels.find((p: any) => p.id === id).layout;
+    const overview = build(resolve({})).tabs.find((t: any) => t.tabId === "overview");
+    const at = (id: string) => overview.panels.find((p: any) => p.id === id).layout;
     expect(at("k8s_sm_fleet_quadrant")).toMatchObject({ x: 0, y: 0, w: 120, h: 39 });
     expect(at("k8s_sm_fleet_cpu")).toMatchObject({ x: 120, y: 0, w: 72, h: 20 });
     expect(at("k8s_sm_fleet_memory")).toMatchObject({ x: 120, y: 20, w: 72, h: 19 });
@@ -1595,10 +1661,10 @@ describe("layout flow — 192-col rows", () => {
 
   it("leaves every uniform-height section laid out exactly as a plain wrap would", () => {
     // The packing must be a no-op wherever a row's panels share one height, which is
-    // every section but Summary. Checked against the plain wrap recomputed here, so a
+    // every section but Overview. Checked against the plain wrap recomputed here, so a
     // future packing change that silently reflows Health or Utilization fails.
     for (const tab of build(resolve({})).tabs) {
-      if (tab.tabId === "summary") continue;
+      if (tab.tabId === "overview") continue;
       let x = 0;
       let y = 0;
       let rowHeight = 0;
@@ -1629,8 +1695,8 @@ describe("strip model", () => {
     }
   });
 
-  it("a hidden group owning an OVERVIEW panel sets autoExpand; one that does not, does not", () => {
-    // kube-state owns Overview tiles; kubelet-pod owns none.
+  it("a hidden group owning an INVENTORY panel sets autoExpand; one that does not, does not", () => {
+    // kube-state owns Inventory tiles; kubelet-pod owns none.
     const noKubeState = fullK8sStreams();
     noKubeState.metrics = noKubeState.metrics.filter((s: any) => !s.name.startsWith("kube_"));
     expect(resolve({ streams: noKubeState }).stripAutoExpand).toBe(true);
@@ -1640,15 +1706,15 @@ describe("strip model", () => {
     expect(resolve({ streams: noKubeletPod }).stripAutoExpand).toBe(false);
   });
 
-  it("targets the overview section by ID, not whichever section happens to be first", () => {
-    // kubelet-node owns three Overview panels and NONE in the leading Summary
+  it("targets the inventory section by ID, not whichever section happens to be first", () => {
+    // kubelet-node owns three Inventory panels and NONE in the leading Overview
     // section, so a positional sections[0] lookup would read false here.
     const noKubeletNode = fullK8sStreams();
     noKubeletNode.metrics = noKubeletNode.metrics.filter(
       (s: any) => !s.name.startsWith("k8s_node_"),
     );
-    expect(kubernetesPage.sections[0].id, "precondition: overview is not first").not.toBe(
-      "overview",
+    expect(kubernetesPage.sections[0].id, "precondition: inventory is not first").not.toBe(
+      "inventory",
     );
     expect(resolve({ streams: noKubeletNode }).stripAutoExpand).toBe(true);
   });
@@ -1879,16 +1945,16 @@ describe("§8.2 golden parity — hosts pack vs the frozen buildHostDashboard ou
     }
   });
 
-  describe("every Overview/Nodes panel emits a REAL cluster matcher after substitution", () => {
+  describe("every Inventory/Nodes panel emits a REAL cluster matcher after substitution", () => {
     // The shipped bug read as "the picker does nothing" because the built query
     // had no matcher in it. Asserted on buildDashboard output — the same text
     // that reaches the query API — so a token that fails to substitute is caught
     // here rather than by a user watching a tile not move.
-    it("substitutes a cluster matcher into all nine Overview panels", () => {
+    it("substitutes a cluster matcher into all nine Inventory panels", () => {
       const built = build(resolve({}));
-      const overview = (built.tabs ?? []).find((t: any) => t.tabId === "overview");
-      expect(overview.panels.length).toBe(9);
-      for (const p of overview.panels) {
+      const inventory = (built.tabs ?? []).find((t: any) => t.tabId === "inventory");
+      expect(inventory.panels.length).toBe(9);
+      for (const p of inventory.panels) {
         for (const q of p.queries) {
           // The SPELLING is per-panel-stream (§5.4): the fixture's kubelet-node
           // streams carry k8s_cluster_name while kube-state carries k8s_cluster,
@@ -1901,16 +1967,16 @@ describe("§8.2 golden parity — hosts pack vs the frozen buildHostDashboard ou
 
     it("both spellings appear across the section — proof it resolved per stream", () => {
       const built = build(resolve({}));
-      const overview = (built.tabs ?? []).find((t: any) => t.tabId === "overview");
-      const queries = overview.panels.flatMap((p: any) => p.queries.map((q: any) => q.query));
+      const inventory = (built.tabs ?? []).find((t: any) => t.tabId === "inventory");
+      const queries = inventory.panels.flatMap((p: any) => p.queries.map((q: any) => q.query));
       expect(queries.some((q: string) => q.includes('k8s_cluster_name=~"$cluster"'))).toBe(true);
       expect(queries.some((q: string) => /[^_]k8s_cluster=~"\$cluster"/.test(q))).toBe(true);
     });
 
     it("pins collapse the same token to an exact-match literal, braces intact", () => {
       const built = build(resolve({}), { pins: { [GROUP.cluster]: "ap1cloud" } });
-      const overview = (built.tabs ?? []).find((t: any) => t.tabId === "overview");
-      for (const p of overview.panels) {
+      const inventory = (built.tabs ?? []).find((t: any) => t.tabId === "inventory");
+      for (const p of inventory.panels) {
         for (const q of p.queries) {
           expect(q.query, p.id).toMatch(/k8s_cluster(_name)?="ap1cloud"/);
           expect(q.query, `${p.id} empty matcher`).not.toMatch(/\{\s*\}/);
@@ -2074,8 +2140,13 @@ describe("§8.2 golden parity — hosts pack vs the frozen buildHostDashboard ou
         // manager understands (useVariablesManager:96-112 reads "all" and "custom"
         // specially and falls through to the first option for anything else).
         expect(["all", "first", "custom"]).toContain(ours.selectAll);
-        expect(ours.filterShape).toEqual(theirs.filterShape);
-        expect(ours.filterOperators).toEqual(theirs.filterOperators);
+        // Parity is per CLAUSE, not per count: the reference child narrows by one
+        // parent, while a curated child may narrow by several (pod needs cluster as
+        // well as namespace). Each clause must still be shaped the way it shapes its one.
+        for (const clause of ours.filterShape) expect(clause).toEqual(theirs.filterShape[0]);
+        for (const operator of ours.filterOperators) {
+          expect(operator).toBe(theirs.filterOperators[0]);
+        }
         expect(ours.filterRefsAreBareDollar).toBe(true);
       }
 
@@ -2084,9 +2155,9 @@ describe("§8.2 golden parity — hosts pack vs the frozen buildHostDashboard ou
         built.variables.list.map((v: any) => ({ ...v, scope: "global" })),
         {},
       );
-      // Three deep: the middle link is both a child and a parent, and only the
-      // root is independent.
-      expect(graph["pod@global"].parents).toEqual(["namespace@global"]);
+      // The middle link is both a child and a parent, only the root is independent,
+      // and pod waits on BOTH — a namespace name alone does not identify a pod.
+      expect(graph["pod@global"].parents).toEqual(["cluster@global", "namespace@global"]);
       expect(graph["namespace@global"].parents).toEqual(["cluster@global"]);
       expect(graph["cluster@global"].parents).toEqual([]);
     });
@@ -2128,12 +2199,13 @@ describe("§8.2 golden parity — hosts pack vs the frozen buildHostDashboard ou
         }
       }
 
-      // And the real graph agrees: pod is independent, not waiting on a ghost.
+      // And the real graph agrees: pod keeps the parent it still HAS and waits on
+      // no ghost — dropping one link of a multi-parent chain is not dropping them all.
       const graph = buildScopedDependencyGraph(
         built.variables.list.map((v: any) => ({ ...v, scope: "global" })),
         {},
       );
-      expect(graph["pod@global"].parents).toEqual([]);
+      expect(graph["pod@global"].parents).toEqual(["cluster@global"]);
     });
   });
 
@@ -2338,8 +2410,8 @@ describe("section-level note replaces the per-tile subtitle", () => {
   // on the selected tab, which is exactly what forced the rebuild.
   it("each tab carries its OWN noteKey", () => {
     const dashboard: any = build(resolve({}));
-    const overview = dashboard.tabs.find((t: any) => t.tabId === "overview");
-    expect(overview.curatedNoteKey).toBe("infra.k8s.section.overviewNote");
+    const inventory = dashboard.tabs.find((t: any) => t.tabId === "inventory");
+    expect(inventory.curatedNoteKey).toBe("infra.k8s.section.inventoryNote");
   });
 
   it("a section without a noteKey carries none — the line is per-section, not global", () => {
@@ -2348,10 +2420,10 @@ describe("section-level note replaces the per-tile subtitle", () => {
     expect(nodes.curatedNoteKey).toBeUndefined();
   });
 
-  it("no Overview tile stamps curated_subtitle_key any more", () => {
+  it("no Inventory tile stamps curated_subtitle_key any more", () => {
     const dashboard: any = build(resolve({}));
-    const overview = dashboard.tabs.find((t: any) => t.tabId === "overview");
-    const withSubtitle = overview.panels.filter((p: any) => p.config.curated_subtitle_key);
+    const inventory = dashboard.tabs.find((t: any) => t.tabId === "inventory");
+    const withSubtitle = inventory.panels.filter((p: any) => p.config.curated_subtitle_key);
     expect(withSubtitle.map((p: any) => p.id)).toEqual([]);
   });
 });
@@ -2396,7 +2468,7 @@ describe("the built dashboard does not depend on the selected tab", () => {
     );
     // Cluster renders on ALL THREE tabs: a Workloads without it answered a
     // per-cluster question with every cluster's pods, silently.
-    expect(byName.cluster).toEqual(["overview", "health", "utilization", "nodes", "workloads"]);
+    expect(byName.cluster).toEqual(["inventory", "health", "utilization", "nodes", "workloads"]);
     expect(byName.namespace).toEqual(["health", "utilization", "workloads"]);
     expect(byName.pod).toEqual(["workloads"]);
   });
@@ -2420,15 +2492,23 @@ describe("the built dashboard does not depend on the selected tab", () => {
     expect(filter.value).toBe("$cluster");
 
     // The filter field must be a real column of the stream the child queries.
-    const podStreamFields = new Set(KUBELET_POD_SCHEMA);
+    const phaseStreamFields = new Set(KUBE_POD_PHASE_SCHEMA);
     expect(namespaceVar.query_data.stream).toBe("kube_pod_status_phase");
     expect(
-      podStreamFields.has(filter.name),
-      `namespace narrows by "${filter.name}", which k8s_pod_memory_usage does not carry`,
+      phaseStreamFields.has(filter.name),
+      `namespace narrows by "${filter.name}", which kube_pod_status_phase does not carry`,
     ).toBe(true);
 
-    // And the chain stays three deep, each link naming its own parent.
-    expect(byName.pod.query_data.filter[0].value).toBe("$namespace");
+    // Every clause of a multi-parent chain answers to the same rule.
+    const podVar = byName.pod;
+    expect(podVar.query_data.stream).toBe("kube_pod_status_phase");
+    expect(podVar.query_data.filter.map((f: any) => f.value)).toEqual(["$cluster", "$namespace"]);
+    for (const clause of podVar.query_data.filter) {
+      expect(
+        phaseStreamFields.has(clause.name),
+        `pod narrows by "${clause.name}", which kube_pod_status_phase does not carry`,
+      ).toBe(true);
+    }
     expect(byName.cluster.query_data.filter).toEqual([]);
   });
 
@@ -2452,7 +2532,7 @@ describe("the built dashboard does not depend on the selected tab", () => {
 describe("CPU tile reads used-vs-capacity, and both sides carry the scope", () => {
   const cpuPanel = (dashboard: any) =>
     dashboard.tabs
-      .find((t: any) => t.tabId === "overview")
+      .find((t: any) => t.tabId === "inventory")
       .panels.find((p: any) => p.id === "k8s_ov_cpu_used");
 
   it("the ratio variant divides usage by ALLOCATABLE and reads as a percentage", () => {

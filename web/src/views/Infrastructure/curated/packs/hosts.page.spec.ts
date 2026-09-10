@@ -47,13 +47,11 @@ describe("hosts pack — one section, one group, always pinned", () => {
     expect(hostsPage.scopePickers[0].group).toBe(GROUP.host);
   });
 
-  it("declares exactly one section whose id is the frozen public identifier `host`", () => {
-    // The section id is a tab id and survives in users' URLs (§6.4), so it is
-    // pinned at the pack too — not only in lint's GOLDEN_NAMES list.
+  it("declares exactly one section, whose id is `host`", () => {
     expect(hostsPage.sections.map((s: any) => s.id)).toEqual(["host"]);
   });
 
-  it("pins the 24h staleness threshold like every v1 pack", () => {
+  it("pins the 24h staleness threshold like every pack", () => {
     expect(hostsPage.stalenessThresholdUs).toBe(STALENESS_24H_US);
   });
 });

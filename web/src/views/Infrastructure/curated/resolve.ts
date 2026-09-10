@@ -129,11 +129,11 @@ export interface ResolvedPicker {
   field: string;
   label: string;
   /**
-   * The PARENT concept's field as spelled on THIS picker's own values stream.
-   * The chain filter runs against the child's stream, so the parent's own
-   * spelling can name a column that stream does not have (§5.4 drift).
+   * Each PARENT concept's field as spelled on THIS picker's own values stream,
+   * keyed by parent picker name. The chain filter runs against the child's
+   * stream, so a parent's own spelling can name a column it does not have.
    */
-  parentField?: string;
+  parentFields?: Record<string, string>;
 }
 
 export interface PickerOption {
@@ -679,34 +679,39 @@ export function resolveManifest(args: ResolveArgs): CuratedResolution {
     if (!field) continue;
     if (picker.omitWhenFieldAbsent && schemaFields && !schemaFields.has(field)) continue;
 
-    // The chain filter is applied to THIS picker's values stream, so the parent
-    // concept must be spelled the way that stream spells it — the parent's own
+    // The chain filter is applied to THIS picker's values stream, so EVERY parent
+    // concept must be spelled the way that stream spells it — a parent's own
     // field comes from a different stream and can name a column missing here,
     // which returns an empty list rather than an error.
-    const parentName = picker.chainedOn?.[0]?.picker;
-    const parentDef = parentName
-      ? manifest.scopePickers.find((entry) => entry.name === parentName)
-      : undefined;
-    const parentField = parentDef
-      ? resolveConcept(
-          parentDef.group,
-          group,
-          schemaFields,
-          source.stream,
-          schemaFields !== undefined,
-        ).field
-      : undefined;
+    const parentFields: Record<string, string> = {};
+    for (const { picker: parentName } of picker.chainedOn ?? []) {
+      const parentDef = manifest.scopePickers.find((entry) => entry.name === parentName);
+      if (!parentDef) continue;
+      const parentField = resolveConcept(
+        parentDef.group,
+        group,
+        schemaFields,
+        source.stream,
+        schemaFields !== undefined,
+      ).field;
+      if (parentField) parentFields[parentName] = parentField;
+    }
 
-    pickers.push({ def: picker, field, label: display, ...(parentField ? { parentField } : {}) });
+    pickers.push({
+      def: picker,
+      field,
+      label: display,
+      ...(Object.keys(parentFields).length ? { parentFields } : {}),
+    });
   }
 
-  // By id, not by position: the strip explains absent data behind the OVERVIEW
+  // By id, not by position: the strip explains absent data behind the INVENTORY
   // panel set, and reordering sections must not silently retarget it elsewhere.
-  const overviewSectionId =
-    manifest.sections.find((section) => section.id === "overview")?.id ?? manifest.sections[0]?.id;
+  const inventorySectionId =
+    manifest.sections.find((section) => section.id === "inventory")?.id ?? manifest.sections[0]?.id;
   const stripAutoExpand = hiddenGroups.some((hidden) =>
     resolvedPanels.some(
-      (panel) => panel.groupId === hidden.group.id && panel.sectionId === overviewSectionId,
+      (panel) => panel.groupId === hidden.group.id && panel.sectionId === inventorySectionId,
     ),
   );
 
@@ -1183,10 +1188,12 @@ function buildVariable(
   loadedOptions: PickerOption[] | undefined,
 ): Record<string, unknown> {
   const def = picker.def;
-  const parent = def.chainedOn?.[0]?.picker;
-  const parentPicker = parent
-    ? resolution.pickers.find((entry) => entry.def.name === parent)
-    : undefined;
+  // A parent dropped at resolution time must take its clause with it, or the child
+  // waits on a variable that is not in the list (buildScopedDependencyGraph).
+  const parents = (def.chainedOn ?? []).flatMap(({ picker: name }) => {
+    const resolved = resolution.pickers.find((entry) => entry.def.name === name);
+    return resolved ? [{ name, resolved }] : [];
+  });
 
   // The sections this picker applies to, declared on the variable the way the
   // dashboards model declares `tabs` — read as a reactive filter at render time
@@ -1215,7 +1222,8 @@ function buildVariable(
     // Consumed by VariablesValueSelector; stored dashboards never carry them, so they stay invisible outside curated pages.
     curatedOmitWhenValuesEmpty: def.omitWhenValuesEmpty === true,
     curatedCapNotice: true,
-    curatedNarrowBy: parentPicker?.label ?? "",
+    // Every parent, not just the first: capped values narrow only when the user knows all the controls that cut the list.
+    curatedNarrowBy: parents.map(({ resolved }) => resolved.label).join(", "),
     // Built fresh each render, so there is no saved `options` array to fall back
     // on the way a stored dashboard has — without this the all-sentinel picker
     // never fetches and renders <ALL> over an empty list (useVariablesManager :479-491).
@@ -1227,16 +1235,14 @@ function buildVariable(
       stream: def.valuesFrom.stream,
       field: picker.field,
       max_record_size: 100,
-      filter: parentPicker
-        ? [
-            {
-              // Spelled for the stream the filter RUNS on, not the parent's own.
-              name: picker.parentField ?? parentPicker.field,
-              operator: "IN",
-              value: `$${parent}`,
-            },
-          ]
-        : [],
+      // One clause per parent: a namespace name is not unique across clusters, so
+      // filtering on the nearest parent alone pooled every cluster's pods.
+      filter: parents.map(({ name, resolved }) => ({
+        // Spelled for the stream the filter RUNS on, not the parent's own.
+        name: picker.parentFields?.[name] ?? resolved.field,
+        operator: "IN",
+        value: `$${name}`,
+      })),
     },
   };
 }
