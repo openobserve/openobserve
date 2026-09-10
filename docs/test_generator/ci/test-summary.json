@@ -1,0 +1,17 @@
+[
+  {
+    "title": "should style the pause/resume control with the correct variant in both states",
+    "action": "new",
+    "verifies": "an enabled workflow shows a ghost-destructive pause control and, once paused, a ghost-success resume control"
+  },
+  {
+    "title": "should place each branch arm connector at its own source handle",
+    "action": "new",
+    "verifies": "a two-arm Branch's append connectors have distinct, per-arm start-x coordinates close to their own handles"
+  },
+  {
+    "title": "should render the disabled badge inside a wrapping status strip",
+    "action": "new",
+    "verifies": "disabling a node shows its Disabled badge inside a flex-wrap, max-width-capped status strip"
+  }
+]

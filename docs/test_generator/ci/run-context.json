@@ -1,0 +1,19 @@
+{
+  "feature_slug": "workflow-canvas-branch-connectors",
+  "feature_title": "Workflows Canvas Branch Connectors & Control Polish",
+  "area": "Workflows",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "workflows-canvas-branch-connectors.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Workflows/workflows-canvas-branch-connectors.spec.js",
+  "playwright_group": "Workflows",
+  "source_files": [
+    "web/src/plugins/workflows/WorkflowCanvas.vue",
+    "web/src/plugins/workflows/WorkflowNode.vue",
+    "web/src/components/workflows/WorkflowsList.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": ""
+}
