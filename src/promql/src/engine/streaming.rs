@@ -32,7 +32,9 @@ use super::{
     },
 };
 use crate::{
-    functions, fused, micros,
+    functions,
+    fused::{self, streaming::group_label_columns},
+    micros,
     series_stream::merge::{MergeSeriesStream, StreamingSelector, series_label_columns},
 };
 
@@ -64,22 +66,8 @@ impl Engine {
         let Some(scan) = self.selector_scan(vs, range, "MatrixSelector").await? else {
             return Ok(None);
         };
-        let shape = fused::streaming::FusedShape {
-            op,
-            func: func.clone(),
-            range,
-        };
         let streamed = self
-            .stream_scan_guarded(&scan, |ctx, schema| {
-                fused::streaming::aggregate(
-                    ctx,
-                    schema,
-                    scan.streaming_selector(),
-                    shape,
-                    modifier,
-                    &self.eval_ctx,
-                )
-            })
+            .stream_fused_agg(&scan, modifier, func.clone(), op, range)
             .await?;
         if let Some(value) = streamed {
             if self.result_type.is_none() {
@@ -156,6 +144,38 @@ impl Engine {
         self.eval_vector_selector(&scan.selector, Some(scan.ctxs))
             .await
             .map(Some)
+    }
+
+    async fn stream_fused_agg(
+        &self,
+        scan: &SelectorScan,
+        modifier: &Option<LabelModifier>,
+        func: Arc<dyn functions::RangeFunc>,
+        op: fused::FusedAggOp,
+        range: Duration,
+    ) -> Result<Option<Value>> {
+        self.stream_scan_guarded(scan, |ctx, schema| async move {
+            let Some(label_cols) = group_label_columns(modifier, schema, func.name()) else {
+                return Ok(None);
+            };
+            let Some(sources) = MergeSeriesStream::execute_partitioned(
+                ctx,
+                schema,
+                &scan.streaming_selector(),
+                label_cols,
+                micros(range),
+                &self.eval_ctx,
+            )
+            .await?
+            else {
+                return Ok(None);
+            };
+            let eval = Arc::new(fused::RangeExpr::new(func, range, &self.eval_ctx));
+            fused::aggregate(sources, op, eval)
+                .await
+                .map(|(value, _)| Some(value))
+        })
+        .await
     }
 
     async fn stream_range_func(

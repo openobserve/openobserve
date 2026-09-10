@@ -337,7 +337,7 @@ mod tests {
     }
 
     #[test]
-    fn test_matrix_sources_none_and_invalid_input() {
+    fn test_group_sources_none_and_invalid_input() {
         assert!(group_sources(Value::None, &None, "rate").unwrap().is_none());
         assert!(group_sources(Value::Float(1.0), &None, "rate").is_err());
         assert!(

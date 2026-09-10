@@ -32,14 +32,14 @@ use promql_parser::label::Matchers;
 use tokio::sync::oneshot;
 
 mod aggregations;
-mod binaries;
+pub mod ast;
+mod binary;
 pub mod common;
 pub mod engine;
 pub mod exec;
 mod functions;
 mod fused;
 mod load_series;
-pub mod promql;
 mod series_stream;
 pub mod utils;
 

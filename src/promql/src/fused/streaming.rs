@@ -13,66 +13,19 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Streaming evaluation of `agg(range_func(selector))` over hash-sorted
-//! metrics files: each hash partition merges its hash-ordered file chains one
-//! series at a time through the shared fused fold, so the sample matrix is
-//! never materialized.
-
-use std::{sync::Arc, time::Duration};
+//! The label projection the hash-sorted sources group by.
 
 use config::{
     TIMESTAMP_COL_NAME,
-    meta::promql::{
-        EXEMPLARS_LABEL, HASH_LABEL, NAME_LABEL, VALUE_LABEL,
-        value::{EvalContext, Value},
-    },
+    meta::promql::{EXEMPLARS_LABEL, HASH_LABEL, NAME_LABEL, VALUE_LABEL},
 };
-use datafusion::{arrow::datatypes::Schema, error::Result, prelude::SessionContext};
+use datafusion::arrow::datatypes::Schema;
 use promql_parser::parser::LabelModifier;
 
-use super::range_expr::RangeExpr;
-use crate::{
-    functions::{KEEP_METRIC_NAME_FUNC, RangeFunc},
-    fused::{self, FusedAggOp},
-    micros,
-    series_stream::merge::{MergeSeriesStream, StreamingSelector},
-};
-
-/// The `agg(range_func(...))` pair being evaluated.
-pub(crate) struct FusedShape {
-    pub op: FusedAggOp,
-    pub func: Arc<dyn RangeFunc>,
-    pub range: Duration,
-}
-
-/// Folds from per-partition ordered streams; `None` when the layout or shape cannot stream. The
-/// caller bounds it: dropping the future aborts the partition folds.
-pub(crate) async fn aggregate(
-    ctx: &SessionContext,
-    schema: &Schema,
-    selector: StreamingSelector<'_>,
-    shape: FusedShape,
-    modifier: &Option<LabelModifier>,
-    eval_ctx: &EvalContext,
-) -> Result<Option<Value>> {
-    let Some(group_cols) = group_label_columns(modifier, schema, shape.func.name()) else {
-        return Ok(None);
-    };
-    let lookback = micros(shape.range);
-    let Some(sources) = MergeSeriesStream::execute_partitioned(
-        ctx, schema, &selector, group_cols, lookback, eval_ctx,
-    )
-    .await?
-    else {
-        return Ok(None);
-    };
-    let eval = Arc::new(RangeExpr::new(shape.func.clone(), shape.range, eval_ctx));
-    let (value, _) = fused::aggregate(sources, shape.op, eval).await?;
-    Ok(Some(value))
-}
+use crate::functions::KEEP_METRIC_NAME_FUNC;
 
 /// The `by()` columns in a stable order; `None` for `without()`, which needs the full label set.
-fn group_label_columns(
+pub(crate) fn group_label_columns(
     modifier: &Option<LabelModifier>,
     schema: &Schema,
     func_name: &str,
@@ -103,9 +56,11 @@ fn group_label_columns(
 
 #[cfg(test)]
 mod tests {
+    use std::{sync::Arc, time::Duration};
+
     use config::meta::promql::{
         HASH_SORTED_TABLE_SUFFIX,
-        value::{Label, RangeValue, Sample, TimeWindow},
+        value::{Label, RangeValue, Sample, TimeWindow, Value},
     };
     use datafusion::{
         arrow::{
@@ -113,18 +68,26 @@ mod tests {
             datatypes::DataType,
         },
         datasource::MemTable,
+        error::Result,
         logical_expr::SortExpr,
-        prelude::{SessionConfig, col},
+        prelude::{SessionConfig, SessionContext, col},
     };
     use hashbrown::{HashMap, HashSet};
     use itertools::Itertools;
     use promql_parser::label::{Labels as ModifierLabels, Matchers};
 
     use super::{
-        super::{eval_range::eval_range, materialized, test_support::*},
+        super::{
+            aggregate::aggregate, eval_range::eval_range, materialized, op::FusedAggOp,
+            range_expr::RangeExpr, test_support::*,
+        },
         *,
     };
-    use crate::{functions, series_stream::merge::series_label_columns};
+    use crate::{
+        functions::{self, RangeFunc},
+        micros,
+        series_stream::merge::{MergeSeriesStream, StreamingSelector, series_label_columns},
+    };
 
     fn arrow_schema() -> Arc<Schema> {
         use datafusion::arrow::datatypes::Field;
@@ -259,6 +222,30 @@ mod tests {
         matrix
     }
 
+    /// The sorted table's merge sources, projected to `label_cols`; `None` when it cannot stream.
+    async fn merge_sources(
+        ctx: &SessionContext,
+        label_cols: Vec<String>,
+        range: Duration,
+    ) -> Option<Vec<impl Future<Output = Result<MergeSeriesStream>> + Send + 'static>> {
+        let selector = StreamingSelector {
+            table_name: "m",
+            matchers: &Matchers::empty(),
+            offset: 0,
+        };
+        MergeSeriesStream::execute_partitioned(
+            ctx,
+            &arrow_schema(),
+            &selector,
+            label_cols,
+            micros(range),
+            &eval_ctx(),
+        )
+        .await
+        .unwrap()
+    }
+
+    /// The aggregate over the sorted table's merge sources; `None` when it cannot stream.
     async fn run_streaming(
         ctx: &SessionContext,
         modifier: &Option<LabelModifier>,
@@ -267,21 +254,10 @@ mod tests {
         range: Duration,
     ) -> Option<Value> {
         let func: Arc<dyn RangeFunc> = Arc::from(functions::fusable_range_func(func_name).unwrap());
-        let eval_ctx = eval_ctx();
-        aggregate(
-            ctx,
-            &arrow_schema(),
-            StreamingSelector {
-                table_name: "m",
-                matchers: &Matchers::empty(),
-                offset: 0,
-            },
-            FusedShape { op, func, range },
-            modifier,
-            &eval_ctx,
-        )
-        .await
-        .unwrap()
+        let label_cols = group_label_columns(modifier, &arrow_schema(), func_name)?;
+        let sources = merge_sources(ctx, label_cols, range).await?;
+        let eval = Arc::new(RangeExpr::new(func, range, &eval_ctx()));
+        Some(aggregate(sources, op, eval).await.unwrap().0)
     }
 
     #[test]
@@ -345,7 +321,7 @@ mod tests {
                     .unwrap()
                     .unwrap();
                     let eval = Arc::new(RangeExpr::new(func, range, &eval_ctx()));
-                    let expected = fused::aggregate(sources, op, eval).await.unwrap().0;
+                    let expected = aggregate(sources, op, eval).await.unwrap().0;
 
                     let actual = run_streaming(&ctx, modifier, func_name, op, range)
                         .await
@@ -398,23 +374,10 @@ mod tests {
                 &eval_ctx,
             )
             .unwrap();
-            let selector = StreamingSelector {
-                table_name: "m",
-                matchers: &Matchers::empty(),
-                offset: 0,
-            };
             let label_cols = series_label_columns(&arrow_schema(), &all_labels, func_name);
-            let sources = MergeSeriesStream::execute_partitioned(
-                &ctx,
-                &arrow_schema(),
-                &selector,
-                label_cols,
-                micros(range),
-                &eval_ctx,
-            )
-            .await
-            .unwrap()
-            .expect("the sorted table streams");
+            let sources = merge_sources(&ctx, label_cols, range)
+                .await
+                .expect("the sorted table streams");
             let eval = Arc::new(RangeExpr::new(func, range, &eval_ctx));
             let (actual, _) = eval_range(sources, eval).await.unwrap();
             assert_matrix_close(

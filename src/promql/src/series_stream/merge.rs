@@ -85,7 +85,8 @@ impl MergeSeriesStream {
         label_cols: Vec<String>,
         lookback: i64,
         eval_ctx: &EvalContext,
-    ) -> Result<Option<Vec<impl Future<Output = Result<MergeSeriesStream>> + Send + 'static>>> {
+    ) -> Result<Option<Vec<impl Future<Output = Result<MergeSeriesStream>> + Send + 'static + use<>>>>
+    {
         if schema
             .field_with_name(HASH_LABEL)
             .is_ok_and(|field| field.data_type() != &DataType::UInt64)
