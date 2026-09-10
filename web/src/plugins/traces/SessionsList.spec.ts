@@ -56,6 +56,16 @@ vi.mock("@/composables/useStreams", () => ({
   })),
 }));
 
+// This file's default subject is Agent mode — enterprise-only — independent
+// of whatever a developer's local .env happens to set. OSS-forced-stream
+// behavior gets its own explicit tests further down, overriding this mock.
+vi.mock("@/aws-exports", () => ({
+  default: {
+    isEnterprise: "true",
+    isCloud: "false",
+  },
+}));
+
 vi.mock("@/services/gen-ai-agent-mapping.service", () => ({
   default: {
     listAgents: (...args: any[]) => mockListAgents(...args),
@@ -183,6 +193,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import SessionsList from "./SessionsList.vue";
 import AgentScopeCascade from "@/enterprise/components/AIObservability/AgentScopeCascade.vue";
+import config from "@/aws-exports";
 
 const defaultProps = {
   streamName: "test-stream",
@@ -612,5 +623,46 @@ describe("SessionsList — row click", () => {
     const emitted = wrapper.emitted("sessionSelected");
     expect(emitted).toBeTruthy();
     expect(emitted![0][0]).toMatchObject({ sessionId: "sess-click" });
+  });
+});
+
+describe("SessionsList — OSS builds (neither isEnterprise nor isCloud is 'true')", () => {
+  afterEach(() => {
+    // Every other describe block in this file assumes enterprise mode (see
+    // the module-level @/aws-exports mock) — restore it so later tests aren't
+    // affected by mutating the shared mock object here.
+    config.isEnterprise = "true";
+    config.isCloud = "false";
+  });
+
+  it("hides the Stream/Agent toggle — Agent mode needs the enterprise-only agent-mapping API", async () => {
+    config.isEnterprise = "false";
+    const wrapper = await mountComponent();
+    expect(wrapper.find("[data-test='sessions-list-filter-mode']").exists()).toBe(false);
+  });
+
+  it("forces Stream mode even when the URL asks for Agent mode", async () => {
+    config.isEnterprise = "false";
+    mockRouteQuery = { type: "agent" };
+    const wrapper = await mountComponent();
+    await flushPromises();
+    // With no toggle, the stream selector is always visible.
+    expect(wrapper.find("[data-test='sessions-list-stream-selector']").exists()).toBe(true);
+    expect(wrapper.findComponent(AgentScopeCascade).exists()).toBe(false);
+  });
+
+  it("still shows the toggle on a cloud build (isCloud true) even with isEnterprise false — cloud registers the same enterprise route/backend", async () => {
+    config.isEnterprise = "false";
+    config.isCloud = "true";
+    const wrapper = await mountComponent();
+    expect(wrapper.find("[data-test='sessions-list-filter-mode']").exists()).toBe(true);
+  });
+
+  it("defaults to Agent mode on a cloud build, same as enterprise", async () => {
+    config.isEnterprise = "false";
+    config.isCloud = "true";
+    const wrapper = await mountComponent();
+    await flushPromises();
+    expect(wrapper.findComponent(AgentScopeCascade).exists()).toBe(true);
   });
 });

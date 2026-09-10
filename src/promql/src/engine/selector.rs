@@ -38,9 +38,9 @@ use rayon::iter::{IntoParallelIterator, IntoParallelRefMutIterator, ParallelIter
 
 use super::Engine;
 use crate::{
+    ast::rewrite::remove_filter_all,
     load_series::{LoadedMetrics, PartitionedMetrics, selector_load_data_from_datafusion},
     micros,
-    promql::rewrite::remove_filter_all,
     utils::metric_name,
 };
 
