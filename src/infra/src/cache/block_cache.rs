@@ -601,10 +601,18 @@ mod tests {
 
         let expected = Bytes::from((1..14).collect::<Vec<u8>>());
         assert_eq!(read().await.unwrap(), expected);
-        assert_eq!(fetches.load(Ordering::SeqCst), 1, "cold read spans one fetch");
+        assert_eq!(
+            fetches.load(Ordering::SeqCst),
+            1,
+            "cold read spans one fetch"
+        );
 
         assert_eq!(read().await.unwrap(), expected);
-        assert_eq!(fetches.load(Ordering::SeqCst), 1, "warm read fetches nothing");
+        assert_eq!(
+            fetches.load(Ordering::SeqCst),
+            1,
+            "warm read fetches nothing"
+        );
     }
 
     /// The gauge is fed from `size`, so this covers both the reported value and the capacity

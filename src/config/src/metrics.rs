@@ -1268,18 +1268,19 @@ pub static QUERY_DISK_CACHE_INLINE_DOWNLOAD_BYTES: Lazy<IntCounterVec> = Lazy::n
     )
     .expect("Metric created")
 });
-pub static QUERY_DISK_CACHE_INLINE_DOWNLOAD_DURATION_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
-    HistogramVec::new(
-        HistogramOpts::new(
-            "query_disk_cache_inline_download_duration_seconds",
-            "query disk cache inline download duration in seconds".to_owned() + HELP_SUFFIX,
+pub static QUERY_DISK_CACHE_INLINE_DOWNLOAD_DURATION_SECONDS: Lazy<HistogramVec> =
+    Lazy::new(|| {
+        HistogramVec::new(
+            HistogramOpts::new(
+                "query_disk_cache_inline_download_duration_seconds",
+                "query disk cache inline download duration in seconds".to_owned() + HELP_SUFFIX,
+            )
+            .namespace(NAMESPACE)
+            .const_labels(create_const_labels()),
+            &["file_type"],
         )
-        .namespace(NAMESPACE)
-        .const_labels(create_const_labels()),
-        &["file_type"],
-    )
-    .expect("Metric created")
-});
+        .expect("Metric created")
+    });
 
 // file downloader metrics
 pub static FILE_DOWNLOADER_NORMAL_QUEUE_SIZE: Lazy<IntGaugeVec> = Lazy::new(|| {
