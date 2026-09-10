@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="logs-view-mode-dropdown-btn"
                 size="xs"
                 variant="outline"
-                icon-right="chevron-down"
+                icon-right="arrow-drop-down"
               >
                 <OIcon :name="currentToggleOption.icon" size="sm" class="shrink-0" />
                 {{ currentToggleOption.label }}
