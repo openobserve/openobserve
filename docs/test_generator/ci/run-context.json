@@ -1,0 +1,23 @@
+{
+  "feature_slug": "access-denied-empty-state",
+  "feature_title": "Access Denied (403) Empty State for Lists",
+  "area": "GeneralTests",
+  "edition": "both",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "noAccessState.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/GeneralTests/noAccessState.spec.js",
+  "playwright_group": "GeneralTests",
+  "source_files": [
+    "web/src/lib/core/Table/OTable.vue",
+    "web/src/lib/core/Table/OTable.types.ts",
+    "web/src/lib/core/EmptyState/presets.ts",
+    "web/src/lib/core/EmptyState/illustrations/EmptyLock.vue",
+    "web/src/components/alerts/AlertList.vue",
+    "web/src/views/Dashboards/Dashboards.vue",
+    "web/src/composables/useStreams.ts"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": ""
+}

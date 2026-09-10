@@ -1,0 +1,31 @@
+{
+  "feature_slug": "access-denied-empty-state",
+  "feature_title": "Access Denied (403) Empty State for Lists",
+  "area": "GeneralTests",
+  "edition": "both",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "noAccessState.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/GeneralTests/noAccessState.spec.js",
+  "playwright_group": "GeneralTests",
+  "source_files": [
+    "web/src/lib/core/Table/OTable.vue",
+    "web/src/lib/core/Table/OTable.types.ts",
+    "web/src/lib/core/EmptyState/presets.ts",
+    "web/src/lib/core/EmptyState/illustrations/EmptyLock.vue",
+    "web/src/components/alerts/AlertList.vue",
+    "web/src/views/Dashboards/Dashboards.vue",
+    "web/src/composables/useStreams.ts"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "Changed paths span both layers: the OSS shared UI lives under web/src/lib/core (OTable.vue, OTable.types.ts, EmptyState/presets.ts, EmptyLock.vue) plus web/src/components, web/src/views, web/src/composables, web/src/plugins and web/src/locales, while web/src/enterprise/components (OnlineEvals, onlineEvals/*) and web/src/enterprise/views/AIObservability/* are enterprise-owned. The core `forbidden` prop and `no-access` preset are OSS shared code consumed by both, so edition is 'both'.",
+    "skip": "Not skipping. No explicit opt-out is present (feature_hint.txt and trigger_comment.txt are both empty, no `tests-added` label was passed). The change is user-facing: it alters the empty state rendered by ~35 list/table views and several full views (Dashboards, LogStream, RUM SourceMaps, SyntheticMonitoring), so it is not docs-only or CI-only.",
+    "e2e": "E2E is warranted. When a list fetch returns 403 the table now renders a dedicated 'You don't have access' no-access state (lock illustration, no action cards) instead of a misleading first-run 'create your first…' CTA that would itself 403. This is a visible, cross-cutting UI flow (gated by the new `forbidden` prop + `no-access` preset + EmptyLock illustration) that should be verified for at least one representative list and the Dashboards landing path.",
+    "area": "GeneralTests. The change is a shared-component behavior (OTable empty-state) rather than one product area; it touches alerts, functions, IAM, pipelines, queries, reports, settings, synthetic monitoring, workflows, dashboards and streams. There is no IAM/RBAC testfolder, and GeneralTests already hosts IAM/settings specs (serviceAccount.spec.js, cipherKeys.spec.js, etc.), making it the natural home for a cross-cutting access/empty-state spec.",
+    "group": "GeneralTests is the closest existing testfolder shard. Note: this repo has no plain ci_matrix.json — the OSS env matrix is tests/ui-testing/ci-matrix/ci_matrix_env.json, whose GeneralTests group (actual_folder GeneralTests) is the fit. The Engineer must add noAccessState.spec.js to that group's run_files.",
+    "existing_tests": "No E2E specs in the diff — nothing under tests/ui-testing/playwright-tests/ changed. The only test file is web/src/views/Dashboards/Dashboards.spec.ts, a Vitest unit test, which is unit coverage (dev test-maintenance) and not Playwright E2E, so existing_tests_in_diff is false."
+  }
+}

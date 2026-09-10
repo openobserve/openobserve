@@ -1,0 +1,2862 @@
+===== COMPLETE LIST OF CHANGED FILES (74 files) =====
+# AUTHORITATIVE: this list is never truncated. The diff BODY below may be trimmed for
+# very large PRs, so decide WHICH files/areas changed (e.g. web/src frontend) from THIS list.
+.claude/skills/ui-architect/SKILL.md
+.claude/skills/ui-architect/references/page-recipes.md
+scripts/translations/.translation_state.json
+web/src/components/alerts/AlertList.vue
+web/src/components/alerts/AlertsDestinationList.vue
+web/src/components/alerts/ExternalAlertSourcesList.vue
+web/src/components/alerts/IncidentList.vue
+web/src/components/alerts/PipelinesDestinationList.vue
+web/src/components/alerts/TemplateList.vue
+web/src/components/functions/EnrichmentTableList.vue
+web/src/components/functions/FunctionList.vue
+web/src/components/iam/IngestionTokens.vue
+web/src/components/iam/groups/AppGroups.vue
+web/src/components/iam/organizations/ListOrganizations.vue
+web/src/components/iam/quota/Quota.vue
+web/src/components/iam/roles/AppRoles.vue
+web/src/components/iam/roles/RoleTable.vue
+web/src/components/iam/serviceAccounts/ServiceAccountsList.vue
+web/src/components/iam/users/InvitationList.vue
+web/src/components/iam/users/User.vue
+web/src/components/pipeline/PipelinesList.vue
+web/src/components/pipelines/BackfillJobsList.vue
+web/src/components/pipelines/PipelineHistory.vue
+web/src/components/queries/RunningQueries.vue
+web/src/components/queries/RunningQueriesList.vue
+web/src/components/queries/SummaryList.vue
+web/src/components/reports/ReportList.vue
+web/src/components/settings/AiToolsets.vue
+web/src/components/settings/CipherKeys.vue
+web/src/components/settings/DiscoveredServices.vue
+web/src/components/settings/LlmProvidersSettings.vue
+web/src/components/settings/ModelPricingList.vue
+web/src/components/settings/OrganizationManagement.vue
+web/src/components/settings/RegexPatternList.vue
+web/src/components/synthetic-monitoring/MonitorTable.vue
+web/src/components/workflows/WorkflowsList.vue
+web/src/composables/useRateLimiter.ts
+web/src/composables/useStreams.ts
+web/src/enterprise/components/OnlineEvals.vue
+web/src/enterprise/components/onlineEvals/EvalJobList.vue
+web/src/enterprise/components/onlineEvals/ScoreConfigList.vue
+web/src/enterprise/components/onlineEvals/ScorerList.vue
+web/src/enterprise/components/onlineEvals/composables/useOnlineEvalsData.ts
+web/src/enterprise/views/AIObservability/DatasetsPage.vue
+web/src/enterprise/views/AIObservability/QueuesPage.vue
+web/src/enterprise/views/AIObservability/RemoteTasksPage.vue
+web/src/lib/core/EmptyState/illustrations/EmptyLock.vue
+web/src/lib/core/EmptyState/illustrations/index.ts
+web/src/lib/core/EmptyState/presets.ts
+web/src/lib/core/Table/OTable.types.ts
+web/src/lib/core/Table/OTable.vue
+web/src/locales/languages/ar-SA.json
+web/src/locales/languages/de-DE.json
+web/src/locales/languages/en-US.json
+web/src/locales/languages/es-ES.json
+web/src/locales/languages/fr-FR.json
+web/src/locales/languages/it-IT.json
+web/src/locales/languages/ja-JP.json
+web/src/locales/languages/ko-KR.json
+web/src/locales/languages/nl-NL.json
+web/src/locales/languages/pl-PL.json
+web/src/locales/languages/pt-PT.json
+web/src/locales/languages/ru-RU.json
+web/src/locales/languages/tr-TR.json
+web/src/locales/languages/vi-VN.json
+web/src/locales/languages/zh-CN.json
+web/src/locales/languages/zh-TW.json
+web/src/plugins/logs/SearchHistory.vue
+web/src/plugins/logs/SearchSchedulersList.vue
+web/src/views/Dashboards/Dashboards.spec.ts
+web/src/views/Dashboards/Dashboards.vue
+web/src/views/LogStream.vue
+web/src/views/RUM/SourceMaps.vue
+web/src/views/SyntheticMonitoring.vue
+===== END CHANGED FILES =====
+
+diff --git a/.claude/skills/ui-architect/SKILL.md b/.claude/skills/ui-architect/SKILL.md
+index 1022c7d1950..c876fd634b3 100644
+--- a/.claude/skills/ui-architect/SKILL.md
++++ b/.claude/skills/ui-architect/SKILL.md
+@@ -528,7 +528,7 @@ and each domain has its own reference below.
+ | **Whole-page layout** | **Every routed view is a `OPageLayout`.** It's the ONE page component — it owns the full-height column, the header (from `:title`/`:icon`/`:subtitle`/`:back` props + `#actions`/`#header-tabs`, the latter needing **`tabs-below`** to land in row 2 instead of inline), an optional `#subnav` strip, an optional `#sidebar` rail (fixed or `resizable`), and the body's inset. You plug in data; there's no place to hand-roll a padded `<div>`. Body is inset to the page-edge grid by default — pass **`bleed`** for a full-bleed body (an `OTable`, a chart, a `router-view` shell), or **`constrained`** for a centered reading column (forms). The `#header` slot is a rare escape hatch only. | [page-recipes](references/page-recipes.md) |
+ | **Content inset** | `OPageLayout` already insets the body. Anywhere else (a panel, a dialog section, one tab's content) wrap it in **`OContent`** (bakes the one `px-page-edge` grid line, the primitive `OPageLayout` uses internally) instead of hand-picking `px-2`/`px-4`/`p-2.5`; pass `bleed` (or `bleed-x`/`bleed-y`) for full-bleed content that owns its own edge — same escape-hatch idea as `ODrawer`/`ODialog` `bleed`. Never hand-roll a content inset. | [conventions](references/conventions.md) |
+ | **Tab strips** | an `OTabs` strip needs **no** horizontal wrapper padding — the first tab's label self-aligns to the `px-page-edge` grid, so it lines up with the `OContent` body below it. Put the strip's bottom divider on the strip (`border-b`) and give it no `px-*`; wrapping a tab strip in `px-page-edge` double-insets the labels. | [conventions](references/conventions.md) |
+-| **Listing toolbar** | every list carries three affordances — search + filters (`#toolbar`), refresh (`#toolbar-trailing`), and the auto-injected column-visibility toggle; empty state is one `OEmptyState` with `:filtered` | [page-recipes](references/page-recipes.md) |
++| **Listing toolbar** | every list carries three affordances — search + filters (`#toolbar`), refresh (`#toolbar-trailing`), and the auto-injected column-visibility toggle; empty state is one `OEmptyState` with `:filtered`, in the `#empty` slot only, plus `:forbidden` on the table so a 403 shows "You don't have access" instead of "create your first…" | [page-recipes](references/page-recipes.md) |
+ | **Data fetching** | view → domain service (`src/services`, via the `http.ts` wrapper) → Vuex (shared/cached) or local `ref` (ephemeral); never call `http`/axios from a component | [conventions](references/conventions.md) |
+ | **Form container** | confirm → `ConfirmDialog`; short form → `ODialog`; tall or contextual form → `ODrawer`; primary multi-section flow → a full in-page view. Use `ODialog` / `ODrawer` for these | [conventions](references/conventions.md) |
+ | **Form validation** | `OForm` + a colocated Zod `<Form>.schema.ts`; fields are `OForm*` bound **only by `name=`** (no `v-model`/`ref` mirror, no `formData`); submit + loading automatic; payload built with explicit keys; field arrays use `:key="index"` | [forms-validation](references/forms-validation.md) |
+diff --git a/.claude/skills/ui-architect/references/page-recipes.md b/.claude/skills/ui-architect/references/page-recipes.md
+index a32b5af58c2..728f302ed80 100644
+--- a/.claude/skills/ui-architect/references/page-recipes.md
++++ b/.claude/skills/ui-architect/references/page-recipes.md
+@@ -14,6 +14,7 @@ feel like one product.
+   - [The mandatory listing toolbar: search · refresh · column toggle](#the-mandatory-listing-toolbar)
+   - [Columns: hideable + default-hidden + persisted](#columns-hideable--default-hidden--persisted)
+   - [Empty state: filtered vs first-run](#empty-state-filtered-vs-first-run)
++  - [Denied: the third empty state (`:forbidden`)](#denied-the-third-empty-state-forbidden)
+   - [States, actions, shortcuts, data](#states-actions-shortcuts-data)
+ - [Recipe: detail / editor page](#recipe-detail--editor-page)
+ - [Listing-page checklist](#listing-page-checklist)
+@@ -287,6 +288,63 @@ blocks:
+   first-run title/description/illustration/action cards — pick or add one rather
+   than passing raw title/description strings for a listing page.
+ 
++### Denied: the third empty state (`:forbidden`)
++
++A 403 and a genuinely empty list are **both zero rows**, so without help the table
++shows the first-run state — inviting a user to "create your first alert" behind
++buttons that will each 403. The page carries one boolean so `OTable` can tell them
++apart:
++
++```vue
++<OTable :loading="loading" :forbidden="forbidden" ... />
++```
++
++```ts
++const forbidden = ref(false);
++
++const getAlerts = async () => {
++  loading.value = true;
++  forbidden.value = false;                 // clear at the START of every load
++  try {
++    rows.value = (await alertsService.list(org)).data.list;
++  } catch (err: any) {
++    forbidden.value = err?.response?.status === 403;
++    // the grouped access toast already reports a 403; a second red toast adds nothing
++    if (!forbidden.value) showErrorNotification(...);
++  } finally {
++    loading.value = false;
++  }
++};
++```
++
++`OTable` renders the shared `no-access` state ("You don't have access", no action
++cards) when `forbidden` is true **and** the table has no rows. It never overrides
++visible data.
++
++**The rules that matter:**
++
++- **Only the request that fetches THIS table's rows may set it.** A 403 from a
++  *different* endpoint says nothing about this one. Sibling resources are granted
++  independently — `dfolder` vs `dashboard`, `alerts` vs `alerts/templates` — so a
++  denied folder list must not blank a dashboard list the user can read.
++- **Wire every load path.** Initial load *and* refresh/refetch, or the flag goes
++  stale between them.
++- **The `#empty` slot is the only place for the empty state.** If a page renders
++  its first-run state in an outer `v-else-if="!rows.length"` branch, the table
++  never mounts when the list is empty and `:forbidden` is dead code. Fold both
++  first-run and filtered copy into `#empty` (conditional `title`/`description`)
++  so there is one code path.
++- **Presentational tables** (a child that receives `:loading` as a prop) need a
++  `forbidden?: boolean` prop forwarded the same way; the parent that owns the
++  fetch sets it.
++- **Never put `data-test` on `OEmptyState` itself** — Vue attribute fallthrough
++  lands it on the same root element and silently *replaces* the component's own
++  `data-test="o2-empty-state"`. Put it on the wrapper.
++- **Beware composables that rewrap errors.** A helper that rejects with
++  `new Error(e.message)` drops `.response`, so `err?.response?.status` is
++  `undefined` and the flag can never fire. Preserve the status on the rejection.
++
++
+ ### States, actions, shortcuts, data
+ 
+ - **Loading / empty / error:** pass `:loading`; provide the single `#empty`
+@@ -340,7 +398,11 @@ form — those go in an `ODialog`/`ODrawer`; see SKILL.md § Forms):
+ - [ ] Non-essential columns **hidden by default** via `:column-visibility`.
+ - [ ] Single `#empty` `OEmptyState` with a `preset` + **`:filtered`** (true when
+       search/filter active) + an `@action` that resets on `clear-filters`;
+-      `#error` if fetch can fail; `:loading` bound.
++      `#error` if fetch can fail; `:loading` bound. **No first-run state in an
++      outer `v-if` branch** — the table must mount even when the list is empty.
++- [ ] **`:forbidden`** bound to a ref the page sets from a 403 on *its own* list
++      request (cleared at the start of every load path), so a denied user sees
++      "You don't have access" rather than a create CTA that will 403.
+ - [ ] Row actions in an `isAction` column; delete via `ConfirmDialog`.
+ - [ ] `n` / `/` / `r` keyboard shortcuts registered and bound.
+ - [ ] **Registered in navigation** and gated for the right env/role — see
+diff --git a/scripts/translations/.translation_state.json b/scripts/translations/.translation_state.json
+index 85ea4164125..a7485afd426 100644
+--- a/scripts/translations/.translation_state.json
++++ b/scripts/translations/.translation_state.json
+@@ -7650,6 +7650,10 @@
+       "title": "ab827e3fe17da220"
+     },
+     "newBrowserCheck": "8fc313f5a618fae6",
++    "noAccess": {
++      "description": "e9dfa068eab7243d",
++      "title": "abb84be05cfa0d97"
++    },
+     "noAiToolsets": {
+       "action": "c0734a1357c60064",
+       "actionDesc": "bf18f1d9d6efff97",
+diff --git a/web/src/components/alerts/AlertList.vue b/web/src/components/alerts/AlertList.vue
+index ae1f1967a7a..545e47783b3 100644
+--- a/web/src/components/alerts/AlertList.vue
++++ b/web/src/components/alerts/AlertList.vue
+@@ -101,6 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+               show-index
+               row-key="alert_id"
+               :loading="loading"
++              :forbidden="forbidden"
+               pagination="client"
+               :page-size="pageSize"
+               :page-size-options="pageSizeOptions"
+@@ -1011,6 +1012,7 @@ export default defineComponent({
+     // Start in the loading state so the table shows the skeleton on first
+     // render instead of briefly flashing the empty state before the fetch.
+     const loading = ref(true);
++    const forbidden = ref(false);
+     const oTableRef: any = ref(null);
+     // The first real load lands after mount and races TanStack's own auto-reset-on-data-change, which resolves through its own deferred microtask queue — setTimeout(0) runs strictly after that queue drains, so the restored page reliably wins.
+     watch(
+@@ -1774,6 +1776,7 @@ export default defineComponent({
+         folderId = "";
+       }
+       loading.value = true;
++      forbidden.value = false;
+       try {
+         const res = await alertsService.listByFolderId(
+           1,
+@@ -1968,13 +1971,17 @@ export default defineComponent({
+           }
+         }
+         dismiss();
+-      } catch (error) {
++      } catch (error: any) {
+         console.error(error);
+         dismiss();
+-        toast({
+-          variant: "error",
+-          message: t("toastMessages.alerts.errorWhilePullingAlerts"),
+-        });
++        forbidden.value = error?.response?.status === 403;
++        // The grouped access toast already reports a 403; a second red toast adds nothing.
++        if (!forbidden.value) {
++          toast({
++            variant: "error",
++            message: t("toastMessages.alerts.errorWhilePullingAlerts"),
++          });
++        }
+       } finally {
+         loading.value = false;
+       }
+@@ -3469,6 +3476,7 @@ export default defineComponent({
+       streams,
+       isFetchingStreams,
+       loading,
++      forbidden,
+       isSubmitting,
+       filterQuery,
+       getImageURL,
+diff --git a/web/src/components/alerts/AlertsDestinationList.vue b/web/src/components/alerts/AlertsDestinationList.vue
+index 9cfd3873d6f..04ff04319ec 100644
+--- a/web/src/components/alerts/AlertsDestinationList.vue
++++ b/web/src/components/alerts/AlertsDestinationList.vue
+@@ -54,6 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+           :columns="columns"
+           row-key="name"
+           :loading="loading"
++          :forbidden="forbidden"
+           :selected-ids="selectedDestinationIds"
+           selection="multiple"
+           pagination="client"
+@@ -529,6 +530,7 @@ export default defineComponent({
+     };
+ 
+     const loading = ref(false);
++    const forbidden = ref(false);
+     // The first real load lands after mount and races TanStack's own auto-reset-on-data-change, which resolves through its own deferred microtask queue — setTimeout(0) runs strictly after that queue drains, so the restored page reliably wins.
+     watch(
+       loading,
+@@ -547,6 +549,7 @@ export default defineComponent({
+         timeout: 0,
+       });
+       loading.value = true;
++      forbidden.value = false;
+       destinationService
+         .list({
+           page_num: 1,
+@@ -570,7 +573,8 @@ export default defineComponent({
+           updateRoute();
+         })
+         .catch((err) => {
+-          if (err.response.status != 403) {
++          forbidden.value = err?.response?.status === 403;
++          if (!forbidden.value) {
+             toast({
+               variant: "error",
+               message: t("toastMessages.alerts.errorWhilePullingDestinations"),
+@@ -910,6 +914,7 @@ export default defineComponent({
+       editDestination,
+       getImageURL,
+       loading,
++      forbidden,
+       conformDeleteDestination,
+       filterQuery,
+       filterData,
+diff --git a/web/src/components/alerts/ExternalAlertSourcesList.vue b/web/src/components/alerts/ExternalAlertSourcesList.vue
+index d85f4e5484e..39046741385 100644
+--- a/web/src/components/alerts/ExternalAlertSourcesList.vue
++++ b/web/src/components/alerts/ExternalAlertSourcesList.vue
+@@ -43,6 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+           :columns="advancedColumns"
+           row-key="rowKey"
+           :loading="loading"
++          :forbidden="forbidden"
+           pagination="client"
+           :page-size="20"
+           :page-size-options="[10, 20, 50, 100]"
+@@ -366,6 +367,7 @@ export default defineComponent({
+   data() {
+     return {
+       loading: false,
++      forbidden: false,
+       filterQuery: "",
+       showAddDrawer: false,
+       editTargetIntegration: undefined as AlertSourceIntegration | undefined,
+@@ -536,11 +538,16 @@ export default defineComponent({
+     },
+     async fetchIntegrations() {
+       this.loading = true;
++      this.forbidden = false;
+       try {
+         const res = await alertSources.list(this.orgIdentifier);
+         this.integrations = res.data.integrations;
+-      } catch (e) {
+-        toast({ variant: "error", message: this.t("alert_sources.error") });
++      } catch (e: any) {
++        this.forbidden = e?.response?.status === 403;
++        // The grouped access toast already reports a 403; a second red toast adds nothing.
++        if (!this.forbidden) {
++          toast({ variant: "error", message: this.t("alert_sources.error") });
++        }
+       } finally {
+         this.loading = false;
+       }
+diff --git a/web/src/components/alerts/IncidentList.vue b/web/src/components/alerts/IncidentList.vue
+index 2b44d226509..924c2a267d6 100644
+--- a/web/src/components/alerts/IncidentList.vue
++++ b/web/src/components/alerts/IncidentList.vue
+@@ -28,6 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+         :columns="columns"
+         :frame="false"
+         :loading="loading"
++        :forbidden="forbidden"
+         row-key="id"
+         pagination="client"
+         :page-size="pageSize"
+@@ -305,6 +306,7 @@ export default defineComponent({
+     const qTableRef: any = ref(null);
+     // Starts true so the skeleton shows on first render and the once-off page-restore watch below fires on the real true→false transition.
+     const loading = ref(true);
++    const forbidden = ref(false);
+     // The first real load lands after mount and races TanStack's own auto-reset-on-data-change, which resolves through its own deferred microtask queue — setTimeout(0) runs strictly after that queue drains, so the restored page reliably wins.
+     watch(
+       loading,
+@@ -566,6 +568,7 @@ export default defineComponent({
+ 
+     const loadIncidents = async () => {
+       loading.value = true;
++      forbidden.value = false;
+       try {
+         const org = store.state.selectedOrganization.identifier;
+         const limit = 1000;
+@@ -581,10 +584,14 @@ export default defineComponent({
+         allIncidents.value = items;
+         store.dispatch("incidents/setCachedData", items);
+       } catch (error: any) {
+-        toast({
+-          variant: "error",
+-          message: t("alerts.incidents.errorLoading"),
+-        });
++        forbidden.value = error?.response?.status === 403;
++        // The grouped access toast already reports a 403; a second red toast adds nothing.
++        if (!forbidden.value) {
++          toast({
++            variant: "error",
++            message: t("alerts.incidents.errorLoading"),
++          });
++        }
+         console.error("Failed to load incidents:", error);
+       } finally {
+         loading.value = false;
+@@ -844,6 +851,7 @@ export default defineComponent({
+       raw,
+       t,
+       loading,
++      forbidden,
+       allIncidents,
+       visibleIncidents,
+       severityStats,
+diff --git a/web/src/components/alerts/PipelinesDestinationList.vue b/web/src/components/alerts/PipelinesDestinationList.vue
+index 759c1ef6f4d..979efa36a66 100644
+--- a/web/src/components/alerts/PipelinesDestinationList.vue
++++ b/web/src/components/alerts/PipelinesDestinationList.vue
+@@ -40,6 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+           :columns="columns"
+           row-key="name"
+           :loading="loading"
++          :forbidden="forbidden"
+           :selected-ids="selectedDestinationIds"
+           selection="multiple"
+           pagination="client"
+@@ -334,6 +335,7 @@ export default defineComponent({
+     });
+ 
+     const loading = ref(false);
++    const forbidden = ref(false);
+     const getDestinations = () => {
+       const dismiss = toast({
+         variant: "loading",
+@@ -341,6 +343,7 @@ export default defineComponent({
+         timeout: 0,
+       });
+       loading.value = true;
++      forbidden.value = false;
+       destinationService
+         .list({
+           page_num: 1,
+@@ -356,7 +359,8 @@ export default defineComponent({
+           updateRoute();
+         })
+         .catch((err) => {
+-          if (err.response.status != 403) {
++          forbidden.value = err?.response?.status === 403;
++          if (!forbidden.value) {
+             toast({
+               variant: "error",
+               message: t("toastMessages.alerts.errorWhilePullingDestinations"),
+@@ -659,6 +663,7 @@ export default defineComponent({
+       getImageURL,
+       conformDeleteDestination,
+       loading,
++      forbidden,
+       filterQuery,
+       filterData,
+       editingDestination,
+diff --git a/web/src/components/alerts/TemplateList.vue b/web/src/components/alerts/TemplateList.vue
+index fc59307761b..b87ca142f87 100644
+--- a/web/src/components/alerts/TemplateList.vue
++++ b/web/src/components/alerts/TemplateList.vue
+@@ -53,6 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+           :columns="columns"
+           row-key="name"
+           :loading="loading"
++          :forbidden="forbidden"
+           :selected-ids="selectedTemplateIds"
+           selection="multiple"
+           :is-row-selectable="isTemplateRowSelectable"
+@@ -406,6 +407,7 @@ watch(
+ );
+ 
+ const loading = ref(false);
++const forbidden = ref(false);
+ // The first real load lands after mount and races TanStack's own auto-reset-on-data-change, which resolves through its own deferred microtask queue — setTimeout(0) runs strictly after that queue drains, so the restored page reliably wins.
+ watch(
+   loading,
+@@ -425,6 +427,7 @@ const getTemplates = () => {
+   });
+ 
+   loading.value = true;
++  forbidden.value = false;
+   templateService
+     .list({
+       org_identifier: store.state.selectedOrganization.identifier,
+@@ -441,7 +444,8 @@ const getTemplates = () => {
+     })
+     .catch((err) => {
+       dismiss();
+-      if (err.response.status !== 403) {
++      forbidden.value = err?.response?.status === 403;
++      if (!forbidden.value) {
+         toast({
+           variant: "error",
+           message: t("toastMessages.alerts.errorWhilePullingTemplates"),
+diff --git a/web/src/components/functions/EnrichmentTableList.vue b/web/src/components/functions/EnrichmentTableList.vue
+index ff96f8acb4a..2dc01f17896 100644
+--- a/web/src/components/functions/EnrichmentTableList.vue
++++ b/web/src/components/functions/EnrichmentTableList.vue
+@@ -49,6 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+             :columns="columns"
+             row-key="name"
+             :loading="loading"
++            :forbidden="forbidden"
+             pagination="client"
+             :page-size="selectedPerPage"
+             :page-size-options="perPageOptionsList"
+@@ -488,6 +489,7 @@ export default defineComponent({
+     const selectedTableForUrlJobs = ref<any>(null);
+     const filterQuery = ref("");
+     const loading = ref(true);
++    const forbidden = ref(false);
+     // Plain ref, not URL/store-backed: only the OTable v-if branch unmounts on add/edit, not EnrichmentTableList itself.
+     const currentPage = ref(1);
+     const onPageChange = (page: number) => {
+@@ -610,6 +612,7 @@ export default defineComponent({
+ 
+     const getLookupTables = async (force: boolean = false) => {
+       loading.value = true;
++      forbidden.value = false;
+       const dismiss = toast({
+         variant: "loading",
+         message: t("toastMessages.functions.pleaseWaitWhileLoadingEnrichmentTables"),
+@@ -720,7 +723,8 @@ export default defineComponent({
+       } catch (err: any) {
+         console.info("Error while fetching enrichment tables", err);
+         dismiss();
+-        if (err.response?.status != 403) {
++        forbidden.value = err?.response?.status === 403;
++        if (!forbidden.value) {
+           toast({
+             variant: "error",
+             message: err.response?.data?.message || t("functions.fetchFunctionsError"),
+@@ -1071,6 +1075,7 @@ export default defineComponent({
+       selectedDelete,
+       getLookupTables,
+       loading,
++      forbidden,
+       resultTotal,
+       refreshList,
+       perPageOptionsList,
+diff --git a/web/src/components/functions/FunctionList.vue b/web/src/components/functions/FunctionList.vue
+index 09ba5aafeb9..bd4aeba633d 100644
+--- a/web/src/components/functions/FunctionList.vue
++++ b/web/src/components/functions/FunctionList.vue
+@@ -48,6 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+             :columns="columns"
+             row-key="name"
+             :loading="loading"
++            :forbidden="forbidden"
+             pagination="client"
+             :current-page="currentPage"
+             @update:current-page="onPageChange"
+@@ -343,8 +344,10 @@ export default defineComponent({
+     };
+ 
+     const loading = ref(true);
++    const forbidden = ref(false);
+     const getJSTransforms = () => {
+       loading.value = true;
++      forbidden.value = false;
+       // return ;
+       const dismiss = toast({
+         variant: "loading",
+@@ -387,7 +390,8 @@ export default defineComponent({
+           console.error("Error while pulling function", err);
+ 
+           dismiss();
+-          if (err?.response?.status && err?.response?.status != 403) {
++          forbidden.value = err?.response?.status === 403;
++          if (err?.response?.status && !forbidden.value) {
+             toast({
+               variant: "error",
+               message: t("toastMessages.functions.errorWhilePullingFunction"),
+@@ -744,6 +748,7 @@ export default defineComponent({
+       selectedDelete,
+       getJSTransforms,
+       loading,
++      forbidden,
+       resultTotal,
+       refreshList,
+       pageSize,
+diff --git a/web/src/components/iam/IngestionTokens.vue b/web/src/components/iam/IngestionTokens.vue
+index 013d23496b9..aa17bc36528 100644
+--- a/web/src/components/iam/IngestionTokens.vue
++++ b/web/src/components/iam/IngestionTokens.vue
+@@ -57,6 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+           :columns="columns"
+           row-key="name"
+           :loading="loading"
++          :forbidden="forbidden"
+           v-model:global-filter="filterQuery"
+           :show-global-filter="false"
+           :default-columns="false"
+@@ -286,6 +287,7 @@ export default defineComponent({
+ 
+     const tokens = ref<Token[]>([]);
+     const loading = ref(false);
++    const forbidden = ref(false);
+     const filterQuery = ref("");
+     const showCreateForm = ref(false);
+     const showRevealedDialog = ref(false);
+@@ -352,17 +354,22 @@ export default defineComponent({
+ 
+     const fetchTokens = async () => {
+       loading.value = true;
++      forbidden.value = false;
+       try {
+         const res = await organizationsService.list_org_ingestion_tokens(
+           store.state.selectedOrganization.identifier,
+         );
+         tokens.value = res.data.data;
+       } catch (e: any) {
+-        toast({
+-          variant: "error",
+-          message: e.response?.data?.message || t("ingestion.tokenFetchError"),
+-          timeout: 5000,
+-        });
++        forbidden.value = e?.response?.status === 403;
++        // The grouped access toast already reports a 403; a second red toast adds nothing.
++        if (!forbidden.value) {
++          toast({
++            variant: "error",
++            message: e.response?.data?.message || t("ingestion.tokenFetchError"),
++            timeout: 5000,
++          });
++        }
+       } finally {
+         loading.value = false;
+       }
+@@ -476,6 +483,7 @@ export default defineComponent({
+       t,
+       tokens,
+       loading,
++      forbidden,
+       filterQuery,
+       columns,
+       showCreateForm,
+diff --git a/web/src/components/iam/groups/AppGroups.vue b/web/src/components/iam/groups/AppGroups.vue
+index 85ae993c375..d63d50e4f73 100644
+--- a/web/src/components/iam/groups/AppGroups.vue
++++ b/web/src/components/iam/groups/AppGroups.vue
+@@ -35,6 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+           :columns="columns"
+           row-key="group_name"
+           :loading="loading"
++          :forbidden="forbidden"
+           :selected-ids="selectedGroupNames"
+           v-model:global-filter="filterQuery"
+           :show-global-filter="false"
+@@ -276,8 +277,10 @@ const editGroup = (group: any) => {
+ };
+ 
+ const loading = ref(false);
++const forbidden = ref(false);
+ const setupGroups = async () => {
+   loading.value = true;
++  forbidden.value = false;
+   await getGroups(store.state.selectedOrganization.identifier)
+     .then((res) => {
+       groupsState.groups = res.data.map((group: string) => ({
+@@ -285,8 +288,9 @@ const setupGroups = async () => {
+       }));
+       updateTable();
+     })
+-    .catch((err) => {
++    .catch((err: any) => {
+       console.log(err);
++      forbidden.value = err?.response?.status === 403;
+     })
+     .finally(() => {
+       loading.value = false;
+diff --git a/web/src/components/iam/organizations/ListOrganizations.vue b/web/src/components/iam/organizations/ListOrganizations.vue
+index 609516c92fb..abdb9f2d4fb 100644
+--- a/web/src/components/iam/organizations/ListOrganizations.vue
++++ b/web/src/components/iam/organizations/ListOrganizations.vue
+@@ -39,6 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+           :columns="columns"
+           row-key="identifier"
+           :loading="loading"
++          :forbidden="forbidden"
+           v-model:global-filter="filterQuery"
+           :show-global-filter="false"
+           pagination="client"
+@@ -354,6 +355,7 @@ export default defineComponent({
+     });
+ 
+     const loading = ref(false);
++    const forbidden = ref(false);
+     const getOrganizations = () => {
+       const dismiss = toast({
+         variant: "loading",
+@@ -361,6 +363,7 @@ export default defineComponent({
+         timeout: 0,
+       });
+       loading.value = true;
++      forbidden.value = false;
+       // In the _meta admin context on cloud, use the admin endpoint so admins can
+       // track org deletion status; otherwise use the regular list. Access is always
+       // enforced server-side.
+@@ -439,6 +442,10 @@ export default defineComponent({
+ 
+           dismiss();
+         })
++        .catch((err: any) => {
++          forbidden.value = err?.response?.status === 403;
++          dismiss();
++        })
+         .finally(() => {
+           loading.value = false;
+         });
+@@ -597,6 +604,7 @@ export default defineComponent({
+       router,
+       config,
+       loading,
++      forbidden,
+       organizations,
+       organization,
+       columns,
+diff --git a/web/src/components/iam/quota/Quota.vue b/web/src/components/iam/quota/Quota.vue
+index 82e62a20600..2e9c751dc02 100644
+--- a/web/src/components/iam/quota/Quota.vue
++++ b/web/src/components/iam/quota/Quota.vue
+@@ -127,6 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+           :columns="generateColumns()"
+           row-key="module_name"
+           :loading="isApiLimitsLoading"
++          :forbidden="apiLimitsForbidden"
+           :global-filter="searchQuery"
+           pagination="client"
+           :page-size="20"
+@@ -212,6 +213,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+           :columns="roleLimitsColumns"
+           row-key="uuid"
+           :loading="isRolesLoading"
++          :forbidden="roleLimitsForbidden"
+           :global-filter="searchQuery"
+           pagination="client"
+           :page-size="20"
+@@ -457,6 +459,8 @@ export default defineComponent({
+       getModulesToDisplay,
+       isRoleLimitsLoading,
+       isApiLimitsLoading,
++      apiLimitsForbidden,
++      roleLimitsForbidden,
+     } = useRateLimiter();
+     const rolesLimitRows = ref<any[]>([]);
+     const rolesColumns = ref<any[]>([]);
+@@ -1582,6 +1586,8 @@ export default defineComponent({
+       jsonDiff,
+       isRoleLimitsLoading,
+       isApiLimitsLoading,
++      apiLimitsForbidden,
++      roleLimitsForbidden,
+       isRolesLoading,
+       activeTimeUnit,
+       timeUnitTabs,
+diff --git a/web/src/components/iam/roles/AppRoles.vue b/web/src/components/iam/roles/AppRoles.vue
+index 606fe96ee64..1a3a16836e3 100644
+--- a/web/src/components/iam/roles/AppRoles.vue
++++ b/web/src/components/iam/roles/AppRoles.vue
+@@ -32,6 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+           data-test="iam-roles-table-section"
+           :data="rows"
+           :loading="loading"
++          :forbidden="forbidden"
+           :action-loading="bulkDeleteLoading"
+           v-model:global-filter="filterQuery"
+           :selected-ids="selectedRoleNames"
+@@ -180,6 +181,7 @@ const editRole = (role: any) => {
+ };
+ 
+ const loading = ref(false);
++const forbidden = ref(false);
+ 
+ // `GET /roles` returns role NAMES only, so a role row has nothing to show beyond
+ // its name. The one fact worth surfacing — is anyone actually in this role — comes
+@@ -221,6 +223,7 @@ const applyRoleUserCounts = () => {
+ 
+ const setupRoles = async () => {
+   loading.value = true;
++  forbidden.value = false;
+   await getRoles(store.state.selectedOrganization.identifier)
+     .then((res) => {
+       rolesState.roles = res.data.map((role: string) => ({
+@@ -233,8 +236,9 @@ const setupRoles = async () => {
+       // whole table hostage to a secondary, enterprise-only endpoint.
+       void loadRoleUserCounts().then(applyRoleUserCounts);
+     })
+-    .catch((err) => {
++    .catch((err: any) => {
+       console.log(err);
++      forbidden.value = err?.response?.status === 403;
+     })
+     .finally(() => {
+       loading.value = false;
+diff --git a/web/src/components/iam/roles/RoleTable.vue b/web/src/components/iam/roles/RoleTable.vue
+index 526875bc544..7056a46419f 100644
+--- a/web/src/components/iam/roles/RoleTable.vue
++++ b/web/src/components/iam/roles/RoleTable.vue
+@@ -15,6 +15,7 @@ const { t } = useI18nTyped();
+ const props = defineProps<{
+   data: any[];
+   loading?: boolean;
++  forbidden?: boolean;
+   actionLoading?: boolean;
+   selectedIds?: string[];
+   globalFilter?: string;
+@@ -93,6 +94,7 @@ const isUnusedRole = (row: any): boolean => row?.user_count === 0;
+     :data="data"
+     :columns="columns"
+     :loading="loading"
++    :forbidden="forbidden"
+     :selected-ids="selectedIds"
+     :global-filter="globalFilter"
+     :show-global-filter="false"
+diff --git a/web/src/components/iam/serviceAccounts/ServiceAccountsList.vue b/web/src/components/iam/serviceAccounts/ServiceAccountsList.vue
+index f877e28c775..feedf6db32a 100644
+--- a/web/src/components/iam/serviceAccounts/ServiceAccountsList.vue
++++ b/web/src/components/iam/serviceAccounts/ServiceAccountsList.vue
+@@ -42,6 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+           :columns="columns"
+           row-key="email"
+           :loading="loading"
++          :forbidden="forbidden"
+           pagination="client"
+           :page-size="20"
+           :page-size-options="[20, 50, 100, 250, 500]"
+@@ -748,6 +749,7 @@ export default defineComponent({
+       deleteUserEmailIdentifier.value = row.email;
+     };
+     const loading = ref(false);
++    const forbidden = ref(false);
+     const getServiceAccountsUsers = async () => {
+       const dismiss = toast({
+         variant: "loading",
+@@ -756,6 +758,7 @@ export default defineComponent({
+       });
+ 
+       loading.value = true;
++      forbidden.value = false;
+       return new Promise((resolve, reject) => {
+         service_accounts
+           .list(store.state.selectedOrganization.identifier)
+@@ -779,7 +782,8 @@ export default defineComponent({
+ 
+             resolve(true);
+           })
+-          .catch(() => {
++          .catch((err: any) => {
++            forbidden.value = err?.response?.status === 403;
+             dismiss();
+             reject(false);
+           })
+@@ -1093,6 +1097,7 @@ export default defineComponent({
+       serviceAccountsState,
+       columns,
+       loading,
++      forbidden,
+       orgData,
+       confirmDelete,
+       serviceAccounts,
+diff --git a/web/src/components/iam/users/InvitationList.vue b/web/src/components/iam/users/InvitationList.vue
+index 5aec0ae470e..ac3e83c2f32 100644
+--- a/web/src/components/iam/users/InvitationList.vue
++++ b/web/src/components/iam/users/InvitationList.vue
+@@ -28,6 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+           :columns="columns"
+           row-key="token"
+           :loading="loading"
++          :forbidden="forbidden"
+           v-model:global-filter="filterQuery"
+           :show-global-filter="false"
+           pagination="client"
+@@ -267,6 +268,7 @@ export default defineComponent({
+     ];
+     const resultTotal = ref<number>(0);
+     const loading = ref(false);
++    const forbidden = ref(false);
+ 
+     onMounted(() => {
+       fetchPendingInvitations();
+@@ -280,6 +282,7 @@ export default defineComponent({
+       });
+ 
+       loading.value = true;
++      forbidden.value = false;
+       try {
+         const response = await usersService.getPendingInvites();
+ 
+@@ -290,12 +293,16 @@ export default defineComponent({
+         resultTotal.value = response.data.data.length;
+         dismiss();
+       } catch (error) {
+-        const e = error as { response?: { data?: { message?: string } } };
++        const e = error as { response?: { status?: number; data?: { message?: string } } };
+         dismiss();
+-        toast({
+-          message: raw(e.response?.data?.message || t("iam.invitationList.failedLoadPending")),
+-          variant: "error",
+-        });
++        forbidden.value = e.response?.status === 403;
++        // The grouped access toast already reports a 403; a second red toast adds nothing.
++        if (!forbidden.value) {
++          toast({
++            message: raw(e.response?.data?.message || t("iam.invitationList.failedLoadPending")),
++            variant: "error",
++          });
++        }
+       } finally {
+         loading.value = false;
+       }
+@@ -429,6 +436,7 @@ export default defineComponent({
+       columns,
+       resultTotal,
+       loading,
++      forbidden,
+       confirmAccept,
+       confirmReject,
+       selectedInvitation,
+diff --git a/web/src/components/iam/users/User.vue b/web/src/components/iam/users/User.vue
+index 49c8c9f1c8f..7e6c9ab1ebb 100644
+--- a/web/src/components/iam/users/User.vue
++++ b/web/src/components/iam/users/User.vue
+@@ -44,6 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+           :columns="columns"
+           row-key="email"
+           :loading="loading"
++          :forbidden="forbidden"
+           :selected-ids="selectedUserIds"
+           v-model:global-filter="filterQuery"
+           :show-global-filter="false"
+@@ -749,6 +750,7 @@ export default defineComponent({
+     };
+ 
+     const loading = ref(false);
++    const forbidden = ref(false);
+     const getOrgMembers = () => {
+       const dismiss = toast({
+         variant: "loading",
+@@ -757,6 +759,7 @@ export default defineComponent({
+       });
+ 
+       loading.value = true;
++      forbidden.value = false;
+       return new Promise((resolve, reject) => {
+         usersService
+           .orgUsers(store.state.selectedOrganization.identifier)
+@@ -871,13 +874,17 @@ export default defineComponent({
+           .catch((err: any) => {
+             console.error("Failed to fetch org members:", err);
+             dismiss();
+-            toast({
+-              variant: "error",
+-              message: t("iam.user.failedToLoadUsers", {
+-                error: err?.response?.data?.message || err?.message || t("iam.user.unknownError"),
+-              }),
+-              timeout: 5000,
+-            });
++            forbidden.value = err?.response?.status === 403;
++            // The grouped access toast already reports a 403; a second red toast adds nothing.
++            if (!forbidden.value) {
++              toast({
++                variant: "error",
++                message: t("iam.user.failedToLoadUsers", {
++                  error: err?.response?.data?.message || err?.message || t("iam.user.unknownError"),
++                }),
++                timeout: 5000,
++              });
++            }
+             reject(false);
+           })
+           .finally(() => {
+@@ -1406,6 +1413,7 @@ export default defineComponent({
+       usersState,
+       columns,
+       loading,
++      forbidden,
+       orgData,
+       confirmDelete,
+       deleteUser,
+diff --git a/web/src/components/pipeline/PipelinesList.vue b/web/src/components/pipeline/PipelinesList.vue
+index 8f0080419db..4507766c2a3 100644
+--- a/web/src/components/pipeline/PipelinesList.vue
++++ b/web/src/components/pipeline/PipelinesList.vue
+@@ -31,6 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+           :columns="otableColumns"
+           row-key="pipeline_id"
+           :loading="loading"
++          :forbidden="forbidden"
+           :global-filter="filterQuery"
+           :show-global-filter="false"
+           :page-size="20"
+@@ -970,8 +971,10 @@ const goToImportPipeline = () => {
+ };
+ 
+ const loading = ref(true);
++const forbidden = ref(false);
+ const getPipelines = async () => {
+   loading.value = true;
++  forbidden.value = false;
+   try {
+     const response = await pipelineService.getPipelines(
+       store.state.selectedOrganization.identifier,
+@@ -1028,8 +1031,9 @@ const getPipelines = async () => {
+         ...pipeline,
+       };
+     });
+-  } catch (error) {
++  } catch (error: any) {
+     console.error(error);
++    forbidden.value = error?.response?.status === 403;
+   } finally {
+     loading.value = false;
+   }
+diff --git a/web/src/components/pipelines/BackfillJobsList.vue b/web/src/components/pipelines/BackfillJobsList.vue
+index ae749eb5a47..aff56a377f1 100644
+--- a/web/src/components/pipelines/BackfillJobsList.vue
++++ b/web/src/components/pipelines/BackfillJobsList.vue
+@@ -79,6 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+           table-id="pipelines-backfill-jobs-list"
+           row-key="job_id"
+           :loading="loading"
++          :forbidden="forbidden"
+           pagination="client"
+           :page-size="selectedPerPage"
+           :page-size-options="perPageOptionsList"
+@@ -334,6 +335,7 @@ const { t } = useI18nTyped();
+ const qTableRef = ref();
+ 
+ const loading = ref(false);
++const forbidden = ref(false);
+ const jobs = ref<BackfillJob[]>([]);
+ const showDetailsDialog = ref(false);
+ const selectedJobId = ref("");
+@@ -431,6 +433,7 @@ onMounted(() => {
+ 
+ const loadJobs = async () => {
+   loading.value = true;
++  forbidden.value = false;
+ 
+   try {
+     const response = await backfillService.listBackfillJobs({
+@@ -440,10 +443,14 @@ const loadJobs = async () => {
+     loadPipelineOptions();
+   } catch (error: any) {
+     console.error("Error loading backfill jobs:", error);
+-    toast({
+-      variant: "error",
+-      message: t("toastMessages.pipelines.failedToLoadBackfillJobs"),
+-    });
++    forbidden.value = error?.response?.status === 403;
++    // The grouped access toast already reports a 403; a second red toast adds nothing.
++    if (!forbidden.value) {
++      toast({
++        variant: "error",
++        message: t("toastMessages.pipelines.failedToLoadBackfillJobs"),
++      });
++    }
+   } finally {
+     loading.value = false;
+   }
+diff --git a/web/src/components/pipelines/PipelineHistory.vue b/web/src/components/pipelines/PipelineHistory.vue
+index 9515dd3f93b..5bbbf590685 100644
+--- a/web/src/components/pipelines/PipelineHistory.vue
++++ b/web/src/components/pipelines/PipelineHistory.vue
+@@ -76,6 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+         class="pipeline-history-table bg-card-glass-bg h-full"
+       >
+         <OTable
++          :forbidden="forbidden"
+           ref="tableRef"
+           :frame="false"
+           :data="rows"
+@@ -480,6 +481,7 @@ const store = useStore();
+ 
+ // Data
+ const loading = ref(false);
++const forbidden = ref(false);
+ const rows = ref<any[]>([]);
+ const searchQuery = ref("");
+ const selectedPipeline = ref<any>();
+@@ -699,6 +701,7 @@ const clearSearch = () => {
+ 
+ const fetchPipelineHistory = async () => {
+   loading.value = true;
++  forbidden.value = false;
+   try {
+     const org = store.state.selectedOrganization.identifier;
+ 
+@@ -747,11 +750,17 @@ const fetchPipelineHistory = async () => {
+   } catch (error: any) {
+     console.error("Error fetching pipeline history:", error);
+     console.error("Error response:", error.response);
+-    toast({
+-      variant: "error",
+-      message:
+-        error.response?.data?.message || error.message || t("pipeline.fetchPipelineHistoryFailed"),
+-    });
++    forbidden.value = error?.response?.status === 403;
++    // The grouped access toast already reports a 403; a second red toast adds nothing.
++    if (!forbidden.value) {
++      toast({
++        variant: "error",
++        message:
++          error.response?.data?.message ||
++          error.message ||
++          t("pipeline.fetchPipelineHistoryFailed"),
++      });
++    }
+   } finally {
+     loading.value = false;
+   }
+diff --git a/web/src/components/queries/RunningQueries.vue b/web/src/components/queries/RunningQueries.vue
+index 32c7d015f2e..88c8736d87a 100644
+--- a/web/src/components/queries/RunningQueries.vue
++++ b/web/src/components/queries/RunningQueries.vue
+@@ -84,6 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+           >
+             <RunningQueriesList
+               :rows="rowsQuery"
++              :forbidden="forbidden"
+               :filtered="!!filterQuery"
+               :last-refreshed="lastRefreshed"
+               :search-type="selectedSearchType"
+@@ -105,6 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+           >
+             <SummaryList
+               :rows="summaryRows"
++              :forbidden="forbidden"
+               :filtered="!!filterQuery"
+               :last-refreshed="lastRefreshed"
+               v-model:selectedRows="selectedRow['summary']"
+@@ -302,6 +304,7 @@ export default defineComponent({
+     };
+ 
+     const loadingState = ref(false);
++    const forbidden = ref(false);
+     const queries = ref([]);
+ 
+     const deleteDialog = ref({
+@@ -604,10 +607,14 @@ export default defineComponent({
+           runningQueriesSummary.value = getRunningQueriesSummary();
+         })
+         .catch((error: any) => {
+-          toast({
+-            message: error.response?.data?.message || t("queries.fetchRunningQueriesFailed"),
+-            variant: "error",
+-          });
++          forbidden.value = error?.response?.status === 403;
++          // The grouped access toast already reports a 403; a second red toast adds nothing.
++          if (!forbidden.value) {
++            toast({
++              message: error.response?.data?.message || t("queries.fetchRunningQueriesFailed"),
++              variant: "error",
++            });
++          }
+         })
+         .finally(() => {
+           dismiss();
+@@ -772,6 +779,7 @@ export default defineComponent({
+       cancel: "cancel",
+       schemaData,
+       loadingState,
++      forbidden,
+       refreshData,
+       lastRefreshed,
+       isMetaOrg,
+diff --git a/web/src/components/queries/RunningQueriesList.vue b/web/src/components/queries/RunningQueriesList.vue
+index 643cee49b00..5e17648d732 100644
+--- a/web/src/components/queries/RunningQueriesList.vue
++++ b/web/src/components/queries/RunningQueriesList.vue
+@@ -22,6 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+       :columns="columns"
+       row-key="trace_id"
+       :loading="loadingState"
++      :forbidden="forbidden"
+       :selected-ids="selectedRowIds"
+       selection="multiple"
+       pagination="client"
+@@ -179,6 +180,10 @@ export default defineComponent({
+       type: Boolean,
+       default: false,
+     },
++    forbidden: {
++      type: Boolean,
++      default: false,
++    },
+     lastRefreshed: {
+       type: String,
+       default: "",
+diff --git a/web/src/components/queries/SummaryList.vue b/web/src/components/queries/SummaryList.vue
+index f01e3d977d9..ac1241937a9 100644
+--- a/web/src/components/queries/SummaryList.vue
++++ b/web/src/components/queries/SummaryList.vue
+@@ -23,6 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+     :columns="columns"
+     row-key="row_id"
+     :loading="loadingState"
++    :forbidden="forbidden"
+     pagination="client"
+     selection="multiple"
+     v-model:selected-ids="selectedIds"
+@@ -125,6 +126,10 @@ export default defineComponent({
+       type: Array,
+       required: true,
+     },
++    forbidden: {
++      type: Boolean,
++      default: false,
++    },
+     filtered: {
+       type: Boolean,
+       default: false,
+diff --git a/web/src/components/reports/ReportList.vue b/web/src/components/reports/ReportList.vue
+index cc6f177991e..f60981c48fe 100644
+--- a/web/src/components/reports/ReportList.vue
++++ b/web/src/components/reports/ReportList.vue
+@@ -53,6 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+               row-key="report_id"
+               :frame="false"
+               :loading="isLoadingReports"
++              :forbidden="forbidden"
+               pagination="client"
+               selection="multiple"
+               v-model:selected-ids="selectedReportIds"
+@@ -370,6 +371,7 @@ const staticReportsList: Ref<any[]> = ref([]);
+ // Start in the loading state so the table shows the skeleton on first render
+ // instead of briefly flashing the empty state before the fetch completes.
+ const isLoadingReports = ref(true);
++const forbidden = ref(false);
+ const activeTab = ref("shared");
+ const filterQuery = ref(""); // client-side filter within current folder
+ const searchQuery = ref(""); // API search across all folders
+@@ -497,6 +499,7 @@ const loadReports = async (folderId: string, nameQuery?: string) => {
+   }
+ 
+   isLoadingReports.value = true;
++  forbidden.value = false;
+   const dismiss = toast({
+     variant: "loading",
+     message: t("toastMessages.reports.pleaseWaitWhileFetchingReports"),
+@@ -541,7 +544,8 @@ const loadReports = async (folderId: string, nameQuery?: string) => {
+     staticReportsList.value = mapped;
+     filterReports();
+   } catch (err: any) {
+-    if (err?.response?.status !== 403) {
++    forbidden.value = err?.response?.status === 403;
++    if (!forbidden.value) {
+       toast({
+         variant: "error",
+         message: err?.data?.message || t("reports.fetchReportsError"),
+@@ -567,7 +571,8 @@ const filterReports = () => {
+ onBeforeMount(async () => {
+   // Ensure report folders are in the store before FolderList renders
+   if (!store.state.organizationData.foldersByType?.["reports"]) {
+-    await getFoldersListByType(store, "reports");
++    // A folder-list 403 must not abort the load below, or the skeleton never clears.
++    await getFoldersListByType(store, "reports").catch(() => null);
+   }
+   await loadReports(activeFolderId.value);
+ });
+diff --git a/web/src/components/settings/AiToolsets.vue b/web/src/components/settings/AiToolsets.vue
+index e3c64470162..4fc0517d7f1 100644
+--- a/web/src/components/settings/AiToolsets.vue
++++ b/web/src/components/settings/AiToolsets.vue
+@@ -38,6 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+       <!-- Table -->
+       <div class="bg-card-glass-bg mt-2.5 overflow-hidden">
+         <OTable
++          :forbidden="forbidden"
+           :frame="false"
+           :data="visibleRows"
+           :columns="columns"
+@@ -170,6 +171,7 @@ export default defineComponent({
+     const tabledata: any = ref([]);
+     const showAddDialog = ref(false);
+     const loading = ref(false);
++    const forbidden = ref(false);
+     const filterQuery = ref("");
+ 
+     const columns: OTableColumnDef[] = [
+@@ -245,6 +247,7 @@ export default defineComponent({
+     // -----------------------------------------------------------------------
+     const getData = () => {
+       loading.value = true;
++      forbidden.value = false;
+       const dismiss = toast({
+         variant: "loading",
+         message: t("common.loading"),
+@@ -264,7 +267,8 @@ export default defineComponent({
+           resultTotal.value = tabledata.value.length;
+         })
+         .catch((err) => {
+-          if (err?.status !== 403) {
++          forbidden.value = err?.status === 403 || err?.response?.status === 403;
++          if (!forbidden.value) {
+             toast({
+               variant: "error",
+               message:
+@@ -391,6 +395,7 @@ export default defineComponent({
+       t,
+       store,
+       loading,
++      forbidden,
+       tabledata,
+       columns,
+       showAddDialog,
+diff --git a/web/src/components/settings/CipherKeys.vue b/web/src/components/settings/CipherKeys.vue
+index baff863e967..6415e211420 100644
+--- a/web/src/components/settings/CipherKeys.vue
++++ b/web/src/components/settings/CipherKeys.vue
+@@ -36,6 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+           :columns="columns"
+           row-key="name"
+           :loading="loading"
++          :forbidden="forbidden"
+           :selected-ids="selectedKeyIds"
+           selection="multiple"
+           pagination="client"
+@@ -184,6 +185,7 @@ export default defineComponent({
+     const tabledata: any = ref([]);
+     const showAddDialog = ref(false);
+     const loading = ref(false);
++    const forbidden = ref(false);
+     const filterQuery = ref("");
+     const columns: OTableColumnDef[] = [
+       {
+@@ -293,6 +295,7 @@ export default defineComponent({
+ 
+     const getData = () => {
+       loading.value = true;
++      forbidden.value = false;
+       const dismiss = toast({
+         variant: "loading",
+         message: t("settings.cipherKeysPage.loadingData"),
+@@ -319,7 +322,8 @@ export default defineComponent({
+         .catch((error) => {
+           loading.value = false;
+           dismiss();
+-          if (error.status != 403) {
++          forbidden.value = error?.status === 403 || error?.response?.status === 403;
++          if (!forbidden.value) {
+             toast({
+               variant: "error",
+               message: error.response?.data?.message || t("settings.cipherKeysPage.fetchFailed"),
+@@ -481,6 +485,7 @@ export default defineComponent({
+       store,
+       router,
+       loading,
++      forbidden,
+       tabledata,
+       columns,
+       showAddDialog,
+diff --git a/web/src/components/settings/DiscoveredServices.vue b/web/src/components/settings/DiscoveredServices.vue
+index 18974ce1930..ada26a0bb55 100644
+--- a/web/src/components/settings/DiscoveredServices.vue
++++ b/web/src/components/settings/DiscoveredServices.vue
+@@ -40,6 +40,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+       </OButton>
+     </div>
+ 
++    <div v-else-if="forbidden" class="flex flex-1 items-center justify-center">
++      <OEmptyState size="hero" preset="no-access" data-test="discovered-services-forbidden" />
++    </div>
++
+     <!-- Empty State -->
+     <div v-else-if="services.length === 0" class="flex flex-1 items-center justify-center">
+       <OEmptyState
+@@ -161,6 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+             :data="refreshing ? [] : flatRows"
+             :columns="columns"
+             :loading="refreshing"
++            :forbidden="forbidden"
+             row-key="id"
+             pagination="client"
+             :page-size="pageSize"
+@@ -535,6 +540,7 @@ interface ServiceGroup {
+ const store = useStore();
+ 
+ const loading = ref(true);
++const forbidden = ref(false);
+ const refreshing = ref(false);
+ const resetting = ref(false);
+ const error = ref<string | null>(null);
+@@ -798,6 +804,7 @@ const loadServices = async (isRefresh = false) => {
+     loading.value = true;
+   }
+   error.value = null;
++  forbidden.value = false;
+ 
+   try {
+     const orgId = store.state.selectedOrganization?.identifier;
+@@ -815,7 +822,10 @@ const loadServices = async (isRefresh = false) => {
+     }));
+   } catch (err: any) {
+     console.error("Failed to load services:", err);
+-    error.value = err?.message || t("settings.discoveredServices.failedToLoadServices");
++    forbidden.value = err?.response?.status === 403;
++    if (!forbidden.value) {
++      error.value = err?.message || t("settings.discoveredServices.failedToLoadServices");
++    }
+   } finally {
+     loading.value = false;
+     refreshing.value = false;
+diff --git a/web/src/components/settings/LlmProvidersSettings.vue b/web/src/components/settings/LlmProvidersSettings.vue
+index 7582daab8d0..c9d6a0079e0 100644
+--- a/web/src/components/settings/LlmProvidersSettings.vue
++++ b/web/src/components/settings/LlmProvidersSettings.vue
+@@ -29,6 +29,10 @@
+         <OSpinner size="md" />
+       </div>
+ 
++      <div v-else-if="forbidden" class="flex flex-1 items-center justify-center">
++        <OEmptyState size="hero" preset="no-access" data-test="llm-providers-forbidden" />
++      </div>
++
+       <div v-else-if="!providers.length" class="flex flex-1 items-center justify-center">
+         <!-- First-run state — uses the same `no-llm-providers` preset the
+              OTable's #empty slot uses for the filtered case, so the empty
+@@ -51,6 +55,7 @@
+           :columns="columns"
+           row-key="id"
+           :loading="isLoading"
++          :forbidden="forbidden"
+           :footer-title="t('llmProviders.title')"
+           :global-filter="searchQuery"
+           :show-global-filter="false"
+@@ -180,6 +185,7 @@ const router = useRouter();
+ 
+ const providers = ref<Provider[]>([]);
+ const isLoading = ref(false);
++const forbidden = ref(false);
+ const searchQuery = ref("");
+ const formPage = ref<{ mode: "create" | "edit"; row: Provider | null } | null>(null);
+ 
+@@ -265,10 +271,13 @@ watch(
+ async function loadProviders() {
+   if (!orgId.value) return;
+   isLoading.value = true;
++  forbidden.value = false;
+   try {
+     providers.value = await onlineEvalsService.providers.list(orgId.value);
+   } catch (err: any) {
+-    showError(err, t("llmProviders.loadError"));
++    forbidden.value = err?.response?.status === 403;
++    // The grouped access toast already reports a 403; a second red toast adds nothing.
++    if (!forbidden.value) showError(err, t("llmProviders.loadError"));
+   } finally {
+     isLoading.value = false;
+   }
+diff --git a/web/src/components/settings/ModelPricingList.vue b/web/src/components/settings/ModelPricingList.vue
+index 42058969844..83db6d755af 100644
+--- a/web/src/components/settings/ModelPricingList.vue
++++ b/web/src/components/settings/ModelPricingList.vue
+@@ -87,6 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+           :columns="columns"
+           row-key="id"
+           :loading="loading"
++          :forbidden="forbidden"
+           :selected-ids="selectedIds"
+           selection="multiple"
+           pagination="client"
+@@ -613,6 +614,7 @@ const router = useRouter();
+ const qTableRef = ref<any>(null);
+ const models = ref<any[]>([]);
+ const loading = ref(true);
++const forbidden = ref(false);
+ const refreshing = ref(false);
+ 
+ const showPricingDialog = ref(false);
+@@ -873,10 +875,12 @@ function notifyError(prefix: string, e: any) {
+ 
+ async function fetchModels() {
+   loading.value = true;
++  forbidden.value = false;
+   try {
+     const res = await modelPricingService.list(orgIdentifier.value);
+     models.value = res.data || [];
+   } catch (e: any) {
++    forbidden.value = e?.response?.status === 403;
+     notifyError(t("modelPricing.errLoadModels"), e);
+   } finally {
+     loading.value = false;
+diff --git a/web/src/components/settings/OrganizationManagement.vue b/web/src/components/settings/OrganizationManagement.vue
+index a5d6a3ef595..1ada5aea932 100644
+--- a/web/src/components/settings/OrganizationManagement.vue
++++ b/web/src/components/settings/OrganizationManagement.vue
+@@ -41,6 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+           table-id="org-management-list"
+           :show-global-filter="false"
+           :loading="loading"
++          :forbidden="forbidden"
+         >
+           <template #toolbar>
+             <OSearchInput
+@@ -425,6 +426,7 @@ export default defineComponent({
+     const extendTrialDataRow = ref();
+     const extendedTrial = ref(1);
+     const loading = ref(false);
++    const forbidden = ref(false);
+     const extendTrialPrompt = ref(false);
+     const tabledata = ref<any>([]);
+     const resultTotal = ref(0);
+@@ -685,6 +687,7 @@ export default defineComponent({
+ 
+     const getData = () => {
+       loading.value = true;
++      forbidden.value = false;
+       const dismiss = toast({
+         variant: "loading",
+         message: t("settings.organizationManagementPage.loadingData"),
+@@ -728,7 +731,8 @@ export default defineComponent({
+         .catch((error) => {
+           loading.value = false;
+           dismiss();
+-          if (error.status != 403) {
++          forbidden.value = error?.status === 403 || error?.response?.status === 403;
++          if (!forbidden.value) {
+             toast({
+               variant: "error",
+               message:
+@@ -1067,6 +1071,7 @@ export default defineComponent({
+       resultTotal,
+       tabledata,
+       loading,
++      forbidden,
+       extendedTrial,
+       extendTrialPrompt,
+       toggleExtendTrialDialog,
+diff --git a/web/src/components/settings/RegexPatternList.vue b/web/src/components/settings/RegexPatternList.vue
+index 8e2e8318675..21245044e65 100644
+--- a/web/src/components/settings/RegexPatternList.vue
++++ b/web/src/components/settings/RegexPatternList.vue
+@@ -61,6 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+             table-id="settings-regex-patterns"
+             :show-global-filter="false"
+             :loading="listLoading"
++            :forbidden="forbidden"
+             @update:selected-ids="handleSelectedIdsUpdate"
+           >
+             <template #toolbar>
+@@ -308,6 +309,7 @@ export default defineComponent({
+     const resultTotal = ref(0);
+ 
+     const listLoading = ref(false);
++    const forbidden = ref(false);
+ 
+     const showImportRegexPatternDialog = ref(false);
+ 
+@@ -359,6 +361,7 @@ export default defineComponent({
+ 
+     const getRegexPatterns = async () => {
+       listLoading.value = true;
++      forbidden.value = false;
+       try {
+         const response = await regexPatternsService.list(
+           store.state.selectedOrganization.identifier,
+@@ -371,10 +374,14 @@ export default defineComponent({
+         store.dispatch("setRegexPatterns", regexPatterns.value);
+         resultTotal.value = regexPatterns.value.length;
+       } catch (error: any) {
+-        toast({
+-          message: error.data.message || t("settings.regexPatternList.errorFetching"),
+-          variant: "error",
+-        });
++        forbidden.value = error?.response?.status === 403;
++        // The grouped access toast already reports a 403; a second red toast adds nothing.
++        if (!forbidden.value) {
++          toast({
++            message: error.data.message || t("settings.regexPatternList.errorFetching"),
++            variant: "error",
++          });
++        }
+       } finally {
+         listLoading.value = false;
+       }
+@@ -548,6 +555,7 @@ export default defineComponent({
+       resultTotal,
+       createRegexPattern,
+       listLoading,
++      forbidden,
+       editRegexPattern,
+       deleteRegexPattern,
+       deleteDialog,
+diff --git a/web/src/components/synthetic-monitoring/MonitorTable.vue b/web/src/components/synthetic-monitoring/MonitorTable.vue
+index 4c696065334..aaa94a6b008 100644
+--- a/web/src/components/synthetic-monitoring/MonitorTable.vue
++++ b/web/src/components/synthetic-monitoring/MonitorTable.vue
+@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+     :columns="columns"
+     :data="data"
+     :loading="loading"
++    :forbidden="forbidden"
+     pagination="client"
+     :page-size="20"
+     :page-size-options="[10, 20, 25, 50]"
+@@ -531,6 +532,7 @@ const props = withDefaults(
+     mode: Mode;
+     data: any[];
+     loading?: boolean;
++    forbidden?: boolean;
+     /** IANA zone for the Last Check tooltip. Passed in: this table is a leaf
+      *  component and must not reach into the store for it. */
+     timezone?: string;
+diff --git a/web/src/components/workflows/WorkflowsList.vue b/web/src/components/workflows/WorkflowsList.vue
+index 0d7af403fe3..bf73be3d889 100644
+--- a/web/src/components/workflows/WorkflowsList.vue
++++ b/web/src/components/workflows/WorkflowsList.vue
+@@ -73,6 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+             :columns="otableColumns"
+             row-key="id"
+             :loading="loading"
++            :forbidden="forbidden"
+             :page-size="20"
+             :page-size-options="[20, 50, 100, 250, 500]"
+             :enable-column-resize="true"
+@@ -275,6 +276,7 @@ const currentRouteName = computed(() => router.currentRoute.value.name);
+ const orgId = computed(() => store.state.selectedOrganization.identifier as string);
+ 
+ const loading = ref(true);
++const forbidden = ref(false);
+ const filterQuery = ref("");
+ const workflows = ref<any[]>([]);
+ const oTableRef: any = ref(null);
+@@ -385,6 +387,7 @@ const otableColumns = computed(() => columns.value);
+ 
+ const getWorkflows = async () => {
+   loading.value = true;
++  forbidden.value = false;
+   try {
+     const response = await workflowService.listWorkflows(orgId.value);
+     // list handler returns a bare array of Workflow.
+@@ -395,8 +398,9 @@ const getWorkflows = async () => {
+       trigger: triggerLabel(wf),
+       updated_at_display: formatTs(wf.updated_at),
+     }));
+-  } catch (error) {
++  } catch (error: any) {
+     console.error(error);
++    forbidden.value = error?.response?.status === 403;
+   } finally {
+     loading.value = false;
+   }
+diff --git a/web/src/composables/useRateLimiter.ts b/web/src/composables/useRateLimiter.ts
+index 4378fa1072d..b8c5fe949ca 100644
+--- a/web/src/composables/useRateLimiter.ts
++++ b/web/src/composables/useRateLimiter.ts
+@@ -20,10 +20,13 @@ const useRateLimiter = () => {
+   const store = useStore();
+   let isApiLimitsLoading = ref<boolean>(false);
+   let isRoleLimitsLoading = ref<boolean>(false);
++  const apiLimitsForbidden = ref<boolean>(false);
++  const roleLimitsForbidden = ref<boolean>(false);
+ 
+   const getApiLimitsByOrganization = async (orgId: string, interval: string = "second") => {
+     try {
+       isApiLimitsLoading.value = true;
++      apiLimitsForbidden.value = false;
+       const response = await rateLimiterService.getApiLimits(orgId, interval);
+       let transformedData: any = [];
+ 
+@@ -64,8 +67,9 @@ const useRateLimiter = () => {
+       });
+       isApiLimitsLoading.value = false;
+       return transformedData;
+-    } catch (error) {
++    } catch (error: any) {
+       isApiLimitsLoading.value = false;
++      apiLimitsForbidden.value = error?.response?.status === 403;
+       console.log(error);
+     }
+   };
+@@ -114,8 +118,9 @@ const useRateLimiter = () => {
+       });
+       isRoleLimitsLoading.value = false;
+       return transformedData;
+-    } catch (error) {
++    } catch (error: any) {
+       console.log(error);
++      roleLimitsForbidden.value = error?.response?.status === 403;
+       isRoleLimitsLoading.value = false;
+     }
+   };
+@@ -146,6 +151,8 @@ const useRateLimiter = () => {
+     getModulesToDisplay,
+     isRoleLimitsLoading,
+     isApiLimitsLoading,
++    apiLimitsForbidden,
++    roleLimitsForbidden,
+   };
+ };
+ export default useRateLimiter;
+diff --git a/web/src/composables/useStreams.ts b/web/src/composables/useStreams.ts
+index 2769ef916de..b1b8273be5f 100644
+--- a/web/src/composables/useStreams.ts
++++ b/web/src/composables/useStreams.ts
+@@ -23,6 +23,11 @@ import type { TranslateFn, I18nText } from "@/types/i18n";
+ 
+ const getStreamsPromise: any = ref(null);
+ 
++// Keep the HTTP status on the rejection: callers need it to tell a denial (403)
++// apart from any other failure, and a bare Error would drop it.
++const withResponse = (err: Error, source: any): Error =>
++  Object.assign(err, { response: source?.response, status: source?.status });
++
+ const useStreams = (t: TranslateFn) => {
+   const store = useStore();
+ 
+@@ -124,7 +129,7 @@ const useStreams = (t: TranslateFn) => {
+                 .catch((e: any) => {
+                   getStreamsPromise.value = null;
+                   dismiss();
+-                  reject(new Error(e.message));
++                  reject(withResponse(new Error(e.message), e));
+                 });
+             } else {
+               getStreamsPromise.value = StreamService.nameList(
+@@ -147,7 +152,7 @@ const useStreams = (t: TranslateFn) => {
+                 .catch((e: any) => {
+                   getStreamsPromise.value = null;
+                   dismiss();
+-                  reject(new Error(e.message));
++                  reject(withResponse(new Error(e.message), e));
+                 });
+             }
+           } else {
+@@ -158,7 +163,7 @@ const useStreams = (t: TranslateFn) => {
+             }
+           }
+         } catch (e: any) {
+-          reject(new Error(e.message));
++          reject(withResponse(new Error(e.message), e));
+         }
+       })();
+     });
+@@ -219,10 +224,10 @@ const useStreams = (t: TranslateFn) => {
+             .catch((e: any) => {
+               getStreamsPromise.value = null;
+               dismiss();
+-              reject(new Error(e.message));
++              reject(withResponse(new Error(e.message), e));
+             });
+         } catch (e: any) {
+-          reject(new Error(e.message));
++          reject(withResponse(new Error(e.message), e));
+         }
+       })();
+     });
+@@ -262,7 +267,7 @@ const useStreams = (t: TranslateFn) => {
+           try {
+             await getStreams(streamType, false);
+           } catch (e: any) {
+-            reject(new Error(e.message));
++            reject(withResponse(new Error(e.message), e));
+           }
+         }
+ 
+@@ -319,7 +324,7 @@ const useStreams = (t: TranslateFn) => {
+             );
+           }
+         } catch (e: any) {
+-          reject(new Error(e.message));
++          reject(withResponse(new Error(e.message), e));
+         }
+       })();
+     });
+@@ -371,7 +376,7 @@ const useStreams = (t: TranslateFn) => {
+           return streamsCache[streamType].value?.list?.[streamIndex] || {};
+         } catch (e: any) {
+           // Use reject in Promise.all to catch errors specifically.
+-          throw new Error(e.message);
++          throw withResponse(new Error(e.message), e);
+         }
+       }),
+     );
+diff --git a/web/src/enterprise/components/OnlineEvals.vue b/web/src/enterprise/components/OnlineEvals.vue
+index 9398ea84b6f..119eb7b4cc6 100644
+--- a/web/src/enterprise/components/OnlineEvals.vue
++++ b/web/src/enterprise/components/OnlineEvals.vue
+@@ -201,6 +201,7 @@ the Free Software Foundation, either version 3 of the License, or
+           />
+           <ScoreConfigList
+             v-else-if="activeTab === 'scoreConfigs'"
++            :forbidden="scoreConfigsForbidden"
+             :rows="filteredRows as ScoreConfig[]"
+             :all-score-configs="scoreConfigs"
+             :scorers="scorers"
+@@ -219,6 +220,7 @@ the Free Software Foundation, either version 3 of the License, or
+           />
+           <ScorerList
+             v-else-if="activeTab === 'scorers'"
++            :forbidden="scorersForbidden"
+             :rows="filteredRows as Scorer[]"
+             :all-scorers="scorers"
+             :jobs="jobs"
+@@ -240,6 +242,7 @@ the Free Software Foundation, either version 3 of the License, or
+           />
+           <EvalJobList
+             v-else-if="activeTab === 'jobs'"
++            :forbidden="jobsForbidden"
+             :rows="filteredRows as EvalJob[]"
+             :search="filterQuery"
+             :loading="isLoading"
+@@ -503,6 +506,9 @@ const {
+   scoreConfigVersions,
+   providers,
+   isLoading,
++  jobsForbidden,
++  scorersForbidden,
++  scoreConfigsForbidden,
+   loadAll,
+   loadProviders,
+   ensureScoreConfigVersions,
+diff --git a/web/src/enterprise/components/onlineEvals/EvalJobList.vue b/web/src/enterprise/components/onlineEvals/EvalJobList.vue
+index 042c725a21e..8d3802ad167 100644
+--- a/web/src/enterprise/components/onlineEvals/EvalJobList.vue
++++ b/web/src/enterprise/components/onlineEvals/EvalJobList.vue
+@@ -9,6 +9,7 @@
+         :columns="columns"
+         row-key="id"
+         :loading="loading"
++        :forbidden="forbidden"
+         :footer-title="t('onlineEvals.job.listTitle')"
+         :global-filter="search"
+         :show-global-filter="false"
+@@ -185,6 +186,7 @@ const props = defineProps<{
+   rows: EvalJob[];
+   search: string;
+   loading?: boolean;
++  forbidden?: boolean;
+   /** A bulk action (e.g. delete-selected) is in flight — shows the table overlay. */
+   actionLoading?: boolean;
+   /** ID of the job whose activate/pause request is currently in flight. */
+diff --git a/web/src/enterprise/components/onlineEvals/ScoreConfigList.vue b/web/src/enterprise/components/onlineEvals/ScoreConfigList.vue
+index 814906c1446..ce5b164850b 100644
+--- a/web/src/enterprise/components/onlineEvals/ScoreConfigList.vue
++++ b/web/src/enterprise/components/onlineEvals/ScoreConfigList.vue
+@@ -9,6 +9,7 @@
+         :columns="columns"
+         row-key="id"
+         :loading="loading"
++        :forbidden="forbidden"
+         :footer-title="t('onlineEvals.scoreConfig.listTitle')"
+         :global-filter="search"
+         :show-global-filter="false"
+@@ -198,6 +199,7 @@ const props = defineProps<{
+   scorers: Scorer[];
+   search: string;
+   loading?: boolean;
++  forbidden?: boolean;
+ }>();
+ 
+ const emit = defineEmits<{
+diff --git a/web/src/enterprise/components/onlineEvals/ScorerList.vue b/web/src/enterprise/components/onlineEvals/ScorerList.vue
+index 45e77f08997..b5522a79bba 100644
+--- a/web/src/enterprise/components/onlineEvals/ScorerList.vue
++++ b/web/src/enterprise/components/onlineEvals/ScorerList.vue
+@@ -9,6 +9,7 @@
+         :columns="columns"
+         row-key="id"
+         :loading="loading"
++        :forbidden="forbidden"
+         :footer-title="t('onlineEvals.scorer.listTitle')"
+         :global-filter="search"
+         :show-global-filter="false"
+@@ -208,6 +209,7 @@ const props = defineProps<{
+   providers: Provider[];
+   search: string;
+   loading?: boolean;
++  forbidden?: boolean;
+ }>();
+ 
+ const emit = defineEmits<{
+diff --git a/web/src/enterprise/components/onlineEvals/composables/useOnlineEvalsData.ts b/web/src/enterprise/components/onlineEvals/composables/useOnlineEvalsData.ts
+index 98189de98f2..57e94a8bb6a 100644
+--- a/web/src/enterprise/components/onlineEvals/composables/useOnlineEvalsData.ts
++++ b/web/src/enterprise/components/onlineEvals/composables/useOnlineEvalsData.ts
+@@ -17,10 +17,16 @@ export function useOnlineEvalsData() {
+   const scoreConfigVersions = ref<Record<string, ScoreConfig[]>>({});
+   const providers = ref<Provider[]>([]);
+   const isLoading = ref(false);
++  const jobsForbidden = ref(false);
++  const scorersForbidden = ref(false);
++  const scoreConfigsForbidden = ref(false);
+ 
+   async function loadAll(orgId: string) {
+     if (!orgId) return;
+     isLoading.value = true;
++    jobsForbidden.value = false;
++    scorersForbidden.value = false;
++    scoreConfigsForbidden.value = false;
+     try {
+       const [providerResult, scoreConfigResult, scorerResult, jobResult] = await Promise.allSettled(
+         [
+@@ -43,18 +49,21 @@ export function useOnlineEvalsData() {
+           scoreConfigResult.value.map((config) => [entityId(config), [config]]),
+         );
+       } else {
++        scoreConfigsForbidden.value = scoreConfigResult.reason?.response?.status === 403;
+         showError(scoreConfigResult.reason, t("onlineEvals.loadError"));
+       }
+ 
+       if (scorerResult.status === "fulfilled") {
+         scorers.value = scorerResult.value;
+       } else {
++        scorersForbidden.value = scorerResult.reason?.response?.status === 403;
+         showError(scorerResult.reason, t("onlineEvals.loadError"));
+       }
+ 
+       if (jobResult.status === "fulfilled") {
+         jobs.value = jobResult.value;
+       } else {
++        jobsForbidden.value = jobResult.reason?.response?.status === 403;
+         showError(jobResult.reason, t("onlineEvals.loadError"));
+       }
+     } finally {
+@@ -94,6 +103,9 @@ export function useOnlineEvalsData() {
+     scoreConfigVersions,
+     providers,
+     isLoading,
++    jobsForbidden,
++    scorersForbidden,
++    scoreConfigsForbidden,
+     loadAll,
+     loadProviders,
+     ensureScoreConfigVersions,
+diff --git a/web/src/enterprise/views/AIObservability/DatasetsPage.vue b/web/src/enterprise/views/AIObservability/DatasetsPage.vue
+index 6dcb5d19628..19c4e5f770a 100644
+--- a/web/src/enterprise/views/AIObservability/DatasetsPage.vue
++++ b/web/src/enterprise/views/AIObservability/DatasetsPage.vue
+@@ -43,6 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+         :columns="columns"
+         row-key="id"
+         :loading="loading"
++        :forbidden="forbidden"
+         @row-click="openDetail"
+         :footer-title="t('aiObservability.datasets.listTitle')"
+         :global-filter="search"
+@@ -279,6 +280,7 @@ function openDetail(row: LlmDataset) {
+ 
+ const datasets = ref<LlmDataset[]>([]);
+ const loading = ref(false);
++const forbidden = ref(false);
+ const search = ref("");
+ 
+ const numberedRows = useNumberedRows(datasets);
+@@ -369,10 +371,15 @@ const columns = computed<OTableColumnDef[]>(() => [
+ async function refresh() {
+   if (!orgId.value) return;
+   loading.value = true;
++  forbidden.value = false;
+   try {
+     datasets.value = await llmDatasetsService.list(orgId.value);
+-  } catch {
+-    toast({ variant: "error", message: t("aiObservability.datasets.loadError") });
++  } catch (err: any) {
++    forbidden.value = err?.response?.status === 403;
++    // The grouped access toast already reports a 403; a second red toast adds nothing.
++    if (!forbidden.value) {
++      toast({ variant: "error", message: t("aiObservability.datasets.loadError") });
++    }
+   } finally {
+     loading.value = false;
+   }
+diff --git a/web/src/enterprise/views/AIObservability/QueuesPage.vue b/web/src/enterprise/views/AIObservability/QueuesPage.vue
+index a5c3702afe9..97f1f699136 100644
+--- a/web/src/enterprise/views/AIObservability/QueuesPage.vue
++++ b/web/src/enterprise/views/AIObservability/QueuesPage.vue
+@@ -41,6 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+         :columns="columns"
+         row-key="id"
+         :loading="loading"
++        :forbidden="forbidden"
+         :footer-title="t('aiObservability.queues.listTitle')"
+         :global-filter="search"
+         :show-global-filter="false"
+@@ -388,6 +389,7 @@ const orgQuery = computed(() => ({ org_identifier: orgId.value }));
+ 
+ const queues = ref<LlmQueue[]>([]);
+ const loading = ref(false);
++const forbidden = ref(false);
+ const search = ref("");
+ 
+ const numberedRows = useNumberedRows(queues);
+@@ -497,6 +499,7 @@ const columns = computed<OTableColumnDef[]>(() => [
+ async function refresh() {
+   if (!orgId.value) return;
+   loading.value = true;
++  forbidden.value = false;
+   try {
+     // ONE request: the list row now carries targetDatasetName and the review
+     // counts, so nothing else is needed to render the table. The Score Config
+@@ -505,8 +508,12 @@ async function refresh() {
+     // Org-wide catalogs, so a manual refresh invalidates them; the next drawer
+     // open re-fetches.
+     optionsLoaded.value = false;
+-  } catch {
+-    toast({ variant: "error", message: t("aiObservability.queues.loadError") });
++  } catch (err: any) {
++    forbidden.value = err?.response?.status === 403;
++    // The grouped access toast already reports a 403; a second red toast adds nothing.
++    if (!forbidden.value) {
++      toast({ variant: "error", message: t("aiObservability.queues.loadError") });
++    }
+   } finally {
+     loading.value = false;
+   }
+diff --git a/web/src/enterprise/views/AIObservability/RemoteTasksPage.vue b/web/src/enterprise/views/AIObservability/RemoteTasksPage.vue
+index 33795a2cf0e..a08db7650ec 100644
+--- a/web/src/enterprise/views/AIObservability/RemoteTasksPage.vue
++++ b/web/src/enterprise/views/AIObservability/RemoteTasksPage.vue
+@@ -45,6 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+         :columns="columns"
+         row-key="entityId"
+         :loading="loading"
++        :forbidden="forbidden"
+         :footer-title="t('aiObservability.remoteTasks.listTitle')"
+         :global-filter="search"
+         :show-global-filter="false"
+@@ -231,6 +232,7 @@ const orgId = computed<string>(() => store.state.selectedOrganization?.identifie
+ 
+ const tasks = ref<RemoteTask[]>([]);
+ const loading = ref(false);
++const forbidden = ref(false);
+ const search = ref("");
+ 
+ /**
+@@ -404,13 +406,18 @@ async function loadReferenceCounts() {
+ async function refresh() {
+   if (!orgId.value) return;
+   loading.value = true;
++  forbidden.value = false;
+   try {
+     tasks.value = await remoteTasksService.list(orgId.value);
+   } catch (error: any) {
+-    toast({
+-      variant: "error",
+-      message: raw(error?.response?.data?.message) || t("aiObservability.remoteTasks.loadError"),
+-    });
++    forbidden.value = error?.response?.status === 403;
++    // The grouped access toast already reports a 403; a second red toast adds nothing.
++    if (!forbidden.value) {
++      toast({
++        variant: "error",
++        message: raw(error?.response?.data?.message) || t("aiObservability.remoteTasks.loadError"),
++      });
++    }
+   } finally {
+     loading.value = false;
+   }
+diff --git a/web/src/lib/core/EmptyState/illustrations/EmptyLock.vue b/web/src/lib/core/EmptyState/illustrations/EmptyLock.vue
+new file mode 100644
+index 00000000000..7b8486f8781
+--- /dev/null
++++ b/web/src/lib/core/EmptyState/illustrations/EmptyLock.vue
+@@ -0,0 +1,142 @@
++<!-- Copyright 2026 OpenObserve Inc.
++
++This program is free software: you can redistribute it and/or modify
++it under the terms of the GNU Affero General Public License as published by
++the Free Software Foundation, either version 3 of the License, or
++(at your option) any later version.
++
++This program is distributed in the hope that it will be useful
++but WITHOUT ANY WARRANTY; without even the implied warranty of
++MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++GNU Affero General Public License for more details.
++
++You should have received a copy of the GNU Affero General Public License
++along with this program.  If not, see <http://www.gnu.org/licenses/>.
++-->
++
++<!--
++  EmptyLock — "you may not see this" illustration: a closed padlock standing in
++  front of a dashed content card. The card is the point — it says the content
++  EXISTS and is withheld, which an empty container would wrongly read as "there
++  is nothing here". Deliberately still: this is a stop, not an invitation, so
++  only a slow halo breathes. Brand-recoloured; motion gated by `animated` +
++  prefers-reduced-motion.
++-->
++<template>
++  <svg
++    :width="width"
++    viewBox="0 0 240 180"
++    fill="none"
++    xmlns="http://www.w3.org/2000/svg"
++    role="img"
++    :aria-label="t('emptyState.noAccess.title')"
++    :class="['es-root', { 'es-static': !animated }]"
++  >
++    <ellipse cx="120" cy="152" rx="54" ry="8" fill="var(--color-primary-900)" opacity="0.1" />
++
++    <!-- dotted field -->
++    <g fill="var(--color-border-default)" opacity="0.5">
++      <circle cx="46" cy="52" r="2" />
++      <circle cx="198" cy="58" r="2" />
++      <circle cx="38" cy="110" r="1.6" />
++      <circle cx="206" cy="102" r="1.6" />
++      <circle cx="58" cy="36" r="1.6" />
++    </g>
++
++    <!-- withheld content: a dashed card with rows, sitting behind the lock -->
++    <g opacity="0.65">
++      <rect
++        x="78"
++        y="34"
++        width="84"
++        height="50"
++        rx="6"
++        stroke="var(--color-border-default)"
++        stroke-width="1.5"
++        stroke-dasharray="5 4"
++      />
++      <g fill="var(--color-primary-400)" opacity="0.55">
++        <rect x="88" y="46" width="46" height="4" rx="2" />
++        <rect x="88" y="56" width="64" height="4" rx="2" />
++        <rect x="88" y="66" width="34" height="4" rx="2" />
++      </g>
++    </g>
++
++    <!-- halo: the only moving part, and only just -->
++    <circle
++      class="es-halo"
++      cx="120"
++      cy="116"
++      r="42"
++      stroke="var(--color-primary-400)"
++      stroke-width="1.5"
++      opacity="0.18"
++    />
++
++    <!-- padlock -->
++    <g>
++      <path
++        d="M106 100 V90 A14 14 0 0 1 134 90 V100"
++        stroke="var(--color-border-strong)"
++        stroke-width="6"
++        stroke-linecap="round"
++        fill="none"
++      />
++      <rect
++        x="94"
++        y="100"
++        width="52"
++        height="44"
++        rx="9"
++        fill="var(--color-surface-subtle)"
++        stroke="var(--color-border-strong)"
++        stroke-width="2"
++      />
++      <circle cx="120" cy="117" r="5.5" fill="var(--color-border-strong)" />
++      <path d="M117.6 121 L122.4 121 L123.6 133 L116.4 133 Z" fill="var(--color-border-strong)" />
++    </g>
++  </svg>
++</template>
++
++<script setup lang="ts">
++import { useI18nTyped } from "@/types/i18n";
++
++const { t } = useI18nTyped();
++
++withDefaults(defineProps<{ width?: number; animated?: boolean }>(), { width: 260, animated: true });
++</script>
++
++<style scoped>
++/* keep(keyframes): SVG illustration animation. Scoped on purpose (W2.b): the
++   illustrations reuse generic keyframe names (es-pulse, es-twinkle, …) with
++   DIFFERENT bodies from unscoped blocks — a global name collision where the
++   last-loaded illustration hijacked the others' animations. Vue rewrites scoped
++   keyframe names per component, which ends the collision. All selectors and the
++   es-static gate live in this file's own template. */
++.es-halo {
++  transform-box: fill-box;
++  transform-origin: center;
++  animation: es-breathe 4s ease-in-out infinite;
++}
++
++@keyframes es-breathe {
++  0%,
++  100% {
++    transform: scale(0.94);
++    opacity: 0.12;
++  }
++  50% {
++    transform: scale(1.04);
++    opacity: 0.26;
++  }
++}
++
++.es-static :where(.es-halo) {
++  animation: none;
++}
++@media (prefers-reduced-motion: reduce) {
++  :where(.es-halo) {
++    animation: none;
++  }
++}
++</style>
+diff --git a/web/src/lib/core/EmptyState/illustrations/index.ts b/web/src/lib/core/EmptyState/illustrations/index.ts
+index fb559cfb3c9..17f0f9c836e 100644
+--- a/web/src/lib/core/EmptyState/illustrations/index.ts
++++ b/web/src/lib/core/EmptyState/illustrations/index.ts
+@@ -35,6 +35,7 @@ import EmptyConstellation from "./EmptyConstellation.vue";
+ import EmptyObservatory from "./EmptyObservatory.vue";
+ import EmptyDataScene from "./EmptyDataScene.vue";
+ import EmptyBox from "./EmptyBox.vue";
++import EmptyLock from "./EmptyLock.vue";
+ import EmptyBoard from "./EmptyBoard.vue";
+ import EmptyHourglass from "./EmptyHourglass.vue";
+ import EmptyConnect from "./EmptyConnect.vue";
+@@ -60,6 +61,7 @@ export const illustrations = {
+   // ---- object / metaphor illustrations (the DEFAULT — no character) --------
+   "no-results": EmptyNoResults,
+   box: EmptyBox,
++  lock: EmptyLock,
+   board: EmptyBoard,
+   hourglass: EmptyHourglass,
+   connect: EmptyConnect,
+diff --git a/web/src/lib/core/EmptyState/presets.ts b/web/src/lib/core/EmptyState/presets.ts
+index 58625b5e689..56fe4b0e911 100644
+--- a/web/src/lib/core/EmptyState/presets.ts
++++ b/web/src/lib/core/EmptyState/presets.ts
+@@ -55,6 +55,14 @@ export interface EmptyStatePreset {
+ }
+ 
+ export const emptyStatePresets = {
++  // --- access denied (a 403 on the data this view lists) -------------------
++  "no-access": {
++    illustration: "lock",
++    variant: "neutral",
++    titleKey: "emptyState.noAccess.title",
++    descriptionKey: "emptyState.noAccess.description",
++    actions: [],
++  },
+   // --- no results (a search/filter/time-range returned nothing) ------------
+   "no-search-results": {
+     illustration: "no-results",
+diff --git a/web/src/lib/core/Table/OTable.types.ts b/web/src/lib/core/Table/OTable.types.ts
+index 5097cd82d8a..41cfd1f0577 100644
+--- a/web/src/lib/core/Table/OTable.types.ts
++++ b/web/src/lib/core/Table/OTable.types.ts
+@@ -363,6 +363,12 @@ export interface OTableProps<TData = any> {
+   /** Data is arriving incrementally (SSE/WebSocket). Shows a pulsing indicator. */
+   streaming?: boolean;
+   error?: string | null;
++  /**
++   * The data this table lists was denied (403). Shows the no-access state
++   * instead of the first-run empty state, which would otherwise invite the
++   * user to create something they are not allowed to create.
++   */
++  forbidden?: boolean;
+   /** Text shown when data is empty and not loading */
+   emptyMessage?: I18nText;
+   dense?: boolean;
+diff --git a/web/src/lib/core/Table/OTable.vue b/web/src/lib/core/Table/OTable.vue
+index 02096fd8484..b7402d69b4e 100644
+--- a/web/src/lib/core/Table/OTable.vue
++++ b/web/src/lib/core/Table/OTable.vue
+@@ -44,6 +44,7 @@ import OTablePagination from "./sub-components/OTablePagination.vue";
+ import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+ import OIcon from "@/lib/core/Icon/OIcon.vue";
+ import OTableEmpty from "./sub-components/OTableEmpty.vue";
++import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+ import OTableLoading from "./sub-components/OTableLoading.vue";
+ import OTableError from "./sub-components/OTableError.vue";
+ import { PIVOT_TABLE_TOTAL_COLUMN_WIDTH } from "@/utils/dashboard/constants";
+@@ -1030,8 +1031,18 @@ useTableRowShortcuts(scrollContainerRef);
+ // with a "Loading…" banner over them (that pattern lets consumers'
+ // progressive data mutations leak through visually). Consumers that want
+ // refetch-without-replacing-content should use the `streaming` prop.
++// A denied fetch and a genuinely empty list are both zero rows; only the caller
++// knows which, so `forbidden` decides and takes precedence over the empty state.
++const showForbidden = computed(
++  () => !heldLoading.value && !!props.forbidden && displayRows.value.length === 0,
++);
+ const showEmpty = computed(
+-  () => !heldLoading.value && !props.streaming && !props.error && displayRows.value.length === 0,
++  () =>
++    !heldLoading.value &&
++    !props.streaming &&
++    !props.error &&
++    !showForbidden.value &&
++    displayRows.value.length === 0,
+ );
+ const showError = computed(() => !heldLoading.value && !!props.error);
+ const showLoadingOverlay = computed(() => heldLoading.value);
+@@ -1531,8 +1542,13 @@ defineExpose({
+           </tfoot>
+         </table>
+ 
++        <!-- ── Access Denied State ───────────────────────────── -->
++        <OTableEmpty v-if="showForbidden" :floor="!props.fillHeight" data-test="o2-table-forbidden">
++          <OEmptyState size="hero" preset="no-access" />
++        </OTableEmpty>
++
+         <!-- ── Empty State ───────────────────────────────────── -->
+-        <OTableEmpty v-if="showEmpty" :message="props.emptyMessage" :floor="!props.fillHeight">
++        <OTableEmpty v-else-if="showEmpty" :message="props.emptyMessage" :floor="!props.fillHeight">
+           <template v-if="slots.empty" #default>
+             <slot name="empty" />
+           </template>
+diff --git a/web/src/locales/languages/ar-SA.json b/web/src/locales/languages/ar-SA.json
+index 586925d6024..4e2c3ccbdb0 100644
+--- a/web/src/locales/languages/ar-SA.json
++++ b/web/src/locales/languages/ar-SA.json
+@@ -76,6 +76,10 @@
+       "action": "تنفيذ الاستعلام",
+       "actionDesc": "تحميل الأحداث للفلاتر المحددة"
+     },
++    "noAccess": {
++      "title": "لا تملك حق الوصول",
++      "description": "Contact your administrator if you believe you should have access."
++    },
+     "noDashboards": {
+       "title": "أنشئ لوحة القيادة الأولى لك",
+       "description": "لوحات القيادة تجمع بين القياسات، والسجلات، والتتبعات في عرض واحد. قم ببناء واحدة للبدء.",
+diff --git a/web/src/locales/languages/de-DE.json b/web/src/locales/languages/de-DE.json
+index 1ccfb3baf30..d9b3fc135dd 100644
+--- a/web/src/locales/languages/de-DE.json
++++ b/web/src/locales/languages/de-DE.json
+@@ -76,6 +76,10 @@
+       "action": "Abfrage ausführen",
+       "actionDesc": "Ereignisse für die ausgewählten Filter laden"
+     },
++    "noAccess": {
++      "title": "Sie haben keinen Zugriff",
++      "description": "Kontaktieren Sie Ihren Administrator, wenn Sie glauben, dass Sie Zugriff haben sollten."
++    },
+     "noDashboards": {
+       "title": "Erstelle dein erstes Dashboard",
+       "description": "Dashboards bringen Ihre Metriken, Logs und Traces in einer Ansicht zusammen. Erstellen Sie eines, um loszulegen.",
+diff --git a/web/src/locales/languages/en-US.json b/web/src/locales/languages/en-US.json
+index 43c89484949..d2ae92f215b 100644
+--- a/web/src/locales/languages/en-US.json
++++ b/web/src/locales/languages/en-US.json
+@@ -76,6 +76,10 @@
+       "action": "Run query",
+       "actionDesc": "Load events for the selected filters"
+     },
++    "noAccess": {
++      "title": "You don't have access",
++      "description": "Contact your administrator if you believe you should have access."
++    },
+     "noDashboards": {
+       "title": "Create your first dashboard",
+       "description": "Dashboards bring your metrics, logs, and traces together in one view. Build one to get started.",
+diff --git a/web/src/locales/languages/es-ES.json b/web/src/locales/languages/es-ES.json
+index 998382e7d5a..f3aeb8a208b 100644
+--- a/web/src/locales/languages/es-ES.json
++++ b/web/src/locales/languages/es-ES.json
+@@ -76,6 +76,10 @@
+       "action": "Ejecutar consulta",
+       "actionDesc": "Cargar eventos para los filtros seleccionados"
+     },
++    "noAccess": {
++      "title": "No tienes acceso",
++      "description": "Contacta con tu administrador si crees que deberías tener acceso."
++    },
+     "noDashboards": {
+       "title": "Crea tu primer Dashboard",
+       "description": "Los Dashboards reúnen las métricas, los registros y los seguimientos en una sola vista. Crea uno para empezar.",
+diff --git a/web/src/locales/languages/fr-FR.json b/web/src/locales/languages/fr-FR.json
+index b03c36a32c1..2aa2b9c10d5 100644
+--- a/web/src/locales/languages/fr-FR.json
++++ b/web/src/locales/languages/fr-FR.json
+@@ -76,6 +76,10 @@
+       "action": "Exécuter une requête",
+       "actionDesc": "Charger des événements pour les filtres sélectionnés"
+     },
++    "noAccess": {
++      "title": "Vous n'avez pas accès",
++      "description": "Contactez votre administrateur si vous pensez que vous devriez avoir accès."
++    },
+     "noDashboards": {
+       "title": "Créez votre premier tableau de bord",
+       "description": "Les tableaux de bord regroupent vos métriques, logs et traces dans une seule vue. Créez-en un pour commencer.",
+diff --git a/web/src/locales/languages/it-IT.json b/web/src/locales/languages/it-IT.json
+index 4846784d73d..8a5541214a8 100644
+--- a/web/src/locales/languages/it-IT.json
++++ b/web/src/locales/languages/it-IT.json
+@@ -76,6 +76,10 @@
+       "action": "Esegui interrogazione",
+       "actionDesc": "Carica eventi per i filtri selezionati"
+     },
++    "noAccess": {
++      "title": "Non hai accesso",
++      "description": "Contatta il tuo amministratore se ritieni di dover avere accesso."
++    },
+     "noDashboards": {
+       "title": "Crea la tua prima dashboard",
+       "description": "Le dashboard riuniscono metriche, log e tracce in un'unica vista. Creane una per iniziare.",
+diff --git a/web/src/locales/languages/ja-JP.json b/web/src/locales/languages/ja-JP.json
+index 9c401ebcf2e..2788929566c 100644
+--- a/web/src/locales/languages/ja-JP.json
++++ b/web/src/locales/languages/ja-JP.json
+@@ -76,6 +76,10 @@
+       "action": "クエリーを実行",
+       "actionDesc": "選択したフィルターのイベントをロードします"
+     },
++    "noAccess": {
++      "title": "アクセス権限がありません",
++      "description": "アクセス権があると思われる場合は、管理者に連絡してください。"
++    },
+     "noDashboards": {
+       "title": "はじめてのダッシュボードを作成",
+       "description": "ダッシュボードはメトリクス、ログ、トレースを1つのビューにまとめます。1つ作成して始めましょう。",
+diff --git a/web/src/locales/languages/ko-KR.json b/web/src/locales/languages/ko-KR.json
+index 3a546332486..17179ad3e8a 100644
+--- a/web/src/locales/languages/ko-KR.json
++++ b/web/src/locales/languages/ko-KR.json
+@@ -76,6 +76,10 @@
+       "action": "쿼리 실행",
+       "actionDesc": "선택한 필터의 로드 이벤트"
+     },
++    "noAccess": {
++      "title": "접근 권한이 없습니다",
++      "description": "접근 권한이 있어야 한다고 생각되면 관리자에게 문의하세요."
++    },
+     "noDashboards": {
+       "title": "첫 대시보드 만들기",
+       "description": "대시보드는 메트릭, 로그, 트레이스를 하나의 뷰로 통합합니다. 시작하려면 대시보드를 만드세요.",
+diff --git a/web/src/locales/languages/nl-NL.json b/web/src/locales/languages/nl-NL.json
+index 65edb75702f..9dcbaeb489c 100644
+--- a/web/src/locales/languages/nl-NL.json
++++ b/web/src/locales/languages/nl-NL.json
+@@ -76,6 +76,10 @@
+       "action": "Query uitvoeren",
+       "actionDesc": "Gebeurtenissen laden voor de geselecteerde filters"
+     },
++    "noAccess": {
++      "title": "U heeft geen toegang",
++      "description": "Neem contact op met uw beheerder als u denkt dat u toegang zou moeten hebben."
++    },
+     "noDashboards": {
+       "title": "Maak je eerste dashboard",
+       "description": "Dashboards brengen uw metrieken, logboeken en traces samen in één weergave. Bouw er een om te beginnen.",
+diff --git a/web/src/locales/languages/pl-PL.json b/web/src/locales/languages/pl-PL.json
+index 14cefea0815..89ebcd01e0c 100644
+--- a/web/src/locales/languages/pl-PL.json
++++ b/web/src/locales/languages/pl-PL.json
+@@ -76,6 +76,10 @@
+       "action": "Uruchom zapytanie",
+       "actionDesc": "Załaduj zdarzenia dla wybranych filtrów"
+     },
++    "noAccess": {
++      "title": "Nie masz dostępu",
++      "description": "Skontaktuj się z administratorem, jeśli uważasz, że powinieneś mieć dostęp."
++    },
+     "noDashboards": {
+       "title": "Utwórz swój pierwszy dashboard",
+       "description": "Pulpity łączą metryki, logi i trace w jednym widoku. Zbuduj jeden, aby rozpocząć.",
+diff --git a/web/src/locales/languages/pt-PT.json b/web/src/locales/languages/pt-PT.json
+index 989aece4e3e..d7e05dbaddb 100644
+--- a/web/src/locales/languages/pt-PT.json
++++ b/web/src/locales/languages/pt-PT.json
+@@ -76,6 +76,10 @@
+       "action": "Executar consulta",
+       "actionDesc": "Carregar eventos para os filtros selecionados"
+     },
++    "noAccess": {
++      "title": "Você não tem acesso",
++      "description": "Entre em contato com o administrador se você acredita que deveria ter acesso."
++    },
+     "noDashboards": {
+       "title": "Crie seu primeiro painel",
+       "description": "Os painéis reúnem suas métricas, registros e rastros em uma única visualização. Crie um para começar.",
+diff --git a/web/src/locales/languages/ru-RU.json b/web/src/locales/languages/ru-RU.json
+index 9223db7c04f..99fb61078a5 100644
+--- a/web/src/locales/languages/ru-RU.json
++++ b/web/src/locales/languages/ru-RU.json
+@@ -76,6 +76,10 @@
+       "action": "Выполнить запрос",
+       "actionDesc": "Загрузить события для выбранных фильтров"
+     },
++    "noAccess": {
++      "title": "У вас нет доступа",
++      "description": "Обратитесь к администратору, если считаете, что у вас должен быть доступ."
++    },
+     "noDashboards": {
+       "title": "Создайте свою первую панель мониторинга",
+       "description": "Дашборды объединяют ваши метрики, логи и трейсы в одном представлении. Создайте дашборд, чтобы начать.",
+diff --git a/web/src/locales/languages/tr-TR.json b/web/src/locales/languages/tr-TR.json
+index 5d021350594..7a4898bd687 100644
+--- a/web/src/locales/languages/tr-TR.json
++++ b/web/src/locales/languages/tr-TR.json
+@@ -76,6 +76,10 @@
+       "action": "Sorgu çalıştır",
+       "actionDesc": "Seçilen filtreler için olayları yükle"
+     },
++    "noAccess": {
++      "title": "Erişiminiz yok",
++      "description": "Erişiminiz olması gerektiğini düşünüyorsanız yöneticinizle iletişime geçin."
++    },
+     "noDashboards": {
+       "title": "İlk panonuzu oluşturun",
+       "description": "Gösterge panoları, metriklerinizi, günlüklerinizi ve izlerinizi tek bir görünümde bir araya getirir. Başlamak için bir tane oluşturun.",
+diff --git a/web/src/locales/languages/vi-VN.json b/web/src/locales/languages/vi-VN.json
+index 8fbfafe39b4..40a8201d3cb 100644
+--- a/web/src/locales/languages/vi-VN.json
++++ b/web/src/locales/languages/vi-VN.json
+@@ -76,6 +76,10 @@
+       "action": "Chạy truy vấn",
+       "actionDesc": "Tải sự kiện cho các bộ lọc đã chọn"
+     },
++    "noAccess": {
++      "title": "Bạn không có quyền truy cập",
++      "description": "Contact your administrator if you believe you should have access."
++    },
+     "noDashboards": {
+       "title": "Tạo bảng điều khiển đầu tiên của bạn",
+       "description": "Bảng điều khiển tập hợp chỉ số, nhật ký và trace của bạn vào một chế độ xem. Hãy tạo một bảng để bắt đầu.",
+diff --git a/web/src/locales/languages/zh-CN.json b/web/src/locales/languages/zh-CN.json
+index aae0dfe82a9..cda8a0bbc93 100644
+--- a/web/src/locales/languages/zh-CN.json
++++ b/web/src/locales/languages/zh-CN.json
+@@ -76,6 +76,10 @@
+       "action": "运行查询",
+       "actionDesc": "加载所选过滤器的事件"
+     },
++    "noAccess": {
++      "title": "您没有访问权限",
++      "description": "如果您认为自己应有访问权限，请联系您的管理员。"
++    },
+     "noDashboards": {
+       "title": "创建您的第一个仪表板",
+       "description": "仪表盘将指标、日志和追踪汇总到一个视图中。创建一个即可开始使用。",
+diff --git a/web/src/locales/languages/zh-TW.json b/web/src/locales/languages/zh-TW.json
+index 0f312844734..fe3ac92b1cb 100644
+--- a/web/src/locales/languages/zh-TW.json
++++ b/web/src/locales/languages/zh-TW.json
+@@ -76,6 +76,10 @@
+       "action": "執行查詢",
+       "actionDesc": "載入所選篩選條件的事件"
+     },
++    "noAccess": {
++      "title": "您沒有存取權限",
++      "description": "若您認為自己應有存取權限，請聯絡管理員。"
++    },
+     "noDashboards": {
+       "title": "建立您的第一個儀表板",
+       "description": "儀表板將您的指標、日誌與追蹤整合於單一檢視中。建立一個以開始使用。",
+diff --git a/web/src/plugins/logs/SearchHistory.vue b/web/src/plugins/logs/SearchHistory.vue
+index e2900764925..4d4149d5928 100644
+--- a/web/src/plugins/logs/SearchHistory.vue
++++ b/web/src/plugins/logs/SearchHistory.vue
+@@ -74,6 +74,7 @@
+         :columns="columnsToBeRendered"
+         row-key="uuid"
+         :loading="isLoading"
++        :forbidden="forbidden"
+         pagination="client"
+         :page-size="pageSize"
+         :page-size-options="pageSizeOptions"
+@@ -368,6 +369,7 @@ export default defineComponent({
+     const columnsToBeRendered = ref<OTableColumnDef[]>([]);
+     const expandedIds = ref<string[]>([]);
+     const isLoading = ref(false);
++    const forbidden = ref(false);
+     const moreDetailsToDisplay = ref("");
+ 
+     const { extractTimestamps } = logsUtils();
+@@ -449,6 +451,7 @@ export default defineComponent({
+           router.currentRoute.value.query.org_identifier ||
+           store.state.selectedOrganization.identifier;
+         isLoading.value = true;
++        forbidden.value = false;
+         if (dateTimeToBeSent.value.valueType === "relative") {
+           const convertedData = extractTimestamps(dateTimeToBeSent.value.relativeTimePeriod);
+           dateTimeToBeSent.value.startTime = convertedData.from * 1000;
+@@ -525,12 +528,16 @@ export default defineComponent({
+         });
+         dataToBeLoaded.value = filteredHits;
+         isLoading.value = false;
+-      } catch (error) {
+-        toast({
+-          variant: "error",
+-          message: t("logs.searchHistory.fetchFailed"),
+-          timeout: 5000,
+-        });
++      } catch (error: any) {
++        forbidden.value = error?.response?.status === 403;
++        // The grouped access toast already reports a 403; a second red toast adds nothing.
++        if (!forbidden.value) {
++          toast({
++            variant: "error",
++            message: t("logs.searchHistory.fetchFailed"),
++            timeout: 5000,
++          });
++        }
+         console.log(error, "error");
+         isLoading.value = false;
+       } finally {
+@@ -749,6 +756,7 @@ export default defineComponent({
+       t,
+       route,
+       isLoading,
++      forbidden,
+       updateDateTime,
+       searchDateTimeRef,
+       expandedIds,
+diff --git a/web/src/plugins/logs/SearchSchedulersList.vue b/web/src/plugins/logs/SearchSchedulersList.vue
+index d32859cbb9c..3b84332da67 100644
+--- a/web/src/plugins/logs/SearchSchedulersList.vue
++++ b/web/src/plugins/logs/SearchSchedulersList.vue
+@@ -33,6 +33,7 @@
+       </template>
+       <div class="bg-card-glass-bg min-h-0 flex-1 overflow-hidden">
+         <OTable
++          :forbidden="forbidden"
+           :frame="false"
+           class="search-scheduler-otable"
+           data-test="search-scheduler-table"
+@@ -344,6 +345,7 @@ export default defineComponent({
+     );
+     const expandedIds = ref<string[]>([]);
+     const isLoading = ref(false);
++    const forbidden = ref(false);
+     const showSearchResults = ref(false);
+     const toBeCancelled = ref({});
+     const confirmCancel = ref(false);
+@@ -460,6 +462,7 @@ export default defineComponent({
+         expandedIds.value = [];
+         query.value = "";
+         isLoading.value = true;
++        forbidden.value = false;
+         let responseToBeFetched = [];
+         searchService
+           .get_scheduled_search_list({
+@@ -497,7 +500,8 @@ export default defineComponent({
+             isLoading.value = false;
+           })
+           .catch((e) => {
+-            if (e.response.status != 403) {
++            forbidden.value = e?.response?.status === 403;
++            if (!forbidden.value) {
+               toast({
+                 variant: "error",
+                 message: t("search_scheduler_job.fetch_failed"),
+@@ -833,6 +837,7 @@ export default defineComponent({
+       t,
+       route,
+       isLoading,
++      forbidden,
+       pageSize,
+       pageSizeOptions,
+       expandedIds,
+diff --git a/web/src/views/Dashboards/Dashboards.spec.ts b/web/src/views/Dashboards/Dashboards.spec.ts
+index 39a5c5456ed..1c74b5bc1b0 100644
+--- a/web/src/views/Dashboards/Dashboards.spec.ts
++++ b/web/src/views/Dashboards/Dashboards.spec.ts
+@@ -63,6 +63,7 @@ vi.mock("@/services/settings", () => ({
+ }));
+ 
+ import settingsService from "@/services/settings";
++import * as commons from "@/utils/commons";
+ import { useFavoriteDashboards } from "@/composables/useFavoriteDashboards";
+ 
+ // Mock DOM methods to prevent errors from missing DOM APIs
+@@ -391,6 +392,27 @@ describe("Dashboards.vue", () => {
+       expect(wrapper.vm.activeFolderId).toBe("default");
+     });
+ 
++    it("should stop the loading skeleton when the folder list is forbidden", async () => {
++      // A 403 folder list used to abort mount before the landing decision ran,
++      // leaving the table on its skeleton forever instead of the empty state.
++      vi.mocked(commons.getFoldersList).mockRejectedValueOnce(
++        Object.assign(new Error("Request failed with status code 403"), {
++          response: { status: 403 },
++        }),
++      );
++
++      wrapper = shallowMount(Dashboards, {
++        global: buildGlobalConfig(store, router, i18n, {}),
++      });
++
++      await nextTick();
++      await nextTick();
++      await nextTick();
++
++      expect(wrapper.vm.activeFolderId).toBe("default");
++      expect(wrapper.vm.loading).toBe(false);
++    });
++
+     it("should have reactive activeFolderId property", async () => {
+       wrapper = shallowMount(Dashboards, {
+         global: buildGlobalConfig(store, router, i18n),
+diff --git a/web/src/views/Dashboards/Dashboards.vue b/web/src/views/Dashboards/Dashboards.vue
+index 11fd259f203..a737f6faf9d 100644
+--- a/web/src/views/Dashboards/Dashboards.vue
++++ b/web/src/views/Dashboards/Dashboards.vue
+@@ -122,6 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+             :columns="columns"
+             row-key="id"
+             :loading="loading"
++            :forbidden="forbidden"
+             :frame="false"
+             :default-columns="false"
+             show-index
+@@ -855,8 +856,12 @@ export default defineComponent({
+     const selectedDashboardIds = computed(() => selectedIds.value);
+ 
+     onMounted(async () => {
+-      //get folders list
+-      await getFoldersList(store);
++      // Awaited so the landing decision settles after FolderList's async init emission.
++      try {
++        await getFoldersList(store);
++      } catch {
++        // Already reported by the grouped access toast; the empty rail stands in.
++      }
+ 
+       // Load favorites BEFORE picking the landing view — the favorites-first
+       // landing below depends on knowing whether any exist.
+@@ -913,15 +918,20 @@ export default defineComponent({
+         // String() matches JS's own null→"null" key coercion (behavior-neutral).
+         loading.value =
+           !store.state.organizationData.allDashboardList[String(activeFolderId.value)];
++        forbidden.value = false;
+         try {
+           const response = await getAllDashboardsByFolderId(store, activeFolderId.value);
+ 
+           dashboardList.value = response || [];
+         } catch (error) {
+           console.error("Error loading dashboards:", error);
+-          showErrorNotification(
+-            raw(asCaughtError(error).message || t("dashboard.dashboards.failedToLoadFolder")),
+-          );
++          forbidden.value = asCaughtError(error).response?.status === 403;
++          // The grouped access toast already reports a 403; a second red toast adds nothing.
++          if (!forbidden.value) {
++            showErrorNotification(
++              raw(asCaughtError(error).message || t("dashboard.dashboards.failedToLoadFolder")),
++            );
++          }
+         } finally {
+           loading.value = false;
+           searchAcrossFolders.value = false;
+@@ -1143,6 +1153,8 @@ export default defineComponent({
+     // Start in the loading state so the table shows the skeleton on first
+     // render instead of briefly flashing the empty state before the fetch.
+     const loading = ref(true);
++    // Only the dashboards fetch is authoritative on access; the folder list is not.
++    const forbidden = ref(false);
+     // The first real load lands after mount and races TanStack's own auto-reset-on-data-change, which resolves through its own deferred microtask queue — setTimeout(0) runs strictly after that queue drains, so the restored page reliably wins.
+     watch(
+       loading,
+@@ -1713,6 +1725,7 @@ export default defineComponent({
+       dashboard,
+       columns,
+       loading,
++      forbidden,
+       showAddDashboardDialog,
+       showAddDashboardFromGitHub,
+       addDashboard,
+diff --git a/web/src/views/LogStream.vue b/web/src/views/LogStream.vue
+index 97457c47afd..f6a4f39031e 100644
+--- a/web/src/views/LogStream.vue
++++ b/web/src/views/LogStream.vue
+@@ -69,6 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+           :show-global-filter="false"
+           :default-columns="false"
+           :loading="loadingState"
++          :forbidden="forbidden"
+           :enable-column-resize="true"
+           :persist-columns="true"
+           table-id="streams-log-stream-list"
+@@ -450,6 +451,7 @@ export default defineComponent({
+     const duplicateStreamList: Ref<any[]> = ref([]);
+     const selectedStreamType = ref("logs");
+     const loadingState = ref(true);
++    const forbidden = ref(false);
+     const searchKeyword = ref("");
+     const deleteAssociatedAlertsPipelines = ref(true);
+     const streamActiveTab = ref("logs");
+@@ -650,6 +652,7 @@ export default defineComponent({
+     const getLogStream = (_refresh?: boolean) => {
+       if (store.state.selectedOrganization != null) {
+         loadingState.value = true;
++        forbidden.value = false;
+         previousOrgIdentifier.value = store.state.selectedOrganization.identifier;
+         const dismiss = toast({
+           variant: "loading",
+@@ -718,7 +721,8 @@ export default defineComponent({
+             dismiss();
+           })
+           .catch((err) => {
+-            if (err.response?.status != 403) {
++            forbidden.value = err?.response?.status === 403;
++            if (!forbidden.value) {
+               toast({
+                 variant: "error",
+                 message: err.response?.data?.message || t("logStream.errorWhileFetchingStreams"),
+@@ -1265,6 +1269,7 @@ export default defineComponent({
+       streamsEmptyActions,
+       onStreamsEmptyStateAction,
+       loadingState,
++      forbidden,
+       isDeleting,
+       searchKeyword,
+       deleteAssociatedAlertsPipelines,
+diff --git a/web/src/views/RUM/SourceMaps.vue b/web/src/views/RUM/SourceMaps.vue
+index e2524ca035c..8690df55ab0 100644
+--- a/web/src/views/RUM/SourceMaps.vue
++++ b/web/src/views/RUM/SourceMaps.vue
+@@ -101,6 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+         :column-visibility="columnVisibility"
+         row-key="id"
+         :loading="isLoading"
++        :forbidden="forbidden"
+         pagination="client"
+         :page-size="selectedPerPage"
+         :page-size-options="perPageOptionsList"
+@@ -274,6 +275,7 @@ const fetchFilterValues = async () => {
+ 
+ // State
+ const isLoading = ref(false);
++const forbidden = ref(false);
+ const sourceMaps = ref<any[]>([]);
+ const groupedSourceMaps = ref<any[]>([]);
+ const expandedIds = ref<string[]>([]);
+@@ -343,6 +345,7 @@ const perPageOptionsList = [20, 50, 100, 250];
+ // Fetch source maps
+ const fetchSourceMaps = async () => {
+   isLoading.value = true;
++  forbidden.value = false;
+ 
+   try {
+     const params: any = {};
+@@ -360,8 +363,9 @@ const fetchSourceMaps = async () => {
+ 
+     // Group source maps by service, version, and environment
+     groupSourceMaps();
+-  } catch (error) {
++  } catch (error: any) {
+     console.error("Error fetching source maps:", error);
++    forbidden.value = error?.response?.status === 403;
+     sourceMaps.value = [];
+     groupedSourceMaps.value = [];
+   } finally {
+diff --git a/web/src/views/SyntheticMonitoring.vue b/web/src/views/SyntheticMonitoring.vue
+index d5dd8af1f1d..e00b84cd571 100644
+--- a/web/src/views/SyntheticMonitoring.vue
++++ b/web/src/views/SyntheticMonitoring.vue
+@@ -106,6 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+           :mode="monitorTableMode"
+           :data="filteredMonitors"
+           :loading="loading"
++          :forbidden="forbidden"
+           :timezone="store.state.timezone"
+           :footer-title="footerTitle"
+           :empty-message="emptyMessage"
+@@ -561,6 +562,7 @@ type DisplayMonitor = ReturnType<typeof mapMonitor>;
+ // Start in loading state so the table shows the skeleton on first render
+ // instead of briefly flashing the empty state before the fetch completes.
+ const loading = ref(true);
++const forbidden = ref(false);
+ 
+ const orgIdentifier = computed<string>(
+   () => (store.state as any).selectedOrganization?.identifier ?? "",
+@@ -583,6 +585,7 @@ function waitForOrgIdentifier(): Promise<void> {
+ async function loadMonitors(folderId?: string) {
+   if (!orgIdentifier.value) return;
+   loading.value = true;
++  forbidden.value = false;
+   try {
+     const targetFolder =
+       folderId !== undefined
+@@ -595,6 +598,9 @@ async function loadMonitors(folderId?: string) {
+     // bundle and a server on opposite sides of that rename still render.
+     const rows = (res.data as any).checks ?? (res.data as any).monitors ?? [];
+     monitors.value = rows.map(mapMonitor);
++  } catch (err: any) {
++    forbidden.value = err?.response?.status === 403;
++    throw err;
+   } finally {
+     loading.value = false;
+   }

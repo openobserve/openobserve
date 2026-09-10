@@ -1,0 +1,12 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/GeneralTests/noAccessState.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/GeneralTests/sanity.spec.js",
+    "tests/ui-testing/playwright-tests/GeneralTests/edition-features.spec.js",
+    "tests/ui-testing/playwright-tests/GeneralTests/theme-management.spec.js",
+    "tests/ui-testing/playwright-tests/GeneralTests/changeOrg.spec.js"
+  ],
+  "needs_registration": true,
+  "rationale": "The 403/no-access empty state (OTable 'forbidden' prop -> o2-table-forbidden) is a brand-new generic surface with no existing coverage. A suite-wide grep for 'forbidden|no-access|noAccess|o2-table-forbidden|access denied' returned zero test assertions (only unrelated '403' HTTP-status strings in cleanup.spec.js and 'forbidden identifiers' comments in dashboard utils). No GeneralTests spec touches OTable's forbidden branch, so a new spec is required. Because the feature is a generic OTable/OEmptyState mechanism consumed by Dashboards and Alerts, it belongs in GeneralTests (matching run-context spec_path) and must be registered in ci_matrix.json under the GeneralTests shard run_files."
+}

@@ -1,0 +1,17 @@
+[
+  {
+    "title": "should render the no-access empty state on the dashboards list when the list API returns 403",
+    "action": "new",
+    "verifies": "a 403 on the dashboards list API swaps the table to the 'You don't have access' empty state (copy + lock illustration, no CTA, first-run empty suppressed)"
+  },
+  {
+    "title": "should render the no-access empty state on the alerts list when the list API returns 403",
+    "action": "new",
+    "verifies": "a 403 on the alerts list API renders the no-access empty state with copy and no create-alert CTA"
+  },
+  {
+    "title": "should not render the no-access state for an authorized dashboards list",
+    "action": "new",
+    "verifies": "an authorized (200) dashboards list renders rows or the first-run empty state, never the no-access state"
+  }
+]
