@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="llm-insights"
       all-agents
       agent-skeleton
-      :show-agent-toggle="config.isEnterprise == 'true'"
+      :show-agent-toggle="isEnterpriseOrCloud"
       :show-version="!compareMode"
       :labels="{
         agent: t('traces.lLMInsightsDashboard.agent'),
@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              affordance when it can't apply is cleaner (ui-architect empty-affordance
              rule). The tooltip explains the concept when the entry IS available. -->
         <OTooltip
-          v-if="config.isEnterprise == 'true' && canCompare && !compareMode"
+          v-if="isEnterpriseOrCloud && canCompare && !compareMode"
           :content="t('traces.lLMInsightsDashboard.compareEntryHint')"
         >
           <OButton
@@ -93,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </AiScopeBar>
 
     <VersionCompareView
-      v-if="config.isEnterprise == 'true' && compareMode"
+      v-if="isEnterpriseOrCloud && compareMode"
       :version-list="compareVersionList"
       :stream="effectiveStream"
       :windows="versionCompare.windows.value"
@@ -373,6 +373,11 @@ const switching = ref(false);
 // Filter mode: "stream" = view a whole stream; "agent" = view a single agent,
 // whose source stream + trace filter both come from the agents API.
 const MODE_LS_KEY = "llmInsights_filterMode";
+// Cloud registers the SAME enterprise route tree and backend as an enterprise
+// build (see router/index.ts's userCloudRoutes() picked for isCloud too) — only
+// a true OSS build lacks the agent-mapping API this gates. Matches the
+// predicate already used for this exact purpose in Index.vue/SessionsPage.vue.
+const isEnterpriseOrCloud = config.isEnterprise == "true" || config.isCloud == "true";
 // Default scope is ALWAYS "agent" — the AI module is agent-centric and every AI
 // page lands on Agent for consistency. Only an explicit `?type=stream` URL param
 // overrides it (a stale saved preference must not silently land on Stream).
@@ -380,7 +385,7 @@ const MODE_LS_KEY = "llmInsights_filterMode";
 // compare), so OSS is pinned to Stream regardless of the URL/localStorage —
 // there's no toggle to reach Agent from anyway.
 const filterMode = ref<"stream" | "agent">(
-  config.isEnterprise !== "true" ? "stream" : urlType === "stream" ? "stream" : "agent",
+  !isEnterpriseOrCloud ? "stream" : urlType === "stream" ? "stream" : "agent",
 );
 // Agent NAME to seed the cascade with once the list loads: the URL `?agent=`
 // deep-link first, else the persisted last selection. Resolved into

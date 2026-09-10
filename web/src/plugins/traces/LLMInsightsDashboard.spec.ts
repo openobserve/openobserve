@@ -509,11 +509,13 @@ describe("LLMInsightsDashboard — onViewTrace", () => {
   });
 });
 
-describe("LLMInsightsDashboard — OSS builds (config.isEnterprise !== 'true')", () => {
+describe("LLMInsightsDashboard — OSS builds (neither isEnterprise nor isCloud is 'true')", () => {
   const originalIsEnterprise = config.isEnterprise;
+  const originalIsCloud = config.isCloud;
 
   afterEach(() => {
     config.isEnterprise = originalIsEnterprise;
+    config.isCloud = originalIsCloud;
   });
 
   it("hides the Stream/Agent toggle and the Compare entry — both need the enterprise-only agent-mapping API", async () => {
@@ -522,5 +524,13 @@ describe("LLMInsightsDashboard — OSS builds (config.isEnterprise !== 'true')",
     await flushPromises();
     expect(wrapper.find("[data-test='llm-insights-filter-mode']").exists()).toBe(false);
     expect(wrapper.find("[data-test='llm-insights-compare-entry']").exists()).toBe(false);
+  });
+
+  it("still shows the toggle on a cloud build (isCloud true) even with isEnterprise false — cloud registers the same enterprise route/backend", async () => {
+    config.isEnterprise = "false";
+    config.isCloud = "true";
+    const wrapper = mountDashboard();
+    await flushPromises();
+    expect(wrapper.find("[data-test='llm-insights-filter-mode']").exists()).toBe(true);
   });
 });
