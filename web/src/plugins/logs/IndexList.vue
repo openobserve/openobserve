@@ -716,6 +716,17 @@ export default defineComponent({
       },
     );
 
+    // Reset to page 1 whenever the selected stream(s) change. Covers the SQL
+    // Mode path too: useSearchBar's onStreamChange swaps selectedStreamFields
+    // directly and has no reference to this component's local pagination state.
+    watch(
+      () => searchObj.data.stream.selectedStream,
+      () => {
+        resetPagination();
+      },
+      { deep: true },
+    );
+
     // Close the stream-select dropdown whenever the Source Details drawer opens
     // so the open popover does not obscure the drawer in both single and multi-select mode.
     watch(
