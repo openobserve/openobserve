@@ -29,7 +29,7 @@ import type {
   RequirementGroup,
   CuratedSection,
 } from "./types";
-import { STALENESS_24H_US } from "./types";
+import { GROUP, STALENESS_24H_US } from "./types";
 
 /** Covers the ingest flush window: doc_time_max trails live ingest (§5.3). */
 export const STALE_GRACE_US = 10 * 60 * 1_000_000;
@@ -37,16 +37,20 @@ export const STALE_GRACE_US = 10 * 60 * 1_000_000;
 const GRID_COLUMNS = 192;
 
 /** Labels the cardinality rule accepts as enumerable without a topk bound (§4.1). */
-const ENUMERABLE_LABELS = new Set([
+export const ENUMERABLE_LABELS = new Set([
   "phase",
   "condition",
   "direction",
   "status",
   "action",
+  // Schema-bounded: the compute resources a container can request, never more than a handful.
+  "resource",
   // Kernel-bounded, not fleet-bounded: CPU states, block devices, mountpoints.
   "state",
   "device",
   "mountpoint",
+  // Fleet-bounded: one series per cluster an org OPERATES, a number it provisions by hand — unlike its namespaces or pods, which its workloads multiply.
+  `\${f:${GROUP.cluster}}`,
 ]);
 
 export interface StreamStats {

@@ -21,7 +21,7 @@ import * as acorn from "acorn";
 import * as walk from "acorn-walk";
 import { describe, it, expect } from "vitest";
 import type { FieldAlias } from "@/services/service_streams";
-import { lintManifest } from "../resolve";
+import { ENUMERABLE_LABELS, lintManifest } from "../resolve";
 import { validateUserCode } from "@/utils/dashboard/convertCustomChartData";
 import { curatedPacks } from "./index";
 import defaultSemanticGroups from "./__fixtures__/semanticGroups.default.json";
@@ -38,22 +38,6 @@ const UNIT_VALUES = new Set(
     .map((o) => o.value)
     .filter((v): v is string => v != null),
 );
-
-/** Labels the cardinality rule accepts as enumerable without a topk bound. */
-const ENUMERABLE_LABELS = new Set([
-  "phase",
-  "condition",
-  "direction",
-  "status",
-  "action",
-  // §4.1 amendment (cold review loop 2, finding 1): the three host-shaped labels.
-  // Their domains are fixed by the kernel, not by fleet size — CPU states, block
-  // devices and mountpoints are per-host constants — and no registered pack
-  // groups on them unpinned, so they cannot fan out with the fleet.
-  "state",
-  "device",
-  "mountpoint",
-]);
 
 /** Collector tokens a capability-first label must not START with (finding 21). */
 const COLLECTOR_TOKENS = ["kubeletstats", "kube-state", "cluster receiver", "kubelet"];
