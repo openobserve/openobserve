@@ -13,31 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::promql::value::{EvalContext, Sample, Value};
-use datafusion::error::Result;
+use config::meta::promql::value::Sample;
 use hashbrown::HashMap;
-use promql_parser::parser::LabelModifier;
 
 use crate::{
     aggregations::{Accumulate, AggFunc},
     common::std_deviation2,
 };
-
-pub fn stddev(param: &Option<LabelModifier>, data: Value, eval_ctx: &EvalContext) -> Result<Value> {
-    let start = std::time::Instant::now();
-    log::info!(
-        "[trace_id: {}] [PromQL Timing] stddev() started",
-        eval_ctx.trace_id,
-    );
-
-    let result = super::eval_aggregate(param, data, Stddev, eval_ctx);
-    log::info!(
-        "[trace_id: {}] [PromQL Timing] stddev() execution took: {:?}",
-        eval_ctx.trace_id,
-        start.elapsed()
-    );
-    result
-}
 
 pub struct Stddev;
 
@@ -110,15 +92,16 @@ impl Accumulate for StddevAccumulate {
 mod tests {
     use std::sync::Arc;
 
-    use config::meta::promql::value::{Label, RangeValue, Sample, Value};
+    use config::meta::promql::value::{EvalContext, Label, RangeValue, Sample, Value};
 
     use super::*;
+    use crate::aggregations::eval_aggregate;
 
     #[test]
     fn test_stddev_value_none_input() {
         let timestamp = 1640995200;
         let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
-        let result = stddev(&None, Value::None, &eval_ctx).unwrap();
+        let result = eval_aggregate(&None, Value::None, Stddev, &eval_ctx).unwrap();
         assert!(matches!(result, Value::None));
     }
 
@@ -126,7 +109,7 @@ mod tests {
     fn test_stddev_invalid_input_returns_err() {
         let timestamp = 1640995200;
         let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
-        let result = stddev(&None, Value::Float(1.0), &eval_ctx);
+        let result = eval_aggregate(&None, Value::Float(1.0), Stddev, &eval_ctx);
         assert!(result.is_err());
     }
 
@@ -134,7 +117,7 @@ mod tests {
     fn test_stddev_empty_matrix_returns_none() {
         let timestamp = 1640995200;
         let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
-        let result = stddev(&None, Value::Matrix(vec![]), &eval_ctx).unwrap();
+        let result = eval_aggregate(&None, Value::Matrix(vec![]), Stddev, &eval_ctx).unwrap();
         assert!(matches!(result, Value::None));
     }
 
@@ -177,7 +160,7 @@ mod tests {
         let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
 
         // Test stddev without label grouping - should return standard deviation
-        let result = stddev(&None, data.clone(), &eval_ctx).unwrap();
+        let result = eval_aggregate(&None, data.clone(), Stddev, &eval_ctx).unwrap();
 
         match result {
             Value::Matrix(matrix) => {

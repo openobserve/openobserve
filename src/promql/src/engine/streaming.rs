@@ -607,17 +607,45 @@ mod tests {
     async fn test_instant_agg_matches_generic_streaming_and_materialized() {
         type Agg = fn(&Option<LabelModifier>, Value, &EvalContext) -> Result<Value>;
         let cases: [(&str, &str, Agg); 4] = [
-            ("sum(m)", "m", crate::aggregations::sum),
-            ("count(m)", "m", crate::aggregations::count),
+            ("sum(m)", "m", |modifier, input, eval_ctx| {
+                crate::aggregations::eval_aggregate(
+                    modifier,
+                    input,
+                    crate::aggregations::Sum,
+                    eval_ctx,
+                )
+            }),
+            ("count(m)", "m", |modifier, input, eval_ctx| {
+                crate::aggregations::eval_aggregate(
+                    modifier,
+                    input,
+                    crate::aggregations::Count,
+                    eval_ctx,
+                )
+            }),
             (
                 "avg(m offset 30s)",
                 "m offset 30s",
-                crate::aggregations::avg,
+                |modifier, input, eval_ctx| {
+                    crate::aggregations::eval_aggregate(
+                        modifier,
+                        input,
+                        crate::aggregations::Avg,
+                        eval_ctx,
+                    )
+                },
             ),
             (
                 "max(m offset 30s)",
                 "m offset 30s",
-                crate::aggregations::max,
+                |modifier, input, eval_ctx| {
+                    crate::aggregations::eval_aggregate(
+                        modifier,
+                        input,
+                        crate::aggregations::Max,
+                        eval_ctx,
+                    )
+                },
             ),
         ];
         for (query, selector, agg) in cases {

@@ -78,14 +78,30 @@ impl Engine {
         let eval_ctx = self.eval_ctx.clone();
 
         Ok(match op.id() {
-            token::T_SUM => aggregations::sum(modifier, input, &eval_ctx)?,
-            token::T_AVG => aggregations::avg(modifier, input, &eval_ctx)?,
-            token::T_COUNT => aggregations::count(modifier, input, &eval_ctx)?,
-            token::T_MIN => aggregations::min(modifier, input, &eval_ctx)?,
-            token::T_MAX => aggregations::max(modifier, input, &eval_ctx)?,
-            token::T_GROUP => aggregations::group(modifier, input, &eval_ctx)?,
-            token::T_STDDEV => aggregations::stddev(modifier, input, &eval_ctx)?,
-            token::T_STDVAR => aggregations::stdvar(modifier, input, &eval_ctx)?,
+            token::T_SUM => {
+                aggregations::eval_aggregate(modifier, input, aggregations::Sum, &eval_ctx)?
+            }
+            token::T_AVG => {
+                aggregations::eval_aggregate(modifier, input, aggregations::Avg, &eval_ctx)?
+            }
+            token::T_COUNT => {
+                aggregations::eval_aggregate(modifier, input, aggregations::Count, &eval_ctx)?
+            }
+            token::T_MIN => {
+                aggregations::eval_aggregate(modifier, input, aggregations::Min, &eval_ctx)?
+            }
+            token::T_MAX => {
+                aggregations::eval_aggregate(modifier, input, aggregations::Max, &eval_ctx)?
+            }
+            token::T_GROUP => {
+                aggregations::eval_aggregate(modifier, input, aggregations::Group, &eval_ctx)?
+            }
+            token::T_STDDEV => {
+                aggregations::eval_aggregate(modifier, input, aggregations::Stddev, &eval_ctx)?
+            }
+            token::T_STDVAR => {
+                aggregations::eval_aggregate(modifier, input, aggregations::Stdvar, &eval_ctx)?
+            }
             token::T_TOPK => {
                 let param_expr = param.clone().unwrap();
                 let k_value = self.exec_expr(&param_expr).await?;
