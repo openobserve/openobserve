@@ -519,6 +519,22 @@ describe("PromQLTableChart", () => {
       consoleSpy.mockRestore();
     });
 
+    // The tall triage tables were the worst offenders — bg-success-50 has no dark-mode variant.
+    it("the healthy-empty all-clear carries NO background fill", async () => {
+      wrapper = createWrapper({
+        data: { columns: mockTableData.columns, rows: [] },
+        config: { ...mockConfig, curated_empty_means_healthy: true },
+      });
+      await flushPromises();
+      const allClear = wrapper.find('[data-test="no-data-all-clear"]');
+      expect(allClear.exists()).toBe(true);
+      const fill = allClear.element.closest('[class*="bg-success"]');
+      expect(fill).toBe(null);
+      // Same token and glyph as PanelContainer's tile, so one section cannot look half-fixed.
+      expect(allClear.classes()).toContain("text-status-success-text");
+      expect(allClear.findComponent({ name: "OIcon" }).props("name")).toBe("check");
+    });
+
     it("should handle completely empty data", () => {
       const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
       wrapper = createWrapper({

@@ -31,14 +31,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              state, so an empty triage table means nothing is wrong rather than
              nothing was collected. -->
         <template v-if="panelConfig.curated_empty_means_healthy" #empty>
-          <div class="bg-success-50 absolute inset-0 flex items-center justify-center">
-            <OEmptyState
-              size="inline"
-              icon="check"
-              :title="t('infra.curated.tileAllClear')"
-              :backdrop="false"
-              data-test="no-data-all-clear"
-            />
+          <!-- Hand-rolled to match PanelContainer's tile: OEmptyState pins its title to text-text-heading and has no success tone. -->
+          <div
+            class="text-status-success-text absolute inset-0 flex items-center justify-center gap-1 text-sm"
+            data-test="no-data-all-clear"
+          >
+            <OIcon name="check" size="sm" />
+            <span>{{ t("infra.curated.tileAllClear") }}</span>
           </div>
         </template>
 
@@ -88,7 +87,6 @@ import TableRenderer from "./TableRenderer.vue";
 import TablePaginationControls from "../addPanel/TablePaginationControls.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 
 export default defineComponent({
   name: "PromQLTableChart",
@@ -106,7 +104,7 @@ export default defineComponent({
       default: false,
     },
   },
-  components: { TableRenderer, TablePaginationControls, OSelect, OIcon, OEmptyState },
+  components: { TableRenderer, TablePaginationControls, OSelect, OIcon },
   setup(props) {
     const store = useStore();
     const { t } = useI18nTyped();

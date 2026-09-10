@@ -1846,6 +1846,24 @@ describe("PanelContainer", () => {
       expect(overlay.text()).toContain("All clear");
     });
 
+    // bg-success-50 has no dark-mode variant, so the LEAST urgent state became the loudest on a 14-panel tab.
+    it("All clear carries NO background fill — only the check glyph and success text", async () => {
+      wrapper = createWrapper({
+        data: eligible({ curated_empty_means_healthy: true }),
+        viewOnly: true,
+      });
+      const renderer = wrapper.findComponent({ name: "PanelSchemaRenderer" });
+      await settle(renderer, "No Data");
+      const overlay = wrapper.find('[data-test="dashboard-panel-curated-no-data"]');
+      const classes = overlay.classes();
+      expect(classes.some((name) => name.startsWith("bg-"))).toBe(false);
+      expect(overlay.find('[data-test="dashboard-panel-curated-all-clear-icon"]').exists()).toBe(
+        true,
+      );
+      // --color-text-success does not exist; status-success-text is the only per-theme success TEXT token.
+      expect(classes).toContain("text-status-success-text");
+    });
+
     it("a healthy-empty TABLE stands the overlay down — its own empty state owns it", async () => {
       wrapper = createWrapper({
         data: {

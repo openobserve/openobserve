@@ -395,12 +395,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-if="curatedNoData && !curatedTableOwnsEmpty"
         class="absolute inset-0 flex items-center justify-center text-sm"
-        :class="
-          curatedAllClear ? 'bg-success-50 text-text-success gap-1' : 'text-text-muted italic'
-        "
+        :class="curatedAllClear ? 'text-status-success-text gap-1' : 'text-text-muted italic'"
         data-test="dashboard-panel-curated-no-data"
       >
-        <OIcon v-if="curatedAllClear" name="check" size="sm" />
+        <OIcon
+          v-if="curatedAllClear"
+          name="check"
+          size="sm"
+          data-test="dashboard-panel-curated-all-clear-icon"
+        />
         <span>{{
           curatedAllClear ? t("infra.curated.tileAllClear") : t("infra.curated.tileNoData")
         }}</span>
