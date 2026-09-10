@@ -265,6 +265,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
+      <!-- Outside scrollContainerRef so the results progress bar can't scroll away. -->
+      <div class="relative">
+        <LoadingProgress
+          data-test="logs-results-progress"
+          :loading="searchObj.loading"
+          :loadingProgressPercentage="searchObj.loadingProgressPercentage || 0"
+        />
+      </div>
+
       <!-- Combined scroll: histogram + logs/patterns scroll together vertically.
         The histogram is pinned along the X axis only (see histogramPinStyle), so
         scrolling the wide results table sideways can't drag the chart with it. -->
@@ -489,7 +498,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :columns="getColumns || []"
                   :data="searchObj.data.queryResults?.hits || []"
                   :wrap="searchObj.meta.toggleSourceWrap"
-                  :loading="searchObj.loading"
+                  :loading="isResultsSkeleton"
+                  :streaming="isResultsStreaming"
                   :row-key="logsRowKey"
                   :row-height="20"
                   virtual-scroll
@@ -524,6 +534,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @row-click="openLogDetailsByRow"
                   @update:expandedIds="onExpandedLogIdsChange"
                 >
+                  <!-- Empty slot opts out of OTable's default banner, which would shift the grid on every partition. -->
+                  <template #loading-banner />
+
                   <!-- FTS-highlighted cell content; falls back to the plain value. -->
                   <template
                     v-for="col in getColumns || []"
@@ -1961,6 +1974,11 @@ export default defineComponent({
       return ((searchObj.data?.resultGrid?.columns as any[]) ?? []).filter((col: any) => !!col.id);
     });
 
+    const hasResultRows = computed(() => (searchObj.data.queryResults?.hits?.length ?? 0) > 0);
+    // First paint has nothing to show, so the skeleton is right; once rows exist we switch to `streaming` so partial results stay on screen.
+    const isResultsSkeleton = computed(() => searchObj.loading && !hasResultRows.value);
+    const isResultsStreaming = computed(() => searchObj.loading && hasResultRows.value);
+
     const getPartitionPaginations = computed(() => {
       return searchObj.data.queryResults?.partitionDetail?.paginations || [];
     });
@@ -2284,6 +2302,7 @@ export default defineComponent({
       );
     };
     // `immediate` so a mount with results already present still highlights them.
+    // `clearCache: true` is load-bearing: updateGridColumns() reassigns the columns on every streaming chunk, and this is the only path that drops the previous partition's highlighted HTML for a reused row index.
     watch(
       () => getColumns.value,
       () => reprocessLogsHighlight(true),
@@ -2417,6 +2436,9 @@ export default defineComponent({
       getTableWidth,
       scrollTableToTop,
       getColumns,
+      hasResultRows,
+      isResultsSkeleton,
+      isResultsStreaming,
       reorderSelectedFields,
       getPaginations,
       refreshPagination,

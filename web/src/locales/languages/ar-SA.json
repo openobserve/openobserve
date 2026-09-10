@@ -76,6 +76,10 @@
       "action": "تنفيذ الاستعلام",
       "actionDesc": "تحميل الأحداث للفلاتر المحددة"
     },
+    "noAccess": {
+      "title": "لا تملك حق الوصول",
+      "description": "Contact your administrator if you believe you should have access."
+    },
     "noDashboards": {
       "title": "أنشئ لوحة القيادة الأولى لك",
       "description": "لوحات القيادة تجمع بين القياسات، والسجلات، والتتبعات في عرض واحد. قم ببناء واحدة للبدء.",
@@ -9794,6 +9798,8 @@
       "outputTokens": "رموز الإخراج",
       "out": "اخرج",
       "totalCost": "التكلفة الإجمالية",
+      "scores": "النتائج",
+      "notScoredYet": "لم يتم التقييم بعد",
       "preview": "معاينة",
       "input": "المدخلات",
       "output": "الإنتاج",
@@ -11108,6 +11114,10 @@
         "runSummary": "{trials} · {scorers}",
         "progress": "تقدّم المهمة",
         "scoring": "التسجيل",
+        "tasks": "المهام",
+        "scores": "النتائج",
+        "taskDistribution": "ناجحة: {succeeded} · فاشلة: {failed} · قيد الانتظار: {pending} · تم تخطيها: {skipped}",
+        "scoreOutcomeDistribution": "مقيّمة: {scored} · فاشلة: {failed} · قيد الانتظار: {pending} · تم تخطيها: {skipped} · غير مقيّمة: {unscored}",
         "scoringDistribution": "{success} ناجح · {failed} فشل · {pending} قيد الانتظار · {skipped} تم تخطيه",
         "compare": "قارن",
         "comparePicker": {
@@ -11851,6 +11861,8 @@
       "schemaInvalidJson": "يجب أن يكون المخطط صالحا JSON.",
       "schemaIgnored": "المخطط · يتجاهله هذا الموفّر",
       "schemaUnsupported": "لا يوفّر هذا الموفّر حقلاً للمخرجات المنظّمة. يُحتفظ بالمخطط في هذا العمود، لكنه لا يُرسل ويجيب النموذج بنص عادي.",
+      "schemaApproximated": "المخطط · تقريبي بواسطة هذا المزوّد",
+      "schemaApproximatedHelp": "يدعم هذا المزوّد وضع JSON فقط، وليس مخطط JSON. يتم إرسال الطلب في وضع JSON مع إعادة ذكر المخطط في الموجّه، لذا تكون الإجابة JSON لكن شكلها غير مضمون.",
       "outputPlaceholder": "يظهر المخرجات هنا — اضغط على تشغيل.",
       "outputNotRun": "لا يركض",
       "retry": "إعادة المحاولة",
@@ -11954,6 +11966,12 @@
   },
   "onlineEvals": {
     "versionPrefix": "v",
+    "traceScoreChip": {
+      "reasoning": "لماذا",
+      "scoredAt": "تم التقييم {time}",
+      "moreCount": "+{count} أخرى",
+      "allScores": "جميع النتائج ({count})"
+    },
     "importNameRequired": "الاسم *",
     "importNewNameRequired": "اسم جديد *",
     "importDataTypeRequired": "نوع البيانات *",
@@ -12224,8 +12242,10 @@
       "sectionTitle": "المزود",
       "nameLabel": "الاسم",
       "typeLabel": "نوع المزود",
-      "endpointLabel": "نقطة النهاية",
-      "endpointPlaceholder": "عنوان URL الكامل للإكمالات، مثلاً https://your-host/v1/chat/completions",
+      "endpointLabel": "عنوان URL الأساسي",
+      "endpointPlaceholder": "عنوان URL الأساسي، مثل https://your-host/v1",
+      "endpointHelpDefault": "اتركه فارغًا لاستخدام الافتراضي: {url}",
+      "endpointHelpRequired": "مطلوب — لا يوجد لهذا المزوّد عنوان URL أساسي افتراضي.",
       "defaultModelLabel": "النموذج الافتراضي",
       "availableModelsLabel": "النماذج المتوفرة",
       "apiKeyLabel": "مفتاح API",
@@ -12234,7 +12254,6 @@
       "authSection": "المصادقة",
       "authEditNote": "لا يمكن استرجاع بيانات الاعتماد. لاختبار موفّر يتطلب مصادقة، أدخل مفتاح API الخاص به.",
       "cannotRename": "لا يمكن إعادة تسميته بعد الخلق.",
-      "availableModelsHelp": "اختياري. قائمة النماذج المفصولة بالفواصل المتوفرة على هذا المزود.",
       "saveError": "فشل في حفظ مزود الخدمة",
       "nameRequired": "اسم المزود مطلوب",
       "typeRequired": "نوع المزود مطلوب",
@@ -12341,7 +12360,8 @@
         "nameRequired": "الاسم مطلوب",
         "nameFormat": "استخدم الحروف الصغيرة والأرقام والخطوط السفلية فقط",
         "minRequired": "الحد الأدنى مطلوب",
-        "maxRequired": "الحد الأقصى مطلوب"
+        "maxRequired": "الحد الأقصى مطلوب",
+        "maxNotGreaterThanMin": "يجب أن يكون الحد الأقصى أكبر من الحد الأدنى"
       },
       "import": {
         "title": "إعداد نقاط الاستيراد",
@@ -12912,7 +12932,7 @@
     },
     "empty": {
       "title": "لا يوجد مزودو LLM بعد",
-      "description": "يخزّن مزودو LLM تفاصيل الاتصال (نقطة النهاية + بيانات الاعتماد) لنماذج اللغة التي تستدعيها أدوات تقييم حكَم LLM لديك. أضف واحدًا لبدء إجراء تقييمات قائمة على الحكَم."
+      "description": "مزوّدو LLM يخزنون تفاصيل الاتصال (عنوان URL الأساسي + بيانات الاعتماد) لنماذج اللغة التي يستدعيها مُقيِّمو LLM لديك. أضف واحدًا للبدء بتشغيل التقييمات القائمة على الحكم."
     }
   },
   "logs": {
@@ -16000,6 +16020,12 @@
     "aiQueueDetail": "قائمة الانتظار",
     "aiQueueReview": "مراجعة قائمة الانتظار",
     "aiDatasetDetail": "مجموعة البيانات",
+    "aiExperimentCreate": "تجربة جديدة",
+    "aiExperimentCompare": "مقارنة التجارب",
+    "aiExperimentDetail": "تجربة",
+    "aiRemoteTaskCreate": "مهمة عن بُعد جديدة",
+    "aiRemoteTaskEdit": "تعديل مهمة عن بُعد",
+    "aiRemoteTaskDetail": "مهمة عن بُعد",
     "notFound": "404 - لم يعثر عليه",
     "createReport": "إنشاء تقرير",
     "addCheck": "التحقق من إضافة",

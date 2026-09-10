@@ -39,6 +39,9 @@ fn score_config_error_response(value: ScoreConfigError) -> Response {
         ScoreConfigError::MissingName => {
             MetaHttpResponse::bad_request("Score config name cannot be empty")
         }
+        ScoreConfigError::InvalidNumericRange => {
+            MetaHttpResponse::bad_request("Numeric range min must be less than max")
+        }
         ScoreConfigError::NotFound => MetaHttpResponse::not_found("Score config not found"),
         ScoreConfigError::DuplicateName => {
             MetaHttpResponse::conflict("Score config name already exists")
@@ -325,6 +328,7 @@ mod tests {
     fn test_score_config_error_conversion() {
         let cases: Vec<(ScoreConfigError, u16)> = vec![
             (ScoreConfigError::MissingName, 400),
+            (ScoreConfigError::InvalidNumericRange, 400),
             (ScoreConfigError::NotFound, 404),
             (ScoreConfigError::DuplicateName, 409),
             (ScoreConfigError::InUseByScorer, 409),

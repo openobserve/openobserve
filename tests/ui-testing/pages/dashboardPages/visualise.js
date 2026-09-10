@@ -685,6 +685,16 @@ export default class LogsVisualise {
     // The Query Inspector item is v-if-gated on the panel's metaData, populated only after its query executes, so wait for the panel to render before opening the menu.
     await this.verifyChartRenders(this.page);
 
+    // The dashboard panel query can transiently return empty under CI load (WAL lag) though the data exists (it rendered in Visualize) — metaData gating the Query Inspector item only populates on a non-empty query, so refresh until the panel loads data.
+    const noData = this.page.locator('[data-test="no-data"]');
+    const refreshBtn = this.page.locator('[data-test="dashboard-refresh-btn"]');
+    await expect(async () => {
+      if (await noData.isVisible().catch(() => false)) {
+        await refreshBtn.click({ timeout: 5000 }).catch(() => {});
+        await expect(noData).toBeHidden({ timeout: 5000 });
+      }
+    }).toPass({ timeout: 30000, intervals: [1000, 2000, 3000] });
+
     const dropdown = this.getPanelDropdown(panelName);
     await dropdown.waitFor({ state: "visible", timeout: 20000 });
 

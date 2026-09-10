@@ -41,6 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           table-id="org-management-list"
           :show-global-filter="false"
           :loading="loading"
+          :forbidden="forbidden"
         >
           <template #toolbar>
             <OSearchInput
@@ -425,6 +426,7 @@ export default defineComponent({
     const extendTrialDataRow = ref();
     const extendedTrial = ref(1);
     const loading = ref(false);
+    const forbidden = ref(false);
     const extendTrialPrompt = ref(false);
     const tabledata = ref<any>([]);
     const resultTotal = ref(0);
@@ -685,6 +687,7 @@ export default defineComponent({
 
     const getData = () => {
       loading.value = true;
+      forbidden.value = false;
       const dismiss = toast({
         variant: "loading",
         message: t("settings.organizationManagementPage.loadingData"),
@@ -728,7 +731,8 @@ export default defineComponent({
         .catch((error) => {
           loading.value = false;
           dismiss();
-          if (error.status != 403) {
+          forbidden.value = error?.status === 403 || error?.response?.status === 403;
+          if (!forbidden.value) {
             toast({
               variant: "error",
               message:
@@ -1067,6 +1071,7 @@ export default defineComponent({
       resultTotal,
       tabledata,
       loading,
+      forbidden,
       extendedTrial,
       extendTrialPrompt,
       toggleExtendTrialDialog,

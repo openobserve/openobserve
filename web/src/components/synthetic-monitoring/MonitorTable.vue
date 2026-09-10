@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :columns="columns"
     :data="data"
     :loading="loading"
+    :forbidden="forbidden"
     pagination="client"
     :page-size="20"
     :page-size-options="[10, 20, 25, 50]"
@@ -531,6 +532,7 @@ const props = withDefaults(
     mode: Mode;
     data: any[];
     loading?: boolean;
+    forbidden?: boolean;
     /** IANA zone for the Last Check tooltip. Passed in: this table is a leaf
      *  component and must not reach into the store for it. */
     timezone?: string;
