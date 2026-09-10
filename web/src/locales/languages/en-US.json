@@ -18363,7 +18363,6 @@
     "ownershipRules": "Assigned rules",
     "ownershipRulesHint": "most specific match wins · ordered as evaluated",
     "addRule": "Add rule",
-    "newRule": "New rule",
     "ruleOrder": "Order",
     "rulePagesCaught": "{count} page | {count} pages",
     "rulePagesCaughtHeader": "Pages caught, 30d",
