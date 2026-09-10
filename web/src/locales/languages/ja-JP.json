@@ -3666,6 +3666,16 @@
       "chooseMethod": "統合方法を選択",
       "chooseMethodPrompt": "{service}の統合方法を選択："
     },
+    "iac": {
+      "shortName": "コードとして管理",
+      "title": "{brand} をコードとして管理",
+      "body": "オブザーバビリティ設定を Terraform または OpenTofu として定義し、他のインフラと同様にバージョン管理下に置きます。サポートされているリソースはその一覧ページからエクスポートすると、既存のリソースを取り込む import ブロックを含む、すぐに適用できる設定を取得できます。",
+      "registriesLabel": "利用可能",
+      "resourceAlerts": "アラート（複合アラートを含む）",
+      "resourceSlos": "SLOs",
+      "resourceDashboards": "ダッシュボード",
+      "resourcePipelines": "パイプラインとパイプラインの送信先"
+    },
     "mcp": {
       "name": "OpenObserve MCPサーバー",
       "shortName": "MCPサーバー",
@@ -5149,6 +5159,8 @@
       "folderDeletionFailed": "フォルダの削除に失敗しました",
       "errorFetchingSearch": "検索結果の取得中にエラーが発生しました",
       "exportedSuccessfully": "{count} 個のダッシュボードが正常にエクスポートされました。",
+      "exportDialogTitle": "ダッシュボードをエクスポート | {count} 件のダッシュボードをエクスポート",
+      "exportDialogSubtitle": "ダッシュボードを確認してから、JSON または OpenObserve プロバイダー用の Terraform としてダウンロードします。",
       "errorExporting": "ダッシュボードのエクスポート中にエラーが発生しました",
       "deletingDashboards": "ダッシュボードを削除中...",
       "noneSelectedForDeletion": "削除するダッシュボードが選択されていません",
@@ -8233,7 +8245,9 @@
     "severityCriticalDescription": "最優先インシデント",
     "severityErrorDescription": "標準エラーインシデント",
     "severityWarningDescription": "警告レベルのインシデント",
-    "severityInfoDescription": "情報インシデント"
+    "severityInfoDescription": "情報インシデント",
+    "exportDialogTitle": "送信先をエクスポート | {count} 件の送信先をエクスポート",
+    "exportDialogSubtitle": "送信先を確認してから、JSON または OpenObserve プロバイダー用の Terraform としてダウンロードします。"
   },
   "pipeline_destinations": {
     "header": "パイプライン宛先",
@@ -10371,7 +10385,9 @@
     "period": "ピリオド",
     "cron": "クロン",
     "type": "タイプ",
-    "run_pipeline": "パイプラインを実行"
+    "run_pipeline": "パイプラインを実行",
+    "exportDialogTitle": "パイプラインをエクスポート | {count} 件のパイプラインをエクスポート",
+    "exportDialogSubtitle": "パイプラインを確認してから、JSON または OpenObserve プロバイダー用の Terraform としてダウンロードします。"
   },
   "alert_list": {
     "alert_history": "アラート履歴"

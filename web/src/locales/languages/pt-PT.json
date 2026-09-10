@@ -3666,6 +3666,16 @@
       "chooseMethod": "Escolher Método de Integração",
       "chooseMethodPrompt": "Selecione como deseja integrar {service}:"
     },
+    "iac": {
+      "shortName": "Gerenciar como código",
+      "title": "Gerenciar {brand} como código",
+      "body": "Defina sua configuração de observabilidade como Terraform ou OpenTofu e mantenha-a no controle de versão junto com o restante da sua infraestrutura. Exporte qualquer recurso compatível a partir de sua página de lista para obter uma configuração pronta para aplicação, incluindo blocos de importação que adotam o que você já executa.",
+      "registriesLabel": "Disponível em",
+      "resourceAlerts": "Alertas, incluindo alertas compostos",
+      "resourceSlos": "SLOs",
+      "resourceDashboards": "Painéis",
+      "resourcePipelines": "Oleodutos e destinos de oleodutos"
+    },
     "mcp": {
       "name": "Servidor MCP do OpenObserve",
       "shortName": "Servidor MCP",
@@ -5149,6 +5159,8 @@
       "folderDeletionFailed": "Falha na exclusão da pasta",
       "errorFetchingSearch": "Erro ao buscar resultados da pesquisa",
       "exportedSuccessfully": "{count} Dashboards exportado(s) com sucesso.",
+      "exportDialogTitle": "Exportar painel | Exportar {count} painéis",
+      "exportDialogSubtitle": "Revise o painel e baixe-o como JSON ou como Terraform para o provedor OpenObserve.",
       "errorExporting": "Erro ao exportar dashboards",
       "deletingDashboards": "Excluindo dashboards...",
       "noneSelectedForDeletion": "Nenhum dashboard selecionado para exclusão",
@@ -8233,7 +8245,9 @@
     "severityCriticalDescription": "Incidentes de maior prioridade",
     "severityErrorDescription": "Incidentes de erro padrão",
     "severityWarningDescription": "Incidentes de nível de aviso",
-    "severityInfoDescription": "Incidentes informativos"
+    "severityInfoDescription": "Incidentes informativos",
+    "exportDialogTitle": "Exportar destino | Exportar {count} destinos",
+    "exportDialogSubtitle": "Revise o destino e baixe-o como JSON ou como Terraform para o provedor OpenObserve."
   },
   "pipeline_destinations": {
     "header": "Destinos de Oleodutos",
@@ -10371,7 +10385,9 @@
     "period": "Período",
     "cron": "Cron",
     "type": "Tipo",
-    "run_pipeline": "Executar Pipeline"
+    "run_pipeline": "Executar Pipeline",
+    "exportDialogTitle": "Exportar oleoduto | Exportar {count} oleodutos",
+    "exportDialogSubtitle": "Revise o oleoduto e baixe-o como JSON ou como Terraform para o provedor OpenObserve."
   },
   "alert_list": {
     "alert_history": "Histórico de alertas"

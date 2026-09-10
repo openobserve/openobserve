@@ -3666,6 +3666,16 @@
       "chooseMethod": "Wybierz metodę integracji",
       "chooseMethodPrompt": "Wybierz, jak chcesz zintegrować {service}:"
     },
+    "iac": {
+      "shortName": "Zarządzaj jako kod",
+      "title": "Zarządzaj {brand} jako kod",
+      "body": "Zdefiniuj konfigurację obserwowalności jako Terraform lub OpenTofu i przechowuj ją w systemie kontroli wersji razem z resztą swojej infrastruktury. Wyeksportuj dowolny obsługiwany zasób ze strony jego listy, aby uzyskać gotową do zastosowania konfigurację, wraz z blokami importu, które przejmują to, co już masz uruchomione.",
+      "registriesLabel": "Dostępne w",
+      "resourceAlerts": "Alerty, w tym alerty złożone",
+      "resourceSlos": "SLO",
+      "resourceDashboards": "Pulpity",
+      "resourcePipelines": "Potoki i miejsca docelowe potoków"
+    },
     "mcp": {
       "name": "OpenObserve MCP Server",
       "shortName": "Serwer MCP",
@@ -5149,6 +5159,8 @@
       "folderDeletionFailed": "Usunięcie folderu nie powiodło się",
       "errorFetchingSearch": "Błąd podczas pobierania wyników wyszukiwania",
       "exportedSuccessfully": "{count} pulpitów nawigacyjnych wyeksportowano pomyślnie.",
+      "exportDialogTitle": "Eksportuj pulpit | Eksportuj {count} pulpitów",
+      "exportDialogSubtitle": "Przejrzyj pulpit, a następnie pobierz go jako JSON lub jako Terraform dla dostawcy OpenObserve.",
       "errorExporting": "Błąd podczas eksportowania pulpitów nawigacyjnych",
       "deletingDashboards": "Usuwanie pulpitów nawigacyjnych...",
       "noneSelectedForDeletion": "Nie wybrano pulpitów nawigacyjnych do usunięcia",
@@ -8233,7 +8245,9 @@
     "severityCriticalDescription": "Incydenty o najwyższym priorytecie",
     "severityErrorDescription": "Incydenty standardowych błędów",
     "severityWarningDescription": "Incydenty poziomu ostrzeżeń",
-    "severityInfoDescription": "Incydenty informacyjne"
+    "severityInfoDescription": "Incydenty informacyjne",
+    "exportDialogTitle": "Eksportuj miejsce docelowe | Eksportuj {count} miejsc docelowych",
+    "exportDialogSubtitle": "Przejrzyj miejsce docelowe, a następnie pobierz je jako JSON lub jako Terraform dla dostawcy OpenObserve."
   },
   "pipeline_destinations": {
     "header": "Cele potoków",
@@ -10371,7 +10385,9 @@
     "period": "Okres",
     "cron": "Cron",
     "type": "Typ",
-    "run_pipeline": "Uruchom potok"
+    "run_pipeline": "Uruchom potok",
+    "exportDialogTitle": "Eksportuj potok | Eksportuj {count} potoków",
+    "exportDialogSubtitle": "Przejrzyj potok, a następnie pobierz go jako JSON lub jako Terraform dla dostawcy OpenObserve."
   },
   "alert_list": {
     "alert_history": "Historia"

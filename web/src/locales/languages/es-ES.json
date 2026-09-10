@@ -3666,6 +3666,16 @@
       "chooseMethod": "Elija el método de integración",
       "chooseMethodPrompt": "Seleccione cómo desea integrar {service}:"
     },
+    "iac": {
+      "shortName": "Gestionar como código",
+      "title": "Gestionar {brand} como código",
+      "body": "Define tu configuración de observabilidad como Terraform o OpenTofu y mantenla en control de versiones junto con el resto de tu infraestructura. Exporta cualquier recurso compatible desde su página de lista para obtener una configuración lista para aplicar, incluidos bloques de import que adoptan lo que ya tienes en ejecución.",
+      "registriesLabel": "Disponible en",
+      "resourceAlerts": "Alertas, incluidas las alertas compuestas",
+      "resourceSlos": "SLOs",
+      "resourceDashboards": "Dashboards",
+      "resourcePipelines": "Tuberías y destinos de tuberías"
+    },
     "mcp": {
       "name": "Servidor MCP de OpenObserve",
       "shortName": "Servidor MCP",
@@ -5149,6 +5159,8 @@
       "folderDeletionFailed": "Error al eliminar la carpeta",
       "errorFetchingSearch": "Error al obtener resultados de búsqueda",
       "exportedSuccessfully": "{count} Dashboard(s) exportado(s) correctamente.",
+      "exportDialogTitle": "Exportar dashboard | Exportar {count} dashboards",
+      "exportDialogSubtitle": "Revisa el dashboard y luego descárgalo como JSON o como Terraform para el proveedor de OpenObserve.",
       "errorExporting": "Error al exportar Dashboards",
       "deletingDashboards": "Eliminando Dashboards...",
       "noneSelectedForDeletion": "No se seleccionaron Dashboards para eliminar",
@@ -8233,7 +8245,9 @@
     "severityCriticalDescription": "Incidentes de mayor prioridad",
     "severityErrorDescription": "Incidentes de error estándar",
     "severityWarningDescription": "Incidentes de nivel de advertencia",
-    "severityInfoDescription": "Incidentes informativos"
+    "severityInfoDescription": "Incidentes informativos",
+    "exportDialogTitle": "Exportar destino | Exportar {count} destinos",
+    "exportDialogSubtitle": "Revisa el destino y luego descárgalo como JSON o como Terraform para el proveedor de OpenObserve."
   },
   "pipeline_destinations": {
     "header": "Destinos de tuberías",
@@ -10371,7 +10385,9 @@
     "period": "Período",
     "cron": "Cron",
     "type": "Tipo",
-    "run_pipeline": "Ejecute Pipeline"
+    "run_pipeline": "Ejecute Pipeline",
+    "exportDialogTitle": "Exportar tubería | Exportar {count} tuberías",
+    "exportDialogSubtitle": "Revisa la tubería y luego descárgala como JSON o como Terraform para el proveedor de OpenObserve."
   },
   "alert_list": {
     "alert_history": "Historial de alertas"

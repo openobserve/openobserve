@@ -3666,6 +3666,16 @@
       "chooseMethod": "اختر طريقة التكامل",
       "chooseMethodPrompt": "حدد كيف تريد دمج {service}:"
     },
+    "iac": {
+      "shortName": "إدارة كشيفرة",
+      "title": "إدارة {brand} كشيفرة",
+      "body": "عرّف إعداد المراقبة الخاص بك بصيغة Terraform أو OpenTofu واحتفظ به في نظام إدارة الإصدارات إلى جانب بقية بنيتك التحتية. صدّر أي مورد مدعوم من صفحة قائمته للحصول على إعداد جاهز للتطبيق، بما في ذلك كتل الاستيراد التي تتبنّى ما تشغّله بالفعل.",
+      "registriesLabel": "متوفر على",
+      "resourceAlerts": "التنبيهات، بما في ذلك التنبيهات المركّبة",
+      "resourceSlos": "SLOs",
+      "resourceDashboards": "لوحات المعلومات",
+      "resourcePipelines": "مسارات المعالجة ووجهات المسارات"
+    },
     "mcp": {
       "name": "OpenObserve خادم MCP",
       "shortName": "خادم MCP",
@@ -5149,6 +5159,8 @@
       "folderDeletionFailed": "فشل حذف المجلد",
       "errorFetchingSearch": "حدث خطأ أثناء جلب نتائج البحث",
       "exportedSuccessfully": "تم تصدير لوحات المعلومات {count} بنجاح.",
+      "exportDialogTitle": "تصدير لوحة المعلومات | تصدير {count} لوحات معلومات",
+      "exportDialogSubtitle": "راجع لوحة المعلومات، ثم نزّلها بصيغة JSON أو بصيغة Terraform لمزوّد OpenObserve.",
       "errorExporting": "حدث خطأ أثناء تصدير لوحات المعلومات",
       "deletingDashboards": "جاري حذف لوحات المعلومات...",
       "noneSelectedForDeletion": "لم يتم تحديد أي لوحات معلومات للحذف",
@@ -8233,7 +8245,9 @@
     "severityCriticalDescription": "الحوادث ذات الأولوية الأعلى",
     "severityErrorDescription": "حوادث الأخطاء القياسية",
     "severityWarningDescription": "حوادث مستوى التحذير",
-    "severityInfoDescription": "الحوادث الإعلامية"
+    "severityInfoDescription": "الحوادث الإعلامية",
+    "exportDialogTitle": "تصدير وجهة | تصدير {count} وجهات",
+    "exportDialogSubtitle": "راجع الوجهة، ثم نزّلها بصيغة JSON أو بصيغة Terraform لمزوّد OpenObserve."
   },
   "pipeline_destinations": {
     "header": "وجهات مسارات المعالجة",
@@ -10371,7 +10385,9 @@
     "period": "نقطة على السطر",
     "cron": "كرون",
     "type": "النوع",
-    "run_pipeline": "تشغيل مسار المعالجة"
+    "run_pipeline": "تشغيل مسار المعالجة",
+    "exportDialogTitle": "تصدير مسار معالجة | تصدير {count} مسارات معالجة",
+    "exportDialogSubtitle": "راجع مسار المعالجة، ثم نزّله بصيغة JSON أو بصيغة Terraform لمزوّد OpenObserve."
   },
   "alert_list": {
     "alert_history": "التاريخ"
