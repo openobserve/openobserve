@@ -2108,6 +2108,10 @@ export default defineComponent({
     watch(
       () => patternsState.value.loading,
       (loading, wasLoading) => {
+        // The patterns list shares its scroller with the rest of the view, so a re-run must land on row 1 rather than inherit the previous offset
+        if (loading && !wasLoading) {
+          scrollTableToTop(0);
+        }
         if (wasLoading && !loading) {
           searchObj.meta.lastRunAt = Date.now();
         }

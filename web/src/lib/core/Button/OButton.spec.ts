@@ -286,6 +286,25 @@ describe("OButton", () => {
     expect(wrapper.classes().join(" ")).toContain("focus-visible:ring-3");
   });
 
+  // --- Loading ---
+
+  // Regression: a child-mode OTooltip mounted mid-query anchored to an inline-flex wrapper that lost its box once loading ended, opening at (0,0)
+  it("keeps the slot wrapper display:contents while loading and only hides it", () => {
+    const wrapper = mount(OButton, { props: { loading: true }, slots: { default: "Save" } });
+    const content = wrapper.find("span.contents");
+    expect(content.exists()).toBe(true);
+    expect(content.classes()).toContain("invisible");
+    expect(content.classes()).not.toContain("inline-flex");
+    expect(content.attributes("style")).toBeUndefined();
+  });
+
+  it("does not hide the slot wrapper when not loading", () => {
+    const wrapper = mount(OButton, { slots: { default: "Save" } });
+    const content = wrapper.find("span.contents");
+    expect(content.exists()).toBe(true);
+    expect(content.classes()).not.toContain("invisible");
+  });
+
   // --- data attributes ---
 
   it("sets data-o2-btn on the rendered element", () => {
