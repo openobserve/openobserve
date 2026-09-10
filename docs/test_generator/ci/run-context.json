@@ -1,0 +1,20 @@
+{
+  "feature_slug": "logs-search-result-scroll-reset",
+  "feature_title": "Logs Search Result Scroll Reset",
+  "area": "Logs",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "logsSearchResultScroll.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Logs/logsSearchResultScroll.spec.js",
+  "playwright_group": "Logs-Core",
+  "source_files": [
+    "web/src/plugins/logs/SearchResult.vue",
+    "web/src/lib/core/VirtualScroll/OVirtualScroll.vue",
+    "web/src/lib/core/VirtualScroll/useVirtualScroll.ts",
+    "web/src/lib/core/Button/OButton.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": ""
+}

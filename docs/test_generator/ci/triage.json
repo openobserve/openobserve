@@ -1,0 +1,28 @@
+{
+  "feature_slug": "logs-search-result-scroll-reset",
+  "feature_title": "Logs Search Result Scroll Reset",
+  "area": "Logs",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "logsSearchResultScroll.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Logs/logsSearchResultScroll.spec.js",
+  "playwright_group": "Logs-Core",
+  "source_files": [
+    "web/src/plugins/logs/SearchResult.vue",
+    "web/src/lib/core/VirtualScroll/OVirtualScroll.vue",
+    "web/src/lib/core/VirtualScroll/useVirtualScroll.ts",
+    "web/src/lib/core/Button/OButton.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "All seven changed paths live under web/src/** (web/src/lib/core/Button/*, web/src/lib/core/VirtualScroll/*, web/src/plugins/logs/*). None are under enterprise/, o2_enterprise/, src/enterprise/, or any enterprise-gated module, and no enterprise keywords (SSO/SAML/RBAC/SDR/cipher/logo-management) appear in the paths or changed symbols. Classified as OSS.",
+    "skip": "Not skipped. trigger_comment.txt and feature_hint.txt are both empty, so there is no explicit tests-added label or skip request. The change alters user-facing .vue components (SearchResult.vue, OButton.vue, OVirtualScroll.vue), so it is not a docs/CI/comment-only change.",
+    "e2e": "E2E is warranted. The change alters user-exercisable behavior in the Logs search results view: a fresh patterns extraction now scrolls the shared container to top, the virtual scroller preserves its offset when rows are remeasured, and the button loading wrapper keeps display:contents to avoid stranding a child tooltip at (0,0). These are real interaction/state changes a user can hit, not internal-only refactors.",
+    "area": "Area is Logs. The primary user-facing change is in web/src/plugins/logs/SearchResult.vue, with the OVirtualScroll and OButton core-component fixes supporting that logs view. Sibling E2E specs live under tests/ui-testing/playwright-tests/Logs/.",
+    "group": "playwright_group Logs-Core is the closest existing OSS shard: its actual_folder is Logs and its run_files already cover search-result/logs behavior (logspage.spec.js, logsAnalyzeDimensions.spec.js, shareLink.spec.js).",
+    "existing_tests": "No E2E specs in the diff. The changed OButton.spec.ts, OVirtualScroll.spec.ts, and SearchResult.spec.ts are Vitest unit tests, not Playwright specs under tests/ui-testing/playwright-tests/. existing_tests_in_diff is false."
+  }
+}

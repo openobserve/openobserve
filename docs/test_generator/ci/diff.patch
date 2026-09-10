@@ -1,0 +1,235 @@
+===== COMPLETE LIST OF CHANGED FILES (7 files) =====
+# AUTHORITATIVE: this list is never truncated. The diff BODY below may be trimmed for
+# very large PRs, so decide WHICH files/areas changed (e.g. web/src frontend) from THIS list.
+web/src/lib/core/Button/OButton.spec.ts
+web/src/lib/core/Button/OButton.vue
+web/src/lib/core/VirtualScroll/OVirtualScroll.spec.ts
+web/src/lib/core/VirtualScroll/OVirtualScroll.vue
+web/src/lib/core/VirtualScroll/useVirtualScroll.ts
+web/src/plugins/logs/SearchResult.spec.ts
+web/src/plugins/logs/SearchResult.vue
+===== END CHANGED FILES =====
+
+diff --git a/web/src/lib/core/Button/OButton.spec.ts b/web/src/lib/core/Button/OButton.spec.ts
+index b4cd5827633..a01e3e95eeb 100644
+--- a/web/src/lib/core/Button/OButton.spec.ts
++++ b/web/src/lib/core/Button/OButton.spec.ts
+@@ -289,6 +289,25 @@ describe("OButton", () => {
+     expect(wrapper.classes().join(" ")).toContain("focus-visible:ring-3");
+   });
+ 
++  // --- Loading ---
++
++  // Regression: a child-mode OTooltip mounted mid-query anchored to an inline-flex wrapper that lost its box once loading ended, opening at (0,0)
++  it("keeps the slot wrapper display:contents while loading and only hides it", () => {
++    const wrapper = mount(OButton, { props: { loading: true }, slots: { default: "Save" } });
++    const content = wrapper.find("span.contents");
++    expect(content.exists()).toBe(true);
++    expect(content.classes()).toContain("invisible");
++    expect(content.classes()).not.toContain("inline-flex");
++    expect(content.attributes("style")).toBeUndefined();
++  });
++
++  it("does not hide the slot wrapper when not loading", () => {
++    const wrapper = mount(OButton, { slots: { default: "Save" } });
++    const content = wrapper.find("span.contents");
++    expect(content.exists()).toBe(true);
++    expect(content.classes()).not.toContain("invisible");
++  });
++
+   // --- data attributes ---
+ 
+   it("sets data-o2-btn on the rendered element", () => {
+diff --git a/web/src/lib/core/Button/OButton.vue b/web/src/lib/core/Button/OButton.vue
+index 90b1121a0de..a31576c9caa 100644
+--- a/web/src/lib/core/Button/OButton.vue
++++ b/web/src/lib/core/Button/OButton.vue
+@@ -368,11 +368,8 @@ function handleClick(event: MouseEvent): void {
+       <OIcon name="progress-activity" size="sm" class="animate-spin" />
+     </span>
+ 
+-    <!-- Original content — invisible (not hidden) when loading to preserve button dimensions -->
+-    <span
+-      :class="loading ? 'invisible inline-flex items-center' : 'contents'"
+-      :style="loading ? { gap: 'inherit' } : undefined"
+-    >
++    <!-- Keep display:contents while loading: a wrapper that later loses its box strands a child-mode OTooltip anchored to it at (0,0) -->
++    <span :class="loading ? 'invisible contents' : 'contents'">
+       <slot name="icon-left">
+         <OIcon v-if="iconLeft" :name="iconLeft" size="sm" />
+       </slot>
+diff --git a/web/src/lib/core/VirtualScroll/OVirtualScroll.spec.ts b/web/src/lib/core/VirtualScroll/OVirtualScroll.spec.ts
+index c3722d06f31..870db132636 100644
+--- a/web/src/lib/core/VirtualScroll/OVirtualScroll.spec.ts
++++ b/web/src/lib/core/VirtualScroll/OVirtualScroll.spec.ts
+@@ -4,6 +4,7 @@ import { describe, it, expect, vi } from "vitest";
+ import { mount } from "@vue/test-utils";
+ import { h, ref, nextTick } from "vue";
+ import OVirtualScroll from "./OVirtualScroll.vue";
++import { useVirtualizer } from "@tanstack/vue-virtual";
+ 
+ // @tanstack/vue-virtual uses DOM measurements that jsdom doesn't support.
+ // We mock useVirtualizer to return predictable virtual items.
+@@ -28,6 +29,7 @@ vi.mock("@tanstack/vue-virtual", () => ({
+       getTotalSize: () => count * estimateSize,
+       scrollToIndex: vi.fn(),
+       measure: vi.fn(),
++      measureElement: vi.fn(),
+     });
+   }),
+ }));
+@@ -188,4 +190,39 @@ describe("OVirtualScroll", () => {
+       expect(wrapper.find(".o2-virtual-scroll__content").exists()).toBe(true);
+     });
+   });
++
++  // ── Delegated scroller ─────────────────────────────────────────
++
++  describe("delegated scroller", () => {
++    const lastVirtualizer = () => {
++      const results = vi.mocked(useVirtualizer).mock.results;
++      return results[results.length - 1]?.value.value;
++    };
++
++    // Regression: a patterns re-run remeasured rows and TanStack's default compensation pushed the shared logs scroller mid-way
++    it("keeps a delegated scroller's offset stable when rows are remeasured", () => {
++      mount(OVirtualScroll, {
++        props: {
++          items: makeItems(3),
++          scrollTarget: document.createElement("div"),
++          dynamicRowHeight: true,
++        },
++      });
++      const shouldAdjust = lastVirtualizer()?.shouldAdjustScrollPositionOnItemSizeChange;
++      expect(shouldAdjust).toBeTypeOf("function");
++      expect(shouldAdjust?.()).toBe(false);
++    });
++
++    it("retains the virtualizer's default anchoring for an internal scroller", () => {
++      mount(OVirtualScroll, { props: { items: makeItems(3), dynamicRowHeight: true } });
++      expect(lastVirtualizer()?.shouldAdjustScrollPositionOnItemSizeChange).toBeUndefined();
++    });
++
++    it("retains the default anchoring for a delegated scroller with fixed row heights", () => {
++      mount(OVirtualScroll, {
++        props: { items: makeItems(3), scrollTarget: document.createElement("div") },
++      });
++      expect(lastVirtualizer()?.shouldAdjustScrollPositionOnItemSizeChange).toBeUndefined();
++    });
++  });
+ });
+diff --git a/web/src/lib/core/VirtualScroll/OVirtualScroll.vue b/web/src/lib/core/VirtualScroll/OVirtualScroll.vue
+index 7c17a30e5fa..e0b15c1b27b 100644
+--- a/web/src/lib/core/VirtualScroll/OVirtualScroll.vue
++++ b/web/src/lib/core/VirtualScroll/OVirtualScroll.vue
+@@ -62,6 +62,8 @@ const {
+   estimateSize: props.estimateSize,
+   overscan: props.overscan,
+   dynamicRowHeight: dynamicRowHeightRef,
++  // A delegated scroller can hold content above this list, so a data refresh that remeasures rows must not move the owning page
++  preserveScrollOffsetOnRowResize: () => !!props.scrollTarget && props.dynamicRowHeight,
+ });
+ 
+ // Emit virtual-scroll event on mount and whenever the rendered range changes.
+diff --git a/web/src/lib/core/VirtualScroll/useVirtualScroll.ts b/web/src/lib/core/VirtualScroll/useVirtualScroll.ts
+index 5149fbbbfec..368214702a8 100644
+--- a/web/src/lib/core/VirtualScroll/useVirtualScroll.ts
++++ b/web/src/lib/core/VirtualScroll/useVirtualScroll.ts
+@@ -1,6 +1,15 @@
+ // Copyright 2026 OpenObserve Inc.
+ 
+-import { computed, onMounted, ref, watch, type Ref } from "vue";
++import {
++  computed,
++  onMounted,
++  ref,
++  toValue,
++  watch,
++  watchEffect,
++  type MaybeRefOrGetter,
++  type Ref,
++} from "vue";
+ import { useVirtualizer } from "@tanstack/vue-virtual";
+ 
+ export interface UseVirtualScrollOptions {
+@@ -21,6 +30,8 @@ export interface UseVirtualScrollOptions {
+    * Passed as a Ref so toggling at runtime is reactive.
+    */
+   dynamicRowHeight?: Ref<boolean>;
++  /** Keep the scroll element's offset stable while measured row heights change (a delegated scroller also holds content above the list). */
++  preserveScrollOffsetOnRowResize?: MaybeRefOrGetter<boolean>;
+ }
+ 
+ /**
+@@ -30,7 +41,14 @@ export interface UseVirtualScrollOptions {
+  * instead of TanStack Table `Row<T>[]`.
+  */
+ export function useVirtualScroll(options: UseVirtualScrollOptions) {
+-  const { items, parentRef, scrollTarget, estimateSize = 40, overscan = 5 } = options;
++  const {
++    items,
++    parentRef,
++    scrollTarget,
++    estimateSize = 40,
++    overscan = 5,
++    preserveScrollOffsetOnRowResize,
++  } = options;
+ 
+   const dynamicRowHeight = options.dynamicRowHeight ?? ref(false);
+ 
+@@ -94,6 +112,15 @@ export function useVirtualScroll(options: UseVirtualScrollOptions) {
+ 
+   const virtualizer = useVirtualizer(virtualizerOptions);
+ 
++  // TanStack shifts scrollTop by every remeasure delta above the viewport; on a shared scroller that drags the whole page
++  watchEffect(() => {
++    virtualizer.value.shouldAdjustScrollPositionOnItemSizeChange = toValue(
++      preserveScrollOffsetOnRowResize,
++    )
++      ? () => false
++      : undefined;
++  });
++
+   const virtualItems = computed(() => virtualizer.value.getVirtualItems());
+   const totalSize = computed(() => virtualizer.value.getTotalSize());
+   /** Visible-only range (no overscan) as reported by the virtualizer. */
+diff --git a/web/src/plugins/logs/SearchResult.spec.ts b/web/src/plugins/logs/SearchResult.spec.ts
+index 743fb54a80e..54ac736949b 100644
+--- a/web/src/plugins/logs/SearchResult.spec.ts
++++ b/web/src/plugins/logs/SearchResult.spec.ts
+@@ -149,6 +149,20 @@ describe("SearchResult Component", () => {
+       wrapper.vm.scrollContainerRef = null;
+       expect(() => wrapper.vm.scrollTableToTop(0)).not.toThrow();
+     });
++
++    // Regression: the skeleton clamped the shared scroller mid-list, so a fresh patterns result mounted half-way down instead of at the top
++    it("should scroll the shared container to the top when a patterns extraction starts", async () => {
++      const scrollToSpy = vi.fn();
++      wrapper.vm.scrollContainerRef = { scrollTo: scrollToSpy };
++      wrapper.vm.patternsState = { ...wrapper.vm.patternsState, loading: false };
++      await flushPromises();
++      scrollToSpy.mockClear();
++
++      wrapper.vm.patternsState = { ...wrapper.vm.patternsState, loading: true };
++      await flushPromises();
++
++      expect(scrollToSpy).toHaveBeenCalledWith({ top: 0 });
++    });
+   });
+ 
+   describe("Chart and Histogram Functionality", () => {
+diff --git a/web/src/plugins/logs/SearchResult.vue b/web/src/plugins/logs/SearchResult.vue
+index a520a5a5302..e0be9695aeb 100644
+--- a/web/src/plugins/logs/SearchResult.vue
++++ b/web/src/plugins/logs/SearchResult.vue
+@@ -2102,6 +2102,10 @@ export default defineComponent({
+     watch(
+       () => patternsState.value.loading,
+       (loading, wasLoading) => {
++        // The patterns list shares its scroller with the rest of the view, so a re-run must land on row 1 rather than inherit the previous offset
++        if (loading && !wasLoading) {
++          scrollTableToTop(0);
++        }
+         if (wasLoading && !loading) {
+           searchObj.meta.lastRunAt = Date.now();
+         }

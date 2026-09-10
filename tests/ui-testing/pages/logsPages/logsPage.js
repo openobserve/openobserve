@@ -205,6 +205,7 @@ export class LogsPage {
         this.recordsPerPageOption = value => `[data-test="logs-search-result-records-per-page-option"][data-test-value="${value}"]`;
         // OPagination per-page buttons forward parentDataTest as `${parent}-page-{n}` (OPagination.vue:98)
         this.resultPaginationPageBtn = pageNumber => `[data-test="logs-search-result-pagination-page-${pageNumber}"]`;
+        this.resultPaginationPrev = '[data-test="logs-search-result-pagination-prev"]';
         this.interestingFieldBtn = field => `[data-test="log-search-index-list-interesting-${field}-field-btn"]`;
         this.logsSearchBarFunctionDropdown = '[data-test="logs-search-bar-function-dropdown"]';
         this.logsSearchBarFunctionDropdownSave = '[data-test="logs-search-bar-function-dropdown"] button';
@@ -1999,6 +2000,22 @@ export class LogsPage {
         }
         // Final attempt — let it throw if it still fails
         await expect(searchResult).toContainText(expectedPattern, { timeout: 15000 });
+    }
+
+    /**
+     * Change the records-per-page dropdown to the given value and wait for the
+     * re-run to settle. Opens the OSelect via its `-trigger` (clicking the root
+     * wrapper does not toggle the reka-ui popover), then clicks the option row.
+     * @param {string|number} value - Rows per page (10 | 25 | 50 | 100).
+     */
+    async selectRecordsPerPage(value) {
+        const trigger = this.page.locator(this.recordsPerPageDropdown).locator('[data-test$="-trigger"]').first();
+        await trigger.waitFor({ state: 'visible', timeout: 15000 });
+        await trigger.click();
+        const option = this.page.locator(this.recordsPerPageOption(value)).first();
+        await option.waitFor({ state: 'visible', timeout: 10000 });
+        await option.click();
+        await this.waitForResultsLoaded();
     }
 
     async pageNotVisible() {
@@ -11328,6 +11345,16 @@ export class LogsPage {
     async clickNextPage() {
         const nextBtn = this.page.locator('[data-test="logs-search-result-pagination-next"]');
         await nextBtn.click({ force: true });
+        await this.waitForResultsLoaded();
+    }
+
+    /**
+     * Click the "Previous page" button in the pagination component.
+     */
+    async clickPrevPage() {
+        const prevBtn = this.page.locator(this.resultPaginationPrev);
+        await prevBtn.waitFor({ state: 'visible', timeout: 10000 });
+        await prevBtn.click();
         await this.waitForResultsLoaded();
     }
 

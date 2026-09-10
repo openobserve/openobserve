@@ -1,0 +1,10 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/Logs/logsSearchResultScroll.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/RegressionSet/Logs/logs-9044-7354.spec.js",
+    "tests/ui-testing/playwright-tests/Logs/pagination.spec.js"
+  ],
+  "needs_registration": true,
+  "rationale": "The headline 'scroll reset on page navigation' behavior is already covered by the RegressionSet spec logs-9044-7354.spec.js (page-number click 1->2 and 2->1, and the Next button). That regression spec is tagged @regression and lives outside Logs-Core, and it does NOT cover the two remaining WIRED paths this feature adds: (a) scroll reset on rows-per-page change (SearchResult.vue:242 -> :1039) and (b) scroll reset on the Prev button (SearchResult.vue:1007/1020). These are new, distinct scenarios with no existing spec in the Logs-Core group, so we create the dedicated spec_path from run-context (Logs-Core) and register it in ci_matrix.json. The patterns-extraction reset is UNWIRED in OSS (SearchBar.vue:105 gates the toggle on config.isEnterprise == 'true') and is parked as test.fixme."
+}

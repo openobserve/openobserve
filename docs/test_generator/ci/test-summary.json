@@ -1,0 +1,17 @@
+[
+  {
+    "title": "Scroll resets to top when changing rows-per-page from 10 to 25",
+    "action": "new",
+    "verifies": "changing the records-per-page dropdown resets the shared results pane to the top and lands on page 1"
+  },
+  {
+    "title": "Scroll resets to top when navigating from page 2 back to page 1 via Prev button",
+    "action": "new",
+    "verifies": "the Prev (<) pagination button returns the shared results pane to the top of page 1"
+  },
+  {
+    "title": "patterns extraction scroll reset — not wired in OSS: SearchBar.vue:105 (enterprise toggle), usePatterns.ts:89",
+    "action": "new",
+    "verifies": "documents that a fresh patterns extraction should reset the shared pane to top (enterprise-only, parked as test.fixme)"
+  }
+]
