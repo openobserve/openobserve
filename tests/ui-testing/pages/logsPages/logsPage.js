@@ -4785,12 +4785,12 @@ export class LogsPage {
     }
 
     async clickMenuLinkLogsItem() {
-        await this.clickMenuLinkByType('logs');
-        // Sidebar nav is an in-SPA route change; gate on the Search toggle re-mounting before
-        // callers read persisted state. Unlike visualizeToggle, this item has no v-if guard
-        // (zoConfig.timechart_enabled, enterprise, viewport width), so it's present in every
-        // tab mode and every environment — visualizeToggle never renders when timechart_enabled
-        // is off (e.g. alpha1), which left this wait to time out every run.
+        // The sidebar item is force-clicked, so a covering overlay swallows it silently and leaves the SPA on the previous route — retry until /logs actually loads.
+        await expect(async () => {
+            await this.clickMenuLinkByType('logs');
+            await this.page.waitForURL(/\/web\/logs(\?|$)/, { timeout: 5000 });
+        }).toPass({ timeout: 30000, intervals: [500, 1000, 2000] });
+        // logsToggle has no v-if guard (timechart_enabled, enterprise, viewport) so it mounts in every tab mode and environment, unlike visualizeToggle.
         await expect(this.page.locator(this.logsToggle)).toBeVisible({ timeout: 15000 });
     }
 
