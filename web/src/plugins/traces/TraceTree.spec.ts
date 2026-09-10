@@ -312,6 +312,22 @@ describe("TraceTree", () => {
     expect(serviceNameElements[1].text()).toBe(mockSpans[1].serviceName);
   });
 
+  it("should constrain span names so long ones ellipsise", () => {
+    for (const span of mockSpans) {
+      const operationName = wrapper.find(
+        `[data-test="trace-tree-span-operation-name-${span.spanId}"]`,
+      );
+      // min-w-0: without it the flex item keeps its full text width and the row's ellipsis never fires.
+      expect(operationName.classes()).toEqual(expect.arrayContaining(["truncate", "min-w-0"]));
+
+      const serviceName = wrapper.find(`[data-test="trace-tree-span-service-name-${span.spanId}"]`);
+      // shrink-0 + a cap: flex shrinks in proportion to width, so a long operation name would otherwise eat the service name first.
+      expect(serviceName.classes()).toEqual(
+        expect.arrayContaining(["truncate", "shrink-0", "max-w-[40%]"]),
+      );
+    }
+  });
+
   it("should render error icon for error spans", () => {
     const errorIcon = wrapper.find('[data-test="trace-tree-span-error-icon-6702b0494b2b6e57"]');
     expect(errorIcon.exists()).toBe(true);
