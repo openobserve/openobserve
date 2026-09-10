@@ -102,7 +102,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 }`,
               }"
               class="flex flex-col items-start justify-start truncate"
-              :title="(spans as any[])[virtualRow.index].operationName"
             >
               <div
                 class="relative-position operation-name-container bg-surface-base flex h-7.5 w-full cursor-pointer flex-nowrap items-center overflow-visible"
@@ -157,7 +156,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                     :data-test="`trace-tree-span-select-btn-${(spans as any[])[virtualRow.index].spanId}`"
                   >
-                    <div class="span-name-section-content flex items-center truncate">
+                    <!-- w-full: content-sized, this box shrinks with its own text, so the service name's cap would resolve against the text it is meant to bound. -->
+                    <div
+                      class="span-name-section-content flex w-full min-w-0 items-center truncate"
+                    >
                       <OIcon
                         v-if="(spans as any[])[virtualRow.index].spanStatus === 'ERROR'"
                         name="error"
@@ -166,8 +168,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :title="t('traces.traceTree.errorSpan')"
                         :data-test="`trace-tree-span-error-icon-${(spans as any[])[virtualRow.index].spanId}`"
                       />
+                      <!-- shrink-0 + a cap, not plain shrink: flex shrinks in proportion to width, so a long operation name would eat a short service name first. -->
                       <span
-                        class="mr-2 text-sm font-bold font-medium"
+                        class="mr-2 max-w-[50%] shrink-0 truncate text-sm font-bold font-medium"
                         :class="{
                           'bg-table-highlight-bg text-table-highlight-text font-bold':
                             isHighlighted((spans as any[])[virtualRow.index].spanId),
@@ -175,6 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             currentSelectedValue === (spans as any[])[virtualRow.index].spanId,
                         }"
                         :data-test="`trace-tree-span-service-name-${(spans as any[])[virtualRow.index].spanId}`"
+                        :title="(spans as any[])[virtualRow.index].resolvedIdentity"
                       >
                         {{ (spans as any[])[virtualRow.index].resolvedIdentity }}
                       </span>
@@ -193,9 +197,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         alt=""
                         :data-test="`trace-tree-span-tech-icon-${(spans as any[])[virtualRow.index].spanId}`"
                       />
+                      <!-- min-w-0: a flex item defaults to min-width:auto and would refuse to shrink, so the row's ellipsis never fires. -->
                       <span
-                        class="text-text-secondary text-sm"
+                        class="text-text-secondary min-w-0 truncate text-sm"
                         :data-test="`trace-tree-span-operation-name-${(spans as any[])[virtualRow.index].spanId}`"
+                        :title="(spans as any[])[virtualRow.index].operationName"
                         >{{ (spans as any[])[virtualRow.index].operationName }}</span
                       >
                     </div>
