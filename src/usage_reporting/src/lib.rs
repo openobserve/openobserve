@@ -218,7 +218,6 @@ pub async fn flush() {
     shutdown(cfg.limit.usage_reporting_thread_num).await;
 }
 
-/// Counts the request in Prometheus, then records usage; the enterprise build alone records usage.
 #[cfg_attr(not(feature = "enterprise"), allow(unreachable_code, unused_variables))]
 pub async fn report_request_usage_stats(
     stats: RequestStats,
