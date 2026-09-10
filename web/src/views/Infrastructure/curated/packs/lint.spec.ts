@@ -42,14 +42,11 @@ const UNIT_VALUES = new Set(
 /** Collector tokens a capability-first label must not START with (finding 21). */
 const COLLECTOR_TOKENS = ["kubeletstats", "kube-state", "cluster receiver", "kubelet"];
 
-/** The v1 public identifiers — renames are deliberate, release-noted decisions. */
-const GOLDEN_NAMES: Record<string, { pickers: string[]; sections: string[] }> = {
+const ORDERED_NAMES: Record<string, { pickers: string[]; sections: string[] }> = {
   kubernetes: {
     pickers: ["cluster", "namespace", "pod"],
-    // "summary" leads deliberately: the landing tab is tabs[0]
-    // (CuratedPageView.vue:151-164) and the fleet roll-up is the page's answer to
-    // "which cluster should I look at" before any single one is worth opening.
-    sections: ["summary", "overview", "health", "utilization", "nodes", "workloads"],
+    // "overview" leads because the fleet roll-up answers "which cluster should I look at" before any single one is worth opening.
+    sections: ["overview", "inventory", "health", "utilization", "nodes", "workloads"],
   },
   hosts: { pickers: ["host"], sections: ["host"] },
 };
@@ -353,13 +350,12 @@ describe.each(packs)("generic invariants — %s pack", (packId, manifest) => {
     }
   });
 
-  it("picker names and section ids equal the frozen v1 golden list", () => {
-    // They surface as ?var-<name>= deep links and tab ids — renaming one breaks
-    // users' saved URLs, so it must be a deliberate edit here too.
-    const golden = GOLDEN_NAMES[packId];
-    expect(golden, `no golden list registered for ${packId}`).toBeDefined();
-    expect(manifest.scopePickers.map((p: any) => p.name)).toEqual(golden.pickers);
-    expect(manifest.sections.map((s: any) => s.id)).toEqual(golden.sections);
+  it("sections are in the designed ORDER, so the landing tab is the intended one", () => {
+    // tabs[0] is what the page opens on (CuratedPageView.vue:151-164), so section order is editorial, not cosmetic.
+    const expected = ORDERED_NAMES[packId];
+    expect(expected, `no section order registered for ${packId}`).toBeDefined();
+    expect(manifest.scopePickers.map((p: any) => p.name)).toEqual(expected.pickers);
+    expect(manifest.sections.map((s: any) => s.id)).toEqual(expected.sections);
   });
 
   it("(a) topk/title, table half: an N in the title AND an instant-vector query", () => {
@@ -551,7 +547,7 @@ describe.each(packs)("author JS (custom_chart) — %s pack", (_packId, manifest)
 });
 
 describe("registry", () => {
-  it("keys every pack by its WorkloadId and carries the in-scope v1 packs", () => {
+  it("keys every pack by its WorkloadId and carries the in-scope packs", () => {
     expect(Object.keys(curatedPacks).sort()).toEqual(["hosts", "kubernetes"]);
     for (const [id, manifest] of packs) expect(manifest.id).toBe(id);
   });

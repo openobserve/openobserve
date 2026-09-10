@@ -58,8 +58,8 @@ describe("kubernetes pack — shape", () => {
     expect(kubernetesPage.sections.map((s: any) => s.id)).toEqual([
       // The fleet quadrant is the landing tab (tabs[0], CuratedPageView.vue:151-164):
       // which cluster to open is the question that precedes opening one.
-      "summary",
       "overview",
+      "inventory",
       "health",
       "utilization",
       "nodes",
@@ -68,7 +68,7 @@ describe("kubernetes pack — shape", () => {
     expect(allPanels()).toHaveLength(50);
   });
 
-  it("pins the 24h staleness threshold like every v1 pack (§5.3)", () => {
+  it("pins the 24h staleness threshold like every pack (§5.3)", () => {
     expect(kubernetesPage.stalenessThresholdUs).toBe(STALENESS_24H_US);
   });
 
@@ -117,7 +117,7 @@ describe("the Inventory node pair reads ONE collector", () => {
     // at the exact moment a node has failed. Same collector, or the tile lies.
     for (const id of ["k8s_ov_nodes", "k8s_ov_nodes_ready"]) {
       expect(panel(id).groupId, id).toBe("kube-state");
-      expect(sectionOf(id)!.id, id).toBe("overview");
+      expect(sectionOf(id)!.id, id).toBe("inventory");
     }
     for (const query of queriesOf("k8s_ov_nodes")) {
       expect(query).toContain("kube_node_status_allocatable");
@@ -237,7 +237,7 @@ describe("DRY-RUN finding 7 — topk bounds rows only on an instant vector", () 
 
 describe("pass-4 finding 1 — every aggregate has an inventory behind it", () => {
   it("k8s_ov_unhealthy_pods names the pods behind the three phase tiles", () => {
-    expect(sectionOf("k8s_ov_unhealthy_pods")!.id).toBe("overview");
+    expect(sectionOf("k8s_ov_unhealthy_pods")!.id).toBe("inventory");
     expect(panel("k8s_ov_unhealthy_pods").groupId).toBe("kube-state");
     const [query] = queriesOf("k8s_ov_unhealthy_pods");
     expect(query).toContain('phase=~"Pending|Failed|Unknown"');
@@ -298,10 +298,10 @@ describe("DRY-RUN finding 10 — five phases exist, so the tiles are not a parti
 
   // The disclosure moved OFF the tiles: sharing a one-line bar with the title it
   // truncated them to "Pods ru…"/"Pods pe…"/"Pods f…". It is a fact about the
-  // trio, so the Overview section states it once, above the grid.
+  // trio, so the Inventory section states it once, above the grid.
   it("the phase fact is a SECTION note, and no tile carries a subtitle", () => {
-    const overview = kubernetesPage.sections.find((s: any) => s.id === "overview")!;
-    expect(overview.noteKey).toBe("infra.k8s.section.overviewNote");
+    const inventory = kubernetesPage.sections.find((s: any) => s.id === "inventory")!;
+    expect(inventory.noteKey).toBe("infra.k8s.section.inventoryNote");
     // Pack-wide, not just the phase trio: CuratedPanelDef dropped subtitleKey, so a re-introduction would be read by nothing.
     for (const p of allPanels()) {
       expect((p as any).subtitleKey, p.id).toBeUndefined();
@@ -353,17 +353,34 @@ describe("DRY-RUN finding 6 — pickers source from a LIVE stream and omit on em
     expect(picker("cluster").omitWhenFieldAbsent).toBe(true);
   });
 
-  it("pickers name the real group ids and the pod picker chains on namespace", () => {
+  it("pickers name the real group ids and the pod picker chains on cluster AND namespace", () => {
     expect(picker("cluster").group).toBe(GROUP.cluster);
     expect(picker("namespace").group).toBe(GROUP.namespace);
     expect(picker("pod").group).toBe(GROUP.pod);
-    expect(picker("pod").chainedOn).toEqual([{ picker: "namespace" }]);
+    expect(picker("namespace").chainedOn).toEqual([{ picker: "cluster" }]);
+    // Namespace names are NOT unique across clusters — `openobserve` exists in
+    // several — so a pod picker filtering on namespace alone offered every
+    // cluster's identically-named pods, the reported bug.
+    expect(picker("pod").chainedOn).toEqual([{ picker: "cluster" }, { picker: "namespace" }]);
+  });
+
+  it("all three pickers source values from the collector the health tables query", () => {
+    // A picker offering values from a collector the panels do not query is the
+    // 46-of-58 miss that re-sourced cluster and namespace; pod was left behind.
+    const kubeState = {
+      groupId: "kube-state",
+      stream: "kube_pod_status_phase",
+      streamType: "metrics",
+    };
+    expect(picker("cluster").valuesFrom).toEqual(kubeState);
+    expect(picker("namespace").valuesFrom).toEqual(kubeState);
+    expect(picker("pod").valuesFrom).toEqual(kubeState);
   });
 });
 
 describe("declarative scoping (pass-1 finding 3)", () => {
-  it("Overview and Nodes declare `cluster` only — fleet tiles stay fleet-wide BY DECLARATION", () => {
-    expect(kubernetesPage.sections.find((s: any) => s.id === "overview")!.scopedBy).toEqual([
+  it("Inventory and Nodes declare `cluster` only — fleet tiles stay fleet-wide BY DECLARATION", () => {
+    expect(kubernetesPage.sections.find((s: any) => s.id === "inventory")!.scopedBy).toEqual([
       "cluster",
     ]);
     expect(kubernetesPage.sections.find((s: any) => s.id === "nodes")!.scopedBy).toEqual([
@@ -376,10 +393,10 @@ describe("declarative scoping (pass-1 finding 3)", () => {
     expect(queriesOf("k8s_ov_pods_by_phase")[0]).toContain("${scope:cluster}");
   });
 
-  it("EVERY Overview and Nodes panel reacts to the cluster picker (the shipped bug)", () => {
-    // A user picking one cluster saw 2 of 9 Overview panels move; the rest kept
+  it("EVERY Inventory and Nodes panel reacts to the cluster picker (the shipped bug)", () => {
+    // A user picking one cluster saw 2 of 9 Inventory panels move; the rest kept
     // fleet-wide numbers. No panel in either section is exempt.
-    for (const id of ["overview", "nodes"]) {
+    for (const id of ["inventory", "nodes"]) {
       const section = kubernetesPage.sections.find((s: any) => s.id === id)!;
       for (const p of section.panels as any[]) {
         expect(p.fleetWide ?? [], `${p.id} claims a cluster exemption`).not.toContain("cluster");
@@ -531,23 +548,26 @@ describe("multi-cluster inventory tables name their cluster", () => {
   );
 });
 
-// A number with no stated window is a number the reader has to guess at. The
-// tiles already said "(now)"; the tables that must agree with them say it too.
-describe("every instant panel states its window in the title", () => {
+// These tables must agree with the tiles they sit under, which they can only do
+// by reading the same instant. The titles used to spell it "(now)"; the words
+// went, so the read itself is pinned and the section notes carry the disclosure.
+describe("every instant panel actually reads one instant", () => {
   it.each(["k8s_ov_unhealthy_pods", "k8s_nd_not_ready", "k8s_nd_conditions"])(
-    "%s title discloses that it reads the current instant",
+    "%s reads the current instant and resolves to real copy",
     (id) => {
       let node: any = enLocale;
       for (const segment of panel(id).titleKey.split(".")) node = node?.[segment];
       expect(typeof node, `${panel(id).titleKey} resolves to no copy`).toBe("string");
-      expect(String(node).toLowerCase(), panel(id).titleKey).toContain("(now)");
+      for (const variant of panel(id).variants) {
+        expect((variant as any).queryMode, `${id} must not widen to a range`).toBe("instant");
+      }
     },
   );
 
-  it("the overview note tells the reader the tiles and the table share one instant", () => {
+  it("the inventory note tells the reader the tiles and the table share one instant", () => {
     let node: any = enLocale;
-    const overview = kubernetesPage.sections.find((s: any) => s.id === "overview");
-    for (const segment of overview!.noteKey!.split(".")) node = node?.[segment];
-    expect(String(node).toLowerCase()).toContain("now");
+    const inventory = kubernetesPage.sections.find((s: any) => s.id === "inventory");
+    for (const segment of inventory!.noteKey!.split(".")) node = node?.[segment];
+    expect(String(node).toLowerCase()).toContain("current instant");
   });
 });

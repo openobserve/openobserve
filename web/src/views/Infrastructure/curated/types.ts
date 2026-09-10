@@ -137,7 +137,7 @@ export interface CuratedSection {
 
 export interface ScopePickerDef {
   name: string;
-  /** Optional override; v1 packs take the group's own `display` instead (§8.4). */
+  /** Optional override; the packs take the group's own `display` instead (§8.4). */
   labelKey?: I18nKey;
   group: SemanticGroupId;
   valuesFrom: { groupId: string; stream: string; streamType: CuratedStreamType };
@@ -167,7 +167,7 @@ export interface CuratedPageManifest {
 }
 
 /**
- * The v1 packs' group ids, copied VERBATIM from the defaults JSON (§3.3). The
+ * The packs' group ids, copied VERBATIM from the defaults JSON (§3.3). The
  * inconsistent "-name" suffixing is the JSON's, not a convention.
  */
 export const GROUP = {
@@ -179,5 +179,5 @@ export const GROUP = {
   host: "host",
 } as const satisfies Record<string, SemanticGroupId>;
 
-/** All v1 packs' stalenessThresholdUs — the useAlertLibrary 24h precedent, in µs. */
+/** Every pack's stalenessThresholdUs — the useAlertLibrary 24h precedent, in µs. */
 export const STALENESS_24H_US = 24 * 60 * 60 * 1_000_000;

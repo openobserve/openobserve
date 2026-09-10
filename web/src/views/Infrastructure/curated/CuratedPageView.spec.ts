@@ -80,7 +80,7 @@ const dashboardFixture = (sections = ["overview", "nodes"]) => ({
 const withNoteOnFirstTab = (dashboard: any) => ({
   ...dashboard,
   tabs: dashboard.tabs.map((tab: any, index: number) =>
-    index === 0 ? { ...tab, curatedNoteKey: "infra.k8s.section.overviewNote" } : tab,
+    index === 0 ? { ...tab, curatedNoteKey: "infra.k8s.section.inventoryNote" } : tab,
   ),
 });
 
@@ -1057,6 +1057,19 @@ describe("CuratedPageView", () => {
       const banner = wrapper.find('[data-test="curated-stale-banner"]');
       expect(banner.text()).not.toContain("kube_pod_status_phase");
       expect(banner.text()).toMatch(/\b3\b/);
+    });
+
+    // A listed stream whose stats never flushed serializes doc_time_max: 0, which formatted as the Unix epoch.
+    it("a never-flushed stream reads 'no data yet' — never an epoch date or a 20,000-day age", async () => {
+      const state = staleState();
+      state.staleGroups.value[0].lastSeenUs = 0;
+      (state.staleGroups.value[0] as any).noDataYet = true;
+      wrapper = await mountView({}, state);
+      const banner = wrapper.find('[data-test="curated-stale-banner"]');
+      expect(banner.exists()).toBe(true);
+      expect(banner.text()).not.toContain("1970");
+      expect(banner.text()).not.toMatch(/\d{5,} days?/);
+      expect(banner.text().toLowerCase()).toContain("no data yet");
     });
 
     it("the 'as of the last stream-list refresh' caveat is TOOLTIP-only", async () => {
