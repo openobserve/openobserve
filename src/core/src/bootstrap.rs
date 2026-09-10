@@ -33,7 +33,7 @@ impl schema::OrganizationProvisioner for CoreOrganizationProvisioner {
         #[cfg(feature = "enterprise")]
         let usage_enabled = true;
         #[cfg(not(feature = "enterprise"))]
-        let usage_enabled = cfg.common.usage_enabled;
+        let usage_enabled = false;
 
         #[cfg(feature = "enterprise")]
         let audit_enabled = o2_enterprise::enterprise::common::config::get_config()
