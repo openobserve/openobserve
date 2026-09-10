@@ -20,11 +20,12 @@
 mod accumulator;
 mod aggregate;
 mod eval_range;
-pub(crate) mod matrix;
+pub(crate) mod materialized;
 mod op;
 mod range_expr;
-pub(crate) mod stream;
+pub(crate) mod streaming;
 
+pub(crate) use aggregate::aggregate;
 use datafusion::error::{DataFusionError, Result};
 pub(crate) use eval_range::eval_range;
 pub(crate) use op::FusedAggOp;

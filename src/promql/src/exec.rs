@@ -26,8 +26,8 @@ use tokio::sync::{RwLock, Semaphore};
 
 use super::engine::Engine;
 use crate::{
-    DEFAULT_LOOKBACK, TableProvider, micros, micros_since_epoch,
-    promql::selector_visitor::MetricSelectorVisitor,
+    DEFAULT_LOOKBACK, TableProvider, ast::selector_visitor::MetricSelectorVisitor, micros,
+    micros_since_epoch,
 };
 
 #[derive(Clone)]

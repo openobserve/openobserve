@@ -19,6 +19,7 @@ use std::{sync::Arc, time::Duration};
 
 use config::meta::promql::value::*;
 use datafusion::error::{DataFusionError, Result};
+use infra::errors::ErrorCodes;
 use promql_parser::parser::{
     Call, Expr as PromExpr, LabelModifier, MatrixSelector, VectorSelector, token,
 };
@@ -66,15 +67,9 @@ impl Engine {
             }
             if let Some(range_arg) = shape.range_arg {
                 let range_input = self.exec_expr(range_arg).await?;
-                return fused::matrix::fused_agg(
-                    modifier,
-                    range_input,
-                    shape.func,
-                    shape.op,
-                    &self.eval_ctx,
-                    self.ctx.query_ctx.timeout,
-                )
-                .await;
+                return self
+                    .materialized_fused_agg(modifier, range_input, shape.func, shape.op)
+                    .await;
             }
         }
 
@@ -149,6 +144,31 @@ impl Engine {
                 )));
             }
         })
+    }
+
+    /// The fused fold over an already-materialized matrix, bounded by the query timeout.
+    pub(super) async fn materialized_fused_agg(
+        &self,
+        modifier: &Option<LabelModifier>,
+        data: Value,
+        func: Arc<dyn functions::RangeFunc>,
+        op: fused::FusedAggOp,
+    ) -> Result<Value> {
+        let Some((sources, range)) =
+            fused::materialized::group_sources(data, modifier, func.name())?
+        else {
+            return Ok(Value::None);
+        };
+        let eval = Arc::new(fused::RangeExpr::new(func, range, &self.eval_ctx));
+        let timeout = Duration::from_secs(self.ctx.query_ctx.timeout);
+        let (value, _) = tokio::time::timeout(timeout, fused::aggregate(sources, op, eval))
+            .await
+            .map_err(|_| {
+                DataFusionError::from(ErrorCodes::SearchTimeout(
+                    "[PromQL] fused agg timeout".to_string(),
+                ))
+            })??;
+        Ok(value)
     }
 }
 

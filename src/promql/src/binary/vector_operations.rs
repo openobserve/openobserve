@@ -26,7 +26,7 @@ use datafusion::error::{DataFusionError, Result};
 use promql_parser::parser::{BinaryExpr, VectorMatchCardinality, token};
 use rayon::prelude::*;
 
-use crate::binaries::scalar_binary_operations;
+use crate::binary::scalar_binary_operations;
 
 // DROP_METRIC_BIN_OP if the operation is one of these, drop the metric __name__
 pub static DROP_METRIC_BIN_OP: Lazy<HashSet<u8>> = Lazy::new(|| {
