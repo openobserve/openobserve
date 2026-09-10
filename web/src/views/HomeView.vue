@@ -30,6 +30,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :tabs-below="tabOrder.length > 1"
       bleed
     >
+      <!-- < md the chat-history opener rides the title row rather than taking one of its own. -->
+      <template v-if="isMobile && activeHomeTab === 'ai'" #actions>
+        <OButton
+          variant="outline"
+          size="sm"
+          data-test="home-mobile-chats-toggle"
+          @click="mobileChatsOpen = true"
+        >
+          <template #icon-left><OIcon name="menu" size="sm" /></template>
+          {{ t("chatHistory.title") }}
+        </OButton>
+      </template>
       <!-- Top-level page header: module icon + "Home" title, with the home tabs
            rendered as a full-width strip below (tabsBelow). The header owns its
            own bottom divider when tabs are present; when only a single tab
@@ -88,32 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- < md the chat-history rail moves into a drawer so the chat gets
                the full width. -->
           <HomeChatHistory class="max-md:hidden" @load-chat="onLoadChat" @new-chat="onNewChat" />
-          <!-- In-flow toggle bar (not a floating overlay — it would sit over the
-               message list once the chat scrolls). -->
-          <div
-            v-if="isMobile"
-            class="flex shrink-0 items-center pb-1"
-            data-drawer-anchor="home-chats"
-          >
-            <OButton
-              variant="outline"
-              size="sm"
-              data-test="home-mobile-chats-toggle"
-              @click="mobileChatsOpen = true"
-            >
-              <template #icon-left><OIcon name="menu" size="sm" /></template>
-              {{ t("chatHistory.title") }}
-            </OButton>
-          </div>
-          <!-- max-md: the mobile Chats row is a sibling, so h-full would push the
-               composer past the clipped panel — flex instead. -->
-          <O2AIChat
-            ref="homeChat"
-            class="max-md:min-h-0 max-md:flex-1"
-            :is-open="true"
-            :header-height="0"
-            :centered-start="true"
-          />
+          <O2AIChat ref="homeChat" :is-open="true" :header-height="0" :centered-start="true" />
           <ODrawer
             v-if="isMobile"
             v-model:open="mobileChatsOpen"
@@ -121,7 +108,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
             bleed
             seamless
-            anchor='[data-drawer-anchor="home-chats"]'
+            anchor="header.app-page-header"
+            anchor-edge="bottom"
             data-test="home-mobile-chats-drawer"
           >
             <HomeChatHistory

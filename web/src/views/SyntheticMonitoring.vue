@@ -173,7 +173,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="@container/synthetics-toolbar flex min-w-0 flex-1 flex-wrap items-center gap-2 gap-y-1.5 max-md:contents"
             >
               <!-- Type tabs -->
-              <OToggleGroup :model-value="activeTab" @update:model-value="onTabChange">
+              <OToggleGroup
+                mobile-dropdown
+                :model-value="activeTab"
+                data-test="synthetic-monitoring-type-tabs"
+                @update:model-value="onTabChange"
+              >
                 <OToggleGroupItem
                   v-for="tab in typeTabs"
                   :key="tab.key"
@@ -182,17 +187,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :icon-left="tab.icon"
                   :title="tab.label"
                 >
-                  <span class="max-md:hidden @max-[38rem]/synthetics-toolbar:hidden">{{
-                    tab.label
-                  }}</span>
+                  <span class="@max-[38rem]/synthetics-toolbar:hidden">{{ tab.label }}</span>
                 </OToggleGroupItem>
               </OToggleGroup>
 
               <!-- Search -->
-              <!-- < md search takes its own full row below the icon controls. -->
               <!-- md:min-w-60: flex-1 is basis-0, so without a floor the input
                    shrinks to nothing instead of wrapping to its own row. -->
-              <div class="min-w-0 flex-1 max-md:order-last max-md:basis-full md:min-w-60">
+              <div class="min-w-0 flex-1 md:min-w-60">
                 <OInput
                   v-model="search"
                   :placeholder="
