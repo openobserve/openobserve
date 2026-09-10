@@ -19,8 +19,7 @@
 //!
 //! 1. Ownership for every workflow folder, so the `workflow_folder` type is represented.
 //!
-//! 2. A `parent` relation from each workflow to its folder. Before this migration every workflow
-//!    lived in the default folder.
+//! 2. A `parent` relation from each workflow to the folder its row names.
 //!
 //! 3. For every role in every org, the org-level `workflows:_all_<org>` grant is *copied* to
 //!    `workflow_folder:_all_<org>`. Permission now flows through `parent`, so a grant left only on
@@ -30,8 +29,9 @@
 //! Nothing is ever removed, so an interrupted run over-grants briefly rather than locking anyone
 //! out of workflows they could previously see.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
+use config::meta::folder::DEFAULT_FOLDER;
 use o2_openfga::{authorizer, config::get_config as get_ofga_config, meta::mapping::OFGA_MODELS};
 use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder};
 
@@ -45,6 +45,9 @@ pub async fn migrate_workflow_folders<C: ConnectionTrait>(db: &C) -> Result<(), 
     }
 
     let mut orgs: HashSet<String> = HashSet::new();
+    // Maps a folder's primary key to its slug: rows store the key, tuples name
+    // the slug.
+    let mut folder_slugs: HashMap<String, String> = HashMap::new();
 
     // 1. Ownership for every workflow folder.
     let mut folder_len = 0;
@@ -59,6 +62,7 @@ pub async fn migrate_workflow_folders<C: ConnectionTrait>(db: &C) -> Result<(), 
         let mut seen: HashSet<(String, String)> = HashSet::new();
         for folder in page {
             orgs.insert(folder.org.clone());
+            folder_slugs.insert(folder.id.clone(), folder.folder_id.clone());
             if seen.insert((folder.folder_id.clone(), folder.org.clone())) {
                 authorizer::authz::get_ownership_tuple(
                     &folder.org,
@@ -98,10 +102,17 @@ pub async fn migrate_workflow_folders<C: ConnectionTrait>(db: &C) -> Result<(), 
                 &workflow.id,
                 &mut tuples,
             );
-            // Folders are named by slug in tuples; every pre-migration workflow
-            // was backfilled into the org's default folder.
+            // Point at the folder the row actually names. Assuming "default"
+            // holds only if the OFGA migration runs in the same startup as the
+            // column backfill; when OpenFGA is enabled later the workflows have
+            // already been organised, and a hardcoded default would both grant
+            // the wrong folder's roles and leave a second stale parent behind.
+            let slug = folder_slugs
+                .get(&workflow.folder_id)
+                .map(|s| s.as_str())
+                .unwrap_or(DEFAULT_FOLDER);
             authorizer::authz::get_parent_tuple(
-                "default",
+                slug,
                 workflow_folders_type,
                 &object,
                 &mut tuples,
