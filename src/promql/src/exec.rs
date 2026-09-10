@@ -26,8 +26,8 @@ use tokio::sync::{RwLock, Semaphore};
 
 use super::engine::Engine;
 use crate::{
-    DEFAULT_LOOKBACK, TableProvider, micros, micros_since_epoch,
-    promql::selector_visitor::MetricSelectorVisitor,
+    DEFAULT_LOOKBACK, TableProvider, ast::selector_visitor::MetricSelectorVisitor, micros,
+    micros_since_epoch,
 };
 
 #[derive(Clone)]
@@ -63,6 +63,10 @@ impl PromqlContext {
             lookback_delta: five_min,
             scan_stats: Arc::new(RwLock::new(ScanStats::default())),
         }
+    }
+
+    pub fn lookback(&self) -> Duration {
+        Duration::from_micros(self.lookback_delta as u64)
     }
 
     #[tracing::instrument(name = "promql:engine:exec", skip_all)]

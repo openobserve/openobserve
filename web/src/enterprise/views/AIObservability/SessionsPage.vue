@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :stream-name="streamName"
       :start-time="timeRange.startTime"
       :end-time="timeRange.endTime"
-      detail-route-name="aiSessionDetails"
+      :detail-route-name="detailRouteName"
       class="min-h-0 flex-1"
     />
   </AiPageShell>
@@ -44,10 +44,18 @@ import AiPageShell from "@/enterprise/components/AIObservability/AiPageShell.vue
 import SessionsList from "@/plugins/traces/SessionsList.vue";
 import { useAiDateController } from "@/enterprise/composables/useAiDateController";
 import { useChildRefresh } from "@/enterprise/composables/useChildRefresh";
+import config from "@/aws-exports";
 
 defineOptions({ name: "AISessionsPage" });
 
 const { t } = useI18nTyped();
+
+// This same page renders at both /ai/sessions (enterprise/cloud) and /sessions
+// (OSS) — the detail route only exists under the name each build actually
+// registers it under. Matches the exact build check router/index.ts uses to
+// pick userCloudRoutes() (which registers aiSessionDetails) vs useOSRoutes().
+const detailRouteName =
+  config.isEnterprise == "true" || config.isCloud == "true" ? "aiSessionDetails" : "sessionDetails";
 
 // Shared with LLM Insights + Quality — see useAiDateRange.ts. Sessions syncs its
 // date to the URL (urlSync:true) so deep-links reproduce the exact view.

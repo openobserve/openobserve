@@ -53,6 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :columns="columns"
           row-key="name"
           :loading="loading"
+          :forbidden="forbidden"
           :selected-ids="selectedTemplateIds"
           selection="multiple"
           :is-row-selectable="isTemplateRowSelectable"
@@ -406,6 +407,7 @@ watch(
 );
 
 const loading = ref(false);
+const forbidden = ref(false);
 // The first real load lands after mount and races TanStack's own auto-reset-on-data-change, which resolves through its own deferred microtask queue — setTimeout(0) runs strictly after that queue drains, so the restored page reliably wins.
 watch(
   loading,
@@ -425,6 +427,7 @@ const getTemplates = () => {
   });
 
   loading.value = true;
+  forbidden.value = false;
   templateService
     .list({
       org_identifier: store.state.selectedOrganization.identifier,
@@ -441,7 +444,8 @@ const getTemplates = () => {
     })
     .catch((err) => {
       dismiss();
-      if (err.response.status !== 403) {
+      forbidden.value = err?.response?.status === 403;
+      if (!forbidden.value) {
         toast({
           variant: "error",
           message: t("toastMessages.alerts.errorWhilePullingTemplates"),

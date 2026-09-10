@@ -32,12 +32,12 @@ use hashbrown::HashSet;
 use infra::errors::Result;
 use promql::{
     DEFAULT_LOOKBACK, TableProvider,
-    exec::PromqlContext,
-    micros,
-    promql::{
+    ast::{
         name_visitor,
         selector_window::{SelectorWindow, selector_window},
     },
+    exec::PromqlContext,
+    micros,
 };
 use promql_parser::{label::Matchers, parser};
 use proto::cluster_rpc;
@@ -429,7 +429,8 @@ async fn get_max_file_list(
     // 1. get metrics name
     let ast = parser::parse(query).map_err(DataFusionError::Execution)?;
     let mut visitor = name_visitor::MetricNameVisitor::default();
-    promql_parser::util::walk_expr(&mut visitor, &ast).unwrap();
+    promql_parser::util::walk_expr(&mut visitor, &ast)
+        .map_err(|e| DataFusionError::Execution(e.to_string()))?;
     let metrics_name = visitor.into_names();
     let window = selector_window(&ast);
 

@@ -117,6 +117,7 @@ vi.mock("vuex", async (importOriginal) => {
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import LLMInsightsDashboard from "./LLMInsightsDashboard.vue";
+import config from "@/aws-exports";
 // The KPI cache is a module singleton (survives remounts in the app); clear it
 // between tests so a warmed entry from one mount doesn't suppress the fetch in
 // the next.
@@ -505,5 +506,31 @@ describe("LLMInsightsDashboard — onViewTrace", () => {
     mockRouterPush.mockClear();
     (wrapper.vm as any).onViewTrace("");
     expect(mockRouterPush).not.toHaveBeenCalled();
+  });
+});
+
+describe("LLMInsightsDashboard — OSS builds (neither isEnterprise nor isCloud is 'true')", () => {
+  const originalIsEnterprise = config.isEnterprise;
+  const originalIsCloud = config.isCloud;
+
+  afterEach(() => {
+    config.isEnterprise = originalIsEnterprise;
+    config.isCloud = originalIsCloud;
+  });
+
+  it("hides the Stream/Agent toggle and the Compare entry — both need the enterprise-only agent-mapping API", async () => {
+    config.isEnterprise = "false";
+    const wrapper = mountDashboard();
+    await flushPromises();
+    expect(wrapper.find("[data-test='llm-insights-filter-mode']").exists()).toBe(false);
+    expect(wrapper.find("[data-test='llm-insights-compare-entry']").exists()).toBe(false);
+  });
+
+  it("still shows the toggle on a cloud build (isCloud true) even with isEnterprise false — cloud registers the same enterprise route/backend", async () => {
+    config.isEnterprise = "false";
+    config.isCloud = "true";
+    const wrapper = mountDashboard();
+    await flushPromises();
+    expect(wrapper.find("[data-test='llm-insights-filter-mode']").exists()).toBe(true);
   });
 });
