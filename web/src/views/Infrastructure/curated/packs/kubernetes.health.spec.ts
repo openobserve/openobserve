@@ -77,11 +77,11 @@ const FAILURE_REASONS = [
 ];
 
 describe("health — shape", () => {
-  it("sits directly after overview, ahead of utilization", () => {
+  it("sits directly after inventory, ahead of utilization", () => {
     // Triage first: a reader who opened the page because something is wrong should
     // reach "what is broken" before "what is wasteful".
     const ids = kubernetesPage.sections.map((s: any) => s.id);
-    expect(ids.indexOf(SECTION_ID)).toBe(ids.indexOf("overview") + 1);
+    expect(ids.indexOf(SECTION_ID)).toBe(ids.indexOf("inventory") + 1);
     expect(ids.indexOf(SECTION_ID)).toBeLessThan(ids.indexOf("utilization"));
   });
 
@@ -391,10 +391,12 @@ describe("health — instant reads, units and titles", () => {
     }
   });
 
-  it("every title marks the instant read", () => {
-    for (const p of panels()) {
-      expect(copy(p.titleKey).toLowerCase(), `${p.id}`).toContain("(now)");
-    }
+  // The instant read this section's titles used to spell "(now)" is pinned by
+  // "every panel is an instant query" above; the disclosure now rides healthNote.
+  it("the section note discloses the instant read", () => {
+    const section = kubernetesPage.sections.find((s: any) => s.id === SECTION_ID)!;
+    expect(section.noteKey, "the instant read must be disclosed somewhere").toBeTruthy();
+    expect(copy(section.noteKey!).toLowerCase()).toContain("current instant");
   });
 
   it("no tile title claims a top-N it does not have", () => {

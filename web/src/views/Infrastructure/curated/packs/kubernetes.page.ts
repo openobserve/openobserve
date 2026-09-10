@@ -541,17 +541,23 @@ export const kubernetesPage: CuratedPageManifest = {
     {
       name: "pod",
       group: GROUP.pod,
-      valuesFrom: { groupId: "kubelet-pod", stream: "k8s_pod_memory_usage", streamType: "metrics" },
+      // Left on kubeletstats when cluster and namespace moved: the same 46-of-58 miss,
+      // and this section's restart/request tables are kube-state, so it must match them.
+      valuesFrom: { groupId: "kube-state", stream: "kube_pod_status_phase", streamType: "metrics" },
       multiSelect: true,
-      chainedOn: [{ picker: "namespace" }],
+      // Cluster FIRST: a namespace name is not unique across clusters (`openobserve`
+      // exists in several), so narrowing on namespace alone offered every cluster's pods.
+      chainedOn: [{ picker: "cluster" }, { picker: "namespace" }],
       omitWhenValuesEmpty: true,
     },
   ],
 
   sections: [
     {
-      id: "summary",
-      titleKey: "infra.k8s.section.summary",
+      id: "overview",
+      titleKey: "infra.k8s.section.overview",
+      // Carries the instant disclosure the panel titles used to spell as "(now)".
+      noteKey: "infra.k8s.section.overviewNote",
       // Deliberately unscoped: the over-provisioned corner is only legible NEXT TO
       // the tight one, and filtering to one cluster degenerates the chart to a dot.
       panels: [
@@ -716,13 +722,13 @@ export const kubernetesPage: CuratedPageManifest = {
     },
 
     {
-      id: "overview",
-      titleKey: "infra.k8s.section.overview",
+      id: "inventory",
+      titleKey: "infra.k8s.section.inventory",
       scopedBy: ["cluster"],
       // Running/Pending/Failed are three of FIVE phases, so the tiles do not sum
       // to the fleet (dry-run finding 10). Stated once for the trio: inlined per
       // tile it consumed the bar and truncated the very titles it qualified.
-      noteKey: "infra.k8s.section.overviewNote",
+      noteKey: "infra.k8s.section.inventoryNote",
       panels: [
         // Counted from kube-state, the SAME collector as the ready tile beside it: a
         // NotReady node stops emitting kubeletstats entirely, so a kubeletstats
