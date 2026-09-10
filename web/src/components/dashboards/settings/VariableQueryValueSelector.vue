@@ -38,6 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :data-test="`variable-selector-${variableItem.name}-inner`"
       :multiple="variableItem.multiSelect"
       :disabled="!!disabled"
+      :clearable="clearable"
       @search="onSearch"
       @open="onPopupShow"
       @close="onPopupHide"
@@ -151,6 +152,7 @@ export default defineComponent({
     disabled: { type: Boolean, default: false },
     disabledTooltipKey: { type: String, default: undefined },
     disabledTooltipParams: { type: Object, default: undefined },
+    clearable: { type: Boolean, default: false },
   },
   emits: ["update:modelValue", "search"],
   setup(props: any, { emit }) {

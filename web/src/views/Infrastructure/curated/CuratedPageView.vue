@@ -337,6 +337,28 @@ type VariablesManager = ReturnType<typeof useVariablesManager>;
 const variablesManager = ref<VariablesManager | null>(null);
 let stopCommitWatch: (() => void) | undefined;
 
+/**
+ * A cleared picker has to leave the URL too, or a refresh restores the scope the
+ * user just dropped. getUrlParams omits an empty value (useVariablesManager
+ * :994-1002), so rebuilding every `var-` key from it deletes exactly the cleared
+ * ones — including the `.t.`/`.p.` suffixed shapes a prefix match would miss.
+ */
+const syncPickerUrl = (manager: VariablesManager) => {
+  const params = manager.getUrlParams({ useLive: false });
+  const query: Record<string, any> = { ...route.query };
+  for (const key of Object.keys(query)) {
+    if (key.startsWith("var-")) delete query[key];
+  }
+  Object.assign(query, params);
+  const unchanged =
+    Object.keys(query).length === Object.keys(route.query).length &&
+    Object.keys(query).every((key) => String(query[key]) === String(route.query[key]));
+  if (unchanged) return;
+  // A scope correction is not a navigable step, so it must not stack a history entry.
+  isInternalUrlUpdate.value = true;
+  void router.replace({ query }).finally(() => (isInternalUrlUpdate.value = false));
+};
+
 const onVariablesManagerReady = (manager: VariablesManager) => {
   variablesManager.value = manager;
   stopCommitWatch?.();
@@ -344,7 +366,10 @@ const onVariablesManagerReady = (manager: VariablesManager) => {
   // on those would re-run panels for a picker the user never touched.
   stopCommitWatch = watch(
     () => manager.variablesData.global.map((variable) => variable.value),
-    () => manager.commitAll(),
+    () => {
+      manager.commitAll();
+      syncPickerUrl(manager);
+    },
     { deep: true },
   );
 };

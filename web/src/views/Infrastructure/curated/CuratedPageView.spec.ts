@@ -169,7 +169,14 @@ const passthrough = (name: string) =>
 /** Stands in for the OSelect tree only — the props under test stay real. */
 const querySelectorStub = defineComponent({
   name: "VariableQueryValueSelector",
-  props: ["modelValue", "variableItem", "loadOptions", "disabled", "disabledTooltipKey"],
+  props: [
+    "modelValue",
+    "variableItem",
+    "loadOptions",
+    "disabled",
+    "disabledTooltipKey",
+    "clearable",
+  ],
   template: "<div class='qvs-stub' />",
 });
 
@@ -1307,6 +1314,70 @@ describe("CuratedPageView", () => {
       expect(vm.isVariableOmitted({ ...variables[0], isVariableLoadingPending: true })).toBe(false);
       expect(vm.isVariableOmitted({ ...variables[0], isVariablePartialLoaded: false })).toBe(false);
       selector.unmount();
+    });
+
+    it("a cold load whose URL carries var-cluster keeps the picker even before options arrive", async () => {
+      // loadFromUrl sets isVariablePartialLoaded and clears BOTH loading flags so the
+      // value is not re-fetched (useVariablesManager :880-885), so on a hard refresh the
+      // held-value picker is indistinguishable from a settled-empty one and vanished.
+      const variables = pickerVariables();
+      const cluster = variables[0] as any;
+      cluster.value = ["common-dev"];
+      const selector = await mountRealSelector(variables);
+      const vm = selector.vm as any;
+      expect(vm.isVariableOmitted(cluster)).toBe(false);
+      // A single-select picker holding a URL value is the same case.
+      expect(vm.isVariableOmitted({ ...cluster, multiSelect: false, value: "common-dev" })).toBe(
+        false,
+      );
+      // The legitimate omission survives: no value held, nothing to protect.
+      expect(vm.isVariableOmitted({ ...cluster, value: [] })).toBe(true);
+      selector.unmount();
+    });
+
+    it("a curated picker is clearable, so a chosen scope can be undone", async () => {
+      // The affordance is OSelect's own `clearable` X (used app-wide); the curated
+      // page previously offered no way back out of a selection at all.
+      const variables = pickerVariables();
+      const selector = await mountRealSelector(variables);
+      const picker = selector.findComponent(querySelectorStub);
+      expect(picker.props("clearable")).toBe(true);
+      selector.unmount();
+    });
+
+    it("clearing a picker strips its var- key from the URL and resets the chained child", async () => {
+      const variables = pickerVariables();
+      (variables[0] as any).options = [{ label: "common-dev", value: "common-dev" }];
+      (variables[0] as any).value = ["common-dev"];
+      (variables[1] as any).value = ["argocd"];
+      // The REAL chain edge buildVariable emits — the graph is built from this
+      // `$cluster` reference, so a fixture without it resets no children.
+      (variables[1] as any).query_data = {
+        ...(variables[1] as any).query_data,
+        stream: "kube_pod_status_phase",
+        field: "namespace",
+        filter: [{ name: "k8s_cluster", operator: "IN", value: "$cluster" }],
+      };
+      wrapper = await mountView({}, withPickers(variables), {
+        "var-cluster": "common-dev",
+        "var-namespace": "argocd",
+      });
+      await flushPromises();
+
+      const manager = useVariablesManager((key: string) => key);
+      await manager.initialize(variables, {});
+      wrapper
+        .findComponent({ name: "RenderDashboardCharts" })
+        .vm.$emit("variablesManagerReady", manager);
+      await flushPromises();
+
+      manager.updateVariableValue("cluster", "global", undefined, undefined, []);
+      manager.commitAll();
+      await flushPromises();
+
+      expect(router.currentRoute.value.query["var-cluster"]).toBeUndefined();
+      // The chain: a namespace picked under the cleared cluster must not keep filtering.
+      expect(router.currentRoute.value.query["var-namespace"]).toBeUndefined();
     });
 
     it("finding 23b: an omitted cluster picker with ONE resolvable value renders the name as static text", async () => {
