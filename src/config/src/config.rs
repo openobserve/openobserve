@@ -1943,12 +1943,17 @@ pub struct Common {
     pub usage_reporting_mode: String,
     #[env_config(
         name = "ZO_USAGE_REPORTING_URL",
-        default = "http://localhost:5080/api/_meta/usage/_json"
+        default = "http://localhost:5080/api/_meta/usage/_json",
+        help = "Where remote usage reporting posts. Unused in the open source build, which never reports usage."
     )]
     pub usage_reporting_url: String,
     #[env_config(name = "ZO_USAGE_REPORTING_CREDS", default = "")]
     pub usage_reporting_creds: String,
-    #[env_config(name = "ZO_USAGE_REPORTING_ERRORS_ENABLED", default = true)]
+    #[env_config(
+        name = "ZO_USAGE_REPORTING_ERRORS_ENABLED",
+        default = true,
+        help = "Report error data. Writes the _meta errors stream and fills the last-error panel on the pipelines page. Error text can echo the record that failed."
+    )]
     pub usage_reporting_errors_enabled: bool,
     #[env_config(name = "ZO_USAGE_BATCH_SIZE", default = 2000)]
     pub usage_batch_size: usize,
