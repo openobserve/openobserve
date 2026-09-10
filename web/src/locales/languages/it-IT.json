@@ -3680,6 +3680,7 @@
       "auth": {
         "oauth": "OAuth — accedi (consigliato)",
         "token": "Token di accesso",
+        "oauthTitle": "Accedi con il tuo browser",
         "oauthNote": "Nessuna credenziale da gestire: il tuo client MCP apre un browser per l'accesso e l'accesso è limitato dai tuoi permessi esistenti. Usalo quando il tuo client supporta OAuth."
       },
       "credential": {
@@ -3723,7 +3724,10 @@
         "hermes": "Aggiungi a ~/.hermes/config.yaml (YAML), poi esegui /reload-mcp.",
         "codex": "Aggiungi a ~/.codex/config.toml (TOML), quindi riavvia Codex."
       },
-      "installOneClick": "Aggiungi a {client}"
+      "installOneClick": "Aggiungi a {client}",
+      "skillsLabel": "Aggiungi la skill {brand} (opzionale)",
+      "skillsHint": "Insegna al tuo Assistente AI come eseguire query, creare avvisi e dashboard in {brand}, così può sfruttare al meglio gli strumenti MCP. Eseguilo nel tuo progetto, poi scegli gli agenti su cui installarlo.",
+      "skillsRepo": "Visualizza le skill su {host}"
     },
     "manageTokensBtnLabel": "Gestisci i token",
     "orgLevelExplanation": "Si tratta di token di ingestione a livello di organizzazione. Non sono legati ai singoli utenti e continueranno a funzionare anche se l'utente che li ha creati lascia l'organizzazione. I token possono essere utilizzati solo sugli endpoint di ingestione.",

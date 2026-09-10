@@ -3680,6 +3680,7 @@
       "auth": {
         "oauth": "OAuth — Anmeldung (empfohlen)",
         "token": "Zugriffstoken",
+        "oauthTitle": "Mit Ihrem Browser anmelden",
         "oauthNote": "Keine Anmeldedaten zu verwalten: Ihr MCP-Client öffnet einen Browser zur Anmeldung, und der Zugriff wird durch Ihre vorhandenen Berechtigungen beschränkt. Verwenden Sie dies, wann immer Ihr Client OAuth unterstützt."
       },
       "credential": {
@@ -3723,7 +3724,10 @@
         "hermes": "Zu ~/.hermes/config.yaml (YAML) hinzufügen, dann /reload-mcp ausführen.",
         "codex": "Zu ~/.codex/config.toml (TOML) hinzufügen, dann Codex neu starten."
       },
-      "installOneClick": "Zu {client} hinzufügen"
+      "installOneClick": "Zu {client} hinzufügen",
+      "skillsLabel": "{brand}-Skill hinzufügen (optional)",
+      "skillsHint": "Bringt Ihrem KI-Assistenten bei, wie er in {brand} Abfragen durchführt, Warnmeldungen einrichtet und Dashboards erstellt, damit er mehr aus den MCP-Tools herausholt. Führen Sie es in Ihrem Projekt aus und wählen Sie dann die Agenten aus, in denen es installiert werden soll.",
+      "skillsRepo": "Die Skills auf {host} anzeigen"
     },
     "manageTokensBtnLabel": "Tokens verwalten",
     "orgLevelExplanation": "Dabei handelt es sich um Erfassungs-Token auf Organisationsebene. Sie sind nicht an einzelne Benutzer gebunden und funktionieren auch dann weiter, wenn der Benutzer, der sie erstellt hat, die Organisation verlässt. Tokens können nur auf Datenerfassungsendpunkten verwendet werden.",

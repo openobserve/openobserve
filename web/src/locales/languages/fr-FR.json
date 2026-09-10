@@ -3680,6 +3680,7 @@
       "auth": {
         "oauth": "OAuth — connexion (recommandé)",
         "token": "Jeton d'accès",
+        "oauthTitle": "Connectez-vous avec votre navigateur",
         "oauthNote": "Aucun identifiant à gérer : votre client MCP ouvre un navigateur pour vous connecter, et l'accès est limité par vos autorisations existantes. Utilisez-le lorsque votre client prend en charge OAuth."
       },
       "credential": {
@@ -3723,7 +3724,10 @@
         "hermes": "Ajouter à ~/.hermes/config.yaml (YAML), puis exécuter /reload-mcp.",
         "codex": "Ajouter à ~/.codex/config.toml (TOML), puis redémarrer Codex."
       },
-      "installOneClick": "Ajouter à {client}"
+      "installOneClick": "Ajouter à {client}",
+      "skillsLabel": "Ajouter la compétence {brand} (facultatif)",
+      "skillsHint": "Apprend à votre assistante IA à interroger, à alerter et à créer des tableaux de bord dans {brand}, afin qu'elle tire le meilleur parti des outils MCP. Exécutez-la dans votre projet, puis choisissez les agents dans lesquels l'installer.",
+      "skillsRepo": "Voir les compétences sur {host}"
     },
     "manageTokensBtnLabel": "Gérer les jetons",
     "orgLevelExplanation": "Il s'agit de jetons d'ingestion au niveau de l'organisation. Ils ne sont pas liés à des utilisateurs individuels et continueront de fonctionner même si l'utilisateur qui les a créés quitte l'organisation. Les jetons ne peuvent être utilisés que sur les points finaux d'ingestion.",

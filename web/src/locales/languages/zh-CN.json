@@ -3680,6 +3680,7 @@
       "auth": {
         "oauth": "OAuth — 登录（推荐）",
         "token": "访问令牌",
+        "oauthTitle": "使用浏览器登录",
         "oauthNote": "无需管理凭证：您的 MCP 客户端会打开浏览器进行登录，访问权限受限于您现有的权限。只要您的客户端支持 OAuth，请使用此方式。"
       },
       "credential": {
@@ -3723,7 +3724,10 @@
         "hermes": "添加到~/.hermes/config.yaml (YAML)，然后运行/reload-mcp。",
         "codex": "添加到~/.codex/config.toml (TOML)，然后重启Codex。"
       },
-      "installOneClick": "添加到{client}"
+      "installOneClick": "添加到{client}",
+      "skillsLabel": "添加 {brand} 技能（可选）",
+      "skillsHint": "教您的人工智能助手如何在 {brand} 中进行查询、告警和构建仪表盘，从而更充分地利用 MCP 工具。在您的项目中运行它，然后选择要安装到的智能体。",
+      "skillsRepo": "在 {host} 上查看技能"
     },
     "manageTokensBtnLabel": "管理令牌",
     "orgLevelExplanation": "这些是组织级别的写入令牌。它们与个人用户无关，即使创建它们的用户离开组织，它们也将继续工作。令牌只能在写入API上使用。",

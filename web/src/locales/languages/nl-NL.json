@@ -3680,6 +3680,7 @@
       "auth": {
         "oauth": "OAuth — inloggen (aanbevolen)",
         "token": "Toegangstoken",
+        "oauthTitle": "Log in met je browser",
         "oauthNote": "Geen credential om te beheren: uw MCP-client opent een browser om in te loggen en de toegang is beperkt tot uw bestaande machtigingen. Gebruik dit wanneer uw client OAuth ondersteunt."
       },
       "credential": {
@@ -3723,7 +3724,10 @@
         "hermes": "Toevoegen aan ~/.hermes/config.yaml (YAML), voer daarna /reload-mcp uit.",
         "codex": "Toevoegen aan ~/.codex/config.toml (TOML), herstart daarna Codex."
       },
-      "installOneClick": "Toevoegen aan {client}"
+      "installOneClick": "Toevoegen aan {client}",
+      "skillsLabel": "Voeg de {brand}-vaardigheid toe (optioneel)",
+      "skillsHint": "Leert je AI-assistent hoe hij query's uitvoert, alarmen instelt en dashboards bouwt in {brand}, zodat je meer uit de MCP-tools haalt. Voer het uit in je project en kies vervolgens de agents waarin je het wilt installeren.",
+      "skillsRepo": "Bekijk de vaardigheden op {host}"
     },
     "manageTokensBtnLabel": "Tokens beheren",
     "orgLevelExplanation": "Dit zijn innametokens op organisatieniveau. Ze zijn niet gebonden aan individuele gebruikers en blijven werken, zelfs als de gebruiker die ze heeft aangemaakt de organisatie verlaat. Tokens kunnen alleen worden gebruikt op eindpunten voor inname.",

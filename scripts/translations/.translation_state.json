@@ -8823,6 +8823,7 @@
       "auth": {
         "oauth": "c324eda2422e19d1",
         "oauthNote": "cb0d79fc4e1cc49a",
+        "oauthTitle": "a8d518d7bb385987",
         "token": "9a911b08feb9d292"
       },
       "clients": {
@@ -8876,6 +8877,9 @@
       "securityBody": "de00835eaf7e01f2",
       "securityTitle": "925dcec8f1041a1d",
       "shortName": "960e444e99771619",
+      "skillsHint": "e60d1e31c0597783",
+      "skillsLabel": "71cb3d49b256843d",
+      "skillsRepo": "887cfdf2ea742b4a",
       "tagline": "32cc3ebe273db3de"
     },
     "messageQueuesLabel": "9cd00858543a587f",

@@ -3680,6 +3680,7 @@
       "auth": {
         "oauth": "OAuth — zaloguj się (zalecane)",
         "token": "Token dostępu",
+        "oauthTitle": "Zaloguj się przez przeglądarkę",
         "oauthNote": "Brak danych logowania do zarządzania: Twój klient MCP otwiera przeglądarkę, aby się zalogować, a dostęp jest ograniczony przez Twoje istniejące uprawnienia. Używaj go, gdy Twój klient obsługuje OAuth."
       },
       "credential": {
@@ -3723,7 +3724,10 @@
         "hermes": "Dodaj do ~/.hermes/config.yaml (YAML), a następnie uruchom /reload-mcp.",
         "codex": "Dodaj do ~/.codex/config.toml (TOML), a następnie uruchom ponownie Codex."
       },
-      "installOneClick": "Dodaj do {client}"
+      "installOneClick": "Dodaj do {client}",
+      "skillsLabel": "Dodaj umiejętność {brand} (opcjonalnie)",
+      "skillsHint": "Uczy Twojego asystenta AI, jak odpytywać dane, konfigurować alerty i tworzyć pulpity w {brand}, dzięki czemu lepiej wykorzysta narzędzia MCP. Uruchom ją w swoim projekcie, a następnie wybierz agentów, u których chcesz ją zainstalować.",
+      "skillsRepo": "Zobacz umiejętności na {host}"
     },
     "manageTokensBtnLabel": "Zarządzaj tokenami",
     "orgLevelExplanation": "Są to tokeny pozyskiwania danych na poziomie organizacji. Nie są powiązane z indywidualnymi użytkownikami i będą działać nawet jeśli użytkownik, który je utworzył, opuści organizację. Tokeny mogą być używane tylko w punktach końcowych pozyskiwania danych.",

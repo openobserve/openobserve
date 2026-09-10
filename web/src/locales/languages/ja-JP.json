@@ -3680,6 +3680,7 @@
       "auth": {
         "oauth": "OAuth — サインイン（推奨）",
         "token": "アクセストークン",
+        "oauthTitle": "ブラウザでサインイン",
         "oauthNote": "管理する資格情報はありません。MCPクライアントがブラウザを開いてサインインし、アクセスは既存の権限に基づいてスコープされます。クライアントがOAuthをサポートしている場合はこれを使用してください。"
       },
       "credential": {
@@ -3723,7 +3724,10 @@
         "hermes": "~/.hermes/config.yaml (YAML) に追加し、次に /reload-mcp を実行してください。",
         "codex": "~/.codex/config.toml (TOML) に追加し、次に Codex を再起動してください。"
       },
-      "installOneClick": "{client} に追加"
+      "installOneClick": "{client} に追加",
+      "skillsLabel": "{brand} スキルを追加（任意）",
+      "skillsHint": "{brand} でのクエリ、アラート、ダッシュボードの作成方法を AI アシスタントに教えることで、MCP ツールをより活用できるようになります。プロジェクトで実行し、インストール先のエージェントを選択してください。",
+      "skillsRepo": "{host} でスキルを表示"
     },
     "manageTokensBtnLabel": "トークンの管理",
     "orgLevelExplanation": "これらは組織レベルの取り込みトークンです。これらは個々のユーザーに関連付けられることはなく、作成したユーザーが組織を離れても引き続き機能します。トークンは取り込みエンドポイントでのみ使用できます。",

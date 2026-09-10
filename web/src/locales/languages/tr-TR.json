@@ -3680,6 +3680,7 @@
       "auth": {
         "oauth": "OAuth — oturum aç (önerilir)",
         "token": "Erişim belirteci",
+        "oauthTitle": "Tarayıcınızla oturum açın",
         "oauthNote": "Yönetilecek kimlik bilgisi yok: MCP istemciniz oturum açmak için bir tarayıcı açar ve erişim mevcut izinlerinizle sınırlanır. İstemciniz OAuth'u desteklediğinde kullanın."
       },
       "credential": {
@@ -3723,7 +3724,10 @@
         "hermes": "~/.hermes/config.yaml (YAML) dosyasına ekleyin, ardından /reload-mcp çalıştırın.",
         "codex": "~/.codex/config.toml (TOML) dosyasına ekleyin, ardından Codex'i yeniden başlatın."
       },
-      "installOneClick": "{client} öğesine ekle"
+      "installOneClick": "{client} öğesine ekle",
+      "skillsLabel": "{brand} becerisini ekleyin (isteğe bağlı)",
+      "skillsHint": "Yapay Zeka Asistanınıza {brand} içinde nasıl sorgu yapacağını, uyarı oluşturacağını ve gösterge panoları oluşturacağını öğretir, böylece MCP araçlarından daha fazla yararlanır. Projenizde çalıştırın, ardından hangi aracılara yükleyeceğinizi seçin.",
+      "skillsRepo": "{host} üzerindeki becerileri görüntüleyin"
     },
     "manageTokensBtnLabel": "Belirteçleri Yönet",
     "orgLevelExplanation": "Bunlar kuruluş düzeyinde alım belirteçleridir. Bireysel kullanıcılara bağlı değildirler ve onları oluşturan kullanıcı kuruluştan ayrılsa bile çalışmaya devam edeceklerdir. Belirteçler yalnızca alım uç noktalarında kullanılabilir.",

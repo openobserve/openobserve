@@ -3680,6 +3680,7 @@
       "auth": {
         "oauth": "OAuth — đăng nhập (khuyên dùng)",
         "token": "Mã thông báo truy cập",
+        "oauthTitle": "Đăng nhập bằng trình duyệt của bạn",
         "oauthNote": "Không cần quản lý thông tin xác thực: ứng dụng khách MCP của bạn mở trình duyệt để đăng nhập và quyền truy cập được giới hạn bởi các quyền hiện có của bạn. Sử dụng nó bất cứ khi nào ứng dụng khách của bạn hỗ trợ OAuth."
       },
       "credential": {
@@ -3723,7 +3724,10 @@
         "hermes": "Thêm vào ~/.hermes/config.yaml (YAML), sau đó chạy /reload-mcp.",
         "codex": "Thêm vào ~/.codex/config.toml (TOML), sau đó khởi động lại Codex."
       },
-      "installOneClick": "Thêm vào {client}"
+      "installOneClick": "Thêm vào {client}",
+      "skillsLabel": "Thêm kỹ năng {brand} (không bắt buộc)",
+      "skillsHint": "Dạy Trợ lý AI của bạn cách truy vấn, cảnh báo và tạo bảng điều khiển trong {brand}, để tận dụng tốt hơn các công cụ MCP. Chạy nó trong dự án của bạn, sau đó chọn các agent để cài đặt.",
+      "skillsRepo": "Xem các kỹ năng trên {host}"
     },
     "manageTokensBtnLabel": "Quản lý mã thông báo",
     "orgLevelExplanation": "Đây là các mã thông báo ingestion cấp tổ chức. Chúng không gắn với người dùng cụ thể và sẽ tiếp tục hoạt động ngay cả khi người dùng đã tạo chúng rời khỏi tổ chức. Mã thông báo chỉ có thể được sử dụng trên các điểm cuối ingestion.",

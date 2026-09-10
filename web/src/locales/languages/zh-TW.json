@@ -3680,6 +3680,7 @@
       "auth": {
         "oauth": "OAuth — 登入（建議使用）",
         "token": "存取權杖",
+        "oauthTitle": "使用瀏覽器登入",
         "oauthNote": "無需管理憑證：您的 MCP 用戶端會開啟瀏覽器進行登入，存取範圍受限於您現有的權限。只要您的用戶端支援 OAuth，即可使用此方式。"
       },
       "credential": {
@@ -3723,7 +3724,10 @@
         "hermes": "新增至 ~/.hermes/config.yaml（YAML），然後執行 /reload-mcp。",
         "codex": "新增至 ~/.codex/config.toml（TOML），然後重新啟動 Codex。"
       },
-      "installOneClick": "新增至 {client}"
+      "installOneClick": "新增至 {client}",
+      "skillsLabel": "新增 {brand} 技能（選填）",
+      "skillsHint": "教導您的 AI 助手如何在 {brand} 中查詢、設定警示及建立儀表板，讓它能更充分利用 MCP 工具。在您的專案中執行它，然後選擇要安裝到的代理程式。",
+      "skillsRepo": "在 {host} 上檢視技能"
     },
     "manageTokensBtnLabel": "管理權杖",
     "orgLevelExplanation": "這些是組織層級的擷取權杖。它們不與個別使用者綁定，即使建立它們的使用者離開組織後仍可繼續運作。權杖僅可用於擷取端點。",
