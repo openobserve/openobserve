@@ -1,0 +1,22 @@
+[
+  {
+    "title": "should dismiss the open Help dropdown and open the Data flyout when hovering the Data tile",
+    "action": "new",
+    "verifies": "hovering the Data group tile dispatches a synthetic Escape that closes the open Help dropdown while the Data flyout opens"
+  },
+  {
+    "title": "should open the Data flyout without a stray Escape when no dropdown is open",
+    "action": "new",
+    "verifies": "with no dropdown open the flyout still opens and no dropdown is accidentally opened/left behind"
+  },
+  {
+    "title": "should open the Data flyout and navigate when clicking the Data tile",
+    "action": "new",
+    "verifies": "clicking the Data tile opens the flyout immediately (no hover debounce) and navigates to /streams"
+  },
+  {
+    "title": "should dismiss the open Profile dropdown when hovering the Data tile",
+    "action": "new",
+    "verifies": "the dismiss is not Help-specific; the Profile dropdown is closed by the same synthetic Escape"
+  }
+]

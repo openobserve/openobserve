@@ -1,0 +1,11 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/GeneralTests/navGroupFlyoutDismiss.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/GeneralTests/theme-management.spec.js",
+    "tests/ui-testing/pages/commonActions.js",
+    "tests/ui-testing/pages/generalPages/homePage.js"
+  ],
+  "needs_registration": true,
+  "rationale": "No Playwright spec exercises the nav-group flyout or the dismiss-open-dropdown behaviour. openNavFlyoutChild in commonActions.js hovers a group tile only to click a child (navigation helper), and no spec under tests/ui-testing/playwright-tests/ uses nav-group-flyout-* selectors or asserts a dropdown was dismissed. The change (ONavGroup.open() now dispatches Escape to close open reka dropdowns) has no E2E coverage, so a brand-new GeneralTests spec is required. It must be registered in ci-matrix/ci_matrix.json under the GeneralTests shard."
+}

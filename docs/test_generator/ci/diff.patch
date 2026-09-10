@@ -1,0 +1,110 @@
+===== COMPLETE LIST OF CHANGED FILES (2 files) =====
+# AUTHORITATIVE: this list is never truncated. The diff BODY below may be trimmed for
+# very large PRs, so decide WHICH files/areas changed (e.g. web/src frontend) from THIS list.
+web/src/lib/core/Navbar/ONavGroup.spec.ts
+web/src/lib/core/Navbar/ONavGroup.vue
+===== END CHANGED FILES =====
+
+diff --git a/web/src/lib/core/Navbar/ONavGroup.spec.ts b/web/src/lib/core/Navbar/ONavGroup.spec.ts
+index 669d03a4063..61f03e149c4 100644
+--- a/web/src/lib/core/Navbar/ONavGroup.spec.ts
++++ b/web/src/lib/core/Navbar/ONavGroup.spec.ts
+@@ -114,6 +114,63 @@ describe("ONavGroup", () => {
+     expect(flyout().exists()).toBe(true);
+   });
+ 
++  /**
++   * A dropdown is portaled after this flyout and sits on a higher layer, so it
++   * paints over the menu the pointer is on. Escape is what reka's dismissable
++   * layers listen for; the flyout sends it before showing itself.
++   */
++  it("closes an open dropdown before showing the flyout", async () => {
++    const popper = document.createElement("div");
++    popper.setAttribute("data-reka-popper-content-wrapper", "");
++    document.body.appendChild(popper);
++    const keys: string[] = [];
++    const listener = (e: Event) => keys.push((e as KeyboardEvent).key);
++    document.addEventListener("keydown", listener);
++
++    wrapper = mountGroup();
++    await hoverOpen();
++
++    document.removeEventListener("keydown", listener);
++    popper.remove();
++    expect(keys).toContain("Escape");
++    expect(flyout().exists()).toBe(true);
++  });
++
++  // Nothing to dismiss must stay silent: a stray Escape would close whatever
++  // else is listening, and hovering the rail is not a dismissal gesture.
++  it("sends no Escape when no dropdown is open", async () => {
++    const keys: string[] = [];
++    const listener = (e: Event) => keys.push((e as KeyboardEvent).key);
++    document.addEventListener("keydown", listener);
++
++    wrapper = mountGroup();
++    await hoverOpen();
++
++    document.removeEventListener("keydown", listener);
++    expect(keys).not.toContain("Escape");
++  });
++
++  // A dialog or drawer owns Escape while it is open, and the rail stays
++  // reachable beside a drawer — so the flyout must not fire the key there.
++  it("leaves an open dialog alone", async () => {
++    const popper = document.createElement("div");
++    popper.setAttribute("data-reka-popper-content-wrapper", "");
++    const overlay = document.createElement("div");
++    overlay.setAttribute("data-test", "o-dialog-overlay");
++    document.body.append(popper, overlay);
++    const keys: string[] = [];
++    const listener = (e: Event) => keys.push((e as KeyboardEvent).key);
++    document.addEventListener("keydown", listener);
++
++    wrapper = mountGroup();
++    await hoverOpen();
++
++    document.removeEventListener("keydown", listener);
++    popper.remove();
++    overlay.remove();
++    expect(keys).not.toContain("Escape");
++  });
++
+   it("positions the flyout after the rail in LTR", async () => {
+     document.documentElement.dir = "ltr";
+     wrapper = mountGroup();
+diff --git a/web/src/lib/core/Navbar/ONavGroup.vue b/web/src/lib/core/Navbar/ONavGroup.vue
+index 79413a3dba1..c53695eb399 100644
+--- a/web/src/lib/core/Navbar/ONavGroup.vue
++++ b/web/src/lib/core/Navbar/ONavGroup.vue
+@@ -312,8 +312,30 @@ async function positionFlyout() {
+   };
+ }
+ 
++/**
++ * Send any open dropdown away before the flyout appears.
++ *
++ * Both are page menus, but a dropdown is portaled after this flyout AND sits on
++ * a higher layer, so it paints over the menu the pointer is actually on.
++ * Raising the flyout is the wrong lever: it would have to clear 10001, which is
++ * above the modal layer, and a nav menu floating over a dialog is worse than
++ * the overlap it would fix. One menu at a time is the behaviour anyway.
++ *
++ * Escape is what reka's dismissable layers listen for. It is scoped to the case
++ * where a popper is the topmost layer — with a dialog or drawer open the same
++ * key would close that instead, and the rail is reachable beside a drawer.
++ */
++function dismissOpenDropdowns() {
++  if (!document.querySelector("[data-reka-popper-content-wrapper]")) return;
++  if (document.querySelector('[data-test="o-dialog-overlay"], [data-test="o-drawer-overlay"]')) {
++    return;
++  }
++  document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
++}
++
+ async function open() {
+   if (visibleChildren.value.length === 0) return;
++  dismissOpenDropdowns();
+   clearTimers();
+   isOpen.value = true;
+   openGroupKey.value = props.groupKey;

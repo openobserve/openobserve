@@ -69,6 +69,25 @@ export async function openNavFlyoutChild(page, child) {
 }
 
 /**
+ * Hover a left-nav group tile until its flyout opens, without clicking a child.
+ * Same retry pattern as openNavFlyoutChild — move the pointer away first so
+ * `hover()` always fires a fresh `mouseenter`, and retry the open-and-reveal as
+ * a unit — but stops once the flyout is visible instead of selecting an item.
+ * @param {import('@playwright/test').Page} page
+ * @param {keyof typeof NAV_GROUP_TILE} group - group tile key (default 'data')
+ */
+export async function openNavGroupFlyout(page, group = 'data') {
+    const tile = page.locator(NAV_GROUP_TILE[group]);
+    await tile.waitFor({ state: 'visible', timeout: 30000 });
+    const flyout = page.locator(`[data-test="nav-group-flyout-${group}"]`);
+    await expect(async () => {
+        await page.mouse.move(0, 0);
+        await tile.hover();
+        await expect(flyout).toBeVisible({ timeout: 2000 });
+    }).toPass({ timeout: 30000 });
+}
+
+/**
  * Navigate straight to the metrics PANEL EDITOR.
  *
  * `/metrics` is the zero-query Metrics Explorer (a browse grid of metric cards);

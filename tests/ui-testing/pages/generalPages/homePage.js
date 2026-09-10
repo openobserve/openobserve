@@ -1,6 +1,6 @@
 // homePage.js - Landing Page Object for OpenObserve
 import { expect } from '@playwright/test';
-import { openNavFlyoutChild, gotoMetricsEditor } from '../commonActions.js';
+import { openNavFlyoutChild, openNavGroupFlyout, gotoMetricsEditor } from '../commonActions.js';
 
 export class HomePage {
     constructor(page) {
@@ -40,6 +40,7 @@ export class HomePage {
         this.themeManager = page.locator('[data-test="menu-link-predefined-themes-item"]');
         this.logoutButton = page.locator('[data-test="menu-link-logout-item"]');
         this.aiChatButton = page.locator('[data-test="menu-link-ai-item"]');
+        this.navGroupFlyout = page.locator('[data-test="nav-group-flyout-data"]');
 
         // ===== THEME SWITCHER SELECTORS =====
         // ThemeSwitcher button lives in the header toolbar. The OButton renders as a
@@ -373,6 +374,33 @@ export class HomePage {
      */
     async pressEscape() {
         await this.page.keyboard.press('Escape');
+    }
+
+    // ===== NAV GROUP FLYOUT METHODS =====
+
+    async openDataFlyout() {
+        await openNavGroupFlyout(this.page, 'data');
+    }
+
+    async expectNavGroupFlyoutVisible() {
+        await expect(this.navGroupFlyout).toBeVisible();
+    }
+
+    async expectHelpMenuHidden() {
+        await expect(this.aboutLink).toBeHidden();
+    }
+
+    async expectProfileMenuHidden() {
+        await expect(this.logoutButton).toBeHidden();
+    }
+
+    async clickDataTile() {
+        await this.streamsMenu.waitFor({ state: 'visible', timeout: 10000 });
+        await this.streamsMenu.click();
+    }
+
+    async expectStreamsPageLoaded() {
+        await expect(this.streamsPageIndicator).toBeVisible({ timeout: 15000 });
     }
 
     async logout() {

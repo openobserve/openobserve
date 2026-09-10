@@ -1,0 +1,25 @@
+{
+  "feature_slug": "nav-group-flyout-dismiss",
+  "feature_title": "Navbar Group Flyout Dismisses Open Dropdowns",
+  "area": "GeneralTests",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "navGroupFlyoutDismiss.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/GeneralTests/navGroupFlyoutDismiss.spec.js",
+  "playwright_group": "GeneralTests",
+  "source_files": [
+    "web/src/lib/core/Navbar/ONavGroup.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "Both changed paths live under web/src/lib/core/Navbar/ in the open-source frontend tree; no enterprise-owned paths (o2_enterprise/, enterprise/) and no enterprise keywords (cipher/SSO/SAML/RBAC/SDR) appear in the file list or in the changed symbols, so this is an OSS change.",
+    "skip": "No explicit opt-out is present: the trigger comment and feature hint are both empty and no tests-added label was passed. The diff modifies a user-facing Vue component (ONavGroup.vue), so it is not docs-/CI-/comment-only, and it is not skipped.",
+    "e2e": "The change alters a user-facing interaction in web/src — opening a navbar group flyout now dismisses any open dropdown by dispatching an Escape keydown, so a user hovering the rail with a dropdown open sees different behavior; this changed interaction warrants an E2E test.",
+    "area": "The change lives in the shared core Navbar library (web/src/lib/core/Navbar), not inside any Logs/Metrics/Traces/Dashboards product view, so it maps to GeneralTests, which already hosts shared/core UI specs such as cipherKeys and logoManagement.",
+    "group": "GeneralTests is the existing matrix shard for shared/core UI specs; the new navbar flyout spec joins that group.",
+    "existing_tests": "The only changed test file is web/src/lib/core/Navbar/ONavGroup.spec.ts, a Vitest unit spec — not a Playwright E2E spec under tests/ui-testing/playwright-tests/ — so there are no E2E specs in the diff."
+  }
+}
