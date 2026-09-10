@@ -47,6 +47,7 @@ import OTablePagination from "./sub-components/OTablePagination.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTableEmpty from "./sub-components/OTableEmpty.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTableLoading from "./sub-components/OTableLoading.vue";
 import OTableError from "./sub-components/OTableError.vue";
 import { PIVOT_TABLE_TOTAL_COLUMN_WIDTH } from "@/utils/dashboard/constants";
@@ -1105,11 +1106,17 @@ useTableRowShortcuts(scrollContainerRef);
 // filters every loaded row to null (every row belongs to a hidden section)
 // left the body blank with neither a row nor the empty state, since the page
 // itself was not empty.
+// A denied fetch and a genuinely empty list are both zero rows; only the caller
+// knows which, so `forbidden` decides and takes precedence over the empty state.
+const showForbidden = computed(
+  () => !heldLoading.value && !!props.forbidden && displayRows.value.length === 0,
+);
 const showEmpty = computed(
   () =>
     !heldLoading.value &&
     !props.streaming &&
     !props.error &&
+    !showForbidden.value &&
     (sectionsEnabled.value ? bodyRows.value.length === 0 : displayRows.value.length === 0),
 );
 const showError = computed(() => !heldLoading.value && !!props.error);
@@ -1620,8 +1627,13 @@ defineExpose({
           </tfoot>
         </table>
 
+        <!-- ── Access Denied State ───────────────────────────── -->
+        <OTableEmpty v-if="showForbidden" :floor="!props.fillHeight" data-test="o2-table-forbidden">
+          <OEmptyState size="hero" preset="no-access" />
+        </OTableEmpty>
+
         <!-- ── Empty State ───────────────────────────────────── -->
-        <OTableEmpty v-if="showEmpty" :message="props.emptyMessage" :floor="!props.fillHeight">
+        <OTableEmpty v-else-if="showEmpty" :message="props.emptyMessage" :floor="!props.fillHeight">
           <template v-if="slots.empty" #default>
             <slot name="empty" />
           </template>

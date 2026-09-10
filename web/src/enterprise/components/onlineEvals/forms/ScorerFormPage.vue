@@ -150,7 +150,7 @@
                   <span class="bg-status-info-text h-2 w-2 shrink-0 rounded-full" />
                   <span class="text-text-secondary">
                     {{ t("onlineEvals.scorer.endpointLabel") }}
-                    <span class="font-mono">{{ providerEndpoint(selectedProvider) }}</span>
+                    <span class="font-mono">{{ resolvedEndpointOf(selectedProvider) || "—" }}</span>
                   </span>
                   <span class="text-text-secondary">·</span>
                   <span class="text-text-secondary">
@@ -690,7 +690,13 @@ import onlineEvalsService, {
   type Scorer,
   type ScorerType,
 } from "@/services/online-evals.service";
-import { dataTypeOf, defaultModelOf, entityId, valueOf } from "../utils/evalEntity";
+import {
+  dataTypeOf,
+  defaultModelOf,
+  entityId,
+  resolvedEndpointOf,
+  valueOf,
+} from "../utils/evalEntity";
 import { extractTemplateVariables, formatTemplateVariable, showError } from "../utils/evalFormat";
 import { useScorerTest } from "../composables/useScorerTest";
 import ScorerTestPanel from "./scorer/ScorerTestPanel.vue";
@@ -1222,17 +1228,6 @@ function initForm(row: Scorer | null, scorerType: ScorerType): ScorerForm {
     ...auth,
     customHeaders: readCustomHeaders(row.params?.custom_headers),
   };
-}
-
-function providerEndpoint(provider: Provider) {
-  return provider.endpoint || providerHostFallback(provider);
-}
-
-function providerHostFallback(provider: Provider) {
-  const type = String(valueOf(provider, "providerType", "provider_type") || "").toLowerCase();
-  if (type === "openai") return "api.openai.com";
-  if (type === "anthropic") return "api.anthropic.com";
-  return "—";
 }
 
 async function handleScoreConfigSelection() {

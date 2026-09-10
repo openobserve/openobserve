@@ -506,7 +506,7 @@ pub async fn zo_config(
     #[cfg(feature = "enterprise")]
     let last_usage_report_ts = last_reported_timestamp().await;
 
-    let usage_enabled = enterprise_value!(cfg.common.usage_enabled, true);
+    let usage_enabled = enterprise_value!(false, true);
 
     // max usage reporting interval can be 10 mins, because we
     // need relatively recent data for usage calculations

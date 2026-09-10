@@ -205,7 +205,9 @@
                     <span class="bg-status-info-text h-2 w-2 shrink-0 rounded-full" />
                     <span class="text-text-secondary">
                       {{ t("aiObservability.experiments.form.providerEndpointLabel") }}
-                      <span class="font-mono">{{ providerEndpoint(selectedProvider) }}</span>
+                      <span class="font-mono">{{
+                        resolvedEndpointOf(selectedProvider) || "—"
+                      }}</span>
                     </span>
                     <span class="text-text-secondary">{{ separator }}</span>
                     <span class="text-text-secondary">
@@ -491,8 +493,8 @@ import onlineEvalsService, { type Provider, type Scorer } from "@/services/onlin
 import {
   defaultModelOf,
   entityId,
+  resolvedEndpointOf,
   scorerTypeOf,
-  valueOf,
 } from "@/enterprise/components/onlineEvals/utils/evalEntity";
 import {
   createPreviewRequestGate,
@@ -712,14 +714,6 @@ function goBack() {
 // scorer form does.
 const separator = raw("·");
 const dash = raw("—");
-
-function providerEndpoint(provider: Provider) {
-  if (provider.endpoint) return provider.endpoint;
-  const type = String(valueOf(provider, "providerType", "provider_type") || "").toLowerCase();
-  if (type === "openai") return "api.openai.com";
-  if (type === "anthropic") return "api.anthropic.com";
-  return "—";
-}
 
 // A provider added in another tab should be reachable without reloading.
 async function refreshProviders() {

@@ -28,6 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :columns="columns"
         :frame="false"
         :loading="loading"
+        :forbidden="forbidden"
         row-key="id"
         pagination="client"
         :page-size="pageSize"
@@ -314,6 +315,7 @@ export default defineComponent({
     const qTableRef: any = ref(null);
     // Starts true so the skeleton shows on first render and the once-off page-restore watch below fires on the real true→false transition.
     const loading = ref(true);
+    const forbidden = ref(false);
     // The first real load lands after mount and races TanStack's own auto-reset-on-data-change, which resolves through its own deferred microtask queue — setTimeout(0) runs strictly after that queue drains, so the restored page reliably wins.
     watch(
       loading,
@@ -575,6 +577,7 @@ export default defineComponent({
 
     const loadIncidents = async () => {
       loading.value = true;
+      forbidden.value = false;
       try {
         const org = store.state.selectedOrganization.identifier;
         const limit = 1000;
@@ -590,10 +593,14 @@ export default defineComponent({
         allIncidents.value = items;
         store.dispatch("incidents/setCachedData", items);
       } catch (error: any) {
-        toast({
-          variant: "error",
-          message: t("alerts.incidents.errorLoading"),
-        });
+        forbidden.value = error?.response?.status === 403;
+        // The grouped access toast already reports a 403; a second red toast adds nothing.
+        if (!forbidden.value) {
+          toast({
+            variant: "error",
+            message: t("alerts.incidents.errorLoading"),
+          });
+        }
         console.error("Failed to load incidents:", error);
       } finally {
         loading.value = false;
@@ -861,6 +868,7 @@ export default defineComponent({
       raw,
       t,
       loading,
+      forbidden,
       allIncidents,
       visibleIncidents,
       severityStats,

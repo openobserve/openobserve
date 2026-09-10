@@ -76,6 +76,10 @@
       "action": "Ejecutar consulta",
       "actionDesc": "Cargar eventos para los filtros seleccionados"
     },
+    "noAccess": {
+      "title": "No tienes acceso",
+      "description": "Contacta con tu administrador si crees que deberías tener acceso."
+    },
     "noDashboards": {
       "title": "Crea tu primer Dashboard",
       "description": "Los Dashboards reúnen las métricas, los registros y los seguimientos en una sola vista. Crea uno para empezar.",
@@ -9857,6 +9861,8 @@
       "outputTokens": "Tokens de salida",
       "out": "Salida",
       "totalCost": "Costo total",
+      "scores": "Puntuaciones",
+      "notScoredYet": "Aún sin puntuar",
       "preview": "Vista previa",
       "input": "Entrada",
       "output": "Salida",
@@ -11171,6 +11177,10 @@
         "runSummary": "{trials} · {scorers}",
         "progress": "Progreso de la tarea",
         "scoring": "Puntuación",
+        "tasks": "Tareas",
+        "scores": "Puntuaciones",
+        "taskDistribution": "{succeeded} exitosos · {failed} fallidos · {pending} pendientes · {skipped} omitidos",
+        "scoreOutcomeDistribution": "{scored} puntuados · {failed} fallidos · {pending} pendientes · {skipped} omitidos · {unscored} sin puntuar",
         "scoringDistribution": "{success} exitosos · {failed} fallidos · {pending} pendientes · {skipped} omitidos",
         "compare": "Comparar",
         "comparePicker": {
@@ -11914,6 +11924,8 @@
       "schemaInvalidJson": "El esquema debe ser JSON válido.",
       "schemaIgnored": "Esquema · Ignorado por este proveedor",
       "schemaUnsupported": "Este proveedor no tiene un campo de salida estructurada. El esquema se conserva en esta columna, pero no se envía y el modelo responde con texto plano.",
+      "schemaApproximated": "Esquema · Aproximado por este proveedor",
+      "schemaApproximatedHelp": "Este proveedor solo admite el modo JSON, no un esquema JSON. La solicitud se envía en modo JSON con el esquema repetido en el prompt, por lo que la respuesta es JSON, pero su forma no está garantizada.",
       "outputPlaceholder": "La salida aparece aquí — pulse Ejecutar.",
       "outputNotRun": "No ejecutado",
       "retry": "Reintentar",
@@ -12017,6 +12029,12 @@
   },
   "onlineEvals": {
     "versionPrefix": "v",
+    "traceScoreChip": {
+      "reasoning": "Por qué",
+      "scoredAt": "Puntuado {time}",
+      "moreCount": "+{count} más",
+      "allScores": "Todas las puntuaciones ({count})"
+    },
     "importNameRequired": "Nombre *",
     "importNewNameRequired": "Nuevo nombre *",
     "importDataTypeRequired": "Tipo de datos *",
@@ -12287,8 +12305,10 @@
       "sectionTitle": "Proveedor",
       "nameLabel": "Nombre",
       "typeLabel": "Tipo de proveedor",
-      "endpointLabel": "Punto final",
-      "endpointPlaceholder": "URL de completions completa, p. ej. https://your-host/v1/chat/completions",
+      "endpointLabel": "URL base",
+      "endpointPlaceholder": "URL base, p. ej. https://your-host/v1",
+      "endpointHelpDefault": "Déjalo vacío para usar la URL predeterminada: {url}",
+      "endpointHelpRequired": "Obligatorio — este proveedor no tiene una URL base predeterminada.",
       "defaultModelLabel": "Modelo predeterminado",
       "availableModelsLabel": "Modelos disponibles",
       "apiKeyLabel": "Clave de API",
@@ -12297,7 +12317,6 @@
       "authSection": "Autenticación",
       "authEditNote": "Las credenciales no se pueden volver a leer. Para probar un proveedor que requiera autenticación, ingrese su clave de API.",
       "cannotRename": "No se puede renombrar después de la creación.",
-      "availableModelsHelp": "Opcional. Lista separada por comas de los modelos disponibles en este proveedor.",
       "saveError": "No se pudo guardar el proveedor",
       "nameRequired": "Provider name is required",
       "typeRequired": "Provider type is required",
@@ -12404,7 +12423,8 @@
         "nameRequired": "Name is required",
         "nameFormat": "Use lowercase letters, numbers, and underscores only",
         "minRequired": "Min is required",
-        "maxRequired": "Max is required"
+        "maxRequired": "Max is required",
+        "maxNotGreaterThanMin": "El máximo debe ser mayor que el mínimo."
       },
       "import": {
         "title": "Importar configuración de puntuación",
@@ -12975,7 +12995,7 @@
     },
     "empty": {
       "title": "Aún no hay proveedores de LLM",
-      "description": "Los proveedores de LLM almacenan los detalles de conexión (punto final y credenciales) de los modelos lingüísticos a los que llaman los evaluadores de LLM Judge. Agregue uno para comenzar a realizar evaluaciones basadas en jueces."
+      "description": "Los proveedores de LLM almacenan los detalles de conexión (URL base + credenciales) de los modelos de lenguaje a los que llaman tus jueces LLM. Añade uno para comenzar a ejecutar evaluaciones basadas en jueces."
     }
   },
   "logs": {
@@ -16072,6 +16092,12 @@
     "aiQueueDetail": "Cola",
     "aiQueueReview": "Revisión de cola",
     "aiDatasetDetail": "Conjunto de datos",
+    "aiExperimentCreate": "Nuevo experimento",
+    "aiExperimentCompare": "Comparar experimentos",
+    "aiExperimentDetail": "Experimento",
+    "aiRemoteTaskCreate": "Nueva tarea remota",
+    "aiRemoteTaskEdit": "Editar tarea remota",
+    "aiRemoteTaskDetail": "Tarea remota",
     "notFound": "404 - No encontrado",
     "createReport": "Crear reporte",
     "addCheck": "Agregar verificación",
