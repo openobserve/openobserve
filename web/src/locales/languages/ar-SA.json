@@ -76,6 +76,10 @@
       "action": "تنفيذ الاستعلام",
       "actionDesc": "تحميل الأحداث للفلاتر المحددة"
     },
+    "noAccess": {
+      "title": "لا تملك حق الوصول",
+      "description": "Contact your administrator if you believe you should have access."
+    },
     "noDashboards": {
       "title": "أنشئ لوحة القيادة الأولى لك",
       "description": "لوحات القيادة تجمع بين القياسات، والسجلات، والتتبعات في عرض واحد. قم ببناء واحدة للبدء.",

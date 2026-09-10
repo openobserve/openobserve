@@ -76,6 +76,10 @@
       "action": "Ejecutar consulta",
       "actionDesc": "Cargar eventos para los filtros seleccionados"
     },
+    "noAccess": {
+      "title": "No tienes acceso",
+      "description": "Contacta con tu administrador si crees que deberías tener acceso."
+    },
     "noDashboards": {
       "title": "Crea tu primer Dashboard",
       "description": "Los Dashboards reúnen las métricas, los registros y los seguimientos en una sola vista. Crea uno para empezar.",

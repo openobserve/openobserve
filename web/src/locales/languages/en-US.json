@@ -76,6 +76,10 @@
       "action": "Run query",
       "actionDesc": "Load events for the selected filters"
     },
+    "noAccess": {
+      "title": "You don't have access",
+      "description": "Contact your administrator if you believe you should have access."
+    },
     "noDashboards": {
       "title": "Create your first dashboard",
       "description": "Dashboards bring your metrics, logs, and traces together in one view. Build one to get started.",

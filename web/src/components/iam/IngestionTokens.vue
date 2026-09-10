@@ -57,6 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :columns="columns"
           row-key="name"
           :loading="loading"
+          :forbidden="forbidden"
           v-model:global-filter="filterQuery"
           :show-global-filter="false"
           :default-columns="false"
@@ -286,6 +287,7 @@ export default defineComponent({
 
     const tokens = ref<Token[]>([]);
     const loading = ref(false);
+    const forbidden = ref(false);
     const filterQuery = ref("");
     const showCreateForm = ref(false);
     const showRevealedDialog = ref(false);
@@ -352,17 +354,22 @@ export default defineComponent({
 
     const fetchTokens = async () => {
       loading.value = true;
+      forbidden.value = false;
       try {
         const res = await organizationsService.list_org_ingestion_tokens(
           store.state.selectedOrganization.identifier,
         );
         tokens.value = res.data.data;
       } catch (e: any) {
-        toast({
-          variant: "error",
-          message: e.response?.data?.message || t("ingestion.tokenFetchError"),
-          timeout: 5000,
-        });
+        forbidden.value = e?.response?.status === 403;
+        // The grouped access toast already reports a 403; a second red toast adds nothing.
+        if (!forbidden.value) {
+          toast({
+            variant: "error",
+            message: e.response?.data?.message || t("ingestion.tokenFetchError"),
+            timeout: 5000,
+          });
+        }
       } finally {
         loading.value = false;
       }
@@ -476,6 +483,7 @@ export default defineComponent({
       t,
       tokens,
       loading,
+      forbidden,
       filterQuery,
       columns,
       showCreateForm,
