@@ -111,12 +111,7 @@ pub async fn migrate_workflow_folders<C: ConnectionTrait>(db: &C) -> Result<(), 
                 .get(&workflow.folder_id)
                 .map(|s| s.as_str())
                 .unwrap_or(DEFAULT_FOLDER);
-            authorizer::authz::get_parent_tuple(
-                slug,
-                workflow_folders_type,
-                &object,
-                &mut tuples,
-            );
+            authorizer::authz::get_parent_tuple(slug, workflow_folders_type, &object, &mut tuples);
         }
         if !tuples.is_empty()
             && let Err(e) = authorizer::authz::update_tuples(tuples, vec![]).await

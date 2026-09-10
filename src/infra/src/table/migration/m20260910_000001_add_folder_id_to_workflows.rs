@@ -24,11 +24,11 @@
 //! rather than generated, so every node computes the same id and a re-run is
 //! idempotent.
 //!
-//! - SQLite cannot add a FOREIGN KEY to an existing table via ALTER TABLE. It
-//!   is a dev-only backend here, so the constraint is Postgres-only; the
-//!   column, the backfill and the index still apply to both.
-//! - Postgres rejects ADD CONSTRAINT if any row references a missing folder, so
-//!   the backfill must leave no unmatched value behind.
+//! - SQLite cannot add a FOREIGN KEY to an existing table via ALTER TABLE. It is a dev-only backend
+//!   here, so the constraint is Postgres-only; the column, the backfill and the index still apply
+//!   to both.
+//! - Postgres rejects ADD CONSTRAINT if any row references a missing folder, so the backfill must
+//!   leave no unmatched value behind.
 
 use sea_orm::{ConnectionTrait, Statement};
 use sea_orm_migration::prelude::*;
@@ -101,7 +101,13 @@ impl MigrationTrait for Migration {
         let backend = manager.get_database_backend();
 
         manager
-            .drop_index(Index::drop().if_exists().name(IDX_NAME).table(Workflows::Table).to_owned())
+            .drop_index(
+                Index::drop()
+                    .if_exists()
+                    .name(IDX_NAME)
+                    .table(Workflows::Table)
+                    .to_owned(),
+            )
             .await?;
 
         if backend == sea_orm::DbBackend::Postgres {

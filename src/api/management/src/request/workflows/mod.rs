@@ -40,8 +40,8 @@ use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::UserEmail;
 use search_service::{self as SearchService, query_range::get_settings_max_query_range};
 use serde::{Deserialize, Serialize};
-use utoipa::ToSchema;
 use serde_json::Value;
+use utoipa::ToSchema;
 
 use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::http::get_or_create_trace_id},
@@ -197,7 +197,10 @@ pub async fn save_workflow(
 
     // The query parameter is authoritative so one request cannot name two
     // different destinations.
-    let folder = query.get("folder").map(|s| s.as_str()).unwrap_or(DEFAULT_FOLDER);
+    let folder = query
+        .get("folder")
+        .map(|s| s.as_str())
+        .unwrap_or(DEFAULT_FOLDER);
 
     if !is_draft {
         match workflows::save_workflow(workflow, Some(folder)).await {
@@ -289,7 +292,10 @@ pub async fn list_workflows(
     };
     // Get List of allowed objects ends
 
-    let folder = query.get("folder").map(|s| s.as_str()).unwrap_or(DEFAULT_FOLDER);
+    let folder = query
+        .get("folder")
+        .map(|s| s.as_str())
+        .unwrap_or(DEFAULT_FOLDER);
 
     let workflows = match workflows::list_workflows(&org_id, permitted.clone(), Some(folder)).await
     {

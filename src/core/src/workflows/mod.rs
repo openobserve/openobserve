@@ -447,7 +447,10 @@ pub async fn move_workflows(
         }
     }
     if !missing.is_empty() {
-        return Err(anyhow::anyhow!("workflows not found: {}", missing.join(", ")));
+        return Err(anyhow::anyhow!(
+            "workflows not found: {}",
+            missing.join(", ")
+        ));
     }
 
     db::workflows::move_workflows(org_id, workflow_ids, dst_folder_slug).await?;
