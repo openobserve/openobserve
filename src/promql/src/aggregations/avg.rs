@@ -33,40 +33,61 @@ impl AggFunc for Avg {
     }
 }
 
+#[derive(Clone, Default)]
+pub(crate) struct AvgState {
+    sum: f64,
+    compensation: f64,
+    count: usize,
+}
+
 pub struct AvgAccumulate {
-    sum: HashMap<i64, (f64, f64)>,
-    count: HashMap<i64, usize>,
+    states: HashMap<i64, AvgState>,
+}
+
+impl AvgState {
+    pub(crate) fn push(&mut self, value: f64) {
+        (self.sum, self.compensation) = kahan_sum_increment(value, self.sum, self.compensation);
+        self.count += 1;
+    }
+
+    pub(crate) fn merge(&mut self, other: Self) {
+        if other.count == 0 {
+            return;
+        }
+        // Fold the other partial's sum and compensation in as two
+        // separate compensated increments: a plain `c + other_c` add
+        // rounds residuals away before the main sums get to cancel.
+        (self.sum, self.compensation) = kahan_sum_increment(other.sum, self.sum, self.compensation);
+        (self.sum, self.compensation) =
+            kahan_sum_increment(other.compensation, self.sum, self.compensation);
+        self.count += other.count;
+    }
+
+    pub(crate) fn value(&self) -> Option<f64> {
+        (self.count > 0).then(|| (self.sum + self.compensation) / self.count as f64)
+    }
 }
 
 impl AvgAccumulate {
     fn new() -> Self {
-        AvgAccumulate {
-            sum: HashMap::new(),
-            count: HashMap::new(),
+        Self {
+            states: HashMap::new(),
         }
     }
 }
 
 impl Accumulate for AvgAccumulate {
     fn accumulate(&mut self, sample: &Sample) {
-        let (sum, c) = self.sum.entry(sample.timestamp).or_insert((0.0, 0.0));
-        (*sum, *c) = kahan_sum_increment(sample.value, *sum, *c);
-        let count_entry = self.count.entry(sample.timestamp).or_insert(0);
-        *count_entry += 1;
+        self.states
+            .entry(sample.timestamp)
+            .or_default()
+            .push(sample.value);
     }
 
     fn merge(&mut self, other: Box<dyn Accumulate>) {
         let other = other.into_any().downcast::<Self>().expect("same type");
-        for (timestamp, (other_sum, other_c)) in other.sum {
-            let (sum, c) = self.sum.entry(timestamp).or_insert((0.0, 0.0));
-            // Fold the other partial's sum and compensation in as two
-            // separate compensated increments: a plain `c + other_c` add
-            // rounds residuals away before the main sums get to cancel.
-            (*sum, *c) = kahan_sum_increment(other_sum, *sum, *c);
-            (*sum, *c) = kahan_sum_increment(other_c, *sum, *c);
-        }
-        for (timestamp, count) in other.count {
-            *self.count.entry(timestamp).or_insert(0) += count;
+        for (timestamp, other) in other.states {
+            self.states.entry(timestamp).or_default().merge(other);
         }
     }
 
@@ -75,12 +96,10 @@ impl Accumulate for AvgAccumulate {
     }
 
     fn evaluate(self: Box<Self>) -> Vec<Sample> {
-        self.sum
+        self.states
             .into_iter()
-            .filter_map(|(timestamp, (sum, c))| {
-                self.count
-                    .get(&timestamp)
-                    .map(|&count| Sample::new(timestamp, (sum + c) / count as f64))
+            .filter_map(|(timestamp, state)| {
+                state.value().map(|value| Sample::new(timestamp, value))
             })
             .collect()
     }

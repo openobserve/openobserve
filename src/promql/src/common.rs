@@ -19,16 +19,8 @@ pub fn std_deviation(data: &[f64]) -> Option<f64> {
     std_variance(data).map(f64::sqrt)
 }
 
-pub fn std_deviation2(data: &[f64], mean: f64, length: i64) -> Option<f64> {
-    std_variance2(data, mean, length).map(f64::sqrt)
-}
-
 pub fn std_variance(data: &[f64]) -> Option<f64> {
     variance(data.iter().copied())
-}
-
-pub fn std_variance2(data: &[f64], mean: f64, length: i64) -> Option<f64> {
-    variance_with_mean(data.iter().copied(), mean, length)
 }
 
 pub(crate) fn variance(values: impl ExactSizeIterator<Item = f64> + Clone) -> Option<f64> {
@@ -37,7 +29,15 @@ pub(crate) fn variance(values: impl ExactSizeIterator<Item = f64> + Clone) -> Op
         return None;
     }
     let mean = values.clone().sum::<f64>() / count as f64;
-    variance_with_mean(values, mean, count)
+    Some(
+        values
+            .map(|value| {
+                let diff = mean - value;
+                diff * diff
+            })
+            .sum::<f64>()
+            / count as f64,
+    )
 }
 
 pub fn quantile(data: &[f64], quantile: f64) -> Option<f64> {
@@ -143,21 +143,6 @@ pub fn kahan_sum_increment(increment: f64, sum: f64, c: f64) -> (f64, f64) {
         (increment - updated_sum) + sum
     };
     (updated_sum, c + y)
-}
-
-fn variance_with_mean(values: impl Iterator<Item = f64>, mean: f64, count: i64) -> Option<f64> {
-    if count <= 0 {
-        return None;
-    }
-    Some(
-        values
-            .map(|value| {
-                let diff = mean - value;
-                diff * diff
-            })
-            .sum::<f64>()
-            / count as f64,
-    )
 }
 
 #[cfg(test)]
@@ -391,26 +376,6 @@ mod tests {
     }
 
     #[test]
-    fn test_std_variance2() {
-        // Test normal case
-        let data = vec![1.0, 2.0, 3.0, 4.0, 5.0];
-        let mean_val = 3.0;
-        let length = 5;
-        let result = std_variance2(&data, mean_val, length);
-        assert!(result.is_some());
-        // Variance should be 2.0 for this data
-        assert!((result.unwrap() - 2.0).abs() < 1e-10);
-
-        // Test with zero length
-        let result = std_variance2(&data, mean_val, 0);
-        assert_eq!(result, None);
-
-        // Test with negative length
-        let result = std_variance2(&data, mean_val, -1);
-        assert_eq!(result, None);
-    }
-
-    #[test]
     fn test_std_deviation() {
         // Test normal case
         let data = vec![1.0, 2.0, 3.0, 4.0, 5.0];
@@ -422,22 +387,6 @@ mod tests {
         // Test empty slice
         let data: Vec<f64> = vec![];
         let result = std_deviation(&data);
-        assert_eq!(result, None);
-    }
-
-    #[test]
-    fn test_std_deviation2() {
-        // Test normal case
-        let data = vec![1.0, 2.0, 3.0, 4.0, 5.0];
-        let mean_val = 3.0;
-        let length = 5;
-        let result = std_deviation2(&data, mean_val, length);
-        assert!(result.is_some());
-        // Standard deviation should be sqrt(2.0) for this data
-        assert!((result.unwrap() - 2.0_f64.sqrt()).abs() < 1e-10);
-
-        // Test with zero length
-        let result = std_deviation2(&data, mean_val, 0);
         assert_eq!(result, None);
     }
 

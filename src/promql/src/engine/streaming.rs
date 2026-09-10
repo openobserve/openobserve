@@ -26,10 +26,7 @@ use promql_parser::{
 
 use super::{
     Engine,
-    selector::{
-        SelectorContexts, equal_matcher_filters, get_offset_modifier, named_selector,
-        plain_selector,
-    },
+    selector::{SelectorContexts, named_selector, plain_selector},
 };
 use crate::{
     functions, micros,
@@ -284,26 +281,10 @@ impl Engine {
             return Ok(None);
         }
         let selector = named_selector(plain_selector(vs, kind)?, kind)?;
-        let table_name = selector.name.clone().unwrap();
-
-        let offset = get_offset_modifier(selector.offset.clone());
-        let start = self.ctx.start - micros(range) - offset;
-        let end = self.ctx.end - offset;
-        let mut filters = equal_matcher_filters(&selector.matchers);
-        let mut label_selector = self.label_selector.clone();
-        label_selector.extend(self.ctx.label_selector.iter().cloned());
-
+        let (start, end, offset) = self.selector_time_range(&selector, Some(range));
+        let label_selector = self.selector_labels();
         let ctxs = self
-            .ctx
-            .table_provider
-            .create_context(
-                &query_ctx.org_id,
-                &table_name,
-                (start, end),
-                selector.matchers.clone(),
-                label_selector.clone(),
-                &mut filters,
-            )
+            .create_selector_contexts(&selector, (start, end), &label_selector)
             .await?;
         let scan_matchers = match ctxs.as_slice() {
             [(_, _, _, false)] => Matchers::empty(),

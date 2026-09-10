@@ -40,7 +40,7 @@ mod stdvar;
 mod sum;
 mod topk;
 
-pub(crate) use avg::Avg;
+pub(crate) use avg::{Avg, AvgState};
 pub(crate) use bottomk::bottomk;
 pub(crate) use count::Count;
 pub(crate) use count_values::count_values;

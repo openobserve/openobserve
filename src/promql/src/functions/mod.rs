@@ -399,6 +399,25 @@ pub(crate) fn advance_sample_window<'a>(
     &samples[*start_index..*end_index]
 }
 
+fn map_samples(data: Value, operation: &str, map: impl Fn(&Sample) -> f64 + Sync) -> Result<Value> {
+    match data {
+        Value::Matrix(mut matrix) => {
+            matrix.par_iter_mut().for_each(|series| {
+                series.labels = std::mem::take(&mut series.labels).without_metric_name();
+                for sample in &mut series.samples {
+                    sample.value = map(sample);
+                }
+            });
+            Ok(Value::Matrix(matrix))
+        }
+        Value::None => Ok(Value::None),
+        _ => Err(DataFusionError::Plan(format!(
+            "Invalid input for {operation}, expected matrix but got: {:?}",
+            data.get_type()
+        ))),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

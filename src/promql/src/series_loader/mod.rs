@@ -215,29 +215,8 @@ pub(super) async fn load_samples_from_datafusion(
     fragment_hint: usize,
     query_duration: i64,
 ) -> Result<(PartitionedMetrics, HashSet<i64>)> {
-    let ctx = Arc::new(df.task_ctx());
-    let target_partitions = ctx.session_config().target_partitions();
-    let plan = df
-        .select_columns(&[TIMESTAMP_COL_NAME, HASH_LABEL, VALUE_LABEL])?
-        .create_physical_plan()
-        .await?;
-    let schema = plan.schema();
-    let plan = Arc::new(RepartitionExec::try_new(
-        plan,
-        Partitioning::Hash(
-            vec![Arc::new(Column::new_with_schema(HASH_LABEL, &schema)?)],
-            target_partitions,
-        ),
-    )?);
-
-    if config::get_config().common.print_key_sql {
-        log::info!(
-            "{}",
-            config::meta::plan::generate_plan_string(trace_id, plan.as_ref())
-        );
-    }
-
-    let streams = execute_stream_partitioned(plan, ctx)?;
+    let df = df.select_columns(&[TIMESTAMP_COL_NAME, HASH_LABEL, VALUE_LABEL])?;
+    let streams = partition_streams(trace_id, df).await?;
     let mut tasks = Vec::with_capacity(streams.len());
     for mut stream in streams {
         let hash_field_type = hash_field_type.clone();
@@ -281,17 +260,7 @@ pub(super) async fn load_samples_from_datafusion(
         tasks.push(task);
     }
 
-    let mut all_unique_timestamps = HashSet::new();
-    let mut metrics = Vec::with_capacity(tasks.len());
-    for task in tasks {
-        let (partition, timestamps) = task
-            .await
-            .map_err(|e| DataFusionError::Execution(e.to_string()))??;
-        all_unique_timestamps.extend(timestamps);
-        metrics.push(partition);
-    }
-
-    Ok((metrics, all_unique_timestamps))
+    collect_partitions(tasks).await
 }
 
 fn append_batch_samples(
@@ -397,30 +366,10 @@ async fn load_exemplars_from_datafusion(
     df: DataFrame,
     collect_timestamps: bool,
 ) -> Result<(PartitionedMetrics, HashSet<i64>)> {
-    let ctx = Arc::new(df.task_ctx());
-    let target_partitions = ctx.session_config().target_partitions();
-    let plan = df
+    let df = df
         .filter(col(EXEMPLARS_LABEL).is_not_null())?
-        .select_columns(&[HASH_LABEL, EXEMPLARS_LABEL])?
-        .create_physical_plan()
-        .await?;
-    let schema = plan.schema();
-    let plan = Arc::new(RepartitionExec::try_new(
-        plan,
-        Partitioning::Hash(
-            vec![Arc::new(Column::new_with_schema(HASH_LABEL, &schema)?)],
-            target_partitions,
-        ),
-    )?);
-
-    if config::get_config().common.print_key_sql {
-        log::info!(
-            "{}",
-            config::meta::plan::generate_plan_string(trace_id, plan.as_ref())
-        );
-    }
-
-    let streams = execute_stream_partitioned(plan, ctx)?;
+        .select_columns(&[HASH_LABEL, EXEMPLARS_LABEL])?;
+    let streams = partition_streams(trace_id, df).await?;
     let mut tasks = Vec::with_capacity(streams.len());
     for mut stream in streams {
         let hash_field_type = hash_field_type.clone();
@@ -471,6 +420,36 @@ async fn load_exemplars_from_datafusion(
         tasks.push(task);
     }
 
+    collect_partitions(tasks).await
+}
+
+async fn partition_streams(
+    trace_id: &str,
+    df: DataFrame,
+) -> Result<Vec<datafusion::physical_plan::SendableRecordBatchStream>> {
+    let ctx = Arc::new(df.task_ctx());
+    let target_partitions = ctx.session_config().target_partitions();
+    let plan = df.create_physical_plan().await?;
+    let schema = plan.schema();
+    let plan = Arc::new(RepartitionExec::try_new(
+        plan,
+        Partitioning::Hash(
+            vec![Arc::new(Column::new_with_schema(HASH_LABEL, &schema)?)],
+            target_partitions,
+        ),
+    )?);
+
+    if config::get_config().common.print_key_sql {
+        log::info!(
+            "{}",
+            config::meta::plan::generate_plan_string(trace_id, plan.as_ref())
+        );
+    }
+
+    execute_stream_partitioned(plan, ctx)
+}
+
+async fn collect_partitions(tasks: Vec<TokioResult>) -> Result<(PartitionedMetrics, HashSet<i64>)> {
     let mut all_unique_timestamps = HashSet::new();
     let mut metrics = Vec::with_capacity(tasks.len());
     for task in tasks {
