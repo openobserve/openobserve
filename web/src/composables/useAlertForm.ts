@@ -2082,7 +2082,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   // operator who meant it is entitled to keep it.
   const showSaveWarnings = (res: { data?: { warnings?: string[] } }) => {
     for (const message of res?.data?.warnings ?? []) {
-      toast({ variant: "warning", message, timeout: 10000 });
+      toast({ variant: "warning", message: raw(message), timeout: 10000 });
     }
   };
 
