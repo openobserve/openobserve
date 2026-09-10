@@ -1,6 +1,9 @@
 // Copyright 2026 OpenObserve Inc.
 
-export const K8S_VIEWER_PERMS = ["AllowList", "AllowGet"] as const;
+export const K8S_VIEWER_STREAM_ROW_PERMS = ["AllowGet"] as const;
+
+// ALLOW_GET on `metrics:_all_<org>` reads as a wildcard over every metric stream in the org, so the type node gets LIST only.
+export const K8S_VIEWER_TYPE_NODE_PERMS = ["AllowList"] as const;
 
 // Kept BY HAND — k8sViewerPreset.spec.ts fails when a curated pack adds or drops a stream.
 export const K8S_VIEWER_STREAMS: string[] = [

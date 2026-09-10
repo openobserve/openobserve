@@ -3,7 +3,11 @@
 import { describe, it, expect } from "vitest";
 
 import { curatedPacks } from "@/views/Infrastructure/curated/packs";
-import { K8S_VIEWER_PERMS, K8S_VIEWER_STREAMS } from "./k8sViewerPreset";
+import {
+  K8S_VIEWER_STREAM_ROW_PERMS,
+  K8S_VIEWER_STREAMS,
+  K8S_VIEWER_TYPE_NODE_PERMS,
+} from "./k8sViewerPreset";
 
 // Mirrors RE_OFGA_UNSUPPORTED_NAME in src/config/src/utils/str.rs:45-46.
 const OFGA_UNSUPPORTED = /[:#?\s'"%&]/;
@@ -57,9 +61,15 @@ describe("K8S_VIEWER_STREAMS", () => {
   });
 });
 
-describe("K8S_VIEWER_PERMS", () => {
-  it("is the two read permissions EditRole offers a stream row", () => {
-    expect(K8S_VIEWER_PERMS).toEqual(["AllowList", "AllowGet"]);
+describe("preset permission sets", () => {
+  it("grants a curated stream row read access only", () => {
+    expect(K8S_VIEWER_STREAM_ROW_PERMS).toEqual(["AllowGet"]);
+  });
+
+  // ALLOW_GET on `metrics:_all_<org>` reads as a wildcard over every metric stream in the org, which would make the per-stream grants decorative.
+  it("grants the metrics type node LIST and never GET", () => {
+    expect(K8S_VIEWER_TYPE_NODE_PERMS).toEqual(["AllowList"]);
+    expect(K8S_VIEWER_TYPE_NODE_PERMS).not.toContain("AllowGet");
   });
 });
 
