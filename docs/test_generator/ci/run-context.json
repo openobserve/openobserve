@@ -1,0 +1,23 @@
+{
+  "feature_slug": "ai-observability-monitor-oss",
+  "feature_title": "AI Observability Monitor (LLM Insights + Sessions) in OSS",
+  "area": "Traces",
+  "edition": "both",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "aiObservabilityMonitor.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Traces/aiObservabilityMonitor.spec.js",
+  "playwright_group": "Traces",
+  "source_files": [
+    "web/src/composables/router.ts",
+    "web/src/layouts/MainLayout.vue",
+    "web/src/enterprise/views/AIObservability/Index.vue",
+    "web/src/enterprise/views/AIObservability/SessionsPage.vue",
+    "web/src/plugins/traces/LLMInsightsDashboard.vue",
+    "web/src/plugins/traces/SessionsList.vue",
+    "web/src/enterprise/components/AIObservability/AiScopeBar.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": ""
+}

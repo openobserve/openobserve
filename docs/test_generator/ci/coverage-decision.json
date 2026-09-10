@@ -1,0 +1,12 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/Traces/aiObservabilityMonitor.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Traces/traceGenAiParts.spec.js",
+    "tests/ui-testing/pages/tracesPages/genAiTracesIngestionPage.js",
+    "tests/ui-testing/pages/tracesPages/tracesPage.js"
+  ],
+  "needs_registration": true,
+  "registration_location": "tests/ui-testing/ci-matrix/ci_matrix.json -> Traces.run_files (append \"aiObservabilityMonitor.spec.js\")",
+  "rationale": "No existing spec or page object covers the AI Observability Monitor (LLM Insights + Sessions) module. traceGenAiParts.spec.js only covers GenAI v5 'parts' rendering inside the trace detail sidebar, not the /web/ai Monitor pages. The genAiTracesIngestionPage.ingestGenAiSpan helper is reusable for seeding LLM streams (and only needs a small extension to set status.code=2 for error-span sessions). This is a distinct feature area under the existing Traces shard, so a new spec file is warranted. Folder (Traces) + area tag (@traces) match the feature."
+}

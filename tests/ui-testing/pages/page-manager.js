@@ -112,6 +112,7 @@ import { SDRPatternsPage } from "./sdrPages/sdrPatternsPage.js";
 import { SDRVerificationPage } from "./sdrPages/sdrVerificationPage.js";
 import { SDRTracesIngestionPage } from "./sdrPages/sdrTracesIngestionPage.js";
 import { GenAiTracesIngestionPage } from "./tracesPages/genAiTracesIngestionPage.js";
+import { AiObservabilityPage } from "./tracesPages/aiObservabilityPage.js";
 import { StreamAssociationPage } from "./streamsPages/streamAssociationPage.js";
 import { StreamsFormValidationPage } from "./streamsPages/streamsFormValidationPage.js";
 
@@ -241,6 +242,7 @@ class PageManager {
     this.sdrVerificationPage = new SDRVerificationPage(page);
     this.sdrTracesPage = new SDRTracesIngestionPage(page);
     this.genAiTracesIngestionPage = new GenAiTracesIngestionPage(page);
+    this.aiObservabilityPage = new AiObservabilityPage(page);
     this.streamAssociationPage = new StreamAssociationPage(page);
     this.streamsFormValidation = new StreamsFormValidationPage(page);
 

@@ -1,0 +1,11 @@
+[
+  { "title": "should show the AI Observability nav entry after Traces and open LLM Insights", "action": "new", "verifies": "the OSS left rail renders the AI Observability entry and it lands on the LLM Insights page" },
+  { "title": "should render the LLM Insights KPI strip and recent-errors table for an ingested LLM stream", "action": "new", "verifies": "a seeded LLM stream produces the 5-card KPI strip plus the recent-errors table without the empty/error states" },
+  { "title": "should list an ingested conversation in Sessions and open its detail on row click", "action": "new", "verifies": "a shared-conversation-id conversation appears as a session row and row click opens the session detail page" },
+  { "title": "should show only Monitor rail items and hide the Agent toggle on OSS", "action": "new", "verifies": "the section rail renders only LLM Insights + Sessions and every enterprise rail item and the Agent toggle are absent" },
+  { "title": "should show the consolidated empty state when no LLM streams exist", "action": "new", "verifies": "with no LLM streams the LLM Insights dashboard resolves to the consolidated empty state" },
+  { "title": "should show the no-streams empty state in Sessions when no LLM streams exist", "action": "new", "verifies": "with no LLM streams the Sessions list resolves to the no-streams empty state" },
+  { "title": "should re-fetch LLM Insights on refresh without entering the error state", "action": "new", "verifies": "the page-level refresh re-runs the KPI fetch and stays out of the error state" },
+  { "title": "should show an error status badge on a session whose turn span is ERROR", "action": "new", "verifies": "a conversation containing an ERROR (status.code=2) turn renders an error status badge on the session row" },
+  { "title": "should show multiple turns in the session detail for a multi-turn conversation", "action": "new", "verifies": "a conversation with multiple distinct traceIds surfaces more than one turn row in session detail" }
+]

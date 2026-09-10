@@ -1,0 +1,15 @@
+web/src/composables/router.spec.ts
+web/src/composables/router.ts
+web/src/enterprise/components/AIObservability/AiScopeBar.spec.ts
+web/src/enterprise/components/AIObservability/AiScopeBar.vue
+web/src/enterprise/views/AIObservability/Index.spec.ts
+web/src/enterprise/views/AIObservability/Index.vue
+web/src/enterprise/views/AIObservability/SessionsPage.spec.ts
+web/src/enterprise/views/AIObservability/SessionsPage.vue
+web/src/layouts/MainLayout.spec.ts
+web/src/layouts/MainLayout.vue
+web/src/plugins/traces/LLMInsightsDashboard.spec.ts
+web/src/plugins/traces/LLMInsightsDashboard.versionCompare.spec.ts
+web/src/plugins/traces/LLMInsightsDashboard.vue
+web/src/plugins/traces/SessionsList.spec.ts
+web/src/plugins/traces/SessionsList.vue

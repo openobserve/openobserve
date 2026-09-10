@@ -1,0 +1,1236 @@
+===== COMPLETE LIST OF CHANGED FILES (15 files) =====
+# AUTHORITATIVE: this list is never truncated. The diff BODY below may be trimmed for
+# very large PRs, so decide WHICH files/areas changed (e.g. web/src frontend) from THIS list.
+web/src/composables/router.spec.ts
+web/src/composables/router.ts
+web/src/enterprise/components/AIObservability/AiScopeBar.spec.ts
+web/src/enterprise/components/AIObservability/AiScopeBar.vue
+web/src/enterprise/views/AIObservability/Index.spec.ts
+web/src/enterprise/views/AIObservability/Index.vue
+web/src/enterprise/views/AIObservability/SessionsPage.spec.ts
+web/src/enterprise/views/AIObservability/SessionsPage.vue
+web/src/layouts/MainLayout.spec.ts
+web/src/layouts/MainLayout.vue
+web/src/plugins/traces/LLMInsightsDashboard.spec.ts
+web/src/plugins/traces/LLMInsightsDashboard.versionCompare.spec.ts
+web/src/plugins/traces/LLMInsightsDashboard.vue
+web/src/plugins/traces/SessionsList.spec.ts
+web/src/plugins/traces/SessionsList.vue
+===== END CHANGED FILES =====
+
+diff --git a/web/src/composables/router.spec.ts b/web/src/composables/router.spec.ts
+index 68fac51299f..33cbe735663 100644
+--- a/web/src/composables/router.spec.ts
++++ b/web/src/composables/router.spec.ts
+@@ -24,6 +24,11 @@ vi.mock("./shared/useIngestionRoutes", () => ({
+   default: vi.fn(() => mockIngestionRoutes),
+ }));
+ 
++const mockRouteGuard = vi.fn();
++vi.mock("@/utils/zincutils", () => ({
++  routeGuard: (...args: unknown[]) => mockRouteGuard(...args),
++}));
++
+ import useOSRoutes from "./router";
+ import useIngestionRoutes from "./shared/useIngestionRoutes";
+ 
+@@ -37,14 +42,14 @@ describe("useOSRoutes", () => {
+     expect(parentRoutes).toEqual([]);
+   });
+ 
+-  it("homeChildRoutes contains the routes returned by useIngestionRoutes", () => {
++  it("homeChildRoutes starts with the routes returned by useIngestionRoutes", () => {
+     const { homeChildRoutes } = useOSRoutes();
+-    expect(homeChildRoutes).toEqual(mockIngestionRoutes);
++    expect(homeChildRoutes.slice(0, mockIngestionRoutes.length)).toEqual(mockIngestionRoutes);
+   });
+ 
+-  it("homeChildRoutes has the same length as the mocked ingestion routes", () => {
++  it("homeChildRoutes has one extra route (the AI Monitor shell) beyond the mocked ingestion routes", () => {
+     const { homeChildRoutes } = useOSRoutes();
+-    expect(homeChildRoutes).toHaveLength(mockIngestionRoutes.length);
++    expect(homeChildRoutes).toHaveLength(mockIngestionRoutes.length + 1);
+   });
+ 
+   it("homeChildRoutes items match the mocked route objects", () => {
+@@ -53,6 +58,51 @@ describe("useOSRoutes", () => {
+     expect(homeChildRoutes[1]).toEqual({ path: "ingestion/logs", name: "ingestLogs" });
+   });
+ 
++  it("registers the AI Monitor shell with only LLM Insights + Sessions as children", () => {
++    const { homeChildRoutes } = useOSRoutes();
++    const aiRoute = homeChildRoutes.find((r: any) => r.path === "ai");
++    expect(aiRoute).toBeDefined();
++    expect(aiRoute.children.map((c: any) => c.name)).toEqual([
++      "aiObservability",
++      "aiLLMInsights",
++      "aiSessions",
++    ]);
++  });
++
++  describe("the AI Monitor shell route", () => {
++    function aiRoute() {
++      const { homeChildRoutes } = useOSRoutes();
++      return homeChildRoutes.find((r: any) => r.path === "ai") as any;
++    }
++
++    it("redirects the bare /ai path to aiLLMInsights, same as the enterprise tree", () => {
++      const redirectChild = aiRoute().children[0];
++      expect(redirectChild).toEqual({
++        path: "",
++        name: "aiObservability",
++        redirect: { name: "aiLLMInsights" },
++      });
++    });
++
++    it("calls routeGuard from the shell's own beforeEnter, same as every other OSS route", () => {
++      const next = vi.fn();
++      aiRoute().beforeEnter({ path: "/ai" }, {}, next);
++      expect(mockRouteGuard).toHaveBeenCalledWith({ path: "/ai" }, {}, next);
++    });
++
++    it("lazy-loads each child's component rather than importing it eagerly", () => {
++      const [, llmInsightsChild, sessionsChild] = aiRoute().children;
++      expect(typeof llmInsightsChild.component).toBe("function");
++      expect(typeof sessionsChild.component).toBe("function");
++    });
++
++    it("gives llm-insights and sessions their own distinct paths under /ai", () => {
++      const [, llmInsightsChild, sessionsChild] = aiRoute().children;
++      expect(llmInsightsChild.path).toBe("llm-insights");
++      expect(sessionsChild.path).toBe("sessions");
++    });
++  });
++
+   it("useIngestionRoutes is called when the composable is invoked", () => {
+     useOSRoutes();
+     expect(useIngestionRoutes).toHaveBeenCalledTimes(1);
+@@ -91,6 +141,6 @@ describe("useOSRoutes", () => {
+     vi.mocked(useIngestionRoutes).mockReturnValueOnce(customRoutes as any);
+ 
+     const { homeChildRoutes } = useOSRoutes();
+-    expect(homeChildRoutes).toEqual(customRoutes);
++    expect(homeChildRoutes.slice(0, customRoutes.length)).toEqual(customRoutes);
+   });
+ });
+diff --git a/web/src/composables/router.ts b/web/src/composables/router.ts
+index 1b1895208e3..2d0d61059e4 100644
+--- a/web/src/composables/router.ts
++++ b/web/src/composables/router.ts
+@@ -13,12 +13,58 @@
+ // You should have received a copy of the GNU Affero General Public License
+ // along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ 
++import { routeGuard } from "@/utils/zincutils";
+ import useIngestionRoutes from "./shared/useIngestionRoutes";
+ 
+ const useOSRoutes = () => {
+   const parentRoutes: any = [];
+ 
+-  const homeChildRoutes: any[] = [...useIngestionRoutes()];
++  // LLM Insights + Sessions are the "Monitor" half of the AI Observability
++  // module — ships in OSS under the SAME /ai shell and route names
++  // (aiLLMInsights/aiSessions) the enterprise build uses, just with a
++  // trimmed-down set of children. The rest of that module (Evaluate/
++  // Experiment/Annotate, plus Monitor's Agent Graph/Agent Behavior) stays
++  // enterprise/cloud-only, registered separately under
++  // web/src/enterprise/composables/router.ts, which OSS builds never import.
++  // AIObservabilityShell (Index.vue) hides everything but the Monitor group
++  // when `config.isEnterprise`/`isCloud` are both false, so its rail only ever
++  // links to routes that actually exist here. Reuses the SAME page components
++  // the enterprise routes render — they already resolve their own
++  // enterprise-only bits (detail route name, Agent mode, Version Compare) via
++  // `config.isEnterprise` internally.
++  const homeChildRoutes: any[] = [
++    ...useIngestionRoutes(),
++    {
++      path: "ai",
++      component: () => import("@/enterprise/views/AIObservability/Index.vue"),
++      beforeEnter(to: any, from: any, next: any) {
++        routeGuard(to, from, next);
++      },
++      meta: {
++        titleKey: "routeTitles.aiMonitoring",
++        keepAlive: false,
++      },
++      children: [
++        {
++          path: "",
++          name: "aiObservability",
++          redirect: { name: "aiLLMInsights" },
++        },
++        {
++          path: "llm-insights",
++          name: "aiLLMInsights",
++          component: () => import("@/enterprise/views/AIObservability/LLMInsightsPage.vue"),
++          meta: { titleKey: "aiObservability.nav.llmInsights", keepAlive: false },
++        },
++        {
++          path: "sessions",
++          name: "aiSessions",
++          component: () => import("@/enterprise/views/AIObservability/SessionsPage.vue"),
++          meta: { titleKey: "aiObservability.nav.sessions", keepAlive: false },
++        },
++      ],
++    },
++  ];
+ 
+   return { parentRoutes, homeChildRoutes };
+ };
+diff --git a/web/src/enterprise/components/AIObservability/AiScopeBar.spec.ts b/web/src/enterprise/components/AIObservability/AiScopeBar.spec.ts
+index f99f216425f..0a090d1d7a6 100644
+--- a/web/src/enterprise/components/AIObservability/AiScopeBar.spec.ts
++++ b/web/src/enterprise/components/AIObservability/AiScopeBar.spec.ts
+@@ -195,4 +195,49 @@ describe("AiScopeBar", () => {
+     expect(w.emitted("update:selectedEnv")).toBeTruthy();
+     expect(w.emitted("update:selectedEnv")![0]).toEqual(["prod"]);
+   });
++
++  describe("showAgentToggle (OSS callers hide Agent mode entirely)", () => {
++    it("defaults to true — the toggle renders when the prop is omitted (no regression for existing callers)", () => {
++      const w = mountBar();
++      expect(w.find('[data-test="sessions-list-filter-mode"]').exists()).toBe(true);
++    });
++
++    it("hides the toggle group when showAgentToggle is false", () => {
++      const w = mountBar({ showAgentToggle: false });
++      expect(w.find('[data-test="sessions-list-filter-mode"]').exists()).toBe(false);
++    });
++
++    it("pins the bar to stream mode when showAgentToggle is false, even if filterMode is (defensively) 'agent'", () => {
++      const w = mountBar({
++        showAgentToggle: false,
++        filterMode: "agent",
++        activeStream: "s1",
++        selectedStreamCount: 5,
++      });
++      expect(w.find('[data-test="sessions-list-stream-selector"]').exists()).toBe(true);
++      expect(w.find(".agent-scope-cascade").exists()).toBe(false);
++      // The count only means something alongside a way to act on it — with no
++      // toggle to reach Agent mode, it's hidden too, not just the cascade.
++      expect(w.find('[data-test="sessions-list-stream-count"]').exists()).toBe(false);
++    });
++
++    it("never renders the agent cascade when showAgentToggle is false, regardless of filterMode", () => {
++      // activeStream must be truthy here — with it blank, a pre-existing (and
++      // unrelated) quirk lower in the template falls through to the cascade
++      // branch regardless of mode; showAgentToggle isn't what that's testing.
++      const wStream = mountBar({
++        showAgentToggle: false,
++        filterMode: "stream",
++        activeStream: "s1",
++      });
++      const wAgent = mountBar({ showAgentToggle: false, filterMode: "agent", activeStream: "s1" });
++      expect(wStream.find(".agent-scope-cascade").exists()).toBe(false);
++      expect(wAgent.find(".agent-scope-cascade").exists()).toBe(false);
++    });
++
++    it("does not show the stream-count badge when showAgentToggle is false and no stream is active yet", () => {
++      const w = mountBar({ showAgentToggle: false, filterMode: "agent", activeStream: "" });
++      expect(w.find('[data-test="sessions-list-stream-count"]').exists()).toBe(false);
++    });
++  });
+ });
+diff --git a/web/src/enterprise/components/AIObservability/AiScopeBar.vue b/web/src/enterprise/components/AIObservability/AiScopeBar.vue
+index 7b0c1dd6994..19dd147eba3 100644
+--- a/web/src/enterprise/components/AIObservability/AiScopeBar.vue
++++ b/web/src/enterprise/components/AIObservability/AiScopeBar.vue
+@@ -44,6 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+     :class="{ 'border-border-default border-b': bordered }"
+   >
+     <OToggleGroup
++      v-if="showAgentToggle"
+       :model-value="filterMode"
+       type="single"
+       :data-test="`${dataTest}-filter-mode`"
+@@ -53,35 +54,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+       <OToggleGroupItem value="stream" size="sm">{{ labels.stream }}</OToggleGroupItem>
+     </OToggleGroup>
+ 
+-    <div
+-      v-if="filterMode === 'stream'"
+-      :data-test="`${dataTest}-stream-selector`"
+-      class="w-64 flex-shrink-0"
+-    >
+-      <OSkeleton type="text" v-if="showStreamSkeleton && !streamsLoaded" class="h-8.5 w-full" />
+-      <OSelect
+-        v-else
+-        v-model="activeStreamModel"
+-        :label="raw(labels.streamLabel)"
+-        label-position="inside"
+-        :options="streamSelectOptions"
+-        labelKey="label"
+-        valueKey="value"
+-        :option-tooltip="streamOptionTooltip"
+-        class="rounded-default w-full"
+-        @update:model-value="onStreamChange"
++    <!-- Explicit if/else on isStreamMode itself (not on a descendant's own
++         condition) — StreamAgentCountBadge below has its own separate
++         visibility rule, and chaining v-else off of IT rather than off this
++         stream/agent branch previously meant hiding the badge alone could
++         silently fall through to rendering the agent cascade. -->
++    <template v-if="isStreamMode">
++      <div :data-test="`${dataTest}-stream-selector`" class="w-64 flex-shrink-0">
++        <OSkeleton type="text" v-if="showStreamSkeleton && !streamsLoaded" class="h-8.5 w-full" />
++        <OSelect
++          v-else
++          v-model="activeStreamModel"
++          :label="raw(labels.streamLabel)"
++          label-position="inside"
++          :options="streamSelectOptions"
++          labelKey="label"
++          valueKey="value"
++          :option-tooltip="streamOptionTooltip"
++          class="rounded-default w-full"
++          @update:model-value="onStreamChange"
++        />
++      </div>
++      <!-- Meaningless without Agent mode to switch into — an OSS caller with
++           showAgentToggle false has nowhere to act on this count, so it would
++           just be an unexplained number next to the stream picker. -->
++      <StreamAgentCountBadge
++        v-if="showAgentToggle && activeStreamModel"
++        :count="selectedStreamCount"
++        :data-test="countDataTest ?? `${dataTest}-stream-count`"
+       />
+-    </div>
+-    <StreamAgentCountBadge
+-      v-if="filterMode === 'stream' && activeStreamModel"
+-      :count="selectedStreamCount"
+-      :data-test="countDataTest ?? `${dataTest}-stream-count`"
+-    />
++    </template>
+ 
+     <!-- Agent mode: the Env→Agent→Version cascade replaces the single grouped
+          agent dropdown. The three dropdowns themselves SHOW the current
+          selection, so the separate env/version scope badges are gone. The
+-         skeleton gate is preserved (LLM gates until agents load). -->
++         skeleton gate is preserved (LLM gates until agents load). Never
++         reachable when `showAgentToggle` is false — there's no control to
++         switch into it and the parent never sets filterMode to "agent". -->
+     <template v-else>
+       <OSkeleton type="text" v-if="agentSkeleton && !agentsLoaded" class="h-8.5 w-44" />
+       <AgentScopeCascade
+@@ -186,6 +195,12 @@ const props = withDefaults(
+         false because its topology is version-agnostic. Forwarded to
+         AgentScopeCascade. */
+     showVersion?: boolean;
++    /** Show the Stream/Agent toggle at all. Agent mode depends on the
++        enterprise-only agent-mapping API, so an OSS caller passes false to
++        hide the toggle entirely and pin the bar to Stream mode — there is no
++        control left to switch into Agent, and the parent must never set
++        filterMode to "agent" in that case. Defaults to true. */
++    showAgentToggle?: boolean;
+   }>(),
+   {
+     allAgents: false,
+@@ -195,9 +210,14 @@ const props = withDefaults(
+     bordered: true,
+     streamOptionTooltip: false,
+     showVersion: true,
++    showAgentToggle: true,
+   },
+ );
+ 
++// Stream mode is also the only mode once the Agent toggle is hidden — there's
++// no way for filterMode to legitimately be "agent" then.
++const isStreamMode = computed(() => props.filterMode === "stream" || !props.showAgentToggle);
++
+ const emit = defineEmits<{
+   (e: "update:filterMode", value: FilterMode): void;
+   (e: "update:activeStream", value: string): void;
+diff --git a/web/src/enterprise/views/AIObservability/Index.spec.ts b/web/src/enterprise/views/AIObservability/Index.spec.ts
+new file mode 100644
+index 00000000000..039e438f833
+--- /dev/null
++++ b/web/src/enterprise/views/AIObservability/Index.spec.ts
+@@ -0,0 +1,144 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// This program is free software: you can redistribute it and/or modify
++// it under the terms of the GNU Affero General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU Affero General Public License for more details.
++//
++// You should have received a copy of the GNU Affero General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++//
++// @vitest-environment jsdom
++//
++// AIObservabilityShell's rail is the single source of truth for what's
++// reachable in the AI Observability module. On a true OSS build, only
++// LLM Insights + Sessions have OSS-registered routes (see
++// web/src/composables/router.ts) — everything else here (Agent Graph/
++// Behavior, Discovery, Queues, Datasets, Playground, Experiments, Remote
++// Tasks, Quality, Eval Jobs, Scorers, Score Configs) would 404, so the rail
++// must not link to any of it.
++
++import { describe, it, expect, vi, beforeEach } from "vitest";
++import { mount } from "@vue/test-utils";
++
++let mockIsEnterprise = "false";
++let mockIsCloud = "false";
++vi.mock("@/aws-exports", () => ({
++  default: {
++    get isEnterprise() {
++      return mockIsEnterprise;
++    },
++    get isCloud() {
++      return mockIsCloud;
++    },
++  },
++}));
++
++vi.mock("vuex", () => ({
++  useStore: () => ({ state: { selectedOrganization: { identifier: "test-org" } } }),
++}));
++
++vi.mock("vue-router", () => ({
++  useRoute: () => ({ name: "aiLLMInsights", query: {} }),
++}));
++
++vi.mock("@/types/i18n", async (importOriginal) => {
++  const actual: any = await importOriginal();
++  return { ...actual, useI18nTyped: () => ({ t: (key: string) => key }) };
++});
++
++const SectionRailStub = {
++  props: ["groups", "activeKey", "title", "icon", "collapsible", "collapsed"],
++  template: '<div class="section-rail" />',
++};
++
++async function mountShell() {
++  const Index = (await import("./Index.vue")).default;
++  return mount(Index, {
++    global: {
++      stubs: {
++        SectionRail: SectionRailStub,
++        OPageLayout: { template: '<div><slot name="sidebar" /><slot /></div>' },
++      },
++    },
++  });
++}
++
++function groupsOf(wrapper: Awaited<ReturnType<typeof mountShell>>) {
++  return wrapper.findComponent(SectionRailStub).props("groups") as Array<{
++    label: string;
++    items: Array<{ key: string; to: unknown }>;
++  }>;
++}
++
++beforeEach(() => {
++  vi.resetModules();
++  mockIsEnterprise = "false";
++  mockIsCloud = "false";
++});
++
++describe("AIObservabilityShell — OSS builds (isEnterprise and isCloud both false)", () => {
++  it("shows only the Monitor group, with exactly LLM Insights + Sessions", async () => {
++    const wrapper = await mountShell();
++    const groups = groupsOf(wrapper);
++    expect(groups).toHaveLength(1);
++    expect(groups[0].label).toBe("aiObservability.sections.monitor");
++    expect(groups[0].items.map((i) => i.key)).toEqual(["llmInsights", "sessions"]);
++  });
++
++  it("does not link to Agent Graph or Agent Behavior — Monitor's other two items have no OSS route", async () => {
++    const wrapper = await mountShell();
++    const keys = groupsOf(wrapper).flatMap((g) => g.items.map((i) => i.key));
++    expect(keys).not.toContain("agentGraph");
++    expect(keys).not.toContain("agentBehavior");
++  });
++
++  it("hides Annotate, Experiment, and Evaluate entirely", async () => {
++    const wrapper = await mountShell();
++    const labels = groupsOf(wrapper).map((g) => g.label);
++    expect(labels).not.toContain("aiObservability.sections.annotate");
++    expect(labels).not.toContain("aiObservability.sections.experiment");
++    expect(labels).not.toContain("aiObservability.sections.evaluate");
++  });
++
++  it("points LLM Insights and Sessions at the same route names the enterprise rail uses", async () => {
++    const wrapper = await mountShell();
++    const items = groupsOf(wrapper)[0].items;
++    expect((items[0].to as any).name).toBe("aiLLMInsights");
++    expect((items[1].to as any).name).toBe("aiSessions");
++  });
++});
++
++describe("AIObservabilityShell — enterprise/cloud builds", () => {
++  it("shows every group and every item when isEnterprise is true", async () => {
++    mockIsEnterprise = "true";
++    const wrapper = await mountShell();
++    const groups = groupsOf(wrapper);
++    expect(groups.map((g) => g.label)).toEqual([
++      "aiObservability.sections.monitor",
++      "aiObservability.sections.evaluate",
++      "aiObservability.sections.experiment",
++      "aiObservability.sections.annotate",
++    ]);
++    const monitorKeys = groups[0].items.map((i) => i.key);
++    expect(monitorKeys).toEqual(["llmInsights", "sessions", "agentGraph", "agentBehavior"]);
++  });
++
++  it("shows every group and every item when isCloud is true, even with isEnterprise false", async () => {
++    mockIsCloud = "true";
++    const wrapper = await mountShell();
++    const groups = groupsOf(wrapper);
++    expect(groups).toHaveLength(4);
++    expect(groups[0].items.map((i) => i.key)).toEqual([
++      "llmInsights",
++      "sessions",
++      "agentGraph",
++      "agentBehavior",
++    ]);
++  });
++});
+diff --git a/web/src/enterprise/views/AIObservability/Index.vue b/web/src/enterprise/views/AIObservability/Index.vue
+index c33efd47fa3..2c142b7540c 100644
+--- a/web/src/enterprise/views/AIObservability/Index.vue
++++ b/web/src/enterprise/views/AIObservability/Index.vue
+@@ -49,6 +49,7 @@ import SectionRail from "@/components/common/SectionRail.vue";
+ import type { SectionHubGroup, SectionHubItem } from "@/components/common/SectionHub.vue";
+ import { navSection } from "./navSection";
+ import type { IconName } from "@/lib/core/Icon/OIcon.icons";
++import config from "@/aws-exports";
+ 
+ /** The same mark the primary nav uses for this module, so the collapsed rail
+  *  still says which module it belongs to. */
+@@ -99,122 +100,131 @@ function evalLink(tab: EvalTab) {
+ 
+ const activeSection = computed<string>(() => navSection(route.name, route.query.tab));
+ 
++// Only Monitor's LLM Insights + Sessions have OSS-registered routes (see
++// web/src/composables/router.ts) — the rest of Monitor (Agent Graph/Behavior)
++// and every other group need the real enterprise/cloud backend, so on a true
++// OSS build the rail must not link anywhere else; it would 404.
++const OSS_AVAILABLE_KEYS = new Set(["llmInsights", "sessions"]);
++const isEnterpriseOrCloud = config.isEnterprise == "true" || config.isCloud == "true";
++
+ // Single source of truth for the rail items (groups) AND the breadcrumb
+ // switcher. Order here is the order shown in the rail.
+-const sectionItems = computed<(SectionHubItem & { group: string })[]>(() => [
+-  {
+-    key: "llmInsights",
+-    label: t("aiObservability.nav.llmInsights"),
+-    icon: "dashboard",
+-    to: { name: "aiLLMInsights", query: orgQuery.value },
+-    dataTest: "ai-secondary-nav-llm-insights",
+-    group: "Monitor",
+-  },
+-  {
+-    key: "sessions",
+-    label: t("aiObservability.nav.sessions"),
+-    icon: "forum",
+-    to: { name: "aiSessions", query: orgQuery.value },
+-    dataTest: "ai-secondary-nav-sessions",
+-    group: "Monitor",
+-  },
+-  {
+-    key: "agentGraph",
+-    label: t("aiObservability.nav.agentGraph"),
+-    icon: "hub",
+-    to: { name: "aiAgentGraph", query: orgQuery.value },
+-    dataTest: "ai-secondary-nav-agent-graph",
+-    group: "Monitor",
+-  },
+-  {
+-    key: "agentBehavior",
+-    label: t("aiObservability.nav.agentBehavior"),
+-    icon: "troubleshoot",
+-    to: { name: "aiAgentBehavior", query: orgQuery.value },
+-    dataTest: "ai-secondary-nav-agent-behavior",
+-    group: "Monitor",
+-  },
+-  {
+-    key: "discovery",
+-    label: t("aiObservability.nav.discovery"),
+-    icon: "saved-search",
+-    to: { name: "aiDiscovery", query: orgQuery.value },
+-    dataTest: "ai-secondary-nav-discovery",
+-    group: "Annotate",
+-  },
+-  {
+-    key: "queues",
+-    label: t("aiObservability.nav.queues"),
+-    icon: "fact-check",
+-    to: { name: "aiQueues", query: orgQuery.value },
+-    dataTest: "ai-secondary-nav-queues",
+-    group: "Annotate",
+-  },
+-  {
+-    key: "datasets",
+-    label: t("aiObservability.nav.datasets"),
+-    icon: "table-chart",
+-    to: { name: "aiDatasets", query: orgQuery.value },
+-    dataTest: "ai-secondary-nav-datasets",
+-    group: "Annotate",
+-  },
+-  {
+-    key: "playground",
+-    label: t("aiObservability.nav.playground"),
+-    icon: "play-circle",
+-    to: { name: "aiPlayground", query: orgQuery.value },
+-    dataTest: "ai-secondary-nav-playground",
+-    group: "Experiment",
+-  },
+-  {
+-    key: "experiments",
+-    label: t("aiObservability.nav.experiments"),
+-    icon: "science",
+-    to: { name: "aiExperiments", query: orgQuery.value },
+-    dataTest: "ai-secondary-nav-experiments",
+-    group: "Experiment",
+-  },
+-  {
+-    key: "remoteTasks",
+-    label: t("aiObservability.nav.remoteTasks"),
+-    icon: "cloud-upload",
+-    to: { name: "aiRemoteTasks", query: orgQuery.value },
+-    dataTest: "ai-secondary-nav-remote-tasks",
+-    group: "Experiment",
+-  },
+-  {
+-    key: "quality",
+-    label: t("aiObservability.nav.quality"),
+-    icon: "star-rate",
+-    to: evalLink("quality"),
+-    dataTest: "ai-secondary-nav-quality",
+-    group: "Evaluate",
+-  },
+-  {
+-    key: "jobs",
+-    label: t("aiObservability.nav.evalJobs"),
+-    icon: "event",
+-    to: evalLink("jobs"),
+-    dataTest: "ai-secondary-nav-eval-jobs",
+-    group: "Evaluate",
+-  },
+-  {
+-    key: "scorers",
+-    label: t("aiObservability.nav.scorers"),
+-    icon: "rule",
+-    to: evalLink("scorers"),
+-    dataTest: "ai-secondary-nav-scorers",
+-    group: "Evaluate",
+-  },
+-  {
+-    key: "scoreConfigs",
+-    label: t("aiObservability.nav.scoreConfigs"),
+-    icon: "tune",
+-    to: evalLink("scoreConfigs"),
+-    dataTest: "ai-secondary-nav-score-configs",
+-    group: "Evaluate",
+-  },
+-]);
++const sectionItems = computed<(SectionHubItem & { group: string })[]>(() =>
++  [
++    {
++      key: "llmInsights",
++      label: t("aiObservability.nav.llmInsights"),
++      icon: "dashboard",
++      to: { name: "aiLLMInsights", query: orgQuery.value },
++      dataTest: "ai-secondary-nav-llm-insights",
++      group: "Monitor",
++    },
++    {
++      key: "sessions",
++      label: t("aiObservability.nav.sessions"),
++      icon: "forum",
++      to: { name: "aiSessions", query: orgQuery.value },
++      dataTest: "ai-secondary-nav-sessions",
++      group: "Monitor",
++    },
++    {
++      key: "agentGraph",
++      label: t("aiObservability.nav.agentGraph"),
++      icon: "hub",
++      to: { name: "aiAgentGraph", query: orgQuery.value },
++      dataTest: "ai-secondary-nav-agent-graph",
++      group: "Monitor",
++    },
++    {
++      key: "agentBehavior",
++      label: t("aiObservability.nav.agentBehavior"),
++      icon: "troubleshoot",
++      to: { name: "aiAgentBehavior", query: orgQuery.value },
++      dataTest: "ai-secondary-nav-agent-behavior",
++      group: "Monitor",
++    },
++    {
++      key: "discovery",
++      label: t("aiObservability.nav.discovery"),
++      icon: "saved-search",
++      to: { name: "aiDiscovery", query: orgQuery.value },
++      dataTest: "ai-secondary-nav-discovery",
++      group: "Annotate",
++    },
++    {
++      key: "queues",
++      label: t("aiObservability.nav.queues"),
++      icon: "fact-check",
++      to: { name: "aiQueues", query: orgQuery.value },
++      dataTest: "ai-secondary-nav-queues",
++      group: "Annotate",
++    },
++    {
++      key: "datasets",
++      label: t("aiObservability.nav.datasets"),
++      icon: "table-chart",
++      to: { name: "aiDatasets", query: orgQuery.value },
++      dataTest: "ai-secondary-nav-datasets",
++      group: "Annotate",
++    },
++    {
++      key: "playground",
++      label: t("aiObservability.nav.playground"),
++      icon: "play-circle",
++      to: { name: "aiPlayground", query: orgQuery.value },
++      dataTest: "ai-secondary-nav-playground",
++      group: "Experiment",
++    },
++    {
++      key: "experiments",
++      label: t("aiObservability.nav.experiments"),
++      icon: "science",
++      to: { name: "aiExperiments", query: orgQuery.value },
++      dataTest: "ai-secondary-nav-experiments",
++      group: "Experiment",
++    },
++    {
++      key: "remoteTasks",
++      label: t("aiObservability.nav.remoteTasks"),
++      icon: "cloud-upload",
++      to: { name: "aiRemoteTasks", query: orgQuery.value },
++      dataTest: "ai-secondary-nav-remote-tasks",
++      group: "Experiment",
++    },
++    {
++      key: "quality",
++      label: t("aiObservability.nav.quality"),
++      icon: "star-rate",
++      to: evalLink("quality"),
++      dataTest: "ai-secondary-nav-quality",
++      group: "Evaluate",
++    },
++    {
++      key: "jobs",
++      label: t("aiObservability.nav.evalJobs"),
++      icon: "event",
++      to: evalLink("jobs"),
++      dataTest: "ai-secondary-nav-eval-jobs",
++      group: "Evaluate",
++    },
++    {
++      key: "scorers",
++      label: t("aiObservability.nav.scorers"),
++      icon: "rule",
++      to: evalLink("scorers"),
++      dataTest: "ai-secondary-nav-scorers",
++      group: "Evaluate",
++    },
++    {
++      key: "scoreConfigs",
++      label: t("aiObservability.nav.scoreConfigs"),
++      icon: "tune",
++      to: evalLink("scoreConfigs"),
++      dataTest: "ai-secondary-nav-score-configs",
++      group: "Evaluate",
++    },
++  ].filter((item) => isEnterpriseOrCloud || OSS_AVAILABLE_KEYS.has(item.key)),
++);
+ 
+ const activeSectionItem = computed(() =>
+   sectionItems.value.find((i) => i.key === activeSection.value),
+diff --git a/web/src/enterprise/views/AIObservability/SessionsPage.spec.ts b/web/src/enterprise/views/AIObservability/SessionsPage.spec.ts
+new file mode 100644
+index 00000000000..fe8e4f2ee6e
+--- /dev/null
++++ b/web/src/enterprise/views/AIObservability/SessionsPage.spec.ts
+@@ -0,0 +1,120 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// This program is free software: you can redistribute it and/or modify
++// it under the terms of the GNU Affero General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU Affero General Public License for more details.
++//
++// You should have received a copy of the GNU Affero General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++//
++// @vitest-environment jsdom
++//
++// This same page renders at both /ai/sessions (enterprise/cloud — the detail
++// route "aiSessionDetails" exists there) and /sessions (OSS — only the plain
++// "sessionDetails" route exists). detailRouteName must resolve to whichever
++// one the CURRENT build actually registered, or a session row would push to a
++// route name vue-router has never heard of.
++
++import { describe, it, expect, vi, beforeEach } from "vitest";
++import { mount } from "@vue/test-utils";
++
++let mockIsEnterprise = "false";
++let mockIsCloud = "false";
++vi.mock("@/aws-exports", () => ({
++  default: {
++    get isEnterprise() {
++      return mockIsEnterprise;
++    },
++    get isCloud() {
++      return mockIsCloud;
++    },
++  },
++}));
++
++vi.mock("@/types/i18n", async (importOriginal) => {
++  const actual: any = await importOriginal();
++  return { ...actual, useI18nTyped: () => ({ t: (key: string) => key }) };
++});
++
++vi.mock("@/enterprise/components/AIObservability/AiPageShell.vue", () => ({
++  default: {
++    name: "AiPageShell",
++    template: '<div class="ai-page-shell"><slot /></div>',
++  },
++}));
++
++vi.mock("@/enterprise/composables/useAiDateController", () => ({
++  useAiDateController: () => ({
++    dateState: { value: { valueType: "relative", relativeTimePeriod: "15m" } },
++    timeRange: { value: { startTime: 100, endTime: 200 } },
++    applyRelative: vi.fn(),
++    onDateChange: vi.fn(),
++    writeToUrl: vi.fn(),
++    mountResolve: vi.fn(),
++    DEFAULT_RELATIVE: "15m",
++  }),
++}));
++
++vi.mock("@/enterprise/composables/useChildRefresh", () => ({
++  useChildRefresh: () => ({
++    lastRunAt: { value: null },
++    isLoading: { value: false },
++    refresh: vi.fn(),
++  }),
++}));
++
++const SessionsListStub = {
++  name: "SessionsList",
++  props: ["streamName", "startTime", "endTime", "detailRouteName"],
++  template: '<div class="sessions-list" />',
++};
++vi.mock("@/plugins/traces/SessionsList.vue", () => ({ default: SessionsListStub }));
++
++async function mountPage() {
++  vi.resetModules();
++  const SessionsPage = (await import("./SessionsPage.vue")).default;
++  return mount(SessionsPage);
++}
++
++beforeEach(() => {
++  mockIsEnterprise = "false";
++  mockIsCloud = "false";
++});
++
++describe("SessionsPage — detailRouteName resolves to the route the current build actually registers", () => {
++  it("resolves to sessionDetails on a true OSS build (isEnterprise and isCloud both false)", async () => {
++    const wrapper = await mountPage();
++    expect(wrapper.findComponent(SessionsListStub).props("detailRouteName")).toBe("sessionDetails");
++  });
++
++  it("resolves to aiSessionDetails when isEnterprise is true", async () => {
++    mockIsEnterprise = "true";
++    const wrapper = await mountPage();
++    expect(wrapper.findComponent(SessionsListStub).props("detailRouteName")).toBe(
++      "aiSessionDetails",
++    );
++  });
++
++  it("resolves to aiSessionDetails when isCloud is true, even with isEnterprise false", async () => {
++    mockIsCloud = "true";
++    const wrapper = await mountPage();
++    expect(wrapper.findComponent(SessionsListStub).props("detailRouteName")).toBe(
++      "aiSessionDetails",
++    );
++  });
++
++  it("resolves to aiSessionDetails when both isEnterprise and isCloud are true", async () => {
++    mockIsEnterprise = "true";
++    mockIsCloud = "true";
++    const wrapper = await mountPage();
++    expect(wrapper.findComponent(SessionsListStub).props("detailRouteName")).toBe(
++      "aiSessionDetails",
++    );
++  });
++});
+diff --git a/web/src/enterprise/views/AIObservability/SessionsPage.vue b/web/src/enterprise/views/AIObservability/SessionsPage.vue
+index 0e54ac871e2..d7514cb46d1 100644
+--- a/web/src/enterprise/views/AIObservability/SessionsPage.vue
++++ b/web/src/enterprise/views/AIObservability/SessionsPage.vue
+@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+       :stream-name="streamName"
+       :start-time="timeRange.startTime"
+       :end-time="timeRange.endTime"
+-      detail-route-name="aiSessionDetails"
++      :detail-route-name="detailRouteName"
+       class="min-h-0 flex-1"
+     />
+   </AiPageShell>
+@@ -44,11 +44,19 @@ import AiPageShell from "@/enterprise/components/AIObservability/AiPageShell.vue
+ import SessionsList from "@/plugins/traces/SessionsList.vue";
+ import { useAiDateController } from "@/enterprise/composables/useAiDateController";
+ import { useChildRefresh } from "@/enterprise/composables/useChildRefresh";
++import config from "@/aws-exports";
+ 
+ defineOptions({ name: "AISessionsPage" });
+ 
+ const { t } = useI18nTyped();
+ 
++// This same page renders at both /ai/sessions (enterprise/cloud) and /sessions
++// (OSS) — the detail route only exists under the name each build actually
++// registers it under. Matches the exact build check router/index.ts uses to
++// pick userCloudRoutes() (which registers aiSessionDetails) vs useOSRoutes().
++const detailRouteName =
++  config.isEnterprise == "true" || config.isCloud == "true" ? "aiSessionDetails" : "sessionDetails";
++
+ // Shared with LLM Insights + Quality — see useAiDateRange.ts. Sessions syncs its
+ // date to the URL (urlSync:true) so deep-links reproduce the exact view.
+ const {
+diff --git a/web/src/layouts/MainLayout.spec.ts b/web/src/layouts/MainLayout.spec.ts
+index ebb158b3e4b..13980dbc7a8 100644
+--- a/web/src/layouts/MainLayout.spec.ts
++++ b/web/src/layouts/MainLayout.spec.ts
+@@ -2002,3 +2002,48 @@ describe("MainLayout Methods and Functions", () => {
+     });
+   });
+ });
++
++// The AI Observability nav entry's visibility formula, pinned as a pure
++// predicate (mirroring this file's own style for computed-property logic
++// elsewhere): `isOnlineEvalsEnabled.value || isOssBuild`, where
++// `isOnlineEvalsEnabled = (isEnterprise || isCloud) && online_evals_enabled`
++// and `isOssBuild = !(isEnterprise || isCloud)`. A true OSS build always
++// shows the menu (Monitor ships there with no backend flag); enterprise/cloud
++// still gate the FULL module behind the online_evals_enabled flag as before.
++describe("MainLayout — AI Observability menu visibility (isAiObservabilityMenuVisible)", () => {
++  function isAiObservabilityMenuVisible(
++    isEnterprise: "true" | "false",
++    isCloud: "true" | "false",
++    onlineEvalsEnabled: boolean,
++  ): boolean {
++    const isEnterpriseOrCloud = isEnterprise === "true" || isCloud === "true";
++    const isOnlineEvalsEnabled = isEnterpriseOrCloud && onlineEvalsEnabled;
++    const isOssBuild = !isEnterpriseOrCloud;
++    return isOnlineEvalsEnabled || isOssBuild;
++  }
++
++  it("shows the menu on a true OSS build regardless of the online_evals_enabled flag", () => {
++    expect(isAiObservabilityMenuVisible("false", "false", false)).toBe(true);
++    expect(isAiObservabilityMenuVisible("false", "false", true)).toBe(true);
++  });
++
++  it("hides the menu on an enterprise build when online_evals_enabled is false", () => {
++    expect(isAiObservabilityMenuVisible("true", "false", false)).toBe(false);
++  });
++
++  it("shows the menu on an enterprise build only once online_evals_enabled is true", () => {
++    expect(isAiObservabilityMenuVisible("true", "false", true)).toBe(true);
++  });
++
++  it("hides the menu on a cloud build when online_evals_enabled is false", () => {
++    expect(isAiObservabilityMenuVisible("false", "true", false)).toBe(false);
++  });
++
++  it("shows the menu on a cloud build once online_evals_enabled is true", () => {
++    expect(isAiObservabilityMenuVisible("false", "true", true)).toBe(true);
++  });
++
++  it("shows the menu when both isEnterprise and isCloud are true and the flag is on", () => {
++    expect(isAiObservabilityMenuVisible("true", "true", true)).toBe(true);
++  });
++});
+diff --git a/web/src/layouts/MainLayout.vue b/web/src/layouts/MainLayout.vue
+index 6e4c4e7440d..a808f7713f6 100644
+--- a/web/src/layouts/MainLayout.vue
++++ b/web/src/layouts/MainLayout.vue
+@@ -377,6 +377,14 @@ export default defineComponent({
+       );
+     });
+ 
++    // The AI Observability menu entry itself ships on true OSS builds too —
++    // Monitor (LLM Insights + Sessions) needs no backend flag, unlike the rest
++    // of the module. AIObservabilityShell (Index.vue) shows only the Monitor
++    // group there; Evaluate/Experiment/Annotate/Agent Graph/Agent Behavior stay
++    // behind `isOnlineEvalsEnabled` as before.
++    const isOssBuild = !(config.isEnterprise == "true" || config.isCloud == "true");
++    const isAiObservabilityMenuVisible = computed(() => isOnlineEvalsEnabled.value || isOssBuild);
++
+     // Backend `/config` flag `synthetics_enabled` — `ZO_SYNTHETICS_ENABLED`, and
+     // no longer an enterprise build check: synthetics ships in OSS, and only the
+     // private-agent path behind it is enterprise. Reactive so the menu picks it
+@@ -700,7 +708,7 @@ export default defineComponent({
+         (link: any) => link.name === "aiObservability",
+       );
+ 
+-      if (isOnlineEvalsEnabled.value) {
++      if (isAiObservabilityMenuVisible.value) {
+         if (existingIndex !== -1) return;
+         const tracesIndex = linksList.value.findIndex((link: any) => link.name === "traces");
+         const insertAt = tracesIndex === -1 ? linksList.value.length : tracesIndex + 1;
+@@ -717,7 +725,7 @@ export default defineComponent({
+ 
+     // If `/config` resolves after this component mounted (or if the flag
+     // ever flips at runtime), keep the menu in sync.
+-    watch(isOnlineEvalsEnabled, () => updateAIObservabilityMenu(), { immediate: false });
++    watch(isAiObservabilityMenuVisible, () => updateAIObservabilityMenu(), { immediate: false });
+ 
+     const updateSyntheticMenu = () => {
+       const existingIndex = linksList.value.findIndex((l: any) => l.name === "synthetics");
+diff --git a/web/src/plugins/traces/LLMInsightsDashboard.spec.ts b/web/src/plugins/traces/LLMInsightsDashboard.spec.ts
+index ac32ac866de..deed5bbe3d1 100644
+--- a/web/src/plugins/traces/LLMInsightsDashboard.spec.ts
++++ b/web/src/plugins/traces/LLMInsightsDashboard.spec.ts
+@@ -117,6 +117,7 @@ vi.mock("vuex", async (importOriginal) => {
+ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+ import { mount, flushPromises } from "@vue/test-utils";
+ import LLMInsightsDashboard from "./LLMInsightsDashboard.vue";
++import config from "@/aws-exports";
+ // The KPI cache is a module singleton (survives remounts in the app); clear it
+ // between tests so a warmed entry from one mount doesn't suppress the fetch in
+ // the next.
+@@ -507,3 +508,29 @@ describe("LLMInsightsDashboard — onViewTrace", () => {
+     expect(mockRouterPush).not.toHaveBeenCalled();
+   });
+ });
++
++describe("LLMInsightsDashboard — OSS builds (neither isEnterprise nor isCloud is 'true')", () => {
++  const originalIsEnterprise = config.isEnterprise;
++  const originalIsCloud = config.isCloud;
++
++  afterEach(() => {
++    config.isEnterprise = originalIsEnterprise;
++    config.isCloud = originalIsCloud;
++  });
++
++  it("hides the Stream/Agent toggle and the Compare entry — both need the enterprise-only agent-mapping API", async () => {
++    config.isEnterprise = "false";
++    const wrapper = mountDashboard();
++    await flushPromises();
++    expect(wrapper.find("[data-test='llm-insights-filter-mode']").exists()).toBe(false);
++    expect(wrapper.find("[data-test='llm-insights-compare-entry']").exists()).toBe(false);
++  });
++
++  it("still shows the toggle on a cloud build (isCloud true) even with isEnterprise false — cloud registers the same enterprise route/backend", async () => {
++    config.isEnterprise = "false";
++    config.isCloud = "true";
++    const wrapper = mountDashboard();
++    await flushPromises();
++    expect(wrapper.find("[data-test='llm-insights-filter-mode']").exists()).toBe(true);
++  });
++});
+diff --git a/web/src/plugins/traces/LLMInsightsDashboard.versionCompare.spec.ts b/web/src/plugins/traces/LLMInsightsDashboard.versionCompare.spec.ts
+index 5a31a8bfd91..92dbe2985fd 100644
+--- a/web/src/plugins/traces/LLMInsightsDashboard.versionCompare.spec.ts
++++ b/web/src/plugins/traces/LLMInsightsDashboard.versionCompare.spec.ts
+@@ -114,6 +114,15 @@ vi.mock("@/services/gen-ai-agent-mapping.service", () => ({
+   compareAgentVersions: (...args: any[]) => mockCompareAgentVersions(...args),
+ }));
+ 
++// Version Compare is Agent-mode-only, enterprise-only — independent of
++// whatever a developer's local .env happens to set.
++vi.mock("@/aws-exports", () => ({
++  default: {
++    isEnterprise: "true",
++    isCloud: "false",
++  },
++}));
++
+ vi.mock("vue-i18n", () => ({
+   useI18n: vi.fn(() => ({
+     t: (key: string, params?: Record<string, any>) => (params ? key + JSON.stringify(params) : key),
+diff --git a/web/src/plugins/traces/LLMInsightsDashboard.vue b/web/src/plugins/traces/LLMInsightsDashboard.vue
+index 2d205feb943..16dae7b3d8f 100644
+--- a/web/src/plugins/traces/LLMInsightsDashboard.vue
++++ b/web/src/plugins/traces/LLMInsightsDashboard.vue
+@@ -40,6 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+       data-test="llm-insights"
+       all-agents
+       agent-skeleton
++      :show-agent-toggle="isEnterpriseOrCloud"
+       :show-version="!compareMode"
+       :labels="{
+         agent: t('traces.lLMInsightsDashboard.agent'),
+@@ -63,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+              affordance when it can't apply is cleaner (ui-architect empty-affordance
+              rule). The tooltip explains the concept when the entry IS available. -->
+         <OTooltip
+-          v-if="canCompare && !compareMode"
++          v-if="isEnterpriseOrCloud && canCompare && !compareMode"
+           :content="t('traces.lLMInsightsDashboard.compareEntryHint')"
+         >
+           <OButton
+@@ -92,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+     </AiScopeBar>
+ 
+     <VersionCompareView
+-      v-if="compareMode"
++      v-if="isEnterpriseOrCloud && compareMode"
+       :version-list="compareVersionList"
+       :stream="effectiveStream"
+       :windows="versionCompare.windows.value"
+@@ -308,6 +309,7 @@ import AiScopeBar from "@/enterprise/components/AIObservability/AiScopeBar.vue";
+ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+ import VersionCompareView from "@/enterprise/components/AIObservability/VersionCompareView.vue";
+ import { useVersionCompare } from "./composables/useVersionCompare";
++import config from "@/aws-exports";
+ 
+ const { t } = useI18nTyped();
+ const { getStreams } = useStreams(t);
+@@ -371,10 +373,20 @@ const switching = ref(false);
+ // Filter mode: "stream" = view a whole stream; "agent" = view a single agent,
+ // whose source stream + trace filter both come from the agents API.
+ const MODE_LS_KEY = "llmInsights_filterMode";
++// Cloud registers the SAME enterprise route tree and backend as an enterprise
++// build (see router/index.ts's userCloudRoutes() picked for isCloud too) — only
++// a true OSS build lacks the agent-mapping API this gates. Matches the
++// predicate already used for this exact purpose in Index.vue/SessionsPage.vue.
++const isEnterpriseOrCloud = config.isEnterprise == "true" || config.isCloud == "true";
+ // Default scope is ALWAYS "agent" — the AI module is agent-centric and every AI
+ // page lands on Agent for consistency. Only an explicit `?type=stream` URL param
+ // overrides it (a stale saved preference must not silently land on Stream).
+-const filterMode = ref<"stream" | "agent">(urlType === "stream" ? "stream" : "agent");
++// Agent mode calls the enterprise-only agent-mapping API (and gates version
++// compare), so OSS is pinned to Stream regardless of the URL/localStorage —
++// there's no toggle to reach Agent from anyway.
++const filterMode = ref<"stream" | "agent">(
++  !isEnterpriseOrCloud ? "stream" : urlType === "stream" ? "stream" : "agent",
++);
+ // Agent NAME to seed the cascade with once the list loads: the URL `?agent=`
+ // deep-link first, else the persisted last selection. Resolved into
+ // selectedEnv/AgentName/Version via `selectAgentByName`, then cleared. (The URL
+diff --git a/web/src/plugins/traces/SessionsList.spec.ts b/web/src/plugins/traces/SessionsList.spec.ts
+index 74593bb50aa..594e9defd3f 100644
+--- a/web/src/plugins/traces/SessionsList.spec.ts
++++ b/web/src/plugins/traces/SessionsList.spec.ts
+@@ -56,6 +56,16 @@ vi.mock("@/composables/useStreams", () => ({
+   })),
+ }));
+ 
++// This file's default subject is Agent mode — enterprise-only — independent
++// of whatever a developer's local .env happens to set. OSS-forced-stream
++// behavior gets its own explicit tests further down, overriding this mock.
++vi.mock("@/aws-exports", () => ({
++  default: {
++    isEnterprise: "true",
++    isCloud: "false",
++  },
++}));
++
+ vi.mock("@/services/gen-ai-agent-mapping.service", () => ({
+   default: {
+     listAgents: (...args: any[]) => mockListAgents(...args),
+@@ -183,6 +193,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+ import { mount, flushPromises } from "@vue/test-utils";
+ import SessionsList from "./SessionsList.vue";
+ import AgentScopeCascade from "@/enterprise/components/AIObservability/AgentScopeCascade.vue";
++import config from "@/aws-exports";
+ 
+ const defaultProps = {
+   streamName: "test-stream",
+@@ -614,3 +625,44 @@ describe("SessionsList — row click", () => {
+     expect(emitted![0][0]).toMatchObject({ sessionId: "sess-click" });
+   });
+ });
++
++describe("SessionsList — OSS builds (neither isEnterprise nor isCloud is 'true')", () => {
++  afterEach(() => {
++    // Every other describe block in this file assumes enterprise mode (see
++    // the module-level @/aws-exports mock) — restore it so later tests aren't
++    // affected by mutating the shared mock object here.
++    config.isEnterprise = "true";
++    config.isCloud = "false";
++  });
++
++  it("hides the Stream/Agent toggle — Agent mode needs the enterprise-only agent-mapping API", async () => {
++    config.isEnterprise = "false";
++    const wrapper = await mountComponent();
++    expect(wrapper.find("[data-test='sessions-list-filter-mode']").exists()).toBe(false);
++  });
++
++  it("forces Stream mode even when the URL asks for Agent mode", async () => {
++    config.isEnterprise = "false";
++    mockRouteQuery = { type: "agent" };
++    const wrapper = await mountComponent();
++    await flushPromises();
++    // With no toggle, the stream selector is always visible.
++    expect(wrapper.find("[data-test='sessions-list-stream-selector']").exists()).toBe(true);
++    expect(wrapper.findComponent(AgentScopeCascade).exists()).toBe(false);
++  });
++
++  it("still shows the toggle on a cloud build (isCloud true) even with isEnterprise false — cloud registers the same enterprise route/backend", async () => {
++    config.isEnterprise = "false";
++    config.isCloud = "true";
++    const wrapper = await mountComponent();
++    expect(wrapper.find("[data-test='sessions-list-filter-mode']").exists()).toBe(true);
++  });
++
++  it("defaults to Agent mode on a cloud build, same as enterprise", async () => {
++    config.isEnterprise = "false";
++    config.isCloud = "true";
++    const wrapper = await mountComponent();
++    await flushPromises();
++    expect(wrapper.findComponent(AgentScopeCascade).exists()).toBe(true);
++  });
++});
+diff --git a/web/src/plugins/traces/SessionsList.vue b/web/src/plugins/traces/SessionsList.vue
+index 3121d1aa21a..5a22bf986b4 100644
+--- a/web/src/plugins/traces/SessionsList.vue
++++ b/web/src/plugins/traces/SessionsList.vue
+@@ -47,6 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+       count-data-test="sessions-stream-count"
+       all-agents
+       show-stream-skeleton
++      :show-agent-toggle="isEnterpriseOrCloud"
+       :labels="{
+         agent: t('traces.sessionsList.agent'),
+         stream: t('traces.sessionsList.stream'),
+@@ -229,6 +230,7 @@ import genAiAgentMappingService from "@/services/gen-ai-agent-mapping.service";
+ import { buildAgentSessionFilter } from "./llmAgentFilter";
+ import { splitNumberWithUnit, splitDuration } from "./llmInsightsDashboard.utils";
+ import AiScopeBar from "@/enterprise/components/AIObservability/AiScopeBar.vue";
++import config from "@/aws-exports";
+ 
+ interface Props {
+   streamName: string;
+@@ -292,10 +294,19 @@ const MODE_LS_KEY = "sessionsList_filterMode";
+ const AGENT_LS_KEY = "sessionsList_agentFilter";
+ const ENV_LS_KEY = "sessionsList_envFilter";
+ const VERSION_LS_KEY = "sessionsList_versionFilter";
++// Cloud registers the SAME enterprise route tree and backend as an enterprise
++// build (see router/index.ts's userCloudRoutes() picked for isCloud too) — only
++// a true OSS build lacks the agent-mapping API this gates. Matches the
++// predicate already used for this exact purpose in Index.vue/SessionsPage.vue.
++const isEnterpriseOrCloud = config.isEnterprise == "true" || config.isCloud == "true";
+ // Default scope is ALWAYS "agent" — every AI page lands on Agent for consistency.
+ // Only an explicit `?type=stream` URL param overrides it (a stale saved
+-// preference must not silently land on Stream).
+-const filterMode = ref<"stream" | "agent">(urlType === "stream" ? "stream" : "agent");
++// preference must not silently land on Stream). Agent mode calls the
++// enterprise-only agent-mapping API, so OSS is pinned to Stream regardless of
++// the URL/localStorage — there's no toggle to reach Agent from anyway.
++const filterMode = ref<"stream" | "agent">(
++  !isEnterpriseOrCloud ? "stream" : urlType === "stream" ? "stream" : "agent",
++);
+ // `agents` / `agentsLoaded` are module-scoped (see useSessions) so the agent
+ // picker keeps its options — and stays off its skeleton — across a remount.
+ // Env/name/version to seed the cascade with once the list is available: the

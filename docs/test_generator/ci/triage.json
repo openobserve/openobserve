@@ -1,0 +1,31 @@
+{
+  "feature_slug": "ai-observability-monitor-oss",
+  "feature_title": "AI Observability Monitor (LLM Insights + Sessions) in OSS",
+  "area": "Traces",
+  "edition": "both",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "aiObservabilityMonitor.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Traces/aiObservabilityMonitor.spec.js",
+  "playwright_group": "Traces",
+  "source_files": [
+    "web/src/composables/router.ts",
+    "web/src/layouts/MainLayout.vue",
+    "web/src/enterprise/views/AIObservability/Index.vue",
+    "web/src/enterprise/views/AIObservability/SessionsPage.vue",
+    "web/src/plugins/traces/LLMInsightsDashboard.vue",
+    "web/src/plugins/traces/SessionsList.vue",
+    "web/src/enterprise/components/AIObservability/AiScopeBar.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "The change spans both OSS and enterprise-owned paths. OSS files: web/src/composables/router.ts (new /ai shell route), web/src/layouts/MainLayout.vue (menu visibility), web/src/plugins/traces/LLMInsightsDashboard.vue and SessionsList.vue (pin to Stream mode on OSS). Enterprise files: web/src/enterprise/views/AIObservability/{Index,SessionsPage}.vue and web/src/enterprise/components/AIObservability/AiScopeBar.vue (made OSS-callable via a showAgentToggle prop and rail filtering). The feature is an OSS implementation (Monitor ships to OSS) plus an enterprise-layer adaptation, so edition is 'both'.",
+    "skip": "Not skipped. The trigger comment and feature hint are empty (no opt-out label or skip request), and the change is user-facing: it adds a new AI Observability nav entry, new /ai/llm-insights and /ai/sessions routes, and visible changes to the LLM Insights dashboard and Sessions list on OSS builds.",
+    "e2e": "E2E is warranted. This is a new user-facing UI flow: the AI Observability menu now appears in OSS builds, a new /ai shell route renders with an LLM Insights + Sessions rail, the LLM Insights dashboard hides the Stream/Agent toggle and Compare entry, and the Sessions list is pinned to Stream mode. These are UI behaviors a user can exercise and verify.",
+    "area": "Traces. The bulk of the interactive UI changes live under web/src/plugins/traces/ (LLMInsightsDashboard.vue, SessionsList.vue), and the AI Observability Monitor is trace/LLM-trace observability. No dedicated AIObservability area exists in the test tree; the existing 'Traces' folder is the closest fit for where the new spec should land.",
+    "group": "Traces. The 'Traces' shard group (actual_folder 'Traces') in the ci-matrix is the existing shard whose run_files cover trace/LLM-trace observability specs, so the new AI Observability Monitor spec joins it. The OSS ci_matrix.json is not present in this enterprise checkout; 'Traces' is present in ci_matrix.ent.json and ci_matrix_cloud.json as the matching existing group.",
+    "existing_tests": "No E2E specs in the diff. The changed files are all Vitest unit tests (web/src/**/*.spec.ts) and Vue source — none under tests/ui-testing/playwright-tests/, so there is no existing Playwright E2E coverage to extend."
+  }
+}
