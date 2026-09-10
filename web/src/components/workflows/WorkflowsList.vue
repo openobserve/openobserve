@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </template>
 
-      <div class="min-h-0 flex-1 overflow-hidden">
+      <div class="h-full min-h-0 overflow-hidden">
         <div class="card-container h-full">
           <OTable
             ref="oTableRef"
@@ -183,6 +183,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <OTooltip side="bottom" :content="t('workflow.edit')" />
                 </OButton>
+                <OButton
+                  :data-test="`workflow-list-${row.name}-move`"
+                  variant="ghost"
+                  size="icon-sm"
+                  icon-left="drive-file-move"
+                  :title="t('workflow.moveToFolder')"
+                  @click.stop="openMoveDialog(row)"
+                >
+                  <OTooltip side="bottom" :content="t('workflow.moveToFolder')" />
+                </OButton>
                 <ODropdown align="end">
                   <template #trigger>
                     <OButton
@@ -193,13 +203,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @click.stop
                     />
                   </template>
-                  <ODropdownItem
-                    :data-test="`workflow-list-${row.name}-move`"
-                    @select="openMoveDialog(row)"
-                  >
-                    <template #icon-left><OIcon size="sm" name="folder" /></template>
-                    {{ t("workflow.moveToFolder") }}
-                  </ODropdownItem>
                   <ODropdownItem
                     :data-test="`workflow-list-${row.name}-delete`"
                     variant="destructive"
@@ -432,7 +435,7 @@ const columns = computed(() => [
     header: t("workflow.actions"),
     sortable: false,
     isAction: true,
-    meta: { align: "center", cellClass: "actions-column", actionCount: 4 },
+    meta: { align: "center", cellClass: "actions-column", actionCount: 5 },
   },
 ]);
 const otableColumns = computed(() => columns.value);
