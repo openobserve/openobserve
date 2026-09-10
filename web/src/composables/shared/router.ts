@@ -915,6 +915,7 @@ const useRoutes = () => {
       },
     },
     {
+      // Correlation engine is enterprise/cloud-only: bounce to Alerts on OSS — mirrors anomaly/alert-sources guards.
       path: "alerts/import-semantic-groups",
       name: "importSemanticGroups",
       component: () => import("@/components/alerts/ImportSemanticGroups.vue"),
@@ -922,6 +923,12 @@ const useRoutes = () => {
         titleKey: "correlation.importSemanticGroups.title",
       },
       beforeEnter(to: any, from: any, next: any) {
+        const store = (window as any).store;
+        const isOss = store?.state?.zoConfig?.build_type === "opensource";
+        if (isOss || (config.isEnterprise !== "true" && config.isCloud !== "true")) {
+          next({ name: "alertList", query: { org_identifier: to.query.org_identifier } });
+          return;
+        }
         routeGuard(to, from, next);
       },
     },
