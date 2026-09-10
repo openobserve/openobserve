@@ -213,6 +213,7 @@ import OFieldLabel from "@/lib/lists/FieldList/OFieldLabel.vue";
 import OFieldRow from "@/lib/lists/FieldList/OFieldRow.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import { b64EncodeUnicode } from "@/utils/zincutils";
+import { escapeSingleQuotes } from "@/utils/queryUtils";
 import { copyToClipboard } from "@/utils/clipboard";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 
@@ -654,8 +655,8 @@ const buildExpression = (fieldName: string, v: string, action: string) =>
       ? `${fieldName} IS NULL`
       : `${fieldName} IS NOT NULL`
     : action === "include"
-      ? `${fieldName}='${v}'`
-      : `${fieldName}!='${v}'`;
+      ? `${fieldName}='${escapeSingleQuotes(v)}'`
+      : `${fieldName}!='${escapeSingleQuotes(v)}'`;
 
 const handleAddSearchTerm = (fieldName: string, value: string, action: string) => {
   addSearchTerm(buildExpression(fieldName, value, action));
