@@ -299,12 +299,16 @@ import {
   DBM_VIEWER_STREAMS,
   DBM_VIEWER_TYPE_NODE_PERMS,
 } from "./dbmViewerPreset";
+import {
+  K8S_VIEWER_STREAM_ROW_PERMS,
+  K8S_VIEWER_STREAMS,
+  K8S_VIEWER_TYPE_NODE_PERMS,
+} from "./k8sViewerPreset";
 
 // db_monitoring is checked as a plain GET (never LIST), and has no child
 // entities for a wildcard relation to reach — unlike the `metrics` type node,
 // AllowGet on it grants nothing beyond the module itself.
 const DBM_MODULE_PERMS = ["AllowList", "AllowGet"] as const;
-import { K8S_VIEWER_PERMS, K8S_VIEWER_STREAMS } from "./k8sViewerPreset";
 
 const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 
@@ -1015,11 +1019,7 @@ const reportDbmViewerSeeding = (matched: number, total: number) => {
   );
 };
 
-// Seed the read permissions of K8S_VIEWER_PERMS that a metric stream row
-// actually exposes (a leaf stream hides AllowList, so only AllowGet lands) on the
-// curated Kubernetes/host streams. Stream rows are lazily loaded CHILDREN of the
-// `stream` resource, so both the `stream` node and its `metrics` child must be
-// expanded (which fetches the org's streams) before any row exists to tick.
+// Stream rows are lazily loaded CHILDREN of the `stream` resource, so both the `stream` node and its `metrics` child must be expanded (which fetches the org's streams) before any row exists to tick.
 const seedK8sViewerPreset = async () => {
   const streamResource = resourceMapper.value["stream"];
   if (!streamResource) return;
@@ -1039,11 +1039,13 @@ const seedK8sViewerPreset = async () => {
   const curated = new Set(K8S_VIEWER_STREAMS);
   const matched = rows.filter((row: Entity) => curated.has(row.name));
   const changes = matched.flatMap((row: Entity) =>
-    collectVisibleReadGrants(row, K8S_VIEWER_PERMS),
+    collectVisibleReadGrants(row, K8S_VIEWER_STREAM_ROW_PERMS),
   );
 
-  // GET /{org}/streams is checked against `metrics:_all_<org>`, never the per-stream objects, and FGA's LIST relation does not accept ALLOW_GET — without this the curated pages cannot load their stream list at all.
-  if (matched.length) changes.push(...collectVisibleReadGrants(metricsEntity, K8S_VIEWER_PERMS));
+  // GET /{org}/streams is checked against `metrics:_all_<org>`, never the per-stream objects, and FGA's LIST relation does not accept ALLOW_GET; ALLOW_GET here would instead wildcard every metric stream in the org, so the type node is LIST-only.
+  if (matched.length) {
+    changes.push(...collectVisibleReadGrants(metricsEntity, K8S_VIEWER_TYPE_NODE_PERMS));
+  }
 
   if (changes.length) {
     handlePermissionBatchChange(changes);
