@@ -172,7 +172,7 @@ describe("ConnectDataSourcePopup", () => {
       expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("true");
       expect(segment.track).toHaveBeenCalledWith(
         "onboarding_prompt_shown",
-        expect.objectContaining({ org_id: "default" }),
+        expect.objectContaining({ org_id: "default", user_id: USER_EMAIL }),
       );
     });
 
@@ -277,7 +277,7 @@ describe("ConnectDataSourcePopup", () => {
 
       expect(segment.track).toHaveBeenCalledWith(
         "onboarding_prompt_connect_clicked",
-        expect.objectContaining({ org_id: "default" }),
+        expect.objectContaining({ org_id: "default", user_id: USER_EMAIL }),
       );
       expect(routerSpy).toHaveBeenCalledWith({
         name: "ingestion",
@@ -293,7 +293,7 @@ describe("ConnectDataSourcePopup", () => {
 
       expect(segment.track).toHaveBeenCalledWith(
         "onboarding_prompt_dismissed",
-        expect.objectContaining({ org_id: "default" }),
+        expect.objectContaining({ org_id: "default", user_id: USER_EMAIL }),
       );
       expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("false");
     });
