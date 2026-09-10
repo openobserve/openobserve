@@ -1,0 +1,18 @@
+===== COMPLETE LIST OF CHANGED FILES (1 files) =====
+# AUTHORITATIVE: this list is never truncated. The diff BODY below may be trimmed for
+# very large PRs, so decide WHICH files/areas changed (e.g. web/src frontend) from THIS list.
+web/src/components/dashboards/addPanel/QueryTypeSelector.vue
+===== END CHANGED FILES =====
+
+diff --git a/web/src/components/dashboards/addPanel/QueryTypeSelector.vue b/web/src/components/dashboards/addPanel/QueryTypeSelector.vue
+index d18c9e87bb3..7034a45f5b8 100644
+--- a/web/src/components/dashboards/addPanel/QueryTypeSelector.vue
++++ b/web/src/components/dashboards/addPanel/QueryTypeSelector.vue
+@@ -130,6 +130,7 @@ export default defineComponent({
+       if (dashboardPanelData.data.type == "custom_chart") {
+         // For custom_chart, check the actual query type and customQuery flag
+         selectedButtonType.value = "custom";
++        await nextTick();
+         ignoreSelectedButtonTypeUpdate.value = false;
+         return;
+       }

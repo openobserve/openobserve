@@ -1,0 +1,32 @@
+[
+  {
+    "title": "fresh panel defaults to SQL + Builder with PromQL absent on a logs stream",
+    "action": "new",
+    "verifies": "a brand-new add-panel starts SQL + Builder selected with the PromQL toggle absent and Custom present but unselected"
+  },
+  {
+    "title": "selecting the metrics stream type reveals PromQL and auto-selects it on a fresh panel",
+    "action": "new",
+    "verifies": "the PromQL toggle appears only for a metrics stream type and is auto-selected without a confirmation dialog"
+  },
+  {
+    "title": "Builder to Custom switches immediately with no dialog and mounts the query editor",
+    "action": "new",
+    "verifies": "the Builder to Custom transition is immediate (never prompts) and reveals the Monaco query editor"
+  },
+  {
+    "title": "Custom to Builder with a written query prompts; Cancel preserves, OK commits",
+    "action": "new",
+    "verifies": "Custom to Builder with a non-empty query opens the confirmation dialog, Cancel preserves Custom + query, OK commits Builder"
+  },
+  {
+    "title": "Custom to Builder with an empty query switches immediately with no dialog",
+    "action": "new",
+    "verifies": "Custom to Builder with an empty query skips the confirmation dialog and switches immediately"
+  },
+  {
+    "title": "switching PromQL custom back to SQL clears the query with no dialog",
+    "action": "new",
+    "verifies": "the destructive SQL/PromQL query-type switch clears the custom query and never prompts a confirmation dialog"
+  }
+]

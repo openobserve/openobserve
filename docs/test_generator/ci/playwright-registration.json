@@ -1,0 +1,6 @@
+{
+  "group": "Dashboards-Core",
+  "spec_filename": "dashboard-query-type-selector.spec.js",
+  "create_group": false,
+  "browser": "chrome"
+}

@@ -1,0 +1,25 @@
+{
+  "feature_slug": "dashboard-query-type-selector",
+  "feature_title": "Dashboard Add Panel Query Type Selector",
+  "area": "Dashboards",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "dashboard-query-type-selector.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Dashboards/dashboard-query-type-selector.spec.js",
+  "playwright_group": "Dashboards-Core",
+  "source_files": [
+    "web/src/components/dashboards/addPanel/QueryTypeSelector.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "The only changed file is web/src/components/dashboards/addPanel/QueryTypeSelector.vue, a Vue frontend component under web/src. No enterprise-owned paths (enterprise/, o2_enterprise/, src/enterprise/) or enterprise keyword markers (cipher/SSO/SAML/RBAC/SDR/etc.) are present, so this is an open-source change.",
+    "skip": "No skip marker is present: trigger_comment.txt and feature_hint.txt are empty and no tests-added label was passed. The change is a user-facing frontend component in web/src (not docs/CI/comment-only), so it is not skipped.",
+    "e2e": "The change alters a user-facing interaction in the dashboard add-panel QueryTypeSelector: it adds an await nextTick() before resetting ignoreSelectedButtonTypeUpdate for custom_chart, fixing a race in query-type selection state. This is a UI-flow behavior change that warrants E2E verification of the query type selector interaction.",
+    "area": "The changed file lives under web/src/components/dashboards/addPanel, and the sibling Playwright specs for dashboard panel/query-type selection live under tests/ui-testing/playwright-tests/Dashboards (e.g. dashboardtype.spec.js, custom-charts.spec.js), so the Dashboards area is the correct home.",
+    "group": "Dashboards-Core is the closest matrix shard: its actual_folder is Dashboards and it already contains dashboardtype.spec.js, which covers dashboard/panel type selection — the same surface as the query type selector.",
+    "existing_tests": "No E2E specs in the diff — the only changed file is the QueryTypeSelector.vue component; no files under tests/ui-testing/playwright-tests/ are modified."
+  }
+}

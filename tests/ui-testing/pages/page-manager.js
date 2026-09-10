@@ -12,6 +12,7 @@ import DashboardVariablesScoped from "./dashboardPages/dashboard-variables-scope
 import ChartTypeSelector from "./dashboardPages/dashboard-chart";
 import DashboardSqlAutocomplete from "./dashboardPages/dashboard-sql-autocomplete";
 import DashboardPromQLEditor from "./dashboardPages/dashboard-promql-editor";
+import DashboardQueryTypeSelector from "./dashboardPages/dashboard-query-type-selector";
 import DashboardMultiSQL from "./dashboardPages/dashboard-multi-sql";
 import DashboardMaxQueryRange from "./dashboardPages/dashboard-max-query-range";
 import DashboardDrilldownPage from "./dashboardPages/dashboard-drilldown";
@@ -143,6 +144,7 @@ class PageManager {
     this.chartTypeSelector = new ChartTypeSelector(page);
     this.dashboardSqlAutocomplete = new DashboardSqlAutocomplete(page);
     this.dashboardPromQLEditor = new DashboardPromQLEditor(page);
+    this.queryTypeSelector = new DashboardQueryTypeSelector(page);
     this.dashboardMultiSQL = new DashboardMultiSQL(page);
     this.dashboardMaxQueryRange = new DashboardMaxQueryRange(page);
     this.dashboardDrilldown = new DashboardDrilldownPage(page);
