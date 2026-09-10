@@ -184,21 +184,15 @@ impl Engine {
             .selector_load_data_owned(&selector, Some(range), ctxs)
             .await?;
 
-        let values = match data.get_range_values() {
+        let mut values = match data.get_range_values() {
             Some(v) => v,
             None => return Ok(vec![]),
         };
 
         let start = std::time::Instant::now();
-        let mut values = values
-            .into_par_iter()
-            .map(|rv| RangeValue {
-                labels: rv.labels,
-                samples: rv.samples,
-                exemplars: rv.exemplars,
-                time_window: Some(TimeWindow::new(range)),
-            })
-            .collect::<Vec<_>>();
+        values.par_iter_mut().for_each(|rv| {
+            rv.time_window = Some(TimeWindow::new(range));
+        });
 
         log::info!(
             "[trace_id: {}] [PromQL Timing] eval_matrix_selector() processing took: {:?}",

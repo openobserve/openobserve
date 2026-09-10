@@ -53,10 +53,7 @@ impl Accumulate for MinAccumulate {
     fn merge(&mut self, other: Box<dyn Accumulate>) {
         let other = other.into_any().downcast::<Self>().expect("same type");
         for (timestamp, value) in other.min {
-            let entry = self.min.entry(timestamp).or_insert(f64::INFINITY);
-            if value < *entry {
-                *entry = value;
-            }
+            self.accumulate(&Sample::new(timestamp, value));
         }
     }
 

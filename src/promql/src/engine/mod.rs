@@ -90,24 +90,14 @@ impl Engine {
             PromExpr::Unary(UnaryExpr { expr }) => {
                 let val = self.exec_expr(expr).await?;
                 match val {
-                    Value::Matrix(m) => {
-                        let out = m
-                            .into_iter()
-                            .map(|mut range| RangeValue {
-                                labels: std::mem::take(&mut range.labels).without_metric_name(),
-                                samples: range
-                                    .samples
-                                    .into_iter()
-                                    .map(|s| Sample {
-                                        timestamp: s.timestamp,
-                                        value: -s.value,
-                                    })
-                                    .collect(),
-                                exemplars: range.exemplars,
-                                time_window: range.time_window,
-                            })
-                            .collect();
-                        Value::Matrix(out)
+                    Value::Matrix(mut matrix) => {
+                        for range in &mut matrix {
+                            range.labels = std::mem::take(&mut range.labels).without_metric_name();
+                            for sample in &mut range.samples {
+                                sample.value = -sample.value;
+                            }
+                        }
+                        Value::Matrix(matrix)
                     }
                     Value::Float(f) => Value::Float(-f),
                     _ => {
@@ -574,6 +564,47 @@ pub(crate) mod tests {
             assert_eq!(val, -42.0);
         } else {
             panic!("Expected Value::Float");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_unary_matrix_preserves_timestamps_and_special_values() {
+        let ctx = EvalContext::new(1_000_000, 3_000_000, 1_000_000, "test".into());
+        for (input, expected) in [
+            ("0", -0.0_f64),
+            ("7", -7.0),
+            ("Inf", f64::NEG_INFINITY),
+            ("NaN", f64::NAN),
+        ] {
+            let mut engine = Engine::new(
+                "test",
+                Arc::new(PromqlContext::new(
+                    create_test_query_ctx("test", "test_org", 30),
+                    SimpleMockProvider,
+                    vec![],
+                )),
+                ctx.clone(),
+            );
+            let query = format!(
+                r#"-label_replace(label_replace(vector({input}), "job", "api", "", ""), "__name__", "m", "", "")"#
+            );
+            let expr = promql_parser::parser::parse(&query).unwrap();
+            let Value::Matrix(matrix) = engine.exec_expr(&expr).await.unwrap() else {
+                panic!("expected matrix");
+            };
+            assert_eq!(matrix.len(), 1);
+            assert_eq!(matrix[0].labels.len(), 1);
+            assert_eq!(matrix[0].labels[0].name, "job");
+            assert_eq!(matrix[0].labels[0].value, "api");
+            assert_eq!(matrix[0].samples.len(), 3);
+            for (sample, timestamp) in matrix[0].samples.iter().zip(ctx.timestamps()) {
+                assert_eq!(sample.timestamp, timestamp);
+                if expected.is_nan() {
+                    assert!(sample.value.is_nan());
+                } else {
+                    assert_eq!(sample.value.to_bits(), expected.to_bits());
+                }
+            }
         }
     }
 

@@ -42,21 +42,15 @@ pub(crate) fn label_join(
                         .labels
                         .iter()
                         .filter(|l| l.name != NAME_LABEL && keep_source_labels.contains(&l.name))
-                        .map(|label| label.value.clone())
+                        .map(|label| label.value.as_str())
                         .join(separator);
 
-                    let mut labels = std::mem::take(&mut range_value.labels);
-                    labels.push(Arc::new(Label {
+                    range_value.labels.push(Arc::new(Label {
                         name: dest_label.to_string(),
                         value: new_label_value,
                     }));
 
-                    RangeValue {
-                        labels,
-                        samples: range_value.samples,
-                        exemplars: range_value.exemplars,
-                        time_window: range_value.time_window,
-                    }
+                    range_value
                 })
                 .collect();
             Ok(Value::Matrix(out))

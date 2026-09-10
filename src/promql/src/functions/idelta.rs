@@ -33,11 +33,9 @@ impl RangeFunc for IdeltaFunc {
     }
 
     fn exec(&self, samples: &[Sample], _eval_ts: i64, _range: &Duration) -> Option<f64> {
-        if samples.len() < 2 {
+        let [.., previous, last] = samples else {
             return None;
-        }
-        let last = samples.last().unwrap();
-        let previous = samples.get(samples.len() - 2).unwrap();
+        };
         Some(last.value - previous.value)
     }
 }

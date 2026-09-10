@@ -44,7 +44,7 @@ pub(crate) fn label_replace(
                 .into_par_iter()
                 .map(|mut range_value| {
                     let mut labels = std::mem::take(&mut range_value.labels);
-                    let labels = if replacement.is_empty() {
+                    range_value.labels = if replacement.is_empty() {
                         labels.without_label(dest_label)
                     } else {
                         let label_value = labels.get_value(source_label);
@@ -57,12 +57,7 @@ pub(crate) fn label_replace(
                         }
                         labels
                     };
-                    RangeValue {
-                        labels,
-                        samples: range_value.samples,
-                        exemplars: range_value.exemplars,
-                        time_window: range_value.time_window,
-                    }
+                    range_value
                 })
                 .collect();
             Ok(Value::Matrix(out))

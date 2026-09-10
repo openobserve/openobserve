@@ -35,9 +35,8 @@ impl RangeFunc for ChangesFunc {
 
     fn exec(&self, samples: &[Sample], _eval_ts: i64, _range: &Duration) -> Option<f64> {
         let changes = samples
-            .iter()
-            .zip(samples.iter().skip(1))
-            .map(|(current, next)| (!current.value.eq(&next.value) as u32) as f64)
+            .windows(2)
+            .map(|pair| (!pair[0].value.eq(&pair[1].value) as u32) as f64)
             .sum();
         Some(changes)
     }

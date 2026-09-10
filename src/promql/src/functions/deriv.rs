@@ -38,11 +38,7 @@ impl RangeFunc for DerivFunc {
             return None;
         }
         // https://github.com/prometheus/prometheus/issues/2674
-        let value = linear_regression(samples, samples[0].timestamp / 1000);
-        match value {
-            Some((slope, _)) => Some(slope),
-            _ => None,
-        }
+        linear_regression(samples, samples[0].timestamp / 1000).map(|(slope, _)| slope)
     }
 }
 

@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::promql::value::{EvalContext, Labels, RangeValue, Sample, Value};
+use config::meta::promql::value::{EvalContext, Value};
 use datafusion::error::{DataFusionError, Result};
 
 pub(crate) fn scalar(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
@@ -22,17 +22,7 @@ pub(crate) fn scalar(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
         Value::Matrix(v) => Ok(Value::Matrix(v)),
         Value::None => {
             // Generate samples using timestamps from eval_ctx
-            let samples: Vec<Sample> = eval_ctx
-                .timestamps()
-                .iter()
-                .map(|&ts| Sample::new(ts, f64::NAN))
-                .collect();
-            Ok(Value::Matrix(vec![RangeValue {
-                labels: Labels::default(),
-                samples,
-                exemplars: None,
-                time_window: None,
-            }]))
+            super::vector(Value::Float(f64::NAN), eval_ctx)
         }
         _ => Err(DataFusionError::Plan(
             "Unexpected input. Expected: \"vector(s scalar)\"".into(),

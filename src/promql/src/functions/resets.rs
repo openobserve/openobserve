@@ -35,9 +35,8 @@ impl RangeFunc for ResetsFunc {
 
     fn exec(&self, samples: &[Sample], _eval_ts: i64, _range: &Duration) -> Option<f64> {
         let resets = samples
-            .iter()
-            .zip(samples.iter().skip(1))
-            .map(|(current, next)| (current.value.gt(&next.value) as u32) as f64)
+            .windows(2)
+            .map(|pair| (pair[0].value.gt(&pair[1].value) as u32) as f64)
             .sum();
         Some(resets)
     }

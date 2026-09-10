@@ -33,15 +33,12 @@ impl RangeFunc for LastOverTimeFunc {
     }
 
     fn exec(&self, samples: &[Sample], _eval_ts: i64, _range: &Duration) -> Option<f64> {
-        if samples.is_empty() {
-            return None;
-        }
         // NOTE: Comment taken from prometheus golang source.
         // The last_over_time function acts like offset; thus, it
         // should keep the metric name.  For all the other range
         // vector functions, the only change needed is to drop the
         // metric name in the output.
-        Some(samples.last().unwrap().value)
+        samples.last().map(|sample| sample.value)
     }
 }
 

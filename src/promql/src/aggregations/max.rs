@@ -56,10 +56,7 @@ impl Accumulate for MaxAccumulate {
     fn merge(&mut self, other: Box<dyn Accumulate>) {
         let other = other.into_any().downcast::<Self>().expect("same type");
         for (timestamp, value) in other.max {
-            let entry = self.max.entry(timestamp).or_insert(f64::NEG_INFINITY);
-            if value > *entry {
-                *entry = value;
-            }
+            self.accumulate(&Sample::new(timestamp, value));
         }
     }
 

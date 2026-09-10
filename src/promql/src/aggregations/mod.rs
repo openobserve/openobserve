@@ -385,6 +385,42 @@ mod tests {
     }
 
     #[test]
+    fn test_extrema_merge_preserves_nan_and_signed_zero_behavior() {
+        let funcs: [(Box<dyn AggFunc>, f64); 2] = [
+            (Box::new(Min), f64::INFINITY),
+            (Box::new(Max), f64::NEG_INFINITY),
+        ];
+        for (func, initial) in funcs {
+            for (values, expected) in [
+                (vec![f64::NAN], initial),
+                (vec![f64::NAN, 7.0, f64::NAN], 7.0),
+                (vec![-0.0, 0.0], -0.0),
+                (vec![0.0, -0.0], 0.0),
+            ] {
+                let mut sequential = func.build();
+                let mut merged = func.build();
+                for value in values {
+                    let sample = Sample::new(1, value);
+                    sequential.accumulate(&sample);
+                    let mut partial = func.build();
+                    partial.accumulate(&sample);
+                    merged.merge(partial);
+                }
+                for samples in [sequential.evaluate(), merged.evaluate()] {
+                    assert_eq!(samples.len(), 1);
+                    assert_eq!(samples[0].timestamp, 1);
+                    assert_eq!(
+                        samples[0].value.to_bits(),
+                        expected.to_bits(),
+                        "{}",
+                        func.name()
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
     fn test_accumulate_merge_matches_sequential() {
         use super::{avg::Avg, count::Count, group::Group, max::Max, min::Min, sum::Sum};
 

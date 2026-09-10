@@ -13,43 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::promql::value::{LabelsExt, RangeValue, Sample, Value};
-use datafusion::error::{DataFusionError, Result};
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
+use config::meta::promql::value::Value;
+use datafusion::error::Result;
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#clamp
 pub(crate) fn clamp(data: Value, min: f64, max: f64) -> Result<Value> {
-    match data {
-        Value::Matrix(matrix) => {
-            let out: Vec<RangeValue> = matrix
-                .into_par_iter()
-                .map(|mut range_value| {
-                    // Apply clamp to all samples in this range
-                    let samples: Vec<Sample> = range_value
-                        .samples
-                        .into_iter()
-                        .map(|sample| {
-                            let val = sample.value.clamp(min, max);
-                            Sample::new(sample.timestamp, val)
-                        })
-                        .collect();
-
-                    RangeValue {
-                        labels: std::mem::take(&mut range_value.labels).without_metric_name(),
-                        samples,
-                        exemplars: range_value.exemplars,
-                        time_window: range_value.time_window,
-                    }
-                })
-                .collect();
-            Ok(Value::Matrix(out))
-        }
-        Value::None => Ok(Value::None),
-        _ => Err(DataFusionError::Plan(format!(
-            "Invalid input for clamp, expected matrix but got: {:?}",
-            data.get_type()
-        ))),
-    }
+    // Apply clamp to all samples in this range
+    super::map_samples(data, "clamp", |sample| sample.value.clamp(min, max))
 }
 
 #[cfg(test)]
