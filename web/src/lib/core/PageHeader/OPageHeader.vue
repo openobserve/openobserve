@@ -53,6 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
        61px on some pages and 60px on others. -->
   <header
     class="app-page-header px-page-edge border-border-default shrink-0 border-b"
+    :data-drawer-anchor="ownsSidebarTrigger ? 'page-layout-sidebar' : undefined"
     :class="[
       tabsBelow
         ? 'flex flex-col'
@@ -89,6 +90,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           hasTabs && !tabsBelow ? 'max-md:flex-wrap' : 'max-md:flex-nowrap',
         ]"
       >
+        <OButton
+          v-if="ownsSidebarTrigger"
+          variant="ghost"
+          size="icon-toolbar"
+          data-test="o-page-layout-mobile-sidebar-btn"
+          :aria-label="t('common.sidePanel')"
+          @click="layoutSidebar?.open()"
+        >
+          <OIcon name="menu" size="sm" />
+        </OButton>
         <slot name="title-prefix" />
 
         <!-- Sub-page: the module-icon tile BECOMES a Back button (same 8×8
@@ -237,13 +248,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import { Comment, Text, computed, useSlots } from "vue";
+import {
+  Comment,
+  Text,
+  computed,
+  inject,
+  onActivated,
+  onBeforeUnmount,
+  onDeactivated,
+  onMounted,
+  useSlots,
+} from "vue";
 import { useRouter } from "vue-router";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
+import { PAGE_LAYOUT_SIDEBAR_KEY } from "@/lib/core/PageLayout/pageLayoutSidebar";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 
 interface BackTarget {
@@ -291,6 +313,23 @@ const slots = useSlots();
 const { t } = useI18nTyped();
 // < md the secondary actions collapse behind a "More" button (see template).
 const { isMobile } = useBreakpoint();
+
+// The first header inside a sidebar layout carries its phone trigger, saving the layout a row.
+const layoutSidebar = inject(PAGE_LAYOUT_SIDEBAR_KEY, null);
+const sidebarClaim = Symbol("page-header");
+const claimSidebarTrigger = () => {
+  if (layoutSidebar && layoutSidebar.owner.value === null) layoutSidebar.owner.value = sidebarClaim;
+};
+const releaseSidebarTrigger = () => {
+  if (layoutSidebar?.owner.value === sidebarClaim) layoutSidebar.owner.value = null;
+};
+onMounted(claimSidebarTrigger);
+onActivated(claimSidebarTrigger);
+onBeforeUnmount(releaseSidebarTrigger);
+onDeactivated(releaseSidebarTrigger);
+const ownsSidebarTrigger = computed(
+  () => isMobile.value && layoutSidebar?.owner.value === sidebarClaim,
+);
 
 // A slot passed with an always-present <template> but a falsy inner v-if still
 // yields a comment placeholder node — so checking `$slots.x` is truthy even

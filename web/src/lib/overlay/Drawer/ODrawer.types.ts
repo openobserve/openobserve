@@ -157,6 +157,9 @@ export interface DrawerProps {
    */
   anchor?: string | HTMLElement | null;
 
+  /** Which edge of `anchor` the drawer starts at. Default: "top". */
+  anchorEdge?: "top" | "bottom";
+
   /** Render the portal in place for a contained drawer surface. Default: false. */
   inline?: boolean;
 }

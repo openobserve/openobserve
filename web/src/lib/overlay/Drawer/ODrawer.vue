@@ -58,6 +58,7 @@ const props = withDefaults(defineProps<DrawerProps>(), {
   lazy: true,
   portalTarget: undefined,
   anchor: undefined,
+  anchorEdge: "top",
 });
 
 const emit = defineEmits<DrawerEmits>();
@@ -208,17 +209,24 @@ const anchorTop = ref(0);
 function measureAnchor() {
   const a = props.anchor;
   const el = typeof a === "string" ? document.querySelector<HTMLElement>(a) : a;
-  anchorTop.value = el ? Math.max(0, Math.round(el.getBoundingClientRect().top)) : 0;
+  const rect = el?.getBoundingClientRect();
+  anchorTop.value = rect
+    ? Math.max(0, Math.round(props.anchorEdge === "bottom" ? rect.bottom : rect.top))
+    : 0;
 }
-watchEffect((cleanup) => {
-  if (!internalOpen.value || !props.anchor) {
-    anchorTop.value = 0;
-    return;
-  }
-  measureAnchor();
-  window.addEventListener("resize", measureAnchor);
-  cleanup(() => window.removeEventListener("resize", measureAnchor));
-});
+watchEffect(
+  (cleanup) => {
+    if (!internalOpen.value || !props.anchor) {
+      anchorTop.value = 0;
+      return;
+    }
+    measureAnchor();
+    window.addEventListener("resize", measureAnchor);
+    cleanup(() => window.removeEventListener("resize", measureAnchor));
+  },
+  // The anchor can be swapped in the same tick, so measure only once it is in the DOM.
+  { flush: "post" },
+);
 const anchorStyle = computed(() => {
   const style: Record<string, string> = {};
   if (anchorTop.value > 0) {

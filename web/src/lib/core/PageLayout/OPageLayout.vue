@@ -95,6 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- ── Body (mobile): sidebar collapses into an off-canvas drawer ── -->
     <template v-if="!!slots.sidebar && isMobile">
       <div
+        v-if="!sidebarTriggerOwner"
         class="border-border-default px-page-edge flex shrink-0 items-center border-b py-1"
         data-drawer-anchor="page-layout-sidebar"
       >
@@ -122,6 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         bleed
         seamless
         anchor='[data-drawer-anchor="page-layout-sidebar"]'
+        :anchor-edge="sidebarTriggerOwner ? 'bottom' : 'top'"
         data-test="o-page-layout-mobile-sidebar-drawer"
       >
         <div class="flex h-full flex-col overflow-hidden">
@@ -195,7 +197,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { useI18nTyped, type I18nText } from "@/types/i18n";
-import { ref, computed, watch, useSlots } from "vue";
+import { ref, computed, watch, useSlots, provide } from "vue";
+import { useRouter } from "vue-router";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import ConstrainedPage from "@/components/common/ConstrainedPage.vue";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
@@ -204,6 +207,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
+import { PAGE_LAYOUT_SIDEBAR_KEY } from "./pageLayoutSidebar";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 
 interface BackTarget {
@@ -273,6 +277,20 @@ const { t } = useI18nTyped();
 // < md the rail has no room beside the content — it moves into a drawer.
 const { isMobile } = useBreakpoint();
 const mobileSidebarOpen = ref(false);
+// Picking a destination from the phone sidebar is the end of that interaction.
+const router = useRouter();
+watch(
+  () => router?.currentRoute?.value?.fullPath,
+  () => (mobileSidebarOpen.value = false),
+);
+// Only a sidebar host provides, so a nested sidebar-less layout doesn't shadow its parent's trigger.
+const sidebarTriggerOwner = ref<symbol | null>(null);
+if (slots.sidebar) {
+  provide(PAGE_LAYOUT_SIDEBAR_KEY, {
+    owner: sidebarTriggerOwner,
+    open: () => (mobileSidebarOpen.value = true),
+  });
+}
 
 const hasHeader = computed(
   () =>
