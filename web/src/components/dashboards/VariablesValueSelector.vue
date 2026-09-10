@@ -31,6 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-show="!item.hideOnDashboard"
           v-model="item.value"
           :variableItem="item"
+          :clearable="isVariableClearable(item)"
           @update:model-value="onVariablesValueUpdated(Number(index))"
           :loadOptions="loadVariableOptions"
           @search="onVariableSearch(Number(index), $event)"
@@ -2331,6 +2332,14 @@ export default defineComponent({
       return Boolean(item?.curatedCapNotice && cap && (item?.options?.length ?? 0) >= cap);
     };
 
+    // The all-sentinel is the absence of a scope choice, so it is not a held value.
+    const holdsSelection = (item: any) => {
+      const value = item?.value;
+      if (Array.isArray(value))
+        return value.some((entry) => entry !== "" && entry != null && entry !== SELECT_ALL_VALUE);
+      return value !== "" && value != null && value !== SELECT_ALL_VALUE;
+    };
+
     // Schema presence is not resolvability, so a zero-values picker is removed
     // rather than left enabled and blank — but only once its load has settled.
     // "Settled" is the codebase's own three-flag test (useVariablesManager.ts:221),
@@ -2345,8 +2354,17 @@ export default defineComponent({
         !item?.isVariableLoadingPending &&
         item?.isVariablePartialLoaded &&
         Array.isArray(item?.options) &&
-        item.options.length === 0,
+        item.options.length === 0 &&
+        // loadFromUrl marks a URL-restored picker loaded WITHOUT fetching options
+        // (useVariablesManager :880-885), so on a hard refresh a held value is
+        // indistinguishable from a settled-empty list — and hiding it strands a
+        // filter the user cannot see or undo.
+        !holdsSelection(item),
       );
+
+    // Curated pickers only: a stored dashboard's variables are authored state, and
+    // clearing one there would silently diverge the view from the saved dashboard.
+    const isVariableClearable = (item: any) => Boolean(item?.curatedOmitWhenValuesEmpty);
 
     // `curatedTabs` narrows a GLOBAL variable to the tabs that declare it, so an
     // inapplicable picker is not rendered rather than shown disabled. It gates
@@ -2363,6 +2381,7 @@ export default defineComponent({
       isVariableCapped,
       isVariableOmitted,
       isVariableOffTab,
+      isVariableClearable,
       variablesData,
       changeInitialVariableValues,
       onVariablesValueUpdated,
