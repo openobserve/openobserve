@@ -14742,7 +14742,6 @@
       "syntheticsTokensRefresh": "Tokenliste aktualisieren",
       "aiChatToggle": "KI-Chat umschalten",
       "aiChatClose": "KI-Chat schließen",
-      "aiChatExpand": "KI-Chat erweitern/einklappen",
       "logsSaveView": "Als gespeicherte Ansicht speichern",
       "logsExport": "Ergebnisse als CSV exportieren",
       "tracesCopyUrl": "Trace-Share-URL kopieren",
