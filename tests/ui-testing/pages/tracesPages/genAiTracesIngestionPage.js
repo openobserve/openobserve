@@ -35,10 +35,11 @@ export class GenAiTracesIngestionPage {
    * @param {string} spec.name - span name (unique per test; also the search marker)
    * @param {number} [spec.kind=2] - OTLP span kind (2 = SERVER)
    * @param {Object<string, string>} spec.attributes - dotted `gen_ai.*` keys → JSON-string values
+   * @param {string} [spec.serviceName='genai-test-service'] - resource `service.name` value
    * @param {number} [maxRetries=5]
    * @returns {Promise<{ name: string }>} the span name (doubles as the poll marker)
    */
-  async ingestGenAiSpan(streamName, { name, kind = 2, attributes = {} }, maxRetries = 5) {
+  async ingestGenAiSpan(streamName, { name, kind = 2, attributes = {}, serviceName = 'genai-test-service' }, maxRetries = 5) {
     const orgId = getOrgIdentifier();
     const headers = { ...getAuthHeaders(), 'stream-name': streamName };
     const baseUrl = (process.env.INGESTION_URL || process.env.ZO_BASE_URL).replace(/\/$/, '');
@@ -65,7 +66,7 @@ export class GenAiTracesIngestionPage {
         {
           resource: {
             attributes: [
-              { key: 'service.name', value: { stringValue: 'genai-test-service' } },
+              { key: 'service.name', value: { stringValue: serviceName } },
             ],
           },
           scopeSpans: [

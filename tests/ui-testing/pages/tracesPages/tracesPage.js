@@ -75,6 +75,7 @@ export class TracesPage {
     this.traceDetailsSearchInput = '[data-test="trace-details-search-input"]';
     this.traceDetailsSearchInputField = '[data-test="trace-details-search-input-field"]';
     this.traceDetailsSidebar = '[data-test="trace-details-sidebar"]';
+    this.traceDetailsOperationName = '[data-test="trace-details-operation-name"]';
 
     // ===== LLM PREVIEW PANE (GenAI v5 parts) SELECTORS =====
     // Source: web/src/plugins/traces/TraceDetailsSidebar.vue + LLMContentRenderer.vue
@@ -172,6 +173,10 @@ export class TracesPage {
     // Trace Tree/Span Selectors
     this.traceTreeSpanServiceName = '[data-test="trace-tree-span-service-name"]';
     this.traceTreeSpanServiceNamePrefix = '[data-test^="trace-tree-span-service-name-"]';
+    // Operation-name spans exclude the `-container-` sibling (a row wrapper with a
+    // same-prefix data-test) so the selector resolves to the truncated name span.
+    this.traceTreeSpanOperationNamePrefix =
+      '[data-test^="trace-tree-span-operation-name-"]:not([data-test*="container"])';
 
     // Field List Toggle
     this.fieldListToggleButton = '[data-test="traces-search-field-list-collapse-btn"]';
@@ -2707,6 +2712,55 @@ export class TracesPage {
    */
   async expectPreviewTabVisible() {
     await expect(this.page.locator(this.llmPreviewTab)).toBeVisible({ timeout: 15000 });
+  }
+
+  /**
+   * Wait for the trace-details view to finish loading: the header operation-name
+   * span and the first virtualized tree row are both in the DOM.
+   */
+  async waitForTraceDetailsReady() {
+    await this.page.locator(this.traceDetailsOperationName).waitFor({ state: 'visible', timeout: 15000 });
+    await this.page.locator(this.traceTreeSpanContainer).first().waitFor({ state: 'visible', timeout: 15000 });
+  }
+
+  /**
+   * Assert the standalone header operation name is visible and its native `title`
+   * equals the full (untruncated) root operation name.
+   * @param {string} fullName - the full operation name expected in the tooltip
+   */
+  async expectTraceDetailsOperationNameTitle(fullName) {
+    const el = this.page.locator(this.traceDetailsOperationName);
+    await expect(el).toBeVisible({ timeout: 15000 });
+    await expect(el).toHaveAttribute('title', fullName);
+  }
+
+  /**
+   * Assert the first tree span row's operation name carries a `title` equal to
+   * the full operation name (the truncated span surfaces the full value on hover).
+   * @param {string} fullName - the full operation name expected in the tooltip
+   */
+  async expectTraceTreeSpanOperationNameTitle(fullName) {
+    const el = this.page.locator(this.traceTreeSpanOperationNamePrefix).first();
+    await expect(el).toBeVisible({ timeout: 15000 });
+    await expect(el).toHaveAttribute('title', fullName);
+  }
+
+  /**
+   * Assert the first tree span row's service name carries a `title` equal to the
+   * resolved service identity (the truncated span surfaces the full value on hover).
+   * @param {string} serviceName - the resolved service identity expected in the tooltip
+   */
+  async expectTraceTreeSpanServiceNameTitle(serviceName) {
+    const el = this.page.locator(this.traceTreeSpanServiceNamePrefix).first();
+    await expect(el).toBeVisible({ timeout: 15000 });
+    await expect(el).toHaveAttribute('title', serviceName);
+  }
+
+  /**
+   * Assert the span-details sidebar opened (a span row was selected).
+   */
+  async expectTraceDetailsSidebarVisible() {
+    await expect(this.page.locator(this.traceDetailsSidebar)).toBeVisible({ timeout: 15000 });
   }
 
   /**

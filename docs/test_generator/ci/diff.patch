@@ -1,0 +1,212 @@
+===== COMPLETE LIST OF CHANGED FILES (4 files) =====
+# AUTHORITATIVE: this list is never truncated. The diff BODY below may be trimmed for
+# very large PRs, so decide WHICH files/areas changed (e.g. web/src frontend) from THIS list.
+web/src/plugins/traces/TraceDetails.spec.ts
+web/src/plugins/traces/TraceDetails.vue
+web/src/plugins/traces/TraceTree.spec.ts
+web/src/plugins/traces/TraceTree.vue
+===== END CHANGED FILES =====
+
+diff --git a/web/src/plugins/traces/TraceDetails.spec.ts b/web/src/plugins/traces/TraceDetails.spec.ts
+index fbe465c590d..93497cfc929 100644
+--- a/web/src/plugins/traces/TraceDetails.spec.ts
++++ b/web/src/plugins/traces/TraceDetails.spec.ts
+@@ -16,6 +16,7 @@
+ import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
+ import { mount, flushPromises } from "@vue/test-utils";
+ import TraceDetails from "@/plugins/traces/TraceDetails.vue";
++import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
+ import i18n from "@/locales";
+ import store from "@/test/unit/helpers/store";
+ import router from "@/test/unit/helpers/router";
+@@ -334,6 +335,17 @@ describe("TraceDetails", () => {
+       );
+     });
+ 
++    it("should constrain the operation name so a long one ellipsises", () => {
++      const operationName = wrapper.find('[data-test="trace-details-operation-name"]');
++
++      expect(operationName.classes()).toContain("truncate");
++      expect(operationName.attributes("title")).toBe(
++        tracesMockData.tracesDetails.traceSpans.hits[0].operation_name,
++      );
++      // The ellipsis only fires if the header also lets the title block shrink.
++      expect(wrapper.findComponent(OPageHeader).props("titleOverflow")).toBe("visible");
++    });
++
+     it("should display trace ID in toolbar", () => {
+       const traceId = wrapper.find('[data-test="trace-details-trace-id"]');
+       expect(traceId.exists()).toBe(true);
+diff --git a/web/src/plugins/traces/TraceDetails.vue b/web/src/plugins/traces/TraceDetails.vue
+index 38a271cc46b..87c2d7f1083 100644
+--- a/web/src/plugins/traces/TraceDetails.vue
++++ b/web/src/plugins/traces/TraceDetails.vue
+@@ -35,8 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+         <!-- Standalone (routed) header: shared OPageHeader -->
+         <OPageHeader
+           v-if="mode === 'standalone'"
+-          :title="traceTree[0]?.operationName || t('traces.loadingTrace')"
+-          title-data-test="trace-details-operation-name"
++          title-overflow="visible"
+           :back="
+             showBackButton
+               ? {
+@@ -47,6 +46,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+           "
+           class=""
+         >
++          <!-- Operation names run long (SQL, URLs); the default header title never shrinks, so it never ellipsises. -->
++          <template #title>
++            <span
++              data-test="trace-details-operation-name"
++              class="block truncate"
++              :title="traceTree[0]?.operationName"
++            >
++              {{ traceTree[0]?.operationName || t("traces.loadingTrace") }}
++            </span>
++          </template>
++
+           <template #subtitle>
+             <div class="text-2xs text-text-secondary flex items-center space-x-2 whitespace-nowrap">
+               <span>{{ formatTimestamp(traceStartTime, store.state.timezone) }}</span>
+@@ -98,7 +108,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+               <div class="bg-text-label h-4 w-px py-0" />
+               <!-- Span Count Badge -->
+               <span class="inline-flex">
+-                <OTag type="logsResultChip" value="neutral" data-test="trace-details-spans-count">
++                <!-- sm + py-1! keeps both count chips at 1.1875rem: anything over the header's fixed 1.25rem subtitle band grows into the title's descenders. -->
++                <OTag
++                  type="logsResultChip"
++                  value="neutral"
++                  size="sm"
++                  data-test="trace-details-spans-count"
++                  class="py-1!"
++                >
+                   <span data-test="span-count-text">
+                     {{ formatLargeNumber(effectiveSpanList.length) }}
+                     {{ t("traces.spansLabel") }}
+@@ -114,7 +131,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+                 <OTag
+                   type="logsResultChip"
+                   value="error"
++                  size="sm"
+                   data-test="trace-details-error-spans-count"
++                  class="py-1!"
+                 >
+                   <span
+                     >{{ formatLargeNumber(errorSpansCount) }} {{ t("traces.errorsLabel") }}</span
+diff --git a/web/src/plugins/traces/TraceTree.spec.ts b/web/src/plugins/traces/TraceTree.spec.ts
+index 490f58b7b52..a72db1630c8 100644
+--- a/web/src/plugins/traces/TraceTree.spec.ts
++++ b/web/src/plugins/traces/TraceTree.spec.ts
+@@ -312,6 +312,29 @@ describe("TraceTree", () => {
+     expect(serviceNameElements[1].text()).toBe(mockSpans[1].serviceName);
+   });
+ 
++  it("should constrain span names so long ones ellipsise", () => {
++    for (const span of mockSpans) {
++      const operationName = wrapper.find(
++        `[data-test="trace-tree-span-operation-name-${span.spanId}"]`,
++      );
++      // min-w-0: without it the flex item keeps its full text width and the row's ellipsis never fires.
++      expect(operationName.classes()).toEqual(expect.arrayContaining(["truncate", "min-w-0"]));
++
++      const serviceName = wrapper.find(`[data-test="trace-tree-span-service-name-${span.spanId}"]`);
++      // shrink-0 + a cap: flex shrinks in proportion to width, so a long operation name would otherwise eat the service name first.
++      expect(serviceName.classes()).toEqual(
++        expect.arrayContaining(["truncate", "shrink-0", "max-w-[50%]"]),
++      );
++    }
++  });
++
++  it("should size the name row from the column, not from its own text", () => {
++    // Without w-full the row is content-sized and the service name's cap would
++    // bound it against its own text, truncating names that had room to spare.
++    const nameRow = wrapper.find(".span-name-section-content");
++    expect(nameRow.classes()).toEqual(expect.arrayContaining(["w-full", "min-w-0"]));
++  });
++
+   it("should render error icon for error spans", () => {
+     const errorIcon = wrapper.find('[data-test="trace-tree-span-error-icon-6702b0494b2b6e57"]');
+     expect(errorIcon.exists()).toBe(true);
+@@ -1412,6 +1435,24 @@ describe("TraceTree", () => {
+     });
+   });
+ 
++  describe("span name tooltips", () => {
++    // Both names sit in one row; a title on their shared ancestor made the
++    // service name report the operation name on hover.
++    it("titles the service name with the service name", () => {
++      const serviceName = wrapper.find(
++        '[data-test="trace-tree-span-service-name-d9603ec7f76eb499"]',
++      );
++      expect(serviceName.attributes("title")).toBe("scheduler");
++    });
++
++    it("titles the operation name with the operation name", () => {
++      const operationName = wrapper.find(
++        '[data-test="trace-tree-span-operation-name-d9603ec7f76eb499"]',
++      );
++      expect(operationName.attributes("title")).toBe("service:alerts:evaluate_scheduled");
++    });
++  });
++
+   describe("viewSpanLogs", () => {
+     // A formatted tree node — what the `spans` prop holds: camelCase keys and
+     // microsecond timestamps. This is NOT the shape buildQueryDetails accepts.
+diff --git a/web/src/plugins/traces/TraceTree.vue b/web/src/plugins/traces/TraceTree.vue
+index b57d82043ba..da465b92036 100644
+--- a/web/src/plugins/traces/TraceTree.vue
++++ b/web/src/plugins/traces/TraceTree.vue
+@@ -102,7 +102,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+                 }`,
+               }"
+               class="flex flex-col items-start justify-start truncate"
+-              :title="(spans as any[])[virtualRow.index].operationName"
+             >
+               <div
+                 class="relative-position operation-name-container bg-surface-base flex h-7.5 w-full cursor-pointer flex-nowrap items-center overflow-visible"
+@@ -157,7 +156,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+                     "
+                     :data-test="`trace-tree-span-select-btn-${(spans as any[])[virtualRow.index].spanId}`"
+                   >
+-                    <div class="span-name-section-content flex items-center truncate">
++                    <!-- w-full: content-sized, this box shrinks with its own text, so the service name's cap would resolve against the text it is meant to bound. -->
++                    <div
++                      class="span-name-section-content flex w-full min-w-0 items-center truncate"
++                    >
+                       <OIcon
+                         v-if="(spans as any[])[virtualRow.index].spanStatus === 'ERROR'"
+                         name="error"
+@@ -166,8 +168,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+                         :title="t('traces.traceTree.errorSpan')"
+                         :data-test="`trace-tree-span-error-icon-${(spans as any[])[virtualRow.index].spanId}`"
+                       />
++                      <!-- shrink-0 + a cap, not plain shrink: flex shrinks in proportion to width, so a long operation name would eat a short service name first. -->
+                       <span
+-                        class="me-2 text-sm font-bold font-medium"
++                        class="me-2 max-w-[50%] shrink-0 truncate text-sm font-bold font-medium"
+                         :class="{
+                           'bg-table-highlight-bg text-table-highlight-text font-bold':
+                             isHighlighted((spans as any[])[virtualRow.index].spanId),
+@@ -175,6 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+                             currentSelectedValue === (spans as any[])[virtualRow.index].spanId,
+                         }"
+                         :data-test="`trace-tree-span-service-name-${(spans as any[])[virtualRow.index].spanId}`"
++                        :title="(spans as any[])[virtualRow.index].resolvedIdentity"
+                       >
+                         {{ (spans as any[])[virtualRow.index].resolvedIdentity }}
+                       </span>
+@@ -193,9 +197,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+                         alt=""
+                         :data-test="`trace-tree-span-tech-icon-${(spans as any[])[virtualRow.index].spanId}`"
+                       />
++                      <!-- min-w-0: a flex item defaults to min-width:auto and would refuse to shrink, so the row's ellipsis never fires. -->
+                       <span
+-                        class="text-text-secondary text-sm"
++                        class="text-text-secondary min-w-0 truncate text-sm"
+                         :data-test="`trace-tree-span-operation-name-${(spans as any[])[virtualRow.index].spanId}`"
++                        :title="(spans as any[])[virtualRow.index].operationName"
+                         >{{ (spans as any[])[virtualRow.index].operationName }}</span
+                       >
+                     </div>

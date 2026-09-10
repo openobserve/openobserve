@@ -1,0 +1,4 @@
+web/src/plugins/traces/TraceDetails.spec.ts
+web/src/plugins/traces/TraceDetails.vue
+web/src/plugins/traces/TraceTree.spec.ts
+web/src/plugins/traces/TraceTree.vue

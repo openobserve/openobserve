@@ -1,0 +1,10 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/Traces/traceSpanNameTruncation.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Traces/traceGenAiParts.spec.js",
+    "tests/ui-testing/playwright-tests/Traces/traceDetails.spec.js"
+  ],
+  "needs_registration": true,
+  "rationale": "No E2E spec covers span/service-name truncation + tooltips in the trace detail view. traceGenAiParts.spec.js shares the same ingestion + navigate + open-trace setup pattern (and is the closest sibling) but only asserts GenAI v5 `parts` rendering; traceDetails.spec.js covers panel features (timeline, copy ID, view logs, search, share link), not the truncation/title behavior. The change is a distinct feature area (presentational truncation of span/service names), so a brand-new spec is warranted. It must be registered in ci_matrix.json under the Traces run_files array (needs_registration: true)."
+}

@@ -1,0 +1,5 @@
+[
+  { "title": "should truncate a long operation name in the header and tree with full-name title tooltips", "action": "new", "verifies": "the header and tree operation names truncate and expose the full name via title tooltips" },
+  { "title": "should truncate a long service name with its full value as the title tooltip", "action": "new", "verifies": "a long service name truncates and its title equals the full service name" },
+  { "title": "should keep a truncated long-named span row clickable and open the span sidebar", "action": "new", "verifies": "truncation does not break span-row selection; the sidebar opens on click" }
+]

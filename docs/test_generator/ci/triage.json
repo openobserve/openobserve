@@ -1,0 +1,26 @@
+{
+  "feature_slug": "trace-span-name-truncation",
+  "feature_title": "Trace Span Name Truncation & Tooltips",
+  "area": "Traces",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "traceSpanNameTruncation.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Traces/traceSpanNameTruncation.spec.js",
+  "playwright_group": "Traces",
+  "source_files": [
+    "web/src/plugins/traces/TraceDetails.vue",
+    "web/src/plugins/traces/TraceTree.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "All four changed paths live under web/src/plugins/traces/ (the open-source frontend). None sit under enterprise-owned directories (no o2_enterprise/, enterprise/, src/enterprise/) and no enterprise-only keywords (cipher/SSO/SAML/RBAC/SDR) appear in the paths or symbols, so this is an OSS change.",
+    "skip": "Not skipped. The change is user-facing — it alters the trace details header and the span-name row in the trace tree (ellipsis truncation, hover tooltips, chip sizing). There is no tests-added label and the trigger comment is empty, so no explicit opt-out applies.",
+    "e2e": "E2E is warranted. Long operation/span names now visually truncate with an ellipsis and expose a title tooltip on hover, and the count chips were resized; these are user-exercisable behaviors in the trace details view that a Playwright spec can verify (truncation classes and tooltip text on hover).",
+    "area": "The bulk of the UI changes are in web/src/plugins/traces/ (TraceDetails.vue and TraceTree.vue), and sibling E2E specs already live in tests/ui-testing/playwright-tests/Traces/ (traceDetails.spec.js, traceQueryEditor.spec.js, etc.), so Traces is the correct area.",
+    "group": "The Traces shard (testfolder 'Traces', actual_folder 'Traces') in the ci matrix already runs traceDetails.spec.js, tracesSearch.spec.js, traceQueryEditor.spec.js and the other trace specs, so the new spec belongs in that same group.",
+    "existing_tests": "No E2E specs in the diff. The only test files changed are web/src/plugins/traces/TraceDetails.spec.ts and TraceTree.spec.ts, which are Vitest unit tests, not Playwright E2E coverage under tests/ui-testing/playwright-tests/ — so they do not count as existing E2E coverage of the new truncation/tooltip behavior."
+  }
+}

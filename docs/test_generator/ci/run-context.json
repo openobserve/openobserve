@@ -1,0 +1,18 @@
+{
+  "feature_slug": "trace-span-name-truncation",
+  "feature_title": "Trace Span Name Truncation & Tooltips",
+  "area": "Traces",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "traceSpanNameTruncation.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Traces/traceSpanNameTruncation.spec.js",
+  "playwright_group": "Traces",
+  "source_files": [
+    "web/src/plugins/traces/TraceDetails.vue",
+    "web/src/plugins/traces/TraceTree.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": ""
+}
