@@ -102,7 +102,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 }`,
               }"
               class="flex flex-col items-start justify-start truncate"
-              :title="(spans as any[])[virtualRow.index].operationName"
             >
               <div
                 class="relative-position operation-name-container bg-surface-base flex h-7.5 w-full cursor-pointer flex-nowrap items-center overflow-visible"
@@ -179,6 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             currentSelectedValue === (spans as any[])[virtualRow.index].spanId,
                         }"
                         :data-test="`trace-tree-span-service-name-${(spans as any[])[virtualRow.index].spanId}`"
+                        :title="(spans as any[])[virtualRow.index].resolvedIdentity"
                       >
                         {{ (spans as any[])[virtualRow.index].resolvedIdentity }}
                       </span>
@@ -201,6 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <span
                         class="text-text-secondary min-w-0 truncate text-sm"
                         :data-test="`trace-tree-span-operation-name-${(spans as any[])[virtualRow.index].spanId}`"
+                        :title="(spans as any[])[virtualRow.index].operationName"
                         >{{ (spans as any[])[virtualRow.index].operationName }}</span
                       >
                     </div>
