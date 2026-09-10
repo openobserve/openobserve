@@ -225,3 +225,38 @@ describe("slosToTerraform", () => {
     expect(hcl).toContain('"openobserve_slo" "slo_99th" {');
   });
 });
+
+describe("import blocks", () => {
+  it("addresses each SLO as org/id", () => {
+    const { hcl } = slosToTerraform([countSlo], { orgId: "default", ids: ["2fXkZ8"] });
+
+    expect(hcl).toContain("import {");
+    expect(hcl).toContain("to = openobserve_slo.");
+    expect(hcl).toContain('id = "default/2fXkZ8"');
+  });
+
+  it("keeps ids paired with the right SLO when one is skipped", () => {
+    // The incomplete SLO renders nothing, so a naive index walk would attach the
+    // second SLO to the first id.
+    const { hcl } = slosToTerraform([{ name: "Broken" }, countSlo], {
+      orgId: "default",
+      ids: ["broken-id", "good-id"],
+    });
+
+    expect(hcl).toContain('id = "default/good-id"');
+    expect(hcl).not.toContain("broken-id");
+  });
+
+  it("writes none without an org", () => {
+    expect(slosToTerraform([countSlo], { ids: ["2fXkZ8"] }).hcl).not.toContain("import {");
+  });
+
+  it("writes none for an SLO with no id", () => {
+    expect(slosToTerraform([countSlo], { orgId: "default" }).hcl).not.toContain("import {");
+  });
+
+  it("explains that the blocks can be deleted once applied", () => {
+    const { hcl } = slosToTerraform([countSlo], { orgId: "default", ids: ["2fXkZ8"] });
+    expect(hcl).toContain("can be deleted");
+  });
+});

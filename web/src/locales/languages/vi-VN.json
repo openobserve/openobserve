@@ -3666,6 +3666,16 @@
       "chooseMethod": "Chọn phương thức tích hợp",
       "chooseMethodPrompt": "Chọn cách bạn muốn tích hợp {service}:"
     },
+    "iac": {
+      "shortName": "Quản lý dưới dạng mã",
+      "title": "Quản lý {brand} dưới dạng mã",
+      "body": "Định nghĩa cấu hình khả năng quan sát của bạn bằng Terraform hoặc OpenTofu và lưu nó trong hệ thống quản lý phiên bản cùng với phần còn lại của hạ tầng. Xuất bất kỳ tài nguyên được hỗ trợ nào từ trang danh sách của nó để nhận cấu hình sẵn sàng áp dụng, bao gồm cả các khối import để tiếp nhận những gì bạn đang chạy.",
+      "registriesLabel": "Có sẵn trên",
+      "resourceAlerts": "Cảnh báo, bao gồm cảnh báo tổng hợp",
+      "resourceSlos": "SLO",
+      "resourceDashboards": "Bảng điều khiển",
+      "resourcePipelines": "Pipeline và đích đến của pipeline"
+    },
     "mcp": {
       "name": "OpenObserve MCP Server",
       "shortName": "Máy chủ MCP",
@@ -5149,6 +5159,8 @@
       "folderDeletionFailed": "Xóa thư mục thất bại",
       "errorFetchingSearch": "Lỗi khi tìm kiếm kết quả",
       "exportedSuccessfully": "Đã xuất {count} Dashboards thành công.",
+      "exportDialogTitle": "Xuất bảng điều khiển | Xuất {count} bảng điều khiển",
+      "exportDialogSubtitle": "Xem lại bảng điều khiển, sau đó tải xuống dưới dạng JSON hoặc Terraform cho nhà cung cấp OpenObserve.",
       "errorExporting": "Lỗi xuất dashboards",
       "deletingDashboards": "Đang xóa dashboards...",
       "noneSelectedForDeletion": "Không có dashboard nào được chọn để xóa",
@@ -8233,7 +8245,9 @@
     "severityCriticalDescription": "Sự cố ưu tiên cao nhất",
     "severityErrorDescription": "Sự cố lỗi tiêu chuẩn",
     "severityWarningDescription": "Sự cố mức cảnh báo",
-    "severityInfoDescription": "Sự cố thông tin"
+    "severityInfoDescription": "Sự cố thông tin",
+    "exportDialogTitle": "Xuất đích đến | Xuất {count} đích đến",
+    "exportDialogSubtitle": "Xem lại đích đến, sau đó tải xuống dưới dạng JSON hoặc Terraform cho nhà cung cấp OpenObserve."
   },
   "pipeline_destinations": {
     "header": "Đích Pipeline",
@@ -10371,7 +10385,9 @@
     "period": "Chu kỳ",
     "cron": "Cron",
     "type": "Loại",
-    "run_pipeline": "Chạy đường ống"
+    "run_pipeline": "Chạy đường ống",
+    "exportDialogTitle": "Xuất pipeline | Xuất {count} pipeline",
+    "exportDialogSubtitle": "Xem lại pipeline, sau đó tải xuống dưới dạng JSON hoặc Terraform cho nhà cung cấp OpenObserve."
   },
   "alert_list": {
     "alert_history": "Lịch sử"

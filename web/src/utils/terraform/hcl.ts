@@ -1,16 +1,24 @@
 // Copyright 2026 OpenObserve Inc.
 //
 // hcl.ts — the HCL writer shared by the per-resource Terraform exporters
-// (alerts, SLOs). It knows how to spell values and lay out blocks; the callers
-// own the mapping from an API payload to attribute names.
+// (alerts, composite alerts, SLOs, dashboards). It knows how to spell values,
+// lay out blocks and write import blocks; the callers own the mapping from an
+// API payload to attribute names.
 //
 // Output is `terraform fmt`-canonical, including `=` alignment, so what a user
 // copies out of the UI is already what fmt would produce.
 
 import { PROVIDER_SOURCE, PROVIDER_VERSION } from "./provider";
 
-/** Why a payload cannot be expressed as a Terraform resource. */
-export type TerraformUnsupportedReason = "anomaly" | "incomplete";
+/**
+ * Why a payload cannot be expressed as a Terraform resource.
+ *
+ * `anomaly` and `scheduled` are both "the provider has no resource for this
+ * shape yet", kept apart because they are different gaps and a reader chasing
+ * one should not be told the other. `incomplete` means the payload itself is
+ * missing something the resource requires.
+ */
+export type TerraformUnsupportedReason = "anomaly" | "scheduled" | "incomplete";
 
 export interface TerraformUnsupportedItem {
   name: string;
@@ -24,6 +32,53 @@ export interface TerraformExport {
   unsupported: TerraformUnsupportedItem[];
   /** Source fields the provider schema cannot carry, e.g. `having.ignore_case`. */
   droppedFields: string[];
+}
+
+/**
+ * What every exporter needs in order to write `import` blocks: the organization
+ * the definitions were read from, and the server-assigned id of each one.
+ *
+ * The ids arrive separately rather than on the payloads because the export
+ * endpoints deliberately strip them — an exported definition describes a
+ * resource to CREATE, and carrying the source id would make it look like it
+ * describes the one it came from. Import blocks need exactly that stripped id
+ * back, so it is passed alongside instead of being put back on the payload.
+ *
+ * `ids` is aligned to the payload array by index. Exporters skip items they
+ * cannot render, so they track the index themselves rather than relying on the
+ * output order.
+ */
+export interface TerraformIdentityOptions {
+  /** Organization the definitions came from. Import blocks need it for the id. */
+  orgId?: string;
+  /** Server-assigned ids, aligned by index with the payloads. */
+  ids?: (string | null | undefined)[];
+}
+
+/** A resource to adopt into state rather than create. */
+export interface ImportTarget {
+  /** Resource type, e.g. `openobserve_alert`. */
+  type: string;
+  /** The label the resource block was written under. */
+  label: string;
+  /** Server-assigned resource id, without the org prefix. */
+  id: string;
+}
+
+/**
+ * Builds an import target, or nothing when the caller has no id to import by.
+ *
+ * Every resource this exports uses the same `{org_id}/{id}` import address, so
+ * the shape is assembled here rather than repeated per exporter.
+ */
+export function importTarget(
+  type: string,
+  label: string,
+  orgId: string | undefined,
+  id: unknown,
+): ImportTarget[] {
+  if (!orgId || typeof id !== "string" || id === "") return [];
+  return [{ type, label, id }];
 }
 
 export const INDENT = "  ";
@@ -216,7 +271,59 @@ export function providerHeader(): string {
   ].join("\n");
 }
 
-/** Assembles the finished document, or "" when no resource was rendered. */
-export function document(resources: string[]): string {
-  return resources.length ? `${providerHeader()}\n\n${resources.join("\n\n")}\n` : "";
+/**
+ * The `import` section appended to an export.
+ *
+ * An exported configuration describes resources that already exist. Applying it
+ * as-is creates a SECOND copy of each one, which is the single most expensive
+ * mistake available here. `import` blocks (Terraform 1.5+, and OpenTofu 1.6+)
+ * say "adopt the existing object into this address instead", so the first
+ * `terraform apply` reconciles rather than duplicates.
+ *
+ * They are emitted live rather than commented out because adopting what you
+ * already run is the reason to export in the first place. The comment says the
+ * one case where they are wrong — copying the config into a different
+ * organization, where these ids do not resolve — and what to do about it.
+ */
+export function importSection(imports: ImportTarget[], orgId: string): string {
+  if (!imports.length) return "";
+  const header = [
+    "# Adopt the existing objects instead of creating copies of them.",
+    "#",
+    "# `terraform plan` reports these as imports rather than creations, and the",
+    "# first apply brings them under management unchanged. Once that apply has",
+    "# run the blocks have done their job and can be deleted.",
+    "#",
+    "# Delete them BEFORE applying if this configuration is going somewhere else:",
+    `# the ids below resolve only in the "${orgId}" organization, and a different`,
+    "# organization needs these resources created rather than adopted.",
+    "#",
+    "# Requires Terraform 1.5+ or OpenTofu 1.6+.",
+  ].join("\n");
+
+  const blocks = imports.map((target) =>
+    [
+      "import {",
+      // `to` is a resource address, not a string, so it is written unquoted.
+      `${INDENT}to = ${target.type}.${target.label}`,
+      `${INDENT}id = ${quote(`${orgId}/${target.id}`)}`,
+      "}",
+    ].join("\n"),
+  );
+
+  return `${header}\n\n${blocks.join("\n\n")}`;
+}
+
+/**
+ * Assembles the finished document, or "" when no resource was rendered.
+ *
+ * Import blocks come after the resources they refer to. Terraform does not care
+ * about order, and a reader wants the definitions first.
+ */
+export function document(resources: string[], imports: ImportTarget[] = [], orgId = ""): string {
+  if (!resources.length) return "";
+  const sections = [providerHeader(), resources.join("\n\n")];
+  const importBlocks = orgId ? importSection(imports, orgId) : "";
+  if (importBlocks) sections.push(importBlocks);
+  return `${sections.join("\n\n")}\n`;
 }

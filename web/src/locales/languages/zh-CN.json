@@ -3666,6 +3666,16 @@
       "chooseMethod": "选择集成方式",
       "chooseMethodPrompt": "选择如何集成 {service}："
     },
+    "iac": {
+      "shortName": "以代码方式管理",
+      "title": "以代码方式管理 {brand}",
+      "body": "将可观测性配置定义为 Terraform 或 OpenTofu，并与其余基础设施一起纳入版本控制。在任意受支持资源的列表页中导出该资源，即可获得可直接应用的配置，其中还包含用于纳管现有资源的 import 块。",
+      "registriesLabel": "可在以下获取",
+      "resourceAlerts": "告警（包括组合告警）",
+      "resourceSlos": "SLO",
+      "resourceDashboards": "仪表盘",
+      "resourcePipelines": "流水线和流水线目标"
+    },
     "mcp": {
       "name": "OpenObserve MCP 服务器",
       "shortName": "MCP 服务器",
@@ -5149,6 +5159,8 @@
       "folderDeletionFailed": "文件夹删除失败",
       "errorFetchingSearch": "获取搜索结果时出错",
       "exportedSuccessfully": "已成功导出 {count} 个仪表盘。",
+      "exportDialogTitle": "导出仪表盘 | 导出 {count} 个仪表盘",
+      "exportDialogSubtitle": "检查仪表盘，然后将其下载为 JSON，或下载为 OpenObserve provider 的 Terraform 配置。",
       "errorExporting": "导出仪表盘时出错",
       "deletingDashboards": "正在删除仪表盘...",
       "noneSelectedForDeletion": "未选择要删除的仪表盘",
@@ -8233,7 +8245,9 @@
     "severityCriticalDescription": "最高优先级事件",
     "severityErrorDescription": "标准错误事件",
     "severityWarningDescription": "警告级事件",
-    "severityInfoDescription": "信息级事件"
+    "severityInfoDescription": "信息级事件",
+    "exportDialogTitle": "导出目标 | 导出 {count} 个目标",
+    "exportDialogSubtitle": "检查目标，然后将其下载为 JSON，或下载为 OpenObserve provider 的 Terraform 配置。"
   },
   "pipeline_destinations": {
     "header": "流水线目标",
@@ -10371,7 +10385,9 @@
     "period": "时期",
     "cron": "Cron",
     "type": "类型",
-    "run_pipeline": "运行流水线"
+    "run_pipeline": "运行流水线",
+    "exportDialogTitle": "导出流水线 | 导出 {count} 条流水线",
+    "exportDialogSubtitle": "检查流水线，然后将其下载为 JSON，或下载为 OpenObserve provider 的 Terraform 配置。"
   },
   "alert_list": {
     "alert_history": "历史"

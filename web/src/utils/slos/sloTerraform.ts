@@ -17,12 +17,19 @@
 // provider — it is derived from whichever block is present — as are the id and
 // the definition generation, so none of them are written.
 
-import type { Node, TerraformExport, TerraformUnsupportedItem } from "@/utils/terraform/hcl";
+import type {
+  ImportTarget,
+  Node,
+  TerraformExport,
+  TerraformIdentityOptions,
+  TerraformUnsupportedItem,
+} from "@/utils/terraform/hcl";
 import {
   attr,
   block,
   boolWhen,
   document,
+  importTarget,
   list,
   num,
   quote,
@@ -31,7 +38,7 @@ import {
   str,
 } from "@/utils/terraform/hcl";
 
-export interface SloTerraformOptions {
+export interface SloTerraformOptions extends TerraformIdentityOptions {
   /**
    * Folder the SLO lives in, emitted only when it is not the default. SLOs share
    * the alert folder namespace; OpenObserve has no separate SLO folder type,
@@ -166,15 +173,22 @@ export function slosToTerraform(
   const used = new Set<string>();
   const unsupported: TerraformUnsupportedItem[] = [];
   const resources: string[] = [];
+  const imports: ImportTarget[] = [];
 
-  for (const slo of slos) {
-    if (!slo || typeof slo !== "object") continue;
+  slos.forEach((slo, index) => {
+    if (!slo || typeof slo !== "object") return;
     if (isIncomplete(slo)) {
       unsupported.push({ name: String(slo.name ?? ""), reason: "incomplete" });
-      continue;
+      return;
     }
-    resources.push(sloResource(slo, resourceLabel(slo.name, used, "slo"), options));
-  }
+    const label = resourceLabel(slo.name, used, "slo");
+    resources.push(sloResource(slo, label, options));
+    imports.push(...importTarget("openobserve_slo", label, options.orgId, options.ids?.[index]));
+  });
 
-  return { hcl: document(resources), unsupported, droppedFields: [] };
+  return {
+    hcl: document(resources, imports, options.orgId ?? ""),
+    unsupported,
+    droppedFields: [],
+  };
 }

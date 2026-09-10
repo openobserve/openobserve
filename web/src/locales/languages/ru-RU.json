@@ -3666,6 +3666,16 @@
       "chooseMethod": "Выберите способ интеграции",
       "chooseMethodPrompt": "Выберите, как интегрировать {service}:"
     },
+    "iac": {
+      "shortName": "Управление как кодом",
+      "title": "Управление {brand} как кодом",
+      "body": "Определите конфигурацию наблюдаемости как Terraform или OpenTofu и храните её в системе контроля версий вместе с остальной инфраструктурой. Экспортируйте любой поддерживаемый ресурс со страницы его списка, чтобы получить готовую к применению конфигурацию, включая блоки импорта, которые подхватывают уже работающие ресурсы.",
+      "registriesLabel": "Доступно в",
+      "resourceAlerts": "Оповещения, включая составные оповещения",
+      "resourceSlos": "SLO",
+      "resourceDashboards": "Дашборды",
+      "resourcePipelines": "Конвейеры и назначения конвейеров"
+    },
     "mcp": {
       "name": "Сервер MCP OpenObserve",
       "shortName": "Сервер MCP",
@@ -5149,6 +5159,8 @@
       "folderDeletionFailed": "Не удалось удалить папку",
       "errorFetchingSearch": "Ошибка при получении результатов поиска",
       "exportedSuccessfully": "{count} панелей мониторинга успешно экспортировано.",
+      "exportDialogTitle": "Экспорт дашборда | Экспорт {count} дашбордов",
+      "exportDialogSubtitle": "Проверьте дашборд, затем скачайте его в формате JSON или Terraform для провайдера OpenObserve.",
       "errorExporting": "Ошибка экспорта панелей мониторинга",
       "deletingDashboards": "Удаление панелей мониторинга...",
       "noneSelectedForDeletion": "Не выбрано ни одной панели мониторинга для удаления",
@@ -8233,7 +8245,9 @@
     "severityCriticalDescription": "Инциденты наивысшего приоритета",
     "severityErrorDescription": "Стандартные инциденты ошибок",
     "severityWarningDescription": "Инциденты уровня предупреждения",
-    "severityInfoDescription": "Информационные инциденты"
+    "severityInfoDescription": "Информационные инциденты",
+    "exportDialogTitle": "Экспорт назначения | Экспорт {count} назначений",
+    "exportDialogSubtitle": "Проверьте назначение, затем скачайте его в формате JSON или Terraform для провайдера OpenObserve."
   },
   "pipeline_destinations": {
     "header": "Получатели конвейера",
@@ -10371,7 +10385,9 @@
     "period": "Период",
     "cron": "Cron",
     "type": "Тип",
-    "run_pipeline": "Запустить конвейер"
+    "run_pipeline": "Запустить конвейер",
+    "exportDialogTitle": "Экспорт конвейера | Экспорт {count} конвейеров",
+    "exportDialogSubtitle": "Проверьте конвейер, затем скачайте его в формате JSON или Terraform для провайдера OpenObserve."
   },
   "alert_list": {
     "alert_history": "История"

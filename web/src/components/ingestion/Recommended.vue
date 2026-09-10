@@ -221,6 +221,21 @@ export default defineComponent({
       contentClass: "tab_content",
     });
 
+    // Sits below MCP: both are "connect OpenObserve to something else" rather
+    // than an ingestion method, and neither is edition-gated.
+    recommendedTabs.push({
+      name: "recommendedIac",
+      to: {
+        name: "recommendedIac",
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      },
+      icon: "code",
+      label: t("ingestion.iac.shortName"),
+      contentClass: "tab_content",
+    });
+
     return {
       t,
       store,

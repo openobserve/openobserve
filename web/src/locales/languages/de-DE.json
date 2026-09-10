@@ -3666,6 +3666,16 @@
       "chooseMethod": "Integrationsmethode auswählen",
       "chooseMethodPrompt": "Wählen Sie, wie Sie {service} integrieren möchten:"
     },
+    "iac": {
+      "shortName": "Als Code verwalten",
+      "title": "{brand} als Code verwalten",
+      "body": "Definieren Sie Ihre Observability-Konfiguration als Terraform oder OpenTofu und halten Sie sie zusammen mit dem Rest Ihrer Infrastruktur in der Versionskontrolle. Exportieren Sie jede unterstützte Ressource von ihrer Listenseite, um eine direkt anwendbare Konfiguration zu erhalten, einschließlich Import-Blöcken, die übernehmen, was Sie bereits betreiben.",
+      "registriesLabel": "Verfügbar auf",
+      "resourceAlerts": "Warnmeldungen, einschließlich zusammengesetzter Warnmeldungen",
+      "resourceSlos": "SLOs",
+      "resourceDashboards": "Dashboards",
+      "resourcePipelines": "Rohrleitungen und Rohrleitungsziele"
+    },
     "mcp": {
       "name": "OpenObserve MCP-Server",
       "shortName": "MCP-Server",
@@ -5149,6 +5159,8 @@
       "folderDeletionFailed": "Ordner-Löschung fehlgeschlagen",
       "errorFetchingSearch": "Fehler beim Abrufen der Suchergebnisse",
       "exportedSuccessfully": "{count} Dashboards erfolgreich exportiert.",
+      "exportDialogTitle": "Dashboard exportieren | {count} Dashboards exportieren",
+      "exportDialogSubtitle": "Überprüfen Sie das Dashboard und laden Sie es anschließend als JSON oder als Terraform für den OpenObserve-Provider herunter.",
       "errorExporting": "Fehler beim Exportieren der Dashboards",
       "deletingDashboards": "Dashboards werden gelöscht...",
       "noneSelectedForDeletion": "Keine Dashboards zum Löschen ausgewählt",
@@ -8233,7 +8245,9 @@
     "severityCriticalDescription": "Vorfälle mit höchster Priorität",
     "severityErrorDescription": "Standardfehler-Vorfälle",
     "severityWarningDescription": "Vorfälle auf Warnstufe",
-    "severityInfoDescription": "Informationelle Vorfälle"
+    "severityInfoDescription": "Informationelle Vorfälle",
+    "exportDialogTitle": "Ziel exportieren | {count} Ziele exportieren",
+    "exportDialogSubtitle": "Überprüfen Sie das Ziel und laden Sie es anschließend als JSON oder als Terraform für den OpenObserve-Provider herunter."
   },
   "pipeline_destinations": {
     "header": "Rohrleitungsziele",
@@ -10371,7 +10385,9 @@
     "period": "Zeitraum",
     "cron": "Cron",
     "type": "Typ",
-    "run_pipeline": "Pipeline ausführen"
+    "run_pipeline": "Pipeline ausführen",
+    "exportDialogTitle": "Rohrleitung exportieren | {count} Rohrleitungen exportieren",
+    "exportDialogSubtitle": "Überprüfen Sie die Rohrleitung und laden Sie sie anschließend als JSON oder als Terraform für den OpenObserve-Provider herunter."
   },
   "alert_list": {
     "alert_history": "Verlauf der Warnmeldungen"

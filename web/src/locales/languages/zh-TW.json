@@ -3666,6 +3666,16 @@
       "chooseMethod": "選擇整合方式",
       "chooseMethodPrompt": "選擇您要如何整合 {service}："
     },
+    "iac": {
+      "shortName": "以程式碼管理",
+      "title": "以程式碼管理 {brand}",
+      "body": "將您的可觀測性設定定義為 Terraform 或 OpenTofu，並與其他基礎設施一同納入版本控制。您可以從任何支援的資源列表頁匯出資源，取得可直接套用的設定，其中包含可沿用現有資源的 import 區塊。",
+      "registriesLabel": "可於以下取得",
+      "resourceAlerts": "警示，包含複合警示",
+      "resourceSlos": "SLOs",
+      "resourceDashboards": "儀表板",
+      "resourcePipelines": "管線與管線目標"
+    },
     "mcp": {
       "name": "OpenObserve MCP 伺服器",
       "shortName": "MCP 伺服器",
@@ -5144,6 +5154,8 @@
       "folderDeletionFailed": "資料夾刪除失敗",
       "errorFetchingSearch": "取得搜尋結果時發生錯誤",
       "exportedSuccessfully": "已成功匯出 {count} 個儀表板。",
+      "exportDialogTitle": "匯出儀表板 | 匯出 {count} 個儀表板",
+      "exportDialogSubtitle": "檢閱此儀表板，然後將其下載為 JSON，或下載為適用於 OpenObserve 供應商的 Terraform。",
       "errorExporting": "匯出儀表板時發生錯誤",
       "deletingDashboards": "正在刪除儀表板...",
       "noneSelectedForDeletion": "未選取要刪除的儀表板",
@@ -8228,7 +8240,9 @@
     "severityCriticalDescription": "最高優先級事件",
     "severityErrorDescription": "標準錯誤事件",
     "severityWarningDescription": "警告等級事件",
-    "severityInfoDescription": "資訊事件"
+    "severityInfoDescription": "資訊事件",
+    "exportDialogTitle": "匯出目標 | 匯出 {count} 個目標",
+    "exportDialogSubtitle": "檢閱此目標，然後將其下載為 JSON，或下載為適用於 OpenObserve 供應商的 Terraform。"
   },
   "pipeline_destinations": {
     "header": "管線目標",
@@ -10366,7 +10380,9 @@
     "period": "期間",
     "cron": "Cron",
     "type": "類型",
-    "run_pipeline": "執行管線"
+    "run_pipeline": "執行管線",
+    "exportDialogTitle": "匯出管線 | 匯出 {count} 個管線",
+    "exportDialogSubtitle": "檢閱此管線，然後將其下載為 JSON，或下載為適用於 OpenObserve 供應商的 Terraform。"
   },
   "alert_list": {
     "alert_history": "警示歷史紀錄"

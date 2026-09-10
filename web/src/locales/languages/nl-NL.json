@@ -3666,6 +3666,16 @@
       "chooseMethod": "Kies integratiemethode",
       "chooseMethodPrompt": "Selecteer hoe u {service} wilt integreren:"
     },
+    "iac": {
+      "shortName": "Beheren als code",
+      "title": "Beheer {brand} als code",
+      "body": "Definieer je waarneembaarheidsconfiguratie als Terraform of OpenTofu en houd deze in versiebeheer naast de rest van je infrastructuur. Exporteer elke ondersteunde resource vanaf de bijbehorende lijstpagina om een direct toepasbare configuratie te krijgen, inclusief importblokken die overnemen wat je al draait.",
+      "registriesLabel": "Beschikbaar op",
+      "resourceAlerts": "Alarmen, inclusief samengestelde alarmen",
+      "resourceSlos": "SLO's",
+      "resourceDashboards": "Dashboards",
+      "resourcePipelines": "Pijpleidingen en pijpleidingbestemmingen"
+    },
     "mcp": {
       "name": "OpenObserve MCP-server",
       "shortName": "MCP-server",
@@ -5149,6 +5159,8 @@
       "folderDeletionFailed": "Map verwijderen mislukt",
       "errorFetchingSearch": "Fout bij ophalen zoekresultaten",
       "exportedSuccessfully": "{count} dashboards succesvol geëxporteerd.",
+      "exportDialogTitle": "Dashboard exporteren | {count} dashboards exporteren",
+      "exportDialogSubtitle": "Controleer het dashboard en download het vervolgens als JSON of als Terraform voor de OpenObserve-provider.",
       "errorExporting": "Fout bij exporteren dashboards",
       "deletingDashboards": "Dashboards verwijderen...",
       "noneSelectedForDeletion": "Geen dashboards geselecteerd voor verwijdering",
@@ -8233,7 +8245,9 @@
     "severityCriticalDescription": "Incidenten met hoogste prioriteit",
     "severityErrorDescription": "Standaard foutincidenten",
     "severityWarningDescription": "Incidenten op waarschuwingsniveau",
-    "severityInfoDescription": "Informatieve incidenten"
+    "severityInfoDescription": "Informatieve incidenten",
+    "exportDialogTitle": "Bestemming exporteren | {count} bestemmingen exporteren",
+    "exportDialogSubtitle": "Controleer de bestemming en download deze vervolgens als JSON of als Terraform voor de OpenObserve-provider."
   },
   "pipeline_destinations": {
     "header": "Pijpleidingbestemmingen",
@@ -10371,7 +10385,9 @@
     "period": "Periode",
     "cron": "Cron",
     "type": "Typ",
-    "run_pipeline": "Pipeline uitvoeren"
+    "run_pipeline": "Pipeline uitvoeren",
+    "exportDialogTitle": "Pijpleiding exporteren | {count} pijpleidingen exporteren",
+    "exportDialogSubtitle": "Controleer de pijpleiding en download deze vervolgens als JSON of als Terraform voor de OpenObserve-provider."
   },
   "alert_list": {
     "alert_history": "Waarschuwingsgeschiedenis"

@@ -115,6 +115,7 @@ import AIIntegrations from "@/components/ingestion/AIIntegrations.vue";
 import AIIntegrationDetail from "@/components/ingestion/ai/AIIntegrationDetail.vue";
 import { aiCategories } from "@/components/ingestion/ai/data";
 import McpCrossLink from "@/components/ingestion/McpCrossLink.vue";
+import IacCrossLink from "@/components/ingestion/IacCrossLink.vue";
 
 const useIngestionRoutes = () => {
   // One route per AI integration across all tabs. `aiCategories` is already
@@ -418,6 +419,17 @@ const useIngestionRoutes = () => {
               path: "mcp",
               name: "recommendedMcp",
               component: McpCrossLink,
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              },
+            },
+            // Where the Terraform / OpenTofu provider lives. Like the MCP
+            // pointer above it, this is a destination rather than an ingestion
+            // method, and it is registered on every edition.
+            {
+              path: "iac",
+              name: "recommendedIac",
+              component: IacCrossLink,
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },

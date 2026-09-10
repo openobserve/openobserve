@@ -3666,6 +3666,16 @@
       "chooseMethod": "Choisir la méthode d'intégration",
       "chooseMethodPrompt": "Sélectionnez comment vous souhaitez intégrer {service} :"
     },
+    "iac": {
+      "shortName": "Gérer en tant que code",
+      "title": "Gérer {brand} en tant que code",
+      "body": "Définissez votre configuration d'observabilité en Terraform ou OpenTofu et conservez-la dans le contrôle de version aux côtés du reste de votre infrastructure. Exportez toute ressource prise en charge depuis sa page de liste pour obtenir une configuration prête à appliquer, y compris les blocs d'import qui adoptent ce que vous exécutez déjà.",
+      "registriesLabel": "Disponible sur",
+      "resourceAlerts": "Alertes, y compris les alertes composites",
+      "resourceSlos": "SLO",
+      "resourceDashboards": "Tableaux de bord",
+      "resourcePipelines": "Canalisations et destinations de canalisations"
+    },
     "mcp": {
       "name": "Serveur MCP OpenObserve",
       "shortName": "Serveur MCP",
@@ -5149,6 +5159,8 @@
       "folderDeletionFailed": "Échec de la suppression du dossier",
       "errorFetchingSearch": "Erreur lors de la récupération des résultats de recherche",
       "exportedSuccessfully": "{count} tableau(x) de bord exporté(s) avec succès.",
+      "exportDialogTitle": "Exporter le tableau de bord | Exporter {count} tableaux de bord",
+      "exportDialogSubtitle": "Vérifiez le tableau de bord, puis téléchargez-le au format JSON ou Terraform pour le fournisseur OpenObserve.",
       "errorExporting": "Erreur lors de l'exportation des tableaux de bord",
       "deletingDashboards": "Suppression des tableaux de bord...",
       "noneSelectedForDeletion": "Aucun tableau de bord sélectionné pour la suppression",
@@ -8233,7 +8245,9 @@
     "severityCriticalDescription": "Incidents de priorité la plus élevée",
     "severityErrorDescription": "Incidents d'erreur standard",
     "severityWarningDescription": "Incidents de niveau d'avertissement",
-    "severityInfoDescription": "Incidents informatifs"
+    "severityInfoDescription": "Incidents informatifs",
+    "exportDialogTitle": "Exporter la destination | Exporter {count} destinations",
+    "exportDialogSubtitle": "Vérifiez la destination, puis téléchargez-la au format JSON ou Terraform pour le fournisseur OpenObserve."
   },
   "pipeline_destinations": {
     "header": "Destinations des canalisations",
@@ -10371,7 +10385,9 @@
     "period": "Période",
     "cron": "Cron",
     "type": "Tapez",
-    "run_pipeline": "Exécuter un pipeline"
+    "run_pipeline": "Exécuter un pipeline",
+    "exportDialogTitle": "Exporter la canalisation | Exporter {count} canalisations",
+    "exportDialogSubtitle": "Vérifiez la canalisation, puis téléchargez-la au format JSON ou Terraform pour le fournisseur OpenObserve."
   },
   "alert_list": {
     "alert_history": "Historique des alertes"

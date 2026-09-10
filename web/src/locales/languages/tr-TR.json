@@ -3666,6 +3666,16 @@
       "chooseMethod": "Entegrasyon Yöntemini Seçin",
       "chooseMethodPrompt": "{service} hizmetini nasıl entegre etmek istediğinizi seçin:"
     },
+    "iac": {
+      "shortName": "Kod olarak yönet",
+      "title": "{brand}'i kod olarak yönet",
+      "body": "Gözlemlenebilirlik yapılandırmanızı Terraform veya OpenTofu olarak tanımlayın ve altyapınızın geri kalanıyla birlikte sürüm kontrolünde tutun. Desteklenen herhangi bir kaynağı liste sayfasından dışa aktararak, halihazırda çalıştırdıklarınızı benimseyen içe aktarma blokları dahil olmak üzere uygulamaya hazır bir yapılandırma elde edin.",
+      "registriesLabel": "Şurada kullanılabilir",
+      "resourceAlerts": "Bileşik uyarılar dahil uyarılar",
+      "resourceSlos": "SLO'lar",
+      "resourceDashboards": "Gösterge panoları",
+      "resourcePipelines": "Boru hatları ve boru hattı hedefleri"
+    },
     "mcp": {
       "name": "OpenObserve MCP Sunucusu",
       "shortName": "MCP Sunucusu",
@@ -5149,6 +5159,8 @@
       "folderDeletionFailed": "Klasör silme başarısız oldu",
       "errorFetchingSearch": "Arama sonuçları alınırken hata",
       "exportedSuccessfully": "{count} Pano başarıyla dışa aktarıldı.",
+      "exportDialogTitle": "Gösterge panelini dışa aktar | {count} gösterge panelini dışa aktar",
+      "exportDialogSubtitle": "Gösterge panelini inceleyin, ardından JSON olarak veya OpenObserve sağlayıcısı için Terraform olarak indirin.",
       "errorExporting": "Panolar dışa aktarılırken hata",
       "deletingDashboards": "Panolar siliniyor...",
       "noneSelectedForDeletion": "Silme için hiçbir pano seçilmedi",
@@ -8233,7 +8245,9 @@
     "severityCriticalDescription": "En yüksek öncelikli olaylar",
     "severityErrorDescription": "Standart hata olayları",
     "severityWarningDescription": "Uyarı düzeyi olayları",
-    "severityInfoDescription": "Bilgilendirme olayları"
+    "severityInfoDescription": "Bilgilendirme olayları",
+    "exportDialogTitle": "Hedefi dışa aktar | {count} hedefi dışa aktar",
+    "exportDialogSubtitle": "Hedefi inceleyin, ardından JSON olarak veya OpenObserve sağlayıcısı için Terraform olarak indirin."
   },
   "pipeline_destinations": {
     "header": "Boru Hattı Hedefleri",
@@ -10371,7 +10385,9 @@
     "period": "Dönem",
     "cron": "Cron",
     "type": "Tür",
-    "run_pipeline": "Boru Hattı Çalıştır"
+    "run_pipeline": "Boru Hattı Çalıştır",
+    "exportDialogTitle": "Boru hattını dışa aktar | {count} boru hattını dışa aktar",
+    "exportDialogSubtitle": "Boru hattını inceleyin, ardından JSON olarak veya OpenObserve sağlayıcısı için Terraform olarak indirin."
   },
   "alert_list": {
     "alert_history": "Uyarı Geçmişi"
