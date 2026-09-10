@@ -243,6 +243,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, computed, watch, onUnmounted } from "vue";
+import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -276,6 +277,7 @@ export default defineComponent({
   emits: ["update:open"],
   setup(props) {
     const { t } = useI18nTyped();
+    const store = useStore();
     const tasks = ref<CleanupTask[]>([]);
     const loading = ref(false);
     let pollTimer: ReturnType<typeof setInterval> | null = null;
@@ -396,7 +398,10 @@ export default defineComponent({
       if (!props.orgId) return;
       loading.value = true;
       try {
-        const res = await organizationsService.get_cleanup_tasks(props.orgId);
+        const res = await organizationsService.get_cleanup_tasks(
+          store.state.selectedOrganization.identifier,
+          props.orgId,
+        );
         tasks.value = res.data ?? [];
       } catch (e) {
         // silently fail — next poll will retry
