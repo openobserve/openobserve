@@ -52,6 +52,161 @@ impl Engine {
             return Ok(Value::Float((self.eval_ctx.start / 1_000_000) as f64));
         }
 
+        let start = std::time::Instant::now();
+        let result = if let Some(range_func) = func_name.range_func() {
+            let input = self.call_expr_arg(args, 0).await?;
+            functions::eval_range(input, range_func, &self.eval_ctx)?
+        } else {
+            self.call_builtin(func_name, args).await?
+        };
+        log::info!(
+            "[trace_id: {}] [PromQL Timing] call_expr({}) execution took: {:?}",
+            self.trace_id,
+            func.name,
+            start.elapsed()
+        );
+        Ok(result)
+    }
+
+    async fn call_builtin(&mut self, func_name: Func, args: &FunctionArgs) -> Result<Value> {
+        Ok(match func_name {
+            Func::Clamp => {
+                let err = "Invalid args, expected clamp(v instant-vector, min scalar, max scalar)";
+                self.ensure_args_len(args, 3, err)?;
+                let input = self.call_expr_arg(args, 0).await?;
+                let min = self.call_expr_arg(args, 1).await?;
+                let min_f = self.parse_f64_else_err(&min, err)?;
+                let max = self.call_expr_arg(args, 2).await?;
+                let max_f = self.parse_f64_else_err(&max, err)?;
+
+                if min_f > max_f {
+                    return Ok(Value::Matrix(vec![]));
+                }
+                functions::clamp(input, min_f, max_f)?
+            }
+            Func::ClampMax => {
+                let err = "Invalid args, expected clamp(v instant-vector, max scalar)";
+                self.ensure_args_len(args, 2, err)?;
+                let input = self.call_expr_arg(args, 0).await?;
+                let max = self.call_expr_arg(args, 1).await?;
+                let max_f = self.parse_f64_else_err(&max, err)?;
+
+                functions::clamp(input, f64::MIN, max_f)?
+            }
+            Func::ClampMin => {
+                let err = "Invalid args, expected clamp(v instant-vector, min scalar)";
+                self.ensure_args_len(args, 2, err)?;
+                let input = self.call_expr_arg(args, 0).await?;
+                let min = self.call_expr_arg(args, 1).await?;
+                let min_f = self.parse_f64_else_err(&min, err)?;
+
+                functions::clamp(input, min_f, f64::MAX)?
+            }
+            Func::HistogramQuantile => {
+                let err = "Invalid args, expected histogram_quantile(phi scalar, b instant-vector)";
+                self.ensure_args_len(args, 2, err)?;
+                let phi = self.call_expr_arg(args, 0).await?;
+                let phi_f = self.parse_f64_else_err(&phi, err)?;
+                let input = self.call_expr_arg(args, 1).await?;
+
+                functions::histogram_quantile(phi_f, input, &self.eval_ctx)?
+            }
+            Func::HoltWinters => {
+                let err =
+                    "Invalid args, expected holt_winters(v range-vector, sf scalar, tf scalar)";
+                self.ensure_args_len(args, 3, err)?;
+                let input = self.call_expr_arg(args, 0).await?;
+                let sf = self.call_expr_arg(args, 1).await?;
+                let scaling_factor = self.parse_f64_else_err(&sf, err)?;
+                let tf = self.call_expr_arg(args, 2).await?;
+                let trend_factor = self.parse_f64_else_err(&tf, err)?;
+
+                functions::holt_winters(input, scaling_factor, trend_factor, &self.eval_ctx)?
+            }
+            Func::LabelJoin => {
+                let err = "Invalid args, expected label_join(v instant-vector, dst string, sep string, src_1 string, src_2 string, ...)";
+                self.ensure_ge_three_args(args, err)?;
+                let input = self.call_expr_arg(args, 0).await?;
+                let dst_label = self.call_expr_arg(args, 1).await?.get_string().ok_or(
+                    DataFusionError::NotImplemented("Invalid destination label found".into()),
+                )?;
+                let separator = self.call_expr_arg(args, 2).await?.get_string().ok_or(
+                    DataFusionError::NotImplemented("Invalid separator label found".into()),
+                )?;
+                let mut source_labels = vec![];
+                for each_src in args.args[3..].iter() {
+                    if let Value::String(label) = self.exec_expr(each_src).await.unwrap() {
+                        source_labels.push(label);
+                    };
+                }
+                if source_labels.is_empty() {
+                    return Err(DataFusionError::NotImplemented(
+                        "source labels can not be empty or invalid".into(),
+                    ));
+                }
+                functions::label_join(input, &dst_label, &separator, source_labels)?
+            }
+            Func::LabelReplace => {
+                let err = "Invalid args, expected label_replace(v instant-vector, dst_label string, replacement string, src_label string, regex string)";
+                self.ensure_args_len(args, 5, err)?;
+                let input = self.call_expr_arg(args, 0).await?;
+                let dst_label = self.call_expr_arg(args, 1).await?.get_string().ok_or(
+                    DataFusionError::NotImplemented("Invalid destination label found".into()),
+                )?;
+                let replacement = self.call_expr_arg(args, 2).await?.get_string().ok_or(
+                    DataFusionError::NotImplemented("Invalid replacement string found".into()),
+                )?;
+                let src_label = self.call_expr_arg(args, 3).await?.get_string().ok_or(
+                    DataFusionError::NotImplemented("Invalid source label string found".into()),
+                )?;
+                let regex = self.call_expr_arg(args, 4).await?.get_string().ok_or(
+                    DataFusionError::NotImplemented("Invalid regex string found".into()),
+                )?;
+
+                functions::label_replace(input, &dst_label, &replacement, &src_label, &regex)?
+            }
+            Func::PredictLinear => {
+                let err = "Invalid args, expected predict_linear(v range-vector, t scalar)";
+                self.ensure_args_len(args, 2, err)?;
+                let input = self.call_expr_arg(args, 0).await?;
+                let prediction_steps = self.call_expr_arg(args, 1).await?;
+                let prediction_steps_f = self.parse_f64_else_err(&prediction_steps, err)?;
+
+                functions::predict_linear(input, prediction_steps_f, &self.eval_ctx)?
+            }
+            Func::QuantileOverTime => {
+                let err = "Invalid args, expected quantile_over_time(scalar, range-vector)";
+                self.ensure_args_len(args, 2, err)?;
+                let phi_quantile = self.call_expr_arg(args, 0).await?;
+                let phi_quantile_f = self.parse_f64_else_err(&phi_quantile, err)?;
+                let input = self.call_expr_arg(args, 1).await?;
+
+                functions::quantile_over_time(phi_quantile_f, input, &self.eval_ctx)?
+            }
+            Func::Round => {
+                let input = self
+                    .call_expr_arg(args, args.len().saturating_sub(1))
+                    .await?;
+                functions::round(input)?
+            }
+            Func::HistogramCount
+            | Func::HistogramFraction
+            | Func::HistogramSum
+            | Func::Sort
+            | Func::SortDesc => {
+                return Err(DataFusionError::NotImplemented(format!(
+                    "Unsupported Function: {func_name:?}"
+                )));
+            }
+            _ => self.call_single_arg_builtin(func_name, args).await?,
+        })
+    }
+
+    async fn call_single_arg_builtin(
+        &mut self,
+        func_name: Func,
+        args: &FunctionArgs,
+    ) -> Result<Value> {
         let input = if matches!(
             func_name,
             Func::DayOfMonth
@@ -83,32 +238,38 @@ impl Engine {
                 }
             }
         } else {
-            let input_index = match func_name {
-                Func::Clamp
-                | Func::ClampMax
-                | Func::ClampMin
-                | Func::HoltWinters
-                | Func::LabelJoin
-                | Func::LabelReplace
-                | Func::PredictLinear => 0,
-                _ => args.len().saturating_sub(1),
-            };
-            self.call_expr_arg(args, input_index).await?
+            self.call_expr_arg(args, 0).await?
         };
 
-        let start = std::time::Instant::now();
-        let result = if let Some(range_func) = func_name.range_func() {
-            functions::eval_range(input, range_func, &self.eval_ctx)?
-        } else {
-            self.call_builtin(func, func_name, input, args).await?
-        };
-        log::info!(
-            "[trace_id: {}] [PromQL Timing] call_expr({}) execution took: {:?}",
-            self.trace_id,
-            func.name,
-            start.elapsed()
-        );
-        Ok(result)
+        Ok(match func_name {
+            Func::Abs => functions::abs(input)?,
+            Func::Absent => functions::absent(input, &self.eval_ctx)?,
+            Func::AbsentOverTime => functions::absent_over_time(input, &self.eval_ctx)?,
+            Func::Ceil => functions::ceil(input)?,
+            Func::DayOfMonth => functions::day_of_month(input)?,
+            Func::DayOfWeek => functions::day_of_week(input)?,
+            Func::DayOfYear => functions::day_of_year(input)?,
+            Func::DaysInMonth => functions::days_in_month(input)?,
+            Func::Exp => functions::exp(input)?,
+            Func::Floor => functions::floor(input)?,
+            Func::Hour => functions::hour(input)?,
+            Func::Ln => functions::ln(input)?,
+            Func::Log10 => functions::log10(input)?,
+            Func::Log2 => functions::log2(input)?,
+            Func::Minute => functions::minute(input)?,
+            Func::Month => functions::month(input)?,
+            Func::Scalar => functions::scalar(input, &self.eval_ctx)?,
+            Func::Sgn => functions::sgn(input)?,
+            Func::Sqrt => functions::sqrt(input)?,
+            Func::Timestamp => functions::timestamp(input)?,
+            Func::Vector => functions::vector(input, &self.eval_ctx)?,
+            Func::Year => functions::year(input)?,
+            _ => {
+                return Err(DataFusionError::Internal(format!(
+                    "{func_name:?} must be evaluated before builtin dispatch"
+                )));
+            }
+        })
     }
 
     async fn call_expr_arg(&mut self, args: &FunctionArgs, index: usize) -> Result<Value> {
@@ -138,210 +299,6 @@ impl Engine {
             Value::Float(f) => Ok(*f),
             _ => Err(DataFusionError::NotImplemented(err.into())),
         }
-    }
-
-    async fn call_builtin(
-        &mut self,
-        func: &Function,
-        func_name: Func,
-        input: Value,
-        args: &FunctionArgs,
-    ) -> Result<Value> {
-        Ok(match func_name {
-            Func::Abs => functions::abs(input)?,
-            Func::Absent => functions::absent(input, &self.eval_ctx)?,
-            Func::AbsentOverTime => functions::absent_over_time(input, &self.eval_ctx)?,
-            Func::Ceil => functions::ceil(input)?,
-            Func::Clamp => {
-                let err =
-                    "Invalid args, expected \"clamp(v instant-vector, min scalar, max scalar)\"";
-                self.ensure_args_len(args, 3, err)?;
-
-                let min = self.call_expr_arg(args, 1).await?;
-                let max = self.call_expr_arg(args, 2).await?;
-
-                let (min_f, max_f) = match (min, max) {
-                    (Value::Float(min), Value::Float(max)) => {
-                        if min > max {
-                            return Ok(Value::Matrix(vec![]));
-                        }
-                        (min, max)
-                    }
-                    _ => {
-                        return Err(DataFusionError::NotImplemented(err.into()));
-                    }
-                };
-                functions::clamp(input, min_f, max_f)?
-            }
-            Func::ClampMax => {
-                let err = "Invalid args, expected \"clamp(v instant-vector, max scalar)\"";
-                self.ensure_args_len(args, 2, err)?;
-
-                let max = self.call_expr_arg(args, 1).await?;
-                let max_f = match max {
-                    Value::Float(max) => max,
-                    _ => {
-                        return Err(DataFusionError::NotImplemented(err.into()));
-                    }
-                };
-                functions::clamp(input, f64::MIN, max_f)?
-            }
-            Func::ClampMin => {
-                let err = "Invalid args, expected \"clamp(v instant-vector, min scalar)\"";
-                self.ensure_args_len(args, 2, err)?;
-
-                let min = self.call_expr_arg(args, 1).await?;
-                let min_f = match min {
-                    Value::Float(min) => min,
-                    _ => {
-                        return Err(DataFusionError::NotImplemented(err.into()));
-                    }
-                };
-                functions::clamp(input, min_f, f64::MAX)?
-            }
-            Func::DayOfMonth => functions::day_of_month(input)?,
-            Func::DayOfWeek => functions::day_of_week(input)?,
-            Func::DayOfYear => functions::day_of_year(input)?,
-            Func::DaysInMonth => functions::days_in_month(input)?,
-            Func::Exp => functions::exp(input)?,
-            Func::Floor => functions::floor(input)?,
-            Func::HistogramQuantile => {
-                let args = &args.args;
-                if args.len() != 2 {
-                    return Err(DataFusionError::Plan(format!(
-                        "{}: expected 2 arguments, got {}",
-                        func.name,
-                        args.len()
-                    )));
-                }
-                let phi = {
-                    match *args[0] {
-                        PromExpr::NumberLiteral(ref num) => num.val,
-                        _ => {
-                            return Err(DataFusionError::Plan(format!(
-                                "{}: the first argument must be a number",
-                                func.name
-                            )));
-                        }
-                    }
-                };
-
-                // Use range version if we have an eval context
-                functions::histogram_quantile(phi, input, &self.eval_ctx)?
-            }
-            Func::HoltWinters => {
-                let err =
-                    "Invalid args, expected \"holt_winters(v range-vector, sf scalar, tf scalar)\"";
-                self.ensure_args_len(args, 3, err)?;
-
-                let sf = self.call_expr_arg(args, 1).await?;
-                let tf = self.call_expr_arg(args, 2).await?;
-
-                let scaling_factor = self.parse_f64_else_err(&sf, err)?;
-                let trend_factor = self.parse_f64_else_err(&tf, err)?;
-
-                functions::holt_winters(input, scaling_factor, trend_factor, &self.eval_ctx)?
-            }
-            Func::Hour => functions::hour(input)?,
-            Func::LabelJoin => {
-                let err = "Invalid args, expected \"label_join(v instant-vector, dst string, sep string, src_1 string, src_2 string, ...)\"";
-                self.ensure_ge_three_args(args, err)?;
-
-                let dst_label = self.call_expr_arg(args, 1).await?.get_string().ok_or(
-                    DataFusionError::NotImplemented("Invalid destination label found".into()),
-                )?;
-                let separator = self.call_expr_arg(args, 2).await?.get_string().ok_or(
-                    DataFusionError::NotImplemented("Invalid separator label found".into()),
-                )?;
-
-                let mut source_labels = vec![];
-                for each_src in args.args[3..].iter() {
-                    if let Value::String(label) = self.exec_expr(each_src).await.unwrap() {
-                        source_labels.push(label);
-                    };
-                }
-                if source_labels.is_empty() {
-                    return Err(DataFusionError::NotImplemented(
-                        "source labels can not be empty or invalid".into(),
-                    ));
-                }
-                functions::label_join(input, &dst_label, &separator, source_labels)?
-            }
-            Func::LabelReplace => {
-                let err = "Invalid args, expected \"label_replace(v instant-vector, dst_label string, replacement string, src_label string, regex string)\"";
-
-                self.ensure_args_len(args, 5, err)?;
-
-                let dst_label = self.call_expr_arg(args, 1).await?.get_string().ok_or(
-                    DataFusionError::NotImplemented("Invalid destination label found".into()),
-                )?;
-                let replacement = self.call_expr_arg(args, 2).await?.get_string().ok_or(
-                    DataFusionError::NotImplemented("Invalid replacement string found".into()),
-                )?;
-
-                let src_label = self.call_expr_arg(args, 3).await?.get_string().ok_or(
-                    DataFusionError::NotImplemented("Invalid source label string found".into()),
-                )?;
-
-                let regex = self.call_expr_arg(args, 4).await?.get_string().ok_or(
-                    DataFusionError::NotImplemented("Invalid regex string found".into()),
-                )?;
-
-                functions::label_replace(input, &dst_label, &replacement, &src_label, &regex)?
-            }
-            Func::Ln => functions::ln(input)?,
-            Func::Log10 => functions::log10(input)?,
-            Func::Log2 => functions::log2(input)?,
-            Func::Minute => functions::minute(input)?,
-            Func::Month => functions::month(input)?,
-            Func::PredictLinear => {
-                let err = "Invalid args, expected \"predict_linear(v range-vector, t scalar)\"";
-
-                self.ensure_args_len(args, 2, err)?;
-
-                let prediction_steps = self.call_expr_arg(args, 1).await?.get_float().ok_or(
-                    DataFusionError::NotImplemented(
-                        "Invalid prediction_steps, f64 expected".into(),
-                    ),
-                )?;
-                functions::predict_linear(input, prediction_steps, &self.eval_ctx)?
-            }
-            Func::QuantileOverTime => {
-                let err = "Invalid args, expected \"quantile_over_time(scalar, range-vector)\"";
-
-                self.ensure_args_len(args, 2, err)?;
-                let phi_quantile = match self.call_expr_arg(args, 0).await {
-                    Ok(Value::Float(v)) => v,
-                    _ => {
-                        return Err(DataFusionError::Plan(
-                            "[quantile] param must be a NumberLiteral".into(),
-                        ));
-                    }
-                };
-                functions::quantile_over_time(phi_quantile, input, &self.eval_ctx)?
-            }
-            Func::Round => functions::round(input)?,
-            Func::Scalar => functions::scalar(input, &self.eval_ctx)?,
-            Func::Sgn => functions::sgn(input)?,
-            Func::HistogramCount
-            | Func::HistogramFraction
-            | Func::HistogramSum
-            | Func::Sort
-            | Func::SortDesc => {
-                return Err(DataFusionError::NotImplemented(format!(
-                    "Unsupported Function: {func_name:?}"
-                )));
-            }
-            Func::Sqrt => functions::sqrt(input)?,
-            Func::Timestamp => functions::timestamp(input)?,
-            Func::Vector => functions::vector(input, &self.eval_ctx)?,
-            Func::Year => functions::year(input)?,
-            _ => {
-                return Err(DataFusionError::Internal(format!(
-                    "{func_name:?} must be evaluated before builtin dispatch"
-                )));
-            }
-        })
     }
 }
 
@@ -433,6 +390,12 @@ mod tests {
             ("3 < bool vector(5)", 1.0),
             ("7 < bool vector(5)", 0.0),
             ("quantile_over_time(0.5, vector(5)[1m:1s])", 5.0),
+            ("predict_linear(vector(5)[1m:1s], 10)", 5.0),
+            (r#"label_join(vector(5), "dst", ",", "src")"#, 5.0),
+            (
+                r#"label_replace(vector(5), "dst", "$1", "src", "(.*)")"#,
+                5.0,
+            ),
         ] {
             let mut engine = Engine::new(
                 "test",
