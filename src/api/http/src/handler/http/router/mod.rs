@@ -2086,8 +2086,14 @@ mod tests {
         // And the rule that keeps it true, stated where somebody adding a route
         // will read it: nothing in `basic_routes` may take a path parameter
         // directly after `/api/`.
+        // Only production code registers routes; the assertions below quote
+        // `/api/{org_id}/...` OpenAPI keys as data, and scanning those too
+        // reported a passing router as broken.
         let src = include_str!("mod.rs");
-        let offenders: Vec<&str> = src
+        let (production, _) = src
+            .split_once("\n#[cfg(test)]\nmod tests {")
+            .expect("test module marker moved; this scan would read fixtures as routes");
+        let offenders: Vec<&str> = production
             .lines()
             .map(str::trim)
             .filter(|l| l.starts_with("\"/api/{") && !l.starts_with("\"/api/{*"))
