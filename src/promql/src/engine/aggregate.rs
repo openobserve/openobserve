@@ -50,8 +50,7 @@ impl Engine {
         // fused shapes fold the range function into the aggregation; others stay generic
         if let Some(shape) = fused_agg_shape(op, expr) {
             if let Some((selector, range)) = shape.selector {
-                let range =
-                    range.unwrap_or_else(|| Duration::from_micros(self.ctx.lookback_delta as u64));
+                let range = range.unwrap_or_else(|| self.ctx.lookback());
                 if let Some(value) = self
                     .try_streaming_fused_agg(
                         selector,
@@ -183,7 +182,7 @@ fn fused_agg_shape<'a>(op: &token::TokenType, expr: &'a PromExpr) -> Option<Fuse
         // name, which is exactly last_over_time
         PromExpr::VectorSelector(selector) => Some(FusedAggShape {
             op: agg_op,
-            func: Arc::from(functions::fusable_range_func("last_over_time")?),
+            func: functions::instant_lookback_func(),
             range_arg: None,
             selector: Some((selector, None)),
         }),

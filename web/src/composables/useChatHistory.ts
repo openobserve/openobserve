@@ -15,6 +15,7 @@
 
 import type { ChatMessage, ChatHistoryEntry } from "@/ts/interfaces/chat";
 import { raw, type TranslateFn } from "@/types/i18n";
+import { computeUserOrgKey } from "@/utils/userOrgKey";
 
 const DB_NAME = "o2ChatDB";
 const DB_VERSION = 2;
@@ -53,29 +54,6 @@ const initDB = (): Promise<IDBDatabase> => {
       }
     };
   });
-};
-
-/**
- * Compute an opaque SHA-256 hash of "email:orgIdentifier".
- * Falls back to a synchronous djb2 hash in environments without crypto.subtle.
- * The result is cached after first computation.
- */
-const computeUserOrgKey = async (userEmail: string, orgIdentifier: string): Promise<string> => {
-  const raw = `${userEmail}:${orgIdentifier}`;
-
-  if (typeof crypto !== "undefined" && crypto.subtle) {
-    const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(raw));
-    return Array.from(new Uint8Array(buf))
-      .map((b) => b.toString(16).padStart(2, "0"))
-      .join("");
-  }
-
-  // Synchronous djb2 fallback (test environments without crypto.subtle)
-  let hash = 5381;
-  for (let i = 0; i < raw.length; i++) {
-    hash = (((hash << 5) + hash) ^ raw.charCodeAt(i)) >>> 0;
-  }
-  return hash.toString(36);
 };
 
 /**

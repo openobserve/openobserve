@@ -9798,6 +9798,8 @@
       "outputTokens": "Jetons de sortie",
       "out": "Sortie",
       "totalCost": "Coût total",
+      "scores": "Scores",
+      "notScoredYet": "Pas encore noté",
       "preview": "Aperçu",
       "input": "Entrée",
       "output": "Sortie",
@@ -11112,6 +11114,10 @@
         "runSummary": "{trials} · {scorers}",
         "progress": "Progression de la tâche",
         "scoring": "Notation",
+        "tasks": "Tâches",
+        "scores": "Scores",
+        "taskDistribution": "{succeeded} réussies · {failed} échouées · {pending} en attente · {skipped} ignorées",
+        "scoreOutcomeDistribution": "{scored} notés · {failed} échoués · {pending} en attente · {skipped} ignorés · {unscored} non notés",
         "scoringDistribution": "{success} réussi · {failed} échoué · {pending} en attente · {skipped} ignoré",
         "compare": "Comparer",
         "comparePicker": {
@@ -11855,6 +11861,8 @@
       "schemaInvalidJson": "Le schéma doit être un JSON valide.",
       "schemaIgnored": "Schéma · Ignoré par ce fournisseur",
       "schemaUnsupported": "Ce fournisseur ne dispose pas de champ de sortie structurée. Le schéma est conservé dans cette colonne, mais il n'est pas envoyé et le modèle répond en texte brut.",
+      "schemaApproximated": "Schéma · Approximé par ce fournisseur",
+      "schemaApproximatedHelp": "Ce fournisseur ne prend en charge que le mode JSON, pas un schéma JSON. La requête est envoyée en mode JSON avec le schéma répété dans le prompt, donc la réponse est du JSON, mais sa structure n'est pas garantie.",
       "outputPlaceholder": "La sortie apparaît ici — appuyez sur Exécuter.",
       "outputNotRun": "Non exécuté",
       "retry": "Réessayer",
@@ -11958,6 +11966,12 @@
   },
   "onlineEvals": {
     "versionPrefix": "v",
+    "traceScoreChip": {
+      "reasoning": "Pourquoi",
+      "scoredAt": "Noté {time}",
+      "moreCount": "+{count} de plus",
+      "allScores": "Tous les scores ({count})"
+    },
     "importNameRequired": "Nom *",
     "importNewNameRequired": "Nouveau nom *",
     "importDataTypeRequired": "Type de données *",
@@ -12228,8 +12242,10 @@
       "sectionTitle": "Prestataire",
       "nameLabel": "Nom",
       "typeLabel": "Type de fournisseur",
-      "endpointLabel": "Point final",
-      "endpointPlaceholder": "URL complète des complétions, p. ex. https://your-host/v1/chat/completions",
+      "endpointLabel": "URL de base",
+      "endpointPlaceholder": "URL de base, par exemple https://your-host/v1",
+      "endpointHelpDefault": "Laisser vide pour utiliser l'URL par défaut : {url}",
+      "endpointHelpRequired": "Obligatoire — ce fournisseur n'a pas d'URL de base par défaut.",
       "defaultModelLabel": "Modèle par défaut",
       "availableModelsLabel": "Modèles disponibles",
       "apiKeyLabel": "Clé API",
@@ -12238,7 +12254,6 @@
       "authSection": "Authentification",
       "authEditNote": "Les informations d'identification ne peuvent pas être relues. Pour tester un fournisseur nécessitant une authentification, saisissez sa clé API.",
       "cannotRename": "Ne peut pas être renommé après la création.",
-      "availableModelsHelp": "Facultatif. Liste de modèles disponibles sur ce fournisseur, séparés par des virgules.",
       "saveError": "Impossible d'enregistrer le fournisseur",
       "nameRequired": "Provider name is required",
       "typeRequired": "Provider type is required",
@@ -12345,7 +12360,8 @@
         "nameRequired": "Name is required",
         "nameFormat": "Use lowercase letters, numbers, and underscores only",
         "minRequired": "Min is required",
-        "maxRequired": "Max is required"
+        "maxRequired": "Max is required",
+        "maxNotGreaterThanMin": "Max doit être supérieur à Min"
       },
       "import": {
         "title": "Importer une configuration de score",
@@ -12916,7 +12932,7 @@
     },
     "empty": {
       "title": "Pas encore de fournisseurs LLM",
-      "description": "Les fournisseurs LLM stockent les informations de connexion (point de terminaison + informations d'identification) pour les modèles linguistiques que vos évaluateurs LLM Judge appellent. Ajoutez-en un pour commencer à effectuer des évaluations par des juges."
+      "description": "Les fournisseurs de LLM stockent les informations de connexion (URL de base + identifiants) pour les modèles de langage que vos évaluateurs LLM Judge appellent. Ajoutez-en un pour commencer à exécuter des évaluations basées sur des juges."
     }
   },
   "logs": {
@@ -16004,6 +16020,12 @@
     "aiQueueDetail": "File d'attente",
     "aiQueueReview": "Examen de la file d'attente",
     "aiDatasetDetail": "Jeu de données",
+    "aiExperimentCreate": "Nouvelle expérience",
+    "aiExperimentCompare": "Comparer les expériences",
+    "aiExperimentDetail": "Expérience",
+    "aiRemoteTaskCreate": "Nouvelle tâche distante",
+    "aiRemoteTaskEdit": "Modifier la tâche distante",
+    "aiRemoteTaskDetail": "Tâche distante",
     "notFound": "404 - Introuvable",
     "createReport": "Créer un rapport",
     "addCheck": "Ajouter une vérification",

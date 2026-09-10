@@ -65,6 +65,10 @@ impl PromqlContext {
         }
     }
 
+    pub fn lookback(&self) -> Duration {
+        Duration::from_micros(self.lookback_delta as u64)
+    }
+
     #[tracing::instrument(name = "promql:engine:exec", skip_all)]
     pub async fn exec(
         &mut self,

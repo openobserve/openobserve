@@ -201,8 +201,13 @@ impl Engine {
             PromExpr::NumberLiteral(NumberLiteral { val }) => Value::Float(*val),
             PromExpr::StringLiteral(StringLiteral { val }) => Value::String(val.clone()),
             PromExpr::VectorSelector(vs) => {
-                let vs = selector::plain_selector(vs, "VectorSelector")?;
-                let data = self.eval_vector_selector(&vs).await?;
+                let data = match self.try_streaming_instant_selector(vs).await? {
+                    Some(data) => data,
+                    None => {
+                        let vs = selector::plain_selector(vs, "VectorSelector")?;
+                        self.eval_vector_selector(&vs, None).await?
+                    }
+                };
                 if data.is_empty() {
                     Value::None
                 } else {

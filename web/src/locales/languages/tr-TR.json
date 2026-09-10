@@ -9798,6 +9798,8 @@
       "outputTokens": "Çıkış Token'ları",
       "out": "Çıkış",
       "totalCost": "Toplam Maliyet",
+      "scores": "Puanlar",
+      "notScoredYet": "Henüz puanlanmadı",
       "preview": "Önizleme",
       "input": "Giriş",
       "output": "Çıkış",
@@ -11112,6 +11114,10 @@
         "runSummary": "{trials} · {scorers}",
         "progress": "Görev İlerlemesi",
         "scoring": "Puanlama",
+        "tasks": "Görevler",
+        "scores": "Puanlar",
+        "taskDistribution": "{succeeded} başarılı · {failed} başarısız · {pending} bekleyen · {skipped} atlanan",
+        "scoreOutcomeDistribution": "{scored} puanlanmış · {failed} başarısız · {pending} bekleyen · {skipped} atlanan · {unscored} puanlanmamış",
         "scoringDistribution": "{success} başarılı · {failed} başarısız · {pending} beklemede · {skipped} atlandı",
         "compare": "Karşılaştır",
         "comparePicker": {
@@ -11855,6 +11861,8 @@
       "schemaInvalidJson": "Şema geçerli JSON olmalıdır.",
       "schemaIgnored": "Şema · Bu sağlayıcı tarafından yok sayılıyor",
       "schemaUnsupported": "Bu sağlayıcının yapılandırılmış çıktı alanı yok. Şema bu sütunda saklanır ancak gönderilmez ve model düz metinle yanıt verir.",
+      "schemaApproximated": "Şema · Bu sağlayıcı tarafından yaklaşık olarak belirlenir",
+      "schemaApproximatedHelp": "Bu sağlayıcı yalnızca JSON modunu destekler, JSON şemasını desteklemez. İstek, şema istemde yeniden belirtilerek JSON modunda gönderilir; bu nedenle yanıt JSON olur ancak biçimi garanti edilmez.",
       "outputPlaceholder": "Çıktı burada görünür — Çalıştır'a basın.",
       "outputNotRun": "Çalıştırılmadı",
       "retry": "Yeniden Dene",
@@ -11958,6 +11966,12 @@
   },
   "onlineEvals": {
     "versionPrefix": "v",
+    "traceScoreChip": {
+      "reasoning": "Neden",
+      "scoredAt": "Puanlandı: {time}",
+      "moreCount": "+{count} daha",
+      "allScores": "Tüm puanlar ({count})"
+    },
     "importNameRequired": "Ad *",
     "importNewNameRequired": "Yeni Ad *",
     "importDataTypeRequired": "Veri Türü *",
@@ -12228,8 +12242,10 @@
       "sectionTitle": "Sağlayıcı",
       "nameLabel": "İsim",
       "typeLabel": "Sağlayıcı tipi",
-      "endpointLabel": "Bitiş noktası",
-      "endpointPlaceholder": "Tamamlamalar için tam URL, örn. https://your-host/v1/chat/completions",
+      "endpointLabel": "Temel URL",
+      "endpointPlaceholder": "Temel URL, örn. https://your-host/v1",
+      "endpointHelpDefault": "Varsayılanı kullanmak için boş bırakın: {url}",
+      "endpointHelpRequired": "Zorunlu — bu sağlayıcının varsayılan bir temel URL'si yok.",
       "defaultModelLabel": "Varsayılan model",
       "availableModelsLabel": "Mevcut modeller",
       "apiKeyLabel": "API Anahtarı",
@@ -12238,7 +12254,6 @@
       "authSection": "Kimlik Doğrulama",
       "authEditNote": "Kimlik bilgileri geri okunamaz. Kimlik doğrulaması gerektiren bir sağlayıcıyı test etmek için API anahtarını girin.",
       "cannotRename": "Oluşturulduktan sonra yeniden adlandırılamaz.",
-      "availableModelsHelp": "İsteğe bağlı. Bu Sağlayıcıda kullanılabilen modellerin virgülle ayrılmış listesi.",
       "saveError": "Sağlayıcı kaydedilemedi",
       "nameRequired": "Provider name is required",
       "typeRequired": "Provider type is required",
@@ -12345,7 +12360,8 @@
         "nameRequired": "Name is required",
         "nameFormat": "Use lowercase letters, numbers, and underscores only",
         "minRequired": "Min is required",
-        "maxRequired": "Max is required"
+        "maxRequired": "Max is required",
+        "maxNotGreaterThanMin": "Max değeri, Min değerinden büyük olmalıdır."
       },
       "import": {
         "title": "Puan Yapılandırmasını İçe Aktar",
@@ -12916,7 +12932,7 @@
     },
     "empty": {
       "title": "Henüz LLM Sağlayıcısı Yok",
-      "description": "LLM Sağlayıcıları, LLM Judge puanlarının aradığı dil modelleri için bağlantı ayrıntılarını (uç nokta + kimlik bilgileri) depolar. Yargıç tabanlı değerlendirmeleri yürütmeye başlamak için bir tane ekleyin."
+      "description": "LLM Sağlayıcıları, LLM Judge puanlayıcılarınızın çağırdığı dil modelleri için bağlantı bilgilerini (temel URL + kimlik bilgileri) saklar. Yargıç tabanlı değerlendirmeleri çalıştırmaya başlamak için bir sağlayıcı ekleyin."
     }
   },
   "logs": {
@@ -16004,6 +16020,12 @@
     "aiQueueDetail": "Kuyruk",
     "aiQueueReview": "Kuyruk İncelemesi",
     "aiDatasetDetail": "Veri Seti",
+    "aiExperimentCreate": "Yeni Deney",
+    "aiExperimentCompare": "Deneyleri Karşılaştır",
+    "aiExperimentDetail": "Deney",
+    "aiRemoteTaskCreate": "Yeni Uzak Görev",
+    "aiRemoteTaskEdit": "Uzak Görevi Düzenle",
+    "aiRemoteTaskDetail": "Uzak Görev",
     "notFound": "404 - Bulunamadı",
     "createReport": "Rapor Oluştur",
     "addCheck": "Kontrol Ekle",

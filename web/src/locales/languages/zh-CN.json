@@ -9798,6 +9798,8 @@
       "outputTokens": "输出令牌",
       "out": "出",
       "totalCost": "总成本",
+      "scores": "评分",
+      "notScoredYet": "尚未评分",
       "preview": "预览",
       "input": "输入",
       "output": "输出",
@@ -11112,6 +11114,10 @@
         "runSummary": "{trials} · {scorers}",
         "progress": "任务进度",
         "scoring": "评分",
+        "tasks": "任务",
+        "scores": "评分",
+        "taskDistribution": "{succeeded} 成功 · {failed} 失败 · {pending} 等待中 · {skipped} 已跳过",
+        "scoreOutcomeDistribution": "{scored} 已评分 · {failed} 失败 · {pending} 等待中 · {skipped} 已跳过 · {unscored} 未评分",
         "scoringDistribution": "{success} 成功 · {failed} 失败 · {pending} 待处理 · {skipped} 跳过",
         "compare": "比较",
         "comparePicker": {
@@ -11855,6 +11861,8 @@
       "schemaInvalidJson": "模式必须是有效的 JSON。",
       "schemaIgnored": "模式 · 此提供商已忽略",
       "schemaUnsupported": "此提供商没有结构化输出字段。模式会保留在此列中，但不会发送，模型将以纯文本回答。",
+      "schemaApproximated": "Schema · 由该提供方近似生成",
+      "schemaApproximatedHelp": "此提供方仅支持 JSON 模式，不支持 JSON Schema。请求以 JSON 模式发送，并在提示中重述了 Schema，因此返回内容是 JSON，但其结构无法保证。",
       "outputPlaceholder": "输出将显示在此处 — 点击运行。",
       "outputNotRun": "未运行",
       "retry": "重试",
@@ -11958,6 +11966,12 @@
   },
   "onlineEvals": {
     "versionPrefix": "v",
+    "traceScoreChip": {
+      "reasoning": "为什么",
+      "scoredAt": "评分于 {time}",
+      "moreCount": "+{count} 更多",
+      "allScores": "所有评分 ({count})"
+    },
     "importNameRequired": "名称 *",
     "importNewNameRequired": "新名称 *",
     "importDataTypeRequired": "数据类型 *",
@@ -12228,8 +12242,10 @@
       "sectionTitle": "提供商",
       "nameLabel": "姓名",
       "typeLabel": "提供商类型",
-      "endpointLabel": "端点",
-      "endpointPlaceholder": "完整的 completions URL，例如 https://your-host/v1/chat/completions",
+      "endpointLabel": "基础 URL",
+      "endpointPlaceholder": "基础 URL，例如 https://your-host/v1",
+      "endpointHelpDefault": "留空则使用默认值：{url}",
+      "endpointHelpRequired": "必填 — 此提供方没有默认的基础 URL。",
       "defaultModelLabel": "默认模型",
       "availableModelsLabel": "可用模型",
       "apiKeyLabel": "API 密钥",
@@ -12238,7 +12254,6 @@
       "authSection": "身份验证",
       "authEditNote": "凭据无法回读。若要测试需要身份验证的提供方，请输入其 API 密钥。",
       "cannotRename": "创建后无法重命名。",
-      "availableModelsHelp": "可选。此提供商上可用模型的逗号分隔列表。",
       "saveError": "无法保存提供商",
       "nameRequired": "Provider name is required",
       "typeRequired": "Provider type is required",
@@ -12345,7 +12360,8 @@
         "nameRequired": "Name is required",
         "nameFormat": "Use lowercase letters, numbers, and underscores only",
         "minRequired": "Min is required",
-        "maxRequired": "Max is required"
+        "maxRequired": "Max is required",
+        "maxNotGreaterThanMin": "最大值必须大于最小值"
       },
       "import": {
         "title": "导入评分配置",
@@ -12916,7 +12932,7 @@
     },
     "empty": {
       "title": "还没有 LLM 提供商",
-      "description": "LLM 提供商存储 LLM 评判器所调用语言模型的连接信息（端点和凭据）。添加提供商后即可运行基于评判器的评估。"
+      "description": "LLM 提供方存储 LLM Judge 评分器所调用语言模型的连接详情（基础 URL + 凭据）。添加一个即可开始运行基于 LLM Judge 的评估。"
     }
   },
   "logs": {
@@ -16004,6 +16020,12 @@
     "aiQueueDetail": "队列",
     "aiQueueReview": "队列审核",
     "aiDatasetDetail": "数据集",
+    "aiExperimentCreate": "新建实验",
+    "aiExperimentCompare": "比较实验",
+    "aiExperimentDetail": "实验",
+    "aiRemoteTaskCreate": "新建远程任务",
+    "aiRemoteTaskEdit": "编辑远程任务",
+    "aiRemoteTaskDetail": "远程任务",
     "notFound": "404 - 未找到",
     "createReport": "创建报告",
     "addCheck": "添加检查",

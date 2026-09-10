@@ -9798,6 +9798,8 @@
       "outputTokens": "Tokens de Saída",
       "out": "Saída",
       "totalCost": "Custo Total",
+      "scores": "Pontuações",
+      "notScoredYet": "Ainda sem pontuação",
       "preview": "Visualização",
       "input": "Entrada",
       "output": "Saída",
@@ -11112,6 +11114,10 @@
         "runSummary": "{trials} · {scorers}",
         "progress": "Progresso da tarefa",
         "scoring": "Pontuação",
+        "tasks": "Tarefas",
+        "scores": "Pontuações",
+        "taskDistribution": "Sucesso: {succeeded} · Falhas: {failed} · Pendentes: {pending} · Ignorados: {skipped}",
+        "scoreOutcomeDistribution": "Pontuados: {scored} · Falhas: {failed} · Pendentes: {pending} · Ignorados: {skipped} · Sem pontuação: {unscored}",
         "scoringDistribution": "{success} sucesso · {failed} falha · {pending} pendente · {skipped} ignorado",
         "compare": "Comparar",
         "comparePicker": {
@@ -11855,6 +11861,8 @@
       "schemaInvalidJson": "O esquema deve ser JSON válido.",
       "schemaIgnored": "Esquema · Ignorado por este fornecedor",
       "schemaUnsupported": "Este fornecedor não tem um campo de saída estruturada. O esquema é mantido nesta coluna, mas não é enviado e o modelo responde com texto simples.",
+      "schemaApproximated": "Esquema · Aproximado por este provedor",
+      "schemaApproximatedHelp": "Este provedor suporta apenas o modo JSON, não um esquema JSON. A solicitação é enviada no modo JSON com o esquema reafirmado no prompt, portanto a resposta é JSON, mas sua forma não é garantida.",
       "outputPlaceholder": "A saída aparece aqui — pressione Executar.",
       "outputNotRun": "Não executado",
       "retry": "Tentar novamente",
@@ -11958,6 +11966,12 @@
   },
   "onlineEvals": {
     "versionPrefix": "v",
+    "traceScoreChip": {
+      "reasoning": "Por quê",
+      "scoredAt": "Pontuado {time}",
+      "moreCount": "+{count} mais",
+      "allScores": "Todas as pontuações ({count})"
+    },
     "importNameRequired": "Nome *",
     "importNewNameRequired": "Novo Nome *",
     "importDataTypeRequired": "Tipo de Dado *",
@@ -12228,8 +12242,10 @@
       "sectionTitle": "Provedor",
       "nameLabel": "Nome",
       "typeLabel": "Tipo de provedor",
-      "endpointLabel": "Ponto final",
-      "endpointPlaceholder": "URL completa de completions, ex.: https://your-host/v1/chat/completions",
+      "endpointLabel": "URL base",
+      "endpointPlaceholder": "URL base, ex.: https://your-host/v1",
+      "endpointHelpDefault": "Deixe em branco para usar o padrão: {url}",
+      "endpointHelpRequired": "Obrigatório — este provedor não tem URL base padrão.",
       "defaultModelLabel": "Modelo padrão",
       "availableModelsLabel": "Modelos disponíveis",
       "apiKeyLabel": "Chave de API",
@@ -12238,7 +12254,6 @@
       "authSection": "Autenticação",
       "authEditNote": "As credenciais não podem ser relidas. Para testar um provedor que exige autenticação, insira a chave de API dele.",
       "cannotRename": "Não pode ser renomeado após a criação.",
-      "availableModelsHelp": "Opcional. Lista separada por vírgulas de modelos disponíveis neste Provedor.",
       "saveError": "Falha ao salvar o provedor",
       "nameRequired": "Provider name is required",
       "typeRequired": "Provider type is required",
@@ -12345,7 +12360,8 @@
         "nameRequired": "Name is required",
         "nameFormat": "Use lowercase letters, numbers, and underscores only",
         "minRequired": "Min is required",
-        "maxRequired": "Max is required"
+        "maxRequired": "Max is required",
+        "maxNotGreaterThanMin": "O máximo deve ser maior que o mínimo"
       },
       "import": {
         "title": "Importar Configuração de Pontuação",
@@ -12916,7 +12932,7 @@
     },
     "empty": {
       "title": "Ainda não há fornecedores de LLM",
-      "description": "Os provedores de LLM armazenam os detalhes da conexão (endpoint + credenciais) dos modelos de linguagem que seus avaliadores do LLM Judge chamam. Adicione um para começar a fazer avaliações baseadas em juízes."
+      "description": "Os provedores de LLM armazenam os detalhes de conexão (URL base + credenciais) para os modelos de linguagem utilizados pelos seus pontuadores LLM Judge. Adicione um para começar a executar avaliações baseadas em LLM Judge."
     }
   },
   "logs": {
@@ -16004,6 +16020,12 @@
     "aiQueueDetail": "Fila",
     "aiQueueReview": "Revisão da Fila",
     "aiDatasetDetail": "Conjunto de dados",
+    "aiExperimentCreate": "Novo experimento",
+    "aiExperimentCompare": "Comparar experimentos",
+    "aiExperimentDetail": "Experimento",
+    "aiRemoteTaskCreate": "Nova tarefa remota",
+    "aiRemoteTaskEdit": "Editar tarefa remota",
+    "aiRemoteTaskDetail": "Tarefa remota",
     "notFound": "404 - Não Encontrado",
     "createReport": "Criar Relatório",
     "addCheck": "Adicionar Verificação",
