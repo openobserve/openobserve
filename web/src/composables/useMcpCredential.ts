@@ -13,21 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// Dedicated credential for the MCP server: create a service account and, under
-// RBAC, add it to one shared read-only role per org. Reuses the IAM primitives
-// (service_accounts.create + createRole + seedReadonlyRolePermissions +
-// updateRole add_users), so the result is indistinguishable from a service
-// account made by hand. Known gap: a role created but left unseeded (seeding
-// threw) stays empty, since later mints skip seeding — the fix is to diff
-// getAllRolePermissions against buildReadonlyPermissions, not done here.
+// Mints a dedicated MCP service account and, under RBAC, joins it to one shared read-only role per org.
 
 import { ref } from "vue";
 import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
 import service_accounts from "@/services/service_accounts";
-import { createRole, getResourcePermission, updateRole } from "@/services/iam";
+import { createRole, getAllRolePermissions, getResources, updateRole } from "@/services/iam";
 import {
-  seedReadonlyRolePermissions,
+  buildReadonlyPermissions,
   type RolePermission,
 } from "@/components/iam/roles/readonlyPreset";
 import { buildServiceAccountEmail } from "@/components/iam/serviceAccounts/AddServiceAccount.schema";
@@ -35,10 +29,10 @@ import { buildServiceAccountEmail } from "@/components/iam/serviceAccounts/AddSe
 // Underscore, not hyphen: create_role normalizes the name (non-[A-Za-z0-9_] → "_"), update_role does not.
 export const MCP_READONLY_ROLE = "mcp_readonly";
 
-// MCP is JSON-RPC over POST, which the route registry maps to PUT on the `mcp` resource — a grant
-// the read-only preset (AllowGet + AllowList) never makes, so without it every call 403s.
+// MCP is JSON-RPC over POST, which the route registry maps to PUT on `mcp` — a grant the read-only preset never makes.
 const MCP_GRANTS = ["AllowList", "AllowPut"] as const;
 
+/** `readonly`: joined to the shared role · `unscoped`: the role grants nothing or couldn't be applied · `rbacDisabled`: no RBAC to scope with. */
 export type McpCredentialScope = "readonly" | "unscoped" | "rbacDisabled";
 
 export interface McpCredential {
@@ -48,11 +42,14 @@ export interface McpCredential {
   token: string;
   /** Null unless the account was actually added to the shared read-only role. */
   role: string | null;
+  /** How far the token's access is limited; tells a null `role` from RBAC being off. */
   scope: McpCredentialScope;
 }
 
 // Show-once token: a remount must reuse it, and org-keyed because an org switch remounts the consumer.
 const sessionCredentials = new Map<string, McpCredential>();
+
+const grantKey = (perm: RolePermission): string => `${perm.object}|${perm.permission}`;
 
 export function useMcpCredential() {
   const store = useStore();
@@ -75,31 +72,32 @@ export function useMcpCredential() {
     }
   };
 
-  // Only the gap is sent: OpenFGA rejects re-writing a tuple it already holds, and update_role
-  // surfaces that as a 500 that would cost the account its role assignment.
-  const missingMcpGrants = async (org: string): Promise<RolePermission[]> => {
-    const object = `mcp:_all_${org}`;
-    try {
-      const res = await getResourcePermission({
-        role_name: MCP_READONLY_ROLE,
-        org_identifier: org,
-        resource: "mcp",
-      });
-      const held = new Set(
-        ((res?.data ?? []) as RolePermission[])
-          .filter((perm) => perm.object === object)
-          .map((perm) => perm.permission),
-      );
-      // AllowAll already resolves PUT in the OpenFGA model.
-      if (held.has("AllowAll")) return [];
-      return MCP_GRANTS.filter((permission) => !held.has(permission)).map((permission) => ({
-        object,
-        permission,
-      }));
-    } catch (readErr) {
-      console.error("MCP credential: existing mcp grants could not be read", readErr);
-      return [];
-    }
+  // The shared role may predate a grant or be left empty by a failed first seed, so every mint tops it up.
+  const missingRoleGrants = async (
+    org: string,
+    isMetaOrg: boolean,
+    created: boolean,
+  ): Promise<{ add: RolePermission[]; readable: boolean }> => {
+    const res = await getResources(org);
+    const readonly = buildReadonlyPermissions(res?.data ?? [], org, isMetaOrg);
+    const mcpObject = `mcp:_all_${org}`;
+    const desired = new Map(
+      [...readonly, ...MCP_GRANTS.map((permission) => ({ object: mcpObject, permission }))].map(
+        (perm) => [grantKey(perm), perm] as const,
+      ),
+    );
+
+    // A role created a moment ago holds nothing, so its read is skipped.
+    const held: RolePermission[] = created
+      ? []
+      : ((await getAllRolePermissions({ role_name: MCP_READONLY_ROLE, org_identifier: org }))
+          ?.data ?? []);
+    const heldKeys = new Set(held.map(grantKey));
+    // OpenFGA rejects re-writing a tuple it already holds (update_role reports a 500), so only the gap is sent.
+    const add = [...desired.values()].filter(
+      (perm) => !heldKeys.has(grantKey(perm)) && !heldKeys.has(`${perm.object}|AllowAll`),
+    );
+    return { add, readable: readonly.length > 0 };
   };
 
   // Never throws: a role hiccup must not cost the caller the show-once token.
@@ -112,24 +110,13 @@ export function useMcpCredential() {
     const isMetaOrg = org === store.state.zoConfig?.meta_org;
     try {
       const created = await ensureReadonlyRole(org);
-      // Re-seeding rewrites existing tuples, which OpenFGA rejects and update_role reports as a 500.
-      const granted = created
-        ? await seedReadonlyRolePermissions(MCP_READONLY_ROLE, org, isMetaOrg)
-        : null;
+      const { add, readable } = await missingRoleGrants(org, isMetaOrg, created);
       await updateRole({
         role_id: MCP_READONLY_ROLE,
         org_identifier: org,
-        payload: {
-          add: await missingMcpGrants(org),
-          remove: [],
-          add_users: [email],
-          remove_users: [],
-        },
+        payload: { add, remove: [], add_users: [email], remove_users: [] },
       });
-      return {
-        role: MCP_READONLY_ROLE,
-        scope: granted === 0 ? "unscoped" : "readonly",
-      };
+      return { role: MCP_READONLY_ROLE, scope: readable ? "readonly" : "unscoped" };
     } catch (roleErr) {
       console.error("MCP credential: read-only role could not be applied", roleErr);
       return { role: null, scope: "unscoped" };

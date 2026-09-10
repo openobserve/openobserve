@@ -17,12 +17,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/services/iam", () => ({
   createRole: vi.fn(),
-  getResourcePermission: vi.fn(),
+  getAllRolePermissions: vi.fn(),
+  getResources: vi.fn(),
   updateRole: vi.fn(),
-}));
-
-vi.mock("@/components/iam/roles/readonlyPreset", () => ({
-  seedReadonlyRolePermissions: vi.fn(),
 }));
 
 vi.mock("@/services/service_accounts", () => ({ default: { create: vi.fn() } }));
@@ -39,14 +36,37 @@ vi.mock("vuex", () => ({ useStore: () => mockStore }));
 // The composable runs outside a component, where the global i18n plugin isn't installed.
 vi.mock("@/types/i18n", () => ({ useI18nTyped: () => ({ t: (key: string) => key }) }));
 
-import { createRole, getResourcePermission, updateRole } from "@/services/iam";
-import { seedReadonlyRolePermissions } from "@/components/iam/roles/readonlyPreset";
+import { createRole, getAllRolePermissions, getResources, updateRole } from "@/services/iam";
 import service_accounts from "@/services/service_accounts";
 import { MCP_READONLY_ROLE, useMcpCredential } from "./useMcpCredential";
 
 const created = () => ({
   data: { code: 200, message: "ok", token: "tok_123", user: "x" },
 });
+
+// `org` is grantable only from the meta org, and hidden resources are never seeded.
+const RESOURCES = [
+  { key: "stream", visible: true },
+  { key: "mcp", visible: true },
+  { key: "org", visible: true },
+  { key: "internal", visible: false },
+];
+
+// The read-only preset for RESOURCES in a non-meta org, plus the MCP write grant.
+const fullSet = (org: string) => [
+  { object: `stream:_all_${org}`, permission: "AllowList" },
+  { object: `stream:_all_${org}`, permission: "AllowGet" },
+  { object: `mcp:_all_${org}`, permission: "AllowList" },
+  { object: `mcp:_all_${org}`, permission: "AllowGet" },
+  { object: `mcp:_all_${org}`, permission: "AllowPut" },
+];
+
+const addedGrants = () => vi.mocked(updateRole).mock.calls[0][0].payload.add;
+
+const roleAlreadyExists = () =>
+  vi.mocked(createRole).mockRejectedValue({
+    response: { status: 400, data: { message: "Role already exists" } },
+  });
 
 // The credential cache is module-scoped, so every case needs an org of its own.
 const useOrg = (org: string, zoConfig: Record<string, unknown> = {}) => {
@@ -60,9 +80,9 @@ describe("useMcpCredential", () => {
     vi.clearAllMocks();
     vi.mocked(service_accounts.create).mockResolvedValue(created() as any);
     vi.mocked(createRole).mockResolvedValue({} as any);
-    vi.mocked(getResourcePermission).mockResolvedValue({ data: [] } as any);
+    vi.mocked(getResources).mockResolvedValue({ data: RESOURCES } as any);
+    vi.mocked(getAllRolePermissions).mockResolvedValue({ data: [] } as any);
     vi.mocked(updateRole).mockResolvedValue({} as any);
-    vi.mocked(seedReadonlyRolePermissions).mockResolvedValue(12);
   });
 
   describe("without rbac", () => {
@@ -80,32 +100,27 @@ describe("useMcpCredential", () => {
         "org-norbac",
       );
       expect(createRole).not.toHaveBeenCalled();
-      expect(seedReadonlyRolePermissions).not.toHaveBeenCalled();
+      expect(getResources).not.toHaveBeenCalled();
       expect(updateRole).not.toHaveBeenCalled();
       expect(cred).toMatchObject({ role: null, scope: "rbacDisabled", token: "tok_123" });
     });
   });
 
   describe("with rbac", () => {
-    it("seeds the shared role on first use and joins the account to it", async () => {
+    it("grants a fresh role the read-only set plus MCP write, and joins the account", async () => {
       const { generate } = useOrg("org-fresh");
 
       const cred = await generate();
 
       expect(createRole).toHaveBeenCalledWith(MCP_READONLY_ROLE, "org-fresh");
-      expect(seedReadonlyRolePermissions).toHaveBeenCalledWith(
-        MCP_READONLY_ROLE,
-        "org-fresh",
-        false,
-      );
+      // Nothing to diff against on a role created a moment ago.
+      expect(getAllRolePermissions).not.toHaveBeenCalled();
+      expect(updateRole).toHaveBeenCalledTimes(1);
       expect(updateRole).toHaveBeenCalledWith({
         role_id: MCP_READONLY_ROLE,
         org_identifier: "org-fresh",
         payload: {
-          add: [
-            { object: "mcp:_all_org-fresh", permission: "AllowList" },
-            { object: "mcp:_all_org-fresh", permission: "AllowPut" },
-          ],
+          add: fullSet("org-fresh"),
           remove: [],
           add_users: [cred!.email],
           remove_users: [],
@@ -114,37 +129,78 @@ describe("useMcpCredential", () => {
       expect(cred).toMatchObject({ role: MCP_READONLY_ROLE, scope: "readonly" });
     });
 
-    // create_role normalizes the name (non-[A-Za-z0-9_] → "_") but update_role does not,
-    // so all three calls must use one spelling that survives that normalization.
-    it("addresses the same normalization-safe role name in all three calls", async () => {
+    // create_role normalizes the name (non-[A-Za-z0-9_] → "_") but update_role does not.
+    it("addresses the same normalization-safe role name in both calls", async () => {
       const { generate } = useOrg("org-samename");
 
       await generate();
 
       const names = [
         vi.mocked(createRole).mock.calls[0][0],
-        vi.mocked(seedReadonlyRolePermissions).mock.calls[0][0],
         vi.mocked(updateRole).mock.calls[0][0].role_id,
       ];
       expect(new Set(names).size).toBe(1);
       expect(names[0]).toMatch(/^[a-zA-Z0-9_]+$/);
     });
 
-    it("skips seeding when the shared role already exists", async () => {
-      vi.mocked(createRole).mockRejectedValue({
-        response: { status: 400, data: { message: "Role already exists" } },
-      });
-      const { generate, error } = useOrg("org-existing");
+    it("adds no grants to an existing role that already holds them all", async () => {
+      roleAlreadyExists();
+      vi.mocked(getAllRolePermissions).mockResolvedValue({ data: fullSet("org-complete") } as any);
+      const { generate, error } = useOrg("org-complete");
 
       const cred = await generate();
 
-      expect(seedReadonlyRolePermissions).not.toHaveBeenCalled();
-      expect(updateRole).toHaveBeenCalledTimes(1);
+      expect(getAllRolePermissions).toHaveBeenCalledWith({
+        role_name: MCP_READONLY_ROLE,
+        org_identifier: "org-complete",
+      });
+      expect(addedGrants()).toEqual([]);
+      expect(vi.mocked(updateRole).mock.calls[0][0].payload.add_users).toEqual([cred!.email]);
       expect(cred).toMatchObject({ role: MCP_READONLY_ROLE, scope: "readonly" });
       expect(error.value).toBe("");
     });
 
-    it("keeps the show-once token when the role work fails", async () => {
+    // A first mint whose seed threw leaves the role created but empty; later mints must still fill it.
+    it("re-grants everything to an existing role a failed first seed left empty", async () => {
+      roleAlreadyExists();
+      const { generate } = useOrg("org-emptyrole");
+
+      const cred = await generate();
+
+      expect(addedGrants()).toEqual(fullSet("org-emptyrole"));
+      expect(cred).toMatchObject({ role: MCP_READONLY_ROLE, scope: "readonly" });
+    });
+
+    // POST /api/{org}/mcp resolves to PUT on the `mcp` resource, which the read-only preset never grants.
+    it("adds only the MCP write grant a role seeded before it existed is missing", async () => {
+      roleAlreadyExists();
+      vi.mocked(getAllRolePermissions).mockResolvedValue({
+        data: fullSet("org-preput").filter((perm) => perm.permission !== "AllowPut"),
+      } as any);
+      const { generate } = useOrg("org-preput");
+
+      await generate();
+
+      expect(addedGrants()).toEqual([{ object: "mcp:_all_org-preput", permission: "AllowPut" }]);
+    });
+
+    it("treats AllowAll as covering every grant on that resource", async () => {
+      roleAlreadyExists();
+      vi.mocked(getAllRolePermissions).mockResolvedValue({
+        data: [
+          { object: "stream:_all_org-allowall", permission: "AllowList" },
+          { object: "stream:_all_org-allowall", permission: "AllowGet" },
+          { object: "mcp:_all_org-allowall", permission: "AllowAll" },
+        ],
+      } as any);
+      const { generate } = useOrg("org-allowall");
+
+      await generate();
+
+      expect(addedGrants()).toEqual([]);
+    });
+
+    it("keeps the show-once token when the role update fails", async () => {
       vi.mocked(updateRole).mockRejectedValue(new Error("boom"));
       const { generate, error } = useOrg("org-partial");
 
@@ -154,60 +210,34 @@ describe("useMcpCredential", () => {
       expect(error.value).toBe("");
     });
 
-    it("reports an unscoped account when seeding grants nothing", async () => {
-      vi.mocked(seedReadonlyRolePermissions).mockResolvedValue(0);
-      const { generate } = useOrg("org-empty");
-
-      expect(await generate()).toMatchObject({ scope: "unscoped" });
-    });
-
-    // POST /api/{org}/mcp resolves to PUT on the `mcp` resource, which the read-only preset never grants.
-    it("adds only the mcp grant the role is missing", async () => {
-      vi.mocked(getResourcePermission).mockResolvedValue({
-        data: [
-          { object: "mcp:_all_org-partial-grant", permission: "AllowGet" },
-          { object: "mcp:_all_org-partial-grant", permission: "AllowList" },
-        ],
-      } as any);
-      const { generate } = useOrg("org-partial-grant");
-
-      await generate();
-
-      expect(vi.mocked(updateRole).mock.calls[0][0].payload.add).toEqual([
-        { object: "mcp:_all_org-partial-grant", permission: "AllowPut" },
-      ]);
-    });
-
-    it("adds nothing when the role already covers mcp with AllowAll", async () => {
-      vi.mocked(getResourcePermission).mockResolvedValue({
-        data: [{ object: "mcp:_all_org-allowall", permission: "AllowAll" }],
-      } as any);
-      const { generate } = useOrg("org-allowall");
-
-      await generate();
-
-      expect(vi.mocked(updateRole).mock.calls[0][0].payload.add).toEqual([]);
-    });
-
-    it("still assigns the account when the mcp grants cannot be read", async () => {
-      vi.mocked(getResourcePermission).mockRejectedValue(new Error("boom"));
+    // Without the existing grants a blind write could duplicate a tuple and 500, so nothing is sent.
+    it("reports unscoped without joining the role when its grants cannot be read", async () => {
+      roleAlreadyExists();
+      vi.mocked(getAllRolePermissions).mockRejectedValue(new Error("boom"));
       const { generate } = useOrg("org-unreadable");
 
       const cred = await generate();
 
-      expect(vi.mocked(updateRole).mock.calls[0][0].payload).toMatchObject({
-        add: [],
-        add_users: [cred!.email],
-      });
-      expect(cred).toMatchObject({ role: MCP_READONLY_ROLE, scope: "readonly" });
+      expect(updateRole).not.toHaveBeenCalled();
+      expect(cred).toMatchObject({ token: "tok_123", role: null, scope: "unscoped" });
     });
 
-    it("seeds meta-org permissions inside the meta org", async () => {
-      const { generate } = useOrg("_meta");
+    it("reports an unscoped account when no resource is readable", async () => {
+      vi.mocked(getResources).mockResolvedValue({ data: [] } as any);
+      const { generate } = useOrg("org-noresources");
 
-      await generate();
+      expect(await generate()).toMatchObject({ scope: "unscoped" });
+    });
 
-      expect(seedReadonlyRolePermissions).toHaveBeenCalledWith(MCP_READONLY_ROLE, "_meta", true);
+    it("grants the org resource only inside the meta org", async () => {
+      await useOrg("_meta").generate();
+      await useOrg("org-plain").generate();
+
+      const [metaAdd, plainAdd] = vi.mocked(updateRole).mock.calls.map((c) => c[0].payload.add);
+      expect(metaAdd).toContainEqual({ object: "org:_all__meta", permission: "AllowList" });
+      expect(plainAdd.some((perm: { object: string }) => perm.object.startsWith("org:"))).toBe(
+        false,
+      );
     });
   });
 
