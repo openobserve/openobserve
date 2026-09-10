@@ -199,10 +199,32 @@ async function multistreamselect(page) {
     const pageManager = new PageManager(page);
     testLogger.info('Testing interesting fields with multistream selection');
 
-    await multistreamselect(page);
+    // Deliberately NOT using multistreamselect() (e2e_automate + e2e_stream1) here:
+    // e2e_automate is a shared fixture ingested into by unrelated tests across the whole
+    // suite, so its schema only grows over time. The app auto-marks fields from
+    // zoConfig.default_quick_mode_fields (service_name, span_id, trace_id, etc.) as
+    // "interesting" the moment they exist in a selected stream's schema — if e2e_automate
+    // has picked one up but e2e_stream1 hasn't, the resulting multi-stream UNION ALL BY
+    // NAME query selects that field from both streams and the one missing it 500s with a
+    // schema error, with zero relation to what this test actually exercises. Two freshly
+    // ingested, identically-shaped streams keep this test deterministic regardless of what
+    // any other test does to the shared fixtures.
+    const testRunId = Date.now().toString(36);
+    const { streamA, streamB } = await pageManager.ingestionPage.ingestionJoinUnion(testRunId);
+
+    await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
+    await pageManager.logsPage.selectStream(streamA);
+    await pageManager.logsPage.applyQueryButton(logData.logsUrl);
+    await pageManager.logsPage.fillStreamFilter(streamB);
+    await page.waitForTimeout(2000);
+    await pageManager.logsPage.toggleStreamSelection(streamB);
+    await page.waitForTimeout(4000);
+    await pageManager.logsPage.expectLogsSearchIndexListContainsText(`${streamA}, ${streamB}`);
 
     // The interesting-field (ⓘ) button only renders when quick mode is on
     // (FieldExpansion.vue v-if="showQuickMode"), and surfaces on row hover.
+    await pageManager.logsPage.enableQuickModeIfDisabled();
+    await pageManager.logsPage.clickAllFieldsButton();
     await pageManager.logsPage.ensureQuickModeState(true);
 
     // Search for job field using POM
