@@ -51,10 +51,10 @@ pub fn set_batch_publisher(
 
 /// Start the reporting queues.
 ///
-/// Deliberately NOT gated on `usage_enabled`. Trigger records — alert and
+/// Deliberately ungated. Trigger records — alert and
 /// report execution history — are published unconditionally (see
 /// [`publish_triggers_usage`]), so the queue has to be running even on a
-/// deployment that has usage reporting switched off. Usage and error records
+/// build that never reports usage. Usage and error records
 /// keep their own gates at their own publish sites, so starting the queue does
 /// not cause anything extra to be written.
 pub async fn run() {
@@ -75,9 +75,9 @@ pub async fn run() {
 /// execution history (`api/pipelines`, which queries the `triggers` stream),
 /// and the SLO alert-based SLI.
 ///
-/// It used to be gated on `ZO_USAGE_REPORTING_ENABLED` (default `false`), so
-/// switching off what reads as billing telemetry silently disabled alert
-/// history as well. That coupling is not discoverable from the flag's name.
+/// It used to be gated on the usage reporting flag, so switching off what reads
+/// as billing telemetry silently disabled alert history as well. That coupling
+/// was not discoverable from the flag's name.
 /// Volume is bounded by alert count x evaluation frequency, not by request
 /// rate, so there is no cost argument for gating it the way there is for
 /// `UsageData`.
@@ -200,9 +200,9 @@ pub async fn publish_error(error_data: ErrorData) {
 
 /// Drain the reporting queues at shutdown.
 ///
-/// Not gated on `usage_enabled`: trigger records are always queued, so a
-/// deployment with usage reporting off still has buffered alert history that
-/// must reach a stream before the process exits.
+/// Ungated: trigger records are always queued, so a build that never reports
+/// usage still has buffered alert history that must reach a stream before the
+/// process exits.
 ///
 /// The scheduler is included in the role test because it is the node that
 /// publishes trigger records. On a dedicated scheduler node the old
@@ -849,6 +849,5 @@ mod tests {
             .expect("publish_error is defined");
         let body = &body[..body.find("\npub ").unwrap_or(body.len())];
         assert!(body.contains("if !cfg.common.usage_reporting_errors_enabled"));
-        assert!(!body.contains("if !cfg.common.usage_enabled"));
     }
 }
