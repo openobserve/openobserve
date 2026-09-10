@@ -9,6 +9,7 @@
         :columns="columns"
         row-key="id"
         :loading="loading"
+        :forbidden="forbidden"
         :footer-title="t('onlineEvals.job.listTitle')"
         :global-filter="search"
         :show-global-filter="false"
@@ -185,6 +186,7 @@ const props = defineProps<{
   rows: EvalJob[];
   search: string;
   loading?: boolean;
+  forbidden?: boolean;
   /** A bulk action (e.g. delete-selected) is in flight — shows the table overlay. */
   actionLoading?: boolean;
   /** ID of the job whose activate/pause request is currently in flight. */

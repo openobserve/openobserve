@@ -33,6 +33,7 @@
       </template>
       <div class="bg-card-glass-bg min-h-0 flex-1 overflow-hidden">
         <OTable
+          :forbidden="forbidden"
           :frame="false"
           class="search-scheduler-otable"
           data-test="search-scheduler-table"
@@ -344,6 +345,7 @@ export default defineComponent({
     );
     const expandedIds = ref<string[]>([]);
     const isLoading = ref(false);
+    const forbidden = ref(false);
     const showSearchResults = ref(false);
     const toBeCancelled = ref({});
     const confirmCancel = ref(false);
@@ -460,6 +462,7 @@ export default defineComponent({
         expandedIds.value = [];
         query.value = "";
         isLoading.value = true;
+        forbidden.value = false;
         let responseToBeFetched = [];
         searchService
           .get_scheduled_search_list({
@@ -497,7 +500,8 @@ export default defineComponent({
             isLoading.value = false;
           })
           .catch((e) => {
-            if (e.response.status != 403) {
+            forbidden.value = e?.response?.status === 403;
+            if (!forbidden.value) {
               toast({
                 variant: "error",
                 message: t("search_scheduler_job.fetch_failed"),
@@ -833,6 +837,7 @@ export default defineComponent({
       t,
       route,
       isLoading,
+      forbidden,
       pageSize,
       pageSizeOptions,
       expandedIds,
