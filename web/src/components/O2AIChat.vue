@@ -3536,13 +3536,6 @@ export default defineComponent({
           }
         },
       },
-      {
-        id: "aiChatExpand",
-        key: "ctrl+b",
-        keyForMac: "meta+b",
-        description: t("shortcuts.actions.aiChatExpand"),
-        handler: toggleExpand,
-      },
     ]);
 
     const addNewChat = () => {
