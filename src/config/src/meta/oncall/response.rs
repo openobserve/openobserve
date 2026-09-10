@@ -20,39 +20,30 @@ use utoipa::ToSchema;
 
 use super::{policy::Channel, subject::SubjectRef};
 
-/// The run a record's ladder starts on.
-///
-/// A record written before handoffs restarted the ladder carries no run at
-/// all, and is on this one — so `None` and `Some(1)` mean the same thing and
-/// must never be compared directly.
+/// The run a record's ladder starts on. A record written before handoffs
+/// restarted the ladder carries no run at all and is on this one, so `None` and
+/// `Some(1)` mean the same thing and must never be compared directly.
 pub const FIRST_LADDER_RUN: i32 = 1;
 
-/// The run a handoff moves a record onto.
-///
-/// Handing a page over starts the ladder again rather than resuming it: the
-/// receiving responder has not been paged yet, and the rungs the previous one
-/// climbed say nothing about whether the new one has answered.
+/// The run a handoff moves a record onto. Handing a page over starts the ladder
+/// again rather than resuming it: the rungs the previous responder climbed say
+/// nothing about whether the new one has answered.
 pub fn next_ladder_run(current: Option<i32>) -> i32 {
     current.unwrap_or(FIRST_LADDER_RUN) + 1
 }
 
-/// The longest a page can be quieted for.
-///
-/// A day, which is longer than any shift. Snoozing does not claim the page, so
-/// somebody who quiets one should not be able to keep it quiet past their own
-/// tenure of it — whether the next person wants silence is their decision to
-/// make.
+/// The longest a page can be quieted for — a day, longer than any shift.
+/// Snoozing does not claim the page, so somebody who quiets one should not keep
+/// it quiet past their own tenure of it.
 pub const MAX_SNOOZE_MINUTES: i64 = 24 * 60;
 
 /// When a snooze of `minutes` starting at `now` ends, or `None` if that is not
 /// a snooze this product will make.
 ///
-/// Bounded and checked, because the multiplication is the whole risk: the
-/// number arrives from a request body, and `minutes * 60 * 1_000_000` runs off
-/// the end of an i64 somewhere north of 150 000 years. A debug build panics
-/// and drops the connection; a release build wraps, which is far worse — the
-/// record goes quiet until an instant in the past or the impossibly far
-/// future, and a live page is silenced by an integer.
+/// The multiplication is the whole risk: `minutes` arrives from a request body,
+/// and `minutes * 60 * 1_000_000` overflows an i64 north of 150 000 years. A
+/// debug build panics; a release build wraps, silencing a live page until an
+/// instant in the past or the impossibly far future.
 pub fn snooze_until(now: i64, minutes: i64) -> Option<i64> {
     if !(1..=MAX_SNOOZE_MINUTES).contains(&minutes) {
         return None;
@@ -64,25 +55,18 @@ pub fn snooze_until(now: i64, minutes: i64) -> Option<i64> {
 
 /// Where the ladder's clock sits after a snooze.
 ///
-/// Rungs are measured from the anchor, so pausing the ladder means pushing the
-/// anchor forward by the length of the pause — the rungs then resume in order
-/// instead of all firing the instant the quiet lapses.
+/// Rungs are measured from the anchor, so pausing the ladder pushes the anchor
+/// forward by the length of the pause and the rungs resume in order instead of
+/// all firing when the quiet lapses.
 ///
-/// The push is measured from **where the quiet already reaches**, not from
-/// `from`. Adding the whole duration to an already-pushed clock is what made a
-/// second snooze silence a page for the sum of both: two 60-minute snoozes a
-/// minute apart left `snoozed_until` at +62m and the anchor at +120m, so the
-/// record read as awake at 62 minutes and did not page until 130. The banner
-/// said one thing and the pager did another, and extending a snooze is the
-/// ordinary gesture — the durations are a menu somebody can press twice.
+/// The push is measured from where the quiet already reaches, not from `from`.
+/// Adding the whole duration to an already-pushed clock made two 60-minute
+/// snoozes a minute apart read as awake at 62m but stay silent until 130m —
+/// and pressing snooze twice is an ordinary gesture.
 ///
-/// Never moves backwards. Shortening a snooze must not drag a rung in front of
-/// the moment the ladder already promised it, and `escalate_now` cancels by
-/// calling with `from == until`, which lands here as a no-op on the anchor.
-///
-/// Pure, and separated from the row update on purpose: this arithmetic was
-/// wrong for as long as it lived inside a database call, where no test could
-/// reach it.
+/// Never moves backwards: shortening a snooze must not drag a rung in front of
+/// the moment the ladder already promised it. `escalate_now` cancels by calling
+/// with `from == until`, which lands here as a no-op.
 pub fn snoozed_ladder_anchor(
     existing_anchor: Option<i64>,
     opened_at: i64,
@@ -94,11 +78,9 @@ pub fn snoozed_ladder_anchor(
     existing_anchor.unwrap_or(opened_at) + (until - quiet_reaches).max(0)
 }
 
-/// Lifecycle of a response record.
-///
-/// `triggered → triaged → acknowledged → resolved`, where `triaged` is
-/// produced by the L0 agent and is skipped entirely when the agent is absent
-/// or disabled.
+/// Lifecycle of a response record: `triggered → triaged → acknowledged →
+/// resolved`. `triaged` comes from the L0 agent and is skipped entirely when
+/// the agent is absent or disabled.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ResponseState {
@@ -110,11 +92,9 @@ pub enum ResponseState {
 
 /// Why this team was paged.
 ///
-/// A database goes down and five services break. The owner fixes the
-/// database; the impacted teams contain the blast radius on their own service
-/// — confirm impact, fall back, own their customer surface. Different jobs, so
-/// they get different records rather than sharing one, and each team acks and
-/// resolves its own.
+/// A database goes down and five services break. The owner fixes the database;
+/// the impacted teams contain the blast radius on their own service. Different
+/// jobs, so they get different records, and each team acks and resolves its own.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ResponderRole {
@@ -172,40 +152,29 @@ pub enum ResponseEventKind {
     Recovery,
     /// A lifecycle transition.
     State,
-    /// The ladder ran out of rungs and nobody had acknowledged.
-    ///
-    /// Its own kind rather than a sentence inside a `Sys` entry because "this
-    /// page was never answered by anyone" is the outcome the product most
-    /// needs to be able to count.
+    /// The ladder ran out of rungs and nobody had acknowledged. Its own kind
+    /// because "this page was never answered by anyone" is the outcome the
+    /// product most needs to count.
     Exhausted,
-    /// One page, to one person, on one channel.
-    ///
-    /// The machine-readable half of the ledger, and the reason a crash
-    /// part-way through a rung does not re-page the people it already
-    /// reached. Kept off the human timeline — a responder wants one legible
-    /// "paged ana, bo" line, not a row per address.
+    /// One page, to one person, on one channel — the machine-readable half of
+    /// the ledger, and why a crash part-way through a rung does not re-page the
+    /// people it already reached. Kept off the human timeline: a responder wants
+    /// one "paged ana, bo" line, not a row per address.
     Delivery,
-    /// The L0 agent's structured verdict for this firing.
-    ///
-    /// Its own kind rather than another `Rca` entry because this is the
-    /// durable, auditable copy of a machine's *recommendation*, and "why was I
-    /// not paged" has to be answerable from it.
+    /// The L0 agent's structured verdict. Its own kind because this is the
+    /// durable copy of a machine's *recommendation*, and "why was I not paged"
+    /// has to be answerable from it.
     AiVerdict,
-    /// A verdict raised this firing's severity.
-    ///
-    /// Written with the severity asked for beside the one applied, because a
-    /// clamped promotion is two different facts and a responder woken by one is
-    /// owed both.
+    /// A verdict raised this firing's severity. Records the severity asked for
+    /// beside the one applied: a clamped promotion is two facts, and a responder
+    /// woken by one is owed both.
     SeverityPromoted,
     /// The condition fired again so soon after recovering that the engine
     /// treated it as the same unstable firing and did not page.
     ///
-    /// Its own kind rather than a `Sys` sentence because "this was dampened"
-    /// is the one thing a smoothed record must not hide: the responder has to
-    /// be able to see, on the record they were woken for, that the condition
-    /// came back four more times and nobody was woken for those. A timeline
-    /// that only shows the page it did send is a timeline that lies about what
-    /// happened.
+    /// Its own kind because "this was dampened" is the one thing a smoothed
+    /// record must not hide. A timeline showing only the page it did send is a
+    /// timeline that lies about what happened.
     Flapped,
 }
 
@@ -243,19 +212,16 @@ impl ResponseState {
         matches!(self, Self::Resolved)
     }
 
-    /// Whether the ladder should still be climbing.
-    ///
-    /// Acknowledged is deliberately NOT escalating — somebody took it, which
-    /// is the whole point of the ladder — but it is still very much open. See
-    /// `is_unresolved`; conflating the two loses acknowledged records.
+    /// Whether the ladder should still be climbing. Acknowledged is
+    /// deliberately NOT escalating — somebody took it — but it is still open.
+    /// See `is_unresolved`; conflating the two loses acknowledged records.
     pub fn is_escalating(&self) -> bool {
         matches!(self, Self::Triggered | Self::Triaged)
     }
 
-    /// Whether this is still somebody's problem.
-    ///
-    /// What the list and the action buttons ask. An acknowledged page has an
-    /// owner and no ladder, and it still has to be closed by a human.
+    /// Whether this is still somebody's problem — what the list and the action
+    /// buttons ask. An acknowledged page has an owner and no ladder, and still
+    /// has to be closed by a human.
     pub fn is_unresolved(&self) -> bool {
         !self.is_terminal()
     }
@@ -325,9 +291,9 @@ impl ResponseEventKind {
     }
 
     /// True for entries that exist only so the engine can dedup its own
-    /// retries. They are not hidden — `list_deliveries` reads them — but they
-    /// are kept off the timeline, because a rung that paged eight people on
-    /// two channels is one line to a human and sixteen rows to the engine.
+    /// retries. Not hidden — `list_deliveries` reads them — but kept off the
+    /// timeline: a rung that paged eight people on two channels is one line to
+    /// a human and sixteen rows to the engine.
     pub fn is_ledger_only(&self) -> bool {
         matches!(self, Self::Delivery)
     }
@@ -344,18 +310,16 @@ pub struct ResponseEvent {
     pub body: String,
     /// The rung this page belongs to, as its delay from `opened_at`.
     ///
-    /// This IS the delivery ledger: `plan` is handed the delays already sent
-    /// and will not re-send them, which is what makes replays and retries
-    /// safe. A delay survives a policy being reordered or renamed; a
-    /// positional index would not.
+    /// This IS the delivery ledger: `plan` will not re-send a delay already
+    /// sent, which is what makes replays safe. A delay survives a policy being
+    /// reordered or renamed; a positional index would not.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rung_micros: Option<i64>,
     /// The ladder run this page belongs to.
     ///
-    /// A rung delay alone is not a ledger key once a page can change hands: a
-    /// handoff restarts the ladder, and the previous owner's rung at +5m must
-    /// not read as the new owner's rung at +5m having already fired. Absent
-    /// means the first run.
+    /// A rung delay alone is not a ledger key once a page can change hands: the
+    /// previous owner's rung at +5m must not read as the new owner's rung at
+    /// +5m having already fired. Absent means the first run.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ladder_run: Option<i32>,
     /// Who a `Delivery` entry was addressed to.
@@ -415,11 +379,10 @@ impl ResponseEvent {
 
     /// Marks a rung's own entry as one the transport lost outright.
     ///
-    /// Written on the `Page` entry, beside the per-recipient `Delivery` rows
-    /// that say which sends failed, and it carries the one fact the ladder
-    /// cannot reconstruct from them: that this rung had real recipients and
-    /// reached **none** of them. A rung that resolved to nobody deliberately
-    /// does not get it — that rung is spent, and this one is not.
+    /// Carries the one fact the ladder cannot reconstruct from the per-recipient
+    /// rows: this rung had real recipients and reached none of them. A rung that
+    /// resolved to nobody does not get it — that rung is spent, and this one is
+    /// not.
     pub fn reached_nobody(mut self) -> Self {
         self.delivered = Some(false);
         self
@@ -439,12 +402,10 @@ impl ResponseEvent {
         self.ladder_run.unwrap_or(FIRST_LADDER_RUN)
     }
 
-    /// Whether this entry says `recipient` was already reached on `channel`
-    /// for one rung of one run.
-    ///
-    /// This is the dedup key a replay checks. A *failed* attempt deliberately
-    /// does not match: a crash between two sends must retry the page that did
-    /// not land, and only that one.
+    /// Whether this entry says `recipient` was already reached on `channel` for
+    /// one rung of one run — the dedup key a replay checks. A failed attempt
+    /// deliberately does not match: a crash between two sends must retry the
+    /// page that did not land, and only that one.
     pub fn is_delivery_of(
         &self,
         ladder_run: i32,
@@ -466,10 +427,9 @@ fn owner_role() -> ResponderRole {
 }
 /// Why a page turned out to happen.
 ///
-/// A fixed list rather than free text: the point is that the NEXT firing of
-/// the same rule can say "3× config change / deploy". Free text fragments into
-/// near-duplicates and never groups, which is the same as having nothing.
-/// Nuance goes in `cause_note`, one sentence beside it.
+/// A fixed list rather than free text, so the next firing of the same rule can
+/// say "3× config change". Free text fragments into near-duplicates and never
+/// groups. Nuance goes in `cause_note`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ResolutionCause {
@@ -531,10 +491,9 @@ pub struct Response {
     pub subject: SubjectRef,
     /// The team that owns this firing, or `None` when routing found nobody.
     ///
-    /// A teamless record pages nobody — there is no policy, no rotation and no
-    /// ladder, not an empty one — and it exists so the firing appears beside
-    /// the ones that did page rather than only on the unrouted queue. Handing
-    /// it to a team is what gives it an owner and starts its ladder (R-D6).
+    /// A teamless record pages nobody — no policy, no rotation, no ladder — and
+    /// exists so the firing appears beside the ones that did page. Handing it to
+    /// a team gives it an owner and starts its ladder (R-D6).
     #[serde(default)]
     pub team_id: Option<String>,
     /// What the page is about. Kept on the record so it survives the alert
@@ -552,8 +511,8 @@ pub struct Response {
     /// Quiet until this instant, in micros.
     ///
     /// Not an acknowledgement: snoozing says "I know, stop shouting", not "I
-    /// have this". The record stays open and unowned, and the ladder resumes
-    /// when it expires — which is exactly what makes it safe to offer.
+    /// have this". The record stays open and unowned and the ladder resumes when
+    /// it expires — which is what makes it safe to offer.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub snoozed_until: Option<i64>,
     /// What the ladder measures its step delays from; `opened_at` until a
@@ -562,10 +521,9 @@ pub struct Response {
     pub ladder_anchor: Option<i64>,
     /// Which run of the ladder the record is on.
     ///
-    /// Handing a page to another person or another team starts a new run, and
-    /// the ledger is read per run — which is what makes the receiving
-    /// responder's ladder begin at its first rung instead of at the rung the
-    /// previous one had reached. Absent means the first run.
+    /// Handing a page to another person or team starts a new run, and the ledger
+    /// is read per run — which is what makes the receiving responder's ladder
+    /// begin at its first rung. Absent means the first run.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ladder_run: Option<i32>,
     /// `AlertPriority::to_i32` — the same scale alerts already use.
@@ -573,13 +531,12 @@ pub struct Response {
     #[serde(default = "owner_role")]
     pub responder_role: ResponderRole,
     /// When the ladder ran out with nobody answering. `None` while it is still
-    /// climbing, or once somebody took it before it ran out.
+    /// climbing, or if somebody took it first.
     ///
     /// Deliberately NOT a `ResponseState`. An exhausted page can still be
-    /// acknowledged and resolved — somebody finds it an hour later and takes
-    /// it — so a lifecycle state would force a false either/or between "the
-    /// ladder is spent" and "a human has it". Exhaustion is a property of the
-    /// ladder; the state is a property of the human.
+    /// acknowledged and resolved, so a lifecycle state would force a false
+    /// either/or: exhaustion is a property of the ladder, the state is a
+    /// property of the human.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub exhausted_at: Option<i64>,
     /// For an impacted record, the owner record it was opened alongside.
@@ -602,16 +559,13 @@ pub struct Response {
 impl Response {
     /// The owning team on a path that only ever runs for a routed record.
     ///
-    /// A teamless record never reaches the ladder — `start_with` returns before
-    /// dispatching and no escalation job is armed (R6.2) — so the paging path's
-    /// reads are unreachable for one. This exists so those reads stay one line
-    /// rather than eighteen guards for a case that cannot arrive, and it
-    /// degrades safely if one ever does: the empty id misses every lookup, so
-    /// the answer is no policy, no rotation and no channel.
+    /// A teamless record never reaches the ladder (R6.2), so the paging path's
+    /// reads are unreachable for one. This keeps them one line rather than
+    /// eighteen guards, and degrades safely: the empty id misses every lookup,
+    /// so the answer is no policy, no rotation, no channel.
     ///
-    /// **Not for anything that WRITES keyed on the team.** `get_or_create` on
-    /// an empty id would mint a row for a team that does not exist; those
-    /// callers ask `team_id` directly and bail.
+    /// Not for anything that WRITES keyed on the team — `get_or_create` on an
+    /// empty id would mint a row for a team that does not exist.
     pub fn team(&self) -> &str {
         self.team_id.as_deref().unwrap_or_default()
     }
@@ -639,14 +593,11 @@ impl Response {
 
     /// The record as it stands the instant a page changes hands.
     ///
-    /// A handoff is a transfer, not a note: the acknowledgement belonged to
-    /// whoever gave the page away, so it is cleared, and the ladder starts
-    /// again from now under a new run rather than resuming where the previous
-    /// responder's had reached. Passing `to_team_id` moves the record to
-    /// another team as well; passing `None` hands it to somebody on the same
-    /// one. Either way nobody is auto-acknowledged — a handoff nobody accepts
-    /// has to keep chasing, or it is how a page becomes quietly nobody's
-    /// problem.
+    /// A transfer, not a note: the acknowledgement belonged to whoever gave the
+    /// page away, so it is cleared, and the ladder restarts under a new run.
+    /// `to_team_id` moves the record to another team; `None` hands it to
+    /// somebody on the same one. Either way nobody is auto-acknowledged — a
+    /// handoff nobody accepts has to keep chasing.
     pub fn handed_over(&self, to_team_id: Option<&str>, now: i64) -> Self {
         Self {
             team_id: to_team_id
@@ -672,11 +623,10 @@ impl Response {
 
     /// Whether the ladder is still climbing towards somebody.
     ///
-    /// `state.is_escalating()` alone answers only half of it: a page whose
-    /// ladder has run out keeps the `Triggered` state — there is no
-    /// `Exhausted` state and deliberately so — so a screen reading the state
-    /// showed "escalating" beside a timeline that said the ladder was spent.
-    /// Ask the record, not the enum.
+    /// `state.is_escalating()` answers only half: a spent ladder keeps the
+    /// `Triggered` state — there is no `Exhausted` state, deliberately — so a
+    /// screen reading the state showed "escalating" beside a timeline that said
+    /// otherwise. Ask the record, not the enum.
     pub fn is_escalating(&self) -> bool {
         self.state.is_escalating() && self.exhausted_at.is_none()
     }
@@ -693,10 +643,9 @@ impl Response {
 /// How long after a record closes a re-fire of the same source counts as the
 /// same unstable firing rather than a new one.
 ///
-/// Five minutes: longer than any sane evaluation frequency, so an alert
-/// flapping on its own cadence is caught; shorter than the time it takes a
-/// responder to finish reading a page, so a condition that genuinely came back
-/// still reaches somebody while the first one is fresh.
+/// Five minutes: longer than any sane evaluation frequency, so a flapping alert
+/// is caught; shorter than the time it takes to read a page, so a condition that
+/// genuinely came back still reaches somebody while the first one is fresh.
 pub const DEFAULT_FLAP_DAMPENING_SECS: i64 = 300;
 
 /// What a firing should do about the record that already exists for its source.
@@ -704,41 +653,38 @@ pub const DEFAULT_FLAP_DAMPENING_SECS: i64 = 300;
 pub enum PageDecision {
     /// Nothing open, nothing recently closed. Open a record and page.
     Page,
-    /// A record for this source is still open — it **is** this firing, and the
-    /// ladder attached to it is what escalates if nobody answers. Paging again
-    /// would wake the same person for the thing they are already holding.
+    /// A record for this source is still open — it IS this firing, and its
+    /// ladder is what escalates if nobody answers. Paging again would wake the
+    /// same person for the thing they are already holding.
     AlreadyOpen,
-    /// The previous record closed less than the dampening window ago. This
-    /// firing is the same unstable condition coming back, so it is recorded on
-    /// that record instead of opening a second one and waking anybody again.
+    /// The previous record closed less than the dampening window ago: the same
+    /// unstable condition coming back, recorded on that record instead of
+    /// opening a second one.
     Flap {
-        /// The record the flap belongs on. Carried in the value rather than
-        /// left for the caller to re-derive, so "dampen" cannot be spelled
-        /// without saying which record it is dampening onto.
+        /// The record the flap belongs on. Carried in the value so "dampen"
+        /// cannot be spelled without saying which record it dampens onto.
         response_id: String,
         /// How long the recovery held before it came back, in micros. Goes on
         /// the timeline verbatim: "fired again 40s after recovering" is a
-        /// different fact from "fired again 4m after recovering", and a
-        /// responder reading the record afterwards needs to tell them apart.
+        /// different fact from "fired again 4m after recovering".
         recovered_for_micros: i64,
     },
 }
 
 /// Whether this firing pages, folds into an open record, or is dampened.
 ///
-/// `latest` is the newest record for this source whatever its state — not the
-/// newest *open* one. That widening is the whole change: the close-then-reopen
-/// cycle is invisible to a query that only returns open records, which is why
-/// the previous rule ("still open") could not see a flap at all.
+/// `latest` is the newest record for this source whatever its state, not the
+/// newest *open* one. The close-then-reopen cycle is invisible to a query that
+/// only returns open records, which is why the previous rule could not see a
+/// flap at all.
 ///
 /// `dampening_micros` of zero or less turns dampening off and restores the
-/// previous behaviour exactly, which is what makes it safe to ship on by
-/// default: an operator who finds it eating pages has a switch, and the switch
-/// leads back to code that is still exercised.
+/// previous behaviour exactly — the switch that makes it safe to ship on by
+/// default.
 ///
-/// `now` is passed in. A record whose `closed_at` is missing or in the future
-/// is treated as not-recently-closed — a clock that disagrees with itself must
-/// cost a duplicate page, never a suppressed one.
+/// A record whose `closed_at` is missing or in the future is treated as
+/// not-recently-closed: a clock that disagrees with itself must cost a
+/// duplicate page, never a suppressed one.
 pub fn page_decision(latest: Option<&Response>, now: i64, dampening_micros: i64) -> PageDecision {
     let Some(record) = latest else {
         return PageDecision::Page;
@@ -765,12 +711,9 @@ pub fn page_decision(latest: Option<&Response>, now: i64, dampening_micros: i64)
     }
 }
 
-/// The timeline sentence for one dampened re-fire.
-///
-/// Pure and here rather than formatted at the call site, because this string is
-/// the entire responder-facing evidence that dampening happened — if it is
-/// wrong or absent the record is silently smoothed, which is the outcome G16
-/// says is worse than the flapping.
+/// The timeline sentence for one dampened re-fire. Pure and here rather than
+/// formatted at the call site, because this string is the entire
+/// responder-facing evidence that dampening happened.
 pub fn flap_note(recovered_for_micros: i64) -> String {
     let seconds = recovered_for_micros.max(0) / 1_000_000;
     format!(
@@ -782,10 +725,9 @@ pub fn flap_note(recovered_for_micros: i64) -> String {
 /// Why blast radius found no downstream team.
 ///
 /// Every one of these used to return an empty list and write nothing, so
-/// "nothing depends on this" and "blast radius is broken" produced identical
-/// output. `NoGraph` is not hypothetical: the service-graph job runs hourly by
-/// default, so a fresh data directory has no graph for the first hour and every
-/// page in that window silently has no blast radius.
+/// "nothing depends on this" and "blast radius is broken" looked identical.
+/// `NoGraph` is not hypothetical: the service-graph job runs hourly, so a fresh
+/// data directory has no graph for its first hour.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NoBlastRadius {
     /// The signal carried no `service` dimension, so there was nothing to ask
@@ -827,20 +769,18 @@ pub enum UpstreamRecovery {
     /// confirmed. The owner's record closes now.
     CloseOwner,
     /// Dependents are still containing the blast radius on their own services.
-    /// The owner's record stays open — "the incident closes on the slowest
-    /// dependent, not on the root cause" — and these are the records it is
-    /// waiting on.
+    /// The owner's record stays open — the incident closes on the slowest
+    /// dependent, not on the root cause — and these are what it waits on.
     AwaitDependents { outstanding: Vec<String> },
 }
 
 /// Whether the root cause clearing closes the firing, or only tells the
 /// dependents about it.
 ///
-/// §4 is explicit that recovery is ordered: the database being healthy does
-/// not mean payment-gateway has replayed its buffered writes, and closing
-/// their record on their behalf is how the replay never happens. So the
-/// upstream signal is exactly that — a signal — and the owner's own record
-/// stays open until the slowest dependent says it is clear.
+/// §4: recovery is ordered. The database being healthy does not mean
+/// payment-gateway has replayed its buffered writes, and closing their record
+/// on their behalf is how the replay never happens. So the upstream signal is
+/// exactly that — a signal.
 pub fn upstream_recovery(impacted: &[Response]) -> UpstreamRecovery {
     let outstanding: Vec<String> = impacted
         .iter()
@@ -855,11 +795,8 @@ pub fn upstream_recovery(impacted: &[Response]) -> UpstreamRecovery {
 }
 
 /// Whether confirming `confirmed_id` was the last thing the owner's record was
-/// waiting on.
-///
-/// Takes the sibling list as it was read *before* the confirmation landed, and
-/// discounts the confirmed record itself, so the caller does not have to
-/// re-read the whole set inside a race it cannot win anyway.
+/// waiting on. Takes the sibling list as it was read *before* the confirmation
+/// landed, so the caller need not re-read the set inside a race it cannot win.
 pub fn dependents_all_clear(impacted: &[Response], confirmed_id: &str) -> bool {
     !impacted
         .iter()
@@ -872,8 +809,7 @@ pub fn dependents_all_clear(impacted: &[Response], confirmed_id: &str) -> bool {
 ///
 /// Three stages and no more: the room needs "somebody was woken", "somebody has
 /// it" and "it is over, and why". Every rung in between is the ladder's
-/// business, and posting them is what turns a flapping alert into channel noise
-/// — which is precisely why the incident path already dedups its own repeats.
+/// business, and posting them turns a flapping alert into channel noise.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ChannelPostStage {
@@ -892,11 +828,9 @@ impl ChannelPostStage {
     }
 
     /// The stage a record in this state is at, or `None` for a state the room
-    /// is not told about.
-    ///
-    /// `Triaged` is deliberately absent: it means the agent is still looking,
-    /// which is not news to a room and would spend the record's one message on
-    /// a state that is over in ninety seconds.
+    /// is not told about. `Triaged` is deliberately absent: it means the agent
+    /// is still looking, which is not news, and would spend the record's one
+    /// message on a state that is over in ninety seconds.
     pub fn of(state: ResponseState) -> Option<Self> {
         match state {
             ResponseState::Triggered => Some(Self::Paged),
@@ -929,22 +863,18 @@ pub struct ChannelPost {
 /// several kinds of message can tell them apart.
 pub const CHANNEL_POST_KEY_PREFIX: &str = "o2-oncall-response";
 
-/// The dedup key for a record's channel post: one per **record**.
-///
-/// Not per rung, and not per ladder run. A record handed to another team is
-/// still the same outage to the room that has been watching it, and minting a
-/// second key there would post the whole story twice.
+/// The dedup key for a record's channel post: one per record, not per rung and
+/// not per ladder run. A record handed to another team is still the same outage
+/// to the room, and a second key would post the whole story twice.
 pub fn channel_post_key(response_id: &str) -> String {
     format!("{CHANNEL_POST_KEY_PREFIX}:{response_id}")
 }
 
 /// What the room is told about a record right now.
 ///
-/// `detail_url` links to the record rather than reproducing the alert. The
-/// record carries `title`, the subject and the runbook — it does **not** carry
-/// the rows and values that fired, so the alert's own detail cannot be
-/// reproduced here without widening the record, and a link cannot go stale the
-/// way a copied payload can.
+/// `detail_url` links to the record rather than reproducing the alert: the
+/// record does not carry the rows and values that fired, and a link cannot go
+/// stale the way a copied payload can.
 pub fn channel_post(
     response: &Response,
     team_name: &str,
@@ -1011,17 +941,13 @@ pub enum ChannelPostAction {
     Skip,
 }
 
-/// Whether this stage goes to the room, and how.
-///
-/// `can_edit` is [`super::agent::updates_in_place`] for the channel the post
-/// rides — its first caller. The rule it produces is the one that keeps a
-/// record to a single message:
+/// Whether this stage goes to the room, and how. `can_edit` is
+/// [`super::agent::updates_in_place`] for the channel the post rides.
 ///
 /// - nothing posted yet → **post**, whatever the stage. A record whose opening post was lost still
-///   deserves to have its outcome said once, and posting for the first time is not re-posting.
+///   deserves to have its outcome said once.
 /// - posted, and the transport can revise what it sent → **edit**.
-/// - posted, and it cannot → **skip**. Not "post again": a room that gets three messages per record
-///   is the noise this whole design exists to avoid, and the responder who needs the update is on
+/// - posted, and it cannot → **skip**. Not "post again": the responder who needs the update is on
 ///   the page, not in the channel.
 pub fn channel_post_action(already_posted: bool, can_edit: bool) -> ChannelPostAction {
     match (already_posted, can_edit) {
@@ -1120,11 +1046,9 @@ mod tests {
         }
     }
 
-    /// The L0 agent's two entries. `AiVerdict` is the durable, auditable copy
-    /// of what the machine recommended, and `SeverityPromoted` is the receipt
-    /// for the one decision this design lets a verdict make. Both belong on the
-    /// human timeline: "why was I paged" and "why was I *not* paged" are both
-    /// answered from them, and the second question matters more.
+    /// The L0 agent's two entries, both on the human timeline: "why was I
+    /// paged" and "why was I *not* paged" are answered from them, and the
+    /// second question matters more.
     #[test]
     fn test_the_agents_entries_are_on_the_timeline_and_not_written_by_a_person() {
         for k in [
@@ -1156,10 +1080,9 @@ mod tests {
     }
 
     /// A late event must never reopen a record a human already closed. Which
-    /// states may follow which is enforced where the write happens, in the
-    /// `state` filters on `oncall_responses::acknowledge` and `hand_over`, so
-    /// that two responders racing are decided by the database and not by a
-    /// stale snapshot. This pins the one fact the enum itself owns.
+    /// states may follow which is enforced in the `state` filters on
+    /// `oncall_responses::acknowledge` and `hand_over`, so two racing
+    /// responders are decided by the database. This pins what the enum owns.
     #[test]
     fn test_resolved_is_terminal() {
         assert!(ResponseState::Resolved.is_terminal());
@@ -1204,7 +1127,7 @@ mod tests {
 
     /// A rung that pages eight people on two channels is one line to a
     /// responder and sixteen rows to the engine. Only the engine's rows are
-    /// kept off the timeline; everything else a reader can act on stays.
+    /// kept off the timeline.
     #[test]
     fn test_only_delivery_rows_are_kept_off_the_timeline() {
         assert!(ResponseEventKind::Delivery.is_ledger_only());
@@ -1247,9 +1170,8 @@ mod tests {
     }
 
     /// The bug this pins: a handoff left the previous owner's pages in the
-    /// ledger, so the receiving team's very first rung read as already sent
-    /// and nobody on it was ever woken. The rung delay alone cannot be the
-    /// key once a page can change hands.
+    /// ledger, so the receiving team's first rung read as already sent and
+    /// nobody on it was woken.
     #[test]
     fn test_a_rung_from_an_earlier_run_is_not_this_run_s_ledger() {
         let first = ResponseEvent::new(ResponseEventKind::Page, 10, "o2-engine", "paged ana@o2.ai")
@@ -1267,8 +1189,8 @@ mod tests {
     }
 
     /// A crash between two sends in one rung must retry the page that did not
-    /// land and skip the one that did — the dedup Phase 5 asks for is keyed
-    /// per person and per channel, not per rung.
+    /// land and skip the one that did — the dedup is keyed per person and per
+    /// channel, not per rung.
     #[test]
     fn test_only_a_page_that_landed_counts_as_delivered() {
         let landed = ResponseEvent::new(ResponseEventKind::Delivery, 10, "o2-engine", "sent")
@@ -1294,10 +1216,9 @@ mod tests {
     }
 
     /// The one fact the ladder cannot get from the per-recipient rows: this
-    /// rung had real people on it and reached none of them. A rung that
-    /// resolved to nobody is not marked, because that rung IS spent — nobody
-    /// will appear on it in five minutes — and marking it would make the engine
-    /// re-send a page to no one for as long as its retry budget lasts.
+    /// rung had real people on it and reached none of them. A rung that resolved
+    /// to nobody is not marked — that rung IS spent, and marking it would
+    /// re-send a page to no one for as long as the retry budget lasts.
     #[test]
     fn test_only_a_rung_the_transport_lost_reads_as_unsent() {
         let lost = ResponseEvent::new(
@@ -1381,8 +1302,6 @@ mod tests {
         }
     }
 
-    /// Snoozing quiets the page without claiming it, so the record stays open
-    /// and unowned — an expired snooze must let the ladder resume.
     /// The bug this pins: one predicate served both the engine ("keep
     /// climbing?") and the list ("still mine to close?"). Acknowledged answers
     /// no to the first and yes to the second, so it vanished from the product.
@@ -1429,9 +1348,8 @@ mod tests {
     }
 
     /// The bug this pins: handing a page to another team moved the team but
-    /// left the ladder where it was, so the first tick after the handoff found
-    /// every rung already sent and dropped the job — the receiving team was
-    /// never paged at all.
+    /// left the ladder where it was, so the first tick found every rung already
+    /// sent and dropped the job — the receiving team was never paged.
     #[test]
     fn test_a_handoff_restarts_the_ladder_for_the_receiving_team() {
         let mut r = sample(Some(1_100), None);
@@ -1466,9 +1384,9 @@ mod tests {
         );
     }
 
-    /// Handing a page to a PERSON has to work the same way: the recipient is
-    /// paged and keeps being chased if they never answer. Acknowledging on
-    /// their behalf is exactly how a handoff becomes nobody's problem.
+    /// Handing a page to a PERSON works the same way: the recipient is paged and
+    /// keeps being chased if they never answer. Acknowledging on their behalf is
+    /// how a handoff becomes nobody's problem.
     #[test]
     fn test_handing_to_a_person_keeps_the_page_chaseable_on_the_same_team() {
         let r = sample(None, None);
@@ -1487,9 +1405,6 @@ mod tests {
         assert_eq!(moved.current_run(), 2);
     }
 
-    /// A snooze says "I know, stop shouting" and belongs to the person who set
-    /// it. Carrying it across a handoff would hand somebody a page that is
-    /// already quiet.
     /// The bug: there is no `Exhausted` state, so a spent ladder keeps
     /// `Triggered` and every screen reading the state said "escalating" beside
     /// a timeline that said the ladder had run out.
@@ -1526,7 +1441,7 @@ mod tests {
 
     /// A repeat pass has rungs left to climb. Carrying the previous run's
     /// exhaustion would report the fresh ladder as spent before it paged
-    /// anybody — and stop the mid-rung guard letting it dispatch at all.
+    /// anybody, and stop the mid-rung guard letting it dispatch at all.
     #[test]
     fn test_a_new_run_clears_the_previous_run_s_exhaustion() {
         let mut r = sample(None, None);
@@ -1545,11 +1460,10 @@ mod tests {
         assert_eq!(moved.snoozed_until, None);
     }
 
-    /// The bug this pins: `minutes` comes off a request body and was
-    /// multiplied out unchecked. `{"minutes": 999999999999}` panicked the
-    /// handler and dropped the connection — and in a release build it would
-    /// have wrapped instead, quietly silencing a live page until an instant
-    /// in the past or 150 000 years away.
+    /// The bug this pins: `minutes` comes off a request body and was multiplied
+    /// out unchecked. `{"minutes": 999999999999}` panicked the handler, and in a
+    /// release build would have wrapped instead — silencing a live page until an
+    /// instant in the past or 150 000 years away.
     #[test]
     fn test_a_snooze_cannot_run_off_the_end_of_the_clock() {
         for absurd in [999_999_999_999, i64::MAX, i64::MIN, i64::MAX / 2] {
@@ -1565,7 +1479,7 @@ mod tests {
 
     /// A snooze is "I know, stop shouting", not "goodbye". It has to expire
     /// inside the shift of whoever set it, because it claims nothing and the
-    /// record stays open and unowned the whole time.
+    /// record stays open and unowned throughout.
     #[test]
     fn test_a_snooze_is_bounded_to_a_day_and_must_be_positive() {
         assert_eq!(
@@ -1594,10 +1508,9 @@ mod tests {
             assert_eq!(anchor, 60 * MIN);
         }
 
-        /// The defect. Pressing snooze again during a snooze used to add the
-        /// whole second duration to an already-pushed clock, so the record
-        /// reported itself awake at 62m and stayed silent until 130m — the
-        /// banner and the pager disagreeing by more than an hour.
+        /// The defect. Pressing snooze again during a snooze added the whole
+        /// second duration to an already-pushed clock, so the record reported
+        /// itself awake at 62m and stayed silent until 130m.
         #[test]
         fn test_a_second_snooze_does_not_add_to_the_quiet_it_overlaps() {
             let first = snoozed_ladder_anchor(None, 0, None, MIN, 61 * MIN);
@@ -1707,11 +1620,10 @@ mod tests {
         }
     }
 
-    /// The bug this pins, in the design's own worked example: Postgres
-    /// recovers, the engine closes payment-gateway's record on their behalf,
-    /// and the writes buffered during the outage are never replayed. §4: "each
-    /// impacted team confirms its own recovery. The owner team cannot close on
-    /// their behalf."
+    /// The bug this pins, in the design's own example: Postgres recovers, the
+    /// engine closes payment-gateway's record on their behalf, and the writes
+    /// buffered during the outage are never replayed. §4: "each impacted team
+    /// confirms its own recovery."
     #[test]
     fn test_an_upstream_recovery_does_not_close_a_dependents_record() {
         let dependents = [
@@ -1951,10 +1863,9 @@ mod tests {
         }
     }
 
-    /// The test that matters. An alert on a one-minute frequency that fires,
-    /// clears, fires, clears — the exact shape G16 describes — pages **once**,
-    /// not once per flap, and every suppressed re-fire is attributed to the
-    /// record the responder was actually woken for.
+    /// The test that matters. An alert that fires, clears, fires, clears on a
+    /// one-minute frequency pages once, not once per flap, and every suppressed
+    /// re-fire is attributed to the record the responder was woken for.
     #[test]
     fn test_a_flapping_alert_produces_one_page_cycle_not_n() {
         let minute = 60 * 1_000_000;
@@ -1981,11 +1892,9 @@ mod tests {
         assert_eq!(flaps, 4, "and each flap is still on the record");
     }
 
-    /// The other half, and the one that must not regress: a recovery that
-    /// holds is a recovery. Dampening lives entirely on the firing side, so
-    /// `closed_at` being set at all is proof the record closed at the instant
-    /// the condition cleared — there is no state in which a held recovery
-    /// leaves a page stuck open.
+    /// The other half: a recovery that holds is a recovery. Dampening lives
+    /// entirely on the firing side, so `closed_at` being set is proof the record
+    /// closed when the condition cleared — no state leaves a page stuck open.
     #[test]
     fn test_a_recovery_that_holds_closes_promptly_and_the_next_firing_pages() {
         let record = closed_at(1_000);
@@ -2045,8 +1954,8 @@ mod tests {
     }
 
     /// A torn row — closed, but with a state a racing writer put back — must not
-    /// answer `AlreadyOpen`. It used to, and because nothing ever clears the
-    /// state again that silenced the source's every later firing permanently.
+    /// answer `AlreadyOpen`. It used to, and because nothing clears the state
+    /// again that silenced the source's every later firing permanently.
     #[test]
     fn test_a_closed_record_never_reports_open_whatever_its_state() {
         for state in [
@@ -2077,7 +1986,7 @@ mod tests {
     }
 
     /// A clock that disagrees with itself must cost a duplicate page, never a
-    /// suppressed one — so a close stamped in the future does not suppress, and
+    /// suppressed one: a close stamped in the future does not suppress, and
     /// neither does a terminal row with no close instant at all.
     #[test]
     fn test_an_impossible_clock_pages_rather_than_suppresses() {
@@ -2114,10 +2023,10 @@ mod tests {
         assert!(flap_note(recovered_for_micros).contains("dampened"));
     }
 
-    /// The three ways blast radius finds nobody all used to write nothing, so
-    /// "nothing depends on this" and "blast radius is broken" produced
-    /// byte-identical output. Each has to say which one it was, and none may
-    /// read as an error — finding nobody is a legitimate answer.
+    /// The three ways blast radius finds nobody used to write nothing, so
+    /// "nothing depends on this" and "blast radius is broken" looked identical.
+    /// Each says which it was, and none reads as an error — finding nobody is a
+    /// legitimate answer.
     #[test]
     fn test_each_reason_for_no_blast_radius_says_which_one_it_was() {
         let notes = [

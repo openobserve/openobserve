@@ -19,26 +19,16 @@ use chrono::{Datelike, LocalResult, TimeZone, Timelike};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-/// The slot every rotation, override and rung belongs to unless it says
-/// otherwise.
+/// The name given to a team's first rotation.
 ///
-/// It is a stored default rather than an `Option` at every call site because
-/// "which slot" has an answer for every rotation that has ever existed — the
-/// ones written before slots were a concept are the team's primary, and reading
-/// them as anything else would change what stored data means.
-/// The name the system gives a team's first rotation.
-///
-/// A *name*, not a keyword: nothing in resolution treats it specially, and a
-/// team may rename or delete it. It replaced `DEFAULT_SLOT`, which was a
-/// keyword — every rotation that did not name a slot silently meant that one,
-/// and six escalation targets existed to say "that one" in different ways.
+/// A name, not a keyword: nothing in resolution treats it specially, and a
+/// team may rename or delete it.
 pub const DEFAULT_ROTATION_NAME: &str = "Primary";
 
-/// The name the system gives the second rotation, when one is asked for.
+/// The name given to a second rotation, when one is asked for.
 ///
-/// Also just a name. The rotation it labels is entirely ordinary: same roster,
-/// same cadence, anchor one shift behind. Nothing derives it and nothing links
-/// the two — see `Rotation::offset_from`.
+/// Also just a name. The rotation is ordinary — same roster, same cadence,
+/// anchor one shift behind. Nothing links the two; see `Rotation::offset_from`.
 pub const SECONDARY_ROTATION_NAME: &str = "Secondary";
 
 /// The longest a rotation's name may be.
@@ -46,16 +36,9 @@ pub const MAX_ROTATION_NAME_CHARS: usize = 64;
 
 /// What the single shift rule of a plain rotation is called.
 ///
-/// Deliberately **not** the rotation's own name. `Rotation::weekly` used to
-/// copy it, so a team created with the two-rotation default got a rotation
-/// called "Secondary" whose only rule was called "Primary" — because
-/// `offset_from` clones the primary's rules. Two things named for a position,
-/// one of which is not that position.
-///
-/// A rule answers *when* and *who*, never *which position*. "Base" is what the
-/// architecture doc's follow-the-sun example calls the unrestricted catch-all
-/// underneath the regional rules, and it cannot be confused with a rotation
-/// name because no team names a position "Base".
+/// Not the rotation's own name: `offset_from` clones the primary's rules, so
+/// copying it gave a rotation called "Secondary" a rule called "Primary". A
+/// rule says when and who, never which position.
 pub const DEFAULT_SHIFT_RULE_NAME: &str = "Base";
 
 pub const MICROS_PER_MINUTE: i64 = 60_000_000;
@@ -63,15 +46,13 @@ pub const MICROS_PER_HOUR: i64 = 60 * MICROS_PER_MINUTE;
 pub const MICROS_PER_DAY: i64 = 24 * MICROS_PER_HOUR;
 pub const MICROS_PER_WEEK: i64 = 7 * MICROS_PER_DAY;
 
-/// When a rotation applies, in the schedule's own timezone.
-///
-/// Follow-the-sun is three restricted rotations over one unrestricted
-/// catch-all; weekday/weekend is two. The window is expressed in local wall
-/// time because that is how people describe their hours — "I cover 09:00 to
-/// 17:00" means their 09:00, not UTC's.
 /// Minutes in a day — the exclusive upper bound `end_minute` allows.
 pub const MINUTES_PER_DAY: u32 = 1440;
 
+/// When a rotation applies, in the schedule's own timezone.
+///
+/// Local wall time, because that is how people state their hours: "I cover
+/// 09:00 to 17:00" means their 09:00, not UTC's.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
 pub struct TimeWindow {
     /// 0 = Monday … 6 = Sunday. Empty means every day.
@@ -81,9 +62,8 @@ pub struct TimeWindow {
     pub start_minute: u32,
     /// Minutes from local midnight, exclusive.
     ///
-    /// May be LESS than `start_minute`, which means the window wraps midnight
-    /// (a 22:00–06:00 night shift). Splitting that into two windows would make
-    /// the common case the awkward one.
+    /// May be LESS than `start_minute`, meaning the window wraps midnight (a
+    /// 22:00–06:00 night shift).
     pub end_minute: u32,
 }
 
@@ -100,14 +80,12 @@ impl TimeWindow {
         )
     }
 
-    /// Whether the window covers a wall-clock reading, given as a day of the
-    /// week (0 = Monday) and minutes past local midnight.
+    /// Whether the window covers a wall-clock reading: day of week (0 =
+    /// Monday) and minutes past local midnight.
     ///
-    /// Split out from [`TimeWindow::contains`] so that the question "do these
-    /// two windows both cover some minute of the week?" can be asked without
-    /// inventing instants to ask it with. The schedule presets need exactly
-    /// that to refuse two layers that would be equally in force, and a second
-    /// copy of this rule would be a second chance for it to drift.
+    /// Split out from [`TimeWindow::contains`] so "do two windows both cover
+    /// some minute of the week?" can be asked without inventing instants. The
+    /// presets need that to refuse two layers that would be equally in force.
     pub fn covers_local(&self, day: u8, minute: u32) -> bool {
         let in_time = if self.start_minute <= self.end_minute {
             minute >= self.start_minute && minute < self.end_minute
@@ -142,24 +120,18 @@ pub struct ShiftRule {
     pub shift_micros: i64,
     /// Instant at which `members[0]`'s first shift begins, in microseconds.
     ///
-    /// Shifts before this instant resolve too — the sequence extends
-    /// backwards — so an anchor set in the future is not an error, it just
-    /// means the cycle is counted from there.
+    /// Shifts before it resolve too — the sequence extends backwards — so an
+    /// anchor in the future is not an error.
     ///
-    /// This is also the whole of the "secondary" mechanism. Two rotations with
-    /// the same roster and anchors one shift apart can never resolve to the
-    /// same person, and that is *data*, not a rule: nothing at resolution time
-    /// knows the two are related, and dragging one anchor breaks the pairing on
-    /// purpose. It replaced `secondary_offset`, which computed the second
-    /// person from the first's roster and so produced a position that existed
-    /// whether or not anybody staffed it.
+    /// This is the whole "secondary" mechanism. Two rotations with the same
+    /// roster and anchors one shift apart can never resolve to the same
+    /// person, and that is data, not a rule: nothing at resolution time knows
+    /// they are related.
     pub anchor_micros: i64,
-    /// Higher wins when two rules in the same rotation both apply at an
-    /// instant.
+    /// Higher wins when two rules in the same rotation both apply.
     ///
-    /// Explicit rather than positional: PagerDuty orders layers by their
-    /// position in a list, which means reordering the UI silently changes who
-    /// gets paged. A number you can read is worth the extra field.
+    /// Explicit rather than positional, so reordering the UI list cannot
+    /// silently change who gets paged.
     #[serde(default)]
     pub priority: i32,
     /// When this rule applies. Empty means always — the catch-all every
@@ -170,14 +142,12 @@ pub struct ShiftRule {
     /// forever".
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub starts_at: Option<i64>,
-    /// The rule is not in effect at or after this instant. `None` means
-    /// "until further notice".
+    /// The rule stops applying at or after this instant. `None` means "until
+    /// further notice".
     ///
-    /// This is how a rule is **retired** (`architecture/02` §3b). Until it
-    /// existed the only way to stop one was to delete it, which threw away
-    /// the record of who had been covering those hours. Exclusive, like every
-    /// other boundary here: the end instant already belongs to whatever takes
-    /// over.
+    /// How a rule is retired (`architecture/02` §3b). Deleting it instead
+    /// would throw away the record of who covered those hours. Exclusive, like
+    /// every boundary here.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ends_at: Option<i64>,
 }
@@ -209,10 +179,9 @@ pub enum ShiftRuleError {
         got: u32,
         max: u32,
     },
-    /// A restriction starts and ends at the same minute, so it covers no
-    /// instant of the day at all. This is the trap `end_minute: 0` sets for
-    /// someone who means "all day": the rule looks configured but never
-    /// wins.
+    /// Start and end are the same minute, so the restriction covers no instant
+    /// at all. This is the trap `end_minute: 0` sets for someone who means
+    /// "all day": the rule looks configured but never wins.
     EmptyRestriction {
         field: String,
         minute: u32,
@@ -247,9 +216,8 @@ impl std::fmt::Display for ShiftRuleError {
 /// Why a rotation was rejected.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RotationError {
-    /// A rotation with no name. Levels of an escalation policy point at a
-    /// rotation, and a page that says "you are on call in ``" tells a woken
-    /// engineer nothing.
+    /// A rotation with no name. Escalation levels point at rotations, and a
+    /// page saying "you are on call in ``" tells a woken engineer nothing.
     NoName(String),
     /// A rotation with no shift rules puts nobody on call, ever. It is the one
     /// state that looks configured on a calendar and pages no one.
@@ -295,12 +263,9 @@ impl ShiftRule {
 
     /// The same rule, shifted `shifts` handovers earlier.
     ///
-    /// **This is the whole "secondary" mechanism**, and it is deliberately a
-    /// plain constructor rather than anything the resolver knows about. A
-    /// rotation built with `offset_from(primary, 1)` holds the person who takes
-    /// over next, for as long as nobody edits either — and when somebody does,
-    /// the two drift and a `config-risks` warning says so, rather than a hidden
-    /// rule quietly keeping them in step.
+    /// The whole "secondary" mechanism, and deliberately a plain constructor
+    /// the resolver knows nothing about. If somebody edits one side, the two
+    /// drift and `config-risks` reports it — no hidden rule keeps them in step.
     pub fn offset_from(other: &ShiftRule, shifts: i64) -> Self {
         Self {
             anchor_micros: other
@@ -310,22 +275,19 @@ impl ShiftRule {
         }
     }
 
-    /// Whether the layer itself is live at `at`, ignoring its restrictions.
+    /// Whether the layer is live at `at`, ignoring its restrictions.
     ///
-    /// Separate from [`Rotation::applies_at`] because the two answer different
-    /// questions: the validity window says whether this layer exists at all at
-    /// that point in the schedule's life, and the restrictions say which hours
-    /// it covers while it does.
+    /// Separate from [`Rotation::applies_at`]: the validity window says whether
+    /// the layer exists at all, the restrictions say which hours it covers.
     pub fn in_effect_at(&self, at_micros: i64) -> bool {
         self.starts_at.is_none_or(|s| at_micros >= s) && self.ends_at.is_none_or(|e| at_micros < e)
     }
 
     /// Whether this rotation is in force at `at`.
     ///
-    /// Windows are ORed: a rotation covering "weekday mornings or weekend
-    /// afternoons" is two windows, and matching either is enough. A layer
-    /// outside its validity window is not in force whatever its restrictions
-    /// say — retiring a layer has to mean retiring it.
+    /// Windows are ORed — "weekday mornings or weekend afternoons" is two
+    /// windows and either matching is enough. A layer outside its validity
+    /// window is never in force, whatever its restrictions say.
     pub fn applies_at(&self, at_micros: i64, tz: chrono_tz::Tz) -> bool {
         self.in_effect_at(at_micros)
             && (self.restrictions.is_empty()
@@ -378,12 +340,11 @@ impl ShiftRule {
         Ok(())
     }
 
-    /// Instant at which handover number `index` happens, counted from the
-    /// anchor. `index` may be negative: the sequence extends backwards.
+    /// Instant of handover number `index`, counted from the anchor. `index`
+    /// may be negative: the sequence extends backwards.
     ///
-    /// The boundary is a **wall-clock** fact — "Mondays at 09:00" — so it is
-    /// computed in the schedule's local calendar and converted back to an
-    /// instant afterwards.
+    /// A handover is a wall-clock fact — "Mondays at 09:00" — so it is computed
+    /// in the local calendar and converted back to an instant.
     fn boundary(&self, index: i64, tz: chrono_tz::Tz) -> Option<i64> {
         let local_anchor = to_local_micros(self.anchor_micros, tz)?;
         let offset = index.checked_mul(self.shift_micros)?;
@@ -392,16 +353,12 @@ impl ShiftRule {
 
     /// Zero-based index of the shift containing `at`.
     ///
-    /// Counted in the schedule's local wall time, not in elapsed micros. A
-    /// weekly 09:00 handover has to stay at 09:00 for the people living it,
-    /// and elapsed micros move it to 08:00 or 10:00 the moment the zone
-    /// changes offset — so the shift straddling a transition is 23 or 25 hours
-    /// long, exactly as `architecture/02` §9 says.
+    /// Counted in local wall time, not elapsed micros: a 09:00 handover must
+    /// stay at 09:00 for the people living it, so the shift straddling a DST
+    /// transition is 23 or 25 hours long (`architecture/02` §9).
     ///
-    /// Floor division rather than truncating division, so that instants before
-    /// the anchor land on the shift that actually contains them. Truncating
-    /// division maps both `-1` and `+1` micros from the anchor to shift 0,
-    /// which would make the same person on call for two consecutive shifts.
+    /// Floor division, not truncating: truncating maps both −1 and +1 micros
+    /// from the anchor to shift 0, putting the same person on two shifts.
     fn shift_index(&self, at: i64, tz: chrono_tz::Tz) -> Option<i64> {
         let local_at = to_local_micros(at, tz)?;
         let local_anchor = to_local_micros(self.anchor_micros, tz)?;
@@ -426,19 +383,17 @@ impl ShiftRule {
 
     /// Who holds this level at `at`, or `None` if the rotation is unusable.
     ///
-    /// Returning `None` rather than a fallback is deliberate: an unstaffed
-    /// level must surface as a coverage gap, never as a silently dropped page.
+    /// `None` rather than a fallback, so an unstaffed level surfaces as a
+    /// coverage gap instead of a silently dropped page.
     pub fn member_at(&self, at: i64, tz: chrono_tz::Tz) -> Option<&str> {
         self.member_offset(at, 0, tz)
     }
 
     /// The member `offset` handovers after the one on shift at `at`.
     ///
-    /// The raw arithmetic, with no absences and no covers in it. What a
-    /// "secondary" is comes from [`Rotation::resolved_secondary_offset`] and
-    /// is resolved by [`next_on_call_in_slot`], which is the only caller
-    /// entitled to decide it; expressing the position this way is why a team
-    /// needs one rotation rather than one per escalation level.
+    /// Raw arithmetic, with no absences and no covers. What a "secondary" is
+    /// comes from [`Rotation::resolved_secondary_offset`] and is decided by
+    /// [`next_on_call_in_slot`], the only caller entitled to decide it.
     pub fn member_offset(&self, at: i64, offset: i64, tz: chrono_tz::Tz) -> Option<&str> {
         if self.validate().is_err() {
             return None;
@@ -451,11 +406,9 @@ impl ShiftRule {
     /// The rotation's members in ladder order at `at`: whoever is on shift
     /// first, then the person they hand over to, and so on round the cycle.
     ///
-    /// This is the one place the cycle is unrolled, and everything that has to
-    /// pick "the next available person" walks this list rather than doing its
-    /// own arithmetic on `member_offset`. Two copies of that arithmetic is two
-    /// chances for the on-call and the secondary to disagree about whose turn
-    /// it is.
+    /// The one place the cycle is unrolled. Everything that picks "the next
+    /// available person" walks this list — a second copy of the arithmetic is a
+    /// second chance for on-call and secondary to disagree.
     pub fn order_at(&self, at: i64, tz: chrono_tz::Tz) -> Vec<&str> {
         if self.validate().is_err() {
             return Vec::new();
@@ -473,26 +426,21 @@ impl ShiftRule {
             .collect()
     }
 
-    /// Who holds this rotation at `at`, **skipping anybody who is away**.
+    /// Who holds this rotation at `at`, skipping anybody who is away.
     ///
-    /// The skip rule, stated once because everything else follows from it: the
-    /// shift passes to the next person in the handover order who is not away at
-    /// that instant, and to nobody else. It is a pure function of the rotation,
-    /// the instant, and the absence windows — so it gives the same answer on
-    /// every node, on every call, and after any number of replays.
+    /// The shift passes to the next person in handover order who is not away,
+    /// and to nobody else. Pure in the rotation, the instant and the absence
+    /// windows, so every node agrees.
     ///
-    /// **Whose turn does it move?** Only the away person's. The alternative —
-    /// re-dealing the whole cycle so that everybody after the skipped shift
-    /// slides along — is the model a reader first imagines, and it is the wrong
-    /// one: it makes today's answer depend on every absence ever recorded
-    /// before it, so adding one holiday in October reshuffles the grid for
-    /// November, and the schedule somebody agreed to is not the schedule they
-    /// get. Here, marking Ana away changes exactly the shifts Ana would have
-    /// held, and nobody else's row on the calendar moves.
+    /// Only the away person's turn moves. Re-dealing the whole cycle — the
+    /// model a reader first imagines — would make today's answer depend on
+    /// every absence ever recorded, so one holiday in October reshuffles
+    /// November. Here, marking Ana away changes only the shifts Ana would have
+    /// held.
     ///
-    /// `None` when every member is away, which is a coverage gap — the same
-    /// answer an empty rotation gives, reported by the same sweep. Bounded by
-    /// the member count, so it can neither loop nor spin on the paging path.
+    /// `None` when everybody is away: a coverage gap, same as an empty
+    /// rotation. Bounded by the member count, so it cannot spin on the paging
+    /// path.
     pub fn available_member_at(
         &self,
         at: i64,
@@ -522,21 +470,19 @@ impl ShiftRule {
     }
 }
 
-/// How many times the local estimate is allowed to be walked towards the real
-/// boundary. A DST transition moves one boundary by at most a couple of hours,
-/// so the estimate is never more than one shift out; the bound exists so that
-/// a pathological zone cannot spin here on the paging path.
+/// How many times the local estimate may be walked towards the real boundary.
+/// A DST transition moves a boundary by a couple of hours at most; the bound
+/// stops a pathological zone spinning here on the paging path.
 const MAX_BOUNDARY_CORRECTIONS: u8 = 4;
 
-/// The widest DST gap any zone has ever used is an hour; the loop is bounded
-/// well past that so a future rule change cannot land a handover in a hole
-/// this code refuses to climb out of.
+/// The widest DST gap any zone has used is an hour. Bounded well past that, so
+/// a future rule change cannot land a handover in a hole this code refuses to
+/// climb out of.
 const MAX_GAP_MINUTES: i64 = 180;
 
 /// What the wall clock in `tz` reads at instant `at`, as micros on the local
-/// calendar. Local readings are what handovers are expressed in, and
-/// subtracting two of them is what makes a shift 23 or 25 hours across a
-/// transition instead of always exactly 24.
+/// calendar. Subtracting two local readings is what makes a shift 23 or 25
+/// hours across a transition instead of always 24.
 fn to_local_micros(at: i64, tz: chrono_tz::Tz) -> Option<i64> {
     let utc = chrono::DateTime::from_timestamp_micros(at)?;
     Some(
@@ -550,14 +496,12 @@ fn to_local_micros(at: i64, tz: chrono_tz::Tz) -> Option<i64> {
 /// The instant at which the wall clock in `tz` reads `local`.
 ///
 /// Two readings have no single answer, and both are handover times somebody
-/// will really be woken by:
+/// will be woken by:
 ///
-/// - **Fall back.** The clock reads 01:30 twice. The handover is the *first* of them; taking the
-///   second would leave the outgoing engineer on call for an extra hour, and taking both would hand
-///   over twice.
-/// - **Spring forward.** The clock never reads 02:30 at all. The handover is the first instant the
-///   clock does reach — 03:00 — rather than being skipped, which would silently extend a shift by a
-///   whole cycle.
+/// - **Fall back.** The clock reads 01:30 twice; the handover is the first. The second would leave
+///   the outgoing engineer on an extra hour, and both would hand over twice.
+/// - **Spring forward.** The clock never reads 02:30; the handover is 03:00. Skipping it would
+///   extend a shift by a whole cycle.
 fn from_local_micros(local: i64, tz: chrono_tz::Tz) -> Option<i64> {
     let naive = chrono::DateTime::from_timestamp_micros(local)?.naive_utc();
     match tz.from_local_datetime(&naive) {
@@ -575,9 +519,8 @@ fn from_local_micros(local: i64, tz: chrono_tz::Tz) -> Option<i64> {
 
 /// Who one rotation puts on call at an instant.
 ///
-/// One per rotation, and a rotation is the only thing that produces one — the
-/// previous shape had an entry per *slot*, where a slot could exist because
-/// something derived it rather than because anybody staffed it.
+/// One per rotation, and only a rotation produces one — so a position cannot
+/// appear here because something derived it rather than because it is staffed.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct OnCallPosition {
     /// The rotation's id. What a level of the escalation policy points at.
@@ -589,9 +532,9 @@ pub struct OnCallPosition {
     pub user_email: String,
     /// Who takes over at the next handover.
     ///
-    /// **Display only.** Nothing pages this: it is the calendar's "up next",
-    /// and it used to double as the secondary, which is precisely how one team
-    /// got two different people both correctly labelled "the secondary".
+    /// Display only — nothing pages this. It once doubled as the secondary,
+    /// which is how one team got two different people both correctly labelled
+    /// "the secondary".
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub next_user_email: Option<String>,
     /// Set when a cover, rather than a shift rule, put this person here.
@@ -603,10 +546,9 @@ pub const OVERRIDE_ROTATION_NAME: &str = "Override";
 
 /// One person taking a bounded slice of somebody else's on-call.
 ///
-/// `architecture/02` §5: absolute ranges, no recurrence, stored in micros. An
-/// override never mutates the rotation — deleting it restores the computed
-/// result — which is why it is a separate record rather than an edit to the
-/// member list.
+/// `architecture/02` §5: absolute ranges, no recurrence, stored in micros. A
+/// separate record rather than an edit to the member list, so deleting it
+/// restores the computed result.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct ScheduleOverride {
     pub id: String,
@@ -614,10 +556,9 @@ pub struct ScheduleOverride {
     pub team_id: String,
     /// Which rotation is being covered.
     ///
-    /// A cover names a rotation for the same reason a level does: a cover is
-    /// "stand in for this position", and a position is a rotation. Covering two
-    /// of them is two covers, said out loud, rather than one cover that
-    /// silently lands the same person in both.
+    /// A cover stands in for one position. Covering two of them is two covers,
+    /// said out loud, rather than one that silently lands the same person in
+    /// both.
     pub rotation_id: String,
     /// Who is actually holding the pager for this window.
     pub user_email: String,
@@ -656,16 +597,13 @@ impl ScheduleOverride {
 
 /// One stretch during which a person is not to be given a shift.
 ///
-/// **Org-wide, not per team.** Being on holiday is a fact about a person, and a
-/// person who is on two teams is away from both. Storing it per team means the
-/// same window has to be written twice, and the failure mode of forgetting the
-/// second one is the exact failure this exists to prevent: a page landing on
-/// somebody who is on a beach. It is also who enters it — the person going
-/// away, once, not each of their team leads.
+/// Org-wide, not per team: being on holiday is a fact about a person, and
+/// somebody on two teams is away from both. Per team, the window has to be
+/// written twice, and forgetting the second is the exact failure this prevents
+/// — a page landing on somebody who is on a beach.
 ///
-/// Absolute instants in micros, like an override, and for the same reason:
-/// recurrence is a calendar feature and a schedule that guesses which Fridays
-/// somebody meant is a schedule that guesses wrong at 3am.
+/// Absolute micros, like an override. Recurrence is a calendar feature, and a
+/// schedule that guesses which Fridays somebody meant guesses wrong at 3am.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct Unavailability {
     pub id: String,
@@ -703,10 +641,9 @@ impl Unavailability {
 
 /// Whether `user_email` is away at `at`.
 ///
-/// Stated once, here, so that the resolver, the calendar and the edit-time
-/// warning cannot come to different conclusions about the same window — which
-/// is how a screen ends up promising that somebody will be skipped while the
-/// paging path still reaches them.
+/// Stated once here so the resolver, the calendar and the edit-time warning
+/// cannot disagree about the same window — which is how a screen promises
+/// somebody will be skipped while the paging path still reaches them.
 pub fn is_unavailable(unavailability: &[Unavailability], user_email: &str, at: i64) -> bool {
     unavailability
         .iter()
@@ -715,23 +652,13 @@ pub fn is_unavailable(unavailability: &[Unavailability], user_email: &str, at: i
 
 /// The override in force at `at`, or `None`.
 ///
-/// **The overlap rule.** Overrides are allowed to overlap — refusing the second
-/// one would mean somebody arranging cover at 2am has to work out what the
-/// first one said before they can arrange the second, and the answer they want
-/// is always "mine, I just agreed it". So the winner is the one created last:
-/// `created_at` descending, and `id` descending to break a tie, because two
-/// rows can share a microsecond and the answer still has to be the same on
-/// every node. Ksuids are monotonic, so the id tiebreak is "created last" as
-/// well rather than an arbitrary lexical pick.
+/// Overrides may overlap: somebody arranging cover at 2am should not have to
+/// work out what the earlier one said. The winner is the one created last —
+/// `created_at` descending, `id` descending to break a tie, because two rows
+/// can share a microsecond and every node must still agree. Ksuids are
+/// monotonic, so the id tiebreak is "created last" too.
 ///
-/// This is `architecture/02` §5's rule — "latest `created_at` wins for the
-/// overlapping interval" — stated once, here, so nothing else has to decide it.
-/// The override in force over one rotation at `at`.
-///
-/// Covers do not cross rotations: arranging cover for the primary says nothing
-/// about who backs them up, and letting one cover claim every position at once
-/// would collapse a two-rotation team into one person for the length of the
-/// window.
+/// `architecture/02` §5's rule, stated once so nothing else has to decide it.
 pub fn covering_override_for<'a>(
     overrides: &'a [ScheduleOverride],
     rotation_id: &str,
@@ -759,33 +686,28 @@ fn default_rule_name() -> String {
     DEFAULT_SHIFT_RULE_NAME.to_string()
 }
 
-/// A named position, and the only thing in this system that puts a person on
-/// call.
+/// A named position, and the only thing here that puts a person on call.
 ///
-/// This is Zenduty's *schedule* and incident.io's *rota*. It resolves to
-/// **exactly one person** at any instant — several people on call means several
-/// rotations, and that is what a level of the escalation policy is for.
+/// Zenduty's *schedule*, incident.io's *rota*. Resolves to exactly one person
+/// at any instant — several people on call means several rotations, which is
+/// what an escalation level is for.
 ///
-/// It replaced a `slot: String` field on what is now [`ShiftRule`]. The
-/// difference is not spelling. A slot was a name that *anything* could claim,
-/// including a rule that merely declared it derived one, so a position could
-/// exist without a roster behind it — and when a team then staffed it properly,
-/// the two sources disagreed at the first instant the explicit one did not
-/// apply. A rotation exists because a row exists. Delete it and the position is
-/// gone.
+/// A rotation exists because a row exists; delete it and the position is gone.
+/// The `slot: String` field it replaced was a name anything could claim, so a
+/// position could exist with no roster behind it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct Rotation {
     pub id: String,
-    /// What a level of the escalation policy names it, and what a page calls
-    /// it. Renameable — levels store the id, so a typo fix cannot move who gets
+    /// What an escalation level names it, and what a page calls it.
+    /// Renameable — levels store the id, so a typo fix cannot move who is
     /// paged.
     pub name: String,
     /// The stack. Highest priority whose restrictions match at `at` wins, and
-    /// exactly one of them does.
+    /// exactly one does.
     ///
-    /// Follow-the-sun is several rules **here**, in one rotation — not several
-    /// rotations. Two rotations are two people on call; three regional rules
-    /// are one person on call across three timezones' working hours.
+    /// Follow-the-sun is several rules here, in one rotation. Two rotations
+    /// are two people on call; three regional rules are one person across
+    /// three timezones' working hours.
     #[serde(default)]
     pub shift_rules: Vec<ShiftRule>,
     /// Where this rotation came from. `Some("default")` marks one the system
@@ -819,17 +741,11 @@ impl Rotation {
     /// The same roster and cadence as `other`, every rule shifted `shifts`
     /// handovers earlier.
     ///
-    /// **This is what "create a Secondary" means, in full.** The result is an
+    /// This is what "create a Secondary" means, in full. The result is an
     /// ordinary rotation: no link is stored, nothing at resolution time knows
-    /// the two are related, and editing either is allowed. Two rotations built
-    /// this way cannot resolve to the same person while the roster holds two or
-    /// more people — and if somebody edits one roster and not the other, the
-    /// collision is *reported* by `colliding_rotations` rather than prevented by
-    /// a hidden rule.
-    ///
-    /// The mechanism it replaced computed the second person from the first's
-    /// roster at resolution time, so the position existed whether or not
-    /// anybody staffed it.
+    /// the two are related, and editing either is allowed. If somebody edits
+    /// one roster and not the other, `colliding_rotations` reports the clash
+    /// rather than a hidden rule preventing it.
     pub fn offset_from(
         id: impl Into<String>,
         name: impl Into<String>,
@@ -863,13 +779,12 @@ impl Rotation {
 
     /// The shift rule in force at `at`.
     ///
-    /// Only rules inside their validity window are considered — a retired rule
-    /// is not a rule — and then the highest priority among those whose
-    /// restrictions match wins; ties break on the more specific rule (one WITH
-    /// restrictions beats the catch-all), then on anchor order so the answer is
-    /// stable across nodes. That last tiebreak matters more than it looks: two
-    /// equally-specific rules is a configuration mistake, but it must still
-    /// resolve the same way everywhere rather than depending on row order.
+    /// Only rules inside their validity window count — a retired rule is not a
+    /// rule. Then highest priority among those whose restrictions match; ties
+    /// break towards the more specific rule (one WITH restrictions beats the
+    /// catch-all), then anchor order. Two equally specific rules is a
+    /// configuration mistake, but it must still resolve the same everywhere
+    /// rather than depending on row order.
     pub fn winning_rule(&self, at: i64, tz: chrono_tz::Tz) -> Option<&ShiftRule> {
         self.shift_rules
             .iter()
@@ -884,14 +799,12 @@ impl Rotation {
 
     /// Who holds this rotation at `at`.
     ///
-    /// **A cover outranks every rule, and outranks an absence.** Somebody who
-    /// claims a window has said out loud that they will take it, and the product
-    /// must not decide it knows better because their leave calendar disagrees —
-    /// the commonest reason for the two to overlap is precisely that they cut a
-    /// holiday short to cover.
+    /// A cover outranks every rule, and outranks an absence. Somebody who
+    /// claims a window has said they will take it, and the product must not
+    /// overrule them because their leave calendar disagrees — the commonest
+    /// reason for the two to overlap is that they cut a holiday short to cover.
     ///
-    /// `None` is a coverage gap, reported by the sweep, never a silently
-    /// dropped page.
+    /// `None` is a coverage gap, reported by the sweep, never a dropped page.
     pub fn on_call(
         &self,
         overrides: &[ScheduleOverride],
@@ -923,16 +836,13 @@ impl Rotation {
 
     /// Everyone on the rotation's winning rule, on shift or not.
     ///
-    /// The covering person is appended when they are not already on the roster.
-    /// This is a broadcast, and a broadcast that leaves out the one person
-    /// actually holding the pager is not one. The covered engineer is *not*
-    /// removed for the same reason: they are still on the team, and shrinking
-    /// it to arrange a night off is how a page reaches an empty room.
+    /// The covering person is appended when not already on the roster: a
+    /// broadcast that leaves out the person holding the pager is not one. The
+    /// covered engineer stays for the same reason — they are still on the team.
     ///
-    /// The **away** are removed, and that is a different judgement: a cover is a
-    /// night off from a shift, an absence is not being there at all. When it
-    /// empties the level the ladder advances immediately, and `WholeTeam` — the
-    /// level below this one in every shipped ladder — ignores absence entirely,
+    /// The away are removed, which is a different judgement: a cover is a night
+    /// off from a shift, an absence is not being there at all. When that empties
+    /// the level the ladder advances, and `WholeTeam` below it ignores absence,
     /// so a page still has somewhere to go.
     pub fn everyone(
         &self,
@@ -985,8 +895,8 @@ impl Rotation {
 
 /// Who is on call across a team, one entry per rotation.
 ///
-/// A rotation that resolves to nobody is **absent** from the result rather than
-/// present-and-empty: that is a coverage gap, and the sweep is what reports it.
+/// A rotation resolving to nobody is absent from the result rather than
+/// present-and-empty: that is a coverage gap, and the sweep reports it.
 pub fn resolve_on_call(
     rotations: &[Rotation],
     overrides: &[ScheduleOverride],
@@ -1001,10 +911,10 @@ pub fn resolve_on_call(
         .collect()
 }
 
-/// Every person a team currently has on call, across every rotation, deduped.
+/// Every person a team has on call, across every rotation, deduped.
 ///
-/// Used by the "who would this page reach" reads, not by any level: a level
-/// names one rotation.
+/// For the "who would this page reach" reads, not for any level: a level names
+/// one rotation.
 pub fn everyone_on_call(
     rotations: &[Rotation],
     overrides: &[ScheduleOverride],
@@ -1022,18 +932,15 @@ pub fn everyone_on_call(
     out
 }
 
-/// Rotations that resolve to the **same person** at `at`.
+/// Rotations that resolve to the same person at `at`.
 ///
-/// This is the check that replaces the old derived-secondary guarantee. That
-/// guarantee was structural — an offset of at least one could not collide — and
-/// it bought its safety by making the second position uneditable. Two ordinary
-/// rotations *can* collide, so the product says so instead:
+/// Two ordinary rotations can collide, so the product says so:
 ///
 /// > ⚠ Ana is on call in both Primary and Secondary from Tue 25 Aug.
 ///
-/// Reporting beats preventing here, because it catches every cause — a roster
+/// Reporting beats preventing, because it catches every cause — a roster
 /// edited on one side, an anchor dragged, a cover placed on both — where a
-/// stored link between two rotations would only ever have caught the first.
+/// stored link between two rotations would catch only the first.
 pub fn colliding_rotations<'a>(
     rotations: &'a [Rotation],
     overrides: &[ScheduleOverride],
@@ -1066,9 +973,9 @@ pub struct CoverageSegment {
     pub from: i64,
     /// Exclusive.
     pub to: i64,
-    /// `None` is a **coverage gap** — nobody is on call for this stretch. It
-    /// is a segment rather than a hole in the list because a gap the caller
-    /// has to infer from missing rows is a gap nobody notices.
+    /// `None` is a coverage gap — nobody is on call for this stretch. A
+    /// segment rather than a hole in the list, because a gap the caller has to
+    /// infer from missing rows is a gap nobody notices.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub user_email: Option<String>,
     /// The layer that produced the holder, so the grid can colour by layer.
@@ -1120,32 +1027,29 @@ impl std::fmt::Display for GridError {
 impl std::error::Error for GridError {}
 
 /// The longest window the resolver will walk. Thirty-one days covers "this
-/// month" for the calendar view and every 7×24 grid the UI draws; a year is a
-/// report, not a schedule preview.
+/// month" and every 7×24 grid the UI draws; a year is a report, not a preview.
 pub const MAX_GRID_MICROS: i64 = 31 * MICROS_PER_DAY;
 
 /// The segment budget. A week of hourly restriction edges is under 400, so
 /// this is loose enough that no honest schedule meets it.
 pub const MAX_GRID_SEGMENTS: usize = 2_000;
 
-/// How many handovers one rotation may contribute before the walk gives up.
-/// A minute-long shift over a month would otherwise enumerate 44,640 of them
-/// on the way to a `TooManySegments` it could have reached sooner.
+/// How many handovers one rotation may contribute before the walk gives up. A
+/// minute-long shift over a month would otherwise enumerate 44,640 of them on
+/// the way to a `TooManySegments` it could have reached sooner.
 const MAX_HANDOVERS_PER_ROTATION: usize = MAX_GRID_SEGMENTS;
 
 /// The resolved holder across `[from, to)`, in order, with no holes.
 ///
-/// Pure, like everything else here: `from` and `to` are passed in, no clock is
-/// read, and the same inputs give the same segments on every node.
+/// Pure: `from` and `to` are passed in, no clock is read, and the same inputs
+/// give the same segments on every node.
 ///
-/// The walk is over *candidate boundaries* rather than a fixed step, so a
-/// half-hour cover and a 30-second one are both exact and a quiet week is a
-/// handful of rows rather than 168 identical ones. The candidates are every
-/// instant at which the answer could possibly change: a handover, the edge of
-/// a restriction window in local time, a layer starting or being retired, or
-/// an override beginning or ending. Between two consecutive candidates the
-/// answer is constant by construction, so it is resolved once and adjacent
-/// stretches with the same answer are merged.
+/// The walk steps over candidate boundaries rather than a fixed interval, so a
+/// 30-second cover is exact and a quiet week is a few rows rather than 168
+/// identical ones. Candidates are every instant the answer could change: a
+/// handover, the local-time edge of a restriction window, a layer starting or
+/// retiring, or an override beginning or ending. Between two of them the answer
+/// is constant, so it is resolved once and equal neighbours are merged.
 pub fn resolve_window(
     rotation: &Rotation,
     overrides: &[ScheduleOverride],
@@ -1205,9 +1109,8 @@ pub fn resolve_window(
 
 /// Who holds this rotation's pager at `at`, and what put them there.
 ///
-/// The `deriving_rotation` arm that used to sit here is gone with the thing it
-/// served: a position with no rule of its own now simply has no holder, which
-/// is a gap, which is true.
+/// A position with no rule of its own has no holder, which is a gap, which is
+/// true.
 fn holder_at(
     rotation: &Rotation,
     overrides: &[ScheduleOverride],
@@ -1299,8 +1202,8 @@ fn candidate_boundaries(
 /// The local-wall-clock edges of a rotation's restriction windows.
 ///
 /// Computed per local day rather than by stepping in elapsed micros, for the
-/// same reason handovers are (§9): "09:00" is a wall-clock fact, and a day
-/// that gains or loses an hour must still have its window open at 09:00.
+/// same reason handovers are (§9): a day that gains or loses an hour must
+/// still open its 09:00 window at 09:00.
 fn restriction_boundaries(
     r: &ShiftRule,
     from: i64,
@@ -1362,13 +1265,13 @@ pub const MAX_AWAY_SHIFTS: usize = 50;
 
 /// Shifts in `[from, to)` that a rotation would hand to somebody who is away.
 ///
-/// Reported even though the resolver would skip them, because the two answer
-/// different questions: the resolver says who gets paged tonight, and this says
-/// that the schedule somebody just saved does not mean what they think it does.
+/// Reported even though the resolver skips them: the resolver says who gets
+/// paged tonight, this says the schedule somebody just saved does not mean what
+/// they think.
 ///
-/// Only counted where the layer would actually be in force — a restricted layer
-/// that loses the slot at that instant hands nobody anything, and warning about
-/// it would train people to ignore the warning.
+/// Only where the layer would actually be in force — a restricted layer that
+/// loses the slot hands nobody anything, and warning about it trains people to
+/// ignore the warning.
 pub fn away_assignments(
     rotations: &[Rotation],
     unavailability: &[Unavailability],
@@ -1456,8 +1359,7 @@ mod tests {
     const TZ: chrono_tz::Tz = chrono_tz::UTC;
 
     /// A bare shift rule. Most of this suite is about the shift maths — index,
-    /// handover boundary, DST — which lives on the rule, not on the rotation
-    /// that holds it.
+    /// handover boundary, DST — which lives on the rule, not the rotation.
     fn weekly(members: &[&str]) -> ShiftRule {
         ShiftRule::weekly(
             "Primary",
@@ -1483,9 +1385,9 @@ mod tests {
         assert_eq!(r.member_at(ANCHOR + MICROS_PER_DAY, TZ), Some("ana@o2.ai"));
     }
 
-    /// The handover instant belongs to the INCOMING person. An inclusive
-    /// upper bound would leave the outgoing engineer on call for one extra
-    /// microsecond, and both of them paged for the same alert.
+    /// The handover instant belongs to the INCOMING person. An inclusive upper
+    /// bound would leave the outgoing engineer on call one extra microsecond,
+    /// and page both of them for the same alert.
     #[test]
     fn test_handover_boundary_is_exclusive() {
         let r = weekly(&["ana@o2.ai", "bob@o2.ai"]);
@@ -1683,10 +1585,9 @@ mod tests {
 
     /// Wrap a stack of rules into one rotation.
     ///
-    /// Most of this suite predates rotations-as-objects and is about how
-    /// *rules* combine — priority, restrictions, validity, DST. Those questions
-    /// did not change, so the tests did not either; they just need a position
-    /// to be asked about.
+    /// Most of this suite is about how rules combine — priority, restrictions,
+    /// validity, DST — and those questions did not change when rotations became
+    /// objects. The tests just need a position to ask about.
     fn of(rules: &[ShiftRule]) -> Rotation {
         Rotation {
             id: R1.to_string(),
@@ -1734,8 +1635,7 @@ mod tests {
     }
 
     /// The window is local wall time, so the same instant matches or not
-    /// depending on the schedule's zone — that is the entire point of
-    /// follow-the-sun.
+    /// depending on the schedule's zone — the entire point of follow-the-sun.
     #[test]
     fn test_window_is_evaluated_in_the_schedules_timezone() {
         let office = window(&[], 9 * 60, 17 * 60);
@@ -1921,9 +1821,8 @@ mod tests {
         assert!(resolve_on_call(&[of(&rotations)], &[], &[], saturday, IST).is_empty());
     }
 
-    /// DST: New York moves its clock, and a 09:00-local window must still be
-    /// 09:00 local on both sides of the transition rather than drifting by an
-    /// hour in UTC.
+    /// DST: New York moves its clock, and a 09:00-local window must stay at
+    /// 09:00 local on both sides rather than drifting by an hour in UTC.
     #[test]
     fn test_window_follows_local_time_across_dst() {
         let ny = chrono_tz::America::New_York;
@@ -2025,8 +1924,8 @@ mod tests {
     }
 
     /// A 02:30 handover on the spring-forward morning names a time the clock
-    /// never reads. It happens when the clock reaches 03:00 — skipping it
-    /// would silently hand a person an extra day of on-call.
+    /// never reads. It happens at 03:00 — skipping it would hand somebody an
+    /// extra day of on-call.
     #[test]
     fn test_a_handover_inside_the_skipped_hour_fires_when_the_clock_reaches_it() {
         let anchor = local(NY, 2026, 3, 5, 2, 30);
@@ -2051,8 +1950,8 @@ mod tests {
     }
 
     /// A 01:30 handover on the fall-back morning names a time the clock reads
-    /// twice. It happens at the first of them, once — handing over again an
-    /// hour later would page the outgoing engineer for somebody else's shift.
+    /// twice. It happens at the first, once — handing over again an hour later
+    /// would page the outgoing engineer for somebody else's shift.
     #[test]
     fn test_a_handover_inside_the_repeated_hour_happens_only_once() {
         let anchor = local(NY, 2026, 10, 30, 1, 30);
@@ -2079,9 +1978,8 @@ mod tests {
         );
     }
 
-    /// Shift boundaries have to keep advancing even while the local clock is
-    /// repeating itself, or a page lands on whoever the reversal happens to
-    /// select.
+    /// Shift boundaries must keep advancing while the local clock repeats
+    /// itself, or a page lands on whoever the reversal happens to select.
     #[test]
     fn test_shift_boundaries_are_monotonic_through_both_transitions() {
         for (anchor, from, hours) in [
@@ -2165,9 +2063,9 @@ mod tests {
         }
     }
 
-    /// The point of the field: a retired layer stops paging, and the layer
-    /// underneath takes the hours back rather than the shift falling into a
-    /// gap. Retiring must not be a coverage gap in disguise.
+    /// The point of the field: a retired layer stops paging and the layer
+    /// underneath takes the hours back. Retiring must not be a coverage gap in
+    /// disguise.
     #[test]
     fn test_retiring_a_layer_hands_its_hours_back_to_the_one_underneath() {
         let retired_at = ANCHOR + 4 * MICROS_PER_WEEK;
@@ -2239,10 +2137,9 @@ mod tests {
         r.validate().unwrap();
     }
 
-    /// `end_minute: 0` is the trap an operator falls into when they mean "all
-    /// day": `covers_local` reads `start == end` as zero minutes, not 1440, so
-    /// the layer would save, look configured, and never win. Refuse it up
-    /// front instead.
+    /// `end_minute: 0` is the trap for somebody who means "all day":
+    /// `covers_local` reads `start == end` as zero minutes, not 1440, so the
+    /// layer would save, look configured, and never win. Refused up front.
     #[test]
     fn test_a_restriction_with_equal_start_and_end_minute_is_refused() {
         let mut r = weekly(&["ana@o2.ai"]);
@@ -2338,9 +2235,9 @@ mod tests {
         assert!(!o.covers(200), "back-to-back covers must not both apply");
     }
 
-    /// §5 step 1: an override beats every layer, including one somebody set to
-    /// the highest priority in the schedule. That is what makes a cover the
-    /// last word and why it needs no approval workflow.
+    /// §5 step 1: an override beats every layer, including one set to the
+    /// highest priority in the schedule. That is what makes a cover the last
+    /// word, and why it needs no approval workflow.
     #[test]
     fn test_an_override_beats_every_layer() {
         let mut top = retirable("Top", "top@o2.ai", i32::MAX);
@@ -2391,9 +2288,9 @@ mod tests {
         );
     }
 
-    /// The overlap rule, stated in `covering_override`: latest `created_at`
-    /// wins, `id` breaks a tie. Deterministic on every node, and explainable
-    /// in one sentence — which is why there is no approval workflow.
+    /// The overlap rule from `covering_override`: latest `created_at` wins,
+    /// `id` breaks a tie. Deterministic on every node and explainable in one
+    /// sentence — which is why there is no approval workflow.
     #[test]
     fn test_the_latest_created_override_wins_the_overlap() {
         let first = cover("ov_a", "first@o2.ai", 0, 1000, 10);
@@ -2467,9 +2364,9 @@ mod tests {
         );
     }
 
-    /// A cover from 18:00 to 09:00 the next morning is the commonest one there
-    /// is, and it has to mean the same wall-clock hours in the two zones a
-    /// distributed team reads it in. Stored in absolute micros, so it does.
+    /// A cover from 18:00 to 09:00 next morning is the commonest one there is,
+    /// and it must mean the same wall-clock hours in both zones a distributed
+    /// team reads it in. Stored in absolute micros, so it does.
     #[test]
     fn test_a_cover_spanning_midnight_means_the_same_hours_in_every_zone() {
         let ny = chrono_tz::America::New_York;
@@ -2537,8 +2434,8 @@ mod tests {
     // §9: overrides are absolute instants; re-deriving bounds in local time hands an hour back.
 
     /// A cover across the spring-forward. The clock skips an hour; the cover
-    /// is still continuous, and it is an hour shorter in wall time than it
-    /// looks — which is what an absolute range means.
+    /// stays continuous and is an hour shorter in wall time than it looks —
+    /// which is what an absolute range means.
     #[test]
     fn test_a_cover_spanning_the_spring_forward_is_continuous() {
         let rotations = vec![ShiftRule::weekly(
@@ -2572,9 +2469,8 @@ mod tests {
         );
     }
 
-    /// The mirror: a cover across the fall-back. The repeated hour is inside
-    /// it exactly once as far as the pager is concerned — the local clock goes
-    /// backwards and the holder must not go with it.
+    /// The mirror: a cover across the fall-back. The repeated hour is inside it
+    /// exactly once as far as the pager is concerned.
     #[test]
     fn test_a_cover_spanning_the_fall_back_holds_through_the_repeated_hour() {
         let rotations = vec![ShiftRule::weekly(
@@ -2603,8 +2499,8 @@ mod tests {
     }
 
     /// A cover whose end lands inside the hour the clock never reads. It is an
-    /// absolute instant, so it simply ends there — the hole in the local
-    /// calendar is not a hole in the timeline.
+    /// absolute instant, so it ends there — the hole in the local calendar is
+    /// not a hole in the timeline.
     #[test]
     fn test_a_cover_ending_inside_the_skipped_hour_still_ends() {
         let rotations = vec![ShiftRule::weekly(
@@ -2626,9 +2522,9 @@ mod tests {
         );
     }
 
-    /// A handover landing inside the skipped hour, with a cover standing over
-    /// it: the cover wins on both sides, and the handover underneath still
-    /// happens exactly once when the cover lifts.
+    /// A handover inside the skipped hour with a cover over it: the cover wins
+    /// on both sides, and the handover underneath still happens once when the
+    /// cover lifts.
     #[test]
     fn test_a_cover_over_a_handover_in_the_skipped_hour() {
         let anchor = local(NY, 2026, 3, 5, 2, 30);
@@ -2681,7 +2577,7 @@ mod tests {
 
     // ── The resolved schedule (§3b) ─────────────────────────────────────────
 
-    /// The segments have to tile the window exactly: no holes, no overlaps,
+    /// The segments must tile the window exactly: no holes, no overlaps,
     /// starting at `from` and ending at `to`. Everything else the grid says is
     /// worthless if this is not true.
     fn assert_tiles(segments: &[CoverageSegment], from: i64, to: i64) {
@@ -2935,9 +2831,9 @@ mod tests {
         );
     }
 
-    /// The mirror: a rotation that hands over constantly but always to the
-    /// same person is one row, because the ANSWER never changes. Merging is
-    /// what keeps the honest cases small.
+    /// The mirror: a rotation that hands over constantly but always to the same
+    /// person is one row, because the ANSWER never changes. Merging is what
+    /// keeps the honest cases small.
     #[test]
     fn test_a_one_person_rotation_is_one_segment_however_often_it_hands_over() {
         let mut r = ShiftRule::weekly("Solo", vec!["ana@o2.ai".into()], ANCHOR);
@@ -3012,11 +2908,9 @@ mod tests {
 
     // ── Rotations as positions (02 §0) ──────────────────────────────────────
 
-    /// The mechanism the derived secondary was replaced by, in one test.
-    ///
-    /// Same roster, same cadence, anchor one shift back. No field links them and
-    /// nothing at resolution time knows they are related — which is exactly why
-    /// this is allowed to be a default.
+    /// The secondary mechanism in one test: same roster, same cadence, anchor
+    /// one shift back. No field links them and nothing at resolution time knows
+    /// they are related — which is why this is allowed to be a default.
     #[test]
     fn test_an_offset_rotation_is_never_the_person_already_on_call() {
         let primary = rota("rot_p", &["ana@o2.ai", "bob@o2.ai", "cara@o2.ai"]);
@@ -3043,10 +2937,9 @@ mod tests {
     /// A rotation and its rules are named for different things, so the default
     /// rule must not borrow the rotation's name.
     ///
-    /// It did. `Rotation::weekly` copied it, and `offset_from` clones rules —
-    /// so the shipped two-rotation default produced a rotation called
-    /// "Secondary" whose only rule was called "Primary", which is the exact
-    /// species of confusion this rework exists to remove.
+    /// It did: `Rotation::weekly` copied it and `offset_from` clones rules, so
+    /// the shipped default produced a rotation called "Secondary" whose only
+    /// rule was called "Primary".
     #[test]
     fn test_the_default_rule_is_not_named_after_its_rotation() {
         let primary = rota("rot_p", &["ana@o2.ai", "bob@o2.ai"]);
@@ -3127,10 +3020,9 @@ mod tests {
         assert_eq!(positions[1].user_email, "eve@o2.ai");
     }
 
-    /// A cover stands over **one** position. It used to be able to claim a slot
-    /// nothing staffed, which is the same shape of mistake as the derived
-    /// secondary: a position existing because something other than a rotation
-    /// asked for it.
+    /// A cover stands over one position. It used to be able to claim a slot
+    /// nothing staffed — the same mistake as the derived secondary: a position
+    /// existing because something other than a rotation asked for it.
     #[test]
     fn test_a_cover_only_stands_over_the_rotation_it_names() {
         let primary = rota("rot_p", &["ana@o2.ai", "bob@o2.ai"]);
@@ -3238,9 +3130,9 @@ mod tests {
         );
     }
 
-    /// The skip wraps: away at the end of the order hands back to the top,
-    /// and consecutive absences are walked through rather than stopping at the
-    /// first one.
+    /// The skip wraps: away at the end of the order hands back to the top, and
+    /// consecutive absences are walked through rather than stopping at the
+    /// first.
     #[test]
     fn test_the_skip_wraps_round_the_cycle() {
         let rotations = vec![ShiftRule::weekly(
@@ -3268,8 +3160,8 @@ mod tests {
     }
 
     /// Everybody away is a coverage gap — the same answer an empty rotation
-    /// gives, reported by the same sweep. Never a loop, never a panic, and
-    /// never the away person.
+    /// gives, from the same sweep. Never a loop, never a panic, and never the
+    /// away person.
     #[test]
     fn test_everybody_away_degrades_to_a_coverage_gap() {
         let rotations = vec![ShiftRule::weekly(
@@ -3314,9 +3206,9 @@ mod tests {
         assert!(segments.iter().all(|s| s.is_gap()), "{segments:?}");
     }
 
-    /// Claiming a window is a statement of intent, and the product must not
-    /// decide it knows better. The commonest reason for a cover to overlap
-    /// somebody's own leave is that they cut it short to take the shift.
+    /// Claiming a window is a statement of intent. The commonest reason for a
+    /// cover to overlap somebody's own leave is that they cut it short to take
+    /// the shift.
     #[test]
     fn test_an_override_outranks_an_absence() {
         let rotations = vec![ShiftRule::weekly(
@@ -3352,16 +3244,14 @@ mod tests {
         );
     }
 
-    /// Determinism, which is the property the whole skip rule stands on.
+    /// Determinism, which the whole skip rule stands on. Two properties.
     ///
-    /// Two things are asserted, and they are different. **Repeatability**: the
-    /// same inputs give the same answer however many times they are asked, and
-    /// however the absence rows are ordered — they arrive from a database with
-    /// no promised order, and a resolution that depended on it would page a
-    /// different person on each node. **Stability**: adding an absence for one
-    /// person changes only the shifts that person would have held. Every other
-    /// stretch of the grid is byte-identical, so the calendar does not reshuffle
-    /// under somebody who was only marking a Tuesday off.
+    /// Repeatability: the same inputs give the same answer however the absence
+    /// rows are ordered — they arrive from a database with no promised order,
+    /// and depending on it would page a different person on each node.
+    ///
+    /// Stability: adding one person's absence changes only the shifts that
+    /// person would have held. Every other stretch is byte-identical.
     #[test]
     fn test_the_skip_is_deterministic_and_does_not_reshuffle_the_grid() {
         let rotations = vec![ShiftRule::weekly(
@@ -3452,9 +3342,9 @@ mod tests {
         assert_eq!(segments[2].user_email.as_deref(), Some("ana@o2.ai"));
     }
 
-    /// A skip across a spring-forward week. The handover is a wall-clock fact
-    /// and stays one; the absence is an absolute window and stays one; and the
-    /// two together must not lose or duplicate an hour of cover.
+    /// A skip across a spring-forward week. The handover is a wall-clock fact,
+    /// the absence is an absolute window, and the two together must not lose or
+    /// duplicate an hour of cover.
     #[test]
     fn test_a_skip_across_a_dst_week_keeps_the_wall_clock_handover() {
         // US spring forward is 2026-03-08. Hand over Sundays at 09:00 local.
@@ -3509,9 +3399,9 @@ mod tests {
     }
 
     /// The edit-time warning: the rota would hand Ana a week she is away for.
-    /// The resolver would skip it, and that is exactly why it has to be said
-    /// out loud — otherwise the first anybody hears of it is a different name
-    /// on the calendar.
+    /// The resolver would skip it, which is why it has to be said out loud —
+    /// otherwise the first anybody hears of it is a different name on the
+    /// calendar.
     #[test]
     fn test_away_assignments_name_the_shift_the_rota_would_hand_over() {
         let rotations = vec![ShiftRule::weekly(

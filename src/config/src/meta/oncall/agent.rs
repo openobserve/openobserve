@@ -21,17 +21,12 @@ use utoipa::ToSchema;
 use super::policy::Channel;
 use crate::meta::alerts::priority::AlertPriority;
 
-/// Shortest triage hold a team may configure.
-///
-/// Below this the gate cannot pay for itself: the agent's deterministic
-/// pre-flight is measured in seconds and a hold shorter than one is a hold that
-/// always expires.
+/// Shortest triage hold a team may configure. The agent's pre-flight takes
+/// seconds, so a shorter hold always expires before it can pay for itself.
 pub const MIN_TRIAGE_BUDGET_SECONDS: i64 = 30;
 
-/// Longest triage hold a team may configure.
-///
-/// Ten minutes. Past this the question a responder asks stops being "why is the
-/// page late" and becomes "did the pager break".
+/// Longest triage hold a team may configure. Past ten minutes the question
+/// stops being "why is the page late" and becomes "did the pager break".
 pub const MAX_TRIAGE_BUDGET_SECONDS: i64 = 600;
 
 /// Actor recorded for anything the agent itself produced.
@@ -41,10 +36,9 @@ pub const AGENT_ACTOR: &str = "o2-sre";
 
 /// How sure the agent is, as a band rather than a number.
 ///
-/// The agent has no calibrated probability, and a percentage would be false
-/// precision that trains responders to ignore the field. The band maps to how
-/// the verdict is rendered: `High` states the cause as the headline, `Low`
-/// renders it as an unverified hypothesis.
+/// There is no calibrated probability behind it, so a percentage would be
+/// false precision. `High` states the cause as the headline; `Low` renders it
+/// as an unverified guess.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Confidence {
@@ -95,21 +89,18 @@ pub struct SuspectChange {
     pub occurred_at: i64,
 }
 
-/// One re-runnable claim: the query, panel or commit behind a finding.
-///
-/// The card's "I already checked" section is a receipt, not an assertion — a
-/// responder who does not trust the agent still lands on the right five panels
-/// instead of hunting for them.
+/// One re-runnable claim: the query, panel or commit behind a finding. A
+/// receipt, not an assertion — a responder who distrusts the agent still lands
+/// on the right panels.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct EvidenceLink {
     pub label: String,
     pub url: String,
 }
 
-/// What the agent recommends the engine do about paging.
-///
-/// A recommendation, never a decision: the engine applies it according to
-/// policy a human configured in advance.
+/// What the agent recommends the engine do about paging. A recommendation,
+/// never a decision: the engine applies it under policy a human configured in
+/// advance.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum PageAction {
@@ -141,16 +132,13 @@ impl std::fmt::Display for PageAction {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct PageRecommendation {
     pub action: PageAction,
-    /// **Promotion only.** [`ratchet`] discards anything at or below the
-    /// firing's current severity: the agent may raise a P3 to P2, never lower a
-    /// P2 to P3.
+    /// Promotion only. [`ratchet`] discards anything at or below the firing's
+    /// current severity.
     ///
-    /// Read with a hand-written deserializer because the block is written by a
-    /// language model: `"P2"`, `"p2"` and the bare `2` the API itself uses all
-    /// mean the same thing, and dropping one of them silently is a promotion
-    /// that never happened. Anything outside the scale fails the whole verdict
-    /// (§2.2) rather than this one field — half a verdict is a paging
-    /// recommendation read from a value nobody checked.
+    /// Hand-written deserializer because a language model writes this: `"P2"`,
+    /// `"p2"` and bare `2` all mean the same. Anything off the scale fails the
+    /// whole verdict (§2.2) — half a verdict is a paging recommendation read
+    /// from a value nobody checked.
     #[serde(
         default,
         deserialize_with = "deserialize_severity_suggestion",
@@ -161,11 +149,9 @@ pub struct PageRecommendation {
     pub reason: String,
 }
 
-/// Read a `severity_suggestion` in any of the spellings a model writes.
-///
-/// `"P2"`, `"p2"` and `2` are the same severity; `null` and an absent field are
-/// no suggestion. Everything else is an error, which — because the field sits
-/// inside the verdict — rejects the whole verdict rather than half of it.
+/// Read a `severity_suggestion` in any spelling a model writes. `"P2"`, `"p2"`
+/// and `2` are one severity; `null` and an absent field are no suggestion.
+/// Anything else rejects the whole verdict rather than half of it.
 fn deserialize_severity_suggestion<'de, D>(d: D) -> Result<Option<AlertPriority>, D::Error>
 where
     D: serde::Deserializer<'de>,
@@ -204,12 +190,8 @@ pub enum ActionKind {
     Other,
 }
 
-/// Something a human might do next.
-///
-/// **Inert.** It is rendered as text on the page and on the record, and a human
-/// carries it out. There is no `workflow_ref`, no `args` and no grant, because
-/// there is no execution path in this implementation — the whole field is three
-/// strings a responder reads.
+/// Something a human might do next. Inert: three strings rendered as text. No
+/// `workflow_ref`, no `args`, no grant, because there is no execution path.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct ProposedAction {
     pub title: String,
@@ -218,14 +200,11 @@ pub struct ProposedAction {
 }
 
 /// What the agent concluded, emitted at the end of every autonomous RCA run.
-///
-/// Persisted on the subject timeline and cached on the escalation state; the
-/// full markdown report it summarises is unchanged and still saved as today.
+/// Persisted on the subject timeline and cached on the escalation state.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct AnalysisVerdict {
-    /// One sentence. `"cause unknown"` is a legal, first-class value — the
-    /// prompt prefers it to confabulation, and such a verdict still carries
-    /// evidence and still recommends `Page`.
+    /// One sentence. `"cause unknown"` is a first-class value — the prompt
+    /// prefers it to confabulation, and such a verdict still recommends `Page`.
     pub probable_cause: String,
     pub confidence: Confidence,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -247,9 +226,9 @@ pub struct AnalysisVerdict {
 
 /// Where the investigation has got to.
 ///
-/// `Skipped` covers RCA disabled, agent URL unset, health check failed, and the
-/// existing in-flight and cooldown guards. The engine treats `Skipped` and
-/// `Failed` identically: behave exactly as the system does today, pre-L0.
+/// `Skipped` covers RCA disabled, agent URL unset, failed health check, and
+/// the in-flight and cooldown guards. The engine treats it and `Failed`
+/// identically: behave exactly as the pre-L0 system does.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum AnalysisStatus {
@@ -262,10 +241,8 @@ pub enum AnalysisStatus {
 impl AnalysisStatus {
     pub const ALL: [Self; 4] = [Self::Pending, Self::Complete, Self::Failed, Self::Skipped];
 
-    /// Whether a verdict can still arrive for this firing.
-    ///
-    /// `Failed` and `Skipped` both mean "no verdict is coming", which is why
-    /// the gate must not wait on either of them.
+    /// Whether a verdict can still arrive. `Failed` and `Skipped` both mean no,
+    /// so the gate must not wait on either.
     pub fn may_still_answer(&self) -> bool {
         matches!(self, Self::Pending)
     }
@@ -277,9 +254,9 @@ pub struct AnalysisState {
     pub status: AnalysisStatus,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub verdict: Option<AnalysisVerdict>,
-    /// When the run was asked for. This — not the wall clock at the time of a
-    /// re-queue — is what the triage hold is measured from, so a node that dies
-    /// mid-TRIAGE resumes the same deadline rather than restarting it.
+    /// When the run was asked for. The hold is measured from this, not from the
+    /// clock at a re-queue, so a node dying mid-TRIAGE resumes the same
+    /// deadline.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub requested_at: Option<i64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -326,11 +303,9 @@ pub struct L0Modes {
     pub p4: L0Mode,
 }
 
-/// A team's L0 block.
-///
-/// Ships with every auto-created policy, so nobody has to configure L0 to
-/// benefit from it. There is deliberately no `allow_demotion` knob: the ratchet
-/// is an invariant of the engine, not a team preference.
+/// A team's L0 block. Ships with every auto-created policy, so nobody has to
+/// configure L0 to benefit from it. No `allow_demotion` knob: the ratchet is an
+/// invariant of the engine, not a team preference.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct L0Policy {
     pub mode: L0Modes,
@@ -350,9 +325,8 @@ pub struct L0Policy {
 pub enum L0Error {
     /// P1 is not gateable. The invariant is not a setting.
     P1MustBeParallel(L0Mode),
-    /// P4 and P5 page nobody, so there is no page to hold and no page to run
-    /// alongside. A gate there would insert the trigger row §3 says a P4 never
-    /// gets.
+    /// P4 and P5 page nobody, so there is nothing to hold. A gate there would
+    /// insert the trigger row §3 says a P4 never gets.
     P4MustBeAgentOnly(L0Mode),
     /// Outside `MIN_TRIAGE_BUDGET_SECONDS..=MAX_TRIAGE_BUDGET_SECONDS`.
     BudgetOutOfRange(i64),
@@ -415,12 +389,10 @@ impl L0Policy {
 
     /// The mode that actually applies at `priority`.
     ///
-    /// Never a plain field read, in **either** direction. P1 is parallel
-    /// whatever a stored row says; `Only` on a paging severity would silence
-    /// it; and `Gate` or `Parallel` on P4/P5 would put a firing that pages
-    /// nobody into a hold, which inserts the trigger row §3 says a P4 never
-    /// gets. Whether a severity pages is [`severity_pages`], not a setting, so
-    /// this derives the answer from that rather than trusting the column.
+    /// Never a plain field read. P1 is parallel whatever the row says; `Only`
+    /// on a paging severity would silence it; `Gate` on P4/P5 would hold a
+    /// firing that pages nobody. Derived from [`severity_pages`] rather than
+    /// trusted from the column.
     pub fn mode_for(&self, priority: AlertPriority) -> L0Mode {
         // A severity that pages nobody has no page to hold, so the column is not trusted here.
         if !severity_pages(priority) {
@@ -442,8 +414,7 @@ impl L0Policy {
     }
 
     /// The triage hold in microseconds, clamped into the documented bounds.
-    ///
-    /// Clamped on read as well as refused on write, because rows arrive from
+    /// Clamped on read as well as refused on write: rows arrive from
     /// replication and from hands on a database, and an unbounded hold is a
     /// page that never happens.
     pub fn triage_budget_micros(&self) -> i64 {
@@ -456,16 +427,12 @@ impl L0Policy {
 
 // §2.1a — the ratchet
 
-/// What the engine did with a `severity_suggestion`.
+/// What the engine did with a `severity_suggestion`. No variant lowers a
+/// severity, and that absence is the point.
 ///
-/// There is no variant that lowers a severity, and that absence is the point:
-/// the asymmetry is expressed in the type, not only in the branch that computes
-/// it.
-///
-/// Serialised because the page it has to be rendered on is dispatched by a
-/// later tick than the one that decided it: recomputing the ratchet at render
-/// time reads the row's *already promoted* severity and answers `Discarded`,
-/// which drops the promotion note §5.3 says is never dropped.
+/// Serialised because the page is dispatched by a later tick than the one that
+/// decided it: recomputing at render time reads the already promoted severity,
+/// answers `Discarded`, and drops the promotion note §5.3 never drops.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SeverityDecision {
@@ -483,9 +450,9 @@ pub enum SeverityDecision {
         current: AlertPriority,
         requested: AlertPriority,
     },
-    /// Applied. `to` is more urgent than `from`, always; it differs from
-    /// `requested` when the promotion was clamped to `max_promotion_steps`, and
-    /// both levels are kept so the timeline can show what was asked for.
+    /// Applied. `to` is always more urgent than `from`; it differs from
+    /// `requested` when clamped to `max_promotion_steps`, and both are kept so
+    /// the timeline can show what was asked for.
     Promoted {
         from: AlertPriority,
         to: AlertPriority,
@@ -494,10 +461,8 @@ pub enum SeverityDecision {
 }
 
 impl SeverityDecision {
-    /// The severity the firing actually proceeds at.
-    ///
-    /// The single function every caller must use. It can return the current
-    /// severity or a more urgent one, and nothing else.
+    /// The severity the firing proceeds at — the single function every caller
+    /// must use. Returns the current severity or a more urgent one, never less.
     pub fn applied(&self) -> AlertPriority {
         match self {
             Self::Unchanged { current }
@@ -515,16 +480,13 @@ impl SeverityDecision {
     }
 }
 
-/// Apply a `severity_suggestion` to a firing's current severity.
-///
-/// The whole of §2.1a. A suggestion at or below `current` is discarded and
-/// counted; a promotion beyond `max_promotion_steps` is clamped to the bound
-/// and applied, with the requested level kept for the timeline.
+/// Apply a `severity_suggestion` to a firing's current severity — all of §2.1a.
+/// At or below `current` is discarded and counted; beyond
+/// `max_promotion_steps` is clamped and applied.
 ///
 /// `AlertPriority::to_i32()` runs P1 = 1 … P5 = 5, so promotion *decreases* the
-/// integer. Compare through [`AlertPriority::is_more_urgent_than`]; a bare `>`
-/// on the raw ids reads exactly backwards and turns every demotion into a
-/// promotion.
+/// integer. Compare through [`AlertPriority::is_more_urgent_than`]: a bare `>`
+/// on raw ids turns every demotion into a promotion.
 pub fn ratchet(
     current: AlertPriority,
     suggestion: Option<AlertPriority>,
@@ -582,11 +544,9 @@ impl GatePlan {
     }
 }
 
-/// Decide how a firing enters the ladder.
-///
-/// Takes no `now`: the hold is anchored on `analysis.requested_at` (falling
-/// back to the firing) so a node that dies mid-TRIAGE and is re-queued
-/// recomputes the same absolute deadline instead of restarting the budget.
+/// Decide how a firing enters the ladder. Takes no `now`: the hold is anchored
+/// on `analysis.requested_at`, so a node that dies mid-TRIAGE recomputes the
+/// same absolute deadline instead of restarting the budget.
 pub fn gate_plan(
     l0: &L0Policy,
     priority: AlertPriority,
@@ -614,9 +574,9 @@ pub fn gate_plan(
 
 /// What the engine does with a verdict.
 ///
-/// Note what cannot be expressed: `Page.severity` is the ratcheted severity and
-/// there is no field for a lowered one. A `Downgrade` sets `quieter_channels`,
-/// which is a choice about one notification, never about the record.
+/// Note what cannot be expressed: there is no field for a lowered severity. A
+/// `Downgrade` sets `quieter_channels`, a choice about one notification, never
+/// about the record.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VerdictOutcome {
     /// The hold has time left and no verdict has landed. Come back at `until`.
@@ -633,9 +593,9 @@ pub enum VerdictOutcome {
     /// No page at all. The record is still written, the verdict still lands on
     /// the timeline, and the firing still appears in the team's digest.
     Suppress,
-    /// The page has already gone out. The verdict rides as one follow-up
-    /// update, ledger-deduped, on non-interrupting channels — not a new page.
-    /// Also the P4/P5 outcome, where there is nobody to follow up with.
+    /// The page has already gone out. The verdict rides as one ledger-deduped
+    /// follow-up on non-interrupting channels. Also the P4/P5 outcome, where
+    /// there is nobody to follow up with.
     FollowUp { severity: AlertPriority },
     /// The gate is over and no usable verdict arrived. Page exactly as the
     /// pre-L0 system would have.
@@ -643,12 +603,10 @@ pub enum VerdictOutcome {
 }
 
 impl VerdictOutcome {
-    /// Whether this firing is notified on a quieter channel set.
-    ///
-    /// The one question the dispatcher has to ask of a `Downgrade`. Written as
-    /// a function because the field is otherwise read at exactly one match arm
-    /// and silently ignored at every other, which is how a knob ends up
-    /// computed, counted and inert.
+    /// Whether this firing rides a quieter channel set — the one question the
+    /// dispatcher asks of a `Downgrade`. A function because the field is
+    /// otherwise read at one match arm and ignored everywhere else, which is
+    /// how a knob ends up computed and inert.
     pub fn wants_quieter_channels(&self) -> bool {
         matches!(
             self,
@@ -666,19 +624,15 @@ impl VerdictOutcome {
     }
 }
 
-/// The instant a gated firing's hold runs out.
-///
-/// Anchored on the request for the same reason [`gate_plan`] is: a re-queue
-/// after a crash resumes the deadline it persisted rather than starting a new
-/// one.
+/// The instant a gated firing's hold runs out. Anchored on the request, like
+/// [`gate_plan`], so a re-queue after a crash resumes the persisted deadline.
 fn hold_deadline(l0: &L0Policy, analysis: &AnalysisState, now: i64) -> i64 {
     analysis.requested_at.unwrap_or(now) + l0.triage_budget_micros()
 }
 
 /// The verdict-application decision — pure over `(policy.l0, analysis,
-/// severity, now)`.
-///
-/// `severity` is the firing's currently recorded severity, not the suggestion.
+/// severity, now)`. `severity` is the firing's recorded severity, not the
+/// suggestion.
 pub fn apply_verdict(
     l0: &L0Policy,
     analysis: &AnalysisState,
@@ -757,11 +711,9 @@ pub fn apply_verdict(
     }
 }
 
-/// Whether a severity pages a human at all under §1's table.
-///
-/// L0's own table, not the escalation policy's ladder: a team whose policy
-/// gives P3 no rungs is that policy's business, and this is the question
-/// "should a promotion into this severity wake somebody".
+/// Whether a severity pages a human at all under §1's table. L0's own table,
+/// not the policy's ladder: this asks whether a promotion into this severity
+/// should wake somebody.
 pub fn severity_pages(priority: AlertPriority) -> bool {
     match priority {
         AlertPriority::P1 | AlertPriority::P2 | AlertPriority::P3 => true,
@@ -772,12 +724,9 @@ pub fn severity_pages(priority: AlertPriority) -> bool {
 
 // §6 — the guards that decide whether L0 runs at all
 
-/// The analysis status a run ends in.
-///
-/// §6: a run whose report carried no usable verdict block is `Failed`, not
-/// `Complete` — "same as the budget-expiry path if gating". A `Pending` that is
-/// never moved off `Pending` is a gate that waits for the full budget on every
-/// malformed report, which is the latency the gate promises it does not cost.
+/// The analysis status a run ends in. §6: a report with no usable verdict block
+/// is `Failed`, not `Complete` — leaving it `Pending` would make every
+/// malformed report cost the full budget in latency.
 pub fn analysis_status_after_run(produced_a_verdict: bool) -> AnalysisStatus {
     if produced_a_verdict {
         AnalysisStatus::Complete
@@ -787,11 +736,9 @@ pub fn analysis_status_after_run(produced_a_verdict: bool) -> AnalysisStatus {
     }
 }
 
-/// The analysis status a firing starts with.
-///
-/// L0 adds no new trigger path: these are the guards the RCA trigger already
-/// evaluates, read once and turned into a state the ladder understands. Every
-/// blocked reason is `Skipped`, and `Skipped` means "behave exactly as today".
+/// The analysis status a firing starts with. L0 adds no new trigger path:
+/// these are the guards the RCA trigger already evaluates. Every blocked
+/// reason is `Skipped`, and `Skipped` means "behave exactly as today".
 pub fn analysis_status_for_start(
     rca_enabled: bool,
     agent_url_set: bool,
@@ -811,10 +758,9 @@ pub fn analysis_status_for_start(
 
 // §8 — observability
 
-/// One counter movement caused by applying a verdict.
-///
-/// Returned rather than emitted so the decision stays pure and a dashboard and
-/// the timeline cannot disagree about what happened.
+/// One counter movement caused by applying a verdict. Returned rather than
+/// emitted, so the decision stays pure and a dashboard and the timeline cannot
+/// disagree about what happened.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum L0Metric {
     /// `oncall_l0_verdicts_total{action, confidence}` — volume and mix.
@@ -830,8 +776,8 @@ pub enum L0Metric {
         to: AlertPriority,
     },
     /// `oncall_l0_severity_clamp_total` — an attempted demotion, refused.
-    /// Expected to be ~0; a nonzero rate is a prompt-regression or
-    /// prompt-injection signal, not a routine event.
+    /// Expected to be ~0; a nonzero rate is a prompt regression or an injection
+    /// attempt, not a routine event.
     SeverityClamped,
     /// `oncall_l0_suppressed_total` — only ever nonzero for opted-in teams.
     Suppressed,
@@ -889,10 +835,8 @@ pub fn metrics_for(
 
 // §2.2 — the parser contract
 
-/// A report and whatever verdict it carried.
-///
-/// `report` is the content as it will be persisted. It is the input, unchanged,
-/// in every case — a malformed verdict can never lose a report or a page.
+/// A report and whatever verdict it carried. `report` is the input unchanged in
+/// every case: a malformed verdict can never lose a report or a page.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParsedReport<'a> {
     pub report: &'a str,
@@ -900,11 +844,9 @@ pub struct ParsedReport<'a> {
 }
 
 /// Split an agent report into the markdown that is stored and the verdict the
-/// ladder consumes.
-///
-/// The verdict is a fenced ` ```json verdict ` block, the final section of the
-/// report. Parse failure or an absent block is **no verdict** — never an error,
-/// never a reason to drop the report.
+/// ladder consumes. The verdict is a fenced ` ```json verdict ` block at the
+/// end. Parse failure or an absent block is no verdict — never an error, never
+/// a reason to drop the report.
 pub fn parse_report(rca_content: &str) -> ParsedReport<'_> {
     ParsedReport {
         // The input, unchanged, in every case: a malformed verdict can never lose a report.
@@ -913,9 +855,7 @@ pub fn parse_report(rca_content: &str) -> ParsedReport<'_> {
     }
 }
 
-/// The body of the last ` ```json verdict ` fence in a report.
-///
-/// The last one, because the verdict is "the final section of the report": an
+/// The body of the last ` ```json verdict ` fence. The last one, because an
 /// agent that re-ran and emitted a second block must not leave the reader
 /// guessing which one the ladder used.
 fn last_verdict_block(rca_content: &str) -> Option<String> {
@@ -946,12 +886,9 @@ fn last_verdict_block(rca_content: &str) -> Option<String> {
 
 // §5 — what the notifications carry
 
-/// The channels a follow-up verdict update may use.
-///
-/// §5.2 names chat, push and email, so this is an **allowlist**: a denylist of
+/// The channels a follow-up verdict update may use. An allowlist: a denylist of
 /// the urgent ones would admit every channel this product adds later without
-/// anybody deciding that it should. Of the three, only email still exists —
-/// chat and push were removed with the rest of the channels nothing could send.
+/// anybody deciding it should. Of §5.2's three, only email still exists.
 pub fn update_channels(channels: &[Channel]) -> Vec<Channel> {
     channels
         .iter()
@@ -960,22 +897,17 @@ pub fn update_channels(channels: &[Channel]) -> Vec<Channel> {
         .collect()
 }
 
-/// The channel set a downgraded firing is notified on.
-///
-/// §3: a `Downgrade` asks for *this firing* to ride quieter channels while the
-/// record keeps the severity the rule assigned. No channel this build can send
-/// wakes a sleeping person, so there is nothing quieter to drop to — and a
-/// downgrade may make a page quieter, never make it disappear. Kept as the seam
-/// the caller already has for when an interrupting channel lands.
+/// The channel set a downgraded firing is notified on. No channel this build
+/// can send wakes a sleeping person, so there is nothing quieter to drop to —
+/// and a downgrade may make a page quieter, never make it disappear. Kept as
+/// the seam for when an interrupting channel lands.
 pub fn quieter_channels(channels: &[Channel]) -> Vec<Channel> {
     channels.to_vec()
 }
 
-/// The line every message on a promoted page carries.
-///
-/// Never dropped from the template: a responder woken by a machine's judgement
-/// is owed that judgement in the first line, and it is the sentence they will
-/// quote when deciding whether to trust the next one.
+/// The line every message on a promoted page carries. Never dropped from the
+/// template: a responder woken by a machine's judgement is owed that judgement
+/// in the first line.
 pub fn promotion_note(
     from: AlertPriority,
     to: AlertPriority,
@@ -996,18 +928,13 @@ pub fn promotion_note(
 
 /// The investigation lines a notification renders.
 ///
-/// Three situations, and the empty one matters most: with the analysis
-/// `Skipped` or `Failed` there is nothing to say, so an SMTP-only deployment
-/// with RCA disabled renders the current, pre-L0 message byte-for-byte. A
-/// `Pending` analysis renders one "investigation running" line with its deep
-/// link — no waiting and no placeholder spam. A `Complete` one renders the
-/// findings.
+/// The empty case matters most: `Skipped` or `Failed` renders the pre-L0
+/// message byte-for-byte. `Pending` renders one "investigation running" line
+/// with its deep link; `Complete` renders the findings.
 ///
-/// `decision` is what the engine did with the `severity_suggestion`, and the
-/// page has to be rendered from it rather than from the verdict alone. A
-/// verdict field printed raw is a page that announces a severity nobody
-/// applied: a **discarded demotion** would put "P4" on a P2 page, which is the
-/// demotion §2.1a refuses, arriving by way of the template.
+/// Rendered from `decision`, not from the verdict alone. A discarded demotion
+/// printed raw would put "P4" on a P2 page — the demotion §2.1a refuses,
+/// arriving by way of the template.
 pub fn verdict_lines(analysis: &AnalysisState, decision: &SeverityDecision) -> Vec<String> {
     let Some(verdict) = &analysis.verdict else {
         // Nothing added, so an SMTP-only deployment renders the pre-L0 message byte-for-byte.
@@ -1065,34 +992,26 @@ pub fn verdict_lines(analysis: &AnalysisState, decision: &SeverityDecision) -> V
     lines
 }
 
-/// Whether a channel can revise a message it has already delivered.
-///
-/// §5.1: on chat, push and in-app the findings fill in **the same message**
-/// rather than arriving as a second notification. Neither channel this build
-/// can send is revisable, so a verdict always rides the one follow-up update —
-/// which is why the update has to be ledger-deduped and the edit does not.
+/// Whether a channel can revise a message it already delivered. No channel this
+/// build can send is revisable, so a verdict always rides the one follow-up
+/// update — which is why the update is ledger-deduped and the edit is not.
 pub fn updates_in_place(channel: Channel) -> bool {
     match channel {
         Channel::Email | Channel::Webhook => false,
     }
 }
 
-/// Whether the verdict reached the responder before they acknowledged.
-///
-/// The headline metric — how often the human's page already contained the
-/// answer. Written as a function because the comparison is the whole of it, and
-/// an inverted one silently inflates the number that justifies the feature.
+/// Whether the verdict reached the responder before they acknowledged — the
+/// headline metric. A function because an inverted comparison silently inflates
+/// the number that justifies the feature.
 pub fn verdict_beat_the_ack(verdict_at: Option<i64>, acked_at: i64) -> bool {
     // Strictly before: landing at the same instant briefed nobody, and `<=` inflates the metric.
     verdict_at.is_some_and(|at| at < acked_at)
 }
 
-/// Whether a suppressed firing coming back counts against the suppression.
-///
-/// The trust metric behind `oncall_l0_false_suppress_total`: a suppressed
-/// subject that re-fired at **or above** its original severity within 24 hours.
-/// If this is not ~zero, teams should not enable suppression and the UI should
-/// say so next to the toggle.
+/// Whether a suppressed firing coming back counts against the suppression: a
+/// suppressed subject that re-fired at or above its original severity within 24
+/// hours. If this is not ~zero, teams should not enable suppression.
 pub fn is_false_suppress(
     suppressed_at: i64,
     suppressed_severity: AlertPriority,
@@ -1238,10 +1157,9 @@ mod tests {
 
     // §4 — the policy block
 
-    /// Every knob in §4's table, by value. The defaults are the whole reason
-    /// nobody has to configure L0 to benefit from it, so a silent edit to one
-    /// of them changes the behaviour of every team that never opened the
-    /// screen — which is most of them.
+    /// Every knob in §4's table, by value. The defaults are why nobody has to
+    /// configure L0, so a silent edit to one changes behaviour for every team
+    /// that never opened the screen.
     #[test]
     fn test_l0_defaults_match_the_published_knob_table() {
         let d = L0Policy::defaults();
@@ -1264,10 +1182,8 @@ mod tests {
         d.validate().unwrap();
     }
 
-    /// "The invariant is not a setting." Refusing it at write time is not
-    /// enough — rows arrive from replication and from hands on a database — so
-    /// the read path has to refuse it too, and a P1 held behind a model must be
-    /// impossible to express at all.
+    /// The invariant is not a setting. Rows arrive from replication and from
+    /// hands on a database, so the read path has to refuse a held P1 too.
     #[test]
     fn test_p1_is_parallel_even_when_a_stored_policy_says_otherwise() {
         for forbidden in [L0Mode::Gate, L0Mode::Only] {
@@ -1305,10 +1221,8 @@ mod tests {
         );
     }
 
-    /// 30 seconds is shorter than any useful hold and 600 is where "the page is
-    /// late" becomes "the pager is broken". The bound is inclusive at both
-    /// ends; an off-by-one here is a team that cannot save the value the UI
-    /// shows them.
+    /// The bound is inclusive at both ends; an off-by-one is a team that cannot
+    /// save the value the UI shows them.
     #[test]
     fn test_the_triage_budget_is_bounded_at_thirty_and_six_hundred_seconds() {
         for ok in [
@@ -1345,10 +1259,9 @@ mod tests {
         );
     }
 
-    /// `only` means "nobody is ever paged at this severity", which is a
-    /// statement about P4 and P5 and nothing else. A stored `only` on a paging
-    /// severity would silence it permanently, so it is read as the safest thing
-    /// it could have meant.
+    /// `only` means "nobody is ever paged at this severity", true of P4 and P5
+    /// alone. A stored `only` on a paging severity would silence it
+    /// permanently, so it is read as the safest thing it could have meant.
     #[test]
     fn test_only_mode_outside_p4_is_read_as_parallel() {
         let p = raw(
@@ -1370,15 +1283,13 @@ mod tests {
         }
     }
 
-    /// The other direction of the same defence. `mode_for` was pinned only
-    /// against a stored `only` on a paging severity; a stored `gate` on P4 is
-    /// the mirror, and the obvious implementation — read the field — puts a
-    /// firing that pages nobody into a 90-second hold and inserts the trigger
-    /// row §3 says a P4 never gets.
+    /// The mirror: a stored `gate` on P4. Reading the field puts a firing that
+    /// pages nobody into a 90-second hold and inserts the trigger row §3 says a
+    /// P4 never gets.
     ///
-    /// It also splits implementers: deriving P4's answer from `mode_for` and
-    /// deriving it from `severity_pages` both satisfy every other test, and
-    /// only the second is right. Pinned here so they cannot diverge.
+    /// It also splits implementers — deriving P4's answer from `mode_for` and
+    /// from `severity_pages` both satisfy every other test, and only the second
+    /// is right.
     #[test]
     fn test_p4_and_p5_are_agent_only_even_when_a_stored_policy_gates_them() {
         for forbidden in [L0Mode::Gate, L0Mode::Parallel] {
@@ -1494,11 +1405,8 @@ mod tests {
 
     // §2.1a — the ratchet. The tests that must never be weakened.
 
-    /// Every `(current, suggestion)` pair across P1-P5, plus "no suggestion",
-    /// with the shipped `max_promotion_steps` of 2. This is the whole of
-    /// §2.1a's table written out: the diagonal and everything below it is
-    /// discarded, everything above it promotes, and a promotion of more than
-    /// two rungs is clamped to two.
+    /// Every `(current, suggestion)` pair across P1–P5 at the shipped
+    /// `max_promotion_steps` of 2 — §2.1a's table written out.
     #[test]
     fn test_every_severity_pair_is_a_promotion_a_clamp_or_a_discard() {
         let p = shipped();
@@ -1566,13 +1474,9 @@ mod tests {
         );
     }
 
-    /// The invariant, stated directly and checked over every input this
-    /// function has: promotion, refusal, clamping, an absent suggestion, a
-    /// bound of zero, a bound wider than the scale. Nothing produces a severity
-    /// less urgent than the one the rule assigned.
-    ///
-    /// This is the test enforcing §2.1a against a model that can change under
-    /// us, and it must never be weakened.
+    /// The invariant over every input this function has. Nothing produces a
+    /// severity less urgent than the rule assigned. This enforces §2.1a against
+    /// a model that can change under us, and must never be weakened.
     #[test]
     fn test_no_verdict_can_ever_lower_a_recorded_severity() {
         for current in ALL {
@@ -1643,11 +1547,9 @@ mod tests {
         }
     }
 
-    /// The bug this pins, and the only reason the ratchet needs a test at all:
     /// `AlertPriority::to_i32()` is P1=1..P5=5, so a bare `suggestion > current`
-    /// on the raw ids reads P4 (4) > P2 (2) as a promotion and quietly demotes a
-    /// P2 to a P4. Written out as its own case because the exhaustive table
-    /// above would still pass if somebody reduced it to the diagonal.
+    /// on raw ids reads P4 > P2 as a promotion and quietly demotes. Its own
+    /// case, because the table above would still pass reduced to the diagonal.
     #[test]
     fn test_the_naive_integer_comparison_reads_a_demotion_as_a_promotion() {
         let p = shipped();
@@ -1683,9 +1585,8 @@ mod tests {
         );
     }
 
-    /// The diagonal. A suggestion equal to the current severity is not a
-    /// promotion and must not read as one — it is the case a model produces
-    /// most often, and treating it as a promotion would write a
+    /// A suggestion equal to the current severity is not a promotion — the case
+    /// a model produces most often, and treating it as one writes a
     /// `SeverityPromoted` event for a severity that did not change.
     #[test]
     fn test_a_suggestion_equal_to_the_current_severity_changes_nothing() {
@@ -1704,14 +1605,10 @@ mod tests {
         }
     }
 
-    /// The bound is a **number**, not a switch between "none" and "the
-    /// default". Pinned only at 0 and 2, `let bound = if steps == 0 { 0 } else { 2 }`
-    /// passes everything — and a team that narrowed its blast radius to one
-    /// rung, which is the whole reason the knob is a number, is silently
-    /// overridden and gets the two-rung jump it explicitly refused.
-    ///
-    /// Exact expected values at every bound the scale can express, so the
-    /// clamp arithmetic is pinned rather than merely bracketed.
+    /// The bound is a number, not a switch between "none" and "the default".
+    /// Pinned only at 0 and 2, `let bound = if steps == 0 { 0 } else { 2 }`
+    /// passes — and a team that narrowed its blast radius to one rung gets the
+    /// two-rung jump it refused. Exact values at every expressible bound.
     #[test]
     fn test_the_promotion_bound_is_honoured_at_every_width() {
         // (bound, current, requested, the level that may be applied)
@@ -1812,9 +1709,8 @@ mod tests {
         );
     }
 
-    /// A bound of zero can only mean "no promotions", and the clamp would
-    /// otherwise land on the current severity and be reported as a promotion to
-    /// itself — a `SeverityPromoted{P3 → P3}` line and a page for nothing.
+    /// A bound of zero can only mean "no promotions". Otherwise the clamp lands
+    /// on the current severity and reports a promotion to itself.
     #[test]
     fn test_a_clamp_that_lands_on_the_current_severity_is_not_a_promotion() {
         let p = raw(
@@ -1838,9 +1734,8 @@ mod tests {
         assert_eq!(ratchet(P3, Some(P1), &p).applied(), P3);
     }
 
-    /// With promotion turned off the recommendation is still recorded and still
-    /// rendered on the page — the team asked not to be re-paged, not to be kept
-    /// in the dark.
+    /// With promotion off the recommendation is still recorded and rendered:
+    /// the team asked not to be re-paged, not to be kept in the dark.
     #[test]
     fn test_promotion_is_refused_but_still_recorded_when_the_team_turned_it_off() {
         let p = raw(
@@ -1966,18 +1861,13 @@ mod tests {
         }
     }
 
-    /// **The knob has to reach the thing that pages people.** Every other gate
-    /// test runs at the default 90 s, so two wrong implementations survive
-    /// them: one that hardcodes `anchor + 90_000_000` and ignores the setting
-    /// entirely, and one that reads `triage_budget_seconds` raw and skips the
-    /// clamp.
+    /// The knob has to reach the thing that pages people. Every other gate test
+    /// runs at the default 90 s, so an implementation that reads
+    /// `triage_budget_seconds` raw and skips the clamp survives them.
     ///
-    /// The second is the dangerous one. A row carrying `i64::MAX` — from
-    /// replication, a migration, or a hand-edit — produces a `fire_at` that
-    /// overflows or sits past any clock the process will ever see, and the
-    /// TRIAGE row never fires. Nobody is paged, ever, and nothing logs an
-    /// error. So the clamp is asserted here, on the path that wakes somebody,
-    /// rather than on the accessor.
+    /// A row carrying `i64::MAX` — from replication, a migration or a hand-edit
+    /// — produces a `fire_at` past any clock the process will see, so the TRIAGE
+    /// row never fires: nobody is paged and nothing logs an error.
     #[test]
     fn test_the_configured_triage_budget_is_the_one_that_gates() {
         // (stored seconds, the hold it must actually produce)
@@ -2085,10 +1975,9 @@ mod tests {
         );
     }
 
-    /// §6, last-but-one row: a node dying mid-TRIAGE re-queues the row and the
-    /// budget resumes from the persisted deadline. If the deadline were
-    /// recomputed from the wall clock, every crash would silently extend the
-    /// hold — and a flapping node would extend it forever.
+    /// §6: a node dying mid-TRIAGE resumes from the persisted deadline.
+    /// Recomputed from the wall clock, every crash extends the hold — and a
+    /// flapping node extends it forever.
     #[test]
     fn test_the_hold_deadline_is_anchored_on_the_request_not_on_the_wall_clock() {
         let p = shipped();
@@ -2122,10 +2011,9 @@ mod tests {
 
     // §1 — timing. The invariant that "is not a setting".
 
-    /// §7 of the required list: a P4 or P5 records its verdict, ends in
-    /// `triaged`, and never inserts a trigger row or wakes anybody — for every
-    /// action, including a `Page` recommendation. The agent cannot page a P4 by
-    /// asking; it can only stop the firing being a P4, which is the next test.
+    /// §7: a P4 or P5 records its verdict, ends `triaged`, and never inserts a
+    /// trigger row — for every action, including `Page`. The agent cannot page a
+    /// P4 by asking; it can only stop the firing being a P4.
     #[test]
     fn test_p4_and_p5_record_a_verdict_and_page_nobody() {
         for allow_suppress in [true, false] {
@@ -2161,10 +2049,9 @@ mod tests {
         }
     }
 
-    /// The one mechanism by which a held severity reaches a human early, and
-    /// §10.4's whole argument: the rule "a P4 does not page" is not overridden,
-    /// the firing stops being a P4. §4 says so directly — "P4 → P1 is clamped
-    /// to P2" only means anything if a promoted P4 can then page.
+    /// §10.4's argument: the rule "a P4 does not page" is not overridden, the
+    /// firing stops being a P4. "P4 → P1 is clamped to P2" only means anything
+    /// if a promoted P4 can then page.
     #[test]
     fn test_a_promoted_p4_pages_because_it_is_no_longer_a_p4() {
         let p = shipped();
@@ -2189,10 +2076,9 @@ mod tests {
 
     // §3, §4 — the verdict matrix
 
-    /// The mode × action × opt-in matrix §9 asks for, at a gated severity with
-    /// the verdict inside the budget. The defaults are the interesting row:
-    /// `allow_suppress` is false, so a Suppress verdict from a team that has
-    /// not opted in still pages.
+    /// §9's mode × action × opt-in matrix at a gated severity. The defaults are
+    /// the interesting row: `allow_suppress` is false, so a Suppress verdict
+    /// from a team that has not opted in still pages.
     #[test]
     fn test_the_verdict_matrix_over_action_and_opt_in() {
         let at = FIRED_AT + 4 * SECOND;
@@ -2282,15 +2168,12 @@ mod tests {
         }
     }
 
-    /// The **mode** axis of §9's matrix, which the table above holds fixed at
-    /// `gate`. §4: a team that sets `parallel` at P2 or P3 buys zero added
-    /// latency "at the cost of the suppression branch" — the page has already
-    /// gone out, so nothing a verdict says can call it back.
+    /// The mode axis §9's table holds fixed at `gate`. A team on `parallel`
+    /// buys zero added latency at the cost of the suppression branch.
     ///
-    /// The bug this catches is an implementation that decides on
-    /// `action == Suppress && allow_suppress` without ever consulting
-    /// `mode_for(severity)`. It passes the gated table completely, and it
-    /// silences a P2 for a team that deliberately turned the gate off.
+    /// The bug this catches decides on `action == Suppress && allow_suppress`
+    /// without consulting `mode_for(severity)`: it passes the gated table
+    /// completely and silences a P2 for a team that turned the gate off.
     #[test]
     fn test_a_parallel_severity_loses_the_suppression_and_downgrade_branches() {
         let at = FIRED_AT + 4 * SECOND;
@@ -2406,9 +2289,9 @@ mod tests {
         );
     }
 
-    /// §2.1a's other half: `Downgrade` asks for a quieter channel set for one
-    /// notification and never touches the recorded severity. Conflating the two
-    /// is how "the agent can never demote" becomes false by a side door.
+    /// §2.1a's other half: `Downgrade` asks for quieter channels and never
+    /// touches the recorded severity. Conflating the two is how "the agent can
+    /// never demote" becomes false by a side door.
     #[test]
     fn test_a_downgrade_never_changes_the_recorded_severity() {
         let p = shipped();
@@ -2435,10 +2318,9 @@ mod tests {
         }
     }
 
-    /// A verdict that both promotes and asks for quiet is contradictory, and
-    /// the safe reading is the loud one: the promotion is the part the engine
-    /// verified, and §5.3 says a promoted page fires the higher severity's own
-    /// channel set.
+    /// A verdict that both promotes and asks for quiet is contradictory, and the
+    /// safe reading is the loud one: §5.3 says a promoted page fires the higher
+    /// severity's own channel set.
     #[test]
     fn test_a_promotion_outranks_a_suppress_or_downgrade_in_the_same_verdict() {
         let p = everything_enabled();
@@ -2457,9 +2339,8 @@ mod tests {
         }
     }
 
-    /// §3, the WAITING side. A verdict that arrives after the page rides as one
-    /// follow-up update, not a second page — with the single exception of a
-    /// promotion, which re-enters the ladder and pages the delta.
+    /// §3, the WAITING side. A verdict arriving after the page rides as one
+    /// follow-up — except a promotion, which re-enters the ladder.
     #[test]
     fn test_a_verdict_that_lands_after_the_page_is_an_update_not_a_second_page() {
         let p = shipped();
@@ -2502,9 +2383,8 @@ mod tests {
         );
     }
 
-    /// The hold, before anything has landed. A gated firing with a live
-    /// investigation waits — and waits until the deadline, not until some
-    /// interval a tick happened to pick.
+    /// The hold waits until the deadline, not until some interval a tick
+    /// happened to pick.
     #[test]
     fn test_a_gated_firing_holds_until_its_deadline_and_no_longer() {
         let p = shipped();
@@ -2533,9 +2413,8 @@ mod tests {
         }
     }
 
-    /// §6, three rows at once: budget expiry, a missing or malformed verdict
-    /// block, and a dead agent all reach the same place — the page the pre-L0
-    /// system would have sent.
+    /// §6, three rows at once: budget expiry, a malformed verdict block, and a
+    /// dead agent all reach the page the pre-L0 system would have sent.
     #[test]
     fn test_a_missing_or_malformed_verdict_fails_open_at_the_deadline() {
         let p = shipped();
@@ -2589,10 +2468,9 @@ mod tests {
         assert!(AnalysisStatus::Pending.may_still_answer());
     }
 
-    /// §3, stated as an equality rather than as two lists that happen to agree:
-    /// "the escalation engine treats `Skipped` and `Failed` identically". They
-    /// arrive from different places — a disabled agent versus one that answered
-    /// with rubbish — and the moment they diverge, one of the two stops being
+    /// §3 as an equality rather than two lists that happen to agree. `Skipped`
+    /// and `Failed` arrive from different places — a disabled agent versus one
+    /// that answered with rubbish — and the moment they diverge, one stops being
     /// covered by the fail-open argument.
     #[test]
     fn test_a_failed_analysis_and_a_skipped_one_are_treated_identically() {
@@ -2623,11 +2501,9 @@ mod tests {
         }
     }
 
-    /// §1: the hold is "shorter than the rung it sits inside" — under a third
-    /// of P2's first escalation interval and a tenth of P3's. The default
-    /// budget and the default ladder are edited in different files by different
-    /// people, and the day the budget grows past the rung, the gate stops being
-    /// a hold and starts being a missed escalation.
+    /// §1: the hold is shorter than the rung it sits inside. The budget and the
+    /// ladder are edited in different files, and the day the budget grows past
+    /// the rung, the gate becomes a missed escalation.
     #[test]
     fn test_the_triage_budget_stays_well_inside_the_rung_it_sits_in() {
         use super::super::policy::EscalationPolicy;
@@ -2663,14 +2539,9 @@ mod tests {
         };
     }
 
-    /// **The compound invariant of §6: removing the agent from the system
-    /// reproduces today's behaviour exactly.**
-    ///
-    /// Every L0 code path is additive on top of a ladder that works without it,
-    /// so with the analysis `Skipped` — RCA disabled, agent URL unset, health
-    /// check failed, guard blocked the run — every severity behaves as it did
-    /// before L0 existed: P1, P2 and P3 page at t=0, P4 and P5 page nobody,
-    /// nothing is ever held, and no verdict changes any of it.
+    /// §6's compound invariant: removing the agent reproduces today's behaviour
+    /// exactly. With the analysis `Skipped`, P1–P3 page at t=0, P4 and P5 page
+    /// nobody, nothing is held, and no verdict changes any of it.
     #[test]
     fn test_removing_the_agent_reproduces_todays_behaviour_exactly() {
         for allow_suppress in [true, false] {
@@ -2709,10 +2580,9 @@ mod tests {
         }
     }
 
-    /// §6's guard rows. L0 adds no new trigger path: every reason the existing
-    /// RCA trigger declines to run is one state, `Skipped`, and `Skipped` means
-    /// "behave exactly as today". Table-driven over the whole guard space, so a
-    /// new guard that forgets to map to `Skipped` fails here.
+    /// §6's guard rows. Every reason the RCA trigger declines to run is one
+    /// state, `Skipped`. Table-driven over the guard space, so a new guard that
+    /// forgets to map to `Skipped` fails here.
     #[test]
     fn test_analysis_is_skipped_whenever_a_guard_blocks_the_run() {
         for rca_enabled in [true, false] {
@@ -2745,15 +2615,9 @@ mod tests {
         }
     }
 
-    /// §10.3's trace, run through the decisions that produce it. The failure
-    /// mode this whole design was stress-tested against — the causal signal
-    /// fires at the lowest severity and the symptom fires at the highest — and
-    /// the numbers in the document are the assertion.
-    ///
-    /// 02:14:00 a P3 fires and **nobody is paged**: a P3 at 2am must not wake
-    /// anyone, and nothing in L0 changes that. 02:14:04 the verdict lands
-    /// promoting it to P2, and what pages is a P2. The rule was never
-    /// overridden; the firing stopped being a P3.
+    /// §10.3's trace: the causal signal fires at the lowest severity and the
+    /// symptom at the highest. A P3 fires at 02:14:00 and nobody is paged; the
+    /// verdict lands four seconds later promoting it, and what pages is a P2.
     #[test]
     fn test_the_worked_example_pages_a_p2_four_seconds_after_a_p3_that_woke_nobody() {
         let p = shipped();
@@ -2803,10 +2667,9 @@ mod tests {
         assert!(verdict_at - fired < p.triage_budget_micros());
     }
 
-    /// §6's `Pending → Failed` transition, which nothing else models. A run
-    /// that came back with an unusable block has finished; leaving it
-    /// `Pending` makes every malformed report cost the full triage budget in
-    /// latency, on a gate whose entire promise is that it does not.
+    /// §6's `Pending → Failed` transition, which nothing else models. Leaving an
+    /// unusable run `Pending` makes every malformed report cost the full triage
+    /// budget in latency.
     #[test]
     fn test_a_run_that_produced_no_usable_verdict_ends_failed_not_pending() {
         assert_eq!(analysis_status_after_run(true), AnalysisStatus::Complete);
@@ -2829,9 +2692,8 @@ mod tests {
         );
     }
 
-    /// The gate is not the only thing a P4 skips: it has no hold to be in, so a
-    /// P4 whose investigation is still running is not `Hold`, it is simply a
-    /// firing nobody will be paged for either way.
+    /// A P4 has no hold to be in, so one whose investigation is still running
+    /// is not `Hold` — it is a firing nobody will be paged for either way.
     #[test]
     fn test_a_p4_with_a_live_investigation_is_not_holding_anything() {
         let p = shipped();
@@ -2856,10 +2718,9 @@ mod tests {
 
     // §8 — observability
 
-    /// `oncall_l0_severity_clamp_total` is the prompt-regression alarm: it
-    /// counts attempted demotions and is expected to be ~0. A step-clamped
-    /// promotion is a routine, safe event and must not appear on it, or the
-    /// alarm reads as noise and stops being read at all.
+    /// `oncall_l0_severity_clamp_total` is the prompt-regression alarm and is
+    /// expected to be ~0. A step-clamped promotion is routine and must not
+    /// appear on it, or the alarm reads as noise.
     #[test]
     fn test_the_clamp_counter_moves_only_on_an_attempted_demotion() {
         let p = shipped();
@@ -2890,10 +2751,9 @@ mod tests {
         assert!(count(P3, Some(P2)).contains(&L0Metric::Promoted { from: P3, to: P2 }));
     }
 
-    /// "Only ever nonzero for opted-in teams" is the claim §8 makes about the
-    /// suppression and downgrade counters, and it is the claim the trust
-    /// argument rests on. A recommendation the engine did not honour must not
-    /// appear as one it did.
+    /// §8's claim about the suppression and downgrade counters: only ever
+    /// nonzero for opted-in teams. A recommendation the engine did not honour
+    /// must not appear as one it did.
     #[test]
     fn test_suppressed_and_downgraded_count_only_when_they_actually_happened() {
         let at = FIRED_AT + 4 * SECOND;
@@ -2932,9 +2792,8 @@ mod tests {
         assert!(!metrics_for(&opted_in, &suppress, P1, at).contains(&L0Metric::Suppressed));
     }
 
-    /// `oncall_l0_budget_expired_total` answers "is the agent too slow for the
-    /// gate". A verdict that landed in time, or a run that never started, is
-    /// not the agent being slow.
+    /// `oncall_l0_budget_expired_total` answers "is the agent too slow". A
+    /// verdict that landed in time, or a run that never started, is not that.
     #[test]
     fn test_budget_expiry_counts_only_when_no_verdict_landed_in_time() {
         let p = shipped();
@@ -3027,9 +2886,8 @@ mod tests {
   "report_ref": "inc_9/rca/1"
 }"#;
 
-    /// The happy path, field by field — §10.3's own verdict. Every one of these
-    /// fields is a line on the responder's card, and a field the parser drops
-    /// is a line that silently disappears at 3am.
+    /// The happy path, field by field. Every field is a line on the responder's
+    /// card, and one the parser drops disappears silently at 3am.
     #[test]
     fn test_a_valid_verdict_block_parses_every_field() {
         let content = report_with(GOLDEN_VERDICT);
@@ -3059,10 +2917,9 @@ mod tests {
         assert_eq!(v.report_ref, "inc_9/rca/1");
     }
 
-    /// §2.2, the sentence the whole parser exists to honour: "a malformed
-    /// verdict can never lose a report or a page". Every way a model can get
-    /// the block wrong, and in each the markdown still saves exactly as today
-    /// and the firing still falls through to the fail-open page.
+    /// §2.2: a malformed verdict can never lose a report or a page. Every way a
+    /// model can get the block wrong, and in each the markdown still saves and
+    /// the firing still falls through to the fail-open page.
     #[test]
     fn test_a_malformed_verdict_block_loses_neither_the_report_nor_the_page() {
         let broken = [
@@ -3112,9 +2969,8 @@ mod tests {
     }
 
     /// "cause unknown" is a first-class value the prompt prefers to
-    /// confabulation, and such a verdict still carries evidence and still
-    /// recommends `Page`. A parser that treated it as a failure would turn the
-    /// agent's honesty into a dropped verdict.
+    /// confabulation. A parser treating it as a failure would turn the agent's
+    /// honesty into a dropped verdict.
     #[test]
     fn test_an_unknown_cause_verdict_parses_and_still_recommends_a_page() {
         let content = report_with(
@@ -3142,10 +2998,9 @@ mod tests {
         assert!(v.proposed_actions.is_empty());
     }
 
-    /// The block is written by a language model, so the field has to accept the
-    /// form a model writes. `"P2"` is what the prompt asks for; the bare
-    /// integer is the API's own spelling and is accepted rather than silently
-    /// dropped — dropping it would be a promotion that never happened.
+    /// The field accepts the forms a model writes. `"P2"` is what the prompt
+    /// asks for; the bare integer is the API's own spelling, and dropping it
+    /// would be a promotion that never happened.
     #[test]
     fn test_the_severity_suggestion_accepts_the_form_a_model_writes() {
         for (spelling, want) in [
@@ -3169,9 +3024,8 @@ mod tests {
     }
 
     /// A severity outside the scale is not a severity. Rejecting the whole
-    /// verdict rather than the one field is deliberate: half a verdict is a
-    /// verdict whose paging recommendation was read from a value nobody
-    /// checked, and §6 already has a safe answer for "no verdict".
+    /// verdict is deliberate: half a verdict has its paging recommendation read
+    /// from a value nobody checked, and §6 already handles "no verdict".
     #[test]
     fn test_a_severity_suggestion_outside_the_scale_rejects_the_whole_verdict() {
         for bad in ["\"P9\"", "0", "6", "\"critical\"", "-1", "\"\""] {
@@ -3184,9 +3038,8 @@ mod tests {
         }
     }
 
-    /// Idempotence at the parser: the agent re-running and emitting a second
-    /// block must not leave the reader guessing which one the ladder used. The
-    /// verdict is "the final section of the report", so the last block wins.
+    /// Idempotence at the parser. The verdict is the report's final section, so
+    /// an agent that re-ran and emitted a second block resolves to the last.
     #[test]
     fn test_the_last_verdict_block_in_a_report_is_the_one_that_counts() {
         let first = "{ \"probable_cause\": \"first\", \"confidence\": \"low\", \"page_recommendation\": { \"action\": \"page\", \"reason\": \"r\" }, \"report_ref\": \"r\" }";
@@ -3203,16 +3056,12 @@ mod tests {
 
     // §5 — what the notifications carry
 
-    /// §5.2: the follow-up "rides channel/push/email" and does not re-fire
-    /// voice or SMS. Waking somebody twice — once because a human is needed and
-    /// once because news arrived — is how a team learns that its urgent
-    /// channels cry wolf, and then stops answering the ones that do not.
+    /// §5.2: the follow-up rides chat, push and email and does not re-fire
+    /// voice or SMS. Waking somebody twice teaches a team that its urgent
+    /// channels cry wolf.
     ///
-    /// §5.2 names three channels — "it rides channel/push/email" — so this is
-    /// an allowlist. A denylist of the urgent ones passes the same happy path
-    /// and quietly admits every channel this product adds later: the next
-    /// transport to land would start carrying verdict updates because nobody
-    /// wrote it down anywhere.
+    /// An allowlist, not a denylist: a denylist passes the same happy path and
+    /// quietly admits every channel this product adds later.
     #[test]
     fn test_a_verdict_update_rides_only_the_channels_the_design_names() {
         assert_eq!(
@@ -3227,11 +3076,9 @@ mod tests {
         );
     }
 
-    /// §3, the `Downgrade` branch: "NOTIFYING with quieter channels for THIS
-    /// firing" — and "quieter" must never become "silent", because §2.1a's
-    /// whole asymmetry is that nothing a verdict says may cost somebody a page.
-    /// No channel this build can send wakes a sleeping person, so every set
-    /// comes back unchanged.
+    /// §3's `Downgrade` branch. "Quieter" must never become "silent" — §2.1a's
+    /// asymmetry is that nothing a verdict says may cost somebody a page. No
+    /// channel here wakes a sleeping person, so every set comes back unchanged.
     #[test]
     fn test_a_downgrade_never_silences_a_rung() {
         for set in [
@@ -3244,10 +3091,9 @@ mod tests {
         assert!(quieter_channels(&[]).is_empty(), "nothing in, nothing out");
     }
 
-    /// §5.3: "the promotion reason is never dropped from the template". A
-    /// responder woken by a machine's judgement is owed that judgement in the
-    /// first line, and it is the sentence they will quote when deciding whether
-    /// to trust the next one.
+    /// §5.3: the promotion reason is never dropped from the template. It is the
+    /// sentence a responder will quote when deciding whether to trust the next
+    /// one.
     #[test]
     fn test_a_promoted_page_always_carries_the_reason_it_was_promoted() {
         let reason = "predicted FD exhaustion in ~22 min";
@@ -3267,13 +3113,9 @@ mod tests {
         assert!(bare.contains("P4") && bare.contains("P2"), "{bare}");
     }
 
-    /// "Templates degrade cleanly": an SMTP-only deployment with RCA disabled
-    /// renders the current, pre-L0 messages byte-for-byte. Nothing is added
-    /// when there is nothing to add — no "AI: n/a" line, no empty section.
-    ///
-    /// The same rendering is what every level ≥ 2 dispatch uses (§5.4), so an
-    /// escalation target arrives briefed when there is a verdict and reads
-    /// exactly as it does today when there is not.
+    /// Templates degrade cleanly: an SMTP-only deployment with RCA disabled
+    /// renders the pre-L0 messages byte-for-byte — no "AI: n/a" line, no empty
+    /// section. Every level ≥ 2 dispatch uses the same rendering (§5.4).
     #[test]
     fn test_a_page_with_no_verdict_renders_exactly_todays_message() {
         let nothing = SeverityDecision::Unchanged { current: P3 };
@@ -3305,18 +3147,12 @@ mod tests {
         );
     }
 
-    /// §5.1: the first page beats the verdict at P1 and whenever a hold
-    /// expires, and it says so — one line, with the deep link. Not a
-    /// placeholder that gets superseded, and not silence that leaves a
-    /// responder wondering whether anything is looking at this.
-    /// The template is the last place §2.1a can be undone. A discarded
-    /// demotion still carries `severity_suggestion: P4` on the verdict, and a
-    /// renderer that prints the field raw puts "P4" on a page for a firing that
-    /// is, and remains, a P2. The engine refused the demotion; the message must
-    /// not deliver it anyway.
+    /// The template is the last place §2.1a can be undone. A discarded demotion
+    /// still carries `severity_suggestion: P4`, and printing the field raw puts
+    /// "P4" on a page for a firing that remains a P2.
     ///
-    /// The refused *promotion* is the opposite case and §6 requires it be
-    /// rendered — so the two cannot be handled by the same blanket rule.
+    /// A refused *promotion* is the opposite case and §6 requires it be
+    /// rendered, so one blanket rule cannot handle both.
     #[test]
     fn test_a_refused_suggestion_is_not_rendered_as_though_it_had_been_applied() {
         let at = FIRED_AT + 4 * SECOND;
@@ -3370,10 +3206,9 @@ mod tests {
         );
     }
 
-    /// §5.1: on channels that can revise a message, the findings fill in the
-    /// same message rather than arriving as a second notification. Neither
-    /// channel this build can send is revisable — which is why the follow-up
-    /// update, and not the edit, is the thing that has to be deduped.
+    /// §5.1: where a channel can revise a message, the findings fill in the same
+    /// one. No channel this build can send is revisable — which is why the
+    /// follow-up update, not the edit, is what has to be deduped.
     #[test]
     fn test_no_channel_this_build_sends_can_revise_what_it_already_sent() {
         for c in [Channel::Email, Channel::Webhook] {
@@ -3384,10 +3219,8 @@ mod tests {
         }
     }
 
-    /// The headline metric §8 says justifies the feature. An inverted or
-    /// non-strict comparison here does not break anything a user sees — it
-    /// quietly inflates the one number the programme is judged on, which is
-    /// worse.
+    /// §8's headline metric. An inverted or non-strict comparison breaks nothing
+    /// a user sees — it inflates the one number the programme is judged on.
     #[test]
     fn test_the_verdict_beat_the_ack_only_when_it_actually_arrived_first() {
         let acked = FIRED_AT + 120 * SECOND;
@@ -3404,9 +3237,8 @@ mod tests {
         );
     }
 
-    /// The trust metric. A suppressed firing that comes back worse is the whole
-    /// argument against suppression, so the window and the direction both have
-    /// to be right: 24 hours, and "at or above", not "above".
+    /// The trust metric. Window and direction both have to be right: 24 hours,
+    /// and "at or above", not "above".
     #[test]
     fn test_a_false_suppress_is_a_re_fire_at_or_above_the_same_severity_within_a_day() {
         let day = 24 * 3_600 * SECOND;
@@ -3434,10 +3266,9 @@ mod tests {
         );
     }
 
-    /// The §11 boundary, enforced by the type rather than by a review comment:
-    /// a `ProposedAction` is three strings. There is no `workflow_ref`, no
-    /// `args`, no `reversible` and no `verify_signal`, so nothing downstream can
-    /// read this field as anything other than display text.
+    /// §11's boundary, enforced by the type: a `ProposedAction` is three
+    /// strings. No `workflow_ref`, no `args`, no `reversible`, so nothing
+    /// downstream can read it as anything but display text.
     #[test]
     fn test_a_proposed_action_carries_no_execution_affordance() {
         let action = ProposedAction {
@@ -3468,9 +3299,9 @@ mod tests {
         }
     }
 
-    /// The verdict is persisted on the timeline and cached on the escalation
-    /// state, so its stored shape is a contract. A field that stops round
-    /// tripping is a responder card that loses a line after an upgrade.
+    /// The verdict is persisted and cached, so its stored shape is a contract. A
+    /// field that stops round tripping is a responder card that loses a line
+    /// after an upgrade.
     #[test]
     fn test_a_verdict_round_trips_through_json() {
         let v = verdict(PageAction::Downgrade, Some(P1));
@@ -3503,8 +3334,7 @@ mod tests {
     }
 
     /// The analysis state rides `Trigger.data`, which the super cluster already
-    /// replicates, so the surviving cluster has the verdict state. That only
-    /// holds if the state serialises whole.
+    /// replicates — but only if the state serialises whole.
     #[test]
     fn test_the_analysis_state_round_trips_through_json() {
         let state = complete(
@@ -3534,10 +3364,9 @@ mod tests {
         assert_eq!(json, r#"{"status":"skipped"}"#);
     }
 
-    /// The wire spellings are what the prompt contract asks a model to emit and
-    /// what the timeline stores. Renaming one breaks both at once, and the
-    /// break is silent: the block stops parsing and the firing quietly falls
-    /// back to the pre-L0 page.
+    /// The wire spellings are what the prompt asks a model to emit and what the
+    /// timeline stores. Renaming one breaks both, silently: the block stops
+    /// parsing and the firing falls back to the pre-L0 page.
     #[test]
     fn test_the_verdict_vocabulary_is_pinned() {
         for (c, want) in [
