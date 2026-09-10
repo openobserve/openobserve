@@ -15,7 +15,11 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@/services/iam", () => ({ createRole: vi.fn(), updateRole: vi.fn() }));
+vi.mock("@/services/iam", () => ({
+  createRole: vi.fn(),
+  getResourcePermission: vi.fn(),
+  updateRole: vi.fn(),
+}));
 
 vi.mock("@/components/iam/roles/readonlyPreset", () => ({
   seedReadonlyRolePermissions: vi.fn(),
@@ -35,7 +39,7 @@ vi.mock("vuex", () => ({ useStore: () => mockStore }));
 // The composable runs outside a component, where the global i18n plugin isn't installed.
 vi.mock("@/types/i18n", () => ({ useI18nTyped: () => ({ t: (key: string) => key }) }));
 
-import { createRole, updateRole } from "@/services/iam";
+import { createRole, getResourcePermission, updateRole } from "@/services/iam";
 import { seedReadonlyRolePermissions } from "@/components/iam/roles/readonlyPreset";
 import service_accounts from "@/services/service_accounts";
 import { MCP_READONLY_ROLE, useMcpCredential } from "./useMcpCredential";
@@ -56,6 +60,7 @@ describe("useMcpCredential", () => {
     vi.clearAllMocks();
     vi.mocked(service_accounts.create).mockResolvedValue(created() as any);
     vi.mocked(createRole).mockResolvedValue({} as any);
+    vi.mocked(getResourcePermission).mockResolvedValue({ data: [] } as any);
     vi.mocked(updateRole).mockResolvedValue({} as any);
     vi.mocked(seedReadonlyRolePermissions).mockResolvedValue(12);
   });
@@ -96,7 +101,15 @@ describe("useMcpCredential", () => {
       expect(updateRole).toHaveBeenCalledWith({
         role_id: MCP_READONLY_ROLE,
         org_identifier: "org-fresh",
-        payload: { add: [], remove: [], add_users: [cred!.email], remove_users: [] },
+        payload: {
+          add: [
+            { object: "mcp:_all_org-fresh", permission: "AllowList" },
+            { object: "mcp:_all_org-fresh", permission: "AllowPut" },
+          ],
+          remove: [],
+          add_users: [cred!.email],
+          remove_users: [],
+        },
       });
       expect(cred).toMatchObject({ role: MCP_READONLY_ROLE, scope: "readonly" });
     });
@@ -146,6 +159,47 @@ describe("useMcpCredential", () => {
       const { generate } = useOrg("org-empty");
 
       expect(await generate()).toMatchObject({ scope: "unscoped" });
+    });
+
+    // POST /api/{org}/mcp resolves to PUT on the `mcp` resource, which the read-only preset never grants.
+    it("adds only the mcp grant the role is missing", async () => {
+      vi.mocked(getResourcePermission).mockResolvedValue({
+        data: [
+          { object: "mcp:_all_org-partial-grant", permission: "AllowGet" },
+          { object: "mcp:_all_org-partial-grant", permission: "AllowList" },
+        ],
+      } as any);
+      const { generate } = useOrg("org-partial-grant");
+
+      await generate();
+
+      expect(vi.mocked(updateRole).mock.calls[0][0].payload.add).toEqual([
+        { object: "mcp:_all_org-partial-grant", permission: "AllowPut" },
+      ]);
+    });
+
+    it("adds nothing when the role already covers mcp with AllowAll", async () => {
+      vi.mocked(getResourcePermission).mockResolvedValue({
+        data: [{ object: "mcp:_all_org-allowall", permission: "AllowAll" }],
+      } as any);
+      const { generate } = useOrg("org-allowall");
+
+      await generate();
+
+      expect(vi.mocked(updateRole).mock.calls[0][0].payload.add).toEqual([]);
+    });
+
+    it("still assigns the account when the mcp grants cannot be read", async () => {
+      vi.mocked(getResourcePermission).mockRejectedValue(new Error("boom"));
+      const { generate } = useOrg("org-unreadable");
+
+      const cred = await generate();
+
+      expect(vi.mocked(updateRole).mock.calls[0][0].payload).toMatchObject({
+        add: [],
+        add_users: [cred!.email],
+      });
+      expect(cred).toMatchObject({ role: MCP_READONLY_ROLE, scope: "readonly" });
     });
 
     it("seeds meta-org permissions inside the meta org", async () => {

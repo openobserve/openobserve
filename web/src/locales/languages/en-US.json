@@ -3676,6 +3676,7 @@
       "auth": {
         "oauth": "OAuth — sign in (recommended)",
         "token": "Access token",
+        "oauthTitle": "Sign in with your browser",
         "oauthNote": "No credential to manage: your MCP client opens a browser to sign in, and access is scoped by your existing permissions. Use it whenever your client supports OAuth."
       },
       "credential": {

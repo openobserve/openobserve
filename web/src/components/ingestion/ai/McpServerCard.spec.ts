@@ -121,6 +121,15 @@ describe("McpServerCard", () => {
       expect(wrapper.find('[data-test="ai-integrations-mcp-credential"]').exists()).toBe(false);
     });
 
+    // OAuth mode carries the same banner weight as token mode, so the pane is not one bare line.
+    it("explains OAuth in a banner rather than a lone caption", () => {
+      const wrapper = mountCard({ sso_enabled: true });
+
+      const note = wrapper.find('[data-test="ai-integrations-mcp-oauth-note"]');
+      expect(note.exists()).toBe(true);
+      expect(note.text()).toContain("Sign in with your browser");
+    });
+
     // OAuth discovery 404s with Dex off, so offering the tab would strand the user in SSO login.
     it("hides OAuth and forces token mode when SSO is disabled", () => {
       const wrapper = mountCard({ sso_enabled: false });

@@ -458,9 +458,20 @@ const goToServiceAccounts = () => {
           />
         </OTabs>
 
-        <OText v-if="authMode === 'oauth'" variant="meta" as="p" class="leading-snug">
-          {{ t("ingestion.mcp.auth.oauthNote") }}
-        </OText>
+        <OBanner
+          v-if="authMode === 'oauth'"
+          icon="login"
+          data-test="ai-integrations-mcp-oauth-note"
+        >
+          <div class="flex flex-col gap-1">
+            <OText variant="body-strong">
+              {{ t("ingestion.mcp.auth.oauthTitle") }}
+            </OText>
+            <OText variant="meta" as="p" class="leading-snug">
+              {{ t("ingestion.mcp.auth.oauthNote") }}
+            </OText>
+          </div>
+        </OBanner>
 
         <div v-else class="flex flex-col gap-3" data-test="ai-integrations-mcp-credential">
           <!-- No dedicated credential: the snippets carry a placeholder header -->

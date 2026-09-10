@@ -25,12 +25,19 @@ import { ref } from "vue";
 import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
 import service_accounts from "@/services/service_accounts";
-import { createRole, updateRole } from "@/services/iam";
-import { seedReadonlyRolePermissions } from "@/components/iam/roles/readonlyPreset";
+import { createRole, getResourcePermission, updateRole } from "@/services/iam";
+import {
+  seedReadonlyRolePermissions,
+  type RolePermission,
+} from "@/components/iam/roles/readonlyPreset";
 import { buildServiceAccountEmail } from "@/components/iam/serviceAccounts/AddServiceAccount.schema";
 
 // Underscore, not hyphen: create_role normalizes the name (non-[A-Za-z0-9_] → "_"), update_role does not.
 export const MCP_READONLY_ROLE = "mcp_readonly";
+
+// MCP is JSON-RPC over POST, which the route registry maps to PUT on the `mcp` resource — a grant
+// the read-only preset (AllowGet + AllowList) never makes, so without it every call 403s.
+const MCP_GRANTS = ["AllowList", "AllowPut"] as const;
 
 export type McpCredentialScope = "readonly" | "unscoped" | "rbacDisabled";
 
@@ -68,6 +75,33 @@ export function useMcpCredential() {
     }
   };
 
+  // Only the gap is sent: OpenFGA rejects re-writing a tuple it already holds, and update_role
+  // surfaces that as a 500 that would cost the account its role assignment.
+  const missingMcpGrants = async (org: string): Promise<RolePermission[]> => {
+    const object = `mcp:_all_${org}`;
+    try {
+      const res = await getResourcePermission({
+        role_name: MCP_READONLY_ROLE,
+        org_identifier: org,
+        resource: "mcp",
+      });
+      const held = new Set(
+        ((res?.data ?? []) as RolePermission[])
+          .filter((perm) => perm.object === object)
+          .map((perm) => perm.permission),
+      );
+      // AllowAll already resolves PUT in the OpenFGA model.
+      if (held.has("AllowAll")) return [];
+      return MCP_GRANTS.filter((permission) => !held.has(permission)).map((permission) => ({
+        object,
+        permission,
+      }));
+    } catch (readErr) {
+      console.error("MCP credential: existing mcp grants could not be read", readErr);
+      return [];
+    }
+  };
+
   // Never throws: a role hiccup must not cost the caller the show-once token.
   const applyReadonlyRole = async (
     email: string,
@@ -85,7 +119,12 @@ export function useMcpCredential() {
       await updateRole({
         role_id: MCP_READONLY_ROLE,
         org_identifier: org,
-        payload: { add: [], remove: [], add_users: [email], remove_users: [] },
+        payload: {
+          add: await missingMcpGrants(org),
+          remove: [],
+          add_users: [email],
+          remove_users: [],
+        },
       });
       return {
         role: MCP_READONLY_ROLE,
