@@ -1,0 +1,133 @@
+===== COMPLETE LIST OF CHANGED FILES (1 files) =====
+# AUTHORITATIVE: this list is never truncated. The diff BODY below may be trimmed for
+# very large PRs, so decide WHICH files/areas changed (e.g. web/src frontend) from THIS list.
+web/src/components/alerts/AlertList.vue
+===== END CHANGED FILES =====
+
+diff --git a/web/src/components/alerts/AlertList.vue b/web/src/components/alerts/AlertList.vue
+index ecf81a78745..ae1f1967a7a 100644
+--- a/web/src/components/alerts/AlertList.vue
++++ b/web/src/components/alerts/AlertList.vue
+@@ -802,24 +802,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+             v-model="toBeCloneAlertName"
+             :label="t('alerts.alertName')"
+           />
+-          <OSelect
+-            data-test="to-be-clone-stream-type"
+-            v-model="toBeClonestreamType"
+-            :label="t('alerts.streamType')"
+-            :options="streamTypes"
+-            @update:model-value="updateStreams()"
+-            class="mt-1"
+-          />
+-          <OSelect
+-            data-test="to-be-clone-stream-name"
+-            v-model="toBeClonestreamName"
+-            :disabled="!toBeClonestreamType"
+-            :label="t('alerts.stream_name')"
+-            :options="indexOptions"
+-            searchable
+-            @update:model-value="updateStreamName"
+-            class="mt-1 mb-2"
+-          />
++          <template v-if="!toBeClonedIsComposite">
++            <OSelect
++              data-test="to-be-clone-stream-type"
++              v-model="toBeClonestreamType"
++              :label="t('alerts.streamType')"
++              :options="streamTypes"
++              @update:model-value="updateStreams()"
++              class="mt-1"
++            />
++            <OSelect
++              data-test="to-be-clone-stream-name"
++              v-model="toBeClonestreamName"
++              :disabled="!toBeClonestreamType"
++              :label="t('alerts.stream_name')"
++              :options="indexOptions"
++              searchable
++              @update:model-value="updateStreamName"
++              class="mt-1 mb-2"
++            />
++          </template>
+           <div class="mb-4">
+             <SelectFolderDropDown
+               :type="'alerts'"
+@@ -1084,6 +1086,7 @@ export default defineComponent({
+     const toBeCloneAlertName = ref("");
+     const toBeClonedID = ref("");
+     const toBeClonedIsAnomaly = ref(false);
++    const toBeClonedIsComposite = ref(false);
+     const toBeClonestreamType = ref("");
+     const toBeClonestreamName = ref("");
+     const streamTypes = ref(["logs", "metrics", "traces"]);
+@@ -2306,11 +2309,12 @@ export default defineComponent({
+       toBeClonedID.value = row.alert_id;
+       toBeCloneAlertName.value = row.name;
+       toBeClonedIsAnomaly.value = row.type === "anomaly";
++      toBeClonedIsComposite.value = row.alert_type === "Composite";
+       toBeClonestreamName.value = "";
+       toBeClonestreamType.value = "";
+       showForm.value = true;
+-      // Anomaly rows use the /clone endpoint — no need to pre-fetch full data
+-      if (!toBeClonedIsAnomaly.value) {
++      // Anomaly and composite rows use the /clone endpoint — no need to pre-fetch full data
++      if (!toBeClonedIsAnomaly.value && !toBeClonedIsComposite.value) {
+         toBeClonedAlert.value = await getAlertById(row.alert_id);
+       }
+     };
+@@ -2369,6 +2373,46 @@ export default defineComponent({
+         return;
+       }
+ 
++      // Composite rows: no single stream to select, so use the dedicated
++      // /clone endpoint the same way as anomaly rows, minus stream_type/stream_name
++      // (the backend rejects those fields on a composite payload).
++      if (toBeClonedIsComposite.value) {
++        isSubmitting.value = true;
++        const dismiss = toast({
++          variant: "loading",
++          message: t("toastMessages.alerts.pleaseWait"),
++          timeout: 0,
++        });
++        try {
++          await alertsService.clone_by_id(
++            store.state.selectedOrganization.identifier,
++            toBeClonedID.value,
++            {
++              name: toBeCloneAlertName.value,
++              folder_id: (folderIdToBeCloned.value as string) || "default",
++            },
++            folderIdToBeCloned.value,
++          );
++          dismiss();
++          toast({
++            variant: "success",
++            message: t("toastMessages.alerts.alertClonedSuccessfully"),
++          });
++          showForm.value = false;
++          await getAlertsFn(store, folderIdToBeCloned.value);
++          activeFolderId.value = folderIdToBeCloned.value;
++        } catch (e: any) {
++          dismiss();
++          toast({
++            variant: "error",
++            message: e?.response?.data?.message,
++          });
++        } finally {
++          isSubmitting.value = false;
++        }
++        return;
++      }
++
+       if (!toBeClonedAlert.value) {
+         toast({
+           variant: "error",
+@@ -3412,6 +3456,7 @@ export default defineComponent({
+       showForm,
+       toBeCloneAlertName,
+       toBeClonedIsAnomaly,
++      toBeClonedIsComposite,
+       toBeClonestreamType,
+       toBeClonestreamName,
+       streamTypes,

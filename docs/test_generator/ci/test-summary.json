@@ -1,0 +1,7 @@
+[
+  { "title": "should hide stream selects and clone a composite alert into the same folder", "action": "new", "verifies": "the composite clone dialog hides the stream selects and Save creates a second composite in the same folder" },
+  { "title": "should preserve composite identity when cloned (not flattened to simple)", "action": "new", "verifies": "the cloned alert keeps alert_type=composite and the same child-referencing expression" },
+  { "title": "should route a composite clone into a different folder", "action": "new", "verifies": "changing the destination folder lands the clone in that folder, not default" },
+  { "title": "should cancel the clone dialog without creating an alert", "action": "new", "verifies": "Cancel dismisses the dialog and no new alert is created" },
+  { "title": "should clone a composite whose child alert was deleted", "action": "new", "verifies": "an id-based composite clone still succeeds with a stale child reference" }
+]

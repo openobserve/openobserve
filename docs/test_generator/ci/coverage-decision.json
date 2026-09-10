@@ -1,0 +1,10 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/Alerts/alerts-composite-clone.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Alerts/alerts-composite-ui.spec.js",
+    "tests/ui-testing/playwright-tests/Alerts/alerts-e2e-flow.spec.js"
+  ],
+  "needs_registration": true,
+  "rationale": "No existing spec covers composite clone. alerts-e2e-flow.spec.js clones a REGULAR alert only (pm.alertsPage.cloneAlert(name,'logs',stream)), never a composite. alerts-composite-ui.spec.js covers composite list/create/edit but NOT clone, and it is not registered in ci-matrix/ci_matrix.json (no 'composite' entry), so appending there would leave the tests unrun. The feature is a distinct area behavior with a dedicated /clone endpoint and its own gating path (toBeClonedIsComposite); a new spec matches run-context spec_path. Must be added to ci_matrix.json Alerts run_files."
+}

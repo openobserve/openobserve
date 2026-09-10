@@ -1,0 +1,25 @@
+{
+  "feature_slug": "composite-alert-clone",
+  "feature_title": "Clone Composite Alerts",
+  "area": "Alerts",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "alerts-composite-clone.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Alerts/alerts-composite-clone.spec.js",
+  "playwright_group": "Alerts",
+  "source_files": [
+    "web/src/components/alerts/AlertList.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "The only changed file is web/src/components/alerts/AlertList.vue, which lives under web/src (the open-source frontend). No paths under enterprise/, o2_enterprise/, or src/enterprise/ are touched, and no enterprise keywords (SSO/SAML/RBAC/SDR/cipher/logo) appear in the paths or symbols, so this is an OSS change.",
+    "skip": "Not skipped. There is no tests-added label or skip comment in the trigger context, and the change is user-facing (it alters the Alert clone dialog), so none of the skip conditions apply.",
+    "e2e": "E2E is warranted because the change alters a user-facing UI flow: cloning a composite alert now hides the stream-type/stream-name selectors and routes through the /clone endpoint. This is new conditional behavior in the clone dialog that a user can exercise and that should be verified in the browser.",
+    "area": "The change lives in web/src/components/alerts/AlertList.vue, which is the Alerts area, and the existing specs for alerts live under tests/ui-testing/playwright-tests/Alerts/, so the Alerts area is the natural home.",
+    "group": "The Alerts shard group in tests/ui-testing/ci-matrix/ci_matrix.json has actual_folder Alerts and already runs alert specs (alerts-advanced, alerts-ui-operations, etc.), so the new spec should join that existing group rather than create a new one.",
+    "existing_tests": "No E2E specs in the diff. The only changed file is a Vue component (web/src/components/alerts/AlertList.vue); no files under tests/ui-testing/playwright-tests/ were modified, so there are no dev-authored Playwright specs to enhance."
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "feature_slug": "composite-alert-clone",
+  "feature_title": "Clone Composite Alerts",
+  "area": "Alerts",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "alerts-composite-clone.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Alerts/alerts-composite-clone.spec.js",
+  "playwright_group": "Alerts",
+  "source_files": [
+    "web/src/components/alerts/AlertList.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": ""
+}
