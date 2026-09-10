@@ -47,6 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       count-data-test="sessions-stream-count"
       all-agents
       show-stream-skeleton
+      :show-agent-toggle="config.isEnterprise == 'true'"
       :labels="{
         agent: t('traces.sessionsList.agent'),
         stream: t('traces.sessionsList.stream'),
@@ -229,6 +230,7 @@ import genAiAgentMappingService from "@/services/gen-ai-agent-mapping.service";
 import { buildAgentSessionFilter } from "./llmAgentFilter";
 import { splitNumberWithUnit, splitDuration } from "./llmInsightsDashboard.utils";
 import AiScopeBar from "@/enterprise/components/AIObservability/AiScopeBar.vue";
+import config from "@/aws-exports";
 
 interface Props {
   streamName: string;
@@ -294,8 +296,12 @@ const ENV_LS_KEY = "sessionsList_envFilter";
 const VERSION_LS_KEY = "sessionsList_versionFilter";
 // Default scope is ALWAYS "agent" — every AI page lands on Agent for consistency.
 // Only an explicit `?type=stream` URL param overrides it (a stale saved
-// preference must not silently land on Stream).
-const filterMode = ref<"stream" | "agent">(urlType === "stream" ? "stream" : "agent");
+// preference must not silently land on Stream). Agent mode calls the
+// enterprise-only agent-mapping API, so OSS is pinned to Stream regardless of
+// the URL/localStorage — there's no toggle to reach Agent from anyway.
+const filterMode = ref<"stream" | "agent">(
+  config.isEnterprise !== "true" ? "stream" : urlType === "stream" ? "stream" : "agent",
+);
 // `agents` / `agentsLoaded` are module-scoped (see useSessions) so the agent
 // picker keeps its options — and stays off its skeleton — across a remount.
 // Env/name/version to seed the cascade with once the list is available: the
