@@ -157,7 +157,7 @@ describe("buildDbmSectionPanel — counter-rate panels (sql-rate)", () => {
     expect(entry.schema.queryType).toBe("sql");
     // Poll resolution: the 15-minute rollup charted 4 dots an hour.
     expect(entry.schema.queries[0].fields.stream).toBe("_o2_dbm_server");
-    expect(q).toContain("o2_event_name = 'db.server.top_query'");
+    expect(q).toContain("o2_dbm_kind = 'top_query'");
     expect(q).toContain("substr(o2_dbm_activity_query, 1, 60)");
     expect(q).toContain("MAX(o2_dbm_calls) AS cum");
     expect(q).toContain("LAG(cum) OVER (PARTITION BY segment ORDER BY ts)");
@@ -218,7 +218,7 @@ describe("buildDbmSectionPanel — server-counter panels (sql-server)", () => {
     const entry = buildDbmSectionPanel(panelDef("blocks", "blksHit"), "query", {}, t);
     const q = entry.schema.queries[0].query;
     expect(entry.schema.queries[0].fields.stream).toBe("_o2_dbm_server");
-    expect(q).toContain("o2_event_name = 'db.server.top_query'");
+    expect(q).toContain("o2_dbm_kind = 'top_query'");
     // Cumulative counters summed per bucket double-count; only deltas chart.
     expect(q).toContain("COALESCE(o2_dbm_metrics_are_delta, true) = true");
     expect(q).toContain("SUM(o2_dbm_shared_blks_hit)");

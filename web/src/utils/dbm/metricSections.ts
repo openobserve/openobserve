@@ -519,7 +519,10 @@ function rateEntry(
 }
 
 function serverScopeWhere(scope: DbmMetricsScope, extra: string[]): string {
-  const predicates = ["o2_event_name = 'db.server.top_query'", ...extra];
+  // The discriminator every other DBM reader uses (fromDbmLocks.ts,
+  // metricsPanels.ts's load panel) — `o2_event_name` is not a column on
+  // `_o2_dbm_server` at all, a hard DataFusion schema error, not empty data.
+  const predicates = ["o2_dbm_kind = 'top_query'", ...extra];
   if (scope.system) predicates.push(`o2_dbm_engine = '${dbmSqlEscape(scope.system)}'`);
   if (scope.instance) predicates.push(`o2_dbm_instance = '${dbmSqlEscape(scope.instance)}'`);
   if (scope.namespace) predicates.push(`o2_dbm_database = '${dbmSqlEscape(scope.namespace)}'`);
