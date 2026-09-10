@@ -384,13 +384,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span v-else class="text-text-muted block text-right">{{ raw("—") }}</span>
         </template>
 
-        <!-- Both actions are about queries — opening the query list, or
-             alerting on a p95 nothing measured — so a trafficless row offers
-             neither rather than offering two dead buttons. -->
+        <!-- Actions are per-row: the query-shaped ones (open, alert) need
+             traffic to point at, so a trafficless row offers only the Metrics
+             hop — its identity came from the metric streams, so that one
+             always lands on content. -->
         <template #cell-actions="{ row }">
           <DbmRowActions
-            v-if="!isBreakdownRow(row) && !row.trafficless"
-            :actions="rowActions"
+            v-if="!isBreakdownRow(row)"
+            :actions="rowActionsFor(row)"
             data-test="dbm-databases-row-actions"
             @action="(id) => onRowAction(id, row)"
           />
@@ -1355,14 +1356,32 @@ const rowStyle = (row: TableRow) => {
   return color ? { boxShadow: `var(--shadow-rail-thin-geom) ${color}` } : {};
 };
 
-const rowActions = computed<DbmRowAction[]>(() => [
-  { id: "open", icon: "chevron-right", label: t("dbm.databases.openQueries") },
-  { id: "alert", icon: "shield", label: t("dbm.databases.alertMe") },
-]);
+/**
+ * Per-row: the query-shaped actions need traffic to point at, but a
+ * TRAFFICLESS row's identity came from the metric streams — the Metrics hop is
+ * exactly the one guaranteed to land on content there.
+ */
+const rowActionsFor = (row: DatabaseRow): DbmRowAction[] => {
+  const metrics: DbmRowAction = {
+    id: "metrics",
+    icon: "show-chart",
+    label: t("dbm.databases.viewMetrics"),
+  };
+  if (row.trafficless) return [metrics];
+  return [
+    { id: "open", icon: "chevron-right", label: t("dbm.databases.openQueries") },
+    metrics,
+    { id: "alert", icon: "shield", label: t("dbm.databases.alertMe") },
+  ];
+};
 
 const onRowAction = (id: string, row: DatabaseRow) => {
   if (id === "open") {
     openQueries(row);
+    return;
+  }
+  if (id === "metrics") {
+    openMetrics(row);
     return;
   }
   // Database scope, not query scope: this row IS the whole instance, so the
@@ -1651,6 +1670,24 @@ const onEmptyAction = (cause: DbmEmptyCauseId) => {
  * than a dead end. Its schema wins over the row's, because the leaf is the
  * narrower and more recent statement of what the reader wants.
  */
+/** The Metrics tab, scoped to this database — window and filters carry. */
+const openMetrics = (row: DatabaseRow, namespaceOverride?: string | null) => {
+  const namespace = namespaceOverride ?? row.db_namespace;
+  router
+    .push({
+      name: "dbmMetrics",
+      query: {
+        ...route.query,
+        org_identifier: org.value,
+        ...queryParams.value,
+        system: row.db_system,
+        instance: row.db_instance,
+        ...(namespace ? { namespace } : {}),
+      },
+    })
+    .catch(() => {});
+};
+
 const openQueries = (
   row: DatabaseRow,
   target?: { namespace: string | null; service: string | null },
@@ -1681,21 +1718,21 @@ const openQueries = (
  * child carries only names, so its database is found by the key it was built
  * from.
  */
+/**
+ * A row click applies the row as SCOPE and lands on Metrics — the database's
+ * vital signs, filters pre-set. The per-query views stay one explicit action
+ * away on the row (open queries / alert).
+ */
 const onRowClick = (row: TableRow) => {
   if (!isBreakdownRow(row)) {
-    // A trafficless row navigates too: the query list is not empty by
-    // construction for it — Top queries falls back to the database-reported
-    // list, and the system/instance scope this handoff carries filters that
-    // list to exactly this row. Returning early here would turn the whole fleet
-    // into dead rows on a no-APM org.
-    openQueries(row);
+    openMetrics(row);
     return;
   }
   // A placeholder names no schema and no service, so it has no scope to hand
-  // off — clicking it would silently open the unfiltered query list.
+  // off — clicking it would silently open unfiltered Metrics.
   if (row.kind === "status") return;
   const parent = rows.value.find((candidate) => row.rowKey.startsWith(`${candidate.rowKey}/`));
-  if (parent) openQueries(parent, { namespace: row.namespace, service: row.service });
+  if (parent) openMetrics(parent, row.namespace);
 };
 
 // This page carries no "suggest a fix" button — "make my database faster" has no

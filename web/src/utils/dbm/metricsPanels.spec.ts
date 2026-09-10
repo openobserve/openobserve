@@ -27,6 +27,7 @@ import {
   filterDbmMetricStreams,
   humanizeDbmMetricName,
   injectPromqlSelector,
+  panelErrorIsForbidden,
 } from "./metricsPanels";
 
 /** Key-echoing stub — the assertions read the KEY, not real copy. */
@@ -131,6 +132,16 @@ describe("injectPromqlSelector", () => {
         'x="y"',
       ),
     ).toBe('postgresql_blks_hit{x="y"} / postgresql_blks_read{}');
+  });
+});
+
+describe("panelErrorIsForbidden", () => {
+  it("recognizes a 403 in either string or number form, and nothing else", () => {
+    expect(panelErrorIsForbidden({ code: 403 })).toBe(true);
+    expect(panelErrorIsForbidden({ code: "403" })).toBe(true);
+    expect(panelErrorIsForbidden({ code: 500 })).toBe(false);
+    expect(panelErrorIsForbidden({ code: "" })).toBe(false);
+    expect(panelErrorIsForbidden(null)).toBe(false);
   });
 });
 
@@ -273,9 +284,13 @@ describe("filterDbmMetricPanels", () => {
 });
 
 describe("buildDbmLoadPanelSchema", () => {
-  it("builds a stacked SQL panel over the server-vantage stream", () => {
+  it("builds a line SQL panel over the server-vantage stream", () => {
     const schema = buildDbmLoadPanelSchema({});
-    expect(schema.type).toBe("stacked");
+    expect(schema.type).toBe("line");
+    // Connected lines with a dot on every real sample: the dots keep sparse
+    // data honest (each marks an actual bucket) while the line stays readable.
+    expect(schema.config.connect_nulls).toBe(true);
+    expect(schema.config.show_symbol).toBe(true);
     expect(schema.queryType).toBe("sql");
     const q = schema.queries[0];
     expect(q.customQuery).toBe(true);
@@ -286,16 +301,24 @@ describe("buildDbmLoadPanelSchema", () => {
 
   it("normalizes to AVERAGE active sessions — zoom-invariant, poll-count denominator", () => {
     const q = buildDbmLoadPanelSchema({}).queries[0].query;
-    // Per-poll counts summed over the bucket, divided by the bucket's polls.
-    expect(q).toContain("COUNT(DISTINCT o2_dbm_timestamp) AS polls");
-    expect(q).toContain("SUM(s.cnt) * 1.0 / MAX(p.polls)");
+    // Per-poll counts summed over the bucket, divided by the bucket's polls —
+    // counted via DENSE_RANK windows so the stream is scanned once, never by
+    // a COUNT(DISTINCT) self-join that reads the same bytes twice.
+    expect(q).toContain("DENSE_RANK() OVER (PARTITION BY ts ORDER BY poll)");
+    expect(q).toContain("MAX(rnk) OVER (PARTITION BY ts) AS polls");
+    expect(q).toContain("SUM(cnt) * 1.0 / MAX(polls)");
+    expect(q).not.toContain("JOIN");
+    // The search API caps results at 1000 rows unless the SQL carries a LIMIT.
+    expect(q).toMatch(/LIMIT 30000$/);
   });
 
-  it("excludes idle sessions rather than allow-listing one engine's state word", () => {
+  it("excludes every idle state variant rather than allow-listing one engine's word", () => {
     const q = buildDbmLoadPanelSchema({}).queries[0].query;
     // MySQL has no 'active' state — an allow-list hid its CPU load entirely.
     expect(q).not.toContain("= 'active'");
-    expect(q).toContain("o2_dbm_session_state IS NULL OR o2_dbm_session_state <> 'idle'");
+    // 'idle in transaction' (and its aborted variant) wait on ClientRead and
+    // painted a constant band of fake load; the prefix match excludes them all.
+    expect(q).toContain("o2_dbm_session_state IS NULL OR o2_dbm_session_state NOT LIKE 'idle%'");
   });
 
   it("defaults the breakdown to wait event with NULL named CPU", () => {
@@ -315,7 +338,7 @@ describe("buildDbmLoadPanelSchema", () => {
     );
   });
 
-  it("splices the scope with single quotes escaped, into BOTH halves of the join", () => {
+  it("splices the scope with single quotes escaped into the one base scan", () => {
     const q = buildDbmLoadPanelSchema({
       system: "postgresql",
       instance: "db-1",
@@ -323,7 +346,8 @@ describe("buildDbmLoadPanelSchema", () => {
     }).queries[0].query;
     expect(q).toContain("o2_dbm_engine = 'postgresql'");
     expect(q).toContain("o2_dbm_database = 'o''brien'");
-    // The poll-count subquery must see the same rows as the session subquery.
-    expect(q.split("o2_dbm_instance = 'db-1'")).toHaveLength(3);
+    // One scan feeds both the session counts and the poll denominator — a
+    // second WHERE would mean the self-join (and its 2x scan) crept back.
+    expect(q.split("o2_dbm_instance = 'db-1'")).toHaveLength(2);
   });
 });

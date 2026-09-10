@@ -91,6 +91,12 @@ describe("dbm metrics tab wiring", () => {
     expect(page).toMatch(/current\.value\.startTime,\s*current\.value\.endTime/s);
   });
 
+  it("jumps sections INSTANTLY — a smooth scroll would detonate every lazy panel passed", () => {
+    expect(page).toContain('scrollIntoView({ behavior: "auto"');
+    expect(page).not.toContain('"smooth"');
+    expect(page).toContain("DbmMetricsRail");
+  });
+
   it("defers the dashboards engine off the DBM shell's initial chunk", () => {
     expect(panel).toMatch(
       /defineAsyncComponent\(\s*\(\) => import\("@\/components\/dashboards\/PanelSchemaRenderer\.vue"\)/,

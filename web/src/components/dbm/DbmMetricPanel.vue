@@ -73,11 +73,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :selected-time-obj="selectedTimeObj"
         :variables-data="{}"
         search-type="ui"
+        :allow-alert-creation="true"
         :allow-annotations-add="false"
         :allow-annotations-a-p-i="false"
         @updated:data-zoom="emit('zoom', $event)"
+        @error="onPanelError"
       />
       <OSkeleton v-else type="rect" class="rounded-default h-full w-full" />
+      <!-- A stream-permission 403 named, instead of the engine's raw
+           "Unauthorized Access" body text. Non-403 errors keep the engine's
+           own rendering. -->
+      <div
+        v-if="noAccess"
+        class="bg-surface-base absolute inset-0 mx-2 mb-2 flex flex-col items-center justify-center gap-2"
+        :data-test="`dbm-metric-panel-no-access-${panelKey}`"
+      >
+        <OIcon name="lock" class="text-text-muted size-5" />
+        <span class="text-text-secondary max-w-full px-4 text-center text-xs">
+          {{ t("dbm.metrics.noAccess", { stream: streamName }) }}
+        </span>
+      </div>
     </div>
   </section>
 </template>
@@ -91,6 +106,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { panelErrorIsForbidden } from "@/utils/dbm/metricsPanels";
 
 // Async: the dashboards engine is heavy and must not ride the DBM shell's
 // initial chunk — same reason DbmHistoryPanel defers it.
@@ -132,6 +148,14 @@ const emit = defineEmits<{
 const { t } = useI18nTyped();
 
 const helpText = computed<I18nText | null>(() => (props.help ? raw(props.help) : null));
+
+const streamName = computed(() => raw(props.schema?.queries?.[0]?.fields?.stream ?? ""));
+
+/** The engine re-emits `{code: ""}` on reset, so recovery clears this too. */
+const noAccess = ref(false);
+const onPanelError = (event: { message?: string; code?: unknown }) => {
+  noAccess.value = panelErrorIsForbidden(event);
+};
 
 // The dashboard pipeline carries timestamps as `new Date(microseconds)` so
 // `.getTime()` round-trips the µs count the search backend expects. Dividing

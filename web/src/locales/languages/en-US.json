@@ -2057,7 +2057,8 @@
       "startFrom": {
         "label": "Start from",
         "custom": "Custom (empty role)",
-        "readonly": "Read-only (view access to all resources)"
+        "readonly": "Read-only (view access to all resources)",
+        "dbm": "Database Monitoring viewer (read-only on the DB Monitoring module and the metric streams its Metrics tab queries)"
       },
       "name": {
         "required": "Role name is required.",
@@ -2093,7 +2094,9 @@
       "loadFailed": "Failed to load role details. Redirecting to roles list.",
       "noUpdatesDetected": "No updates detected.",
       "updateSuccess": "Updated role successfully!",
-      "updateError": "Error while updating role!"
+      "updateError": "Error while updating role!",
+      "dbmPresetSeeded": "Pre-selected read access on {matched} of {total} DB Monitoring metric streams, plus the DB Monitoring module. Review before saving.",
+      "dbmPresetNoMatch": "None of the {total} DB Monitoring metric streams exist in this organization yet, so nothing was pre-selected on them; the DB Monitoring module grant was still staged."
     },
     "rolesPage": {
       "subtitle": "Roles bundle permissions — assign them to Users, Service Accounts, or Groups to grant access.",
@@ -16298,6 +16301,7 @@
       },
       "databaseCount": "1 database | {count} databases",
       "openQueries": "See its queries",
+      "viewMetrics": "View metrics",
       "alertMe": "Alert me",
       "columnHints": {
         "qps": "Calls per second — this window's calls divided by its length, so a 15-minute view and a 4-hour view stay comparable.",
@@ -16558,10 +16562,10 @@
         "missingDescription": "This page describes one query, and the address doesn't name one. If you just switched organizations, the query you were reading belongs to the one you left.",
         "action": "Browse this organization's queries"
       },
-      "backToQueries": "Back to top queries",
-      "backToActivity": "Back to activity",
-      "backToSamples": "Back to slowest calls",
-      "backToDeadlocks": "Back to deadlocks",
+      "backToQueries": "top queries",
+      "backToActivity": "activity",
+      "backToSamples": "slowest calls",
+      "backToDeadlocks": "deadlocks",
       "latencyTitle": "Speed over time",
       "volumeTitle": "Calls and failures over time",
       "endpointsTitle": "Where it's called from",
@@ -16765,6 +16769,8 @@
       },
       "limitLegend": "connection limit",
       "explore": "Open in Metrics Explorer",
+      "railLabel": "Metrics sections",
+      "noAccess": "You don't have permission to read {stream}. Ask an admin for read access to this stream.",
       "byDims": {
         "query": "by query",
         "database": "by database",
@@ -16775,7 +16781,10 @@
         "table": "by table",
         "index": "by index",
         "client": "by client",
-        "state": "by state"
+        "state": "by state",
+        "direction": "by direction",
+        "device": "by device",
+        "host": "by host"
       },
       "catalog": {
         "activity": {
@@ -16801,6 +16810,13 @@
         "vacuum": {
           "title": "Vacuum",
           "desc": "Live and dead rows per table"
+        },
+        "host": {
+          "managedNote": "This database runs on a cloud-managed endpoint (such as Amazon RDS), so its provider does not expose a host for your collectors to monitor. Clear the database filter to see host metrics for the hosts your collectors do report.",
+          "title": "Host",
+          "desc": "CPU, memory and I/O of the database host",
+          "loopbackHint": "instance dialled via localhost — showing all hosts",
+          "matchHint": "host metrics are matched by hostname"
         }
       },
       "catalogPanels": {
@@ -16816,7 +16832,11 @@
         "blksHit": "Shared blocks hit",
         "blksRead": "Shared blocks read",
         "blksDirtied": "Shared blocks dirtied",
-        "rowsByState": "Rows by state"
+        "rowsByState": "Rows by state",
+        "cpuUtilization": "CPU utilization",
+        "memoryUsage": "Memory",
+        "diskIo": "Disk I/O",
+        "networkIo": "Network I/O"
       },
       "searchPlaceholder": "Filter metrics…",
       "triageOrder": "ordered by triage relevance",

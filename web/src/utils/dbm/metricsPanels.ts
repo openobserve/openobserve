@@ -146,9 +146,9 @@ export function filterDbmMetricStreams(
   });
 }
 
-const promqlEscape = (value: string) => value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+export const promqlEscape = (value: string) => value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 
-const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+export const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /**
  * A port-tolerant identity matcher. The scope's instance is the CLIENT's
@@ -201,6 +201,16 @@ export function injectPromqlSelector(
     );
   }
   return out;
+}
+
+/**
+ * Whether a panel error is a stream-permission denial. This tab queries with
+ * the USER's credentials (unlike the sibling tabs' module-granted endpoints),
+ * so a 403 here means "no read grant on this stream" — a state to name, never
+ * the engine's raw "Unauthorized Access" body text.
+ */
+export function panelErrorIsForbidden(event: { code?: unknown } | null | undefined): boolean {
+  return String(event?.code ?? "") === "403";
 }
 
 /** `postgresql_bgwriter_buffers_allocated` → `Bgwriter buffers allocated`. */
@@ -548,7 +558,10 @@ export function buildDbmLoadPanelSchema(
 ): Record<string, any> {
   const predicates = [
     "o2_dbm_kind = 'activity'",
-    "(o2_dbm_session_state IS NULL OR o2_dbm_session_state <> 'idle')",
+    // Prefix match: 'idle in transaction' (+ its aborted variant) also waits
+    // on ClientRead and painted a constant band of fake load. MySQL's states
+    // never start with 'idle', so its sessions are untouched.
+    "(o2_dbm_session_state IS NULL OR o2_dbm_session_state NOT LIKE 'idle%')",
   ];
   if (scope.system) predicates.push(`o2_dbm_engine = '${dbmSqlEscape(scope.system)}'`);
   if (scope.instance) predicates.push(`o2_dbm_instance = '${dbmSqlEscape(scope.instance)}'`);
@@ -557,18 +570,22 @@ export function buildDbmLoadPanelSchema(
 
   // GROUP BY repeats the expression: the planner refuses to resolve a SELECT
   // alias of an expression there (llmInsightsPanels groups the same way).
+  // Per-bucket poll counts come from DENSE_RANK + MAX windows over ONE scan —
+  // a COUNT(DISTINCT) self-join reads the stream twice for the same numbers
+  // (verified identical), and window COUNT(DISTINCT) is unsupported. The
+  // trailing LIMIT lifts the search API's 1000-row result cap.
   const dim = LOAD_BREAKDOWN_EXPRS[breakdown];
   const sql =
-    `SELECT s.ts AS ts, s.segment AS segment, SUM(s.cnt) * 1.0 / MAX(p.polls) AS sessions FROM ` +
+    `SELECT ts, segment, SUM(cnt) * 1.0 / MAX(polls) AS sessions FROM ` +
+    `(SELECT ts, segment, cnt, MAX(rnk) OVER (PARTITION BY ts) AS polls FROM ` +
+    `(SELECT ts, segment, poll, cnt, DENSE_RANK() OVER (PARTITION BY ts ORDER BY poll) AS rnk FROM ` +
     `(SELECT histogram(_timestamp) AS ts, ${dim} AS segment, o2_dbm_timestamp AS poll, COUNT(*) AS cnt ` +
-    `FROM "${DBM_SERVER_STREAM}" WHERE ${where} GROUP BY ts, ${dim}, poll) AS s ` +
-    `JOIN (SELECT histogram(_timestamp) AS ts, COUNT(DISTINCT o2_dbm_timestamp) AS polls ` +
-    `FROM "${DBM_SERVER_STREAM}" WHERE ${where} GROUP BY ts) AS p ON s.ts = p.ts ` +
-    `GROUP BY s.ts, s.segment ORDER BY s.ts ASC`;
+    `FROM "${DBM_SERVER_STREAM}" WHERE ${where} GROUP BY ts, ${dim}, poll) AS b) AS w) AS x ` +
+    `GROUP BY ts, segment ORDER BY ts ASC LIMIT 30000`;
 
   return buildDbmSqlPanelSchema({
     id: "dbm-metric-load",
-    chartType: "stacked",
+    chartType: "line",
     unit: "numbers",
     stream: DBM_SERVER_STREAM,
     sql,
@@ -610,6 +627,12 @@ export function buildDbmSqlPanelSchema(args: DbmSqlPanelArgs): Record<string, an
       ...basePanelConfig(),
       unit: args.unit,
       unit_custom: "",
+      // SQL panels chart SPARSE event data (samples, rollup windows). Lines
+      // stay connected for readability, but every real bucket draws a DOT —
+      // the dots are what keep a bridged stretch honest (no dot = no sample),
+      // and a lone single-poll wait event still renders instead of vanishing.
+      connect_nulls: true,
+      show_symbol: true,
     },
     queryType: "sql",
     queries: [
