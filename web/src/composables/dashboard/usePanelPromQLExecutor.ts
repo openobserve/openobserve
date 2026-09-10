@@ -214,7 +214,11 @@ export const usePanelPromQLExecutor = (ctx: {
               enableLogging: false,
             });
 
+            // loadData() aborts the old run's controller but never cancels its stream, so a superseded run keeps delivering frames that would overwrite the newer run's results — an empty first partition then strands the panel on "No Data".
+            const isSuperseded = () => !!abortControllerRef?.signal?.aborted;
+
             const handlePromQLResponse = (data: any, res: any) => {
+              if (isSuperseded()) return;
               if (res.type === "event_progress") {
                 state.loadingProgressPercentage = res?.content?.percent ?? 0;
                 state.isPartialData = true;
@@ -253,6 +257,10 @@ export const usePanelPromQLExecutor = (ctx: {
             };
 
             const handlePromQLError = (data: any, err: any) => {
+              if (isSuperseded()) {
+                removeTraceId(traceId);
+                return;
+              }
               // Mark this query as completed (even with error)
               completedQueries.add(queryIndex);
 
@@ -277,6 +285,10 @@ export const usePanelPromQLExecutor = (ctx: {
             };
 
             const handlePromQLComplete = () => {
+              if (isSuperseded()) {
+                removeTraceId(traceId);
+                return;
+              }
               // Mark this query as completed
               completedQueries.add(queryIndex);
 

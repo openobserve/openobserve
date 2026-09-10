@@ -217,17 +217,6 @@ const useRoutes = () => {
         titleKey: "menu.home",
       },
     },
-    // TEMPORARY: preview route for the OEmptyState design sample. Remove once
-    // the empty-state design is approved (along with src/views/EmptyStateDemo.vue).
-    {
-      path: "empty-state-demo",
-      name: "emptyStateDemo",
-      component: () => import("@/views/EmptyStateDemo.vue"),
-      meta: {
-        keepAlive: false,
-        titleKey: "routeTitles.emptyStateDemo",
-      },
-    },
     {
       path: "logs",
       name: "logs",
