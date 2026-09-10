@@ -24,8 +24,8 @@ use config::{
     utils::time::now_micros,
 };
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, EntityTrait, FromQueryResult, PaginatorTrait, QueryFilter,
-    QueryOrder, QuerySelect, Select, Set,
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, FromQueryResult, PaginatorTrait,
+    QueryFilter, QueryOrder, QuerySelect, Select, Set,
     sea_query::{Expr, ExprTrait},
 };
 
@@ -47,8 +47,7 @@ fn to_response(m: oncall_responses::Model) -> Option<Response> {
         org_id: m.org_id,
         team_id: m.team_id,
         title: m.title,
-        // An unreadable cause degrades to "no cause recorded" rather than
-        // taking the whole record down; the note beside it still survives.
+        // An unreadable cause degrades to "no cause recorded" rather than losing the record.
         cause: m.cause.as_deref().and_then(ResolutionCause::from_str_opt),
         cause_note: m.cause_note,
         snoozed_until: m.snoozed_until,
@@ -75,10 +74,7 @@ fn to_event(m: oncall_response_events::Model) -> Option<ResponseEvent> {
         rung_micros: m.rung_micros,
         ladder_run: m.ladder_run,
         recipient: m.recipient,
-        // A channel this build cannot name costs the entry its dedup key, not
-        // its existence — the same trade as an unreadable rung. The worst case
-        // is one page sent twice; dropping the entry would lose the fact that
-        // anybody was paged at all.
+        // A channel this build cannot name loses its dedup key, not its existence: one page twice.
         channel: m.channel.and_then(Channel::from_i32),
         delivered: m.delivered,
     })
@@ -121,8 +117,7 @@ pub async fn open(
         acked_at: Set(None),
         closed_at: Set(None),
         incident_id: Set(None),
-        // Copied at open, so the page keeps pointing where the alert pointed
-        // when it fired.
+        // Copied at open, so the page keeps pointing where the alert pointed when it fired.
         runbook_url: Set(runbook_for(org_id, subject).await),
         exhausted_at: Set(None),
     };
@@ -246,9 +241,7 @@ pub async fn list_open(
 ) -> Result<Vec<Response>, errors::Error> {
     let client = get_orm_client_rw().await;
     Ok(open_query(org_id, filter)
-        // Most urgent first, then newest — and the id as a final tiebreak,
-        // without which two records sharing a priority and an open time could
-        // swap places between two pages and be shown twice or not at all.
+        // Id as final tiebreak, or two records sharing priority and open time swap between pages.
         .order_by_asc(oncall_responses::Column::Priority)
         .order_by_desc(oncall_responses::Column::OpenedAt)
         .order_by_desc(oncall_responses::Column::Id)
@@ -274,10 +267,7 @@ fn open_query(org_id: &str, filter: &ResponseFilter<'_>) -> Select<oncall_respon
         ResponseState::Triaged.to_i32(),
         ResponseState::Acknowledged.to_i32(),
     ];
-    // A cause only exists on a closed record, so asking for one and not for
-    // resolved records is a filter that can only ever return nothing. Widening
-    // rather than refusing keeps "what keeps breaking us" answerable from the
-    // same endpoint the open list uses.
+    // A cause only exists on a closed record, so this without resolved records returns nothing.
     if filter.include_resolved || filter.cause.is_some() {
         states.push(ResponseState::Resolved.to_i32());
     }
@@ -288,14 +278,11 @@ fn open_query(org_id: &str, filter: &ResponseFilter<'_>) -> Select<oncall_respon
         q = q.filter(oncall_responses::Column::TeamId.eq(t));
     }
     if let Some(teams) = filter.team_ids.as_ref() {
-        // An empty set means "no team owns that path". Answering it with the
-        // unfiltered list would report every page in the org as belonging to a
-        // path nobody owns, so it is matched literally.
+        // An empty set means "no team owns that path", so match it literally, never unfiltered.
         q = q.filter(oncall_responses::Column::TeamId.is_in(teams.clone()));
     }
     if let Some(source_id) = filter.source_id {
-        // Anchored on the `#`, or `al_ck` would match every firing of
-        // `al_ckt`.
+        // Anchored on the `#`, or `al_ck` would match every firing of `al_ckt`.
         q = q.filter(oncall_responses::Column::SubjectId.starts_with(format!("{source_id}#")));
     }
     if let Some(subject_type) = filter.subject_type {
@@ -373,16 +360,11 @@ pub async fn cause_breakdown(
 
     let mut out = Vec::with_capacity(tallies.len());
     for tally in tallies {
-        // A cause string this build cannot read is dropped rather than shown
-        // as some other cause: a miscounted category is worse than a missing
-        // one, because nobody can tell it is wrong.
+        // A cause this build cannot read is dropped, not shown as another: a gap beats a miscount.
         let Some(cause) = ResolutionCause::from_str_opt(&tally.cause) else {
             continue;
         };
-        // One bounded lookup per cause that actually occurred — at most
-        // `ResolutionCause::ALL.len()`, each an indexed single row. The
-        // alternative, a correlated per-group subquery, is not portable across
-        // the three backends this ships on.
+        // One bounded indexed lookup per cause; a correlated subquery is not portable to all.
         let example = base()
             .filter(oncall_responses::Column::Cause.eq(cause.as_str()))
             .order_by_desc(oncall_responses::Column::ClosedAt)
@@ -398,8 +380,7 @@ pub async fn cause_breakdown(
             last_at: example.as_ref().and_then(|e| e.closed_at),
         });
     }
-    // Most common first, then most recent — "what keeps breaking us" is a
-    // ranking, and ties resolved by recency put the live problem on top.
+    // Most common first, then most recent, so ties put the live problem on top.
     out.sort_by(|a, b| b.count.cmp(&a.count).then(b.last_at.cmp(&a.last_at)));
     Ok(out)
 }
@@ -623,13 +604,9 @@ async fn hand_over(
     let Some(current) = to_response(existing.clone()) else {
         return Ok(None);
     };
-    // What a handoff does to a record is a decision, and it is made in one
-    // place: `Response::handed_over`. This only writes down what it decided.
+    // A handoff's effect on a record is decided in `Response::handed_over`; this writes it down.
     let next = current.handed_over(to_team_id, now);
-    // Conditional for the same reason `acknowledge` is: the read above is a
-    // snapshot, and a `resolve` landing between it and this write would be
-    // overwritten back to `Triggered` while keeping its `closed_at`. That torn
-    // row escalates for ever and `resolve` refuses to close it twice.
+    // Conditional: a `resolve` landing between the read and this write would tear the row.
     oncall_responses::Entity::update_many()
         .col_expr(
             oncall_responses::Column::TeamId,
@@ -656,8 +633,7 @@ async fn hand_over(
             oncall_responses::Column::LadderRun,
             Expr::value(next.ladder_run),
         )
-        // Cleared by `handed_over` because the new run has rungs left. Written
-        // here, or the decision would be made and then thrown away.
+        // `handed_over` clears it because the new run has rungs left; unwritten, that is lost.
         .col_expr(
             oncall_responses::Column::ExhaustedAt,
             Expr::value(next.exhausted_at),
@@ -668,8 +644,7 @@ async fn hand_over(
         .filter(oncall_responses::Column::State.ne(ResponseState::Resolved.to_i32()))
         .exec(client)
         .await?;
-    // Read back rather than trusting the snapshot: after a lost race the answer
-    // is the closed record, which is what the caller must act on.
+    // Read back, not from the snapshot: after a lost race the answer is the closed record.
     get(org_id, id).await
 }
 
@@ -796,8 +771,7 @@ pub async fn acknowledge(
         .filter(oncall_responses::Column::State.is_in(escalating_states()))
         .exec(client)
         .await?;
-    // Read back whether we won or lost: the caller's question is "who has it
-    // now", and after a lost race that is somebody else.
+    // Read back whether we won or lost: after a lost race, "who has it now" is somebody else.
     get(org_id, id).await
 }
 
@@ -819,9 +793,7 @@ fn escalating_states() -> Vec<i32> {
 pub async fn is_escalating(org_id: &str, id: &str) -> Result<bool, errors::Error> {
     Ok(get(org_id, id)
         .await?
-        // The RECORD, not the state: a spent ladder keeps the `Triggered`
-        // state, and a rung still in flight when it ran out has nothing left
-        // to reach. Safe against repeats because a new run clears the flag.
+        // The RECORD, not the state: a spent ladder keeps `Triggered`; a new run clears the flag.
         .is_some_and(|r| r.is_escalating()))
 }
 
@@ -841,15 +813,7 @@ pub async fn resolve(
         return Ok(None);
     };
     let note = cause_note.map(str::trim).filter(|n| !n.is_empty());
-    // Already closed. Resolving again must not move `closed_at` — it was
-    // resolved when it was resolved, and rewriting that would falsify every
-    // time-to-resolve built on it.
-    //
-    // But it must not swallow a cause either. This used to return the record
-    // untouched, so somebody who resolved in a hurry and came back to record
-    // *why* got a 200 and lost what they typed. A cause arriving late is the
-    // most useful thing anybody adds to a closed record: it is what turns the
-    // next firing's `prior-causes` from a list of dates into history.
+    // Resolving again must not move `closed_at`, nor swallow a cause recorded after the fact.
     if existing.closed_at.is_some() {
         if cause.is_none() && note.is_none() {
             return Ok(to_response(existing));
@@ -928,7 +892,18 @@ pub async fn list_for_incident(
 /// Entries that are not deliveries leave the four trailing columns null, and
 /// null is distinct from null in a unique index, so they never collide.
 pub async fn add_event(response_id: &str, event: &ResponseEvent) -> Result<(), errors::Error> {
-    let client = get_orm_client_rw().await;
+    add_event_in(get_orm_client_rw().await, response_id, event).await
+}
+
+/// [`add_event`] against a caller-supplied connection.
+///
+/// The super-cluster consumer applies replicated deliveries through this, so
+/// the ledger's insert-or-rewrite rule has exactly one implementation.
+pub(super) async fn add_event_in<C: ConnectionTrait>(
+    conn: &C,
+    response_id: &str,
+    event: &ResponseEvent,
+) -> Result<(), errors::Error> {
     let model = oncall_response_events::ActiveModel {
         id: Set(ider::uuid()),
         response_id: Set(response_id.to_string()),
@@ -942,15 +917,14 @@ pub async fn add_event(response_id: &str, event: &ResponseEvent) -> Result<(), e
         channel: Set(event.channel.map(|c| c.to_i32())),
         delivered: Set(event.delivered),
     };
-    let Err(e) = model.insert(client).await else {
+    let Err(e) = model.insert(conn).await else {
         return Ok(());
     };
     let msg = e.to_string().to_lowercase();
     if !(msg.contains("unique") || msg.contains("duplicate")) {
         return Err(e.into());
     }
-    // Only a delivery row can have collided, so every key column below is
-    // known to hold a value — a null never conflicts with anything.
+    // Only a delivery row can have collided, so every key column below is known to hold a value.
     oncall_response_events::Entity::update_many()
         .col_expr(oncall_response_events::Column::At, Expr::value(event.at))
         .col_expr(
@@ -970,7 +944,7 @@ pub async fn add_event(response_id: &str, event: &ResponseEvent) -> Result<(), e
         .filter(oncall_response_events::Column::RungMicros.eq(event.rung_micros))
         .filter(oncall_response_events::Column::Recipient.eq(event.recipient.clone()))
         .filter(oncall_response_events::Column::Channel.eq(event.channel.map(|c| c.to_i32())))
-        .exec(client)
+        .exec(conn)
         .await?;
     Ok(())
 }
@@ -1106,8 +1080,7 @@ pub async fn prune_events(cutoff: i64, max_records: u64) -> Result<(u64, u64), e
                     .to_owned(),
             ),
         )
-        // Oldest first, so a backlog is worked off from the end that matters
-        // least to a responder.
+        // Oldest first, so a backlog is worked off from the end that matters least to a responder.
         .order_by_asc(oncall_responses::Column::ClosedAt)
         .limit(max_records)
         .select_only()
@@ -1140,12 +1113,7 @@ async fn all_events(response_id: &str) -> Result<Vec<ResponseEvent>, errors::Err
         .collect())
 }
 
-// ── Aggregates for the team screens ───────────────────────────────────────────
-//
-// Every function below counts in the database. The org that most needs these
-// answers is the one with the most rows, and a summary computed by loading
-// every response of the last week would be slowest exactly where it matters —
-// the same reason `cause_breakdown` above groups in SQL.
+// Every function below counts in the database: the org needing these answers has the most rows.
 
 /// A window over `opened_at`, restricted to one team.
 ///
@@ -1251,9 +1219,7 @@ pub async fn team_page_stats(
         .count(client)
         .await? as i64;
 
-    // One `COUNT` for every night in the window, OR'd into a single predicate
-    // rather than run per night: seven statements to answer "how many woke
-    // somebody" would be six more than the question deserves.
+    // One predicate, not one statement per night: seven queries for one question is six too many.
     let night_pages = if night_windows.is_empty() {
         0
     } else {
@@ -1271,16 +1237,14 @@ pub async fn team_page_stats(
             .await? as i64
     };
 
-    // Anything above rung zero. `after_micros` is a delay, so "> 0" is "not
-    // the rung that fired immediately" without this layer needing the ladder.
+    // `after_micros` is a delay, so "> 0" excludes the immediate rung without knowing the ladder.
     let reached_second_rung = reached_rung_at_least(org_id, team_id, from, to, 1)
         .count(client)
         .await? as i64;
 
     let mut reached_final_rung = 0;
     for (priority, last_rung) in final_rung_micros {
-        // A ladder whose only rung is rung zero has no bottom to reach: every
-        // page would count, which would make the number meaningless.
+        // A ladder whose only rung is rung zero has no bottom to reach, so every page would count.
         if *last_rung <= 0 {
             continue;
         }
@@ -1394,9 +1358,7 @@ pub async fn delivery_health(
     let mut out: std::collections::HashMap<String, (i64, i64)> = std::collections::HashMap::new();
     for row in rows {
         let entry = out.entry(row.who).or_insert((0, 0));
-        // A NULL `delivered` predates the column carrying an outcome. Counted
-        // as neither: guessing it succeeded would hide a real failure, and
-        // guessing it failed would invent one.
+        // A NULL `delivered` predates the column: guessing hides a real failure or invents one.
         match row.delivered {
             Some(true) => entry.0 += row.count,
             Some(false) => entry.1 += row.count,
@@ -1425,8 +1387,7 @@ pub async fn deliveries_by_person(
             .filter(oncall_response_events::Column::Recipient.is_not_null())
             .filter(oncall_response_events::Column::At.gte(from))
             .filter(oncall_response_events::Column::At.lt(to))
-            // The ledger has no org column, so the team restriction has to
-            // come through the records it belongs to.
+            // The ledger has no org column, so the team restriction comes through its records.
             .filter(
                 oncall_response_events::Column::ResponseId.in_subquery(
                     Query::select()

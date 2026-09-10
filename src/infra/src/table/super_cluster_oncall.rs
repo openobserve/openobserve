@@ -36,13 +36,24 @@
 //! two regions writing the same record concurrently resolve to whichever
 //! message lands second — acceptable, because only one cluster runs the
 //! alert-manager job, so only one region writes.
+//!
+//! Every snapshot update below therefore goes through `reset_all()`, and that
+//! is load-bearing rather than decorative. `Model::into_active_model()` marks
+//! every column `Unchanged`, and SeaORM's update builder emits `SET` only for
+//! `Set` columns and never for the primary key — so an update built from a
+//! model alone carries no assignments at all, is short-circuited as a no-op,
+//! and *returns success having changed nothing*. A snapshot that silently
+//! applies nothing is worse than one that fails: the acknowledgement, the
+//! resolution and the ladder state stay at whatever the replica had, and the
+//! surviving region keeps paging a record somebody already answered.
 
 use config::meta::oncall::{
     EscalationPolicy, OwnershipRule, Response, ResponseEvent, Schedule, ScheduleOverride, Team,
     TeamMember, Unavailability,
 };
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, Set, TransactionTrait,
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, QueryFilter, Set,
+    TransactionTrait, sea_query::SimpleExpr,
 };
 
 use super::entity::{
@@ -81,9 +92,7 @@ pub async fn put_team(team: &Team) -> Result<(), errors::Error> {
     };
     match existing {
         Some(_) => {
-            let mut active = model.into_active_model();
-            active.id = Set(team.id.clone());
-            active.update(client).await?;
+            model.into_active_model().reset_all().update(client).await?;
         }
         None => {
             model.into_active_model().insert(client).await?;
@@ -208,9 +217,7 @@ pub async fn put_override(record: &ScheduleOverride) -> Result<(), errors::Error
         .await?
     {
         Some(_) => {
-            let mut active = model.into_active_model();
-            active.id = Set(record.id.clone());
-            active.update(client).await?;
+            model.into_active_model().reset_all().update(client).await?;
         }
         None => {
             model.into_active_model().insert(client).await?;
@@ -250,9 +257,7 @@ pub async fn put_unavailability(record: &Unavailability) -> Result<(), errors::E
         .await?
     {
         Some(_) => {
-            let mut active = model.into_active_model();
-            active.id = Set(record.id.clone());
-            active.update(client).await?;
+            model.into_active_model().reset_all().update(client).await?;
         }
         None => {
             model.into_active_model().insert(client).await?;
@@ -384,7 +389,30 @@ pub async fn put_routing_config(
 /// timer for a record it cannot find. Renumbering here would drop every
 /// replicated page.
 pub async fn put_response(response: &Response) -> Result<(), errors::Error> {
-    let client = get_orm_client_rw().await;
+    put_response_in(get_orm_client_rw().await, response).await
+}
+
+/// Appends one timeline entry, if the replica does not already have it.
+///
+/// The timeline is not decoration: `Page` entries **are** the delivery ledger,
+/// and the engine refuses to re-send a rung it finds there. Replicating the
+/// record without its entries would hand the surviving cluster a record with an
+/// empty ledger, and the first tick after failover would page the whole ladder
+/// from rung zero again.
+///
+/// Deduped on the entry's own content rather than on a row id, because the meta
+/// type carries no id — and content is the better key anyway: two regions that
+/// independently recorded the same page should converge on one row, not two.
+/// A **delivery** is the exception, and it is not really one: its content is
+/// not stable, so the ledger key stands in for it. See [`put_event_in`].
+pub async fn put_event(response_id: &str, event: &ResponseEvent) -> Result<(), errors::Error> {
+    put_event_in(get_orm_client_rw().await, response_id, event).await
+}
+
+async fn put_response_in<C: ConnectionTrait>(
+    conn: &C,
+    response: &Response,
+) -> Result<(), errors::Error> {
     let model = oncall_responses::Model {
         id: response.id.clone(),
         org_id: response.org_id.clone(),
@@ -415,45 +443,64 @@ pub async fn put_response(response: &Response) -> Result<(), errors::Error> {
         exhausted_at: response.exhausted_at,
     };
     match oncall_responses::Entity::find_by_id(&response.id)
-        .one(client)
+        .one(conn)
         .await?
     {
         Some(_) => {
-            let mut active = model.into_active_model();
-            active.id = Set(response.id.clone());
-            active.update(client).await?;
+            model.into_active_model().reset_all().update(conn).await?;
         }
         None => {
-            model.into_active_model().insert(client).await?;
+            model.into_active_model().insert(conn).await?;
         }
     }
     Ok(())
 }
 
-/// Appends one timeline entry, if the replica does not already have it.
+/// [`put_event`] against a caller-supplied connection.
 ///
-/// The timeline is not decoration: `Page` entries **are** the delivery ledger,
-/// and the engine refuses to re-send a rung it finds there. Replicating the
-/// record without its entries would hand the surviving cluster a record with an
-/// empty ledger, and the first tick after failover would page the whole ladder
-/// from rung zero again.
-///
-/// Deduped on the entry's own content rather than on a row id, because the meta
-/// type carries no id — and content is the better key anyway: two regions that
-/// independently recorded the same page should converge on one row, not two.
-pub async fn put_event(response_id: &str, event: &ResponseEvent) -> Result<(), errors::Error> {
-    let client = get_orm_client_rw().await;
+/// A delivery is identified by its ledger key and never by its content: the
+/// retry of a failed send describes the same page at a later `at`, so a
+/// content check would miss the row it is meant to correct and the insert
+/// behind it would hit the unique index on that key. That is a hard error, and
+/// a replicated message that can only ever error is redelivered for ever while
+/// the ledger keeps reading `delivered: false`. So deliveries go through
+/// `add_event_in`, which is the one place that rule is written down.
+async fn put_event_in<C: ConnectionTrait>(
+    conn: &C,
+    response_id: &str,
+    event: &ResponseEvent,
+) -> Result<(), errors::Error> {
     let channel = event.channel.map(|c| c.to_i32());
+    // An entry is in the ledger exactly when all four key columns are present.
+    if event.ladder_run.is_some()
+        && event.rung_micros.is_some()
+        && event.recipient.is_some()
+        && channel.is_some()
+    {
+        return super::oncall_responses::add_event_in(conn, response_id, event).await;
+    }
     let existing = oncall_response_events::Entity::find()
         .filter(oncall_response_events::Column::ResponseId.eq(response_id))
         .filter(oncall_response_events::Column::At.eq(event.at))
         .filter(oncall_response_events::Column::Kind.eq(event.kind.to_i32()))
         .filter(oncall_response_events::Column::Actor.eq(event.actor.as_str()))
-        .filter(oncall_response_events::Column::RungMicros.eq(event.rung_micros))
-        .filter(oncall_response_events::Column::LadderRun.eq(event.ladder_run))
-        .filter(oncall_response_events::Column::Recipient.eq(event.recipient.clone()))
-        .filter(oncall_response_events::Column::Channel.eq(channel))
-        .one(client)
+        .filter(equals_or_is_null(
+            oncall_response_events::Column::RungMicros,
+            event.rung_micros,
+        ))
+        .filter(equals_or_is_null(
+            oncall_response_events::Column::LadderRun,
+            event.ladder_run,
+        ))
+        .filter(equals_or_is_null(
+            oncall_response_events::Column::Recipient,
+            event.recipient.clone(),
+        ))
+        .filter(equals_or_is_null(
+            oncall_response_events::Column::Channel,
+            channel,
+        ))
+        .one(conn)
         .await?;
     if existing.is_some() {
         return Ok(());
@@ -471,9 +518,24 @@ pub async fn put_event(response_id: &str, event: &ResponseEvent) -> Result<(), e
         channel: Set(channel),
         delivered: Set(event.delivered),
     }
-    .insert(client)
+    .insert(conn)
     .await?;
     Ok(())
+}
+
+/// A content-dedup predicate that an absent value can actually satisfy.
+///
+/// `col.eq(None)` renders `col = NULL`, which matches nothing — so the columns
+/// a non-delivery entry leaves empty would fail their own dedup check and every
+/// redelivery would append another copy of the same line.
+fn equals_or_is_null<T: Into<sea_orm::Value>>(
+    col: oncall_response_events::Column,
+    value: Option<T>,
+) -> SimpleExpr {
+    match value {
+        Some(v) => col.eq(v),
+        None => col.is_null(),
+    }
 }
 
 #[cfg(test)]
@@ -484,8 +546,53 @@ mod tests {
         Channel, ResponderRole, ResponseEvent, ResponseEventKind, ResponseState, SubjectRef,
         SubjectType,
     };
+    use sea_orm::{ConnectOptions, Database, DatabaseConnection, Schema, sea_query::Index};
 
     use super::*;
+
+    /// One connection, not a pool: two connections to `sqlite::memory:` are two
+    /// databases.
+    ///
+    /// The unique delivery index is built by hand because
+    /// `create_table_from_entity` emits no secondary indexes — and it is the
+    /// whole point of the delivery test, which asserts that a replicated retry
+    /// does not collide with it.
+    async fn db() -> DatabaseConnection {
+        let mut opts = ConnectOptions::new("sqlite::memory:".to_string());
+        opts.max_connections(1);
+        let db = Database::connect(opts).await.unwrap();
+        let backend = db.get_database_backend();
+        let schema = Schema::new(backend);
+        for stmt in [
+            schema.create_table_from_entity(oncall_responses::Entity),
+            schema.create_table_from_entity(oncall_response_events::Entity),
+        ] {
+            db.execute(backend.build(&stmt)).await.unwrap();
+        }
+        let delivery_key = Index::create()
+            .table(oncall_response_events::Entity)
+            .name("idx_oncall_response_events_delivery")
+            .col(oncall_response_events::Column::ResponseId)
+            .col(oncall_response_events::Column::LadderRun)
+            .col(oncall_response_events::Column::RungMicros)
+            .col(oncall_response_events::Column::Recipient)
+            .col(oncall_response_events::Column::Channel)
+            .unique()
+            .take();
+        db.execute(backend.build(&delivery_key)).await.unwrap();
+        db
+    }
+
+    fn a_delivery(at: i64, delivered: bool) -> ResponseEvent {
+        ResponseEvent {
+            rung_micros: Some(300_000_000),
+            ladder_run: Some(1),
+            recipient: Some("ana@o2.ai".to_string()),
+            channel: Some(Channel::Email),
+            delivered: Some(delivered),
+            ..ResponseEvent::new(ResponseEventKind::Delivery, at, "o2-engine", "paged ana")
+        }
+    }
 
     fn a_response() -> Response {
         Response {
@@ -625,5 +732,77 @@ mod tests {
         assert_ne!(to_ana.recipient, to_bo.recipient);
         assert_ne!(to_ana.channel, ana_on_webhook.channel);
         assert_eq!(to_ana, to_ana.clone());
+    }
+
+    /// A snapshot over an existing record has to actually move the row. Built
+    /// from a model alone the update carries no `SET` and succeeds having
+    /// changed nothing, so the replica keeps paging a record the source region
+    /// says was acknowledged.
+    #[tokio::test]
+    async fn test_a_snapshot_over_an_existing_record_rewrites_it() {
+        let db = db().await;
+        put_response_in(&db, &a_response()).await.unwrap();
+        let acked = Response {
+            state: ResponseState::Acknowledged,
+            acked_by: Some("ana@o2.ai".to_string()),
+            acked_at: Some(99),
+            snoozed_until: Some(1_000),
+            ladder_run: Some(3),
+            ..a_response()
+        };
+        put_response_in(&db, &acked).await.unwrap();
+
+        let row = oncall_responses::Entity::find_by_id("resp_1")
+            .one(&db)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(row.state, ResponseState::Acknowledged.to_i32());
+        assert_eq!(row.acked_by.as_deref(), Some("ana@o2.ai"));
+        assert_eq!(row.acked_at, Some(99));
+        assert_eq!(row.snoozed_until, Some(1_000));
+        assert_eq!(row.ladder_run, Some(3));
+    }
+
+    /// The retry of a failed send is the same page at a later `at`, so it must
+    /// rewrite the ledger row rather than insert beside it — the unique
+    /// delivery key would reject that insert, and a message that can only error
+    /// is redelivered for ever.
+    #[tokio::test]
+    async fn test_a_retried_delivery_rewrites_its_ledger_row() {
+        let db = db().await;
+        put_event_in(&db, "resp_1", &a_delivery(100, false))
+            .await
+            .unwrap();
+        put_event_in(&db, "resp_1", &a_delivery(200, true))
+            .await
+            .unwrap();
+
+        let rows = oncall_response_events::Entity::find()
+            .all(&db)
+            .await
+            .unwrap();
+        assert_eq!(rows.len(), 1, "one page to one person on one channel");
+        assert_eq!(rows[0].delivered, Some(true), "the later outcome is true");
+        assert_eq!(rows[0].at, 200);
+    }
+
+    /// Redelivery is normal on this path, and a note leaves every ledger column
+    /// null. Deduped with `= NULL` the check never matches, and each replay
+    /// appends another copy of the same line to somebody's timeline.
+    #[tokio::test]
+    async fn test_a_replayed_timeline_entry_stays_one_row() {
+        let db = db().await;
+        let note = ResponseEvent::new(ResponseEventKind::Note, 500, "ana@o2.ai", "on it");
+        for _ in 0..3 {
+            put_event_in(&db, "resp_1", &note).await.unwrap();
+        }
+
+        let rows = oncall_response_events::Entity::find()
+            .all(&db)
+            .await
+            .unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].body, "on it");
     }
 }
