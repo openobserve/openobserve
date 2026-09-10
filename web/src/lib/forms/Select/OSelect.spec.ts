@@ -17,7 +17,7 @@ describe("OSelect", () => {
   });
 
   it.each([
-    ["sm", "h-6"],
+    ["sm", "h-[2.125rem]"],
     ["md", "h-[2.125rem]"],
   ] as const)("sizes the trigger for %s", (size, expected) => {
     wrapper = mount(OSelect, { props: { size } });
