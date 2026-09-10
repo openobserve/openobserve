@@ -498,3 +498,21 @@ export function groupNavLinks(
 
   return result;
 }
+
+/** Route-name lookup the visibility check needs; satisfied by a vue-router Router. */
+export interface RouteNameLookup {
+  hasRoute(name: string): boolean;
+}
+
+// A child is offered only when its route exists in this build, custom_hide_menus
+// does not name it, and its gate (if any) passes — exactly as the target page decides.
+export function isNavChildVisible(
+  child: Pick<SubnavChild, "name" | "gate">,
+  ctx: NavGateContext,
+  router: RouteNameLookup,
+): boolean {
+  if (!router.hasRoute(child.name)) return false;
+  if (ctx.hiddenMenus.has(child.name)) return false;
+  const predicate = child.gate ? GATE_PREDICATES[child.gate] : undefined;
+  return !predicate || predicate(ctx);
+}

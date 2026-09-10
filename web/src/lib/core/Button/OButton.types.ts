@@ -86,7 +86,9 @@ export type ButtonSize =
   // 30px labeled button — matches toolbar icon height for labeled outline toolbar buttons
   | "sm-toolbar"
   // Chip with fixed 12px font — for dashboard query builder axis field chips
-  | "chip-12";
+  | "chip-12"
+  // Pill-shaped search trigger for the header command-palette box — owns height, radius, padding and weight
+  | "search-pill";
 
 export interface ButtonProps extends PrimitiveProps {
   /** Visual style variant */
@@ -99,6 +101,8 @@ export interface ButtonProps extends PrimitiveProps {
   loading?: boolean;
   /** Applies active/selected state styling (overrides variant to primary appearance) */
   active?: boolean;
+  /** Horizontal placement of icon, label and trailing icon; `between` pins them to the edges (search pills). */
+  contentAlign?: "center" | "between";
   /** Native button type attribute — only meaningful when as="button" */
   type?: "button" | "submit" | "reset";
   /** Makes the button a block-level element ( full width, flex instead of inline-flex ) */

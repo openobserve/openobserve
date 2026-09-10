@@ -51,9 +51,9 @@ import { useRouter, type LocationQueryRaw } from "vue-router";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import MenuLink from "@/components/MenuLink.vue";
-import config from "@/aws-exports";
-import { GATE_PREDICATES } from "./navGroups";
-import type { SubnavChild, NavGateContext } from "./ONavbar.types";
+import { isNavChildVisible } from "./navGroups";
+import { useNavGateContext } from "./useNavGateContext";
+import type { SubnavChild } from "./ONavbar.types";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 const props = defineProps<{
@@ -89,45 +89,12 @@ const isOpen = ref(false);
 const isPinned = ref(false);
 const flyoutStyle = ref<Record<string, string>>({});
 
-// Visibility context — mirrors the exact flags the target pages compute, so the
-// flyout's gating matches the page's section nav 1:1 (see GATE_PREDICATES).
-const gateContext = computed<NavGateContext>(() => {
-  const z = store.state.zoConfig ?? {};
-  const orgSettings = store.state.organizationData?.organizationSettings ?? {};
-  return {
-    isEnterprise: config.isEnterprise == "true",
-    isCloud: config.isCloud == "true",
-    // useIsMetaOrg's logic, made null-safe for early renders.
-    isMeta: store.state.selectedOrganization?.identifier === z.meta_org,
-    rbac: !!z.rbac_enabled,
-    serviceAccount: z.service_account_enabled ?? true,
-    orgStorage: orgSettings.org_storage_enabled === true,
-    modelPricing: !!z.model_pricing_enabled,
-    serviceStreams: z.service_streams_enabled !== false,
-    onlineEvals: !!z.online_evals_enabled,
-    databaseMonitoring: !!z.database_monitoring_enabled,
-    // Raw split (no trim) to match how pages test custom_hide_menus.
-    hiddenMenus: new Set((z.custom_hide_menus ?? "").split(",")),
-  };
-});
+// One gate definition shared with the rail and the command palette (useNavGateContext).
+const gateContext = useNavGateContext();
 
-// A child shows only when (a) its route is registered in this build, (b)
-// custom_hide_menus does not name it, AND (c) its visibility gate (if any)
-// passes — exactly as the target page would decide.
-//
-// The custom_hide_menus check is by route NAME so a child with no top-level
-// rail entry of its own is hideable at all: `requires` only tracks the parent,
-// and MainLayout's filter only ever sees top-level links.
+// custom_hide_menus is checked by route NAME so a child with no top-level rail entry is hideable.
 const visibleChildren = computed(() =>
-  props.children.filter((c) => {
-    if (!router.hasRoute(c.name)) return false;
-    if (gateContext.value.hiddenMenus.has(c.name)) return false;
-    if (c.gate) {
-      const predicate = GATE_PREDICATES[c.gate];
-      if (predicate && !predicate(gateContext.value)) return false;
-    }
-    return true;
-  }),
+  props.children.filter((c) => isNavChildVisible(c, gateContext.value, router)),
 );
 
 // A group with no surviving child is not a group — it is an empty tile that

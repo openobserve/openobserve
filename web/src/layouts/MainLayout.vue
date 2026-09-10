@@ -74,6 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @change-language="changeLanguage"
         @open-predefined-themes="openPredefinedThemes"
         @open-shortcuts="openShortcutsList"
+        @open-palette="openPalette($event || 'header')"
         @signout="signout"
       />
     </header>
@@ -165,6 +166,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <CommunitySlackInvite />
     <PredefinedThemes />
     <ShortcutCheatsheet v-model:open="showShortcuts" />
+    <CommandPalette
+      v-model:open="showPalette"
+      :nav-links="navLinks"
+      :open-source="paletteSource"
+      :ai-enabled="config.isEnterprise == 'true' && !!store.state.zoConfig?.ai_enabled"
+      @open-shortcuts="openShortcutsList"
+      @open-docs="navigateToDocs"
+      @open-slack="openSlack"
+      @ask-ai="sendToAiChat($event, false, true)"
+      @switch-org="switchOrganization"
+    />
   </div>
 </template>
 
@@ -226,6 +238,7 @@ import useRoutePrefetch from "@/composables/useRoutePrefetch";
 import { toast, dismissAll } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { ShortcutCheatsheet } from "@/lib/vue-shortcut-manager";
+import CommandPalette from "@/components/commandPalette/CommandPalette.vue";
 import { useHomeDashboard } from "@/composables/useHomeDashboard";
 
 let mainLayoutMixin: any = null;
@@ -251,6 +264,7 @@ export default defineComponent({
     PredefinedThemes,
     O2AIChat,
     ShortcutCheatsheet,
+    CommandPalette,
     GetStarted,
     CommunitySlackInvite,
     ODialog,
@@ -1366,12 +1380,40 @@ export default defineComponent({
       useShortcuts([{ id: "aiChatToggle", handler: () => toggleAIChat() }]);
     }
 
+    // Command palette (⌘K / Ctrl+K) is available on every build.
+    const showPalette = ref(false);
+    const paletteSource = ref<"shortcut" | "header" | "help">("shortcut");
+    const openPalette = (source: "shortcut" | "header" | "help") => {
+      paletteSource.value = source;
+      showPalette.value = true;
+    };
+    const switchOrganization = (identifier: string) => {
+      const option = orgOptions.value.find((o) => o.identifier === identifier);
+      if (!option) return;
+      selectedOrg.value = option;
+      userClickedOrg.value = option;
+      void updateOrganization();
+    };
+    useShortcuts([
+      {
+        id: "commandPalette",
+        handler: () => {
+          if (showPalette.value) showPalette.value = false;
+          else openPalette("shortcut");
+        },
+      },
+    ]);
+
     return {
       isDark,
       t,
       router,
       store,
       config,
+      showPalette,
+      paletteSource,
+      openPalette,
+      switchOrganization,
       announcementBarRef,
       langList,
       selectedLanguage,

@@ -2858,8 +2858,8 @@
       "runToView": "Run A Test To View This Data.",
       "noBranchItems": "No Items On This Branch.",
       "forwardedCount": "{out} of {total} record forwarded | {out} of {total} records forwarded",
-      "noMatchForwarded": "No match \u2014 0 of {total} record forwarded | No match \u2014 0 of {total} records forwarded",
-      "branchDropped": "{count} record matched no path \u2014 dropped | {count} records matched no path \u2014 dropped",
+      "noMatchForwarded": "No match — 0 of {total} record forwarded | No match — 0 of {total} records forwarded",
+      "branchDropped": "{count} record matched no path — dropped | {count} records matched no path — dropped",
       "noUpstream": "No Upstream Steps.",
       "noRunYet": "No Run Yet.",
       "runLabel": "Run",
@@ -14667,6 +14667,7 @@
     },
     "actions": {
       "openCheatsheet": "Open keyboard shortcuts cheatsheet",
+      "commandPalette": "Open the command palette (search & jump)",
       "closeDialog": "Close any dialog, drawer, or modal",
       "focusSearch": "Focus search bar",
       "focusQuery": "Focus query editor",
@@ -17250,6 +17251,56 @@
       "enginePartialDescription": "The unused-index check needs an index scan counter, which is not collected for this engine, so an empty list here is not an all-clear.",
       "allClearTitle": "Nothing crossed a threshold",
       "allClearDescription": "Every check ran and none crossed its threshold in this time range."
+    }
+  },
+  "palette": {
+    "title": "Command palette",
+    "placeholder": "Search pages, dashboards, alerts, streams and more…",
+    "placeholderScoped": "Search within {scope}…",
+    "placeholderScopedMore": "Search within {scope} and {n} more…",
+    "trigger": "Search or jump to…",
+    "menuEntry": "Search & jump to…",
+    "askAi": "Ask O2 Assistant about \"{q}\"",
+    "clearScopes": "Clear",
+    "scopes": {
+      "actions": "Commands",
+      "pages": "Pages",
+      "dashboard": "Dashboards",
+      "alert": "Alerts",
+      "stream": "Streams",
+      "savedView": "Saved views",
+      "function": "Functions",
+      "pipeline": "Pipelines",
+      "user": "Users",
+      "synthetic": "Synthetics"
+    },
+    "switchOrg": "Switch to {name}",
+    "streamTypes": {
+      "logs": "Logs stream",
+      "metrics": "Metrics stream",
+      "traces": "Traces stream"
+    },
+    "groups": {
+      "recent": "Recent",
+      "actions": "Commands",
+      "pages": "Pages"
+    },
+    "actions": {
+      "newDashboard": "New dashboard",
+      "darkMode": "Switch to dark mode",
+      "lightMode": "Switch to light mode",
+      "slack": "Community Slack"
+    },
+    "hint": {
+      "navigate": "navigate",
+      "open": "open",
+      "newTab": "open in new tab",
+      "showScopes": "filter by type",
+      "hideScopes": "hide filters"
+    },
+    "noResults": "No matches for \"{q}\"",
+    "state": {
+      "paused": "paused"
     }
   }
 }

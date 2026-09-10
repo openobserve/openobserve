@@ -32,8 +32,8 @@ use openobserve_api_management::request::cloud;
 use openobserve_api_management::request::profiling;
 use openobserve_api_management::request::{
     alerts, announcements, authz, dashboards, db_monitoring, folders, kv, model_pricing,
-    organization, service_accounts, short_url, slos, sourcemaps, status, status_pages, stream,
-    synthetics, users,
+    organization, resources, service_accounts, short_url, slos, sourcemaps, status, status_pages,
+    stream, synthetics, users,
 };
 use openobserve_api_pipelines::request::{enrichment_table, functions, pipeline, pipelines};
 use openobserve_api_search::{promql, search, traces};
@@ -1098,6 +1098,7 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/groups/{group_name}", get(authz::fga::get_group_details).put(authz::fga::update_group).delete(authz::fga::delete_group))
         .route("/{org_id}/groups/bulk", delete(authz::fga::delete_group_bulk))
         .route("/{org_id}/resources", get(authz::fga::get_resources))
+        .route("/{org_id}/resources/_search", get(resources::search))
         .route("/{org_id}/roles/{role_id}/users", get(authz::fga::get_users_with_role))
         .route("/{org_id}/users/roles/all", get(authz::fga::get_roles_for_all_users))
         .route("/{org_id}/users/{user_id}/roles", get(authz::fga::get_roles_for_user))

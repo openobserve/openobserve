@@ -239,7 +239,8 @@
       "onboarding-form-validation.spec.js",
       "rum-form-validation.spec.js",
       "login-form-validation.spec.js",
-      "datetime-picker-copy-paste.spec.js"
+      "datetime-picker-copy-paste.spec.js",
+      "commandPalette.spec.js"
     ],
     "disabled": []
   },
