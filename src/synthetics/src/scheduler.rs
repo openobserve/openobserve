@@ -167,6 +167,8 @@ pub enum PoolGate {
 pub(crate) struct GateContext {
     pub remaining: HashMap<String, crate::pool::StepRemaining>,
     pub policies: HashMap<String, PoolExhaustionPolicy>,
+    /// The claimed checks that feed a status page, read once per tick.
+    pub status_attached: std::collections::HashSet<String>,
 }
 
 /// The per-run values every slot of one fan-out shares.
@@ -607,15 +609,18 @@ pub(crate) fn distinct_org_ids(checks: &[synthetics_checks::DueCheck]) -> Vec<St
 pub(crate) fn gate_decision(
     gate: Option<(PoolExhaustionPolicy, crate::pool::StepRemaining)>,
     is_browser: bool,
+    is_status_attached: bool,
 ) -> PoolGate {
     let Some((policy, remaining)) = gate else {
         return PoolGate::Run;
     };
 
+    // A status check reaches the monthly allowance only after the shared one-time pool is spent,
+    // so either pool having room is enough to run it. Browser has no monthly allowance at all.
     let has_room = if is_browser {
         remaining.browser > 0
     } else {
-        remaining.protocol > 0
+        remaining.protocol > 0 || (is_status_attached && remaining.status > 0)
     };
 
     match policy {
@@ -639,6 +644,7 @@ pub(crate) fn slot_verdict(
     if is_private {
         return PoolGate::Run;
     }
+    let is_status_attached = ctx.is_some_and(|c| c.status_attached.contains(&check.id));
     gate_decision(
         ctx.and_then(|c| {
             Some((
@@ -647,6 +653,7 @@ pub(crate) fn slot_verdict(
             ))
         }),
         check.check_type == SyntheticType::Browser,
+        is_status_attached,
     )
 }
 
@@ -779,9 +786,23 @@ async fn resolve_gate_context(checks: &[synthetics_checks::DueCheck]) -> Option<
 
     let remaining = (hooks.remaining_for_orgs)(org_ids).await;
 
+    // One read for the whole tick: inside the fan-out it would run once per claimed check.
+    let claimed: Vec<String> = checks.iter().map(|check| check.id.clone()).collect();
+    let status_attached = infra::table::status_pages::mapped_check_ids(
+        infra::db::get_orm_client_ro().await,
+        Some(&claimed),
+    )
+    .await
+    .unwrap_or_else(|e| {
+        // A check billed as regular is the safe answer: it draws no allowance it did not earn.
+        tracing::error!("[synthetics scheduler] status page mapping unreadable: {e}");
+        std::collections::HashSet::new()
+    });
+
     Some(GateContext {
         remaining,
         policies,
+        status_attached,
     })
 }
 
@@ -2154,7 +2175,11 @@ mod pool_gate_tests {
     const A_LOCATION: &str = "us-east-1";
 
     fn remaining(browser: u64, protocol: u64) -> StepRemaining {
-        StepRemaining { browser, protocol }
+        StepRemaining {
+            browser,
+            protocol,
+            status: 0,
+        }
     }
 
     fn due_check() -> DueCheck {
@@ -2191,6 +2216,7 @@ mod pool_gate_tests {
         rows: &[(&str, StepRemaining)],
     ) -> GateContext {
         GateContext {
+            status_attached: std::collections::HashSet::new(),
             remaining: rows
                 .iter()
                 .map(|(org, r)| ((*org).to_string(), *r))
@@ -2228,7 +2254,7 @@ mod pool_gate_tests {
         for (is_browser, r, has_room) in rows {
             let case = format!("browser={is_browser} remaining={r:?}");
             assert_eq!(
-                gate_decision(Some((SubscriptionRequired, *r)), *is_browser),
+                gate_decision(Some((SubscriptionRequired, *r)), *is_browser, false),
                 if *has_room {
                     PoolGate::Run
                 } else {
@@ -2237,7 +2263,7 @@ mod pool_gate_tests {
                 "T30/E15, a Free org's slot is skipped only when the grant is spent: {case}",
             );
             assert_eq!(
-                gate_decision(Some((MeteredOverage, *r)), *is_browser),
+                gate_decision(Some((MeteredOverage, *r)), *is_browser, false),
                 if *has_room {
                     PoolGate::Run
                 } else {
@@ -2246,7 +2272,7 @@ mod pool_gate_tests {
                 "T31/E16, a Rate or Enterprise org is never skipped: {case}",
             );
             assert_eq!(
-                gate_decision(Some((AdditionalCreditsRequired, *r)), *is_browser),
+                gate_decision(Some((AdditionalCreditsRequired, *r)), *is_browser, false),
                 PoolGate::RunAndNotify,
                 "T36/E18, a contract org is never pool-gated: {case}",
             );
@@ -2266,6 +2292,119 @@ mod pool_gate_tests {
                 );
             }
         }
+    }
+
+    /// The reason the gate learned about the status pool at all: a free org whose one-time pool is
+    /// spent must keep the checks its status page is built on.
+    #[test]
+    fn a_status_check_runs_on_the_monthly_pool_when_the_one_time_pool_is_empty() {
+        let spent = StepRemaining {
+            browser: 0,
+            protocol: 0,
+            status: 43_200,
+        };
+
+        assert_eq!(
+            gate_decision(
+                Some((PoolExhaustionPolicy::SubscriptionRequired, spent)),
+                false,
+                true
+            ),
+            PoolGate::Run,
+        );
+    }
+
+    #[test]
+    fn a_regular_check_ignores_the_monthly_pool() {
+        let spent = StepRemaining {
+            browser: 0,
+            protocol: 0,
+            status: 43_200,
+        };
+
+        assert_eq!(
+            gate_decision(
+                Some((PoolExhaustionPolicy::SubscriptionRequired, spent)),
+                false,
+                false
+            ),
+            PoolGate::Skip,
+        );
+    }
+
+    /// There is no monthly browser allowance, so attachment must not rescue a browser check.
+    #[test]
+    fn a_browser_check_on_a_status_page_reads_only_the_browser_grant() {
+        let spent = StepRemaining {
+            browser: 0,
+            protocol: 500,
+            status: 43_200,
+        };
+
+        assert_eq!(
+            gate_decision(
+                Some((PoolExhaustionPolicy::SubscriptionRequired, spent)),
+                true,
+                true
+            ),
+            PoolGate::Skip,
+        );
+    }
+
+    #[test]
+    fn an_exhausted_monthly_pool_skips_a_status_check_again() {
+        let spent = StepRemaining {
+            browser: 0,
+            protocol: 0,
+            status: 0,
+        };
+
+        assert_eq!(
+            gate_decision(
+                Some((PoolExhaustionPolicy::SubscriptionRequired, spent)),
+                false,
+                true
+            ),
+            PoolGate::Skip,
+        );
+    }
+
+    /// A metered org is never blocked, whichever pool is empty.
+    #[test]
+    fn a_metered_org_runs_a_status_check_as_overage() {
+        let spent = StepRemaining {
+            browser: 0,
+            protocol: 0,
+            status: 0,
+        };
+
+        assert_eq!(
+            gate_decision(
+                Some((PoolExhaustionPolicy::MeteredOverage, spent)),
+                false,
+                true
+            ),
+            PoolGate::RunAsOverage,
+        );
+    }
+
+    #[test]
+    fn slot_verdict_reads_status_membership_off_the_check_id() {
+        let check = protocol_check();
+        let with_monthly_room = StepRemaining {
+            browser: 0,
+            protocol: 0,
+            status: 10,
+        };
+        let mut ctx = ctx(
+            &[(&check.org_id, PoolExhaustionPolicy::SubscriptionRequired)],
+            &[(&check.org_id, with_monthly_room)],
+        );
+
+        assert_eq!(slot_verdict(Some(&ctx), &check, false), PoolGate::Skip);
+
+        ctx.status_attached.insert(check.id.clone());
+        assert_eq!(slot_verdict(Some(&ctx), &check, false), PoolGate::Run);
     }
 
     /// T17/E13 — the customer's own hardware ran it, so we never paid and must never stop it.

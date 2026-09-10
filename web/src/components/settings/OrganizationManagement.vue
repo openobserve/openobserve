@@ -94,6 +94,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #cell-protocol_steps_total="{ row }">
             {{ formatCredits(row.protocol_steps_limit) }}
           </template>
+          <template #cell-status_steps_used="{ row }">
+            {{ formatCredits(row.status_steps_used) }}
+          </template>
+          <template #cell-status_steps_total="{ row }">
+            {{ formatCredits(row.status_steps_limit) }}
+          </template>
           <template #cell-actions="{ row }">
             <div class="flex items-center justify-center gap-1">
               <OButton
@@ -248,6 +254,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('settings.organizationManagementPage.syntheticsProtocolStepsTab')"
             data-test="org-management-set-synthetics-protocol-steps-btn"
           />
+          <OTab
+            name="synthetics_status_protocol"
+            :label="t('settings.organizationManagementPage.syntheticsStatusStepsTab')"
+            data-test="org-management-set-synthetics-status-steps-btn"
+          />
         </OTabs>
 
         <!-- One OForm per pool (own schema, own submit). v-if, so only the active
@@ -287,11 +298,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               name="stepsLimit"
               type="number"
               data-test="synthetics-steps-limit-input"
-              :label="
-                isBrowserStepsTab
-                  ? t('settings.organizationManagementPage.totalBrowserSteps')
-                  : t('settings.organizationManagementPage.totalProtocolSteps')
-              "
+              :label="stepsInputLabel"
               required
             />
             <div class="text-text-secondary text-xs">
@@ -362,7 +369,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 <script lang="ts">
 import { ref, onMounted, watch, defineComponent, computed } from "vue";
-import { useI18nTyped, type I18nText } from "@/types/i18n";
+import { useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { timestampToTimezoneDate, getImageURL } from "@/utils/zincutils";
 import { useStore } from "vuex";
@@ -400,7 +407,11 @@ import {
 } from "./OrganizationManagement.schema";
 
 /** Backend TrialQuotaPool keys — also the usage-allowance dialog's tab names. */
-type QuotaPool = "ai_credits" | "synthetics_browser_steps" | "synthetics_protocol_steps";
+type QuotaPool =
+  | "ai_credits"
+  | "synthetics_browser_steps"
+  | "synthetics_protocol_steps"
+  | "synthetics_status_protocol";
 
 export default defineComponent({
   name: "PageAlerts",
@@ -438,15 +449,35 @@ export default defineComponent({
     const usageLimitsRow = ref<any>({});
     const usageLimitsTab = ref<QuotaPool>("ai_credits");
     const isAiCreditsTab = computed(() => usageLimitsTab.value === "ai_credits");
-    // Browser and protocol are independent grants, so the step tabs differ only in
-    // which pair of row fields they read and write.
+    // The three step grants are independent, so the tabs differ only in which pair
+    // of row fields they read and write, and in their wording.
     const isBrowserStepsTab = computed(() => usageLimitsTab.value === "synthetics_browser_steps");
-    const stepFields = computed(() =>
-      isBrowserStepsTab.value
-        ? { used: "browser_steps_used", limit: "browser_steps_limit" }
-        : { used: "protocol_steps_used", limit: "protocol_steps_limit" },
+    const isStatusStepsTab = computed(() => usageLimitsTab.value === "synthetics_status_protocol");
+    const STEP_FIELDS: Record<string, { used: string; limit: string }> = {
+      synthetics_browser_steps: { used: "browser_steps_used", limit: "browser_steps_limit" },
+      synthetics_protocol_steps: { used: "protocol_steps_used", limit: "protocol_steps_limit" },
+      synthetics_status_protocol: { used: "status_steps_used", limit: "status_steps_limit" },
+    };
+    const stepFields = computed(
+      () => STEP_FIELDS[usageLimitsTab.value] ?? STEP_FIELDS.synthetics_protocol_steps,
     );
+    const stepsInputLabel = computed(() => {
+      if (isBrowserStepsTab.value) {
+        return t("settings.organizationManagementPage.totalBrowserSteps");
+      }
+      return isStatusStepsTab.value
+        ? t("settings.organizationManagementPage.totalStatusSteps")
+        : t("settings.organizationManagementPage.totalProtocolSteps");
+    });
     const stepsUsed = computed(() => usageLimitsRow.value?.[stepFields.value.used] ?? 0);
+    const stepsTitleKey = computed((): I18nKey => {
+      if (isBrowserStepsTab.value) {
+        return "settings.setSyntheticsBrowserStepsFor";
+      }
+      return isStatusStepsTab.value
+        ? "settings.setSyntheticsStatusStepsFor"
+        : "settings.setSyntheticsProtocolStepsFor";
+    });
     const aiCreditsFormDefaults = computed(() =>
       aiCreditsDefaults(usageLimitsRow.value?.credits_limit ?? 0),
     );
@@ -474,18 +505,18 @@ export default defineComponent({
     const usageLimitsTitle = computed(() =>
       isAiCreditsTab.value
         ? t("settings.setAiCreditsFor", { name: usageLimitsRow.value?.name })
-        : t(
-            isBrowserStepsTab.value
-              ? "settings.setSyntheticsBrowserStepsFor"
-              : "settings.setSyntheticsProtocolStepsFor",
-            { name: usageLimitsRow.value?.name },
-          ),
+        : t(stepsTitleKey.value, { name: usageLimitsRow.value?.name }),
     );
-    const usageLimitsSubtitle = computed(() =>
-      isAiCreditsTab.value
-        ? t("settings.organizationManagementPage.setAiCreditsSubtitle")
-        : t("settings.organizationManagementPage.setSyntheticsStepsSubtitle"),
-    );
+    const usageLimitsSubtitle = computed(() => {
+      if (isAiCreditsTab.value) {
+        return t("settings.organizationManagementPage.setAiCreditsSubtitle");
+      }
+      // The status grant is the one pool that resets, so it cannot borrow the
+      // lifetime wording the other two share.
+      return isStatusStepsTab.value
+        ? t("settings.organizationManagementPage.setSyntheticsStatusStepsSubtitle")
+        : t("settings.organizationManagementPage.setSyntheticsStepsSubtitle");
+    });
     const usageLimitsPrimaryLabel = computed(() =>
       isAiCreditsTab.value
         ? t("settings.organizationManagementPage.saveCredits")
@@ -617,6 +648,26 @@ export default defineComponent({
         id: "protocol_steps_total",
         header: t("settings.organizationManagementPage.protocolStepsTotal"),
         accessorKey: "protocol_steps_limit",
+        sortable: true,
+        resizable: true,
+        hideable: true,
+        size: COL.count,
+        meta: { align: "right" },
+      },
+      {
+        id: "status_steps_used",
+        header: t("settings.organizationManagementPage.statusStepsUsed"),
+        accessorKey: "status_steps_used",
+        sortable: true,
+        resizable: true,
+        hideable: true,
+        size: COL.count,
+        meta: { align: "right" },
+      },
+      {
+        id: "status_steps_total",
+        header: t("settings.organizationManagementPage.statusStepsTotal"),
+        accessorKey: "status_steps_limit",
         sortable: true,
         resizable: true,
         hideable: true,
@@ -1088,6 +1139,7 @@ export default defineComponent({
       aiCreditsSchema,
       submitAiCredits,
       isBrowserStepsTab,
+      stepsInputLabel,
       stepsUsed,
       syntheticsStepsFormDefaults,
       syntheticsStepsSchema,
