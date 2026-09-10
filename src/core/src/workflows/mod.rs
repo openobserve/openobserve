@@ -428,19 +428,37 @@ pub async fn move_workflows(
     workflow_ids: &[String],
     dst_folder_slug: &str,
 ) -> Result<(), anyhow::Error> {
+    // The row stores the folder's primary key but tuples name folders by slug,
+    // so resolve the source slug before the move overwrites it.
     let mut previous = Vec::with_capacity(workflow_ids.len());
     for id in workflow_ids {
         if let Some(w) = db::workflows::get_workflow(org_id, id).await? {
-            previous.push((w.id.clone(), w.folder_id.clone()));
+            let src_slug = infra::table::folders::get_name_by_pk(&w.folder_id)
+                .await
+                .ok()
+                .flatten();
+            previous.push((w.id.clone(), src_slug));
         }
     }
 
     db::workflows::move_workflows(org_id, workflow_ids, dst_folder_slug).await?;
 
-    // Ownership follows the row: the old parent tuple would otherwise keep
-    // granting access through the folder the workflow just left.
-    for (id, old_folder) in previous {
-        remove_ownership(org_id, "workflows", Authz::new(&id)).await;
+    // Ownership follows the row. Removing the tuple requires naming the OLD
+    // parent: without it the stale parent survives and the source folder's
+    // grants keep reaching a workflow that has left it.
+    for (id, src_slug) in previous {
+        if let Some(src) = src_slug {
+            remove_ownership(
+                org_id,
+                "workflows",
+                Authz {
+                    obj_id: id.clone(),
+                    parent_type: "workflow_folder".to_string(),
+                    parent: src,
+                },
+            )
+            .await;
+        }
         set_ownership(
             org_id,
             "workflows",
@@ -451,7 +469,6 @@ pub async fn move_workflows(
             },
         )
         .await;
-        let _ = old_folder;
     }
     Ok(())
 }
