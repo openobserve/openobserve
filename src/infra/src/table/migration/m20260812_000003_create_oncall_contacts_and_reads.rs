@@ -200,27 +200,46 @@ impl MigrationTrait for Migration {
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        // sea-query has no `drop_column_if_exists`, so the same guard `up` uses
+        // applies in reverse — a partially-applied `up` must still roll back.
+        if manager
+            .has_column("oncall_responses", "runbook_url")
+            .await?
+        {
+            manager
+                .alter_table(
+                    Table::alter()
+                        .table(OncallResponses::Table)
+                        .drop_column(OncallResponses::RunbookUrl)
+                        .to_owned(),
+                )
+                .await?;
+        }
+        if manager.has_column("alerts", "runbook_url").await? {
+            manager
+                .alter_table(
+                    Table::alter()
+                        .table(Alerts::Table)
+                        .drop_column(Alerts::RunbookUrl)
+                        .to_owned(),
+                )
+                .await?;
+        }
         manager
-            .alter_table(
-                Table::alter()
-                    .table(OncallResponses::Table)
-                    .drop_column(OncallResponses::RunbookUrl)
+            .drop_table(
+                Table::drop()
+                    .table(OncallDeliveryReads::Table)
+                    .if_exists()
                     .to_owned(),
             )
             .await?;
         manager
-            .alter_table(
-                Table::alter()
-                    .table(Alerts::Table)
-                    .drop_column(Alerts::RunbookUrl)
+            .drop_table(
+                Table::drop()
+                    .table(OncallUserContacts::Table)
+                    .if_exists()
                     .to_owned(),
             )
-            .await?;
-        manager
-            .drop_table(Table::drop().table(OncallDeliveryReads::Table).to_owned())
-            .await?;
-        manager
-            .drop_table(Table::drop().table(OncallUserContacts::Table).to_owned())
             .await
     }
 }

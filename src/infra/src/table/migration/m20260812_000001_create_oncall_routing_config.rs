@@ -93,7 +93,12 @@ impl MigrationTrait for Migration {
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
-            .drop_table(Table::drop().table(OncallRoutingConfig::Table).to_owned())
+            .drop_table(
+                Table::drop()
+                    .table(OncallRoutingConfig::Table)
+                    .if_exists()
+                    .to_owned(),
+            )
             .await?;
         if manager.has_column(UNROUTED, "defaulted_team_id").await? {
             manager

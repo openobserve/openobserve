@@ -495,22 +495,52 @@ impl MigrationTrait for Migration {
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
-            .drop_table(Table::drop().table(OncallResponseEvents::Table).to_owned())
+            .drop_table(
+                Table::drop()
+                    .table(OncallResponseEvents::Table)
+                    .if_exists()
+                    .to_owned(),
+            )
             .await?;
         manager
-            .drop_table(Table::drop().table(OncallResponses::Table).to_owned())
+            .drop_table(
+                Table::drop()
+                    .table(OncallResponses::Table)
+                    .if_exists()
+                    .to_owned(),
+            )
             .await?;
         manager
-            .drop_table(Table::drop().table(OncallPolicies::Table).to_owned())
+            .drop_table(
+                Table::drop()
+                    .table(OncallPolicies::Table)
+                    .if_exists()
+                    .to_owned(),
+            )
             .await?;
         manager
-            .drop_table(Table::drop().table(OncallSchedules::Table).to_owned())
+            .drop_table(
+                Table::drop()
+                    .table(OncallSchedules::Table)
+                    .if_exists()
+                    .to_owned(),
+            )
             .await?;
         manager
-            .drop_table(Table::drop().table(OncallTeamMembers::Table).to_owned())
+            .drop_table(
+                Table::drop()
+                    .table(OncallTeamMembers::Table)
+                    .if_exists()
+                    .to_owned(),
+            )
             .await?;
         manager
-            .drop_table(Table::drop().table(OncallTeams::Table).to_owned())
+            .drop_table(
+                Table::drop()
+                    .table(OncallTeams::Table)
+                    .if_exists()
+                    .to_owned(),
+            )
             .await
     }
 }

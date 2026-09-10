@@ -19,6 +19,8 @@ use sea_orm_migration::prelude::*;
 
 use super::get_text_type;
 
+const ALERTS: &str = "alerts";
+
 #[derive(DeriveMigrationName)]
 pub struct Migration;
 
@@ -101,27 +103,39 @@ impl MigrationTrait for Migration {
 
         // Nullable: most alerts route by ownership, and a null here means
         // "discover it" rather than "no team".
-        manager
-            .alter_table(
-                Table::alter()
-                    .table(Alerts::Table)
-                    .add_column_if_not_exists(ColumnDef::new(Alerts::OncallTeam).string().null())
-                    .to_owned(),
-            )
-            .await
+        // Guarded rather than blind: SQLite has no `IF NOT EXISTS` for `ADD
+        // COLUMN`, so a re-run would die on the duplicate.
+        if !manager.has_column(ALERTS, "oncall_team").await? {
+            manager
+                .alter_table(
+                    Table::alter()
+                        .table(Alerts::Table)
+                        .add_column(ColumnDef::new(Alerts::OncallTeam).string().null())
+                        .to_owned(),
+                )
+                .await?;
+        }
+        Ok(())
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        if manager.has_column(ALERTS, "oncall_team").await? {
+            manager
+                .alter_table(
+                    Table::alter()
+                        .table(Alerts::Table)
+                        .drop_column(Alerts::OncallTeam)
+                        .to_owned(),
+                )
+                .await?;
+        }
         manager
-            .alter_table(
-                Table::alter()
-                    .table(Alerts::Table)
-                    .drop_column(Alerts::OncallTeam)
+            .drop_table(
+                Table::drop()
+                    .table(OncallOwnershipRules::Table)
+                    .if_exists()
                     .to_owned(),
             )
-            .await?;
-        manager
-            .drop_table(Table::drop().table(OncallOwnershipRules::Table).to_owned())
             .await
     }
 }
@@ -142,4 +156,59 @@ enum OncallOwnershipRules {
 enum Alerts {
     Table,
     OncallTeam,
+}
+
+#[cfg(test)]
+mod tests {
+    use sea_orm::{ConnectionTrait, Database, DatabaseConnection, Statement};
+    use sea_orm_migration::MigrationTrait;
+
+    use super::*;
+
+    /// A stand-in for the table this migration only ALTERs, so the test does
+    /// not have to replay sixty unrelated migrations to reach it.
+    async fn stub_alerts(db: &DatabaseConnection) {
+        db.execute(Statement::from_string(
+            sea_orm::DbBackend::Sqlite,
+            "CREATE TABLE alerts (id TEXT NOT NULL PRIMARY KEY)".to_owned(),
+        ))
+        .await
+        .unwrap();
+    }
+
+    /// A node that died between the CREATE and the ALTER has to be able to
+    /// finish the job on restart, so every step is guarded.
+    #[tokio::test]
+    async fn test_up_is_idempotent() {
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        stub_alerts(&db).await;
+        let manager = SchemaManager::new(&db);
+
+        Migration.up(&manager).await.expect("first run");
+        Migration.up(&manager).await.expect("second run");
+
+        assert!(manager.has_table("oncall_ownership_rules").await.unwrap());
+        assert!(manager.has_column(ALERTS, "oncall_team").await.unwrap());
+    }
+
+    /// The rollback has to survive a schema where `up` only got halfway, which
+    /// is the state the crash it is cleaning up after left behind.
+    #[tokio::test]
+    async fn test_down_tolerates_a_partially_applied_schema() {
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        stub_alerts(&db).await;
+        let manager = SchemaManager::new(&db);
+
+        Migration
+            .down(&manager)
+            .await
+            .expect("nothing applied yet is still a valid rollback");
+
+        Migration.up(&manager).await.unwrap();
+        Migration.down(&manager).await.expect("full rollback");
+        Migration.down(&manager).await.expect("repeated rollback");
+
+        assert!(!manager.has_table("oncall_ownership_rules").await.unwrap());
+        assert!(!manager.has_column(ALERTS, "oncall_team").await.unwrap());
+    }
 }

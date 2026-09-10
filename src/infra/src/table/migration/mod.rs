@@ -481,15 +481,23 @@ mod tests {
             .map(|migration| migration.name().to_string())
             .collect();
         assert_eq!(
-            names.last().map(String::as_str),
-            Some("m20260825_000001_create_status_page_custom_domains")
-        );
-        assert_eq!(
             names
                 .iter()
                 .filter(|name| name.as_str() == "m20260812_000001_create_composite_alerts")
                 .count(),
             1
+        );
+        // Asserting on the last entry coupled this to whichever migration was newest, so every
+        // feature added after it broke a test about composite alerts.
+        let composite = names
+            .iter()
+            .position(|name| name == "m20260812_000001_create_composite_alerts");
+        let later = names
+            .iter()
+            .position(|name| name == "m20260825_000001_create_status_page_custom_domains");
+        assert!(
+            composite.is_some() && composite < later,
+            "the composite migration must stay registered before the ones that follow it, got {composite:?} and {later:?}"
         );
     }
 }

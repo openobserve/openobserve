@@ -143,7 +143,12 @@ impl MigrationTrait for Migration {
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
-            .drop_table(Table::drop().table(OncallOverrides::Table).to_owned())
+            .drop_table(
+                Table::drop()
+                    .table(OncallOverrides::Table)
+                    .if_exists()
+                    .to_owned(),
+            )
             .await
     }
 }
