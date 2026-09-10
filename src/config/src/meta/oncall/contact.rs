@@ -41,11 +41,10 @@ pub struct Contact {
 }
 
 impl Contact {
-    /// An empty profile for somebody who has never saved one.
-    ///
-    /// Returned rather than a 404: "this person has no phone" is a complete,
-    /// true answer, and making every caller branch on a missing row is how a
-    /// screen ends up rendering nothing at all.
+    /// An empty profile for somebody who has never saved one. Returned rather
+    /// than a 404: "this person has no phone" is a complete, true answer, and
+    /// making every caller branch on a missing row is how a screen ends up
+    /// rendering nothing at all.
     pub fn empty(org_id: &str, user_email: &str) -> Self {
         Self {
             org_id: org_id.to_string(),
@@ -59,11 +58,10 @@ impl Contact {
         }
     }
 
-    /// Whether an SMS or voice transport may ring this number.
-    ///
-    /// Both halves are required. A number nobody has verified is a claim, not
-    /// an address — the previous owner of a recycled mobile has not consented
-    /// to being woken at 3am by somebody else's outage.
+    /// Whether an SMS or voice transport may ring this number. Both halves are
+    /// required: a number nobody has verified is a claim, not an address — the
+    /// previous owner of a recycled mobile has not consented to being woken at
+    /// 3am by somebody else's outage.
     pub fn phone_is_pageable(&self) -> bool {
         self.phone.as_ref().is_some_and(|p| !p.trim().is_empty())
             && self.phone_verified_at.is_some()
@@ -78,10 +76,9 @@ impl Contact {
     }
 
     /// The methods on file that no transport may use yet, named so a profile
-    /// screen can say so out loud.
-    ///
-    /// Silence is the failure this prevents: a person who typed their number
-    /// in and saw it saved reasonably believes they will be phoned.
+    /// screen can say so out loud. Silence is the failure this prevents: a
+    /// person who typed their number in and saw it saved reasonably believes
+    /// they will be phoned.
     pub fn unverified_methods(&self) -> Vec<&'static str> {
         let mut out = Vec::new();
         if self.phone.as_ref().is_some_and(|p| !p.trim().is_empty())
@@ -103,12 +100,11 @@ impl Contact {
 
 /// A phone number as it may be stored.
 ///
-/// Deliberately permissive — E.164-ish, not E.164. The strict thing to do is
-/// refuse anything a carrier would, but this codebase cannot dial, so a
-/// refusal here would only ever be this validator's opinion against a person
-/// who knows their own number. What it does refuse is input that is not a
-/// phone number at all: empty, absurdly long, or carrying characters no dial
-/// string contains.
+/// Deliberately permissive — E.164-ish, not E.164. This codebase cannot dial, so
+/// a strict refusal would only ever be this validator's opinion against a person
+/// who knows their own number. What it does refuse is input that is not a phone
+/// number at all: empty, absurdly long, or carrying characters no dial string
+/// contains.
 pub fn normalize_phone(raw: &str) -> Result<String, ContactError> {
     let trimmed = raw.trim();
     if trimmed.is_empty() {
@@ -164,9 +160,9 @@ mod tests {
         assert!(c.unverified_methods().is_empty());
     }
 
-    /// The interlock this release exists to install: a number on file is not
-    /// permission to ring it. Until a transport can prove the handset, the
-    /// only honest answer is "not pageable".
+    /// The interlock this release installs: a number on file is not permission
+    /// to ring it. Until a transport can prove the handset, the only honest
+    /// answer is "not pageable".
     #[test]
     fn test_an_unverified_phone_is_never_pageable() {
         let mut c = Contact::empty("default", "ana@o2.ai");
@@ -179,9 +175,8 @@ mod tests {
         assert!(c.unverified_methods().is_empty());
     }
 
-    /// A verified-at left over from a previous number must not vouch for the
-    /// new one. The write path clears it; this pins the property the write
-    /// path is protecting.
+    /// A verified-at left over from a previous number must not vouch for the new
+    /// one. The write path clears it; this pins the property it is protecting.
     #[test]
     fn test_a_blank_phone_is_not_pageable_even_when_verified() {
         let mut c = Contact::empty("default", "ana@o2.ai");

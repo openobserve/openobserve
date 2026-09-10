@@ -18,23 +18,20 @@
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-/// How much of a rotation a level pages.
-///
-/// Mirrors incident.io's `schedule_mode`, and is the reason three kinds are
-/// enough: "everyone in this rotation" is a *mode*, not a fourth kind.
+/// How much of a rotation a level pages. Mirrors incident.io's `schedule_mode`,
+/// and is why three kinds are enough: "everyone in this rotation" is a mode,
+/// not a fourth kind.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum RotationMode {
-    /// The one person the rotation puts on call at this instant.
-    ///
-    /// Absent from the wire when it is this, so every level written before the
-    /// mode existed round-trips unchanged.
+    /// The one person the rotation puts on call at this instant. Absent from
+    /// the wire when it is this, so every level written before the mode existed
+    /// round-trips unchanged.
     #[default]
     OnCall,
     /// Everyone on the rotation's winning shift rule, on shift or not — the
-    /// broadcast before the whole team. The away are left out: an absence is
-    /// not being there at all, and `WholeTeam` below is the rung that ignores
-    /// that on purpose.
+    /// broadcast before the whole team. The away are left out: an absence is not
+    /// being there at all, and `WholeTeam` below ignores that on purpose.
     All,
 }
 
@@ -53,17 +50,15 @@ impl RotationMode {
 
 /// One thing a level pages. A level may hold several, and they fire together.
 ///
-/// Firing together is the *only* mechanism for paging more than one person.
-/// There is no stacking, no overlap and no derivation — which is what keeps
-/// "who does this level wake" answerable by reading it.
+/// Firing together is the only mechanism for paging more than one person. No
+/// stacking, no overlap, no derivation — which keeps "who does this level wake"
+/// answerable by reading it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum EscalationTarget {
-    /// A named rotation, by id.
-    ///
-    /// By id rather than by name because a rotation is renameable and a stored
-    /// policy must not start paging a different position because somebody fixed
-    /// a typo on a calendar.
+    /// A named rotation, by id rather than by name: a rotation is renameable,
+    /// and a stored policy must not start paging a different position because
+    /// somebody fixed a typo on a calendar.
     Rotation {
         rotation_id: String,
         #[serde(default, skip_serializing_if = "RotationMode::is_default")]
@@ -72,11 +67,11 @@ pub enum EscalationTarget {
     /// One named person, by email — email is the login, so it is the one
     /// identifier every user is guaranteed to have.
     User { email: String },
-    /// Every member of the team. The last resort at the bottom of a ladder.
+    /// Every member of the team — the last resort at the bottom of a ladder.
     ///
-    /// Deliberately blind to rotations and to absence: it is what a page falls
-    /// back to when every rotation has already failed to produce anybody, and a
-    /// last resort that filters itself down to nobody is not one.
+    /// Deliberately blind to rotations and to absence: it is where a page falls
+    /// back when every rotation has failed to produce anybody, and a last resort
+    /// that filters itself down to nobody is not one.
     WholeTeam,
 }
 
@@ -139,10 +134,10 @@ impl EscalationTarget {
     }
 
     /// What a page says it is going to. Read by a woken engineer, so it names
-    /// the rotation somebody can go and look at rather than a role word.
+    /// the rotation somebody can look at rather than a role word.
     ///
-    /// Takes the rotation's name because the target stores an id, and an id in
-    /// a page body tells a half-asleep reader nothing. `None` is a rotation the
+    /// Takes the rotation's name because the target stores an id, and an id in a
+    /// page body tells a half-asleep reader nothing. `None` is a rotation the
     /// team has since deleted, which is worth saying rather than hiding.
     pub fn describe(&self, rotation_name: Option<&str>) -> String {
         match self {
@@ -156,11 +151,9 @@ impl EscalationTarget {
         }
     }
 
-    /// A bounded label for metrics and logs.
-    ///
-    /// The rotation is *not* folded in: its id is unbounded operator data, and
-    /// a metric label taking arbitrary strings is one time series per rotation
-    /// anybody ever creates.
+    /// A bounded label for metrics and logs. The rotation is not folded in: its
+    /// id is unbounded operator data, and a metric label taking arbitrary
+    /// strings is one time series per rotation anybody ever creates.
     pub fn kind(&self) -> &'static str {
         match self {
             Self::Rotation {

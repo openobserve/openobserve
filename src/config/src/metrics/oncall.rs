@@ -41,10 +41,9 @@ pub static ONCALL_PAGES_DISPATCHED: Lazy<IntCounterVec> = Lazy::new(|| {
 
 /// Page attempts the transport refused or lost, by channel.
 ///
-/// Kept separate from the dispatch counter rather than folded into it as a
-/// `status` label so that "email is down" is a rate on one series instead of a
-/// ratio somebody has to remember to compute. The two together give the ratio
-/// anyway.
+/// Separate from the dispatch counter rather than a `status` label, so "email
+/// is down" is a rate on one series instead of a ratio somebody has to remember
+/// to compute. The two together give the ratio anyway.
 pub static ONCALL_DELIVERY_FAILURES: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
         Opts::new(
@@ -74,11 +73,10 @@ pub static ONCALL_ACKNOWLEDGEMENTS: Lazy<IntCounterVec> = Lazy::new(|| {
 
 /// Time from the record opening to the first acknowledgement — MTTA.
 ///
-/// Buckets run from ten seconds to two hours because that is the range the
-/// number is argued about in: under a minute is "the page worked", ten minutes
-/// is "the first rung did not", and anything past an hour is a ladder that only
-/// stopped because someone noticed by other means. Linear buckets would put
-/// almost every observation in one of them.
+/// Buckets run from ten seconds to two hours, the range the number is argued
+/// about in: under a minute is "the page worked", ten minutes is "the first
+/// rung did not", past an hour is a ladder that stopped because somebody
+/// noticed by other means. Linear buckets would put almost everything in one.
 pub static ONCALL_ACK_LATENCY_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
     HistogramVec::new(
         HistogramOpts::new(
@@ -97,11 +95,10 @@ pub static ONCALL_ACK_LATENCY_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
 
 /// Ladders that ran out of rungs with nobody acknowledging.
 ///
-/// The worst outcome the escalation engine has, and the one it is least able to
-/// tell you about on its own: when the last rung fires there is no next wake-up,
-/// so the trigger row is deleted and the record simply sits there looking open.
-/// This counter is the alertable form of "we paged an entire team and nobody
-/// answered".
+/// The worst outcome the engine has, and the one it can least tell you about on
+/// its own: when the last rung fires there is no next wake-up, so the trigger
+/// row is deleted and the record sits there looking open. This is the alertable
+/// form of "we paged an entire team and nobody answered".
 pub static ONCALL_LADDERS_EXHAUSTED: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
         Opts::new(
@@ -117,10 +114,9 @@ pub static ONCALL_LADDERS_EXHAUSTED: Lazy<IntCounterVec> = Lazy::new(|| {
 
 /// Signals that matched no team and so opened no record at all.
 ///
-/// These are invisible everywhere else by construction: routing that finds
-/// nobody returns before a record exists, so there is no row, no timeline and no
-/// UI surface to look at. A non-zero rate here means alerts are firing into a
-/// gap in the ownership rules.
+/// Invisible everywhere else by construction: routing that finds nobody returns
+/// before a record exists, so there is no row, no timeline and no UI surface. A
+/// non-zero rate means alerts are firing into a gap in the ownership rules.
 pub static ONCALL_UNROUTED_SIGNALS: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
         Opts::new(
@@ -137,13 +133,10 @@ pub static ONCALL_UNROUTED_SIGNALS: Lazy<IntCounterVec> = Lazy::new(|| {
 /// Signals that no ownership rule claimed and that the org's nominated default
 /// team absorbed.
 ///
-/// Deliberately not folded into `oncall_unrouted_signals_total`. That counter
-/// answers "how many pages were never attempted", and it has to keep answering
-/// it after an org nominates a catch-all — otherwise the number an alarm is
-/// built on silently changes meaning on the day somebody fills in a dropdown.
-/// This one answers the different question: how much of the paging load is
-/// riding on a fallback rather than on an owner, which is the size of the gap
-/// in the ownership table.
+/// Deliberately not folded into `oncall_unrouted_signals_total`, which answers
+/// "how many pages were never attempted" and has to keep answering it after an
+/// org nominates a catch-all. This one answers how much of the paging load
+/// rides on a fallback rather than an owner.
 pub static ONCALL_DEFAULTED_SIGNALS: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
         Opts::new(
@@ -160,9 +153,9 @@ pub static ONCALL_DEFAULTED_SIGNALS: Lazy<IntCounterVec> = Lazy::new(|| {
 /// Rungs whose escalation target resolved to no human.
 ///
 /// Distinct from an unrouted signal: the team was found, the ladder is running,
-/// and the rung still notified nobody because the schedule has a hole at that
-/// instant. The ladder advances silently in that case, which is exactly why the
-/// hole needs a counter — `target` says which seat was empty.
+/// and the rung still notified nobody because the schedule has a hole. The
+/// ladder advances silently, which is why the hole needs a counter — `target`
+/// says which seat was empty.
 pub static ONCALL_COVERAGE_GAPS: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
         Opts::new(
@@ -180,9 +173,9 @@ pub static ONCALL_COVERAGE_GAPS: Lazy<IntCounterVec> = Lazy::new(|| {
 
 /// Verdicts the agent produced, by what it recommended and how sure it was.
 ///
-/// The denominator for everything below it, and the mix on its own is the first
-/// signal of a prompt regression: a model that starts recommending `Suppress`
-/// for everything shows up here before it shows up anywhere a human would see.
+/// The denominator for everything below, and the mix alone is the first signal
+/// of a prompt regression: a model that starts recommending `Suppress` for
+/// everything shows up here first.
 pub static ONCALL_L0_VERDICTS: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
         Opts::new(
@@ -214,12 +207,9 @@ pub static ONCALL_L0_BUDGET_EXPIRED: Lazy<IntCounterVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
-/// The ratchet in use, from and to.
-///
-/// Paired with acknowledgement latency and the recorded resolution cause, this
-/// is what answers "were the promoted ones real?" — the question that decides
-/// whether the one decision this design delegates to a model was worth
-/// delegating.
+/// The ratchet in use, from and to. Paired with acknowledgement latency and the
+/// recorded resolution cause, this answers "were the promoted ones real?" — the
+/// question that decides whether delegating this decision was worth it.
 pub static ONCALL_L0_PROMOTED: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
         Opts::new(
@@ -235,10 +225,9 @@ pub static ONCALL_L0_PROMOTED: Lazy<IntCounterVec> = Lazy::new(|| {
 
 /// Suggested demotions, refused.
 ///
-/// **Expected to be ~0.** The engine discards any `severity_suggestion` at or
-/// below the firing's current severity, so a nonzero rate here is not a routine
-/// event: it means the model has regressed, or something in a log line is
-/// talking to it. Alert on the rate, not the total.
+/// Expected to be ~0: the engine discards any suggestion at or below the
+/// current severity, so a nonzero rate means the model has regressed or
+/// something in a log line is talking to it. Alert on the rate, not the total.
 pub static ONCALL_L0_SEVERITY_CLAMP: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
         Opts::new(
@@ -281,12 +270,11 @@ pub static ONCALL_L0_DOWNGRADED: Lazy<IntCounterVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
-/// Whether the human's page already contained the answer.
+/// Whether the human's page already contained the answer — the headline metric.
 ///
-/// The headline metric — the one that justifies the feature. Recorded at the
-/// first acknowledgement with `verdict_first` set to whether a verdict had
-/// landed by then; the ratio §8 names is `yes / (yes + no)`, computed at query
-/// time rather than stored, because a ratio is not a thing a counter can be.
+/// Recorded at the first acknowledgement with `verdict_first` set to whether a
+/// verdict had landed by then. §8's ratio is `yes / (yes + no)`, computed at
+/// query time, because a ratio is not a thing a counter can be.
 pub static ONCALL_L0_VERDICT_BEFORE_FIRST_ACK: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
         Opts::new(
@@ -301,19 +289,14 @@ pub static ONCALL_L0_VERDICT_BEFORE_FIRST_ACK: Lazy<IntCounterVec> = Lazy::new(|
 });
 
 /// A suppressed firing that came back at or above its original severity within
-/// 24 hours.
+/// 24 hours — the trust metric. If this is not ~zero, teams should not enable
+/// suppression, and the UI should say so next to the toggle.
 ///
-/// The trust metric. If this is not ~zero, teams should not enable suppression,
-/// and the UI should say so next to the toggle rather than leaving them to find
-/// out from a missed outage.
-///
-/// **It has no producer yet.** Deciding that a suppressed firing came back
-/// needs a watcher that looks at the next 24 hours of firings for the same
-/// subject, and that watcher is not built. Until it is, this series reads a
-/// permanent zero, which is indistinguishable from "suppression has never once
-/// been wrong" — so nothing may render it beside the `allow_suppress` toggle as
-/// though it were evidence. `config::meta::oncall::is_false_suppress` is the
-/// predicate it will use.
+/// It has no producer yet: deciding that a suppressed firing came back needs a
+/// watcher over the next 24 hours of firings for the same subject, and that is
+/// not built. Until it is, this reads a permanent zero, indistinguishable from
+/// "suppression has never once been wrong" — so nothing may render it beside
+/// the `allow_suppress` toggle as evidence.
 pub static ONCALL_L0_FALSE_SUPPRESS: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
         Opts::new(
@@ -327,12 +310,10 @@ pub static ONCALL_L0_FALSE_SUPPRESS: Lazy<IntCounterVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
-/// Registers the on-call metrics on `registry`.
-///
-/// Called from `metrics::register_metrics` so the whole set lives or dies
-/// together; a metric that is defined but never registered is worse than one
-/// that does not exist, because it looks present in the code and is absent from
-/// `/metrics`.
+/// Registers the on-call metrics on `registry`. Called from
+/// `metrics::register_metrics` so the whole set lives or dies together: a
+/// metric defined but never registered is worse than one that does not exist,
+/// because it looks present in the code and is absent from `/metrics`.
 pub(super) fn register(registry: &prometheus::Registry) {
     registry
         .register(Box::new(ONCALL_PAGES_DISPATCHED.clone()))
@@ -384,11 +365,9 @@ pub(super) fn register(registry: &prometheus::Registry) {
         .expect("Metric registered");
 }
 
-/// Emit the counters one verdict application moved.
-///
-/// Takes the list [`config::meta::oncall::metrics_for`] computed rather than
-/// recomputing anything: the decision and the counter come off one evaluation,
-/// so a dashboard and the timeline cannot disagree about what happened.
+/// Emit the counters one verdict application moved. Takes the list
+/// [`config::meta::oncall::metrics_for`] computed rather than recomputing, so a
+/// dashboard and the timeline cannot disagree about what happened.
 pub fn l0_verdict_applied(org_id: &str, priority: &str, moved: &[crate::meta::oncall::L0Metric]) {
     use crate::meta::oncall::L0Metric;
 
@@ -441,10 +420,9 @@ pub fn page_dispatched(org_id: &str, priority: &str, channel: &str) {
         .inc();
 }
 
-/// One page attempt a channel did not accept.
-///
-/// Deliberately counts the attempt, not the rung: a rung that reached three of
-/// four people is a partial failure and has to read as one.
+/// One page attempt a channel did not accept. Counts the attempt, not the rung:
+/// a rung that reached three of four people is a partial failure and has to
+/// read as one.
 pub fn delivery_failed(org_id: &str, channel: &str) {
     ONCALL_DELIVERY_FAILURES
         .with_label_values(&[org_id, channel])
@@ -455,8 +433,7 @@ pub fn delivery_failed(org_id: &str, channel: &str) {
 ///
 /// `time_to_ack_micros` is optional because the acknowledgement is the fact
 /// worth counting even on a record whose open time this build cannot read;
-/// dropping the whole observation for a missing latency would understate how
-/// many pages were answered.
+/// dropping the observation would understate how many pages were answered.
 pub fn acknowledged(org_id: &str, priority: &str, time_to_ack_micros: Option<i64>) {
     ONCALL_ACKNOWLEDGEMENTS
         .with_label_values(&[org_id, priority])
@@ -506,8 +483,7 @@ mod tests {
     use super::*;
 
     /// The whole set has to register on a fresh registry without a name clash.
-    /// Duplicate metric names are a runtime panic at boot, not a compile error,
-    /// so this is the only place that catches one.
+    /// Duplicate metric names are a runtime panic at boot, not a compile error.
     #[test]
     fn test_every_oncall_metric_registers_once() {
         let registry = Registry::new();
@@ -521,16 +497,13 @@ mod tests {
         assert!(names.len() <= 16, "unexpected extra families: {names:?}");
     }
 
-    /// The emission seam. `metrics_for` decides *what* moved; this decides
-    /// *which series*, and getting that mapping wrong is invisible — the
-    /// decision tests all pass, the counters all move, and the numbers are
-    /// wrong.
+    /// The emission seam. `metrics_for` decides what moved; this decides which
+    /// series, and getting that mapping wrong is invisible — the decision tests
+    /// pass, the counters move, and the numbers are wrong.
     ///
-    /// The pairing that matters is clamp versus promote. They are the same
-    /// shape and adjacent in the code, and swapping them makes
-    /// `oncall_l0_severity_clamp_total` — which is supposed to sit at zero and
-    /// mean "prompt regression" — tick along with every ordinary promotion,
-    /// which retires the alarm.
+    /// Clamp versus promote is the pairing that matters: same shape, adjacent
+    /// in the code, and swapping them makes the prompt-regression alarm tick
+    /// along with every ordinary promotion, which retires it.
     #[test]
     fn test_each_l0_decision_lands_on_its_own_series() {
         use crate::meta::{alerts::priority::AlertPriority, oncall::L0Metric};
@@ -660,10 +633,8 @@ mod tests {
     }
 
     /// §8's names, spelled out. These are the series a team's alerts and
-    /// dashboards are written against, so a rename is a silent outage of the
-    /// thing that was supposed to tell us L0 had gone wrong — and
-    /// `oncall_l0_severity_clamp_total` in particular is the prompt-regression
-    /// alarm, which nobody notices has stopped firing.
+    /// dashboards are written against, so a rename silently takes out the thing
+    /// that was supposed to tell us L0 had gone wrong.
     #[test]
     fn test_the_l0_metric_names_are_the_ones_the_design_publishes() {
         let expected = [

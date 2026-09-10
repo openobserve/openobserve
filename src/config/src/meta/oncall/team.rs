@@ -38,15 +38,15 @@ pub struct Team {
     /// Alert Destination names this team is talked to on — the room the record
     /// is posted to, as opposed to the people the ladder wakes.
     ///
-    /// `None` means never set, which falls back to
-    /// `EscalationPolicy::destinations` so stored policies keep working;
-    /// `Some([])` means deliberately no channel. Precedence lives in one place,
+    /// `None` means never set and falls back to
+    /// `EscalationPolicy::destinations`, so stored policies keep working;
+    /// `Some([])` means deliberately no channel. Precedence lives in
     /// `config::meta::oncall::policy::team_channel`.
     ///
-    /// It is on the team rather than the policy because a team's room is not a
-    /// property of its escalation ladder — you want it without ever editing a
-    /// rung — and because a whole-row super-cluster snapshot built from `Team`
-    /// would otherwise have to carry a column it cannot see.
+    /// On the team rather than the policy because a team's room is not a
+    /// property of its ladder — you want it without editing a rung — and a
+    /// whole-row super-cluster snapshot built from `Team` would otherwise have
+    /// to carry a column it cannot see.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub channel_destinations: Option<Vec<String>>,
     pub created_at: i64,
@@ -56,10 +56,10 @@ pub struct Team {
 /// Membership — a flat list of who is on the team.
 ///
 /// Deliberately carries no level. Which rung somebody covers is a property of
-/// the *rotation* (`Schedule.rotations`), not of belonging to the team: a
-/// person is simply on the team, and the schedule says when they are primary,
-/// secondary, or neither. Pinning a level here would force one row per level
-/// per person and split the same fact across two places.
+/// the rotation (`Schedule.rotations`): a person is on the team, and the
+/// schedule says when they are primary, secondary, or neither. A level here
+/// would force one row per level per person and split one fact across two
+/// places.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct TeamMember {
     pub id: String,
@@ -77,25 +77,22 @@ pub struct Schedule {
     pub rotations: Vec<Rotation>,
     /// Covers in force over this schedule.
     ///
-    /// Carried on the schedule rather than fetched separately at each call
-    /// site because *every* resolution has to see them. An override that the
-    /// page path forgets to load is worse than no override feature at all: the
-    /// engineer who arranged cover stops watching, and the page still goes to
-    /// them. So the one loader that produces a `Schedule` fills this in, and
-    /// nothing downstream can resolve without it.
+    /// Carried on the schedule rather than fetched at each call site because
+    /// every resolution has to see them. An override the page path forgets to
+    /// load is worse than no override feature at all: the engineer who arranged
+    /// cover stops watching, and the page still goes to them.
     ///
     /// Stored in `oncall_overrides`, not in the schedule row — they have their
-    /// own lifecycle and their own audit trail.
+    /// own lifecycle and audit trail.
     #[serde(default)]
     pub overrides: Vec<ScheduleOverride>,
     /// Absences in force over this schedule, for the people on its rotations.
     ///
-    /// Carried here for the same reason the covers are, and the reason is the
-    /// same failure: a resolution path that loads the schedule and forgets the
-    /// absences gets a perfectly plausible answer that pages somebody on a
-    /// beach. Stored org-wide in `oncall_unavailability` — an absence is a fact
-    /// about a person, not about one of their teams — and narrowed to this
-    /// schedule's members by the loader.
+    /// Carried here for the same reason as the covers, against the same
+    /// failure: a path that loads the schedule and forgets the absences gets a
+    /// plausible answer that pages somebody on a beach. Stored org-wide in
+    /// `oncall_unavailability` and narrowed to this schedule's members by the
+    /// loader.
     #[serde(default)]
     pub unavailability: Vec<Unavailability>,
     pub created_at: i64,
@@ -104,12 +101,11 @@ pub struct Schedule {
 
 /// Where a newly added team member belongs on the team's rotations.
 ///
-/// Membership and the rotation are two different facts — being on the team,
-/// and being in the handover order — and they have to be kept in step in both
-/// directions. The seeding path only ever ran for a team's *first* members, so
-/// anybody added afterwards was on the team and on no rotation: the default
-/// ladder's `NextOnCall` rung resolved to nobody, and the second rung of every
-/// page went nowhere.
+/// Membership and the rotation are two facts — being on the team, and being in
+/// the handover order — and they have to stay in step. The seeding path only
+/// ran for a team's first members, so anybody added afterwards was on the team
+/// and on no rotation: the default ladder's `NextOnCall` rung resolved to
+/// nobody, and the second rung of every page went nowhere.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MemberPlacement {
     /// They are already in the handover order. Nothing to write.
@@ -125,8 +121,7 @@ pub enum MemberPlacement {
     NoRotationYet,
     /// The team runs several rotations — layers, follow-the-sun, a weekend
     /// shift. Which one a new person covers is a real scheduling decision, and
-    /// guessing at it would quietly put somebody on call for hours they never
-    /// agreed to. The caller says so instead.
+    /// guessing would put somebody on call for hours they never agreed to.
     NeedsManualPlacement,
 }
 
@@ -134,11 +129,9 @@ pub enum MemberPlacement {
 /// rotations.
 ///
 /// A team with exactly one unrestricted rotation is still on the shipped
-/// default shape, whatever it has been renamed to or however its shift length
-/// has been tuned: appending to the end of the handover order is unambiguous
-/// and is what somebody adding a person to the team means. The moment there
-/// are layers or restrictions, placement stops being obvious and stops being
-/// automatic.
+/// default shape, so appending to the end of the handover order is unambiguous
+/// and is what somebody adding a person means. The moment there are layers or
+/// restrictions, placement stops being obvious and stops being automatic.
 pub fn place_member(rotations: &[Rotation], user_email: &str) -> MemberPlacement {
     let email = user_email.trim().to_ascii_lowercase();
     let names = |r: &Rotation| {
@@ -179,11 +172,9 @@ pub fn place_member(rotations: &[Rotation], user_email: &str) -> MemberPlacement
     }
 }
 
-/// What taking one person off a team did to its rotations.
-///
-/// Carries the coverage consequences rather than just the new list, because
-/// the only thing worse than a rotation with nobody on it is a rotation with
-/// nobody on it that nobody was told about.
+/// What taking one person off a team did to its rotations. Carries the coverage
+/// consequences rather than just the new list: the only thing worse than a
+/// rotation with nobody on it is one nobody was told about.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct MemberRemoval {
     /// The rotations as they now stand, ready to be stored.
@@ -230,10 +221,9 @@ pub enum TeamError {
 
 /// How many instants one coverage sweep will probe for a single schedule.
 ///
-/// A week of hourly steps is 168; the rest of the budget is headroom for a
-/// team running several layers with frequent handovers. It is a stop, not a
-/// target: hitting it means the walk gave up, and giving up reports no gap
-/// rather than a false one.
+/// A week of hourly steps is 168; the rest is headroom for a team running
+/// several layers. A stop, not a target: hitting it means the walk gave up, and
+/// giving up reports no gap rather than a false one.
 const MAX_COVERAGE_PROBES: usize = 2_000;
 
 impl Schedule {
@@ -247,9 +237,8 @@ impl Schedule {
     /// This team's rotations, in stored order.
     ///
     /// Replaced `slots()`, which reported names from three sources — rotations
-    /// that staffed a slot, rotations that *declared* they derived one, and an
-    /// implicit append for teams that had said nothing. Two of those three
-    /// produced positions with no roster behind them.
+    /// that staffed a slot, rotations that declared they derived one, and an
+    /// implicit append. Two of the three produced positions with no roster.
     pub fn rotation_names(&self) -> Vec<String> {
         self.rotations
             .iter()
@@ -272,11 +261,10 @@ impl Schedule {
             > 1
     }
 
-    /// The rotation a team's first level pages when nothing says otherwise:
-    /// the one named [`DEFAULT_ROTATION_NAME`], or failing that the first that
-    /// validates.
+    /// The rotation a team's first level pages when nothing says otherwise: the
+    /// one named [`DEFAULT_ROTATION_NAME`], or the first that validates.
     ///
-    /// A *fallback for reads*, not a resolution rule. Levels store an id; this
+    /// A fallback for reads, not a resolution rule. Levels store an id; this
     /// exists so a screen with nothing selected yet has something to show.
     pub fn primary_rotation(&self) -> Option<&Rotation> {
         self.rotations
@@ -355,9 +343,8 @@ impl Schedule {
     }
 
     /// Shifts in `[from, to)` this schedule would hand to somebody who is away.
-    ///
-    /// The edit-time half of unavailability: the resolver will skip them, and
-    /// this is what says so before anybody finds out from the calendar.
+    /// The edit-time half of unavailability: the resolver skips them, and this
+    /// says so before anybody finds out from the calendar.
     pub fn away_assignments(&self, from: i64, to: i64) -> Vec<AwayShift> {
         away_assignments(
             &self.rotations,
@@ -371,11 +358,10 @@ impl Schedule {
 
     /// Whether a page would reach anybody at all.
     ///
-    /// The **primary** rotation is the question, because that is what the first
+    /// The primary rotation is the question, because that is what the first
     /// level of every shipped ladder pages: a team whose secondary is staffed
-    /// and whose primary is not still wakes nobody when the alert fires. An
-    /// unstaffed rotation further down shows up as its own risk rather than
-    /// changing what "covered" means, so adding a rotation can never turn a
+    /// and whose primary is not still wakes nobody. An unstaffed rotation
+    /// further down is its own risk, so adding a rotation can never turn a
     /// covered team into an uncovered one.
     pub fn is_staffed(&self, at: i64) -> bool {
         self.primary_rotation()
@@ -400,15 +386,13 @@ impl Schedule {
     }
 
     /// The first instant in `[from, from + horizon)` at which this schedule
-    /// pages nobody, or `None` when the whole window is covered (02 §8).
+    /// pages nobody, or `None` when the window is covered (02 §8).
     ///
-    /// Walked in shift-sized steps rather than at a fixed cadence: the only
-    /// instants at which coverage can change are handovers and the edges of an
-    /// override, so stepping to the next handover finds every gap a fixed
-    /// cadence would while asking a fraction of the questions. `max_step`
-    /// bounds the stride anyway, because a rotation with no handover ahead —
-    /// an override window, a one-person layer — would otherwise be sampled
-    /// once and declared covered for a week.
+    /// Walked in shift-sized steps: coverage can only change at handovers and
+    /// override edges, so stepping to the next handover finds every gap a fixed
+    /// cadence would while asking far fewer questions. `max_step` bounds the
+    /// stride, because a rotation with no handover ahead would otherwise be
+    /// sampled once and declared covered for a week.
     ///
     /// Pure and given `from`, so the sweep that calls it every fifteen minutes
     /// is testable without waiting a week for a gap.
@@ -442,35 +426,15 @@ impl Schedule {
             .min()
     }
 
-    /// The schedule with `user_email` taken off every rotation.
+    /// Whether this schedule still mentions somebody anywhere — on a rotation,
+    /// holding a cover, or as an absence window.
     ///
-    /// Removing somebody from the team has to remove them from the rotations
-    /// too, or a departed engineer keeps getting woken by a schedule nobody
-    /// remembers they are on. Pure, so the awkward cases are decided here
-    /// rather than in the middle of a database write:
-    ///
-    /// - **On several layers.** They come off all of them; being on two layers is a scheduling
-    ///   choice, not two different people.
-    /// - **The only person on a rotation.** That rotation now staffs nobody, which is not a
-    ///   rotation — it is dropped, and named in [`MemberRemoval::emptied_rotations`] so the caller
-    ///   can say so out loud. Keeping it with an empty member list would be worse: it fails
-    ///   validation, so the team's next schedule edit would be refused for a reason nobody could
-    ///   see.
-    /// - **The last rotation of all.** Then the team pages nobody, which is a coverage gap —
-    ///   [`MemberRemoval::leaves_no_rotation`] says so.
-    ///
-    /// Matching is case-insensitive: membership is stored lowercased, but a
-    /// rotation written by hand through the API may not be.
-    /// Whether this schedule still mentions somebody **anywhere** — on a
-    /// rotation, holding a cover, or as an absence window.
-    ///
-    /// The offboarding invariant, stated once as a question the schedule can
-    /// answer about itself. Somebody who has left an org must be gone from all
-    /// three, and the three are separately stored and separately deleted:
+    /// The offboarding invariant, as a question the schedule answers about
+    /// itself. The three places are separately stored and separately deleted:
     /// taking a leaver off the rotations while their cover survives leaves them
     /// on call, because an override outranks every layer. Asking "is this
-    /// person anywhere in here" is the assertion that does not have to be
-    /// updated when a fourth place to hide is added.
+    /// person anywhere in here" does not have to be updated when a fourth place
+    /// to hide is added.
     pub fn names_member(&self, user_email: &str) -> bool {
         let email = user_email.trim().to_ascii_lowercase();
         let is = |m: &str| m.trim().to_ascii_lowercase() == email;
@@ -701,13 +665,10 @@ mod tests {
         assert_eq!(s.validate(), Err(TeamError::AmbiguousRotations));
     }
 
-    /// The same two rules in **two rotations** are not ambiguous — they are two
-    /// positions, and both being on call at once is the entire point.
-    ///
-    /// This inverts the old assertion, which was scoped to a slot. Under slots
-    /// the pair above and the pair here were the same shape distinguished by a
-    /// string; a rotation makes them different objects, so the check moves
-    /// inside one and stops firing across two.
+    /// The same two rules in two rotations are not ambiguous — they are two
+    /// positions, and both being on call at once is the point. Under slots the
+    /// two shapes were distinguished by a string; a rotation makes them
+    /// different objects, so the check moves inside one.
     #[test]
     fn test_two_rotations_covering_the_same_hours_are_not_ambiguous() {
         let s = schedule(vec![
@@ -735,10 +696,9 @@ mod tests {
         s.validate().unwrap();
     }
 
-    /// The bug this exists to prevent: only a team's very first members ever
-    /// reached its rotation, so a team built one person at a time ended up
-    /// with a one-person rotation. `NextOnCall` then resolved to nobody, and
-    /// the second rung of every page went nowhere.
+    /// The bug this prevents: only a team's first members ever reached its
+    /// rotation, so a team built one person at a time ended up with a
+    /// one-person rotation. `NextOnCall` then resolved to nobody.
     #[test]
     fn test_a_member_added_later_joins_the_existing_rotation() {
         let rotations = vec![weekly("On-call rotation", &["ana@o2.ai"])];
@@ -777,8 +737,8 @@ mod tests {
     }
 
     /// Adding somebody twice must not put them on the rotation twice — a
-    /// duplicate fails `Rotation::validate` and would double their share of
-    /// the on-call load.
+    /// duplicate fails `Rotation::validate` and would double their share of the
+    /// on-call load.
     #[test]
     fn test_adding_a_member_who_is_already_on_the_rotation_changes_nothing() {
         let rotations = vec![weekly("On-call rotation", &["ana@o2.ai", "bob@o2.ai"])];
@@ -788,10 +748,9 @@ mod tests {
         );
     }
 
-    /// A team running layers has made a real scheduling decision. Which layer
-    /// a new person covers is theirs to make: appending them to whichever
-    /// rotation happened to be first could put somebody on call for the
-    /// weekend they never agreed to.
+    /// A team running layers has made a real scheduling decision. Appending a
+    /// new person to whichever rotation happened to be first could put them on
+    /// call for a weekend they never agreed to.
     #[test]
     fn test_a_hand_edited_schedule_is_not_rewritten_behind_the_operators_back() {
         let mut weekend = weekly("Weekends", &["bob@o2.ai"]);
@@ -825,10 +784,9 @@ mod tests {
         );
     }
 
-    /// The bug this exists to prevent: removing somebody from the team used to
-    /// delete the membership row and leave the rotations untouched, so a
-    /// departed engineer kept getting woken by a schedule nobody remembered
-    /// they were on.
+    /// The bug this prevents: removing somebody from the team deleted the
+    /// membership row and left the rotations untouched, so a departed engineer
+    /// kept getting woken by a schedule nobody remembered they were on.
     #[test]
     fn test_removing_a_member_takes_them_off_the_rotation() {
         let s = schedule(vec![weekly(
@@ -887,9 +845,9 @@ mod tests {
     }
 
     /// A rotation whose last member leaves is a shift with nobody on it. It is
-    /// dropped rather than stored empty — an empty rotation fails validation,
-    /// so the team's next schedule edit would be refused for a reason nobody
-    /// could see — and the emptying is reported so it can be said out loud.
+    /// dropped rather than stored empty — an empty rotation fails validation, so
+    /// the next schedule edit would be refused for a reason nobody could see —
+    /// and the emptying is reported so it can be said out loud.
     #[test]
     fn test_emptying_a_rotation_is_reported_not_stored() {
         let s = schedule(vec![weekly("Catch-all", &["ana@o2.ai"]), {
@@ -938,8 +896,8 @@ mod tests {
     }
 
     /// Somebody on the team but on no rotation costs no write: reporting a
-    /// change here would rewrite the schedule for nothing and bump its
-    /// `updated_at` every time a name is tidied up.
+    /// change would rewrite the schedule for nothing and bump its `updated_at`
+    /// every time a name is tidied up.
     #[test]
     fn test_removing_somebody_who_was_never_on_a_rotation_changes_nothing() {
         let s = schedule(vec![weekly("On-call rotation", &["ana@o2.ai"])]);
@@ -1006,9 +964,9 @@ mod tests {
         assert!(s.is_staffed(ANCHOR));
     }
 
-    /// A schedule with nobody rostered but a cover standing over it is
-    /// staffed. Reporting it as a coverage gap would send an operator hunting
-    /// for a hole somebody already filled.
+    /// A schedule with nobody rostered but a cover standing over it is staffed.
+    /// Reporting a coverage gap would send an operator hunting for a hole
+    /// somebody already filled.
     #[test]
     fn test_a_cover_over_an_unstaffed_schedule_counts_as_coverage() {
         // A retired rule resolves to nobody, and cover is checked first, so it staffs the hole.
@@ -1029,11 +987,10 @@ mod tests {
 
     /// A cover naming a rotation the team does not have staffs nothing.
     ///
-    /// It used to conjure the position — `resolve_on_call` invented a slot for
-    /// any cover that named one — which is the same class of thing as the
-    /// derived secondary: a position existing because something other than a
-    /// rotation asked for it. An orphaned cover is now inert, and the team
-    /// reads as unstaffed, which is true.
+    /// It used to conjure the position — the same class of thing as the derived
+    /// secondary: a position existing because something other than a rotation
+    /// asked for it. An orphaned cover is now inert, and the team reads as
+    /// unstaffed, which is true.
     #[test]
     fn test_a_cover_naming_no_rotation_staffs_nothing() {
         let s = covered(vec![], a_cover("sam@o2.ai", ANCHOR, ANCHOR + 1_000));
@@ -1100,8 +1057,8 @@ mod tests {
     const WEEK: i64 = MICROS_PER_WEEK;
 
     /// §8: "a page that never reaches a human is the worst failure this system
-    /// has". A team with nobody on any rotation is in exactly that state, and
-    /// the sweep has to say so from the first instant it looks at.
+    /// has". A team with nobody on any rotation is in that state, and the sweep
+    /// has to say so from the first instant it looks at.
     #[test]
     fn test_a_team_with_no_rotation_is_a_gap_from_the_first_instant() {
         let s = schedule(vec![]);
@@ -1119,11 +1076,10 @@ mod tests {
         assert_eq!(s.first_coverage_gap(ANCHOR, WEEK, HOUR), None);
     }
 
-    /// The gap §8 says the computed model can still produce: a restricted
-    /// layer with nothing underneath it. Weekdays 09:00–17:00 covers the
-    /// working day and nobody at all outside it, so the sweep has to find the
-    /// first uncovered hour rather than sampling one instant inside the shift
-    /// and reporting the team as staffed.
+    /// The gap §8 says the computed model can still produce: a restricted layer
+    /// with nothing underneath it. Weekdays 09:00–17:00 covers the working day
+    /// and nobody outside it, so the sweep must find the first uncovered hour
+    /// rather than sampling one instant inside the shift.
     #[test]
     fn test_a_restricted_layer_with_nothing_underneath_it_is_found() {
         let mut business = weekly("Business hours", &["ana@o2.ai"]);
@@ -1144,9 +1100,9 @@ mod tests {
         );
     }
 
-    /// The stride is a bound, not the cadence: a rotation that never hands
-    /// over must still be probed across the window rather than sampled once
-    /// and declared covered.
+    /// The stride is a bound, not the cadence: a rotation that never hands over
+    /// must still be probed across the window rather than sampled once and
+    /// declared covered.
     #[test]
     fn test_the_walk_is_bounded_and_terminates_on_a_covered_window() {
         let s = schedule(vec![weekly("On-call rotation", &["ana@o2.ai"])]);
@@ -1246,8 +1202,7 @@ mod tests {
     }
 
     /// Before: they are on a rotation, on a cover and on an absence, and the
-    /// schedule says so. This is the assertion the "after" test is worth
-    /// nothing without.
+    /// schedule says so. The "after" test is worth nothing without this.
     #[test]
     fn test_a_leaver_is_named_by_the_schedule_before_they_are_offboarded() {
         let before = schedule_with_a_leaver();
@@ -1294,9 +1249,9 @@ mod tests {
         }
     }
 
-    /// The cover is the second door into the same bug, and it has to be shut
-    /// separately: an override outranks every layer, so taking somebody off
-    /// the rotation while their cover survives leaves them on call.
+    /// The cover is the second door into the same bug and has to be shut
+    /// separately: an override outranks every layer, so taking somebody off the
+    /// rotation while their cover survives leaves them on call.
     #[test]
     fn test_dropping_the_rotations_alone_would_leave_the_leaver_on_call() {
         let before = schedule_with_a_leaver();

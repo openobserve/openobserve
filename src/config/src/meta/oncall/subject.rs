@@ -79,10 +79,9 @@ impl std::str::FromStr for SubjectType {
     }
 }
 
-/// Points at one firing of one thing.
-///
-/// `source_id` is the rule/check that produced it; `firing` counts firings of
-/// that source. Together they form the `subject_id` stored on the record.
+/// Points at one firing of one thing. `source_id` is the rule or check that
+/// produced it; `firing` counts firings of that source. Together they form the
+/// `subject_id` stored on the record.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
 pub struct SubjectRef {
     pub subject_type: SubjectType,
@@ -101,10 +100,9 @@ impl SubjectRef {
         }
     }
 
-    /// The stored `subject_id`, e.g. `al_ckt#3`.
-    ///
-    /// The suffix is what makes the record per-firing rather than per-rule,
-    /// which is what lets cause history accumulate across firings.
+    /// The stored `subject_id`, e.g. `al_ckt#3`. The suffix is what makes the
+    /// record per-firing rather than per-rule, which is what lets cause history
+    /// accumulate across firings.
     pub fn subject_id(&self) -> String {
         format!("{}#{}", self.source_id, self.firing)
     }
@@ -114,9 +112,8 @@ impl SubjectRef {
         (self.subject_type.to_i32(), self.subject_id())
     }
 
-    /// Parse a stored `subject_id` back into its parts.
-    ///
-    /// Splits on the LAST `#` so a source id containing one is not corrupted.
+    /// Parse a stored `subject_id` back into its parts. Splits on the LAST `#`
+    /// so a source id containing one is not corrupted.
     pub fn parse(subject_type: SubjectType, subject_id: &str) -> Result<Self, SubjectError> {
         let (source, suffix) = subject_id
             .rsplit_once('#')
@@ -286,18 +283,16 @@ mod tests {
         assert_eq!(back, s);
     }
 
-    /// The key a record is stored under, and the key its dedup guard looks up,
+    /// The key a record is stored under and the key its dedup guard looks up
     /// have to be the same string.
     ///
-    /// They were not. A firing that fanned out to several teams stores one
-    /// record per team under `<alert>:group:<team>`, while the guard asked
-    /// about the bare `<alert>`. Lookups are a `"{source_id}#"` prefix match,
-    /// and `alert#` does not prefix `alert:group:team#` — so the guard saw
-    /// nothing, every evaluation answered "page", and each one opened a fresh
-    /// record with the next firing number. For ever.
+    /// They were not. A firing that fanned out stores one record per team under
+    /// `<alert>:group:<team>`, while the guard asked about the bare `<alert>`.
+    /// Lookups are a `"{source_id}#"` prefix match, and `alert#` does not prefix
+    /// `alert:group:team#` — so the guard saw nothing, every evaluation answered
+    /// "page", and each opened a fresh record. For ever.
     ///
-    /// Pinning the prefix relationship here because it is the whole mechanism:
-    /// any producer that scopes a source id has to run its guard on the scoped
+    /// Any producer that scopes a source id has to run its guard on the scoped
     /// id, not the bare one.
     #[test]
     fn test_a_scoped_source_id_is_not_found_under_the_bare_one() {

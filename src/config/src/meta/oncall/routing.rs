@@ -25,17 +25,14 @@ use super::subject::SubjectType;
 /// The dimension every platform has, whatever else it reports.
 ///
 /// Spelled as the semantic group's own id (`default_semantic_groups.json`), so
-/// a rule written against it matches what extraction produces. Named here
-/// rather than typed as a literal at each call site because the fallback in the
-/// incident path and the rules an operator writes have to agree exactly — a
-/// route on `service` and a dimension emitted as `service_name` never meet.
+/// a rule written against it matches what extraction produces. Named once
+/// rather than typed at each call site: a route on `service` and a dimension
+/// emitted as `service_name` never meet.
 pub const SERVICE_DIMENSION: &str = "service";
 
 /// Canonical form of a set of dimensions: sorted by name, rendered `k=v/k=v`.
-///
 /// The same spelling an [`OwnershipRule`] stores, so an unrouted signal's path
-/// and the rule that would have caught it are directly comparable — by eye in
-/// the UI, and by string in the storage layer's unique index.
+/// and the rule that would have caught it are directly comparable.
 pub fn canonical_path(dimensions: &HashMap<String, String>) -> String {
     let mut pairs: Vec<_> = dimensions.iter().collect();
     pairs.sort_by(|a, b| a.0.cmp(b.0));
@@ -50,11 +47,10 @@ pub fn canonical_path(dimensions: &HashMap<String, String>) -> String {
 /// ownership rule claimed.
 ///
 /// One row per org, and `default_team_id` is deliberately optional. There is no
-/// auto-created fallback team: a fresh org has no default, and whatever does
-/// not route goes on the unrouted queue until an operator nominates a team for
-/// it. That nomination is what makes the tier safe — the catch-all is a team
-/// somebody deliberately chose, not one the product invented and then started
-/// waking at 3am for services they may not run.
+/// auto-created fallback team: whatever does not route goes on the unrouted
+/// queue until an operator nominates one. That nomination is what makes the
+/// tier safe — the catch-all is a team somebody chose, not one the product
+/// invented and then started waking at 3am.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct RoutingConfig {
     pub org_id: String,
@@ -65,9 +61,9 @@ pub struct RoutingConfig {
 }
 
 impl RoutingConfig {
-    /// A org that has never touched the setting reads the same as one that
-    /// cleared it, so the read path never has to distinguish "no row" from
-    /// "row with nothing in it".
+    /// An org that has never touched the setting reads the same as one that
+    /// cleared it, so the read path never distinguishes "no row" from "row with
+    /// nothing in it".
     pub fn unset(org_id: &str) -> Self {
         Self {
             org_id: org_id.to_string(),
@@ -90,12 +86,12 @@ pub struct OwnershipRule {
     pub org_id: String,
     pub team_id: String,
     /// Every pair that must match for this rule to apply. An empty map is a
-    /// catch-all and is rejected by [`Self::validate`] — an accidental
-    /// catch-all would silently capture every alert in the org.
+    /// catch-all and is rejected by [`Self::validate`] — an accidental one
+    /// would silently capture every alert in the org.
     ///
     /// A value may end in `*` to claim the subtree below a literal prefix
-    /// (`host=db-*`), which is what §7 asks for on deployments whose finest
-    /// dimension is a numbered host rather than a namespace.
+    /// (`host=db-*`), which §7 asks for on deployments whose finest dimension
+    /// is a numbered host rather than a namespace.
     pub dimensions: HashMap<String, String>,
     pub created_at: i64,
     pub updated_at: i64,
@@ -139,10 +135,9 @@ impl std::error::Error for OwnershipError {}
 
 /// Whether one rule pair matches the value the record carried.
 ///
-/// A trailing `*` is a prefix claim and nothing more: `host=db-*` owns
-/// `db-01` and `db-primary`, and no other form of pattern exists. §7's rule is
-/// "no regex, no boolean logic", because a routing table people cannot read at
-/// a glance is one they stop trusting.
+/// A trailing `*` is a prefix claim and nothing more: `host=db-*` owns `db-01`
+/// and `db-primary`. §7: "no regex, no boolean logic", because a routing table
+/// people cannot read at a glance is one they stop trusting.
 fn pair_matches(want: &str, actual: &str) -> bool {
     match want.strip_suffix('*') {
         Some(prefix) => actual.starts_with(prefix),
@@ -155,49 +150,39 @@ fn pair_matches(want: &str, actual: &str) -> bool {
 ///
 /// Without this, two rules that pin one dimension each are separated only by
 /// how many characters their values happen to have. `{k8s-cluster: production}`
-/// and `{service: payment-gateway}` both match a payment-gateway page in
-/// production, both pin one dimension, and the longer string wins — so
-/// "payments owns payment-gateway everywhere" holds until somebody renames the
-/// cluster to `production-us-east-1-primary`, at which point the cluster team
-/// silently starts taking those pages. That is not a tie-break anyone chose.
+/// and `{service: payment-gateway}` both match a payment-gateway page, both pin
+/// one dimension, and the longer string wins — so "payments owns
+/// payment-gateway everywhere" holds until somebody renames the cluster to
+/// `production-us-east-1-primary`.
 ///
 /// The ordering is not invented here. `Distinguish Services By` is already an
-/// **ordered** list per identity set — an org that wrote `[k8s-cluster,
-/// k8s-namespace]` has said a cluster contains namespaces — so the rank is the
-/// position in that list. `service` is finest by definition, being the thing
-/// the sets exist to disambiguate.
+/// ordered list per identity set, so the rank is the position in that list.
+/// `service` is finest by definition, being the thing the sets exist to
+/// disambiguate.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct DimensionDepth {
     ranks: HashMap<String, usize>,
 }
 
 impl DimensionDepth {
-    /// Ranks read off the org's identity sets, coarsest first within each set.
+    /// The ordering routing falls back to when an org has described no
+    /// topology.
     ///
-    /// Sets are ranked independently rather than concatenated: a record is
-    /// either an ECS task or a Kubernetes pod, so `ecs-task` and `k8s-namespace`
-    /// are never in contention and giving them a shared scale would only invent
-    /// an ordering between two things that never meet.
-    /// The ordering routing falls back to when an org has described no topology.
-    ///
-    /// Without it, an unconfigured org ranks nothing, so two rules pinning one
-    /// dimension each tie on every meaningful term and fall through to *literal
-    /// character count* — `{k8s-namespace: kafka}` loses to
-    /// `{k8s-cluster: prod-use1}` because `prod-use1` is the longer word, while
-    /// `{k8s-namespace: monitoring}` wins because it is longer than the cluster
-    /// name. Measured on a realistic estate, that mis-routes about one page in
-    /// twenty, and which namespaces it hits depends on nothing an operator can
-    /// see.
+    /// Without it an unconfigured org ranks nothing, so two rules pinning one
+    /// dimension each tie on every meaningful term and fall through to literal
+    /// character count: `{k8s-namespace: kafka}` loses to
+    /// `{k8s-cluster: prod-use1}` on word length, while
+    /// `{k8s-namespace: monitoring}` wins. On a realistic estate that
+    /// mis-routes about one page in twenty, unpredictably.
     ///
     /// One axis per platform, coarse → fine. They rank independently, so a
     /// Kubernetes pod and an ECS task never compete on a shared scale.
     ///
     /// `host` and `environment` are deliberately absent. Ranking `host` finer
     /// than `k8s-namespace` would make a node claim beat a namespace claim on
-    /// every Kubernetes signal, which is not a precedence anybody has asked for;
-    /// ranking it coarser leaves bare-metal estates exactly where they are. So
-    /// they stay unranked, and an org that claims ownership by host says so in
-    /// its own identity sets.
+    /// every Kubernetes signal; ranking it coarser leaves bare-metal estates
+    /// where they are. An org that claims ownership by host says so in its own
+    /// identity sets.
     pub fn shipped_default() -> Self {
         const AXES: [&[&str]; 5] = [
             &["k8s-cluster", "k8s-namespace", "k8s-deployment"],
@@ -235,11 +220,9 @@ impl DimensionDepth {
         Self { ranks }
     }
 
-    /// Where this dimension sits, higher being finer.
-    ///
-    /// `service` is always finest. A dimension no set mentions is coarsest —
-    /// it is not part of the topology anybody described, so it cannot be
-    /// allowed to outrank one that is.
+    /// Where this dimension sits, higher being finer. `service` is always
+    /// finest. A dimension no set mentions is coarsest — it is not part of any
+    /// topology anybody described, so it cannot outrank one that is.
     pub fn rank_of(&self, alias: &str) -> usize {
         if alias == SERVICE_DIMENSION {
             return usize::MAX;
@@ -259,11 +242,9 @@ impl OwnershipRule {
         self.dimensions.len()
     }
 
-    /// The finest level this rule reaches, and the second term of the ordering.
-    ///
-    /// Compared before exactness so that depth beats pattern shape: a rule
-    /// naming a service is a narrower claim than one naming a cluster whether
-    /// or not either uses a wildcard. Within one depth, exactness still decides.
+    /// The finest level this rule reaches — the second term of the ordering.
+    /// Compared before exactness, so a rule naming a service is a narrower
+    /// claim than one naming a cluster whether or not either uses a wildcard.
     pub fn finest_depth(&self, depths: &DimensionDepth) -> usize {
         self.dimensions
             .keys()
@@ -272,12 +253,10 @@ impl OwnershipRule {
             .unwrap_or(0)
     }
 
-    /// How many of those dimensions are pinned to a literal value.
-    ///
-    /// The third term of the ordering, so that at equal depth an exact match
-    /// always beats a wildcard one: `host=db-01` is a statement about one host,
-    /// `host=db-*` a statement about a family, and the narrower claim is the
-    /// one whose author meant it.
+    /// How many of those dimensions are pinned to a literal value — the third
+    /// term, so at equal depth an exact match beats a wildcard. `host=db-01` is
+    /// a statement about one host, `host=db-*` about a family, and the narrower
+    /// claim is the one whose author meant it.
     pub fn exact_dimensions(&self) -> usize {
         self.dimensions
             .values()
@@ -285,13 +264,13 @@ impl OwnershipRule {
             .count()
     }
 
-    /// Total literal characters pinned, wildcards' `*` excluded. The fourth
-    /// term: between `host=db-prod-*` and `host=db-*` the longer prefix is the
-    /// more specific claim.
+    /// Total literal characters pinned, excluding `*` — the fourth term:
+    /// between `host=db-prod-*` and `host=db-*` the longer prefix is the more
+    /// specific claim.
     ///
-    /// Only ever compares two rules already tied on count, depth and exactness
-    /// — i.e. two wildcards over the same dimension — which is the one place
-    /// where string length is a real signal rather than an accident.
+    /// Only ever compares rules already tied on count, depth and exactness,
+    /// which is the one place string length is a real signal rather than an
+    /// accident.
     pub fn literal_chars(&self) -> usize {
         self.dimensions
             .values()
@@ -300,10 +279,9 @@ impl OwnershipRule {
     }
 
     /// Whether every pair in this rule is present in `dims` and matches.
-    ///
-    /// Matching is subset-of, not equality: a record carries far more
-    /// dimensions than any rule names, and requiring an exact match would mean
-    /// a rule stops working the moment a new dimension is extracted.
+    /// Subset-of, not equality: a record carries far more dimensions than any
+    /// rule names, and requiring an exact match would break a rule the moment a
+    /// new dimension is extracted.
     pub fn matches(&self, dims: &HashMap<String, String>) -> bool {
         self.dimensions
             .iter()
@@ -384,7 +362,7 @@ impl RoutingDecision {
 
     /// One line for the timeline. Every case names the team and the mechanism
     /// in the same shape, so "why did this page me" reads as a sentence rather
-    /// than as a rule id somebody then has to look up.
+    /// than a rule id somebody then has to look up.
     pub fn reason(&self) -> String {
         match self {
             Self::Explicit { team_id } => format!("routed to {team_id} by the alert's own setting"),
@@ -402,7 +380,7 @@ impl RoutingDecision {
 }
 
 /// Everything the decision is made from. A struct rather than five positional
-/// arguments because the *order* of these is the design, and a caller that
+/// arguments because the order of these is the design, and a caller that
 /// swapped two `Option<&str>`s would compile.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct RoutingInputs<'a> {
@@ -421,10 +399,9 @@ pub struct RoutingInputs<'a> {
 
 /// The decision, plus anything routing had to pass over on the way to it.
 ///
-/// `notes` exists because "the alert named a team that does not exist" is not
-/// a decision and not an error — it is a fact the person reading the timeline
-/// needs, and the only place it can be stated is beside the decision it did not
-/// win.
+/// `notes` exists because "the alert named a team that does not exist" is
+/// neither a decision nor an error — it is a fact the timeline reader needs,
+/// and the only place to state it is beside the decision it did not win.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Routed {
     pub decision: RoutingDecision,
@@ -462,28 +439,23 @@ impl Routed {
 
 /// A signal that fired and that no ownership rule claimed.
 ///
-/// The design's Phase 2 fallback chain ends in an "unrouted queue (visible,
-/// alertable — an unroutable page must never be a silent drop)". A
-/// `log::warn!` is not that: nobody reads warnings from a node they are not
-/// tailing, and it cannot be listed, counted or worked through. This is the
-/// durable form of the same idea.
+/// Phase 2's fallback chain ends in an "unrouted queue (visible, alertable — an
+/// unroutable page must never be a silent drop)". A `log::warn!` is not that:
+/// nobody reads warnings from a node they are not tailing, and it cannot be
+/// listed, counted or worked through.
 ///
-/// It survives the arrival of a default team, and gains a job. §4 is explicit
-/// that the only thing worth surfacing is *"namespaces that paged you and
-/// landed on the default team"* — which is this queue with
-/// [`Self::defaulted_team_id`] set. The two outcomes live in one table because
-/// they are one question, "what has no owner", answered before and after
-/// somebody nominated a catch-all; splitting them would mean the "Assign next"
-/// screen had to read two lists and reconcile them.
+/// It survives the arrival of a default team and gains a job. §4: the only
+/// thing worth surfacing is "namespaces that paged you and landed on the
+/// default team" — this queue with [`Self::defaulted_team_id`] set. Both
+/// outcomes live in one table because they are one question, "what has no
+/// owner", asked before and after somebody nominated a catch-all.
 ///
-/// One row per **dimension path**, not per firing. An alert that nobody owns
-/// and that fires every minute is one line in the operator's queue saying it
-/// happened four hundred times, not four hundred lines — the actionable fact
-/// is the missing rule, and there is exactly one of those.
+/// One row per dimension path, not per firing. An unowned alert firing every
+/// minute is one line saying it happened four hundred times: the actionable
+/// fact is the missing rule, and there is one of those.
 ///
 /// It deliberately does NOT open a response record. A record with no team has
-/// no ladder to walk and nobody to show it to; this is the queue you work
-/// through in the morning to make sure it never happens again.
+/// no ladder to walk and nobody to show it to.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct UnroutedSignal {
     pub id: String,
@@ -500,8 +472,8 @@ pub struct UnroutedSignal {
     pub first_seen_at: i64,
     pub last_seen_at: i64,
     /// The most recent thing that fired here, for the "which alert was this?"
-    /// column. Optional because routing is decided before the subject is
-    /// known, and the answer is a sample rather than a key.
+    /// column. Optional because routing is decided before the subject is known,
+    /// so the answer is a sample rather than a key.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub last_subject_type: Option<SubjectType>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -512,10 +484,9 @@ pub struct UnroutedSignal {
     pub last_priority: Option<i32>,
     /// The default team this path landed on, when the org has one nominated.
     ///
-    /// `None` means nobody was paged at all. The distinction is the whole
-    /// difference between "we have a gap and it is costing us pages" and "we
-    /// have a gap and the default team is absorbing it", and an operator
-    /// working the queue prioritises the two completely differently.
+    /// `None` means nobody was paged at all — the difference between "we have a
+    /// gap and it is costing us pages" and "we have a gap and the default team
+    /// is absorbing it", which an operator prioritises differently.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub defaulted_team_id: Option<String>,
     /// When somebody said "handled". Dismissed entries stay for the record;
@@ -537,12 +508,10 @@ impl UnroutedSignal {
             .is_some_and(|t| !t.trim().is_empty())
     }
 
-    /// Whether a rule now exists that would have caught this.
-    ///
-    /// The queue is worked through by adding rules, so an entry that a new
-    /// rule covers should stop being shown as outstanding without anybody
-    /// having to tick it off. The dimensions are the ones the signal really
-    /// carried, so this asks exactly the question routing would ask.
+    /// Whether a rule now exists that would have caught this. The queue is
+    /// worked through by adding rules, so a covered entry stops being
+    /// outstanding without anybody ticking it off. The dimensions are the ones
+    /// the signal really carried, so this asks what routing would ask.
     pub fn is_covered_by(&self, rules: &[OwnershipRule]) -> bool {
         resolve_owner(rules, &self.dimensions).is_some()
     }
@@ -583,17 +552,15 @@ pub fn outstanding<'a>(
 
 /// The winning rule for `dims`, or `None`.
 ///
-/// **Longest prefix wins**: among every rule whose dimensions are all present,
-/// the one pinning the most dimensions is the most specific claim. A team
-/// owning `cluster=prod` is overridden inside `cluster=prod/namespace=payments`
-/// by the team that claimed the namespace — which is what lets a platform team
-/// own a cluster without owning every service in it.
+/// Longest prefix wins: among every rule whose dimensions are all present, the
+/// one pinning the most is the most specific claim. A team owning
+/// `cluster=prod` is overridden inside `cluster=prod/namespace=payments` by the
+/// team that claimed the namespace — which lets a platform team own a cluster
+/// without owning every service in it.
 ///
-/// Ties are broken by canonical path, then by rule id, so the answer is stable
-/// across nodes and across restarts. A tie means two teams have claimed
-/// equally-specific, both-matching paths — a configuration mistake the UI
-/// should surface, but one that must still resolve deterministically rather
-/// than depending on row order.
+/// Ties break by canonical path, then rule id, so the answer is stable across
+/// nodes and restarts. A tie is a configuration mistake the UI should surface,
+/// but it must still resolve deterministically rather than by row order.
 pub fn resolve_owner<'a>(
     rules: &'a [OwnershipRule],
     dims: &HashMap<String, String>,
@@ -603,10 +570,9 @@ pub fn resolve_owner<'a>(
 
 /// [`resolve_owner`], told how deep each dimension sits.
 ///
-/// The ranking only ever separates rules that were already tied, so an org that
-/// has configured no identity sets still routes exactly as before — except that
-/// `service` outranks everything, which is true by definition and needs no
-/// configuration to be true.
+/// The ranking only separates rules that were already tied, so an org with no
+/// identity sets routes exactly as before — except that `service` outranks
+/// everything, which is true by definition.
 pub fn resolve_owner_ranked<'a>(
     rules: &'a [OwnershipRule],
     dims: &HashMap<String, String>,
@@ -636,14 +602,13 @@ pub fn resolve_owner_ranked<'a>(
 /// 3. the nominated default team
 /// ```
 ///
-/// Explicit beats discovered: a team that has deliberately set the alert's
-/// owner is stating something the dimensions cannot express, and must not be
-/// overruled by a rule someone else added later.
+/// Explicit beats discovered: a team that deliberately set the alert's owner is
+/// stating something the dimensions cannot express, and must not be overruled
+/// by a rule someone else added later.
 ///
-/// The default tier is last and optional. It is safe to have precisely because
-/// nothing creates it: a fresh org has none, and a signal that reaches this
-/// point with none configured stays unrouted and visible rather than being
-/// handed to a team who never agreed to hold the pager for it.
+/// The default tier is last and optional, and safe precisely because nothing
+/// creates it: a signal reaching this point with none configured stays unrouted
+/// and visible rather than handed to a team who never agreed to hold the pager.
 pub fn route(inputs: &RoutingInputs<'_>) -> Routed {
     if let Some(team_id) = inputs.explicit_team_id.filter(|t| !t.trim().is_empty()) {
         return Routed::plain(RoutingDecision::Explicit {
@@ -680,10 +645,9 @@ pub fn route(inputs: &RoutingInputs<'_>) -> Routed {
 }
 
 /// What nobody claimed, named — so "why did this land on the catch-all" is a
-/// task rather than a mystery.
-///
-/// Sorted because the note goes on a timeline that people compare across
-/// firings, and a `HashMap`'s order would make one identity read as several.
+/// task rather than a mystery. Sorted, because the note goes on a timeline
+/// people compare across firings and a `HashMap`'s order would make one
+/// identity read as several.
 fn uncovered_note(dims: &HashMap<String, String>) -> String {
     if dims.is_empty() {
         return "this signal carried no dimensions, so no ownership rule could match it"
@@ -705,19 +669,16 @@ mod tests {
             .collect()
     }
 
-    /// The custom-SQL case, which is the one routing is worst at.
+    /// The custom-SQL case, which routing is worst at.
     ///
-    /// An aggregation — `SELECT count(*) … ` with no `GROUP BY`, a join, a
-    /// query that selects only the columns it alerts on — produces a result row
-    /// with **no identity fields**, so extraction yields nothing and no
-    /// ownership rule can match. It should be rare, and when it happens the
-    /// page lands on the default team or the unrouted queue for an alert whose
+    /// An aggregation with no `GROUP BY` produces a result row with no identity
+    /// fields, so extraction yields nothing and no rule can match. The page then
+    /// lands on the default team or the unrouted queue, for an alert whose
     /// service the incident path has already identified from the registry.
     ///
-    /// This pins the contract the fallback depends on: a rule written on the
-    /// canonical `service` dimension catches a signal routed by service alone.
-    /// If `SERVICE_DIMENSION` and the semantic group's id ever drift apart,
-    /// this fails — which is the point of naming it once.
+    /// This pins the contract the fallback depends on: a rule on the canonical
+    /// `service` dimension catches a signal routed by service alone. If
+    /// `SERVICE_DIMENSION` and the semantic group's id drift apart, this fails.
     #[test]
     fn test_a_signal_identified_only_by_service_still_finds_its_owner() {
         let rules = vec![
@@ -805,10 +766,10 @@ mod tests {
             ])
         }
 
-        /// The scenario the ranking exists for. A platform team owns a whole
-        /// cluster; a product team owns one service wherever it runs. Both
-        /// rules pin one dimension, so before the depth term the winner was
-        /// whichever value had more characters.
+        /// The scenario the ranking exists for. A platform team owns a cluster;
+        /// a product team owns one service wherever it runs. Both rules pin one
+        /// dimension, so before the depth term the winner was whichever value
+        /// had more characters.
         #[test]
         fn test_a_service_rule_beats_a_cluster_rule_at_equal_specificity() {
             let rules = vec![
@@ -828,9 +789,8 @@ mod tests {
         }
 
         /// The same estate after somebody renames the cluster. `literal_chars`
-        /// alone put the cluster ahead here — the platform team quietly started
-        /// taking payment-gateway pages, and nothing in the config had changed
-        /// about ownership.
+        /// alone put the cluster ahead, so the platform team quietly started
+        /// taking payment-gateway pages with nothing in the config changed.
         #[test]
         fn test_renaming_a_cluster_does_not_move_a_service_to_another_team() {
             let rules = vec![
@@ -951,11 +911,11 @@ mod tests {
         /// The mis-route the shipped ordering exists to stop.
         ///
         /// "Platform owns the prod-use1 cluster" and "Data owns the kafka
-        /// namespace" are both one-dimension claims, so before this they tied on
-        /// every meaningful term and fell through to literal character count:
-        /// `prod-use1` is nine characters and `kafka` is five, so Platform won.
-        /// `monitoring` — ten characters — beat the same cluster and went to the
-        /// right team, which is what made the failure so hard to see.
+        /// namespace" are both one-dimension claims, so they tied on every
+        /// meaningful term and fell through to character count: `prod-use1` is
+        /// nine and `kafka` five, so Platform won. `monitoring` — ten — beat the
+        /// same cluster and went to the right team, which is what made the
+        /// failure so hard to see.
         #[test]
         fn test_the_shipped_ordering_stops_word_length_deciding_who_is_paged() {
             let rules = vec![
@@ -1012,8 +972,8 @@ mod tests {
         }
 
         /// Sets are ranked independently. An ECS task and a Kubernetes
-        /// namespace never appear on one record, and giving them a shared scale
-        /// would invent an ordering between two things that never meet.
+        /// namespace never appear on one record, and a shared scale would
+        /// invent an ordering between two things that never meet.
         #[test]
         fn test_sets_are_ranked_independently() {
             let depths = DimensionDepth::from_sets([
@@ -1146,11 +1106,10 @@ mod tests {
 
     /// The one place the whole resolution order is stated as a table.
     ///
-    /// Exhaustive over the three independent switches — the object names a team
-    /// or does not, ownership matches or does not, a default team is nominated
-    /// or is not — because the bug this feature is most likely to grow is a
-    /// tier quietly moving past another one, and that is invisible unless every
-    /// combination is written down beside the tier that is supposed to win.
+    /// Exhaustive over the three independent switches, because the bug this
+    /// feature is most likely to grow is a tier quietly moving past another —
+    /// invisible unless every combination is written down beside the tier that
+    /// is supposed to win.
     #[test]
     fn test_the_resolution_order_over_every_combination() {
         let rules = vec![rule("r_prod", "platform", &[("k8s-cluster", "prod")])];
@@ -1256,7 +1215,7 @@ mod tests {
 
     /// A team that deliberately set the alert's owner is stating something the
     /// dimensions cannot express, and must not be overruled by a rule somebody
-    /// else adds later — nor by a default somebody nominated later still.
+    /// else adds later, nor by a default nominated later still.
     #[test]
     fn test_explicit_beats_a_matching_ownership_rule() {
         let rules = vec![rule("r", "platform", &[("k8s-cluster", "prod")])];
@@ -1308,7 +1267,7 @@ mod tests {
         }
     }
 
-    /// The catch-all is last, and it only exists because somebody nominated it.
+    /// The catch-all is last, and exists only because somebody nominated it.
     /// With none nominated a signal no rule claims stays unrouted and visible —
     /// which is what makes the tier safe to have at all.
     #[test]
@@ -1341,8 +1300,8 @@ mod tests {
         assert_eq!(no_default.decision, RoutingDecision::Unrouted);
     }
 
-    /// A signal with no dimensions at all cannot match a rule — an empty rule
-    /// is refused — so the default team is the only thing between it and the
+    /// A signal with no dimensions cannot match a rule — an empty rule is
+    /// refused — so the default team is the only thing between it and the
     /// queue. §10's "no identity dimensions" row.
     #[test]
     fn test_a_signal_with_no_dimensions_still_reaches_the_default_team() {
@@ -1364,9 +1323,9 @@ mod tests {
         assert!(routed.reason().contains("no default team is set"));
     }
 
-    /// "Nothing owns this" is a task somebody can act on only if the note says
-    /// what nothing owns. Landing on the catch-all says it too: otherwise the
-    /// gap disappears the moment an org nominates one.
+    /// "Nothing owns this" is actionable only if the note says what nothing
+    /// owns. Landing on the catch-all says it too, or the gap disappears the
+    /// moment an org nominates one.
     #[test]
     fn test_an_uncovered_signal_names_what_nothing_covers() {
         let uncovered = dims(&[("k8s-cluster", "prod"), ("service", "zxporter")]);
@@ -1564,7 +1523,7 @@ mod tests {
 
     /// A bare `*` is a catch-all wearing a dimension name, and a `*` in the
     /// middle is somebody reaching for a pattern language this is not. Both are
-    /// refused at the door, and the resolver skips them if one ever gets past.
+    /// refused at the door, and the resolver skips them if one gets past.
     #[test]
     fn test_wildcards_that_are_not_a_trailing_prefix_are_refused() {
         let bare = rule("r", "everyone", &[("k8s-cluster", "*")]);
@@ -1613,8 +1572,8 @@ mod tests {
     }
 
     /// The queue's whole purpose: an operator can see what fired, on which
-    /// dimensions, and how often — which is everything needed to write the
-    /// missing rule. A log line answers none of those.
+    /// dimensions, and how often — everything needed to write the missing rule.
+    /// A log line answers none of those.
     #[test]
     fn test_an_unrouted_entry_names_what_fired_and_what_matched_nothing() {
         let s = unrouted(
@@ -1627,9 +1586,9 @@ mod tests {
         assert_eq!(s.occurrences, 3);
     }
 
-    /// A signal with no identity dimensions cannot match any rule — an empty
-    /// rule is refused — so the queue has to say that rather than showing a
-    /// blank path and leaving the operator to guess.
+    /// A signal with no identity dimensions cannot match any rule, so the queue
+    /// has to say that rather than showing a blank path and leaving the
+    /// operator to guess.
     #[test]
     fn test_a_signal_with_no_dimensions_says_so() {
         let mut s = unrouted("", &[]);
@@ -1713,10 +1672,9 @@ mod tests {
         }
     }
 
-    /// §4's "Assign next" surface: the queue has to be able to say which gaps
-    /// paged the default team, because those are the ones costing somebody
-    /// sleep — and which paged nobody, because those are the ones costing
-    /// nothing until they cost everything.
+    /// §4's "Assign next" surface: the queue has to say which gaps paged the
+    /// default team, because those cost somebody sleep — and which paged
+    /// nobody, because those cost nothing until they cost everything.
     #[test]
     fn test_a_defaulted_entry_is_distinguishable_from_an_unowned_one() {
         let mut nobody = unrouted(

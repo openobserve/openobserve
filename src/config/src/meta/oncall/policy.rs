@@ -26,18 +26,14 @@ use crate::meta::alerts::priority::AlertPriority;
 
 /// How loudly a signal pages when nobody said how loudly it should.
 ///
-/// Every producer — the alert scheduler, the incident correlator, anything
-/// added later — reads this rather than picking its own default. They used to
-/// disagree: the alert path defaulted to P3 and the incident path to P2, so
-/// ticking `creates_incident` on an alert silently changed how loudly it woke
-/// somebody, with nothing in the UI saying so.
+/// Every producer reads this rather than picking its own default. They used to
+/// disagree — the alert path defaulted to P3, the incident path to P2 — so
+/// ticking `creates_incident` silently changed how loudly an alert woke
+/// somebody.
 ///
-/// P2 is the safer of the two. An unset priority means "nobody has decided
-/// yet", and the cost of the two mistakes is not symmetric: paging a little
-/// too loudly wastes a person's attention for a few minutes, while paging too
-/// quietly means a real outage waits for the ladder that P3 walks half an hour
-/// more slowly. A team that finds P2 too loud sets the priority on the alert,
-/// which is one field.
+/// P2 is the safer of the two: paging a little too loudly wastes a few minutes
+/// of attention, while paging too quietly leaves a real outage on the ladder
+/// P3 walks half an hour more slowly.
 pub const DEFAULT_PAGING_PRIORITY: AlertPriority = AlertPriority::P2;
 
 /// How a page reaches a person.
@@ -81,17 +77,16 @@ impl Channel {
 
 /// 03 §6's fallback chain, in the order it is evaluated.
 ///
-/// The chain stops at the first success, so the order decides which channel a
-/// page is tried on first. SMS, voice, push, chat and in-app were removed
-/// because nothing in this build could send them; when a provider lands, the
-/// new channel goes in this list at the position its urgency earns.
+/// The chain stops at the first success, so the order decides which channel is
+/// tried first. When a provider lands, its channel goes in at the position its
+/// urgency earns.
 pub const FALLBACK_ORDER: [Channel; 2] = [Channel::Email, Channel::Webhook];
 
 /// The channels one responder is tried on, in order, for a rung.
 ///
-/// §6, verbatim: "On a single-node deployment with just SMTP configured, the
-/// chain collapses to email and everything still works" — that is the baseline,
-/// not a degenerate case.
+/// §6: "on a single-node deployment with just SMTP configured, the chain
+/// collapses to email and everything still works" — the baseline, not a
+/// degenerate case.
 pub fn fallback_chain(channels: &[Channel]) -> Vec<Channel> {
     FALLBACK_ORDER
         .into_iter()
@@ -99,14 +94,12 @@ pub fn fallback_chain(channels: &[Channel]) -> Vec<Channel> {
         .collect()
 }
 
-/// Whether a channel talks to a **room** rather than to a person (G8).
+/// Whether a channel talks to a room rather than to a person (G8).
 ///
-/// The fallback chain was designed around one question — "have we reached this
-/// human yet" — and stopping at the first success is exactly right for it. It
-/// is the wrong question for a team's chat room: a team that ticks email *and*
-/// chat means "wake the on-call, and put it in the channel", and the chain read
-/// that as "put it in the channel only if the email bounced". `Also post to
-/// chat` was not expressible at all, and it is the common case.
+/// The fallback chain answers "have we reached this human yet", and stopping at
+/// the first success is right for that. It is the wrong question for a chat
+/// room: a team ticking email and chat means "wake the on-call, and put it in
+/// the channel", but the chain read that as "post only if the email bounced".
 ///
 /// So the two kinds are separated by what they address, not by how loud they
 /// are. A webhook resolves to a destination the whole team watches; email
@@ -122,15 +115,13 @@ pub fn is_broadcast(channel: Channel) -> bool {
 /// "always post".
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ChannelPlan {
-    /// Tried **per recipient**, in [`FALLBACK_ORDER`], stopping at the first
-    /// success. Unchanged semantics — this is the chain that was built
-    /// deliberately for reaching a person.
+    /// Tried per recipient, in [`FALLBACK_ORDER`], stopping at the first
+    /// success — the chain built deliberately for reaching a person.
     pub chain: Vec<Channel>,
-    /// Sent **once per rung**, whatever the chain did.
+    /// Sent once per rung, whatever the chain did.
     ///
-    /// Once per rung and not once per recipient, which is the whole difference
-    /// between this and the bug that made the chain necessary: a rung fanning
-    /// out to six people used to post six identical messages into one room.
+    /// Per rung and not per recipient: a rung fanning out to six people used to
+    /// post six identical messages into one room.
     pub broadcast: Vec<Channel>,
 }
 
@@ -160,20 +151,15 @@ pub fn channel_plan(channels: &[Channel]) -> ChannelPlan {
 /// The destinations a team's own channel posts go to, and what a page's
 /// `Webhook` channel resolves to.
 ///
-/// The list used to live only on [`EscalationPolicy::destinations`]. There is
-/// one policy per team, so in practice it was already team-scoped — but a
-/// team's chat room is not a property of its **ladder**, and having to open the
-/// escalation editor to change where the team is talked to is how a channel
-/// ends up pointing at a room nobody reads. The team-level field is the one you
-/// can set without ever touching a rung.
+/// The list used to live only on [`EscalationPolicy::destinations`]. A team's
+/// chat room is not a property of its ladder, and having to open the escalation
+/// editor to change where the team is talked to is how a channel ends up
+/// pointing at a room nobody reads.
 ///
-/// Precedence, deliberately explicit:
-///
-/// - `None` — the team has never set one. The policy's list is used, so every policy stored before
-///   the field existed keeps working exactly as it did.
-/// - `Some(list)` — the team's list wins, **including when it is empty**. An empty list is somebody
-///   saying "this team has no channel"; falling back to the policy there would make the field
-///   impossible to turn off, and would silently resurrect a destination they had removed.
+/// - `None` — the team never set one, so the policy's list is used and every policy stored before
+///   the field existed keeps working.
+/// - `Some(list)` — the team's list wins, including when it is empty. An empty list means "this
+///   team has no channel"; falling back there would make the field impossible to turn off.
 pub fn team_channel<'a>(team: Option<&'a [String]>, policy: &'a [String]) -> &'a [String] {
     match team {
         Some(list) => list,
@@ -186,10 +172,9 @@ pub fn team_channel<'a>(team: Option<&'a [String]>, policy: &'a [String]) -> &'a
 /// How many teams one firing may wake before it is treated as a grouping
 /// mistake rather than as that many outages.
 ///
-/// A `GROUP BY` that suddenly spans fifteen teams is somebody's alert
-/// definition, not fifteen outages, and paging all fifteen is the fastest way
-/// to teach a whole org to ignore the pager. Five is above any real multi-team
-/// failure anybody has described and well below "everyone".
+/// A `GROUP BY` spanning fifteen teams is somebody's alert definition, not
+/// fifteen outages, and paging all fifteen teaches a whole org to ignore the
+/// pager. Five is above any real multi-team failure and well below "everyone".
 pub const MAX_FANOUT_TEAMS: usize = 5;
 
 /// How many of a team's other groups the timeline names before it stops
@@ -197,11 +182,8 @@ pub const MAX_FANOUT_TEAMS: usize = 5;
 const NAMED_GROUPS: usize = 5;
 
 /// The line one team's record carries when the firing woke more than one team.
-///
-/// A responder has to be able to tell "my team's own page" from "part of
-/// something wider" without opening three screens, and their own other groups
-/// are the difference between "payments is down" and "payments and search are
-/// down and I am only being told about one of them".
+/// A responder has to tell "my team's own page" from "part of something wider"
+/// without opening three screens.
 pub fn fanout_note(mine: &str, also_mine: &[String], other_teams: usize) -> String {
     let mut note = format!("paged for {mine}");
     if !also_mine.is_empty() {
@@ -236,22 +218,17 @@ pub fn fanout_capped_note(teams: usize) -> String {
 
 // ── The liaison seat (D-21) ──────────────────────────────────────────────────
 
-/// How many rungs an **impacted** team's record climbs.
+/// How many rungs an impacted team's record climbs.
 ///
-/// Two: the one that opens it, and exactly one chase. `page_impacted` used to
-/// dispatch once and arm no timer at all, so an impacted primary who slept
-/// through their page was never chased and the record sat open with nobody on
-/// it. The other extreme — the team's full ladder — is worse in a different
-/// way: it walks a whole second team up to "everybody" for an outage they
-/// cannot fix. One chase is a liaison seat, not a fix-it seat.
+/// Two: the one that opens it, and exactly one chase. Dispatching once and
+/// arming no timer left an impacted primary who slept through their page never
+/// chased. The team's full ladder is worse the other way — it walks a second
+/// team up to "everybody" for an outage they cannot fix.
 pub const IMPACTED_RUNGS: usize = 2;
 
-/// The ladder an impacted record actually runs: the first [`IMPACTED_RUNGS`]
-/// rungs of the team's own policy, in delay order.
-///
-/// Taken from the team's real ladder rather than synthesised, so the chase goes
-/// to whoever that team decided should be chased — usually their secondary —
-/// at the delay they chose.
+/// The ladder an impacted record runs: the first [`IMPACTED_RUNGS`] rungs of the
+/// team's own policy, in delay order. Taken from the real ladder rather than
+/// synthesised, so the chase goes to whoever that team decided should be chased.
 pub fn impacted_ladder(steps: &[LadderStep]) -> Vec<LadderStep> {
     let mut ordered = steps.to_vec();
     ordered.sort_by_key(|s| s.after_micros);
@@ -265,11 +242,9 @@ pub fn impacted_ladder(steps: &[LadderStep]) -> Vec<LadderStep> {
 /// per channel, then move down the fallback chain".
 pub const MAX_SEND_ATTEMPTS: u32 = 3;
 
-/// How long to wait before trying the same channel again, given how many
-/// attempts have already failed, or `None` when the channel is spent.
-///
-/// §9's 1 s → 2 s → 4 s. Pure and in microseconds so the caller owns the sleep:
-/// a decision that sleeps cannot be unit-tested, and this one is worth pinning.
+/// How long to wait before trying the same channel again, or `None` when the
+/// channel is spent. §9's 1 s → 2 s → 4 s. Pure and in microseconds so the
+/// caller owns the sleep: a decision that sleeps cannot be unit-tested.
 pub fn retry_delay_micros(attempts_made: u32) -> Option<i64> {
     if attempts_made == 0 || attempts_made >= MAX_SEND_ATTEMPTS {
         return None;
@@ -287,15 +262,13 @@ pub const BREAKER_MIN_ATTEMPTS: usize = 4;
 
 /// §9's per-channel circuit breaker, as a pure state machine.
 ///
-/// It exists so that one hard-down provider does not stall every ladder on the
-/// node: without it each rung pays the full retry budget per recipient per
-/// channel, and a team of eight spends minutes discovering the same outage
-/// eight times.
+/// Without it, one hard-down provider stalls every ladder on the node: each
+/// rung pays the full retry budget per recipient per channel, and a team of
+/// eight discovers the same outage eight times.
 ///
-/// Deliberately per-node and in-memory — §9 again: "a shared breaker needs
-/// shared state we do not want to introduce". The cost of being wrong is one
-/// node skipping a channel that has come back, and the half-open probe fixes
-/// that within a minute.
+/// Per-node and in-memory — §9: "a shared breaker needs shared state we do not
+/// want to introduce". Being wrong costs one node skipping a channel that has
+/// come back, and the half-open probe fixes that within a minute.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ChannelBreaker {
     /// `(at, delivered)` for the attempts still inside the window.
@@ -309,11 +282,9 @@ impl ChannelBreaker {
         Self::default()
     }
 
-    /// Whether a send may be attempted now.
-    ///
-    /// An open breaker admits exactly one probe once the cool-down has passed
-    /// — half-open — because the alternative is a channel that never recovers
-    /// until the process restarts.
+    /// Whether a send may be attempted now. An open breaker admits exactly one
+    /// probe once the cool-down has passed — half-open — because the
+    /// alternative is a channel that never recovers until the process restarts.
     pub fn allows(&self, now: i64) -> bool {
         match self.opened_at {
             None => true,
@@ -351,11 +322,10 @@ impl ChannelBreaker {
 
 /// One rung: when it fires, and everyone it pages.
 ///
-/// The delay identifies the rung. Targets that fire together belong to the
-/// same rung by construction, so a ladder can never show three consecutive
-/// rows all saying "immediately" and leave a reader guessing at the order.
-/// It also gives the delivery ledger a key that survives reordering and
-/// renaming, which a positional index would not.
+/// The delay identifies the rung, so targets that fire together belong to the
+/// same rung by construction and a ladder cannot show three consecutive rows
+/// all saying "immediately". It also gives the delivery ledger a key that
+/// survives reordering and renaming.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct LadderStep {
     /// Delay from `opened_at`, in microseconds. Unique within a rung.
@@ -391,16 +361,14 @@ pub struct EscalationPolicy {
     pub org_id: String,
     pub team_id: String,
     pub rungs: Vec<PriorityRung>,
-    /// Alert Destination names this team pages through when a rung includes
-    /// the Webhook channel. Reuses the destinations an org already has rather
-    /// than storing URLs a second time.
+    /// Alert Destination names this team pages through when a rung includes the
+    /// Webhook channel. Reuses the destinations an org already has rather than
+    /// storing URLs twice.
     #[serde(default)]
     pub destinations: Vec<String>,
     /// §4's L0 block: how the AI SRE agent relates to this team's paging.
-    ///
-    /// Defaulted on read, because it is the newest column and a row written
-    /// before it existed has to behave like a team that never opened the
-    /// screen — which is most of them.
+    /// Defaulted on read, because a row written before the column existed has
+    /// to behave like a team that never opened the screen.
     #[serde(default = "super::agent::L0Policy::defaults")]
     pub l0: super::agent::L0Policy,
 }
@@ -437,9 +405,8 @@ pub enum LadderAction {
 }
 
 impl EscalationPolicy {
-    /// The defaults a team is created with, straight off the design's two
-    /// tables: the severity/channel matrix in `00-simplified-flow.md` §2 and
-    /// the escalation timing table in §3.
+    /// The defaults a team is created with, from `00-simplified-flow.md` §2's
+    /// severity/channel matrix and §3's escalation timing table.
     ///
     /// | | t=0 | 5 min | 15 min | 30 min |
     /// |---|---|---|---|---|
@@ -448,43 +415,26 @@ impl EscalationPolicy {
     /// | P3 | primary | — | secondary | whole team |
     /// | P4, P5 | nobody, ever | | | |
     ///
-    /// **The whole team is told twice at most, and never after 15 minutes.**
-    /// It used to repeat at 30 and 60 too, which on a twelve-person team meant
-    /// one unacknowledged P1 sent fifty notifications and woke the entire
-    /// on-call organisation four times. Nobody chose that — it is the policy
-    /// every team is created with — and the fourth ring has never reached
-    /// anybody the first did not. What it reliably does is teach people to mute
-    /// the pager, which costs the *next* incident.
+    /// The whole team is told twice at most, and never after 15 minutes. It
+    /// used to repeat at 30 and 60 too, so on a twelve-person team one
+    /// unacknowledged P1 sent fifty notifications. The fourth ring never
+    /// reached anybody the first did not; what it reliably does is teach people
+    /// to mute the pager, which costs the next incident.
     ///
-    /// The repeats were not a design choice either. They existed because a
-    /// level could only name the whole team, so there was nowhere else for the
-    /// ladder to go; a level can now name any rotation, so a team that wants
-    /// depth adds one instead of ringing the same phones again.
+    /// P1 is parallel: §2 says "no 5-minute delays between primary and
+    /// secondary", and staggering them buys nothing but minutes.
     ///
-    /// **P1 is parallel.** Everyone who can fix a critical outage is paged at
-    /// once; §2 says so in as many words ("no 5-minute delays between primary
-    /// and secondary"), and staggering them buys nothing but minutes.
+    /// The secondary is a rotation, not a derivation. Building it from
+    /// `NextOnCall` made the position exist whether or not anybody staffed it,
+    /// so a team that did staff it had two answers for one chair. `secondary`
+    /// is `None` for a team that only has one rotation.
     ///
-    /// **The secondary is a rotation, not a derivation.** This function used to
-    /// build it from `NextOnCall` — one handover further along the *primary's*
-    /// roster — on the argument that "one rotation is enough to be pageable, so
-    /// a secondary needs no second schedule to staff". That argument was wrong
-    /// in a way that took a live team to see: the position then existed whether
-    /// or not anybody staffed it, so a team that *did* staff it had two answers
-    /// for one chair and got a different person at the weekend. A level now
-    /// names a rotation by id, and `secondary` here is `None` for a team that
-    /// only has one.
-    ///
-    /// The depth beyond the secondary is still the whole team, and that is now
-    /// a *choice* rather than a limit: a team with an "Engineering" rotation can
-    /// point 15 min at it, which the previous model could not express at all.
-    ///
-    /// P4 and P5 page nobody at all: they are recorded and shown in the
-    /// product, and the agent still investigates them.
+    /// P4 and P5 page nobody: they are recorded and shown, and the agent still
+    /// investigates them.
     ///
     /// Every paging priority defaults to Email. When SMS and voice land, THIS
-    /// is the function that changes — the defaults should never promise a
-    /// channel that does not send.
+    /// is the function that changes — the defaults must never promise a channel
+    /// that does not send.
     pub fn default_for_team(
         id: impl Into<String>,
         org_id: impl Into<String>,
@@ -571,14 +521,12 @@ impl EscalationPolicy {
     /// A ladder that pages the whole team, on the shipped timings.
     ///
     /// For the one caller that needs a policy and cannot know the team's
-    /// rotations: the stored rungs would not parse. Guessing a rotation id
-    /// there would be worse than useless — it would name a position that may
-    /// not exist and page nobody — so this falls back to the one target that
-    /// is always resolvable.
+    /// rotations, because the stored rungs would not parse. Guessing a rotation
+    /// id there would name a position that may not exist and page nobody.
     ///
-    /// Loud on purpose: a team whose policy failed to read pages *everybody*,
-    /// which somebody will notice and fix, rather than pages nobody, which
-    /// nobody notices until an outage.
+    /// Loud on purpose: a team whose policy failed to read pages everybody,
+    /// which somebody notices and fixes, rather than nobody, which nobody
+    /// notices until an outage.
     pub fn whole_team_fallback(
         id: impl Into<String>,
         org_id: impl Into<String>,
@@ -637,11 +585,10 @@ impl EscalationPolicy {
         self.rung(priority).is_some_and(|r| !r.steps.is_empty())
     }
 
-    /// How many passes of the ladder this policy runs, bounded.
-    ///
-    /// Read through here rather than off the field, because the field can hold
-    /// anything a replicated row or a hand-edit put in it and the engine must
-    /// not be the place that discovers a ladder repeating four thousand times.
+    /// How many passes of the ladder this policy runs, bounded. Read through
+    /// here rather than off the field: the field can hold anything a replicated
+    /// row or a hand-edit put in it, and the engine must not be where a ladder
+    /// repeating four thousand times is discovered.
     pub fn validate(&self) -> Result<(), PolicyError> {
         let mut seen_priority = std::collections::HashSet::new();
         for rung in &self.rungs {
@@ -676,8 +623,7 @@ impl EscalationPolicy {
 /// `elapsed_micros` is measured from the record's `opened_at`, and
 /// `already_notified` is what the delivery ledger says has gone out. Passing
 /// the ledger in — rather than tracking a cursor — is what makes replays,
-/// retries and a promoted severity safe: re-running with the same inputs
-/// notifies nobody twice.
+/// retries and a promoted severity safe.
 pub fn plan(steps: &[LadderStep], elapsed_micros: i64, already_notified: &[i64]) -> LadderAction {
     let mut due: Vec<LadderStep> = Vec::new();
     let mut next: Option<i64> = None;
@@ -712,19 +658,16 @@ pub fn plan(steps: &[LadderStep], elapsed_micros: i64, already_notified: &[i64])
 
 /// How many times one rung is sent again when every channel errored.
 ///
-/// Four, which with the backoff below is about seven and a half minutes of
-/// trying. Long enough to sit out the transport failures that actually happen
-/// — an SMTP restart, a DNS blip, a webhook's proxy cycling — and short enough
-/// that a provider which is genuinely gone does not hold the ladder still while
-/// the outage it was raised about goes unworked.
+/// Four, which with the backoff below is about seven and a half minutes. Long
+/// enough to sit out an SMTP restart or a DNS blip, short enough that a
+/// provider which is genuinely gone does not hold the ladder still.
 pub const MAX_TRANSPORT_ATTEMPTS: u32 = 4;
 
 /// The wait before the first re-send of a rung the transport lost.
 ///
-/// Thirty seconds, not the one second [`retry_delay_micros`] uses: that one is
-/// retrying a single send inside a rung, and by the time we are here every
-/// channel for every recipient has already spent its own budget. Trying again
-/// immediately would only re-discover the same outage.
+/// Thirty seconds, not the one second [`retry_delay_micros`] uses: that retries
+/// a single send inside a rung, and by the time we are here every channel for
+/// every recipient has spent its own budget.
 pub const TRANSPORT_BACKOFF_MICROS: i64 = 30 * 1_000_000;
 
 /// The longest this backs off. Beyond four minutes a re-send stops being a
@@ -733,10 +676,9 @@ pub const MAX_TRANSPORT_BACKOFF_MICROS: i64 = 4 * MICROS_PER_MINUTE;
 
 /// What one rung's dispatch achieved, as far as the ladder is concerned.
 ///
-/// The distinction this exists for is the one §9 does not make and the engine
-/// needs: a rung that resolved to **nobody** and a rung whose real recipients
-/// were all lost to the **transport** are both "nobody was reached", and they
-/// want opposite things.
+/// The distinction §9 does not make and the engine needs: a rung that resolved
+/// to nobody and a rung whose real recipients were all lost to the transport
+/// are both "nobody was reached", and they want opposite things.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RungOutcome {
     /// At least one person was reached on at least one channel.
@@ -752,28 +694,25 @@ pub enum RungOutcome {
 pub enum AfterRung {
     /// Somebody was woken. Come back when the next rung is due.
     NextRung,
-    /// §9, verbatim: "if every channel for a responder fails, escalation
-    /// advances to the next level immediately rather than waiting out the level
-    /// timeout" — which is written about a rung with nobody on it. Waiting five
-    /// minutes for a name that will never resolve helps no one, so the next
-    /// level is tried inside the same tick.
+    /// §9: "if every channel for a responder fails, escalation advances to the
+    /// next level immediately rather than waiting out the level timeout" —
+    /// written about a rung with nobody on it. Waiting five minutes for a name
+    /// that will never resolve helps no one.
     AdvanceNow,
-    /// Come back at `at` and send this **same** rung again. It is not spent:
-    /// the recipients exist and will be reachable when the transport is.
-    /// `attempts` is the count to record, so the next failure backs off further.
+    /// Come back at `at` and send this same rung again. It is not spent: the
+    /// recipients exist and will be reachable when the transport is. `attempts`
+    /// is the count to record, so the next failure backs off further.
     RetryRung { at: i64, attempts: u32 },
-    /// The transport has had [`MAX_TRANSPORT_ATTEMPTS`] goes at this rung and
-    /// is not coming back in time to matter. Give the rung up and let the
-    /// ladder carry on **at its configured pace** — the next rung when the
-    /// next rung is due, so a dead provider ends at `Exhausted` and whatever
-    /// the policy's final action is, rather than looping or collapsing.
+    /// The transport has had [`MAX_TRANSPORT_ATTEMPTS`] goes and is not coming
+    /// back in time to matter. Give the rung up and let the ladder carry on at
+    /// its configured pace, so a dead provider ends at `Exhausted` rather than
+    /// looping or collapsing.
     GiveUpRung,
 }
 
-/// How long to wait before sending a lost rung again.
-///
-/// 30 s → 1 m → 2 m → 4 m. Doubling, because the second failure means something
-/// the first did not: the first is a blip, the fourth is an outage.
+/// How long to wait before sending a lost rung again: 30 s → 1 m → 2 m → 4 m.
+/// Doubling, because the fourth failure means something the first did not — the
+/// first is a blip, the fourth is an outage.
 fn transport_backoff_micros(attempts_made: u32) -> i64 {
     TRANSPORT_BACKOFF_MICROS
         .saturating_mul(1i64 << attempts_made.min(16))
@@ -783,11 +722,11 @@ fn transport_backoff_micros(attempts_made: u32) -> i64 {
 /// What the ladder does next, from what the rung achieved and how many times
 /// the transport has already lost it.
 ///
-/// The whole point is that only [`RungOutcome::NoRecipients`] consumes the
-/// ladder without pausing. Applying §9's "advance immediately" to a transport
-/// failure too is what let thirty seconds of SMTP retire a P1: every rung read
-/// as sent, `elapsed` walked forward inside one tick, and the record wrote its
-/// own "nobody acknowledged" eleven seconds after it opened.
+/// Only [`RungOutcome::NoRecipients`] consumes the ladder without pausing.
+/// Applying §9's "advance immediately" to a transport failure too is what let
+/// thirty seconds of SMTP retire a P1: every rung read as sent, `elapsed`
+/// walked forward inside one tick, and the record wrote its own "nobody
+/// acknowledged" eleven seconds after it opened.
 pub fn after_rung(outcome: RungOutcome, attempts_made: u32, now: i64) -> AfterRung {
     match outcome {
         RungOutcome::Reached => AfterRung::NextRung,
@@ -920,13 +859,11 @@ mod tests {
         );
     }
 
-    /// The shipped defaults ARE the design's tables — `00-simplified-flow.md`
-    /// §2 (who is paged, and that P1 is parallel) and §3 (when the ladder
-    /// escalates). They drifted once already: P2's secondary sat at 15 minutes
-    /// instead of 5, P3 never escalated at all, and nothing reached 30 or 60,
-    /// so a team that never opened the policy screen got a quieter pager than
-    /// the product promised. This pins every cell, so the next edit that walks
-    /// away from the doc fails here rather than at 3am.
+    /// The shipped defaults ARE the design's tables — §2 (who is paged, and
+    /// that P1 is parallel) and §3 (when the ladder escalates). They drifted
+    /// once: P2's secondary sat at 15 minutes instead of 5 and P3 never
+    /// escalated, so a team that never opened the screen got a quieter pager
+    /// than the product promised. Every cell is pinned here.
     #[test]
     #[allow(clippy::type_complexity)]
     fn test_default_ladders_match_the_published_timing_table() {
@@ -989,9 +926,8 @@ mod tests {
         }
     }
 
-    /// §2, verbatim: "For P1, everyone gets notified simultaneously — no
-    /// 5-minute delays between primary and secondary." One rung, three
-    /// targets, delay zero.
+    /// §2: "for P1, everyone gets notified simultaneously — no 5-minute delays
+    /// between primary and secondary." One rung, three targets, delay zero.
     #[test]
     fn test_p1_pages_primary_secondary_and_l1_together_at_t0() {
         let action = plan(&steps(AlertPriority::P1), 0, &[]);
@@ -1011,9 +947,9 @@ mod tests {
         );
     }
 
-    /// §7.4 of the plan: five variants, and a catch-all arm that pages on an
-    /// unexpected one is the failure mode. Every priority is listed by name,
-    /// and the two that must never page have no steps at any elapsed time.
+    /// §7.4: five variants, and a catch-all arm that pages on an unexpected one
+    /// is the failure mode. Every priority is listed by name, and the two that
+    /// must never page have no steps at any elapsed time.
     #[test]
     fn test_every_priority_is_configured_by_name_and_p4_p5_never_page() {
         let p = policy();
@@ -1048,10 +984,9 @@ mod tests {
         }
     }
 
-    /// The alert path and the incident path used to default an unset priority
+    /// The alert and incident paths used to default an unset priority
     /// differently — P3 and P2 — so toggling `creates_incident` changed how
-    /// loudly the same alert paged. One constant, and it is the louder one,
-    /// because silence during a real outage costs more than one wasted page.
+    /// loudly the same alert paged. One constant, and it is the louder one.
     #[test]
     fn test_the_default_paging_priority_is_the_safer_of_the_two() {
         assert_eq!(DEFAULT_PAGING_PRIORITY, AlertPriority::P2);
@@ -1282,8 +1217,8 @@ mod tests {
     }
 
     /// The vocabulary holds only channels something can send. A variant added
-    /// here without a transport behind it stores a promise the engine silently
-    /// drops — the worst failure mode a pager has.
+    /// without a transport behind it stores a promise the engine silently drops
+    /// — the worst failure mode a pager has.
     #[test]
     fn test_every_channel_in_the_vocabulary_can_be_delivered() {
         assert_eq!(
@@ -1314,8 +1249,8 @@ mod tests {
     // ── The fallback chain (03 §6/§9) ───────────────────────────────────────
 
     /// §9: the chain is evaluated in order and stops at the first success, so
-    /// the order is the whole decision. Email before webhook, because the
-    /// person is the target and the team channel is the fallback.
+    /// the order is the whole decision. Email before webhook, because the person
+    /// is the target and the team channel is the fallback.
     #[test]
     fn test_the_chain_is_ordered_and_only_holds_channels_that_send() {
         assert_eq!(
@@ -1326,9 +1261,8 @@ mod tests {
         assert!(fallback_chain(&[]).is_empty());
     }
 
-    /// §6's baseline, in as many words: "on a single-node deployment with just
-    /// SMTP configured, the chain collapses to email and everything still
-    /// works".
+    /// §6's baseline: "on a single-node deployment with just SMTP configured,
+    /// the chain collapses to email and everything still works".
     #[test]
     fn test_the_chain_collapses_to_email_on_an_smtp_only_deployment() {
         assert_eq!(fallback_chain(&[Channel::Email]), vec![Channel::Email]);
@@ -1419,12 +1353,12 @@ mod tests {
         }
     }
 
-    /// The engine's loop, with the dispatching replaced by a fixed outcome:
-    /// which rungs one tick consumes, and what it leaves the ladder doing.
+    /// The engine's loop with dispatching replaced by a fixed outcome: which
+    /// rungs one tick consumes, and what it leaves the ladder doing.
     ///
-    /// Spelled out here rather than described in prose because "how much of the
-    /// ladder does one tick eat" is the whole of G2, and it is a property of
-    /// [`plan`] and [`after_rung`] together.
+    /// Spelled out here because "how much of the ladder does one tick eat" is
+    /// the whole of G2, and it is a property of [`plan`] and [`after_rung`]
+    /// together.
     fn one_tick(
         steps: &[LadderStep],
         already_sent: &[i64],
@@ -1456,10 +1390,10 @@ mod tests {
         }
     }
 
-    /// The coverage case, exactly as it was. A rung that resolved to nobody
-    /// must not burn its delay in silence: nobody will appear in five minutes,
-    /// so the ladder tries the next level now, and a ladder of them runs out
-    /// inside one tick. §9 wrote "advance immediately" about this.
+    /// A rung that resolved to nobody must not burn its delay in silence:
+    /// nobody will appear in five minutes, so the ladder tries the next level
+    /// now, and a ladder of them runs out inside one tick. §9 wrote "advance
+    /// immediately" about this.
     #[test]
     fn test_a_rung_that_reached_nobody_still_advances_inside_the_tick() {
         let p1 = steps(AlertPriority::P1);
@@ -1472,10 +1406,10 @@ mod tests {
         assert_eq!(ended, None, "and the ladder is spent");
     }
 
-    /// G2. The same ladder, the same "nobody was reached" — except the people
-    /// were there and SMTP was not. One tick must consume **one** rung, not the
-    /// ladder: thirty seconds of a dead transport used to exhaust a five-rung
-    /// P1 in eleven milliseconds and delete its timer.
+    /// G2. The same ladder and the same "nobody was reached" — except the
+    /// people were there and SMTP was not. One tick must consume one rung, not
+    /// the ladder: thirty seconds of a dead transport used to exhaust a
+    /// five-rung P1 in eleven milliseconds and delete its timer.
     #[test]
     fn test_a_transport_failure_consumes_one_rung_not_the_ladder() {
         let p1 = steps(AlertPriority::P1);
@@ -1492,10 +1426,10 @@ mod tests {
         );
     }
 
-    /// The other half of G2: the rung is not consumed either, so when mail
-    /// comes back the very people who should have been woken still are. This
-    /// is what the engine relies on when it drops an unreached rung from the
-    /// ledger before re-planning.
+    /// The other half of G2: the rung is not consumed either, so when mail comes
+    /// back the people who should have been woken still are. This is what the
+    /// engine relies on when it drops an unreached rung from the ledger before
+    /// re-planning.
     #[test]
     fn test_the_lost_rung_is_still_pageable_when_the_transport_returns() {
         let p1 = steps(AlertPriority::P1);
@@ -1522,8 +1456,7 @@ mod tests {
 
     /// It has to end. Four attempts of a doubling backoff is about seven and a
     /// half minutes; after that the rung is given up and the ladder carries on
-    /// at its configured pace — one rung per tick, on to `Exhausted` and
-    /// whatever the policy's final action is. A dead provider must land
+    /// at its configured pace, on to `Exhausted`. A dead provider must land
     /// somewhere honest, not loop.
     #[test]
     fn test_a_dead_transport_gives_the_rung_up_rather_than_retrying_forever() {
@@ -1562,9 +1495,8 @@ mod tests {
         assert_eq!(ended, Some(AfterRung::GiveUpRung));
     }
 
-    /// 30 s → 1 m → 2 m → 4 m, and no further. The doubling is the point — the
-    /// fourth failure means something the first did not — and the cap is what
-    /// stops a retry becoming a second ladder.
+    /// 30 s → 1 m → 2 m → 4 m, and no further. The doubling is the point, and
+    /// the cap is what stops a retry becoming a second ladder.
     #[test]
     fn test_the_backoff_doubles_and_is_capped() {
         let waits: Vec<i64> = (0..6).map(transport_backoff_micros).collect();
@@ -1586,9 +1518,9 @@ mod tests {
         );
     }
 
-    /// A rung somebody was woken on never retries, whatever the transport did
-    /// to the other recipients. The page landed; the ladder's job is done until
-    /// the next level is due.
+    /// A rung somebody was woken on never retries, whatever the transport did to
+    /// the other recipients. The page landed; the ladder's job is done until the
+    /// next level is due.
     #[test]
     fn test_a_rung_that_woke_somebody_never_retries() {
         for attempts in [0, 1, MAX_TRANSPORT_ATTEMPTS, u32::MAX] {
@@ -1620,8 +1552,8 @@ mod tests {
     }
 
     /// The half that was built deliberately and must not be lost: reaching one
-    /// person is still a chain, in fallback order, and the caller stops at the
-    /// first success.
+    /// person is still a chain, in fallback order, stopping at the first
+    /// success.
     #[test]
     fn test_a_person_reaching_chain_keeps_its_order_and_its_membership() {
         let plan = channel_plan(&[Channel::Webhook, Channel::Email]);
@@ -1653,9 +1585,9 @@ mod tests {
 
     // ── Fanning one firing out to several teams (07 I-D2) ───────────────────
 
-    /// A responder has to be able to tell their team's own page from part of
-    /// something wider, and to know that their team's other broken groups are
-    /// on this record rather than on one nobody opened.
+    /// A responder has to tell their team's own page from part of something
+    /// wider, and to know their team's other broken groups are on this record
+    /// rather than one nobody opened.
     #[test]
     fn test_the_fanout_note_says_whose_page_this_is_and_how_wide_it_is() {
         let alone = fanout_note("k8s-namespace=payments", &[], 0);
@@ -1687,8 +1619,8 @@ mod tests {
     }
 
     /// Fifteen teams is somebody's alert definition, not fifteen outages. The
-    /// note has to say that, because the fix is to the grouping and nobody will
-    /// find it from a page that simply arrived.
+    /// note has to say so, because the fix is to the grouping and nobody finds
+    /// that from a page that simply arrived.
     #[test]
     fn test_the_capped_note_blames_the_grouping_not_the_estate() {
         let note = fanout_capped_note(15);

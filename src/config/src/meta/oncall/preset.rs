@@ -20,11 +20,9 @@ use utoipa::ToSchema;
 
 use super::rotation::{MICROS_PER_DAY, MICROS_PER_WEEK, ShiftRule, TimeWindow};
 
-/// Priority given to every restricted layer a preset generates.
-///
-/// The restricted layers of one preset never overlap — that is validated — so
-/// they can share a number, and sharing it keeps the generated schedule
-/// readable: one tier of "when this applies" layers sitting on one catch-all.
+/// Priority given to every restricted layer a preset generates. The restricted
+/// layers of one preset never overlap — that is validated — so they can share a
+/// number, which keeps the generated schedule readable.
 pub const RESTRICTED_PRIORITY: i32 = 10;
 
 /// Priority of the unrestricted catch-all, which must lose to everything above
@@ -32,8 +30,8 @@ pub const RESTRICTED_PRIORITY: i32 = 10;
 pub const CATCH_ALL_PRIORITY: i32 = 0;
 
 /// Handover interval used when the caller does not name one. A week is what
-/// on-call rotations overwhelmingly are, and it is the one value somebody can
-/// change afterwards without re-reasoning about the layers.
+/// on-call rotations overwhelmingly are, and it can be changed afterwards
+/// without re-reasoning about the layers.
 pub const DEFAULT_HANDOVER_MICROS: i64 = MICROS_PER_WEEK;
 
 /// Shortest handover a preset will generate. Below an hour the "rotation" is a
@@ -45,8 +43,7 @@ pub const MIN_HANDOVER_MICROS: i64 = 60 * 60 * 1_000_000;
 pub const MAX_HANDOVER_MICROS: i64 = 366 * MICROS_PER_DAY;
 
 /// Fewest regions follow-the-sun accepts. One region is not follow-the-sun, it
-/// is a single restricted layer — `business_hours_plus_nights` is that shape,
-/// and saying so is more useful than generating something misnamed.
+/// is a single restricted layer — `business_hours_plus_nights` is that shape.
 pub const MIN_FOLLOW_THE_SUN_GROUPS: usize = 2;
 
 /// Most regions follow-the-sun accepts. Four disjoint windows already divides
@@ -54,9 +51,8 @@ pub const MIN_FOLLOW_THE_SUN_GROUPS: usize = 2;
 /// schedule editor is where layers are built.
 pub const MAX_FOLLOW_THE_SUN_GROUPS: usize = 4;
 
-/// Cap on one group's roster. A rotation is a handover order somebody reads —
-/// a hundred names is already past the point where anybody could — and an
-/// unbounded list here is an unbounded list in every response that echoes it.
+/// Cap on one group's roster. A rotation is a handover order somebody reads,
+/// and a hundred names is already past the point where anybody could.
 pub const MAX_GROUP_MEMBERS: usize = 100;
 
 /// Minutes in a day, and therefore the exclusive end of an "all day" window.
@@ -104,11 +100,10 @@ impl std::fmt::Display for PresetId {
     }
 }
 
-/// One layer's worth of people, for the presets whose layers are fixed.
-///
-/// The name is optional because "the weekend layer" already has an obvious
-/// label; supplying an empty one is refused rather than defaulted, because a
-/// blank name in a form means the field was cleared, not that it was skipped.
+/// One layer's worth of people, for the presets whose layers are fixed. The
+/// name is optional because "the weekend layer" has an obvious label; an empty
+/// one is refused rather than defaulted, because a blank name in a form means
+/// the field was cleared, not skipped.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct Group {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -120,9 +115,9 @@ pub struct Group {
 /// One region of a follow-the-sun setup: who, and which hours they hold.
 ///
 /// The name is required here, unlike [`Group`]. A region is the one thing the
-/// preset genuinely cannot guess — "APAC" is knowledge the operator has and the
-/// system does not — and a calendar showing `Region 2` would be a worse
-/// schedule than the one the operator meant to describe.
+/// preset genuinely cannot guess — "APAC" is knowledge the operator has — and a
+/// calendar showing `Region 2` would be a worse schedule than the one they
+/// meant to describe.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct RegionGroup {
     pub name: String,
@@ -137,11 +132,10 @@ pub struct RegionGroup {
 
 /// The inputs of one preset, tagged by which preset they are for.
 ///
-/// Internally tagged on `preset`, so the wire shape is the one §C.3 publishes:
-/// `{"preset": "weekday_weekend", "weekdays": {...}, "weekend": {...}}`. Each
-/// variant names its layers rather than taking a positional array, because
-/// "which of these two groups is the weekend one" is exactly the question a
-/// positional API leaves open until somebody is paged on a Saturday.
+/// Internally tagged on `preset`, so the wire shape is §C.3's. Each variant
+/// names its layers rather than taking a positional array: "which of these two
+/// groups is the weekend one" is exactly the question a positional API leaves
+/// open until somebody is paged on a Saturday.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(tag = "preset", rename_all = "snake_case")]
 pub enum PresetSpec {
@@ -149,8 +143,8 @@ pub enum PresetSpec {
     FollowTheSun {
         groups: Vec<RegionGroup>,
         /// Who covers the hours no region claims. Absent means everybody named
-        /// above, in the order they were named — which is what a follow-the-sun
-        /// team almost always wants and never has to think about.
+        /// above, in the order they were named — what a follow-the-sun team
+        /// almost always wants and never has to think about.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         catch_all: Option<Group>,
     },
@@ -185,10 +179,9 @@ pub enum PresetSpec {
 
 /// Why a preset request was refused.
 ///
-/// Every variant names the field and the bound. An operator who typed the wrong
-/// thing has to be told *what* was wrong: the alternative — quietly generating
-/// something adjacent to what they asked for — produces a schedule that looks
-/// right on the form and pages the wrong person a fortnight later.
+/// Every variant names the field and the bound. Quietly generating something
+/// adjacent to what was asked for produces a schedule that looks right on the
+/// form and pages the wrong person a fortnight later.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PresetError {
     GroupCount {
@@ -233,8 +226,8 @@ pub enum PresetError {
         field: String,
     },
     /// Two regional layers claim the same minute of the day. They would be
-    /// equally in force with equal priority, and which of them staffed the
-    /// hour would be arbitrary.
+    /// equally in force with equal priority, so which of them staffed the hour
+    /// would be arbitrary.
     OverlappingWindows {
         first: String,
         second: String,
@@ -326,11 +319,10 @@ impl PresetSpec {
         }
     }
 
-    /// Every email named anywhere in the request, in the order they appear.
-    ///
-    /// The caller checks these against the org before anything is generated:
-    /// a preset that put a stranger on a rotation would be a page addressed to
-    /// nobody, which is indistinguishable from a page that was never sent.
+    /// Every email named anywhere in the request, in the order they appear. The
+    /// caller checks these against the org first: a preset that put a stranger
+    /// on a rotation would be a page addressed to nobody, indistinguishable
+    /// from one that was never sent.
     pub fn members(&self) -> Vec<&str> {
         let mut out: Vec<&str> = Vec::new();
         match self {
@@ -363,9 +355,8 @@ impl PresetSpec {
     }
 
     /// Rewrites every email in place, which is how the caller substitutes the
-    /// canonical (trimmed, lowercased) address it just validated. Doing it here
-    /// rather than at each call site is what stops `Ana@O2.ai` and `ana@o2.ai`
-    /// becoming two people on one rotation.
+    /// canonical address it just validated. Here rather than at each call site,
+    /// so `Ana@O2.ai` and `ana@o2.ai` cannot become two people on one rotation.
     pub fn map_members(&mut self, f: impl Fn(&str) -> String) {
         let apply = |members: &mut Vec<String>| {
             for m in members.iter_mut() {
@@ -404,17 +395,16 @@ impl PresetSpec {
 /// The rotations a preset builds, top layer first.
 ///
 /// Pure: the timezone decides where the weekly handover falls on the local
-/// calendar and nothing else, the anchor is passed in rather than read from a
-/// clock, and the result is the `Vec<ShiftRule>` of **one** rotation.
+/// calendar, the anchor is passed in rather than read from a clock, and the
+/// result is the `Vec<ShiftRule>` of one rotation.
 ///
 /// One rotation, deliberately. Every preset shape is a set of rules over a
 /// single position — follow-the-sun is one person on call across three
-/// timezones' working hours, not three people at once. A second *position* is a
-/// second rotation, and that is a decision only the team can make.
+/// timezones' working hours, not three at once. A second position is a second
+/// rotation, and only the team can decide that.
 ///
 /// Validation happens here rather than in a separate call the caller could
-/// forget: there is one way in, and it either refuses or returns something the
-/// engine can resolve.
+/// forget: one way in, and it either refuses or returns something resolvable.
 pub fn build(
     spec: &PresetSpec,
     tz: chrono_tz::Tz,
@@ -534,7 +524,6 @@ pub fn build(
 }
 
 /// The windows covering Monday 00:00 up to `(boundary_day, boundary_minute)`.
-///
 /// Whole days come out as one window with several `days` entries and the part
 /// day as a second — the engine ORs a layer's windows, so two of them say
 /// "through Wednesday, plus Thursday morning" without a third concept.
@@ -584,10 +573,9 @@ fn everyone<'a>(groups: impl Iterator<Item = &'a [String]>) -> Vec<String> {
 /// The instant of the most recent local Monday 00:00 at or before `at`.
 ///
 /// Computed on the local calendar, because "Monday midnight" is a wall-clock
-/// fact. If that midnight does not exist — a handful of zones move their clocks
-/// at exactly midnight — the caller's own instant is kept rather than invented
-/// nearby: an anchor an hour out shifts every handover by an hour, which is
-/// worse than an anchor that is merely not tidy.
+/// fact. Where that midnight does not exist — a few zones move their clocks at
+/// exactly midnight — the caller's own instant is kept rather than invented
+/// nearby: an anchor an hour out shifts every handover by an hour.
 fn week_start(at: i64, tz: chrono_tz::Tz) -> i64 {
     use chrono::{Datelike, LocalResult, TimeZone};
 
@@ -751,10 +739,9 @@ fn validate_day(day: u8, field: &str) -> Result<(), PresetError> {
 
 /// A window has to name a real span of the day, and a non-empty one.
 ///
-/// `end_minute` may be 1440 — midnight at the far end — and may be less than
-/// `start_minute`, which is a window that wraps midnight. Equal is refused:
-/// the engine reads that as "no minutes at all", so the layer would exist,
-/// look configured, and never apply.
+/// `end_minute` may be 1440, and may be less than `start_minute`, which wraps
+/// midnight. Equal is refused: the engine reads that as "no minutes at all", so
+/// the layer would exist, look configured, and never apply.
 fn validate_window(
     start_minute: u32,
     end_minute: u32,
@@ -786,10 +773,10 @@ fn validate_window(
 
 /// Refuses two regions that claim the same minute of the day.
 ///
-/// They come out at the same priority, so an overlap is not a preference, it is
-/// a coin toss run once per resolution. Walking the 1440 minutes is the honest
-/// way to ask the question — the windows may wrap midnight, and interval
-/// arithmetic that forgets that is exactly the bug this catches.
+/// They come out at the same priority, so an overlap is a coin toss run once
+/// per resolution. Walking the 1440 minutes is the honest way to ask: the
+/// windows may wrap midnight, and interval arithmetic that forgets that is the
+/// bug this catches.
 fn validate_no_overlap(groups: &[RegionGroup]) -> Result<(), PresetError> {
     for minute in 0..MINUTES_PER_DAY {
         let mut holder: Option<&str> = None;
@@ -844,9 +831,9 @@ pub enum PresetInputKind {
     ///
     /// Distinct from [`Self::DurationMicros`] because the controls are not
     /// interchangeable: a length is a number and a unit, an instant is a date
-    /// and a time read in some zone. `anchor_micros` was declared a duration
-    /// while labelled "First shift begins", so a form generated from this
-    /// catalogue offered "every N hours" for a field that wanted a Tuesday.
+    /// and a time. `anchor_micros` was declared a duration while labelled
+    /// "First shift begins", so a generated form offered "every N hours" for a
+    /// field that wanted a Tuesday.
     TimestampMicros,
     /// Free text.
     Text,
@@ -929,11 +916,9 @@ pub struct PresetDescriptor {
     pub inputs: Vec<PresetInput>,
 }
 
-/// The four shapes, with everything needed to render a form for each.
-///
-/// A closed set rather than a page of a list: these are the four §3b names, they
-/// are compiled in, and a caller can hold all of them. Nothing here reads the
-/// database, so the endpoint that serves it costs a serialisation.
+/// The four shapes, with everything needed to render a form for each. A closed
+/// set rather than a page of a list: these are the four §3b names, compiled in,
+/// and a caller can hold all of them. Nothing here reads the database.
 pub fn catalogue() -> Vec<PresetDescriptor> {
     vec![
         PresetDescriptor {
@@ -1149,8 +1134,7 @@ mod tests {
     use super::*;
 
     /// A preset builds the rules of ONE rotation, so the tests wrap them in one
-    /// to ask who is on call. Which rule won is what they assert on — that is
-    /// the question a preset answers.
+    /// to ask who is on call. Which rule won is what they assert on.
     fn of(rules: &[ShiftRule]) -> crate::meta::oncall::Rotation {
         crate::meta::oncall::Rotation {
             id: "rot_1".to_string(),
@@ -1312,8 +1296,8 @@ mod tests {
     }
 
     /// Sample instants, one per layer per preset, resolving to the group the
-    /// operator meant. A schedule with no gaps that pages the wrong region is
-    /// no better than one with gaps.
+    /// operator meant. A schedule with no gaps that pages the wrong region is no
+    /// better than one with gaps.
     #[test]
     fn test_sample_instants_resolve_to_the_intended_layer() {
         let tz = chrono_tz::UTC;
@@ -1429,10 +1413,10 @@ mod tests {
         }
     }
 
-    /// Every preset generates exactly one layer with no restrictions. This is
-    /// the structural statement of the no-gap property, and it is worth
-    /// asserting separately from the hour walk: the walk proves the schedules
-    /// tested have no holes, this proves the *reason* they cannot.
+    /// Every preset generates exactly one layer with no restrictions — the
+    /// structural statement of the no-gap property. Worth asserting apart from
+    /// the hour walk: the walk proves the schedules tested have no holes, this
+    /// proves the reason they cannot.
     #[test]
     fn test_every_preset_generates_exactly_one_unrestricted_layer() {
         for (id, spec) in every_preset() {
@@ -1747,12 +1731,11 @@ mod tests {
     }
 
     /// A length and an instant are not the same control, and this catalogue is
-    /// the only thing that tells a generated form which to draw.
+    /// the only thing telling a generated form which to draw.
     ///
     /// `anchor_micros` shipped as `DurationMicros` while labelled "First shift
-    /// begins", so a form built from `inputs` — which is the whole point of
-    /// publishing them — offered "every N hours" for a field that wanted a date.
-    /// Nothing caught it because both fields end in `_micros` and both are i64
+    /// begins", so a form built from `inputs` offered "every N hours" for a
+    /// field that wanted a date. Both fields end in `_micros` and both are i64
     /// on the wire: the bug lived entirely in the kind.
     #[test]
     fn test_the_anchor_is_an_instant_and_the_handover_is_a_length() {
