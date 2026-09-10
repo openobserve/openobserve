@@ -27,13 +27,13 @@ use promql_parser::parser::{
 use super::Engine;
 use crate::{
     aggregations::{self, Avg, Count, Group, Max, Min, Stddev, Stdvar, Sum, eval_aggregate},
-    functions, fused,
+    functions, series_stream, streaming_eval,
 };
 
 /// A recognized fused shape: `agg(range_func(...))`, or `agg(instant_selector)` read as
 /// `last_over_time` over the lookback window.
 struct FusedAggShape<'a> {
-    op: fused::FusedAggOp,
+    op: streaming_eval::FusedAggOp,
     func: Arc<dyn functions::RangeFunc>,
     /// The range function's argument to materialize; `None` for the instant shape, which has
     /// no range function and stays generic when it cannot stream.
@@ -153,22 +153,23 @@ impl Engine {
         modifier: &Option<LabelModifier>,
         data: Value,
         func: Arc<dyn functions::RangeFunc>,
-        op: fused::FusedAggOp,
+        op: streaming_eval::FusedAggOp,
     ) -> Result<Value> {
         let Some((sources, range)) =
-            fused::materialized::group_sources(data, modifier, func.name())?
+            series_stream::matrix::group_sources(data, modifier, func.name())?
         else {
             return Ok(Value::None);
         };
-        let eval = Arc::new(fused::RangeExpr::new(func, range, &self.eval_ctx));
+        let eval = Arc::new(streaming_eval::RangeExpr::new(func, range, &self.eval_ctx));
         let timeout = Duration::from_secs(self.ctx.query_ctx.timeout);
-        let (value, _) = tokio::time::timeout(timeout, fused::aggregate(sources, op, eval))
-            .await
-            .map_err(|_| {
-                DataFusionError::from(ErrorCodes::SearchTimeout(
-                    "[PromQL] fused agg timeout".to_string(),
-                ))
-            })??;
+        let (value, _) =
+            tokio::time::timeout(timeout, streaming_eval::aggregate(sources, op, eval))
+                .await
+                .map_err(|_| {
+                    DataFusionError::from(ErrorCodes::SearchTimeout(
+                        "[PromQL] fused agg timeout".to_string(),
+                    ))
+                })??;
         Ok(value)
     }
 }
@@ -180,7 +181,7 @@ fn fused_agg_shape<'a>(op: &token::TokenType, expr: &'a PromExpr) -> Option<Fuse
     {
         return None;
     }
-    let agg_op = fused::FusedAggOp::from_token(op.id())?;
+    let agg_op = streaming_eval::FusedAggOp::from_token(op.id())?;
     match expr {
         PromExpr::Call(Call { func, args }) => {
             let [range_arg] = args.args.as_slice() else {
