@@ -13,21 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Who a level of the ladder pages.
-//!
-//! **Three kinds, and that is the whole vocabulary.** A level names a rotation,
-//! or it names people, or it names the team.
-//!
-//! It was eight. Six of them existed to name a *position* — `OnCallNow` meant
-//! "the default slot", `NextOnCall` meant "one handover further along the same
-//! roster", and three `_in_slot` variants named a slot as a string. Two of
-//! those six could put somebody on call that no rotation had rostered, which is
-//! how one team ended up with the schedule screen and the escalation preview
-//! naming two different people and both being right.
-//!
-//! A position is now a [`super::Rotation`] with an id, so a level points at one.
-//! Nothing here conjures a person: if a level resolves to somebody, a shift rule
-//! put them there. See `architecture/02 §0`.
+//! Who a level pages: a rotation, people, or the team. Nothing here conjures a person.
 
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;

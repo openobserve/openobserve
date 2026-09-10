@@ -13,25 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! The org's routing configuration, and the flag that tells a defaulted signal
-//! from an unowned one.
-//!
-//! Two changes because they are one feature. `oncall_routing_config` holds the
-//! team an operator nominated as the catch-all — architecture/01 §8 — and
-//! `oncall_unrouted_signals.defaulted_team_id` records, on the queue row that
-//! already exists for the gap, that the gap paged that team rather than paging
-//! nobody. §4 says the one thing worth surfacing is *"namespaces that paged you
-//! and landed on the default team"*, and without the column the queue cannot
-//! distinguish the two outcomes it is now recording.
-//!
-//! `default_team_id` is nullable and there is no seed row. Nothing creates a
-//! default team; a fresh org has none until somebody picks one, and until then
-//! an unclaimed signal goes on the queue exactly as it did before.
-//!
-//! §8 also lists a `dimensions` column on this table. It is deliberately not
-//! here: the identity dimensions are already owned by Correlation Settings'
-//! `distinguish_by`, and a second copy of them would be a second answer to the
-//! same question with nothing keeping the two honest.
+//! No `dimensions` column here: Correlation Settings' `distinguish_by` already owns them.
 
 use sea_orm_migration::prelude::*;
 
@@ -48,9 +30,7 @@ impl MigrationTrait for Migration {
                 Table::create()
                     .table(OncallRoutingConfig::Table)
                     .if_not_exists()
-                    // The org IS the key: there is exactly one routing
-                    // configuration per org, so a surrogate id would only
-                    // create the possibility of two.
+                    // The org IS the key: a surrogate id would allow two configs per org.
                     .col(
                         ColumnDef::new(OncallRoutingConfig::OrgId)
                             .string()
@@ -72,8 +52,7 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
-        // Guarded rather than blind: this migration must be re-runnable, and on
-        // a database that already went round once the column is there.
+        // Guarded: this must be re-runnable, and a second pass already has the column.
         if !manager.has_column(UNROUTED, "defaulted_team_id").await? {
             manager
                 .alter_table(
@@ -135,7 +114,6 @@ mod tests {
 
     use super::*;
 
-    /// Column names of `table`, ordered, as SQLite reports them.
     async fn columns(db: &DatabaseConnection, table: &str) -> Vec<String> {
         let rows = db
             .query_all(Statement::from_string(
@@ -149,13 +127,7 @@ mod tests {
             .collect()
     }
 
-    /// The on-call schema as the previous release left it — what a database
-    /// upgrading into this migration actually holds.
-    ///
-    /// `m20260807_000001_create_oncall_ownership` is left out deliberately: the
-    /// only part of it this migration could care about is a column it adds to
-    /// `alerts`, which would mean standing up the whole alerts schema to test a
-    /// table that has nothing to do with it.
+    /// `m20260807_000001_create_oncall_ownership` is left out: it needs the whole `alerts` schema.
     async fn migrate_to_previous_release(manager: &SchemaManager<'_>) {
         super::super::m20260806_000001_create_oncall_tables::Migration
             .up(manager)
@@ -167,9 +139,7 @@ mod tests {
             .unwrap();
     }
 
-    /// The case a fresh-install test cannot see: an existing deployment already
-    /// has an `oncall_unrouted_signals` full of rows, and has to gain the column
-    /// without losing them.
+    /// The case a fresh install cannot see: existing rows must survive gaining the column.
     #[tokio::test]
     async fn test_up_upgrades_an_existing_database() {
         let db = Database::connect("sqlite::memory:").await.unwrap();
@@ -204,8 +174,7 @@ mod tests {
                 .unwrap()
         );
 
-        // The existing row survives, and reads as "paged nobody" — which is
-        // exactly what it meant before the column existed.
+        // The existing row must read as "paged nobody", its meaning before the column.
         let rows = db
             .query_all(Statement::from_string(
                 sea_orm::DbBackend::Sqlite,
@@ -223,8 +192,7 @@ mod tests {
             None
         );
 
-        // No org starts with a default team. If this ever seeds a row, some org
-        // begins paging a team nobody nominated.
+        // If this ever seeds a row, some org begins paging a team nobody nominated.
         let configs = db
             .query_all(Statement::from_string(
                 sea_orm::DbBackend::Sqlite,
@@ -235,9 +203,7 @@ mod tests {
         assert!(configs.is_empty());
     }
 
-    /// The migrator may run this twice — a retried startup, a re-registered
-    /// migration — and neither the `if_not_exists` table nor the guarded
-    /// `ALTER` may fail the second time.
+    /// A retried startup runs this twice, and neither guarded step may fail the second time.
     #[tokio::test]
     async fn test_up_is_idempotent() {
         let db = Database::connect("sqlite::memory:").await.unwrap();
@@ -253,8 +219,7 @@ mod tests {
         );
     }
 
-    /// An upgraded database and a fresh one must end in the same schema, or
-    /// only one of the two install paths is being tested anywhere.
+    /// Upgrade and fresh install must end in the same schema, or only one path is tested.
     #[tokio::test]
     async fn test_upgraded_schema_matches_fresh_schema() {
         let fresh = Database::connect("sqlite::memory:").await.unwrap();
@@ -265,8 +230,6 @@ mod tests {
         let upgraded = Database::connect("sqlite::memory:").await.unwrap();
         let upgraded_mgr = SchemaManager::new(&upgraded);
         migrate_to_previous_release(&upgraded_mgr).await;
-        // The upgrade path is this migration arriving on a database that has
-        // already been serving traffic; the extra round is the retry.
         Migration.up(&upgraded_mgr).await.unwrap();
         Migration.up(&upgraded_mgr).await.unwrap();
 

@@ -13,25 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Schedule overrides — "cover for me".
-//!
-//! `architecture/02` §5. A named person takes a bounded slice of whoever the
-//! rotation would otherwise resolve to. Its own table rather than a column on
-//! `oncall_schedules` because an override has its own lifecycle: it is created
-//! by one person at 2am, it expires on its own, and it is deleted without
-//! touching the rotation it stood over.
-//!
-//! Keyed by team rather than by schedule and level, which is what §3's sketch
-//! says: this codebase dropped per-level rotations — a team has one schedule,
-//! and "who is on call" is one question — so `(org_id, team_id)` is the whole
-//! of the scoping and matches every other on-call read path.
-//!
-//! Written as a new migration rather than as an edit to
-//! `m20260806_000001_create_oncall_tables`, whatever the unreleased-feature
-//! convention says. Editing a create migration in place is what
-//! `m20260811_000002_repair_oncall_schema_drift` exists to undo: SeaORM records
-//! a migration as applied by name, so an edited body never re-runs and every
-//! database that already ran it is left without the new table.
+//! A new migration, not an edit: SeaORM records one as applied by name, so edits never re-run.
 
 use sea_orm_migration::prelude::*;
 
@@ -56,27 +38,18 @@ impl MigrationTrait for Migration {
                     )
                     .col(ColumnDef::new(OncallOverrides::OrgId).string().not_null())
                     .col(ColumnDef::new(OncallOverrides::TeamId).string().not_null())
-                    // Which rotation the cover stands over. NOT NULL: a cover
-                    // is "stand in for this position", and a position is a
-                    // rotation. It was a nullable `slot` string, where NULL
-                    // meant the default one — which let a cover claim a
-                    // position nothing staffed, the same mistake the derived
-                    // secondary made in a different place.
+                    // NOT NULL: a nullable rotation lets a cover claim a position nothing staffed.
                     .col(
                         ColumnDef::new(OncallOverrides::RotationId)
                             .string()
                             .not_null(),
                     )
-                    // The covering user: who actually holds the pager.
                     .col(
                         ColumnDef::new(OncallOverrides::UserEmail)
                             .string()
                             .not_null(),
                     )
-                    // Who is being covered. Nullable: "cover tonight" is a real
-                    // request even when nobody has worked out whose shift
-                    // tonight is, and demanding the answer would turn a
-                    // ten-second interaction into a lookup.
+                    // Nullable: "cover tonight" is real even before whose shift it is.
                     .col(ColumnDef::new(OncallOverrides::CoveringFor).string().null())
                     .col(
                         ColumnDef::new(OncallOverrides::StartAt)
@@ -98,9 +71,7 @@ impl MigrationTrait for Migration {
                             .string()
                             .not_null(),
                     )
-                    // Not decoration: `created_at` IS the overlap rule (§5,
-                    // "latest created_at wins"), so it is NOT NULL and every
-                    // write stamps it.
+                    // `created_at` IS the overlap rule, so it is NOT NULL on every write.
                     .col(
                         ColumnDef::new(OncallOverrides::CreatedAt)
                             .big_integer()
@@ -110,9 +81,7 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
-        // The one query on the paging path: every override for a team that
-        // could still be in force. Ordered by `end_at` because the filter is
-        // "has not finished yet", which is what bounds the read.
+        // Ordered by `end_at`: the paging filter is "has not finished yet", which bounds it.
         manager
             .create_index(
                 Index::create()
@@ -126,7 +95,6 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
-        // Listing a window, and the deletes that follow a person leaving.
         manager
             .create_index(
                 Index::create()
@@ -197,8 +165,7 @@ mod tests {
         let manager = SchemaManager::new(&db);
 
         Migration.up(&manager).await.expect("first run");
-        // `if_not_exists` throughout, because a node that crashed between the
-        // table and its indexes has to be able to finish the job on restart.
+        // `if_not_exists` throughout: a crash between table and indexes must finish on restart.
         Migration.up(&manager).await.expect("second run");
 
         assert!(manager.has_table(TABLE).await.unwrap());
@@ -232,19 +199,12 @@ mod tests {
         );
     }
 
-    /// The mistake that cost two P0s on this feature: testing only a fresh
-    /// install. A database that already ran every earlier on-call migration is
-    /// the one real upgrades take, and this migration has to add the table
-    /// there too — the migrator's version check is what decides whether it
-    /// runs at all, and a table that silently never appears is every on-call
-    /// query failing with "no such table" on the next release.
+    /// Testing only fresh installs cost two P0s: a table missing on upgrade is "no such table".
     #[tokio::test]
     async fn test_an_upgraded_database_gains_the_table_too() {
         let db = Database::connect("sqlite::memory:").await.unwrap();
         let manager = SchemaManager::new(&db);
-        // `m20260807` hangs a column off `alerts`, which is created far
-        // earlier in the chain than anything on-call. Stubbing it keeps this
-        // test about the on-call migrations without replaying sixty others.
+        // `m20260807` hangs a column off `alerts`; stubbing it avoids replaying sixty others.
         db.execute(Statement::from_string(
             sea_orm::DbBackend::Sqlite,
             "CREATE TABLE alerts (id TEXT NOT NULL PRIMARY KEY)".to_owned(),
@@ -274,8 +234,7 @@ mod tests {
             .expect("the upgrade must apply");
         assert!(manager.has_table(TABLE).await.unwrap());
 
-        // And it is actually writable, which is the thing the schema check
-        // above cannot prove on its own.
+        // And it is actually writable, which the schema check above cannot prove on its own.
         db.execute(Statement::from_string(
             sea_orm::DbBackend::Sqlite,
             "INSERT INTO oncall_overrides \
@@ -288,8 +247,7 @@ mod tests {
         .expect("an override must be insertable after the upgrade");
     }
 
-    /// An upgraded database and a fresh one must end in the same schema, or
-    /// only one of the two install paths is being tested anywhere.
+    /// Upgrade and fresh install must end in the same schema, or only one path is tested.
     #[tokio::test]
     async fn test_upgraded_schema_matches_fresh_schema() {
         let fresh = Database::connect("sqlite::memory:").await.unwrap();

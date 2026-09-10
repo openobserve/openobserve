@@ -13,64 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Cluster-coordinator events for the on-call configuration caches
-//! (`architecture/06` §3, `CACHING-STRATEGY.md` §3).
-//!
-//! Every firing used to re-read the same four things — the org's ownership
-//! rules, the team's policy, the team and its roster, and the schedule — once
-//! per rung and, for the ownership scan, once per impacted service. All four
-//! are configuration: they change when somebody edits a form, not when
-//! something breaks.
-//!
-//! So they are cached per node with a short TTL, and this module is the signal
-//! that makes the TTL a backstop rather than the mechanism. Writers call an
-//! `emit_*` after committing; every node runs [`watch`] and drops the matching
-//! entry the instant the event lands.
-//!
-//! Modelled on [`super::synthetics`], including the reason the handler lives
-//! here rather than being passed in: the caches are in `infra::table`, the same
-//! crate, so [`watch`] calls the invalidation functions directly.
-//!
-//! # Why invalidation correctness matters more than hit rate here
-//!
-//! A stale ownership rule pages the wrong team and a stale schedule pages the
-//! wrong person. Both are quiet failures — somebody's phone rings, so the
-//! system looks like it worked. Every cache below is therefore invalidated from
-//! **every** path that can change what it holds, including the super-cluster
-//! apply path, which writes through the ORM rather than through the table
-//! module's own write functions. The TTL is short enough that a missed event
-//! costs one escalation, never a shift.
-//!
-//! # Key layout
-//!
-//! One watch prefix, with a `kind` segment so a single watcher serves all of
-//! them:
-//!
-//! ```text
-//! /oncall_cache/ownership/{org_id}            an org's ownership rules changed
-//! /oncall_cache/policy/{org_id}/{team_id}     one team's escalation policy changed
-//! /oncall_cache/team/{org_id}/{team_id}       one team's name / timezone changed
-//! /oncall_cache/members/{team_id}             one team's roster changed
-//! /oncall_cache/schedule/{org_id}/{team_id}   a rotation or a cover changed
-//! /oncall_cache/ack-spent/{tag}/{expires_at}  an ack token was used up
-//! ```
-//!
-//! `ack-spent` is the odd one out: it is not an invalidation, it is the
-//! opposite — "add this to what you already know". It rides the same prefix
-//! because it wants exactly the same delivery guarantees and the same one
-//! watcher, and because it is the same shape of fact: a small piece of state
-//! that every node has to agree on and that nothing may be paged on the wrong
-//! side of. `03` §8 requires ack tokens to be single-use, and single-use across
-//! one node only is not single-use.
-//!
-//! `ownership` is keyed by org rather than by rule because the cache holds the
-//! whole rule set for an org: routing evaluates all of them in order, so there
-//! is no per-rule entry to drop.
-//!
-//! `schedule` is emitted by override writes as well as schedule writes. Covers
-//! live in their own table but are loaded onto the `Schedule`, and an override
-//! the page path does not see is worse than no override feature at all — the
-//! engineer who arranged cover stops watching and the page still goes to them.
+//! On-call cache events — every write path must emit one, or a stale row pages wrongly.
 
 use crate::{db::Event, errors::Error};
 
@@ -262,9 +205,7 @@ fn apply<F: Fn(&str, i64)>(key: &str, on_ack_token_spent: &F) {
         },
         Some(KIND_ACK_SPENT) => match (parts.get(2), parts.get(3).and_then(|e| e.parse().ok())) {
             (Some(tag), Some(expires_at)) => on_ack_token_spent(tag, expires_at),
-            // Refused rather than guessed at: an entry with an invented expiry
-            // either never lapses or lapses immediately, and one of those two is
-            // a link that keeps working.
+            // Refused, not guessed: an invented expiry either never lapses or lapses at once.
             _ => log::error!("watch_oncall_cache: malformed ack-spent key {key}"),
         },
         other => log::debug!("watch_oncall_cache: ignoring unknown event kind {other:?} ({key})"),

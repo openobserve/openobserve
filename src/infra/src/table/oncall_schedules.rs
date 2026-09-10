@@ -13,12 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! A team's schedule: its rotations, stored as JSON.
-//!
-//! Rotations are one column rather than one table because they are always
-//! read and written as a set — resolving who is on call needs every level at
-//! once, and editing one rotation is a save of the whole schedule. Layers
-//! land inside the same column later.
+//! A team's schedule: rotations in one JSON column, because they are read and written as a set.
 
 use std::{
     sync::LazyLock,
@@ -134,10 +129,7 @@ fn to_schedule(m: oncall_schedules::Model) -> Schedule {
         team_id: m.team_id,
         timezone: m.timezone,
         rotations,
-        // Filled in by the read paths below. A `Schedule` built without them
-        // resolves as though nobody had arranged cover and nobody were away,
-        // which is why every loader that answers "who is on call" goes through
-        // `with_resolution_inputs` rather than constructing one here.
+        // Filled in by the read paths: built here it resolves as if nobody had cover or was away.
         overrides: Vec::new(),
         unavailability: Vec::new(),
         created_at: m.created_at,

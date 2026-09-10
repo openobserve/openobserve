@@ -13,34 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! When a page's escalation ladder ran out with nobody answering.
-//!
-//! One additive, nullable column on `oncall_responses`: `exhausted_at`,
-//! microseconds, absent while the ladder is still climbing.
-//!
-//! **Not a `ResponseState`.** An exhausted page can still be acknowledged and
-//! resolved — somebody finds it an hour later and takes it — so a lifecycle
-//! state would force a false either/or between "the ladder is spent" and "a
-//! human has it". `ResponseState`'s durable ordering also has no room between
-//! `Triaged` (2) and `Acknowledged` (3), and those ids may not be reordered.
-//! Exhaustion is a property of the ladder; the state is a property of the
-//! human.
-//!
-//! Why a column rather than reading the timeline: the `Exhausted` event has
-//! been on the timeline all along, but the pages LIST is where the question is
-//! asked, and answering it there meant one extra query per row. So a record
-//! whose ladder had died went on reporting itself as `triggered` — which
-//! `state.is_escalating()` reads as "still climbing" — beside a timeline that
-//! said it was over.
-//!
-//! A separate migration rather than an edit to `m20260812_000003`, even though
-//! on-call is unreleased: that migration is already applied in every
-//! development database and in CI's persisted SQLite, so an in-place edit adds
-//! the column for nobody who already has the table.
-//!
-//! No backfill. Absent = never exhausted, which is right for every existing
-//! row: a ladder that ran out before this shipped left its `Exhausted` event on
-//! the timeline, and the record simply does not carry the summary.
+//! Not a `ResponseState`: an exhausted page is still ackable, and the durable ids have no gap.
 
 use sea_orm_migration::prelude::*;
 
@@ -50,8 +23,7 @@ pub struct Migration;
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        // One alter option per statement, and an explicit `has_column` guard —
-        // see `m20260824_000001` for why both matter on SQLite.
+        // One alter option per statement, plus a `has_column` guard — see `m20260824_000001`.
         add_column(
             manager,
             ONCALL_RESPONSES,
@@ -93,10 +65,7 @@ enum OncallResponses {
     ExhaustedAt,
 }
 
-/// Add one nullable column, skipping it if already present.
-///
-/// Genuinely idempotent, unlike `add_column_if_not_exists` on SQLite, so a
-/// migration interrupted partway can be retried.
+/// Genuinely idempotent unlike `add_column_if_not_exists` on SQLite, so a retry is safe.
 async fn add_column<C>(
     manager: &SchemaManager<'_>,
     table: &str,

@@ -13,18 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! On-call schema.
-//!
-//! The feature is enterprise, but the DDL lives here with every other
-//! enterprise feature's (incidents, synthetics, SLO) because `o2_enterprise`
-//! carries `sea-orm-migration` only under the `cloud` feature. These tables
-//! exist in every deployment and are written to by none of them unless the
-//! enterprise build and `ZO_ONCALL_ENABLED` are both on.
-//!
-//! All ids are ksuids. Their timestamp component has one-second resolution
-//! and the rest is random, so `ORDER BY id` is chronological only to the
-//! second - anything that must be strictly ordered sorts on an explicit
-//! timestamp column and uses the id purely as a tiebreak.
+//! Enterprise DDL lives here: `o2_enterprise` carries `sea-orm-migration` only under `cloud`.
 
 use sea_orm_migration::prelude::*;
 
@@ -56,13 +45,7 @@ impl MigrationTrait for Migration {
                             .default("UTC"),
                     )
                     .col(ColumnDef::new(OncallTeams::Description).string().null())
-                    // The team's own channel: a JSON array of alert
-                    // Destination names the team is talked to on. Nullable,
-                    // and null is not the same as `[]` — null means "never
-                    // set", which falls back to the escalation policy's list,
-                    // and `[]` means "this team has no channel". Text rather
-                    // than a join table because it is a short list read whole
-                    // or not at all, exactly like the policy's own.
+                    // Null is not `[]`: null falls back to the policy, `[]` means no channel.
                     .col(
                         ColumnDef::new(OncallTeams::ChannelDestinations)
                             .text()
@@ -82,8 +65,7 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
-        // Unique (org_id, name) makes get-or-create race-safe across nodes;
-        // the app-level find-then-insert cannot close that race by itself.
+        // Unique (org_id, name) is what makes get-or-create race-safe; find-then-insert cannot.
         manager
             .create_index(
                 Index::create()
@@ -127,9 +109,7 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
-        // Membership is a flat fact: one row per person per team. Which rung
-        // somebody covers belongs to the rotation
-        // (`oncall_schedules.rotations`), not to belonging to the team.
+        // Membership is flat: which rung somebody covers is `oncall_schedules.rotations`.
         manager
             .create_index(
                 Index::create()
@@ -211,16 +191,14 @@ impl MigrationTrait for Migration {
                             .not_null()
                             .default("[]"),
                     )
-                    // Alert Destination NAMES, not URLs — the org already has
-                    // somewhere to store those.
+                    // Destination names, not URLs: the org already stores those.
                     .col(
                         ColumnDef::new(OncallPolicies::Destinations)
                             .custom(Alias::new(get_text_type()))
                             .not_null()
                             .default("[]"),
                     )
-                    // The L0 block (07-agent-l0 §4). Defaulted, so a team that
-                    // never opens the screen runs the published defaults.
+                    // Defaulted, so a team that never opens the screen runs the defaults.
                     .col(
                         ColumnDef::new(OncallPolicies::L0Json)
                             .custom(Alias::new(get_text_type()))
@@ -263,56 +241,37 @@ impl MigrationTrait for Migration {
                             .string()
                             .not_null(),
                     )
-                    // Nullable: a firing nobody owns still opens a record, with
-                    // no team rather than no record (R-D6). `null` IS the
-                    // teamless case — a sentinel string would be an invariant
-                    // nobody knows about until something compares it to a real
-                    // id.
+                    // Null IS the teamless case; a sentinel would be an unknown invariant.
                     .col(ColumnDef::new(OncallResponses::TeamId).string().null())
-                    // What the page says it is about. Stored rather than
-                    // re-read from the alert on every tick, and it must
-                    // survive the alert being renamed or deleted.
+                    // Stored, not re-read: it must survive the alert being renamed.
                     .col(ColumnDef::new(OncallResponses::Title).string().null())
-                    // Why it happened, captured at resolve. This is what makes
-                    // the next firing of the same rule useful history.
                     .col(ColumnDef::new(OncallResponses::Cause).string().null())
                     .col(ColumnDef::new(OncallResponses::CauseNote).string().null())
-                    // The instant the escalation ladder measures its step
-                    // delays from. Snoozing pushes it forward so a pause does
-                    // not turn into every rung firing at once on expiry;
-                    // `opened_at` stays put so time-to-resolve stays honest.
+                    // Snoozing moves this, not `opened_at`, or every rung fires at once.
                     .col(
                         ColumnDef::new(OncallResponses::LadderAnchor)
                             .big_integer()
                             .null(),
                     )
-                    // Which run of the ladder the record is on. A handoff, to
-                    // a person or to a team, starts a new one: the ledger is
-                    // read per run, so the receiving responder's ladder begins
-                    // at its first rung instead of at whatever rung the
-                    // previous owner's had reached. Null means the first run.
+                    // A handoff starts a new run, so its ladder begins at rung one.
                     .col(
                         ColumnDef::new(OncallResponses::LadderRun)
                             .integer()
                             .null(),
                     )
-                    // Quiet until this instant. Distinct from acking: the page
-                    // is still nobody's, it is just not shouting.
+                    // Distinct from acking: the page is still nobody's, it is just not shouting.
                     .col(
                         ColumnDef::new(OncallResponses::SnoozedUntil)
                             .big_integer()
                             .null(),
                     )
-                    // Owner fixes the cause; impacted contains the blast
-                    // radius on their own service. Different jobs, so
-                    // different records with their own ack and timeline.
+                    // Owner and impacted are different jobs, so each gets its own record.
                     .col(
                         ColumnDef::new(OncallResponses::ResponderRole)
                             .integer()
                             .not_null()
                             .default(1),
                     )
-                    // The owner record this one was opened alongside.
                     .col(
                         ColumnDef::new(OncallResponses::OriginResponseId)
                             .string()
@@ -336,18 +295,13 @@ impl MigrationTrait for Migration {
                             .big_integer()
                             .null(),
                     )
-                    // Nullable and unconstrained: most firings never produce an
-                    // incident, and an incident renders a record rather than
-                    // owning one.
+                    // Nullable: an incident renders a record rather than owning one.
                     .col(ColumnDef::new(OncallResponses::IncidentId).string().null())
                     .to_owned(),
             )
             .await?;
 
-        // The record is keyed by subject, so this is the lookup the engine
-        // does on every firing. Unique because a firing has exactly one
-        // record - the firing counter in subject_id is what separates
-        // repeats of the same rule.
+        // Unique because a firing has one record; `subject_id` separates repeats of the rule.
         manager
             .create_index(
                 Index::create()
@@ -362,8 +316,6 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
-        // Backs the team's open-response list, which is the on-call
-        // engineer's home screen.
         manager
             .create_index(
                 Index::create()
@@ -414,10 +366,7 @@ impl MigrationTrait for Migration {
                             .not_null()
                             .default(""),
                     )
-                    // The rung, as its delay from the record opening, and the
-                    // run it belongs to. Together they are the ledger key the
-                    // planner reads back: the delay alone stopped identifying
-                    // a rung the moment a handoff could restart the ladder.
+                    // Delay and run together are the key: a handoff can restart the ladder.
                     .col(
                         ColumnDef::new(OncallResponseEvents::RungMicros)
                             .big_integer()
@@ -428,12 +377,7 @@ impl MigrationTrait for Migration {
                             .integer()
                             .null(),
                     )
-                    // Who one page was addressed to, on what, and whether the
-                    // transport took it. Written per send rather than per
-                    // rung, so a crash halfway through a rung retries only the
-                    // pages that did not land — and so "did it reach them" is
-                    // answerable per person and per channel rather than from
-                    // a sentence.
+                    // Per send, not per rung, so a crash retries only what did not land.
                     .col(
                         ColumnDef::new(OncallResponseEvents::Recipient)
                             .string()
@@ -449,10 +393,7 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
-        // Timeline read. Sorted on `at` because that is the real ordering;
-        // `id` is the tiebreak that makes paging deterministic when two
-        // events share a microsecond, which ksuids alone cannot provide -
-        // their timestamp resolution is one second.
+        // `id` breaks ties inside one microsecond, which ksuids cannot at one-second resolution.
         manager
             .create_index(
                 Index::create()
@@ -466,16 +407,7 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
-        // P4: nobody is paged twice for the same (run, rung, person,
-        // channel). The engine checks the ledger before sending, but that
-        // check is a read followed by an insert, and nothing stopped two of
-        // them interleaving. This is the half of the rule the database can
-        // hold: one row per key, so a duplicate is a conflict the writer
-        // resolves rather than a second page nobody notices.
-        //
-        // Every other kind of entry leaves all four of the trailing columns
-        // null, and null is distinct from null in a unique index on all three
-        // engines, so notes and rung entries are unaffected.
+        // The engine's dedup is a read then an insert, so only this key stops a double page.
         manager
             .create_index(
                 Index::create()
@@ -639,7 +571,6 @@ mod tests {
 
     use super::*;
 
-    /// The delivery ledger only, on a database this migration built.
     async fn migrated() -> DatabaseConnection {
         let db = Database::connect("sqlite::memory:").await.unwrap();
         Migration.up(&SchemaManager::new(&db)).await.unwrap();
@@ -662,10 +593,7 @@ mod tests {
         .map(|_| ())
     }
 
-    /// P4 is a rule about who gets woken, so the ledger it is read from has to
-    /// be able to state it. Without the constraint the dedup is a read followed
-    /// by an insert, and two of those interleaving page one person twice with
-    /// nothing in the schema to say they had already been reached.
+    /// Without the constraint the dedup is a read then an insert, and two interleaving double-page.
     #[tokio::test]
     async fn test_the_ledger_holds_one_row_per_person_per_channel_per_rung() {
         let db = migrated().await;
@@ -675,9 +603,7 @@ mod tests {
         assert!(write_event(&db, "ev_2", key).await.is_err());
     }
 
-    /// The same constraint must not reach the timeline a person reads. Every
-    /// entry that is not a delivery leaves the four trailing columns null, and
-    /// the whole design rests on null being distinct from null here.
+    /// The design rests on null being distinct from null, so non-delivery entries are exempt.
     #[tokio::test]
     async fn test_two_notes_on_one_record_are_not_a_duplicate() {
         let db = migrated().await;

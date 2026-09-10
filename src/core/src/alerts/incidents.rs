@@ -666,9 +666,7 @@ pub async fn correlate_alert_to_incident(
     )
     .await?;
 
-    // An incident is the correlated view, so it pages ONCE however many alerts
-    // fed it. Only on creation: an alert joining an existing incident must not
-    // open a second record.
+    // Only on creation: an alert joining an existing incident must not open a second record.
     #[cfg(feature = "enterprise")]
     if let IncidentCorrelationOutcome::NewIncidentCreated {
         incident_id,
@@ -676,46 +674,18 @@ pub async fn correlate_alert_to_incident(
     } = &outcome
         && o2_enterprise::enterprise::oncall::is_enabled()
     {
-        // Single-sourced with the alert path in `scheduler::handlers`: the row,
-        // then the alert's own conditions for whatever the row left blank.
+        // Single-sourced with `scheduler::handlers`: the row, then the alert's own conditions.
         let mut dimensions = o2_enterprise::enterprise::oncall::routing::dimensions_for_alert(
             &crate::db::system_settings::get_semantic_field_groups(&alert.org_id).await,
             &alert.query_condition,
             result_row,
         );
-        // Last resort: what correlation already worked out.
-        //
-        // Reached only when neither the row nor the alert's conditions named
-        // anything — a `SELECT count(*)` whose threshold lives in an
-        // inequality, with no equality anywhere to identify it. Nothing static
-        // can route that alert, but correlation can: it has already queried the
-        // service-discovery registry, and re-deriving from the row here and
-        // ignoring that answer was throwing away the better of the two.
-        //
-        // Only this path can offer it — correlation does not run when
-        // `creates_incident` is off — which is why the two paths agree on the
-        // sources above and diverge here rather than earlier.
-        //
-        // Additive like those sources. A row that carries its own
-        // identity keeps routing on it, so no existing alert changes team —
-        // this can only add a route where there was none.
-        // ...and only when it names a service. Discovery's last resort is the
-        // stream a record arrived in, so the registry legitimately holds
-        // `node_cpu_seconds`; routing on that is routing on a table name.
-        //
-        // `is_some_and`, not `is_none_or`: no discovery answer at all is not
-        // evidence that the name is a service. Read the other way, an org whose
-        // registry answered nothing routed every unidentifiable alert on the
-        // literal `unknown` that `extract_service_name` returns as its
-        // not-found value, and every one of them landed on whichever team owns
-        // that phantom name.
+        // `is_some_and`, not `is_none_or`, or every unidentifiable alert routes on `unknown`.
         let names_a_service = parallel_result
             .service_discovery
             .as_ref()
             .is_some_and(|sd| !sd.service_name_from_stream);
-        // A sentinel is not an identity. Belt and braces beside the check
-        // above, because the not-found value is a plain `String` and nothing in
-        // the type stops it reaching a routing decision.
+        // Belt and braces: the not-found value is a plain `String` that could reach routing.
         if dimensions.is_empty()
             && names_a_service
             && !service_name.trim().is_empty()
@@ -732,9 +702,7 @@ pub async fn correlate_alert_to_incident(
                 alert.name,
             );
         }
-        // Single-sourced with the alert path in `scheduler::handlers`. The two
-        // used to disagree — P2 here, P3 there — so ticking `creates_incident`
-        // on an alert quietly changed how loudly it woke somebody.
+        // Single-sourced with the alert path, or `creates_incident` changes how loudly it pages.
         let priority = alert
             .priority
             .unwrap_or(config::meta::oncall::DEFAULT_PAGING_PRIORITY);
@@ -749,13 +717,9 @@ pub async fn correlate_alert_to_incident(
         )
         .await
         {
-            // Blast radius: whoever CALLS the failing service is impacted and
-            // has containment work of their own. It hangs off whichever record
-            // actually paged, which for an incident-backed alert is this one.
+            // The blast radius hangs off whichever record actually paged, which here is this one.
             Ok(Some(origin)) => {
-                // Without this the link exists only as a naming convention in
-                // `subject_id`, so nothing can get from an incident to the
-                // record that paged for it.
+                // Without this, nothing can get from an incident to the record that paged.
                 if let Err(e) = infra::table::oncall_responses::attach_incident(
                     &alert.org_id,
                     &origin.id,
@@ -2590,8 +2554,7 @@ pub async fn update_status(
         infra::table::alert_incidents::update_status(org_id, incident_id, status).await?
     };
 
-    // Every resolution path lands here — manual, auto-resolve and external —
-    // so closing the on-call record once, here, covers all of them.
+    // Every resolution path lands here, so closing the record once covers all of them.
     #[cfg(feature = "enterprise")]
     if status == "resolved"
         && o2_enterprise::enterprise::oncall::is_enabled()

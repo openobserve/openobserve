@@ -73,9 +73,7 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
-        // One claim per path per org. Two teams claiming the same path is a
-        // configuration mistake the resolver has to break a tie over; refusing
-        // it at write time is cheaper than explaining the tie afterwards.
+        // One claim per path: refusing at write time beats making the resolver break a tie.
         manager
             .create_index(
                 Index::create()
@@ -89,7 +87,6 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
-        // Every rule for an org is loaded together on the routing path.
         manager
             .create_index(
                 Index::create()
@@ -101,15 +98,13 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
-        // Nullable: most alerts route by ownership, and a null here means
-        // "discover it" rather than "no team".
-        // Guarded rather than blind: SQLite has no `IF NOT EXISTS` for `ADD
-        // COLUMN`, so a re-run would die on the duplicate.
+        // Guarded: SQLite has no `IF NOT EXISTS` for `ADD COLUMN`, so a re-run dies on it.
         if !manager.has_column(ALERTS, "oncall_team").await? {
             manager
                 .alter_table(
                     Table::alter()
                         .table(Alerts::Table)
+                        // Null means "discover the team from the ownership rules", never "no team".
                         .add_column(ColumnDef::new(Alerts::OncallTeam).string().null())
                         .to_owned(),
                 )
@@ -165,8 +160,7 @@ mod tests {
 
     use super::*;
 
-    /// A stand-in for the table this migration only ALTERs, so the test does
-    /// not have to replay sixty unrelated migrations to reach it.
+    /// A stand-in for the ALTERed table, so the test need not replay sixty migrations.
     async fn stub_alerts(db: &DatabaseConnection) {
         db.execute(Statement::from_string(
             sea_orm::DbBackend::Sqlite,
@@ -176,8 +170,7 @@ mod tests {
         .unwrap();
     }
 
-    /// A node that died between the CREATE and the ALTER has to be able to
-    /// finish the job on restart, so every step is guarded.
+    /// A node that died between the CREATE and the ALTER must finish on restart.
     #[tokio::test]
     async fn test_up_is_idempotent() {
         let db = Database::connect("sqlite::memory:").await.unwrap();
@@ -191,8 +184,7 @@ mod tests {
         assert!(manager.has_column(ALERTS, "oncall_team").await.unwrap());
     }
 
-    /// The rollback has to survive a schema where `up` only got halfway, which
-    /// is the state the crash it is cleaning up after left behind.
+    /// The rollback has to survive a schema where `up` only got halfway.
     #[tokio::test]
     async fn test_down_tolerates_a_partially_applied_schema() {
         let db = Database::connect("sqlite::memory:").await.unwrap();

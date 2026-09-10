@@ -549,17 +549,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // every node, so every node must hear invalidations — including routers,
     // which serve the probe auth path.
     tokio::task::spawn(infra::coordinator::synthetics::watch());
-    // On-call configuration caches (ownership rules, policies, teams, rosters,
-    // schedules). Every node watches, not just the alert_manager that pages:
-    // the API nodes serve the screens that read the same caches, and an admin
-    // who edits a rotation and reloads the page must not be shown what they
-    // just replaced. Cheap on a deployment with on-call switched off — the
-    // prefix simply never sees an event.
+    // Every node watches: API nodes serve the screens an admin reloads after editing a rotation.
     #[cfg(feature = "enterprise")]
     if get_o2_config().oncall.enabled {
         tokio::task::spawn(infra::coordinator::oncall::watch(|tag, expires_at| {
-            // `03` §8: an acknowledgement token is single-use, and single-use on
-            // the one node that happened to serve the click is not single-use.
+            // An ack token is single-use, and single-use on one node only is not single-use.
             o2_enterprise::enterprise::oncall::token::mark_spent(tag, expires_at);
         }));
     }
@@ -1247,9 +1241,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // climbs past what its window can hold. Also releases expired budget
     // residuals (S-14c).
     slo_maintenance::run();
-    // An open record whose escalation timer is gone renders as a live page with
-    // a countdown to a rung that will never fire. Nothing else notices, because
-    // the thing that would have noticed is the timer itself.
+    // Nothing else notices a lost escalation timer: the thing that would have is the timer.
     #[cfg(feature = "enterprise")]
     oncall_maintenance::run();
     // `_llm_scores` is authoritative for Workbench reviews. Repair the narrow

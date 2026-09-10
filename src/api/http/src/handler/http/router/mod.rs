@@ -111,7 +111,7 @@ pub fn cors_layer() -> CorsLayer {
         // Restrict CORS to the configured web_url origin, plus any extra origins in
         // ZO_CORS_ALLOWED_ORIGINS (comma-separated).  mirror_request() + allow_credentials(true)
         // allows any origin to make credentialed requests — effectively disabling same-origin
-        // protection.  Only reflect the Origin header back if it matches one of our allowed origins.
+        // protection.  Only reflect the Origin header back if it matches an allowed origin.
         // We extract only the scheme+host+port from each URL (ignoring any path) because the Origin
         // header per RFC 6454 never carries a path component.  This prevents prefix-match bypasses
         // like https://app.example.com.evil.com when the allowed URL is https://app.example.com.
@@ -683,23 +683,10 @@ pub fn basic_routes() -> Router {
         get(alerts::chart_render::render_chart),
     );
 
-    // On-call acknowledgement — the URL carries an HMAC-signed token verified
-    // inside the handler itself (never via auth_middleware), because the whole
-    // point is acknowledging from an email at 3am with no session. Like the
-    // chart endpoint above, it must stay in basic_routes.
-    //
-    // **Under `/api/v2/` for a routing reason, not a versioning one.** A router
-    // node merges these same routes alongside its catch-all proxy
-    // `/api/{*path}`, and axum refuses to register a parameter and a wildcard
-    // at the same position: `/api/{org_id}/...` beside `/api/{*path}` panics
-    // the process at startup, so every router pod crash-loops. A *static*
-    // second segment does not conflict, which is why the three sibling
-    // token-authenticated routes here — chart render and both incident webhooks
-    // — are all `/api/v2/...`. This one has to be too.
+    // Static `/api/v2`: a param beside the router's `/api/{*path}` panics axum at startup.
     #[cfg(feature = "enterprise")]
     if get_o2_config().oncall.enabled {
-        // GET renders a confirmation page; only POST acknowledges, so a mail
-        // gateway prefetching the emailed link cannot take somebody's page.
+        // Unauthenticated HMAC link; GET only renders, so a gateway prefetch cannot ack a page.
         router = router.route(
             "/api/v2/{org_id}/oncall/ack",
             get(oncall::ack_page).post(oncall::acknowledge),
@@ -924,7 +911,7 @@ pub fn service_routes() -> Router {
 
         // LLM Model Pricing
         .route("/{org_id}/llm/models", get(model_pricing::list).post(model_pricing::create))
-        // NOTE: named routes MUST be registered before {model_id} to avoid being matched as a model ID
+        // NOTE: named routes MUST be registered before {model_id} or they match as a model ID
         .route("/{org_id}/llm/models/built-in", get(model_pricing::get_built_in))
         .route("/{org_id}/llm/models/refresh-built-in", post(model_pricing::refresh_built_in))
         .route("/{org_id}/llm/models/test", post(model_pricing::test_model_match))
@@ -1165,7 +1152,7 @@ pub fn service_routes() -> Router {
     #[cfg(feature = "enterprise")]
     {
         router = router
-            // Gen-AI agent mapping and registry are enterprise features, independent of Online Evaluations.
+            // Gen-AI agent mapping and registry are enterprise, independent of Online Evaluations.
             .route("/{org_id}/settings/gen_ai/agent_mapping", get(gen_ai::get_agent_mapping).put(gen_ai::save_agent_mapping))
             .route("/{org_id}/settings/gen_ai/agent_registry", delete(gen_ai::clear_agent_registry))
             .route("/{org_id}/gen_ai/agents", get(gen_ai::list_scored_agents));
@@ -1411,7 +1398,7 @@ pub fn service_routes() -> Router {
             // Topology
             .route("/{org_id}/traces/service_graph/topology/current", get(traces::get_current_topology))
             .route("/{org_id}/traces/service_graph/edge/history", get(traces::get_edge_history))
-            // Agent behavior signals (loop / failure / cost) — reads the derived _agent_signals stream
+            // Agent behavior signals (loop / failure / cost) — reads the _agent_signals stream
             .route("/{org_id}/traces/agent_signals", get(traces::get_agent_signals))
             .route("/{org_id}/traces/agent_signals/compare", post(traces::compare_agent_versions))
 
@@ -1584,8 +1571,6 @@ pub fn service_routes() -> Router {
         }
     }
 
-    // On-call — all routes gated behind O2_ONCALL_ENABLED. When off,
-    // nothing is registered and every on-call path 404s.
     #[cfg(feature = "enterprise")]
     if get_o2_config().oncall.enabled {
         router = router
@@ -1609,10 +1594,6 @@ pub fn service_routes() -> Router {
                 "/{org_id}/oncall/teams/{team_id}/schedule",
                 get(oncall::get_schedule).put(oncall::set_schedule),
             )
-            // §3b's four starting points. The catalogue is org-scoped
-            // only because everything under /oncall is — it is a compiled
-            // constant, and applying one is a full replace that goes out
-            // through the same write as PUT /schedule.
             .route(
                 "/{org_id}/oncall/schedule-presets",
                 get(oncall::list_schedule_presets),
@@ -1625,8 +1606,6 @@ pub fn service_routes() -> Router {
                 "/{org_id}/oncall/teams/{team_id}/on-call",
                 get(oncall::who_is_on_call),
             )
-            // §5: "cover for me". A cover outranks every layer for its
-            // window, so it lives beside the schedule it stands over.
             .route(
                 "/{org_id}/oncall/teams/{team_id}/overrides",
                 get(oncall::list_overrides).post(oncall::create_override),
@@ -1635,10 +1614,7 @@ pub fn service_routes() -> Router {
                 "/{org_id}/oncall/teams/{team_id}/overrides/{override_id}",
                 delete(oncall::delete_override),
             )
-            // §5a: "Ana is away 20 Aug – 3 Sep". Org-scoped rather than
-            // hung off a team, because being away is a fact about a
-            // person: somebody on two teams is away from both, and a
-            // per-team window is one somebody forgets to write twice.
+            // Org-scoped, not hung off a team: somebody on two teams is away from both.
             .route(
                 "/{org_id}/oncall/unavailability",
                 get(oncall::list_unavailability).post(oncall::create_unavailability),
@@ -1647,8 +1623,6 @@ pub fn service_routes() -> Router {
                 "/{org_id}/oncall/unavailability/{unavailability_id}",
                 delete(oncall::delete_unavailability),
             )
-            // §3b: the resolved schedule, which is what a human reads
-            // instead of running the precedence rules in their head.
             .route(
                 "/{org_id}/oncall/teams/{team_id}/resolved-schedule",
                 get(oncall::get_resolved_schedule),
@@ -1657,17 +1631,11 @@ pub fn service_routes() -> Router {
                 "/{org_id}/oncall/teams/{team_id}/policy",
                 get(oncall::get_policy).put(oncall::set_policy),
             )
-            // Where the team is talked to, as opposed to where its ladder
-            // pages. Its own route rather than a field on the policy: a
-            // team's chat room is not a property of its escalation ladder,
-            // and changing one should never mean opening the other.
             .route(
                 "/{org_id}/oncall/teams/{team_id}/channel",
                 get(oncall::get_team_channel).put(oncall::set_team_channel),
             )
-            // The four derived team reads the screens are built on.
-            // Nothing here is stored: a saved risk list argues with the
-            // configuration beside it the moment somebody fixes something.
+            // Derived on every read, never stored: a saved list argues with the config beside it.
             .route(
                 "/{org_id}/oncall/teams/{team_id}/reachability",
                 get(oncall::get_team_reachability),
@@ -1684,8 +1652,7 @@ pub fn service_routes() -> Router {
                 "/{org_id}/oncall/teams/{team_id}/load",
                 get(oncall::get_team_load),
             )
-            // "If a P1 fired right now" — a dry run, and free of side
-            // effects. `test-page` is the one that actually delivers.
+            // A dry run: must stay free of side effects, `test-page` is what actually delivers.
             .route(
                 "/{org_id}/oncall/teams/{team_id}/escalation-preview",
                 get(oncall::get_escalation_preview),
@@ -1703,9 +1670,7 @@ pub fn service_routes() -> Router {
                 "/{org_id}/oncall/ownership",
                 get(oncall::list_ownership_rules).post(oncall::create_ownership_rule),
             )
-            // A sibling of the list rather than a widening of it: the
-            // counts cost a grouped read of the timeline, and the routing
-            // path's own list has to stay the cheap read it is.
+            // A sibling of the list: the counts cost a grouped read the routing path must not pay.
             .route(
                 "/{org_id}/oncall/ownership/stats",
                 get(oncall::list_ownership_rule_stats),
@@ -1758,8 +1723,6 @@ pub fn service_routes() -> Router {
                 "/{org_id}/oncall/routing/preview",
                 post(oncall::preview_routing),
             )
-            // The unrouted queue and the coverage banner: the two places
-            // the product admits it would page nobody.
             .route(
                 "/{org_id}/oncall/unrouted",
                 get(oncall::list_unrouted_signals),
@@ -1772,22 +1735,17 @@ pub fn service_routes() -> Router {
                 "/{org_id}/oncall/coverage-gaps",
                 get(oncall::list_coverage_gaps),
             )
-            // A firing that turned out to be bigger than an alert.
             .route(
                 "/{org_id}/oncall/responses/{response_id}/promote",
                 post(oncall::promote_to_incident),
             )
-            // How to reach one person (§5). Storage and API only — no SMS
-            // or voice transport exists yet, so everything saved here is
-            // marked unverified and nothing can page it.
+            // Storage only: no SMS or voice transport exists, so nothing saved here can page.
             .route(
                 "/{org_id}/oncall/contacts/{user_email}",
                 get(oncall::get_contact)
                     .put(oncall::set_contact)
                     .delete(oncall::delete_contact),
             )
-            // The responder's own view: what was sent to me, and which
-            // teams am I on.
             .route(
                 "/{org_id}/oncall/my/deliveries",
                 get(oncall::list_my_deliveries),
@@ -1801,20 +1759,15 @@ pub fn service_routes() -> Router {
                 "/{org_id}/oncall/analytics/causes",
                 get(oncall::cause_analytics),
             )
-            // Ordered recovery (`00-simplified-flow` §4): the dependent's
-            // own verb. Without it the owner's record waits forever.
             .route(
                 "/{org_id}/oncall/responses/{response_id}/confirm-recovery",
                 post(oncall::confirm_recovery),
             )
-            // "This needs more people, now" — the ladder advances a rung
-            // without waiting for its timer.
             .route(
                 "/{org_id}/oncall/responses/{response_id}/escalate",
                 post(oncall::escalate_response),
             )
-            // Proves a team's paging configuration reaches a human, down
-            // the real dispatch path, leaving no record behind.
+            // Goes down the real dispatch path but must leave no response record behind.
             .route(
                 "/{org_id}/oncall/teams/{team_id}/test-page",
                 post(oncall::send_test_page),
@@ -1824,7 +1777,7 @@ pub fn service_routes() -> Router {
     #[cfg(feature = "cloud")]
     {
         router = router
-            // Authorized by ROUTE_PERMISSIONS in o2-enterprise; without those rows enterprise auth 403s these for non-root users.
+            // Without ROUTE_PERMISSIONS rows in o2-enterprise, these 403 for non-root users.
             .route(
                 "/{org_id}/alerts/destinations/slack/oauth/start",
                 post(alerts::slack_oauth::start),

@@ -13,16 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! On-call — shared types.
-//!
-//! Lives in `config` because `infra` must name what it stores and
-//! `o2_enterprise` must name what it operates on; `config` is the crate both
-//! depend on. The behaviour that makes on-call an enterprise feature lives in
-//! `o2_enterprise::enterprise::oncall`.
-//!
-//! Everything here is data plus pure functions over it — no I/O, no clock.
-//! Instants are passed in as microseconds, matching
-//! `config::utils::time::now_micros`.
+//! On-call shared types — in `config` because `infra` and `o2_enterprise` both name them.
 
 pub mod agent;
 pub mod contact;

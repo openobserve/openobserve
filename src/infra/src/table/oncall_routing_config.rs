@@ -13,13 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! The org's routing configuration — today, which team catches whatever no
-//! ownership rule claimed.
-//!
-//! Read on the paging path, so the absence of a row has to be as cheap and as
-//! unambiguous as the presence of one: [`get`] answers with an unset config
-//! rather than an `Option`, and no caller has to decide what a missing row
-//! means at 3am.
+//! The org's routing config — [`get`] answers unset, so no caller guesses what a missing row means.
 
 use config::{meta::oncall::RoutingConfig, utils::time::now_micros};
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
@@ -30,8 +24,7 @@ use crate::{db::get_orm_client_rw, errors};
 fn to_config(m: oncall_routing_config::Model) -> RoutingConfig {
     RoutingConfig {
         org_id: m.org_id,
-        // A row that stores an empty string is the same as one storing nothing;
-        // normalising here means the routing decision never has to ask.
+        // An empty string is the same as nothing, so the routing decision never has to ask.
         default_team_id: m.default_team_id.filter(|t| !t.trim().is_empty()),
         updated_at: m.updated_at,
     }

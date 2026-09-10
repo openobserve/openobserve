@@ -13,24 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! One person's view of the delivery ledger — "what was I sent, and did it
-//! arrive?".
-//!
-//! The ledger itself is per record: `oncall_responses::list_deliveries` answers
-//! "who did THIS page reach". That is the right question while working one
-//! page and the wrong one the morning after, when the question is "did anything
-//! try to wake me last night, and did any of it land". Answering that from the
-//! per-record view means fetching every record and every one of its rows, which
-//! is the shape of read this codebase has already had to fix once.
-//!
-//! So the query is keyed on the recipient and scoped by joining back to the
-//! record for its `org_id` — the ledger row has no org of its own, and without
-//! the join a recipient's rows would read across tenants.
-//!
-//! The read marker lives in its own table. A responder opening an inbox must
-//! not write to the row the engine replays to decide whether to page them
-//! again; those are different concerns with very different consequences for
-//! being wrong.
+//! A recipient's inbox. The read marker is its own table: a read must not write the replayed row.
 
 use config::{
     ider,
@@ -154,8 +137,7 @@ fn inbox_select(
     let read_join = oncall_response_events::Entity::belongs_to(oncall_delivery_reads::Entity)
         .from(oncall_response_events::Column::Id)
         .to(oncall_delivery_reads::Column::EventId)
-        // The marker is per person: joining on the event alone would show one
-        // responder's row as read because a colleague had read theirs.
+        // The marker is per person: joining on the event alone reads a row a colleague read.
         .on_condition(move |_left, right| {
             Expr::col((right.clone(), oncall_delivery_reads::Column::UserEmail))
                 .eq(email.clone())
@@ -173,9 +155,7 @@ fn inbox_select(
                 .into(),
         )
         .join(JoinType::LeftJoin, read_join)
-        // Without this the ledger has no tenant at all: the event row carries
-        // only a response id, and a recipient's address is not unique to an
-        // org.
+        // Without this the ledger has no tenant: the event row carries a response id, not an org.
         .filter(oncall_responses::Column::OrgId.eq(org_id))
         .filter(oncall_response_events::Column::Kind.eq(ResponseEventKind::Delivery.to_i32()))
         .filter(oncall_response_events::Column::Recipient.eq(user_email));
@@ -222,10 +202,7 @@ pub async fn list_for_user(
         .column_as(oncall_responses::Column::Priority, "priority")
         .column_as(oncall_responses::Column::State, "state")
         .column_as(oncall_delivery_reads::Column::ReadAt, "read_at")
-        // Newest first, with the event id as the final tiebreak: ksuid
-        // timestamps resolve to one second, and two pages in the same second
-        // could otherwise swap places between pages and be shown twice or not
-        // at all.
+        // Id as final tiebreak: ksuid timestamps resolve to a second, so two pages could swap.
         .order_by_desc(oncall_response_events::Column::At)
         .order_by_desc(oncall_response_events::Column::Id)
         .limit(limit)
@@ -319,9 +296,7 @@ pub async fn set_read(
             event_id: Set(event_id),
             read_at: Set(now),
         };
-        // The unique index is the real arbiter — two tabs marking the same row
-        // at once is normal, and the loser of that race has still had its
-        // effect.
+        // The unique index is the arbiter: two tabs racing is normal, and the loser still counted.
         match oncall_delivery_reads::Entity::insert(model)
             .exec(client)
             .await
@@ -451,8 +426,7 @@ mod tests {
 
     #[test]
     fn test_marking_nothing_is_not_an_error() {
-        // The empty case short-circuits before any client is needed, so this
-        // pins the contract rather than the round trip.
+        // The empty case short-circuits before any client, so this pins the contract, not a trip.
         assert!(InboxQuery::default().from.is_none());
         assert!(!InboxQuery::default().unread_only);
     }

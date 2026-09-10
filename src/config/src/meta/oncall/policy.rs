@@ -13,20 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Escalation policy — a team's ladder and its channels.
-//!
-//! A policy belongs to a team, not to the org: two teams disagreeing about
-//! whether P3 should ring a phone is normal, and the disagreement should not
-//! require a global setting.
-//!
-//! Everything here ships as an **editable default**. The point of the
-//! defaults is that a newly created team is pageable immediately without
-//! anyone designing a policy first; the point of them being editable is that
-//! nothing in this file is a rule the product enforces on a team.
-//!
-//! [`plan`] is the whole decision: given a ladder, how long the record has
-//! been open, and who has already been notified, it returns who to notify now
-//! and when to wake up next. No clock, no I/O.
+//! Escalation policy — a team's ladder and channels, shipped editable so a new team pages.
 
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -340,15 +327,13 @@ impl ChannelBreaker {
 
     /// Folds one attempt's outcome in.
     pub fn record(&mut self, now: i64, delivered: bool) {
-        // A success is the end of the story: the channel works, so neither the
-        // open state nor the failures that produced it mean anything now.
+        // A success ends the story: the channel works, so open state and past failures are moot.
         if delivered {
             self.attempts.clear();
             self.opened_at = None;
             return;
         }
-        // A failed half-open probe re-opens for another full cool-down rather
-        // than letting every following rung pay for one more probe each.
+        // A failed half-open probe re-opens for a full cool-down, else every rung pays a probe.
         if self.opened_at.is_some() {
             self.opened_at = Some(now);
             self.attempts.clear();
@@ -511,8 +496,7 @@ impl EscalationPolicy {
         let m = MICROS_PER_MINUTE;
         let primary_id = primary_rotation_id.into();
         let primary = || vec![EscalationTarget::rotation(primary_id.clone())];
-        // A team with one rotation has no secondary rung at all, rather than a
-        // rung that quietly resolves to the person already being paged.
+        // One rotation means no secondary rung; it would resolve to the person already paged.
         let secondary = || {
             secondary_rotation_id
                 .as_ref()
@@ -524,18 +508,14 @@ impl EscalationPolicy {
             org_id: org_id.into(),
             team_id: team_id.into(),
             destinations: vec![],
-            // Ships with every auto-created policy, so nobody has to configure
-            // L0 to benefit from it.
+            // Ships with every auto-created policy, so nobody configures L0 to benefit from it.
             l0: super::agent::L0Policy::defaults(),
-            // One pass, then say on the record that nobody answered. §3 allows
-            // more; a team that has not asked for more gets what it always got.
+            // One pass, then record that nobody answered; §3 allows more, but only if asked for.
             rungs: vec![
                 PriorityRung {
                     priority: P1,
                     steps: vec![
-                        // §2: primary and secondary together, immediately. Not
-                        // two steps five minutes apart — a P1 that waits to
-                        // wake the backup has spent the minutes that mattered.
+                        // §2: a P1 that waits to wake the backup spends the minutes that mattered.
                         LadderStep::new(
                             0,
                             primary()
@@ -550,8 +530,7 @@ impl EscalationPolicy {
                 },
                 PriorityRung {
                     priority: P2,
-                    // A team with one rotation skips the secondary step rather
-                    // than filling it with the person already on the pager.
+                    // One rotation skips this step; filling it would re-page the same person.
                     steps: [
                         Some(LadderStep::new(0, primary())),
                         secondary().map(|s| LadderStep::new(5 * m, s)),
@@ -622,13 +601,7 @@ impl EscalationPolicy {
             destinations: vec![],
             l0: super::agent::L0Policy::defaults(),
             rungs: vec![
-                // Three whole-team steps, not four. There is only one target
-                // a team with no rotations has, so every step of this ladder
-                // reads identically — and four of the same line is not an
-                // escalation, it is the same page sent again on a timer. The
-                // rungs that survive are the ones that change something: now,
-                // once more in case the first was missed, and a last one
-                // before the ladder stops.
+                // Three, not four: with one target they read alike; a repeat is not escalation.
                 PriorityRung {
                     priority: P1,
                     ..everybody(&[0, 5 * m, 15 * m])
@@ -715,8 +688,7 @@ pub fn plan(steps: &[LadderStep], elapsed_micros: i64, already_notified: &[i64])
                 due.push(step.clone());
             }
         } else {
-            // Steps are not required to be stored in order, so take the
-            // minimum rather than the first one past the cursor.
+            // Steps need not be stored in order: take the minimum, not the first past the cursor.
             next = Some(next.map_or(step.after_micros, |n: i64| n.min(step.after_micros)));
         }
     }
@@ -935,9 +907,7 @@ mod tests {
             vec![EscalationTarget::rotation("rot_secondary")]
         );
 
-        // The whole team, once, and then the ladder is done. It used to say
-        // this twice more; repeating the same twelve phones at 30 and 60
-        // minutes never reached anybody the first ring had not.
+        // The whole team, once: the same twelve phones at 30 and 60 minutes reach nobody new.
         let l1 = plan(&steps(AlertPriority::P2), 15 * MIN, &[0, 5 * MIN]);
         assert_eq!(targets_of(&l1), vec![EscalationTarget::WholeTeam]);
 
@@ -1175,8 +1145,7 @@ mod tests {
     #[test]
     fn test_a_late_wakeup_fires_every_missed_rung_at_once() {
         let s = steps(AlertPriority::P1);
-        // Ten minutes in: the first two rungs were missed and the third is
-        // still ahead, which is what makes this a catch-up rather than an end.
+        // Ten minutes in: the first two rungs were missed, the third is still ahead — a catch-up.
         match plan(&s, 10 * MIN, &[]) {
             LadderAction::Notify {
                 due,
@@ -1530,9 +1499,7 @@ mod tests {
     #[test]
     fn test_the_lost_rung_is_still_pageable_when_the_transport_returns() {
         let p1 = steps(AlertPriority::P1);
-        // What the timeline holds after the failed tick, and what the engine
-        // plans from: the same list with the rung the transport lost taken back
-        // out, because it was attempted rather than sent.
+        // The rung the transport lost was attempted, not sent, so the timeline plans without it.
         let timeline = vec![0];
         let unreached = [0];
         let ledger: Vec<i64> = timeline
@@ -1612,8 +1579,7 @@ mod tests {
                 MAX_TRANSPORT_BACKOFF_MICROS,
             ]
         );
-        // An attempt count from a replicated row can be anything at all, and a
-        // backoff that overflows is a page scheduled in the past or never.
+        // A replicated attempt count can be anything; an overflowing backoff pages in the past.
         assert_eq!(
             transport_backoff_micros(u32::MAX),
             MAX_TRANSPORT_BACKOFF_MICROS

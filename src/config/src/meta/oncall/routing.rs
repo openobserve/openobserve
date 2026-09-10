@@ -13,17 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Ownership — which team owns a failing thing.
-//!
-//! Teams claim **identity-dimension paths** rather than service names, using
-//! the same `{alias_id: value}` vocabulary the service-identity config already
-//! produces (`k8s-cluster`, `k8s-namespace`, …). A team that owns everything in
-//! a cluster writes one rule; a team that owns one namespace inside it writes a
-//! longer one, and the longer one wins.
-//!
-//! That is the whole point: services appear and disappear constantly, but the
-//! namespace they live in does not. Nobody maintains a per-service routing
-//! table.
+//! Ownership — teams claim dimension paths, not service names, so no per-service table is kept.
 
 use std::collections::HashMap;
 
@@ -235,10 +225,7 @@ impl DimensionDepth {
                 if alias == SERVICE_DIMENSION {
                     continue;
                 }
-                // Coarsest wins on collision: an alias appearing early in one
-                // set and late in another is at best ambiguous, and treating it
-                // as the broader claim keeps a rule from outranking one that
-                // genuinely is narrower.
+                // Coarsest wins on collision: an ambiguous alias must not outrank a narrower rule.
                 ranks
                     .entry(alias.clone())
                     .and_modify(|r| *r = (*r).min(position))
@@ -344,8 +331,7 @@ impl OwnershipRule {
             if v == "*" {
                 return Err(OwnershipError::WildcardMatchesEverything(k.clone()));
             }
-            // Only the final character may be a `*`. Anything else is somebody
-            // reaching for a pattern language this deliberately is not.
+            // Only the final character may be a `*`; more would be a pattern language this is not.
             if v.trim_end_matches('*').contains('*') {
                 return Err(OwnershipError::WildcardNotTrailing(k.clone()));
             }
@@ -632,14 +618,9 @@ pub fn resolve_owner_ranked<'a>(
         .max_by(|a, b| {
             a.specificity()
                 .cmp(&b.specificity())
-                // Then how fine the claim is. `{service: payment-gateway}` beats
-                // `{k8s-cluster: production}` because a service is a narrower
-                // thing than a cluster — not because its name is longer, which
-                // is what decided it before this term existed.
+                // Then how fine the claim is: a service beats a cluster, not merely a longer name.
                 .then_with(|| a.finest_depth(depths).cmp(&b.finest_depth(depths)))
-                // Then exactness: §7's "exact beats wildcard at the same depth".
-                // A wildcard can therefore never outrank a more specific exact
-                // rule, only a shallower one.
+                // Then exactness (§7): a wildcard outranks a shallower rule, never an exact one.
                 .then_with(|| a.exact_dimensions().cmp(&b.exact_dimensions()))
                 .then_with(|| a.literal_chars().cmp(&b.literal_chars()))
                 .then_with(|| b.path().cmp(&a.path()))
@@ -755,8 +736,7 @@ mod tests {
             ),
         ];
 
-        // What the fallback produces when the row carried nothing: the service
-        // the incident correlated to, and only that.
+        // What the fallback produces from an empty row: the correlated service, and only that.
         let only_service = dims(&[(SERVICE_DIMENSION, "payments-gateway")]);
         assert_eq!(
             resolve_owner(&rules, &only_service).map(|r| r.team_id.as_str()),
@@ -772,8 +752,7 @@ mod tests {
              alerts used to land"
         );
 
-        // A row that does carry identity is unaffected: the fallback only ever
-        // fires when extraction produced nothing, so no existing alert moves.
+        // The fallback only fires when extraction produced nothing, so no existing alert moves.
         let rich = dims(&[
             ("k8s-cluster", "eks-us-prod"),
             ("k8s-namespace", "commerce"),
@@ -1027,9 +1006,7 @@ mod tests {
                 d.rank_of("service") > d.rank_of("k8s-deployment"),
                 "service is finest by definition",
             );
-            // Left unranked on purpose: ranking `host` finer than a namespace
-            // would make a node claim beat a namespace claim on every k8s
-            // signal, which nobody has asked for.
+            // Unranked on purpose: ranking `host` finer makes a node claim beat a namespace one.
             assert_eq!(d.rank_of("host"), 0);
             assert_eq!(d.rank_of("environment"), 0);
         }
@@ -1180,8 +1157,7 @@ mod tests {
         let matching = dims(&[("k8s-cluster", "prod")]);
         let missing = dims(&[("k8s-cluster", "staging")]);
 
-        // (explicit set, ownership matches, default set) → the winning tier,
-        // and a fragment of the sentence the timeline has to carry.
+        // (explicit set, ownership matches, default set) -> winning tier and timeline sentence.
         let cases: [(bool, bool, bool, RoutingDecision, &str); 8] = [
             (
                 true,
@@ -1457,8 +1433,7 @@ mod tests {
                 .contains("no ownership rule matches")
         );
 
-        // The default tier's line is the one §5 dictates the shape of: it names
-        // the team, not the absent rule.
+        // §5 dictates the default tier's line: it names the team, not the absent rule.
         let defaulted = route(&RoutingInputs {
             default_team_id: Some("Platform"),
             ..Default::default()
@@ -1761,8 +1736,7 @@ mod tests {
                 .describe()
                 .contains("paged the default team platform")
         );
-        // Still a gap, and still outstanding: the default team absorbing it is
-        // not the same as somebody having claimed it.
+        // The default team absorbing a gap is not the same as somebody having claimed it.
         assert_eq!(outstanding(&[defaulted], &[]).len(), 1);
     }
 

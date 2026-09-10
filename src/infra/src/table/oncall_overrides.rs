@@ -13,17 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Overrides — "cover for me" (`architecture/02` §5).
-//!
-//! Their own table rather than a column on the schedule: an override has its
-//! own lifecycle, expires on its own, and is deleted without touching the
-//! rotation it stood over.
-//!
-//! Reads are deliberately blunt — one indexed query for a team's live covers,
-//! and the resolver picks the winner in memory. There are single digits of
-//! these per team, the paging path already loads the schedule row, and a
-//! second round trip to have the database pick the maximum would cost more
-//! than sorting a handful of rows.
+//! Overrides ("cover for me") — own lifecycle, read bluntly because a team has few of them.
 
 use config::{ider, meta::oncall::ScheduleOverride, utils::time::now_micros};
 use sea_orm::{
@@ -108,10 +98,7 @@ pub async fn create(
     }
     .insert(client)
     .await?;
-    // A cover is stored here but *read* as part of the schedule, so the cache
-    // that has to be dropped is the schedule's. Missing this is the failure
-    // that makes the whole cover feature worse than useless: the engineer who
-    // arranged cover stops watching and the page still goes to them.
+    // A cover is stored here but read with the schedule, so the schedule's cache is what drops.
     super::oncall_schedules::invalidate_and_publish(org_id, team_id).await;
     Ok(record)
 }
@@ -183,15 +170,7 @@ pub async fn list_for_resolution(
     at: i64,
 ) -> Result<Vec<ScheduleOverride>, errors::Error> {
     let client = get_orm_client_rw().await;
-    // Ordered **descending** so that the truncation keeps the covers that win.
-    //
-    // Overlapping covers are legal, and `covering_override_for` resolves
-    // them by newest `created_at` — so the rows the limit must not drop are the
-    // newest ones. Ordering ascending here would have kept the 500 *oldest* and
-    // discarded exactly the cover that was going to win, paging the person the
-    // most recent cover excused. It only bites past `MAX_ROWS` covers in the
-    // lookback window, which is why it survived: the query reads correct, and
-    // its own comment claimed the right intent.
+    // **Descending**: `covering_override_for` picks the newest, so ascending truncates the winner.
     let mut rows: Vec<ScheduleOverride> = oncall_overrides::Entity::find()
         .filter(oncall_overrides::Column::OrgId.eq(org_id))
         .filter(oncall_overrides::Column::TeamId.eq(team_id))
@@ -204,17 +183,14 @@ pub async fn list_for_resolution(
         .into_iter()
         .map(to_override)
         .collect();
-    // Handed back oldest-first regardless, so callers see the same order they
-    // always did. Resolution picks by `created_at` and does not care, but a
-    // list whose order flips with its length is a trap for whoever reads it next.
+    // Handed back oldest-first regardless: an order that flips with length traps the next reader.
     rows.reverse();
     Ok(rows)
 }
 
 pub async fn delete(org_id: &str, id: &str) -> Result<bool, errors::Error> {
     let client = get_orm_client_rw().await;
-    // Read before the delete purely to learn the team: the invalidation is
-    // keyed on the team, and after the row is gone there is nothing left to ask.
+    // Read before the delete purely to learn the team the invalidation is keyed on.
     let team_id = get(org_id, id).await?.map(|o| o.team_id);
     let deleted = oncall_overrides::Entity::delete_many()
         .filter(oncall_overrides::Column::OrgId.eq(org_id))
@@ -317,8 +293,7 @@ mod tests {
     #[test]
     fn test_the_window_filter_matches_the_overlap_predicate() {
         let o = to_override(model("ov_1", 100, 200, 1));
-        // `start_at < to AND end_at > from`, which is what `list_in_window`
-        // asks the database for.
+        // `start_at < to AND end_at > from`, which is what `list_in_window` asks the database for.
         assert!(o.overlaps(150, 250), "straddles the end");
         assert!(o.overlaps(50, 150), "straddles the start");
         assert!(o.overlaps(0, 500), "enclosed");
@@ -365,8 +340,7 @@ mod tests {
             .clone();
         assert_eq!(winner, "ov_4", "the newest cover wins");
 
-        // Truncating from the newest end loses the winner; from the oldest end
-        // does not. `list_for_resolution` therefore orders descending.
+        // Truncating from the newest end loses the winner, so this orders descending.
         let kept_oldest = &all[..2];
         let kept_newest = &all[all.len() - 2..];
         assert_ne!(

@@ -13,12 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Teams and schedules.
-//!
-//! An on-call team is **not** an RBAC group. A group answers "who may see
-//! this"; a team answers "who gets woken". Coupling them would let a
-//! permission change silently rewrite a rotation, so the two are deliberately
-//! separate objects with no link between them.
+//! Teams and schedules — an on-call team is not an RBAC group, or a role change could rewrite it.
 
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -156,10 +151,7 @@ pub fn place_member(rotations: &[Rotation], user_email: &str) -> MemberPlacement
     if rotations.iter().any(names) {
         return MemberPlacement::AlreadyOnRotation;
     }
-    // Every rotation that is still on the shipped shape — one unrestricted
-    // rule — gets the joiner appended. All of them, not just the first: a team
-    // created with Primary and Secondary has two, and adding somebody to one
-    // pool and not the other is how the two drift into a collision.
+    // All rotations, not just the first: a Primary/Secondary pair that drifts collides.
     let simple = |r: &Rotation| matches!(r.shift_rules.as_slice(), [only] if only.restrictions.is_empty() && only.priority == 0);
     match rotations {
         [] => MemberPlacement::NoRotationYet,
@@ -424,8 +416,7 @@ impl Schedule {
         let until = from.saturating_add(horizon);
         let step = max_step.max(1);
         let mut at = from;
-        // Belt and braces: a pathological rotation that keeps answering "the
-        // next handover is one microsecond away" must not spin the sweep.
+        // A rotation answering "next handover is one microsecond away" must not spin the sweep.
         let mut visits = 0;
         while at < until && visits < MAX_COVERAGE_PROBES {
             visits += 1;
@@ -509,10 +500,7 @@ impl Schedule {
                 if kept.len() != rule.members.len() {
                     changed = true;
                 }
-                // A rule nobody is on is not a rule. Dropping it beats keeping
-                // it with an empty roster, which fails validation and would
-                // make the team's next schedule edit fail for a reason nobody
-                // could see.
+                // A rule nobody is on fails validation; dropping it beats failing the next edit.
                 if kept.is_empty() {
                     continue;
                 }
@@ -543,18 +531,11 @@ impl Schedule {
         let mut seen_ids = std::collections::HashSet::new();
         for rotation in &self.rotations {
             rotation.validate().map_err(TeamError::InvalidRotation)?;
-            // Levels point at an id, so two rotations sharing one would make a
-            // policy ambiguous about which position it pages.
+            // Levels point at an id, so two rotations sharing one leave a policy ambiguous.
             if !seen_ids.insert(rotation.id.trim().to_ascii_lowercase()) {
                 return Err(TeamError::DuplicateRotationId(rotation.id.clone()));
             }
-            // Several rules in one rotation is follow-the-sun. What cannot be
-            // allowed is two at the same priority with the same restrictions,
-            // where neither is more specific and the winner would be arbitrary.
-            //
-            // Scoped to the rotation, because rules in *different* rotations
-            // never compete: a primary and a secondary covering the same hours
-            // at the same priority is the whole point of having two.
+            // Same priority and restrictions have no winner; different rotations never compete.
             let mut seen = std::collections::HashSet::new();
             for rule in &rotation.shift_rules {
                 let key = (rule.priority, rule.restrictions.clone());
@@ -654,8 +635,7 @@ mod tests {
             name: name.into(),
             timezone: "UTC".into(),
             description: None,
-            // Never set, which is what every team created before the field
-            // existed reads as — the escalation policy's list still stands.
+            // Never set, as every team created before the field reads: the policy's list stands.
             channel_destinations: None,
             created_at: 0,
             updated_at: 0,
@@ -667,10 +647,7 @@ mod tests {
         let s = schedule(vec![weekly("Primary", &["ana@o2.ai", "bob@o2.ai"])]);
 
         let positions = s.on_call_at(ANCHOR);
-        // **One** position from one rotation. This asserted two until
-        // 2026-08-20: the second was derived from the first's roster, existed
-        // whether or not anybody staffed it, and is exactly what this rewrite
-        // removed. A second position is now a second rotation.
+        // **One** position from one rotation: a second position is a second rotation.
         assert_eq!(positions.len(), 1);
         assert_eq!(positions[0].rotation_name, "Primary");
         assert_eq!(positions[0].user_email, "ana@o2.ai");
@@ -716,9 +693,7 @@ mod tests {
 
     #[test]
     fn test_validate_rejects_two_equally_applicable_rotations() {
-        // Same priority, same (empty) restrictions, **in one rotation**:
-        // neither rule is more specific, so which one staffs the shift would be
-        // arbitrary.
+        // Same priority and (empty) restrictions in one rotation: no rule wins the shift.
         let s = schedule(vec![layered(
             "Primary",
             vec![rule("Day", &["ana@o2.ai"]), rule("Night", &["bob@o2.ai"])],
@@ -976,14 +951,7 @@ mod tests {
         assert_eq!(removal.coverage_warning(), None);
     }
 
-    // ── Overrides reach every resolution path ───────────────────────────────
-    //
-    // The failure worth guarding: a cover that the *resolver* honours but that
-    // one caller loads without. The engineer who arranged cover stops watching
-    // and the page still goes to them, which is the worst outcome the feature
-    // has. So every accessor on `Schedule` is asserted against the same
-    // override, and `Schedule` is what every caller — including
-    // `escalation::recipients_of` — goes through.
+    // Every `Schedule` accessor faces the same cover: one caller missing it pages the excused.
     fn covered(rotations: Vec<Rotation>, o: super::super::rotation::ScheduleOverride) -> Schedule {
         Schedule {
             overrides: vec![o],
@@ -1043,9 +1011,7 @@ mod tests {
     /// for a hole somebody already filled.
     #[test]
     fn test_a_cover_over_an_unstaffed_schedule_counts_as_coverage() {
-        // A rotation whose rule is retired, so it resolves to nobody — the
-        // "weekend the schedule does not cover" case. The cover is checked
-        // before any rule, so it staffs the hole.
+        // A retired rule resolves to nobody, and cover is checked first, so it staffs the hole.
         let mut retired = weekly("On-call rotation", &["ana@o2.ai"]);
         retired.shift_rules[0].ends_at = Some(ANCHOR);
         let s = covered(vec![retired], a_cover("sam@o2.ai", ANCHOR, ANCHOR + 1_000));

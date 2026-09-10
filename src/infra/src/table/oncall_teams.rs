@@ -124,9 +124,7 @@ fn to_team(m: oncall_teams::Model) -> Team {
         name: m.name,
         timezone: m.timezone,
         description: m.description,
-        // Carried on the struct now, so a whole-row super-cluster snapshot
-        // replicates the team's room instead of having to preserve a column it
-        // could not see.
+        // Carried on the struct, so a whole-row super-cluster snapshot replicates the team's room.
         channel_destinations: to_channel(m.channel_destinations),
         created_at: m.created_at,
         updated_at: m.updated_at,
@@ -179,9 +177,7 @@ pub async fn create(
         name: Set(name.to_string()),
         timezone: Set(timezone.to_string()),
         description: Set(description),
-        // Not `[]`: a new team has not decided anything about its channel, and
-        // storing an empty list here would mean "no channel" and silently
-        // ignore the policy destinations the team is about to inherit.
+        // Not `[]`: an empty list means "no channel" and ignores the destinations it inherits.
         channel_destinations: Set(None),
         created_at: Set(now),
         updated_at: Set(now),
@@ -530,8 +526,7 @@ pub async fn remove_member(team_id: &str, user_email: &str) -> Result<bool, erro
         .exec(client)
         .await?
         .rows_affected;
-    // Published whether or not a row went: a node that somehow still holds the
-    // removed member is exactly the one that needs the message.
+    // Published whether or not a row went: a node still holding the removed member needs it.
     invalidate_and_publish_members(team_id).await;
     Ok(deleted > 0)
 }

@@ -34,31 +34,15 @@ use crate::service::auth::{UserEmail, check_permissions};
 
 // ── Authorization ─────────────────────────────────────────────────────────────
 
-/// The configuration surface: teams, members, rotations, escalation policies
-/// and ownership rules. Writing any of it decides who gets woken, which is an
-/// administrative act.
+/// Writing any of this surface decides who gets woken, which is an administrative act.
 #[cfg(feature = "enterprise")]
 const CONFIG: &str = "oncall";
 
-/// The record of a page. Reading one is for everybody; the verbs on it —
-/// acknowledge, note, snooze, hand off, resolve — belong to whoever the ladder
-/// actually woke, and the openfga model opens them to any member of the org.
-/// Gating them behind admin would mean the engineer holding the pager could
-/// not use the product they were paged into.
+/// Open to any member of the org: gating the verbs behind admin locks out whoever holds the pager.
 #[cfg(feature = "enterprise")]
 const RESPONSES: &str = "oncall_responses";
 
-/// Gate one on-call request against the caller's role.
-///
-/// The route table in `o2_openfga::meta::route_permissions` gates these paths
-/// too, so this is the second lock on the same door — deliberately. That table
-/// is ordered and first-match-wins, so a broader entry added later can shadow
-/// a narrower one without anything failing loudly. Naming the resource and the
-/// verb at the handler means it cannot quietly inherit somebody else's rule.
-///
-/// `use_all_org` is on because an on-call grant is org-wide. A team is
-/// deliberately not an openfga group, so there is no per-team subject to hang
-/// a grant on; the org in the path is the whole of the scoping.
+/// A second lock behind `route_permissions`, which is first-match-wins and silently shadowable.
 #[cfg(feature = "enterprise")]
 async fn allowed(org_id: &str, user_id: &str, resource: &str, permission: &str) -> bool {
     check_permissions(
@@ -69,8 +53,7 @@ async fn allowed(org_id: &str, user_id: &str, resource: &str, permission: &str) 
 
 // ── Request bodies ────────────────────────────────────────────────────────────
 
-/// A new on-call team. Only the name is required; the timezone is the one every
-/// restriction window on the team is later read in.
+/// The timezone is the one every restriction window on the team is later read in.
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct CreateTeamRequest {
     pub name: String,
@@ -91,11 +74,7 @@ pub struct UpdateTeamRequest {
     pub name: Option<String>,
     #[serde(default)]
     pub timezone: Option<String>,
-    /// Absent leaves the description alone; explicit `null` clears it.
-    ///
-    /// Needs `double_option`: plain `#[serde(default)]` on `Option<Option<T>>`
-    /// decodes an explicit `null` to the OUTER `None`, which is the same value
-    /// as absent — making it impossible to clear a description.
+    /// Needs `double_option`: `#[serde(default)]` decodes an explicit `null` to the outer `None`.
     #[serde(default, deserialize_with = "double_option")]
     pub description: Option<Option<String>>,
 }
@@ -108,9 +87,7 @@ where
     Deserialize::deserialize(de).map(Some)
 }
 
-/// Accepts one email or many. Setting a team up is mostly "add these six
-/// people", and forcing the client to fan out one request per person is the
-/// most tedious part of the flow.
+/// Accepts one email or many, because setting a team up is mostly "add these six people".
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct AddMembersRequest {
     #[serde(default)]
@@ -130,12 +107,7 @@ impl AddMembersRequest {
         all
     }
 
-    /// Whether this body names anybody at all.
-    ///
-    /// Both fields default, so `{}`, `{"user_emails":[]}` and a body whose only
-    /// key was misspelled all deserialized to "add nobody" and answered 200 —
-    /// a team that reads as configured and pages no one. Whatever the caller
-    /// got wrong, no emails arrived, and that is the thing worth refusing.
+    /// Both fields default, so `{}` and a misspelled key both mean "add nobody" and answer 200.
     #[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
     fn names_nobody(&self) -> bool {
         self.user_emails.iter().all(|e| e.trim().is_empty())
@@ -146,58 +118,40 @@ impl AddMembersRequest {
     }
 }
 
-/// The team's whole schedule, as a full replace — rotations absent from the
-/// body are removed, not left standing.
+/// A full replace: rotations absent from the body are removed, not left standing.
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct SetScheduleRequest {
-    /// Absent means "the team's own zone". It used to default to UTC, so a
-    /// client that omitted it silently shifted every restriction window on an
-    /// Asia/Kolkata team by five and a half hours.
+    /// Absent means the team's own zone; UTC silently shifts an Asia/Kolkata team by 5.5 hours.
     #[serde(default)]
     pub timezone: Option<String>,
     #[serde(default)]
     pub rotations: Vec<Rotation>,
 }
 
-/// Applies one of the four §3b shapes, as a full replace of the schedule.
-///
-/// The preset's own inputs are flattened in beside these three, so the body is
-/// `{"preset": "weekday_weekend", "timezone": "...", "weekdays": {...}, ...}` —
-/// the shape §C.3 published and the UI is built against. Which fields a given
-/// preset takes is the catalogue's job to say, not this struct's.
+/// A full replace; which fields a preset takes is the catalogue's job to say, not this struct's.
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct FromPresetRequest {
-    /// Absent means the team's own zone, exactly as `PUT /schedule` means it.
-    /// Every window the preset generates is read in this one zone — there is no
-    /// per-user timezone, which is why the caller supplies the grouping.
+    /// Absent means the team's own zone; there is no per-user timezone to fall back on.
     #[serde(default)]
     pub timezone: Option<String>,
-    /// How long one shift lasts, on every layer the preset builds. Absent is a
-    /// week.
+    /// How long one shift lasts, on every layer the preset builds. Absent is a week.
     #[serde(default)]
     pub handover_micros: Option<i64>,
-    /// When the first shift begins. Absent is now — snapped back to the most
-    /// recent local Monday 00:00, so handovers land on a week boundary rather
-    /// than on whenever somebody happened to click the button.
+    /// Absent is now, snapped to the last local Monday 00:00 so handovers land on a week boundary.
     #[serde(default)]
     pub anchor_micros: Option<i64>,
     #[serde(flatten)]
     pub spec: config::meta::oncall::PresetSpec,
 }
 
-/// The team's escalation ladder. `rungs` is a full replace; the two optional
-/// fields are left as they were when absent.
+/// `rungs` is a full replace; the two optional fields are left as they were when absent.
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct SetPolicyRequest {
     pub rungs: Vec<PriorityRung>,
     /// Alert Destination names to page through. Absent leaves them unchanged.
     #[serde(default)]
     pub destinations: Option<Vec<String>>,
-    /// The team's L0 block — how the AI SRE agent relates to their paging.
-    ///
-    /// Absent leaves it unchanged, so editing rungs cannot silently un-configure
-    /// L0. `mode.P1` is not editable and `mode.P4` must stay agent-only; both are
-    /// refused with a message naming the field.
+    /// Absent leaves it unchanged, so editing rungs cannot silently un-configure L0.
     #[serde(default)]
     pub l0: Option<config::meta::oncall::L0Policy>,
 }
@@ -205,42 +159,23 @@ pub struct SetPolicyRequest {
 #[derive(Debug, Default, Deserialize)]
 pub struct ListResponsesQuery {
     pub team_id: Option<String>,
-    /// Include closed records. Off by default: the home screen is what still
-    /// needs somebody, and resolved pages would bury it within a day.
+    /// Off by default: resolved pages would bury the home screen within a day.
     #[serde(default)]
     pub include_resolved: bool,
-    /// Every firing of one subject, whatever its firing number.
-    ///
-    /// The alert drawer's Firings tab and the "Related & past" panels were both
-    /// built on fetching the org's whole open list and filtering it client-side,
-    /// which is wrong twice: it is slow, and it silently cannot see anything
-    /// past the page bound.
+    /// Every firing of one subject: a client-side filter cannot see past the page bound.
     pub source_id: Option<String>,
-    /// `alert` / `incident` / … — pairs with `source_id`, whose ids are only
-    /// unique within a kind.
+    /// `alert` / `incident` / … — pairs with `source_id`, whose ids are only unique within a kind.
     pub subject_type: Option<String>,
-    /// An identity-dimension path, e.g. `k8s-cluster=prod`.
-    ///
-    /// Resolved to the teams that own it or own anything beneath it, and then
-    /// matched on the record's team — the record carries a team, not a path, and
-    /// making the client do that translation is what "requires N+1 calls" meant.
-    /// A path nobody owns matches nothing, rather than everything.
+    /// Resolved to the owning teams; a path nobody owns matches nothing, not everything.
     pub ownership_path: Option<String>,
-    /// What the firing turned out to be — the known-causes tab. Implies closed
-    /// records, since only a closed record has a cause.
+    /// Implies closed records, since only a closed record has a cause.
     pub cause: Option<String>,
-    /// Page size. Defaulted and capped, because this is the screen somebody
-    /// loads at 3am and a busy org has hundreds of open records.
+    /// Defaulted and capped, because a busy org has hundreds of open records.
     pub limit: Option<u64>,
     pub offset: Option<u64>,
 }
 
-/// Sets or clears one person's contact methods.
-///
-/// Every field uses `double_option`, so absent means "leave it alone" and an
-/// explicit `null` means "remove it". Without that distinction a profile screen
-/// that does not render push tokens would erase one every time somebody saved a
-/// phone number.
+/// `double_option` throughout: a screen that omits push tokens would otherwise erase one.
 #[derive(Debug, Default, Deserialize, utoipa::ToSchema)]
 pub struct SetContactRequest {
     #[serde(default, deserialize_with = "double_option")]
@@ -264,18 +199,14 @@ pub struct InboxQuery {
     pub offset: Option<u64>,
 }
 
-/// Marks inbox rows read, or unread again.
-///
-/// `all` is the "clear my inbox" button and is bounded server-side; naming ids
-/// is what a list does as it scrolls.
+/// `all` is the "clear my inbox" button and is bounded server-side.
 #[derive(Debug, Default, Deserialize, utoipa::ToSchema)]
 pub struct MarkReadRequest {
     #[serde(default)]
     pub event_ids: Vec<String>,
     #[serde(default)]
     pub all: bool,
-    /// `false` puts them back to unread — a responder who dismissed something
-    /// by accident at 3am must be able to undo it.
+    /// `false` puts them back to unread: a 3am dismissal by accident must be undoable.
     #[serde(default = "yes")]
     pub read: bool,
 }
@@ -290,11 +221,7 @@ pub struct MyTeamsQuery {
     pub at: Option<i64>,
 }
 
-/// The window a cause breakdown covers.
-///
-/// Both bounds default rather than being required: "what keeps breaking us" has
-/// an obvious answer for "lately", and forcing every caller to compute
-/// timestamps is how a dashboard tile ends up hardcoding the wrong month.
+/// Both bounds default: making callers compute timestamps is how a tile hardcodes a month.
 #[derive(Debug, Default, Deserialize)]
 pub struct CauseAnalyticsQuery {
     pub team_id: Option<String>,
@@ -307,20 +234,17 @@ pub struct CauseAnalyticsQuery {
 /// Promotes a firing to a full incident.
 #[derive(Debug, Default, Deserialize, utoipa::ToSchema)]
 pub struct PromoteRequest {
-    /// Absent takes the record's own title, which is nearly always right and
-    /// is one less field to fill in mid-page.
+    /// Absent takes the record's own title, which is one less field to fill in mid-page.
     #[serde(default)]
     pub title: Option<String>,
-    /// `P1`–`P4`. Absent derives it from the record's priority, so a promotion
-    /// cannot silently downgrade what woke somebody.
+    /// Absent derives it from the record's priority, so a promotion cannot silently downgrade.
     #[serde(default)]
     pub severity: Option<String>,
 }
 
 #[derive(Debug, Default, Deserialize)]
 pub struct OnCallQuery {
-    /// Resolve at this instant (micros) instead of now, so the UI can show a
-    /// future week without a second endpoint.
+    /// Resolve at this instant (micros), so the UI shows a future week without a second endpoint.
     pub at: Option<i64>,
 }
 
@@ -328,17 +252,14 @@ pub struct OnCallQuery {
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct CreateOwnershipRuleRequest {
     pub team_id: String,
-    /// `{alias_id: value}` — the same vocabulary the service-identity config
-    /// produces, e.g. `{"k8s-cluster": "prod"}`.
+    /// `{alias_id: value}`, the same vocabulary the service-identity config produces.
     pub dimensions: std::collections::HashMap<String, String>,
 }
 
-/// Closes a page, and optionally records what it turned out to be. The whole
-/// body may be omitted.
+/// Closes a page and optionally records what it turned out to be; the whole body may be omitted.
 #[derive(Debug, Default, Deserialize, utoipa::ToSchema)]
 pub struct ResolveRequest {
-    /// Why it happened. Optional, but it is what makes the next firing of the
-    /// same rule useful history rather than a list of dates.
+    /// Optional, but it is what makes the next firing history rather than a list of dates.
     #[serde(default)]
     pub cause: Option<config::meta::oncall::ResolutionCause>,
     /// One sentence beside the structured cause.
@@ -352,18 +273,14 @@ pub struct AddNoteRequest {
     pub body: String,
 }
 
-/// Quiets a page for a while without claiming it — the ladder resumes when the
-/// snooze lapses, so this is not an acknowledgement.
+/// Not an acknowledgement: the ladder resumes when the snooze lapses.
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct SnoozeRequest {
-    /// How long to stay quiet, in minutes. `1`–`1440`; anything else is refused,
-    /// because a negative one would silence a live page into the past and an
-    /// unbounded one runs the microsecond arithmetic off the end of an i64.
+    /// `1`–`1440`: negative silences a live page into the past, unbounded overflows the i64.
     pub minutes: i64,
 }
 
-/// Exactly one of `to` (a person on this team) or `to_team_id` (ownership
-/// moves to another team, and their on-call is paged under their rotation).
+/// Exactly one of `to` (a person here) or `to_team_id` (the other team's on-call is paged).
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct HandoffRequest {
     #[serde(default)]
@@ -374,8 +291,7 @@ pub struct HandoffRequest {
     pub note: Option<String>,
 }
 
-/// An impacted team saying its own service is clear. The cause belongs to the
-/// owner team's record, not to this one, so there is nothing else to send.
+/// The cause belongs to the owner team's record, not to this one, so there is nothing else to send.
 #[derive(Debug, Default, Deserialize, utoipa::ToSchema)]
 pub struct ConfirmRecoveryRequest {
     #[serde(default)]
@@ -389,13 +305,10 @@ pub struct EscalateRequest {
     pub note: Option<String>,
 }
 
-/// Which ladder to prove. Priorities page differently, so "does paging work"
-/// has a different answer per priority and the caller has to say which one.
+/// Priorities page differently, so the caller has to say which ladder to prove.
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct TestPageRequest {
-    /// 1–5. Defaults to P2, the highest priority whose ladder starts with one
-    /// person: P1 pages the primary, the secondary and everyone on the schedule
-    /// at once, which is a lot of phones for a test nobody asked to receive.
+    /// Defaults to P2, the highest priority whose ladder starts with one person, not everyone.
     #[serde(default = "default_test_priority")]
     pub priority: i32,
 }
@@ -417,7 +330,6 @@ pub struct HistoryQuery {
     pub limit: Option<u64>,
 }
 
-/// A signal as it would arrive, to ask which team would be woken for it.
 /// Resolves the same rules a real firing would and sends nothing.
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct PreviewRoutingRequest {
@@ -427,11 +339,7 @@ pub struct PreviewRoutingRequest {
     pub dimensions: std::collections::HashMap<String, String>,
 }
 
-/// The whole routing configuration, stated in one body.
-///
-/// `default_team_id` absent or `null` clears the nomination. There is exactly
-/// one field, so "send the state you want" is unambiguous and clearing needs no
-/// second endpoint and no sentinel value.
+/// One field, so absent or `null` clears the nomination without a second endpoint.
 #[derive(Debug, Default, Deserialize, utoipa::ToSchema)]
 pub struct SetRoutingConfigRequest {
     #[serde(default)]
@@ -446,55 +354,40 @@ pub struct OwnershipQuery {
 /// "Cover for me" — `architecture/02` §5, as one request.
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct CreateOverrideRequest {
-    /// Which rotation is being covered. Omitted means the team's primary, which
-    /// is what "cover for me" means on a team that has never thought about
-    /// positions. A rotation the team does not have is refused: a cover over a
-    /// position nothing staffs would page somebody nobody expected.
-    ///
-    /// Accepts an id or a name — a client with the calendar in front of it sends
-    /// the id, a human writing the call by hand sends "Secondary".
+    /// Omitted means the primary; an unknown rotation is refused, or a cover staffs nothing.
     #[serde(default)]
     pub rotation_id: Option<String>,
-    /// Who is covering. Must be a user of this org: an override outranks every
-    /// layer, so an address that goes nowhere is a team with no pager for the
-    /// length of the window.
+    /// Must be a user of this org: an override outranks every layer, so a bad address is no pager.
     pub user_email: String,
     /// Micros, inclusive.
     pub start_at: i64,
-    /// Micros, exclusive — a cover ending exactly when the next begins does
-    /// not overlap it.
+    /// Micros, exclusive — a cover ending exactly when the next begins does not overlap it.
     pub end_at: i64,
-    /// Who is being covered. Optional: "cover tonight" is a real request even
-    /// when nobody has worked out whose shift tonight is.
+    /// Optional: "cover tonight" is real even before whose shift tonight is has been worked out.
     #[serde(default)]
     pub covering_for: Option<String>,
     #[serde(default)]
     pub reason: Option<String>,
 }
 
-/// Both bounds or neither. A half-specified window is a client bug, and
-/// answering it with the unfiltered list would look like it worked.
+/// Both bounds or neither: answering half a window with the unfiltered list looks like it worked.
 #[derive(Debug, Default, Deserialize)]
 pub struct OverrideWindowQuery {
     pub from: Option<i64>,
     pub to: Option<i64>,
 }
 
-/// The window a resolved-schedule read covers. Both bounds are required: this
-/// endpoint has no useful default, and inventing one would hide the bound.
+/// Both bounds required: there is no useful default, and inventing one would hide the bound.
 #[derive(Debug, Deserialize)]
 pub struct ResolvedScheduleQuery {
     pub from: i64,
     pub to: i64,
-    /// Which rotation's row of the grid to draw. Omitted means the primary.
-    /// One rotation per call rather than all of them interleaved: a row with
-    /// two answers in it is not a row.
+    /// Omitted means the primary; one per call, because a row with two answers is not a row.
     #[serde(default)]
     pub rotation_id: Option<String>,
 }
 
-/// A person, a window, or both. Listing every absence an org has ever recorded
-/// is not a question anything asks, so it is not one this answers.
+/// A person, a window, or both; listing every absence an org ever recorded is not a question.
 #[derive(Debug, Default, Deserialize)]
 pub struct UnavailabilityQuery {
     #[serde(default)]
@@ -508,8 +401,7 @@ pub struct UnavailabilityQuery {
 /// "I am away 20 Aug – 3 Sep."
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct CreateUnavailabilityRequest {
-    /// Whose absence. Omitted means the caller's own, which is the common case
-    /// and the one that must not need an administrator.
+    /// Omitted means the caller's own, which is the case that must not need an administrator.
     #[serde(default)]
     pub user_email: Option<String>,
     /// Micros, inclusive.
@@ -520,8 +412,7 @@ pub struct CreateUnavailabilityRequest {
     pub reason: Option<String>,
 }
 
-/// Carried as a query param on the confirmation GET and as a form field on
-/// the POST that actually acknowledges.
+/// A query param on the confirmation GET, a form field on the POST that acknowledges.
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct AckQuery {
     pub token: String,
@@ -534,16 +425,10 @@ pub struct RemoveMemberQuery {
 
 #[derive(Debug, Default, Deserialize)]
 pub struct UnroutedQuery {
-    /// A dismissed entry is kept rather than deleted — the evidence that the
-    /// gap existed is the point — so asking for them back is opt-in. Left off,
-    /// this is the queue somebody still has to act on.
+    /// A dismissed entry is kept, not deleted — the evidence matters — so asking back is opt-in.
     #[serde(default)]
     pub include_dismissed: bool,
-    /// `default_team` for the gaps that are waking the catch-all — §4's
-    /// "Assign next" — `nobody` for the gaps that are waking no one, and absent
-    /// for both. Unrecognised values are treated as absent rather than refused:
-    /// this is a filter on a worklist, and showing too much is a far better
-    /// failure than a 400 on a screen somebody opened to see what is broken.
+    /// An unrecognised value is treated as absent: a 400 is the worst answer on a worklist.
     pub landing: Option<String>,
     pub limit: Option<u64>,
 }
@@ -563,8 +448,7 @@ impl UnroutedQuery {
 
 #[derive(Debug, Default, Deserialize)]
 pub struct CoverageGapsQuery {
-    /// Answer for this instant (micros) instead of now, so the same call can
-    /// ask "will anybody be on call at 2am on Sunday?".
+    /// Answer for this instant (micros), so the same call can ask about 2am on Sunday.
     pub at: Option<i64>,
     pub limit: Option<u64>,
 }
@@ -575,11 +459,7 @@ pub struct DeliveriesQuery {
     pub offset: Option<u64>,
 }
 
-/// How far back a summary looks, and how far ahead a warning does.
-///
-/// Bounded server-side rather than trusted: these drive `COUNT`s over the
-/// delivery ledger, which is the only on-call table that grows without an
-/// upper bound.
+/// Bounded server-side: these are `COUNT`s over the only on-call table with no upper bound.
 #[derive(Debug, Default, Deserialize)]
 pub struct LookbackQuery {
     /// Days. Clamped `1..=366`.
@@ -590,8 +470,7 @@ pub struct LookbackQuery {
 /// Which ladder to dry-run, and when.
 #[derive(Debug, Default, Deserialize)]
 pub struct EscalationPreviewQuery {
-    /// `P1`–`P5`, or `1`–`5`. Absent is P1 — the ladder somebody opening this
-    /// screen is checking, and the one whose answer matters most.
+    /// `P1`–`P5`, or `1`–`5`. Absent is P1, the ladder somebody opening this screen is checking.
     pub priority: Option<String>,
     /// Resolve at this instant (micros) instead of now.
     pub at: Option<i64>,
@@ -609,12 +488,7 @@ pub struct OwnershipStatsQuery {
 
 // ── Handlers ──────────────────────────────────────────────────────────────────
 
-/// Logs a fault and answers with a fixed sentence.
-///
-/// The error text on this path comes from `sea-orm` and `anyhow` and carries
-/// SQL fragments, table names and column names. Every endpoint in this module
-/// is open to any member of the org rather than to an administrator, so the
-/// detail belongs in the log and nowhere else.
+/// The `sea-orm` text carries SQL fragments, and every endpoint here is open to the whole org.
 #[cfg(feature = "enterprise")]
 fn internal_error(context: &str, e: &impl std::fmt::Display) -> Response {
     tracing::error!("[oncall] {context}: {e}");
@@ -625,11 +499,7 @@ fn internal_error(context: &str, e: &impl std::fmt::Display) -> Response {
     .into_response()
 }
 
-/// Maps a service error onto a status code.
-///
-/// The distinction that matters: a validation failure or a missing team is
-/// the caller's problem and must not read as a server fault, or every
-/// mistyped timezone looks like an outage in the logs.
+/// A validation failure must not read as a server fault, or a typo looks like an outage.
 #[cfg(feature = "enterprise")]
 fn to_response(e: anyhow::Error) -> Response {
     use o2_enterprise::enterprise::oncall::service::OncallError;
@@ -637,12 +507,9 @@ fn to_response(e: anyhow::Error) -> Response {
         Some(OncallError::TeamNotFound(_)) | Some(OncallError::ResponseNotFound(_)) => {
             StatusCode::NOT_FOUND
         }
-        // Not 404: the record exists and the caller may well know it does. The
-        // honest answer is that working it is not theirs to do.
+        // Not 404: the record exists, and the honest answer is that working it is not theirs.
         Some(OncallError::NotOnThisTeam { .. }) => StatusCode::FORBIDDEN,
-        // A conflict, not a 400: the request is well-formed and the state of
-        // the org is what refuses it, and the caller fixes it by changing that
-        // state rather than by changing the request.
+        // A conflict, not a 400: the caller fixes it by changing the org's state, not the request.
         Some(OncallError::NameTaken(_)) | Some(OncallError::IsDefaultTeam(_)) => {
             StatusCode::CONFLICT
         }
@@ -652,8 +519,7 @@ fn to_response(e: anyhow::Error) -> Response {
     if status == StatusCode::INTERNAL_SERVER_ERROR {
         return internal_error("service", &e);
     }
-    // Every remaining status is an `OncallError` variant, whose message is
-    // written to be read by the caller.
+    // Every remaining status is an `OncallError` whose message is written for the caller.
     MetaHttpResponse::error(status.as_u16(), e.to_string()).into_response()
 }
 
@@ -909,9 +775,7 @@ pub async fn add_member(
         if !allowed(&org_id, &user_email.user_id, CONFIG, "POST").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
-        // Refused rather than answered 200: a caller that meant to add six
-        // people and mistyped the key should hear about it, not read success
-        // and find an empty roster at 3am.
+        // Refused, not 200: a caller who mistyped the key must not find an empty roster at 3am.
         if body.names_nobody() {
             return MetaHttpResponse::bad_request(
                 "no members named — send `user_email` or a non-empty `user_emails`",
@@ -1075,16 +939,10 @@ pub async fn list_schedule_presets(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        // A read of what the product can build, not of what this org has
-        // built — but it is still the configuration surface, and gating it
-        // with anything else would mean a second rule to keep in step.
         if !allowed(&org_id, &user_email.user_id, CONFIG, "GET").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
-        // A closed set of four, compiled in, so there is nothing to page
-        // through and no bound that could be exceeded. Each entry carries its
-        // own input schema — including the 2–4 on follow-the-sun's groups —
-        // so a form can be built from this response alone.
+        // Each entry carries its own input schema, so a form can be built from this response alone.
         MetaHttpResponse::json(config::meta::oncall::preset_catalogue())
     }
     #[cfg(not(feature = "enterprise"))]
@@ -1120,10 +978,7 @@ pub async fn apply_schedule_preset(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        // Configuration, and a full replace of the rotations at that — the
-        // same authority as `PUT /schedule`, which is what this ends up
-        // calling. POST rather than PUT because the request names a shape to
-        // build rather than the state to store.
+        // A full replace of the rotations, so the same authority as `PUT /schedule`.
         if !allowed(&org_id, &user_email.user_id, CONFIG, "POST").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
@@ -1138,9 +993,7 @@ pub async fn apply_schedule_preset(
         )
         .await
         {
-            // The stored schedule, which is the body `GET /schedule` returns:
-            // nothing preset-shaped comes back, because nothing preset-shaped
-            // was stored.
+            // The stored schedule: nothing preset-shaped was stored, so none comes back.
             Ok(schedule) => MetaHttpResponse::json(schedule),
             Err(e) => to_response(e),
         }
@@ -1174,8 +1027,6 @@ pub async fn who_is_on_call(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        // A read anyone in the org has a reason to make — "who do I wake?" is
-        // not privileged information.
         if !allowed(&org_id, &user_email.user_id, CONFIG, "GET").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
@@ -1221,8 +1072,7 @@ pub async fn create_override(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        // Configuration: a cover decides who gets woken for its window, which
-        // is the same authority as editing the rotation it stands over.
+        // A cover decides who is woken for its window, as much as editing the rotation does.
         if !allowed(&org_id, &user_email.user_id, CONFIG, "POST").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
@@ -1235,8 +1085,7 @@ pub async fn create_override(
             body.end_at,
             body.covering_for,
             body.reason,
-            // Who arranged it, taken from the caller rather than the body:
-            // "who agreed to this" is not something a client gets to assert.
+            // From the caller, not the body: "who agreed" is not a client's to assert.
             &user_email.user_id,
             config::utils::time::now_micros(),
         )
@@ -1326,9 +1175,7 @@ pub async fn delete_override(
         match o2_enterprise::enterprise::oncall::service::delete_override(&org_id, &override_id)
             .await
         {
-            // Reported rather than silently 200: cancelling a cover that is not
-            // there means somebody is looking at a stale screen, and the
-            // difference matters at 3am.
+            // Reported, not silently 200: cancelling a missing cover means a stale screen.
             Ok(true) => MetaHttpResponse::json(serde_json::json!({ "deleted": true })),
             Ok(false) => MetaHttpResponse::not_found("override not found"),
             Err(e) => to_response(e),
@@ -1368,8 +1215,6 @@ pub async fn get_resolved_schedule(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        // The same read as "who is on call", over a window instead of an
-        // instant, so it costs the same permission.
         if !allowed(&org_id, &user_email.user_id, CONFIG, "GET").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
@@ -1473,13 +1318,7 @@ pub async fn set_policy(
     }
 }
 
-/// Where a team is talked to, as opposed to where its ladder pages (Change 1).
-///
-/// `destinations` absent or `null` puts the team back to "never set", so the
-/// escalation policy's list takes over again. `[]` says the team has no channel
-/// at all. The two are different answers deliberately: collapsing them would
-/// make the field impossible to turn off, because clearing it would silently
-/// resurrect whatever the policy still had in it.
+/// Absent restores "never set" so the policy takes over, `[]` says no channel; do not collapse.
 #[derive(Debug, Default, Deserialize, utoipa::ToSchema)]
 pub struct SetTeamChannelRequest {
     #[serde(default)]
@@ -1491,9 +1330,7 @@ pub struct SetTeamChannelRequest {
 pub struct TeamChannelResponse {
     pub team_id: String,
     pub destinations: Vec<String>,
-    /// `team` or `policy`. Precedence is a thing an operator has to be able to
-    /// see: "I set the team channel and pages still go to the old room" is
-    /// otherwise unanswerable from the API.
+    /// `team` or `policy`, or "pages still go to the old room" is unanswerable from the API.
     pub source: &'static str,
 }
 
@@ -1524,9 +1361,7 @@ pub async fn get_team_channel(
             Ok(t) => t,
             Err(e) => return internal_error("get_team_channel", &e),
         };
-        // Read whole rather than reported as "unset": the caller wants to know
-        // where the team is actually talked to, and answering with an empty
-        // list while pages go to the policy's room would be a lie of omission.
+        // An empty list while pages go to the policy's room would be a lie of omission.
         let policy =
             match o2_enterprise::enterprise::oncall::service::get_policy(&org_id, &team_id).await {
                 Ok(p) => p.destinations,
@@ -1613,10 +1448,7 @@ pub async fn set_team_channel(
     }
 }
 
-/// Renders the confirmation page an emailed acknowledgement link opens.
-///
-/// Deliberately plain HTML with no JavaScript: it is opened on a phone, at
-/// night, from a mail client, and it must work there.
+/// Plain HTML, no JavaScript: it is opened on a phone at night from a mail client.
 #[cfg(feature = "enterprise")]
 fn ack_confirm_page(org_id: &str, token: &str, title: &str) -> Response {
     let esc = |v: &str| {
@@ -1670,11 +1502,7 @@ pub async fn acknowledge(
     {
         use o2_enterprise::enterprise::oncall::{escalation, service, token};
 
-        // Signature, expiry, org, **and** whether the person the token names is
-        // still a member of that org. The last one is why this goes through
-        // the service rather than calling `token::verify` here: the token is
-        // stateless by design and stays that way, and the entitlement is read
-        // once, in one place both ack entry points share.
+        // Through the service, not `token::verify`: membership is read once for both entry points.
         let claims = match service::ack_claims(
             &form.token,
             &org_id,
@@ -1688,14 +1516,7 @@ pub async fn acknowledge(
                     .into_response();
             }
         };
-        // `03` §8: the link is single-use. Signing makes it unforgeable and the
-        // expiry makes it short-lived, but neither stops a replay inside the
-        // TTL — and a record whose ladder has restarted since is a page a stale
-        // link can take from whoever holds it now.
-        //
-        // Spent *before* the acknowledgement rather than after: a token that
-        // loses the race must not be able to act, and the acknowledgement it
-        // would have made has already been made by the click that won.
+        // Spent before the ack: expiry does not stop a replay, and a losing token must not act.
         if !token::spend(
             &form.token,
             claims.expires_at,
@@ -1703,10 +1524,7 @@ pub async fn acknowledge(
         )
         .await
         {
-            // Not an error page. §8 is explicit that acking is idempotent and a
-            // second click "returns the same result and changes nothing", so
-            // this lands on the record exactly as the first click did — the
-            // reader gets what they wanted, and nothing was acted on twice.
+            // Not an error page: acking is idempotent, so a second click lands where the first did.
             return ack_redirect(&claims.org_id, &claims.response_id);
         }
         if let Err(e) =
@@ -1723,12 +1541,7 @@ pub async fn acknowledge(
     }
 }
 
-/// Where an acknowledgement click lands.
-///
-/// The record, not JSON. Somebody who just acknowledged from a phone at 3am
-/// needs the page, and the org has to be in the URL or the app resolves
-/// whichever org they last had selected — which for anyone in more than one is
-/// an empty screen.
+/// The org must be in the URL, or the app resolves whichever one was last selected.
 #[cfg(feature = "enterprise")]
 fn ack_redirect(org_id: &str, response_id: &str) -> Response {
     let base = config::get_config().common.web_url.clone();
@@ -1754,23 +1567,13 @@ fn ack_redirect(org_id: &str, response_id: &str) -> Response {
     ),
     responses((status = 200, description = "Success", content_type = "text/html")),
 )]
-/// GET only LOOKS. It must not acknowledge.
-///
-/// This link is emailed, and mail gateways — Outlook Safe Links, Gmail's
-/// scanner, any corporate filter — fetch URLs in messages to check them. A GET
-/// that acknowledged meant a scanner could take the page before the human read
-/// it: the ladder stops, the timeline records an acknowledgement nobody made,
-/// and the incident sleeps. So the fetch renders a button, and the button
-/// POSTs.
+/// GET must only look: mail gateways fetch URLs, so a scanner would take the page first.
 pub async fn ack_page(Path(org_id): Path<String>, Query(q): Query<AckQuery>) -> Response {
     #[cfg(feature = "enterprise")]
     {
         use o2_enterprise::enterprise::oncall::service;
 
-        // Checked on the GET too, not only on the POST that acts. A leaver who
-        // is refused here never sees the button — and, just as importantly,
-        // never sees the record's title, which this page would otherwise show
-        // to somebody who has left the organization.
+        // Checked on the GET too: a leaver never sees the button, nor the record's title.
         let claims = match service::ack_claims(&q.token, &org_id, config::utils::time::now_micros())
             .await
         {
@@ -1795,10 +1598,7 @@ pub async fn ack_page(Path(org_id): Path<String>, Query(q): Query<AckQuery>) -> 
     }
 }
 
-/// The subject kinds a filter may name.
-///
-/// Spelled here rather than as a `from_str` on the meta type: parsing a query
-/// parameter is this surface's problem, and the enum is shared with the engine.
+/// Spelled here rather than on the meta type: parsing a query param is this surface's job.
 #[cfg(feature = "enterprise")]
 const SUBJECT_TYPES: [config::meta::oncall::SubjectType; 2] = {
     use config::meta::oncall::SubjectType::{Alert, Incident};
@@ -1852,11 +1652,7 @@ pub async fn list_responses(
         let limit = q.limit.unwrap_or(100).clamp(1, 200);
         let offset = q.offset.unwrap_or(0);
 
-        // These two ARE refused when unrecognised, unlike the unrouted queue's
-        // `landing`. The difference is what a wrong answer costs: widening a
-        // worklist shows too much, but silently ignoring `cause=noisy_treshold`
-        // returns every record in the org and reads as "we have never had a
-        // noisy threshold", which is a false statement about the org.
+        // Refused when unrecognised: ignoring `cause=noisy_treshold` returns every record instead.
         let cause = match q.cause.as_deref() {
             None => None,
             Some(c) => match ResolutionCause::from_str_opt(c) {
@@ -1881,19 +1677,12 @@ pub async fn list_responses(
                 }
             },
         };
-        // An ownership path names teams, and the record carries a team. A path
-        // nobody owns resolves to an empty set and therefore matches nothing —
-        // it must not fall through to "unfiltered", which would report every
-        // page in the org as owned by a path with no owner.
+        // A path nobody owns matches nothing; it must never fall through to unfiltered.
         let team_ids = match q.ownership_path.as_deref().map(str::trim) {
             None | Some("") => None,
             Some(path) => match infra::table::oncall_ownership::list(&org_id).await {
                 Ok(rules) => {
-                    // `path()` is derived from the rule's dimensions, so it is
-                    // already in the canonical form every other surface emits —
-                    // which is where a client got this value from in the first
-                    // place. The trailing `/` anchors the subtree match, or
-                    // `k8s-cluster=pro` would claim `k8s-cluster=prod`.
+                    // The trailing `/` anchors the subtree, or `k8s-cluster=pro` claims `prod`.
                     let below = format!("{path}/");
                     Some(
                         rules
@@ -1932,21 +1721,7 @@ pub async fn list_responses(
     }
 }
 
-/// Serializes records with everything a pages table renders beside them.
-///
-/// Three things live off the meta type. The runbook link is a column on the
-/// record but not a field on `Response` — that type is constructed by the
-/// escalation engine in several places this surface does not own. How far a
-/// firing climbed lives on the timeline. And time-to-ack is arithmetic nobody
-/// should have to repeat in four clients.
-///
-/// All three are merged in here, from **two** queries for the whole page and
-/// never one per row: the table shows opened-at, the alert, who answered, how
-/// long they took and which rung it reached, and a second call per row is the
-/// N+1 this exists to avoid.
-///
-/// A record with no runbook, no ack or no page event simply has no key, which
-/// keeps the body identical to what it was before the fields existed.
+/// Two queries for the whole page, never one per row, which is the N+1 this exists to avoid.
 #[cfg(feature = "enterprise")]
 async fn with_page_details(
     org_id: &str,
@@ -1956,8 +1731,7 @@ async fn with_page_details(
     let runbooks = infra::table::oncall_responses::runbook_urls(org_id, &ids)
         .await
         .unwrap_or_else(|e| {
-            // A missing runbook must never cost somebody the list of what is
-            // on fire.
+            // A missing runbook must never cost somebody the list of what is on fire.
             tracing::error!("[oncall] runbook lookup: {e}");
             Default::default()
         });
@@ -1974,14 +1748,11 @@ async fn with_page_details(
                 if let Some(url) = runbooks.get(&r.id) {
                     obj.insert("runbook_url".to_string(), url.clone().into());
                 }
-                // The rung's `after_micros`, which is how a rung is identified
-                // everywhere else in this feature — a positional index would
-                // not survive somebody reordering the ladder.
+                // The rung's `after_micros`: an index would not survive a reordered ladder.
                 if let Some(rung) = rungs.get(&r.id) {
                     obj.insert("reached_rung_micros".to_string(), (*rung).into());
                 }
-                // Only for a record somebody answered. A null here would be
-                // indistinguishable from "answered instantly".
+                // Only when answered: a null is indistinguishable from "answered instantly".
                 if let Some(acked_at) = r.acked_at {
                     obj.insert(
                         "time_to_ack_micros".to_string(),
@@ -2032,9 +1803,7 @@ pub async fn get_response(
         };
         match infra::table::oncall_responses::list_events(&response_id).await {
             Ok(events) => MetaHttpResponse::json(serde_json::json!({
-                // Hoisted beside the record rather than nested inside it: this
-                // is the one screen where "where is the runbook" is asked, and
-                // it must not depend on the alert still existing.
+                // Hoisted: "where is the runbook" must not depend on the alert still existing.
                 "response": with_page_details(&org_id, vec![record]).await.pop(),
                 "events": events,
             })),
@@ -2156,8 +1925,6 @@ pub async fn list_responses_for_incident(
     Path((org_id, incident_id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> Response {
-    // Lets an incident show who it woke without duplicating any of the paging
-    // machinery: the record already exists, it was simply unreachable.
     #[cfg(feature = "enterprise")]
     {
         if !allowed(&org_id, &user_email.user_id, RESPONSES, "LIST").await {
@@ -2228,8 +1995,7 @@ pub async fn get_prior_causes(
     Path((org_id, response_id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> Response {
-    // Grouped, not a list of dates. "3x config change / deploy" is the thing
-    // worth reading mid-page; the individual firings are not.
+    // Grouped, not a list of dates: "3x config change / deploy" is what is worth reading mid-page.
     #[cfg(feature = "enterprise")]
     {
         if !allowed(&org_id, &user_email.user_id, RESPONSES, "GET").await {
@@ -2267,9 +2033,6 @@ pub async fn acknowledge_response(
     Path((org_id, response_id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> Response {
-    // The emailed link carries a signed token because the reader may not have
-    // a session. In-product there already is one, so the logged-in user is the
-    // acknowledger and no token is involved.
     #[cfg(feature = "enterprise")]
     {
         if !allowed(&org_id, &user_email.user_id, RESPONSES, "POST").await {
@@ -2429,19 +2192,13 @@ pub async fn confirm_recovery(
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
     ValidatedJson(body): ValidatedJson<Option<ConfirmRecoveryRequest>>,
 ) -> Response {
-    // Recovery is ordered (`00-simplified-flow` §4): the incident closes on the
-    // slowest dependent, not on the root cause, and the owner team cannot close
-    // on a dependent's behalf. This is the verb that lets the dependent say it
-    // is done — without it the engine tells impacted teams their upstream is
-    // fixed and then waits for a confirmation nothing can send.
+    // Recovery is ordered: without this verb the engine waits for a confirmation nothing sends.
     #[cfg(feature = "enterprise")]
     {
         if !allowed(&org_id, &user_email.user_id, RESPONSES, "POST").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
-        // The record has to exist before the engine's error message is the only
-        // thing distinguishing "no such record" from "wrong kind of record", and
-        // those are a 404 and a 400.
+        // Looked up here so "no such record" stays a 404 and the wrong kind stays a 400.
         match infra::table::oncall_responses::get(&org_id, &response_id).await {
             Ok(None) => return MetaHttpResponse::not_found("Response not found"),
             Err(e) => {
@@ -2459,8 +2216,7 @@ pub async fn confirm_recovery(
             Ok(Some(_)) => {}
         }
         let body = body.unwrap_or_default();
-        // The actor is the session's, never the body's: this is the record of
-        // who said the service was clear.
+        // The actor is the session's: this is the record of who said the service was clear.
         match o2_enterprise::enterprise::oncall::escalation::confirm_recovery(
             &org_id,
             &response_id,
@@ -2500,8 +2256,7 @@ pub async fn escalate_response(
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
     ValidatedJson(body): ValidatedJson<Option<EscalateRequest>>,
 ) -> Response {
-    // Not a handoff. A handoff gives the page away; this keeps it and adds
-    // people to it, which is what a responder means by "I need more help".
+    // Not a handoff: a handoff gives the page away, this keeps it and adds people to it.
     #[cfg(feature = "enterprise")]
     {
         use o2_enterprise::enterprise::oncall::escalation::EscalatedTo;
@@ -2526,10 +2281,7 @@ pub async fn escalate_response(
         )
         .await
         {
-            // `ladder_exhausted` is a 200, deliberately. The responder asked a
-            // reasonable question and the answer is "there is nobody above
-            // you" — rendering that as an error would read as though the press
-            // failed and invite a second one.
+            // `ladder_exhausted` is a 200: an error reads as a failed press and invites a second.
             Ok((record, EscalatedTo::LadderExhausted)) => {
                 MetaHttpResponse::json(serde_json::json!({
                     "escalated_to": "ladder_exhausted",
@@ -2582,11 +2334,7 @@ pub async fn send_test_page(
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
     ValidatedJson(body): ValidatedJson<Option<TestPageRequest>>,
 ) -> Response {
-    // `oncall`, not `oncall_responses`: this proves a configuration, and the
-    // person who configures who gets woken is the one who should be able to
-    // check it. It is also the one on-call verb that puts a message on a real
-    // pager without a real firing, which is a reason to keep it with the
-    // configuration permission rather than the responder one.
+    // `oncall`, not `oncall_responses`: this puts a real page out with no real firing.
     #[cfg(feature = "enterprise")]
     {
         if !allowed(&org_id, &user_email.user_id, CONFIG, "POST").await {
@@ -2602,11 +2350,7 @@ pub async fn send_test_page(
         )
         .await
         {
-            // 200 even when nothing was sent, with `reached_anyone: false` and
-            // the reason beside it. A test page that found a team nobody is on
-            // call for has succeeded at its job — the endpoint worked, the
-            // configuration did not, and reporting that as a 4xx would blame
-            // the request.
+            // 200 even when nothing was sent: the endpoint worked, the configuration did not.
             Ok(result) => MetaHttpResponse::json(serde_json::json!({
                 "reached_anyone": result.reached_anyone(),
                 "not_sent_because": result.not_sent_because,
@@ -2623,8 +2367,6 @@ pub async fn send_test_page(
     }
 }
 
-/// Past firings of the same source — "this fired before, and here is what it
-/// was". The causes recorded at resolve are the point of it.
 #[utoipa::path(
     get,
     path = "/{org_id}/oncall/responses/{response_id}/history",
@@ -2757,9 +2499,7 @@ pub async fn create_ownership_rule(
         {
             Ok(rule) => MetaHttpResponse::json(rule),
             Err(e) => {
-                // The unique index on (org_id, path) is what refuses a second
-                // team claiming the same path; surface it as a conflict rather
-                // than a server fault.
+                // The unique index on (org_id, path) refuses it, so it is a conflict, not a fault.
                 if e.to_string().to_lowercase().contains("unique")
                     || e.to_string().to_lowercase().contains("duplicate")
                 {
@@ -2822,8 +2562,7 @@ pub async fn update_ownership_rule(
             Ok(None) => MetaHttpResponse::error(StatusCode::NOT_FOUND.as_u16(), "Rule not found")
                 .into_response(),
             Err(e) => {
-                // Same unique-index shape as create: repointing a rule onto a
-                // path another team already claims is a conflict, not a fault.
+                // Same unique-index shape as create: a claimed path is a conflict, not a fault.
                 if e.to_string().to_lowercase().contains("unique")
                     || e.to_string().to_lowercase().contains("duplicate")
                 {
@@ -2881,13 +2620,7 @@ pub async fn delete_ownership_rule(
     }
 }
 
-/// Serializes a routing config with the default team's name beside its id.
-///
-/// The id is what the setting stores and what every other endpoint speaks; the
-/// name is what the screen has to render. Sending both means the routing screen
-/// does not have to fetch the whole team list to draw one label — and, more to
-/// the point, does not have to leave the label blank when the team it points at
-/// is one the caller has not loaded.
+/// Sends the name beside the id, so the screen need not fetch the team list for one label.
 #[cfg(feature = "enterprise")]
 async fn routing_config_body(config: &config::meta::oncall::RoutingConfig) -> serde_json::Value {
     let name = match config.default_team_id.as_deref() {
@@ -2907,12 +2640,7 @@ async fn routing_config_body(config: &config::meta::oncall::RoutingConfig) -> se
     })
 }
 
-/// The org's routing configuration — which team catches whatever nothing else
-/// claimed.
-///
-/// Always answers, even for an org that has never set one: `default_team_id` is
-/// then `null`, which is the honest reading of "nothing routes here yet" and
-/// saves every caller a 404 branch.
+/// Always answers: an unset org gets a `null` `default_team_id`, saving callers a 404 branch.
 #[utoipa::path(
     get,
     path = "/{org_id}/oncall/routing/config",
@@ -2945,13 +2673,7 @@ pub async fn get_routing_config(
     }
 }
 
-/// Nominate the org's default on-call team, or clear the nomination.
-///
-/// Nothing creates this team and nothing picks it automatically — an operator
-/// chooses one of their own teams, which is precisely what makes a catch-all
-/// tier safe. The team is checked against **this org**: the setting holds a
-/// team id from a shared table, so an id from another tenant would otherwise be
-/// stored and start paging strangers.
+/// Checked against this org: the setting holds an id from a shared table across tenants.
 #[utoipa::path(
     put,
     path = "/{org_id}/oncall/routing/config",
@@ -2994,11 +2716,7 @@ pub async fn set_routing_config(
     }
 }
 
-/// Answer "where would this route?" without waiting for an alert to fire.
-///
-/// Ownership is longest-prefix over a set of rules, which is easy to get wrong
-/// by hand once a few overlap. Returning the decision AND its reason turns
-/// debugging a mis-route from guesswork into a lookup.
+/// Returns the reason too: longest-prefix ownership is easy to get wrong once rules overlap.
 #[utoipa::path(
     post,
     path = "/{org_id}/oncall/routing/preview",
@@ -3018,8 +2736,7 @@ pub async fn preview_routing(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        // Changes nothing — it is a POST only because the dimensions travel in
-        // a body — so it costs a read, not a write.
+        // Changes nothing; a POST only because the dimensions travel in a body, so it costs a read.
         if !allowed(&org_id, &user_email.user_id, CONFIG, "GET").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
@@ -3034,19 +2751,14 @@ pub async fn preview_routing(
             Err(e) => return to_response(e),
         };
 
-        // Which rule the decision itself named, so "who lost" is computed
-        // against the winner the decision reported rather than against a
-        // second, independently re-derived one.
+        // From the decision itself, so "who lost" is measured against the winner it reported.
         let winning_rule_id = match &routed.decision {
             config::meta::oncall::RoutingDecision::Ownership { rule_id, .. } => {
                 Some(rule_id.clone())
             }
             _ => None,
         };
-        // The tester's other three questions: which ladder that team runs, who
-        // it would reach at this instant, and which rules matched and lost.
-        // A failure here costs the extra half, never the decision — the
-        // decision is what somebody opened this screen for.
+        // A failure here costs the context, never the decision this screen was opened for.
         let context = o2_enterprise::enterprise::oncall::insight::routing_context(
             &org_id,
             routed.team_id(),
@@ -3062,9 +2774,7 @@ pub async fn preview_routing(
             "decision": routed.decision,
             "team_id": routed.team_id(),
             "reason": routed.reason(),
-            // The one thing §4 says is worth surfacing, hoisted out of the
-            // tagged decision so a caller does not have to know the variant
-            // names to draw the "this is only covered by the fallback" badge.
+            // Hoisted out of the tagged decision, so no caller needs the variant names.
             "landed_on_default": routed.landed_on_default(),
             "notes": routed.notes,
             "ladder": context.as_ref().map(|c| &c.ladder),
@@ -3080,14 +2790,7 @@ pub async fn preview_routing(
     }
 }
 
-/// "Would a page to this team actually land?"
-///
-/// The reason this exists at all: a native OpenObserve user can be created
-/// with any string as an email, and root's address very often is not a mailbox
-/// anybody reads. Such a person can sit on a rotation for months while every
-/// page to them is silently lost. Every verdict here is computed — is this a
-/// user of this org, is SMTP configured, is there a verified method — never
-/// asserted, and nothing is sent to find out.
+/// A native user can hold any string as an email, so an unreachable person can sit on a rota.
 #[utoipa::path(
     get,
     path = "/{org_id}/oncall/teams/{team_id}/reachability",
@@ -3128,11 +2831,7 @@ pub async fn get_team_reachability(
     }
 }
 
-/// What is wrong with this team's paging setup, derived rather than stored.
-///
-/// Nothing here is persisted. A stored risk list goes stale the moment
-/// somebody fixes the thing it warns about, and then argues with the screen
-/// beside it.
+/// Derived, never persisted: a stored risk list goes stale as soon as somebody fixes it.
 #[utoipa::path(
     get,
     path = "/{org_id}/oncall/teams/{team_id}/config-risks",
@@ -3164,9 +2863,7 @@ pub async fn list_team_config_risks(
         if !allowed(&org_id, &user_email.user_id, CONFIG, "GET").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
-        // The coverage look-ahead is bounded harder than the history windows:
-        // past a month, "somebody will be missing" stops being news about the
-        // rota anybody is actually holding.
+        // Bounded harder than history windows: past a month it is not news about anybody's rota.
         let days = q
             .days
             .unwrap_or(insight::DEFAULT_LOOKBACK_DAYS)
@@ -3181,9 +2878,7 @@ pub async fn list_team_config_risks(
         )
         .await
         {
-            // `total` is what was found, `risks` is what fits in the page. A
-            // screen showing four problems needs to know whether there are
-            // twelve.
+            // `total` is what was found, `risks` what fits: four shown may be twelve found.
             Ok(found) => MetaHttpResponse::json(serde_json::json!({
                 "team_id": team_id,
                 "horizon_days": days,
@@ -3200,11 +2895,7 @@ pub async fn list_team_config_risks(
     }
 }
 
-/// The team screen's header in one call.
-///
-/// The seven-day figures are counted in the database. The team most in need of
-/// the summary is the one with the most rows, and loading every record of the
-/// week to tally them in Rust would make this slowest exactly where it matters.
+/// Counted in the database: the team most in need of the summary has the most rows.
 #[utoipa::path(
     get,
     path = "/{org_id}/oncall/teams/{team_id}/overview",
@@ -3250,11 +2941,7 @@ pub async fn get_team_overview(
     }
 }
 
-/// Who has been carrying this team, and who will be.
-///
-/// Two windows, deliberately: the pages and nights already taken are history,
-/// and the share of the shifts still to come is the thing anybody can still
-/// change. Both are bounded.
+/// Two bounded windows: what was carried is history, only the shifts ahead can change.
 #[utoipa::path(
     get,
     path = "/{org_id}/oncall/teams/{team_id}/load",
@@ -3298,13 +2985,7 @@ pub async fn get_team_load(
     }
 }
 
-/// "If a P1 fired right now, who would it reach?"
-///
-/// A dry run, and free of side effects by construction: it resolves the same
-/// rungs against the same schedule and the same covers a real firing would,
-/// and then stops. No record is opened, no page is sent, no timer is armed and
-/// no acknowledgement token is minted. `POST …/test-page` is the endpoint that
-/// actually delivers something; this one never does.
+/// A dry run: no record, page, timer or token; `POST …/test-page` is what delivers.
 #[utoipa::path(
     get,
     path = "/{org_id}/oncall/teams/{team_id}/escalation-preview",
@@ -3354,12 +3035,7 @@ pub async fn get_escalation_preview(
     }
 }
 
-/// The ownership rules with their usage beside them.
-///
-/// A sibling of `GET /oncall/ownership` rather than a widening of it: the
-/// counts cost a grouped read of the timeline, and the routing path's own list
-/// must stay the cheap read it is. Paged, because the number of `COUNT`s is
-/// bounded by the page and not by the size of the rule set.
+/// A sibling, not a widening: the counts cost a grouped read the routing path must not pay.
 #[utoipa::path(
     get,
     path = "/{org_id}/oncall/ownership/stats",
@@ -3398,8 +3074,7 @@ pub async fn list_ownership_rule_stats(
             .await
         {
             Ok(stats) => {
-                // The window and the page are echoed back so a client can tell
-                // "no rules matched" from "you asked past the last page".
+                // Echoed back so a client can tell "no rules matched" from "past the last page".
                 let mut body = serde_json::json!(stats);
                 if let Some(obj) = body.as_object_mut() {
                     obj.insert("days".to_string(), days.into());
@@ -3418,12 +3093,7 @@ pub async fn list_ownership_rule_stats(
     }
 }
 
-/// Serializes a queue entry with its own one-line summary beside it.
-///
-/// `describe()` is where the phrasing of "what fired, and what nobody claimed"
-/// already lives. Sending it means every reader of the queue says the same
-/// sentence, instead of each one reassembling it out of four optional fields
-/// and getting the empty-dimensions case subtly wrong.
+/// Sends `describe()`, so every reader of the queue says the same sentence.
 #[cfg(feature = "enterprise")]
 fn with_description(signal: &config::meta::oncall::UnroutedSignal) -> serde_json::Value {
     let mut value = serde_json::json!(signal);
@@ -3433,18 +3103,7 @@ fn with_description(signal: &config::meta::oncall::UnroutedSignal) -> serde_json
     value
 }
 
-/// The queue of signals that fired and that no team owned.
-///
-/// This is the surface that makes "nobody was paged" a state somebody can see.
-/// Without it the only trace was a log line on whichever node happened to
-/// evaluate the alert, which is indistinguishable from nothing having fired.
-///
-/// By default it returns the *outstanding* queue: dismissed entries are out,
-/// and so are entries that an ownership rule written since would now catch.
-/// That is what makes working the queue the same act as fixing it — add the
-/// missing rule and the entry stops being outstanding on its own, with nothing
-/// to tick off by hand. `include_dismissed=true` asks for the raw list
-/// instead, which is the historical record rather than the worklist.
+/// Defaults to the outstanding queue, so the missing rule clears an entry on its own.
 #[utoipa::path(
     get,
     path = "/{org_id}/oncall/unrouted",
@@ -3470,14 +3129,11 @@ pub async fn list_unrouted_signals(
     {
         use o2_enterprise::enterprise::oncall::routing;
 
-        // Configuration, not a page: the fix for an entry here is an ownership
-        // rule, and the people who write those are the people who read this.
+        // Configuration, not a page: the fix for an entry here is an ownership rule.
         if !allowed(&org_id, &user_email.user_id, CONFIG, "LIST").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
-        // Same clamp shape as `list_responses`. An org that has been paging
-        // into a hole for a week accumulates a lot of these, and this is a
-        // screen somebody opens expecting it to load.
+        // Same clamp as `list_responses`: a week of paging into a hole accumulates a lot.
         let limit = q.limit.unwrap_or(100).clamp(1, 200);
         let landing = q.landing();
         let result = if q.include_dismissed {
@@ -3499,12 +3155,7 @@ pub async fn list_unrouted_signals(
     }
 }
 
-/// Marks one queue entry handled.
-///
-/// The escape hatch for an entry no rule will ever cover — a one-off from a
-/// decommissioned cluster, say. It is a DELETE on the queue position, not on
-/// the row: dismissing stamps `dismissed_at` and leaves the record, because
-/// the evidence that a page fell through is worth more than a tidy table.
+/// A DELETE on the queue position, not the row: it stamps `dismissed_at` and keeps evidence.
 #[utoipa::path(
     delete,
     path = "/{org_id}/oncall/unrouted/{signal_id}",
@@ -3546,17 +3197,7 @@ pub async fn dismiss_unrouted_signal(
     }
 }
 
-/// Teams whose schedule would page nobody at a given instant.
-///
-/// An emptied rotation is reported at the moment it happens, but a warning
-/// nobody was looking at when it was logged is a warning nobody saw. This
-/// answers the same question on demand, which is what a standing banner on the
-/// team screen needs.
-///
-/// `total` is the honest count of teams with a gap; `teams` is that list cut
-/// to `limit`. A banner wants the number even when it only renders three
-/// names, and a truncated array that pretended to be the whole answer would
-/// undercount exactly the org most in trouble.
+/// `total` is honest and `teams` is cut to `limit`, or the worst-off org is undercounted.
 #[utoipa::path(
     get,
     path = "/{org_id}/oncall/coverage-gaps",
@@ -3582,9 +3223,7 @@ pub async fn list_coverage_gaps(
         if !allowed(&org_id, &user_email.user_id, CONFIG, "LIST").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
-        // Resolved here rather than left to the service so the response can
-        // say which instant it answered for. A banner that cannot name its own
-        // "as of" is unreadable the moment a shift changes under it.
+        // Resolved here so the response names its instant; a banner with no "as of" is unreadable.
         let at = q.at.unwrap_or_else(config::utils::time::now_micros);
         let limit = q.limit.unwrap_or(100).clamp(1, 200) as usize;
         match o2_enterprise::enterprise::oncall::service::teams_with_coverage_gaps(
@@ -3612,14 +3251,7 @@ pub async fn list_coverage_gaps(
     }
 }
 
-/// Every page this record actually attempted, per person and per channel.
-///
-/// The timeline deliberately leaves these out — a rung that paged eight people
-/// on two channels is one legible line to a responder and sixteen rows to the
-/// ledger — so "which channel did ana's page go out on, and did it arrive"
-/// needs its own read. It was answerable from the database and not from the
-/// product, which is the wrong way round for the one fact a paging system
-/// exists to be able to state.
+/// Its own read: the timeline collapses a rung that paged eight people into one line.
 #[utoipa::path(
     get,
     path = "/{org_id}/oncall/responses/{response_id}/deliveries",
@@ -3649,10 +3281,7 @@ pub async fn list_deliveries(
         if !allowed(&org_id, &user_email.user_id, RESPONSES, "LIST").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
-        // The ledger is keyed on the record alone, so the org has to be
-        // established here: without this a response id from another tenant
-        // would read straight through, and it carries their responders' email
-        // addresses.
+        // Keyed on the record alone, so another tenant's id would otherwise read straight through.
         match infra::table::oncall_responses::get(&org_id, &response_id).await {
             Ok(Some(_)) => {}
             Ok(None) => return MetaHttpResponse::not_found("Response not found"),
@@ -3662,9 +3291,7 @@ pub async fn list_deliveries(
         }
         let limit = q.limit.unwrap_or(100).clamp(1, 200);
         let offset = q.offset.unwrap_or(0);
-        // Both cut in the database. `total` is what the ledger holds and
-        // `deliveries` is what fits in the page: a screen showing a hundred
-        // attempts needs to know whether there were four hundred.
+        // `total` is what the ledger holds, `deliveries` what fits, both cut in the database.
         let total = match infra::table::oncall_responses::count_deliveries(&response_id).await {
             Ok(n) => n,
             Err(e) => return internal_error("count_deliveries", &e),
@@ -3688,18 +3315,7 @@ pub async fn list_deliveries(
 
 // ── Unavailability / holidays (`architecture/02` §5a) ─────────────────────────
 
-/// Whether the caller may record or withdraw this person's absences.
-///
-/// Your own, always. Somebody else's, only with the configuration permission.
-/// The split is the same one contact methods make, for the same reason: the
-/// common case is somebody entering their own leave, and gating that behind an
-/// administrator means the leave does not get entered and the page lands on a
-/// beach. Entering it *for* somebody — a team lead doing the rota — is a real
-/// workflow and is administrative, because an absence quietly takes a person
-/// out of every rotation they are on.
-///
-/// The route table gates the path on `oncall_responses`, which the model opens
-/// to any org member. This is the second, narrower lock behind it.
+/// Your own always, others only with the config permission: self-service must not need an admin.
 #[cfg(feature = "enterprise")]
 async fn may_touch_unavailability(org_id: &str, caller: &str, subject: &str, verb: &str) -> bool {
     if caller.eq_ignore_ascii_case(subject) {
@@ -3731,25 +3347,17 @@ pub async fn list_unavailability(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        // Whose absences are being read decides the lock, not the verb: a
-        // window over the whole org is a read of everybody's leave calendar,
-        // which is configuration.
         let subject = match q.user_email.as_deref() {
             Some(email) if !email.trim().is_empty() => email.trim().to_string(),
-            // No person named and no window either means "mine" — the personal
-            // view — rather than an unbounded read.
+            // No person and no window means "mine", rather than an unbounded read.
             _ if q.from.is_none() && q.to.is_none() => user_email.user_id.clone(),
             _ => String::new(),
         };
-        // Two locks, like the contact profiles: the outer one establishes that
-        // the caller belongs to the org, and the inner one that this is their
-        // own leave — or that they hold the configuration permission.
         if !allowed(&org_id, &user_email.user_id, RESPONSES, "LIST").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
         let permitted = if subject.is_empty() {
-            // An org-wide window is a read of everybody's leave calendar,
-            // which is configuration however narrow the dates are.
+            // An org-wide window reads everybody's leave calendar, which is configuration.
             allowed(&org_id, &user_email.user_id, CONFIG, "LIST").await
         } else {
             may_touch_unavailability(&org_id, &user_email.user_id, &subject, "LIST").await
@@ -3814,10 +3422,7 @@ pub async fn create_unavailability(
             body.start_at,
             body.end_at,
             body.reason,
-            // Who recorded it, taken from the caller rather than the body:
-            // "who entered this" is not something a client gets to assert, and
-            // it is the difference between somebody booking their own leave and
-            // somebody having it booked for them.
+            // From the caller, not the body: booking your own leave differs from having it booked.
             &user_email.user_id,
             config::utils::time::now_micros(),
         )
@@ -3860,9 +3465,7 @@ pub async fn delete_unavailability(
         if !allowed(&org_id, &user_email.user_id, RESPONSES, "DELETE").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
-        // Read before the inner lock, to learn whose absence it is:
-        // withdrawing your own is self-service and withdrawing somebody else's
-        // is not, and after the row is gone there is nothing left to ask.
+        // Read before the inner lock: once the row is gone, whose absence it was is unanswerable.
         let existing = match o2_enterprise::enterprise::oncall::service::get_unavailability(
             &org_id,
             &unavailability_id,
@@ -3884,9 +3487,7 @@ pub async fn delete_unavailability(
         )
         .await
         {
-            // Reported rather than silently 200: withdrawing an absence that
-            // is not there means somebody is looking at a stale screen, and
-            // the difference matters when the answer decides who gets woken.
+            // Reported, not silently 200: withdrawing a missing absence means a stale screen.
             Ok(true) => MetaHttpResponse::json(serde_json::json!({ "deleted": true })),
             Ok(false) => MetaHttpResponse::not_found("unavailability not found"),
             Err(e) => to_response(e),
@@ -3901,32 +3502,17 @@ pub async fn delete_unavailability(
 
 // ── Contact profiles (U27, `architecture/03` §5) ──────────────────────────────
 
-/// Whether the caller may read or write this person's contact methods.
-///
-/// Your own, always. Somebody else's, only with the configuration permission —
-/// an administrator setting up a team is a real workflow, and so is one reading
-/// the phone numbers of an entire org, which is why it is not open to everyone.
-///
-/// The route table gates this path on `oncall_responses`, which the model opens
-/// to any org member; that is deliberate, because self-service is the common
-/// case. This is the second, narrower lock behind it.
+/// Your own always, others only with the config permission: a whole org's numbers are not open.
 #[cfg(feature = "enterprise")]
 async fn may_touch_contacts(org_id: &str, caller: &str, subject: &str, verb: &str) -> bool {
-    // Addresses are compared case-insensitively: a login is not case-sensitive
-    // in practice, and "ana@o2.ai" being refused their own profile because a
-    // link said "Ana@o2.ai" is an infuriating way to lose a phone number.
+    // Case-insensitive: a login is not case-sensitive, and a refusal here loses a phone number.
     if caller.eq_ignore_ascii_case(subject) {
         return true;
     }
     allowed(org_id, caller, CONFIG, verb).await
 }
 
-/// Serializes a profile with the facts a screen has to state out loud.
-///
-/// `unverified` is the point of it. Somebody who typed a number in and saw it
-/// saved reasonably believes they will be phoned; until a transport can prove
-/// the handset, they will not be, and the profile has to say so rather than
-/// let them find out by not being woken.
+/// `unverified` is the point: somebody who saved a number must not learn otherwise at 3am.
 #[cfg(feature = "enterprise")]
 fn contact_body(contact: &config::meta::oncall::Contact) -> serde_json::Value {
     let mut value = serde_json::json!(contact);
@@ -3973,9 +3559,7 @@ pub async fn get_contact(
             return MetaHttpResponse::forbidden("Forbidden");
         }
         match infra::table::oncall_user_contacts::get(&org_id, &subject_email).await {
-            // An empty profile rather than a 404. "This person has no phone" is
-            // a complete answer, and making every caller branch on a missing
-            // row is how a profile screen ends up rendering nothing at all.
+            // An empty profile, not a 404: the branch a 404 forces is one that renders nothing.
             Ok(found) => {
                 MetaHttpResponse::json(contact_body(&found.unwrap_or_else(|| {
                     config::meta::oncall::Contact::empty(&org_id, &subject_email)
@@ -3991,14 +3575,7 @@ pub async fn get_contact(
     }
 }
 
-/// Sets or clears one person's contact methods.
-///
-/// **No SMS or voice is sent from here, and none can be.** Those transports are
-/// out of scope for this release, so nothing can complete a verification and
-/// every number saved lands unverified. That is the intended state, not a gap:
-/// the column exists now so the transport that arrives later has something to
-/// refuse on, rather than inheriting a table full of unproven numbers it treats
-/// as addresses.
+/// No SMS or voice transport exists yet, so every number saved here lands unverified.
 #[utoipa::path(
     put,
     path = "/{org_id}/oncall/contacts/{user_email}",
@@ -4031,9 +3608,7 @@ pub async fn set_contact(
         {
             return MetaHttpResponse::forbidden("Forbidden");
         }
-        // An empty string clears, exactly as it does for `oncall_team` on an
-        // alert: that is how a form clears a text input, and a stored "" would
-        // look like a number to anything reading the column.
+        // An empty string clears: a stored "" would look like a number to anything reading it.
         let phone = match body.phone {
             None => None,
             Some(None) => Some(None),
@@ -4097,9 +3672,7 @@ pub async fn delete_contact(
             return MetaHttpResponse::forbidden("Forbidden");
         }
         match infra::table::oncall_user_contacts::delete(&org_id, &subject_email).await {
-            // Reported rather than silently 200: deleting a profile that is not
-            // there means somebody is looking at a stale screen, and email —
-            // which is their login — keeps working either way.
+            // Reported, not silently 200: deleting a missing profile means a stale screen.
             Ok(deleted) => MetaHttpResponse::json(serde_json::json!({ "deleted": deleted })),
             Err(e) => internal_error("delete_contact", &e),
         }
@@ -4113,13 +3686,7 @@ pub async fn delete_contact(
 
 // ── The responder's own inbox (U25) ───────────────────────────────────────────
 
-/// "What was I sent last night, and did any of it arrive?"
-///
-/// The per-record ledger already answers "who did THIS page reach". It cannot
-/// answer this one without fetching every record in the org, which is the shape
-/// of read `list_responses` had to be fixed for. Keyed on the caller, bounded,
-/// and paginated, with `total` and `unread` beside the page so a badge never
-/// has to walk it.
+/// Keyed on the caller and paginated, with `total` and `unread` so a badge never walks it.
 #[utoipa::path(
     get,
     path = "/{org_id}/oncall/my/deliveries",
@@ -4150,8 +3717,7 @@ pub async fn list_my_deliveries(
         if !allowed(&org_id, &user_email.user_id, RESPONSES, "LIST").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
-        // The caller, never a parameter. An inbox is the one read where "whose"
-        // must not be something a client gets to assert.
+        // The caller, never a parameter: an inbox's "whose" is not a client's to assert.
         let me = &user_email.user_id;
         let filter = oncall_deliveries::InboxQuery {
             unread_only: q.unread_only,
@@ -4168,10 +3734,7 @@ pub async fn list_my_deliveries(
                 return internal_error("list_my_deliveries", &e);
             }
         };
-        // Two counts, both honest: `total` is what the filter matches, `unread`
-        // is what the badge shows and is deliberately NOT affected by the
-        // window — "3 unread" must not change because somebody scrolled to
-        // last Tuesday.
+        // `unread` ignores the window: "3 unread" must not change on scrolling to last Tuesday.
         let total = oncall_deliveries::count_for_user(&org_id, me, &filter)
             .await
             .unwrap_or(rows.len() as u64);
@@ -4223,9 +3786,7 @@ pub async fn mark_deliveries_read(
         let me = &user_email.user_id;
         let now = config::utils::time::now_micros();
 
-        // Same bound as every list on this surface, applied to a write. An
-        // unbounded id list is an unbounded number of round trips, sent by a
-        // client that thought it was being helpful.
+        // Same bound as every list here, on a write: an unbounded id list is unbounded round trips.
         const MAX_IDS: usize = 200;
         if body.event_ids.len() > MAX_IDS {
             return MetaHttpResponse::bad_request(format!(
@@ -4234,17 +3795,13 @@ pub async fn mark_deliveries_read(
         }
 
         let result = if body.all && body.read {
-            // "Clear my inbox", bounded server-side: the natural implementation
-            // is an unbounded UPDATE, and the natural consequence is a lock
-            // held across somebody's entire paging history.
+            // Bounded: an unbounded UPDATE holds a lock across a whole paging history.
             oncall_deliveries::mark_all_read(&org_id, me, 1_000, now).await
         } else {
             oncall_deliveries::set_read(&org_id, me, &body.event_ids, body.read, now).await
         };
         match result {
-            // The unread count travels back, so a badge is correct without a
-            // second request — and correct even when some ids named rows that
-            // were already read, or were never the caller's to read.
+            // The unread count travels back, so a badge is right without a second request.
             Ok(updated) => {
                 let unread = oncall_deliveries::unread_count(&org_id, me)
                     .await
@@ -4266,12 +3823,7 @@ pub async fn mark_deliveries_read(
 
 // ── "Which teams am I on, and am I on call?" ──────────────────────────────────
 
-/// One request instead of N+1.
-///
-/// Answering this needed a team list, then a membership read per team, then a
-/// who-is-on-call read per team. The first two are one join; the third is the
-/// only part that has to be done per team, and it is done here rather than
-/// across the network.
+/// One request instead of N+1: only the per-team schedule read cannot be folded into a join.
 #[utoipa::path(
     get,
     path = "/{org_id}/oncall/my/teams",
@@ -4305,10 +3857,7 @@ pub async fn list_my_teams(
             }
         };
 
-        // Resolved concurrently: each team is an independent schedule read, and
-        // awaited one at a time the latency of this screen grew with the number
-        // of teams somebody belongs to. `join_all` yields in input order, so the
-        // list stays in whatever order the membership read produced.
+        // Concurrent, or latency grows with team count; `join_all` keeps the input order.
         let resolutions = futures::future::join_all(teams.iter().map(|team| {
             o2_enterprise::enterprise::oncall::service::who_is_on_call(&org_id, &team.id, Some(at))
         }))
@@ -4317,10 +3866,7 @@ pub async fn list_my_teams(
         let mut out = Vec::with_capacity(teams.len());
         let mut on_call_anywhere = false;
         for (team, slots) in teams.into_iter().zip(resolutions) {
-            // A schedule that cannot be resolved must not read as "you are not
-            // on call". It reads as unknown, because telling somebody they are
-            // off duty when the truth is that we could not work it out is the
-            // one answer this endpoint must never give.
+            // An unresolvable schedule reads as unknown; "not on call" must never be a guess.
             let (on_call_now, whos_on_call, resolved) = match slots {
                 Ok(slots) => {
                     let mine = slots.iter().any(|s| s.user_email.eq_ignore_ascii_case(me));
@@ -4359,12 +3905,7 @@ pub async fn list_my_teams(
 
 // ── Cause analytics (U26) ─────────────────────────────────────────────────────
 
-/// "What keeps breaking us?" — counts per cause for a team or a whole org.
-///
-/// `prior_causes` answers the same question about one subject, mid-page.
-/// This is the org-level version, and it is the one that has to be careful:
-/// the org with the most to learn from it is the org with the most rows, so the
-/// counting happens in the database rather than by loading every record.
+/// Counted in the database: the org with most to learn from this has the most rows.
 #[utoipa::path(
     get,
     path = "/{org_id}/oncall/analytics/causes",
@@ -4407,9 +3948,7 @@ pub async fn cause_analytics(
         .await
         {
             Ok(causes) => {
-                // `total` is the sum of what was counted, not a second query:
-                // a percentage computed against a different read of the table
-                // would not add up to 100 and would be blamed on the maths.
+                // Summed from what was counted: a second read would not add up to 100.
                 let total: i64 = causes.iter().map(|c| c.count).sum();
                 MetaHttpResponse::json(serde_json::json!({
                     "from": from,
@@ -4429,12 +3968,7 @@ pub async fn cause_analytics(
     }
 }
 
-/// Resolves and bounds an analytics window.
-///
-/// Defaults to the last 30 days, and refuses more than a year in one request.
-/// The cap is not arithmetic squeamishness: this scans a table that grows with
-/// every page an org has ever taken, and "all time" is the query somebody runs
-/// once and then wonders why the API is slow.
+/// Capped at a year because this scans a table that grows with every page an org has ever taken.
 #[cfg(feature = "enterprise")]
 fn analytics_window(from: Option<i64>, to: Option<i64>) -> Result<(i64, i64), String> {
     const DAY: i64 = 86_400_000_000;
@@ -4451,17 +3985,7 @@ fn analytics_window(from: Option<i64>, to: Option<i64>) -> Result<(i64, i64), St
 
 // ── Promote a firing to an incident ───────────────────────────────────────────
 
-/// Makes an incident out of a page that turned out to be one.
-///
-/// `Response.incident_id` has existed since the beginning and could only ever be
-/// set by the path that opened the record. A responder who works a page for ten
-/// minutes and realises it is bigger than an alert had no way to say so, which
-/// meant the correlated view — the one thing an incident is for — was decided by
-/// a rule written weeks earlier and never revisable.
-///
-/// Idempotent by refusal, not by silence: a record already attached to an
-/// incident is a conflict naming that incident, so two responders clicking at
-/// once do not end up looking at two different incidents for one firing.
+/// Idempotent by refusal: an attached record is a conflict, so two clicks give one incident.
 #[utoipa::path(
     post,
     path = "/{org_id}/oncall/responses/{response_id}/promote",
@@ -4481,11 +4005,7 @@ fn analytics_window(from: Option<i64>, to: Option<i64>) -> Result<(i64, i64), St
         (status = 409, description = "Already an incident", content_type = "application/json", body = Object),
     ),
 )]
-/// Copies what the page knew onto the incident it became.
-///
-/// Best effort throughout: an incident that exists with a thin history is worth
-/// more than one rolled back because a timeline write failed. Every step logs
-/// and continues.
+/// Best effort: a thin history beats rolling the incident back over a timeline write.
 #[cfg(feature = "enterprise")]
 async fn carry_page_history_into_incident(
     org_id: &str,
@@ -4495,8 +4015,7 @@ async fn carry_page_history_into_incident(
 ) {
     use config::meta::{alerts::incidents::IncidentEvent, oncall::ResponseEventKind};
 
-    // One line naming the things a reader of the incident would otherwise have
-    // to open the page to learn. Written first so it heads the timeline.
+    // Written first so it heads the timeline.
     let team = infra::table::oncall_teams::get(org_id, record.team())
         .await
         .ok()
@@ -4509,8 +4028,7 @@ async fn carry_page_history_into_incident(
     );
     match (record.acked_by.as_deref(), record.acked_at) {
         (Some(who), _) => summary.push_str(&format!(", acknowledged by {who}")),
-        // Worth saying explicitly. "Nobody answered" is the reason a page most
-        // often becomes an incident, and its absence reads as "not recorded".
+        // Said explicitly, or its absence reads as "not recorded" rather than "nobody answered".
         (None, _) => summary.push_str(", never acknowledged"),
     }
     if let Some(cause) = record.cause.as_ref() {
@@ -4534,15 +4052,7 @@ async fn carry_page_history_into_incident(
         }
     };
 
-    // Notes and the agent's findings, in the order they were written. Pages,
-    // acks and system lines are deliberately left behind: they describe how the
-    // *page* was worked, and the incident has its own timeline for that. What a
-    // human typed, and what the AI SRE concluded, are the parts that carry.
-    // `AiVerdict`, not `Rca`. `Rca` is a variant no producer in either tree
-    // writes — the agent's findings land as `AiVerdict` (`escalation.rs`,
-    // `verdict_event`). Filtering on `Rca` made this loop's whole AI branch
-    // unreachable: notes carried, findings never did, and the prefix below was
-    // dead code.
+    // `AiVerdict`, not `Rca`: nothing writes `Rca`, so filtering on it makes this unreachable.
     for event in timeline.iter().filter(|e| {
         matches!(
             e.kind,
@@ -4565,12 +4075,7 @@ async fn carry_page_history_into_incident(
     }
 }
 
-/// The severity a promotion opens the incident at, with the record's own
-/// priority as a floor.
-///
-/// A promotion may raise the severity but must never lower what already woke
-/// somebody, so an `asked` value less urgent than the floor is discarded rather
-/// than refused — the caller asked for an incident and gets one.
+/// A promotion may raise the severity, never lower what woke somebody, so it is discarded.
 #[cfg(feature = "enterprise")]
 fn promoted_severity(
     priority: i32,
@@ -4584,10 +4089,7 @@ fn promoted_severity(
         3 => IncidentSeverity::P3,
         _ => IncidentSeverity::P4,
     };
-    // P1 is the *most* urgent rung, so "raise" means move to a smaller number.
-    // `IncidentSeverity` derives no `Ord`, which is why this ranks by hand
-    // rather than reaching for `min` — and why an `Ord` added to it later must
-    // not be assumed to run the same way round.
+    // Ranked by hand: `IncidentSeverity` has no `Ord`, and P1 is the most urgent, not the least.
     let rank = |s: IncidentSeverity| match s {
         IncidentSeverity::P1 => 1u8,
         IncidentSeverity::P2 => 2,
@@ -4621,9 +4123,7 @@ pub async fn promote_to_incident(
                 return internal_error("promote lookup", &e);
             }
         };
-        // Promotion opens an incident before it notes the record, so the team
-        // check cannot be inherited from `add_note` further down — a stranger
-        // would create the incident and only then be refused.
+        // Checked before the incident opens: `add_note`'s check comes too late for a stranger.
         if let Err(e) = o2_enterprise::enterprise::oncall::service::refuse_if_not_on_the_paged_team(
             &org_id,
             record.team(),
@@ -4657,20 +4157,13 @@ pub async fn promote_to_incident(
             .map(str::to_string)
             .or_else(|| record.title.clone());
 
-        // Isolated by its own subject rather than correlated by dimensions.
-        // A promotion is a human saying "this specific firing is an incident";
-        // folding it into whatever group a correlation rule would have chosen
-        // would silently attach it to somebody else's incident.
+        // Isolated by its own subject: a correlation rule would attach it to somebody else's.
         let group_values = serde_json::json!({
             "oncall_subject_type": record.subject.subject_type.as_str(),
             "oncall_source_id": record.subject.source_id,
             "oncall_response_id": record.id,
         });
-        // The incident and the record's link to it are written together. Two
-        // statements left an incident nothing pointed at when the second one
-        // failed, and the retry — reading a record the failure had left
-        // unpromoted — walked past the guard above and opened a second
-        // incident for the same firing.
+        // Written together: as two statements a failure leaves an incident nothing points at.
         let incident = match infra::table::alert_incidents::create_and_attach_to_oncall_response(
             &org_id,
             &response_id,
@@ -4683,8 +4176,7 @@ pub async fn promote_to_incident(
         .await
         {
             Ok(Some(i)) => i,
-            // Somebody promoted it between the guard above and this write,
-            // or the record has gone. Either way nothing was created.
+            // Promoted between the guard and this write, or gone; either way nothing was created.
             Ok(None) => {
                 return MetaHttpResponse::error(
                     StatusCode::CONFLICT.as_u16(),
@@ -4699,9 +4191,7 @@ pub async fn promote_to_incident(
         let mut updated = record.clone();
         updated.incident_id = Some(incident.id.clone());
 
-        // Link the alert in, so the incident screen shows what it was made of.
-        // Best effort: an incident that exists and is attached is worth more
-        // than one rolled back because a display join failed.
+        // Best effort: an attached incident beats rolling back over a failed display join.
         if record.subject.subject_type == config::meta::oncall::SubjectType::Alert
             && let Err(e) = infra::table::alert_incidents::add_alert_to_incident(
                 &incident.id,
@@ -4716,23 +4206,9 @@ pub async fn promote_to_incident(
             tracing::warn!("[oncall] promote link alert: {e}");
         }
 
-        // Carry the page's own record across.
-        //
-        // A promotion is the page saying "this is bigger than me" — and the
-        // incident becomes the system of record from that moment. An incident
-        // that opens empty makes the responder re-type what they already wrote,
-        // or worse, lose it: the notes, who was woken, who answered and what the
-        // ladder did all stayed on a page nobody opens again.
-        //
-        // Copied rather than linked, deliberately. This is an audit record of
-        // what was known *at the moment of promotion*, so it must not change
-        // afterwards — and the incident has to be readable on its own, without
-        // the reader knowing there is a page behind it.
+        // Copied, not linked: this is what was known at promotion and must not change after.
         carry_page_history_into_incident(&org_id, &response_id, &incident.id, &record).await;
 
-        // The timeline is how a page explains itself the next morning, and
-        // "this became an incident" is the single most important thing that can
-        // happen to one.
         if let Err(e) = o2_enterprise::enterprise::oncall::escalation::add_note(
             &org_id,
             &response_id,
@@ -4767,8 +4243,7 @@ mod tests {
         assert_eq!(r.description, None);
     }
 
-    /// An absent description leaves it alone; an explicit null clears it.
-    /// Collapsing the two would make it impossible to remove one.
+    /// Collapsing absent and explicit null would make a description impossible to remove.
     #[test]
     fn test_update_distinguishes_absent_from_null_description() {
         let absent: UpdateTeamRequest = serde_json::from_str(r#"{"name":"P"}"#).unwrap();
@@ -4781,8 +4256,6 @@ mod tests {
         assert_eq!(set.description, Some(Some("owns db".to_string())));
     }
 
-    /// One email or many, so a bulk add is one request and a single add still
-    /// works with the obvious payload.
     #[test]
     fn test_add_members_accepts_one_or_many() {
         let single: AddMembersRequest =
@@ -4807,10 +4280,7 @@ mod tests {
         assert!(r.rotations.is_empty());
     }
 
-    /// The §C.3 wire shape: the preset's own inputs sit flat beside the three
-    /// common fields, not nested under a key. A UI is being built against this
-    /// exact body, so it is worth a test that fails if the flattening is ever
-    /// tidied away.
+    /// The preset's inputs sit flat beside the common fields, and a UI is built on that shape.
     #[test]
     fn test_from_preset_body_reads_the_published_shape() {
         let body: FromPresetRequest = serde_json::from_str(
@@ -4830,8 +4300,7 @@ mod tests {
         assert_eq!(body.spec.members(), vec!["naoto@o2.ai", "lars@o2.ai"]);
     }
 
-    /// Everything but the preset and its groups is optional, so the smallest
-    /// body that means anything is accepted.
+    /// Everything but the preset and its groups is optional.
     #[test]
     fn test_from_preset_body_defaults_everything_optional() {
         let body: FromPresetRequest = serde_json::from_str(
@@ -4845,24 +4314,13 @@ mod tests {
         assert_eq!(body.anchor_micros, None);
     }
 
-    /// An unknown preset id is a decode failure, not a silent fallback to one
-    /// of the four.
+    /// An unknown preset id is a decode failure, not a silent fallback to one of the four.
     #[test]
     fn test_an_unknown_preset_is_refused() {
         assert!(serde_json::from_str::<FromPresetRequest>(r#"{"preset":"round_robin"}"#).is_err());
     }
 
-    /// Every session-authenticated handler must gate itself.
-    ///
-    /// This module once had zero authorization calls in it, and because the
-    /// generic middleware denies a resource it does not recognise, the result
-    /// was not an open door but a closed one: every non-root user got a 403 on
-    /// every on-call path. Reading our own source is blunt, but it is the only
-    /// thing that catches a handler added later without a gate — the failure
-    /// mode is silent until somebody who is not root tries to use it.
-    /// The dependent's verb carries nothing but an optional note: the cause is
-    /// the owner team's to record, and accepting one here would let a dependent
-    /// write the reason somebody else's service broke.
+    /// Accepting a cause here would let a dependent write the reason somebody else's service broke.
     #[test]
     fn test_confirm_recovery_takes_a_note_and_nothing_else() {
         let body: ConfirmRecoveryRequest = serde_json::from_str("{}").unwrap();
@@ -4870,15 +4328,13 @@ mod tests {
         let body: ConfirmRecoveryRequest =
             serde_json::from_str(r#"{"note":"buffered writes replayed"}"#).unwrap();
         assert_eq!(body.note.as_deref(), Some("buffered writes replayed"));
-        // Anything else is ignored rather than refused, which is how every
-        // other body in this module behaves.
+        // Ignored rather than refused, which is how every other body in this module behaves.
         let body: ConfirmRecoveryRequest =
             serde_json::from_str(r#"{"cause":"genuine_defect"}"#).unwrap();
         assert_eq!(body.note, None);
     }
 
-    /// Pressing escalate needs no body at all. Somebody mid-incident reaching
-    /// for "wake more people" must not be stopped by a required field.
+    /// Somebody reaching for "wake more people" must not be stopped by a required field.
     #[test]
     fn test_escalate_body_is_entirely_optional() {
         let none: Option<EscalateRequest> = serde_json::from_str("null").unwrap();
@@ -4890,9 +4346,7 @@ mod tests {
         assert_eq!(with_note.note.as_deref(), Some("needs the db team"));
     }
 
-    /// A test page defaults to P2, not P1. P1's shipped ladder pages the
-    /// primary, the secondary and everyone on the schedule at once, which is a
-    /// lot of phones ringing for a test none of their owners asked for.
+    /// P1's ladder pages the whole schedule at once, which is a lot of phones for a test.
     #[test]
     fn test_a_test_page_defaults_to_the_priority_that_wakes_one_person() {
         let defaulted: TestPageRequest = serde_json::from_str("{}").unwrap();
@@ -4902,12 +4356,10 @@ mod tests {
         assert_eq!(explicit.priority, 1);
     }
 
+    /// Reading our own source is the only thing that catches a handler added later with no gate.
     #[test]
     fn test_every_session_handler_is_gated() {
-        // The two exemptions are the emailed acknowledgement link. It is served
-        // from `basic_routes` with no auth middleware and no session at all,
-        // because the whole point is a phone at 3am; its gate is the signed
-        // token verified inside the handler.
+        // Exempt: served from `basic_routes` with no session, gated by the token in the handler.
         const TOKEN_AUTHENTICATED: [&str; 2] = ["acknowledge", "ack_page"];
 
         let source = include_str!("mod.rs");
@@ -4956,9 +4408,7 @@ mod tests {
         assert_eq!(some.at, Some(1_700_000_000_000_000));
     }
 
-    /// The queue defaults to the worklist, not to the archive. A caller that
-    /// asks for nothing must get the entries somebody still has to act on, or
-    /// a badge built on this endpoint counts dismissed history forever.
+    /// The queue defaults to the worklist, or a badge built on it counts dismissed history forever.
     #[test]
     fn test_unrouted_query_defaults_to_outstanding() {
         let bare: UnroutedQuery = serde_json::from_str("{}").unwrap();
@@ -4972,10 +4422,7 @@ mod tests {
         assert_eq!(all.limit, Some(25));
     }
 
-    /// The queue now records two outcomes, and the filter is how "Assign next"
-    /// asks for one of them. An unrecognised value widens rather than refuses:
-    /// this is a worklist somebody opened to see what is broken, and a 400 is
-    /// the worst possible answer to that.
+    /// An unrecognised value widens: a 400 is the worst answer on a worklist somebody opened.
     #[cfg(feature = "enterprise")]
     #[test]
     fn test_unrouted_landing_filter_parses_and_never_refuses() {
@@ -4994,9 +4441,7 @@ mod tests {
         }
     }
 
-    /// Clearing the default team has to be expressible. Both an explicit null
-    /// and an empty body mean "no default", because the body states the whole
-    /// configuration and the configuration is one field.
+    /// Explicit null and an empty body both mean "no default": the body is one whole field.
     #[test]
     fn test_setting_the_default_team_can_also_clear_it() {
         let set: SetRoutingConfigRequest =
@@ -5009,8 +4454,7 @@ mod tests {
         }
     }
 
-    /// The preview has to see the level-1 source, or "test routing" reports a
-    /// team the real page would not go to — which is worse than no preview.
+    /// Without the level-1 source, "test routing" names a team the real page would not use.
     #[test]
     fn test_preview_accepts_the_level_one_source() {
         let full: PreviewRoutingRequest =
@@ -5024,8 +4468,7 @@ mod tests {
         assert!(bare.dimensions.is_empty());
     }
 
-    /// Every list on this surface is bounded the same way, because the bug
-    /// that made it necessary was 473 records in one body.
+    /// Every list here is bounded the same way, after a bug that put 473 records in one body.
     #[test]
     fn test_list_bounds_are_clamped() {
         let clamp = |limit: Option<u64>| limit.unwrap_or(100).clamp(1, 200);
@@ -5058,7 +4501,6 @@ mod tests {
         assert_eq!(paged.offset, Some(40));
     }
 
-    /// The four filters that made three "Related & past" panels impossible.
     /// All optional, so the bare call still answers the home screen.
     #[test]
     fn test_response_filters_are_all_optional() {
@@ -5082,10 +4524,7 @@ mod tests {
         assert_eq!(full.offset, Some(50));
     }
 
-    /// A cause filter is refused when it is not a cause, unlike the unrouted
-    /// queue's `landing`, which widens. The difference is what a wrong answer
-    /// says: a silently-ignored `cause=noisy_treshold` returns every record in
-    /// the org and reads as "we have never had a noisy threshold".
+    /// Refused, not widened: ignoring `cause=noisy_treshold` returns every record instead.
     #[cfg(feature = "enterprise")]
     #[test]
     fn test_an_unknown_cause_is_not_silently_ignored() {
@@ -5118,9 +4557,7 @@ mod tests {
         assert_eq!(parse_subject_type("dashboard"), None);
     }
 
-    /// Absent leaves a contact method alone; explicit `null` removes it.
-    /// Collapsing the two means a screen that does not render push tokens
-    /// erases one every time somebody saves a phone number.
+    /// Collapsing absent and `null` means a screen omitting push tokens erases one on save.
     #[test]
     fn test_contact_body_distinguishes_absent_from_null() {
         let absent: SetContactRequest = serde_json::from_str(r#"{"phone":"+15550100"}"#).unwrap();
@@ -5135,9 +4572,7 @@ mod tests {
         assert_eq!(nothing.phone, None);
     }
 
-    /// The one thing this release must not do: imply that a saved number will
-    /// be dialled. No SMS or voice transport exists yet, so every number lands
-    /// unverified and the body has to say so in a field a UI can read.
+    /// No SMS or voice transport exists yet, so the body must say a number is unverified.
     #[cfg(feature = "enterprise")]
     #[test]
     fn test_a_saved_number_is_reported_as_unverified() {
@@ -5161,9 +4596,7 @@ mod tests {
         assert_eq!(body["unverified"].as_array().unwrap().len(), 0);
     }
 
-    /// An empty profile is a complete answer. Returning 404 for "this person
-    /// has no phone" makes every caller write a branch, and the branch they
-    /// write renders nothing at all.
+    /// An empty profile is a complete answer; the branch a 404 forces renders nothing.
     #[cfg(feature = "enterprise")]
     #[test]
     fn test_a_person_with_no_profile_still_has_a_body() {
@@ -5187,9 +4620,7 @@ mod tests {
         assert_eq!(badge.limit, Some(1));
     }
 
-    /// Marking read is the default, because that is what a list scrolling past
-    /// a row means. Unmarking has to be expressible — a responder who
-    /// dismissed something by accident at 3am must be able to undo it.
+    /// Unmarking must be expressible: a 3am dismissal by accident has to be undoable.
     #[test]
     fn test_marking_read_defaults_to_read() {
         let ids: MarkReadRequest =
@@ -5208,8 +4639,7 @@ mod tests {
         assert!(clear.event_ids.is_empty());
     }
 
-    /// Defaults to the last 30 days and refuses "all time". This scans a table
-    /// that grows with every page an org has ever taken.
+    /// Refuses "all time": this scans a table that grows with every page an org has taken.
     #[cfg(feature = "enterprise")]
     #[test]
     fn test_the_analytics_window_defaults_and_is_capped() {
@@ -5236,23 +4666,10 @@ mod tests {
             analytics_window(Some(to - 400 * DAY), Some(to)).is_err(),
             "an unbounded scan is not a default anybody chose"
         );
-        // No bounds at all still answers, because "what keeps breaking us"
-        // has an obvious meaning for "lately".
         assert!(analytics_window(None, None).is_ok());
     }
 
-    /// A promotion must never lower the severity that already woke somebody,
-    /// so an absent `severity` derives it from the record's own priority.
-    /// What a promotion must carry across, expressed as the filter that decides
-    /// it — the copying itself needs a database, but the *choice* of what
-    /// travels is the part worth pinning.
-    ///
-    /// Notes and the agent's findings carry: they are what a human wrote and
-    /// what the analysis concluded, and the incident becomes the system of
-    /// record the moment it exists. Pages, acks, handoffs and system lines stay
-    /// behind: they describe how the *page* was worked, and the incident keeps
-    /// its own timeline of how the incident is worked. Copying those would
-    /// produce two timelines telling the same story in different words.
+    /// Copying pages and acks too would give the incident two timelines for one story.
     #[test]
     fn test_only_what_a_human_wrote_carries_into_the_incident() {
         use config::meta::oncall::ResponseEventKind as K;
@@ -5261,10 +4678,7 @@ mod tests {
             |kind: K, body: &str| matches!(kind, K::Note | K::AiVerdict) && !body.trim().is_empty();
 
         assert!(carries(K::Note, "rolled back checkout 4.2.1"));
-        // `AiVerdict` is the kind the agent actually writes. This test named
-        // `Rca` when it was first written and passed, because it asserted
-        // against the same filter it was testing rather than against a kind
-        // some producer emits — so the AI branch was dead and green.
+        // `AiVerdict` is what the agent writes; asserting `Rca` passes with the branch dead.
         assert!(carries(K::AiVerdict, "probable cause: the deploy at 14:02"));
         assert!(
             !carries(K::Rca, "anything"),
@@ -5277,8 +4691,7 @@ mod tests {
         assert!(!carries(K::Sys, "nothing could be delivered to this rung"));
         assert!(!carries(K::Exhausted, "escalation ladder exhausted"));
 
-        // An empty note is not a note. Copying it would put a blank comment on
-        // the incident with somebody's name against it.
+        // Copying an empty note puts a blank comment on the incident with a name against it.
         assert!(!carries(K::Note, "   "));
     }
 
@@ -5294,8 +4707,7 @@ mod tests {
         assert_eq!(full.severity.as_deref(), Some("P1"));
     }
 
-    /// The mapping the handler applies when no severity is asked for. P1..P5
-    /// is the alert scale; incidents stop at P4, so the two lowest collapse.
+    /// P1..P5 is the alert scale and incidents stop at P4, so the two lowest collapse.
     #[cfg(feature = "enterprise")]
     #[test]
     fn test_priority_derives_an_incident_severity() {
@@ -5312,9 +4724,7 @@ mod tests {
         );
     }
 
-    /// A severity in the body is a ceiling-raiser, never a downgrade. The
-    /// handler used to take it as given, so `{"severity":"P4"}` turned a P1
-    /// page into a P4 incident and quietly un-did the thing that woke somebody.
+    /// Raises only: taken as given, `{"severity":"P4"}` turns a P1 page into a P4 incident.
     #[cfg(feature = "enterprise")]
     #[test]
     fn test_a_promotion_cannot_downgrade_what_already_woke_somebody() {
@@ -5338,16 +4748,14 @@ mod tests {
             promoted_severity(3, Some(IncidentSeverity::P3)),
             IncidentSeverity::P3
         );
-        // P5 has no incident severity of its own, so its floor is P4 and there
-        // is nothing left for a body to lower.
+        // P5 has no incident severity, so its floor is P4 and there is nothing left to lower.
         assert_eq!(
             promoted_severity(5, Some(IncidentSeverity::P4)),
             IncidentSeverity::P4
         );
     }
 
-    /// Your own profile, always. Somebody else's, only with the configuration
-    /// permission — and an address that differs only in case is still yours.
+    /// An address that differs only in case is still your own profile.
     #[cfg(feature = "enterprise")]
     #[test]
     fn test_a_person_always_owns_their_own_profile() {
@@ -5360,9 +4768,7 @@ mod tests {
         assert!(!same("ana@o2.ai", "bo@o2.ai"));
     }
 
-    /// The summary travels beside the row rather than replacing it: the UI
-    /// gets one agreed sentence AND the structured fields it needs to offer
-    /// "make a rule out of this".
+    /// The summary travels beside the row, never replacing the fields a rule is built from.
     #[cfg(feature = "enterprise")]
     #[test]
     fn test_unrouted_row_carries_both_its_fields_and_its_sentence() {
@@ -5397,9 +4803,7 @@ mod tests {
             "the list row must say exactly what describe() says"
         );
 
-        // The "Assign next" surface reads this field to tell a gap that is
-        // waking somebody from a gap that is waking nobody, so it has to reach
-        // the wire — and the sentence beside it has to agree with it.
+        // Separates a gap waking somebody from one waking nobody, so it must reach the wire.
         let defaulted = config::meta::oncall::UnroutedSignal {
             defaulted_team_id: Some("team_platform".to_string()),
             ..signal
@@ -5425,9 +4829,7 @@ mod tests {
         assert_eq!(asked.limit, Some(10));
     }
 
-    /// The dry run defaults to P1 rather than refusing: somebody opening
-    /// "would a page land" is nearly always asking about the ladder that
-    /// wakes people at 3am.
+    /// Defaults to P1, the ladder somebody asking "would a page land" actually means.
     #[test]
     fn test_the_escalation_preview_defaults_to_p1() {
         let bare: EscalationPreviewQuery = serde_json::from_str("{}").unwrap();
@@ -5456,26 +4858,18 @@ mod tests {
         assert_eq!(asked.offset, Some(10));
     }
 
-    /// Every bound this surface promises, asserted where the clamp is written
-    /// rather than trusted to a comment. These are `COUNT`s over the delivery
-    /// ledger, which is the only on-call table with no upper bound on its
-    /// size.
+    /// These are `COUNT`s over the delivery ledger, the only table with no upper bound.
     #[test]
     fn test_every_new_read_is_bounded() {
-        // config-risks: coverage look-ahead, and the page of risks.
         assert_eq!(7i64.clamp(1, 31), 7);
         assert_eq!(365i64.clamp(1, 31), 31);
         assert_eq!(0i64.clamp(1, 31), 1);
-        // limits, shared by config-risks and ownership/stats.
         assert_eq!(50u64.clamp(1, 200), 50);
         assert_eq!(10_000u64.clamp(1, 200), 200);
         assert_eq!(0u64.clamp(1, 200), 1);
     }
 
-    /// The pages table has to render five things per row without a second
-    /// call each: when it opened, what fired, who answered, how long they
-    /// took and how far it climbed. The first three are fields on the record;
-    /// this pins the arithmetic behind the fourth.
+    /// Pins the arithmetic the pages table needs per row without a second call each.
     #[cfg(feature = "enterprise")]
     #[test]
     fn test_time_to_ack_is_never_negative_and_is_absent_when_unanswered() {
@@ -5507,8 +4901,7 @@ mod tests {
         };
         assert_eq!(base.acked_at.unwrap() - base.opened_at, 3_000);
 
-        // A clock that went backwards between two nodes must not produce a
-        // negative duration on a screen.
+        // A clock that went backwards between nodes must not show a negative duration.
         let skewed = Response {
             acked_at: Some(500),
             ..base.clone()
@@ -5526,9 +4919,7 @@ mod tests {
         );
     }
 
-    /// A cover body written before slots existed still parses, and still means
-    /// the default slot. The UI sends the field only when a team runs more
-    /// than one pool.
+    /// A cover body with no rotation still parses and still means the primary.
     #[test]
     fn test_a_cover_body_without_a_rotation_still_parses() {
         let body: CreateOverrideRequest =
@@ -5543,8 +4934,7 @@ mod tests {
         assert_eq!(named.rotation_id.as_deref(), Some("Secondary"));
     }
 
-    /// The grid is drawn one rotation at a time; omitting the parameter draws
-    /// the primary, which is the row a calendar opens on.
+    /// Omitting the rotation draws the primary, which is the row a calendar opens on.
     #[test]
     fn test_the_resolved_schedule_rotation_is_optional() {
         let q: ResolvedScheduleQuery = serde_json::from_str(r#"{"from":1,"to":2}"#).unwrap();
@@ -5554,9 +4944,7 @@ mod tests {
         assert_eq!(q.rotation_id.as_deref(), Some("rot_2"));
     }
 
-    /// "I am away" is the common case, and it must not require the caller to
-    /// name themselves — the handler fills that in from the session, so a
-    /// client cannot record somebody else's leave by leaving a field out.
+    /// The handler fills the email from the session, so omitting it cannot book another's leave.
     #[test]
     fn test_an_absence_body_defaults_to_the_caller() {
         let body: CreateUnavailabilityRequest =
@@ -5572,9 +4960,7 @@ mod tests {
         assert_eq!(for_somebody_else.reason.as_deref(), Some("annual leave"));
     }
 
-    /// Every field of the absence query is optional on the wire; which
-    /// combinations are answerable is the service layer's decision, stated
-    /// once there rather than half here and half there.
+    /// Optional on the wire; which combinations answer is the service layer's decision.
     #[test]
     fn test_the_absence_query_is_entirely_optional() {
         let q: UnavailabilityQuery = serde_json::from_str("{}").unwrap();

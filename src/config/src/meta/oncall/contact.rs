@@ -13,20 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! How to reach one person — `architecture/03` §5.
-//!
-//! The rule the whole design rests on: **send over whatever the person has,
-//! and email always exists, because it is their login.** Everything here is
-//! therefore optional. A missing phone narrows the chain for one person; it is
-//! never an error, never an onboarding blocker, and never a reason a page
-//! fails to go out.
-//!
-//! Verification is the one piece of rigour. SMS and voice transports are out
-//! of scope for this release, so nothing can complete a verification yet — and
-//! that is exactly why `phone_verified_at` has to exist NOW. A number typed
-//! into a form is an unproven claim about which handset rings; a transport
-//! added later must be able to tell the difference, and a `None` here is what
-//! stops it paging a stranger who used to own that number.
+//! How to reach one person, all optional; `phone_verified_at` guards an unproven number.
 
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -127,8 +114,7 @@ pub fn normalize_phone(raw: &str) -> Result<String, ContactError> {
     if trimmed.is_empty() {
         return Err(ContactError::Invalid("phone is empty".to_string()));
     }
-    // Longest real E.164 is 15 digits; the slack is for spaces, brackets and
-    // an extension. Anything past it is a paste accident.
+    // Longest real E.164 is 15 digits; the slack is for spaces, brackets and an extension.
     if trimmed.chars().count() > 32 {
         return Err(ContactError::Invalid(
             "phone is longer than 32 characters".to_string(),

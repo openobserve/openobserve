@@ -13,12 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Ownership rules — which team owns which slice of the identity space — and
-//! the queue of signals that fell through them.
-//!
-//! The two live together because they are the same question answered twice:
-//! a rule says who owns a path, and an unrouted row says a path nobody owns
-//! just woke nobody.
+//! Ownership rules, and the queue of signals that fell through them — one question, twice.
 
 use std::{
     collections::HashMap,
@@ -161,9 +156,7 @@ pub async fn update(
         org_id: org_id.to_string(),
         team_id: team_id.to_string(),
         dimensions,
-        // Preserved: the rule is the same claim, repointed. Losing its age
-        // would reset every "this rule has never matched" judgement built on
-        // top of it.
+        // Preserved: the same claim, repointed, and losing its age resets every judgement on it.
         created_at: existing.created_at,
         updated_at: now,
     };
@@ -232,9 +225,7 @@ pub async fn delete(org_id: &str, id: &str) -> Result<bool, errors::Error> {
         .exec(client)
         .await?
         .rows_affected;
-    // Published whether or not a row went, for the same reason `delete_rule`
-    // publishes to the super-cluster whether or not one went: a node that still
-    // holds the rule is the one that needs the message.
+    // Published whether or not a row went: a node still holding the rule needs the message.
     invalidate_and_publish(org_id).await;
     Ok(deleted > 0)
 }
@@ -351,8 +342,7 @@ pub async fn record_unrouted(
         model.last_seen_at = Set(now);
         model.dismissed_at = Set(None);
         model.defaulted_team_id = Set(defaulted_team_id);
-        // Only overwrite the sample when this caller actually has one; a bare
-        // routing decision must not blank out what the last full page knew.
+        // Overwrite the sample only when this caller has one; a routing decision must not blank.
         if subject_type.is_some() {
             model.last_subject_type = Set(subject_type);
             model.last_source_id = Set(source_id);
@@ -379,8 +369,7 @@ pub async fn record_unrouted(
     };
     match model.insert(client).await {
         Ok(inserted) => Ok(to_unrouted(inserted)),
-        // Two nodes hit the same gap at the same instant. The unique index
-        // refuses the loser, whose signal is already recorded by the winner.
+        // Two nodes hit the same gap at once; the index refuses the loser, already recorded.
         Err(e) => match oncall_unrouted_signals::Entity::find()
             .filter(oncall_unrouted_signals::Column::OrgId.eq(org_id))
             .filter(oncall_unrouted_signals::Column::Path.eq(&path))

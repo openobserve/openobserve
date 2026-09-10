@@ -13,36 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Prometheus metrics for on-call paging and escalation.
-//!
-//! Everything else in the product can be judged after the fact from the data it
-//! wrote. Paging cannot: the question an operator asks about it is "did anybody
-//! actually get woken up", and the record's own timeline is not an answer,
-//! because the timeline is written by the same code path that would be broken.
-//! A page that reached nobody and a page nobody had to answer look identical
-//! from inside the product; from outside, one of them is a counter that stops
-//! moving.
-//!
-//! So the set below is chosen to make exactly the bad outcomes visible, rather
-//! than to describe the happy path in detail:
-//!
-//! * pages went out, and on which channel — the denominator for everything else;
-//! * deliveries failed — the numerator that says the channel is broken;
-//! * somebody acknowledged, and how long it took — MTTA, the number the on-call rotation is
-//!   actually managed by;
-//! * a ladder ran out of rungs with nobody acknowledging — the worst outcome the system has, and it
-//!   should be near zero;
-//! * a signal did not route to any team — a page that was never even attempted;
-//! * a rung resolved to nobody — the schedule has a hole, so the ladder advanced past a step that
-//!   notified no human.
-//!
-//! The last three are the ones with no other trace. A dropped signal writes no
-//! record at all, so if it is not counted here it did not happen as far as any
-//! dashboard is concerned.
-//!
-//! Emission lives at the call sites in the escalation engine; the helper
-//! functions below exist so those call sites stay one line and so the label
-//! vocabulary is decided once, here, instead of at seven different keyboards.
+//! On-call paging metrics — chosen to make bad outcomes visible; a dropped signal leaves no trace.
 
 use std::sync::LazyLock as Lazy;
 
@@ -205,9 +176,7 @@ pub static ONCALL_COVERAGE_GAPS: Lazy<IntCounterVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
-// ---------------------------------------------------------------------------
 // L0 — the agent's position in the ladder (07-agent-l0-architecture §8)
-// ---------------------------------------------------------------------------
 
 /// Verdicts the agent produced, by what it recommended and how sure it was.
 ///
@@ -431,13 +400,11 @@ pub fn l0_verdict_applied(org_id: &str, priority: &str, moved: &[crate::meta::on
             L0Metric::BudgetExpired => ONCALL_L0_BUDGET_EXPIRED
                 .with_label_values(&[org_id, priority])
                 .inc(),
-            // `from` then `to`, in that order: the pair is read as an arrow on
-            // every dashboard that uses it.
+            // `from` then `to`: the pair is read as an arrow on every dashboard that uses it.
             L0Metric::Promoted { from, to } => ONCALL_L0_PROMOTED
                 .with_label_values(&[org_id, from.as_str(), to.as_str()])
                 .inc(),
-            // The prompt-regression alarm. It is only worth anything while it
-            // sits at zero, so nothing but an attempted demotion may reach it.
+            // The alarm is only worth anything at zero, so only an attempted demotion reaches it.
             L0Metric::SeverityClamped => ONCALL_L0_SEVERITY_CLAMP
                 .with_label_values(&[org_id, priority])
                 .inc(),
@@ -453,9 +420,7 @@ pub fn l0_verdict_applied(org_id: &str, priority: &str, moved: &[crate::meta::on
 
 /// One acknowledged page, and whether the verdict beat the human to it.
 pub fn l0_verdict_before_first_ack(org_id: &str, priority: &str, verdict_first: bool) {
-    // Both arms recorded, because §8's headline number is a ratio and a ratio
-    // needs its denominator: only ever counting the flattering arm reads 100%
-    // forever.
+    // Both arms: §8's headline is a ratio, and the flattering arm alone reads 100% forever.
     let arm = if verdict_first { "yes" } else { "no" };
     ONCALL_L0_VERDICT_BEFORE_FIRST_ACK
         .with_label_values(&[org_id, priority, arm])
@@ -496,9 +461,7 @@ pub fn acknowledged(org_id: &str, priority: &str, time_to_ack_micros: Option<i64
     ONCALL_ACKNOWLEDGEMENTS
         .with_label_values(&[org_id, priority])
         .inc();
-    // A negative delta means the clocks disagree across nodes, not that somebody
-    // answered before they were paged. Recording it would drag MTTA down with a
-    // value that never happened, so it is dropped.
+    // A negative delta means the clocks disagree across nodes; recording it drags MTTA down.
     if let Some(micros) = time_to_ack_micros
         && micros >= 0
     {
@@ -554,8 +517,7 @@ mod tests {
             .into_iter()
             .map(|m| m.name().to_string())
             .collect();
-        // `gather` only emits families that have at least one child, so this
-        // asserts registration succeeded rather than counting series.
+        // `gather` only emits families with a child, so this asserts registration, not a count.
         assert!(names.len() <= 16, "unexpected extra families: {names:?}");
     }
 
@@ -623,9 +585,7 @@ mod tests {
             "a promotion did not move the prompt-regression alarm"
         );
 
-        // Suppressed and Downgraded carry identical label sets, so nothing but
-        // an explicit assertion distinguishes them — the same hazard as
-        // clamp-versus-promote, one variant further down the same match.
+        // Suppressed and Downgraded carry identical labels; only this assertion separates them.
         l0_verdict_applied("org_l0_s", "p3", &[L0Metric::Suppressed]);
         assert_eq!(
             ONCALL_L0_SUPPRESSED
@@ -663,9 +623,7 @@ mod tests {
             1
         );
 
-        // An empty list moves nothing at all — a Skipped analysis has nothing
-        // to count, and counting it as a zero-confidence verdict would poison
-        // the mix.
+        // An empty list moves nothing: a Skipped run as a zero-confidence verdict poisons the mix.
         l0_verdict_applied("org_l0_empty", "p1", &[]);
         assert_eq!(
             ONCALL_L0_VERDICTS
@@ -674,9 +632,7 @@ mod tests {
             0
         );
 
-        // §8's headline metric is a **ratio**, so its denominator has to exist.
-        // Labelling both arms the same way — or only ever recording the arm
-        // that flatters the feature — makes it read 100% forever.
+        // §8's headline is a ratio, so its denominator must exist or it reads 100% forever.
         l0_verdict_before_first_ack("org_l0", "p2", true);
         l0_verdict_before_first_ack("org_l0", "p2", false);
         l0_verdict_before_first_ack("org_l0", "p2", false);
@@ -820,8 +776,7 @@ mod tests {
                 .get(),
             1
         );
-        // A failure must not also count as a dispatch, or the ratio is 1.0 for
-        // a channel that delivered nothing.
+        // A failure must not also count as a dispatch, or a channel delivering nothing reads 1.0.
         assert_eq!(
             ONCALL_PAGES_DISPATCHED
                 .with_label_values(&["org_df", "p1", "email"])
@@ -901,9 +856,7 @@ mod tests {
                 .get(),
             1
         );
-        // The two counters are separate on purpose: a signal that reached the
-        // default team did page somebody, and must not inflate the count of
-        // pages that were never attempted.
+        // A signal reaching the default team did page somebody, so it is not never-attempted.
         assert_eq!(
             ONCALL_DEFAULTED_SIGNALS
                 .with_label_values(&["org_bad", "alert"])

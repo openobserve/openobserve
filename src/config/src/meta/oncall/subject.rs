@@ -13,17 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Subjects — the thing that paged a human.
-//!
-//! The response record is keyed by `(subject_type, subject_id)`, not by
-//! incident id. Incidents are only created when `alerts.creates_incident` is
-//! set; an alert, synthetic or anomaly that never creates one still pages
-//! somebody, and that person still needs a timeline, notes and a cause. An
-//! incident is therefore a *renderer* of a record rather than its owner.
-//!
-//! `subject_id` identifies one **firing**, not one rule. The same alert rule
-//! firing twice produces two records, so a cause recorded on the first is
-//! visible as history on the second.
+//! Subjects — a record is keyed by `(subject_type, subject_id)` on one *firing*, not by incident.
 
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -327,8 +317,7 @@ mod tests {
             "the scoped id must find its own record",
         );
 
-        // And the bare id keeps finding its own, so a single-team firing is
-        // unaffected by the fix.
+        // A bare id still matches only its own, so a single-team firing is unaffected.
         let single = SubjectRef::new(SubjectType::Alert, bare, 1).subject_id();
         assert!(single.starts_with(&format!("{bare}#")));
     }

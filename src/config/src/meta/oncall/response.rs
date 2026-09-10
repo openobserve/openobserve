@@ -13,12 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! The response record — what happened, for one firing.
-//!
-//! One record per subject firing, holding the lifecycle state and a timeline.
-//! It exists whether or not an incident was created, which is what lets
-//! acknowledgement, notes, handoff and cause work for plain alerts,
-//! synthetics and anomalies.
+//! The response record — one per subject firing, so notes and cause work without an incident.
 
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -660,13 +655,9 @@ impl Response {
             state: ResponseState::Triggered,
             acked_by: None,
             acked_at: None,
-            // A page being handed over is being looked at, so a snooze the
-            // previous owner set is theirs and ends with their ownership.
+            // A page handed over is being looked at, so the old owner's snooze ends with it.
             snoozed_until: None,
-            // A new run has rungs left to climb, so the previous run's
-            // exhaustion is history. Leaving it set would report the fresh
-            // ladder as spent before it had paged anybody — and, worse, stop
-            // the mid-rung guard from ever letting it dispatch.
+            // A new run has rungs left; a stale `exhausted_at` stops the mid-rung guard firing.
             exhausted_at: None,
             ladder_anchor: Some(now),
             ladder_run: Some(next_ladder_run(self.ladder_run)),
@@ -697,42 +688,7 @@ impl Response {
     }
 }
 
-// ── Flap dampening (G16) ─────────────────────────────────────────────────────
-//
-// A healthy evaluation resolves the record, and the next firing opens a new
-// one. That is right for a condition that broke, was fixed, and broke again a
-// week later — it is what makes the previous firing's cause show up as history
-// on the next. It is wrong for a condition that is merely *unstable*: an alert
-// on a one-minute frequency that fires, clears, fires, clears produces a full
-// page cycle per flap, wakes one responder all night, and fills the history
-// with one-minute records that each look like a separate incident.
-//
-// Two market shapes address this. Opsgenie has a **close delay** — hold the
-// record open for a few minutes after recovery, so a re-fire lands on the
-// record that is still there. PagerDuty has an **auto-resolve timeout** plus
-// alert grouping. Both amount to the same sentence: *do not treat a brief
-// recovery as the end of the firing*.
-//
-// We implement that sentence from the **firing** side, not the recovery side,
-// and the choice is deliberate. A close delay puts the dampening in the path
-// that closes records, which means every bug in it is a record that does not
-// close — and a page that will not go away is worse than a page that repeats.
-// It also needs a timer to do the closing, so a lost timer is a stuck page
-// too. Suppressing on the *re-fire* instead has the failure modes the other
-// way round: recovery still closes the record the instant the condition
-// clears, exactly as it does today and by exactly the same code, so a real
-// recovery cannot become a stuck page no matter what this function returns.
-// The worst this can do is delay a page by one window, and it is bounded
-// below by that window rather than unbounded.
-//
-// The window is measured from the previous record's `closed_at` — from the
-// recovery, not from the last flap. Debouncing (each flap pushing the window
-// out) would dampen a flap storm to a single page ever, and a condition that
-// flaps for six hours *is* an outage somebody has to be told about more than
-// once. Measuring from the close means a storm pages at most once per window
-// instead of once per evaluation, and never goes permanently silent. Silence
-// is the failure mode this feature exists to prevent; noise is the one it is
-// being asked to reduce, and they are not worth the same.
+// G16 dampens on the re-fire, not the close, and from `closed_at`: a bug delays, never sticks.
 
 /// How long after a record closes a re-fire of the same source counts as the
 /// same unstable firing rather than a new one.
@@ -787,10 +743,7 @@ pub fn page_decision(latest: Option<&Response>, now: i64, dampening_micros: i64)
     let Some(record) = latest else {
         return PageDecision::Page;
     };
-    // `closed_at` outranks the state. A record carrying a close instant with a
-    // non-terminal state is torn — a writer raced the close — and answering
-    // `AlreadyOpen` on it silences this source's every future firing, for ever,
-    // with no way back. Treating it as closed costs at worst one duplicate page.
+    // `closed_at` outranks the state: `AlreadyOpen` on a torn row silences this source for ever.
     if !record.state.is_terminal() && record.closed_at.is_none() {
         return PageDecision::AlreadyOpen;
     }
@@ -798,9 +751,7 @@ pub fn page_decision(latest: Option<&Response>, now: i64, dampening_micros: i64)
         return PageDecision::Page;
     }
     let Some(closed_at) = record.closed_at else {
-        // Terminal without a close instant is a row this code cannot reason
-        // about. It is not evidence of a recent recovery, so it does not
-        // suppress.
+        // Terminal with no close instant is not evidence of recovery, so it does not suppress.
         return PageDecision::Page;
     };
     let recovered_for = now - closed_at;
@@ -915,20 +866,7 @@ pub fn dependents_all_clear(impacted: &[Response], confirmed_id: &str) -> bool {
         .any(|r| r.id != confirmed_id && !r.state.is_terminal())
 }
 
-// ── The team channel's copy of the record (Change 1) ─────────────────────────
-//
-// The team's chat destination used to receive the **page**: "[P2] checkout
-// error rate — Platform", addressed to Ana, in a room of thirty people who
-// learn from it only that Ana is being woken. It answered a question nobody in
-// the room had asked.
-//
-// What the room wants is the record: something fired, this team owns it, here
-// is who is on it and here is where it went. That is a different question from
-// the alert's own notification — which carries the rows and values that fired —
-// so both firing is not duplication, and this one is sent **unconditionally**
-// rather than as a fallback for an alert with no destination of its own.
-// Conditional behaviour there is how somebody adds a destination to an alert
-// next month and the channel silently stops getting on-call context.
+// The team channel gets the record, not the page, unconditionally: a condition stops silently.
 
 /// Where a record has got to, as far as its team's channel is concerned.
 ///
@@ -1024,9 +962,7 @@ pub fn channel_post(
         ChannelPostStage::Paged => {
             body.push_str(&format!("{team_name} has been paged for {what}.\n"));
             if response.responder_role == ResponderRole::Impacted {
-                // The room's own service is affected by somebody else's
-                // outage. Saying so is the difference between "we are on the
-                // hook for a fix" and "we are containing a blast radius".
+                // Impacted, not owner: "we fix this" versus "we contain a blast radius".
                 body.push_str(
                     "This team is impacted rather than the owner: contain the impact on your \
                      service; another team is fixing the cause.\n",
@@ -1039,8 +975,7 @@ pub fn channel_post(
         }
         ChannelPostStage::Resolved => {
             body.push_str(&format!("Resolved: {what} — {team_name}.\n"));
-            // The cause is the only thing in this message the room could not
-            // have worked out for itself, so it is never dropped.
+            // The cause is the only thing the room could not work out for itself, so it stays.
             match response.cause {
                 Some(cause) => body.push_str(&format!("Cause: {cause}\n")),
                 None => body.push_str("Cause: not recorded\n"),
@@ -1323,8 +1258,7 @@ mod tests {
         assert_eq!(first.run(), FIRST_LADDER_RUN);
         assert_ne!(first.run(), 2, "run 2's rung 0 has not fired");
 
-        // Written before the ladder could restart: it belongs to the first
-        // run, not to whichever run happens to be climbing now.
+        // Written before the ladder could restart, so it belongs to the first run, not this one.
         let legacy =
             ResponseEvent::new(ResponseEventKind::Page, 10, "o2-engine", "paged ana@o2.ai")
                 .at_rung(0);
@@ -1396,8 +1330,7 @@ mod tests {
             .in_run(2);
         assert!(!paged.is_unreached_rung(2));
 
-        // A failed per-recipient row is not a rung, and must not take one out
-        // of the ledger on its own: the rest of the rung may well have landed.
+        // A failed per-recipient row is not a rung: the rest of the rung may well have landed.
         let one_failure =
             ResponseEvent::new(ResponseEventKind::Delivery, 10, "o2-engine", "failed")
                 .at_rung(5)
@@ -1675,8 +1608,7 @@ mod tests {
                 61 * MIN,
                 "the clock reaches exactly as far as the quiet does, not 120m",
             );
-            // The property that actually matters: when the record reads as
-            // awake, the ladder is awake too.
+            // The property that matters: when the record reads as awake, the ladder is awake too.
             let quiet_ends = 62 * MIN;
             assert!(
                 second <= quiet_ends,
@@ -2062,8 +1994,7 @@ mod tests {
             "recovery closed it, unconditionally"
         );
         assert_eq!(record.closed_at, Some(1_000));
-        // A firing after the window is a new incident and gets its own record —
-        // which is what keeps the prior-causes history honest.
+        // A firing after the window is a new incident with its own record: the history stays true.
         assert_eq!(
             page_decision(Some(&record), 1_000 + WINDOW, WINDOW),
             PageDecision::Page,
@@ -2085,8 +2016,7 @@ mod tests {
             page_decision(Some(&record), WINDOW - 1, WINDOW),
             PageDecision::Flap { .. }
         ));
-        // Six hours of flapping later, the same closed record no longer
-        // suppresses anything.
+        // Six hours of flapping later, the same closed record no longer suppresses anything.
         assert_eq!(
             page_decision(Some(&record), 6 * 60 * 60 * 1_000_000, WINDOW),
             PageDecision::Page

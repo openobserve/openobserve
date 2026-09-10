@@ -13,17 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Unavailability — "I am away 20 Aug – 3 Sep".
-//!
-//! **Org-scoped, not team-scoped.** Being away is a fact about a person; one
-//! who is on two teams is away from both. A per-team row would mean writing the
-//! same window twice, and forgetting the second one is the failure the whole
-//! feature exists to prevent.
-//!
-//! Reads are blunt, like the overrides beside them: one indexed query for the
-//! org's live windows, narrowed to a schedule's members in memory. A rotation
-//! has single digits of people on it, and asking the database to do the
-//! intersection would cost a round trip per team on the paging path.
+//! Unavailability — org-scoped: being away is a fact about a person, not about one team.
 
 use config::{ider, meta::oncall::Unavailability, utils::time::now_micros};
 use sea_orm::{
@@ -98,10 +88,7 @@ pub async fn create(
     }
     .insert(client)
     .await?;
-    // An absence is stored here but *read* as part of a schedule, so the cache
-    // that has to be dropped is every schedule's. Missing this is what makes
-    // the feature worse than useless: somebody marks themselves away, believes
-    // it, stops watching — and the stale schedule pages them anyway.
+    // An absence is stored here but read with a schedule, so every schedule's cache is dropped.
     super::oncall_schedules::invalidate_org_and_publish(org_id).await;
     Ok(record)
 }
@@ -265,8 +252,7 @@ mod tests {
     #[test]
     fn test_the_window_filter_matches_the_overlap_predicate() {
         let u = to_window(model("un_1", "ana@o2.ai", 100, 200));
-        // `start_at < to AND end_at > from`, which is what `list_in_window`
-        // asks the database for.
+        // `start_at < to AND end_at > from`, which is what `list_in_window` asks the database for.
         assert!(u.overlaps(150, 250), "straddles the end");
         assert!(u.overlaps(50, 150), "straddles the start");
         assert!(u.overlaps(0, 500), "enclosed");

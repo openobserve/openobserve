@@ -13,40 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Schedule presets — the four shapes of `architecture/02` §3b, as data.
-//!
-//! A preset is a **starting point, not a mode**. Applying one produces an
-//! ordinary set of [`Rotation`]s and stores nothing else: the result is edited
-//! layer by layer afterwards like any other schedule, and nothing anywhere
-//! remembers which preset made it. That is deliberate — a "preset schedule"
-//! that had to be un-preset before it could be tuned would be a second kind of
-//! schedule to reason about, and the whole point of shipping the four shapes
-//! centrally is that the UI, the API and the demo harness generate the *same*
-//! thing rather than three slightly different things.
-//!
-//! Everything here is pure: `(inputs, timezone, anchor) -> Vec<ShiftRule>`. No
-//! clock is read and nothing is written, which is what lets the no-coverage-gap
-//! property below be a test rather than a hope.
-//!
-//! ## Why every preset ends in an unrestricted layer
-//!
-//! The engine resolves an instant by taking the highest-priority layer whose
-//! restrictions match, and "no layer matches" is a coverage gap — a real answer,
-//! and the one nobody wants at 3am. So each preset puts its restricted layers on
-//! top of exactly one layer with **no restrictions at all**, which is in force
-//! at every instant and therefore fills every hour the layers above it miss.
-//! That is the entire mechanism, and it is why a preset can promise a schedule
-//! with no holes in it while still letting the operator describe partial cover.
-//!
-//! ## Why the caller supplies the grouping
-//!
-//! There is no per-user timezone anywhere in on-call: a schedule has **one**
-//! zone — the team's — and every restriction window is read in it. A preset
-//! therefore cannot work out who is where; follow-the-sun is expressed the other
-//! way round, by the operator putting the right people on the right layer and
-//! naming the hours that layer covers *in the team's zone*. So the request says
-//! the groups outright, each with its own name, its own members and its own
-//! window, rather than the preset guessing geography it has no way to know.
+//! Schedule presets — a starting point; each ends unrestricted, so no hour is uncovered.
 
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -455,11 +422,7 @@ pub fn build(
     handover_micros: i64,
 ) -> Result<Vec<ShiftRule>, PresetError> {
     validate(spec, handover_micros)?;
-    // Handovers are a wall-clock fact, so the cycle starts at the top of a
-    // local week rather than at whatever instant the request happened to
-    // arrive. A schedule that hands over at 14:37 on a Wednesday because that
-    // is when somebody clicked the button is technically correct and nobody
-    // means it.
+    // Handovers are a wall-clock fact, so the cycle starts at the top of a local week.
     let anchor = week_start(anchor_micros, tz);
 
     let layer = |name: String, members: &[String], priority: i32, restrictions: Vec<TimeWindow>| {
@@ -515,11 +478,7 @@ pub fn build(
                     end_minute: MINUTES_PER_DAY,
                 }],
             ),
-            // The weekend layer is the catch-all rather than a second
-            // restricted layer. The layer above covers all of Mon–Fri, so an
-            // unrestricted layer underneath shows through on exactly Saturday
-            // and Sunday — the same schedule, one fewer thing to get wrong,
-            // and no third layer needed to close a gap that cannot open.
+            // An unrestricted layer under a Mon-Fri layer shows through on exactly the weekend.
             layer(
                 group_name(Some(weekend), "Weekend"),
                 &weekend.members,
@@ -539,9 +498,7 @@ pub fn build(
                 RESTRICTED_PRIORITY,
                 first_half_windows(*boundary_day, *boundary_minute),
             ),
-            // Same trick as weekday/weekend: the second half is everything the
-            // first half does not claim, which an unrestricted layer expresses
-            // exactly and without a second boundary to keep in step.
+            // The second half is whatever the first does not claim, so no second boundary drifts.
             layer(
                 group_name(Some(second), "Second half of the week"),
                 &second.members,
@@ -646,8 +603,7 @@ fn week_start(at: i64, tz: chrono_tz::Tz) -> i64 {
     };
     match tz.from_local_datetime(&midnight) {
         LocalResult::Single(dt) => dt.timestamp_micros(),
-        // A repeated midnight: the earlier reading is the one the week starts
-        // at, the same choice the rotation boundaries make.
+        // A repeated midnight: the earlier reading starts the week, as rotation boundaries do.
         LocalResult::Ambiguous(dt, _) => dt.timestamp_micros(),
         LocalResult::None => at,
     }
@@ -1301,8 +1257,7 @@ mod tests {
     /// preset does not undo that by anchoring somewhere a DST shift moves.
     #[test]
     fn test_a_dst_week_still_has_no_gaps() {
-        // 2026-03-08 02:00 America/New_York does not exist; 2026-11-01 01:00
-        // happens twice. Both weeks start on the Monday before.
+        // 2026-03-08 02:00 America/New_York does not exist and 2026-11-01 01:00 happens twice.
         let weeks = [
             (chrono_tz::America::New_York, 1_772_600_400_000_000i64), // Mon 2026-03-02 00:00 EST
             (chrono_tz::America::New_York, 1_793_764_800_000_000i64), // Mon 2026-10-26 00:00 EDT
@@ -1310,8 +1265,7 @@ mod tests {
         for (tz, monday) in weeks {
             for (id, spec) in every_preset() {
                 let rotations = build(&spec, tz, monday, DEFAULT_HANDOVER_MICROS).unwrap();
-                // Quarter-hour steps, because a transition lands mid-hour in
-                // some zones and an hourly walk can step straight over it.
+                // Some zones transition mid-hour, and an hourly walk would step over it.
                 for step in 0..(7 * 24 * 4) {
                     let at = monday + step * (MICROS_PER_HOUR / 4);
                     assert!(
@@ -1371,9 +1325,7 @@ mod tests {
                     (3, "APAC"),
                     (10, "EMEA"),
                     (20, "AMER"),
-                    // Sunday is covered by the regions too: their windows are
-                    // day-agnostic, so the catch-all only ever fills a gap the
-                    // operator left on purpose.
+                    // The regions cover Sunday too, so the catch-all fills a deliberate gap.
                     (6 * 24 + 3, "APAC"),
                 ],
             ),

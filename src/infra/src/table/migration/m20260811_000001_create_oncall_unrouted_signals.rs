@@ -13,13 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! The unrouted queue: signals that fired and that no team owned.
-//!
-//! Phase 2 of the plan ends its routing chain in an "unrouted queue (visible,
-//! alertable — an unroutable page must never be a silent drop)". This is that
-//! queue. One row per dimension path rather than per firing, so an alert
-//! nobody owns that fires every minute is one line saying it happened four
-//! hundred times.
+//! The unrouted queue: an unroutable page must never be a silent drop.
 
 use sea_orm_migration::prelude::*;
 
@@ -103,8 +97,7 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
-        // One row per path per org: the same gap firing again bumps a counter
-        // instead of adding a line the operator has to read twice.
+        // One row per path per org: a repeat bumps a counter instead of adding another line.
         manager
             .create_index(
                 Index::create()
@@ -118,7 +111,6 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
-        // The queue is listed newest-first, per org.
         manager
             .create_index(
                 Index::create()

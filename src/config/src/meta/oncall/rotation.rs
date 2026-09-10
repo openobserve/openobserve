@@ -13,26 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Rotations — who holds a level, at an instant.
-//!
-//! A rotation is an ordered list of people and a fixed shift length anchored
-//! to a start instant. Resolution is a pure function of `(rotation, at)`: no
-//! clock is read here, which is what makes handovers, boundaries and
-//! out-of-order replays testable.
-//!
-//! Layers, restriction windows and overrides all sit on top of that. They
-//! change *which* rotation applies to an instant — or replace its answer
-//! outright, in the case of an override — but never how a single rotation
-//! resolves. Resolution order is `architecture/02` §3b, top down: an override
-//! beats every layer, then layers in priority order, then nobody, which is a
-//! coverage gap rather than an error.
-//!
-//! **Slots** cut across all of that. A slot is an independently-resolved
-//! position — `primary`, `secondary`, whatever a team names one — and layering
-//! happens *within* a slot, never across. Two slots are two answers at the same
-//! instant, which is how a senior pool backs a junior pool without the two
-//! sharing a handover day. Everything that predates slots reads as
-//! [`DEFAULT_SLOT`], so a one-rotation team notices nothing.
+//! Rotations — `(rotation, at)` resolves purely; an override beats every layer within a slot.
 
 use chrono::{Datelike, LocalResult, TimeZone, Timelike};
 use serde::{Deserialize, Serialize};
@@ -137,8 +118,7 @@ impl TimeWindow {
         if !in_time {
             return false;
         }
-        // A wrapped window's early-morning half belongs to the PREVIOUS day's
-        // shift, so that is the day the restriction is judged against.
+        // A wrapped window's early hours belong to the PREVIOUS day's shift, so judge that day.
         let effective_day = if self.start_minute > self.end_minute && minute < self.end_minute {
             (day + 6) % 7
         } else {
@@ -429,11 +409,7 @@ impl ShiftRule {
             .checked_sub(local_anchor)?
             .div_euclid(self.shift_micros);
 
-        // The local count can be one out on either side of a transition: the
-        // two instants are read against different offsets, and inside a
-        // repeated hour the local clock walks backwards. Settle it against the
-        // real instants of the boundaries themselves, which are monotonic —
-        // that is what stops a fall-back handover from happening twice.
+        // Local counts are one out across a transition, so settle against boundary instants.
         for _ in 0..MAX_BOUNDARY_CORRECTIONS {
             if self.boundary(index, tz).is_some_and(|b| b > at) {
                 index -= 1;
@@ -1199,9 +1175,7 @@ pub fn resolve_window(
         let (user_email, rule, override_id) =
             holder_at(rotation, overrides, unavailability, start, tz);
         match segments.last_mut() {
-            // Two candidates that resolve the same way were not really a
-            // boundary — a restriction edge on a rule that was losing anyway,
-            // most often. Merging keeps the grid readable.
+            // Two candidates resolving the same way were not really a boundary, so merge them.
             Some(last)
                 if last.user_email == user_email
                     && last.rotation == rule
@@ -1283,10 +1257,7 @@ fn candidate_boundaries(
         push(ov.end_at, &mut marks);
     }
 
-    // An absence beginning or ending mid-shift hands the pager over and takes
-    // it back, so both edges are instants the answer changes at. Omitting them
-    // is how the grid would claim somebody covered a week they left halfway
-    // through.
+    // An absence hands the pager over and takes it back, so both edges change the answer.
     for u in unavailability {
         if !u.overlaps(from, to) {
             continue;
@@ -1305,8 +1276,7 @@ fn candidate_boundaries(
         if let Some(e) = r.ends_at {
             push(e, &mut marks);
         }
-        // Handovers. Walk forwards from the shift containing `from`; the
-        // boundaries are monotonic (see `shift_index`), so this terminates.
+        // Boundaries are monotonic (see `shift_index`), so walking forwards terminates.
         let mut cursor = from;
         for _ in 0..MAX_HANDOVERS_PER_ROTATION {
             let Some(next) = r.next_handover(cursor, tz) else {
@@ -1344,12 +1314,9 @@ fn restriction_boundaries(
     let Some(local_from) = to_local_micros(from, tz) else {
         return;
     };
-    // Start a day early: a window that wraps midnight opens on the previous
-    // local day and its closing edge lands inside the requested window.
+    // Start a day early: a window that wraps midnight opens on the previous local day.
     let first_midnight = local_from.div_euclid(MICROS_PER_DAY) * MICROS_PER_DAY - MICROS_PER_DAY;
-    // `MAX_GRID_MICROS` bounds the span, so the day count is bounded too; the
-    // +3 covers the leading day, the trailing partial day and an offset that
-    // pushes local midnight across the boundary.
+    // The span is bounded; +3 covers a leading day, a trailing partial day and an offset shift.
     let days = (to - from).div_euclid(MICROS_PER_DAY) + 3;
     for day in 0..days {
         let midnight = first_midnight + day * MICROS_PER_DAY;
@@ -1366,15 +1333,7 @@ fn restriction_boundaries(
     }
 }
 
-// ── The edit-time warning ────────────────────────────────────────────────────
-//
-// The resolver already refuses to page somebody who is away. That is the safety
-// net, and a safety net is not the feature: by the time it catches anything,
-// somebody has built a rota that quietly hands a colleague a week they are not
-// there for, and the first anybody hears of it is a different name on the
-// calendar. Catching it while the rotation is being edited is the entire value,
-// so the question "would this hand somebody a shift they are away for" is asked
-// here, over a horizon, and answered without a clock.
+// The resolver already refuses to page an absent person; catching it at edit time is the feature.
 
 /// One shift a rotation's own order would give to somebody who is away.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -1436,9 +1395,7 @@ pub fn away_assignments(
                     break;
                 };
                 let (start, end) = (cursor.max(from), shift_end.min(to));
-                // Monotonic by construction (see `shift_index`); the guard is
-                // here so a pathological zone cannot pin the loop on one
-                // instant.
+                // Monotonic by construction; the guard stops a pathological zone pinning the loop.
                 if shift_end <= cursor {
                     break;
                 }
@@ -1454,9 +1411,7 @@ pub fn away_assignments(
                     .filter(|u| u.is(holder) && u.overlaps(start, end))
                 {
                     let (overlap_from, overlap_to) = (u.start_at.max(start), u.end_at.min(end));
-                    // In force here? A rule that is losing to a higher-priority
-                    // one at this instant is not handing anybody anything, and
-                    // warning about it would train people to ignore the warning.
+                    // A losing rule hands nobody anything, and false warnings get ignored.
                     if rotation
                         .winning_rule(overlap_from, tz)
                         .is_none_or(|w| w.name != r.name)
@@ -1481,8 +1436,7 @@ pub fn away_assignments(
             }
         }
     }
-    // Soonest first: the one that matters is the one about to happen. Stable
-    // beyond that so two reads of an unchanged schedule agree.
+    // Soonest first, then stable, so two reads of an unchanged schedule agree.
     out.sort_by(|a, b| {
         a.from
             .cmp(&b.from)
@@ -1998,13 +1952,7 @@ mod tests {
         assert_eq!(back, r);
     }
 
-    // ── DST ─────────────────────────────────────────────────────────────────
-    //
-    // `architecture/02` §9: a handover is anchored to local wall-clock time. A
-    // weekly Monday 09:00 handover stays at 09:00 local across a transition,
-    // and the shift that straddles it is 23 or 25 hours long. Counting pure
-    // elapsed micros instead moves the handover to 08:00 or 10:00 — an hour
-    // either side of when the two engineers agreed to swap.
+    // §9: a handover is anchored to local wall-clock, so elapsed micros move it by an hour.
 
     const NY: chrono_tz::Tz = chrono_tz::America::New_York;
     /// US spring forward: 2026-03-08, 02:00 → 03:00 local.
@@ -2084,8 +2032,7 @@ mod tests {
         let anchor = local(NY, 2026, 3, 5, 2, 30);
         let r = daily(&["ana@o2.ai", "bob@o2.ai", "cara@o2.ai"], anchor);
 
-        // The shift that began on the 7th ends on the 8th, at the first
-        // instant the local clock exists again.
+        // The shift begun on the 7th ends on the 8th, at the first instant the clock exists again.
         let at = local(NY, 2026, 3, 7, 12, 0);
         let handover = r.next_handover(at, NY).unwrap();
         assert_eq!(handover, local(NY, 2026, 3, 8, 3, 0));
@@ -2117,8 +2064,7 @@ mod tests {
         assert_eq!(handover, anchor + 2 * MICROS_PER_DAY);
 
         let incoming = r.member_at(handover, NY).unwrap().to_string();
-        // Walk the repeated hour minute by minute: the local clock goes
-        // backwards through it, and the person on call must not go with it.
+        // The local clock goes backwards through the repeated hour; the person on call must not.
         for minutes in 0..120i64 {
             assert_eq!(
                 r.member_at(handover + minutes * MICROS_PER_MINUTE, NY),
@@ -2178,12 +2124,7 @@ mod tests {
         assert!(r.applies_at(ANCHOR, IST));
     }
 
-    // ── Layer validity windows (§3b) ────────────────────────────────────────
-    //
-    // A layer used to have only one way to stop: deletion. "The weekend
-    // rotation ended in March" was therefore unsayable, and a team wanting to
-    // wind a layer down had to delete the record of who had been covering
-    // those hours.
+    // §3b: without a validity window, winding a layer down deletes who covered those hours.
 
     fn retirable(name: &str, member: &str, priority: i32) -> ShiftRule {
         ShiftRule {
@@ -2417,8 +2358,7 @@ mod tests {
             on_call_now(&rotations, &overrides, &[], ANCHOR, TZ).as_deref(),
             Some("cover@o2.ai")
         );
-        // And outside the window the layers are untouched: an override never
-        // mutates the rotation.
+        // Outside the window the layers are untouched: an override never mutates the rotation.
         assert_eq!(
             on_call_now(&rotations, &overrides, &[], ANCHOR + MICROS_PER_DAY, TZ).as_deref(),
             Some("top@o2.ai")
@@ -2594,12 +2534,7 @@ mod tests {
         }
     }
 
-    // ── Overrides and DST (§9) ──────────────────────────────────────────────
-    //
-    // Overrides are absolute instants, so a transition inside one must not
-    // change who holds the pager or how long they hold it for. The failure
-    // this guards is an implementation that re-derives the bounds in local
-    // time and hands an hour of the cover back to the rostered engineer.
+    // §9: overrides are absolute instants; re-deriving bounds in local time hands an hour back.
 
     /// A cover across the spring-forward. The clock skips an hour; the cover
     /// is still continuous, and it is an hour shorter in wall time than it
@@ -2677,8 +2612,7 @@ mod tests {
             vec!["ana@o2.ai".into()],
             local(NY, 2026, 3, 2, 9, 0),
         )];
-        // 02:30 EST on the spring-forward morning is the first instant after
-        // the clock jumps: 03:30 EDT.
+        // 02:30 EST on the spring-forward morning is the first instant after the jump: 03:30 EDT.
         let skipped = local(NY, 2026, 3, 8, 1, 30) + HOUR;
         let overrides = vec![cover("ov_1", "sam@o2.ai", skipped - HOUR, skipped, 1)];
 
@@ -2719,8 +2653,7 @@ mod tests {
                 "{at}"
             );
         }
-        // The rotation underneath is untouched: it handed over once, at the
-        // instant the clock reached it.
+        // The rotation underneath handed over once, at the instant the clock reached it.
         assert_ne!(
             on_call_now(&rotations, &[], &[], handover - 1, NY),
             on_call_now(&rotations, &[], &[], handover, NY)
@@ -3073,12 +3006,7 @@ mod tests {
         assert_eq!(segments[0].user_email.as_deref(), Some("sam@o2.ai"));
     }
 
-    // ── Slots (GAP 1) ───────────────────────────────────────────────────────
-    //
-    // A slot is an independently-resolved position. Everything below is about
-    // one of two claims: two slots answer at the same instant without
-    // interfering, and a schedule that predates slots keeps meaning exactly
-    // what it meant.
+    // GAP 1: two slots answer at once without interfering, and a pre-slots schedule is unchanged.
 
     // ── Unavailability (GAP 2) ──────────────────────────────────────────────
 
@@ -3277,12 +3205,7 @@ mod tests {
             Some("bob@o2.ai"),
             "the shift passes to the next eligible member"
         );
-        // Bob again, and that is right: he is standing in for ana's week and
-        // the next week is his own. The old assertion was cara, because the old
-        // `next_on_call` walked one position along the *ladder* from whoever
-        // was on call. This is the calendar's question — who holds the next
-        // shift — and nothing pages it, so two consecutive weeks for bob is a
-        // fact to display rather than a double-page to avoid.
+        // This asks who holds the next shift, so two weeks running for bob is a fact, not a bug.
         assert_eq!(
             of(&rotations)
                 .next_holder(&unavailability, ANCHOR, TZ)
@@ -3290,9 +3213,7 @@ mod tests {
             Some("bob@o2.ai"),
         );
 
-        // Nobody else's turn moved. Bob's own week is still Bob's, and Cara's
-        // is still Cara's — which is the property that makes this safe to
-        // recompute at any instant.
+        // Nobody else's turn moved, which is what makes this safe to recompute at any instant.
         assert_eq!(
             on_call_now(
                 &rotations,
@@ -3327,8 +3248,7 @@ mod tests {
             vec!["ana@o2.ai".into(), "bob@o2.ai".into(), "cara@o2.ai".into()],
             ANCHOR,
         )];
-        // Cara's week, and both Cara and Ana — the next along — are away, so
-        // it wraps past the end of the list and lands on Bob.
+        // Cara's week, and Cara and Ana are both away, so it wraps past the list end onto Bob.
         let at = ANCHOR + 2 * MICROS_PER_WEEK;
         let unavailability = vec![
             away("cara@o2.ai", at, at + MICROS_PER_WEEK),
@@ -3338,12 +3258,7 @@ mod tests {
             on_call_now(&rotations, &[], &unavailability, at, TZ).as_deref(),
             Some("bob@o2.ai")
         );
-        // Ana, because "up next" is answered **at the next handover**, and both
-        // absences have ended by then. The old assertion here was `None`: the
-        // old `next_on_call` meant "the next available person *right now*",
-        // which is a ladder question, and the ladder no longer asks it. This is
-        // the calendar's question, and the calendar is right that ana holds the
-        // next shift.
+        // "Up next" is answered at the next handover, by which point both absences have ended.
         assert_eq!(
             of(&rotations)
                 .next_holder(&unavailability, at, TZ)
@@ -3371,9 +3286,7 @@ mod tests {
             on_call_now(&rotations, &[], &unavailability, ANCHOR, TZ),
             None
         );
-        // "Up next" is asked at the next handover, by which point the absences
-        // have ended — so the calendar correctly shows bob taking over. The gap
-        // is *now*, and that is what the grid below reports.
+        // "Up next" is asked at the next handover; the gap is *now*, which the grid below reports.
         assert_eq!(
             of(&rotations)
                 .next_holder(&unavailability, ANCHOR, TZ)
@@ -3487,8 +3400,7 @@ mod tests {
             "the answer must not depend on the order the rows came back in"
         );
 
-        // Stable: only Cara's week changed hands, and it went to the next
-        // person in the order rather than re-dealing the cycle.
+        // Stable: only Cara's week changed hands, to the next person rather than re-dealing.
         let holder_at = |segments: &[CoverageSegment], at: i64| -> Option<String> {
             segments
                 .iter()
@@ -3552,8 +3464,7 @@ mod tests {
             vec!["ana@o2.ai".into(), "bob@o2.ai".into(), "cara@o2.ai".into()],
             anchor,
         )];
-        // Bob holds the week containing the transition; he is away for all of
-        // it, so it passes to Cara.
+        // Bob holds the week containing the transition and is away for it all, so Cara takes it.
         let bob_week = local(NY, 2026, 3, 8, 9, 0);
         let unavailability = vec![away("bob@o2.ai", bob_week, local(NY, 2026, 3, 15, 9, 0))];
 
@@ -3640,8 +3551,7 @@ mod tests {
             "and it says who actually ends up with it"
         );
 
-        // Nothing to say when nobody is away, and nothing to say about a week
-        // outside the horizon.
+        // Nothing to say when nobody is away, and nothing about a week outside the horizon.
         assert!(
             away_assignments(
                 &[of(&rotations)],

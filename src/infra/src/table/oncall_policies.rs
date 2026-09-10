@@ -75,19 +75,14 @@ pub(super) async fn invalidate_and_publish(org_id: &str, team_id: &str) {
 /// configuration. Falling back to the defaults keeps the team pageable while
 /// the corruption is logged.
 fn to_policy(m: oncall_policies::Model) -> EscalationPolicy {
-    // A bad destination list costs one transport, not the whole policy, so it
-    // degrades to empty instead of taking the ladder down with it.
+    // A bad destination list costs one transport, not the whole policy.
     let destinations: Vec<String> = serde_json::from_str(&m.destinations).unwrap_or_default();
-    // §4's L0 block. An unreadable one falls back to the published defaults
-    // rather than to nothing: L0 is additive, and a corrupt column must leave
-    // the team exactly as pageable as it was.
+    // §4's L0 block. An unreadable one falls back to the published defaults; L0 is additive.
     let l0 = match m.l0_json.trim() {
-        // The column default, and every row written before it existed: a team
-        // that has never opened the screen runs §4's published defaults.
+        // The column default, and every row written before it existed: §4's published defaults.
         "" | "{}" => config::meta::oncall::L0Policy::defaults(),
         stored => serde_json::from_str(stored).unwrap_or_else(|e| {
-            // Additive, so a corrupt block leaves the team exactly as pageable
-            // as it was rather than taking the ladder down with it.
+            // Additive, so a corrupt block leaves the team exactly as pageable as it was.
             log::warn!(
                 "[ONCALL] policy {} has an unreadable l0 block, using the defaults: {e}",
                 m.id
@@ -123,10 +118,7 @@ pub async fn get_or_create(org_id: &str, team_id: &str) -> Result<EscalationPoli
     if let Some(found) = get_by_team(org_id, team_id).await? {
         return Ok(found);
     }
-    // The default ladder names the team's own rotations, so it has to read
-    // them. A policy that pointed at ids nobody staffed would look configured
-    // and page nobody — the exact failure the rotation rework removed from the
-    // schedule, and it must not reappear here.
+    // The default ladder names the team's own rotations: unstaffed ids page nobody.
     let schedule = super::oncall_schedules::get_by_team(org_id, team_id).await?;
     let rotations: Vec<&config::meta::oncall::Rotation> = schedule
         .as_ref()
@@ -145,15 +137,12 @@ pub async fn get_or_create(org_id: &str, team_id: &str) -> Result<EscalationPoli
             primary.id.clone(),
             rotations.get(1).map(|r| r.id.clone()),
         ),
-        // A team with no rotations yet still needs a policy, and the whole team
-        // is the only target that resolves without one.
+        // A team with no rotations still needs a policy, and only the whole team resolves.
         None => EscalationPolicy::whole_team_fallback(ider::uuid(), org_id, team_id),
     };
     match insert(&defaults).await {
         Ok(created) => Ok(created),
-        // Another node created it between our read and our write; the unique
-        // index on team_id is what makes that safe, and re-reading is the
-        // correct resolution.
+        // Another node created it between read and write; the unique index makes re-reading safe.
         Err(e) => match get_by_team(org_id, team_id).await? {
             Some(found) => Ok(found),
             None => Err(e),
@@ -214,9 +203,7 @@ pub async fn update_rungs(
     team_id: &str,
     rungs: &[PriorityRung],
     destinations: Option<&[String]>,
-    // §4's L0 block. `None` means **unchanged**, never reset-to-defaults: a
-    // caller editing rungs must not silently wipe a team's L0 configuration,
-    // and this column is the only copy of it.
+    // `None` means **unchanged**, never reset: this column is the only copy of a team's L0 block.
     l0: Option<&config::meta::oncall::L0Policy>,
 ) -> Result<Option<EscalationPolicy>, errors::Error> {
     let client = get_orm_client_rw().await;
@@ -281,8 +268,7 @@ mod tests {
             destinations: "[]".into(),
             // The column default: a team that has never opened the L0 screen.
             l0_json: "{}".into(),
-            // The column defaults, which are 04 §3's own: one pass, then say
-            // on the record that nobody answered.
+            // The column defaults, 04 §3's own: one pass, then record that nobody answered.
             created_at: 10,
             updated_at: 20,
         }
@@ -327,9 +313,7 @@ mod tests {
         stored.l0_json = serde_json::to_string(&edited).unwrap();
         assert_eq!(to_policy(stored).l0, edited);
 
-        // The column default, and every row written before the column existed:
-        // §4's published defaults, so an upgraded team is gated exactly as a
-        // fresh one is.
+        // The column default, and every pre-column row: an upgraded team is gated as a fresh one.
         for never_configured in ["{}", ""] {
             let mut stored = model(&encoded);
             stored.l0_json = never_configured.into();
@@ -359,11 +343,7 @@ mod tests {
                 p.pages_anyone(AlertPriority::P1),
                 "`{bad}` must leave the team pageable"
             );
-            // The **whole-team** fallback, not the shipped default ladder.
-            // The default names the team's rotations by id, and this path has
-            // just failed to read the row those ids would have come from —
-            // guessing one would produce a level pointing at a position that
-            // may not exist, which pages nobody while looking configured.
+            // The whole-team fallback: the default ladder's ids live in the unreadable row.
             assert_eq!(
                 p,
                 EscalationPolicy::whole_team_fallback("pol_1", "default", "team_1")
