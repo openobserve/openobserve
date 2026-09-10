@@ -124,6 +124,8 @@ const staleGroups = computed(() => (suppressBadges.value ? [] : curated.staleGro
  */
 const staleBanners = computed(() =>
   staleGroups.value.map((stale) => {
+    // A listed stream whose stats never flushed serializes doc_time_max: 0, which formats as the Unix epoch.
+    const noDataYet = stale.noDataYet === true || !stale.lastSeenUs;
     // Same reference as CuratedPageView.humanDuration — measured against the later
     // of window-end and wall clock, so one page never shows two different ages.
     const parts = durationParts(
@@ -132,12 +134,15 @@ const staleBanners = computed(() =>
     );
     return {
       id: stale.group.id,
+      key: noDataYet ? "infra.curated.staleNoDataBanner" : "infra.curated.staleBanner",
       capability: t(stale.group.capabilityKey),
-      duration: t(`infra.curated.${parts.key}` as never, { count: parts.count }),
-      date: timestampToTimezoneDate(
-        Math.floor(stale.lastSeenUs / 1000),
-        store.state.timezone ?? "UTC",
-      ),
+      duration: noDataYet ? "" : t(`infra.curated.${parts.key}` as never, { count: parts.count }),
+      date: noDataYet
+        ? ""
+        : timestampToTimezoneDate(
+            Math.floor(stale.lastSeenUs / 1000),
+            store.state.timezone ?? "UTC",
+          ),
     };
   }),
 );
@@ -418,7 +423,7 @@ const statusLabel = computed(() =>
                 dense
                 data-test="curated-stale-banner"
                 :content="
-                  t('infra.curated.staleBanner', {
+                  t(stale.key as never, {
                     capability: stale.capability,
                     duration: stale.duration,
                     date: stale.date,
