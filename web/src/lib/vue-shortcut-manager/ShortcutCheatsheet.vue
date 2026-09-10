@@ -315,11 +315,14 @@ const allModules = computed<DisplayModule[]>(() => {
       return [
         {
           title: t(group.pageKey, PAGE_TITLE_PARAMS[group.pageKey] ?? {}),
-          entries: group.shortcuts.map((s) => ({
-            id: s.id,
-            display: entryDisplay(s),
-            label: t(s.descriptionKey),
-          })),
+          entries: group.shortcuts
+            // aiChatToggle is enterprise-gated in MainLayout, so OSS must not advertise it.
+            .filter((s) => s.id !== "aiChatToggle" || config.isEnterprise === "true")
+            .map((s) => ({
+              id: s.id,
+              display: entryDisplay(s),
+              label: t(s.descriptionKey),
+            })),
         },
       ];
     }),
