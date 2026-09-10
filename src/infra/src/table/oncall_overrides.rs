@@ -26,16 +26,13 @@ use crate::{db::get_orm_client_rw, errors};
 /// How far back a resolution load reaches.
 ///
 /// The schedule loader cannot know which instant it will be asked about, so it
-/// takes everything that has not long finished. Seven days back covers a
-/// timeline being read the morning after a page while keeping the row count
-/// bounded — an org that never deletes an override still loads a handful.
+/// takes everything that has not long finished. Seven days covers a timeline
+/// read the morning after a page while keeping the row count bounded.
 const RESOLUTION_LOOKBACK_MICROS: i64 = 7 * 24 * 60 * 60 * 1_000_000;
 
-/// Ceiling on the rows any one read returns.
-///
-/// A team cannot be covered by a thousand people at once, so hitting this
-/// means somebody scripted a loop. Losing the oldest of them is better than an
-/// unbounded read on the path a page travels.
+/// Ceiling on the rows any one read returns. A team cannot be covered by a
+/// thousand people at once, so hitting this means somebody scripted a loop.
+/// Losing the oldest beats an unbounded read on the path a page travels.
 const MAX_ROWS: u64 = 500;
 
 fn to_override(m: oncall_overrides::Model) -> ScheduleOverride {
@@ -54,9 +51,9 @@ fn to_override(m: oncall_overrides::Model) -> ScheduleOverride {
     }
 }
 
-/// Stores one cover. `id` and `created_at` are minted here, because
-/// `created_at` is the overlap rule (§5) and a caller-supplied one would let a
-/// client decide which of two covers wins.
+/// Stores one cover. `id` and `created_at` are minted here, because `created_at`
+/// is the overlap rule (§5) and a caller-supplied one would let a client decide
+/// which of two covers wins.
 #[allow(clippy::too_many_arguments)]
 pub async fn create(
     org_id: &str,
@@ -131,11 +128,9 @@ pub async fn list_by_team(
         .collect())
 }
 
-/// Covers overlapping `[from, to)`.
-///
-/// Half-open on both sides, matching [`ScheduleOverride::covers`]: a cover
-/// ending exactly at `from` does not touch the window, and one starting
-/// exactly at `to` does not either.
+/// Covers overlapping `[from, to)`. Half-open on both sides, matching
+/// [`ScheduleOverride::covers`]: a cover ending exactly at `from` does not touch
+/// the window, and one starting exactly at `to` does not either.
 pub async fn list_in_window(
     org_id: &str,
     team_id: &str,
@@ -158,12 +153,11 @@ pub async fn list_in_window(
         .collect())
 }
 
-/// What the schedule loader attaches so that every resolution sees the covers.
+/// What the schedule loader attaches so every resolution sees the covers.
 ///
 /// Bounded rather than "everything": an override table is append-mostly, and a
-/// read on the paging path must not grow with the org's history. `at` is the
-/// instant resolution is centred on, passed in rather than read from a clock
-/// here so the same function serves a replay.
+/// read on the paging path must not grow with the org's history. `at` is passed
+/// in rather than read from a clock, so the same function serves a replay.
 pub async fn list_for_resolution(
     org_id: &str,
     team_id: &str,
@@ -220,11 +214,10 @@ pub async fn delete_by_team(org_id: &str, team_id: &str) -> Result<u64, errors::
 
 /// Drops a person's covers that have not finished by `at`.
 ///
-/// The mirror of taking somebody off the rotation when they leave the team.
-/// An override outranks every layer, so a departed engineer holding a future
-/// cover would still be the answer to "who is on call" — the exact bug that
-/// removing them from the rotation was written to prevent, arriving through
-/// the other door. Covers already finished are kept: they are history.
+/// The mirror of taking somebody off the rotation when they leave. An override
+/// outranks every layer, so a departed engineer holding a future cover would
+/// still be the answer to "who is on call" — the same bug arriving through the
+/// other door. Covers already finished are kept: they are history.
 pub async fn delete_future_for_user(
     org_id: &str,
     team_id: &str,
@@ -301,9 +294,9 @@ mod tests {
         assert!(!o.overlaps(0, 100), "ends where the cover starts");
     }
 
-    /// The winner is picked in memory, so the row order must not be what
-    /// decides it — which is what lets `list_for_resolution` hand rows back
-    /// oldest-first while querying newest-first.
+    /// The winner is picked in memory, so row order must not decide it — which
+    /// is what lets `list_for_resolution` hand rows back oldest-first while
+    /// querying newest-first.
     #[test]
     fn test_the_winner_does_not_depend_on_the_row_order() {
         let rows = vec![
@@ -321,14 +314,13 @@ mod tests {
         );
     }
 
-    /// Which end `list_for_resolution` must truncate from, pinned as an
-    /// assertion rather than left in a comment — because it was wrong in a
-    /// comment for a while and read as correct.
+    /// Which end `list_for_resolution` must truncate from, as an assertion
+    /// rather than a comment — it was wrong in a comment for a while and read as
+    /// correct.
     ///
-    /// The winner is the **newest** `created_at`. So a read limited to
-    /// `MAX_ROWS` has to keep the newest rows; keeping the oldest would discard
-    /// precisely the cover about to win and page the person the most recent
-    /// cover excused.
+    /// The winner is the newest `created_at`, so a read limited to `MAX_ROWS`
+    /// has to keep the newest rows. Keeping the oldest would discard precisely
+    /// the cover about to win.
     #[test]
     fn test_truncation_must_keep_the_newest_covers() {
         let all: Vec<_> = (0..5)

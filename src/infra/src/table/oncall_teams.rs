@@ -35,10 +35,8 @@ use crate::{db::get_orm_client_rw, errors};
 
 /// The team row, for the paging path (`06` §3).
 ///
-/// Read once per dispatch, only for the team's display name — the sentence a
-/// page opens with. Nothing about paging depends on it being current to the
-/// second, and a rename that takes a few seconds to reach a page is not a
-/// failure anybody can be hurt by.
+/// Read once per dispatch, only for the team's display name. Nothing about
+/// paging depends on it being current to the second.
 ///
 /// Backs [`get_cached`] only, never [`get`]: the screens that edit a team read
 /// through `get`, so an admin never sees what they just replaced.
@@ -46,37 +44,32 @@ static TEAM_CACHE: LazyLock<RwHashMap<String, (Team, Instant)>> = LazyLock::new(
 
 /// The roster, for the paging path.
 ///
-/// Read whenever a rung names the whole team, which the shipped policy does for
-/// every rung past the third. `06` §6 budgets five minutes of staleness on
-/// membership because the consequence is bounded and one-directional: a member
-/// removed moments ago may receive one more page. Nothing here can *suppress* a
-/// page, which is the line §6 draws.
+/// Read whenever a rung names the whole team, which the shipped policy does
+/// past the third rung. `06` §6 budgets five minutes of staleness because the
+/// consequence is bounded and one-directional: a member removed moments ago may
+/// receive one more page. Nothing here can suppress a page.
 static MEMBERS_CACHE: LazyLock<RwHashMap<String, (Vec<TeamMember>, Instant)>> =
     LazyLock::new(Default::default);
 
 /// Whether an org has any team at all, for the firing path.
 ///
 /// On-call is on by default, so this is asked once per alert firing in every
-/// org — including the overwhelming majority that have never configured the
-/// feature and for whom the answer never changes.
+/// org — including the majority that have never configured the feature and for
+/// whom the answer never changes.
 static ORG_HAS_TEAMS_CACHE: LazyLock<RwHashMap<String, (bool, Instant)>> =
     LazyLock::new(Default::default);
 
-/// Deliberately shorter than `06` §6's five-minute budget.
-///
-/// The budget is what the design tolerates; this is what the feature actually
-/// needs. A page is a handful of reads either way, and the coordinator event is
-/// the real invalidation — the TTL exists only for the event that never
-/// arrived, so buying back four minutes of worst-case staleness costs almost
-/// nothing.
+/// Deliberately shorter than `06` §6's five-minute budget. The budget is what
+/// the design tolerates; this is what the feature needs. The coordinator event
+/// is the real invalidation, so the TTL only covers the event that never
+/// arrived.
 const TEAM_CACHE_TTL: Duration = Duration::from_secs(60);
 
 /// How long "this org has no teams" is believed without asking again.
 ///
-/// Shorter than [`TEAM_CACHE_TTL`] because this is the one entry whose staleness
-/// makes the product look broken: an operator creating their first team and
-/// seeing nothing happen concludes on-call does not work. Team writes drop the
-/// entry on every node, so this only bounds the coordinator event that was lost.
+/// Shorter than [`TEAM_CACHE_TTL`], because this is the one entry whose
+/// staleness makes the product look broken: an operator creating their first
+/// team and seeing nothing happen concludes on-call does not work.
 const NO_TEAMS_CACHE_TTL: Duration = Duration::from_secs(10);
 
 fn team_cache_key(org_id: &str, id: &str) -> String {
@@ -96,13 +89,12 @@ pub fn invalidate_members_cache(team_id: &str) {
     MEMBERS_CACHE.remove(team_id);
 }
 
-/// Invalidates locally **and** tells every other node to do the same.
+/// Invalidates locally and tells every other node to do the same.
 ///
 /// Write paths call this; the coordinator watcher calls the plain
 /// [`invalidate_cache`], which is what stops an event echoing forever. A failed
 /// emit is logged rather than propagated: the row is already committed, and
-/// failing somebody's save because a cache hint did not send would be the worse
-/// trade.
+/// failing somebody's save because a cache hint did not send is the worse trade.
 pub(super) async fn invalidate_and_publish_team(org_id: &str, id: &str) {
     invalidate_cache(org_id, id);
     if let Err(e) = crate::coordinator::oncall::emit_team_changed(org_id, id).await {
@@ -133,15 +125,12 @@ fn to_team(m: oncall_teams::Model) -> Team {
 
 /// The team's own channel, as stored.
 ///
-/// `None` — never set, so the escalation policy's list stands (which is what
-/// every team created before the field existed has). `Some(list)` — the team's
-/// answer, and an empty list is a real answer meaning "no channel". The
-/// precedence itself is [`config::meta::oncall::policy::team_channel`]; this
-/// only reads the column.
+/// `None` — never set, so the escalation policy's list stands. `Some(list)` —
+/// the team's answer, and an empty list is a real answer meaning "no channel".
+/// Precedence itself is [`config::meta::oncall::policy::team_channel`].
 ///
-/// Unparseable JSON reads as "never set" rather than failing the caller: the
-/// caller is usually about to post a page's context into a room, and losing
-/// that to a bad column is worse than falling back to the policy.
+/// Unparseable JSON reads as "never set" rather than failing the caller, who is
+/// usually about to post a page's context into a room.
 fn to_channel(raw: Option<String>) -> Option<Vec<String>> {
     let raw = raw?;
     match serde_json::from_str::<Vec<String>>(&raw) {
@@ -192,9 +181,9 @@ pub async fn create(
 /// set any.
 ///
 /// Not folded into [`Team`]: the team row is read on the paging path for its
-/// display name and cached for that, and the channel is a delivery setting with
-/// a different write path and a different audience. Keeping them apart is what
-/// lets the channel be edited without invalidating the page path's cache.
+/// display name and cached for that, while the channel has a different write
+/// path and audience. Keeping them apart lets the channel be edited without
+/// invalidating the page path's cache.
 pub async fn get_channel(org_id: &str, id: &str) -> Result<Option<Vec<String>>, errors::Error> {
     let client = get_orm_client_rw().await;
     Ok(oncall_teams::Entity::find_by_id(id)
@@ -208,11 +197,10 @@ pub async fn get_channel(org_id: &str, id: &str) -> Result<Option<Vec<String>>, 
 ///
 /// `None` puts the team back to "never set", so the escalation policy's list
 /// takes over again; `Some(vec![])` says the team has no channel at all. Both
-/// are reachable deliberately, because a field that cannot be un-set is one
-/// nobody can undo a mistake in.
+/// are reachable deliberately: a field that cannot be un-set is one nobody can
+/// undo a mistake in.
 ///
-/// Returns `false` when there is no such team in this org — the caller already
-/// knows what it asked to store, so nothing is read back.
+/// Returns `false` when there is no such team in this org.
 pub async fn set_channel(
     org_id: &str,
     id: &str,
@@ -301,10 +289,9 @@ pub async fn update(
     Ok(Some(updated))
 }
 
-/// Deletes the team and its membership in one transaction.
-///
-/// Schedules, policies and responses are left alone deliberately: a response
-/// record is history and must survive the team being reorganised away.
+/// Deletes the team and its membership in one transaction. Schedules, policies
+/// and responses are left alone deliberately: a response record is history and
+/// must survive the team being reorganised away.
 pub async fn delete(org_id: &str, id: &str) -> Result<bool, errors::Error> {
     let client = get_orm_client_rw().await;
     let txn = client.begin().await?;
@@ -344,22 +331,18 @@ pub async fn add_member(team_id: &str, user_email: &str) -> Result<TeamMember, e
 /// Members in the order they were added, which is the order the client sent.
 ///
 /// This list seeds a new team's rotation roster, so its order decides who holds
-/// Primary first and who follows. Sorting it by email made that decision
-/// alphabetically: a team added as `[subhradeep, bhargav, …]` came back
-/// `[bhargav, subhradeep, …]`, so the form's preview of the handover and the
-/// handover the team actually got disagreed — and nothing on either screen
-/// explained why. Lexical order of an address is not a statement about who
-/// should be woken first; the order somebody typed is.
+/// Primary first. Sorting by email made that decision alphabetically, so the
+/// form's preview of the handover and the handover the team actually got
+/// disagreed, with nothing on either screen explaining why.
 ///
-/// Ordered on `created_at` rather than `id`: `ider::uuid()` is a KSUID, whose
+/// Ordered on `created_at` rather than `id`: `ider::uuid()` is a KSUID whose
 /// timestamp prefix has one-second resolution, so a bulk add lands several rows
-/// in one second and their relative id order is random. `created_at` is
-/// microseconds and the inserts are sequential. `id` breaks the tie so the
-/// answer is stable across nodes rather than left to the database.
+/// in one second and their relative id order is random. `id` breaks the tie so
+/// the answer is stable across nodes.
 ///
-/// This is the roster's *seed* only. Once a schedule exists, the order lives in
-/// `shift_rules[].members` and is already whatever the client last wrote — so
-/// re-ordering an existing rotation does not go through here.
+/// The roster's seed only. Once a schedule exists the order lives in
+/// `shift_rules[].members`, so re-ordering an existing rotation does not come
+/// through here.
 pub async fn list_members(team_id: &str) -> Result<Vec<TeamMember>, errors::Error> {
     let client = get_orm_client_rw().await;
     Ok(oncall_team_members::Entity::find()
@@ -377,7 +360,7 @@ pub async fn list_members(team_id: &str) -> Result<Vec<TeamMember>, errors::Erro
 ///
 /// For the paging path only. A team that does not exist is deliberately not
 /// cached: a page whose team was deleted should keep reaching the database and
-/// keep saying so, rather than being answered from memory.
+/// keep saying so.
 pub async fn get_cached(org_id: &str, id: &str) -> Result<Option<Team>, errors::Error> {
     let key = team_cache_key(org_id, id);
     if let Some(entry) = TEAM_CACHE.get(&key)
@@ -395,11 +378,10 @@ pub async fn get_cached(org_id: &str, id: &str) -> Result<Option<Team>, errors::
 /// Whether this org has any on-call team at all, served from
 /// [`ORG_HAS_TEAMS_CACHE`] when fresh.
 ///
-/// The negative **is** cached, unlike a missing team in [`get_cached`], because
-/// it is the answer for nearly every org and it is asked on every firing. What
-/// makes that safe is that [`create`] publishes an invalidation, so the first
-/// team an org ever makes drops this entry on every node before the next firing
-/// reads it; [`NO_TEAMS_CACHE_TTL`] only covers the event that never arrived.
+/// The negative IS cached, unlike a missing team in [`get_cached`], because it
+/// is the answer for nearly every org and is asked on every firing. [`create`]
+/// publishes an invalidation, so the first team an org makes drops this entry on
+/// every node before the next firing reads it.
 pub async fn has_any_cached(org_id: &str) -> Result<bool, errors::Error> {
     if let Some(entry) = ORG_HAS_TEAMS_CACHE.get(org_id) {
         let (any, cached_at) = *entry;
@@ -425,8 +407,8 @@ pub async fn has_any_cached(org_id: &str) -> Result<bool, errors::Error> {
 /// The roster, served from [`MEMBERS_CACHE`] when fresh.
 ///
 /// For the paging path only — the rungs that page the whole team. An empty
-/// roster **is** cached, unlike a missing team: "this team has nobody on it" is
-/// a real, stable answer, and it is the one a coverage gap is made of.
+/// roster IS cached, unlike a missing team: "this team has nobody on it" is a
+/// real, stable answer, and it is what a coverage gap is made of.
 pub async fn list_members_cached(team_id: &str) -> Result<Vec<TeamMember>, errors::Error> {
     if let Some(entry) = MEMBERS_CACHE.get(team_id)
         && entry.1.elapsed() < TEAM_CACHE_TTL
@@ -440,11 +422,10 @@ pub async fn list_members_cached(team_id: &str) -> Result<Vec<TeamMember>, error
 
 /// The teams one person belongs to, in this org.
 ///
-/// The reverse of `list_members`, and the only way to answer "which teams am I
-/// on" without fetching every team and every roster. The membership row has no
-/// org of its own — it is keyed on the team — so the org is established by
-/// joining back to the team, and without that join a member of a team in
-/// another tenant would be reported here.
+/// The only way to answer "which teams am I on" without fetching every team and
+/// every roster. The membership row has no org of its own, so the org is
+/// established by joining back to the team — without that join, a member of a
+/// team in another tenant would be reported here.
 pub async fn list_for_user(org_id: &str, user_email: &str) -> Result<Vec<Team>, errors::Error> {
     let client = get_orm_client_rw().await;
     Ok(oncall_teams::Entity::find()
@@ -467,12 +448,10 @@ pub async fn list_for_user(org_id: &str, user_email: &str) -> Result<Vec<Team>, 
 
 /// How many alert rules name this team in their own `oncall_team` field.
 ///
-/// Counted in SQL, and deliberately narrow: this is the *directly assigned*
-/// half of "what does this team own". The other half — alerts whose identity
-/// path falls under one of the team's ownership rules — cannot be counted here
-/// at all, because an alert's dimensions are not known until it fires. The
-/// field name says which half this is so a screen cannot present it as the
-/// whole answer.
+/// Deliberately narrow: this is the directly assigned half of "what does this
+/// team own". The other half — alerts whose identity path falls under one of the
+/// team's ownership rules — cannot be counted here at all, because an alert's
+/// dimensions are not known until it fires.
 pub async fn count_alerts_assigned(org_id: &str, team_id: &str) -> Result<u64, errors::Error> {
     use sea_orm::PaginatorTrait;
 
@@ -493,10 +472,9 @@ struct PriorityTally {
 /// The same count, broken down by the priority the alert fires at.
 ///
 /// What makes "P4 pages nobody" actionable: on its own it is a policy someone
-/// may have chosen, and "…and six alert rules fire at P4" is the sentence that
-/// turns it into a finding. Grouped in SQL, one statement for all five
-/// priorities. Alerts with no priority set are left out — they have no rung to
-/// be missing.
+/// may have chosen, and "…and six alert rules fire at P4" turns it into a
+/// finding. Alerts with no priority set are left out — they have no rung to be
+/// missing.
 pub async fn count_alerts_assigned_by_priority(
     org_id: &str,
     team_id: &str,
@@ -571,9 +549,9 @@ mod tests {
     }
 
     /// The three states of the column, and they are three different answers.
-    /// Collapsing null and `[]` is what would make the team channel impossible
-    /// to turn off — clearing it would silently fall back to whatever the
-    /// escalation policy still had in it.
+    /// Collapsing null and `[]` would make the team channel impossible to turn
+    /// off — clearing it would fall back to whatever the escalation policy still
+    /// had in it.
     #[test]
     fn test_null_and_empty_are_different_answers_about_a_teams_channel() {
         assert_eq!(to_channel(None), None, "never set");

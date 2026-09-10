@@ -46,11 +46,10 @@ pub async fn default_team(org_id: &str) -> Result<Option<String>, errors::Error>
     Ok(get(org_id).await?.default_team_id)
 }
 
-/// Nominates a team as the org's catch-all, or clears the nomination.
-///
-/// Upserts, because the row is a setting rather than a record: an org that has
-/// never opened the routing screen has no row, and the first time somebody
-/// picks a team is not a different operation from the second.
+/// Nominates a team as the org's catch-all, or clears the nomination. Upserts,
+/// because the row is a setting rather than a record: an org that has never
+/// opened the routing screen has no row, and the first nomination is not a
+/// different operation from the second.
 pub async fn set_default_team(
     org_id: &str,
     team_id: Option<&str>,
@@ -83,10 +82,9 @@ pub async fn set_default_team(
     }
 }
 
-/// Applies a whole configuration under the org it was written for.
-///
-/// The super-cluster door: a replica must end up with exactly what the source
-/// region has, including the `updated_at` that says when it was decided.
+/// Applies a whole configuration under the org it was written for. The
+/// super-cluster door: a replica must end up with exactly what the source region
+/// has, including the `updated_at` that says when it was decided.
 pub async fn put(config: &RoutingConfig) -> Result<(), errors::Error> {
     let client = get_orm_client_rw().await;
     let team_id = config
@@ -118,20 +116,18 @@ pub async fn put(config: &RoutingConfig) -> Result<(), errors::Error> {
     Ok(())
 }
 
-/// Whether `team_id` is this org's nominated catch-all.
-///
-/// Asked before a team is deleted. The answer decides whether the delete is
-/// refused, so it is a query in its own right rather than something the caller
-/// reassembles out of [`get`].
+/// Whether `team_id` is this org's nominated catch-all. Asked before a team is
+/// deleted, and the answer decides whether the delete is refused — so it is a
+/// query in its own right rather than something the caller reassembles out of
+/// [`get`].
 pub async fn is_default_team(org_id: &str, team_id: &str) -> Result<bool, errors::Error> {
     Ok(default_team(org_id).await?.as_deref() == Some(team_id))
 }
 
-/// Clears the nomination if it points at `team_id`.
-///
-/// Not called by team deletion — that is refused instead — but the super-cluster
-/// consumer applies a team delete it did not originate, and a replica must not
-/// be left pointing at a team it no longer has.
+/// Clears the nomination if it points at `team_id`. Not called by team deletion —
+/// that is refused instead — but the super-cluster consumer applies a team delete
+/// it did not originate, and a replica must not be left pointing at a team it no
+/// longer has.
 pub async fn clear_if_default_team(org_id: &str, team_id: &str) -> Result<bool, errors::Error> {
     let client = get_orm_client_rw().await;
     let Some(existing) = oncall_routing_config::Entity::find_by_id(org_id)
@@ -182,8 +178,8 @@ mod tests {
     }
 
     /// A NULL and an empty string both mean "nobody has nominated a team", and
-    /// the routing decision must not have to know that two spellings exist —
-    /// one of them would eventually be treated as a team id that cannot resolve.
+    /// the routing decision must not have to know that two spellings exist — one
+    /// would eventually be treated as a team id that cannot resolve.
     #[test]
     fn test_null_and_blank_both_read_as_no_default() {
         for stored in [None, Some(""), Some("   ")] {

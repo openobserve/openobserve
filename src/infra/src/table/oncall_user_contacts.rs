@@ -48,9 +48,9 @@ pub async fn get(org_id: &str, user_email: &str) -> Result<Option<Contact>, erro
 /// The fields a write may change. `None` leaves a field alone; `Some(None)`
 /// clears it.
 ///
-/// Spelled out rather than taking a whole `Contact` because a profile is
-/// edited from more than one screen, and "send me the whole object back"
-/// is how one screen silently erases a field it does not render.
+/// Spelled out rather than taking a whole `Contact`, because a profile is edited
+/// from more than one screen and "send me the whole object back" is how one
+/// screen silently erases a field it does not render.
 #[derive(Debug, Default, Clone)]
 pub struct ContactPatch {
     pub phone: Option<Option<String>>,
@@ -66,11 +66,11 @@ impl ContactPatch {
 
 /// Creates or updates one profile.
 ///
-/// **Changing a number clears its verification.** This is the whole safety
-/// property of the table: `phone_verified_at` vouches for one specific string,
-/// and carrying it across an edit would let somebody type a verified number,
-/// save, and then swap in an unverified one that a transport would still ring.
-/// Re-saving the identical number is not a change and keeps the proof.
+/// Changing a number clears its verification — the whole safety property of the
+/// table. `phone_verified_at` vouches for one specific string, and carrying it
+/// across an edit would let somebody save a verified number and then swap in an
+/// unverified one a transport would still ring. Re-saving the identical number
+/// is not a change and keeps the proof.
 pub async fn upsert(
     org_id: &str,
     user_email: &str,
@@ -158,10 +158,10 @@ mod tests {
         assert!(c.phone_is_pageable());
     }
 
-    /// The rule the write path enforces, stated as the property it protects:
-    /// a verification vouches for one string, so a different string is
-    /// unverified again. Pinned here as pure logic because the branch itself
-    /// lives inside a database round trip.
+    /// The rule the write path enforces, as the property it protects: a
+    /// verification vouches for one string, so a different string is unverified
+    /// again. Pinned here as pure logic because the branch itself lives inside a
+    /// database round trip.
     #[test]
     fn test_changing_a_number_must_drop_its_verification() {
         let old = Some("+15550100".to_string());

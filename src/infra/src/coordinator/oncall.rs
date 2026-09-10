@@ -24,9 +24,9 @@ const KIND_POLICY: &str = "policy";
 const KIND_TEAM: &str = "team";
 const KIND_MEMBERS: &str = "members";
 const KIND_SCHEDULE: &str = "schedule";
-/// An absence was recorded or withdrawn. Keyed by **org**, not by team,
-/// because that is how absences are stored: one window excuses a person from
-/// every rotation they are on, and the emitter has no team to name.
+/// An absence was recorded or withdrawn. Keyed by org, not by team, because
+/// that is how absences are stored: one window excuses a person from every
+/// rotation they are on, and the emitter has no team to name.
 const KIND_ABSENCE: &str = "absence";
 const KIND_ACK_SPENT: &str = "ack-spent";
 
@@ -54,11 +54,10 @@ pub async fn emit_team_changed(org_id: &str, team_id: &str) -> Result<(), Error>
     .await
 }
 
-/// One team's roster changed.
-///
-/// Keyed on the team alone, because membership rows are: they carry no org of
-/// their own, and inventing one for the event key would make the emitter and
-/// the reader disagree about what identifies a roster.
+/// One team's roster changed. Keyed on the team alone, because membership rows
+/// are: they carry no org of their own, and inventing one for the event key
+/// would make the emitter and the reader disagree about what identifies a
+/// roster.
 pub async fn emit_members_changed(team_id: &str) -> Result<(), Error> {
     emit(&format!(
         "{ONCALL_CACHE_WATCHER_PREFIX}{KIND_MEMBERS}/{team_id}"
@@ -78,9 +77,7 @@ pub async fn emit_schedule_changed(org_id: &str, team_id: &str) -> Result<(), Er
 ///
 /// Every schedule in the org drops, rather than the one team a caller happened
 /// to be looking at. An absence is org-wide by design, so narrowing this to a
-/// team would mean the *other* teams that person is on keep resolving to them —
-/// which is the two-teams failure the org-wide model exists to avoid, arriving
-/// through the cache instead of through the table.
+/// team would mean the other teams that person is on keep resolving to them.
 pub async fn emit_absences_changed(org_id: &str) -> Result<(), Error> {
     emit(&format!(
         "{ONCALL_CACHE_WATCHER_PREFIX}{KIND_ABSENCE}/{org_id}"
@@ -102,12 +99,9 @@ pub async fn emit_ack_token_spent(tag: &str, expires_at: i64) -> Result<(), Erro
     .await
 }
 
-/// Publishes one invalidation.
-///
-/// A `put`, like [`super::synthetics::emit_tokens_changed`], because the key
-/// space is bounded: one key per org, or per team. The store ends up holding
-/// one row for every team that has ever had its schedule edited, which is the
-/// same order as the number of teams.
+/// Publishes one invalidation. A `put`, because the key space is bounded: one
+/// key per org, or per team. The store ends up holding one row for every team
+/// that has ever had its schedule edited.
 async fn emit(key: &str) -> Result<(), Error> {
     let cluster_coordinator = super::get_coordinator().await;
     cluster_coordinator
@@ -116,15 +110,14 @@ async fn emit(key: &str) -> Result<(), Error> {
     Ok(())
 }
 
-/// Publishes a fact whose key space is **not** bounded.
+/// Publishes a fact whose key space is NOT bounded.
 ///
 /// A spent token is keyed by its own tag, so one key per acknowledgement ever
 /// made — a `put` would grow the coordinator's store forever. A delete carries
-/// the event and leaves nothing behind, which is the trade
-/// [`super::synthetics`] makes in the other direction for the same reason.
+/// the event and leaves nothing behind.
 ///
 /// Receivers treat both events identically, so nothing downstream cares which
-/// of the two arrived.
+/// arrived.
 async fn emit_transient(key: &str) -> Result<(), Error> {
     let cluster_coordinator = super::get_coordinator().await;
     cluster_coordinator.delete(key, false, true, None).await
@@ -133,15 +126,13 @@ async fn emit_transient(key: &str) -> Result<(), Error> {
 /// Watches on-call configuration events and invalidates the matching cache.
 ///
 /// Spawned once per node at startup. Every node needs it, not just the
-/// alert_manager: the API nodes serve the screens that read the same caches,
-/// and an admin who edits a rotation and immediately reloads the page must not
-/// be shown what they just replaced.
+/// alert_manager: the API nodes serve the screens that read the same caches, and
+/// an admin who edits a rotation and reloads the page must not be shown what
+/// they just replaced.
 ///
-/// `on_ack_token_spent` is passed in for the reason
-/// [`super::alerts::watch_events`] takes callbacks: the spent-token set lives in
-/// the enterprise crate, which depends on this one, so this one cannot call into
-/// it. Everything else here invalidates a cache in `infra::table` and is called
-/// directly.
+/// `on_ack_token_spent` is passed in because the spent-token set lives in the
+/// enterprise crate, which depends on this one. Everything else here invalidates
+/// a cache in `infra::table` and is called directly.
 pub async fn watch<F>(on_ack_token_spent: F) -> Result<(), anyhow::Error>
 where
     F: Fn(&str, i64) + Send + Sync + 'static,
@@ -252,9 +243,8 @@ mod tests {
         assert_eq!(parts.len(), 3, "a roster event is keyed on the team alone");
     }
 
-    /// Malformed and unknown keys must not panic — `apply` runs inside the
-    /// watch loop, and a panic there stops every later invalidation on the
-    /// node.
+    /// Malformed and unknown keys must not panic — `apply` runs inside the watch
+    /// loop, and a panic there stops every later invalidation on the node.
     #[test]
     fn test_unusable_keys_are_ignored_rather_than_panicking() {
         for key in [

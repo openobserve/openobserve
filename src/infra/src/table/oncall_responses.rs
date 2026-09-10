@@ -35,8 +35,8 @@ use crate::{
     errors::{self, DbError, Error},
 };
 
-/// Rows whose stored discriminants this build cannot interpret are dropped.
-/// A record whose state we cannot read must not be shown as `triggered` and
+/// Rows whose stored discriminants this build cannot interpret are dropped. A
+/// record whose state we cannot read must not be shown as `triggered` and
 /// re-escalated.
 fn to_response(m: oncall_responses::Model) -> Option<Response> {
     let subject_type = SubjectType::from_i32(m.subject_type)?;
@@ -82,10 +82,9 @@ fn to_event(m: oncall_response_events::Model) -> Option<ResponseEvent> {
 
 /// Opens a record for one firing.
 ///
-/// The unique index on `(org_id, subject_type, subject_id)` is what makes
-/// this safe to call from several nodes at once — the second caller gets a
-/// constraint violation rather than a duplicate record, and should read the
-/// existing one.
+/// The unique index on `(org_id, subject_type, subject_id)` makes this safe to
+/// call from several nodes at once: the second caller gets a constraint
+/// violation rather than a duplicate record, and should read the existing one.
 pub async fn open(
     org_id: &str,
     subject: &SubjectRef,
@@ -203,10 +202,8 @@ pub async fn firing_count(
 /// What a list read is asking for.
 ///
 /// A struct rather than a growing argument list because these arrived one at a
-/// time and will keep doing so: the alert drawer wants one source, the "Related
-/// & past" panels want one owning team, and the known-causes tab wants one
-/// cause. Every one of them was previously answered by fetching the org's whole
-/// open list and filtering in the client.
+/// time and will keep doing so. Every one of them was previously answered by
+/// fetching the org's whole open list and filtering in the client.
 #[derive(Debug, Default, Clone)]
 pub struct ResponseFilter<'a> {
     pub team_id: Option<&'a str>,
@@ -223,16 +220,15 @@ pub struct ResponseFilter<'a> {
     pub cause: Option<ResolutionCause>,
 }
 
-/// Records nobody has closed yet: what the on-call engineer's home screen
-/// shows.
+/// Records nobody has closed yet: the on-call engineer's home screen.
 ///
 /// Acknowledged is included. It is not escalating, but somebody owns it and
 /// still has to close it — dropping it here is how a page gets acknowledged
 /// into a void.
 ///
 /// Paged, and not optionally: a busy org accumulates hundreds of open records,
-/// and this is the first screen somebody loads at 3am. `limit` is required
-/// rather than defaulted so no future caller can quietly ask for all of them.
+/// and this is the first screen somebody loads at 3am. `limit` is required so
+/// no future caller can quietly ask for all of them.
 pub async fn list_open(
     org_id: &str,
     filter: &ResponseFilter<'_>,
@@ -296,11 +292,9 @@ fn open_query(org_id: &str, filter: &ResponseFilter<'_>) -> Select<oncall_respon
 
 /// How often each cause has closed a page, for a team or a whole org.
 ///
-/// The org-level counterpart to `prior_causes`, which groups the firings of one
-/// subject. This answers "what keeps breaking us", and it does the counting in
-/// the database: the org that most needs the answer is the one with the most
-/// rows, and loading them all to tally them in Rust would make the endpoint
-/// slowest exactly where it matters.
+/// The org-level counterpart to `prior_causes`. Counted in the database: the
+/// org that most needs the answer has the most rows, and tallying them in Rust
+/// would make the endpoint slowest exactly where it matters.
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct CauseCount {
     pub cause: ResolutionCause,
@@ -327,8 +321,7 @@ struct CauseTally {
 ///
 /// `from`/`to` are micros over `closed_at`, because the question is "what have
 /// we been resolving lately" — bucketing on when a page opened would credit a
-/// long-running firing to the week it started rather than the week it was
-/// understood.
+/// long-running firing to the week it started.
 pub async fn cause_breakdown(
     org_id: &str,
     team_id: Option<&str>,
@@ -387,10 +380,9 @@ pub async fn cause_breakdown(
 
 /// The runbook links for a page of records, keyed by record id.
 ///
-/// A separate read rather than a field on `Response`: the meta type is
-/// constructed by the escalation engine in several places, and widening it
-/// would be a change to code this surface does not own. One `IN` query per page
-/// keeps it to a single round trip regardless of page size.
+/// A separate read rather than a field on `Response`: the meta type is built by
+/// the escalation engine in several places, and widening it would change code
+/// this surface does not own. One `IN` query per page, whatever the page size.
 pub async fn runbook_urls(
     org_id: &str,
     ids: &[String],
@@ -416,9 +408,9 @@ pub async fn runbook_urls(
 
 /// The runbook the alert names, if the subject is an alert that names one.
 ///
-/// Looked up here, at the moment the record opens, so the link is copied onto
-/// the page rather than joined at read time. An alert edited or deleted the
-/// next morning must not change what a resolved page claimed to point at.
+/// Looked up when the record opens, so the link is copied onto the page rather
+/// than joined at read time: an alert edited the next morning must not change
+/// what a resolved page claimed to point at.
 async fn runbook_for(org_id: &str, subject: &SubjectRef) -> Option<String> {
     if subject.subject_type != SubjectType::Alert {
         return None;
@@ -434,12 +426,10 @@ async fn runbook_for(org_id: &str, subject: &SubjectRef) -> Option<String> {
         .filter(|u| !u.trim().is_empty())
 }
 
-/// Records whose ladder is supposed to still be climbing.
-///
-/// The reconciliation sweep's input. Oldest first and bounded, because the
-/// point of the sweep is to find records that have been sitting there — a
-/// record abandoned an hour ago matters more than one abandoned a second ago,
-/// and one pass should do a bounded amount of work.
+/// Records whose ladder is supposed to still be climbing — the reconciliation
+/// sweep's input. Oldest first and bounded: a record abandoned an hour ago
+/// matters more than one abandoned a second ago, and one pass should do a
+/// bounded amount of work.
 pub async fn list_escalating(org_id: &str, limit: u64) -> Result<Vec<Response>, errors::Error> {
     let client = get_orm_client_rw().await;
     Ok(oncall_responses::Entity::find()
@@ -472,13 +462,12 @@ pub async fn list_by_team(
         .collect())
 }
 
-/// Quiets a record until `until`, without claiming it.
 /// Records that the ladder ran out with nobody answering.
 ///
 /// Idempotent: the reconcile sweep and the engine can both reach exhaustion for
 /// the same record, and the first instant is the true one. Leaves `state`
 /// alone — an exhausted page is still somebody's problem and can still be
-/// acknowledged, which is exactly why this is not a state.
+/// acknowledged, which is why this is not a state.
 pub async fn mark_exhausted(
     org_id: &str,
     id: &str,
@@ -536,8 +525,7 @@ pub async fn snooze(
 ///
 /// The severity is what SLO reporting, digests and the post-incident review
 /// read as truth, so the only caller is the escalation engine applying a
-/// ratcheted promotion — the value handed here is `SeverityDecision::applied`,
-/// never a verdict's raw suggestion.
+/// ratcheted promotion — `SeverityDecision::applied`, never a raw suggestion.
 pub async fn set_priority(
     org_id: &str,
     id: &str,
@@ -558,13 +546,11 @@ pub async fn set_priority(
 
 /// Moves a record to another team and starts its ladder again.
 ///
-/// Clearing the ack is what makes a handoff a real transfer: the page is open
-/// again for the receiving team, and the ladder restarts under their rotation.
-/// The timeline is deliberately NOT cleared — who was paged before is history
-/// the new team needs — which is exactly why the run number moves instead. The
-/// old team's pages stay readable while ceasing to count as this team's ledger;
-/// without that, the first tick after the handoff finds every rung already sent
-/// and the receiving team is never paged at all.
+/// Clearing the ack makes a handoff a real transfer: the page is open again for
+/// the receiving team. The timeline is deliberately NOT cleared — who was paged
+/// before is history the new team needs — which is why the run number moves
+/// instead. Without that, the first tick after the handoff finds every rung
+/// already sent and the receiving team is never paged at all.
 pub async fn reassign_team(
     org_id: &str,
     id: &str,
@@ -574,11 +560,10 @@ pub async fn reassign_team(
     hand_over(org_id, id, Some(to_team_id), now).await
 }
 
-/// Hands a record to somebody on the same team, starting its ladder again.
-///
-/// Same transfer semantics as [`reassign_team`], minus the team change: the
-/// recipient is paged from the first rung, and the page keeps climbing if they
-/// never answer.
+/// Hands a record to somebody on the same team, starting its ladder again. Same
+/// transfer semantics as [`reassign_team`], minus the team change: the recipient
+/// is paged from the first rung, and the page keeps climbing if they never
+/// answer.
 pub async fn restart_ladder(
     org_id: &str,
     id: &str,
@@ -661,11 +646,9 @@ pub async fn list_impacted(org_id: &str, origin_id: &str) -> Result<Vec<Response
         .collect())
 }
 
-/// The newest still-open record for a source, if any.
-///
-/// Recovery closes THIS rather than every record for the source: an older
-/// firing that a human already resolved must stay resolved, with its own
-/// cause intact.
+/// The newest still-open record for a source, if any. Recovery closes THIS
+/// rather than every record for the source: an older firing a human already
+/// resolved must stay resolved, with its own cause intact.
 pub async fn latest_open_for_source(
     org_id: &str,
     subject_type: SubjectType,
@@ -692,8 +675,7 @@ pub async fn latest_open_for_source(
 /// A firing that spans several teams stores one record per team under
 /// `<source>:group:<team>`, which `latest_open_for_source`'s `<source>#` prefix
 /// cannot match. Recovery has to close these too: an unclosed record makes
-/// `page_decision` answer `AlreadyOpen` on that team's key for ever, so the
-/// alert silently stops paging the very teams it fanned out to.
+/// `page_decision` answer `AlreadyOpen` on that team's key for ever.
 pub async fn open_group_records_for_source(
     org_id: &str,
     subject_type: SubjectType,
@@ -739,17 +721,16 @@ pub async fn history_for_source(
         .collect())
 }
 
-/// Acknowledges a record. Returns `None` if it is gone, and the unchanged
-/// record if somebody already took it.
+/// Acknowledges a record. Returns `None` if it is gone, and the unchanged record
+/// if somebody already took it.
 ///
-/// First ack wins, and it is decided by the database rather than by this
-/// process: the state filter is part of the UPDATE, so of two responders
-/// clicking at once exactly one row is written and the loser reads back who
-/// actually has the ball. Read-then-write would let both pass the check and
-/// the second one overwrite the first.
+/// First ack wins, decided by the database rather than this process: the state
+/// filter is part of the UPDATE, so of two responders clicking at once exactly
+/// one row is written and the loser reads back who has the ball.
+/// Read-then-write would let both pass the check.
 ///
-/// The same filter is what stops the escalation engine paging a record that
-/// was acknowledged while it was resolving a schedule and talking to SMTP.
+/// The same filter stops the escalation engine paging a record acknowledged
+/// while it was resolving a schedule and talking to SMTP.
 pub async fn acknowledge(
     org_id: &str,
     id: &str,
@@ -857,10 +838,9 @@ pub async fn attach_incident(
     Ok(to_response(model.update(client).await?))
 }
 
-/// The paging record for an incident, newest firing first.
-///
-/// Keyed on the column rather than the `subject_id` naming convention, so the
-/// link survives any change to how subject ids are spelled.
+/// The paging record for an incident, newest firing first. Keyed on the column
+/// rather than the `subject_id` naming convention, so the link survives any
+/// change to how subject ids are spelled.
 pub async fn list_for_incident(
     org_id: &str,
     incident_id: &str,
@@ -880,25 +860,23 @@ pub async fn list_for_incident(
 /// Writes one timeline entry, and rewrites the ledger row when one already
 /// exists for this `(response, run, rung, recipient, channel)`.
 ///
-/// The unique index on those five columns is what enforces P4 — one row per
-/// page to one person on one channel — so a second write for the same key is a
-/// constraint violation rather than a second row. That is not an error here:
-/// both writers are describing the same page, and the later outcome is the true
-/// one. It has to be an update rather than a shrug, because the send that
-/// arrives second is the *retry* of a send that failed, and a ledger still
-/// reading `delivered: false` for a page that landed is what makes the next
-/// replay wake somebody who has already been woken.
+/// The unique index on those five columns enforces P4 — one row per page to one
+/// person on one channel — so a second write for the same key is a constraint
+/// violation rather than a second row. That is not an error: both writers
+/// describe the same page, and the later outcome is the true one. It has to be
+/// an update rather than a shrug, because the second send is the retry of one
+/// that failed, and a ledger still reading `delivered: false` for a page that
+/// landed wakes somebody who has already been woken.
 ///
-/// Entries that are not deliveries leave the four trailing columns null, and
-/// null is distinct from null in a unique index, so they never collide.
+/// Non-delivery entries leave the four trailing columns null, and null is
+/// distinct from null in a unique index, so they never collide.
 pub async fn add_event(response_id: &str, event: &ResponseEvent) -> Result<(), errors::Error> {
     add_event_in(get_orm_client_rw().await, response_id, event).await
 }
 
-/// [`add_event`] against a caller-supplied connection.
-///
-/// The super-cluster consumer applies replicated deliveries through this, so
-/// the ledger's insert-or-rewrite rule has exactly one implementation.
+/// [`add_event`] against a caller-supplied connection. The super-cluster
+/// consumer applies replicated deliveries through this, so the ledger's
+/// insert-or-rewrite rule has exactly one implementation.
 pub(super) async fn add_event_in<C: ConnectionTrait>(
     conn: &C,
     response_id: &str,
@@ -951,13 +929,13 @@ pub(super) async fn add_event_in<C: ConnectionTrait>(
 
 /// The timeline, as a person reads it.
 ///
-/// Sorted on `at`, with the id as the tiebreak. Ksuids alone cannot order
-/// these — their timestamp resolution is one second.
+/// Sorted on `at`, with the id as the tiebreak — ksuids alone cannot order
+/// these, their timestamp resolution is one second.
 ///
 /// Per-delivery rows are left out. They are the engine's dedup key, not a
 /// story: a rung that paged the whole team on two channels is one line to a
 /// responder and sixteen rows to the ledger, and the `Page` entry beside them
-/// already says who was reached and who was not.
+/// already says who was reached.
 pub async fn list_events(response_id: &str) -> Result<Vec<ResponseEvent>, errors::Error> {
     Ok(all_events(response_id)
         .await?
@@ -966,13 +944,12 @@ pub async fn list_events(response_id: &str) -> Result<Vec<ResponseEvent>, errors
         .collect())
 }
 
-/// The story **and** the ledger, in one list and one read.
+/// The story and the ledger, in one list and one read.
 ///
-/// For the callers that need both halves: anything answering "who did this rung
-/// actually reach" reads the ledger, and anything rendering the rung reads the
-/// story. Asking [`list_events`] alone for a `Delivery` row returns nothing by
-/// construction — it is defined by excluding them — so a caller that needs both
-/// and takes only the first silently concludes nobody was ever reached.
+/// For callers that need both halves. Asking [`list_events`] alone for a
+/// `Delivery` row returns nothing by construction — it is defined by excluding
+/// them — so a caller that needs both and takes only the first silently
+/// concludes nobody was ever reached.
 pub async fn list_events_and_deliveries(
     response_id: &str,
 ) -> Result<Vec<ResponseEvent>, errors::Error> {
@@ -981,10 +958,9 @@ pub async fn list_events_and_deliveries(
 
 /// Every page this record actually attempted, per person and per channel.
 ///
-/// The ledger the engine replays against, and the honest answer to "did the
-/// page reach them" — which is the one thing the record exists for. Unpaged
-/// because a replay has to see all of it; the screen that shows it to a person
-/// uses [`list_deliveries_page`].
+/// The ledger the engine replays against, and the honest answer to "did the page
+/// reach them". Unpaged because a replay has to see all of it; the screen that
+/// shows it to a person uses [`list_deliveries_page`].
 pub async fn list_deliveries(response_id: &str) -> Result<Vec<ResponseEvent>, errors::Error> {
     let client = get_orm_client_rw().await;
     Ok(deliveries_query(response_id)
@@ -999,8 +975,7 @@ pub async fn list_deliveries(response_id: &str) -> Result<Vec<ResponseEvent>, er
 ///
 /// A long-running page that walked several ladder runs has one row per
 /// recipient, per channel, per rung, and this is polled while the page is being
-/// worked — fetching the whole ledger to slice it in memory re-shipped every
-/// row on every poll.
+/// worked — slicing in memory re-shipped every row on every poll.
 pub async fn list_deliveries_page(
     response_id: &str,
     limit: u64,
@@ -1037,31 +1012,24 @@ fn deliveries_query(response_id: &str) -> Select<oncall_response_events::Entity>
 /// Drops the timeline of records that closed before `cutoff` (`06` §7).
 ///
 /// `oncall_response_events` is the only on-call table that grows without an
-/// upper bound: one row per recipient, per channel, per rung, per ladder run,
-/// and a P1 that pages a ten-person team on two channels through five rungs
-/// writes a hundred of them for one firing. Nothing pruned it.
+/// upper bound: one row per recipient, per channel, per rung, per ladder run.
+/// A P1 that pages a ten-person team on two channels through five rungs writes
+/// a hundred of them for one firing, and nothing pruned it.
 ///
-/// What is kept, and why:
+/// What is kept:
 ///
-/// - **Every open record's timeline, whatever its age.** A page that has been open for four months
-///   is a page somebody is still working, and it is the one whose history is being read.
-/// - **Everything about a record closed after `cutoff`.** That is the window in which a responder
-///   opens last week's firing to see what was tried.
-/// - **Every response row, always.** Prior causes are read off `oncall_responses.cause` and
-///   `cause_note` by `history_for_source`, never off this table, so the answer to "what was it last
-///   time" is untouched by any retention set here. That is the whole reason this sweep can be
-///   aggressive about the ledger without making the next page less useful.
+/// - **Every open record's timeline, whatever its age.** A page open for four months is one
+///   somebody is still working.
+/// - **Everything about a record closed after `cutoff`** — the window in which a responder opens
+///   last week's firing to see what was tried.
+/// - **Every response row, always.** Prior causes are read off `oncall_responses.cause`, never off
+///   this table, so no retention set here makes the next page less useful.
 ///
-/// Bounded at `max_records` records per pass, and **convergent**: the candidate
-/// set is restricted to records that still have events, so a pass that has
-/// already cleaned the oldest five hundred moves on to the next five hundred
-/// instead of selecting the same rows forever. That restriction is the whole
-/// reason for the subquery — ordering by `closed_at` alone would pick the same
-/// batch on every pass and the sweep would never reach row five hundred and one.
-///
-/// The subquery is a `DISTINCT` over `response_id`, which is the events table's
-/// own lookup index; the sweep runs hourly on one node, which is the cadence
-/// `06` §7 asks for and is what makes that affordable.
+/// Bounded at `max_records` per pass, and convergent: the candidate set is
+/// restricted to records that still have events, so a pass that cleaned the
+/// oldest five hundred moves on to the next five hundred. Ordering by
+/// `closed_at` alone would pick the same batch forever — which is the whole
+/// reason for the subquery.
 ///
 /// Returns `(records_pruned, events_deleted)`.
 pub async fn prune_events(cutoff: i64, max_records: u64) -> Result<(u64, u64), errors::Error> {
@@ -1115,10 +1083,9 @@ async fn all_events(response_id: &str) -> Result<Vec<ResponseEvent>, errors::Err
 
 // Every function below counts in the database: the org needing these answers has the most rows.
 
-/// A window over `opened_at`, restricted to one team.
-///
-/// Shared by every tally here so that "pages this team took last week" means
-/// one thing, not six subtly different things.
+/// A window over `opened_at`, restricted to one team. Shared by every tally
+/// here so that "pages this team took last week" means one thing, not six
+/// subtly different things.
 fn team_window(
     org_id: &str,
     team_id: &str,
@@ -1135,9 +1102,9 @@ fn team_window(
 /// Records whose id appears in the events table under some condition.
 ///
 /// The rung questions ("did this ever reach the second rung?") live on the
-/// timeline, and the timeline has no org column. Expressing them as an
-/// `IN (subquery)` on the response id keeps the whole answer a single `COUNT`
-/// rather than a `DISTINCT` the three backends spell differently.
+/// timeline, which has no org column. An `IN (subquery)` on the response id
+/// keeps the answer a single `COUNT` rather than a `DISTINCT` the three
+/// backends spell differently.
 fn reached_rung_at_least(
     org_id: &str,
     team_id: &str,
@@ -1188,12 +1155,11 @@ pub const FAST_ACK_MICROS: i64 = 5 * 60 * 1_000_000;
 ///
 /// `night_windows` are absolute UTC intervals the caller derived from the
 /// team's timezone; `final_rung_micros` maps a priority onto the `after_micros`
-/// of the last step in its ladder, which is what "reached the bottom" means for
-/// a record at that priority. Both are passed in rather than read here so this
-/// layer keeps no opinion about policy or geography.
+/// of the last step in its ladder. Both are passed in so this layer keeps no
+/// opinion about policy or geography.
 ///
-/// Bounded: at most `6 + final_rung_micros.len()` statements, and the caller
-/// only ever has five priorities.
+/// Bounded at `6 + final_rung_micros.len()` statements, and the caller only
+/// ever has five priorities.
 pub async fn team_page_stats(
     org_id: &str,
     team_id: &str,
@@ -1278,10 +1244,8 @@ struct DeliveryTally {
 }
 
 /// How many of the team's pages each person acknowledged, grouped in SQL.
-///
-/// The fairness question's third column. Records nobody acknowledged have a
-/// null `acked_by` and are excluded by the filter, so the sum of these is
-/// [`TeamPageStats::acknowledged`] and not [`TeamPageStats::pages`].
+/// Records nobody acknowledged have a null `acked_by` and are excluded, so the
+/// sum of these is [`TeamPageStats::acknowledged`], not [`TeamPageStats::pages`].
 pub async fn acks_by_person(
     org_id: &str,
     team_id: &str,
@@ -1303,23 +1267,13 @@ pub async fn acks_by_person(
         .collect())
 }
 
-/// How many pages each person was sent, grouped in SQL.
-///
-/// Counted off the delivery ledger rather than off the response record,
-/// because "pages Aarav received" is not "records Aarav's team took": one
-/// firing that climbs three rungs reaches three different people, and the
-/// fairness screen is asking about phones, not records.
-///
-/// `night_windows` are the same absolute intervals [`team_page_stats`] takes;
-/// passing an empty slice asks only for the totals.
 /// Whether the transport has actually been taking pages to each person lately.
 ///
 /// `(delivered, failed)` per recipient over the window, from the delivery
 /// ledger. Reachability could previously only say whether a channel was
-/// CONFIGURED, so a deployment whose SMTP credentials had been rejected on
-/// every send still reported `would_a_page_land: true` — the one screen whose
-/// job is answering that question, answering it wrong in the dangerous
-/// direction.
+/// CONFIGURED, so a deployment whose SMTP credentials were rejected on every
+/// send still reported `would_a_page_land: true` — the one screen whose job is
+/// answering that question, answering it wrong in the dangerous direction.
 ///
 /// Scoped to the team so the query stays one indexed range scan rather than a
 /// walk over the org's whole ledger.
@@ -1449,11 +1403,10 @@ struct RoutingTally {
 
 /// How often each routing sentence was written, and when it was last written.
 ///
-/// This is the only durable record of *which rule* caught a page: the response
-/// row carries a team, and `start_for_subject` writes the decision's own
-/// sentence onto the timeline. Grouping by that sentence gives one row per
-/// distinct routing outcome — bounded by the number of rules, not by the
-/// number of firings — and the caller matches each sentence back to its rule.
+/// The only durable record of which rule caught a page: the response row carries
+/// a team, and `start_for_subject` writes the decision's sentence onto the
+/// timeline. Grouping by that sentence gives one row per distinct outcome —
+/// bounded by the number of rules, not of firings.
 ///
 /// `marker` is the fragment the caller is looking for, so this layer holds no
 /// opinion about how a decision phrases itself.
@@ -1501,11 +1454,10 @@ struct RungReached {
     rung: i64,
 }
 
-/// The deepest rung each of these records reached, in one grouped query.
-///
-/// The pages list has to say how far a firing climbed, and asking the timeline
-/// once per row is the N+1 this exists to avoid — the same reason
-/// [`runbook_urls`] takes a page of ids rather than one.
+/// The deepest rung each of these records reached, in one grouped query. The
+/// pages list has to say how far a firing climbed, and asking the timeline once
+/// per row is the N+1 this avoids — the same reason [`runbook_urls`] takes a
+/// page of ids.
 pub async fn deepest_rungs(
     ids: &[String],
 ) -> Result<std::collections::HashMap<String, i64>, errors::Error> {
@@ -1642,9 +1594,9 @@ mod tests {
         assert!(e.is_delivery_of(1, 0, "ana@o2.ai", Channel::Email));
     }
 
-    /// A channel this build cannot name costs the entry its dedup key, not
-    /// its existence: one page sent twice beats losing the record that
-    /// anybody was paged at all.
+    /// A channel this build cannot name costs the entry its dedup key, not its
+    /// existence: one page sent twice beats losing the record that anybody was
+    /// paged at all.
     #[test]
     fn test_an_unknown_channel_drops_the_channel_not_the_event() {
         let mut m = event_model(ResponseEventKind::Delivery);
@@ -1670,9 +1622,9 @@ mod tests {
         assert_eq!(to_response(r).unwrap().current_run(), FIRST_LADDER_RUN);
     }
 
-    /// An unknown rung on an otherwise readable event drops the rung, not
-    /// the event — losing "who it went to" is better than losing the fact
-    /// that a page happened.
+    /// An unknown rung on an otherwise readable event drops the rung, not the
+    /// event — losing "who it went to" is better than losing the fact that a
+    /// page happened.
     #[test]
     fn test_unknown_level_drops_the_level_not_the_event() {
         let mut m = event_model(ResponseEventKind::Page);

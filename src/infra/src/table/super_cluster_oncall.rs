@@ -15,37 +15,31 @@
 
 //! Id-preserving writes for replicated on-call rows.
 //!
-//! The ordinary `oncall_*` table modules mint a fresh `ider::uuid()` on every
-//! insert, which is right for the region where the thing is created and wrong
-//! for every other region: an escalation trigger's `module_key` **is** the
-//! response id, teams are referenced by id from schedules, policies and
-//! ownership rules, and an impacted record points at its origin by id. A
-//! replica that renumbered its rows would hold the same facts under different
-//! names, and the trigger arriving behind them would find nothing.
+//! The ordinary `oncall_*` modules mint a fresh `ider::uuid()` on every insert,
+//! which is right for the region where a thing is created and wrong everywhere
+//! else: an escalation trigger's `module_key` IS the response id, and teams are
+//! referenced by id from schedules, policies and ownership rules. A replica
+//! that renumbered its rows would hold the same facts under different names.
 //!
-//! So the super-cluster consumer needs a second door: apply this row, exactly
-//! as the source region wrote it, under the id it already has. That is the only
-//! thing this module does. It lives beside the tables rather than in the queue
-//! crate because it is schema knowledge, and schema knowledge that drifts from
-//! its entity definitions fails at runtime rather than at compile time.
+//! So the consumer needs a second door: apply this row exactly as the source
+//! region wrote it, under the id it already has. It lives beside the tables
+//! because it is schema knowledge, and schema knowledge that drifts from its
+//! entity definitions fails at runtime rather than at compile time.
 //!
-//! Everything here is last-write-wins over a whole row rather than a set of
-//! field-level edits. A snapshot is idempotent under replay and under
-//! reordering-by-retry in a way that "apply this delta" is not, and the queue
-//! promises neither exactly-once nor ordering across retries. The cost is that
-//! two regions writing the same record concurrently resolve to whichever
-//! message lands second — acceptable, because only one cluster runs the
-//! alert-manager job, so only one region writes.
+//! Everything here is last-write-wins over a whole row rather than field-level
+//! edits. A snapshot is idempotent under replay and under reordering-by-retry
+//! in a way that "apply this delta" is not, and the queue promises neither
+//! exactly-once nor ordering. Two regions writing the same record concurrently
+//! resolve to whichever message lands second — acceptable, because only one
+//! cluster runs the alert-manager job.
 //!
-//! Every snapshot update below therefore goes through `reset_all()`, and that
-//! is load-bearing rather than decorative. `Model::into_active_model()` marks
-//! every column `Unchanged`, and SeaORM's update builder emits `SET` only for
-//! `Set` columns and never for the primary key — so an update built from a
-//! model alone carries no assignments at all, is short-circuited as a no-op,
-//! and *returns success having changed nothing*. A snapshot that silently
-//! applies nothing is worse than one that fails: the acknowledgement, the
-//! resolution and the ladder state stay at whatever the replica had, and the
-//! surviving region keeps paging a record somebody already answered.
+//! Every snapshot update goes through `reset_all()`, and that is load-bearing.
+//! `Model::into_active_model()` marks every column `Unchanged`, and SeaORM
+//! emits `SET` only for `Set` columns — so an update built from a model alone
+//! carries no assignments, is short-circuited as a no-op, and returns success
+//! having changed nothing. The acknowledgement, the resolution and the ladder
+//! state then stay at whatever the replica had, and the surviving region keeps
+//! paging a record somebody already answered.
 
 use config::meta::oncall::{
     EscalationPolicy, OwnershipRule, Response, ResponseEvent, Schedule, ScheduleOverride, Team,
@@ -108,10 +102,10 @@ pub async fn put_team(team: &Team) -> Result<(), errors::Error> {
 
 /// Replaces a team's whole membership.
 ///
-/// Sent and applied as a set rather than as add/remove pairs: membership is a
-/// handful of rows, and a lost `remove` would leave somebody being paged in one
-/// region and not in another — the sort of divergence nobody notices until a
-/// page goes to a mailbox that closed months ago.
+/// Sent and applied as a set rather than add/remove pairs: membership is a
+/// handful of rows, and a lost `remove` would leave somebody paged in one region
+/// and not in another — divergence nobody notices until a page goes to a mailbox
+/// that closed months ago.
 pub async fn put_members(team_id: &str, members: &[TeamMember]) -> Result<(), errors::Error> {
     let client = get_orm_client_rw().await;
     let txn = client.begin().await?;
@@ -187,13 +181,11 @@ pub async fn put_schedule(schedule: &Schedule) -> Result<(), errors::Error> {
 
 /// Applies one override under the id the source region gave it.
 ///
-/// Overrides replicate for the same reason schedules do: they are
-/// configuration, and an override the surviving cluster has never seen means a
-/// failover pages the engineer who arranged cover. `created_at` is carried
-/// rather than restamped — it is the overlap rule (§5), so a replica that
-/// stamped its own could pick a different winner from the region that wrote
-/// them, and the two clusters would page different people for the same
-/// minute.
+/// Overrides are configuration, and one the surviving cluster has never seen
+/// means a failover pages the engineer who arranged cover. `created_at` is
+/// carried rather than restamped — it is the overlap rule (§5), so a replica
+/// that stamped its own could pick a different winner and the two clusters would
+/// page different people for the same minute.
 pub async fn put_override(record: &ScheduleOverride) -> Result<(), errors::Error> {
     let client = get_orm_client_rw().await;
     let model = oncall_overrides::Model {
@@ -229,15 +221,13 @@ pub async fn put_override(record: &ScheduleOverride) -> Result<(), errors::Error
 
 /// Applies one absence window under the id the source region gave it.
 ///
-/// Absences replicate for the same reason covers do, and they were the last
-/// piece of on-call that did not: precedence is override → **unavailability** →
-/// the rotation, so a region that has never seen this row resolves a different
-/// person to the same minute. Lose the active cluster mid-holiday and the
-/// survivor pages somebody who is away, which is the one outcome the feature
-/// exists to prevent.
+/// Precedence is override → unavailability → the rotation, so a region that has
+/// never seen this row resolves a different person to the same minute. Lose the
+/// active cluster mid-holiday and the survivor pages somebody who is away —
+/// the one outcome the feature exists to prevent.
 ///
 /// `created_at` is carried rather than restamped, matching the cover: nothing
-/// reads it as a tiebreak today, but the two are read by the same resolver and
+/// reads it as a tiebreak today, but the two are read by the same resolver, and
 /// letting them drift is how a future overlap rule picks a different winner in
 /// each region.
 pub async fn put_unavailability(record: &Unavailability) -> Result<(), errors::Error> {
@@ -370,12 +360,9 @@ pub async fn put_ownership_rule(rule: &OwnershipRule) -> Result<(), errors::Erro
     Ok(())
 }
 
-/// Applies the org's routing configuration.
-///
-/// Delegated rather than reimplemented: the setting is keyed on the org, so
-/// there is no id to preserve and nothing this module would add beyond a second
-/// copy of the same upsert. It is listed here so the replication surface is
-/// still readable as one list.
+/// Applies the org's routing configuration. Delegated rather than
+/// reimplemented: the setting is keyed on the org, so there is no id to preserve.
+/// Listed here so the replication surface reads as one list.
 pub async fn put_routing_config(
     config: &config::meta::oncall::RoutingConfig,
 ) -> Result<(), errors::Error> {
@@ -386,25 +373,23 @@ pub async fn put_routing_config(
 ///
 /// The id is the contract with the scheduler: a replicated escalation trigger's
 /// `module_key` is this string, and the trigger sync path refuses to push a
-/// timer for a record it cannot find. Renumbering here would drop every
-/// replicated page.
+/// timer for a record it cannot find. Renumbering would drop every replicated
+/// page.
 pub async fn put_response(response: &Response) -> Result<(), errors::Error> {
     put_response_in(get_orm_client_rw().await, response).await
 }
 
 /// Appends one timeline entry, if the replica does not already have it.
 ///
-/// The timeline is not decoration: `Page` entries **are** the delivery ledger,
-/// and the engine refuses to re-send a rung it finds there. Replicating the
-/// record without its entries would hand the surviving cluster a record with an
-/// empty ledger, and the first tick after failover would page the whole ladder
-/// from rung zero again.
+/// The timeline is not decoration: `Page` entries ARE the delivery ledger, and
+/// the engine refuses to re-send a rung it finds there. Replicating the record
+/// without its entries would hand the survivor an empty ledger, and the first
+/// tick after failover would page the whole ladder from rung zero again.
 ///
-/// Deduped on the entry's own content rather than on a row id, because the meta
-/// type carries no id — and content is the better key anyway: two regions that
-/// independently recorded the same page should converge on one row, not two.
-/// A **delivery** is the exception, and it is not really one: its content is
-/// not stable, so the ledger key stands in for it. See [`put_event_in`].
+/// Deduped on the entry's own content rather than a row id, because the meta
+/// type carries no id — and content is the better key: two regions that
+/// independently recorded the same page should converge on one row. A delivery
+/// is the exception, because its content is not stable; see [`put_event_in`].
 pub async fn put_event(response_id: &str, event: &ResponseEvent) -> Result<(), errors::Error> {
     put_event_in(get_orm_client_rw().await, response_id, event).await
 }
@@ -458,13 +443,11 @@ async fn put_response_in<C: ConnectionTrait>(
 
 /// [`put_event`] against a caller-supplied connection.
 ///
-/// A delivery is identified by its ledger key and never by its content: the
-/// retry of a failed send describes the same page at a later `at`, so a
-/// content check would miss the row it is meant to correct and the insert
-/// behind it would hit the unique index on that key. That is a hard error, and
-/// a replicated message that can only ever error is redelivered for ever while
-/// the ledger keeps reading `delivered: false`. So deliveries go through
-/// `add_event_in`, which is the one place that rule is written down.
+/// A delivery is identified by its ledger key, never by content: the retry of a
+/// failed send describes the same page at a later `at`, so a content check would
+/// miss the row it is meant to correct and the insert behind it would hit the
+/// unique index. That is a hard error, and a replicated message that can only
+/// error is redelivered for ever while the ledger reads `delivered: false`.
 async fn put_event_in<C: ConnectionTrait>(
     conn: &C,
     response_id: &str,
@@ -523,11 +506,10 @@ async fn put_event_in<C: ConnectionTrait>(
     Ok(())
 }
 
-/// A content-dedup predicate that an absent value can actually satisfy.
-///
-/// `col.eq(None)` renders `col = NULL`, which matches nothing — so the columns
-/// a non-delivery entry leaves empty would fail their own dedup check and every
-/// redelivery would append another copy of the same line.
+/// A content-dedup predicate an absent value can actually satisfy. `col.eq(None)`
+/// renders `col = NULL`, which matches nothing — so the columns a non-delivery
+/// entry leaves empty would fail their own dedup check and every redelivery
+/// would append another copy of the same line.
 fn equals_or_is_null<T: Into<sea_orm::Value>>(
     col: oncall_response_events::Column,
     value: Option<T>,
@@ -555,8 +537,7 @@ mod tests {
     ///
     /// The unique delivery index is built by hand because
     /// `create_table_from_entity` emits no secondary indexes — and it is the
-    /// whole point of the delivery test, which asserts that a replicated retry
-    /// does not collide with it.
+    /// whole point of the delivery test.
     async fn db() -> DatabaseConnection {
         let mut opts = ConnectOptions::new("sqlite::memory:".to_string());
         opts.max_connections(1);
@@ -668,11 +649,10 @@ mod tests {
         }
     }
 
-    /// The round trip an absence has to survive: the row the replica writes
-    /// carries the source region's id and the source region's window, so the
-    /// two clusters answer "is Ana away at t?" the same way. A replica that
-    /// renumbered the row or restamped the window would hold the same holiday
-    /// under a different name and, at the edges, a different answer.
+    /// The round trip an absence has to survive: the replica's row carries the
+    /// source region's id and window, so both clusters answer "is Ana away at
+    /// t?" the same way. A replica that renumbered or restamped would hold the
+    /// same holiday under a different name and, at the edges, a different answer.
     #[test]
     fn test_an_absence_replicates_under_its_source_id_and_window() {
         let source = an_absence();
@@ -735,9 +715,9 @@ mod tests {
     }
 
     /// A snapshot over an existing record has to actually move the row. Built
-    /// from a model alone the update carries no `SET` and succeeds having
-    /// changed nothing, so the replica keeps paging a record the source region
-    /// says was acknowledged.
+    /// from a model alone the update carries no `SET` and succeeds having changed
+    /// nothing, so the replica keeps paging a record the source region says was
+    /// acknowledged.
     #[tokio::test]
     async fn test_a_snapshot_over_an_existing_record_rewrites_it() {
         let db = db().await;
@@ -765,9 +745,9 @@ mod tests {
     }
 
     /// The retry of a failed send is the same page at a later `at`, so it must
-    /// rewrite the ledger row rather than insert beside it — the unique
-    /// delivery key would reject that insert, and a message that can only error
-    /// is redelivered for ever.
+    /// rewrite the ledger row rather than insert beside it — the unique delivery
+    /// key would reject that insert, and a message that can only error is
+    /// redelivered for ever.
     #[tokio::test]
     async fn test_a_retried_delivery_rewrites_its_ledger_row() {
         let db = db().await;

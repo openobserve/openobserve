@@ -7,8 +7,8 @@ pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub org_id: String,
     /// The team an operator nominated as the catch-all. Nullable, and nothing
-    /// ever fills it in on the org's behalf: a fresh org has no default, and
-    /// what does not route goes on the unrouted queue until somebody picks one.
+    /// ever fills it in on the org's behalf: a fresh org has no default, and what
+    /// does not route goes on the unrouted queue until somebody picks one.
     pub default_team_id: Option<String>,
     pub updated_at: i64,
 }

@@ -19,17 +19,17 @@
 //! membership, schedules, escalation policies, ownership rules, response
 //! records and their timelines.
 //!
-//! This exists because on-call keeps no state in `Trigger.data` — every fact
-//! lives in a table. A replicated escalation trigger therefore names a response
-//! id and nothing else, and the trigger sync path in `scheduler.rs` will not
-//! push a timer for a record the receiving region has never seen. Without these
-//! messages that check fails for every replicated trigger, and the failover the
-//! design promises ("escalation resumes from replicated rows") resumes nothing.
+//! On-call keeps no state in `Trigger.data` — every fact lives in a table. A
+//! replicated escalation trigger therefore names a response id and nothing
+//! else, and the trigger sync path in `scheduler.rs` will not push a timer for a
+//! record the receiving region has never seen. Without these messages that check
+//! fails for every replicated trigger, and the failover the design promises
+//! resumes nothing.
 //!
-//! Idempotency: every handler is an id-preserving upsert or a delete of
-//! something that may already be gone, so a redelivery changes nothing. Ids come
-//! from the source region and are never regenerated — the id *is* the join
-//! between a trigger and its record.
+//! Every handler is an id-preserving upsert or a delete of something that may
+//! already be gone, so a redelivery changes nothing. Ids come from the source
+//! region and are never regenerated — the id IS the join between a trigger and
+//! its record.
 
 use infra::{errors::Result, table};
 use o2_enterprise::enterprise::super_cluster::queue::{Message, OncallMessage};

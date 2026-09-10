@@ -33,14 +33,13 @@ use crate::{db::get_orm_client_rw, errors};
 /// The team's escalation policy, for the paging path (`06` §3).
 ///
 /// Read on every tick of every open record — the rungs, the channels, the L0
-/// block and the repeat settings all come off this one row, and a P1 climbing
-/// its ladder reads it once a rung. It changes when somebody edits a form.
+/// block and the repeat settings all come off this row, and a P1 climbing its
+/// ladder reads it once a rung.
 ///
-/// `06` §6 budgets five minutes of staleness here, with the consequence stated
-/// as "previous wait times applied for one escalation". That is the mildest of
-/// the four: a policy edit that lands a minute late delays or hurries one rung,
-/// and cannot change *whether* anybody is paged, because an empty ladder is
-/// never what a cached policy degrades to.
+/// `06` §6 budgets five minutes of staleness, with the consequence stated as
+/// "previous wait times applied for one escalation". The mildest of the four: a
+/// late policy edit delays or hurries one rung, and cannot change whether
+/// anybody is paged, because an empty ladder is never what it degrades to.
 ///
 /// Backs [`get_or_create_cached`] only. The policy screen reads
 /// [`get_or_create`].
@@ -66,14 +65,13 @@ pub(super) async fn invalidate_and_publish(org_id: &str, team_id: &str) {
     }
 }
 
-/// A policy whose rungs will not parse falls back to the shipped defaults
-/// rather than to nothing.
+/// A policy whose rungs will not parse falls back to the shipped defaults rather
+/// than to nothing.
 ///
-/// This is the opposite choice from schedules, and deliberately so. An
-/// unstaffed schedule pages nobody but is *visible* as a coverage gap; an
-/// empty policy would also page nobody and look like a deliberate
-/// configuration. Falling back to the defaults keeps the team pageable while
-/// the corruption is logged.
+/// The opposite choice from schedules, deliberately. An unstaffed schedule pages
+/// nobody but is visible as a coverage gap; an empty policy would also page
+/// nobody and look like deliberate configuration. The defaults keep the team
+/// pageable while the corruption is logged.
 fn to_policy(m: oncall_policies::Model) -> EscalationPolicy {
     // A bad destination list costs one transport, not the whole policy.
     let destinations: Vec<String> = serde_json::from_str(&m.destinations).unwrap_or_default();
@@ -110,10 +108,9 @@ fn to_policy(m: oncall_policies::Model) -> EscalationPolicy {
 }
 
 /// Reads the team's policy, creating it from the defaults if it has none.
-///
-/// Get-or-create rather than plain get because a team must be pageable the
-/// moment it exists — requiring someone to design a policy first is how
-/// alerts end up going nowhere.
+/// Get-or-create rather than plain get, because a team must be pageable the
+/// moment it exists — requiring someone to design a policy first is how alerts
+/// end up going nowhere.
 pub async fn get_or_create(org_id: &str, team_id: &str) -> Result<EscalationPolicy, errors::Error> {
     if let Some(found) = get_by_team(org_id, team_id).await? {
         return Ok(found);
@@ -150,10 +147,9 @@ pub async fn get_or_create(org_id: &str, team_id: &str) -> Result<EscalationPoli
     }
 }
 
-/// The team's policy, served from [`POLICY_CACHE`] when fresh.
-///
-/// For the paging path only. Still get-or-create on a miss, for the reason
-/// [`get_or_create`] gives: a team must be pageable the moment it exists.
+/// The team's policy, served from [`POLICY_CACHE`] when fresh. For the paging
+/// path only. Still get-or-create on a miss, for the reason [`get_or_create`]
+/// gives.
 pub async fn get_or_create_cached(
     org_id: &str,
     team_id: &str,
@@ -291,10 +287,9 @@ mod tests {
         assert_eq!(p, defaults);
     }
 
-    /// §4's L0 block is a stored column, so a team that edits its triage
-    /// budget has to get that budget back. A column that is written and never
-    /// read is a knob that does nothing, and the team who set it has no way to
-    /// tell.
+    /// §4's L0 block is a stored column, so a team that edits its triage budget
+    /// has to get that budget back. A column written and never read is a knob
+    /// that does nothing, and the team who set it has no way to tell.
     #[test]
     fn test_the_l0_block_round_trips_through_its_own_column() {
         let defaults = EscalationPolicy::default_for_team(
@@ -332,9 +327,9 @@ mod tests {
         );
     }
 
-    /// Unlike a schedule, a corrupt policy falls back to the defaults: an
-    /// empty policy pages nobody and is indistinguishable from a deliberate
-    /// one, so the team would go silently unpageable.
+    /// Unlike a schedule, a corrupt policy falls back to the defaults: an empty
+    /// policy pages nobody and is indistinguishable from a deliberate one, so
+    /// the team would go silently unpageable.
     #[test]
     fn test_unparseable_rungs_fall_back_to_the_defaults() {
         for bad in ["not json", "{}", r#"[{"priority":99}]"#] {

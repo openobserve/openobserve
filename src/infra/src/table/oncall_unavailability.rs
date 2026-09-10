@@ -26,19 +26,15 @@ use crate::{db::get_orm_client_rw, errors};
 /// How far back a resolution load reaches.
 ///
 /// The schedule loader cannot know which instant it will be asked about, so it
-/// takes everything that has not long finished. Seven days back covers a
-/// timeline being read the morning after a page while keeping the row count
-/// bounded — the same rule the covers follow, stated the same way so the two
-/// cannot drift apart.
+/// takes everything that has not long finished. The same rule the covers follow,
+/// stated the same way so the two cannot drift apart.
 const RESOLUTION_LOOKBACK_MICROS: i64 = 7 * 24 * 60 * 60 * 1_000_000;
 
 /// Ceiling on the rows any one read returns.
 ///
-/// An org where a thousand absences are live at once has scripted a loop.
-/// Losing the oldest of them beats an unbounded read on the path a page
-/// travels — and the loss is safe in one direction only, which is why the
-/// resolution read is ordered so that the windows most likely to be in force
-/// survive the truncation.
+/// An org where a thousand absences are live at once has scripted a loop. The
+/// loss is safe in one direction only, which is why the resolution read is
+/// ordered so the windows most likely to be in force survive the truncation.
 const MAX_ROWS: u64 = 1_000;
 
 fn to_window(m: oncall_unavailability::Model) -> Unavailability {
@@ -122,10 +118,9 @@ pub async fn list_by_user(
 }
 
 /// Absences overlapping `[from, to)`, for the whole org or for one person.
-///
-/// Half-open on both sides, matching [`Unavailability::covers`]: a window
-/// ending exactly at `from` does not touch the interval, and one starting
-/// exactly at `to` does not either.
+/// Half-open on both sides, matching [`Unavailability::covers`]: a window ending
+/// exactly at `from` does not touch the interval, and one starting exactly at
+/// `to` does not either.
 pub async fn list_in_window(
     org_id: &str,
     user_email: Option<&str>,
@@ -151,18 +146,15 @@ pub async fn list_in_window(
         .collect())
 }
 
-/// What the schedule loader attaches so that every resolution sees the
-/// absences.
+/// What the schedule loader attaches so every resolution sees the absences.
 ///
-/// Bounded rather than "everything", for the same reason the cover read is: an
-/// absence table is append-mostly and a read on the paging path must not grow
-/// with the org's history. `at` is passed in rather than read from a clock, so
-/// the same function serves a replay.
+/// Bounded rather than "everything", like the cover read: an absence table is
+/// append-mostly and a read on the paging path must not grow with the org's
+/// history.
 ///
-/// Ordered by `end_at` **descending** so that a truncated read keeps the
-/// windows reaching furthest forward — the ones most likely still to be in
-/// force. Truncation can then cost a skip that should have happened, never a
-/// skip that should not have.
+/// Ordered by `end_at` descending, so a truncated read keeps the windows
+/// reaching furthest forward — the ones most likely still in force. Truncation
+/// can then cost a skip that should have happened, never one that should not.
 pub async fn list_for_resolution(
     org_id: &str,
     at: i64,

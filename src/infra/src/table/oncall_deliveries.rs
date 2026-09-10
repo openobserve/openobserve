@@ -123,11 +123,10 @@ pub struct InboxQuery {
     pub to: Option<i64>,
 }
 
-/// Builds the joined, org-scoped, recipient-filtered select.
-///
-/// The left join is what makes `unread_only` a SQL filter rather than a pass
-/// over rows this process fetched: filtering after the fact would silently
-/// break pagination, because the page would be cut before the filter ran.
+/// Builds the joined, org-scoped, recipient-filtered select. The left join makes
+/// `unread_only` a SQL filter rather than a pass over rows this process fetched:
+/// filtering afterwards would silently break pagination, because the page would
+/// be cut before the filter ran.
 fn inbox_select(
     org_id: &str,
     user_email: &str,
@@ -172,11 +171,10 @@ fn inbox_select(
     select
 }
 
-/// One person's inbox, newest attempt first.
-///
-/// `limit` is required rather than defaulted, for the same reason
-/// `list_open`'s is: a responder on a bad rotation accumulates thousands of
-/// these, and no caller should be able to ask for all of them by omission.
+/// One person's inbox, newest attempt first. `limit` is required rather than
+/// defaulted, like `list_open`'s: a responder on a bad rotation accumulates
+/// thousands of these, and no caller should be able to ask for all of them by
+/// omission.
 pub async fn list_for_user(
     org_id: &str,
     user_email: &str,
@@ -247,9 +245,8 @@ pub async fn unread_count(org_id: &str, user_email: &str) -> Result<u64, errors:
 /// re-sends its page on every scroll.
 ///
 /// Every id is checked against rows actually addressed to this caller. Without
-/// that a client could mark another person's page read, which is worse than it
-/// sounds: an unread badge is how somebody notices they were paged while their
-/// phone was face down.
+/// that, a client could mark another person's page read — and an unread badge is
+/// how somebody notices they were paged while their phone was face down.
 pub async fn set_read(
     org_id: &str,
     user_email: &str,
@@ -313,11 +310,10 @@ pub async fn set_read(
     Ok(marked)
 }
 
-/// Marks everything currently unread as read — "clear my inbox".
-///
-/// Bounded by `limit` rather than sweeping the table, because the natural
-/// implementation of this button is an unbounded UPDATE and the natural
-/// consequence is a lock held across a responder's entire history.
+/// Marks everything currently unread as read — "clear my inbox". Bounded by
+/// `limit` rather than sweeping the table: the natural implementation of this
+/// button is an unbounded UPDATE, and the natural consequence is a lock held
+/// across a responder's entire history.
 pub async fn mark_all_read(
     org_id: &str,
     user_email: &str,

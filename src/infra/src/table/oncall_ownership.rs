@@ -36,23 +36,20 @@ use crate::{db::get_orm_client_rw, errors};
 
 /// An org's ownership rules, for the paging path (`06` §3).
 ///
-/// The single biggest read this feature does. Routing loads the *whole* rule
-/// set for the org on every firing — the match is longest-prefix over a map,
-/// which SQL cannot express — and blast-radius paging does it again once per
-/// impacted service. An incident touching eight services is nine full scans of
-/// the same table for the same unchanged rows.
+/// The single biggest read this feature does. Routing loads the whole rule set
+/// for the org on every firing — the match is longest-prefix over a map, which
+/// SQL cannot express — and blast-radius paging does it again per impacted
+/// service. An incident touching eight services is nine full scans of the same
+/// unchanged rows.
 ///
-/// The staleness this trades for is the one worth being most careful about: a
-/// stale rule pages the wrong team, and nothing about that looks like a
-/// failure. `06` §6 accepts it because the failure is bounded — the page still
-/// goes *somewhere*, and the ladder still climbs — but every path that writes a
-/// rule invalidates here, including the super-cluster apply path, and the TTL
-/// below is a minute rather than §6's five.
+/// The staleness this trades for is the one to be most careful about: a stale
+/// rule pages the wrong team, and nothing about that looks like a failure. `06`
+/// §6 accepts it because the page still goes somewhere and the ladder still
+/// climbs, but every path that writes a rule invalidates here, including the
+/// super-cluster apply path.
 ///
-/// Keyed by org, not by rule: the value is the whole set, because that is what
-/// the resolution needs.
-///
-/// Backs [`list_cached`] only; the ownership screens read [`list`].
+/// Keyed by org, not by rule: the value is the whole set, which is what
+/// resolution needs. Backs [`list_cached`] only; the screens read [`list`].
 static RULES_CACHE: LazyLock<RwHashMap<String, (Vec<OwnershipRule>, Instant)>> =
     LazyLock::new(Default::default);
 
@@ -64,7 +61,7 @@ pub fn invalidate_cache(org_id: &str) {
 }
 
 /// `pub(super)` because `super_cluster_oncall` applies replicated rules through
-/// the ORM rather than through [`create`], and a rule that arrives from another
+/// the ORM rather than through [`create`], and a rule arriving from another
 /// region has to drop this cache exactly as surely as one typed locally.
 pub(super) async fn invalidate_and_publish(org_id: &str) {
     invalidate_cache(org_id);
@@ -74,8 +71,8 @@ pub(super) async fn invalidate_and_publish(org_id: &str) {
 }
 
 /// A rule whose dimensions column will not parse is dropped, not defaulted to
-/// empty. An empty rule matches EVERY alert in the org, so a parse failure
-/// must never produce one.
+/// empty. An empty rule matches EVERY alert in the org, so a parse failure must
+/// never produce one.
 fn to_rule(m: oncall_ownership_rules::Model) -> Option<OwnershipRule> {
     let dimensions: HashMap<String, String> = match serde_json::from_str(&m.dimensions) {
         Ok(d) => d,
@@ -128,13 +125,12 @@ pub async fn create(
 
 /// Repoints an existing rule at a team, a path, or both.
 ///
-/// `Ok(None)` when no such rule exists in this org, so the caller can answer
-/// 404 rather than inventing one — an update that silently creates is how a
-/// typo'd id ends up owning production traffic.
+/// `Ok(None)` when no such rule exists in this org, so the caller can answer 404
+/// rather than inventing one — an update that silently creates is how a typo'd
+/// id ends up owning production traffic.
 ///
 /// `path` is recomputed from the dimensions rather than carried, because it is
-/// the unique key and the only thing routing matches on. A stale path with
-/// fresh dimensions would route by one and display the other.
+/// the unique key and the only thing routing matches on.
 pub async fn update(
     org_id: &str,
     id: &str,
@@ -171,8 +167,8 @@ pub async fn update(
 }
 
 /// Every rule for an org. The routing path loads the whole set and resolves in
-/// memory: the match is longest-prefix over a map, which SQL cannot express,
-/// and an org has tens of rules, not thousands.
+/// memory: the match is longest-prefix over a map, which SQL cannot express, and
+/// an org has tens of rules, not thousands.
 pub async fn list(org_id: &str) -> Result<Vec<OwnershipRule>, errors::Error> {
     let client = get_orm_client_rw().await;
     Ok(oncall_ownership_rules::Entity::find()
@@ -187,9 +183,9 @@ pub async fn list(org_id: &str) -> Result<Vec<OwnershipRule>, errors::Error> {
 
 /// Every rule for an org, served from [`RULES_CACHE`] when fresh.
 ///
-/// For the paging path only. An org with no rules **is** cached: "nobody claims
+/// For the paging path only. An org with no rules IS cached: "nobody claims
 /// anything here" is a stable answer and the common one for a young org, and it
-/// is exactly the read that would otherwise run on every single firing.
+/// is exactly the read that would otherwise run on every firing.
 pub async fn list_cached(org_id: &str) -> Result<Vec<OwnershipRule>, errors::Error> {
     if let Some(entry) = RULES_CACHE.get(org_id)
         && entry.1.elapsed() < RULES_CACHE_TTL
@@ -249,11 +245,9 @@ pub async fn delete_by_team(org_id: &str, team_id: &str) -> Result<u64, errors::
 /// The most a stored path may be, in characters.
 ///
 /// The column is a `varchar`, because the queue is keyed on it and a unique
-/// index over unbounded text is not portable. Records carry far more
-/// dimensions than any rule names, so a very wide record's path is truncated
-/// rather than refused: losing the tail of a display string is a much smaller
-/// failure than dropping the only evidence that a page went nowhere. The
-/// dimensions themselves are stored in full alongside it.
+/// index over unbounded text is not portable. A very wide record's path is
+/// truncated rather than refused: losing the tail of a display string is a much
+/// smaller failure than dropping the only evidence that a page went nowhere.
 const MAX_PATH_CHARS: usize = 255;
 
 fn truncate_path(path: &str) -> String {
@@ -263,9 +257,9 @@ fn truncate_path(path: &str) -> String {
     }
 }
 
-/// A row whose dimensions will not parse still lists — unlike an ownership
-/// rule, an unparseable one here is harmless (it matches nothing and decides
-/// nothing) and the row's whole purpose is to be seen.
+/// A row whose dimensions will not parse still lists — unlike an ownership rule,
+/// an unparseable one here is harmless, and the row's whole purpose is to be
+/// seen.
 fn to_unrouted(m: oncall_unrouted_signals::Model) -> UnroutedSignal {
     let dimensions: HashMap<String, String> =
         serde_json::from_str(&m.dimensions).unwrap_or_else(|e| {
@@ -295,18 +289,16 @@ fn to_unrouted(m: oncall_unrouted_signals::Model) -> UnroutedSignal {
 /// Records that a signal on `dimensions` matched no ownership rule.
 ///
 /// Upserts on `(org_id, path)`: the second firing into the same gap bumps the
-/// count and the sample rather than adding a line. `subject` is what fired,
-/// when the caller knows it — routing itself decides before the subject is
-/// built, so it is optional and only ever a sample.
+/// count and the sample rather than adding a line. `subject` is what fired, when
+/// the caller knows it — routing decides before the subject is built, so it is
+/// optional and only ever a sample.
 ///
-/// `defaulted_team_id` says whether the gap paged the org's nominated catch-all
-/// or paged nobody. It is written on every firing rather than only on the
-/// first, because the answer changes the moment somebody nominates a default —
-/// and the row an operator reads has to describe what is happening now, not
-/// what happened the first time.
+/// `defaulted_team_id` says whether the gap paged the org's catch-all or paged
+/// nobody. Written on every firing rather than only the first, because the
+/// answer changes the moment somebody nominates a default.
 ///
-/// A previously dismissed row is reopened. Somebody said "handled" and it
-/// happened again, so it plainly was not.
+/// A previously dismissed row is reopened: somebody said "handled" and it
+/// happened again.
 pub async fn record_unrouted(
     org_id: &str,
     dimensions: &HashMap<String, String>,
@@ -384,10 +376,9 @@ pub async fn record_unrouted(
 
 /// Which half of the queue a caller wants.
 ///
-/// The queue now records two outcomes, and they are read by two different
-/// people: "Assign next" wants the gaps that are waking the default team, and
-/// the coverage alarm wants the gaps that are waking nobody. Naming them makes
-/// the call sites say which question they are asking.
+/// The queue records two outcomes, read by two different people: "Assign next"
+/// wants the gaps waking the default team, and the coverage alarm wants the gaps
+/// waking nobody. Naming them makes the call sites say which they are asking.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Landing {
     #[default]
@@ -542,8 +533,8 @@ mod tests {
     }
 
     /// Unlike an ownership rule, a queue row with unreadable dimensions is
-    /// harmless — it matches nothing and decides nothing — and dropping it
-    /// would hide the one fact it exists to report.
+    /// harmless — it matches nothing and decides nothing — and dropping it would
+    /// hide the one fact it exists to report.
     #[test]
     fn test_an_unrouted_row_survives_unparseable_dimensions() {
         let s = to_unrouted(unrouted_model("not json"));
@@ -571,8 +562,8 @@ mod tests {
     }
 
     /// The column carries the difference between "this gap woke the default
-    /// team" and "this gap woke nobody", so it has to survive the mapping —
-    /// and a stored blank has to read as the latter, not as a team named "".
+    /// team" and "this gap woke nobody", so it has to survive the mapping — and
+    /// a stored blank has to read as the latter, not as a team named "".
     #[test]
     fn test_a_defaulted_row_says_which_team_it_woke() {
         let mut m = unrouted_model("{}");
