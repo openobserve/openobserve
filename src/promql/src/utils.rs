@@ -86,7 +86,7 @@ pub fn matcher_predicates(schema: &Schema, matchers: &Matchers) -> Vec<Expr> {
         let predicate = match &mat.op {
             MatchOp::Equal => col(mat.name.clone()).eq(literal(mat.value.clone())),
             MatchOp::NotEqual => col(mat.name.clone()).not_eq(literal(mat.value.clone())),
-            MatchOp::Re(regex) => {
+            MatchOp::Re(regex) | MatchOp::NotRe(regex) => {
                 let regex = format!("^{}$", regex.as_str());
                 // DataFusion 54 can lower a regex on Utf8View to a mixed-type
                 // equality/LIKE expression. Cast only regex matchers until that
@@ -96,16 +96,12 @@ pub fn matcher_predicates(schema: &Schema, matchers: &Matchers) -> Vec<Expr> {
                 } else {
                     col(mat.name.clone())
                 };
-                regexp_like().call(vec![value, lit(regex)])
-            }
-            MatchOp::NotRe(regex) => {
-                let regex = format!("^{}$", regex.as_str());
-                let value = if field_type == DataType::Utf8View {
-                    cast(col(mat.name.clone()), DataType::Utf8)
+                let predicate = regexp_like().call(vec![value, lit(regex)]);
+                if matches!(mat.op, MatchOp::NotRe(_)) {
+                    predicate.not()
                 } else {
-                    col(mat.name.clone())
-                };
-                regexp_like().call(vec![value, lit(regex)]).not()
+                    predicate
+                }
             }
         };
         predicates.push(predicate);
