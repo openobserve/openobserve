@@ -284,6 +284,22 @@ mod tests {
         .unwrap()
     }
 
+    /// The aggregate over the same data as matrix sources.
+    async fn run_materialized(
+        modifier: &Option<LabelModifier>,
+        func_name: &str,
+        op: FusedAggOp,
+        range: Duration,
+    ) -> Value {
+        let func: Arc<dyn RangeFunc> = Arc::from(functions::fusable_range_func(func_name).unwrap());
+        let (sources, range) =
+            matrix::group_sources(Value::Matrix(reference_matrix(range)), modifier, func_name)
+                .unwrap()
+                .unwrap();
+        let eval = Arc::new(RangeExpr::new(func, range, &eval_ctx()));
+        aggregate(sources, op, eval).await.unwrap().0
+    }
+
     #[test]
     fn test_group_label_columns_resolution() {
         let schema = arrow_schema();
@@ -313,7 +329,6 @@ mod tests {
         let ctx = session_ctx();
         register_sorted_table(&ctx);
         let range = Duration::from_secs(60);
-        let eval_ctx = eval_ctx();
 
         let agg_cases = [
             FusedAggOp::Avg,
@@ -336,18 +351,7 @@ mod tests {
         for op in agg_cases {
             for func_name in func_cases {
                 for modifier in &modifiers {
-                    let func: Arc<dyn RangeFunc> =
-                        Arc::from(functions::fusable_range_func(func_name).unwrap());
-                    let expected = matrix::fused_agg(
-                        modifier,
-                        Value::Matrix(reference_matrix(range)),
-                        func,
-                        op,
-                        &eval_ctx,
-                        10,
-                    )
-                    .await
-                    .unwrap();
+                    let expected = run_materialized(modifier, func_name, op, range).await;
 
                     let actual = run_streaming(&ctx, modifier, func_name, op, range)
                         .await

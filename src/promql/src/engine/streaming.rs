@@ -64,7 +64,6 @@ impl Engine {
         let Some(scan) = self.selector_scan(vs, range, "MatrixSelector").await? else {
             return Ok(None);
         };
-        let timeout = self.ctx.query_ctx.timeout;
         let shape = fused::stream::FusedShape {
             op,
             func: func.clone(),
@@ -93,12 +92,7 @@ impl Engine {
         let matrix = self
             .eval_matrix_selector(&scan.selector, range, Some(scan.ctxs))
             .await?;
-        let input = if matrix.is_empty() {
-            Value::None
-        } else {
-            Value::Matrix(matrix)
-        };
-        fused::matrix::fused_agg(modifier, input, func, op, &self.eval_ctx, timeout)
+        self.fused_agg_matrix(modifier, Value::Matrix(matrix), func, op)
             .await
             .map(Some)
     }

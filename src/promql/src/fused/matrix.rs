@@ -13,91 +13,92 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{sync::Arc, time::Duration};
+//! An already-materialized matrix opened as series sources, so it folds through the same
+//! consumers the hash-sorted scans do.
+
+use std::time::Duration;
 
 use config::meta::promql::{
     NAME_LABEL,
-    value::{EvalContext, Value},
+    value::{RangeValue, Value},
 };
 use datafusion::error::{DataFusionError, Result};
-use infra::errors::ErrorCodes;
 use promql_parser::parser::LabelModifier;
 use rayon::prelude::*;
 
-use super::{aggregate::aggregate, op::FusedAggOp, range_expr::RangeExpr};
 use crate::{
-    functions::{KEEP_METRIC_NAME_FUNC, RangeFunc},
-    series_stream::matrix::matrix_streams,
+    functions::KEEP_METRIC_NAME_FUNC,
+    series_stream::matrix::{MatrixSeriesStream, matrix_streams},
 };
 
-/// Evaluates a range function over an already-materialized matrix and folds
-/// its values straight into aggregation groups, through the same fold the
-/// hash-sorted path uses.
-///
-/// The engine selects this only for the exact `agg(range_func(...))` shape;
-/// everything else stays on the generic evaluator, the correctness reference.
-pub(crate) async fn fused_agg(
-    param: &Option<LabelModifier>,
+/// A partition of the matrix, already open.
+pub(crate) type MatrixSource = std::future::Ready<Result<MatrixSeriesStream>>;
+
+/// The matrix as group-ordered sources for the aggregate and the window the load applied to
+/// it; `None` for no input.
+pub(crate) fn group_sources(
     data: Value,
-    func: Arc<dyn RangeFunc>,
-    op: FusedAggOp,
-    eval_ctx: &EvalContext,
-    timeout: u64,
-) -> Result<Value> {
-    let func_name = func.name();
-    let mut matrix = match data {
-        Value::Matrix(matrix) => matrix,
-        Value::None => return Ok(Value::None),
-        value => {
-            return Err(DataFusionError::Plan(format!(
-                "fused {}({func_name}): matrix argument expected but got {}",
-                op.name(),
-                value.get_type()
-            )));
-        }
+    modifier: &Option<LabelModifier>,
+    func_name: &str,
+) -> Result<Option<(Vec<MatrixSource>, Duration)>> {
+    let Some(matrix) = matrix_input(data, func_name)? else {
+        return Ok(None);
     };
-    if matrix.is_empty() {
-        return Ok(Value::None);
-    }
-
-    // Strip the metric name before grouping, as the range function would have;
-    // visible to `sum by(__name__) (...)`.
-    if !KEEP_METRIC_NAME_FUNC.contains(func_name) {
-        matrix.par_iter_mut().for_each(|series| {
-            series.labels.retain(|label| label.name != NAME_LABEL);
-        });
-    }
-
     // the load applied one window to every series, so the first speaks for all
     let range = matrix[0]
         .time_window
         .as_ref()
         .expect("range function input must have a time window")
         .range;
-    let eval = Arc::new(RangeExpr::new(func, range, eval_ctx));
-    let sources = matrix_streams(matrix, param, config::get_config().limit.cpu_num)
+    let matrix = strip_metric_name(matrix, func_name);
+    let streams = matrix_streams(matrix, modifier, config::get_config().limit.cpu_num);
+    Ok(Some((sources(streams), range)))
+}
+
+fn matrix_input(data: Value, func_name: &str) -> Result<Option<Vec<RangeValue>>> {
+    match data {
+        Value::Matrix(matrix) if matrix.is_empty() => Ok(None),
+        Value::Matrix(matrix) => Ok(Some(matrix)),
+        Value::None => Ok(None),
+        value => Err(DataFusionError::Plan(format!(
+            "{func_name}: matrix argument expected but got {}",
+            value.get_type()
+        ))),
+    }
+}
+
+/// Strips the metric name as the range function would have; visible to `sum by(__name__)`.
+fn strip_metric_name(mut matrix: Vec<RangeValue>, func_name: &str) -> Vec<RangeValue> {
+    if !KEEP_METRIC_NAME_FUNC.contains(func_name) {
+        matrix.par_iter_mut().for_each(|series| {
+            series.labels.retain(|label| label.name != NAME_LABEL);
+        });
+    }
+    matrix
+}
+
+fn sources(streams: Vec<MatrixSeriesStream>) -> Vec<MatrixSource> {
+    streams
         .into_iter()
-        .map(|source| std::future::ready(Ok(source)))
-        .collect();
-    let (value, _) =
-        tokio::time::timeout(Duration::from_secs(timeout), aggregate(sources, op, eval))
-            .await
-            .map_err(|_| {
-                DataFusionError::from(ErrorCodes::SearchTimeout(
-                    "[PromQL] fused agg timeout".to_string(),
-                ))
-            })??;
-    Ok(value)
+        .map(|stream| std::future::ready(Ok(stream)))
+        .collect()
 }
 
 #[cfg(test)]
 mod tests {
-    use std::{sync::Arc, time::Duration};
+    use std::sync::Arc;
 
-    use config::meta::promql::value::{Label, RangeValue, Sample, TimeWindow};
+    use config::meta::promql::value::{EvalContext, Label, Sample, TimeWindow};
 
-    use super::{super::test_support::*, *};
-    use crate::{aggregations, functions, series_stream::matrix::MATRIX_PARTITION_CHUNK};
+    use super::{
+        super::{aggregate::aggregate, op::FusedAggOp, range_expr::RangeExpr, test_support::*},
+        *,
+    };
+    use crate::{
+        aggregations,
+        functions::{self, RangeFunc},
+        series_stream::matrix::MATRIX_PARTITION_CHUNK,
+    };
 
     type GenericAgg = fn(&Option<LabelModifier>, Value, &EvalContext) -> Result<Value>;
 
@@ -161,7 +162,10 @@ mod tests {
         eval_ctx: &EvalContext,
     ) -> Result<Value> {
         let func: Arc<dyn RangeFunc> = Arc::from(functions::fusable_range_func(func_name).unwrap());
-        fused_agg(modifier, Value::Matrix(matrix), func, op, eval_ctx, 30).await
+        let (sources, range) = group_sources(Value::Matrix(matrix), modifier, func_name)?
+            .expect("the test matrix is not empty");
+        let eval = Arc::new(RangeExpr::new(func, range, eval_ctx));
+        aggregate(sources, op, eval).await.map(|(value, _)| value)
     }
 
     #[tokio::test]
@@ -347,43 +351,14 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_fused_range_agg_none_and_invalid_input() {
-        let eval_ctx = eval_ctx();
-        let func: Arc<dyn RangeFunc> = Arc::from(functions::fusable_range_func("rate").unwrap());
-        let result = fused_agg(
-            &None,
-            Value::None,
-            func.clone(),
-            FusedAggOp::Sum,
-            &eval_ctx,
-            30,
-        )
-        .await
-        .unwrap();
-        assert!(matches!(result, Value::None));
-
-        let result = fused_agg(
-            &None,
-            Value::Float(1.0),
-            func.clone(),
-            FusedAggOp::Sum,
-            &eval_ctx,
-            30,
-        )
-        .await;
-        assert!(result.is_err());
-
-        let result = fused_agg(
-            &None,
-            Value::Matrix(vec![]),
-            func,
-            FusedAggOp::Sum,
-            &eval_ctx,
-            30,
-        )
-        .await
-        .unwrap();
-        assert!(matches!(result, Value::None));
+    #[test]
+    fn test_matrix_sources_none_and_invalid_input() {
+        assert!(group_sources(Value::None, &None, "rate").unwrap().is_none());
+        assert!(group_sources(Value::Float(1.0), &None, "rate").is_err());
+        assert!(
+            group_sources(Value::Matrix(vec![]), &None, "rate")
+                .unwrap()
+                .is_none()
+        );
     }
 }

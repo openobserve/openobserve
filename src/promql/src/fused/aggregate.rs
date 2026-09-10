@@ -37,7 +37,7 @@ pub(super) struct GroupEntry {
 
 /// Aggregates every partition, partial then final; each source opens inside its own task, and
 /// dropping the future aborts them all.
-pub(super) async fn aggregate<F, S>(
+pub(crate) async fn aggregate<F, S>(
     sources: Vec<F>,
     op: FusedAggOp,
     eval: Arc<RangeExpr>,
