@@ -1,0 +1,12 @@
+[
+  { "title": "MCP Server page renders the endpoint + token credential pane (OSS default)", "action": "new", "verifies": "the MCP card renders the org-scoped endpoint, hides the OAuth tab, and shows the token credential pane with the generate button and security hint" },
+  { "title": "Generate a dedicated token → post-generation panel with rbac-note (OSS)", "action": "new", "verifies": "generating a token swaps to the post-generation panel with a masked credential header, the RBAC-off note, and download/manage buttons, and the raw token never renders" },
+  { "title": "Switching the MCP client re-renders the config snippet", "action": "new", "verifies": "selecting Cursor re-renders the JSON config snippet and reselecting Claude Code restores the bash one-liner" },
+  { "title": "One-click install button is client-dependent", "action": "new", "verifies": "the one-click install button is absent for Claude Code and appears (Add to Cursor) for Cursor" },
+  { "title": "Skills command + repo button (Step 3)", "action": "new", "verifies": "Step 3 shows the npx skills install command and the skills GitHub repo button" },
+  { "title": "Manage / revoke navigates to Service Accounts", "action": "new", "verifies": "the post-generation Manage / revoke button routes to the IAM Service Accounts page" },
+  { "title": "Session credential reuse on remount (same org)", "action": "new", "verifies": "the minted credential is cached per org so the post-generation panel re-shows after navigating away and back without re-minting" },
+  { "title": "OAuth auth-mode tab — not wired on OSS (needs enterprise/cloud + SSO: McpServerCard.vue:70-74)", "action": "new", "verifies": "the OAuth auth-mode tab and note render on enterprise/cloud with SSO (fixme placeholder on OSS)" },
+  { "title": "Readonly scope note — not wired on OSS (needs rbac_enabled: useMcpCredential.ts:119)", "action": "new", "verifies": "the readonly scope note renders when RBAC is enabled (fixme placeholder on OSS)" },
+  { "title": "Unscoped warning — not wired on OSS (needs RBAC on + role failure: useMcpCredential.ts:122)", "action": "new", "verifies": "the unscoped warning renders when RBAC is on but role assignment fails (fixme placeholder on OSS)" }
+]

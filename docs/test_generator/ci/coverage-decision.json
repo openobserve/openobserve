@@ -1,0 +1,11 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/GeneralTests/mcpServerSetup.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/GeneralTests/serviceAccount.spec.js",
+    "tests/ui-testing/playwright-tests/GeneralTests/ai-toolsets-form-validation.spec.js",
+    "tests/ui-testing/playwright-tests/GeneralTests/iam-form-validation.spec.js"
+  ],
+  "needs_registration": true,
+  "rationale": "No existing spec covers the MCP Server Connection Setup card (McpServerCard hosted at /iam/mcpServer). serviceAccount.spec.js exercises the IAM Service Accounts tab, not the MCP credential flow; ai-toolsets-form-validation and iam-form-validation only share the 'MCP' keyword (AddAiToolset MCP URL) and are unrelated to the card. The feature is its own IAM sub-surface with distinct selectors (ai-integrations-mcp-*) and a unique generate-token flow, so a new GeneralTests spec is warranted. Register it in ci_matrix.json GeneralTests run_files."
+}

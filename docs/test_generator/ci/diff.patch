@@ -1,0 +1,2835 @@
+===== COMPLETE LIST OF CHANGED FILES (24 files) =====
+# AUTHORITATIVE: this list is never truncated. The diff BODY below may be trimmed for
+# very large PRs, so decide WHICH files/areas changed (e.g. web/src frontend) from THIS list.
+scripts/translations/.translation_state.json
+src/api/http/src/handler/http/request/mcp/mod.rs
+web/src/components/ingestion/ai/McpServerCard.spec.ts
+web/src/components/ingestion/ai/McpServerCard.vue
+web/src/components/ingestion/setupCard/SetupCardRenderer.vue
+web/src/components/ingestion/setupCard/types.ts
+web/src/composables/useMcpCredential.spec.ts
+web/src/composables/useMcpCredential.ts
+web/src/locales/languages/ar-SA.json
+web/src/locales/languages/de-DE.json
+web/src/locales/languages/en-US.json
+web/src/locales/languages/es-ES.json
+web/src/locales/languages/fr-FR.json
+web/src/locales/languages/it-IT.json
+web/src/locales/languages/ja-JP.json
+web/src/locales/languages/ko-KR.json
+web/src/locales/languages/nl-NL.json
+web/src/locales/languages/pl-PL.json
+web/src/locales/languages/pt-PT.json
+web/src/locales/languages/ru-RU.json
+web/src/locales/languages/tr-TR.json
+web/src/locales/languages/vi-VN.json
+web/src/locales/languages/zh-CN.json
+web/src/locales/languages/zh-TW.json
+===== END CHANGED FILES =====
+
+diff --git a/scripts/translations/.translation_state.json b/scripts/translations/.translation_state.json
+index 46a4748cca5..fbed74e288b 100644
+--- a/scripts/translations/.translation_state.json
++++ b/scripts/translations/.translation_state.json
+@@ -8823,10 +8823,9 @@
+       "auth": {
+         "oauth": "c324eda2422e19d1",
+         "oauthNote": "cb0d79fc4e1cc49a",
++        "oauthTitle": "a8d518d7bb385987",
+         "token": "9a911b08feb9d292"
+       },
+-      "authLabel": "5c32ae8f773796c1",
+-      "clientLabel": "3cf80d5b25a738d1",
+       "clients": {
+         "antigravity": "4da276f5f11d050f",
+         "chatgpt": "50a4122943273ad2",
+@@ -8840,16 +8839,21 @@
+         "vscode": "af437cf8caed3e51",
+         "windsurf": "da30d04dca8e2ba1"
+       },
+-      "configLabel": "bd7f547a796d2933",
++      "configHint": "cbbc94b94fef7deb",
++      "configLabel": "7915e69862be7ae7",
++      "connectHint": "9c7417f6b259a0af",
++      "connectLabel": "7d0b8450b967c40b",
+       "credential": {
+-        "created": "8a7ad20f369ea242",
++        "created": "f5e23e0f00fce190",
+         "download": "d6eafe8235910042",
+         "error": "7ddcced3576b445e",
+-        "generate": "2f02f30a99ef3d96",
++        "generate": "c6e4cddd2773af0c",
+         "manage": "de572f939d581a46",
+-        "quickStartBody": "5a8294722e40104e",
+-        "quickStartTitle": "6e1a5e1b5bb46b22",
+-        "readonlyWarn": "7ac2c2c841fd9524",
++        "quickStartBody": "d2b9167a2c9e62bc",
++        "quickStartTitle": "b6000f54c6e6adc1",
++        "rbacNote": "65df0740cae0c52c",
++        "readonlyNote": "5e453e04030d8c82",
++        "readonlyWarn": "606034424490ad90",
+         "shownOnce": "58bc45155d18d789"
+       },
+       "crossLinkBody": "f36ef3efc51aff3c",
+@@ -8868,13 +8872,14 @@
+         "vscode": "d0e0e3f94f8bdfbb",
+         "windsurf": "a1ef3a47b0214359"
+       },
+-      "docsCta": "673e1c9b4e77fed2",
+-      "endpointLabel": "b10c324c9054c45a",
+       "installOneClick": "22cd4bc02c1d4c1c",
+       "name": "9b5daabca4647fd7",
+-      "securityBody": "0d17925aade50015",
++      "securityBody": "de00835eaf7e01f2",
+       "securityTitle": "925dcec8f1041a1d",
+       "shortName": "960e444e99771619",
++      "skillsHint": "e60d1e31c0597783",
++      "skillsLabel": "71cb3d49b256843d",
++      "skillsRepo": "887cfdf2ea742b4a",
+       "tagline": "32cc3ebe273db3de"
+     },
+     "messageQueuesLabel": "9cd00858543a587f",
+diff --git a/src/api/http/src/handler/http/request/mcp/mod.rs b/src/api/http/src/handler/http/request/mcp/mod.rs
+index 372868219b5..cee3c515b2d 100644
+--- a/src/api/http/src/handler/http/request/mcp/mod.rs
++++ b/src/api/http/src/handler/http/request/mcp/mod.rs
+@@ -427,34 +427,33 @@ pub async fn handle_mcp_get(
+ 
+ /// Handler for OAuth 2.0 Authorization Server Metadata (Enterprise)
+ /// RFC 8414: https://datatracker.ietf.org/doc/html/rfc8414
+-/// This endpoint provides discovery information for OAuth clients
+-/// Must be publicly accessible (no auth) per OAuth spec
++/// Public (no auth) — describes the Dex authorization server, 404 when Dex is off.
+ #[cfg(feature = "enterprise")]
+ #[utoipa::path(
+-    post,
++    get,
+     path = "/.well-known/oauth-authorization-server",
+     context_path = "",
+     tag = "MCP",
+     operation_id = "OAuthServerMetadata",
+     responses(
+         (status = 200, description = "Success", content_type = "application/json"),
++        (status = 404, description = "Not Found - OAuth discovery requires Dex to be enabled", content_type = "application/json"),
+     ),
+     extensions(
+         ("x-o2-mcp" = json!({"enabled": false}))
+     )
+ )]
+ pub async fn oauth_authorization_server_metadata() -> Response {
+-    use std::sync::LazyLock as Lazy;
++    if !oauth_discovery_available().await {
++        return oauth_discovery_unavailable();
++    }
+ 
+-    static METADATA: Lazy<OAuthServerMetadata> = Lazy::new(|| {
+-        let dex_config = o2_dex::config::get_config();
+-        let base_url = dex_config.dex_url.as_str();
+-        OAuthServerMetadata::build(base_url)
+-    });
++    let dex_config = o2_dex::config::get_config();
++    let metadata = OAuthServerMetadata::build(&dex_config.dex_url);
+     Response::builder()
+         .status(StatusCode::OK)
+         .header(header::CONTENT_TYPE, "application/json")
+-        .body(Body::from(serde_json::to_string(&*METADATA).unwrap()))
++        .body(Body::from(serde_json::to_string(&metadata).unwrap()))
+         .unwrap()
+ }
+ 
+@@ -463,7 +462,7 @@ pub async fn oauth_authorization_server_metadata() -> Response {
+ /// This endpoint provides discovery information for OAuth clients
+ #[cfg(not(feature = "enterprise"))]
+ #[utoipa::path(
+-    post,
++    get,
+     path = "/.well-known/oauth-authorization-server",
+     context_path = "",
+     tag = "MCP",
+@@ -488,6 +487,27 @@ pub async fn oauth_authorization_server_metadata() -> Response {
+         .unwrap()
+ }
+ 
++/// Mirrors the UI's `sso_enabled`, so discovery never advertises OAuth the UI hides.
++#[cfg(feature = "enterprise")]
++async fn oauth_discovery_available() -> bool {
++    o2_dex::config::get_config().dex_enabled
++        && !o2_enterprise::enterprise::license::block_feature_for_report_failure().await
++}
++
++#[cfg(feature = "enterprise")]
++fn oauth_discovery_unavailable() -> Response {
++    Response::builder()
++        .status(StatusCode::NOT_FOUND)
++        .header(header::CONTENT_TYPE, "application/json")
++        .body(Body::from(
++            serde_json::to_string(&serde_json::json!({
++                "error": "OAuth discovery requires Dex to be enabled and licensed features unblocked"
++            }))
++            .unwrap(),
++        ))
++        .unwrap()
++}
++
+ /// Extract the org id from an RFC 9728 resource path of the form
+ /// `api/{org_id}/mcp`, returning `None` for any other shape.
+ ///
+@@ -525,25 +545,12 @@ fn parse_mcp_resource_org(resource_path: &str) -> Option<&str> {
+     extensions(("x-o2-mcp" = json!({"enabled": false})))
+ )]
+ pub async fn oauth_protected_resource_metadata(Path(resource_path): Path<String>) -> Response {
+-    let dex_config = o2_dex::config::get_config();
+-    // Without Dex there is no authorization server to point clients at, and
+-    // RFC 9728 requires `authorization_servers` to name at least one. Advertising
+-    // a disabled Dex would send clients into a flow that cannot complete, so
+-    // report that no OAuth-protected resource metadata exists — matching the
+-    // 401 challenge, which is likewise suppressed when Dex is off.
+-    if !dex_config.dex_enabled {
+-        return Response::builder()
+-            .status(StatusCode::NOT_FOUND)
+-            .header(header::CONTENT_TYPE, "application/json")
+-            .body(Body::from(
+-                serde_json::to_string(&serde_json::json!({
+-                    "error": "OAuth discovery requires Dex to be enabled"
+-                }))
+-                .unwrap(),
+-            ))
+-            .unwrap();
++    // RFC 9728 requires `authorization_servers` to name a live server, so this must go silent too.
++    if !oauth_discovery_available().await {
++        return oauth_discovery_unavailable();
+     }
+ 
++    let dex_config = o2_dex::config::get_config();
+     let cfg = config::get_config();
+     let o2_base = format!("{}{}", cfg.common.web_url, cfg.common.base_uri);
+     let o2_base = o2_base.trim_end_matches('/');
+@@ -825,4 +832,19 @@ mod tests {
+         // Enterprise: 200; OSS build: 404. Either is a valid, non-panicking response.
+         assert!(response.status() == StatusCode::OK || response.status() == StatusCode::NOT_FOUND);
+     }
++
++    /// The 401 challenge and RFC 9728 doc both go silent with Dex off; RFC 8414 must too.
++    #[tokio::test]
++    async fn oauth_discovery_endpoints_agree_on_availability() {
++        let protected_resource =
++            oauth_protected_resource_metadata(Path("api/default/mcp".to_string()))
++                .await
++                .status();
++        let authorization_server = oauth_authorization_server_metadata().await.status();
++
++        assert_eq!(
++            protected_resource, authorization_server,
++            "RFC 8414 and RFC 9728 discovery must both be served or both be absent"
++        );
++    }
+ }
+diff --git a/web/src/components/ingestion/ai/McpServerCard.spec.ts b/web/src/components/ingestion/ai/McpServerCard.spec.ts
+new file mode 100644
+index 00000000000..d9a60071548
+--- /dev/null
++++ b/web/src/components/ingestion/ai/McpServerCard.spec.ts
+@@ -0,0 +1,291 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// This program is free software: you can redistribute it and/or modify
++// it under the terms of the GNU Affero General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU Affero General Public License for more details.
++//
++// You should have received a copy of the GNU Affero General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++import { describe, it, expect, beforeEach, vi } from "vitest";
++import { mount } from "@vue/test-utils";
++import { ref } from "vue";
++import { createStore } from "vuex";
++import { createRouter, createWebHistory } from "vue-router";
++import i18n from "@/locales";
++import { b64EncodeStandard } from "@/utils/zincutils";
++import type { McpCredential } from "@/composables/useMcpCredential";
++
++vi.mock("@/aws-exports", () => ({ default: { isEnterprise: "true", isCloud: "false" } }));
++
++const mcp = vi.hoisted(() => ({
++  generate: vi.fn(),
++  generating: false,
++  error: "",
++  credential: null as McpCredential | null,
++}));
++
++vi.mock("@/composables/useMcpCredential", async () => {
++  const actual = await vi.importActual<typeof import("@/composables/useMcpCredential")>(
++    "@/composables/useMcpCredential",
++  );
++  return {
++    ...actual,
++    useMcpCredential: () => ({
++      generate: mcp.generate,
++      generating: ref(mcp.generating),
++      error: ref(mcp.error),
++      credential: ref(mcp.credential),
++    }),
++  };
++});
++
++import McpServerCard from "./McpServerCard.vue";
++import { MCP_READONLY_ROLE } from "@/composables/useMcpCredential";
++
++// Stubbed so assertions read the props rather than highlight.js-decorated markup.
++const CODE_BLOCK_STUB = {
++  name: "OCodeBlock",
++  template: '<div data-test="mcp-code">{{ codeMasked ?? code }}</div>',
++  props: ["code", "codeMasked", "lang", "chrome", "filename"],
++};
++
++const CREDENTIAL: McpCredential = {
++  email: "mcp-abc.default@sa.internal",
++  token: "tok_123",
++  role: MCP_READONLY_ROLE,
++  scope: "readonly",
++};
++
++// Several blocks render (endpoint, credential, config), so pick by data-test.
++const codeBlock = (wrapper: ReturnType<typeof mount>, test: string) =>
++  wrapper.findAllComponents(CODE_BLOCK_STUB).find((c) => c.attributes("data-test") === test)!;
++const configBlock = (wrapper: ReturnType<typeof mount>) =>
++  codeBlock(wrapper, "ai-integrations-mcp-config");
++
++const mountCard = (zoConfig: Record<string, unknown> = {}) =>
++  mount(McpServerCard, {
++    props: { subs: { url: "https://o2.example.com", org: "default", token: "t" } },
++    global: {
++      plugins: [
++        i18n,
++        createStore({ state: { zoConfig: { sso_enabled: false, ...zoConfig } } }),
++        createRouter({
++          history: createWebHistory(),
++          routes: [{ path: "/", component: { template: "<div />" } }],
++        }),
++      ],
++      stubs: { OCodeBlock: CODE_BLOCK_STUB },
++    },
++  });
++
++describe("McpServerCard", () => {
++  beforeEach(() => {
++    mcp.generate.mockClear();
++    mcp.generating = false;
++    mcp.error = "";
++    mcp.credential = null;
++  });
++
++  // The card is a host for the shared setup card, not a layout of its own.
++  describe("layout", () => {
++    it("renders three steps through the shared setup card, with no hero of its own", () => {
++      const wrapper = mountCard();
++
++      expect(wrapper.findComponent({ name: "SetupCardRenderer" }).exists()).toBe(true);
++      expect(wrapper.findAllComponents({ name: "OStep" })).toHaveLength(3);
++      // The IAM page header already names the card.
++      expect(wrapper.find(".c-hero").exists()).toBe(false);
++    });
++
++    it("puts the endpoint on the first step", () => {
++      const wrapper = mountCard();
++
++      expect(codeBlock(wrapper, "ai-integrations-mcp-endpoint").props("code")).toBe(
++        "https://o2.example.com/api/default/mcp",
++      );
++    });
++  });
++
++  describe("skills", () => {
++    it("offers the OpenObserve skill install command as the last step", () => {
++      const wrapper = mountCard();
++
++      expect(codeBlock(wrapper, "ai-integrations-mcp-skills-cmd").props("code")).toBe(
++        "npx skills add openobserve/skills --skill openobserve",
++      );
++    });
++
++    it("opens the skills repo in a new tab without an opener", async () => {
++      const open = vi.spyOn(window, "open").mockReturnValue(null);
++      const wrapper = mountCard();
++
++      await wrapper.find('[data-test="ai-integrations-mcp-skills-repo-btn"]').trigger("click");
++
++      expect(open).toHaveBeenCalledWith(
++        "https://github.com/openobserve/skills",
++        "_blank",
++        "noopener,noreferrer",
++      );
++      open.mockRestore();
++    });
++  });
++
++  describe("auth mode", () => {
++    it("offers OAuth and defaults to it when SSO is enabled", () => {
++      const wrapper = mountCard({ sso_enabled: true });
++
++      expect(wrapper.find('[data-test="ai-integrations-mcp-auth-oauth"]').exists()).toBe(true);
++      expect(wrapper.find('[data-test="ai-integrations-mcp-credential"]').exists()).toBe(false);
++    });
++
++    // OAuth mode carries the same banner weight as token mode, so the pane is not one bare line.
++    it("explains OAuth in a banner rather than a lone caption", () => {
++      const wrapper = mountCard({ sso_enabled: true });
++
++      const note = wrapper.find('[data-test="ai-integrations-mcp-oauth-note"]');
++      expect(note.exists()).toBe(true);
++      expect(note.text()).toContain("Sign in with your browser");
++    });
++
++    // OAuth discovery 404s with Dex off, so offering the tab would strand the user in SSO login.
++    it("hides OAuth and forces token mode when SSO is disabled", () => {
++      const wrapper = mountCard({ sso_enabled: false });
++
++      expect(wrapper.find('[data-test="ai-integrations-mcp-auth-oauth"]').exists()).toBe(false);
++      expect(wrapper.find('[data-test="ai-integrations-mcp-credential"]').exists()).toBe(true);
++    });
++  });
++
++  describe("credential", () => {
++    it("does not mint anything until Generate is clicked", () => {
++      const wrapper = mountCard();
++
++      expect(mcp.generate).not.toHaveBeenCalled();
++      expect(wrapper.find('[data-test="ai-integrations-mcp-generate-btn"]').exists()).toBe(true);
++    });
++
++    it("does not mint one while OAuth mode is active", () => {
++      const wrapper = mountCard({ sso_enabled: true });
++
++      expect(mcp.generate).not.toHaveBeenCalled();
++      expect(wrapper.find('[data-test="ai-integrations-mcp-generate-btn"]').exists()).toBe(false);
++    });
++
++    it("mints once per click", async () => {
++      const wrapper = mountCard();
++
++      await wrapper.find('[data-test="ai-integrations-mcp-generate-btn"]').trigger("click");
++
++      expect(mcp.generate).toHaveBeenCalledTimes(1);
++    });
++
++    // The server decides what it can do; a client-side gate would hide the reason.
++    it("offers Generate even with rbac and service accounts disabled", () => {
++      const wrapper = mountCard({ rbac_enabled: false, service_account_enabled: false });
++
++      expect(wrapper.find('[data-test="ai-integrations-mcp-generate-btn"]').exists()).toBe(true);
++    });
++
++    it("shows the failure and keeps the button when minting is rejected", () => {
++      mcp.error = "Service Accounts Not Enabled";
++      const wrapper = mountCard();
++
++      expect(wrapper.find('[data-test="ai-integrations-mcp-credential-error"]').text()).toBe(
++        "Service Accounts Not Enabled",
++      );
++      expect(wrapper.find('[data-test="ai-integrations-mcp-generate-btn"]').exists()).toBe(true);
++    });
++
++    it("shows progress on the button rather than swapping the panel", () => {
++      mcp.generating = true;
++      const wrapper = mountCard();
++
++      expect(wrapper.find('[data-test="ai-integrations-mcp-credential-creating"]').exists()).toBe(
++        false,
++      );
++      expect(wrapper.find('[data-test="ai-integrations-mcp-generate-btn"]').exists()).toBe(true);
++    });
++
++    it("injects the minted token into the client snippet", () => {
++      mcp.credential = CREDENTIAL;
++      const wrapper = mountCard();
++      const expected = `Basic ${b64EncodeStandard(`${CREDENTIAL.email}:${CREDENTIAL.token}`)}`;
++
++      expect(configBlock(wrapper).props("code")).toContain(expected);
++    });
++
++    // The copyable code carries the token; nothing rendered on the page may.
++    it("masks the token in every rendered code block", () => {
++      mcp.credential = CREDENTIAL;
++      const wrapper = mountCard();
++      const header = codeBlock(wrapper, "ai-integrations-mcp-credential-header");
++
++      expect(wrapper.text()).not.toContain(CREDENTIAL.token);
++      expect(configBlock(wrapper).props("codeMasked")).toContain("Basic \u2022");
++      expect(header.props("codeMasked")).toContain("Basic \u2022");
++      expect(header.props("code")).toContain(
++        b64EncodeStandard(`${CREDENTIAL.email}:${CREDENTIAL.token}`),
++      );
++    });
++
++    // CopyContent expanded [BASIC_PASSCODE] on screen, printing a real credential.
++    it("shows a placeholder header, not a credential, before generating", () => {
++      const wrapper = mountCard();
++      const block = configBlock(wrapper);
++
++      expect(block.props("code")).toContain("Basic <base64 of service-account-email:token>");
++      expect(block.props("codeMasked")).toBeUndefined();
++      expect(wrapper.text()).not.toContain("[BASIC_PASSCODE]");
++    });
++
++    it("labels the snippet with the selected client's config file", async () => {
++      const wrapper = mountCard();
++
++      // SSO is off in this mount, so the client picker is the only tab strip.
++      await wrapper.findComponent({ name: "OTabs" }).vm.$emit("update:modelValue", "cursor");
++
++      const block = configBlock(wrapper);
++      expect(block.props("lang")).toBe("json");
++      expect(block.props("filename")).toBe("~/.cursor/mcp.json");
++      expect(block.props("chrome")).toBe("editor");
++    });
++  });
++
++  describe("credential scope", () => {
++    it("names the shared role when the account was scoped read-only", () => {
++      mcp.credential = CREDENTIAL;
++      const wrapper = mountCard();
++
++      expect(wrapper.find('[data-test="ai-integrations-mcp-readonly-note"]').text()).toContain(
++        MCP_READONLY_ROLE,
++      );
++      expect(wrapper.find('[data-test="ai-integrations-mcp-readonly-warn"]').exists()).toBe(false);
++      expect(wrapper.find('[data-test="ai-integrations-mcp-security"]').exists()).toBe(false);
++    });
++
++    it("warns when the account ended up with no role", () => {
++      mcp.credential = { ...CREDENTIAL, role: null, scope: "unscoped" };
++      const wrapper = mountCard();
++
++      expect(wrapper.find('[data-test="ai-integrations-mcp-readonly-warn"]').text()).toContain(
++        MCP_READONLY_ROLE,
++      );
++    });
++
++    // RBAC off is the expected OSS outcome, not a failure — no warning styling.
++    it("explains the unscoped token when RBAC is off", () => {
++      mcp.credential = { ...CREDENTIAL, role: null, scope: "rbacDisabled" };
++      const wrapper = mountCard();
++
++      expect(wrapper.find('[data-test="ai-integrations-mcp-rbac-note"]').exists()).toBe(true);
++      expect(wrapper.find('[data-test="ai-integrations-mcp-readonly-warn"]').exists()).toBe(false);
++    });
++  });
++});
+diff --git a/web/src/components/ingestion/ai/McpServerCard.vue b/web/src/components/ingestion/ai/McpServerCard.vue
+index 8882e34b932..29f0b7143ca 100644
+--- a/web/src/components/ingestion/ai/McpServerCard.vue
++++ b/web/src/components/ingestion/ai/McpServerCard.vue
+@@ -13,41 +13,46 @@ GNU Affero General Public License for more details.
+ You should have received a copy of the GNU Affero General Public License
+ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ -->
+-
+ <!--
+-  Copy/paste setup for connecting an MCP client to OpenObserve's INBOUND MCP
+-  server at /api/{org}/mcp, which every edition serves.
++  Setup for connecting an MCP client to OpenObserve's INBOUND MCP server at
++  /api/{org}/mcp, which every edition serves. It renders through the shared
++  SetupCardRenderer, so it inherits the stepper, code chrome and footer every
++  other ingestion setup card uses; this file owns only the MCP-specific state
++  (auth mode, credential, selected client) and fills the two steps' slots. The
++  hero is dropped because the hosting page's header already names the card.
+ 
+   Two authentication paths:
+    • OAuth (default) — the client signs in via the browser (Dex). The snippet is
+      just the URL, no header; the server's OAuth discovery drives the login.
+-     Enterprise/Cloud only: the discovery endpoints are compiled out of the OSS
+-     build (they 404), so the tab is hidden there and token mode is the default.
+-   • Access token — Basic auth. Defaults to the user's own credentials
+-     ([BASIC_PASSCODE], masked by CopyContent) as a quick start; a one-click
+-     "Generate" creates a scoped, read-only service account and injects its
+-     show-once token into every snippet. The generate button additionally needs
+-     rbac + service accounts (see useMcpCredential), so on OSS the quick-start
+-     passcode is the only path — which works, and the snippets are identical.
++     Needs Enterprise/Cloud AND SSO enabled: the discovery endpoints are compiled
++     out of the OSS build and 404 while Dex is off, so the tab is hidden in both
++     cases and token mode is the default.
++   • Access token — Basic auth. Until "Generate" is pressed the snippets show a
++     placeholder header, never a real credential. Generating mints a service
++     account — joined to the shared mcp_readonly role when rbac is on — and
++     injects its show-once token into every snippet, masked behind the code
++     block's reveal toggle so the page stays safe to screenshot.
+ 
+   Each client's config is produced by a single build(endpoint, auth) function so
+   the OAuth (auth=null → no header) and token variants can never drift.
+ -->
+ <script setup lang="ts">
+ import { computed, ref } from "vue";
+-import { raw, useI18nTyped } from "@/types/i18n";
++import { raw, useI18nTyped, type I18nKey } from "@/types/i18n";
+ import { useStore } from "vuex";
+ import { useRouter } from "vue-router";
+-import CopyContent from "@/components/CopyContent.vue";
+ import type { CardSubstitutions } from "./content/renderMarkdown";
+-import { safeHttpUrl } from "./content/renderMarkdown";
+ import { b64EncodeStandard } from "@/utils/zincutils";
+ import config from "@/aws-exports";
+-import { useMcpCredential } from "@/composables/useMcpCredential";
++import { MCP_READONLY_ROLE, useMcpCredential } from "@/composables/useMcpCredential";
++import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+ import OButton from "@/lib/core/Button/OButton.vue";
+-import OIcon from "@/lib/core/Icon/OIcon.vue";
++import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
++import OText from "@/lib/core/Typography/OText.vue";
+ import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+ import OTab from "@/lib/navigation/Tabs/OTab.vue";
++import SetupCardRenderer from "@/components/ingestion/setupCard/SetupCardRenderer.vue";
++import type { RichCardContent } from "@/components/ingestion/setupCard/types";
+ 
+ const props = defineProps<{
+   subs: CardSubstitutions;
+@@ -57,29 +62,44 @@ const props = defineProps<{
+ const { t } = useI18nTyped();
+ const store = useStore();
+ const router = useRouter();
+-const { generate, generating, error: genError, credential, canGenerate } = useMcpCredential();
++const { generate, generating, error: genError, credential } = useMcpCredential();
+ 
+ const endpoint = computed(() => `${props.subs.url}/api/${props.subs.org}/mcp`);
+ 
+-// OAuth discovery (/.well-known/…) is compiled out of the OSS build, so the
+-// browser sign-in flow can only work on enterprise/cloud. Elsewhere the tab is
+-// hidden and token mode is the only — and default — path.
+-const oauthAvailable = config.isEnterprise == "true" || config.isCloud == "true";
++// OAuth discovery 404s on OSS builds and whenever SSO (Dex) is off, so it needs both.
++const oauthAvailable = computed(
++  () =>
++    (config.isEnterprise == "true" || config.isCloud == "true") &&
++    !!store.state.zoConfig?.sso_enabled,
++);
+ 
+ // "oauth" (default, recommended where available) | "token".
+-const authMode = ref<"oauth" | "token">(oauthAvailable ? "oauth" : "token");
+-
+-// The Authorization header VALUE injected into token-mode snippets:
+-//  • generated credential → real base64(email:token), shown once;
+-//  • otherwise → the [BASIC_PASSCODE] placeholder, which CopyContent masks on
+-//    screen and substitutes with the user's own passcode on copy.
+-// OAuth mode passes null so build() omits the header entirely.
+-const tokenAuthValue = computed(() => {
+-  if (credential.value) {
+-    return `Basic ${b64EncodeStandard(`${credential.value.email}:${credential.value.token}`)}`;
+-  }
+-  return "Basic [BASIC_PASSCODE]";
+-});
++const selectedAuthMode = ref<"oauth" | "token">("oauth");
++
++// zoConfig arrives asynchronously, so derive the mode rather than latch a stale default.
++const authMode = computed<"oauth" | "token">(() =>
++  oauthAvailable.value ? selectedAuthMode.value : "token",
++);
++
++// OAuth needs no credential, so only token mode can leave the first step outstanding.
++const authSettled = computed(() => authMode.value === "oauth" || !!credential.value);
++
++// Not [BASIC_PASSCODE]: CopyContent expands it to the user's real credential, which
++// then renders in cleartext because maskText is a no-op.
++const TOKEN_PLACEHOLDER = "Basic <base64 of service-account-email:token>";
++const MASKED_AUTH = "Basic ••••••••••••••••";
++
++const SKILLS_REPO_URL = "https://github.com/openobserve/skills";
++// No -a flag: the CLI then asks which agents to install to, so one command serves every client.
++const SKILLS_INSTALL_CMD = "npx skills add openobserve/skills --skill openobserve";
++
++// The Authorization header VALUE injected into token-mode snippets. OAuth mode
++// passes null so build() omits the header entirely.
++const tokenAuthValue = computed(() =>
++  credential.value
++    ? `Basic ${b64EncodeStandard(`${credential.value.email}:${credential.value.token}`)}`
++    : TOKEN_PLACEHOLDER,
++);
+ const authValue = computed(() => (authMode.value === "oauth" ? null : tokenAuthValue.value));
+ 
+ // The `Basic <base64>` line for the generated credential's reveal + download.
+@@ -91,6 +111,14 @@ const credentialHeader = computed(() =>
+ 
+ interface ClientDef {
+   id: string;
++  /** Tab label + the name the one-click install button is built from. */
++  labelKey: I18nKey;
++  /** "Add to ~/.cursor/mcp.json, then reload Cursor" — the note under the code. */
++  descKey: I18nKey;
++  /** Fence language for the config block's highlighting and its toolbar label. */
++  lang: string;
++  /** Config file the snippet belongs in — shown as the block's chrome tab. */
++  filename?: string;
+   build: (endpoint: string, auth: string | null) => string;
+   // One-click install deep link (vscode: / cursor: / https:) — the client
+   // receives the config and asks the user to confirm, no copy/paste. Return
+@@ -118,6 +146,9 @@ const mcpServersUrl = (ep: string, auth: string | null) => `{
+ const CLIENTS: ClientDef[] = [
+   {
+     id: "claudeCode",
++    labelKey: "ingestion.mcp.clients.claudeCode",
++    descKey: "ingestion.mcp.desc.claudeCode",
++    lang: "bash",
+     build: (ep, auth) =>
+       auth
+         ? `claude mcp add openobserve ${ep} \\
+@@ -129,6 +160,10 @@ const CLIENTS: ClientDef[] = [
+     // Codex reads ~/.codex/config.toml (TOML); remote HTTP servers use `url`
+     // plus an optional `http_headers` map.
+     id: "codex",
++    labelKey: "ingestion.mcp.clients.codex",
++    descKey: "ingestion.mcp.desc.codex",
++    lang: "toml",
++    filename: "~/.codex/config.toml",
+     build: (ep, auth) => `[mcp_servers.openobserve]
+ url = "${ep}"${
+       auth
+@@ -139,6 +174,10 @@ http_headers = { "Authorization" = "${auth}" }`
+   },
+   {
+     id: "cursor",
++    labelKey: "ingestion.mcp.clients.cursor",
++    descKey: "ingestion.mcp.desc.cursor",
++    lang: "json",
++    filename: "~/.cursor/mcp.json",
+     build: mcpServersUrl,
+     deepLink: (ep, auth) => {
+       const cfg: Record<string, unknown> = { url: ep };
+@@ -148,6 +187,10 @@ http_headers = { "Authorization" = "${auth}" }`
+   },
+   {
+     id: "vscode",
++    labelKey: "ingestion.mcp.clients.vscode",
++    descKey: "ingestion.mcp.desc.vscode",
++    lang: "json",
++    filename: ".vscode/mcp.json",
+     deepLink: (ep, auth) => {
+       const cfg: Record<string, unknown> = {
+         name: "openobserve",
+@@ -175,6 +218,10 @@ http_headers = { "Authorization" = "${auth}" }`
+   },
+   {
+     id: "claudeDesktop",
++    labelKey: "ingestion.mcp.clients.claudeDesktop",
++    descKey: "ingestion.mcp.desc.claudeDesktop",
++    lang: "json",
++    filename: "claude_desktop_config.json",
+     build: mcpServersUrl,
+     // Prefills claude.ai's "Add custom connector" modal. Custom connectors
+     // authenticate via OAuth only, so no link in token mode.
+@@ -183,9 +230,19 @@ http_headers = { "Authorization" = "${auth}" }`
+         ? null
+         : `https://claude.ai/settings/connectors?modal=add-custom-connector&mcpName=OpenObserve&mcpServerUrl=${encodeURIComponent(ep)}`,
+   },
+-  { id: "windsurf", build: mcpServersUrl },
++  {
++    id: "windsurf",
++    labelKey: "ingestion.mcp.clients.windsurf",
++    descKey: "ingestion.mcp.desc.windsurf",
++    lang: "json",
++    filename: "~/.codeium/windsurf/mcp_config.json",
++    build: mcpServersUrl,
++  },
+   {
+     id: "chatgpt",
++    labelKey: "ingestion.mcp.clients.chatgpt",
++    descKey: "ingestion.mcp.desc.chatgpt",
++    lang: "text",
+     build: (ep, auth) =>
+       auth
+         ? `Server URL: ${ep}
+@@ -196,6 +253,10 @@ Authentication: OAuth (sign in when prompted)`,
+   {
+     // Antigravity uses `serverUrl` (not `url`) for remote HTTP servers.
+     id: "antigravity",
++    labelKey: "ingestion.mcp.clients.antigravity",
++    descKey: "ingestion.mcp.desc.antigravity",
++    lang: "json",
++    filename: "~/.gemini/config/mcp_config.json",
+     build: (ep, auth) => `{
+   "mcpServers": {
+     "openobserve": {
+@@ -213,6 +274,10 @@ Authentication: OAuth (sign in when prompted)`,
+   },
+   {
+     id: "opencode",
++    labelKey: "ingestion.mcp.clients.opencode",
++    descKey: "ingestion.mcp.desc.opencode",
++    lang: "json",
++    filename: "opencode.json",
+     build: (ep, auth) => `{
+   "$schema": "https://opencode.ai/config.json",
+   "mcp": {
+@@ -233,6 +298,10 @@ Authentication: OAuth (sign in when prompted)`,
+   },
+   {
+     id: "openclaw",
++    labelKey: "ingestion.mcp.clients.openclaw",
++    descKey: "ingestion.mcp.desc.openclaw",
++    lang: "json",
++    filename: "~/.openclaw/openclaw.json",
+     build: (ep, auth) => `{
+   "mcp": {
+     "servers": {
+@@ -254,6 +323,10 @@ Authentication: OAuth (sign in when prompted)`,
+   {
+     // Hermes config is YAML (~/.hermes/config.yaml).
+     id: "hermes",
++    labelKey: "ingestion.mcp.clients.hermes",
++    descKey: "ingestion.mcp.desc.hermes",
++    lang: "yaml",
++    filename: "~/.hermes/config.yaml",
+     build: (ep, auth) => `mcp_servers:
+   openobserve:
+     url: "${ep}"${
+@@ -271,6 +344,82 @@ const activeClient = computed(
+   () => CLIENTS.find((c) => c.id === selectedClient.value) ?? CLIENTS[0],
+ );
+ const activeConfig = computed(() => activeClient.value.build(endpoint.value, authValue.value));
++
++// Shown in place of the real token so the page stays safe to screenshot; the
++// block's copy button still copies `activeConfig`. Only when the snippet really
++// carries the credential — OAuth snippets have no header to mask.
++const activeConfigMasked = computed(() =>
++  authValue.value && credential.value
++    ? activeClient.value.build(endpoint.value, MASKED_AUTH)
++    : undefined,
++);
++
++// A terminal command gets terminal chrome; a config snippet gets its file's tab.
++const isTerminalClient = computed(
++  () => !activeClient.value.filename && activeClient.value.lang === "bash",
++);
++
++const content = computed<RichCardContent>(() => ({
++  provider: {
++    name: t("ingestion.mcp.shortName"),
++    tagline: t("ingestion.mcp.tagline", {
++      product: raw("Model Context Protocol"),
++      client1: raw("Claude"),
++      client2: raw("Cursor"),
++      client3: raw("VS Code"),
++    }),
++    logo: "",
++    tone: "",
++  },
++  steps: [
++    {
++      id: "connect",
++      titleKey: "ingestion.mcp.connectLabel",
++      descriptionKey: "ingestion.mcp.connectHint",
++      code: {
++        lang: "http",
++        raw: endpoint.value,
++        dataTest: "ai-integrations-mcp-endpoint",
++      },
++      completeOn: "copy",
++      done: authSettled.value,
++    },
++    {
++      id: "configure",
++      titleKey: "ingestion.mcp.configLabel",
++      descriptionKey: "ingestion.mcp.configHint",
++      chip: {
++        kind: isTerminalClient.value ? "terminal" : "editor",
++        labelKey: isTerminalClient.value
++          ? "ingestion.setupCard.chipTerminal"
++          : "ingestion.setupCard.chipEditor",
++      },
++      code: {
++        lang: activeClient.value.lang,
++        raw: activeConfig.value,
++        masked: activeConfigMasked.value,
++        filename: activeClient.value.filename,
++        dataTest: "ai-integrations-mcp-config",
++      },
++      note: t(activeClient.value.descKey),
++      completeOn: "copy",
++    },
++    {
++      id: "skills",
++      title: t("ingestion.mcp.skillsLabel", { brand: raw("OpenObserve") }),
++      description: t("ingestion.mcp.skillsHint", { brand: raw("OpenObserve") }),
++      chip: { kind: "terminal", labelKey: "ingestion.setupCard.chipTerminal" },
++      code: {
++        lang: "bash",
++        raw: SKILLS_INSTALL_CMD,
++        dataTest: "ai-integrations-mcp-skills-cmd",
++      },
++      completeOn: "copy",
++    },
++  ],
++  docUrl: props.docUrl,
++}));
++
+ const activeDeepLink = computed(
+   () => activeClient.value.deepLink?.(endpoint.value, authValue.value) ?? null,
+ );
+@@ -305,195 +454,198 @@ const goToServiceAccounts = () => {
+   });
+ };
+ 
+-const safeDocUrl = computed(() => safeHttpUrl(props.docUrl ?? ""));
+-const openDocs = () => {
+-  if (safeDocUrl.value) {
+-    window.open(safeDocUrl.value, "_blank", "noopener,noreferrer");
+-  }
++const openSkillsRepo = () => {
++  window.open(SKILLS_REPO_URL, "_blank", "noopener,noreferrer");
+ };
+ </script>
+ 
+ <template>
+-  <div class="flex flex-col gap-6 text-sm" data-test="ai-integrations-mcp-card">
+-    <!-- Hero -->
+-    <div class="flex flex-col gap-1">
+-      <h2 class="text-lg font-semibold">{{ t("ingestion.mcp.name") }}</h2>
+-      <p class="text-text-secondary">
+-        {{
+-          t("ingestion.mcp.tagline", {
+-            product: raw("Model Context Protocol"),
+-            client1: raw("Claude"),
+-            client2: raw("Cursor"),
+-            client3: raw("VS Code"),
+-          })
+-        }}
+-      </p>
+-    </div>
+-
+-    <!-- Endpoint -->
+-    <div class="flex flex-col gap-2">
+-      <div class="font-semibold">{{ t("ingestion.mcp.endpointLabel") }}</div>
+-      <CopyContent :content="raw(endpoint)" />
+-    </div>
+-
+-    <!-- Authentication method -->
+-    <div class="flex flex-col gap-2">
+-      <div class="font-semibold">{{ t("ingestion.mcp.authLabel") }}</div>
+-      <!-- Without OAuth there is only one method, so the picker is just noise. -->
+-      <OTabs v-if="oauthAvailable" v-model="authMode" dense>
+-        <OTab
+-          name="oauth"
+-          :label="t('ingestion.mcp.auth.oauth')"
+-          data-test="ai-integrations-mcp-auth-oauth"
+-        />
+-        <OTab
+-          name="token"
+-          :label="t('ingestion.mcp.auth.token')"
+-          data-test="ai-integrations-mcp-auth-token"
+-        />
+-      </OTabs>
+-      <p v-if="authMode === 'oauth'" class="text-text-secondary">
+-        {{ t("ingestion.mcp.auth.oauthNote") }}
+-      </p>
+-    </div>
+-
+-    <!-- Token mode: credential management -->
+-    <div
+-      v-if="authMode === 'token'"
+-      class="rounded-surface border-border-default bg-surface-panel flex flex-col gap-3 border p-3"
+-      data-test="ai-integrations-mcp-credential"
+-    >
+-      <!-- Before generation: quick-start note + generate button -->
+-      <template v-if="!credential">
+-        <div class="flex items-start justify-between gap-3">
++  <SetupCardRenderer :content="content" :subs="subs" hide-hero data-test="ai-integrations-mcp-card">
++    <!-- Authentication sits under the endpoint it authenticates against. -->
++    <template #step-connect>
++      <div class="flex flex-col gap-3">
++        <!-- Without OAuth there is only one method, so the picker is just noise. -->
++        <OTabs v-if="oauthAvailable" v-model="selectedAuthMode" dense>
++          <OTab
++            name="oauth"
++            :label="t('ingestion.mcp.auth.oauth')"
++            data-test="ai-integrations-mcp-auth-oauth"
++          />
++          <OTab
++            name="token"
++            :label="t('ingestion.mcp.auth.token')"
++            data-test="ai-integrations-mcp-auth-token"
++          />
++        </OTabs>
++
++        <OBanner
++          v-if="authMode === 'oauth'"
++          icon="login"
++          data-test="ai-integrations-mcp-oauth-note"
++        >
+           <div class="flex flex-col gap-1">
+-            <div class="font-semibold">
+-              {{ t("ingestion.mcp.credential.quickStartTitle") }}
+-            </div>
+-            <p class="text-text-secondary">
+-              {{ t("ingestion.mcp.credential.quickStartBody") }}
+-            </p>
++            <OText variant="body-strong">
++              {{ t("ingestion.mcp.auth.oauthTitle") }}
++            </OText>
++            <OText variant="meta" as="p" class="leading-snug">
++              {{ t("ingestion.mcp.auth.oauthNote") }}
++            </OText>
+           </div>
+-          <OButton
+-            v-if="canGenerate()"
+-            variant="primary"
+-            size="sm-action"
+-            :loading="generating"
+-            data-test="ai-integrations-mcp-generate-btn"
+-            @click="onGenerate"
+-          >
+-            {{ t("ingestion.mcp.credential.generate") }}
+-          </OButton>
+-        </div>
+-        <p v-if="genError" class="text-error" data-test="ai-integrations-mcp-credential-error">
+-          {{ genError }}
+-        </p>
+-      </template>
+-
+-      <!-- After generation: show-once reveal + manage -->
+-      <template v-else>
+-        <div class="flex items-center gap-2">
+-          <OIcon name="check-circle" size="sm" class="text-success" />
+-          <span class="font-semibold">
+-            {{ t("ingestion.mcp.credential.created") }}
+-          </span>
+-        </div>
+-        <p class="text-text-secondary">
+-          {{ t("ingestion.mcp.credential.shownOnce", { email: credential.email }) }}
+-        </p>
+-        <CopyContent :content="raw(credentialHeader)" />
+-        <div class="flex gap-2">
+-          <OButton
+-            variant="outline"
+-            size="sm-action"
+-            data-test="ai-integrations-mcp-download-btn"
+-            @click="downloadCredential"
+-          >
+-            <OIcon name="download" size="sm" />
+-            {{ t("ingestion.mcp.credential.download") }}
+-          </OButton>
+-          <OButton
+-            variant="ghost"
+-            size="sm-action"
+-            data-test="ai-integrations-mcp-manage-btn"
+-            @click="goToServiceAccounts"
+-          >
+-            <OIcon name="open-in-new" size="sm" />
+-            {{ t("ingestion.mcp.credential.manage") }}
+-          </OButton>
++        </OBanner>
++
++        <div v-else class="flex flex-col gap-3" data-test="ai-integrations-mcp-credential">
++          <!-- No dedicated credential: the snippets carry a placeholder header -->
++          <template v-if="!credential">
++            <OBanner icon="key" inline-actions>
++              <div class="flex flex-col gap-1">
++                <OText variant="body-strong">
++                  {{ t("ingestion.mcp.credential.quickStartTitle") }}
++                </OText>
++                <OText variant="meta" as="p" class="leading-snug">
++                  {{ t("ingestion.mcp.credential.quickStartBody") }}
++                </OText>
++              </div>
++              <template #actions>
++                <OButton
++                  variant="primary"
++                  size="sm-action"
++                  :loading="generating"
++                  data-test="ai-integrations-mcp-generate-btn"
++                  @click="onGenerate"
++                >
++                  {{ t("ingestion.mcp.credential.generate") }}
++                </OButton>
++              </template>
++            </OBanner>
++
++            <OBanner
++              v-if="genError"
++              variant="error"
++              dense
++              icon="warning"
++              :content="raw(genError)"
++              data-test="ai-integrations-mcp-credential-error"
++            />
++
++            <OBanner
++              variant="info"
++              dense
++              icon="info-outline"
++              :content="t('ingestion.mcp.securityBody')"
++              data-test="ai-integrations-mcp-security"
++            />
++          </template>
++
++          <!-- After generation: show-once reveal + manage -->
++          <template v-else>
++            <OBanner variant="success" icon="check-circle">
++              <div class="flex flex-col gap-1">
++                <OText variant="body-strong">{{ t("ingestion.mcp.credential.created") }}</OText>
++                <OText variant="meta" as="p" class="leading-snug">
++                  {{ t("ingestion.mcp.credential.shownOnce", { email: credential.email }) }}
++                </OText>
++              </div>
++            </OBanner>
++
++            <OCodeBlock
++              :code="credentialHeader"
++              :code-masked="MASKED_AUTH"
++              lang="http"
++              :reveal-tooltip="t('ingestion.setupCard.revealToken')"
++              :hide-tooltip="t('ingestion.setupCard.hideToken')"
++              data-test="ai-integrations-mcp-credential-header"
++            />
++
++            <div class="flex flex-wrap gap-2">
++              <OButton
++                variant="outline"
++                size="sm-action"
++                icon-left="download"
++                data-test="ai-integrations-mcp-download-btn"
++                @click="downloadCredential"
++              >
++                {{ t("ingestion.mcp.credential.download") }}
++              </OButton>
++              <OButton
++                variant="ghost"
++                size="sm-action"
++                icon-left="open-in-new"
++                data-test="ai-integrations-mcp-manage-btn"
++                @click="goToServiceAccounts"
++              >
++                {{ t("ingestion.mcp.credential.manage") }}
++              </OButton>
++            </div>
++
++            <OBanner
++              v-if="credential.scope === 'unscoped'"
++              variant="warning"
++              dense
++              icon="warning"
++              :content="t('ingestion.mcp.credential.readonlyWarn', { role: MCP_READONLY_ROLE })"
++              data-test="ai-integrations-mcp-readonly-warn"
++            />
++            <OText
++              v-else-if="credential.scope === 'rbacDisabled'"
++              variant="meta"
++              as="p"
++              class="leading-snug"
++              data-test="ai-integrations-mcp-rbac-note"
++            >
++              {{ t("ingestion.mcp.credential.rbacNote") }}
++            </OText>
++            <OText
++              v-else
++              variant="meta"
++              as="p"
++              class="leading-snug"
++              data-test="ai-integrations-mcp-readonly-note"
++            >
++              {{ t("ingestion.mcp.credential.readonlyNote", { role: credential.role }) }}
++            </OText>
++          </template>
+         </div>
+-        <p
+-          v-if="!credential.readonlyApplied"
+-          class="text-warning"
+-          data-test="ai-integrations-mcp-readonly-warn"
+-        >
+-          {{ t("ingestion.mcp.credential.readonlyWarn") }}
+-        </p>
+-      </template>
+-    </div>
+-
+-    <!-- Client picker -->
+-    <div class="flex flex-col gap-2">
+-      <div class="font-semibold">{{ t("ingestion.mcp.clientLabel") }}</div>
+-      <OTabs v-model="selectedClient" dense>
+-        <OTab
+-          v-for="c in CLIENTS"
+-          :key="c.id"
+-          :name="c.id"
+-          :label="t(`ingestion.mcp.clients.${c.id}`)"
+-          :data-test="`ai-integrations-mcp-client-${c.id}`"
+-        />
+-      </OTabs>
+-    </div>
+-
+-    <!-- Config for the selected client -->
+-    <div class="flex flex-col gap-2">
+-      <div class="font-semibold">{{ t("ingestion.mcp.configLabel") }}</div>
+-      <p class="text-text-secondary">
+-        {{ t(`ingestion.mcp.desc.${selectedClient}`) }}
+-      </p>
+-      <div v-if="activeDeepLink">
++      </div>
++    </template>
++
++    <!-- The client picker drives the snippet below it, so it renders above it. -->
++    <template #step-configure-controls>
++      <div class="flex flex-col gap-3">
++        <OTabs v-model="selectedClient" dense>
++          <OTab
++            v-for="c in CLIENTS"
++            :key="c.id"
++            :name="c.id"
++            :label="t(c.labelKey)"
++            :data-test="`ai-integrations-mcp-client-${c.id}`"
++          />
++        </OTabs>
++
+         <OButton
++          v-if="activeDeepLink"
+           variant="primary"
+           size="sm-action"
++          icon-left="open-in-new"
++          class="self-start"
+           data-test="ai-integrations-mcp-install-btn"
+           @click="openDeepLink"
+         >
+-          <OIcon name="open-in-new" size="sm" />
+-          {{
+-            t("ingestion.mcp.installOneClick", {
+-              client: t(`ingestion.mcp.clients.${selectedClient}`),
+-            })
+-          }}
++          {{ t("ingestion.mcp.installOneClick", { client: t(activeClient.labelKey) }) }}
+         </OButton>
+       </div>
+-      <CopyContent :content="raw(activeConfig)" />
+-    </div>
+-
+-    <!-- Security note (token mode only) -->
+-    <div
+-      v-if="authMode === 'token'"
+-      class="rounded-surface border-border-default bg-surface-panel flex gap-2 border p-3"
+-      data-test="ai-integrations-mcp-security"
+-    >
+-      <OIcon name="shield" size="sm" class="mt-0.5 shrink-0" />
+-      <div class="flex flex-col gap-1">
+-        <div class="font-semibold">{{ t("ingestion.mcp.securityTitle") }}</div>
+-        <p class="text-text-secondary">{{ t("ingestion.mcp.securityBody") }}</p>
+-      </div>
+-    </div>
++    </template>
+ 
+-    <!-- Docs -->
+-    <div v-if="safeDocUrl">
++    <template #step-skills>
+       <OButton
+-        variant="outline"
++        variant="ghost"
+         size="sm-action"
+-        data-test="ai-integrations-mcp-docs-btn"
+-        @click="openDocs"
++        icon-left="open-in-new"
++        class="self-start"
++        data-test="ai-integrations-mcp-skills-repo-btn"
++        @click="openSkillsRepo"
+       >
+-        <OIcon name="menu-book" size="sm" />
+-        {{ t("ingestion.mcp.docsCta") }}
++        {{ t("ingestion.mcp.skillsRepo", { host: raw("GitHub") }) }}
+       </OButton>
+-    </div>
+-  </div>
++    </template>
++  </SetupCardRenderer>
+ </template>
+diff --git a/web/src/components/ingestion/setupCard/SetupCardRenderer.vue b/web/src/components/ingestion/setupCard/SetupCardRenderer.vue
+index 3e54ad91d11..9d17b42847f 100644
+--- a/web/src/components/ingestion/setupCard/SetupCardRenderer.vue
++++ b/web/src/components/ingestion/setupCard/SetupCardRenderer.vue
+@@ -66,6 +66,8 @@ const props = defineProps<{
+   logoUrl?: string;
+   /** Optional dark-mode logo URL (manifest) — overrides the content dark logo. */
+   logoUrlDark?: string;
++  /** Drop the hero — for a host page whose own header already names the card. */
++  hideHero?: boolean;
+ }>();
+ 
+ const emit = defineEmits<{
+@@ -81,7 +83,7 @@ const { isDark } = useTheme();
+ // The detected stream type drives the status copy + the "View …" destination.
+ // traces / logs land in their explorers; metrics (which fan out into many
+ // per-metric streams) link to the Streams page where those streams appear.
+-const streamKind = computed(() => props.content.detect.streamType);
++const streamKind = computed(() => props.content.detect?.streamType);
+ const isLogsStream = computed(() => streamKind.value === "logs");
+ const isMetricsStream = computed(() => streamKind.value === "metrics");
+ // Status-bar copy that names the data ("Checking for metrics…" / "No spans
+@@ -142,13 +144,15 @@ const viewDataIcon = computed(() =>
+ // detection filter is a SQL WHERE fragment — passed base64-encoded as the
+ // search-bar query, matching how the rest of the app deep-links into search.
+ const viewData = async () => {
++  const detectCfg = props.content.detect;
++  if (!detectCfg) return;
+   // The destination Logs/Traces view reads its stream list from the cached
+   // streams store. A stream this integration just created won't be in that
+   // cache yet, so the deep-link can't select it. Force-refresh this stream type
+   // first so the new stream is present before we navigate. Best-effort — if the
+   // refetch fails we still navigate (the view runs its own fetch on load).
+   try {
+-    await getStreams(props.content.detect.streamType, false, false, true);
++    await getStreams(detectCfg.streamType, false, false, true);
+   } catch {
+     // ignore — navigate anyway
+   }
+@@ -166,7 +170,7 @@ const viewData = async () => {
+     stream: watchedStream.value,
+     period: "15m",
+     refresh: "0",
+-    query: b64EncodeUnicode(props.content.detect.filter) ?? "",
++    query: b64EncodeUnicode(detectCfg.filter) ?? "",
+   };
+   if (isLogsStream.value) {
+     query.stream_type = "logs";
+@@ -207,7 +211,7 @@ const streamNameError = computed(() =>
+ const watchedStream = computed(() =>
+   props.content.streamInput
+     ? streamName.value.trim() || props.content.streamInput.default || "default"
+-    : props.content.detect.streamName || "default",
++    : props.content.detect?.streamName || "default",
+ );
+ // ── free-form inputs (optional) ──────────────────────────────────────────────
+ // Steps can declare `inputs` (e.g. SQL Server host/port on the configure step).
+@@ -235,12 +239,12 @@ const subStream = (text?: string): string | undefined => {
+ const detect = useStreamDetect({
+   config: () => ({
+     orgId: props.subs.org,
+-    streamType: props.content.detect.streamType,
++    streamType: props.content.detect?.streamType ?? "logs",
+     streamName: watchedStream.value,
+     // Forward the match mode — without it, keyword detection (metrics, which fan
+     // out into sqlserver_* streams) falls back to exact match and never connects.
+-    match: props.content.detect.match,
+-    filter: props.content.detect.filter,
++    match: props.content.detect?.match,
++    filter: props.content.detect?.filter ?? "",
+   }),
+   onConnect: () => fireConfetti(),
+ });
+@@ -315,6 +319,7 @@ const copied = ref<Record<string, boolean>>({});
+ // itself is the completion signal.
+ const actioned = ref<Record<string, boolean>>({});
+ const isStepDone = (step: RichCardStep) => {
++  if (step.done !== undefined) return step.done;
+   if (step.completeOn === "copy") return !!copied.value[step.id];
+   if (step.completeOn === "action") return !!actioned.value[step.id];
+   return detected.value;
+@@ -501,7 +506,7 @@ function fireConfetti() {
+   <div class="dirC-demo" :class="{ dark: isDark }" data-test="ai-rich-setup-card">
+     <div class="dirC">
+       <!-- Hero -->
+-      <div class="c-hero">
++      <div v-if="!hideHero" class="c-hero">
+         <div class="c-hero-head">
+           <span class="ds-mono xl text-white" :class="{ logo: logoSrc }">
+             <img
+@@ -645,6 +650,16 @@ function fireConfetti() {
+               </OToggleGroup>
+             </div>
+ 
++            <!-- Page-supplied controls that CHOOSE this step's code (a client
++                 picker, an install shortcut) — above the block they drive. -->
++            <div
++              v-if="$slots[`step-${step.id}-controls`]"
++              class="step-slot"
++              :data-test="`ai-step-controls-${step.id}`"
++            >
++              <slot :name="`step-${step.id}-controls`" :step="step" />
++            </div>
++
+             <OCodeBlock
+               v-if="displayCode(step)"
+               :lang="displayCode(step)?.lang"
+@@ -652,7 +667,7 @@ function fireConfetti() {
+               :filename="displayCode(step)?.filename"
+               :code="subStream(displayCode(step)?.raw) || ''"
+               :code-masked="subStream(displayCode(step)?.masked)"
+-              data-test="ai-code"
++              :data-test="displayCode(step)?.dataTest ?? 'ai-code'"
+               :reveal-tooltip="t('ingestion.setupCard.revealToken')"
+               :hide-tooltip="t('ingestion.setupCard.hideToken')"
+               @copy="onStepCopy(step, i)"
+@@ -727,7 +742,7 @@ function fireConfetti() {
+                   >{{ connectedHeadline
+                   }}<span class="sb-sub"
+                     >{{ t(countUnitKey, { count: detect.count.value }, detect.count.value)
+-                    }}<template v-if="content.detect.modelLabel">
++                    }}<template v-if="content.detect?.modelLabel">
+                       · {{ content.detect.modelLabel }}</template
+                     ></span
+                   ></span
+diff --git a/web/src/components/ingestion/setupCard/types.ts b/web/src/components/ingestion/setupCard/types.ts
+index c9b48ea24af..dbb894acce9 100644
+--- a/web/src/components/ingestion/setupCard/types.ts
++++ b/web/src/components/ingestion/setupCard/types.ts
+@@ -72,6 +72,8 @@ export interface RichCardCode {
+   filename?: string;
+   /** Show a ".env" download button in the block toolbar. */
+   downloadEnv?: boolean;
++  /** data-test for this block, when a card renders more than one. */
++  dataTest?: string;
+ }
+ 
+ /**
+@@ -162,6 +164,8 @@ export interface RichCardStep {
+    */
+   action?: RichCardStepAction;
+   completeOn: StepCompleteOn;
++  /** Host-owned completion — wins over `completeOn` when set. */
++  done?: boolean;
+   /** Marks the step as required (renders a "Required" emphasis on its chip). */
+   required?: boolean;
+   /** The step that hosts the live status bar + "most likely fix" box. */
+@@ -313,7 +317,8 @@ export interface RichCardInput {
+ export interface RichCardContent {
+   provider: RichCardProvider;
+   steps: RichCardStep[];
+-  detect: RichCardDetect;
++  /** Omitted by cards with nothing to ingest (e.g. MCP) — no `detectionAnchor` then. */
++  detect?: RichCardDetect;
+   /** When set, the card shows a stream-name input (see RichCardStreamInput). */
+   streamInput?: RichCardStreamInput;
+   extras?: RichCardExtras;
+diff --git a/web/src/composables/useMcpCredential.spec.ts b/web/src/composables/useMcpCredential.spec.ts
+new file mode 100644
+index 00000000000..d753632da31
+--- /dev/null
++++ b/web/src/composables/useMcpCredential.spec.ts
+@@ -0,0 +1,303 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// This program is free software: you can redistribute it and/or modify
++// it under the terms of the GNU Affero General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU Affero General Public License for more details.
++//
++// You should have received a copy of the GNU Affero General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++import { beforeEach, describe, expect, it, vi } from "vitest";
++
++vi.mock("@/services/iam", () => ({
++  createRole: vi.fn(),
++  getAllRolePermissions: vi.fn(),
++  getResources: vi.fn(),
++  updateRole: vi.fn(),
++}));
++
++vi.mock("@/services/service_accounts", () => ({ default: { create: vi.fn() } }));
++
++const mockStore = {
++  state: {
++    selectedOrganization: { identifier: "" },
++    zoConfig: { rbac_enabled: true, meta_org: "_meta" } as Record<string, unknown>,
++  },
++};
++
++vi.mock("vuex", () => ({ useStore: () => mockStore }));
++
++// The composable runs outside a component, where the global i18n plugin isn't installed.
++vi.mock("@/types/i18n", () => ({ useI18nTyped: () => ({ t: (key: string) => key }) }));
++
++import { createRole, getAllRolePermissions, getResources, updateRole } from "@/services/iam";
++import service_accounts from "@/services/service_accounts";
++import { MCP_READONLY_ROLE, useMcpCredential } from "./useMcpCredential";
++
++const created = () => ({
++  data: { code: 200, message: "ok", token: "tok_123", user: "x" },
++});
++
++// `org` is grantable only from the meta org, and hidden resources are never seeded.
++const RESOURCES = [
++  { key: "stream", visible: true },
++  { key: "mcp", visible: true },
++  { key: "org", visible: true },
++  { key: "internal", visible: false },
++];
++
++// The read-only preset for RESOURCES in a non-meta org, plus the MCP write grant.
++const fullSet = (org: string) => [
++  { object: `stream:_all_${org}`, permission: "AllowList" },
++  { object: `stream:_all_${org}`, permission: "AllowGet" },
++  { object: `mcp:_all_${org}`, permission: "AllowList" },
++  { object: `mcp:_all_${org}`, permission: "AllowGet" },
++  { object: `mcp:_all_${org}`, permission: "AllowPut" },
++];
++
++const addedGrants = () => vi.mocked(updateRole).mock.calls[0][0].payload.add;
++
++const roleAlreadyExists = () =>
++  vi.mocked(createRole).mockRejectedValue({
++    response: { status: 400, data: { message: "Role already exists" } },
++  });
++
++// The credential cache is module-scoped, so every case needs an org of its own.
++const useOrg = (org: string, zoConfig: Record<string, unknown> = {}) => {
++  mockStore.state.selectedOrganization.identifier = org;
++  mockStore.state.zoConfig = { rbac_enabled: true, meta_org: "_meta", ...zoConfig };
++  return useMcpCredential();
++};
++
++describe("useMcpCredential", () => {
++  beforeEach(() => {
++    vi.clearAllMocks();
++    vi.mocked(service_accounts.create).mockResolvedValue(created() as any);
++    vi.mocked(createRole).mockResolvedValue({} as any);
++    vi.mocked(getResources).mockResolvedValue({ data: RESOURCES } as any);
++    vi.mocked(getAllRolePermissions).mockResolvedValue({ data: [] } as any);
++    vi.mocked(updateRole).mockResolvedValue({} as any);
++  });
++
++  describe("without rbac", () => {
++    it("creates the service account and nothing else", async () => {
++      const { generate } = useOrg("org-norbac", { rbac_enabled: false });
++
++      const cred = await generate();
++
++      expect(service_accounts.create).toHaveBeenCalledTimes(1);
++      expect(service_accounts.create).toHaveBeenCalledWith(
++        {
++          email: expect.stringMatching(/^mcp-[a-z0-9]+\.org-norbac@sa\.internal$/),
++          first_name: "MCP client",
++        },
++        "org-norbac",
++      );
++      expect(createRole).not.toHaveBeenCalled();
++      expect(getResources).not.toHaveBeenCalled();
++      expect(updateRole).not.toHaveBeenCalled();
++      expect(cred).toMatchObject({ role: null, scope: "rbacDisabled", token: "tok_123" });
++    });
++  });
++
++  describe("with rbac", () => {
++    it("grants a fresh role the read-only set plus MCP write, and joins the account", async () => {
++      const { generate } = useOrg("org-fresh");
++
++      const cred = await generate();
++
++      expect(createRole).toHaveBeenCalledWith(MCP_READONLY_ROLE, "org-fresh");
++      // Nothing to diff against on a role created a moment ago.
++      expect(getAllRolePermissions).not.toHaveBeenCalled();
++      expect(updateRole).toHaveBeenCalledTimes(1);
++      expect(updateRole).toHaveBeenCalledWith({
++        role_id: MCP_READONLY_ROLE,
++        org_identifier: "org-fresh",
++        payload: {
++          add: fullSet("org-fresh"),
++          remove: [],
++          add_users: [cred!.email],
++          remove_users: [],
++        },
++      });
++      expect(cred).toMatchObject({ role: MCP_READONLY_ROLE, scope: "readonly" });
++    });
++
++    // create_role normalizes the name (non-[A-Za-z0-9_] → "_") but update_role does not.
++    it("addresses the same normalization-safe role name in both calls", async () => {
++      const { generate } = useOrg("org-samename");
++
++      await generate();
++
++      const names = [
++        vi.mocked(createRole).mock.calls[0][0],
++        vi.mocked(updateRole).mock.calls[0][0].role_id,
++      ];
++      expect(new Set(names).size).toBe(1);
++      expect(names[0]).toMatch(/^[a-zA-Z0-9_]+$/);
++    });
++
++    it("adds no grants to an existing role that already holds them all", async () => {
++      roleAlreadyExists();
++      vi.mocked(getAllRolePermissions).mockResolvedValue({ data: fullSet("org-complete") } as any);
++      const { generate, error } = useOrg("org-complete");
++
++      const cred = await generate();
++
++      expect(getAllRolePermissions).toHaveBeenCalledWith({
++        role_name: MCP_READONLY_ROLE,
++        org_identifier: "org-complete",
++      });
++      expect(addedGrants()).toEqual([]);
++      expect(vi.mocked(updateRole).mock.calls[0][0].payload.add_users).toEqual([cred!.email]);
++      expect(cred).toMatchObject({ role: MCP_READONLY_ROLE, scope: "readonly" });
++      expect(error.value).toBe("");
++    });
++
++    // A first mint whose seed threw leaves the role created but empty; later mints must still fill it.
++    it("re-grants everything to an existing role a failed first seed left empty", async () => {
++      roleAlreadyExists();
++      const { generate } = useOrg("org-emptyrole");
++
++      const cred = await generate();
++
++      expect(addedGrants()).toEqual(fullSet("org-emptyrole"));
++      expect(cred).toMatchObject({ role: MCP_READONLY_ROLE, scope: "readonly" });
++    });
++
++    // POST /api/{org}/mcp resolves to PUT on the `mcp` resource, which the read-only preset never grants.
++    it("adds only the MCP write grant a role seeded before it existed is missing", async () => {
++      roleAlreadyExists();
++      vi.mocked(getAllRolePermissions).mockResolvedValue({
++        data: fullSet("org-preput").filter((perm) => perm.permission !== "AllowPut"),
++      } as any);
++      const { generate } = useOrg("org-preput");
++
++      await generate();
++
++      expect(addedGrants()).toEqual([{ object: "mcp:_all_org-preput", permission: "AllowPut" }]);
++    });
++
++    it("treats AllowAll as covering every grant on that resource", async () => {
++      roleAlreadyExists();
++      vi.mocked(getAllRolePermissions).mockResolvedValue({
++        data: [
++          { object: "stream:_all_org-allowall", permission: "AllowList" },
++          { object: "stream:_all_org-allowall", permission: "AllowGet" },
++          { object: "mcp:_all_org-allowall", permission: "AllowAll" },
++        ],
++      } as any);
++      const { generate } = useOrg("org-allowall");
++
++      await generate();
++
++      expect(addedGrants()).toEqual([]);
++    });
++
++    it("keeps the show-once token when the role update fails", async () => {
++      vi.mocked(updateRole).mockRejectedValue(new Error("boom"));
++      const { generate, error } = useOrg("org-partial");
++
++      const cred = await generate();
++
++      expect(cred).toMatchObject({ token: "tok_123", role: null, scope: "unscoped" });
++      expect(error.value).toBe("");
++    });
++
++    // Without the existing grants a blind write could duplicate a tuple and 500, so nothing is sent.
++    it("reports unscoped without joining the role when its grants cannot be read", async () => {
++      roleAlreadyExists();
++      vi.mocked(getAllRolePermissions).mockRejectedValue(new Error("boom"));
++      const { generate } = useOrg("org-unreadable");
++
++      const cred = await generate();
++
++      expect(updateRole).not.toHaveBeenCalled();
++      expect(cred).toMatchObject({ token: "tok_123", role: null, scope: "unscoped" });
++    });
++
++    it("reports an unscoped account when no resource is readable", async () => {
++      vi.mocked(getResources).mockResolvedValue({ data: [] } as any);
++      const { generate } = useOrg("org-noresources");
++
++      expect(await generate()).toMatchObject({ scope: "unscoped" });
++    });
++
++    it("grants the org resource only inside the meta org", async () => {
++      await useOrg("_meta").generate();
++      await useOrg("org-plain").generate();
++
++      const [metaAdd, plainAdd] = vi.mocked(updateRole).mock.calls.map((c) => c[0].payload.add);
++      expect(metaAdd).toContainEqual({ object: "org:_all__meta", permission: "AllowList" });
++      expect(plainAdd.some((perm: { object: string }) => perm.object.startsWith("org:"))).toBe(
++        false,
++      );
++    });
++  });
++
++  describe("failures", () => {
++    it("surfaces the server's reason and attempts no role work", async () => {
++      vi.mocked(service_accounts.create).mockRejectedValue({
++        response: { data: { message: "Service Accounts Not Enabled" } },
++      });
++      const { generate, error, generating } = useOrg("org-403");
++
++      expect(await generate()).toBeNull();
++      expect(error.value).toBe("Service Accounts Not Enabled");
++      expect(createRole).not.toHaveBeenCalled();
++      expect(generating.value).toBe(false);
++    });
++
++    it("rejects a non-200 body", async () => {
++      vi.mocked(service_accounts.create).mockResolvedValue({
++        data: { code: 400, message: "bad request" },
++      } as any);
++      const { generate, error } = useOrg("org-nak");
++
++      expect(await generate()).toBeNull();
++      expect(error.value).toBe("bad request");
++    });
++
++    it("rejects a 200 that carries no token", async () => {
++      vi.mocked(service_accounts.create).mockResolvedValue({ data: { code: 200 } } as any);
++      const { generate, error } = useOrg("org-notoken");
++
++      expect(await generate()).toBeNull();
++      expect(error.value).toBe("ingestion.mcp.credential.error");
++    });
++  });
++
++  describe("session cache", () => {
++    it("returns the same credential instead of minting a second account", async () => {
++      const { generate } = useOrg("org-cache");
++
++      const first = await generate();
++      const second = await generate();
++
++      expect(service_accounts.create).toHaveBeenCalledTimes(1);
++      expect(second).toBe(first);
++    });
++
++    it("hands a remount the credential it can no longer be shown", async () => {
++      const { generate } = useOrg("org-remount");
++      const first = await generate();
++
++      const { credential } = useOrg("org-remount");
++
++      expect(credential.value).toBe(first);
++    });
++
++    it("mints again for a different org", async () => {
++      await useOrg("org-a").generate();
++      await useOrg("org-b").generate();
++
++      expect(service_accounts.create).toHaveBeenCalledTimes(2);
++    });
++  });
++});
+diff --git a/web/src/composables/useMcpCredential.ts b/web/src/composables/useMcpCredential.ts
+index b1b26371b4a..3d11ff1d36d 100644
+--- a/web/src/composables/useMcpCredential.ts
++++ b/web/src/composables/useMcpCredential.ts
+@@ -13,85 +13,140 @@
+ // You should have received a copy of the GNU Affero General Public License
+ // along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ 
+-// One-click, least-privilege credential for the MCP server: create a service
+-// account, attach a freshly-seeded read-only role, and hand back the show-once
+-// token. Reuses the same primitives as the IAM service-account flow
+-// (service_accounts.create + createRole + seedReadonlyRolePermissions +
+-// updateRole add_users) so the credential behaves identically to one made by
+-// hand in IAM — just without the multi-screen detour.
++// Mints a dedicated MCP service account and, under RBAC, joins it to one shared read-only role per org.
+ 
+ import { ref } from "vue";
+ import { useStore } from "vuex";
+ import { useI18nTyped } from "@/types/i18n";
+ import service_accounts from "@/services/service_accounts";
+-import { createRole, updateRole } from "@/services/iam";
+-import { seedReadonlyRolePermissions } from "@/components/iam/roles/readonlyPreset";
++import { createRole, getAllRolePermissions, getResources, updateRole } from "@/services/iam";
++import {
++  buildReadonlyPermissions,
++  type RolePermission,
++} from "@/components/iam/roles/readonlyPreset";
+ import { buildServiceAccountEmail } from "@/components/iam/serviceAccounts/AddServiceAccount.schema";
+ 
++// Underscore, not hyphen: create_role normalizes the name (non-[A-Za-z0-9_] → "_"), update_role does not.
++export const MCP_READONLY_ROLE = "mcp_readonly";
++
++// MCP is JSON-RPC over POST, which the route registry maps to PUT on `mcp` — a grant the read-only preset never makes.
++const MCP_GRANTS = ["AllowList", "AllowPut"] as const;
++
++/** `readonly`: joined to the shared role · `unscoped`: the role grants nothing or couldn't be applied · `rbacDisabled`: no RBAC to scope with. */
++export type McpCredentialScope = "readonly" | "unscoped" | "rbacDisabled";
++
+ export interface McpCredential {
+   /** Synthetic SA identifier — the Basic-auth username (`<name>.<org>@sa.internal`). */
+   email: string;
+   /** Show-once token — the Basic-auth password. Never persisted. */
+   token: string;
+-  /** The read-only role created and attached to the account. */
+-  roleName: string;
+-  /** False when the account was created but the read-only role couldn't be
+-   *  seeded/attached (partial success) — the caller warns the user. */
+-  readonlyApplied: boolean;
++  /** Null unless the account was actually added to the shared read-only role. */
++  role: string | null;
++  /** How far the token's access is limited; tells a null `role` from RBAC being off. */
++  scope: McpCredentialScope;
+ }
+ 
++// Show-once token: a remount must reuse it, and org-keyed because an org switch remounts the consumer.
++const sessionCredentials = new Map<string, McpCredential>();
++
++const grantKey = (perm: RolePermission): string => `${perm.object}|${perm.permission}`;
++
+ export function useMcpCredential() {
+   const store = useStore();
+   const { t } = useI18nTyped();
+ 
++  const currentOrg = (): string => store.state.selectedOrganization?.identifier ?? "";
++
+   const generating = ref(false);
+   const error = ref("");
+-  const credential = ref<McpCredential | null>(null);
++  const credential = ref<McpCredential | null>(sessionCredentials.get(currentOrg()) ?? null);
++
++  // A 400 on a fixed, valid, non-standard role name can only mean it already exists.
++  const ensureReadonlyRole = async (org: string): Promise<boolean> => {
++    try {
++      await createRole(MCP_READONLY_ROLE, org);
++      return true;
++    } catch (err: any) {
++      if (err?.response?.status === 400) return false;
++      throw err;
++    }
++  };
++
++  // The shared role may predate a grant or be left empty by a failed first seed, so every mint tops it up.
++  const missingRoleGrants = async (
++    org: string,
++    isMetaOrg: boolean,
++    created: boolean,
++  ): Promise<{ add: RolePermission[]; readable: boolean }> => {
++    const res = await getResources(org);
++    const readonly = buildReadonlyPermissions(res?.data ?? [], org, isMetaOrg);
++    const mcpObject = `mcp:_all_${org}`;
++    const desired = new Map(
++      [...readonly, ...MCP_GRANTS.map((permission) => ({ object: mcpObject, permission }))].map(
++        (perm) => [grantKey(perm), perm] as const,
++      ),
++    );
+ 
+-  /** rbac + service accounts must both be enabled for a read-only SA to exist. */
+-  const canGenerate = () =>
+-    !!store.state.zoConfig?.rbac_enabled && (store.state.zoConfig?.service_account_enabled ?? true);
++    // A role created a moment ago holds nothing, so its read is skipped.
++    const held: RolePermission[] = created
++      ? []
++      : ((await getAllRolePermissions({ role_name: MCP_READONLY_ROLE, org_identifier: org }))
++          ?.data ?? []);
++    const heldKeys = new Set(held.map(grantKey));
++    // OpenFGA rejects re-writing a tuple it already holds (update_role reports a 500), so only the gap is sent.
++    const add = [...desired.values()].filter(
++      (perm) => !heldKeys.has(grantKey(perm)) && !heldKeys.has(`${perm.object}|AllowAll`),
++    );
++    return { add, readable: readonly.length > 0 };
++  };
++
++  // Never throws: a role hiccup must not cost the caller the show-once token.
++  const applyReadonlyRole = async (
++    email: string,
++    org: string,
++  ): Promise<Pick<McpCredential, "role" | "scope">> => {
++    if (!store.state.zoConfig?.rbac_enabled) return { role: null, scope: "rbacDisabled" };
++
++    const isMetaOrg = org === store.state.zoConfig?.meta_org;
++    try {
++      const created = await ensureReadonlyRole(org);
++      const { add, readable } = await missingRoleGrants(org, isMetaOrg, created);
++      await updateRole({
++        role_id: MCP_READONLY_ROLE,
++        org_identifier: org,
++        payload: { add, remove: [], add_users: [email], remove_users: [] },
++      });
++      return { role: MCP_READONLY_ROLE, scope: readable ? "readonly" : "unscoped" };
++    } catch (roleErr) {
++      console.error("MCP credential: read-only role could not be applied", roleErr);
++      return { role: null, scope: "unscoped" };
++    }
++  };
+ 
+   const generate = async (): Promise<McpCredential | null> => {
++    const org = currentOrg();
++    const cached = sessionCredentials.get(org);
++    if (cached) {
++      credential.value = cached;
++      return cached;
++    }
++
+     generating.value = true;
+     error.value = "";
+-    const org = store.state.selectedOrganization?.identifier;
+-    const isMetaOrg = org === store.state.zoConfig?.meta_org;
+ 
+-    // Unique, slug-valid base name shared by the account and its role.
+-    // Date.now() keeps two clicks from colliding; base36 stays [a-z0-9].
++    // Date.now() keeps two mints from colliding; base36 stays inside the slug charset.
+     const name = `mcp-${Date.now().toString(36)}`;
+ 
+     try {
+       const email = buildServiceAccountEmail(name, org);
+-      const res = await service_accounts.create(
+-        { email, first_name: "MCP client (read-only)" },
+-        org,
+-      );
++      const res = await service_accounts.create({ email, first_name: "MCP client" }, org);
+       const token = res?.data?.token;
+       if (res?.data?.code !== 200 || !token) {
+         throw new Error(res?.data?.message || t("ingestion.mcp.credential.error"));
+       }
+ 
+-      // Best-effort read-only scoping. A failure here leaves a working (but
+-      // unscoped) account + token — surfaced via readonlyApplied, not thrown,
+-      // so the show-once token is never lost to a role hiccup.
+-      let readonlyApplied = false;
+-      try {
+-        await createRole(name, org);
+-        const granted = await seedReadonlyRolePermissions(name, org, isMetaOrg);
+-        await updateRole({
+-          role_id: name,
+-          org_identifier: org,
+-          payload: { add: [], remove: [], add_users: [email], remove_users: [] },
+-        });
+-        readonlyApplied = granted > 0;
+-      } catch (roleErr) {
+-        console.error("MCP credential: read-only role could not be applied", roleErr);
+-        readonlyApplied = false;
+-      }
+-
+-      credential.value = { email, token, roleName: name, readonlyApplied };
++      credential.value = { email, token, ...(await applyReadonlyRole(email, org)) };
++      sessionCredentials.set(org, credential.value);
+       return credential.value;
+     } catch (err: any) {
+       error.value =
+@@ -102,5 +157,5 @@ export function useMcpCredential() {
+     }
+   };
+ 
+-  return { generate, generating, error, credential, canGenerate };
++  return { generate, generating, error, credential };
+ }
+diff --git a/web/src/locales/languages/ar-SA.json b/web/src/locales/languages/ar-SA.json
+index c96f2e4a44c..f2944ec660d 100644
+--- a/web/src/locales/languages/ar-SA.json
++++ b/web/src/locales/languages/ar-SA.json
+@@ -3673,13 +3673,14 @@
+       "crossLinkBody": "{brand} يكشف عن نقطة نهاية {product} (MCP) بحيث يمكن لعملاء الذكاء الاصطناعي مثل {client1} و {client2} و {client3} الاستعلام والتفاعل مع هذه المنظمة. الإعداد والبيانات المعتمدة موجودة في IAM.",
+       "crossLinkCta": "افتح إعداد MCP",
+       "tagline": "قم بتوصيل {client1} و {client2} و {client3} وغيرها من عملاء الذكاء الاصطناعي بهذه المنظمة عبر {product} (MCP).",
+-      "endpointLabel": "نقطة نهاية MCP",
+-      "authLabel": "1. المصادقة",
+-      "clientLabel": "2. اختر عميلك",
++      "connectLabel": "نقطة النهاية والمصادقة",
++      "connectHint": "وجّه عميل MCP إلى عنوان URL هذا، ثم اختر طريقة تسجيل الدخول.",
+       "configLabel": "3. أضف التكوين",
++      "configHint": "اختر عميلك، ثم انسخ التكوين إلى مكانه.",
+       "auth": {
+         "oauth": "OAuth — تسجيل الدخول (موصى به)",
+         "token": "رمز الوصول",
++        "oauthTitle": "سجّل الدخول باستخدام متصفحك",
+         "oauthNote": "لا توجد بيانات اعتماد لإدارتها: يفتح عميل MCP الخاص بك متصفحاً لتسجيل الدخول، ويتم تحديد نطاق الوصول وفق أذوناتك الحالية. استخدمه متى ما كان عميلك يدعم OAuth."
+       },
+       "credential": {
+@@ -3691,11 +3692,12 @@
+         "download": "تحميل",
+         "manage": "إدارة / إلغاء",
+         "readonlyWarn": "تم إنشاء الحساب لكن لم يتم تطبيق دور القراءة فقط تلقائياً — راجع أذوناته في حسابات الخدمة.",
++        "readonlyNote": "مقيّد بالقراءة فقط عبر دور {role} — راجعه أو وسّعه في IAM › الأدوار.",
++        "rbacNote": "RBAC معطّل في هذا النشر، لذا لا يمكن تقييد هذا الرمز المميز للقراءة فقط — فهو يتمتع بنفس صلاحيات الوصول كأي بيانات اعتماد أخرى لهذه المؤسسة.",
+         "error": "تعذر إنشاء بيانات الاعتماد. حاول مرة أخرى، أو أنشئ حساب خدمة يدوياً في IAM."
+       },
+       "securityTitle": "استخدم بيانات اعتماد مخصصة بأقل صلاحيات",
+       "securityBody": "يُفترض الرمز ببيانات اعتماد حسابك الخاص. للإنتاج، أنشئ بيانات اعتماد للقراءة فقط أعلاه (أو أنشئ حساب خدمة محدود الصلاحية) وتجنب الالتزام بالرموز في نظام التحكم بالمصدر.",
+-      "docsCta": "اقرأ الوثائق الكاملة لـ MCP",
+       "clients": {
+         "claudeCode": "Claude Code",
+         "cursor": "Cursor",
+@@ -3722,7 +3724,10 @@
+         "hermes": "أضفه إلى ~/.hermes/config.yaml (YAML)، ثم شغّل /reload-mcp.",
+         "codex": "أضفه إلى ~/.codex/config.toml (TOML)، ثم أعد تشغيل Codex."
+       },
+-      "installOneClick": "أضفه إلى {client}"
++      "installOneClick": "أضفه إلى {client}",
++      "skillsLabel": "أضف مهارة {brand} (اختياري)",
++      "skillsHint": "يعلّم مساعد الذكاء الاصطناعي الخاص بك كيفية الاستعلام وإرسال التنبيهات وبناء لوحات المعلومات في {brand}، مما يجعله يستفيد أكثر من أدوات MCP. شغّله في مشروعك، ثم اختر الوكلاء الذين تريد التثبيت عليهم.",
++      "skillsRepo": "اعرض المهارات على {host}"
+     },
+     "manageTokensBtnLabel": "إدارة الرموز",
+     "orgLevelExplanation": "هذه رموز إدخال على مستوى المؤسسة. ليست مرتبطة بالمستخدمين الفرديين وستظل تعمل حتى إذا غادر المستخدم الذي أنشأها المؤسسة. يمكن استخدام الرموز فقط على نقاط النهاية للإدخال.",
+diff --git a/web/src/locales/languages/de-DE.json b/web/src/locales/languages/de-DE.json
+index 41bc17b2657..25c4b72f723 100644
+--- a/web/src/locales/languages/de-DE.json
++++ b/web/src/locales/languages/de-DE.json
+@@ -3673,29 +3673,31 @@
+       "crossLinkBody": "{brand} stellt einen {product}-(MCP-)Endpunkt bereit, damit KI-Clients wie {client1}, {client2} und {client3} diese Organisation abfragen und Aktionen darin ausführen können. Einrichtung und Anmeldedaten befinden sich in IAM.",
+       "crossLinkCta": "MCP-Einrichtung öffnen",
+       "tagline": "Verbinden Sie {client1}, {client2} und {client3} sowie andere KI-Clients über {product} (MCP) mit dieser Organisation.",
+-      "endpointLabel": "MCP-Endpunkt",
+-      "authLabel": "1. Authentifizierung",
+-      "clientLabel": "2. Wählen Sie Ihren Client",
+-      "configLabel": "3. Konfiguration hinzufügen",
++      "connectLabel": "Endpunkt und Authentifizierung",
++      "connectHint": "Richten Sie Ihren MCP-Client auf diese URL aus und wählen Sie dann die Anmeldemethode.",
++      "configLabel": "Konfiguration hinzufügen",
++      "configHint": "Wählen Sie Ihren Client und fügen Sie die Konfiguration ein.",
+       "auth": {
+         "oauth": "OAuth — Anmeldung (empfohlen)",
+         "token": "Zugriffstoken",
++        "oauthTitle": "Mit Ihrem Browser anmelden",
+         "oauthNote": "Keine Anmeldedaten zu verwalten: Ihr MCP-Client öffnet einen Browser zur Anmeldung, und der Zugriff wird durch Ihre vorhandenen Berechtigungen beschränkt. Verwenden Sie dies, wann immer Ihr Client OAuth unterstützt."
+       },
+       "credential": {
+-        "quickStartTitle": "Schnellstart — Ihr Konto",
+-        "quickStartBody": "Snippets verwenden Ihre eigenen Anmeldedaten, die Ihre vollen Berechtigungen enthalten. Erstellen Sie für die Produktion stattdessen dedizierte schreibgeschützte Anmeldedaten.",
+-        "generate": "Schreibgeschützte Anmeldedaten erstellen",
+-        "created": "Schreibgeschützte Anmeldedaten erstellt",
++        "quickStartTitle": "Noch kein Token",
++        "quickStartBody": "Die folgenden Codeausschnitte enthalten einen Platzhalter-Header. Erzeugen Sie einen dedizierten Token für diesen MCP-Client oder fügen Sie stattdessen einen vorhandenen Dienstkonto-Token ein.",
++        "generate": "Dedizierten Token erzeugen",
++        "created": "Dedizierter Token erstellt",
+         "shownOnce": "Für {email}. Kopieren Sie es jetzt – das Token wird nur einmal angezeigt, und die folgenden Snippets verwenden es jetzt.",
+         "download": "Herunterladen",
+         "manage": "Verwalten / widerrufen",
+-        "readonlyWarn": "Das Konto wurde erstellt, aber die schreibgeschützte Rolle konnte nicht automatisch angewendet werden – überprüfen Sie ihre Berechtigungen in den Dienstkonten.",
++        "readonlyWarn": "Das Konto wurde erstellt, konnte aber nicht zur Rolle {role} hinzugefügt werden — es hat keine Berechtigungen, bis Sie ihm in IAM eine Rolle zuweisen.",
++        "readonlyNote": "Schreibgeschützter Zugriff über die Rolle {role} — überprüfen oder erweitern Sie diese unter IAM › Rollen.",
++        "rbacNote": "RBAC ist in dieser Bereitstellung deaktiviert; dieser Token kann daher nicht auf schreibgeschützten Zugriff eingeschränkt werden — er hat denselben Zugriff wie jede andere Anmeldeinformation dieser Organisation.",
+         "error": "Anmeldedaten konnten nicht erstellt werden. Versuchen Sie es erneut oder erstellen Sie manuell ein Dienstkonto in IAM."
+       },
+       "securityTitle": "Verwenden Sie dedizierte Anmeldedaten mit minimalen Berechtigungen",
+-      "securityBody": "Das Token verwendet standardmäßig Ihre eigenen Konto-Anmeldedaten. Erstellen Sie für die Produktion oben ein schreibgeschütztes Token (oder ein eingeschränktes Dienstkonto) und übergeben Sie Tokens niemals an die Versionskontrolle.",
+-      "docsCta": "Lesen Sie die vollständige MCP-Dokumentation",
++      "securityBody": "Geben Sie dem MCP-Client ein eingeschränktes, schreibgeschütztes Dienstkonto statt Ihrer eigenen Konto-Anmeldedaten, und checken Sie das Token niemals in die Quellcodeverwaltung ein.",
+       "clients": {
+         "claudeCode": "Claude Code",
+         "cursor": "Cursor",
+@@ -3722,7 +3724,10 @@
+         "hermes": "Zu ~/.hermes/config.yaml (YAML) hinzufügen, dann /reload-mcp ausführen.",
+         "codex": "Zu ~/.codex/config.toml (TOML) hinzufügen, dann Codex neu starten."
+       },
+-      "installOneClick": "Zu {client} hinzufügen"
++      "installOneClick": "Zu {client} hinzufügen",
++      "skillsLabel": "{brand}-Skill hinzufügen (optional)",
++      "skillsHint": "Bringt Ihrem KI-Assistenten bei, wie er in {brand} Abfragen durchführt, Warnmeldungen einrichtet und Dashboards erstellt, damit er mehr aus den MCP-Tools herausholt. Führen Sie es in Ihrem Projekt aus und wählen Sie dann die Agenten aus, in denen es installiert werden soll.",
++      "skillsRepo": "Die Skills auf {host} anzeigen"
+     },
+     "manageTokensBtnLabel": "Tokens verwalten",
+     "orgLevelExplanation": "Dabei handelt es sich um Erfassungs-Token auf Organisationsebene. Sie sind nicht an einzelne Benutzer gebunden und funktionieren auch dann weiter, wenn der Benutzer, der sie erstellt hat, die Organisation verlässt. Tokens können nur auf Datenerfassungsendpunkten verwendet werden.",
+diff --git a/web/src/locales/languages/en-US.json b/web/src/locales/languages/en-US.json
+index 56a2f95e747..392ef757d7d 100644
+--- a/web/src/locales/languages/en-US.json
++++ b/web/src/locales/languages/en-US.json
+@@ -3673,29 +3673,31 @@
+       "crossLinkBody": "{brand} exposes a {product} (MCP) endpoint so AI clients like {client1}, {client2} and {client3} can query and act on this organization. Setup and credentials live in IAM.",
+       "crossLinkCta": "Open MCP setup",
+       "tagline": "Connect {client1}, {client2}, {client3} and other AI clients to this organization over the {product} (MCP).",
+-      "endpointLabel": "MCP endpoint",
+-      "authLabel": "1. Authentication",
+-      "clientLabel": "2. Choose your client",
+-      "configLabel": "3. Add the configuration",
++      "connectLabel": "Endpoint and authentication",
++      "connectHint": "Point your MCP client at this URL, then choose how it signs in.",
++      "configLabel": "Add the configuration",
++      "configHint": "Pick your client, then copy the config into place.",
+       "auth": {
+         "oauth": "OAuth — sign in (recommended)",
+         "token": "Access token",
++        "oauthTitle": "Sign in with your browser",
+         "oauthNote": "No credential to manage: your MCP client opens a browser to sign in, and access is scoped by your existing permissions. Use it whenever your client supports OAuth."
+       },
+       "credential": {
+-        "quickStartTitle": "Quick start — your account",
+-        "quickStartBody": "Snippets use your own credentials, which carry your full permissions. For production, generate a dedicated read-only credential instead.",
+-        "generate": "Generate read-only credential",
+-        "created": "Read-only credential created",
++        "quickStartTitle": "No token yet",
++        "quickStartBody": "The snippets below carry a placeholder header. Generate a dedicated token for this MCP client, or paste an existing service account token in its place.",
++        "generate": "Generate dedicated token",
++        "created": "Dedicated token created",
+         "shownOnce": "For {email}. Copy it now — the token is shown only once and the snippets below now use it.",
+         "download": "Download",
+         "manage": "Manage / revoke",
+-        "readonlyWarn": "The account was created but the read-only role couldn't be applied automatically — review its permissions in Service Accounts.",
++        "readonlyWarn": "The account was created but couldn't be added to the {role} role — it has no permissions until you assign one in IAM.",
++        "readonlyNote": "Scoped read-only through the {role} role — review or extend it in IAM › Roles.",
++        "rbacNote": "RBAC is off in this deployment, so this token can't be scoped read-only — it has the same access as any other credential for this organization.",
+         "error": "Couldn't create the credential. Try again, or create a service account manually in IAM."
+       },
+       "securityTitle": "Use a dedicated, least-privilege credential",
+-      "securityBody": "The token defaults to your own account credentials. For production, generate a read-only credential above (or create a scoped service account) and never commit tokens to source control.",
+-      "docsCta": "Read the full MCP documentation",
++      "securityBody": "Give the MCP client a scoped, read-only service account rather than your own account credentials, and never commit its token to source control.",
+       "clients": {
+         "claudeCode": "Claude Code",
+         "cursor": "Cursor",
+@@ -3722,7 +3724,10 @@
+         "hermes": "Add to ~/.hermes/config.yaml (YAML), then run /reload-mcp.",
+         "codex": "Add to ~/.codex/config.toml (TOML), then restart Codex."
+       },
+-      "installOneClick": "Add to {client}"
++      "installOneClick": "Add to {client}",
++      "skillsLabel": "Add the {brand} skill (optional)",
++      "skillsHint": "Teaches your AI assistant how to query, alert and build dashboards in {brand}, so it gets more out of the MCP tools. Run it in your project, then pick the agents to install to.",
++      "skillsRepo": "View the skills on {host}"
+     },
+     "manageTokensBtnLabel": "Manage Tokens",
+     "orgLevelExplanation": "These are organization-level ingestion tokens. They are not tied to individual users and will continue working even if the user who created them leaves the organization. Tokens can only be used on ingestion endpoints.",
+diff --git a/web/src/locales/languages/es-ES.json b/web/src/locales/languages/es-ES.json
+index 40119f9615f..360be162d11 100644
+--- a/web/src/locales/languages/es-ES.json
++++ b/web/src/locales/languages/es-ES.json
+@@ -3673,29 +3673,31 @@
+       "crossLinkBody": "{brand} expone un endpoint de {product} (MCP) para que clientes de IA como {client1}, {client2} y {client3} puedan consultar y actuar sobre esta organización. La configuración y las credenciales se encuentran en IAM.",
+       "crossLinkCta": "Abrir configuración de MCP",
+       "tagline": "Conecte {client1}, {client2}, {client3} y otros clientes de IA a esta organización a través de {product} (MCP).",
+-      "endpointLabel": "Endpoint MCP",
+-      "authLabel": "1. Autenticación",
+-      "clientLabel": "2. Elija su cliente",
+-      "configLabel": "3. Agregue la configuración",
++      "connectLabel": "Endpoint y autenticación",
++      "connectHint": "Apunta tu cliente MCP a esta URL y elige cómo se autentica.",
++      "configLabel": "Añadir la configuración",
++      "configHint": "Selecciona tu cliente y copia la configuración en el lugar correspondiente.",
+       "auth": {
+         "oauth": "OAuth — iniciar sesión (recomendado)",
+         "token": "Token de acceso",
++        "oauthTitle": "Inicia sesión con tu navegador",
+         "oauthNote": "Sin credenciales que gestionar: su cliente MCP abre un navegador para iniciar sesión, y el acceso está limitado por sus permisos existentes. Úselo siempre que su cliente admita OAuth."
+       },
+       "credential": {
+-        "quickStartTitle": "Inicio rápido — su cuenta",
+-        "quickStartBody": "Los fragmentos usan sus propias credenciales, que tienen todos sus permisos. Para producción, genere una credencial de solo lectura dedicada.",
+-        "generate": "Generar credencial de solo lectura",
+-        "created": "Credencial de solo lectura creada",
++        "quickStartTitle": "Aún no hay token",
++        "quickStartBody": "Los fragmentos siguientes incluyen un encabezado de marcador de posición. Genera un token dedicado para este cliente MCP o pega un token de cuenta de servicio existente en su lugar.",
++        "generate": "Generar token dedicado",
++        "created": "Token dedicado creado",
+         "shownOnce": "Para {email}. Cópielo ahora: el token se muestra solo una vez y los fragmentos a continuación ahora lo usan.",
+         "download": "Descargar",
+         "manage": "Gestionar / revocar",
+-        "readonlyWarn": "La cuenta se creó pero el rol de solo lectura no se pudo aplicar automáticamente; revise sus permisos en Cuentas de servicio.",
++        "readonlyWarn": "La cuenta se creó pero no se pudo añadir al rol {role}: no tiene permisos hasta que le asignes uno en IAM.",
++        "readonlyNote": "Con permiso de solo lectura mediante el rol {role}: revísalo o amplíalo en IAM › Roles.",
++        "rbacNote": "RBAC está desactivado en este despliegue, por lo que este token no se puede limitar a solo lectura: tiene el mismo acceso que cualquier otra credencial de esta organización.",
+         "error": "No se pudo crear la credencial. Inténtelo de nuevo o cree una cuenta de servicio manualmente en IAM."
+       },
+       "securityTitle": "Use una credencial dedicada con privilegios mínimos",
+-      "securityBody": "El token predeterminado usa las credenciales de su propia cuenta. Para producción, genere una credencial de solo lectura arriba (o cree una cuenta de servicio con ámbito) y nunca envíe tokens al control de código fuente.",
+-      "docsCta": "Lea la documentación completa de MCP",
++      "securityBody": "Entrégale al cliente MCP una cuenta de servicio limitada y de solo lectura en lugar de las credenciales de tu propia cuenta, y nunca subas su token al control de versiones.",
+       "clients": {
+         "claudeCode": "Claude Code",
+         "cursor": "Cursor",
+@@ -3722,7 +3724,10 @@
+         "hermes": "Agregar a ~/.hermes/config.yaml (YAML), luego ejecutar /reload-mcp.",
+         "codex": "Agregar a ~/.codex/config.toml (TOML), luego reiniciar Codex."
+       },
+-      "installOneClick": "Agregar a {client}"
++      "installOneClick": "Agregar a {client}",
++      "skillsLabel": "Añade la habilidad de {brand} (opcional)",
++      "skillsHint": "Enseña a tu Asistente de IA a consultar, alertar y crear dashboards en {brand}, para que aproveche mejor las herramientas MCP. Ejecútala en tu proyecto y luego elige los agentes en los que instalarla.",
++      "skillsRepo": "Ver las habilidades en {host}"
+     },
+     "manageTokensBtnLabel": "Administrar los tokens",
+     "orgLevelExplanation": "Se trata de tokens de ingestión a nivel de organización. No están vinculados a usuarios individuales y seguirán funcionando aunque el usuario que los creó abandone la organización. Los tokens solo se pueden usar en los puntos finales de ingestión.",
+diff --git a/web/src/locales/languages/fr-FR.json b/web/src/locales/languages/fr-FR.json
+index ab014277a52..e631684335f 100644
+--- a/web/src/locales/languages/fr-FR.json
++++ b/web/src/locales/languages/fr-FR.json
+@@ -3673,29 +3673,31 @@
+       "crossLinkBody": "{brand} expose un point de terminaison {product} (MCP) afin que les clients IA comme {client1}, {client2} et {client3} puissent interroger et agir sur cette organisation. La configuration et les identifiants se trouvent dans IAM.",
+       "crossLinkCta": "Ouvrir la configuration MCP",
+       "tagline": "Connectez {client1}, {client2}, {client3} et d'autres clients IA à cette organisation via le {product} (MCP).",
+-      "endpointLabel": "Point de terminaison MCP",
+-      "authLabel": "1. Authentification",
+-      "clientLabel": "2. Choisissez votre client",
+-      "configLabel": "3. Ajoutez la configuration",
++      "connectLabel": "Point de terminaison et authentification",
++      "connectHint": "Indiquez cette URL à votre client MCP, puis choisissez comment il se connecte.",
++      "configLabel": "Ajouter la configuration",
++      "configHint": "Choisissez votre client, puis copiez la configuration fournie.",
+       "auth": {
+         "oauth": "OAuth — connexion (recommandé)",
+         "token": "Jeton d'accès",
++        "oauthTitle": "Connectez-vous avec votre navigateur",
+         "oauthNote": "Aucun identifiant à gérer : votre client MCP ouvre un navigateur pour vous connecter, et l'accès est limité par vos autorisations existantes. Utilisez-le lorsque votre client prend en charge OAuth."
+       },
+       "credential": {
+-        "quickStartTitle": "Démarrage rapide — votre compte",
+-        "quickStartBody": "Les extraits utilisent vos propres identifiants, qui portent toutes vos autorisations. Pour la production, générez plutôt un identifiant en lecture seule dédié.",
+-        "generate": "Générer un identifiant en lecture seule",
+-        "created": "Identifiant en lecture seule créé",
++        "quickStartTitle": "Aucun jeton pour l'instant",
++        "quickStartBody": "Les extraits ci-dessous portent un en-tête factice. Générez un jeton dédié pour ce client MCP, ou collez un jeton de compte de service existant à sa place.",
++        "generate": "Générer un jeton dédié",
++        "created": "Jeton dédié créé",
+         "shownOnce": "Pour {email}. Copiez-le maintenant — le jeton n'est affiché qu'une seule fois et les extraits ci-dessous l'utilisent désormais.",
+         "download": "Télécharger",
+         "manage": "Gérer / révoquer",
+-        "readonlyWarn": "Le compte a été créé mais le rôle en lecture seule n'a pas pu être appliqué automatiquement — vérifiez ses autorisations dans Comptes de service.",
++        "readonlyWarn": "Le compte a été créé, mais il n'a pas pu être ajouté au rôle {role} — il n'a aucune autorisation jusqu'à ce que vous en attribuiez une dans IAM.",
++        "readonlyNote": "Lecture seule limitée via le rôle {role} — vérifiez-le ou étendez-le dans IAM › Rôles.",
++        "rbacNote": "Le RBAC est désactivé dans ce déploiement, ce jeton ne peut donc pas être limité en lecture seule — il dispose du même accès que n'importe quel autre identifiant pour cette organisation.",
+         "error": "Impossible de créer l'identifiant. Réessayez, ou créez un compte de service manuellement dans IAM."
+       },
+       "securityTitle": "Utilisez un identifiant dédié avec le moins de privilèges possible",
+-      "securityBody": "Le jeton utilise par défaut les identifiants de votre propre compte. Pour la production, générez un identifiant en lecture seule ci-dessus (ou créez un compte de service restreint) et ne validez jamais les jetons dans le contrôle de source.",
+-      "docsCta": "Lisez la documentation complète de MCP",
++      "securityBody": "Donnez au client MCP un compte de service limité en lecture seule plutôt que les informations d'identification de votre propre compte, et ne validez jamais son jeton dans le contrôle de code source.",
+       "clients": {
+         "claudeCode": "Claude Code",
+         "cursor": "Cursor",
+@@ -3722,7 +3724,10 @@
+         "hermes": "Ajouter à ~/.hermes/config.yaml (YAML), puis exécuter /reload-mcp.",
+         "codex": "Ajouter à ~/.codex/config.toml (TOML), puis redémarrer Codex."
+       },
+-      "installOneClick": "Ajouter à {client}"
++      "installOneClick": "Ajouter à {client}",
++      "skillsLabel": "Ajouter la compétence {brand} (facultatif)",
++      "skillsHint": "Apprend à votre assistante IA à interroger, à alerter et à créer des tableaux de bord dans {brand}, afin qu'elle tire le meilleur parti des outils MCP. Exécutez-la dans votre projet, puis choisissez les agents dans lesquels l'installer.",
++      "skillsRepo": "Voir les compétences sur {host}"
+     },
+     "manageTokensBtnLabel": "Gérer les jetons",
+     "orgLevelExplanation": "Il s'agit de jetons d'ingestion au niveau de l'organisation. Ils ne sont pas liés à des utilisateurs individuels et continueront de fonctionner même si l'utilisateur qui les a créés quitte l'organisation. Les jetons ne peuvent être utilisés que sur les points finaux d'ingestion.",
+diff --git a/web/src/locales/languages/it-IT.json b/web/src/locales/languages/it-IT.json
+index 85cb9d92c07..b092ccd5b48 100644
+--- a/web/src/locales/languages/it-IT.json
++++ b/web/src/locales/languages/it-IT.json
+@@ -3673,29 +3673,31 @@
+       "crossLinkBody": "{brand} espone un endpoint {product} (MCP) così che client AI come {client1}, {client2} e {client3} possano interrogare e agire su questa organizzazione. Configurazione e credenziali si trovano in IAM.",
+       "crossLinkCta": "Apri configurazione MCP",
+       "tagline": "Connetti {client1}, {client2}, {client3} e altri client AI a questa organizzazione tramite {product} (MCP).",
+-      "endpointLabel": "Endpoint MCP",
+-      "authLabel": "1. Autenticazione",
+-      "clientLabel": "2. Scegli il tuo client",
+-      "configLabel": "3. Aggiungi la configurazione",
++      "connectLabel": "Endpoint e autenticazione",
++      "connectHint": "Indirizza il tuo client MCP a questo URL, quindi scegli come deve autenticarsi.",
++      "configLabel": "Aggiungi la configurazione",
++      "configHint": "Scegli il client, quindi copia la configurazione nella posizione appropriata.",
+       "auth": {
+         "oauth": "OAuth — accedi (consigliato)",
+         "token": "Token di accesso",
++        "oauthTitle": "Accedi con il tuo browser",
+         "oauthNote": "Nessuna credenziale da gestire: il tuo client MCP apre un browser per l'accesso e l'accesso è limitato dai tuoi permessi esistenti. Usalo quando il tuo client supporta OAuth."
+       },
+       "credential": {
+-        "quickStartTitle": "Guida rapida — il tuo account",
+-        "quickStartBody": "Gli snippet usano le tue credenziali personali, che hanno i tuoi permessi completi. Per la produzione, genera invece una credenziale di sola lettura dedicata.",
+-        "generate": "Genera credenziale di sola lettura",
+-        "created": "Credenziale di sola lettura creata",
++        "quickStartTitle": "Ancora nessun token",
++        "quickStartBody": "I frammenti seguenti contengono un'intestazione segnaposto. Genera un token dedicato per questo client MCP oppure incolla al suo posto un token di un account di servizio esistente.",
++        "generate": "Genera token dedicato",
++        "created": "Token dedicato creato",
+         "shownOnce": "Per {email}. Copiala ora — il token viene mostrato solo una volta e gli snippet seguenti ora lo utilizzano.",
+         "download": "Scarica",
+         "manage": "Gestisci / revoca",
+-        "readonlyWarn": "L'account è stato creato ma il ruolo di sola lettura non può essere applicato automaticamente — rivedi i suoi permessi in Service Accounts.",
++        "readonlyWarn": "L'account è stato creato ma non è stato possibile aggiungerlo al ruolo {role} — non dispone di autorizzazioni finché non se ne assegna una in IAM.",
++        "readonlyNote": "Limitato alla sola lettura tramite il ruolo {role} — rivedilo o estendilo in IAM › Ruoli.",
++        "rbacNote": "Il controllo degli accessi basato sui ruoli (RBAC) è disattivato in questa distribuzione, quindi questo token non può essere limitato alla sola lettura — ha lo stesso accesso di qualsiasi altra credenziale per questa organizzazione.",
+         "error": "Impossibile creare la credenziale. Riprova o crea manualmente un account di servizio in IAM."
+       },
+       "securityTitle": "Usa una credenziale dedicata con privilegi minimi",
+-      "securityBody": "Il token predefinito utilizza le credenziali del tuo account. Per la produzione, genera una credenziale di sola lettura sopra (o crea un account di servizio con ambito) e non inserire mai i token nel controllo versione.",
+-      "docsCta": "Leggi la documentazione completa su MCP",
++      "securityBody": "Assegna al client MCP un account di servizio con ambito limitato e di sola lettura anziché le credenziali del tuo account personale e non inserire mai il suo token nel controllo del codice sorgente.",
+       "clients": {
+         "claudeCode": "Claude Code",
+         "cursor": "Cursor",
+@@ -3722,7 +3724,10 @@
+         "hermes": "Aggiungi a ~/.hermes/config.yaml (YAML), poi esegui /reload-mcp.",
+         "codex": "Aggiungi a ~/.codex/config.toml (TOML), quindi riavvia Codex."
+       },
+-      "installOneClick": "Aggiungi a {client}"
++      "installOneClick": "Aggiungi a {client}",
++      "skillsLabel": "Aggiungi la skill {brand} (opzionale)",
++      "skillsHint": "Insegna al tuo Assistente AI come eseguire query, creare avvisi e dashboard in {brand}, così può sfruttare al meglio gli strumenti MCP. Eseguilo nel tuo progetto, poi scegli gli agenti su cui installarlo.",
++      "skillsRepo": "Visualizza le skill su {host}"
+     },
+     "manageTokensBtnLabel": "Gestisci i token",
+     "orgLevelExplanation": "Si tratta di token di ingestione a livello di organizzazione. Non sono legati ai singoli utenti e continueranno a funzionare anche se l'utente che li ha creati lascia l'organizzazione. I token possono essere utilizzati solo sugli endpoint di ingestione.",
+diff --git a/web/src/locales/languages/ja-JP.json b/web/src/locales/languages/ja-JP.json
+index c1f7739303b..a4feef72821 100644
+--- a/web/src/locales/languages/ja-JP.json
++++ b/web/src/locales/languages/ja-JP.json
+@@ -3673,29 +3673,31 @@
+       "crossLinkBody": "{brand} は {product}（MCP）エンドポイントを公開しており、{client1}、{client2}、{client3} などの AI クライアントがこの組織に対してクエリを実行し操作できます。セットアップと認証情報は IAM にあります。",
+       "crossLinkCta": "MCPセットアップを開く",
+       "tagline": "{product}（MCP）を介して {client1}、{client2}、{client3} およびその他の AI クライアントをこの組織に接続します。",
+-      "endpointLabel": "MCPエンドポイント",
+-      "authLabel": "1. 認証",
+-      "clientLabel": "2. クライアントを選択",
+-      "configLabel": "3. 設定を追加",
++      "connectLabel": "エンドポイントと認証",
++      "connectHint": "MCPクライアントにこのURLを指定し、サインイン方法を選択してください。",
++      "configLabel": "設定を追加",
++      "configHint": "クライアントを選択し、設定を指定の場所にコピーしてください。",
+       "auth": {
+         "oauth": "OAuth — サインイン（推奨）",
+         "token": "アクセストークン",
++        "oauthTitle": "ブラウザでサインイン",
+         "oauthNote": "管理する資格情報はありません。MCPクライアントがブラウザを開いてサインインし、アクセスは既存の権限に基づいてスコープされます。クライアントがOAuthをサポートしている場合はこれを使用してください。"
+       },
+       "credential": {
+-        "quickStartTitle": "クイックスタート — あなたのアカウント",
+-        "quickStartBody": "スニペットはあなた自身の資格情報を使用し、完全な権限を持ちます。本番環境では、代わりに専用の読み取り専用資格情報を生成してください。",
+-        "generate": "読み取り専用資格情報を生成",
+-        "created": "読み取り専用資格情報を作成しました",
++        "quickStartTitle": "トークンがまだありません",
++        "quickStartBody": "以下のスニペットにはプレースホルダーのヘッダーが含まれています。このMCPクライアント専用のトークンを生成するか、既存のサービスアカウントトークンをそこに貼り付けてください。",
++        "generate": "専用トークンを生成",
++        "created": "専用トークンを作成しました",
+         "shownOnce": "{email}用です。今すぐコピーしてください。トークンは一度だけ表示され、以下のスニペットで使用されます。",
+         "download": "ダウンロード",
+         "manage": "管理/取り消し",
+-        "readonlyWarn": "アカウントは作成されましたが、読み取り専用ロールを自動的に適用できませんでした。サービスアカウントで権限を確認してください。",
++        "readonlyWarn": "アカウントは作成されましたが、{role} ロールに追加できませんでした。IAMでロールを割り当てるまで権限はありません。",
++        "readonlyNote": "{role} ロールを通じて読み取り専用にスコープされています。IAM › ロール で確認または拡張してください。",
++        "rbacNote": "この環境ではRBACが無効になっているため、このトークンを読み取り専用にスコープできません。この組織の他の認証情報と同じアクセス権を持ちます。",
+         "error": "資格情報を作成できませんでした。もう一度試すか、IAMで手動でサービスアカウントを作成してください。"
+       },
+       "securityTitle": "専用の最小権限資格情報を使用する",
+-      "securityBody": "トークンはデフォルトで自分のアカウント資格情報になります。本番環境では、上記で読み取り専用資格情報を生成するか（またはスコープされたサービスアカウントを作成し）、トークンをソース管理にコミットしないでください。",
+-      "docsCta": "MCPの完全なドキュメントを読む",
++      "securityBody": "MCPクライアントには、自分のアカウントの認証情報ではなく、スコープされた読み取り専用のサービスアカウントを付与し、そのトークンをソース管理にコミットしないでください。",
+       "clients": {
+         "claudeCode": "Claude Code",
+         "cursor": "Cursor",
+@@ -3722,7 +3724,10 @@
+         "hermes": "~/.hermes/config.yaml (YAML) に追加し、次に /reload-mcp を実行してください。",
+         "codex": "~/.codex/config.toml (TOML) に追加し、次に Codex を再起動してください。"
+       },
+-      "installOneClick": "{client} に追加"
++      "installOneClick": "{client} に追加",
++      "skillsLabel": "{brand} スキルを追加（任意）",
++      "skillsHint": "{brand} でのクエリ、アラート、ダッシュボードの作成方法を AI アシスタントに教えることで、MCP ツールをより活用できるようになります。プロジェクトで実行し、インストール先のエージェントを選択してください。",
++      "skillsRepo": "{host} でスキルを表示"
+     },
+     "manageTokensBtnLabel": "トークンの管理",
+     "orgLevelExplanation": "これらは組織レベルの取り込みトークンです。これらは個々のユーザーに関連付けられることはなく、作成したユーザーが組織を離れても引き続き機能します。トークンは取り込みエンドポイントでのみ使用できます。",
+diff --git a/web/src/locales/languages/ko-KR.json b/web/src/locales/languages/ko-KR.json
+index a8c1e5ff1bf..7c80e9c94bc 100644
+--- a/web/src/locales/languages/ko-KR.json
++++ b/web/src/locales/languages/ko-KR.json
+@@ -3673,29 +3673,31 @@
+       "crossLinkBody": "{brand}는 AI 클라이언트({client1}, {client2}, {client3})가 이 조직을 쿼리하고 작업을 수행할 수 있도록 {product} (MCP) 엔드포인트를 노출합니다. 설정 및 자격 증명은 IAM에 있습니다.",
+       "crossLinkCta": "MCP 설정 열기",
+       "tagline": "{client1}, {client2}, {client3} 및 기타 AI 클라이언트를 {product} (MCP)를 통해 이 조직에 연결하십시오.",
+-      "endpointLabel": "MCP 엔드포인트",
+-      "authLabel": "1. 인증",
+-      "clientLabel": "2. 클라이언트 선택",
+-      "configLabel": "3. 구성 추가",
++      "connectLabel": "엔드포인트 및 인증",
++      "connectHint": "MCP 클라이언트가 이 URL을 가리키게 한 다음 로그인 방식을 선택하세요.",
++      "configLabel": "구성 추가",
++      "configHint": "클라이언트를 선택한 다음 구성을 복사해 넣으세요.",
+       "auth": {
+         "oauth": "OAuth — 로그인 (권장)",
+         "token": "액세스 토큰",
++        "oauthTitle": "브라우저로 로그인",
+         "oauthNote": "관리할 자격 증명이 없습니다: MCP 클라이언트가 브라우저를 열어 로그인하며, 액세스는 기존 권한에 따라 범위가 지정됩니다. 클라이언트가 OAuth를 지원할 때마다 사용하세요."
+       },
+       "credential": {
+-        "quickStartTitle": "빠른 시작 — 내 계정",
+-        "quickStartBody": "스니펫은 전체 권한을 가진 자체 자격 증명을 사용합니다. 프로덕션의 경우 전용 읽기 전용 자격 증명을 생성하세요.",
+-        "generate": "읽기 전용 자격 증명 생성",
+-        "created": "읽기 전용 자격 증명이 생성됨",
++        "quickStartTitle": "아직 토큰 없음",
++        "quickStartBody": "아래 스니펫에는 자리 표시자 헤더가 들어 있습니다. 이 MCP 클라이언트 전용 토큰을 생성하거나 기존 서비스 계정 토큰을 그 자리에 붙여넣으세요.",
++        "generate": "전용 토큰 생성",
++        "created": "전용 토큰이 생성되었습니다",
+         "shownOnce": "{email}용입니다. 지금 복사하세요 — 토큰은 한 번만 표시되며 아래 스니펫에서 이를 사용합니다.",
+         "download": "다운로드",
+         "manage": "관리 / 철회",
+-        "readonlyWarn": "계정이 생성되었지만 읽기 전용 역할을 자동으로 적용할 수 없습니다. 서비스 계정에서 권한을 검토하세요.",
++        "readonlyWarn": "{role} 역할에 추가할 수 없었지만 계정은 생성되었습니다. IAM에서 역할을 할당하기 전까지 권한이 없습니다.",
++        "readonlyNote": "{role} 역할을 통해 읽기 전용으로 범위가 제한됩니다. IAM › 역할에서 검토하거나 확장하세요.",
++        "rbacNote": "이 배포에서는 RBAC가 꺼져 있어 이 토큰을 읽기 전용으로 범위를 제한할 수 없습니다. 이 조직의 다른 자격 증명과 동일한 액세스 권한을 갖습니다.",
+         "error": "자격 증명을 생성할 수 없습니다. 다시 시도하거나 IAM에서 수동으로 서비스 계정을 생성하세요."
+       },
+       "securityTitle": "전용 최소 권한 자격 증명 사용",
+-      "securityBody": "토큰은 기본적으로 자체 계정 자격 증명을 사용합니다. 프로덕션의 경우 위에서 읽기 전용 자격 증명을 생성하고(또는 범위가 지정된 서비스 계정 생성) 토큰을 소스 제어에 절대 커밋하지 마세요.",
+-      "docsCta": "전체 MCP 문서 읽기",
++      "securityBody": "MCP 클라이언트에는 자신의 계정 자격 증명 대신 범위가 제한된 읽기 전용 서비스 계정을 사용하고 해당 토큰을 소스 제어에 커밋하지 마세요.",
+       "clients": {
+         "claudeCode": "Claude Code",
+         "cursor": "Cursor",
+@@ -3722,7 +3724,10 @@
+         "hermes": "~/.hermes/config.yaml (YAML)에 추가한 후 /reload-mcp를 실행하세요.",
+         "codex": "~/.codex/config.toml (TOML)에 추가한 후 Codex를 다시 시작하세요."
+       },
+-      "installOneClick": "{client}에 추가"
++      "installOneClick": "{client}에 추가",
++      "skillsLabel": "{brand} 스킬 추가(선택 사항)",
++      "skillsHint": "{brand}에서 쿼리하고, 알림을 설정하고, 대시보드를 구축하는 방법을 AI 어시스턴트에게 가르쳐 주므로 MCP 도구를 더 효과적으로 활용할 수 있습니다. 프로젝트에서 실행한 다음, 설치할 에이전트를 선택하세요.",
++      "skillsRepo": "{host}에서 스킬 보기"
+     },
+     "manageTokensBtnLabel": "토큰 관리",
+     "orgLevelExplanation": "조직 수준의 통합 토큰입니다.토큰은 개별 사용자에 국한되지 않으며 토큰을 생성한 사용자가 조직을 떠나도 계속 작동합니다.토큰은 통합 엔드포인트에서만 사용할 수 있습니다.",
+diff --git a/web/src/locales/languages/nl-NL.json b/web/src/locales/languages/nl-NL.json
+index fc2cf736590..6d82a7757c2 100644
+--- a/web/src/locales/languages/nl-NL.json
++++ b/web/src/locales/languages/nl-NL.json
+@@ -3673,29 +3673,31 @@
+       "crossLinkBody": "{brand} stelt een {product} (MCP)-eindpunt beschikbaar zodat AI-clients zoals {client1}, {client2} en {client3} query's kunnen uitvoeren op deze organisatie en acties kunnen ondernemen. Installatie en referenties bevinden zich in IAM.",
+       "crossLinkCta": "MCP-instellingen openen",
+       "tagline": "Verbind {client1}, {client2}, {client3} en andere AI-clients met deze organisatie via de {product} (MCP).",
+-      "endpointLabel": "MCP-eindpunt",
+-      "authLabel": "1. Authenticatie",
+-      "clientLabel": "2. Kies uw client",
+-      "configLabel": "3. Configuratie toevoegen",
++      "connectLabel": "Eindpunt en authenticatie",
++      "connectHint": "Wijs je MCP-client naar deze URL en kies vervolgens hoe deze zich aanmeldt.",
++      "configLabel": "Voeg de configuratie toe",
++      "configHint": "Kies je client en kopieer de config naar de juiste plek.",
+       "auth": {
+         "oauth": "OAuth — inloggen (aanbevolen)",
+         "token": "Toegangstoken",
++        "oauthTitle": "Log in met je browser",
+         "oauthNote": "Geen credential om te beheren: uw MCP-client opent een browser om in te loggen en de toegang is beperkt tot uw bestaande machtigingen. Gebruik dit wanneer uw client OAuth ondersteunt."
+       },
+       "credential": {
+-        "quickStartTitle": "Snel starten — uw account",
+-        "quickStartBody": "Snippets gebruiken uw eigen credentials, die uw volledige machtigingen hebben. Voor productie genereert u in plaats daarvan een specifiek alleen-lezen credential.",
+-        "generate": "Alleen-lezen credential genereren",
+-        "created": "Alleen-lezen credential aangemaakt",
++        "quickStartTitle": "Nog geen token",
++        "quickStartBody": "De onderstaande codefragmenten bevatten een placeholder-header. Genereer een speciaal token voor deze MCP-client of plak een bestaand serviceaccount-token in de plaats.",
++        "generate": "Genereer een speciaal token",
++        "created": "Speciaal token aangemaakt",
+         "shownOnce": "Voor {email}. Kopieer het nu — het token wordt slechts één keer weergegeven en de onderstaande snippets gebruiken het nu.",
+         "download": "Downloaden",
+         "manage": "Beheren / intrekken",
+-        "readonlyWarn": "Het account is aangemaakt, maar de alleen-lezen rol kon niet automatisch worden toegepast — controleer de machtigingen in Service Accounts.",
++        "readonlyWarn": "Het account is aangemaakt, maar kon niet aan de rol {role} worden toegevoegd — het heeft geen machtigingen totdat je er een toewijst in IAM.",
++        "readonlyNote": "Beperkt tot alleen-lezen via de rol {role} — controleer of breid deze uit in IAM › Rollen.",
++        "rbacNote": "RBAC is uitgeschakeld in deze implementatie, dus dit token kan niet worden beperkt tot alleen-lezen — het heeft dezelfde toegang als elke andere credential voor deze organisatie.",
+         "error": "Kon het credential niet aanmaken. Probeer het opnieuw of maak handmatig een serviceaccount aan in IAM."
+       },
+       "securityTitle": "Gebruik een specifiek credential met minimale rechten",
+-      "securityBody": "Het token gebruikt standaard uw eigen accountcredentials. Voor productie genereert u hierboven een alleen-lezen credential (of maakt u een serviceaccount met beperkingen) en commit u tokens nooit naar broncodebeheer.",
+-      "docsCta": "Lees de volledige MCP-documentatie",
++      "securityBody": "Geef de MCP-client een beperkt, alleen-lezen serviceaccount in plaats van je eigen accountgegevens, en leg het token nooit vast in versiebeheer.",
+       "clients": {
+         "claudeCode": "Claude Code",
+         "cursor": "Cursor",
+@@ -3722,7 +3724,10 @@
+         "hermes": "Toevoegen aan ~/.hermes/config.yaml (YAML), voer daarna /reload-mcp uit.",
+         "codex": "Toevoegen aan ~/.codex/config.toml (TOML), herstart daarna Codex."
+       },
+-      "installOneClick": "Toevoegen aan {client}"
++      "installOneClick": "Toevoegen aan {client}",
++      "skillsLabel": "Voeg de {brand}-vaardigheid toe (optioneel)",
++      "skillsHint": "Leert je AI-assistent hoe hij query's uitvoert, alarmen instelt en dashboards bouwt in {brand}, zodat je meer uit de MCP-tools haalt. Voer het uit in je project en kies vervolgens de agents waarin je het wilt installeren.",
++      "skillsRepo": "Bekijk de vaardigheden op {host}"
+     },
+     "manageTokensBtnLabel": "Tokens beheren",
+     "orgLevelExplanation": "Dit zijn innametokens op organisatieniveau. Ze zijn niet gebonden aan individuele gebruikers en blijven werken, zelfs als de gebruiker die ze heeft aangemaakt de organisatie verlaat. Tokens kunnen alleen worden gebruikt op eindpunten voor inname.",
+diff --git a/web/src/locales/languages/pl-PL.json b/web/src/locales/languages/pl-PL.json
+index a4cfe544b3f..3d0e1546f5b 100644
+--- a/web/src/locales/languages/pl-PL.json
++++ b/web/src/locales/languages/pl-PL.json
+@@ -3673,29 +3673,31 @@
+       "crossLinkBody": "{brand} udostępnia punkt końcowy {product} (MCP), dzięki czemu klienci AI, tacy jak {client1}, {client2} i {client3}, mogą wysyłać zapytania i działać w tej organizacji. Konfiguracja i poświadczenia znajdują się w IAM.",
+       "crossLinkCta": "Otwórz konfigurację MCP",
+       "tagline": "Połącz {client1}, {client2}, {client3} i innych klientów AI z tą organizacją przez {product} (MCP).",
+-      "endpointLabel": "Punkt końcowy MCP",
+-      "authLabel": "1. Uwierzytelnianie",
+-      "clientLabel": "2. Wybierz swojego klienta",
+-      "configLabel": "3. Dodaj konfigurację",
++      "connectLabel": "Endpoint i uwierzytelnianie",
++      "connectHint": "Skonfiguruj swojego klienta MCP pod tym adresem URL, a następnie wybierz sposób logowania.",
++      "configLabel": "Dodaj konfigurację",
++      "configHint": "Wybierz swojego klienta, a następnie skopiuj konfigurację w odpowiednie miejsce.",
+       "auth": {
+         "oauth": "OAuth — zaloguj się (zalecane)",
+         "token": "Token dostępu",
++        "oauthTitle": "Zaloguj się przez przeglądarkę",
+         "oauthNote": "Brak danych logowania do zarządzania: Twój klient MCP otwiera przeglądarkę, aby się zalogować, a dostęp jest ograniczony przez Twoje istniejące uprawnienia. Używaj go, gdy Twój klient obsługuje OAuth."
+       },
+       "credential": {
+-        "quickStartTitle": "Szybki start — Twoje konto",
+-        "quickStartBody": "Fragmenty kodu używają Twoich własnych danych logowania, które niosą pełne uprawnienia. W środowisku produkcyjnym wygeneruj zamiast tego dedykowane dane logowania tylko do odczytu.",
+-        "generate": "Wygeneruj dane logowania tylko do odczytu",
+-        "created": "Utworzono dane logowania tylko do odczytu",
++        "quickStartTitle": "Brak tokenu",
++        "quickStartBody": "Poniższe fragmenty kodu zawierają nagłówek zastępczy. Wygeneruj dedykowany token dla tego klienta MCP lub wklej istniejący token konta usługi w jego miejsce.",
++        "generate": "Wygeneruj dedykowany token",
++        "created": "Utworzono dedykowany token",
+         "shownOnce": "Dla {email}. Skopiuj je teraz — token jest wyświetlany tylko raz, a poniższe fragmenty kodu już go używają.",
+         "download": "Pobierz",
+         "manage": "Zarządzaj / odwołaj",
+-        "readonlyWarn": "Konto zostało utworzone, ale rola tylko do odczytu nie mogła zostać zastosowana automatycznie — sprawdź jej uprawnienia w Kontach usług.",
++        "readonlyWarn": "Konto zostało utworzone, ale nie można go było dodać do roli {role} — nie ma ono żadnych uprawnień, dopóki nie przypiszesz mu roli w IAM.",
++        "readonlyNote": "Dostęp tylko do odczytu przez rolę {role} — przejrzyj ją lub rozszerz w IAM › Role.",
++        "rbacNote": "W tym wdrożeniu RBAC jest wyłączony, więc ten token nie może być ograniczony do odczytu — ma takie same uprawnienia jak każde inne poświadczenie w tej organizacji.",
+         "error": "Nie udało się utworzyć danych logowania. Spróbuj ponownie lub utwórz konto usługi ręcznie w IAM."
+       },
+       "securityTitle": "Użyj dedykowanych danych logowania z najmniejszymi uprawnieniami",
+-      "securityBody": "Token domyślnie używa poświadczeń Twojego konta. W środowisku produkcyjnym wygeneruj powyżej poświadczenie tylko do odczytu (lub utwórz ograniczone konto usługi) i nigdy nie zatwierdzaj tokenów w systemie kontroli wersji.",
+-      "docsCta": "Przeczytaj pełną dokumentację MCP",
++      "securityBody": "Nadaj klientowi MCP ograniczone konto usługi z uprawnieniami tylko do odczytu, a nie dane uwierzytelniające własnego konta, i nigdy nie wysyłaj jego tokenu do kontroli wersji.",
+       "clients": {
+         "claudeCode": "Claude Code",
+         "cursor": "Cursor",
+@@ -3722,7 +3724,10 @@
+         "hermes": "Dodaj do ~/.hermes/config.yaml (YAML), a następnie uruchom /reload-mcp.",
+         "codex": "Dodaj do ~/.codex/config.toml (TOML), a następnie uruchom ponownie Codex."
+       },
+-      "installOneClick": "Dodaj do {client}"
++      "installOneClick": "Dodaj do {client}",
++      "skillsLabel": "Dodaj umiejętność {brand} (opcjonalnie)",
++      "skillsHint": "Uczy Twojego asystenta AI, jak odpytywać dane, konfigurować alerty i tworzyć pulpity w {brand}, dzięki czemu lepiej wykorzysta narzędzia MCP. Uruchom ją w swoim projekcie, a następnie wybierz agentów, u których chcesz ją zainstalować.",
++      "skillsRepo": "Zobacz umiejętności na {host}"
+     },
+     "manageTokensBtnLabel": "Zarządzaj tokenami",
+     "orgLevelExplanation": "Są to tokeny pozyskiwania danych na poziomie organizacji. Nie są powiązane z indywidualnymi użytkownikami i będą działać nawet jeśli użytkownik, który je utworzył, opuści organizację. Tokeny mogą być używane tylko w punktach końcowych pozyskiwania danych.",
+diff --git a/web/src/locales/languages/pt-PT.json b/web/src/locales/languages/pt-PT.json
+index d51f0dabc73..b5835a2638a 100644
+--- a/web/src/locales/languages/pt-PT.json
++++ b/web/src/locales/languages/pt-PT.json
+@@ -3673,29 +3673,31 @@
+       "crossLinkBody": "{brand} expõe um endpoint {product} (MCP) para que clientes de IA como {client1}, {client2} e {client3} possam consultar e agir nesta organização. A configuração e as credenciais ficam no IAM.",
+       "crossLinkCta": "Abrir configuração do MCP",
+       "tagline": "Conecte {client1}, {client2}, {client3} e outros clientes de IA a esta organização através do {product} (MCP).",
+-      "endpointLabel": "Endpoint MCP",
+-      "authLabel": "1. Autenticação",
+-      "clientLabel": "2. Escolha seu cliente",
+-      "configLabel": "3. Adicione a configuração",
++      "connectLabel": "Endpoint e autenticação",
++      "connectHint": "Aponte seu cliente MCP para esta URL e escolha como ele se autentica.",
++      "configLabel": "Adicione a configuração",
++      "configHint": "Escolha seu cliente e cole a configuração onde ela deve ficar.",
+       "auth": {
+         "oauth": "OAuth — faça login (recomendado)",
+         "token": "Token de acesso",
++        "oauthTitle": "Faça login com seu navegador",
+         "oauthNote": "Nenhuma credencial para gerenciar: seu cliente MCP abre um navegador para fazer login e o acesso é limitado pelas suas permissões existentes. Use sempre que seu cliente suportar OAuth."
+       },
+       "credential": {
+-        "quickStartTitle": "Início rápido — sua conta",
+-        "quickStartBody": "Os snippets usam suas próprias credenciais, que carregam todas as suas permissões. Para produção, gere uma credencial somente leitura dedicada.",
+-        "generate": "Gerar credencial somente leitura",
+-        "created": "Credencial somente leitura criada",
++        "quickStartTitle": "Ainda sem token",
++        "quickStartBody": "Os trechos abaixo contêm um cabeçalho de espaço reservado. Gere um token dedicado para este cliente MCP ou cole um token de conta de serviço existente no lugar do cabeçalho.",
++        "generate": "Gerar token dedicado",
++        "created": "Token dedicado criado",
+         "shownOnce": "Para {email}. Copie agora — o token é mostrado apenas uma vez e os snippets abaixo agora o utilizam.",
+         "download": "Baixar",
+         "manage": "Gerenciar / revogar",
+-        "readonlyWarn": "A conta foi criada, mas a função somente leitura não pôde ser aplicada automaticamente — revise suas permissões em Contas de Serviço.",
++        "readonlyWarn": "A conta foi criada, mas não pôde ser adicionada à função {role} — ela não tem permissões até que você atribua uma no IAM.",
++        "readonlyNote": "Acesso limitado a somente leitura pela função {role} — revise ou estenda em IAM › Funções.",
++        "rbacNote": "O RBAC está desativado nesta implantação, portanto este token não pode ser limitado a somente leitura — ele tem o mesmo acesso que qualquer outra credencial desta organização.",
+         "error": "Não foi possível criar a credencial. Tente novamente ou crie uma conta de serviço manualmente no IAM."
+       },
+       "securityTitle": "Use uma credencial dedicada com privilégios mínimos",
+-      "securityBody": "O token usa por padrão as credenciais da sua conta. Para produção, gere uma credencial somente leitura acima (ou crie uma conta de serviço com escopo) e nunca envie tokens para o controle de versão.",
+-      "docsCta": "Leia a documentação completa do MCP",
++      "securityBody": "Forneça ao cliente MCP uma conta de serviço com escopo somente leitura, em vez de suas próprias credenciais de conta, e nunca faça commit do token dessa conta no controle de versão.",
+       "clients": {
+         "claudeCode": "Claude Code",
+         "cursor": "Cursor",
+@@ -3722,7 +3724,10 @@
+         "hermes": "Adicione a ~/.hermes/config.yaml (YAML), depois execute /reload-mcp.",
+         "codex": "Adicione a ~/.codex/config.toml (TOML), depois reinicie o Codex."
+       },
+-      "installOneClick": "Adicione a {client}"
++      "installOneClick": "Adicione a {client}",
++      "skillsLabel": "Adicionar a skill {brand} (opcional)",
++      "skillsHint": "Ensina seu Assistente de IA a consultar, alertar e criar painéis no {brand}, para aproveitar melhor as ferramentas MCP. Execute-a no seu projeto e depois escolha os agentes onde instalá-la.",
++      "skillsRepo": "Ver as skills em {host}"
+     },
+     "manageTokensBtnLabel": "Gerenciar tokens",
+     "orgLevelExplanation": "Esses são tokens de ingestão no nível da organização. Eles não estão vinculados a usuários individuais e continuarão funcionando mesmo que o usuário que os criou deixe a organização. Os tokens só podem ser usados em terminais de ingestão.",
+diff --git a/web/src/locales/languages/ru-RU.json b/web/src/locales/languages/ru-RU.json
+index ccd6877abf7..966d7685b1a 100644
+--- a/web/src/locales/languages/ru-RU.json
++++ b/web/src/locales/languages/ru-RU.json
+@@ -3673,29 +3673,31 @@
+       "crossLinkBody": "{brand} предоставляет конечную точку {product} (MCP), чтобы такие ИИ-клиенты, как {client1}, {client2} и {client3}, могли запрашивать данные и действовать в этой организации. Настройка и учетные данные находятся в IAM.",
+       "crossLinkCta": "Открыть настройку MCP",
+       "tagline": "Подключите {client1}, {client2}, {client3} и других ИИ-клиентов к этой организации через {product} (MCP).",
+-      "endpointLabel": "Конечная точка MCP",
+-      "authLabel": "1. Аутентификация",
+-      "clientLabel": "2. Выберите клиент",
+-      "configLabel": "3. Добавьте конфигурацию",
++      "connectLabel": "Endpoint и аутентификация",
++      "connectHint": "Укажите этот URL в вашем MCP-клиенте, затем выберите способ входа.",
++      "configLabel": "Добавить конфигурацию",
++      "configHint": "Выберите клиент, затем скопируйте конфигурацию в нужное место.",
+       "auth": {
+         "oauth": "OAuth — вход (рекомендуется)",
+         "token": "Токен доступа",
++        "oauthTitle": "Войдите через браузер",
+         "oauthNote": "Нет необходимости управлять учетными данными: ваш MCP клиент открывает браузер для входа, а доступ ограничен вашими существующими разрешениями. Используйте это, когда ваш клиент поддерживает OAuth."
+       },
+       "credential": {
+-        "quickStartTitle": "Быстрый старт — ваша учетная запись",
+-        "quickStartBody": "Фрагменты используют ваши собственные учетные данные, которые несут ваши полные разрешения. Для продакшена вместо этого создайте выделенные учетные данные только для чтения.",
+-        "generate": "Создать учетные данные только для чтения",
+-        "created": "Учетные данные только для чтения созданы",
++        "quickStartTitle": "Пока нет токена",
++        "quickStartBody": "Фрагменты ниже содержат заголовок с заполнителем. Создайте отдельный токен для этого MCP-клиента или вставьте вместо него существующий токен служебной учетной записи.",
++        "generate": "Создать отдельный токен",
++        "created": "Отдельный токен создан",
+         "shownOnce": "Для {email}. Скопируйте их сейчас — токен отображается только один раз, и фрагменты ниже теперь используют его.",
+         "download": "Скачать",
+         "manage": "Управление / отзыв",
+-        "readonlyWarn": "Учетная запись была создана, но роль только для чтения не удалось применить автоматически — проверьте ее разрешения в Service Accounts.",
++        "readonlyWarn": "Учетная запись создана, но не удалось добавить ее в роль {role} — у нее нет разрешений, пока вы не назначите какую-либо роль в IAM.",
++        "readonlyNote": "Доступ ограничен только чтением через роль {role} — просмотрите или расширьте ее в IAM › Роли.",
++        "rbacNote": "RBAC отключен в этом развертывании, поэтому этот токен нельзя ограничить режимом только для чтения — он имеет тот же доступ, что и любые другие учетные данные для этой организации.",
+         "error": "Не удалось создать учетные данные. Попробуйте снова или создайте сервисную учетную запись вручную в IAM."
+       },
+       "securityTitle": "Используйте выделенные учетные данные с минимальными привилегиями",
+-      "securityBody": "Токен по умолчанию использует учетные данные вашей учетной записи. Для production создайте учетные данные только для чтения выше (или создайте ограниченный сервисный аккаунт) и никогда не фиксируйте токены в системе контроля версий.",
+-      "docsCta": "Прочитайте полную документацию MCP",
++      "securityBody": "Предоставьте MCP-клиенту ограниченную служебную учетную запись только для чтения, а не учетные данные вашей собственной учетной записи, и никогда не сохраняйте ее токен в системе контроля версий.",
+       "clients": {
+         "claudeCode": "Claude Code",
+         "cursor": "Cursor",
+@@ -3722,7 +3724,10 @@
+         "hermes": "Добавьте в ~/.hermes/config.yaml (YAML), затем выполните /reload-mcp.",
+         "codex": "Добавьте в ~/.codex/config.toml (TOML), затем перезапустите Codex."
+       },
+-      "installOneClick": "Добавьте в {client}"
++      "installOneClick": "Добавьте в {client}",
++      "skillsLabel": "Добавьте навык {brand} (необязательно)",
++      "skillsHint": "Учит ваш ИИ-ассистент запрашивать данные, настраивать оповещения и создавать дашборды в {brand}, чтобы он эффективнее использовал инструменты MCP. Запустите его в своем проекте, затем выберите агентов, куда установить.",
++      "skillsRepo": "Просмотреть навыки на {host}"
+     },
+     "manageTokensBtnLabel": "Управление токенами",
+     "orgLevelExplanation": "Это токены приема на уровне организации. Они не привязаны к отдельным пользователям и будут продолжать работать, даже если пользователь, создавший их, покинет организацию. Токены можно использовать только на конечных точках приема.",
+diff --git a/web/src/locales/languages/tr-TR.json b/web/src/locales/languages/tr-TR.json
+index 468bb124591..1cb6b434873 100644
+--- a/web/src/locales/languages/tr-TR.json
++++ b/web/src/locales/languages/tr-TR.json
+@@ -3673,29 +3673,31 @@
+       "crossLinkBody": "{brand}, {client1}, {client2} ve {client3} gibi AI istemcilerinin bu kuruluşu sorgulayabilmesi ve işlem yapabilmesi için bir {product} (MCP) uç noktası sunar. Kurulum ve kimlik bilgileri IAM'de bulunur.",
+       "crossLinkCta": "MCP kurulumunu aç",
+       "tagline": "{client1}, {client2}, {client3} ve diğer AI istemcilerini {product} (MCP) üzerinden bu kuruluşa bağlayın.",
+-      "endpointLabel": "MCP uç noktası",
+-      "authLabel": "1. Kimlik Doğrulama",
+-      "clientLabel": "2. İstemcinizi Seçin",
+-      "configLabel": "3. Yapılandırmayı Ekleyin",
++      "connectLabel": "Endpoint ve kimlik doğrulama",
++      "connectHint": "MCP istemcinizi bu URL'ye yönlendirin ve nasıl oturum açacağını seçin.",
++      "configLabel": "Yapılandırmayı ekleyin",
++      "configHint": "İstemcinizi seçin, ardından yapılandırmayı yerine kopyalayın.",
+       "auth": {
+         "oauth": "OAuth — oturum aç (önerilir)",
+         "token": "Erişim belirteci",
++        "oauthTitle": "Tarayıcınızla oturum açın",
+         "oauthNote": "Yönetilecek kimlik bilgisi yok: MCP istemciniz oturum açmak için bir tarayıcı açar ve erişim mevcut izinlerinizle sınırlanır. İstemciniz OAuth'u desteklediğinde kullanın."
+       },
+       "credential": {
+-        "quickStartTitle": "Hızlı başlangıç — hesabınız",
+-        "quickStartBody": "Parçacıklar, tam izinlerinizi taşıyan kendi kimlik bilgilerinizi kullanır. Üretim için bunun yerine özel bir salt okunur kimlik bilgisi oluşturun.",
+-        "generate": "Salt okunur kimlik bilgisi oluştur",
+-        "created": "Salt okunur kimlik bilgisi oluşturuldu",
++        "quickStartTitle": "Henüz token yok",
++        "quickStartBody": "Aşağıdaki kod parçacıkları yer tutucu bir başlık içerir. Bu MCP istemcisi için özel bir token oluşturun veya yerine mevcut bir hizmet hesabı token'ını yapıştırın.",
++        "generate": "Özel token oluştur",
++        "created": "Özel token oluşturuldu",
+         "shownOnce": "{email} için. Şimdi kopyalayın — belirteç yalnızca bir kez gösterilir ve aşağıdaki parçacıklar artık onu kullanır.",
+         "download": "İndir",
+         "manage": "Yönet / iptal et",
+-        "readonlyWarn": "Hesap oluşturuldu ancak salt okunur rol otomatik olarak uygulanamadı — izinlerini Servis Hesapları'nda gözden geçirin.",
++        "readonlyWarn": "Hesap oluşturuldu ancak {role} rolüne eklenemedi — IAM'de bir rol atayıncaya kadar hiçbir izni yoktur.",
++        "readonlyNote": "{role} rolüyle salt okunur olarak sınırlandırıldı — IAM › Roller bölümünde inceleyin veya genişletin.",
++        "rbacNote": "Bu dağıtımda RBAC kapalı olduğundan, bu token salt okunur olarak sınırlandırılamaz — bu kuruluştaki diğer herhangi bir kimlik bilgisiyle aynı erişime sahiptir.",
+         "error": "Kimlik bilgisi oluşturulamadı. Tekrar deneyin veya IAM'de manuel olarak bir servis hesabı oluşturun."
+       },
+       "securityTitle": "Özel, en az ayrıcalıklı bir kimlik bilgisi kullanın",
+-      "securityBody": "Belirteç varsayılan olarak kendi hesap kimlik bilgilerinizi kullanır. Üretim için yukarıda bir salt okunur kimlik bilgisi oluşturun (veya kapsamlı bir servis hesabı oluşturun) ve belirteçleri asla kaynak kontrolüne göndermeyin.",
+-      "docsCta": "Tam MCP belgelerini okuyun",
++      "securityBody": "MCP istemcisine kendi hesap kimlik bilgileriniz yerine kapsamı salt okunur olarak sınırlandırılmış bir hizmet hesabı verin ve token'ını asla sürüm kontrolüne işlemeyin.",
+       "clients": {
+         "claudeCode": "Claude Code",
+         "cursor": "Cursor",
+@@ -3722,7 +3724,10 @@
+         "hermes": "~/.hermes/config.yaml (YAML) dosyasına ekleyin, ardından /reload-mcp çalıştırın.",
+         "codex": "~/.codex/config.toml (TOML) dosyasına ekleyin, ardından Codex'i yeniden başlatın."
+       },
+-      "installOneClick": "{client} öğesine ekle"
++      "installOneClick": "{client} öğesine ekle",
++      "skillsLabel": "{brand} becerisini ekleyin (isteğe bağlı)",
++      "skillsHint": "Yapay Zeka Asistanınıza {brand} içinde nasıl sorgu yapacağını, uyarı oluşturacağını ve gösterge panoları oluşturacağını öğretir, böylece MCP araçlarından daha fazla yararlanır. Projenizde çalıştırın, ardından hangi aracılara yükleyeceğinizi seçin.",
++      "skillsRepo": "{host} üzerindeki becerileri görüntüleyin"
+     },
+     "manageTokensBtnLabel": "Belirteçleri Yönet",
+     "orgLevelExplanation": "Bunlar kuruluş düzeyinde alım belirteçleridir. Bireysel kullanıcılara bağlı değildirler ve onları oluşturan kullanıcı kuruluştan ayrılsa bile çalışmaya devam edeceklerdir. Belirteçler yalnızca alım uç noktalarında kullanılabilir.",
+diff --git a/web/src/locales/languages/vi-VN.json b/web/src/locales/languages/vi-VN.json
+index 6b53ed6570e..01e35d7fcc3 100644
+--- a/web/src/locales/languages/vi-VN.json
++++ b/web/src/locales/languages/vi-VN.json
+@@ -3673,29 +3673,31 @@
+       "crossLinkBody": "{brand} cung cấp điểm cuối {product} (MCP) để các ứng dụng AI như {client1}, {client2} và {client3} có thể truy vấn và thao tác trên tổ chức này. Cấu hình và thông tin xác thực nằm trong IAM.",
+       "crossLinkCta": "Mở thiết lập MCP",
+       "tagline": "Kết nối {client1}, {client2}, {client3} và các ứng dụng AI khác với tổ chức này qua {product} (MCP).",
+-      "endpointLabel": "Điểm cuối MCP",
+-      "authLabel": "1. Xác thực",
+-      "clientLabel": "2. Chọn ứng dụng khách của bạn",
+-      "configLabel": "3. Thêm cấu hình",
++      "connectLabel": "Endpoint và xác thực",
++      "connectHint": "Trỏ MCP client của bạn tới URL này, rồi chọn cách đăng nhập.",
++      "configLabel": "Thêm cấu hình",
++      "configHint": "Chọn client của bạn, sau đó chép cấu hình vào đúng vị trí.",
+       "auth": {
+         "oauth": "OAuth — đăng nhập (khuyên dùng)",
+         "token": "Mã thông báo truy cập",
++        "oauthTitle": "Đăng nhập bằng trình duyệt của bạn",
+         "oauthNote": "Không cần quản lý thông tin xác thực: ứng dụng khách MCP của bạn mở trình duyệt để đăng nhập và quyền truy cập được giới hạn bởi các quyền hiện có của bạn. Sử dụng nó bất cứ khi nào ứng dụng khách của bạn hỗ trợ OAuth."
+       },
+       "credential": {
+-        "quickStartTitle": "Bắt đầu nhanh — tài khoản của bạn",
+-        "quickStartBody": "Các đoạn mã sử dụng thông tin xác thực của riêng bạn, mang đầy đủ quyền của bạn. Đối với môi trường sản xuất, hãy tạo thông tin xác thực chỉ đọc chuyên dụng thay thế.",
+-        "generate": "Tạo thông tin xác thực chỉ đọc",
+-        "created": "Đã tạo thông tin xác thực chỉ đọc",
++        "quickStartTitle": "Chưa có token",
++        "quickStartBody": "Các đoạn mã bên dưới chứa một header giữ chỗ. Hãy tạo token chuyên dụng cho MCP client này, hoặc dán token tài khoản dịch vụ hiện có vào vị trí đó.",
++        "generate": "Tạo token chuyên dụng",
++        "created": "Đã tạo token chuyên dụng",
+         "shownOnce": "Cho {email}. Sao chép ngay — mã thông báo chỉ được hiển thị một lần và các đoạn mã bên dưới hiện sử dụng nó.",
+         "download": "Tải xuống",
+         "manage": "Quản lý / thu hồi",
+-        "readonlyWarn": "Tài khoản đã được tạo nhưng không thể áp dụng vai trò chỉ đọc tự động — hãy xem xét quyền của nó trong Tài khoản dịch vụ.",
++        "readonlyWarn": "Tài khoản đã được tạo nhưng không thể thêm vào vai trò {role} — tài khoản không có quyền nào cho đến khi bạn gán một vai trò trong IAM.",
++        "readonlyNote": "Giới hạn chỉ đọc thông qua vai trò {role} — hãy xem lại hoặc mở rộng trong IAM › Vai trò.",
++        "rbacNote": "RBAC đang tắt trong môi trường triển khai này, vì vậy token này không thể giới hạn chỉ đọc — nó có quyền truy cập giống như mọi thông tin xác thực khác của tổ chức này.",
+         "error": "Không thể tạo thông tin xác thực. Hãy thử lại hoặc tạo tài khoản dịch vụ thủ công trong IAM."
+       },
+       "securityTitle": "Sử dụng thông tin xác thực chuyên dụng với đặc quyền tối thiểu",
+-      "securityBody": "Mã thông báo mặc định là thông tin xác thực tài khoản của bạn. Đối với môi trường sản xuất, hãy tạo thông tin xác thực chỉ đọc ở trên (hoặc tạo tài khoản dịch vụ có phạm vi) và không bao giờ commit mã thông báo vào kiểm soát nguồn.",
+-      "docsCta": "Đọc tài liệu MCP đầy đủ",
++      "securityBody": "Hãy cấp cho MCP client một tài khoản dịch vụ chỉ đọc, giới hạn phạm vi thay vì dùng thông tin xác thực tài khoản cá nhân của bạn, và không bao giờ commit token của nó vào kho mã nguồn.",
+       "clients": {
+         "claudeCode": "Claude Code",
+         "cursor": "Cursor",
+@@ -3722,7 +3724,10 @@
+         "hermes": "Thêm vào ~/.hermes/config.yaml (YAML), sau đó chạy /reload-mcp.",
+         "codex": "Thêm vào ~/.codex/config.toml (TOML), sau đó khởi động lại Codex."
+       },
+-      "installOneClick": "Thêm vào {client}"
++      "installOneClick": "Thêm vào {client}",
++      "skillsLabel": "Thêm kỹ năng {brand} (không bắt buộc)",
++      "skillsHint": "Dạy Trợ lý AI của bạn cách truy vấn, cảnh báo và tạo bảng điều khiển trong {brand}, để tận dụng tốt hơn các công cụ MCP. Chạy nó trong dự án của bạn, sau đó chọn các agent để cài đặt.",
++      "skillsRepo": "Xem các kỹ năng trên {host}"
+     },
+     "manageTokensBtnLabel": "Quản lý mã thông báo",
+     "orgLevelExplanation": "Đây là các mã thông báo ingestion cấp tổ chức. Chúng không gắn với người dùng cụ thể và sẽ tiếp tục hoạt động ngay cả khi người dùng đã tạo chúng rời khỏi tổ chức. Mã thông báo chỉ có thể được sử dụng trên các điểm cuối ingestion.",
+diff --git a/web/src/locales/languages/zh-CN.json b/web/src/locales/languages/zh-CN.json
+index ba4abeed2fd..9819945f63e 100644
+--- a/web/src/locales/languages/zh-CN.json
++++ b/web/src/locales/languages/zh-CN.json
+@@ -3673,29 +3673,31 @@
+       "crossLinkBody": "{brand} 暴露了一个 {product} (MCP) 端点，以便像 {client1}、{client2} 和 {client3} 这样的 AI 客户端可以查询并对此组织执行操作。设置和凭据位于 IAM 中。",
+       "crossLinkCta": "打开 MCP 设置",
+       "tagline": "通过 {product} (MCP) 将 {client1}、{client2}、{client3} 和其他 AI 客户端连接到此组织。",
+-      "endpointLabel": "MCP 端点",
+-      "authLabel": "1. 身份验证",
+-      "clientLabel": "2. 选择您的客户端",
+-      "configLabel": "3. 添加配置",
++      "connectLabel": "端点与身份验证",
++      "connectHint": "将 MCP 客户端指向此 URL，然后选择其登录方式。",
++      "configLabel": "添加配置",
++      "configHint": "选择你的客户端，然后将配置复制到相应位置。",
+       "auth": {
+         "oauth": "OAuth — 登录（推荐）",
+         "token": "访问令牌",
++        "oauthTitle": "使用浏览器登录",
+         "oauthNote": "无需管理凭证：您的 MCP 客户端会打开浏览器进行登录，访问权限受限于您现有的权限。只要您的客户端支持 OAuth，请使用此方式。"
+       },
+       "credential": {
+-        "quickStartTitle": "快速入门 — 您的帐户",
+-        "quickStartBody": "代码片段使用您自己的凭证，这些凭证具有您的完整权限。对于生产环境，请生成专用的只读凭证。",
+-        "generate": "生成只读凭证",
+-        "created": "只读凭证已创建",
++        "quickStartTitle": "暂无令牌",
++        "quickStartBody": "下面的代码片段带有占位请求头。请为此 MCP 客户端生成专用令牌，或粘贴现有的服务账号令牌替换占位内容。",
++        "generate": "生成专用令牌",
++        "created": "专用令牌已创建",
+         "shownOnce": "用于 {email}。请立即复制 — 令牌仅显示一次，下面的代码片段现在将使用它。",
+         "download": "下载",
+         "manage": "管理/撤销",
+-        "readonlyWarn": "帐户已创建，但只读角色无法自动应用 — 请在服务帐户中检查其权限。",
++        "readonlyWarn": "账号已创建，但无法添加到 {role} 角色中——在 IAM 中为其分配一个角色之前，它没有任何权限。",
++        "readonlyNote": "已通过 {role} 角色限定为只读——请在 IAM › 角色 中查看或扩展它。",
++        "rbacNote": "此部署中 RBAC 已关闭，因此此令牌无法被限定为只读——它与此组织中的任何其他凭证具有相同的访问权限。",
+         "error": "无法创建凭证。请重试，或在 IAM 中手动创建服务帐户。"
+       },
+       "securityTitle": "使用专用的、最小权限的凭证",
+-      "securityBody": "令牌默认为您自己的帐户凭证。对于生产环境，请生成上述只读凭证（或创建有范围的服务帐户），切勿将令牌提交到源代码管理。",
+-      "docsCta": "阅读完整的 MCP 文档",
++      "securityBody": "请为 MCP 客户端提供范围受限的只读服务账号，而不是你自己的账号凭证，切勿将其令牌提交到源代码管理中。",
+       "clients": {
+         "claudeCode": "Claude Code",
+         "cursor": "Cursor",
+@@ -3722,7 +3724,10 @@
+         "hermes": "添加到~/.hermes/config.yaml (YAML)，然后运行/reload-mcp。",
+         "codex": "添加到~/.codex/config.toml (TOML)，然后重启Codex。"
+       },
+-      "installOneClick": "添加到{client}"
++      "installOneClick": "添加到{client}",
++      "skillsLabel": "添加 {brand} 技能（可选）",
++      "skillsHint": "教您的人工智能助手如何在 {brand} 中进行查询、告警和构建仪表盘，从而更充分地利用 MCP 工具。在您的项目中运行它，然后选择要安装到的智能体。",
++      "skillsRepo": "在 {host} 上查看技能"
+     },
+     "manageTokensBtnLabel": "管理令牌",
+     "orgLevelExplanation": "这些是组织级别的写入令牌。它们与个人用户无关，即使创建它们的用户离开组织，它们也将继续工作。令牌只能在写入API上使用。",
+diff --git a/web/src/locales/languages/zh-TW.json b/web/src/locales/languages/zh-TW.json
+index 9c569eb1c8b..22acd18b0fc 100644
+--- a/web/src/locales/languages/zh-TW.json
++++ b/web/src/locales/languages/zh-TW.json
+@@ -3673,29 +3673,31 @@
+       "crossLinkBody": "{brand} 公開 {product} (MCP) 端點，以便像 {client1}、{client2} 和 {client3} 這樣的 AI 用戶端可以查詢並對此組織採取動作。設定和憑證位於 IAM 中。",
+       "crossLinkCta": "開啟 MCP 設定",
+       "tagline": "透過 {product} (MCP) 將 {client1}、{client2}、{client3} 及其他 AI 用戶端連線至此組織。",
+-      "endpointLabel": "MCP 端點",
+-      "authLabel": "1. 驗證",
+-      "clientLabel": "2. 選擇用戶端",
+-      "configLabel": "3. 新增設定",
++      "connectLabel": "端點與驗證",
++      "connectHint": "將您的 MCP 用戶端指向此 URL，然後選擇其登入方式。",
++      "configLabel": "新增設定",
++      "configHint": "選擇您的用戶端，然後將設定複製到對應位置。",
+       "auth": {
+         "oauth": "OAuth — 登入（建議使用）",
+         "token": "存取權杖",
++        "oauthTitle": "使用瀏覽器登入",
+         "oauthNote": "無需管理憑證：您的 MCP 用戶端會開啟瀏覽器進行登入，存取範圍受限於您現有的權限。只要您的用戶端支援 OAuth，即可使用此方式。"
+       },
+       "credential": {
+-        "quickStartTitle": "快速開始 — 您的帳戶",
+-        "quickStartBody": "程式碼片段使用您自己的憑證，這會帶有您的完整權限。針對生產環境，請改為產生專用的唯讀憑證。",
+-        "generate": "產生唯讀憑證",
+-        "created": "已建立唯讀憑證",
++        "quickStartTitle": "尚無 Token",
++        "quickStartBody": "下方的程式碼片段帶有預留位置的標頭。請為此 MCP 用戶端產生專用 Token，或將現有的服務帳戶 Token 貼到該處。",
++        "generate": "產生專用 Token",
++        "created": "已建立專用 Token",
+         "shownOnce": "適用於 {email}。請立即複製 — 權杖僅顯示一次，下方的程式碼片段現在會使用它。",
+         "download": "下載",
+         "manage": "管理 / 撤銷",
+-        "readonlyWarn": "帳戶已建立，但無法自動套用唯讀角色 — 請在服務帳戶中檢視其權限。",
++        "readonlyWarn": "帳戶已建立，但無法加入 {role} 角色 — 在 IAM 中指派角色前，它沒有任何權限。",
++        "readonlyNote": "透過 {role} 角色限定為唯讀 — 請在 IAM › 角色 中檢視或擴充。",
++        "rbacNote": "此部署中已停用 RBAC，因此此 Token 無法限定為唯讀 — 它與此組織的任何其他憑證擁有一樣的存取權限。",
+         "error": "無法建立憑證。請重試，或在 IAM 中手動建立服務帳戶。"
+       },
+       "securityTitle": "使用專用、最小權限的憑證",
+-      "securityBody": "權杖預設為您自己的帳戶憑證。針對生產環境，請在上方產生唯讀憑證（或建立限定的服務帳戶），切勿將權杖提交至原始碼控制。",
+-      "docsCta": "閱讀完整的 MCP 文件",
++      "securityBody": "請給予 MCP 用戶端一個限定範圍的唯讀服務帳戶，而不是您自己的帳戶憑證，而且絕不要將其 Token 提交至版本控制。",
+       "clients": {
+         "claudeCode": "Claude Code",
+         "cursor": "Cursor",
+@@ -3722,7 +3724,10 @@
+         "hermes": "新增至 ~/.hermes/config.yaml（YAML），然後執行 /reload-mcp。",
+         "codex": "新增至 ~/.codex/config.toml（TOML），然後重新啟動 Codex。"
+       },
+-      "installOneClick": "新增至 {client}"
++      "installOneClick": "新增至 {client}",
++      "skillsLabel": "新增 {brand} 技能（選填）",
++      "skillsHint": "教導您的 AI 助手如何在 {brand} 中查詢、設定警示及建立儀表板，讓它能更充分利用 MCP 工具。在您的專案中執行它，然後選擇要安裝到的代理程式。",
++      "skillsRepo": "在 {host} 上檢視技能"
+     },
+     "manageTokensBtnLabel": "管理權杖",
+     "orgLevelExplanation": "這些是組織層級的擷取權杖。它們不與個別使用者綁定，即使建立它們的使用者離開組織後仍可繼續運作。權杖僅可用於擷取端點。",

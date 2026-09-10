@@ -11,6 +11,7 @@ export class IamPage {
         // ============================================================
         this.iamPageMenu = page.locator('[data-test="menu-link-\\/iam-item"]');
         this.serviceAccountsTab = page.locator('[data-test="iam-service-accounts-tab"]');
+        this.mcpServerTab = page.locator('[data-test="iam-mcp-server-tab"]');
 
         // Org selector (navbar combobox + popover option matched by data-test-value)
         this.orgSelect = page.locator('[data-test="navbar-organizations-select"]');
@@ -130,6 +131,13 @@ export class IamPage {
     async iamPageServiceAccountsTab() {
 
         await this.serviceAccountsTab.click();
+
+    }
+
+    async iamPageMcpServerTab() {
+
+        await this.mcpServerTab.click();
+        await expect(this.page).toHaveURL(/iam\/mcpServer/);
 
     }
 

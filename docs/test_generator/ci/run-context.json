@@ -1,0 +1,20 @@
+{
+  "feature_slug": "mcp-server-setup",
+  "feature_title": "MCP Server Connection Setup",
+  "area": "GeneralTests",
+  "edition": "both",
+  "needs_e2e": true,
+  "needs_api": true,
+  "spec_filename": "mcpServerSetup.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/GeneralTests/mcpServerSetup.spec.js",
+  "playwright_group": "GeneralTests",
+  "source_files": [
+    "web/src/components/ingestion/ai/McpServerCard.vue",
+    "web/src/components/ingestion/setupCard/SetupCardRenderer.vue",
+    "web/src/components/ingestion/setupCard/types.ts",
+    "web/src/composables/useMcpCredential.ts"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": ""
+}

@@ -1,0 +1,28 @@
+{
+  "feature_slug": "mcp-server-setup",
+  "feature_title": "MCP Server Connection Setup",
+  "area": "GeneralTests",
+  "edition": "both",
+  "needs_e2e": true,
+  "needs_api": true,
+  "spec_filename": "mcpServerSetup.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/GeneralTests/mcpServerSetup.spec.js",
+  "playwright_group": "GeneralTests",
+  "source_files": [
+    "web/src/components/ingestion/ai/McpServerCard.vue",
+    "web/src/components/ingestion/setupCard/SetupCardRenderer.vue",
+    "web/src/components/ingestion/setupCard/types.ts",
+    "web/src/composables/useMcpCredential.ts"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "Changed paths are all OSS-owned locations (src/api/http/src/handler/http/request/mcp/mod.rs, web/src/**, scripts/translations/) — none under enterprise/, o2_enterprise/, or src/enterprise/. But the MCP handler changes both enterprise-gated code (#[cfg(feature = \"enterprise\")] — the new oauth_discovery_available() that consults o2_dex config and o2_enterprise::enterprise::license::block_feature_for_report_failure()) and non-enterprise code (#[cfg(not(feature = \"enterprise\"))] post→get), while the whole frontend (McpServerCard.vue, useMcpCredential.ts, SetupCardRenderer.vue) is OSS. The change is an OSS UI implementation plus an enterprise-gated backend layer, so it spans both editions.",
+    "skip": "Not skipped. No explicit opt-out (no tests-added label, trigger_comment.txt and feature_hint.txt are empty) and the change is user-facing: it reworks the MCP server setup card's layout, auth-mode gating, credential flow, and adds a skills step. Dev-authored Vitest unit tests do not count as an opt-out marker.",
+    "e2e": "E2E is warranted. McpServerCard.vue is a substantial user-facing refactor: it now renders through the shared SetupCardRenderer with a 3-step stepper, gates the OAuth tab on zoConfig.sso_enabled (not just the edition), swaps the quick-start passcode for a placeholder header, mints a dedicated read-only service-account token via useMcpCredential, and adds a skills install step — all verifiable UI flows with concrete data-test hooks.",
+    "area": "GeneralTests. There is no Ingestion/AI/MCP area in the matrix, and the nearest existing coverage is ingestion-config.spec.js, which lives under GeneralTests. The MCP setup card is a general ingestion/setup flow rather than a Logs/Metrics/Traces/etc. feature.",
+    "group": "GeneralTests — that shard already hosts ingestion-config.spec.js, the closest sibling to an MCP-server setup flow, so the new spec belongs with it.",
+    "existing_tests": "No Playwright E2E specs in the diff. The only test files changed are Vitest unit tests under web/src/ (McpServerCard.spec.ts and useMcpCredential.spec.ts); those are unit coverage, not E2E specs under tests/ui-testing/playwright-tests/, so existing_tests_in_diff is false."
+  }
+}
