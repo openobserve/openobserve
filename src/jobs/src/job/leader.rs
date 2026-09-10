@@ -19,28 +19,24 @@
 //! `LOCAL_NODE.is_scheduler()` and then elected their leader from
 //! `get_cached_online_query_nodes`, which is a different set of machines: where
 //! `alert_manager` is a role of its own the node running the job is not a
-//! querier, so it is never in the list it is comparing itself against, and
-//! `is_leader` is **permanently false**. Every sweep silently never ran.
+//! querier, so it is never in the list it compares itself against, and
+//! `is_leader` is permanently false. Every sweep silently never ran.
 //!
-//! It is invisible on a single node with every role — which is a querier, and
-//! usually the only one — and that is exactly where it was tested.
+//! Invisible on a single node with every role — which is a querier, and usually
+//! the only one — and that is exactly where it was tested.
 //!
-//! The election is the same one the rest of the codebase uses: lowest uuid
-//! wins. What changed is only the set it is drawn from, and that it is drawn
-//! from the same set that decided the job would spawn at all.
+//! The election is the one the rest of the codebase uses: lowest uuid wins.
+//! What changed is only the set it is drawn from.
 
 use config::{cluster::LOCAL_NODE, meta::cluster::Node};
 
 /// Whether `uuid` leads this set of nodes.
 ///
-/// Pure, and the reason it is pure is that the failure it had was not
-/// observable in a test that could not hand it a role-separated cluster.
-///
-/// An empty set is deliberately led by everyone. With no cluster view at all
-/// the safe assumption is a single node, and the sweeps are all idempotent or
-/// re-entrant enough that a duplicated pass is cheaper than a skipped one: an
-/// abandoned page that nobody re-arms is worse than a re-arm the scheduler's
-/// claim lock collapses back to one anyway.
+/// An empty set is deliberately led by everyone. With no cluster view at all the
+/// safe assumption is a single node, and the sweeps are idempotent enough that a
+/// duplicated pass is cheaper than a skipped one: an abandoned page nobody
+/// re-arms is worse than a re-arm the scheduler's claim lock collapses back to
+/// one anyway.
 pub fn leads(nodes: &[Node], uuid: &str) -> bool {
     match nodes.iter().min_by(|a, b| a.uuid.cmp(&b.uuid)) {
         Some(first) => first.uuid == uuid,
@@ -48,10 +44,9 @@ pub fn leads(nodes: &[Node], uuid: &str) -> bool {
     }
 }
 
-/// Whether this node does the whole-deployment work this pass.
-///
-/// Elected from the alert-manager set, which is the set the caller has already
-/// established it belongs to.
+/// Whether this node does the whole-deployment work this pass. Elected from the
+/// alert-manager set, which is the set the caller has already established it
+/// belongs to.
 pub async fn is_alert_manager_leader() -> bool {
     let nodes = infra::cluster::get_cached_online_alert_manager_nodes()
         .await
@@ -79,10 +74,9 @@ mod tests {
     /// alert manager, none of them the same machine.
     ///
     /// The alert manager is the only node that runs the sweep, so it must lead
-    /// its own set — and the assertion underneath is the bug itself, kept as an
-    /// assertion because it reads as harmless and is not: elected from the
+    /// its own set. The assertion underneath is the bug itself: elected from the
     /// query nodes, the node that does the work can never win, and coverage
-    /// warnings, abandoned-ladder re-arms and timeline retention all stop.
+    /// warnings, abandoned-ladder re-arms and retention all stop.
     #[test]
     fn test_the_alert_manager_leads_the_set_it_is_actually_in() {
         let queriers = vec![
@@ -102,9 +96,9 @@ mod tests {
         );
     }
 
-    /// Two alert managers is the case the election exists for: exactly one of
-    /// them sweeps, and both agree on which, whatever order the cache hands
-    /// them back in.
+    /// Two alert managers is the case the election exists for: exactly one
+    /// sweeps, and both agree on which, whatever order the cache hands them
+    /// back in.
     #[test]
     fn test_exactly_one_of_two_alert_managers_sweeps() {
         let mut nodes = vec![

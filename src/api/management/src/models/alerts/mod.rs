@@ -192,16 +192,15 @@ pub struct Alert {
     pub tags: Vec<String>,
 
     /// On-call team (a team id) this alert pages, taking precedence over
-    /// ownership discovery. Omitted or `null` means "work the owner out from
-    /// the identity dimensions", which is the normal case.
+    /// ownership discovery. Omitted or `null` means "work the owner out from the
+    /// identity dimensions", which is the normal case.
     ///
     /// Validated at save against the on-call teams of the same org: a team id
     /// that names nothing routes nowhere, and a page that routes nowhere is
     /// silence rather than an error.
     ///
-    /// Save is a full replace, exactly like `tags` — sending the alert back
-    /// without this field clears the binding, and sending `null` or `""` does
-    /// the same explicitly.
+    /// Save is a full replace, like `tags` — sending the alert back without this
+    /// field clears the binding.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schema(example = "2f9K3mXQpLrTgYw8vN1cBzHd0Ae")]
     pub oncall_team: Option<String>,
@@ -209,16 +208,14 @@ pub struct Alert {
     /// Where the fix for this alert is written down.
     ///
     /// Copied onto every on-call response record the alert opens, so whoever is
-    /// woken is handed the link in the page instead of being asked to go and
-    /// find it while the thing is on fire.
+    /// woken is handed the link in the page instead of going to find it while
+    /// the thing is on fire.
     ///
     /// Validated at save: `http://` or `https://` with a host, or the save is
     /// refused. A malformed link stored today is a dead click at 3am, and the
     /// moment it is read is the worst possible moment to discover it.
     ///
-    /// Full replace, exactly like `oncall_team` — sending the alert back
-    /// without this field clears the link, and `null` or `""` does the same
-    /// explicitly.
+    /// Full replace, like `oncall_team`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schema(example = "https://wiki.example.com/runbooks/checkout")]
     pub runbook_url: Option<String>,
@@ -1644,10 +1641,10 @@ mod tests {
         assert!(meta.creates_incident);
     }
 
-    /// The create/update bodies flatten this `Alert`, so a field missing here
-    /// is a field the API can never set. `oncall_team` was exactly that: the
-    /// column, the meta field and the routing tier all existed, and a request
-    /// carrying the team returned 200 with the column still empty.
+    /// The create/update bodies flatten this `Alert`, so a field missing here is
+    /// a field the API can never set. `oncall_team` was exactly that: the column,
+    /// the meta field and the routing tier all existed, and a request carrying
+    /// the team returned 200 with the column still empty.
     #[test]
     fn test_oncall_team_survives_the_request_body() {
         let alert: Alert = serde_json::from_value(serde_json::json!({
@@ -1659,9 +1656,9 @@ mod tests {
         assert_eq!(meta.oncall_team.as_deref(), Some("team-ksuid-1"));
     }
 
-    /// Absent, explicit null and empty string must all clear the binding —
-    /// a team id of `""` matches no team, so keeping it would page nobody
-    /// while looking bound.
+    /// Absent, explicit null and empty string must all clear the binding — a
+    /// team id of `""` matches no team, so keeping it would page nobody while
+    /// looking bound.
     #[test]
     fn test_oncall_team_clears_on_absent_null_and_empty() {
         for body in [

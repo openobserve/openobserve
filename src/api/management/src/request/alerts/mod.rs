@@ -87,13 +87,12 @@ pub mod templates;
 /// Reject an `oncall_team` that names no on-call team in this organization.
 ///
 /// A mistyped or cross-org team id is not a loud failure later: routing takes
-/// `alerts.oncall_team` as its highest-precedence tier, finds no such team,
-/// and the page reaches nobody. Silence is the worst failure a paging product
-/// has, and save is the one moment when somebody is looking, so the id is
-/// checked here rather than at 3am.
+/// `alerts.oncall_team` as its highest-precedence tier, finds no such team, and
+/// the page reaches nobody. Save is the one moment when somebody is looking, so
+/// the id is checked here rather than at 3am.
 ///
-/// `None` — absent, `null` or an empty string, all normalized to `None` on the
-/// way in — clears the binding and is always allowed.
+/// `None` — absent, `null` or an empty string — clears the binding and is always
+/// allowed.
 async fn validate_oncall_team(org_id: &str, team_id: Option<&str>) -> Result<(), Response> {
     let Some(team_id) = team_id else {
         return Ok(());
@@ -114,11 +113,10 @@ async fn validate_oncall_team(org_id: &str, team_id: Option<&str>) -> Result<(),
 
 /// Advisories about who this alert will page, for a save that has succeeded.
 ///
-/// Same posture as `validate_oncall_team` — say it at save, when somebody is
-/// looking — but a warning rather than a refusal: routing is not being changed,
-/// and an operator who meant it must still be able to save. An alert bound to
-/// an explicit `oncall_team` is silent here, because ownership rules never get
-/// a say in where it pages.
+/// Same posture as `validate_oncall_team` — say it at save — but a warning
+/// rather than a refusal: routing is not being changed, and an operator who
+/// meant it must still be able to save. An alert bound to an explicit
+/// `oncall_team` is silent here, because ownership rules never get a say.
 async fn paging_warnings(_org_id: &str, _alert: &MetaAlert) -> Vec<String> {
     #[cfg(feature = "enterprise")]
     {
@@ -152,11 +150,10 @@ async fn paging_warnings(_org_id: &str, _alert: &MetaAlert) -> Vec<String> {
 
 /// Reject a `runbook_url` that is not a link.
 ///
-/// Same posture as `validate_oncall_team`: refuse it at save, when somebody is
-/// looking, rather than store it and let it fail at read. A runbook is read at
-/// exactly one moment — the middle of a page — and "the link does nothing" is
-/// then indistinguishable from "there is no runbook", except that somebody has
-/// wasted a minute finding out.
+/// Refused at save, when somebody is looking, rather than stored and left to
+/// fail at read. A runbook is read at exactly one moment — the middle of a page
+/// — and "the link does nothing" is then indistinguishable from "there is no
+/// runbook".
 ///
 /// `None` clears the link and is always allowed.
 fn validate_runbook_url(url: Option<&str>) -> Result<(), Response> {

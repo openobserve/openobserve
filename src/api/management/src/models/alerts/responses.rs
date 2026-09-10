@@ -104,14 +104,13 @@ pub struct ListAlertsResponseBodyItem {
     pub priority: Option<u8>,
     /// The on-call team this alert names, when it names one.
     ///
-    /// Routing's highest-precedence tier (`alerts.oncall_team`), and the only
-    /// tier a list row can report: every other one resolves from the identity
-    /// dimensions of the row that fires, which an alert definition does not
-    /// carry. Absent means "resolved at fire time", not "pages nobody".
+    /// Routing's highest-precedence tier, and the only tier a list row can
+    /// report: every other one resolves from the identity dimensions of the row
+    /// that fires, which an alert definition does not carry. Absent means
+    /// "resolved at fire time", not "pages nobody".
     ///
     /// The list has always had a column for this and never had the field, so
-    /// the UI's `v-if="row.oncall_team"` could not be true and **every** alert
-    /// read as unbound — including ones deliberately pinned to a team.
+    /// every alert read as unbound — including ones deliberately pinned.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub oncall_team: Option<String>,
     /// Normalized selection tags (PT-6). Omitted when empty.
@@ -847,8 +846,7 @@ mod tests {
 
     /// The defect this field was added for. The list column reads the alert's
     /// bound team, and the field was never on the item — so a deliberately
-    /// pinned alert was indistinguishable from an unbound one, and every row
-    /// read "From ownership".
+    /// pinned alert was indistinguishable from an unbound one.
     #[test]
     fn test_a_bound_alert_reports_the_team_it_names() {
         let mut alert = meta_alerts::Alert::default();

@@ -184,16 +184,14 @@ pub fn extract_where(sql: &str) -> WhereInfo {
     info
 }
 
-/// The equality conditions that hold in **every** case where this SQL matches.
+/// The equality conditions that hold in every case where this SQL matches.
 ///
-/// An aggregating alert — `SELECT count(*) … WHERE …` — returns a row with no
-/// identity columns in it, so the only remaining evidence of *where* it was
-/// looking is the alert's own text. On-call routing reads that evidence to
-/// decide who gets woken, which makes "which of these equalities are actually
-/// guaranteed" a question a pager depends on.
+/// An aggregating alert returns a row with no identity columns, so the only
+/// remaining evidence of where it was looking is the alert's own text. On-call
+/// routing reads that evidence to decide who gets woken.
 ///
-/// The honest answer is: only the ones reachable through `AND` from the top of
-/// the WHERE.
+/// The honest answer is: only the equalities reachable through `AND` from the
+/// top of the WHERE.
 ///
 /// ```text
 /// a = '1' AND b = '2'                → a, b
@@ -203,10 +201,9 @@ pub fn extract_where(sql: &str) -> WhereInfo {
 /// a = '1' AND a = '2'                → nothing; no row satisfies both
 /// ```
 ///
-/// Values are string literals only. A dimension is a name, and admitting numbers
-/// would let `http_status = 500` present itself as an identity.
-///
-/// Returns pairs sorted by column, so two callers on one alert cannot disagree.
+/// String literals only: a dimension is a name, and admitting numbers would let
+/// `http_status = 500` present itself as an identity. Sorted by column, so two
+/// callers on one alert cannot disagree.
 pub fn guaranteed_equalities(sql: &str) -> Vec<(String, String)> {
     if sql.len() > MAX_WHERE_SQL_BYTES {
         return Vec::new();
@@ -653,11 +650,9 @@ mod tests {
         assert!(names.contains(&"alerts".to_string()));
     }
 
-    /// The truth table `guaranteed_equalities` exists to satisfy.
-    ///
-    /// Every row here is a routing decision: what comes out of this function is
-    /// the identity an aggregating alert is routed on, so a value that is not
-    /// actually guaranteed pages the wrong team with total confidence.
+    /// The truth table `guaranteed_equalities` exists to satisfy. Every row here
+    /// is a routing decision, so a value that is not actually guaranteed pages
+    /// the wrong team with total confidence.
     #[test]
     fn test_guaranteed_equalities_only_admits_what_must_be_true() {
         let cases: &[(&str, &[(&str, &str)])] = &[

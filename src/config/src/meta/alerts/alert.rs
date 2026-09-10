@@ -134,21 +134,19 @@ pub struct Alert {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tags: Vec<String>,
 
-    /// On-call team this alert pages, overriding ownership discovery.
-    ///
-    /// `None` means "work it out from the identity dimensions", which is the
-    /// normal case — an explicit value is for the alert whose owner the
-    /// dimensions cannot express.
+    /// On-call team this alert pages, overriding ownership discovery. `None`
+    /// means "work it out from the identity dimensions", which is the normal
+    /// case — an explicit value is for the alert whose owner the dimensions
+    /// cannot express.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub oncall_team: Option<String>,
 
     /// Where the fix for this alert is written down.
     ///
-    /// Copied onto every on-call response record the alert opens, so the
-    /// person woken by it is handed the runbook in the page rather than being
-    /// asked to go and find it. Validated at save — a malformed link is
-    /// refused rather than stored, because the moment it is read is the one
-    /// moment nobody has the patience to debug a URL.
+    /// Copied onto every on-call response record the alert opens, so the person
+    /// woken is handed the runbook in the page. Validated at save — a malformed
+    /// link is refused rather than stored, because the moment it is read is the
+    /// one moment nobody has the patience to debug a URL.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub runbook_url: Option<String>,
 
@@ -159,10 +157,9 @@ pub struct Alert {
 /// Accept a runbook link, or say why not.
 ///
 /// Deliberately narrow: `http`/`https` with a host. That excludes `file:`,
-/// `javascript:` and the bare `wiki/runbooks/checkout` somebody pastes out of
-/// a browser tab — the last of which is the common case and the one that looks
-/// like it worked right up until a responder clicks it at 3am and lands
-/// nowhere. Storing it and failing at read time is the outcome this refuses.
+/// `javascript:` and the bare `wiki/runbooks/checkout` somebody pastes out of a
+/// browser tab — the last of which is the common case, and the one that looks
+/// like it worked right up until a responder clicks it at 3am.
 pub fn normalize_runbook_url(raw: &str) -> Result<String, String> {
     let trimmed = raw.trim();
     if trimmed.is_empty() {
@@ -1082,8 +1079,8 @@ mod tests {
         assert!(alert.tags.is_empty());
     }
 
-    /// A runbook link is stored as typed, so a deep link with a query string
-    /// and a fragment survives — those are how wikis address a section, and
+    /// A runbook link is stored as typed, so a deep link with a query string and
+    /// a fragment survives — those are how wikis address a section, and
     /// normalizing them away would point somebody at the top of a 40-page doc.
     #[test]
     fn test_a_real_runbook_link_is_accepted_unchanged() {

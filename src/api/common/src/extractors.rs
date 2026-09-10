@@ -92,15 +92,13 @@ fn deserialize_headers<T: DeserializeOwned>(headers: &HeaderMap) -> Result<T, St
     })
 }
 
-/// Wrapper around [`axum::Json`] whose rejection is JSON-shaped like the rest
-/// of the API, rather than axum's default plain-text rejection body.
+/// Wrapper around [`axum::Json`] whose rejection is JSON-shaped like the rest of
+/// the API, rather than axum's default plain-text rejection body.
 ///
-/// A handler using plain `axum::Json<T>` looks identical until a caller sends
-/// a body that fails to deserialize: axum answers that with a `text/plain`
+/// A handler using plain `axum::Json<T>` looks identical until a caller sends a
+/// body that fails to deserialize: axum answers that with a `text/plain`
 /// rejection before the handler ever runs, so callers that assume every error
-/// response carries a `message` field (as every handler-level error in this
-/// API does) see nothing recognizable. This wrapper closes that gap by giving
-/// the extraction failure the same `{"code", "message"}` shape.
+/// carries a `message` field see nothing recognizable.
 pub struct ValidatedJson<T>(pub T);
 
 /// Rejection type for [`ValidatedJson`].
@@ -272,10 +270,9 @@ mod tests {
     }
 
     /// The bug this extractor exists for: a body that fails to deserialize is
-    /// rejected by axum *before the handler runs*, so no handler-level error
+    /// rejected by axum before the handler runs, so no handler-level error
     /// mapping can reach it. It answered `text/plain`, and a client reading
-    /// `message` from every other error in this API saw nothing — which is
-    /// exactly what "Request failed with status code 422" was.
+    /// `message` saw nothing — which is what "status code 422" was.
     #[tokio::test]
     async fn test_a_malformed_body_is_rejected_as_json_not_text() {
         #[derive(serde::Deserialize)]

@@ -53,8 +53,7 @@ pub struct ModuleSchedulerConfig {
     /// node, in seconds. `None` keeps the shared `ZO_ALERT_SCHEDULE_TIMEOUT`.
     ///
     /// Only meaningful on a module-filtered lane: every row such a lane pulls belongs to its own
-    /// module, so the lease it asks for applies to that module alone. The shared lane pulls a mix
-    /// and has no such freedom.
+    /// module, so the lease applies to that module alone. The shared lane pulls a mix.
     pub lease_timeout_secs: Option<i64>,
 }
 
@@ -518,14 +517,12 @@ impl Scheduler {
         Self::build(config, module_configs, with_shared_lane)
     }
 
-    /// Build the shared (legacy) lane *and* a dedicated lane for each of `module_configs`.
+    /// Build the shared (legacy) lane and a dedicated lane for each of `module_configs`.
     ///
     /// The shared lane still pulls every module, so a module named here is pulled by two lanes.
-    /// That is safe rather than merely tolerable: `pull` claims rows inside one transaction under
-    /// a per-module advisory lock and flips their status in the same statement, so exactly one
-    /// lane ever gets a given row. What the dedicated lane buys is a channel and a worker pool
-    /// that nothing else can fill — its rows get claimed on their own cadence even while the
-    /// shared lane's whole budget is going to a backlog of something else.
+    /// That is safe: `pull` claims rows inside one transaction under a per-module advisory lock
+    /// and flips their status in the same statement, so exactly one lane ever gets a given row.
+    /// What the dedicated lane buys is a channel and a worker pool nothing else can fill.
     pub fn new_with_shared_and_modules(
         config: SchedulerConfig,
         module_configs: Vec<ModuleSchedulerConfig>,
@@ -711,15 +708,14 @@ fn resolve_module_configs(
 
 /// The lanes that exist even when `ZO_SCHEDULER_PER_MODULE_PULLERS` is off.
 ///
-/// Every other module degrades to "late" when it shares a lane; that is a nuisance and a flag is
-/// the right way to buy your way out of it. On-call escalation degrades to "nobody was woken up".
-/// A rung that says five minutes has to fire in five minutes, and a paging timer sitting behind a
-/// thousand queued alert evaluations does not — which is exactly what the lane's own comment in
-/// [`resolve_module_configs`] says must never happen. So this one is not behind the flag: a
-/// deployment nobody has tuned is precisely the deployment where the promise still has to hold.
+/// Every other module degrades to "late" when it shares a lane, which is a nuisance a flag is the
+/// right way out of. On-call escalation degrades to "nobody was woken up": a rung that says five
+/// minutes has to fire in five minutes, and a paging timer behind a thousand queued alert
+/// evaluations does not. So this one is not behind the flag — a deployment nobody has tuned is
+/// precisely where the promise still has to hold.
 ///
-/// Nothing else joins it. Widening this list would flip the default lane topology for modules
-/// whose owners chose the shared lane, which is not a decision on-call gets to make for them.
+/// Nothing else joins it. Widening the list would flip the default lane topology for modules
+/// whose owners chose the shared lane.
 fn always_on_module_configs(
     cfg: &config::Config,
     base: &SchedulerConfig,
@@ -749,11 +745,10 @@ fn oncall_lane_wanted() -> bool {
 /// The on-call escalation lane's budget, cadence and lease.
 ///
 /// Two config vocabularies name the same numbers and both are documented, so both are honoured
-/// with a stated precedence rather than one of them silently losing: the generic scheduler var
-/// (`ZO_SCHEDULER_ONCALL_*`) wins when an operator sets it, because that is how every other
-/// module's lane is tuned and someone reaching for it means it; otherwise the feature's own
-/// `O2_ONCALL_ESCALATION_*`, which is the knob the on-call docs point at and the only one with a
-/// meaningful default; otherwise the shared scheduler defaults.
+/// with a stated precedence rather than one silently losing: the generic scheduler var
+/// (`ZO_SCHEDULER_ONCALL_*`) wins when set, because that is how every other module's lane is
+/// tuned; otherwise the feature's own `O2_ONCALL_ESCALATION_*`, which the on-call docs point at;
+/// otherwise the shared scheduler defaults.
 fn oncall_module_config(cfg: &config::Config, base: &SchedulerConfig) -> ModuleSchedulerConfig {
     ModuleSchedulerConfig {
         // Its own lane so a paging timer is never queued behind an alert
@@ -1116,9 +1111,9 @@ mod tests {
     // deployment nobody has tuned.
     // -----------------------------------------------------------------------
 
-    /// The shared lane keeps every module, and the named modules get one more lane each. This is
-    /// the shape a stock deployment now runs: legacy behaviour for everything, plus a lane whose
-    /// rows can be claimed while the shared lane is busy.
+    /// The shared lane keeps every module, and the named modules get one more lane each — the
+    /// shape a stock deployment now runs: legacy behaviour for everything, plus a lane whose rows
+    /// can be claimed while the shared lane is busy.
     #[test]
     fn test_shared_and_modules_builds_both_kinds_of_lane() {
         let cfg = make_config();
@@ -1194,7 +1189,7 @@ mod tests {
 
     /// `ZO_SCHEDULER_ONCALL_CONCURRENCY` is the generic per-module knob and wins when set;
     /// `O2_ONCALL_ESCALATION_CONCURRENCY` is the feature's own and is the fallback. Both are
-    /// documented, so neither may be silently ignored — which is the defect this pins.
+    /// documented, so neither may be silently ignored.
     #[test]
     fn test_oncall_lane_prefers_the_scheduler_var_then_the_feature_var() {
         let base = make_config(); // alert concurrency 3

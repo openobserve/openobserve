@@ -15,18 +15,15 @@
 
 //! Incident acknowledgement attribution.
 //!
-//! Two additive, nullable columns on `alert_incidents`:
+//! Two additive, nullable columns on `alert_incidents`: `acknowledged_by`
+//! (TEXT, the user that acknowledged) and `acknowledged_at` (BIGINT, micros).
 //!
-//! 1. `acknowledged_by` — TEXT, the user id/email that acknowledged the incident.
-//! 2. `acknowledged_at` — BIGINT, microsecond timestamp of that acknowledgement.
+//! Mirrors `oncall_responses.acked_by`/`acked_at`. Before this, "who
+//! acknowledged this incident" was only answerable by reading the side-channel
+//! `incident_events` timeline, unlike on-call's primary record.
 //!
-//! Mirrors `oncall_responses.acked_by`/`acked_at` (see
-//! `m20260806_000001_create_oncall_tables.rs`): before this, "who
-//! acknowledged this incident" was only answerable by reading the side
-//! -channel `incident_events` timeline, unlike on-call's primary record.
-//!
-//! No backfill and no index. Absent = never acknowledged, which is correct
-//! for every existing row.
+//! No backfill and no index. Absent = never acknowledged, which is correct for
+//! every existing row.
 
 use sea_orm_migration::prelude::*;
 
@@ -94,10 +91,9 @@ enum ColType {
     BigInt,
 }
 
-/// Add one nullable column, skipping it if already present.
-///
-/// Genuinely idempotent, unlike `add_column_if_not_exists` on SQLite, so a
-/// migration interrupted partway can be retried.
+/// Add one nullable column, skipping it if already present. Genuinely
+/// idempotent, unlike `add_column_if_not_exists` on SQLite, so a migration
+/// interrupted partway can be retried.
 async fn add_column<C>(
     manager: &SchemaManager<'_>,
     table: &str,

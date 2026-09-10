@@ -30,10 +30,8 @@ use crate::{
     errors::{self, DbError, Error},
 };
 
-/// The row a new incident starts as.
-///
-/// One construction site, so the plain create and the on-call promotion's
-/// transaction cannot drift as columns are added.
+/// The row a new incident starts as. One construction site, so the plain create
+/// and the on-call promotion's transaction cannot drift as columns are added.
 fn new_incident(
     org_id: &str,
     severity: &str,
@@ -107,12 +105,11 @@ pub async fn create(
 /// never been promoted, so the retry passed the already-promoted guard and
 /// opened a second incident for the same firing.
 ///
-/// The update is conditional on the record still being unpromoted, which is
-/// also what makes that guard hold under two promotions at once: one commits,
-/// the other writes nothing.
+/// The update is conditional on the record still being unpromoted, which is also
+/// what makes that guard hold under two promotions at once: one commits, the
+/// other writes nothing.
 ///
-/// `Ok(None)` means nothing was written — no such record in this org, or
-/// somebody had already promoted it.
+/// `Ok(None)` means nothing was written.
 pub async fn create_and_attach_to_oncall_response(
     org_id: &str,
     response_id: &str,
@@ -272,13 +269,12 @@ pub async fn update_status(
 }
 
 /// Acknowledges an incident. Returns `None` if it is gone, and the current
-/// record (possibly unchanged) if the WHERE guard didn't match — e.g.
-/// somebody else already acknowledged it, or it's already resolved/reopened.
+/// record if the WHERE guard did not match — somebody else already acknowledged
+/// it, or it is already resolved.
 ///
-/// The state filter is part of the UPDATE itself, so of two people clicking
-/// acknowledge at once exactly one row is written and the loser reads back
-/// who actually has it. Read-then-write (what `update_status` does) would
-/// let both pass the check and the second overwrite the first's attribution.
+/// The state filter is part of the UPDATE, so of two people clicking at once
+/// exactly one row is written and the loser reads back who has it.
+/// Read-then-write would let both pass the check.
 pub async fn acknowledge(
     org_id: &str,
     id: &str,

@@ -34,8 +34,8 @@ use config::{
 /// What `extract_service_name` returns when it finds no service.
 ///
 /// Named because it is a sentinel and not a name. Routing must refuse it: an
-/// alert nobody can identify belongs in the unrouted queue, where somebody sees
-/// it, rather than on the pager of whichever team happens to own this string.
+/// alert nobody can identify belongs in the unrouted queue, not on the pager of
+/// whichever team happens to own this string.
 const UNKNOWN_SERVICE: &str = "unknown";
 
 /// Service Discovery correlation result
@@ -1012,8 +1012,8 @@ fn labels_from_row(row: &Map<String, Value>) -> HashMap<String, String> {
 /// The service the registry identifies this row as, when it identifies a real
 /// service.
 ///
-/// For the alert path, which has no correlation of its own: an alert routed
-/// differently depending on a checkbox about incidents, because only the
+/// For the alert path, which has no correlation of its own: an alert used to
+/// route differently depending on a checkbox about incidents, because only the
 /// incident path could reach the registry. `None` when the registry has nothing,
 /// or when the name it has is the stream a record arrived in — routing on that
 /// is routing on a table name.
@@ -2726,9 +2726,9 @@ pub async fn update_severity(
 mod tests {
     use super::*;
 
-    /// The incident path and the alert path page the same person about the
-    /// same alert, so an unset priority has to mean the same thing on both.
-    /// They used to differ — P2 here, P3 in `scheduler::handlers` — which made
+    /// The incident path and the alert path page the same person about the same
+    /// alert, so an unset priority has to mean the same thing on both. They used
+    /// to differ — P2 here, P3 in `scheduler::handlers` — which made
     /// `creates_incident` a hidden severity switch.
     #[test]
     fn test_the_incident_path_uses_the_shared_default_priority() {
@@ -2740,8 +2740,8 @@ mod tests {
     }
 
     /// B-29: a P1 alert must map to a P1 incident severity, not the eval_level
-    /// default (Critical -> P2) — this is the exact mapping `correlate_alert_to_incident`
-    /// uses to pre-populate `CorrelationSubject.severity` for the internal alert path.
+    /// default. This is the exact mapping `correlate_alert_to_incident` uses to
+    /// pre-populate `CorrelationSubject.severity` for the internal alert path.
     #[test]
     fn test_alert_priority_maps_to_incident_severity() {
         use config::meta::alerts::{incidents::IncidentSeverity, priority::AlertPriority};
@@ -2958,10 +2958,9 @@ mod tests {
     /// unidentifiable alert on this literal, so all of them landed on whichever
     /// team owned the phantom name `unknown`.
     ///
-    /// This pins the two halves of the guard that stop it. `names_a_service`
-    /// asks `is_some_and`, so no discovery answer means no service. The
-    /// comparison against `UNKNOWN_SERVICE` catches the case where discovery
-    /// answered and still found nothing.
+    /// Two halves to the guard: `names_a_service` asks `is_some_and`, so no
+    /// discovery answer means no service, and the comparison against
+    /// `UNKNOWN_SERVICE` catches discovery answering and still finding nothing.
     #[test]
     fn test_the_not_found_service_never_becomes_a_routing_dimension() {
         let absent: Option<ServiceDiscoveryResult> = None;
