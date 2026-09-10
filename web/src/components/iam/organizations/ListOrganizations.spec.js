@@ -231,6 +231,8 @@ describe("ListOrganizations", () => {
       // getOrganizations() uses the regular list() endpoint, not the admin one.
       expect(organizationsService.list).toHaveBeenCalled();
       expect(organizationsService.get_admin_org).not.toHaveBeenCalled();
+      // The user-scoped list feeds the header switcher.
+      expect(mockStore.dispatch).toHaveBeenCalledWith("setOrganizations", expect.anything());
     });
 
     it("should use the _meta admin endpoint when the selected org is _meta on cloud", async () => {
@@ -238,6 +240,7 @@ describe("ListOrganizations", () => {
       organizationsService.list.mockClear();
       organizationsService.get_admin_org.mockClear();
       organizationsService.get_admin_org.mockResolvedValue(mockOrganizations);
+      mockStore.dispatch.mockClear();
       const metaWrapper = mount(ListOrganizations, {
         global: {
           plugins: [i18n, router],
@@ -257,6 +260,8 @@ describe("ListOrganizations", () => {
       await flushPromises();
       expect(organizationsService.get_admin_org).toHaveBeenCalledWith("_meta");
       expect(organizationsService.list).not.toHaveBeenCalled();
+      // The all-orgs admin view must NOT leak into the header switcher.
+      expect(mockStore.dispatch).not.toHaveBeenCalledWith("setOrganizations", expect.anything());
       metaWrapper.unmount();
       config.isCloud = "false";
     });
