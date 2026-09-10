@@ -155,14 +155,30 @@ mod tests {
     #[tokio::test]
     async fn test_fused_range_agg_matches_generic_for_all_pairs() {
         let agg_cases: [(FusedAggOp, GenericAgg); 8] = [
-            (FusedAggOp::Avg, aggregations::avg),
-            (FusedAggOp::Count, aggregations::count),
-            (FusedAggOp::Group, aggregations::group),
-            (FusedAggOp::Max, aggregations::max),
-            (FusedAggOp::Min, aggregations::min),
-            (FusedAggOp::Stddev, aggregations::stddev),
-            (FusedAggOp::Stdvar, aggregations::stdvar),
-            (FusedAggOp::Sum, aggregations::sum),
+            (FusedAggOp::Avg, |modifier, input, eval_ctx| {
+                aggregations::eval_aggregate(modifier, input, aggregations::Avg, eval_ctx)
+            }),
+            (FusedAggOp::Count, |modifier, input, eval_ctx| {
+                aggregations::eval_aggregate(modifier, input, aggregations::Count, eval_ctx)
+            }),
+            (FusedAggOp::Group, |modifier, input, eval_ctx| {
+                aggregations::eval_aggregate(modifier, input, aggregations::Group, eval_ctx)
+            }),
+            (FusedAggOp::Max, |modifier, input, eval_ctx| {
+                aggregations::eval_aggregate(modifier, input, aggregations::Max, eval_ctx)
+            }),
+            (FusedAggOp::Min, |modifier, input, eval_ctx| {
+                aggregations::eval_aggregate(modifier, input, aggregations::Min, eval_ctx)
+            }),
+            (FusedAggOp::Stddev, |modifier, input, eval_ctx| {
+                aggregations::eval_aggregate(modifier, input, aggregations::Stddev, eval_ctx)
+            }),
+            (FusedAggOp::Stdvar, |modifier, input, eval_ctx| {
+                aggregations::eval_aggregate(modifier, input, aggregations::Stdvar, eval_ctx)
+            }),
+            (FusedAggOp::Sum, |modifier, input, eval_ctx| {
+                aggregations::eval_aggregate(modifier, input, aggregations::Sum, eval_ctx)
+            }),
         ];
         let range_cases = [
             "avg_over_time",
@@ -238,14 +254,30 @@ mod tests {
             .collect::<Vec<_>>();
 
         let agg_cases: [(FusedAggOp, GenericAgg); 8] = [
-            (FusedAggOp::Avg, aggregations::avg),
-            (FusedAggOp::Count, aggregations::count),
-            (FusedAggOp::Group, aggregations::group),
-            (FusedAggOp::Max, aggregations::max),
-            (FusedAggOp::Min, aggregations::min),
-            (FusedAggOp::Stddev, aggregations::stddev),
-            (FusedAggOp::Stdvar, aggregations::stdvar),
-            (FusedAggOp::Sum, aggregations::sum),
+            (FusedAggOp::Avg, |modifier, input, eval_ctx| {
+                aggregations::eval_aggregate(modifier, input, aggregations::Avg, eval_ctx)
+            }),
+            (FusedAggOp::Count, |modifier, input, eval_ctx| {
+                aggregations::eval_aggregate(modifier, input, aggregations::Count, eval_ctx)
+            }),
+            (FusedAggOp::Group, |modifier, input, eval_ctx| {
+                aggregations::eval_aggregate(modifier, input, aggregations::Group, eval_ctx)
+            }),
+            (FusedAggOp::Max, |modifier, input, eval_ctx| {
+                aggregations::eval_aggregate(modifier, input, aggregations::Max, eval_ctx)
+            }),
+            (FusedAggOp::Min, |modifier, input, eval_ctx| {
+                aggregations::eval_aggregate(modifier, input, aggregations::Min, eval_ctx)
+            }),
+            (FusedAggOp::Stddev, |modifier, input, eval_ctx| {
+                aggregations::eval_aggregate(modifier, input, aggregations::Stddev, eval_ctx)
+            }),
+            (FusedAggOp::Stdvar, |modifier, input, eval_ctx| {
+                aggregations::eval_aggregate(modifier, input, aggregations::Stdvar, eval_ctx)
+            }),
+            (FusedAggOp::Sum, |modifier, input, eval_ctx| {
+                aggregations::eval_aggregate(modifier, input, aggregations::Sum, eval_ctx)
+            }),
         ];
         for (op, generic_agg) in agg_cases {
             for modifier in [None, by(&["path"])] {
@@ -302,8 +334,18 @@ mod tests {
             .collect::<Vec<_>>();
 
         for (op, generic_agg) in [
-            (FusedAggOp::Sum, aggregations::sum as GenericAgg),
-            (FusedAggOp::Avg, aggregations::avg as GenericAgg),
+            (
+                FusedAggOp::Sum,
+                (|modifier, input, eval_ctx| {
+                    aggregations::eval_aggregate(modifier, input, aggregations::Sum, eval_ctx)
+                }) as GenericAgg,
+            ),
+            (
+                FusedAggOp::Avg,
+                (|modifier, input, eval_ctx| {
+                    aggregations::eval_aggregate(modifier, input, aggregations::Avg, eval_ctx)
+                }) as GenericAgg,
+            ),
         ] {
             let generic_input =
                 range_eval("rate", Value::Matrix(matrix.clone()), &eval_ctx).unwrap();
