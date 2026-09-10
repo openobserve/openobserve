@@ -70,12 +70,12 @@ const TABLE_IDS = [
 describe("utilization — shape", () => {
   it("sits directly after overview, ahead of node capacity", () => {
     // Asserted RELATIVE to the sections that exist, not as a frozen full list:
-    // tranche 1B inserts `health` between overview and utilization, and this pin
+    // tranche 1B inserts `health` between inventory and utilization, and this pin
     // must not fail on a correct 1A just because 1B has not landed.
     const ids = kubernetesPage.sections.map((s: any) => s.id);
     expect(ids).toContain(SECTION_ID);
     expect(ids.indexOf(SECTION_ID)).toBeLessThan(ids.indexOf("nodes"));
-    expect(ids.indexOf(SECTION_ID)).toBeGreaterThan(ids.indexOf("overview"));
+    expect(ids.indexOf(SECTION_ID)).toBeGreaterThan(ids.indexOf("inventory"));
   });
 
   it("every panel declares exactly one variant with exactly one query", () => {
@@ -101,12 +101,7 @@ describe("utilization — shape", () => {
     ]);
   });
 
-  // COUPLED EDIT, not testable from here: lint.spec.ts:59-65 keeps GOLDEN_NAMES
-  // module-private and asserts the pack's section ids equal it (:366-373). Adding
-  // this section REQUIRES adding "utilization" there, plus updating the frozen
-  // lists at resolve.spec.ts:1155 and :2118 and the panel count in
-  // kubernetes.page.spec.ts. Exporting GOLDEN_NAMES purely to assert it here would
-  // loosen the governance file, so the requirement is recorded rather than pinned.
+  // COUPLED EDIT, unpinnable here: lint.spec.ts keeps its section-order list module-private, so adding a section means editing that list too.
 
   it("scopes by cluster and namespace, and declares no pod picker", () => {
     // No panel here is pod-scoped: the tables list pods as ROWS, so scoping their
@@ -269,12 +264,13 @@ describe("utilization — instant reads and titles", () => {
     }
   });
 
-  it("instant panels say so in their copy", () => {
-    for (const id of [...TILE_IDS, ...TABLE_IDS]) {
-      expect(copy(panel(id).titleKey), `${id} title should mark the instant read`).toContain(
-        "(now)",
-      );
-    }
+  // The instant read this section's titles used to spell "(now)" is pinned by
+  // "every tile and table is an instant query" above; the disclosure now rides
+  // utilizationNote, the only place the reader is still told.
+  it("the section note discloses the instant read", () => {
+    const section = kubernetesPage.sections.find((s: any) => s.id === SECTION_ID)!;
+    expect(section.noteKey, "the instant read must be disclosed somewhere").toBeTruthy();
+    expect(copy(section.noteKey!).toLowerCase()).toContain("current instant");
   });
 });
 

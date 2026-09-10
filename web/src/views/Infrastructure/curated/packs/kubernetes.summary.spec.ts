@@ -38,7 +38,7 @@ import { getUnitOptions } from "@/composables/dashboard/useColumnFormatting";
 import { raw } from "@/types/i18n";
 import enLocale from "@/locales/languages/en-US.json";
 
-const SECTION_ID = "summary";
+const SECTION_ID = "overview";
 
 /** The hero: the per-cluster commitment scatter. */
 const PANEL_ID = "k8s_sm_fleet_quadrant";
@@ -273,10 +273,7 @@ describe("summary — shape", () => {
     expect(panel(PANEL_ID).groupId).toBe("kube-state");
   });
 
-  // COUPLED EDIT, not testable from here: lint.spec.ts keeps GOLDEN_NAMES module-
-  // private and asserts the pack's section ids equal it. Adding this section
-  // REQUIRES adding "summary" there, plus the frozen tab lists in resolve.spec.ts
-  // and the section-id list and panel count in kubernetes.page.spec.ts.
+  // COUPLED EDIT, unpinnable here: lint.spec.ts keeps its section-order list module-private, so adding a section means editing that list too.
 });
 
 describe("summary — the panel is fleet-wide by construction", () => {
@@ -369,12 +366,14 @@ describe("summary — the panel is an instant snapshot, never a range reduction"
     expect(js, "the author JS must read the instant vector shape").toMatch(/\.value\b/);
   });
 
-  it("carries a title that promises an instant, matching the query mode", () => {
-    // The panel says "(now)". A range window made that a lie in the direction that
-    // matters most: over a wide picker a decommissioned cluster still has a last
-    // value, so it plotted as live. An instant query at now drops it on PromQL
-    // staleness, which is why widening the picker no longer resurrects dead clusters.
-    expect(copy(panel(PANEL_ID).titleKey)).toMatch(/\(now\)/);
+  it("discloses the instant read in the section note, the titles no longer saying it", () => {
+    // The disclosure moved off the titles, but the fact still needs stating: over a
+    // wide picker a decommissioned cluster still has a last value, so it plotted as
+    // live. An instant query at now drops it on PromQL staleness, and the note is the
+    // only place the reader is told the time picker does not widen these reads.
+    const section = kubernetesPage.sections.find((s: any) => s.id === SECTION_ID)!;
+    expect(section.noteKey, "the instant read must be disclosed somewhere").toBeTruthy();
+    expect(copy(section.noteKey!).toLowerCase()).toContain("current instant");
   });
 });
 
@@ -1256,8 +1255,7 @@ describe("summary — a bubble click ANNOUNCES the cluster, and never navigates 
   });
 
   it("targets a tab id the manifest actually declares", () => {
-    // "health" is a frozen section id, not copy: a rename would route to a tab
-    // that does not exist and land the reader back on the default one.
+    // "health" is a section id, not copy: renaming it here alone routes to a tab that does not exist and lands the reader on the default one.
     expect(kubernetesPage.sections.map((s: any) => s.id)).toContain(FLEET_DRILLDOWN_TAB);
   });
 
