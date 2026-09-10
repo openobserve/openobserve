@@ -117,6 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="app-tabs-container h-9">
                 <AppTabs
                   class="tabs-selection-container"
+                  mobile-dropdown
                   :tabs="tabOptions"
                   v-model:active-tab="selectedTab"
                   @update:active-tab="onTabChange"
@@ -124,7 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <OSearchInput
                 v-model="filterQuery"
-                class="ms-auto w-64"
+                class="ms-auto w-64 max-md:ms-0 max-md:w-auto max-md:min-w-40 max-md:flex-1"
                 :placeholder="t('modelPricing.searchPlaceholder')"
               />
             </div>

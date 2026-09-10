@@ -83,7 +83,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                  OTable's own controls share one wrapping toolbar. -->
             <div class="flex w-full items-center justify-between gap-2 max-md:contents">
               <OToggleGroup
+                mobile-dropdown
                 :model-value="streamActiveTab"
+                data-test="log-stream-type-filter"
                 @update:model-value="(v) => filterLogStreamByTab(v as string)"
               >
                 <OToggleGroupItem value="logs" size="sm">

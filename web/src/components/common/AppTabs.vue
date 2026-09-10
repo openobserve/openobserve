@@ -15,7 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OToggleGroup v-if="show" :model-value="activeTab" @update:model-value="onSelect">
+  <OToggleGroup
+    v-if="show"
+    :model-value="activeTab"
+    :mobile-dropdown="mobileDropdown"
+    @update:model-value="onSelect"
+  >
     <OToggleGroupItem
       v-for="tab in visibleTabs"
       :key="tab.value"
@@ -77,11 +82,14 @@ const props = withDefaults(
     size?: ToggleGroupItemSize;
     // Tooltip shown when hovering an unsaved-changes dot (optional).
     dirtyTitle?: I18nText;
+    // Collapse to a dropdown below md (see OToggleGroup `mobileDropdown`).
+    mobileDropdown?: boolean;
   }>(),
   {
     show: true,
     size: "sm",
     dirtyTitle: raw(""),
+    mobileDropdown: false,
   },
 );
 

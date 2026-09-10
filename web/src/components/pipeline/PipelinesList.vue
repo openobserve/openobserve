@@ -75,6 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #toolbar>
             <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">
               <OToggleGroup
+                mobile-dropdown
                 :model-value="activeTab"
                 @update:model-value="onTabChange"
                 data-test="pipeline-list-tabs"

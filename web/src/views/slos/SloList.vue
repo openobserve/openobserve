@@ -92,7 +92,7 @@
           >
             {{ t("common.export") }}
           </OButton>
-          <OToggleGroup v-model="typeFilter" data-test="slos-slolist-type-filter">
+          <OToggleGroup v-model="typeFilter" mobile-dropdown data-test="slos-slolist-type-filter">
             <OToggleGroupItem
               v-for="opt in typeOptions"
               :key="opt.value"

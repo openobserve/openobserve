@@ -73,6 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #toolbar>
               <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">
                 <OToggleGroup
+                  mobile-dropdown
                   :model-value="selectedFilter"
                   @update:model-value="
                     (v) => {
@@ -98,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OSearchInput
                   data-test="enrichment-tables-search-input"
                   v-model="filterQuery"
-                  class="ms-auto w-64 max-md:order-last max-md:ms-0 max-md:w-full max-md:basis-full"
+                  class="ms-auto w-64 max-md:ms-0 max-md:w-auto max-md:min-w-40 max-md:flex-1"
                   :placeholder="t('function.searchEnrichmentTable')"
                 />
               </div>

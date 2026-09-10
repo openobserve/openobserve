@@ -30,6 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="px-page-edge flex items-center justify-start gap-3 py-2 max-md:flex-wrap max-md:gap-2"
       >
         <OToggleGroup
+          mobile-dropdown
           :model-value="selectedQueryTypeTab"
           @update:model-value="onChangeQueryTab($event as 'summary' | 'all')"
           data-test="running-queries-query-type-tabs"
@@ -49,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :options="searchFieldOptions"
             labelKey="label"
             valueKey="value"
-            class="w-35 p-0"
+            class="w-35 p-0 max-md:w-28"
             data-test="running-queries-search-fields-select"
             @update:model-value="filterQuery = ''"
           />
@@ -57,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSearchInput
           v-if="selectedSearchField == 'all'"
           v-model="filterQuery"
-          class="no-border o2-search-input max-md:min-w-40 max-md:flex-1"
+          class="no-border o2-search-input max-md:min-w-24 max-md:flex-1"
           :placeholder="t('queries.search')"
           data-test="running-queries-search-input"
         />

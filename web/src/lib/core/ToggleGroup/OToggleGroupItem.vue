@@ -4,11 +4,16 @@ import type {
   ToggleGroupItemSlots,
   ToggleGroupContext,
 } from "./OToggleGroup.types";
-import { ToggleGroupAnimatedKey, TOGGLE_GROUP_CONTEXT_KEY } from "./OToggleGroup.types";
+import {
+  ToggleGroupAnimatedKey,
+  ToggleGroupMenuKey,
+  TOGGLE_GROUP_CONTEXT_KEY,
+} from "./OToggleGroup.types";
 import { ToggleGroupItem } from "reka-ui";
-import { computed, inject, type ComputedRef } from "vue";
+import { computed, inject, useAttrs, type ComputedRef } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 
 defineOptions({ inheritAttrs: false });
 
@@ -22,6 +27,13 @@ const props = withDefaults(defineProps<ToggleGroupItemProps>(), {
 });
 
 const slots = defineSlots<ToggleGroupItemSlots>();
+
+// Set when the parent group has collapsed into a dropdown (phones): render as its trigger label or a menu row.
+const menu = inject(ToggleGroupMenuKey, null);
+const attrs = useAttrs();
+const menuItemTestId = computed(() =>
+  attrs["data-test"] ? `${attrs["data-test"]}-item` : `o-toggle-group-item-${String(props.value)}`,
+);
 
 // An item may be used standalone (no OToggleGroup parent), so the context is
 // optional and every read below is guarded.
@@ -75,12 +87,34 @@ const iconSize: Record<NonNullable<ToggleGroupItemProps["size"]>, "xs" | "sm" | 
 </script>
 
 <template>
+  <template v-if="menu?.mode === 'trigger'">
+    <template v-if="menu.isActive(props.value)">
+      <slot v-if="slots['icon-left']" name="icon-left" />
+      <OIcon v-else-if="props.iconLeft" :name="props.iconLeft" size="sm" />
+      <slot />
+    </template>
+  </template>
+  <ODropdownItem
+    v-else-if="menu"
+    :disabled="props.disabled"
+    :data-test="menuItemTestId"
+    @select="menu.select(props.value)"
+  >
+    <template v-if="slots['icon-left'] || props.iconLeft" #icon-left>
+      <slot v-if="slots['icon-left']" name="icon-left" />
+      <OIcon v-else-if="props.iconLeft" :name="props.iconLeft" size="sm" />
+    </template>
+    <slot />
+    <template #icon-right>
+      <OIcon v-if="menu.isActive(props.value)" name="check" size="sm" class="ms-auto" />
+    </template>
+  </ODropdownItem>
   <!--
     Disabled buttons suppress hover events when pointer-events-none is set.
     The span wrapper intercepts hover so cursor-not-allowed and the tooltip
     remain visible even when the inner item is disabled.
   -->
-  <span :class="props.disabled ? 'cursor-not-allowed' : 'contents'">
+  <span v-else :class="props.disabled ? 'cursor-not-allowed' : 'contents'">
     <ToggleGroupItem
       v-bind="$attrs"
       :value="props.value"
