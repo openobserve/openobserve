@@ -54,26 +54,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OToggleGroupItem value="stream" size="sm">{{ labels.stream }}</OToggleGroupItem>
     </OToggleGroup>
 
-    <div v-if="isStreamMode" :data-test="`${dataTest}-stream-selector`" class="w-64 flex-shrink-0">
-      <OSkeleton type="text" v-if="showStreamSkeleton && !streamsLoaded" class="h-8.5 w-full" />
-      <OSelect
-        v-else
-        v-model="activeStreamModel"
-        :label="raw(labels.streamLabel)"
-        label-position="inside"
-        :options="streamSelectOptions"
-        labelKey="label"
-        valueKey="value"
-        :option-tooltip="streamOptionTooltip"
-        class="rounded-default w-full"
-        @update:model-value="onStreamChange"
+    <!-- Explicit if/else on isStreamMode itself (not on a descendant's own
+         condition) — StreamAgentCountBadge below has its own separate
+         visibility rule, and chaining v-else off of IT rather than off this
+         stream/agent branch previously meant hiding the badge alone could
+         silently fall through to rendering the agent cascade. -->
+    <template v-if="isStreamMode">
+      <div :data-test="`${dataTest}-stream-selector`" class="w-64 flex-shrink-0">
+        <OSkeleton type="text" v-if="showStreamSkeleton && !streamsLoaded" class="h-8.5 w-full" />
+        <OSelect
+          v-else
+          v-model="activeStreamModel"
+          :label="raw(labels.streamLabel)"
+          label-position="inside"
+          :options="streamSelectOptions"
+          labelKey="label"
+          valueKey="value"
+          :option-tooltip="streamOptionTooltip"
+          class="rounded-default w-full"
+          @update:model-value="onStreamChange"
+        />
+      </div>
+      <!-- Meaningless without Agent mode to switch into — an OSS caller with
+           showAgentToggle false has nowhere to act on this count, so it would
+           just be an unexplained number next to the stream picker. -->
+      <StreamAgentCountBadge
+        v-if="showAgentToggle && activeStreamModel"
+        :count="selectedStreamCount"
+        :data-test="countDataTest ?? `${dataTest}-stream-count`"
       />
-    </div>
-    <StreamAgentCountBadge
-      v-if="isStreamMode && activeStreamModel"
-      :count="selectedStreamCount"
-      :data-test="countDataTest ?? `${dataTest}-stream-count`"
-    />
+    </template>
 
     <!-- Agent mode: the Env→Agent→Version cascade replaces the single grouped
          agent dropdown. The three dropdowns themselves SHOW the current

@@ -216,7 +216,9 @@ describe("AiScopeBar", () => {
       });
       expect(w.find('[data-test="sessions-list-stream-selector"]').exists()).toBe(true);
       expect(w.find(".agent-scope-cascade").exists()).toBe(false);
-      expect(w.find('[data-test="sessions-list-stream-count"]').exists()).toBe(true);
+      // The count only means something alongside a way to act on it — with no
+      // toggle to reach Agent mode, it's hidden too, not just the cascade.
+      expect(w.find('[data-test="sessions-list-stream-count"]').exists()).toBe(false);
     });
 
     it("never renders the agent cascade when showAgentToggle is false, regardless of filterMode", () => {
