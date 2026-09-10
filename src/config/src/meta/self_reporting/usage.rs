@@ -301,6 +301,9 @@ pub struct TriggerData {
     /// The venue the failed synthetics slot was scheduled for.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub synthetics_location: Option<String>,
+    /// Absent when no delivery decision was recorded that a failure could be measured against.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub delivery_attempted: Option<bool>,
 }
 
 impl Default for TriggerData {
@@ -340,6 +343,7 @@ impl Default for TriggerData {
             value_is_lower_bound: None,
             synthetics_error_source: None,
             synthetics_location: None,
+            delivery_attempted: None,
         }
     }
 }
@@ -390,6 +394,7 @@ impl TriggerData {
             value_is_lower_bound: Some(false),
             synthetics_error_source: Some(String::new()),
             synthetics_location: Some(String::new()),
+            delivery_attempted: Some(true),
         }
     }
 
@@ -1710,6 +1715,7 @@ mod tests {
             value_is_lower_bound: None,
             synthetics_error_source: None,
             synthetics_location: None,
+            delivery_attempted: None,
         };
 
         let json = serde_json::to_string(&trigger_data).unwrap();
@@ -2662,6 +2668,70 @@ mod tests {
                  column the quota alert rule can never fire on"
             );
         }
+    }
+
+    /// A row written before the field existed must read back as `None`, not as "not attempted".
+    #[test]
+    fn trigger_data_legacy_row_reads_delivery_attempted_as_none() {
+        let legacy = serde_json::json!({
+            "_timestamp": 1_700_000_000_000_000i64,
+            "org": "default",
+            "module": "alert",
+            "key": "cpu/alert-id",
+            "next_run_at": 1_700_000_060_000_000i64,
+            "is_realtime": false,
+            "is_silenced": false,
+            "status": "firing",
+            "start_time": 1_700_000_000_000_000i64,
+            "end_time": 1_700_000_060_000_000i64,
+            "retries": 0,
+            "error": null,
+            "success_response": null,
+            "is_partial": null,
+            "delay_in_secs": null,
+            "evaluation_took_in_secs": null,
+            "source_node": null,
+            "query_took": null,
+            "scheduler_trace_id": null,
+            "time_in_queue_ms": null
+        });
+        let parsed: TriggerData =
+            serde_json::from_value(legacy).expect("a legacy row must still deserialize");
+        assert_eq!(parsed.delivery_attempted, None);
+    }
+
+    #[test]
+    fn trigger_data_delivery_attempted_omitted_when_none_and_round_trips_when_set() {
+        let bare = TriggerData::default();
+        let json = serde_json::to_value(&bare).expect("TriggerData must serialize");
+        assert!(json.get("delivery_attempted").is_none());
+
+        for value in [true, false] {
+            let stamped = TriggerData {
+                delivery_attempted: Some(value),
+                ..TriggerData::default()
+            };
+            let json = serde_json::to_value(&stamped).expect("TriggerData must serialize");
+            assert_eq!(json["delivery_attempted"], value);
+            let back: TriggerData =
+                serde_json::from_value(json).expect("a stamped row must read back unchanged");
+            assert_eq!(back.delivery_attempted, Some(value));
+        }
+    }
+
+    #[test]
+    fn trigger_data_reflection_sample_includes_delivery_attempted() {
+        assert!(
+            TriggerData::init_for_reflection()
+                .delivery_attempted
+                .is_some(),
+            "`skip_serializing_if` drops the field from the reflection sample when it is None"
+        );
+        assert!(
+            TriggerData::get_field_names().contains(&"delivery_attempted".to_string()),
+            "a `triggers` schema without the column turns the Alert Hygiene SQL into a planning \
+             error, which kills the whole read rather than returning NULL"
+        );
     }
 }
 

@@ -75,6 +75,20 @@ pub struct CorrelationSubject {
     pub severity: Option<config::meta::alerts::incidents::IncidentSeverity>,
 }
 
+/// How an incident notification actually landed, as the scheduler records it.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct IncidentNotifyOutcome {
+    /// False when no destination was wired, so no send was ever decided on.
+    pub attempted: bool,
+    pub failed: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct CorrelatedIncident {
+    pub outcome: IncidentCorrelationOutcome,
+    pub notify: IncidentNotifyOutcome,
+}
+
 /// Combined correlation result from both Service Discovery and semantic extraction
 struct ParallelCorrelationResult {
     service_discovery: Option<ServiceDiscoveryResult>,
@@ -338,7 +352,7 @@ async fn send_incident_notifications(
     event: &str,
     triggered_at: i64,
     dest_names: &[String],
-) {
+) -> IncidentNotifyOutcome {
     // Preserve the alert/stream sub-object emitted for the internal alert path.
     let alert_block = config::utils::json::json!({
         "name": alert.name,
@@ -356,7 +370,7 @@ async fn send_incident_notifications(
         dest_names,
         Some(alert_block),
     )
-    .await;
+    .await
 }
 
 /// Build an incident-specific notification payload and send to all given destinations.
@@ -374,9 +388,12 @@ async fn send_incident_notifications_inner(
     triggered_at: i64,
     dest_names: &[String],
     alert_block: Option<Value>,
-) {
+) -> IncidentNotifyOutcome {
     if dest_names.is_empty() {
-        return;
+        log::warn!(
+            "[incidents] No destination for incident {incident_id} ({event}); nothing was sent"
+        );
+        return IncidentNotifyOutcome::default();
     }
 
     // Load incident to get severity, title and service_name.
@@ -428,7 +445,10 @@ async fn send_incident_notifications_inner(
             log::error!(
                 "[incidents] Failed to serialize notification payload for {incident_id}: {e}"
             );
-            return;
+            return IncidentNotifyOutcome {
+                attempted: true,
+                failed: true,
+            };
         }
     };
 
@@ -482,6 +502,14 @@ async fn send_incident_notifications_inner(
             "[incidents] Notification partially failed for incident {incident_id} ({event}): {}",
             err_parts.join("; ")
         );
+    }
+    notify_outcome(&err_parts)
+}
+
+fn notify_outcome(err_parts: &[String]) -> IncidentNotifyOutcome {
+    IncidentNotifyOutcome {
+        attempted: true,
+        failed: !err_parts.is_empty(),
     }
 }
 
@@ -558,7 +586,7 @@ pub async fn correlate_alert_to_incident(
     // Warning → P3). None (manual triggers, single-level alerts) keeps the
     // enterprise default.
     eval_level: Option<config::meta::alerts::level::AlertLevel>,
-) -> Result<Option<IncidentCorrelationOutcome>, anyhow::Error> {
+) -> Result<Option<CorrelatedIncident>, anyhow::Error> {
     let mut labels = labels_from_row(result_row);
 
     // Enrich with alert condition dimensions (deterministic baseline)
@@ -794,6 +822,7 @@ pub async fn correlate_alert_to_incident(
 
     // Send incident notification unless rows are empty (manual trigger path)
     // or the outcome is a repeated alert (suppressed by design).
+    let mut notify = IncidentNotifyOutcome::default();
     if !notify_rows.is_empty() {
         match &outcome {
             IncidentCorrelationOutcome::NewIncidentCreated { incident_id, .. }
@@ -807,7 +836,7 @@ pub async fn correlate_alert_to_incident(
                 let merged_destinations =
                     collect_incident_destinations(&alert.org_id, incident_id, &alert.destinations)
                         .await;
-                send_incident_notifications(
+                notify = send_incident_notifications(
                     alert,
                     incident_id,
                     event,
@@ -824,7 +853,7 @@ pub async fn correlate_alert_to_incident(
         }
     }
 
-    Ok(Some(outcome))
+    Ok(Some(CorrelatedIncident { outcome, notify }))
 }
 
 /// External-event twin of [`correlate_alert_to_incident`].
@@ -2818,6 +2847,33 @@ mod tests {
             ranks.windows(2).all(|w| w[0] >= w[1]),
             "severity must not increase as priority falls: {ranks:?}"
         );
+    }
+
+    /// A notification failure the scheduler cannot see is a firing recorded as clean.
+    #[test]
+    fn any_failed_destination_makes_the_incident_notification_a_failure() {
+        let clean = notify_outcome(&[]);
+        assert!(clean.attempted);
+        assert!(!clean.failed);
+        let partial = notify_outcome(&["pagerduty: HTTP 500".to_string()]);
+        assert!(partial.attempted);
+        assert!(partial.failed);
+    }
+
+    #[tokio::test]
+    async fn incident_notification_without_destinations_is_not_attempted() {
+        let outcome = send_incident_notifications_inner(
+            "org",
+            "alert",
+            "inc-1",
+            "new_incident_created",
+            0,
+            &[],
+            None,
+        )
+        .await;
+        assert!(!outcome.attempted);
+        assert!(!outcome.failed);
     }
 
     #[test]

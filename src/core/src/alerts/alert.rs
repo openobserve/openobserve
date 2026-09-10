@@ -2020,14 +2020,14 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
         )
         .await
         {
-            Ok(Some(outcome)) => {
+            Ok(Some(correlated)) => {
                 log::info!(
                     "Manual trigger for alert {org_id}/{} correlated to incident {} (service: {})",
                     alert.name,
-                    outcome.incident_id(),
-                    outcome.service_name(),
+                    correlated.outcome.incident_id(),
+                    correlated.outcome.service_name(),
                 );
-                incident_path_notified(&outcome)
+                incident_path_notified(&correlated.outcome)
             }
             Ok(None) => {
                 log::debug!(
@@ -2121,14 +2121,14 @@ pub async fn trigger_by_name(
         )
         .await
         {
-            Ok(Some(outcome)) => {
+            Ok(Some(correlated)) => {
                 log::info!(
                     "Manual trigger for alert {org_id}/{} correlated to incident {} (service: {})",
                     alert.name,
-                    outcome.incident_id(),
-                    outcome.service_name(),
+                    correlated.outcome.incident_id(),
+                    correlated.outcome.service_name(),
                 );
-                incident_path_notified(&outcome)
+                incident_path_notified(&correlated.outcome)
             }
             Ok(None) => {
                 log::debug!(

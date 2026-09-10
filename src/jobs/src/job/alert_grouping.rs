@@ -41,15 +41,29 @@ pub async fn process_expired_batches() {
                 );
 
                 for batch in batches {
-                    if let Err(e) = openobserve_core::alerts::grouping::send_grouped_notification(
+                    // The send consumes the batch, so its rows must be built first.
+                    let mut rows = openobserve_core::alerts::grouping::flush_rows(&batch);
+                    match openobserve_core::alerts::grouping::send_grouped_notification(
                         &trace_id, batch,
                     )
                     .await
                     {
-                        log::error!(
-                            "[alert_grouping_worker] Error sending grouped notification trace_id {trace_id} : {} ",
-                            e
-                        );
+                        Ok(attempted) => {
+                            openobserve_core::alerts::grouping::stamp_flush_delivery(
+                                &mut rows, attempted,
+                            );
+                        }
+                        Err(e) => {
+                            log::error!(
+                                "[alert_grouping_worker] Error sending grouped notification trace_id {trace_id} : {} ",
+                                e
+                            );
+                            openobserve_core::alerts::grouping::stamp_flush_error(&mut rows, &e);
+                        }
+                    }
+                    // These rows are the only record of the evaluations; enqueue published none.
+                    for row in rows {
+                        usage_reporting::publish_triggers_usage(row);
                     }
                 }
             }

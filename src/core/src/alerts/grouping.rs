@@ -21,11 +21,16 @@
 use std::sync::{Arc, LazyLock as Lazy};
 
 use chrono::Utc;
-use config::{meta::alerts::alert::Alert, utils::json};
+use config::{
+    meta::{
+        alerts::alert::Alert,
+        self_reporting::usage::{RunOutcome, TriggerData},
+    },
+    utils::json,
+};
 use dashmap::DashMap;
 
-/// In-memory cache of pending alert batches
-/// Key: fingerprint, Value: PendingBatch
+/// Keyed per tenant: a fingerprint carries no org, so two orgs would share one batch.
 static PENDING_BATCHES: Lazy<Arc<DashMap<String, PendingBatch>>> =
     Lazy::new(|| Arc::new(DashMap::new()));
 
@@ -54,6 +59,23 @@ pub struct BatchedAlert {
     pub alert: Alert,
     pub rows: Vec<json::Map<String, json::Value>>,
     pub timestamp: i64,
+    /// This evaluation's history row, held back until the flush decides its delivery.
+    pub trigger_data: TriggerData,
+}
+
+/// Destinations were contacted and the send failed, wholly or partially.
+#[derive(Debug)]
+pub struct GroupedSendError(pub String);
+
+/// What the batcher did with an evaluation handed to [`add_to_batch`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BatchAdmission {
+    /// Collected into a batch that is still waiting; the flush publishes its row.
+    Queued,
+    /// Collected into a batch that is now full; the caller must flush it immediately.
+    Ready,
+    /// The batch was full and not yet taken, so this evaluation joined no batch at all.
+    Refused,
 }
 
 impl PendingBatch {
@@ -64,6 +86,7 @@ impl PendingBatch {
         org_id: String,
         alert: Alert,
         rows: Vec<json::Map<String, json::Value>>,
+        trigger_data: TriggerData,
         group_wait_seconds: i64,
         max_group_size: usize,
         level: Option<config::meta::alerts::level::AlertLevel>,
@@ -78,6 +101,7 @@ impl PendingBatch {
                 alert,
                 rows,
                 timestamp: now,
+                trigger_data,
             }],
             timer_started_at: now,
             group_wait_seconds,
@@ -87,7 +111,12 @@ impl PendingBatch {
     }
 
     /// Add an alert to this batch
-    pub fn add_alert(&mut self, alert: Alert, rows: Vec<json::Map<String, json::Value>>) -> bool {
+    pub fn add_alert(
+        &mut self,
+        alert: Alert,
+        rows: Vec<json::Map<String, json::Value>>,
+        trigger_data: TriggerData,
+    ) -> bool {
         if self.alerts.len() >= self.max_group_size {
             return false; // Batch full
         }
@@ -97,6 +126,7 @@ impl PendingBatch {
             alert,
             rows,
             timestamp: now,
+            trigger_data,
         });
         true
     }
@@ -114,14 +144,27 @@ impl PendingBatch {
     }
 }
 
-/// Add alert to pending batch or create new batch
-/// Returns true if batch is ready to send (expired or full)
+impl std::fmt::Display for GroupedSendError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
+impl std::error::Error for GroupedSendError {}
+
+/// The fingerprint has no org component, so the map key must supply the tenant isolation.
+fn batch_key(org_id: &str, fingerprint: &str) -> String {
+    format!("{org_id}/{fingerprint}")
+}
+
+/// Add alert to pending batch or create new batch, reporting whether it was collected at all.
 #[allow(clippy::too_many_arguments)]
 pub fn add_to_batch(
     fingerprint: String,
     org_id: String,
     alert: Alert,
     rows: Vec<json::Map<String, json::Value>>,
+    trigger_data: TriggerData,
     group_wait_seconds: i64,
     max_group_size: usize,
     level: Option<config::meta::alerts::level::AlertLevel>,
@@ -129,16 +172,15 @@ pub fn add_to_batch(
     // sharing a fingerprint shares a group, because the group is part of the
     // fingerprint — so this is set once, when the batch is created.
     group_labels: Option<std::collections::BTreeMap<String, String>>,
-) -> bool {
+) -> BatchAdmission {
     let mut batch_ready = false;
     let mut is_new_batch = false;
-    let mut batch_size = 0;
+    let mut refused = false;
 
     PENDING_BATCHES
-        .entry(fingerprint.clone())
+        .entry(batch_key(&org_id, &fingerprint))
         .and_modify(|batch| {
-            if batch.add_alert(alert.clone(), rows.clone()) {
-                batch_size = batch.alerts.len();
+            if batch.add_alert(alert.clone(), rows.clone(), trigger_data.clone()) {
                 log::debug!(
                     "[grouping] Added alert '{}' to existing batch {} (count: {}/{})",
                     alert.name,
@@ -155,6 +197,7 @@ pub fn add_to_batch(
                     );
                 }
             } else {
+                refused = true;
                 log::warn!(
                     "[grouping] Failed to add alert '{}' to batch {} (already full)",
                     alert.name,
@@ -164,7 +207,8 @@ pub fn add_to_batch(
         })
         .or_insert_with(|| {
             is_new_batch = true;
-            batch_size = 1;
+            // A new batch holds one alert, so a `max_group_size` of 1 makes it full on creation.
+            batch_ready = max_group_size <= 1;
             log::info!(
                 "[grouping] Created new batch for fingerprint {}, alert: '{}', org: {}, wait_seconds: {}, max_size: {}",
                 fingerprint,
@@ -175,9 +219,10 @@ pub fn add_to_batch(
             );
             PendingBatch::new(
                 fingerprint.clone(),
-                org_id,
+                org_id.clone(),
                 alert,
                 rows,
+                trigger_data,
                 group_wait_seconds,
                 max_group_size,
                 level,
@@ -186,37 +231,40 @@ pub fn add_to_batch(
         });
 
     if is_new_batch {
-        let batch_count = PENDING_BATCHES.len();
-        log::debug!("[grouping] Current pending batches count: {batch_count}");
+        // The gauge is per-org, so it must count this org's batches, not the whole map.
+        let batch_count = get_pending_batch_count(&org_id);
+        log::debug!("[grouping] Pending batches for org {org_id}: {batch_count}");
 
-        // Update gauge metric for pending batches
-        // Use org_id from the batch we just inserted
-        if let Some(batch) = PENDING_BATCHES.get(&fingerprint) {
-            config::metrics::ALERT_GROUPING_BATCHES_PENDING
-                .with_label_values(&[batch.org_id.as_str()])
-                .set(batch_count as i64);
-        }
+        config::metrics::ALERT_GROUPING_BATCHES_PENDING
+            .with_label_values(&[org_id.as_str()])
+            .set(batch_count);
     }
 
-    batch_ready
+    if refused {
+        BatchAdmission::Refused
+    } else if batch_ready {
+        BatchAdmission::Ready
+    } else {
+        BatchAdmission::Queued
+    }
 }
 
 /// Get and remove a batch if it's ready (expired or full)
-pub fn get_ready_batch(fingerprint: &str) -> Option<PendingBatch> {
-    if let Some(entry) = PENDING_BATCHES.get(fingerprint)
-        && (entry.is_expired() || entry.is_full())
-    {
-        let batch = PENDING_BATCHES.remove(fingerprint).map(|(_, batch)| batch);
-        if let Some(ref b) = batch {
-            log::debug!(
-                "[grouping] Retrieved ready batch for fingerprint {} ({} alerts)",
-                fingerprint,
-                b.alerts.len()
-            );
-        }
-        return batch;
+pub fn get_ready_batch(org_id: &str, fingerprint: &str) -> Option<PendingBatch> {
+    // Readiness is judged under the removing write lock: a `get` guard across `remove` deadlocks.
+    let batch = PENDING_BATCHES
+        .remove_if(&batch_key(org_id, fingerprint), |_, batch| {
+            batch.is_expired() || batch.is_full()
+        })
+        .map(|(_, batch)| batch);
+    if let Some(ref b) = batch {
+        log::debug!(
+            "[grouping] Retrieved ready batch for fingerprint {} ({} alerts)",
+            fingerprint,
+            b.alerts.len()
+        );
     }
-    None
+    batch
 }
 
 /// Get all expired batches
@@ -224,12 +272,12 @@ pub fn get_expired_batches() -> Vec<PendingBatch> {
     let mut expired = Vec::new();
     let now = Utc::now().timestamp_micros();
 
-    PENDING_BATCHES.retain(|fingerprint, batch| {
+    PENDING_BATCHES.retain(|key, batch| {
         if batch.is_expired() {
             let elapsed_seconds = (now - batch.timer_started_at) / 1_000_000;
             log::info!(
                 "[grouping] Batch {} expired after {}s with {} alerts",
-                fingerprint,
+                key,
                 elapsed_seconds,
                 batch.alerts.len()
             );
@@ -259,11 +307,60 @@ pub fn get_pending_batch_count(org_id: &str) -> i64 {
         .count() as i64
 }
 
+/// One held-back history row per evaluation in a batch, built before the send consumes it.
+pub fn flush_rows(batch: &PendingBatch) -> Vec<TriggerData> {
+    let group_size = batch.alerts.len() as i32;
+    batch
+        .alerts
+        .iter()
+        .map(|batched| TriggerData {
+            dedup_enabled: Some(true),
+            grouped: Some(true),
+            // The real membership of the batch that was sent, not the configured maximum.
+            group_size: Some(group_size),
+            ..batched.trigger_data.clone()
+        })
+        .collect()
+}
+
+/// The row of an evaluation the batcher refused: it matched, nothing went out, nothing was tried.
+pub fn refused_row(trigger_data: &TriggerData) -> TriggerData {
+    TriggerData {
+        status: RunOutcome::NotifyFailed,
+        error: Some(
+            "alert grouping batch was already full; this evaluation joined no batch and no \
+             notification was sent"
+                .to_string(),
+        ),
+        dedup_enabled: Some(true),
+        grouped: Some(false),
+        delivery_attempted: Some(false),
+        ..trigger_data.clone()
+    }
+}
+
+pub fn stamp_flush_delivery(rows: &mut [TriggerData], attempted: bool) {
+    for row in rows {
+        row.delivery_attempted = Some(attempted);
+    }
+}
+
+pub fn stamp_flush_error(rows: &mut [TriggerData], error: &GroupedSendError) {
+    let text = format!("error sending notification for alert: {error}");
+    for row in rows {
+        // The query succeeded; `Error` here would recount N firings as N evaluation errors.
+        row.status = RunOutcome::NotifyFailed;
+        row.error = Some(text.clone());
+        row.delivery_attempted = Some(true);
+    }
+}
+
+/// `Ok(true)` when a destination or workflow was contacted, `Ok(false)` when nothing was wired.
 #[cfg(feature = "enterprise")]
 pub async fn send_grouped_notification(
     trace_id: &str,
     batch: crate::alerts::grouping::PendingBatch,
-) -> Result<(), anyhow::Error> {
+) -> Result<bool, GroupedSendError> {
     use config::meta::alerts::deduplication::SendStrategy;
 
     use crate::alerts::alert::AlertExt;
@@ -285,13 +382,13 @@ pub async fn send_grouped_notification(
 
     // Get the first alert (primary) and grouping config
     let primary_alert = &batch.alerts[0].alert;
-    let grouping_config = primary_alert
+    // The batch holds the alert's own clone, admitted only under an enabled grouping config.
+    let send_strategy = primary_alert
         .deduplication
         .as_ref()
         .and_then(|d| d.grouping.as_ref())
-        .ok_or_else(|| anyhow::anyhow!("Grouping config not found"))?;
-
-    let send_strategy = &grouping_config.send_strategy;
+        .map(|g| g.send_strategy.clone())
+        .unwrap_or_default();
 
     // Collect alert details
     let alert_names: Vec<String> = batch.alerts.iter().map(|a| a.alert.name.clone()).collect();
@@ -415,6 +512,7 @@ pub async fn send_grouped_notification(
         .await
     {
         Ok(outcome) => {
+            let nothing_to_deliver = outcome.nothing_to_deliver;
             let (success_msg, err_msg) = (outcome.success_message, outcome.error_message);
             if !err_msg.is_empty() {
                 log::error!(
@@ -426,12 +524,12 @@ pub async fn send_grouped_notification(
                 config::metrics::ALERT_GROUPING_SEND_ERRORS_TOTAL
                     .with_label_values(&[batch.org_id.as_str(), "partial_failure"])
                     .inc();
-                return Err(anyhow::anyhow!("Partial failure: {}", err_msg));
+                return Err(GroupedSendError(format!("Partial failure: {err_msg}")));
             }
 
             // Record successful send metrics
             let strategy_str = format!("{:?}", send_strategy).to_lowercase();
-            let reason = if elapsed_seconds >= grouping_config.group_wait_seconds {
+            let reason = if elapsed_seconds >= batch.group_wait_seconds {
                 "expired"
             } else {
                 "max_size"
@@ -450,7 +548,7 @@ pub async fn send_grouped_notification(
                 batch.fingerprint,
                 success_msg
             );
-            Ok(())
+            Ok(!nothing_to_deliver)
         }
         Err(e) => {
             log::error!(
@@ -462,17 +560,43 @@ pub async fn send_grouped_notification(
             config::metrics::ALERT_GROUPING_SEND_ERRORS_TOTAL
                 .with_label_values(&[batch.org_id.as_str(), "send_failed"])
                 .inc();
-            Err(anyhow::anyhow!("Send failed: {}", e))
+            Err(GroupedSendError(format!("Send failed: {e}")))
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use config::meta::self_reporting::usage::TriggerDataType;
+
     use super::*;
 
     fn make_alert() -> Alert {
         serde_json::from_value(serde_json::json!({})).unwrap()
+    }
+
+    fn make_named_alert(name: &str, id: &str) -> Alert {
+        serde_json::from_value(serde_json::json!({ "name": name, "id": id })).unwrap()
+    }
+
+    /// The row `handle_alert_triggers` holds back at enqueue, as it builds it for a firing.
+    fn enqueue_row(alert: &Alert, org: &str) -> TriggerData {
+        TriggerData {
+            _timestamp: 1_700_000_000_000_000,
+            org: org.to_string(),
+            module: TriggerDataType::Alert,
+            key: format!("{}/{}", alert.name, alert.get_unique_key()),
+            next_run_at: 1_700_000_300_000_000,
+            status: RunOutcome::Firing,
+            start_time: 1_699_999_700_000_000,
+            end_time: 1_700_000_000_000_000,
+            retries: 2,
+            delay_in_secs: Some(4),
+            source_node: Some("node-7".to_string()),
+            scheduler_trace_id: Some("eval-trace".to_string()),
+            time_in_queue_ms: Some(11),
+            ..Default::default()
+        }
     }
 
     #[test]
@@ -482,6 +606,7 @@ mod tests {
             "myorg".to_string(),
             make_alert(),
             vec![],
+            TriggerData::default(),
             30,
             10,
             None,
@@ -498,13 +623,14 @@ mod tests {
             "myorg".to_string(),
             make_alert(),
             vec![],
+            TriggerData::default(),
             30,
             2,
             None,
             None,
         );
         assert!(!batch.is_full());
-        let added = batch.add_alert(make_alert(), vec![]);
+        let added = batch.add_alert(make_alert(), vec![], TriggerData::default());
         assert!(added);
         assert!(batch.is_full());
     }
@@ -516,13 +642,14 @@ mod tests {
             "myorg".to_string(),
             make_alert(),
             vec![],
+            TriggerData::default(),
             30,
             1,
             None,
             None,
         );
         assert!(batch.is_full());
-        let added = batch.add_alert(make_alert(), vec![]);
+        let added = batch.add_alert(make_alert(), vec![], TriggerData::default());
         assert!(!added);
         assert_eq!(batch.alerts.len(), 1);
     }
@@ -534,6 +661,7 @@ mod tests {
             "myorg".to_string(),
             make_alert(),
             vec![],
+            TriggerData::default(),
             3600, // 1 hour wait
             10,
             None,
@@ -545,76 +673,216 @@ mod tests {
     #[test]
     fn test_add_to_batch_creates_new_batch() {
         let fp = "grouping_test_add_creates_new_batch_unique".to_string();
-        PENDING_BATCHES.remove(&fp);
+        let key = batch_key("org-test-add", &fp);
+        PENDING_BATCHES.remove(&key);
 
         let ready = add_to_batch(
             fp.clone(),
             "org-test-add".to_string(),
             make_alert(),
             vec![],
+            TriggerData::default(),
             3600,
             10,
             None,
             None,
         );
-        assert!(!ready);
-        assert!(PENDING_BATCHES.contains_key(&fp));
+        assert_eq!(ready, BatchAdmission::Queued);
+        assert!(PENDING_BATCHES.contains_key(&key));
 
-        PENDING_BATCHES.remove(&fp);
+        PENDING_BATCHES.remove(&key);
     }
 
     #[test]
-    fn test_add_to_batch_returns_true_when_full() {
+    fn test_add_to_batch_reports_ready_when_full() {
         let fp = "grouping_test_add_batch_full_unique".to_string();
-        PENDING_BATCHES.remove(&fp);
+        let key = batch_key("org-test-full", &fp);
+        PENDING_BATCHES.remove(&key);
 
         let ready1 = add_to_batch(
             fp.clone(),
             "org-test-full".to_string(),
             make_alert(),
             vec![],
+            TriggerData::default(),
             3600,
             2,
             None,
             None,
         );
-        assert!(!ready1); // new batch, 1 alert, not full
+        assert_eq!(ready1, BatchAdmission::Queued); // new batch, 1 alert, not full
 
         let ready2 = add_to_batch(
             fp.clone(),
             "org-test-full".to_string(),
             make_alert(),
             vec![],
+            TriggerData::default(),
             3600,
             2,
             None,
             None,
         );
-        assert!(ready2); // 2nd alert fills batch, ready=true
+        assert_eq!(ready2, BatchAdmission::Ready); // 2nd alert fills batch
 
-        PENDING_BATCHES.remove(&fp);
+        PENDING_BATCHES.remove(&key);
+    }
+
+    /// `max_group_size = 1` is a valid config, and such a batch is full the moment it is created.
+    #[test]
+    fn test_add_to_batch_reports_ready_when_the_new_batch_is_born_full() {
+        let fp = "grouping_test_add_born_full_unique".to_string();
+        let org = "org-test-born-full";
+        PENDING_BATCHES.remove(&batch_key(org, &fp));
+        let a = make_named_alert("disk_full", &config::ider::uuid());
+
+        let admission = add_to_batch(
+            fp.clone(),
+            org.to_string(),
+            a.clone(),
+            vec![],
+            enqueue_row(&a, org),
+            3600,
+            1,
+            None,
+            None,
+        );
+
+        assert_eq!(admission, BatchAdmission::Ready);
+        let batch = get_ready_batch(org, &fp).expect("a batch born full flushes inline");
+        assert_eq!(batch.alerts.len(), 1);
+        assert!(!PENDING_BATCHES.contains_key(&batch_key(org, &fp)));
+    }
+
+    /// The fingerprint carries no org, so one shared between tenants must not share a batch.
+    #[test]
+    fn test_two_orgs_sharing_a_fingerprint_keep_separate_batches() {
+        let fp = "grouping_test_cross_org_isolation_unique".to_string();
+        let (org_a, org_b) = ("org-test-tenant-a", "org-test-tenant-b");
+        PENDING_BATCHES.remove(&batch_key(org_a, &fp));
+        PENDING_BATCHES.remove(&batch_key(org_b, &fp));
+        let a = make_named_alert("disk_full", &config::ider::uuid());
+        let b = make_named_alert("disk_full", &config::ider::uuid());
+
+        for (org, alert) in [(org_a, &a), (org_b, &b)] {
+            add_to_batch(
+                fp.clone(),
+                org.to_string(),
+                alert.clone(),
+                vec![],
+                enqueue_row(alert, org),
+                3600,
+                10,
+                None,
+                None,
+            );
+        }
+
+        let batch_a = PENDING_BATCHES
+            .get(&batch_key(org_a, &fp))
+            .map(|e| e.clone())
+            .expect("org a keeps its own batch");
+        let batch_b = PENDING_BATCHES
+            .get(&batch_key(org_b, &fp))
+            .map(|e| e.clone())
+            .expect("org b keeps its own batch");
+        assert_eq!(batch_a.org_id, org_a);
+        assert_eq!(batch_b.org_id, org_b);
+        assert_eq!(batch_a.alerts.len(), 1);
+        assert_eq!(batch_b.alerts.len(), 1);
+        assert_eq!(batch_a.alerts[0].alert.name, "disk_full");
+        assert_eq!(batch_a.alerts[0].alert.get_unique_key(), a.get_unique_key());
+        assert_eq!(batch_b.alerts[0].alert.get_unique_key(), b.get_unique_key());
+        assert_eq!(get_pending_batch_count(org_a), 1);
+        assert_eq!(get_pending_batch_count(org_b), 1);
+        for org in [org_a, org_b] {
+            assert_eq!(
+                config::metrics::ALERT_GROUPING_BATCHES_PENDING
+                    .with_label_values(&[org])
+                    .get(),
+                1
+            );
+        }
+
+        PENDING_BATCHES.remove(&batch_key(org_a, &fp));
+        PENDING_BATCHES.remove(&batch_key(org_b, &fp));
     }
 
     #[test]
     fn test_get_ready_batch_returns_none_when_not_expired() {
         let fp = "grouping_test_get_ready_not_expired_unique".to_string();
-        PENDING_BATCHES.remove(&fp);
+        let key = batch_key("org-test-get", &fp);
+        PENDING_BATCHES.remove(&key);
 
         add_to_batch(
             fp.clone(),
             "org-test-get".to_string(),
             make_alert(),
             vec![],
+            TriggerData::default(),
             3600,
             10,
             None,
             None,
         );
 
-        let batch = get_ready_batch(&fp);
+        let batch = get_ready_batch("org-test-get", &fp);
         assert!(batch.is_none()); // 3600s wait, not expired
 
-        PENDING_BATCHES.remove(&fp);
+        PENDING_BATCHES.remove(&key);
+    }
+
+    /// A `get` guard held across `remove` deadlocks the shard, so a full batch would never flush.
+    #[test]
+    fn test_get_ready_batch_takes_a_full_batch() {
+        let fp = "grouping_test_get_ready_full_unique".to_string();
+        PENDING_BATCHES.remove(&batch_key("acme", &fp));
+        let a = make_named_alert("disk_full", &config::ider::uuid());
+        let admit = || {
+            add_to_batch(
+                fp.clone(),
+                "acme".to_string(),
+                a.clone(),
+                vec![],
+                enqueue_row(&a, "acme"),
+                3600,
+                2,
+                None,
+                None,
+            )
+        };
+        assert_eq!(admit(), BatchAdmission::Queued);
+        assert_eq!(admit(), BatchAdmission::Ready);
+
+        let batch = get_ready_batch("acme", &fp).expect("a full batch is ready");
+
+        assert_eq!(batch.alerts.len(), 2);
+        assert!(!PENDING_BATCHES.contains_key(&batch_key("acme", &fp)));
+    }
+
+    /// Same deadlock on the expiry path: a ready batch means `remove` runs under the `get` guard.
+    #[test]
+    fn test_get_ready_batch_takes_an_expired_batch() {
+        let fp = "grouping_test_get_ready_expired_unique".to_string();
+        PENDING_BATCHES.remove(&batch_key("acme", &fp));
+        let a = make_named_alert("disk_full", &config::ider::uuid());
+
+        add_to_batch(
+            fp.clone(),
+            "acme".to_string(),
+            a.clone(),
+            vec![],
+            enqueue_row(&a, "acme"),
+            0,
+            10,
+            None,
+            None,
+        );
+
+        let batch = get_ready_batch("acme", &fp).expect("a batch past its wait is ready");
+
+        assert_eq!(batch.alerts.len(), 1);
+        assert!(!PENDING_BATCHES.contains_key(&batch_key("acme", &fp)));
     }
 
     #[test]
@@ -622,14 +890,15 @@ mod tests {
         let fp1 = "grouping_count_fp1_unique_org".to_string();
         let fp2 = "grouping_count_fp2_unique_org".to_string();
         let org = "org-count-unique-test";
-        PENDING_BATCHES.remove(&fp1);
-        PENDING_BATCHES.remove(&fp2);
+        PENDING_BATCHES.remove(&batch_key(org, &fp1));
+        PENDING_BATCHES.remove(&batch_key(org, &fp2));
 
         add_to_batch(
             fp1.clone(),
             org.to_string(),
             make_alert(),
             vec![],
+            TriggerData::default(),
             3600,
             10,
             None,
@@ -640,6 +909,7 @@ mod tests {
             org.to_string(),
             make_alert(),
             vec![],
+            TriggerData::default(),
             3600,
             10,
             None,
@@ -649,7 +919,353 @@ mod tests {
         let count = get_pending_batch_count(org);
         assert!(count >= 2);
 
-        PENDING_BATCHES.remove(&fp1);
-        PENDING_BATCHES.remove(&fp2);
+        PENDING_BATCHES.remove(&batch_key(org, &fp1));
+        PENDING_BATCHES.remove(&batch_key(org, &fp2));
+    }
+
+    #[test]
+    fn test_flush_rows_one_per_batched_entry() {
+        let id_a = config::ider::uuid();
+        let id_b = config::ider::uuid();
+        let a = make_named_alert("disk_full", &id_a);
+        let b = make_named_alert("cpu_hot", &id_b);
+        let mut batch = PendingBatch::new(
+            "fp_rows".to_string(),
+            "acme".to_string(),
+            a.clone(),
+            vec![],
+            enqueue_row(&a, "acme"),
+            30,
+            10,
+            None,
+            None,
+        );
+        batch.add_alert(b.clone(), vec![], enqueue_row(&b, "acme"));
+
+        let rows = flush_rows(&batch);
+
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0].key, format!("disk_full/{id_a}"));
+        assert_eq!(rows[1].key, format!("cpu_hot/{id_b}"));
+        assert!(rows.iter().all(|r| r.group_size == Some(2)));
+        assert!(rows.iter().all(|r| r.grouped == Some(true)));
+        assert!(rows.iter().all(|r| r.dedup_enabled == Some(true)));
+    }
+
+    /// `group_size` is the batch that was actually sent; the configured maximum is a ceiling.
+    #[test]
+    fn test_flush_rows_group_size_is_the_real_membership_not_the_maximum() {
+        let a = make_named_alert("disk_full", &config::ider::uuid());
+        let batch = PendingBatch::new(
+            "fp_size".to_string(),
+            "acme".to_string(),
+            a.clone(),
+            vec![],
+            enqueue_row(&a, "acme"),
+            30,
+            50,
+            None,
+            None,
+        );
+
+        let rows = flush_rows(&batch);
+
+        assert_eq!(rows[0].group_size, Some(1));
+    }
+
+    /// A batched evaluation publishes its own row, so it must carry its own scheduler fields.
+    #[test]
+    fn test_flush_rows_carry_the_held_back_evaluation_row() {
+        let a = make_named_alert("disk_full", &config::ider::uuid());
+        let batch = PendingBatch::new(
+            "fp_fields".to_string(),
+            "acme".to_string(),
+            a.clone(),
+            vec![],
+            enqueue_row(&a, "acme"),
+            30,
+            10,
+            None,
+            None,
+        );
+
+        let row = &flush_rows(&batch)[0];
+
+        assert_eq!(row.org, "acme");
+        assert_eq!(row.module, TriggerDataType::Alert);
+        assert_eq!(row._timestamp, 1_700_000_000_000_000);
+        assert_eq!(row.next_run_at, 1_700_000_300_000_000);
+        assert_eq!(row.start_time, 1_699_999_700_000_000);
+        assert_eq!(row.end_time, 1_700_000_000_000_000);
+        assert_eq!(row.retries, 2);
+        assert_eq!(row.delay_in_secs, Some(4));
+        assert_eq!(row.source_node.as_deref(), Some("node-7"));
+        assert_eq!(row.scheduler_trace_id.as_deref(), Some("eval-trace"));
+        assert_eq!(row.time_in_queue_ms, Some(11));
+    }
+
+    /// A batch that reached its destinations records the firing the evaluation carried.
+    #[test]
+    fn test_flush_rows_record_the_evaluation_status_when_unstamped() {
+        let a = make_named_alert("disk_full", &config::ider::uuid());
+        let batch = PendingBatch::new(
+            "fp_status".to_string(),
+            "acme".to_string(),
+            a.clone(),
+            vec![],
+            enqueue_row(&a, "acme"),
+            30,
+            10,
+            None,
+            None,
+        );
+
+        let rows = flush_rows(&batch);
+
+        assert_eq!(rows[0].status, RunOutcome::Firing);
+        assert_eq!(rows[0].error, None);
+    }
+
+    #[test]
+    fn test_stamp_flush_error_marks_every_member_notify_failed() {
+        let a = make_named_alert("disk_full", &config::ider::uuid());
+        let b = make_named_alert("cpu_hot", &config::ider::uuid());
+        let mut batch = PendingBatch::new(
+            "fp_fail".to_string(),
+            "acme".to_string(),
+            a.clone(),
+            vec![],
+            enqueue_row(&a, "acme"),
+            30,
+            10,
+            None,
+            None,
+        );
+        batch.add_alert(b.clone(), vec![], enqueue_row(&b, "acme"));
+        let mut rows = flush_rows(&batch);
+
+        stamp_flush_error(
+            &mut rows,
+            &GroupedSendError("Send failed: boom".to_string()),
+        );
+
+        assert_eq!(rows.len(), 2);
+        assert!(rows.iter().all(|r| r.status == RunOutcome::NotifyFailed));
+        assert!(rows.iter().all(|r| r.status.is_firing()));
+        assert!(rows.iter().all(|r| r.error.as_deref()
+            == Some("error sending notification for alert: Send failed: boom")));
+    }
+
+    /// A partial destination failure is still a delivery failure and still counts as firing.
+    #[test]
+    fn test_stamp_flush_error_records_a_partial_failure_with_its_text() {
+        let a = make_named_alert("disk_full", &config::ider::uuid());
+        let batch = PendingBatch::new(
+            "fp_partial".to_string(),
+            "acme".to_string(),
+            a.clone(),
+            vec![],
+            enqueue_row(&a, "acme"),
+            30,
+            10,
+            None,
+            None,
+        );
+        let mut rows = flush_rows(&batch);
+
+        stamp_flush_error(
+            &mut rows,
+            &GroupedSendError("Partial failure: slack 500".to_string()),
+        );
+
+        assert_eq!(rows[0].status, RunOutcome::NotifyFailed);
+        assert_eq!(
+            rows[0].error.as_deref(),
+            Some("error sending notification for alert: Partial failure: slack 500")
+        );
+    }
+
+    /// The batch map is in-memory: a row exists only once a flush has decided its delivery.
+    #[test]
+    fn test_a_pending_batch_holds_its_rows_back_until_it_is_flushed() {
+        let fp = "grouping_test_rows_held_back_unique".to_string();
+        let key = batch_key("acme", &fp);
+        PENDING_BATCHES.remove(&key);
+        let a = make_named_alert("disk_full", &config::ider::uuid());
+
+        let ready = add_to_batch(
+            fp.clone(),
+            "acme".to_string(),
+            a.clone(),
+            vec![],
+            enqueue_row(&a, "acme"),
+            3600,
+            10,
+            None,
+            None,
+        );
+
+        assert_eq!(ready, BatchAdmission::Queued);
+        assert!(get_ready_batch("acme", &fp).is_none());
+        assert_eq!(
+            PENDING_BATCHES.get(&key).unwrap().alerts[0]
+                .trigger_data
+                .key,
+            format!("disk_full/{}", a.get_unique_key())
+        );
+
+        PENDING_BATCHES.remove(&key);
+    }
+
+    /// The full-batch race: without a refusal the evaluation vanishes, unbatched and unpublished.
+    #[test]
+    fn test_add_to_batch_refuses_an_evaluation_when_the_full_batch_was_not_yet_taken() {
+        let fp = "grouping_test_refused_when_full_unique".to_string();
+        let key = batch_key("acme", &fp);
+        PENDING_BATCHES.remove(&key);
+        let a = make_named_alert("disk_full", &config::ider::uuid());
+        let admit = |alert: &Alert| {
+            add_to_batch(
+                fp.clone(),
+                "acme".to_string(),
+                alert.clone(),
+                vec![],
+                enqueue_row(alert, "acme"),
+                3600,
+                2,
+                None,
+                None,
+            )
+        };
+
+        assert_eq!(admit(&a), BatchAdmission::Queued);
+        assert_eq!(admit(&a), BatchAdmission::Ready);
+        let refused = admit(&make_named_alert("cpu_hot", &config::ider::uuid()));
+
+        assert_eq!(refused, BatchAdmission::Refused);
+        assert_eq!(PENDING_BATCHES.get(&key).unwrap().alerts.len(), 2);
+
+        PENDING_BATCHES.remove(&key);
+    }
+
+    /// A refused evaluation matched but reached no destination, so it is a firing with no attempt.
+    #[test]
+    fn test_refused_row_is_a_firing_that_attempted_no_delivery() {
+        let a = make_named_alert("disk_full", &config::ider::uuid());
+
+        let row = refused_row(&enqueue_row(&a, "acme"));
+
+        assert_eq!(row.status, RunOutcome::NotifyFailed);
+        assert!(row.status.is_firing());
+        assert_eq!(row.delivery_attempted, Some(false));
+        assert_eq!(row.grouped, Some(false));
+        assert_eq!(row.dedup_enabled, Some(true));
+        assert!(row.group_size.is_none());
+        assert!(row.error.is_some());
+    }
+
+    /// The refused evaluation publishes its OWN row, so it must keep its own scheduler fields.
+    #[test]
+    fn test_refused_row_carries_the_evaluation_it_refused() {
+        let a = make_named_alert("disk_full", &config::ider::uuid());
+
+        let row = refused_row(&enqueue_row(&a, "acme"));
+
+        assert_eq!(row.org, "acme");
+        assert_eq!(row.key, format!("disk_full/{}", a.get_unique_key()));
+        assert_eq!(row._timestamp, 1_700_000_000_000_000);
+        assert_eq!(row.next_run_at, 1_700_000_300_000_000);
+        assert_eq!(row.scheduler_trace_id.as_deref(), Some("eval-trace"));
+    }
+
+    #[test]
+    fn test_stamp_flush_delivery_records_the_attempt_on_every_member() {
+        let a = make_named_alert("disk_full", &config::ider::uuid());
+        let mut batch = PendingBatch::new(
+            "fp_attempt".to_string(),
+            "acme".to_string(),
+            a.clone(),
+            vec![],
+            enqueue_row(&a, "acme"),
+            30,
+            10,
+            None,
+            None,
+        );
+        batch.add_alert(a.clone(), vec![], enqueue_row(&a, "acme"));
+
+        for attempted in [true, false] {
+            let mut rows = flush_rows(&batch);
+            stamp_flush_delivery(&mut rows, attempted);
+            assert!(rows.iter().all(|r| r.delivery_attempted == Some(attempted)));
+            assert!(rows.iter().all(|r| r.status == RunOutcome::Firing));
+        }
+    }
+
+    /// A refusing destination must be countable, or the failure ratio has no denominator.
+    #[test]
+    fn test_stamp_flush_error_records_an_attempt_for_a_delivery_failure() {
+        let a = make_named_alert("disk_full", &config::ider::uuid());
+        let batch = PendingBatch::new(
+            "fp_err_attempt".to_string(),
+            "acme".to_string(),
+            a.clone(),
+            vec![],
+            enqueue_row(&a, "acme"),
+            30,
+            10,
+            None,
+            None,
+        );
+        let mut rows = flush_rows(&batch);
+
+        stamp_flush_error(
+            &mut rows,
+            &GroupedSendError("Send failed: boom".to_string()),
+        );
+
+        assert_eq!(rows[0].delivery_attempted, Some(true));
+    }
+
+    /// Alert Hygiene counts attempts only on firing rows, so a `Some(true)` elsewhere is lost.
+    #[test]
+    fn test_every_batched_row_stamped_as_attempted_is_a_firing_row() {
+        let a = make_named_alert("disk_full", &config::ider::uuid());
+        let batch = PendingBatch::new(
+            "fp_containment".to_string(),
+            "acme".to_string(),
+            a.clone(),
+            vec![],
+            enqueue_row(&a, "acme"),
+            30,
+            10,
+            None,
+            None,
+        );
+
+        let mut stamped: Vec<TriggerData> = Vec::new();
+        for attempted in [true, false] {
+            let mut rows = flush_rows(&batch);
+            stamp_flush_delivery(&mut rows, attempted);
+            stamped.extend(rows);
+        }
+        let mut rows = flush_rows(&batch);
+        stamp_flush_error(
+            &mut rows,
+            &GroupedSendError("Send failed: boom".to_string()),
+        );
+        stamped.extend(rows);
+        stamped.push(refused_row(&enqueue_row(&a, "acme")));
+
+        for row in &stamped {
+            assert!(row.delivery_attempted.is_some(), "{:?}", row.status);
+            if row.delivery_attempted == Some(true) {
+                assert!(
+                    row.status.is_firing(),
+                    "{:?} is not a firing row",
+                    row.status
+                );
+            }
+        }
     }
 }

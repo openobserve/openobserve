@@ -60,7 +60,7 @@ use super::{
     pipeline::{batch_execution::ExecutablePipeline, db as pipeline},
 };
 use crate::{
-    alerts::alert::AlertExt,
+    alerts::alert::{AlertError, AlertExt, NotificationOutcome},
     common::{
         infra::config::STREAM_ALERTS,
         meta::stream::{SchemaEvolution, SchemaRecords},
@@ -233,25 +233,15 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
             alert.org_id,
             alert.name
         );
-        match alert
+        let outcome = alert
             .send_notification(&trace_id, val, now, None, now, None, None, None, &[])
-            .await
-        {
+            .await;
+        record_realtime_delivery(&mut trigger_data_stream, &outcome);
+        match outcome {
             Err(e) => {
                 log::error!("Failed to send notification: {e}");
-                trigger_data_stream.status = RunOutcome::NotifyFailed;
-                trigger_data_stream.error =
-                    Some(format!("error sending notification for alert: {e}"));
             }
-            Ok(outcome) => {
-                let success_msg = outcome.success_message.trim().to_owned();
-                let error_msg = outcome.error_message.trim().to_owned();
-                if !error_msg.is_empty() {
-                    trigger_data_stream.error = Some(error_msg);
-                }
-                if !success_msg.is_empty() {
-                    trigger_data_stream.success_response = Some(success_msg);
-                }
+            Ok(_) => {
                 // enforce a minimum silence floor so a high-volume stream cannot
                 // fire (and write to the db) once per matching request
                 let silence_micros = alert.trigger_condition.effective_silence_micros();
@@ -808,6 +798,38 @@ fn partition_bucket_micros(time_level: PartitionTimeLevel) -> i64 {
     }
 }
 
+/// Alert Hygiene declines an alert whose firings are uncovered; an errored send was still tried.
+fn record_realtime_delivery(
+    trigger_data_stream: &mut TriggerData,
+    outcome: &Result<NotificationOutcome, AlertError>,
+) {
+    trigger_data_stream.delivery_attempted = Some(true);
+    match outcome {
+        Err(e) => {
+            trigger_data_stream.status = RunOutcome::NotifyFailed;
+            trigger_data_stream.error = Some(format!("error sending notification for alert: {e}"));
+        }
+        Ok(outcome) => {
+            // An alert wired to no destination reached no decision to send.
+            if outcome.nothing_to_deliver {
+                trigger_data_stream.delivery_attempted = Some(false);
+            }
+            // As on the scheduled path: an undelivered destination is a failure, not a firing.
+            if !outcome.failed.is_empty() {
+                trigger_data_stream.status = RunOutcome::NotifyFailed;
+            }
+            let success_msg = outcome.success_message.trim().to_owned();
+            let error_msg = outcome.error_message.trim().to_owned();
+            if !error_msg.is_empty() {
+                trigger_data_stream.error = Some(error_msg);
+            }
+            if !success_msg.is_empty() {
+                trigger_data_stream.success_response = Some(success_msg);
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use arrow_schema::Field;
@@ -1352,7 +1374,6 @@ mod tests {
         let result = create_log_ingestion_req(99, data);
         assert!(result.is_err());
     }
-
     #[test]
     fn test_column_accepts_only_no_op_casts() {
         assert!(column_accepts(&DataType::Utf8, &DataType::Utf8));
@@ -1442,5 +1463,122 @@ mod tests {
                 .err()
                 .expect("over the limit");
         assert!(err.to_string().contains("columns"), "{err}");
+    }
+
+    /// The realtime row is built inline in `evaluate_trigger`; only the fields the helper writes.
+    fn realtime_row() -> TriggerData {
+        TriggerData {
+            module: TriggerDataType::Alert,
+            is_realtime: true,
+            status: RunOutcome::Firing,
+            ..Default::default()
+        }
+    }
+
+    fn delivered(success: &str, error: &str) -> Result<NotificationOutcome, AlertError> {
+        Ok(NotificationOutcome {
+            succeeded: vec!["slack".to_string()],
+            failed: vec![],
+            nothing_to_deliver: false,
+            success_message: success.to_string(),
+            error_message: error.to_string(),
+        })
+    }
+
+    /// Slack landed, pagerduty did not: what `send_notification` returns as `Ok` on a partial.
+    fn partially_delivered() -> Result<NotificationOutcome, AlertError> {
+        Ok(NotificationOutcome {
+            succeeded: vec!["slack".to_string()],
+            failed: vec!["pagerduty".to_string()],
+            nothing_to_deliver: false,
+            success_message: "sent to slack".to_string(),
+            error_message: "pagerduty timed out".to_string(),
+        })
+    }
+
+    #[test]
+    fn a_realtime_send_that_reached_a_destination_is_recorded_as_attempted() {
+        let mut row = realtime_row();
+        record_realtime_delivery(&mut row, &delivered(" sent ", ""));
+        assert_eq!(row.delivery_attempted, Some(true));
+        assert_eq!(row.status, RunOutcome::Firing);
+        assert_eq!(row.success_response.as_deref(), Some("sent"));
+        assert_eq!(row.error, None);
+    }
+
+    /// Without the stamp the row is NULL-covered and the notify_failed rule declines the alert.
+    #[test]
+    fn a_realtime_send_that_failed_is_recorded_as_attempted_on_a_notify_failed_row() {
+        let mut row = realtime_row();
+        let err = Err(AlertError::SendNotificationError {
+            error_message: "http 500".to_string(),
+        });
+        record_realtime_delivery(&mut row, &err);
+        assert_eq!(row.delivery_attempted, Some(true));
+        assert_eq!(row.status, RunOutcome::NotifyFailed);
+        assert_eq!(
+            row.error.as_deref(),
+            Some("error sending notification for alert: http 500")
+        );
+    }
+
+    #[test]
+    fn a_realtime_send_with_nothing_wired_records_a_decision_rather_than_an_attempt() {
+        let mut row = realtime_row();
+        let nothing = Ok(NotificationOutcome {
+            nothing_to_deliver: true,
+            ..Default::default()
+        });
+        record_realtime_delivery(&mut row, &nothing);
+        assert_eq!(row.delivery_attempted, Some(false));
+        assert_eq!(row.status, RunOutcome::Firing);
+    }
+
+    /// A firing whose destination never got paged must not dilute the delivery-failure ratio.
+    #[test]
+    fn a_realtime_send_that_partially_failed_is_notify_failed_and_still_an_attempt() {
+        let mut row = realtime_row();
+        record_realtime_delivery(&mut row, &partially_delivered());
+        assert_eq!(row.status, RunOutcome::NotifyFailed);
+        assert_eq!(row.delivery_attempted, Some(true));
+        assert_eq!(row.error.as_deref(), Some("pagerduty timed out"));
+        assert_eq!(row.success_response.as_deref(), Some("sent to slack"));
+    }
+
+    /// The consumer scopes both `delivery_attempts` and `delivery_decisions` to firing rows.
+    #[test]
+    fn every_stamped_realtime_row_carries_a_status_that_counts_as_a_firing() {
+        for outcome in [
+            delivered("sent", ""),
+            Ok(NotificationOutcome {
+                nothing_to_deliver: true,
+                ..Default::default()
+            }),
+            partially_delivered(),
+            Err(AlertError::SendNotificationError {
+                error_message: "boom".to_string(),
+            }),
+        ] {
+            let mut row = realtime_row();
+            record_realtime_delivery(&mut row, &outcome);
+            assert!(row.delivery_attempted.is_some(), "{:?}", row.status);
+            assert!(
+                row.status.is_firing(),
+                "a delivery decision on {:?} lands in no denominator",
+                row.status
+            );
+        }
+    }
+
+    /// The flag comes from a real send, not from an outcome hand-built to match the helper.
+    #[tokio::test]
+    async fn an_alert_with_no_destination_really_reports_nothing_to_deliver_to_the_recorder() {
+        let alert = Alert::default();
+        let outcome = alert
+            .send_notification("t", &[], 0, None, 0, None, None, None, &[])
+            .await;
+        let mut row = realtime_row();
+        record_realtime_delivery(&mut row, &outcome);
+        assert_eq!(row.delivery_attempted, Some(false));
     }
 }
