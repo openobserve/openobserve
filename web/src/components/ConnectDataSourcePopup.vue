@@ -50,8 +50,11 @@ let stopOrgWatch: (() => void) | null = null;
 
 const track = (event: string, properties: Record<string, any> = {}) => {
   try {
+    // RudderStack is never identify()'d in this app, so every event is
+    // anonymous unless org/user context rides in the properties themselves.
     segment.track(event, {
       org_id: store.state.selectedOrganization?.identifier,
+      user_id: store.state.userInfo?.email,
       ...properties,
     });
   } catch {
