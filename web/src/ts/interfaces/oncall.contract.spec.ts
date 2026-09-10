@@ -145,15 +145,7 @@ const RESPONSE_EVENT_KINDS = [
 ] as const satisfies readonly ResponseEventKind[];
 const _c1: Complete<ResponseEventKind, typeof RESPONSE_EVENT_KINDS> = true;
 
-const CHANNELS = [
-  "email",
-  "sms",
-  "voice",
-  "chat",
-  "webhook",
-  "push",
-  "in_app",
-] as const satisfies readonly Channel[];
+const CHANNELS = ["email", "webhook"] as const satisfies readonly Channel[];
 const _c2: Complete<Channel, typeof CHANNELS> = true;
 
 const RESPONSE_STATES = [
@@ -167,12 +159,7 @@ const _c3: Complete<ResponseState, typeof RESPONSE_STATES> = true;
 const RESPONDER_ROLES = ["owner", "impacted"] as const satisfies readonly ResponderRole[];
 const _c4: Complete<ResponderRole, typeof RESPONDER_ROLES> = true;
 
-const SUBJECT_TYPES = [
-  "alert",
-  "incident",
-  "synthetic",
-  "anomaly",
-] as const satisfies readonly SubjectType[];
+const SUBJECT_TYPES = ["alert", "incident"] as const satisfies readonly SubjectType[];
 const _c5: Complete<SubjectType, typeof SUBJECT_TYPES> = true;
 
 const ESCALATION_TARGET_KINDS = [
@@ -196,7 +183,6 @@ const _c8: Complete<L0Mode, typeof L0_MODES> = true;
 
 const ROUTING_DECISION_KINDS = [
   "explicit",
-  "context",
   "ownership",
   "default",
   "unrouted",
@@ -220,6 +206,7 @@ const _c10: Complete<PresetInputKind, typeof PRESET_INPUT_KINDS> = true;
 const _causes: Complete<ResolutionCause, typeof RESOLUTION_CAUSES> = true;
 void [_c1, _c2, _c3, _c4, _c5, _c6, _c7, _c8, _c9, _c10, _c11, _causes];
 
+// `FinalAction` names no map below: `EscalationPolicy` carries no `final_action` field yet, so it is not a Rust enum a MIRRORED or SKIPPED entry could point at without failing the stale-entry check — `FINAL_ACTIONS`/`_c7` above still pin `PolicyFinalAction` against drift on its own.
 /** Rust enum name → the TS mirror it must equal. */
 const MIRRORED: Record<string, readonly string[]> = {
   ResponseEventKind: RESPONSE_EVENT_KINDS,
@@ -229,7 +216,6 @@ const MIRRORED: Record<string, readonly string[]> = {
   SubjectType: SUBJECT_TYPES,
   EscalationTarget: ESCALATION_TARGET_KINDS,
   RotationMode: ROTATION_MODES,
-  FinalAction: FINAL_ACTIONS,
   L0Mode: L0_MODES,
   RoutingDecision: ROUTING_DECISION_KINDS,
   PresetInputKind: PRESET_INPUT_KINDS,

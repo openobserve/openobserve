@@ -148,7 +148,7 @@ describe("OnCallReachAlarm", () => {
   /// on-call was reached, and must not open the banner on its own.
   it("ignores a failed room post", () => {
     const wrapper = render({
-      deliveries: [delivery({ channel: "chat", recipient: "#gateway" })],
+      deliveries: [delivery({ channel: "webhook", recipient: "#gateway" })],
     });
     expect(wrapper.find('[data-test="oncall-reach-alarm"]').exists()).toBe(false);
   });

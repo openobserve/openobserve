@@ -19,6 +19,7 @@ import { describe, expect, it } from "vitest";
 
 import OnCallTeamAttention from "@/components/oncall/OnCallTeamAttention.vue";
 import i18n from "@/locales";
+import { formatInZone } from "@/utils/oncall";
 import type {
   ConfigRisk,
   ConfigRisks,
@@ -385,7 +386,11 @@ describe("OnCallTeamAttention", () => {
   /// somebody has to convert before they can act on it. A warning about
   /// something happening in September is only actionable if it says September.
   it("dates a rotation collision rather than only counting down to it", async () => {
-    const at = Date.UTC(2026, 8, 10, 9, 0) * 1000;
+    // A fixed calendar date goes stale the day the clock catches up to it, so
+    // the date is derived from "now" and the expected text from the same
+    // formatter the component itself calls.
+    const at = (Date.now() + 10 * 24 * 60 * 60 * 1000) * 1000;
+    const expected = formatInZone(at, "UTC", { weekday: "short", day: "numeric", month: "short" });
     const wrapper = await open(
       render(
         risks([
@@ -404,8 +409,7 @@ describe("OnCallTeamAttention", () => {
     const evidence = wrapper.find(
       '[data-test="oncall-attention-evidence-two_rotations_resolve_to_one_person"]',
     );
-    expect(evidence.text()).toContain("Sep");
-    expect(evidence.text()).toContain("10");
+    expect(evidence.text()).toContain(expected);
     // And who it lands on: the whole finding is that ONE person holds two
     // positions, so naming them is the finding rather than decoration.
     expect(evidence.text()).toContain("bhargav@openobserve.ai");

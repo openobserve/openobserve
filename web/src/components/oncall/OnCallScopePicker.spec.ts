@@ -34,6 +34,9 @@ const stubs = {
   },
   OButton: {
     name: "OButton",
+    // inheritAttrs: false, matching the real component: otherwise the parent's
+    // @click also falls through onto the root button, firing the handler twice.
+    inheritAttrs: false,
     template: `<button :data-test="$attrs['data-test']" @click="$emit('click')"><slot /></button>`,
   },
   OIcon: { name: "OIcon", template: "<i />" },

@@ -1134,19 +1134,16 @@ describe("parseRoutingReason", () => {
     expect(parseRoutingReason(sentence)?.mechanism).toBe(mechanism);
   });
 
-  it("carries the team the context attribute asked for", () => {
-    const parsed = parseRoutingReason(
-      "routed to tm_9 by the alert's context attribute team=`Payments`",
-    );
-    expect(parsed?.mechanism).toBe("context");
-    expect(parsed?.namedTeam).toBe("Payments");
-  });
-
   /// Drift must return null so the caller prints the server's sentence rather
   /// than a half-read one.
   it("returns null when the wording is not one it knows", () => {
     expect(parseRoutingReason("matched ownership rule namespace = envoy")).toBeNull();
     expect(parseRoutingReason(null)).toBeNull();
+    // The context-attribute tier was cut (D5) — the server can never send this
+    // sentence again, so it now falls through as unrecognised wording.
+    expect(
+      parseRoutingReason("routed to tm_9 by the alert's context attribute team=`Payments`"),
+    ).toBeNull();
   });
 });
 

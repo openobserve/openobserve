@@ -467,8 +467,9 @@ describe("OnCallRouting", () => {
   /// that can fail when the prop NAMES are wrong rather than their values.
   it("opens a real dialog with a working Save and Cancel", async () => {
     const { default: ODialog } = await import("@/lib/overlay/Dialog/ODialog.vue");
+    const { default: OnCallRuleEditor } = await import("@/components/oncall/OnCallRuleEditor.vue");
     const wrapper = mount(OnCallRouting, {
-      global: { plugins: [i18n, store], stubs: { ...stubs, ODialog } },
+      global: { plugins: [i18n, store], stubs: { ...stubs, ODialog, OnCallRuleEditor } },
       attachTo: document.body,
     });
     await flushPromises();
@@ -480,7 +481,7 @@ describe("OnCallRouting", () => {
     const dialogHtml = document.body.innerHTML;
     expect(dialogHtml).toContain("o-dialog-primary-btn");
     expect(dialogHtml).toContain("o-dialog-secondary-btn");
-    expect(dialogHtml).toContain("Save rule");
+    expect(dialogHtml).toContain(">Save<");
 
     wrapper.unmount();
   });

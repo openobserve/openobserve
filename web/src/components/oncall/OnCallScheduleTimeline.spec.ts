@@ -490,7 +490,7 @@ describe("OnCallScheduleTimeline", () => {
       expect(entry.exists()).toBe(true);
       // VISIBLE text, not an aria-label on an icon: the stub renders slots
       // only, so a passing assertion here means a reader can see the words.
-      expect(entry.text()).toBe("Start from a preset");
+      expect(entry.text()).toBe("Quick start");
 
       await entry.trigger("click");
       expect(wrapper.emitted("presets")).toHaveLength(1);

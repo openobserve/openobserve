@@ -336,10 +336,10 @@ describe("OnCallResponseDetail", () => {
     expect(wrapper.findComponent({ name: "OnCallAboutPage" }).props("subjectStream")).toBe(null);
   });
 
-  // A synthetic subject names no alert, so nothing is fetched for it.
+  // An incident subject names no alert, so nothing is fetched for it.
   it("does not fetch an alert for a subject that is not one", async () => {
     await renderWith({
-      subject: { subject_type: "synthetic", source_id: "sy_login", firing: 1 },
+      subject: { subject_type: "incident", source_id: "inc_login", firing: 1 },
     });
 
     expect(alerts.get_by_alert_id).not.toHaveBeenCalled();

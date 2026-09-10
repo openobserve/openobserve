@@ -543,16 +543,15 @@ describe("OnCallResponses", () => {
       expect(wrapper.find('[data-test^="oncall-row-snooze-"]').exists()).toBe(false);
     });
 
-    /// The channels are the policy's — what WOULD be used — so a channel with
-    /// no provider behind it has to be distinguishable from one that sends.
+    /// The channels shown are the policy's — what WOULD be used, not what happened.
     it("shows the channels the page would go out on", async () => {
       service.getPolicy.mockResolvedValue({
-        data: { rungs: [{ priority: 1, steps: [{}, {}], channels: ["email", "sms"] }] },
+        data: { rungs: [{ priority: 1, steps: [{}, {}], channels: ["email", "webhook"] }] },
       } as any);
       const wrapper = await withPages([page({ priority: 1 })]);
 
       expect(wrapper.find('[data-test$="-email"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test$="-sms"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test$="-webhook"]').exists()).toBe(true);
     });
   });
 

@@ -53,10 +53,34 @@ const policy: OnCallPolicy = {
   ],
 };
 
+// OTable owns sort/virtualization/DOM structure; stubbing it to a plain
+// per-row list lets these tests exercise this component's own row data and
+// cell slots (order, tagging, formatting) rather than OTable's internals.
+const stubs = {
+  OTable: {
+    name: "OTable",
+    props: ["data", "columns", "loading"],
+    emits: ["row-click"],
+    template: `<div>
+      <template v-if="(data || []).length">
+        <div
+          v-for="row in data"
+          :key="row.id"
+          :data-test="'oncall-recent-pages-row-' + row.id"
+          @click="$emit('row-click', row)"
+        >
+          <slot v-for="c in (columns || [])" :key="c.id" :name="'cell-' + c.id" :row="row" :value="row[c.accessorKey]" />
+        </div>
+      </template>
+      <slot v-else name="empty" />
+    </div>`,
+  },
+};
+
 function render(pages: OnCallResponse[], props: Record<string, unknown> = {}) {
   return mount(OnCallRecentPages, {
     props: { pages, policy, windowDays: 7, ...props },
-    global: { plugins: [i18n] },
+    global: { plugins: [i18n], stubs },
   });
 }
 
@@ -135,6 +159,6 @@ describe("OnCallRecentPages", () => {
   });
 
   it("shows the empty state rather than a bare card when nothing fired", () => {
-    expect(render([]).find('[data-test="oncall-recent-pages-empty"]').exists()).toBe(true);
+    expect(render([]).find('[data-test="o2-empty-state"]').exists()).toBe(true);
   });
 });

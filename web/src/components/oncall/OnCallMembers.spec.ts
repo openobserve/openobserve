@@ -347,7 +347,7 @@ describe("OnCallMembers", () => {
               would_a_page_land: true,
               channels: [
                 { channel: "email", deliverable: true, configured_but_unverified: false },
-                { channel: "sms", deliverable: false, configured_but_unverified: true },
+                { channel: "webhook", deliverable: true, configured_but_unverified: false },
               ],
             },
           ],
@@ -356,7 +356,7 @@ describe("OnCallMembers", () => {
       await flushPromises();
 
       expect(wrapper.find('[data-test="oncall-channel-ana@o2.ai-email"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="oncall-channel-ana@o2.ai-sms"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="oncall-channel-ana@o2.ai-webhook"]').exists()).toBe(true);
     });
 
     /// A failed schedule fetch must cost the shift column, not the table.

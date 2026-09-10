@@ -51,6 +51,7 @@ function render(
       responseId: "resp-1",
       state,
       totalRungs,
+      progressLoaded: true,
       progress: progress && {
         fired: [],
         next_targets: [],

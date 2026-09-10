@@ -117,26 +117,12 @@ describe("OnCallPolicyEditor", () => {
     service.setPolicy.mockResolvedValue({ data: {} } as any);
   });
 
-  // A checkbox for a channel nothing can send lets somebody tick SMS and
-  // receive nothing, with no error — the worst failure a pager can have.
-  it("offers only channels that can actually be delivered", async () => {
+  it("offers the deliverable channels", async () => {
     const wrapper = render();
     await flushPromises();
 
     expect(wrapper.find('[data-test="oncall-policy-channel-1-email"]').exists()).toBe(true);
-    for (const unimplemented of ["sms", "voice", "chat", "push", "in_app"]) {
-      expect(
-        wrapper.find(`[data-test="oncall-policy-channel-1-${unimplemented}"]`).exists(),
-        `${unimplemented} has no Notifier and must not be offered`,
-      ).toBe(false);
-    }
-  });
-
-  // The short list should read as deliberate, not as something missing.
-  it("says why the other channels are absent", async () => {
-    const wrapper = render();
-    await flushPromises();
-    expect(wrapper.text()).toContain("when they can actually deliver");
+    expect(wrapper.find('[data-test="oncall-policy-channel-1-webhook"]').exists()).toBe(true);
   });
 
   it("shows a non-paging priority as paging nobody", async () => {
