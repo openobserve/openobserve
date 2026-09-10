@@ -318,7 +318,9 @@ const onFolderChange = (folderId: string) => {
   router.push({
     query: { ...route.query, org_identifier: orgId.value, folder: folderId },
   });
-  getWorkflows();
+  // Pass the folder explicitly: router.push resolves asynchronously, so
+  // reading it back off the route here would still yield the previous folder.
+  getWorkflows(folderId);
 };
 const store = useStore();
 
@@ -435,11 +437,14 @@ const columns = computed(() => [
 ]);
 const otableColumns = computed(() => columns.value);
 
-const getWorkflows = async () => {
+const getWorkflows = async (folderId?: string) => {
   loading.value = true;
   forbidden.value = false;
   try {
-    const response = await workflowService.listWorkflows(orgId.value, activeFolderId.value);
+    const response = await workflowService.listWorkflows(
+      orgId.value,
+      folderId ?? activeFolderId.value,
+    );
     // list handler returns a bare array of Workflow.
     const list = Array.isArray(response.data) ? response.data : (response.data?.list ?? []);
     workflows.value = list.map((wf: any, index: number) => ({
