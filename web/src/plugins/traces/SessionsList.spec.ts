@@ -626,12 +626,13 @@ describe("SessionsList — row click", () => {
   });
 });
 
-describe("SessionsList — OSS builds (config.isEnterprise !== 'true')", () => {
+describe("SessionsList — OSS builds (neither isEnterprise nor isCloud is 'true')", () => {
   afterEach(() => {
     // Every other describe block in this file assumes enterprise mode (see
     // the module-level @/aws-exports mock) — restore it so later tests aren't
     // affected by mutating the shared mock object here.
     config.isEnterprise = "true";
+    config.isCloud = "false";
   });
 
   it("hides the Stream/Agent toggle — Agent mode needs the enterprise-only agent-mapping API", async () => {
@@ -648,5 +649,20 @@ describe("SessionsList — OSS builds (config.isEnterprise !== 'true')", () => {
     // With no toggle, the stream selector is always visible.
     expect(wrapper.find("[data-test='sessions-list-stream-selector']").exists()).toBe(true);
     expect(wrapper.findComponent(AgentScopeCascade).exists()).toBe(false);
+  });
+
+  it("still shows the toggle on a cloud build (isCloud true) even with isEnterprise false — cloud registers the same enterprise route/backend", async () => {
+    config.isEnterprise = "false";
+    config.isCloud = "true";
+    const wrapper = await mountComponent();
+    expect(wrapper.find("[data-test='sessions-list-filter-mode']").exists()).toBe(true);
+  });
+
+  it("defaults to Agent mode on a cloud build, same as enterprise", async () => {
+    config.isEnterprise = "false";
+    config.isCloud = "true";
+    const wrapper = await mountComponent();
+    await flushPromises();
+    expect(wrapper.findComponent(AgentScopeCascade).exists()).toBe(true);
   });
 });

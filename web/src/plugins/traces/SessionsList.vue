@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       count-data-test="sessions-stream-count"
       all-agents
       show-stream-skeleton
-      :show-agent-toggle="config.isEnterprise == 'true'"
+      :show-agent-toggle="isEnterpriseOrCloud"
       :labels="{
         agent: t('traces.sessionsList.agent'),
         stream: t('traces.sessionsList.stream'),
@@ -294,13 +294,18 @@ const MODE_LS_KEY = "sessionsList_filterMode";
 const AGENT_LS_KEY = "sessionsList_agentFilter";
 const ENV_LS_KEY = "sessionsList_envFilter";
 const VERSION_LS_KEY = "sessionsList_versionFilter";
+// Cloud registers the SAME enterprise route tree and backend as an enterprise
+// build (see router/index.ts's userCloudRoutes() picked for isCloud too) — only
+// a true OSS build lacks the agent-mapping API this gates. Matches the
+// predicate already used for this exact purpose in Index.vue/SessionsPage.vue.
+const isEnterpriseOrCloud = config.isEnterprise == "true" || config.isCloud == "true";
 // Default scope is ALWAYS "agent" — every AI page lands on Agent for consistency.
 // Only an explicit `?type=stream` URL param overrides it (a stale saved
 // preference must not silently land on Stream). Agent mode calls the
 // enterprise-only agent-mapping API, so OSS is pinned to Stream regardless of
 // the URL/localStorage — there's no toggle to reach Agent from anyway.
 const filterMode = ref<"stream" | "agent">(
-  config.isEnterprise !== "true" ? "stream" : urlType === "stream" ? "stream" : "agent",
+  !isEnterpriseOrCloud ? "stream" : urlType === "stream" ? "stream" : "agent",
 );
 // `agents` / `agentsLoaded` are module-scoped (see useSessions) so the agent
 // picker keeps its options — and stays off its skeleton — across a remount.
