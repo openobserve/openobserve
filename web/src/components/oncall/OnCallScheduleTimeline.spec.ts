@@ -32,7 +32,7 @@ const stubs = {
     // `aria-label` and `data-test` fall through; `icon-left` is a prop, so the
     // stub has to publish it for a test to tell a labelled button from one
     // carrying only an icon.
-    template: "<button :data-icon=\"iconLeft\" @click=\"$emit('click')\"><slot /></button>",
+    template: '<button :data-icon="iconLeft" @click="$emit(\'click\')"><slot /></button>',
   },
   OScheduleTimeline: {
     name: "OScheduleTimeline",
@@ -116,7 +116,10 @@ describe("OnCallScheduleTimeline", () => {
   it("draws one lane per rotation", () => {
     const wrapper = render({
       rotations: [rotation("Primary"), rotation("Secondary")],
-      segments: [seg(), seg({ rotation_id: rid("Secondary"), rotation: "Secondary", user_email: "bob@o2.ai" })],
+      segments: [
+        seg(),
+        seg({ rotation_id: rid("Secondary"), rotation: "Secondary", user_email: "bob@o2.ai" }),
+      ],
     });
     // Keyed on the ROTATION ID. A name is renameable and two rotations may
     // share one, so it cannot key a lane.
@@ -161,7 +164,10 @@ describe("OnCallScheduleTimeline", () => {
   it("gives two rotations two different colours", () => {
     const wrapper = render({
       rotations: [rotation("Primary"), rotation("Secondary")],
-      segments: [seg(), seg({ rotation_id: rid("Secondary"), rotation: "Secondary", user_email: "bob@o2.ai" })],
+      segments: [
+        seg(),
+        seg({ rotation_id: rid("Secondary"), rotation: "Secondary", user_email: "bob@o2.ai" }),
+      ],
     });
     const [primary, secondary] = tracksOf(wrapper);
     expect(primary.bands[0].tone).not.toBe(secondary.bands[0].tone);
@@ -441,9 +447,7 @@ describe("OnCallScheduleTimeline", () => {
   /// The hour alone does not say WHICH column the line is standing in, and on
   /// a fortnight view that is the only thing the marker is there to answer.
   it("stamps the now marker with a date as well as a time", () => {
-    const label = String(
-      render().findComponent({ name: "OScheduleTimeline" }).props("nowLabel"),
-    );
+    const label = String(render().findComponent({ name: "OScheduleTimeline" }).props("nowLabel"));
     expect(label).toMatch(/\d/);
     // A month name, not just "09:59".
     expect(label).toMatch(/[A-Za-z]{3}/);

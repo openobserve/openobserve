@@ -371,7 +371,8 @@ const transportMissing = computed(
 
 const sorted = computed<ConfigRisk[]>(() =>
   [...(props.risks?.risks ?? [])].sort(
-    (a, b) => BUCKET_ORDER.indexOf(bucketFor(a.severity)) - BUCKET_ORDER.indexOf(bucketFor(b.severity)),
+    (a, b) =>
+      BUCKET_ORDER.indexOf(bucketFor(a.severity)) - BUCKET_ORDER.indexOf(bucketFor(b.severity)),
   ),
 );
 
@@ -495,7 +496,13 @@ const rows = computed<AttentionRow[]>(() => {
   // Distinct people, in the order the server named them: the same person on
   // three ladders is one person who cannot be paged.
   const who = [...new Set(collapsed.map((risk) => risk.user_email).filter(Boolean))] as string[];
-  const evidence: I18nText[] = [t("oncall.attentionPeopleAffected", { count: who.length, names: raw(who.join(", ")) }, who.length)];
+  const evidence: I18nText[] = [
+    t(
+      "oncall.attentionPeopleAffected",
+      { count: who.length, names: raw(who.join(", ")) },
+      who.length,
+    ),
+  ];
   const sent = pagesInWindow.value;
   if (sent) evidence.push(sent);
 

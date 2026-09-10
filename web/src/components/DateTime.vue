@@ -104,7 +104,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTabPanel v-if="!disableRelative" name="relative">
               <div class="date-time-table relative flex flex-col">
                 <div class="border-border-default border-b px-3 py-2">
-                  <OSearchInput v-model="relativeSearchTerm" data-test="date-time-relative-search" />
+                  <OSearchInput
+                    v-model="relativeSearchTerm"
+                    data-test="date-time-relative-search"
+                  />
                 </div>
                 <div
                   v-if="filteredRelativePeriods.length === 0"

@@ -146,8 +146,8 @@ describe("OnCallL0Editor", () => {
   it("seeds from the engine defaults when the stored policy has no block", () => {
     const wrapper = render(null);
     expect(wrapper.findComponent('[data-test="oncall-l0-budget"]').props("modelValue")).toBe(90);
-    expect(
-      wrapper.findComponent('[data-test="oncall-l0-mode-p2"]').props("modelValue"),
-    ).toBe("gate");
+    expect(wrapper.findComponent('[data-test="oncall-l0-mode-p2"]').props("modelValue")).toBe(
+      "gate",
+    );
   });
 });

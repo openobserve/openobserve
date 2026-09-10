@@ -148,7 +148,10 @@ const barVariantClass = computed(() => {
            which reads as the icon sitting a hair high beside its own label.
            `min-h-5` is that line box, so a taller slotted icon still grows the
            wrapper and keeps its old top alignment instead of overflowing. -->
-      <div v-if="showIconArea" :class="['flex shrink-0', bar ? 'items-center' : 'min-h-5 items-center']">
+      <div
+        v-if="showIconArea"
+        :class="['flex shrink-0', bar ? 'items-center' : 'min-h-5 items-center']"
+      >
         <slot name="icon">
           <OIcon :name="icon" size="sm" />
         </slot>

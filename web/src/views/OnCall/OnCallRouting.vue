@@ -399,7 +399,6 @@ const dialogTitle = computed<I18nText>(() => {
   return editingRule.value ? t("oncall.editOwnershipRule") : t("oncall.addOwnershipRule");
 });
 
-
 function failed(err: unknown, fallback: Parameters<typeof toast>[0]["message"]) {
   const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
   toast({ variant: "error", message: raw(message) || fallback });

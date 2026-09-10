@@ -158,10 +158,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { resolvableTimezones, SHIFT_PRESETS } from "@/utils/oncall";
 import OnCallRotationPreview from "./OnCallRotationPreview.vue";
 
-import {
-  makeOnCallTeamSchema,
-  type OnCallTeamFormValues,
-} from "./OnCallTeamForm.schema";
+import { makeOnCallTeamSchema, type OnCallTeamFormValues } from "./OnCallTeamForm.schema";
 
 const FORM_ID = "oncall-team-form";
 
@@ -228,10 +225,7 @@ function nextMondayAt10(): string {
 
 const defaultValues = computed<OnCallTeamFormValues>(() => ({
   name: props.team?.name ?? "",
-  timezone:
-    props.team?.timezone ??
-    Intl.DateTimeFormat().resolvedOptions().timeZone ??
-    "UTC",
+  timezone: props.team?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC",
   description: props.team?.description ?? "",
   members: [],
   shift_micros: MICROS_PER_WEEK,

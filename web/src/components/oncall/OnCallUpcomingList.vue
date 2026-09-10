@@ -41,7 +41,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template v-for="(entry, entryIndex) in shift.entries" :key="entry.ruleName + entry.member">
           <span v-if="entryIndex" class="text-text-secondary text-xs">{{ raw("·") }}</span>
-          <OText v-if="rules.length > 1" variant="label" class="shrink-0">{{ raw(entry.ruleName) }}</OText>
+          <OText v-if="rules.length > 1" variant="label" class="shrink-0">{{
+            raw(entry.ruleName)
+          }}</OText>
           <OUserCell :value="entry.member" />
         </template>
         <OText variant="meta" class="ms-auto">{{ raw(shiftRange(shift)) }}</OText>

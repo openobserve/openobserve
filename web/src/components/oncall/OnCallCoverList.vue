@@ -243,9 +243,7 @@ async function fetchCovers() {
     const all = props.rotationId
       ? (res.data ?? []).filter((cover) => cover.rotation_id === props.rotationId)
       : (res.data ?? []);
-    covers.value = [...all].sort(
-      (a, b) => b.created_at - a.created_at || b.id.localeCompare(a.id),
-    );
+    covers.value = [...all].sort((a, b) => b.created_at - a.created_at || b.id.localeCompare(a.id));
   } catch {
     // A cover list that cannot load is not worth an error over the calendar it
     // sits under — the calendar still answers who is on call, which is the
@@ -282,11 +280,9 @@ async function removeCover() {
   }
 }
 
-watch(
-  () => [props.teamId, props.window?.from, props.window?.to, props.rotationId],
-  fetchCovers,
-  { immediate: true },
-);
+watch(() => [props.teamId, props.window?.from, props.window?.to, props.rotationId], fetchCovers, {
+  immediate: true,
+});
 
 defineExpose({ refresh: fetchCovers });
 </script>

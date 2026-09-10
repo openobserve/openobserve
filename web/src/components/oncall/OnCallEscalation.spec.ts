@@ -85,9 +85,7 @@ describe("OnCallEscalation", () => {
       next_targets: ["the on-call"],
       next_at: (Date.now() - 5_000) * 1000,
     });
-    expect(wrapper.find('[data-test="oncall-escalation-end"]').text()).toContain(
-      "any moment",
-    );
+    expect(wrapper.find('[data-test="oncall-escalation-end"]').text()).toContain("any moment");
   });
 
   it("lists the rungs already sent, with who they reached", () => {
@@ -98,9 +96,7 @@ describe("OnCallEscalation", () => {
       ],
     });
 
-    expect(wrapper.find('[data-test="oncall-escalation-rung-0"]').text()).toContain(
-      "ana@o2.ai",
-    );
+    expect(wrapper.find('[data-test="oncall-escalation-rung-0"]').text()).toContain("ana@o2.ai");
     const second = wrapper.find('[data-test="oncall-escalation-rung-300000000"]');
     expect(second.text()).toContain("bob@o2.ai");
     // Levels, not delays: "L2" is how a policy is talked about, and the
@@ -147,22 +143,32 @@ describe("OnCallEscalation", () => {
   /// whole-rung-lost marker, scoped to the CURRENT run: an earlier run's lost
   /// rung is history, not a retry in flight.
   it("marks a fired rung the transport lost, from the timeline", () => {
-    const wrapper = render(
-      { fired: [{ after_micros: 0, at: 1, targets: ["ana@o2.ai"] }] },
-      [{ kind: "page", at: 1, actor: "o2-engine", body: "paged ana", rung_micros: 0, delivered: false }],
-    );
+    const wrapper = render({ fired: [{ after_micros: 0, at: 1, targets: ["ana@o2.ai"] }] }, [
+      {
+        kind: "page",
+        at: 1,
+        actor: "o2-engine",
+        body: "paged ana",
+        rung_micros: 0,
+        delivered: false,
+      },
+    ]);
     expect(wrapper.find('[data-test="oncall-escalation-rung-lost-0"]').exists()).toBe(true);
   });
 
   it("does not carry an old run's lost rung into the current one", () => {
-    const wrapper = render(
-      { fired: [{ after_micros: 0, at: 9, targets: ["bo@o2.ai"] }] },
-      [
-        // run 1 lost its first rung; the handoff started run 2, which landed.
-        { kind: "page", at: 1, actor: "o2-engine", body: "paged ana", rung_micros: 0, delivered: false },
-        { kind: "page", at: 9, actor: "o2-engine", body: "paged bo", rung_micros: 0, ladder_run: 2 },
-      ],
-    );
+    const wrapper = render({ fired: [{ after_micros: 0, at: 9, targets: ["bo@o2.ai"] }] }, [
+      // run 1 lost its first rung; the handoff started run 2, which landed.
+      {
+        kind: "page",
+        at: 1,
+        actor: "o2-engine",
+        body: "paged ana",
+        rung_micros: 0,
+        delivered: false,
+      },
+      { kind: "page", at: 9, actor: "o2-engine", body: "paged bo", rung_micros: 0, ladder_run: 2 },
+    ]);
     expect(wrapper.find('[data-test="oncall-escalation-rung-lost-0"]').exists()).toBe(false);
   });
 
@@ -182,19 +188,43 @@ describe("OnCallEscalation", () => {
       },
       [
         // Rung 0: matched nobody at all — page line only, no delivery rows.
-        { kind: "page", at: 1, actor: "o2-engine", body: "nobody matched on_call_now", rung_micros: 0 },
+        {
+          kind: "page",
+          at: 1,
+          actor: "o2-engine",
+          body: "nobody matched on_call_now",
+          rung_micros: 0,
+        },
         // Rung +5m: had a person, every send failed — the lost marker.
-        { kind: "page", at: 2, actor: "o2-engine", body: "could not reach bo@o2.ai", rung_micros: 300_000_000, delivered: false },
+        {
+          kind: "page",
+          at: 2,
+          actor: "o2-engine",
+          body: "could not reach bo@o2.ai",
+          rung_micros: 300_000_000,
+          delivered: false,
+        },
       ],
       "owner",
       [
-        { kind: "delivery", at: 2, actor: "o2-engine", body: "email to bo failed", rung_micros: 300_000_000, recipient: "bo@o2.ai", channel: "email", delivered: false },
+        {
+          kind: "delivery",
+          at: 2,
+          actor: "o2-engine",
+          body: "email to bo failed",
+          rung_micros: 300_000_000,
+          recipient: "bo@o2.ai",
+          channel: "email",
+          delivered: false,
+        },
       ],
     );
     expect(wrapper.find('[data-test="oncall-escalation-rung-empty-0"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="oncall-escalation-rung-lost-0"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="oncall-escalation-rung-lost-300000000"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="oncall-escalation-rung-empty-300000000"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="oncall-escalation-rung-empty-300000000"]').exists()).toBe(
+      false,
+    );
   });
 
   /// A rung that reached people writes delivery rows, so it earns neither tag.
@@ -224,7 +254,16 @@ describe("OnCallEscalation", () => {
       [{ kind: "page", at: 1, actor: "o2-engine", body: "paged ana@o2.ai", rung_micros: 0 }],
       "owner",
       [
-        { kind: "delivery", at: 1, actor: "o2-engine", body: "email delivered to ana", rung_micros: 0, recipient: "ana@o2.ai", channel: "email", delivered: true },
+        {
+          kind: "delivery",
+          at: 1,
+          actor: "o2-engine",
+          body: "email delivered to ana",
+          rung_micros: 0,
+          recipient: "ana@o2.ai",
+          channel: "email",
+          delivered: true,
+        },
       ],
     );
     expect(wrapper.find('[data-test="oncall-escalation-rung-empty-0"]').exists()).toBe(false);
@@ -239,13 +278,21 @@ describe("OnCallEscalation", () => {
       [{ kind: "page", at: 1, actor: "o2-engine", body: "paged ana@o2.ai", rung_micros: 0 }],
       "owner",
       [
-        { kind: "delivery", at: 9, actor: "o2-engine", body: "email to bo", rung_micros: 300_000_000, recipient: "bo@o2.ai", channel: "email", delivered: true },
+        {
+          kind: "delivery",
+          at: 9,
+          actor: "o2-engine",
+          body: "email to bo",
+          rung_micros: 300_000_000,
+          recipient: "bo@o2.ai",
+          channel: "email",
+          delivered: true,
+        },
       ],
       120,
     );
     expect(wrapper.find('[data-test="oncall-escalation-rung-empty-0"]').exists()).toBe(false);
   });
-
 
   /// A repeating policy fires the same rung five times. Five near-identical
   /// lines bury the fact worth reading — that the whole repeat reached nobody
@@ -262,9 +309,30 @@ describe("OnCallEscalation", () => {
         ],
       },
       [
-        { kind: "page", at: 1, actor: "o2-engine", body: "paged", rung_micros: 10 * minute, delivered: false },
-        { kind: "page", at: 2, actor: "o2-engine", body: "paged", rung_micros: 20 * minute, delivered: false },
-        { kind: "page", at: 3, actor: "o2-engine", body: "paged", rung_micros: 30 * minute, delivered: false },
+        {
+          kind: "page",
+          at: 1,
+          actor: "o2-engine",
+          body: "paged",
+          rung_micros: 10 * minute,
+          delivered: false,
+        },
+        {
+          kind: "page",
+          at: 2,
+          actor: "o2-engine",
+          body: "paged",
+          rung_micros: 20 * minute,
+          delivered: false,
+        },
+        {
+          kind: "page",
+          at: 3,
+          actor: "o2-engine",
+          body: "paged",
+          rung_micros: 30 * minute,
+          delivered: false,
+        },
       ],
     );
 
@@ -290,7 +358,14 @@ describe("OnCallEscalation", () => {
         ],
       },
       [
-        { kind: "page", at: 1, actor: "o2-engine", body: "paged", rung_micros: 0, delivered: false },
+        {
+          kind: "page",
+          at: 1,
+          actor: "o2-engine",
+          body: "paged",
+          rung_micros: 0,
+          delivered: false,
+        },
         { kind: "page", at: 2, actor: "o2-engine", body: "paged", rung_micros: 10 * minute },
       ],
     );
@@ -313,9 +388,7 @@ describe("OnCallEscalation", () => {
       },
       global: { plugins: [i18n], stubs },
     });
-    expect(wrapper.find('[data-test="oncall-escalation-end"]').text()).toContain(
-      "default team",
-    );
+    expect(wrapper.find('[data-test="oncall-escalation-end"]').text()).toContain("default team");
   });
 
   /// The rail offers the edit only when the caller says where it goes; the

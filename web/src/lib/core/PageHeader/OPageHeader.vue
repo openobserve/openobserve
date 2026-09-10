@@ -136,7 +136,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <div v-if="hasActions" class="flex shrink-0 items-center gap-2 max-sm:w-full max-sm:flex-wrap">
+      <div
+        v-if="hasActions"
+        class="flex shrink-0 items-center gap-2 max-sm:w-full max-sm:flex-wrap"
+      >
         <slot name="actions" />
       </div>
     </div>

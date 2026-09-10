@@ -336,10 +336,7 @@ describe("groupNavLinks", () => {
   it("keeps SLOs a plain link when Alerts and Incidents are hidden", () => {
     expect(
       keysWithoutInfra(groupNavLinks([link("home"), link("sloList")], undefined, oncallOff)),
-    ).toEqual([
-      "link:home",
-      "link:sloList",
-    ]);
+    ).toEqual(["link:home", "link:sloList"]);
   });
 
   /// With on-call ON, SLOs is no longer alone: On-Call gives the tile its

@@ -91,9 +91,7 @@ const shiftMicros = form.useStore(
   (s: any) => (s.values?.shift_micros ?? MICROS_PER_WEEK) as number,
 );
 const firstHandover = form.useStore((s: any) => (s.values?.first_handover ?? "") as string);
-const wantSecondary = form.useStore(
-  (s: any) => (s.values?.create_secondary ?? true) as boolean,
-);
+const wantSecondary = form.useStore((s: any) => (s.values?.create_secondary ?? true) as boolean);
 
 /// Only worth a second column when there is somebody else to be in it. On a
 /// one-person roster the two rotations resolve to the same person, which is the

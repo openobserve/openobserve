@@ -95,9 +95,7 @@ const commentTextModel = computed({
   set: (value: string) => emit("update:commentText", value),
 });
 
-const currentUserId = computed(
-  () => store.state.userInfo?.email?.split("@")[0] || "User",
-);
+const currentUserId = computed(() => store.state.userInfo?.email?.split("@")[0] || "User");
 
 const HUMAN_KINDS: ResponseEventKind[] = ["ack", "handoff", "note"];
 

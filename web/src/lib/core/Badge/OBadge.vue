@@ -323,7 +323,7 @@ function handleRemove(e: MouseEvent): void {
       :disabled="disabled || undefined"
       :aria-label="removeLabel ?? t('common.remove')"
       :class="[
-        '-me-0.5 ms-0.5 inline-flex shrink-0 cursor-pointer items-center justify-center',
+        'ms-0.5 -me-0.5 inline-flex shrink-0 cursor-pointer items-center justify-center',
         'rounded-full p-0.5 opacity-70',
         'hover:bg-current/15 hover:opacity-100',
         'focus-visible:ring-badge-focus-ring focus-visible:ring-2 focus-visible:outline-none',

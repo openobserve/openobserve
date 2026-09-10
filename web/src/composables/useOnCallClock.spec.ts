@@ -4,11 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { defineComponent, h } from "vue";
 import { mount } from "@vue/test-utils";
 
-import {
-  onCallClockRunning,
-  onCallClockSubscribers,
-  useOnCallClock,
-} from "./useOnCallClock";
+import { onCallClockRunning, onCallClockSubscribers, useOnCallClock } from "./useOnCallClock";
 
 /** A component whose only job is to hold a subscription for a while. */
 const Consumer = defineComponent({

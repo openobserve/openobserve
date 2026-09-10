@@ -229,8 +229,7 @@ describe("OScheduleTimeline", () => {
       attachTo: document.body,
     });
     const plot = w.find("[data-test='o2-schedule-timeline'] > div");
-    plot.element.getBoundingClientRect = () =>
-      ({ left: 0, right: 200, width: 200 }) as DOMRect;
+    plot.element.getBoundingClientRect = () => ({ left: 0, right: 200, width: 200 }) as DOMRect;
 
     await plot.trigger("mousemove", { clientX: 50 });
     expect(w.emitted("hover")!.at(-1)).toEqual([0.25]);
@@ -248,8 +247,7 @@ describe("OScheduleTimeline", () => {
     expect(w.find("[data-test='o2-schedule-timeline-hover']").exists()).toBe(false);
 
     const plot = w.find("[data-test='o2-schedule-timeline'] > div");
-    plot.element.getBoundingClientRect = () =>
-      ({ left: 0, right: 200, width: 200 }) as DOMRect;
+    plot.element.getBoundingClientRect = () => ({ left: 0, right: 200, width: 200 }) as DOMRect;
     await plot.trigger("mousemove", { clientX: 100 });
 
     expect(w.find("[data-test='o2-schedule-timeline-hover']").exists()).toBe(true);

@@ -46,10 +46,7 @@ describe("oncall service — the request shapes the server actually accepts", ()
     it("sends a body, so the request carries a JSON content type", () => {
       oncallService.escalateNow({ org_identifier: "default", response_id: "resp_1" });
 
-      expect(client.post).toHaveBeenCalledWith(
-        "/api/default/oncall/responses/resp_1/escalate",
-        {},
-      );
+      expect(client.post).toHaveBeenCalledWith("/api/default/oncall/responses/resp_1/escalate", {});
     });
 
     it("carries the note when one is given", () => {

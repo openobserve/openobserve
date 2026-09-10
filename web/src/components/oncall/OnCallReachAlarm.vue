@@ -85,11 +85,7 @@ import { computed } from "vue";
 
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
-import type {
-  DeliveryRecord,
-  EscalationProgress,
-  ResponseState,
-} from "@/ts/interfaces/oncall";
+import type { DeliveryRecord, EscalationProgress, ResponseState } from "@/ts/interfaces/oncall";
 import { useI18nTyped } from "@/types/i18n";
 import { useOnCallClock } from "@/composables/useOnCallClock";
 import { formatMicrosDuration } from "@/utils/formatters";

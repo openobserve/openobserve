@@ -59,7 +59,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Catching this while somebody is still looking at the rotation is the
          entire value; catching it at 3am is not. -->
-    <p v-for="clash in awayClashesFor(rule)" :key="clash.id" class="text-status-warning-text text-xs">
+    <p
+      v-for="clash in awayClashesFor(rule)"
+      :key="clash.id"
+      class="text-status-warning-text text-xs"
+    >
       {{
         t("oncall.rotationMemberAway", {
           who: raw(clash.user_email),
@@ -73,7 +77,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          so they sit on one row rather than reading as two unrelated
          questions. -->
     <div class="grid gap-3 sm:grid-cols-2">
-      <OSelect v-model="rule.shift_micros" :label="t('oncall.shiftLength')" :options="shiftOptions" />
+      <OSelect
+        v-model="rule.shift_micros"
+        :label="t('oncall.shiftLength')"
+        :options="shiftOptions"
+      />
 
       <!-- Without this the anchor was silently "now", so a rotation created
            at 14:32 handed over at 14:32 forever. -->
@@ -151,7 +159,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <div class="flex">
-            <OButton variant="outline" size="sm-action" icon-left="add" @click="addRestriction(rule)">
+            <OButton
+              variant="outline"
+              size="sm-action"
+              icon-left="add"
+              @click="addRestriction(rule)"
+            >
               {{ t("oncall.rotationRestrictionAdd") }}
             </OButton>
           </div>

@@ -349,9 +349,7 @@ describe("OnCallCoverForm — swapping", () => {
     await pick(wrapper, 0, 0);
     await pick(wrapper, 1, 1);
 
-    expect(wrapper.find('[data-test="oncall-swap-problem"]').text()).toContain(
-      "same rotation",
-    );
+    expect(wrapper.find('[data-test="oncall-swap-problem"]').text()).toContain("same rotation");
     expect(wrapper.find('[data-test="oncall-swap-summary"]').exists()).toBe(false);
   });
 
@@ -376,9 +374,7 @@ describe("OnCallCoverForm — swapping", () => {
     await pick(wrapper, 0, 0); // ana
     await pick(wrapper, 1, 2); // ana again
 
-    expect(wrapper.find('[data-test="oncall-swap-problem"]').text()).toContain(
-      "changes nothing",
-    );
+    expect(wrapper.find('[data-test="oncall-swap-problem"]').text()).toContain("changes nothing");
     expect(wrapper.find('[data-test="oncall-swap-summary"]').exists()).toBe(false);
 
     await wrapper.find('[data-test="dialog-primary"]').trigger("click");
@@ -478,8 +474,7 @@ describe("OnCallCoverForm — taking a cover", () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
     await flushPromises();
     return wrapper.emitted("save")?.[0]?.[0] as
-      | { user_email: string; start_at: number; end_at: number; rotation_id?: string }
-      | undefined;
+      { user_email: string; start_at: number; end_at: number; rotation_id?: string } | undefined;
   }
 
   it("emits the window as the start_at / end_at pair the API takes", async () => {
@@ -630,7 +625,7 @@ describe("OnCallCoverForm — taking a cover", () => {
     expect(toZonedInputValue(saved!.end_at, IST)).toMatch(/T00:00$/);
   });
 
-  it("starts \"tonight\" at the team's evening", async () => {
+  it('starts "tonight" at the team\'s evening', async () => {
     const wrapper = renderCover({ timezone: IST });
     await wrapper.find('[data-test="oncall-cover-preset-tonight"]').trigger("click");
 
@@ -648,7 +643,9 @@ describe("OnCallCoverForm — taking a cover", () => {
     await wrapper.find('[data-test="oncall-cover-preset-tonight"]').trigger("click");
     await flushPromises();
 
-    expect(wrapper.find('[data-test-field="window"]').attributes("data-test-type")).toBe("absolute");
+    expect(wrapper.find('[data-test-field="window"]').attributes("data-test-type")).toBe(
+      "absolute",
+    );
   });
 
   /// Reopening on a different gap must not inherit the last one's window or

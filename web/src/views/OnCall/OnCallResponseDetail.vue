@@ -369,16 +369,15 @@
 
     <OnCallResponseDetailSkeleton v-else-if="loading" />
 
-    <OEmptyState
-      v-else
-      size="hero"
-      preset="no-data"
-      data-test="oncall-response-detail-empty"
-    />
+    <OEmptyState v-else size="hero" preset="no-data" data-test="oncall-response-detail-empty" />
 
     <!-- Handing a page to another team clears the ack and re-arms the ladder,
          so it gets room to say so rather than a menu. -->
-    <ODrawer v-model:open="showHandoff" :title="t('oncall.handoffTitle')" data-test="oncall-handoff-drawer">
+    <ODrawer
+      v-model:open="showHandoff"
+      :title="t('oncall.handoffTitle')"
+      data-test="oncall-handoff-drawer"
+    >
       <div class="flex flex-col gap-4">
         <OToggleGroup v-model="handoffMode">
           <OToggleGroupItem value="person" size="sm" data-test="oncall-handoff-mode-person">
@@ -666,8 +665,7 @@ const recoveryNote = ref("");
 /// origin id says the same thing (§ "UI rule"); either one is enough, and an
 /// older record written before the role column is still readable.
 const isImpacted = computed(
-  () =>
-    response.value?.responder_role === "impacted" || !!response.value?.origin_response_id,
+  () => response.value?.responder_role === "impacted" || !!response.value?.origin_response_id,
 );
 
 /// The dependent's close. The owner's record closes on its own once the last
@@ -825,15 +823,11 @@ const title = computed(() =>
 
 // Every action hangs off this. It asks "is this still somebody's problem",
 // not "is the ladder running" — an acknowledged page still needs resolving.
-const isOpenState = computed(
-  () => !!response.value && isUnresolved(response.value.state),
-);
+const isOpenState = computed(() => !!response.value && isUnresolved(response.value.state));
 
 /// Only an escalating page can be claimed. Once it is owned, Acknowledge and
 /// Snooze are gone and Resolve becomes the primary action.
-const canAcknowledge = computed(
-  () => !!response.value && isEscalating(response.value.state),
-);
+const canAcknowledge = computed(() => !!response.value && isEscalating(response.value.state));
 
 /// Where the team-name link in the subtitle goes — same target and tab
 /// OnCallAboutPage's own team row links to, so the two agree on what
@@ -914,8 +908,9 @@ const resolveValue = computed(() => {
 const reachedRung = computed<I18nText | string>(() => {
   const micros = response.value?.reached_rung_micros;
   if (micros === undefined || micros === null) return ABSENT;
-  const steps = policy.value?.rungs.find((rung) => rung.priority === response.value?.priority)
-    ?.steps;
+  const steps = policy.value?.rungs.find(
+    (rung) => rung.priority === response.value?.priority,
+  )?.steps;
   const index = steps?.findIndex((step) => step.after_micros === micros) ?? -1;
   if (index < 0 || !steps) return raw(`+${formatMicrosDuration(micros)}`);
   return t("oncall.statReachedRungOf", { n: index + 1, total: steps.length });
@@ -1189,10 +1184,7 @@ async function fetchSubjectAlert() {
   subjectAlert.value = null;
   if (response.value?.subject.subject_type !== "alert") return;
   try {
-    const res = await alertsService.get_by_alert_id(
-      orgId.value,
-      response.value.subject.source_id,
-    );
+    const res = await alertsService.get_by_alert_id(orgId.value, response.value.subject.source_id);
     subjectAlert.value = res.data ?? null;
   } catch {
     subjectAlert.value = null;

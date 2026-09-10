@@ -64,10 +64,7 @@ function render() {
 const rowsOf = (w: any) => w.findComponent({ name: "OTable" }).props("data") as any[];
 const statsOf = (w: any) =>
   Object.fromEntries(
-    (w.findComponent({ name: "OStatStrip" }).props("items") as any[]).map((i) => [
-      i.key,
-      i.value,
-    ]),
+    (w.findComponent({ name: "OStatStrip" }).props("items") as any[]).map((i) => [i.key, i.value]),
   );
 
 describe("OnCallPolicies", () => {

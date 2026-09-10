@@ -67,8 +67,18 @@ describe("OnCallWhoIsOn", () => {
   it("names each row after the rotation that produced it", () => {
     const wrapper = render({
       positions: [
-        { rotation_id: "rot_primary", rotation_name: "Primary", rule: "weekly", user_email: "ana@o2.ai" },
-        { rotation_id: "rot_db", rotation_name: "Database", rule: "weekly", user_email: "bo@o2.ai" },
+        {
+          rotation_id: "rot_primary",
+          rotation_name: "Primary",
+          rule: "weekly",
+          user_email: "ana@o2.ai",
+        },
+        {
+          rotation_id: "rot_db",
+          rotation_name: "Database",
+          rule: "weekly",
+          user_email: "bo@o2.ai",
+        },
       ],
     });
     const rows = wrapper.findAll("dd");
@@ -82,8 +92,18 @@ describe("OnCallWhoIsOn", () => {
   it("marks who this page reached and who it did not", () => {
     const wrapper = render({
       positions: [
-        { rotation_id: "rot_primary", rotation_name: "Primary", rule: "weekly", user_email: "ana@o2.ai" },
-        { rotation_id: "rot_secondary", rotation_name: "Secondary", rule: "weekly", user_email: "bo@o2.ai" },
+        {
+          rotation_id: "rot_primary",
+          rotation_name: "Primary",
+          rule: "weekly",
+          user_email: "ana@o2.ai",
+        },
+        {
+          rotation_id: "rot_secondary",
+          rotation_name: "Secondary",
+          rule: "weekly",
+          user_email: "bo@o2.ai",
+        },
       ],
       deliveries: [
         delivery({ recipient: "ana@o2.ai", delivered: false }),
@@ -99,7 +119,14 @@ describe("OnCallWhoIsOn", () => {
   /// does not un-reach the person.
   it("counts a person as reached if any send to them landed", () => {
     const wrapper = render({
-      positions: [{ rotation_id: "rot_primary", rotation_name: "Primary", rule: "weekly", user_email: "ana@o2.ai" }],
+      positions: [
+        {
+          rotation_id: "rot_primary",
+          rotation_name: "Primary",
+          rule: "weekly",
+          user_email: "ana@o2.ai",
+        },
+      ],
       deliveries: [
         delivery({ recipient: "ana@o2.ai", delivered: false }),
         delivery({ recipient: "ana@o2.ai", delivered: true }),
@@ -110,7 +137,14 @@ describe("OnCallWhoIsOn", () => {
 
   it("says nothing about somebody this page never tried", () => {
     const wrapper = render({
-      positions: [{ rotation_id: "rot_primary", rotation_name: "Primary", rule: "weekly", user_email: "ana@o2.ai" }],
+      positions: [
+        {
+          rotation_id: "rot_primary",
+          rotation_name: "Primary",
+          rule: "weekly",
+          user_email: "ana@o2.ai",
+        },
+      ],
     });
     expect(wrapper.find('[data-test="oncall-who-is-on-primary-reach"]').exists()).toBe(false);
   });
@@ -143,7 +177,14 @@ describe("OnCallWhoIsOn", () => {
     // slowest CI runs.
     const fiveDaysMicros = (Date.now() + 5 * 24 * 60 * 60 * 1000 + 60_000) * 1000;
     const wrapper = render({
-      positions: [{ rotation_id: "rot_primary", rotation_name: "Primary", rule: "weekly", user_email: "ana@o2.ai" }],
+      positions: [
+        {
+          rotation_id: "rot_primary",
+          rotation_name: "Primary",
+          rule: "weekly",
+          user_email: "ana@o2.ai",
+        },
+      ],
       handoverAt: fiveDaysMicros,
       handoverTo: "yuki@o2.ai",
     });
@@ -157,7 +198,15 @@ describe("OnCallWhoIsOn", () => {
   /// about a person.
   describe("once the page is closed", () => {
     const closedProps = {
-      positions: [{ rotation_id: "rot_primary", rotation_name: "Primary", rule: "weekly", user_email: "ana@o2.ai", next_user_email: "cy@o2.ai" }],
+      positions: [
+        {
+          rotation_id: "rot_primary",
+          rotation_name: "Primary",
+          rule: "weekly",
+          user_email: "ana@o2.ai",
+          next_user_email: "cy@o2.ai",
+        },
+      ],
       closedAt: 1_700_000_000_000_000,
     };
 

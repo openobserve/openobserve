@@ -164,7 +164,9 @@ describe("OnCallScopePicker", () => {
       const wrapper = render({ sets: [K8S, AWS] });
       expect(path(wrapper)).toEqual(["k8s-cluster", "k8s-namespace", "service"]);
 
-      await wrapper.find('[data-test="oncall-scope-platform"] [data-option="aws"]').trigger("click");
+      await wrapper
+        .find('[data-test="oncall-scope-platform"] [data-option="aws"]')
+        .trigger("click");
       expect(path(wrapper)).toEqual(["ecs-task", "service"]);
     });
 
@@ -176,7 +178,9 @@ describe("OnCallScopePicker", () => {
     /// a condition nobody can see is a rule that matches nothing.
     it("drops the old platform's values when switching", async () => {
       const wrapper = render({ sets: [K8S, AWS], modelValue: { "k8s-cluster": "production" } });
-      await wrapper.find('[data-test="oncall-scope-platform"] [data-option="aws"]').trigger("click");
+      await wrapper
+        .find('[data-test="oncall-scope-platform"] [data-option="aws"]')
+        .trigger("click");
       expect(lastEmit(wrapper)).toEqual({});
     });
 

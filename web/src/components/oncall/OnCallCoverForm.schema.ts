@@ -27,7 +27,10 @@ const MAX_SPAN_MICROS = 90 * MICROS_PER_DAY;
  */
 const MAX_AHEAD_MICROS = 730 * MICROS_PER_DAY;
 
-export const makeOnCallCoverSchema = (t: TranslateFn, now: () => number = () => Date.now() * 1000) =>
+export const makeOnCallCoverSchema = (
+  t: TranslateFn,
+  now: () => number = () => Date.now() * 1000,
+) =>
   z
     .object({
       user_email: z.string().min(1, t("oncall.coverWhoRequired")),

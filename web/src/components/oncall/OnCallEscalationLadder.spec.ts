@@ -35,8 +35,7 @@ const stubs = {
   OTimelineItem: {
     name: "OTimelineItem",
     props: { label: null, title: null, subtitle: null, variant: null, framed: Boolean },
-    template:
-      "<li>{{ label }} {{ title }} {{ subtitle }}<slot name=\"subtitle\" /><slot /></li>",
+    template: '<li>{{ label }} {{ title }} {{ subtitle }}<slot name="subtitle" /><slot /></li>',
   },
   OInnerLoading: { name: "OInnerLoading", template: "<div />" },
   OButton: {

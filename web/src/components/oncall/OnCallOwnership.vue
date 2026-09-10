@@ -90,7 +90,11 @@ import OnCallRoutingList from "@/components/oncall/OnCallRoutingList.vue";
 import type { RuleDraft } from "@/components/oncall/OnCallRuleEditor.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import alertsService from "@/services/alerts";
-import { getDimensionAnalytics, getIdentityConfig, getServicesList } from "@/services/service_streams";
+import {
+  getDimensionAnalytics,
+  getIdentityConfig,
+  getServicesList,
+} from "@/services/service_streams";
 import type { IdentitySet } from "@/services/service_streams";
 import { useOnCallRoutingConfig } from "@/composables/useOnCallRoutingConfig";
 import oncallService from "@/services/oncall";
@@ -132,8 +136,11 @@ const services = ref<DiscoveredService[]>([]);
 /// hierarchy — cluster contains namespace — which is what lets the rule editor
 /// offer levels to claim instead of a flat list of registry rows.
 const sets = ref<IdentitySet[]>([]);
-const { config: routingConfig, load: loadRoutingConfig, refresh: refreshRoutingConfig } =
-  useOnCallRoutingConfig();
+const {
+  config: routingConfig,
+  load: loadRoutingConfig,
+  refresh: refreshRoutingConfig,
+} = useOnCallRoutingConfig();
 
 /// Who holds the path the rule editor is currently drafting.
 const conflict = ref<RoutingPreview | null>(null);
@@ -243,9 +250,7 @@ async function fetchCatalogue() {
     const dims = res.data?.dimensions ?? [];
     catalogue.value = {
       present: res.data?.recommended_priority_dimensions ?? dims.map((d) => d.dimension_name),
-      values: Object.fromEntries(
-        dims.map((d) => [d.dimension_name, d.value_counts ?? {}]),
-      ),
+      values: Object.fromEntries(dims.map((d) => [d.dimension_name, d.value_counts ?? {}])),
     };
   } catch {
     // An empty catalogue falls back to the full vocabulary and free-text

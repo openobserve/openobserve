@@ -54,7 +54,9 @@ vi.mock("@/services/alerts", () => ({
 
 /// Escalate's whole point is what it reports back, and the report is a toast.
 const toastSpy = vi.fn();
-vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: (...args: unknown[]) => toastSpy(...args) }));
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: (...args: unknown[]) => toastSpy(...args),
+}));
 
 const push = vi.fn();
 vi.mock("vue-router", () => ({
@@ -224,7 +226,9 @@ function render() {
 }
 
 async function renderWith(overrides: Record<string, unknown> = {}) {
-  service.getResponse.mockResolvedValue({ data: { response: record(overrides), events: [] } } as any);
+  service.getResponse.mockResolvedValue({
+    data: { response: record(overrides), events: [] },
+  } as any);
   const wrapper = render();
   await flushPromises();
   return wrapper;
@@ -275,17 +279,15 @@ describe("OnCallResponseDetail", () => {
     const wrapper = render();
     await flushPromises();
 
-    expect(
-      wrapper.findComponent({ name: "OnCallAboutPage" }).props("routingReason"),
-    ).toBe("routed to tm_pay by ownership rule k8s-namespace=payments");
+    expect(wrapper.findComponent({ name: "OnCallAboutPage" }).props("routingReason")).toBe(
+      "routed to tm_pay by ownership rule k8s-namespace=payments",
+    );
   });
 
   // No decision recorded must leave the row out rather than render an empty one.
   it("omits the routing row when no decision was recorded", async () => {
     const wrapper = await renderWith();
-    expect(wrapper.findComponent({ name: "OnCallAboutPage" }).props("routingReason")).toBe(
-      null,
-    );
+    expect(wrapper.findComponent({ name: "OnCallAboutPage" }).props("routingReason")).toBe(null);
   });
 
   it("loads the past firings alongside the causes", async () => {
@@ -599,9 +601,7 @@ describe("OnCallResponseDetail", () => {
 
       const wrapper = await renderWith();
 
-      expect(
-        wrapper.findComponent({ name: "OnCallPriorCauses" }).props("groups"),
-      ).toHaveLength(1);
+      expect(wrapper.findComponent({ name: "OnCallPriorCauses" }).props("groups")).toHaveLength(1);
     });
 
     /// History is context. Losing it must not stop someone acting on the page
@@ -637,7 +637,9 @@ describe("OnCallResponseDetail", () => {
   describe("confirm recovery", () => {
     it("offers confirm-recovery instead of resolve on an impacted record", async () => {
       const wrapper = await renderWith({ origin_response_id: "resp_owner" });
-      expect(wrapper.find('[data-test="oncall-response-confirm-recovery-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="oncall-response-confirm-recovery-btn"]').exists()).toBe(
+        true,
+      );
       expect(wrapper.find('[data-test="oncall-response-resolve-btn"]').exists()).toBe(false);
     });
 
@@ -704,7 +706,13 @@ describe("OnCallResponseDetail", () => {
 
     it("leaves an owner record with no liaison language at all", async () => {
       service.escalationProgress.mockResolvedValue({
-        data: { fired: [], next_targets: [], next_at: null, exhausted: false, stopped_because: null },
+        data: {
+          fired: [],
+          next_targets: [],
+          next_at: null,
+          exhausted: false,
+          stopped_because: null,
+        },
       } as any);
       const wrapper = await renderWith({ responder_role: "owner" });
 
@@ -747,9 +755,10 @@ describe("OnCallResponseDetail", () => {
       const select = wrapper
         .findAllComponents({ name: "OSelect" })
         .find((c) => c.attributes("data-test") === "oncall-promote-severity");
-      expect(
-        (select?.props("options") as { value: string }[]).map((o) => o.value),
-      ).toEqual(["P1", "P2"]);
+      expect((select?.props("options") as { value: string }[]).map((o) => o.value)).toEqual([
+        "P1",
+        "P2",
+      ]);
     });
 
     /// Two responders clicking at once must not end up looking at two
@@ -757,7 +766,10 @@ describe("OnCallResponseDetail", () => {
     /// the refetch is what puts the winning incident in front of the loser.
     it("refetches on a conflict so the incident that won is the one shown", async () => {
       service.promoteResponse.mockRejectedValue({
-        response: { status: 409, data: { message: "this record is already part of incident inc_9" } },
+        response: {
+          status: 409,
+          data: { message: "this record is already part of incident inc_9" },
+        },
       });
       const wrapper = await renderWith();
 
@@ -772,9 +784,7 @@ describe("OnCallResponseDetail", () => {
     it("stops offering the promotion once the record has an incident", async () => {
       const wrapper = await renderWith({ incident_id: "inc_9" });
       expect(wrapper.find('[data-test="oncall-response-promote-btn"]').exists()).toBe(false);
-      expect(wrapper.findComponent({ name: "OnCallAboutPage" }).props("incidentId")).toBe(
-        "inc_9",
-      );
+      expect(wrapper.findComponent({ name: "OnCallAboutPage" }).props("incidentId")).toBe("inc_9");
     });
 
     /// A firing is routinely recognised as part of something larger after it
@@ -880,7 +890,9 @@ describe("OnCallResponseDetail", () => {
 
   describe("top stats and what fired", () => {
     it("puts the firing count on the stat strip", async () => {
-      const wrapper = await renderWith({ subject: { subject_type: "alert", source_id: "al_ckt", firing: 2 } });
+      const wrapper = await renderWith({
+        subject: { subject_type: "alert", source_id: "al_ckt", firing: 2 },
+      });
       const stats = wrapper.findComponent({ name: "OStatStrip" }).props("items");
 
       expect(stats.find((s: any) => s.key === "firing").value).toBe("#2");
@@ -909,7 +921,9 @@ describe("OnCallResponseDetail", () => {
 
     /// A manually-opened page has no alert rule behind it — nothing "fired".
     it("has no what-fired card for a non-alert subject", async () => {
-      const wrapper = await renderWith({ subject: { subject_type: "manual", source_id: "m1", firing: 1 } });
+      const wrapper = await renderWith({
+        subject: { subject_type: "manual", source_id: "m1", firing: 1 },
+      });
 
       expect(wrapper.findComponent({ name: "OnCallWhatFired" }).exists()).toBe(false);
     });
@@ -933,9 +947,9 @@ describe("OnCallResponseDetail", () => {
       const wrapper = await renderWith();
 
       expect(wrapper.findComponent({ name: "OnCallWhoIsOn" }).props("positions")).toHaveLength(1);
-      expect(
-        wrapper.findComponent({ name: "OnCallReachAlarm" }).props("smtpConfigured"),
-      ).toBe(false);
+      expect(wrapper.findComponent({ name: "OnCallReachAlarm" }).props("smtpConfigured")).toBe(
+        false,
+      );
     });
 
     /// `null` is "the check did not answer", which is not the same fact as a
@@ -956,8 +970,18 @@ describe("OnCallResponseDetail", () => {
       const now = Date.now() * 1000;
       service.resolvedSchedule.mockResolvedValue({
         data: [
-          { from: now - 1_000_000, to: now + 1_000_000, rotation: "weekly", user_email: "ana@o2.ai" },
-          { from: now + 1_000_000, to: now + 9_000_000, rotation: "weekly", user_email: "bo@o2.ai" },
+          {
+            from: now - 1_000_000,
+            to: now + 1_000_000,
+            rotation: "weekly",
+            user_email: "ana@o2.ai",
+          },
+          {
+            from: now + 1_000_000,
+            to: now + 9_000_000,
+            rotation: "weekly",
+            user_email: "bo@o2.ai",
+          },
         ],
       } as any);
       const wrapper = await renderWith();
@@ -973,7 +997,12 @@ describe("OnCallResponseDetail", () => {
       const now = Date.now() * 1000;
       service.resolvedSchedule.mockResolvedValue({
         data: [
-          { from: now - 1_000_000, to: now + 1_000_000, rotation: "weekly", user_email: "ana@o2.ai" },
+          {
+            from: now - 1_000_000,
+            to: now + 1_000_000,
+            rotation: "weekly",
+            user_email: "ana@o2.ai",
+          },
           { from: now + 1_000_000, to: now + 9_000_000, rotation: "weekly" },
         ],
       } as any);
@@ -990,9 +1019,7 @@ describe("OnCallResponseDetail", () => {
       const closedAt = 1_700_000_000_000_000 + HOUR_MICROS;
       const wrapper = await renderWith({ state: "resolved", closed_at: closedAt });
 
-      expect(service.whoIsOnCall).toHaveBeenCalledWith(
-        expect.objectContaining({ at: closedAt }),
-      );
+      expect(service.whoIsOnCall).toHaveBeenCalledWith(expect.objectContaining({ at: closedAt }));
       expect(wrapper.findComponent({ name: "OnCallWhoIsOn" }).props("closedAt")).toBe(closedAt);
     });
 
@@ -1008,9 +1035,7 @@ describe("OnCallResponseDetail", () => {
     it("keeps asking about now while the page is open", async () => {
       await renderWith();
 
-      expect(service.whoIsOnCall).toHaveBeenCalledWith(
-        expect.objectContaining({ at: undefined }),
-      );
+      expect(service.whoIsOnCall).toHaveBeenCalledWith(expect.objectContaining({ at: undefined }));
     });
   });
 

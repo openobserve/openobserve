@@ -87,7 +87,7 @@
         <OnCallTeamAttention
           :risks="configRisks"
           :timezone="team?.timezone ?? 'UTC'"
-      :viewer-timezone="store.state.timezone"
+          :viewer-timezone="store.state.timezone"
           :reachability="reachability"
           :overview="overview"
           :checked-at="insightsCheckedAt"
@@ -183,7 +183,7 @@
               <OnCallCoverageStrip
                 :rotations="schedule?.rotations ?? []"
                 :timezone="team?.timezone ?? 'UTC'"
-      :viewer-timezone="store.state.timezone"
+                :viewer-timezone="store.state.timezone"
                 :days="COVERAGE_DAYS"
               />
             </div>
@@ -210,7 +210,7 @@
             :members="members"
             :rotations="schedule?.rotations ?? []"
             :timezone="team?.timezone ?? 'UTC'"
-      :viewer-timezone="store.state.timezone"
+            :viewer-timezone="store.state.timezone"
             :on-call-now="onCallNow"
             :reachability="reachability"
             :load="teamLoad"
@@ -248,7 +248,7 @@
               :rotations="teamRotations"
               :segments="segments"
               :timezone="team?.timezone ?? 'UTC'"
-      :viewer-timezone="store.state.timezone"
+              :viewer-timezone="store.state.timezone"
               :loading="segmentsLoading"
               :can-cover="hasMembers !== false && canConfigure"
               @fill-gap="onFillGap"
@@ -270,7 +270,7 @@
               ref="coverListRef"
               :team-id="teamId"
               :timezone="team?.timezone ?? 'UTC'"
-      :viewer-timezone="store.state.timezone"
+              :viewer-timezone="store.state.timezone"
               :window="scheduleWindow"
               :rotations="teamRotations"
               @changed="fetchSegments"
@@ -281,7 +281,7 @@
               :team-id="teamId"
               :members="members"
               :timezone="team?.timezone ?? 'UTC'"
-      :viewer-timezone="store.state.timezone"
+              :viewer-timezone="store.state.timezone"
               :rotation-count="schedule?.rotations?.length ?? 0"
               @applied="onScheduleSaved"
             />
@@ -293,7 +293,7 @@
               drawer-only
               :team-id="teamId"
               :timezone="team?.timezone ?? 'UTC'"
-      :viewer-timezone="store.state.timezone"
+              :viewer-timezone="store.state.timezone"
               :schedule="schedule"
               :members="members"
               :intent="scheduleIntent"

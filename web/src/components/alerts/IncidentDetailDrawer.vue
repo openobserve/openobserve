@@ -57,8 +57,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </span>
 
-          <span v-if="incidentDetails.acknowledged_by" class="inline-flex items-center gap-1 cursor-default">
-            <span class="text-text-secondary text-xs">{{ t("alerts.incidents.acknowledgedBy") }}</span>
+          <span
+            v-if="incidentDetails.acknowledged_by"
+            class="inline-flex cursor-default items-center gap-1"
+          >
+            <span class="text-text-secondary text-xs">{{
+              t("alerts.incidents.acknowledgedBy")
+            }}</span>
             <OUserCell :value="incidentDetails.acknowledged_by" />
           </span>
 
@@ -101,7 +106,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :loading="updating"
             :aria-label="t('alerts.incidents.acknowledgeAriaLabel')"
             @click="acknowledgeIncident"
-            ><OIcon name="check-circle" size="sm" aria-hidden="true" />{{ t("alerts.incidents.acknowledge")
+            ><OIcon name="check-circle" size="sm" aria-hidden="true" />{{
+              t("alerts.incidents.acknowledge")
             }}<OTooltip :delay="500" :content="t('alerts.incidents.markAsAcknowledgedTooltip')"
           /></OButton>
           <OButton
@@ -634,7 +640,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <span class="text-text-secondary text-xs">
                             {{ t("alerts.incidents.onCallAckedBy") }}
                           </span>
-                          <OUserCell v-if="oncallResponse.acked_by" :value="oncallResponse.acked_by" />
+                          <OUserCell
+                            v-if="oncallResponse.acked_by"
+                            :value="oncallResponse.acked_by"
+                          />
                           <span v-else class="text-status-warning-text text-xs">
                             {{ t("alerts.incidents.onCallUnanswered") }}
                           </span>
@@ -695,11 +704,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <span class="text-text-body truncate text-xs">
                               {{ raw(oncallTeamNameFor(liaison.team_id)) }}
                             </span>
-                            <OTag
-                              type="oncallResponseState"
-                              :value="liaison.state"
-                              size="sm"
-                            />
+                            <OTag type="oncallResponseState" :value="liaison.state" size="sm" />
                           </span>
                         </div>
 

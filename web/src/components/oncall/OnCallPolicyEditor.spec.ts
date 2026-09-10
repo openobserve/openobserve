@@ -605,7 +605,7 @@ describe("targets that name a rotation", () => {
     expect(picker.exists()).toBe(true);
     // Offered by NAME, sent as the ID: a rotation is renameable, and a stored
     // policy must not start paging a different position because of a typo fix.
-    expect((picker.props("options") as { label: string; value: string }[])).toEqual([
+    expect(picker.props("options") as { label: string; value: string }[]).toEqual([
       { label: "Primary", value: "rot_primary" },
       { label: "Secondary", value: "rot_secondary" },
     ]);
@@ -695,9 +695,7 @@ describe("targets that name a rotation", () => {
     await wrapper.find('[data-test="oncall-policy-save"]').trigger("click");
     await flushPromises();
 
-    expect(
-      savedTargets().filter((t: any) => t.rotation_id === "rot_secondary"),
-    ).toHaveLength(1);
+    expect(savedTargets().filter((t: any) => t.rotation_id === "rot_secondary")).toHaveLength(1);
   });
 
   /// The same rotation in both modes is two different errands, so it is two
@@ -718,9 +716,7 @@ describe("targets that name a rotation", () => {
     await wrapper.find('[data-test="oncall-policy-save"]').trigger("click");
     await flushPromises();
 
-    expect(
-      savedTargets().filter((t: any) => t.rotation_id === "rot_primary"),
-    ).toHaveLength(2);
+    expect(savedTargets().filter((t: any) => t.rotation_id === "rot_primary")).toHaveLength(2);
   });
 
   /// Found by this suite leaking between tests: `reset` shallow-copied each
@@ -897,7 +893,10 @@ describe("the ladder as one sentence", () => {
         priority: 1,
         steps: [
           { after_micros: 0, targets: [{ kind: "rotation", rotation_id: "rot_primary" }] },
-          { after_micros: 5 * 60_000_000, targets: [{ kind: "rotation", rotation_id: "rot_second" }] },
+          {
+            after_micros: 5 * 60_000_000,
+            targets: [{ kind: "rotation", rotation_id: "rot_second" }],
+          },
           { after_micros: 15 * 60_000_000, targets: [{ kind: "whole_team" }] },
         ],
         channels: ["email"],

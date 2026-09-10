@@ -246,7 +246,11 @@
                       :data-test="`oncall-schedule-rule-name-${ruleIndex}`"
                     />
                     <OTag v-if="isRetired(rule)" variant="default-soft" size="xs">
-                      {{ t("oncall.rotationRetiredOnDate", { date: raw(shortDate(rule.ends_at ?? 0)) }) }}
+                      {{
+                        t("oncall.rotationRetiredOnDate", {
+                          date: raw(shortDate(rule.ends_at ?? 0)),
+                        })
+                      }}
                     </OTag>
                   </div>
 
@@ -488,7 +492,9 @@ const multiRule = computed(() => (active.value?.shift_rules.length ?? 0) > 1);
 const namedShiftRules = computed(() =>
   (active.value?.shift_rules ?? []).map((rule, ruleIndex) => ({
     ...rule,
-    name: rule.name?.trim() ? rule.name : String(t("oncall.shiftRuleNthName", { n: ruleIndex + 1 })),
+    name: rule.name?.trim()
+      ? rule.name
+      : String(t("oncall.shiftRuleNthName", { n: ruleIndex + 1 })),
   })),
 );
 

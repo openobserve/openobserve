@@ -26,7 +26,10 @@ describe("alertConditionText", () => {
     expect(
       alertConditionText({
         query_condition: {
-          aggregation: { function: "avg", having: { column: "latency", operator: ">", value: 500 } },
+          aggregation: {
+            function: "avg",
+            having: { column: "latency", operator: ">", value: 500 },
+          },
         },
       }),
     ).toBe("avg(latency) > 500");

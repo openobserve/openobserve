@@ -423,7 +423,15 @@ import type {
 } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { SERVICE_DIMENSION, dimensionsSentence, identityDimensions, normalizeDimensionValue, priorityLabel, priorityTagVariant, ruleClaimsDimensions } from "@/utils/oncall";
+import {
+  SERVICE_DIMENSION,
+  dimensionsSentence,
+  identityDimensions,
+  normalizeDimensionValue,
+  priorityLabel,
+  priorityTagVariant,
+  ruleClaimsDimensions,
+} from "@/utils/oncall";
 
 export interface RuleDraft {
   dimensions: Record<string, string>;
@@ -577,8 +585,7 @@ const draftDimensions = computed(dimensionsOf);
 /// An empty catalogue means the registry has nothing to say yet, and the whole
 /// vocabulary is better than an empty picker.
 const dimensionOptions = computed(() => {
-  const label = (id: string) =>
-    raw(props.aliases.find((alias) => alias.id === id)?.display || id);
+  const label = (id: string) => raw(props.aliases.find((alias) => alias.id === id)?.display || id);
   const present = props.catalogue.present;
   if (!present.length) {
     return props.aliases.map((alias) => ({ label: label(alias.id), value: alias.id }));
@@ -656,7 +663,9 @@ const valueOptions = computed(() => {
     .map(([value, services]) => ({
       label: raw(value),
       value,
-      description: services ? t("oncall.ruleEditorValueServices", { count: services }, services) : undefined,
+      description: services
+        ? t("oncall.ruleEditorValueServices", { count: services }, services)
+        : undefined,
     }));
 });
 

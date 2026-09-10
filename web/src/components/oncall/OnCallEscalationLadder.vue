@@ -113,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <button
               v-if="resolvesTo(group.rung)"
               type="button"
-              class="underline hover:text-text-heading"
+              class="hover:text-text-heading underline"
               :data-test="`oncall-ladder-open-members-${group.firstMicros}`"
               @click="emit('open-members')"
             >

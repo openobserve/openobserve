@@ -397,7 +397,8 @@ const getInlineEventText = (event: any): string => {
   }
 };
 
-const getSanitizedInlineHtml = (event: any): string => DOMPurify.sanitize(getInlineEventText(event));
+const getSanitizedInlineHtml = (event: any): string =>
+  DOMPurify.sanitize(getInlineEventText(event));
 
 const getCommentBody = (event: any): string => event.data?.comment || "";
 

@@ -538,7 +538,10 @@ export function rungProblem(
   if (!unreachable.length) return null;
   if (people.length > 1) {
     return {
-      label: t("oncall.ladderUnreachableCount", { count: unreachable.length, total: people.length }),
+      label: t("oncall.ladderUnreachableCount", {
+        count: unreachable.length,
+        total: people.length,
+      }),
       tip: null,
     };
   }
@@ -560,11 +563,7 @@ export function rungProblem(
  * still reachable, and reporting it as unstaffed would cry wolf on every
  * restricted rotation outside its hours.
  */
-export function isStaffed(
-  rotations: Rotation[],
-  atMicros: number,
-  timezone: string,
-): boolean {
+export function isStaffed(rotations: Rotation[], atMicros: number, timezone: string): boolean {
   return rotations.some((rotation) => resolveHolder(rotation, atMicros, timezone).member !== null);
 }
 
@@ -785,18 +784,13 @@ export function wallTimeInZone(atMicros: number, timezone: string): ZonedWallTim
  *  • the early-morning half of a wrapped window belongs to the PREVIOUS day's
  *    shift, so somebody covering Friday nights is still on at 02:00 on Saturday.
  */
-export function windowContains(
-  window: TimeWindow,
-  atMicros: number,
-  timezone: string,
-): boolean {
+export function windowContains(window: TimeWindow, atMicros: number, timezone: string): boolean {
   const wall = wallTimeInZone(atMicros, timezone);
   if (!wall) return false;
   const { minuteOfDay: minute, dayFromMonday: day } = wall;
   const { start_minute: start, end_minute: end, days } = window;
 
-  const inTime =
-    start <= end ? minute >= start && minute < end : minute >= start || minute < end;
+  const inTime = start <= end ? minute >= start && minute < end : minute >= start || minute < end;
   if (!inTime) return false;
 
   const effectiveDay = start > end && minute < end ? (day + 6) % 7 : day;
@@ -1036,10 +1030,7 @@ function describeDays(days: number[] | undefined, t: TranslateFn): string {
  * it is the fallback UNDER the restricted layers, and calling it "always" is
  * how somebody concludes the layers above it never fire.
  */
-export function describeRestrictions(
-  windows: TimeWindow[] | undefined,
-  t: TranslateFn,
-): I18nText {
+export function describeRestrictions(windows: TimeWindow[] | undefined, t: TranslateFn): I18nText {
   const list = windows ?? [];
   if (list.length === 0) return t("oncall.restrictionAlways");
   const described = list

@@ -1658,11 +1658,9 @@ const fieldWidthClass = computed(() => {
                               class="shrink-0"
                             />
                             <span v-else-if="iconKey" class="size-4 shrink-0" />
-                            <span
-                              class="truncate"
-                              :title="filteredOptions[vRow.index].label"
-                              >{{ filteredOptions[vRow.index].label }}</span
-                            >
+                            <span class="truncate" :title="filteredOptions[vRow.index].label">{{
+                              filteredOptions[vRow.index].label
+                            }}</span>
                           </template>
                         </ListboxItem>
                       </div>

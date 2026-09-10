@@ -77,10 +77,7 @@ describe("OnCallDeliveryLedger", () => {
   /// team's sends must not read as rungs of the new team's climb. Absent
   /// ladder_run means the first run; newest run renders first.
   it("groups by ladder run once a handoff has restarted the climb", () => {
-    const wrapper = render([
-      row(),
-      row({ recipient: "bo@o2.ai", ladder_run: 2 }),
-    ]);
+    const wrapper = render([row(), row({ recipient: "bo@o2.ai", ladder_run: 2 })]);
     expect(wrapper.find('[data-test="oncall-deliveries-run-1"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="oncall-deliveries-run-2"]').exists()).toBe(true);
     const html = wrapper.html();

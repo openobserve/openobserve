@@ -129,10 +129,12 @@ function schedule(rotations: OnCallSchedule["rotations"]): OnCallSchedule {
   };
 }
 
-function render(opts: {
-  members?: OnCallTeamMember[];
-  schedule?: OnCallSchedule | null;
-} = {}) {
+function render(
+  opts: {
+    members?: OnCallTeamMember[];
+    schedule?: OnCallSchedule | null;
+  } = {},
+) {
   return mount(OnCallScheduleEditor, {
     props: {
       teamId: "team_1",
@@ -219,10 +221,7 @@ describe("OnCallScheduleEditor", () => {
   /// has to stop and say which rotation is the problem.
   it("refuses a save that would silently drop an empty rotation", async () => {
     const wrapper = render({
-      schedule: schedule([
-        rota("Primary"),
-        rota("Backup", [rule({ members: ["bob@o2.ai"] })]),
-      ]),
+      schedule: schedule([rota("Primary"), rota("Backup", [rule({ members: ["bob@o2.ai"] })])]),
     });
     await flushPromises();
 
@@ -250,9 +249,7 @@ describe("OnCallScheduleEditor", () => {
     await wrapper.find('[data-test="oncall-schedule-add-rotation"]').trigger("click");
     await flushPromises();
 
-    expect(
-      wrapper.find('[data-test="oncall-rotation-done"]').attributes("disabled"),
-    ).toBeDefined();
+    expect(wrapper.find('[data-test="oncall-rotation-done"]').attributes("disabled")).toBeDefined();
 
     await wrapper
       .findComponent('[data-test="oncall-schedule-members-0"]')
@@ -448,7 +445,9 @@ describe("OnCallScheduleEditor", () => {
     it("removes a window", async () => {
       const wrapper = render({
         schedule: schedule([
-          rota("Primary", [layer({ restrictions: [{ days: [0], start_minute: 0, end_minute: 60 }] })]),
+          rota("Primary", [
+            layer({ restrictions: [{ days: [0], start_minute: 0, end_minute: 60 }] }),
+          ]),
         ]),
       });
       await openRotation(wrapper);
@@ -468,9 +467,7 @@ describe("OnCallScheduleEditor", () => {
     /// unreachable rather than the reader learning it from a 400.
     it("blocks a save that would collide with a sibling rule's priority", async () => {
       const wrapper = render({
-        schedule: schedule([
-          rota("Primary", [layer(), layer({ name: "Weekend", priority: 1 })]),
-        ]),
+        schedule: schedule([rota("Primary", [layer(), layer({ name: "Weekend", priority: 1 })])]),
       });
       await openRotation(wrapper);
 
@@ -549,9 +546,7 @@ describe("OnCallScheduleEditor — retiring a shift rule", () => {
 
   it("clears ends_at when the rule is put back into service", async () => {
     const wrapper = render({
-      schedule: schedule([
-        rota("Weekend", [rule({ ends_at: ANCHOR + MICROS_PER_WEEK })]),
-      ]),
+      schedule: schedule([rota("Weekend", [rule({ ends_at: ANCHOR + MICROS_PER_WEEK })])]),
     });
     await openRotation(wrapper);
 

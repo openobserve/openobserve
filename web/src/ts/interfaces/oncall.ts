@@ -82,11 +82,7 @@ export type Channel =
   | "push"
   | "in_app";
 
-export type ResponseState =
-  | "triggered"
-  | "triaged"
-  | "acknowledged"
-  | "resolved";
+export type ResponseState = "triggered" | "triaged" | "acknowledged" | "resolved";
 
 export type ResponseEventKind =
   | "sys"
@@ -182,9 +178,7 @@ export interface TimeWindow {
  * handle for one.
  */
 export type ScheduleEditorIntent =
-  | { mode: "new" }
-  | { mode: "edit"; id: string }
-  | { mode: "duplicate"; id: string };
+  { mode: "new" } | { mode: "edit"; id: string } | { mode: "duplicate"; id: string };
 
 /**
  * One layer inside a rotation — a roster, a cadence, and when it applies.

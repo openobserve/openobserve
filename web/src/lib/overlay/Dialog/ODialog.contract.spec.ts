@@ -82,7 +82,10 @@ function dialogTags(source: string): string[] {
 }
 
 const callSites = walk(WEB_SRC)
-  .map((file) => ({ file: file.slice(WEB_SRC.length + 1), tags: dialogTags(readFileSync(file, "utf8")) }))
+  .map((file) => ({
+    file: file.slice(WEB_SRC.length + 1),
+    tags: dialogTags(readFileSync(file, "utf8")),
+  }))
   .filter((entry) => entry.tags.length);
 
 describe("ODialog call sites use the contract ODialog actually has", () => {

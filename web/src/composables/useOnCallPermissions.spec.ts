@@ -66,17 +66,14 @@ describe("useOnCallPermissions", () => {
     unmount();
   });
 
-  it.each(["root", "admin", "editor", "Admin"])(
-    "lets %s change configuration",
-    async (role) => {
-      withRole(role);
-      const { perms, unmount } = host();
-      await flushPromises();
+  it.each(["root", "admin", "editor", "Admin"])("lets %s change configuration", async (role) => {
+    withRole(role);
+    const { perms, unmount } = host();
+    await flushPromises();
 
-      expect(perms.canConfigure.value).toBe(true);
-      unmount();
-    },
-  );
+    expect(perms.canConfigure.value).toBe(true);
+    unmount();
+  });
 
   it.each(["viewer", "member", "user", "service_account"])(
     "does not offer configuration to %s",

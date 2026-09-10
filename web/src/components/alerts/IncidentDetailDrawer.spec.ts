@@ -1592,7 +1592,12 @@ describe("IncidentDetailDrawer.vue", () => {
     /// rest hid every liaison the incident had woken.
     it("lists the teams paged alongside the owner", async () => {
       wrapper = await withRecords([
-        record({ id: "resp-2", team_id: "team_2", responder_role: "impacted", state: "acknowledged" }),
+        record({
+          id: "resp-2",
+          team_id: "team_2",
+          responder_role: "impacted",
+          state: "acknowledged",
+        }),
         record(),
       ]);
       const panel = wrapper.find('[data-test="incident-oncall-panel"]');

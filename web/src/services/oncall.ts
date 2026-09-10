@@ -67,9 +67,7 @@ const oncall = {
     http().get<OnCallTeam[]>(`/api/${org_identifier}/oncall/teams`),
 
   getTeam: ({ org_identifier, team_id }: { org_identifier: string; team_id: string }) =>
-    http().get<OnCallTeam>(
-      `/api/${org_identifier}/oncall/teams/${encodeURIComponent(team_id)}`,
-    ),
+    http().get<OnCallTeam>(`/api/${org_identifier}/oncall/teams/${encodeURIComponent(team_id)}`),
 
   createTeam: ({
     org_identifier,
@@ -124,10 +122,9 @@ const oncall = {
     team_id: string;
     user_email: string;
   }) =>
-    http().delete(
-      `/api/${org_identifier}/oncall/teams/${encodeURIComponent(team_id)}/members`,
-      { params: { user_email } },
-    ),
+    http().delete(`/api/${org_identifier}/oncall/teams/${encodeURIComponent(team_id)}/members`, {
+      params: { user_email },
+    }),
 
   /// The four shapes, each carrying its own form schema. Render from the
   /// response, never from the docs — a fifth preset must appear unaided.
@@ -269,24 +266,12 @@ const oncall = {
     );
   },
 
-  getResponse: ({
-    org_identifier,
-    response_id,
-  }: {
-    org_identifier: string;
-    response_id: string;
-  }) =>
+  getResponse: ({ org_identifier, response_id }: { org_identifier: string; response_id: string }) =>
     http().get<{ response: OnCallResponse; events: OnCallResponseEvent[] }>(
       `/api/${org_identifier}/oncall/responses/${encodeURIComponent(response_id)}`,
     ),
 
-  listOwnershipRules: ({
-    org_identifier,
-    team_id,
-  }: {
-    org_identifier: string;
-    team_id?: string;
-  }) =>
+  listOwnershipRules: ({ org_identifier, team_id }: { org_identifier: string; team_id?: string }) =>
     http().get<OwnershipRule[]>(
       `/api/${org_identifier}/oncall/ownership`,
       team_id ? { params: { team_id } } : undefined,
@@ -344,16 +329,8 @@ const oncall = {
       data,
     ),
 
-  deleteOwnershipRule: ({
-    org_identifier,
-    rule_id,
-  }: {
-    org_identifier: string;
-    rule_id: string;
-  }) =>
-    http().delete(
-      `/api/${org_identifier}/oncall/ownership/${encodeURIComponent(rule_id)}`,
-    ),
+  deleteOwnershipRule: ({ org_identifier, rule_id }: { org_identifier: string; rule_id: string }) =>
+    http().delete(`/api/${org_identifier}/oncall/ownership/${encodeURIComponent(rule_id)}`),
 
   /// Answers "where would this route?" without waiting for an alert to fire.
   /// Where the team is talked to, and WHERE THE ANSWER CAME FROM — read
@@ -411,8 +388,7 @@ const oncall = {
   }: {
     org_identifier: string;
     data: { user_email?: string; start_at: number; end_at: number; reason?: string };
-  }) =>
-    http().post<Unavailability>(`/api/${org_identifier}/oncall/unavailability`, data),
+  }) => http().post<Unavailability>(`/api/${org_identifier}/oncall/unavailability`, data),
 
   deleteUnavailability: ({
     org_identifier,
@@ -447,8 +423,7 @@ const oncall = {
   }: {
     org_identifier: string;
     data: { oncall_team?: string; dimensions: Record<string, string> };
-  }) =>
-    http().post<RoutingPreview>(`/api/${org_identifier}/oncall/routing/preview`, data),
+  }) => http().post<RoutingPreview>(`/api/${org_identifier}/oncall/routing/preview`, data),
 
   /// Claims the page and stops the ladder.
   acknowledgeResponse: ({
@@ -556,13 +531,7 @@ const oncall = {
     ),
 
   /// What previous firings of this subject turned out to be, grouped by cause.
-  priorCauses: ({
-    org_identifier,
-    response_id,
-  }: {
-    org_identifier: string;
-    response_id: string;
-  }) =>
+  priorCauses: ({ org_identifier, response_id }: { org_identifier: string; response_id: string }) =>
     http().get<CauseGroup[]>(
       `/api/${org_identifier}/oncall/responses/${encodeURIComponent(response_id)}/prior-causes`,
     ),
@@ -969,9 +938,7 @@ const oncall = {
 
   /// Per-member page load and rotation fairness over a window.
   teamLoad: ({ org_identifier, team_id }: { org_identifier: string; team_id: string }) =>
-    http().get<TeamLoad>(
-      `/api/${org_identifier}/oncall/teams/${encodeURIComponent(team_id)}/load`,
-    ),
+    http().get<TeamLoad>(`/api/${org_identifier}/oncall/teams/${encodeURIComponent(team_id)}/load`),
 };
 
 export default oncall;

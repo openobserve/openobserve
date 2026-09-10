@@ -1512,11 +1512,7 @@ defineExpose({
 
             <!-- Section heading row -->
             <template v-if="slots['group-header']" #group-header="ghProps">
-              <slot
-                name="group-header"
-                :section-key="ghProps.sectionKey"
-                :rows="ghProps.rows"
-              />
+              <slot name="group-header" :section-key="ghProps.sectionKey" :rows="ghProps.rows" />
             </template>
 
             <!-- Tree-mode warning row slot -->

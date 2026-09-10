@@ -531,9 +531,7 @@ function dayRange(window: TimeWindow): string {
 function cadenceWord(shiftMicros: number): string {
   if (shiftMicros === MICROS_PER_DAY) return String(t("oncall.laneCadenceDaily"));
   if (shiftMicros === 7 * MICROS_PER_DAY) return String(t("oncall.laneCadenceWeekly"));
-  return String(
-    t("oncall.laneCadenceEvery", { duration: raw(formatMicrosDuration(shiftMicros)) }),
-  );
+  return String(t("oncall.laneCadenceEvery", { duration: raw(formatMicrosDuration(shiftMicros)) }));
 }
 
 /// The next instant this rotation hands over to somebody else, taken from the
@@ -589,7 +587,9 @@ const lanes = computed<Lane[]>(() =>
       if (window.start_minute === 0 && window.end_minute === MINUTES_PER_DAY) {
         parts.push(String(t("oncall.laneAllDay")));
       } else {
-        parts.push(`${formatMinuteOfDay(window.start_minute)} / ${formatMinuteOfDay(window.end_minute)}`);
+        parts.push(
+          `${formatMinuteOfDay(window.start_minute)} / ${formatMinuteOfDay(window.end_minute)}`,
+        );
       }
     } else if (only) {
       parts.push(cadenceWord(only.shift_micros));

@@ -22,7 +22,11 @@ import type { DeliveryRecord, EscalationProgress, ResponseState } from "@/ts/int
 
 const stubs = {
   OBanner: { name: "OBanner", template: "<div><slot /><slot name='actions' /></div>" },
-  OButton: { name: "OButton", emits: ["click"], template: `<button @click="$emit('click')"><slot /></button>` },
+  OButton: {
+    name: "OButton",
+    emits: ["click"],
+    template: `<button @click="$emit('click')"><slot /></button>`,
+  },
 };
 
 function delivery(overrides: Partial<DeliveryRecord> = {}): DeliveryRecord {
@@ -38,13 +42,15 @@ function delivery(overrides: Partial<DeliveryRecord> = {}): DeliveryRecord {
   };
 }
 
-function render(options: {
-  state?: ResponseState;
-  deliveries?: DeliveryRecord[];
-  deliveriesTotal?: number | null;
-  progress?: Partial<EscalationProgress> | null;
-  smtpConfigured?: boolean | null;
-} = {}) {
+function render(
+  options: {
+    state?: ResponseState;
+    deliveries?: DeliveryRecord[];
+    deliveriesTotal?: number | null;
+    progress?: Partial<EscalationProgress> | null;
+    smtpConfigured?: boolean | null;
+  } = {},
+) {
   const deliveries = options.deliveries ?? [delivery()];
   return mount(OnCallReachAlarm, {
     props: {
@@ -164,12 +170,15 @@ describe("OnCallReachAlarm", () => {
   /// The server's own finding, never our inference: `smtp_configured: false`
   /// explains every failed row above it in one line.
   it("names the deployment-level cause only when the server stated it", () => {
-    expect(render({ smtpConfigured: false }).find('[data-test="oncall-reach-alarm-cause"]').text())
-      .toContain("no transport is configured");
-    expect(render({ smtpConfigured: null }).find('[data-test="oncall-reach-alarm-cause"]').exists())
-      .toBe(false);
-    expect(render({ smtpConfigured: true }).find('[data-test="oncall-reach-alarm-cause"]').exists())
-      .toBe(false);
+    expect(
+      render({ smtpConfigured: false }).find('[data-test="oncall-reach-alarm-cause"]').text(),
+    ).toContain("no transport is configured");
+    expect(
+      render({ smtpConfigured: null }).find('[data-test="oncall-reach-alarm-cause"]').exists(),
+    ).toBe(false);
+    expect(
+      render({ smtpConfigured: true }).find('[data-test="oncall-reach-alarm-cause"]').exists(),
+    ).toBe(false);
   });
 
   it("offers the two verbs that actually exist", async () => {

@@ -145,8 +145,11 @@ const store = useStore();
 
 const orgId = computed(() => store.state.selectedOrganization.identifier);
 
-const { config: routingConfig, load: loadRoutingConfig, refresh: refreshRoutingConfig } =
-  useOnCallRoutingConfig();
+const {
+  config: routingConfig,
+  load: loadRoutingConfig,
+  refresh: refreshRoutingConfig,
+} = useOnCallRoutingConfig();
 /// `""` means "none" in the picker; the wire value is null. One vocabulary
 /// per layer, converted at the save.
 const draftDefaultTeam = ref("");

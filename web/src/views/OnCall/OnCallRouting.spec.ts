@@ -316,7 +316,9 @@ describe("OnCallRouting", () => {
   /// escalation ladder yet", for every team.
   it("fetches the picked team's ladder and feeds it back to the editor", async () => {
     service.teamOverview.mockResolvedValue({
-      data: { rungs: [{ priority: "P1", rungs: 2, pages_anyone: true, ends_with_whole_team: false }] },
+      data: {
+        rungs: [{ priority: "P1", rungs: 2, pages_anyone: true, ends_with_whole_team: false }],
+      },
     } as any);
     const wrapper = render();
     await flushPromises();
@@ -333,7 +335,9 @@ describe("OnCallRouting", () => {
 
   it("clears the ladder when the picker reports no team chosen", async () => {
     service.teamOverview.mockResolvedValue({
-      data: { rungs: [{ priority: "P1", rungs: 2, pages_anyone: true, ends_with_whole_team: false }] },
+      data: {
+        rungs: [{ priority: "P1", rungs: 2, pages_anyone: true, ends_with_whole_team: false }],
+      },
     } as any);
     const wrapper = render();
     await flushPromises();
@@ -440,9 +444,7 @@ describe("OnCallRouting", () => {
     await flushPromises();
     await showSignals(wrapper);
 
-    wrapper
-      .findAllComponents({ name: "OToggleGroup" })[1]
-      .vm.$emit("update:modelValue", "nobody");
+    wrapper.findAllComponents({ name: "OToggleGroup" })[1].vm.$emit("update:modelValue", "nobody");
     await flushPromises();
 
     wrapper.findComponent({ name: "OSwitch" }).vm.$emit("update:modelValue", true);

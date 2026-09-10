@@ -182,11 +182,7 @@ function propsFromTypeBody(body: string): Set<string> {
   return names;
 }
 
-function propsFromNamedType(
-  typeName: string,
-  file: string,
-  source: string,
-): Set<string> | null {
+function propsFromNamedType(typeName: string, file: string, source: string): Set<string> | null {
   const bare = typeName.split("<")[0].trim();
   const candidates = [
     join(dirname(file), `${basename(file, ".vue")}.types.ts`),
@@ -205,9 +201,7 @@ function propsFromNamedType(
     const declared = new RegExp(`interface\\s+${bare}\\b([^{]*)\\{`).exec(text);
     if (!declared) continue;
 
-    const props = propsFromTypeBody(
-      braceBody(text, declared.index + declared[0].length - 1),
-    );
+    const props = propsFromTypeBody(braceBody(text, declared.index + declared[0].length - 1));
     // `extends Base` contributes its own members.
     const parents = declared[1].match(/extends\s+([\w,\s]+)/);
     if (parents) {
@@ -271,35 +265,30 @@ describe("on-call spec stubs mirror the components they stand in for", () => {
     expect(compared).toBeGreaterThan(150);
   });
 
-  it.each(specs.map((s) => [s.slice(WEB_SRC.length + 1), s] as const))(
-    "%s",
-    (_label, specPath) => {
-      const stubs = stubsIn(readFileSync(specPath, "utf8"));
-      const problems: string[] = [];
+  it.each(specs.map((s) => [s.slice(WEB_SRC.length + 1), s] as const))("%s", (_label, specPath) => {
+    const stubs = stubsIn(readFileSync(specPath, "utf8"));
+    const problems: string[] = [];
 
-      for (const stub of stubs) {
-        if (stub.component in UNRESOLVABLE) continue;
-        const files = componentIndex.get(stub.component);
-        // A stub for something that is not a single-file component in this
-        // repo (a local test double, a renamed component) is not this test's
-        // business.
-        if (!files || files.length !== 1) continue;
+    for (const stub of stubs) {
+      if (stub.component in UNRESOLVABLE) continue;
+      const files = componentIndex.get(stub.component);
+      // A stub for something that is not a single-file component in this
+      // repo (a local test double, a renamed component) is not this test's
+      // business.
+      if (!files || files.length !== 1) continue;
 
-        const real = declaredProps(files[0]);
-        if (!real || real.size === 0) continue;
+      const real = declaredProps(files[0]);
+      if (!real || real.size === 0) continue;
 
-        for (const prop of stub.props) {
-          if (!real.has(prop)) {
-            problems.push(
-              `${stub.component} has no prop "${prop}" — real props: ${[...real]
-                .sort()
-                .join(", ")}`,
-            );
-          }
+      for (const prop of stub.props) {
+        if (!real.has(prop)) {
+          problems.push(
+            `${stub.component} has no prop "${prop}" — real props: ${[...real].sort().join(", ")}`,
+          );
         }
       }
+    }
 
-      expect(problems).toEqual([]);
-    },
-  );
+    expect(problems).toEqual([]);
+  });
 });

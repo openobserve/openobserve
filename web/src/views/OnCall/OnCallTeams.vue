@@ -113,10 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
         <!-- A team with no second pool is ordinary, not a gap: a muted dash,
              not the alarm colour the primary column spends. -->
-        <span
-          v-else-if="!(positionsByTeam[row.id]?.rest.length ?? 0)"
-          class="text-text-muted"
-        >
+        <span v-else-if="!(positionsByTeam[row.id]?.rest.length ?? 0)" class="text-text-muted">
           {{ raw("—") }}
         </span>
         <span v-else class="flex flex-col gap-0.5">

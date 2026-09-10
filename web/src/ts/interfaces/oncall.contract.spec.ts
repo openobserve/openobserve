@@ -129,18 +129,38 @@ type Complete<U extends string, A extends readonly string[]> = [U] extends [A[nu
   : never;
 
 const RESPONSE_EVENT_KINDS = [
-  "sys", "page", "ack", "note", "rca", "handoff", "recovery", "state",
-  "exhausted", "delivery", "ai_verdict", "severity_promoted", "flapped",
+  "sys",
+  "page",
+  "ack",
+  "note",
+  "rca",
+  "handoff",
+  "recovery",
+  "state",
+  "exhausted",
+  "delivery",
+  "ai_verdict",
+  "severity_promoted",
+  "flapped",
 ] as const satisfies readonly ResponseEventKind[];
 const _c1: Complete<ResponseEventKind, typeof RESPONSE_EVENT_KINDS> = true;
 
 const CHANNELS = [
-  "email", "sms", "voice", "chat", "webhook", "push", "in_app",
+  "email",
+  "sms",
+  "voice",
+  "chat",
+  "webhook",
+  "push",
+  "in_app",
 ] as const satisfies readonly Channel[];
 const _c2: Complete<Channel, typeof CHANNELS> = true;
 
 const RESPONSE_STATES = [
-  "triggered", "triaged", "acknowledged", "resolved",
+  "triggered",
+  "triaged",
+  "acknowledged",
+  "resolved",
 ] as const satisfies readonly ResponseState[];
 const _c3: Complete<ResponseState, typeof RESPONSE_STATES> = true;
 
@@ -148,12 +168,17 @@ const RESPONDER_ROLES = ["owner", "impacted"] as const satisfies readonly Respon
 const _c4: Complete<ResponderRole, typeof RESPONDER_ROLES> = true;
 
 const SUBJECT_TYPES = [
-  "alert", "incident", "synthetic", "anomaly",
+  "alert",
+  "incident",
+  "synthetic",
+  "anomaly",
 ] as const satisfies readonly SubjectType[];
 const _c5: Complete<SubjectType, typeof SUBJECT_TYPES> = true;
 
 const ESCALATION_TARGET_KINDS = [
-  "rotation", "user", "whole_team",
+  "rotation",
+  "user",
+  "whole_team",
 ] as const satisfies readonly EscalationTargetKind[];
 const _c6: Complete<EscalationTargetKind, typeof ESCALATION_TARGET_KINDS> = true;
 
@@ -161,7 +186,8 @@ const ROTATION_MODES = ["on_call", "all"] as const satisfies readonly RotationMo
 const _c11: Complete<RotationMode, typeof ROTATION_MODES> = true;
 
 const FINAL_ACTIONS = [
-  "stop", "notify_default_team",
+  "stop",
+  "notify_default_team",
 ] as const satisfies readonly PolicyFinalAction[];
 const _c7: Complete<PolicyFinalAction, typeof FINAL_ACTIONS> = true;
 
@@ -169,13 +195,25 @@ const L0_MODES = ["parallel", "gate", "only"] as const satisfies readonly L0Mode
 const _c8: Complete<L0Mode, typeof L0_MODES> = true;
 
 const ROUTING_DECISION_KINDS = [
-  "explicit", "context", "ownership", "default", "unrouted",
+  "explicit",
+  "context",
+  "ownership",
+  "default",
+  "unrouted",
 ] as const satisfies readonly RoutingDecisionKind[];
 const _c9: Complete<RoutingDecisionKind, typeof ROUTING_DECISION_KINDS> = true;
 
 const PRESET_INPUT_KINDS = [
-  "group", "group_list", "day_of_week", "day_list", "minute_of_day",
-  "timezone", "duration_micros", "timestamp_micros", "text", "member_list",
+  "group",
+  "group_list",
+  "day_of_week",
+  "day_list",
+  "minute_of_day",
+  "timezone",
+  "duration_micros",
+  "timestamp_micros",
+  "text",
+  "member_list",
 ] as const satisfies readonly PresetInputKind[];
 const _c10: Complete<PresetInputKind, typeof PRESET_INPUT_KINDS> = true;
 

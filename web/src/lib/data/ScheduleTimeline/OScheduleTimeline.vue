@@ -76,7 +76,9 @@ function onPointerMove(event: MouseEvent) {
   // is the RIGHT edge. Measuring from `rect.left` regardless would run the
   // marker backwards on exactly the layouts nobody tests.
   const rtl = getComputedStyle(el).direction === "rtl";
-  const share = rtl ? (rect.right - event.clientX) / rect.width : (event.clientX - rect.left) / rect.width;
+  const share = rtl
+    ? (rect.right - event.clientX) / rect.width
+    : (event.clientX - rect.left) / rect.width;
 
   hover.value = clamp01(share);
   emit("hover", hover.value);
@@ -90,8 +92,7 @@ function onPointerLeave() {
 /// A pill centred on its line loses half of itself at the edges of the window —
 /// the same clipping the axis ticks had. It sits beside the line instead, and
 /// flips to the other side once there is no room on the right.
-const pillSide = (offset: number) =>
-  offset > 0.85 ? "-translate-x-full -ms-1.5" : "ms-1.5";
+const pillSide = (offset: number) => (offset > 0.85 ? "-translate-x-full -ms-1.5" : "ms-1.5");
 </script>
 
 <template>
@@ -112,106 +113,110 @@ const pillSide = (offset: number) =>
            reader was trying to read. -->
       <div v-if="laneHeaders" class="h-6 shrink-0" aria-hidden="true" />
 
-    <!-- Axis — labels sit above the plot area, aligned to the same 0-1 scale. -->
-    <div v-if="ticks.length" class="flex items-end">
-      <div v-if="!laneHeaders" :class="[labelClass, 'shrink-0']" />
-      <div
-        :class="[
-          'text-text-secondary text-2xs relative min-w-0 flex-1',
-          laneHeaders ? 'h-8' : 'h-4',
-        ]"
-      >
-        <!-- Centred ticks need a gutter to hang their left half over. Lane mode
+      <!-- Axis — labels sit above the plot area, aligned to the same 0-1 scale. -->
+      <div v-if="ticks.length" class="flex items-end">
+        <div v-if="!laneHeaders" :class="[labelClass, 'shrink-0']" />
+        <div
+          :class="[
+            'text-text-secondary text-2xs relative min-w-0 flex-1',
+            laneHeaders ? 'h-8' : 'h-4',
+          ]"
+        >
+          <!-- Centred ticks need a gutter to hang their left half over. Lane mode
              removes it, so they are anchored to the boundary they mark — which
              is also where a day label belongs when it labels a COLUMN rather
              than a point. -->
-        <span
-          v-for="tick in ticks"
-          :key="tick.key"
-          :class="[
-            'absolute bottom-0 flex flex-col whitespace-nowrap',
-            laneHeaders ? '' : '-translate-x-1/2',
-            tick.emphasis ? 'text-status-error-text font-medium' : '',
-          ]"
-          :style="inlineStart(tick.offset)"
-        >
-          <span>{{ tick.label }}</span>
-          <span v-if="tick.sublabel" class="text-text-secondary font-normal">{{
-            tick.sublabel
-          }}</span>
-        </span>
+          <span
+            v-for="tick in ticks"
+            :key="tick.key"
+            :class="[
+              'absolute bottom-0 flex flex-col whitespace-nowrap',
+              laneHeaders ? '' : '-translate-x-1/2',
+              tick.emphasis ? 'text-status-error-text font-medium' : '',
+            ]"
+            :style="inlineStart(tick.offset)"
+          >
+            <span>{{ tick.label }}</span>
+            <span v-if="tick.sublabel" class="text-text-secondary font-normal">{{
+              tick.sublabel
+            }}</span>
+          </span>
+        </div>
       </div>
-    </div>
 
-    <div
-      v-for="track in tracks"
-      :key="track.key"
-      :class="laneHeaders ? 'flex flex-col gap-1.5' : 'flex items-stretch gap-2'"
-      :data-test="`o2-schedule-track-${track.key}`"
-    >
-      <!-- Lane mode: the caller draws a full-width header above the strip. The
-           gutter it replaces is removed, so the strip spans the whole row. -->
-      <slot v-if="laneHeaders" name="track-header" :track="track" />
       <div
-        v-else
-        :class="[labelClass, 'text-text-secondary flex shrink-0 items-center truncate text-xs']"
+        v-for="track in tracks"
+        :key="track.key"
+        :class="laneHeaders ? 'flex flex-col gap-1.5' : 'flex items-stretch gap-2'"
+        :data-test="`o2-schedule-track-${track.key}`"
       >
-        {{ track.label }}
-      </div>
+        <!-- Lane mode: the caller draws a full-width header above the strip. The
+           gutter it replaces is removed, so the strip spans the whole row. -->
+        <slot v-if="laneHeaders" name="track-header" :track="track" />
+        <div
+          v-else
+          :class="[labelClass, 'text-text-secondary flex shrink-0 items-center truncate text-xs']"
+        >
+          {{ track.label }}
+        </div>
 
-      <!-- An empty strip is an answer, and usually the loudest one on the
+        <!-- An empty strip is an answer, and usually the loudest one on the
            chart. When the caller has something to say about it, it says it
            INSTEAD of the strip rather than inside an otherwise blank one. -->
-      <slot v-if="!track.bands.length && $slots['track-empty']" name="track-empty" :track="track" />
-
-      <div
-        v-else
-        :class="[
-          'bg-surface-subtle rounded-default relative h-7 min-w-0',
-          laneHeaders ? 'w-full' : 'flex-1',
-        ]"
-      >
-        <!-- Day / hour guides. Decorative, so no accessible name. -->
-        <span
-          v-for="(guide, index) in guides"
-          :key="`guide-${index}`"
-          class="border-border-default absolute inset-y-0 border-l"
-          :style="inlineStart(guide)"
-          aria-hidden="true"
+        <slot
+          v-if="!track.bands.length && $slots['track-empty']"
+          name="track-empty"
+          :track="track"
         />
 
-        <!-- An empty strip reads as "nobody, all week". When the row is empty
-             because nothing was fetched for it, say that instead. -->
-        <span
-          v-if="track.note && !track.bands.length"
-          class="text-text-muted absolute inset-0 flex items-center px-2 text-xs italic"
-          :data-test="`o2-schedule-track-note-${track.key}`"
+        <div
+          v-else
+          :class="[
+            'bg-surface-subtle rounded-default relative h-7 min-w-0',
+            laneHeaders ? 'w-full' : 'flex-1',
+          ]"
         >
-          {{ track.note }}
-        </span>
+          <!-- Day / hour guides. Decorative, so no accessible name. -->
+          <span
+            v-for="(guide, index) in guides"
+            :key="`guide-${index}`"
+            class="border-border-default absolute inset-y-0 border-l"
+            :style="inlineStart(guide)"
+            aria-hidden="true"
+          />
 
-        <template v-for="band in track.bands" :key="band.key">
-          <slot name="band" :band="band" :track="track">
-            <OScheduleBand :band="band" />
-          </slot>
-        </template>
+          <!-- An empty strip reads as "nobody, all week". When the row is empty
+             because nothing was fetched for it, say that instead. -->
+          <span
+            v-if="track.note && !track.bands.length"
+            class="text-text-muted absolute inset-0 flex items-center px-2 text-xs italic"
+            :data-test="`o2-schedule-track-note-${track.key}`"
+          >
+            {{ track.note }}
+          </span>
 
-        <!-- Now marker, drawn over the bands so it is never hidden by one.
+          <template v-for="band in track.bands" :key="band.key">
+            <slot name="band" :band="band" :track="track">
+              <OScheduleBand :band="band" />
+            </slot>
+          </template>
+
+          <!-- Now marker, drawn over the bands so it is never hidden by one.
              Gutter mode only — lane mode draws one full-height line over every
              track instead, from the overlay below. -->
-        <span
-          v-if="now !== null && !laneHeaders"
-          class="bg-accent absolute inset-y-0 z-1 w-px"
-          :style="inlineStart(now)"
-          :role="nowLabel ? 'img' : undefined"
-          :aria-label="nowLabel"
-          :aria-hidden="nowLabel ? undefined : 'true'"
-          data-test="o2-schedule-timeline-now"
-        />
+          <span
+            v-if="now !== null && !laneHeaders"
+            class="bg-accent absolute inset-y-0 z-1 w-px"
+            :style="inlineStart(now)"
+            :role="nowLabel ? 'img' : undefined"
+            :aria-label="nowLabel"
+            :aria-hidden="nowLabel ? undefined : 'true'"
+            data-test="o2-schedule-timeline-now"
+          />
+        </div>
       </div>
-    </div>
 
-    <!-- Full-height markers.
+      <!-- Full-height markers.
          LANE MODE ONLY: with no gutter the plot area IS this element's width,
          so one overlay spans every lane and the line reads as one line. In
          gutter mode the plot starts after the label column, and each strip
@@ -220,57 +225,57 @@ const pillSide = (offset: number) =>
          `pointer-events-none` throughout: the lane headers underneath carry
          buttons, and a marker that ate their clicks would be a worse trade
          than no marker. -->
-    <div v-if="laneHeaders" class="pointer-events-none absolute inset-0 z-2">
-      <!-- Where the pointer is. Grey, because it answers "which instant am I
+      <div v-if="laneHeaders" class="pointer-events-none absolute inset-0 z-2">
+        <!-- Where the pointer is. Grey, because it answers "which instant am I
            looking at" — a question about the reader, not about the schedule. -->
-      <template v-if="hover !== null">
-        <span
-          class="bg-border-strong absolute inset-y-0 w-px"
-          :style="inlineStart(hover)"
-          aria-hidden="true"
-          data-test="o2-schedule-timeline-hover"
-        />
-        <span
-          v-if="hoverLabel"
-          :class="[
-            'bg-text-secondary text-text-inverse rounded-default absolute top-0 px-1.5 py-0.5',
-            'text-2xs font-medium whitespace-nowrap',
-            pillSide(hover),
-          ]"
-          :style="inlineStart(hover)"
-          aria-hidden="true"
-          data-test="o2-schedule-timeline-hover-label"
-        >
-          {{ hoverLabel }}
-        </span>
-      </template>
+        <template v-if="hover !== null">
+          <span
+            class="bg-border-strong absolute inset-y-0 w-px"
+            :style="inlineStart(hover)"
+            aria-hidden="true"
+            data-test="o2-schedule-timeline-hover"
+          />
+          <span
+            v-if="hoverLabel"
+            :class="[
+              'bg-text-secondary text-text-inverse rounded-default absolute top-0 px-1.5 py-0.5',
+              'text-2xs font-medium whitespace-nowrap',
+              pillSide(hover),
+            ]"
+            :style="inlineStart(hover)"
+            aria-hidden="true"
+            data-test="o2-schedule-timeline-hover-label"
+          >
+            {{ hoverLabel }}
+          </span>
+        </template>
 
-      <!-- Now. Drawn last so it stays legible where the two cross, and always
+        <!-- Now. Drawn last so it stays legible where the two cross, and always
            present: every instant on this chart is read relative to it. -->
-      <template v-if="now !== null">
-        <span
-          class="bg-status-error-text absolute inset-y-0 z-1 w-px"
-          :style="inlineStart(now)"
-          :role="nowLabel ? 'img' : undefined"
-          :aria-label="nowLabel"
-          :aria-hidden="nowLabel ? undefined : 'true'"
-          data-test="o2-schedule-timeline-now"
-        />
-        <span
-          v-if="nowLabel"
-          :class="[
-            'bg-status-error-text text-text-inverse rounded-default absolute top-0 z-1 px-1.5 py-0.5',
-            'text-2xs font-medium whitespace-nowrap',
-            pillSide(now),
-          ]"
-          :style="inlineStart(now)"
-          aria-hidden="true"
-          data-test="o2-schedule-timeline-now-label"
-        >
-          {{ nowLabel }}
-        </span>
-      </template>
-    </div>
+        <template v-if="now !== null">
+          <span
+            class="bg-status-error-text absolute inset-y-0 z-1 w-px"
+            :style="inlineStart(now)"
+            :role="nowLabel ? 'img' : undefined"
+            :aria-label="nowLabel"
+            :aria-hidden="nowLabel ? undefined : 'true'"
+            data-test="o2-schedule-timeline-now"
+          />
+          <span
+            v-if="nowLabel"
+            :class="[
+              'bg-status-error-text text-text-inverse rounded-default absolute top-0 z-1 px-1.5 py-0.5',
+              'text-2xs font-medium whitespace-nowrap',
+              pillSide(now),
+            ]"
+            :style="inlineStart(now)"
+            aria-hidden="true"
+            data-test="o2-schedule-timeline-now-label"
+          >
+            {{ nowLabel }}
+          </span>
+        </template>
+      </div>
     </div>
 
     <div v-if="$slots.legend" class="flex flex-wrap items-center gap-2">

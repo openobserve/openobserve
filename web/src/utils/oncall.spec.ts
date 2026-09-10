@@ -16,11 +16,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { EscalationLevel, Rotation, ShiftRule, TimeWindow } from "@/ts/interfaces/oncall";
-import {
-  MICROS_PER_DAY,
-  MICROS_PER_HOUR,
-  MICROS_PER_WEEK,
-} from "@/ts/interfaces/oncall";
+import { MICROS_PER_DAY, MICROS_PER_HOUR, MICROS_PER_WEEK } from "@/ts/interfaces/oncall";
 import {
   CHANNEL_WAKES,
   PRIORITY_TONE,
@@ -98,9 +94,7 @@ describe("memberAt", () => {
     const r = weekly(["ana@o2.ai", "bob@o2.ai", "cara@o2.ai"]);
     const expected = ["ana@o2.ai", "bob@o2.ai", "cara@o2.ai"];
     for (let week = 0; week < 9; week++) {
-      expect(memberAt(r, ANCHOR + week * MICROS_PER_WEEK)).toBe(
-        expected[week % 3],
-      );
+      expect(memberAt(r, ANCHOR + week * MICROS_PER_WEEK)).toBe(expected[week % 3]);
     }
   });
 
@@ -136,12 +130,8 @@ describe("memberAt", () => {
   // fallback member.
   it("resolves to nobody when the rotation is unusable", () => {
     expect(memberAt(weekly([]), ANCHOR)).toBeNull();
-    expect(
-      memberAt({ ...weekly(["ana@o2.ai"]), shift_micros: 0 }, ANCHOR),
-    ).toBeNull();
-    expect(
-      memberAt({ ...weekly(["ana@o2.ai"]), shift_micros: -1 }, ANCHOR),
-    ).toBeNull();
+    expect(memberAt({ ...weekly(["ana@o2.ai"]), shift_micros: 0 }, ANCHOR)).toBeNull();
+    expect(memberAt({ ...weekly(["ana@o2.ai"]), shift_micros: -1 }, ANCHOR)).toBeNull();
   });
 });
 
@@ -185,9 +175,7 @@ describe("tag variants", () => {
 
   it("maps every lifecycle state to a distinct variant", () => {
     const variants = new Set(
-      (["triggered", "triaged", "acknowledged", "resolved"] as const).map(
-        stateTagVariant,
-      ),
+      (["triggered", "triaged", "acknowledged", "resolved"] as const).map(stateTagVariant),
     );
     expect(variants.size).toBe(4);
   });
@@ -266,7 +254,10 @@ describe("groupBySubject", () => {
   /// Two subject types can share a source id without being the same thing.
   it("does not merge different subject types", () => {
     const alert = rec("a", "same", 100);
-    const incident = { ...rec("b", "same", 200), subject: { subject_type: "incident", source_id: "same", firing: 1 } };
+    const incident = {
+      ...rec("b", "same", 200),
+      subject: { subject_type: "incident", source_id: "same", firing: 1 },
+    };
 
     expect(groupBySubject([alert, incident as any])).toHaveLength(2);
   });
@@ -280,9 +271,7 @@ describe("isStaffed", () => {
   const rotation = (members: string[]): Rotation => ({
     id: "rot_primary",
     name: "Primary",
-    shift_rules: [
-      { name: "Base", members, shift_micros: 604_800_000_000, anchor_micros: 0 },
-    ],
+    shift_rules: [{ name: "Base", members, shift_micros: 604_800_000_000, anchor_micros: 0 }],
   });
 
   /// The only coverage question left. There used to be six slots to leave
@@ -302,9 +291,7 @@ describe("isStaffed", () => {
   /// Two rotations are two positions. One with a gap does not make the team
   /// unreachable — the other still pages.
   it("is true when any one rotation is staffed", () => {
-    expect(
-      isStaffed([rotation([]), rotation(["ana@o2.ai"])], 0, "UTC"),
-    ).toBe(true);
+    expect(isStaffed([rotation([]), rotation(["ana@o2.ai"])], 0, "UTC")).toBe(true);
   });
 });
 
@@ -741,8 +728,16 @@ describe("isShiftRuleValid", () => {
     ["a zero shift", { ...base(), shift_micros: 0 }, false],
     ["a negative shift", { ...base(), shift_micros: -1 }, false],
     ["a blank name", { ...base(), name: "  " }, false],
-    ["a case-insensitive duplicate member", { ...base(), members: ["ana@o2.ai", "ANA@o2.ai"] }, false],
-    ["a validity window that ends before it starts", { ...base(), starts_at: 2, ends_at: 1 }, false],
+    [
+      "a case-insensitive duplicate member",
+      { ...base(), members: ["ana@o2.ai", "ANA@o2.ai"] },
+      false,
+    ],
+    [
+      "a validity window that ends before it starts",
+      { ...base(), starts_at: 2, ends_at: 1 },
+      false,
+    ],
   ])("%s → %s", (_name, rule, expected) => {
     expect(isShiftRuleValid(rule as ShiftRule)).toBe(expected);
   });
@@ -847,7 +842,9 @@ describe("resolveHolder", () => {
   });
 
   it("walks the winning rule's own handover order", () => {
-    const rotation = rota("Primary", [layer("Base", ["ana@o2.ai", "bob@o2.ai", "cara@o2.ai"], 0, [])]);
+    const rotation = rota("Primary", [
+      layer("Base", ["ana@o2.ai", "bob@o2.ai", "cara@o2.ai"], 0, []),
+    ]);
     expect(resolveHolder(rotation, ANCHOR, IST).member).toBe("ana@o2.ai");
     expect(resolveHolder(rotation, ANCHOR + MICROS_PER_WEEK, IST).member).toBe("bob@o2.ai");
   });
@@ -894,7 +891,9 @@ describe("resolvePositions", () => {
 
 describe("resolveNextHolder", () => {
   it("is the winning rule's next member", () => {
-    const rotation = rota("Primary", [layer("Base", ["ana@o2.ai", "bob@o2.ai", "cara@o2.ai"], 0, [])]);
+    const rotation = rota("Primary", [
+      layer("Base", ["ana@o2.ai", "bob@o2.ai", "cara@o2.ai"], 0, []),
+    ]);
     expect(resolveNextHolder(rotation, ANCHOR, IST)).toBe("bob@o2.ai");
     expect(resolveNextHolder(rotation, ANCHOR + MICROS_PER_WEEK, IST)).toBe("cara@o2.ai");
   });
@@ -907,7 +906,9 @@ describe("resolveNextHolder", () => {
   // Returning the same person would page them twice and call the second one an
   // escalation.
   it("is null for a one-person rotation", () => {
-    expect(resolveNextHolder(rota("P", [layer("Base", ["ana@o2.ai"], 0, [])]), ANCHOR, IST)).toBeNull();
+    expect(
+      resolveNextHolder(rota("P", [layer("Base", ["ana@o2.ai"], 0, [])]), ANCHOR, IST),
+    ).toBeNull();
   });
 
   it("is null when nobody is on call", () => {
@@ -981,9 +982,7 @@ describe("describeRestrictions", () => {
       "oncall.day_sat": "Sat",
       "oncall.day_sun": "Sun",
     };
-    return (messages[key] ?? key).replace(/\{(\w+)\}/g, (_m, name) =>
-      String(params?.[name] ?? ""),
-    );
+    return (messages[key] ?? key).replace(/\{(\w+)\}/g, (_m, name) => String(params?.[name] ?? ""));
   }) as unknown as TranslateFn;
 
   // "always" would read as "the layers above this never fire". It is the
@@ -1064,9 +1063,9 @@ describe("routingReasonOf", () => {
   });
 
   it("finds the explicit-team sentence", () => {
-    expect(
-      routingReasonOf([ev("sys", "routed to tm_pay by the alert's own setting")]),
-    ).toBe("routed to tm_pay by the alert's own setting");
+    expect(routingReasonOf([ev("sys", "routed to tm_pay by the alert's own setting")])).toBe(
+      "routed to tm_pay by the alert's own setting",
+    );
   });
 
   it("finds the unrouted sentence", () => {
@@ -1320,9 +1319,9 @@ describe("compareRulePrecedence", () => {
   /// STRING, so sorting on rendered text ranks it first — but the server
   /// resolves the service rule as the winner, on literal characters.
   it("ranks by pinned literal characters, not by rendered path length", () => {
-    expect(
-      order(rule({ "k8s-namespace": "payments" }), rule({ service: "payments-api" })),
-    ).toEqual(["service=payments-api", "k8s-namespace=payments"]);
+    expect(order(rule({ "k8s-namespace": "payments" }), rule({ service: "payments-api" }))).toEqual(
+      ["service=payments-api", "k8s-namespace=payments"],
+    );
   });
 
   it("puts the deeper rule first, however short its values", () => {
@@ -1432,9 +1431,9 @@ describe("shortReachReason", () => {
     expect(shortReachReason("`root@example` is a login, not a mailbox", t)).toBe(
       "oncall.reachShortNotMailbox",
     );
-    expect(
-      shortReachReason("`a@example.com` uses a domain reserved for documentation", t),
-    ).toBe("oncall.reachShortUnroutable");
+    expect(shortReachReason("`a@example.com` uses a domain reserved for documentation", t)).toBe(
+      "oncall.reachShortUnroutable",
+    );
   });
 
   /// Guessing a short word for a cause we have never seen is how a UI tells

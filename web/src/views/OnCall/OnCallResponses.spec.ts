@@ -137,7 +137,7 @@ const stubs = {
   RouterLink: {
     name: "RouterLink",
     props: ["to"],
-    template: "<a @click.stop=\"push(to)\"><slot /></a>",
+    template: '<a @click.stop="push(to)"><slot /></a>',
     setup() {
       return { push };
     },
@@ -160,7 +160,11 @@ const stubs = {
     emits: ["update:modelValue"],
     template: "<div><slot /></div>",
   },
-  OToggleGroupItem: { name: "OToggleGroupItem", props: ["value"], template: "<button><slot /></button>" },
+  OToggleGroupItem: {
+    name: "OToggleGroupItem",
+    props: ["value"],
+    template: "<button><slot /></button>",
+  },
   ODropdownSeparator: { name: "ODropdownSeparator", template: "<hr />" },
   OTag: { name: "OTag", template: "<span><slot /></span>" },
   OEmptyState: {
@@ -249,10 +253,7 @@ describe("OnCallResponses", () => {
     Object.fromEntries(
       ["ringing", "snoozed", "handled"]
         .filter((key) => w.find(`[data-test='oncall-section-header-${key}']`).exists())
-        .map((key) => [
-          key,
-          Number(w.find(`[data-test='oncall-section-count-${key}']`).text()),
-        ]),
+        .map((key) => [key, Number(w.find(`[data-test='oncall-section-count-${key}']`).text())]),
     );
 
   /// A snoozed page is still open, so it would otherwise sit in the run of
@@ -456,9 +457,7 @@ describe("OnCallResponses", () => {
       } as any);
       const wrapper = await withPages([page({ priority: 1 })]);
 
-      expect(wrapper.findComponent({ name: "OnCallEscalationCell" }).props("totalRungs")).toBe(
-        3,
-      );
+      expect(wrapper.findComponent({ name: "OnCallEscalationCell" }).props("totalRungs")).toBe(3);
     });
   });
 
@@ -888,7 +887,8 @@ describe("OnCallResponses", () => {
     async function withMyShift(rows: Record<string, unknown>[]) {
       service.whoIsOnCall.mockImplementation(({ team_id }: any) =>
         Promise.resolve({
-          data: team_id === "team_1" ? [{ rotation: "Primary", user_email: "example@gmail.com" }] : [],
+          data:
+            team_id === "team_1" ? [{ rotation: "Primary", user_email: "example@gmail.com" }] : [],
         } as any),
       );
       return withPages(rows);
@@ -1190,7 +1190,6 @@ describe("OnCallResponses", () => {
       expect(sections(wrapper)).toEqual({ ringing: 1 });
     });
   });
-
 });
 
 /// Two things the triage list already held and did not use.
@@ -1330,9 +1329,7 @@ describe("OnCallResponses — filtering by cause", () => {
   /// the component, which a CSS selector passed to `findComponent` does not
   /// match.
   const byTest = (wrapper: any, name: string, test: string) =>
-    wrapper
-      .findAllComponents({ name })
-      .find((c: any) => c.attributes("data-test") === test);
+    wrapper.findAllComponents({ name }).find((c: any) => c.attributes("data-test") === test);
 
   const cause = (wrapper: any) => byTest(wrapper, "OSelect", "oncall-responses-cause-filter");
   const filterTabs = (wrapper: any) =>

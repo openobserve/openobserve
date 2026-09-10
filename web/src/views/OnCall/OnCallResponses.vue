@@ -206,10 +206,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
 
-      <template
-        v-if="selectedIds.length || truncated || escalationCapped"
-        #bottom
-      >
+      <template v-if="selectedIds.length || truncated || escalationCapped" #bottom>
         <div v-if="selectedIds.length" class="flex w-full flex-wrap items-center gap-2">
           <OText variant="body" as="span" data-test="oncall-bulk-count">
             {{ t("oncall.selectedCount", { count: selectedIds.length }) }}
@@ -307,7 +304,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="px-page-edge flex flex-wrap items-center gap-x-2 gap-y-1 py-1.5"
           :data-test="`oncall-section-header-${sectionKey}`"
         >
-          <span class="text-2xs font-semibold tracking-wide uppercase" :class="sectionTone(sectionKey)">
+          <span
+            class="text-2xs font-semibold tracking-wide uppercase"
+            :class="sectionTone(sectionKey)"
+          >
             {{ t(`oncall.section_${sectionKey}`) }}
           </span>
           <OTag variant="default-soft" size="sm" :data-test="`oncall-section-count-${sectionKey}`">
@@ -541,7 +541,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTooltip
               v-if="!isDeliverableChannel(channel)"
               side="top"
-              :content="t('oncall.channelUndeliverable', { channel: t(`oncall.channel_${channel}`) })"
+              :content="
+                t('oncall.channelUndeliverable', { channel: t(`oncall.channel_${channel}`) })
+              "
             />
           </OTag>
         </span>
@@ -1306,8 +1308,7 @@ const myShift = computed(() => {
   // Soonest handover first: the shift ending next is the one being counted down.
   const sorted = [...mine].sort(
     (a, b) =>
-      (handoverByTeam.value[a.team.id] ?? Infinity) -
-      (handoverByTeam.value[b.team.id] ?? Infinity),
+      (handoverByTeam.value[a.team.id] ?? Infinity) - (handoverByTeam.value[b.team.id] ?? Infinity),
   );
   const first = sorted[0];
   return {
@@ -1626,9 +1627,7 @@ async function fetchIncidentTitles() {
     ),
   ];
   if (!ids.length) return;
-  const results = await Promise.allSettled(
-    ids.map((id) => incidentsService.get(orgId.value, id)),
-  );
+  const results = await Promise.allSettled(ids.map((id) => incidentsService.get(orgId.value, id)));
   const next = { ...incidentTitleById.value };
   ids.forEach((id, index) => {
     const result = results[index];

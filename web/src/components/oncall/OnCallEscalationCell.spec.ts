@@ -67,9 +67,7 @@ function render(
 describe("OnCallEscalationCell", () => {
   it("names the rung it is on out of the rungs the policy defines", () => {
     const wrapper = render("triggered", { fired: firedRungs(2) });
-    expect(wrapper.find('[data-test="oncall-escalation-cell-level"]').text()).toBe(
-      "Level 2 of 3",
-    );
+    expect(wrapper.find('[data-test="oncall-escalation-cell-level"]').text()).toBe("Level 2 of 3");
   });
 
   /// A guessed denominator is worse than none: "Level 2 of 3" against a policy
@@ -132,9 +130,7 @@ describe("OnCallEscalationCell", () => {
 
   it("says nothing has been paged when the ladder position is unknown", () => {
     const wrapper = render("triggered", null);
-    expect(wrapper.find('[data-test="oncall-escalation-cell-level"]').text()).toBe(
-      "Not paged yet",
-    );
+    expect(wrapper.find('[data-test="oncall-escalation-cell-level"]').text()).toBe("Not paged yet");
   });
 
   /// The bar and the state icon both restated the headline, and the row already
@@ -204,5 +200,4 @@ describe("OnCallEscalationCell", () => {
       "Escalating — level 2, paging liam@o2.ai",
     );
   });
-
 });

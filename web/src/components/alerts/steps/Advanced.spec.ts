@@ -260,9 +260,10 @@ describe("Advanced — on-call team picker", () => {
     expect(select.exists()).toBe(true);
     expect(listTeamsMock).toHaveBeenCalledOnce();
 
-    const options = host
-      .findComponent({ name: "Step6Advanced" })
-      .vm.oncallTeamOptions as Array<{ label: string; value: string }>;
+    const options = host.findComponent({ name: "Step6Advanced" }).vm.oncallTeamOptions as Array<{
+      label: string;
+      value: string;
+    }>;
     expect(options).toEqual([
       { label: "Payments", value: "tm_pay" },
       { label: "Platform", value: "tm_plat" },

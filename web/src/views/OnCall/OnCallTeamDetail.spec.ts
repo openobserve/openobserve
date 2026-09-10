@@ -773,7 +773,9 @@ describe("OnCallTeamDetail", () => {
     const wrapper = render();
     await flushPromises();
 
-    wrapper.findComponent({ name: "OnCallTeamAttention" }).vm.$emit("act", "schedule", "Rotation 2");
+    wrapper
+      .findComponent({ name: "OnCallTeamAttention" })
+      .vm.$emit("act", "schedule", "Rotation 2");
     await flushPromises();
 
     const panels = wrapper.findComponent({ name: "OTabPanels" });
@@ -939,9 +941,9 @@ describe("OnCallTeamDetail", () => {
       await showWeek(wrapper);
 
       expect(service.resolvedSchedule).not.toHaveBeenCalled();
-      expect(
-        wrapper.findComponent({ name: "OnCallScheduleTimeline" }).props("segments"),
-      ).toEqual([]);
+      expect(wrapper.findComponent({ name: "OnCallScheduleTimeline" }).props("segments")).toEqual(
+        [],
+      );
     });
   });
 });

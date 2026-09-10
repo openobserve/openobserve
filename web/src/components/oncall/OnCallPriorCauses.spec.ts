@@ -92,9 +92,9 @@ describe("OnCallPriorCauses", () => {
 
   it("renders a cause that has no note", () => {
     const wrapper = render([group({ note: null })]);
-    expect(wrapper.find('[data-test="oncall-prior-cause-config_change_or_deploy"]').text()).toContain(
-      "Config change / deploy",
-    );
+    expect(
+      wrapper.find('[data-test="oncall-prior-cause-config_change_or_deploy"]').text(),
+    ).toContain("Config change / deploy");
   });
 
   /// While the fetch is in flight `groups` is `[]` — indistinguishable from a

@@ -102,11 +102,7 @@ import { MICROS_PER_DAY } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { formatMicrosDuration } from "@/utils/formatters";
-import {
-  formatInZone,
-  resolveHolder,
-  wallTimeInZone,
-} from "@/utils/oncall";
+import { formatInZone, resolveHolder, wallTimeInZone } from "@/utils/oncall";
 
 const props = withDefaults(
   defineProps<{
@@ -250,7 +246,12 @@ const holderRuns = computed<HolderRun[]>(() => {
     runSample = sample;
     runKey = key;
   }
-  out.push({ from: runStart, to: end.value, primary: runSample.primary, secondary: runSample.secondary });
+  out.push({
+    from: runStart,
+    to: end.value,
+    primary: runSample.primary,
+    secondary: runSample.secondary,
+  });
   return out;
 });
 
@@ -318,9 +319,7 @@ const tracks = computed<ScheduleTrack[]>(() => {
 /// The first stretch with nobody on call. Read off the SAME runs the bands are
 /// drawn from, never resolved a second way: a sentence that disagreed with the
 /// picture above it would be worse than no sentence.
-const firstGap = computed<Run | null>(
-  () => runs.value.find((run) => run.cover === "none") ?? null,
-);
+const firstGap = computed<Run | null>(() => runs.value.find((run) => run.cover === "none") ?? null);
 
 /// Cover the moment the strip starts, which is now.
 const coveredNow = computed(() => runs.value[0]?.cover !== "none");
@@ -406,9 +405,7 @@ const dayBoundaries = computed<number[]>(() => {
   return out;
 });
 
-const dayColumns = computed(() =>
-  dayBoundaries.value.map((at) => (at - start.value) / span.value),
-);
+const dayColumns = computed(() => dayBoundaries.value.map((at) => (at - start.value) / span.value));
 
 /// Dates on the axis. Every day's label would collide at a fortnight's zoom, so
 /// they thin out — but always onto real midnights, never onto even fractions of

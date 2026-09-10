@@ -278,9 +278,7 @@ const segments = computed(() =>
 );
 
 /// The segments that are actually conditions — `Any` writes nothing.
-const pinned = computed(() =>
-  segments.value.filter((segment) => segment.value !== ANY),
-);
+const pinned = computed(() => segments.value.filter((segment) => segment.value !== ANY));
 
 /// The claim in a sentence, including what it does not take.
 const consequence = computed<I18nText>(() => {

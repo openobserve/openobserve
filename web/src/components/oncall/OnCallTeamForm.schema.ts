@@ -19,10 +19,7 @@ export const makeOnCallTeamSchema = (t: (_key: string) => string) =>
       .string()
       .min(1, t("oncall.teamNameRequired"))
       .refine((v) => v.trim().length > 0, t("oncall.teamNameRequired"))
-      .refine(
-        (v) => [...v].length <= TEAM_NAME_MAX,
-        t("oncall.teamNameTooLong"),
-      ),
+      .refine((v) => [...v].length <= TEAM_NAME_MAX, t("oncall.teamNameTooLong")),
     timezone: z.string().min(1, t("oncall.timezoneRequired")),
     description: z.string().optional(),
     // Creation-only. Optional so the edit drawer — which shows none of these,

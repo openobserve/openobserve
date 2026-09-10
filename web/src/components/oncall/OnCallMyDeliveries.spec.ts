@@ -42,7 +42,11 @@ const stubs = {
       </div>
     </div>`,
   },
-  OEmptyState: { name: "OEmptyState", props: ["description"], template: "<div>{{ description }}</div>" },
+  OEmptyState: {
+    name: "OEmptyState",
+    props: ["description"],
+    template: "<div>{{ description }}</div>",
+  },
   // `type` and `value` are declared so the state chip can be asserted on: an
   // undeclared prop lands in attrs and `props("value")` reads undefined.
   OTag: { name: "OTag", props: ["variant", "type", "value"], template: "<span><slot /></span>" },

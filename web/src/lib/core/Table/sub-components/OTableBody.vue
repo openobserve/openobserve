@@ -267,65 +267,62 @@ const headingColspan = computed(
        items, so sectioned and unsectioned bodies share the row markup. -->
   <tbody v-else-if="!isVirtual()" data-test="o2-table-body">
     <template v-for="item in plainBodyItems" :key="item.itemKey">
-    <!-- Spans every visible column: a heading is about the run below it, not
+      <!-- Spans every visible column: a heading is about the run below it, not
          about one column. -->
-    <tr
-      v-if="item.kind === 'heading'"
-      :data-test="`o2-table-section-${item.sectionKey}`"
-      class="bg-surface-panel"
-    >
-      <td
-        :colspan="headingColspan"
-        :class="bordered ? 'border-table-row-divider border-b' : ''"
+      <tr
+        v-if="item.kind === 'heading'"
+        :data-test="`o2-table-section-${item.sectionKey}`"
+        class="bg-surface-panel"
       >
-        <slot name="group-header" :section-key="item.sectionKey" :rows="item.rows" />
-      </td>
-    </tr>
+        <td :colspan="headingColspan" :class="bordered ? 'border-table-row-divider border-b' : ''">
+          <slot name="group-header" :section-key="item.sectionKey" :rows="item.rows" />
+        </td>
+      </tr>
 
-    <OTableBodyRow
-      v-else-if="item.kind === 'row'"
-      :row="item.row"
-      :table="table"
-      :clickable="clickable"
-      :selection-enabled="selectionEnabled"
-      :selection-multiple="selectionMultiple"
-      :is-row-selected="isRowSelectedFn?.(item.row.original)"
-      :is-row-selectable="isRowSelectable"
-      :expansion-enabled="expansionEnabled"
-      :can-expand="getRowExpansionEnabled ? getRowExpansionEnabled(item.row.original) : true"
-      :is-expanded="isExpandedFn?.(item.row.original)"
-      :highlight-text="highlightText"
-      :should-highlight-column="shouldHighlightColumn"
-      :get-highlighted-html="getHighlightedHtml"
-      :wrap="wrap"
-      :dense="dense"
-      :bordered="bordered"
-      :striped="striped"
-      :row-class-fn="rowClass"
-      :row-style-fn="rowStyleFn"
-      :status-bar-color="getStatusBarColor?.(item.row.original)"
-      :enable-cell-copy="enableCellCopy"
-      :get-cell-style="getCellStyle"
-      :get-pivot-merge="getPivotMerge"
-      :enable-row-reorder="props.enableRowReorder"
-      :row-draggable="false"
-      @toggle-selection="emit('toggle-selection', $event)"
-      @toggle-expansion="emit('toggle-expansion', $event)"
-      @row-click="(row: any, evt: MouseEvent) => emit('row-click', row, evt)"
-      @row-dblclick="(row: any, evt: MouseEvent) => emit('row-dblclick', row, evt)"
-      @row-mouseenter="(row: any, evt: MouseEvent) => emit('row-mouseenter', row, evt)"
-      @row-mouseleave="(row: any) => emit('row-mouseleave', row)"
-      @cell-click="emit('cell-click', $event)"
-      @cell-contextmenu="emit('cell-contextmenu', $event)"
-    >
-      <!-- Pass through named cell slots from parent -->
-      <template v-for="(_, slotName) in slots" :key="slotName" #[slotName]="slotProps">
-        <slot :name="slotName" v-bind="slotProps" />
-      </template>
-      <template v-if="slots.expansion" #expansion="expSlotProps">
-        <slot name="expansion" v-bind="expSlotProps" />
-      </template>
-    </OTableBodyRow>
+      <OTableBodyRow
+        v-else-if="item.kind === 'row'"
+        :row="item.row"
+        :table="table"
+        :clickable="clickable"
+        :selection-enabled="selectionEnabled"
+        :selection-multiple="selectionMultiple"
+        :is-row-selected="isRowSelectedFn?.(item.row.original)"
+        :is-row-selectable="isRowSelectable"
+        :expansion-enabled="expansionEnabled"
+        :can-expand="getRowExpansionEnabled ? getRowExpansionEnabled(item.row.original) : true"
+        :is-expanded="isExpandedFn?.(item.row.original)"
+        :highlight-text="highlightText"
+        :should-highlight-column="shouldHighlightColumn"
+        :get-highlighted-html="getHighlightedHtml"
+        :wrap="wrap"
+        :dense="dense"
+        :bordered="bordered"
+        :striped="striped"
+        :row-class-fn="rowClass"
+        :row-style-fn="rowStyleFn"
+        :status-bar-color="getStatusBarColor?.(item.row.original)"
+        :enable-cell-copy="enableCellCopy"
+        :get-cell-style="getCellStyle"
+        :get-pivot-merge="getPivotMerge"
+        :enable-row-reorder="props.enableRowReorder"
+        :row-draggable="false"
+        @toggle-selection="emit('toggle-selection', $event)"
+        @toggle-expansion="emit('toggle-expansion', $event)"
+        @row-click="(row: any, evt: MouseEvent) => emit('row-click', row, evt)"
+        @row-dblclick="(row: any, evt: MouseEvent) => emit('row-dblclick', row, evt)"
+        @row-mouseenter="(row: any, evt: MouseEvent) => emit('row-mouseenter', row, evt)"
+        @row-mouseleave="(row: any) => emit('row-mouseleave', row)"
+        @cell-click="emit('cell-click', $event)"
+        @cell-contextmenu="emit('cell-contextmenu', $event)"
+      >
+        <!-- Pass through named cell slots from parent -->
+        <template v-for="(_, slotName) in slots" :key="slotName" #[slotName]="slotProps">
+          <slot :name="slotName" v-bind="slotProps" />
+        </template>
+        <template v-if="slots.expansion" #expansion="expSlotProps">
+          <slot name="expansion" v-bind="expSlotProps" />
+        </template>
+      </OTableBodyRow>
     </template>
   </tbody>
 

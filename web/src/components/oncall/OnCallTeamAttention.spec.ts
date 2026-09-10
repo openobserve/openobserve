@@ -36,8 +36,7 @@ const stubs = {
   ODrawer: {
     name: "ODrawer",
     props: ["open"],
-    template:
-      "<div v-if='open'><slot name='header-right' /><slot /><slot name='footer' /></div>",
+    template: "<div v-if='open'><slot name='header-right' /><slot /><slot name='footer' /></div>",
   },
   OTag: { name: "OTag", template: "<span><slot /></span>" },
   OText: { name: "OText", template: "<span><slot /></span>" },
@@ -125,10 +124,10 @@ describe("OnCallTeamAttention", () => {
     it("says the roster is empty and points at the roster", async () => {
       const wrapper = await open(render(risks([gap]), { hasMembers: false }));
 
-      expect(wrapper.find('[data-test="oncall-attention-team_has_no_members"]').exists()).toBe(true);
-      await wrapper
-        .find('[data-test="oncall-attention-cta-team_has_no_members"]')
-        .trigger("click");
+      expect(wrapper.find('[data-test="oncall-attention-team_has_no_members"]').exists()).toBe(
+        true,
+      );
+      await wrapper.find('[data-test="oncall-attention-cta-team_has_no_members"]').trigger("click");
       expect(wrapper.emitted("act")?.[0]?.[0]).toBe("members");
     });
 
@@ -249,7 +248,9 @@ describe("OnCallTeamAttention", () => {
         ]),
       ),
     );
-    await wrapper.find('[data-test="oncall-attention-cta-single_member_rotation"]').trigger("click");
+    await wrapper
+      .find('[data-test="oncall-attention-cta-single_member_rotation"]')
+      .trigger("click");
 
     expect(wrapper.emitted("act")?.[0]).toEqual(["schedule", "Rotation 2"]);
   });
@@ -341,16 +342,19 @@ describe("OnCallTeamAttention", () => {
         { reachability: reachability(false), overview: overview(24) },
       ),
     );
-    expect(wrapper.find('[data-test="oncall-attention-evidence-unreachable_on_rung"]').text()).toContain(
-      "24 pages sent in the last 7 days",
-    );
+    expect(
+      wrapper.find('[data-test="oncall-attention-evidence-unreachable_on_rung"]').text(),
+    ).toContain("24 pages sent in the last 7 days");
   });
 
   it("says how often a narrow ladder has already run to its end", async () => {
     const wrapper = await open(
-      render(risks([risk({ kind: "ladder_last_rung_is_not_the_whole_team", severity: "medium" })]), {
-        overview: overview(24, 2),
-      }),
+      render(
+        risks([risk({ kind: "ladder_last_rung_is_not_the_whole_team", severity: "medium" })]),
+        {
+          overview: overview(24, 2),
+        },
+      ),
     );
     expect(
       wrapper

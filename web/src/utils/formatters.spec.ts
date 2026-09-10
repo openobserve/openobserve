@@ -522,12 +522,9 @@ describe("formatMicrosDuration", () => {
 
   // Clock skew across nodes can produce a negative span; showing "-3s" would
   // read as a real measurement.
-  it.each([-1, Number.NaN, Number.POSITIVE_INFINITY])(
-    "renders an em dash for %s",
-    (micros) => {
-      expect(formatMicrosDuration(micros)).toBe("—");
-    },
-  );
+  it.each([-1, Number.NaN, Number.POSITIVE_INFINITY])("renders an em dash for %s", (micros) => {
+    expect(formatMicrosDuration(micros)).toBe("—");
+  });
 });
 
 // ---------------------------------------------------------------------------
