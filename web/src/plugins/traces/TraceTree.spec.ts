@@ -1435,6 +1435,24 @@ describe("TraceTree", () => {
     });
   });
 
+  describe("span name tooltips", () => {
+    // Both names sit in one row; a title on their shared ancestor made the
+    // service name report the operation name on hover.
+    it("titles the service name with the service name", () => {
+      const serviceName = wrapper.find(
+        '[data-test="trace-tree-span-service-name-d9603ec7f76eb499"]',
+      );
+      expect(serviceName.attributes("title")).toBe("scheduler");
+    });
+
+    it("titles the operation name with the operation name", () => {
+      const operationName = wrapper.find(
+        '[data-test="trace-tree-span-operation-name-d9603ec7f76eb499"]',
+      );
+      expect(operationName.attributes("title")).toBe("service:alerts:evaluate_scheduled");
+    });
+  });
+
   describe("viewSpanLogs", () => {
     // A formatted tree node — what the `spans` prop holds: camelCase keys and
     // microsecond timestamps. This is NOT the shape buildQueryDetails accepts.
