@@ -93,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="main-content"
           class="bg-surface-chrome-deeper flex min-h-0 flex-col pr-2 pb-2"
           :style="{
-            width: !store.state.isAiChatEnabled
+            width: !store.state.isAiChatEnabled || isHomeRoute
               ? '100%'
               : store.state.isAiChatExpanded
                 ? '50%'
@@ -120,6 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Right Panel (AI Chat - unified for both general and context-specific usage) -->
         <aside
+          v-if="!isHomeRoute"
           v-show="store.state.isAiChatEnabled && isLoading"
           class="o2-sidebar o2-sidebar-right bg-surface-chrome-deeper sticky top-[var(--navbar-height,2.25rem)] shrink-0 self-start overflow-y-auto"
           :class="[
@@ -1255,6 +1256,9 @@ export default defineComponent({
       window.open(slackURL, "_blank");
     };
 
+    // Home has its own inline O2 AI tab, so the sidebar panel must not mount there too.
+    const isHomeRoute = computed(() => router.currentRoute.value.name === "home");
+
     const toggleAIChat = () => {
       // On the home page, switch to the AI tab instead of opening the side panel
       if (router.currentRoute.value.name === "home") {
@@ -1400,6 +1404,7 @@ export default defineComponent({
       settings: "settings",
       closeSocket,
       splitterModel,
+      isHomeRoute,
       toggleAIChat,
       closeChat,
       getBtnLogo,
