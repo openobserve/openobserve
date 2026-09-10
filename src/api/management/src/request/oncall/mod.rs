@@ -69,6 +69,8 @@ async fn allowed(org_id: &str, user_id: &str, resource: &str, permission: &str) 
 
 // ── Request bodies ────────────────────────────────────────────────────────────
 
+/// A new on-call team. Only the name is required; the timezone is the one every
+/// restriction window on the team is later read in.
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct CreateTeamRequest {
     pub name: String,
@@ -82,6 +84,7 @@ fn default_timezone() -> String {
     "UTC".to_string()
 }
 
+/// A partial edit of a team: every field absent leaves that part alone.
 #[derive(Debug, Default, Deserialize, utoipa::ToSchema)]
 pub struct UpdateTeamRequest {
     #[serde(default)]
@@ -143,6 +146,8 @@ impl AddMembersRequest {
     }
 }
 
+/// The team's whole schedule, as a full replace — rotations absent from the
+/// body are removed, not left standing.
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct SetScheduleRequest {
     /// Absent means "the team's own zone". It used to default to UTC, so a
@@ -180,6 +185,8 @@ pub struct FromPresetRequest {
     pub spec: config::meta::oncall::PresetSpec,
 }
 
+/// The team's escalation ladder. `rungs` is a full replace; the two optional
+/// fields are left as they were when absent.
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct SetPolicyRequest {
     pub rungs: Vec<PriorityRung>,
@@ -317,6 +324,7 @@ pub struct OnCallQuery {
     pub at: Option<i64>,
 }
 
+/// Points one identity-dimension path at the team that gets woken for it.
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct CreateOwnershipRuleRequest {
     pub team_id: String,
@@ -325,6 +333,8 @@ pub struct CreateOwnershipRuleRequest {
     pub dimensions: std::collections::HashMap<String, String>,
 }
 
+/// Closes a page, and optionally records what it turned out to be. The whole
+/// body may be omitted.
 #[derive(Debug, Default, Deserialize, utoipa::ToSchema)]
 pub struct ResolveRequest {
     /// Why it happened. Optional, but it is what makes the next firing of the
@@ -336,14 +346,19 @@ pub struct ResolveRequest {
     pub cause_note: Option<String>,
 }
 
+/// One line onto a page's timeline, attributed to the caller.
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct AddNoteRequest {
     pub body: String,
 }
 
+/// Quiets a page for a while without claiming it — the ladder resumes when the
+/// snooze lapses, so this is not an acknowledgement.
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct SnoozeRequest {
-    /// How long to stay quiet, in minutes.
+    /// How long to stay quiet, in minutes. `1`–`1440`; anything else is refused,
+    /// because a negative one would silence a live page into the past and an
+    /// unbounded one runs the microsecond arithmetic off the end of an i64.
     pub minutes: i64,
 }
 
@@ -402,6 +417,8 @@ pub struct HistoryQuery {
     pub limit: Option<u64>,
 }
 
+/// A signal as it would arrive, to ask which team would be woken for it.
+/// Resolves the same rules a real firing would and sends nothing.
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct PreviewRoutingRequest {
     #[serde(default)]
@@ -570,13 +587,11 @@ pub struct LookbackQuery {
     pub limit: Option<u64>,
 }
 
-/// Which ladder to dry-run. Required: "would a page land" has a different
-/// answer per priority, and defaulting it would answer a question nobody
-/// asked.
+/// Which ladder to dry-run, and when.
 #[derive(Debug, Default, Deserialize)]
 pub struct EscalationPreviewQuery {
-    /// `P1`–`P5`, or `1`–`5`. Defaults to P1 — the ladder somebody opening
-    /// this screen is checking.
+    /// `P1`–`P5`, or `1`–`5`. Absent is P1 — the ladder somebody opening this
+    /// screen is checking, and the one whose answer matters most.
     pub priority: Option<String>,
     /// Resolve at this instant (micros) instead of now.
     pub at: Option<i64>,
@@ -593,6 +608,22 @@ pub struct OwnershipStatsQuery {
 }
 
 // ── Handlers ──────────────────────────────────────────────────────────────────
+
+/// Logs a fault and answers with a fixed sentence.
+///
+/// The error text on this path comes from `sea-orm` and `anyhow` and carries
+/// SQL fragments, table names and column names. Every endpoint in this module
+/// is open to any member of the org rather than to an administrator, so the
+/// detail belongs in the log and nowhere else.
+#[cfg(feature = "enterprise")]
+fn internal_error(context: &str, e: &impl std::fmt::Display) -> Response {
+    tracing::error!("[oncall] {context}: {e}");
+    MetaHttpResponse::error(
+        StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
+        "internal error".to_string(),
+    )
+    .into_response()
+}
 
 /// Maps a service error onto a status code.
 ///
@@ -619,8 +650,10 @@ fn to_response(e: anyhow::Error) -> Response {
         None => StatusCode::INTERNAL_SERVER_ERROR,
     };
     if status == StatusCode::INTERNAL_SERVER_ERROR {
-        tracing::error!("[oncall] {e}");
+        return internal_error("service", &e);
     }
+    // Every remaining status is an `OncallError` variant, whose message is
+    // written to be read by the caller.
     MetaHttpResponse::error(status.as_u16(), e.to_string()).into_response()
 }
 
@@ -1321,7 +1354,7 @@ pub async fn delete_override(
         ("team_id" = String, Path, description = "Team ID"),
         ("from" = i64, Query, description = "Window start (microseconds)"),
         ("to" = i64, Query, description = "Window end (microseconds), at most 31 days after `from`"),
-        ("slot" = Option<String>, Query, description = "Rotation slot; defaults to `primary`"),
+        ("rotation_id" = Option<String>, Query, description = "Rotation id or name; defaults to the team's primary"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
@@ -1489,7 +1522,7 @@ pub async fn get_team_channel(
         }
         let team = match infra::table::oncall_teams::get_channel(&org_id, &team_id).await {
             Ok(t) => t,
-            Err(e) => return MetaHttpResponse::internal_error(e),
+            Err(e) => return internal_error("get_team_channel", &e),
         };
         // Read whole rather than reported as "unset": the caller wants to know
         // where the team is actually talked to, and answering with an empty
@@ -1547,7 +1580,7 @@ pub async fn set_team_channel(
         });
         match infra::table::oncall_teams::set_channel(&org_id, &team_id, requested.clone()).await {
             Ok(false) => MetaHttpResponse::not_found(format!("team `{team_id}` not found")),
-            Err(e) => MetaHttpResponse::internal_error(e),
+            Err(e) => internal_error("set_team_channel", &e),
             Ok(true) => {
                 let policy =
                     match o2_enterprise::enterprise::oncall::service::get_policy(&org_id, &team_id)
@@ -1874,12 +1907,7 @@ pub async fn list_responses(
                     )
                 }
                 Err(e) => {
-                    tracing::error!("[oncall] list_responses ownership: {e}");
-                    return MetaHttpResponse::error(
-                        StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
-                        e.to_string(),
-                    )
-                    .into_response();
+                    return internal_error("list_responses ownership", &e);
                 }
             },
         };
@@ -1894,11 +1922,7 @@ pub async fn list_responses(
         };
         match infra::table::oncall_responses::list_open(&org_id, &filter, limit, offset).await {
             Ok(rows) => MetaHttpResponse::json(with_page_details(&org_id, rows).await),
-            Err(e) => {
-                tracing::error!("[oncall] list_responses: {e}");
-                MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
-                    .into_response()
-            }
+            Err(e) => internal_error("list_responses", &e),
         }
     }
     #[cfg(not(feature = "enterprise"))]
@@ -2003,12 +2027,7 @@ pub async fn get_response(
                 .into_response();
             }
             Err(e) => {
-                tracing::error!("[oncall] get_response: {e}");
-                return MetaHttpResponse::error(
-                    StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
-                    e.to_string(),
-                )
-                .into_response();
+                return internal_error("get_response", &e);
             }
         };
         match infra::table::oncall_responses::list_events(&response_id).await {
@@ -2019,11 +2038,7 @@ pub async fn get_response(
                 "response": with_page_details(&org_id, vec![record]).await.pop(),
                 "events": events,
             })),
-            Err(e) => {
-                tracing::error!("[oncall] get_response events: {e}");
-                MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
-                    .into_response()
-            }
+            Err(e) => internal_error("get_response events", &e),
         }
     }
     #[cfg(not(feature = "enterprise"))]
@@ -2045,6 +2060,7 @@ pub async fn get_response(
         ("org_id" = String, Path, description = "Organization name"),
         ("response_id" = String, Path, description = "Response record ID"),
     ),
+    request_body(content = ResolveRequest, content_type = "application/json"),
     responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
 )]
 pub async fn resolve_response(
@@ -2429,12 +2445,7 @@ pub async fn confirm_recovery(
         match infra::table::oncall_responses::get(&org_id, &response_id).await {
             Ok(None) => return MetaHttpResponse::not_found("Response not found"),
             Err(e) => {
-                tracing::error!("[oncall] confirm-recovery lookup: {e}");
-                return MetaHttpResponse::error(
-                    StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
-                    e.to_string(),
-                )
-                .into_response();
+                return internal_error("confirm-recovery lookup", &e);
             }
             Ok(Some(record)) if record.origin_response_id.is_none() => {
                 return MetaHttpResponse::error(
@@ -2659,11 +2670,7 @@ pub async fn get_response_history(
                     .filter(|r| r.id != response_id)
                     .collect::<Vec<_>>(),
             ),
-            Err(e) => {
-                tracing::error!("[oncall] history: {e}");
-                MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
-                    .into_response()
-            }
+            Err(e) => internal_error("history", &e),
         }
     }
     #[cfg(not(feature = "enterprise"))]
@@ -3650,33 +3657,26 @@ pub async fn list_deliveries(
             Ok(Some(_)) => {}
             Ok(None) => return MetaHttpResponse::not_found("Response not found"),
             Err(e) => {
-                tracing::error!("[oncall] list_deliveries lookup: {e}");
-                return MetaHttpResponse::error(
-                    StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
-                    e.to_string(),
-                )
-                .into_response();
+                return internal_error("list_deliveries lookup", &e);
             }
         }
-        let limit = q.limit.unwrap_or(100).clamp(1, 200) as usize;
-        let offset = q.offset.unwrap_or(0) as usize;
-        match infra::table::oncall_responses::list_deliveries(&response_id).await {
-            Ok(rows) => {
-                // A long-running page that walked several ladder runs has one
-                // row per recipient per channel per rung, so the body is cut
-                // even though the query is not. `total` keeps the count true.
-                let total = rows.len();
-                let page: Vec<_> = rows.into_iter().skip(offset).take(limit).collect();
-                MetaHttpResponse::json(serde_json::json!({
-                    "total": total,
-                    "deliveries": page,
-                }))
-            }
-            Err(e) => {
-                tracing::error!("[oncall] list_deliveries: {e}");
-                MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
-                    .into_response()
-            }
+        let limit = q.limit.unwrap_or(100).clamp(1, 200);
+        let offset = q.offset.unwrap_or(0);
+        // Both cut in the database. `total` is what the ledger holds and
+        // `deliveries` is what fits in the page: a screen showing a hundred
+        // attempts needs to know whether there were four hundred.
+        let total = match infra::table::oncall_responses::count_deliveries(&response_id).await {
+            Ok(n) => n,
+            Err(e) => return internal_error("count_deliveries", &e),
+        };
+        match infra::table::oncall_responses::list_deliveries_page(&response_id, limit, offset)
+            .await
+        {
+            Ok(rows) => MetaHttpResponse::json(serde_json::json!({
+                "total": total,
+                "deliveries": rows,
+            })),
+            Err(e) => internal_error("list_deliveries", &e),
         }
     }
     #[cfg(not(feature = "enterprise"))]
@@ -3981,11 +3981,7 @@ pub async fn get_contact(
                     config::meta::oncall::Contact::empty(&org_id, &subject_email)
                 })))
             }
-            Err(e) => {
-                tracing::error!("[oncall] get_contact: {e}");
-                MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
-                    .into_response()
-            }
+            Err(e) => internal_error("get_contact", &e),
         }
     }
     #[cfg(not(feature = "enterprise"))]
@@ -4065,11 +4061,7 @@ pub async fn set_contact(
         .await
         {
             Ok(contact) => MetaHttpResponse::json(contact_body(&contact)),
-            Err(e) => {
-                tracing::error!("[oncall] set_contact: {e}");
-                MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
-                    .into_response()
-            }
+            Err(e) => internal_error("set_contact", &e),
         }
     }
     #[cfg(not(feature = "enterprise"))]
@@ -4109,11 +4101,7 @@ pub async fn delete_contact(
             // there means somebody is looking at a stale screen, and email —
             // which is their login — keeps working either way.
             Ok(deleted) => MetaHttpResponse::json(serde_json::json!({ "deleted": deleted })),
-            Err(e) => {
-                tracing::error!("[oncall] delete_contact: {e}");
-                MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
-                    .into_response()
-            }
+            Err(e) => internal_error("delete_contact", &e),
         }
     }
     #[cfg(not(feature = "enterprise"))]
@@ -4177,12 +4165,7 @@ pub async fn list_my_deliveries(
         {
             Ok(rows) => rows,
             Err(e) => {
-                tracing::error!("[oncall] list_my_deliveries: {e}");
-                return MetaHttpResponse::error(
-                    StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
-                    e.to_string(),
-                )
-                .into_response();
+                return internal_error("list_my_deliveries", &e);
             }
         };
         // Two counts, both honest: `total` is what the filter matches, `unread`
@@ -4271,11 +4254,7 @@ pub async fn mark_deliveries_read(
                     "unread": unread,
                 }))
             }
-            Err(e) => {
-                tracing::error!("[oncall] mark_deliveries_read: {e}");
-                MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
-                    .into_response()
-            }
+            Err(e) => internal_error("mark_deliveries_read", &e),
         }
     }
     #[cfg(not(feature = "enterprise"))]
@@ -4322,28 +4301,26 @@ pub async fn list_my_teams(
         let teams = match infra::table::oncall_teams::list_for_user(&org_id, me).await {
             Ok(teams) => teams,
             Err(e) => {
-                tracing::error!("[oncall] list_my_teams: {e}");
-                return MetaHttpResponse::error(
-                    StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
-                    e.to_string(),
-                )
-                .into_response();
+                return internal_error("list_my_teams", &e);
             }
         };
 
+        // Resolved concurrently: each team is an independent schedule read, and
+        // awaited one at a time the latency of this screen grew with the number
+        // of teams somebody belongs to. `join_all` yields in input order, so the
+        // list stays in whatever order the membership read produced.
+        let resolutions = futures::future::join_all(teams.iter().map(|team| {
+            o2_enterprise::enterprise::oncall::service::who_is_on_call(&org_id, &team.id, Some(at))
+        }))
+        .await;
+
         let mut out = Vec::with_capacity(teams.len());
         let mut on_call_anywhere = false;
-        for team in teams {
+        for (team, slots) in teams.into_iter().zip(resolutions) {
             // A schedule that cannot be resolved must not read as "you are not
             // on call". It reads as unknown, because telling somebody they are
             // off duty when the truth is that we could not work it out is the
             // one answer this endpoint must never give.
-            let slots = o2_enterprise::enterprise::oncall::service::who_is_on_call(
-                &org_id,
-                &team.id,
-                Some(at),
-            )
-            .await;
             let (on_call_now, whos_on_call, resolved) = match slots {
                 Ok(slots) => {
                     let mine = slots.iter().any(|s| s.user_email.eq_ignore_ascii_case(me));
@@ -4442,11 +4419,7 @@ pub async fn cause_analytics(
                     "causes": causes,
                 }))
             }
-            Err(e) => {
-                tracing::error!("[oncall] cause_analytics: {e}");
-                MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
-                    .into_response()
-            }
+            Err(e) => internal_error("cause_analytics", &e),
         }
     }
     #[cfg(not(feature = "enterprise"))]
@@ -4592,6 +4565,41 @@ async fn carry_page_history_into_incident(
     }
 }
 
+/// The severity a promotion opens the incident at, with the record's own
+/// priority as a floor.
+///
+/// A promotion may raise the severity but must never lower what already woke
+/// somebody, so an `asked` value less urgent than the floor is discarded rather
+/// than refused — the caller asked for an incident and gets one.
+#[cfg(feature = "enterprise")]
+fn promoted_severity(
+    priority: i32,
+    asked: Option<config::meta::alerts::incidents::IncidentSeverity>,
+) -> config::meta::alerts::incidents::IncidentSeverity {
+    use config::meta::alerts::incidents::IncidentSeverity;
+
+    let floor = match priority {
+        1 => IncidentSeverity::P1,
+        2 => IncidentSeverity::P2,
+        3 => IncidentSeverity::P3,
+        _ => IncidentSeverity::P4,
+    };
+    // P1 is the *most* urgent rung, so "raise" means move to a smaller number.
+    // `IncidentSeverity` derives no `Ord`, which is why this ranks by hand
+    // rather than reaching for `min` — and why an `Ord` added to it later must
+    // not be assumed to run the same way round.
+    let rank = |s: IncidentSeverity| match s {
+        IncidentSeverity::P1 => 1u8,
+        IncidentSeverity::P2 => 2,
+        IncidentSeverity::P3 => 3,
+        IncidentSeverity::P4 => 4,
+    };
+    match asked {
+        Some(s) if rank(s) < rank(floor) => s,
+        _ => floor,
+    }
+}
+
 pub async fn promote_to_incident(
     Path((org_id, response_id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
@@ -4610,12 +4618,7 @@ pub async fn promote_to_incident(
             Ok(Some(r)) => r,
             Ok(None) => return MetaHttpResponse::not_found("Response not found"),
             Err(e) => {
-                tracing::error!("[oncall] promote lookup: {e}");
-                return MetaHttpResponse::error(
-                    StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
-                    e.to_string(),
-                )
-                .into_response();
+                return internal_error("promote lookup", &e);
             }
         };
         // Promotion opens an incident before it notes the record, so the team
@@ -4638,21 +4641,14 @@ pub async fn promote_to_incident(
             .into_response();
         }
 
-        // A promotion may raise the severity but must never lower what already
-        // woke somebody: the record's priority is the floor.
-        let derived = match record.priority {
-            1 => IncidentSeverity::P1,
-            2 => IncidentSeverity::P2,
-            3 => IncidentSeverity::P3,
-            _ => IncidentSeverity::P4,
-        };
-        let severity = match body.severity.as_deref() {
-            None => derived,
-            Some(raw) => match raw.trim().to_uppercase().parse::<IncidentSeverity>() {
-                Ok(s) => s,
+        let asked = match body.severity.as_deref() {
+            None => None,
+            Some(raw) => match raw.trim().parse::<IncidentSeverity>() {
+                Ok(s) => Some(s),
                 Err(_) => return MetaHttpResponse::bad_request("`severity` must be P1–P4"),
             },
         };
+        let severity = promoted_severity(record.priority, asked);
         let title = body
             .title
             .as_deref()
@@ -4697,12 +4693,7 @@ pub async fn promote_to_incident(
                 .into_response();
             }
             Err(e) => {
-                tracing::error!("[oncall] promote create incident: {e}");
-                return MetaHttpResponse::error(
-                    StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
-                    e.to_string(),
-                )
-                .into_response();
+                return internal_error("promote create incident", &e);
             }
         };
         let mut updated = record.clone();
@@ -5310,17 +5301,49 @@ mod tests {
     fn test_priority_derives_an_incident_severity() {
         use config::meta::alerts::incidents::IncidentSeverity;
 
-        let derive = |priority: i32| match priority {
-            1 => IncidentSeverity::P1,
-            2 => IncidentSeverity::P2,
-            3 => IncidentSeverity::P3,
-            _ => IncidentSeverity::P4,
-        };
-        assert_eq!(derive(1), IncidentSeverity::P1);
-        assert_eq!(derive(2), IncidentSeverity::P2);
-        assert_eq!(derive(3), IncidentSeverity::P3);
-        assert_eq!(derive(4), IncidentSeverity::P4);
-        assert_eq!(derive(5), IncidentSeverity::P4, "P5 has nowhere lower");
+        assert_eq!(promoted_severity(1, None), IncidentSeverity::P1);
+        assert_eq!(promoted_severity(2, None), IncidentSeverity::P2);
+        assert_eq!(promoted_severity(3, None), IncidentSeverity::P3);
+        assert_eq!(promoted_severity(4, None), IncidentSeverity::P4);
+        assert_eq!(
+            promoted_severity(5, None),
+            IncidentSeverity::P4,
+            "P5 has nowhere lower"
+        );
+    }
+
+    /// A severity in the body is a ceiling-raiser, never a downgrade. The
+    /// handler used to take it as given, so `{"severity":"P4"}` turned a P1
+    /// page into a P4 incident and quietly un-did the thing that woke somebody.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_a_promotion_cannot_downgrade_what_already_woke_somebody() {
+        use config::meta::alerts::incidents::IncidentSeverity;
+
+        assert_eq!(
+            promoted_severity(1, Some(IncidentSeverity::P4)),
+            IncidentSeverity::P1,
+            "a P1 page must not be promoted into a P4 incident"
+        );
+        assert_eq!(
+            promoted_severity(2, Some(IncidentSeverity::P3)),
+            IncidentSeverity::P2
+        );
+        assert_eq!(
+            promoted_severity(4, Some(IncidentSeverity::P1)),
+            IncidentSeverity::P1,
+            "raising it is the whole point of sending the field"
+        );
+        assert_eq!(
+            promoted_severity(3, Some(IncidentSeverity::P3)),
+            IncidentSeverity::P3
+        );
+        // P5 has no incident severity of its own, so its floor is P4 and there
+        // is nothing left for a body to lower.
+        assert_eq!(
+            promoted_severity(5, Some(IncidentSeverity::P4)),
+            IncidentSeverity::P4
+        );
     }
 
     /// Your own profile, always. Somebody else's, only with the configuration

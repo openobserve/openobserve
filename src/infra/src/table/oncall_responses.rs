@@ -1008,13 +1008,56 @@ pub async fn list_events_and_deliveries(
 /// Every page this record actually attempted, per person and per channel.
 ///
 /// The ledger the engine replays against, and the honest answer to "did the
-/// page reach them" — which is the one thing the record exists for.
+/// page reach them" — which is the one thing the record exists for. Unpaged
+/// because a replay has to see all of it; the screen that shows it to a person
+/// uses [`list_deliveries_page`].
 pub async fn list_deliveries(response_id: &str) -> Result<Vec<ResponseEvent>, errors::Error> {
-    Ok(all_events(response_id)
+    let client = get_orm_client_rw().await;
+    Ok(deliveries_query(response_id)
+        .all(client)
         .await?
         .into_iter()
-        .filter(|e| e.kind == ResponseEventKind::Delivery)
+        .filter_map(to_event)
         .collect())
+}
+
+/// One page of the ledger, cut in the database.
+///
+/// A long-running page that walked several ladder runs has one row per
+/// recipient, per channel, per rung, and this is polled while the page is being
+/// worked — fetching the whole ledger to slice it in memory re-shipped every
+/// row on every poll.
+pub async fn list_deliveries_page(
+    response_id: &str,
+    limit: u64,
+    offset: u64,
+) -> Result<Vec<ResponseEvent>, errors::Error> {
+    let client = get_orm_client_rw().await;
+    Ok(deliveries_query(response_id)
+        .limit(limit)
+        .offset(offset)
+        .all(client)
+        .await?
+        .into_iter()
+        .filter_map(to_event)
+        .collect())
+}
+
+/// How many rows the ledger holds, so a paged screen can say what it is a page
+/// of. "Showing 100" is not an answer to "was everybody reached".
+pub async fn count_deliveries(response_id: &str) -> Result<u64, errors::Error> {
+    let client = get_orm_client_rw().await;
+    Ok(deliveries_query(response_id).count(client).await?)
+}
+
+/// Ordered exactly as [`all_events`] is, so a page of the ledger reads in the
+/// same sequence as the timeline it belongs to.
+fn deliveries_query(response_id: &str) -> Select<oncall_response_events::Entity> {
+    oncall_response_events::Entity::find()
+        .filter(oncall_response_events::Column::ResponseId.eq(response_id))
+        .filter(oncall_response_events::Column::Kind.eq(ResponseEventKind::Delivery.to_i32()))
+        .order_by_asc(oncall_response_events::Column::At)
+        .order_by_asc(oncall_response_events::Column::Id)
 }
 
 /// Drops the timeline of records that closed before `cutoff` (`06` §7).
