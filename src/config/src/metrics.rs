@@ -1170,6 +1170,67 @@ pub static QUERY_DISK_CACHE_MISS_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
+pub static QUERY_BLOCK_CACHE_BLOCKS_REQUESTED: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "query_block_cache_blocks_requested",
+            "query block cache blocks requested".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+pub static QUERY_BLOCK_CACHE_BLOCKS_FETCHED: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "query_block_cache_blocks_fetched",
+            "query block cache blocks fetched".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+pub static QUERY_BLOCK_CACHE_REQUESTS_BYPASSED: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "query_block_cache_requests_bypassed",
+            "query block cache requests bypassed".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+pub static QUERY_BLOCK_CACHE_USED_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "query_block_cache_used_bytes",
+            "query block cache used bytes".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+pub static QUERY_BLOCK_CACHE_RANGE_REQUESTS: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "query_block_cache_range_requests",
+            "query block cache range requests".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+
 pub static QUERY_DISK_CACHE_INLINE_DOWNLOAD_FILES_CONSIDERED: Lazy<IntCounterVec> =
     Lazy::new(|| {
         IntCounterVec::new(
@@ -2119,6 +2180,21 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(QUERY_DISK_CACHE_MISS_COUNT.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(QUERY_BLOCK_CACHE_BLOCKS_REQUESTED.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(QUERY_BLOCK_CACHE_BLOCKS_FETCHED.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(QUERY_BLOCK_CACHE_REQUESTS_BYPASSED.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(QUERY_BLOCK_CACHE_USED_BYTES.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(QUERY_BLOCK_CACHE_RANGE_REQUESTS.clone()))
         .expect("Metric registered");
     registry
         .register(Box::new(

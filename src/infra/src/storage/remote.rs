@@ -174,7 +174,7 @@ impl ObjectStore for Remote {
             })?;
 
         // metrics
-        let data_len = result.meta.size;
+        let data_len = result.range.end - result.range.start;
         let columns = file.split('/').collect::<Vec<&str>>();
         if columns[0] == "files" {
             metrics::STORAGE_READ_BYTES
@@ -407,4 +407,93 @@ pub async fn test_config() -> Result<(), anyhow::Error> {
         return Err(anyhow::anyhow!("S3 upload test failed: {e}"));
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use object_store::memory::InMemory;
+
+    use super::*;
+
+    const TEST_DATA: &[u8] = b"0123456789";
+
+    async fn remote_with_file(location: &Path) -> Remote {
+        let client = InMemory::new();
+        client
+            .put(
+                &format_key(location.as_ref(), true).into(),
+                PutPayload::from(Bytes::from_static(TEST_DATA)),
+            )
+            .await
+            .unwrap();
+
+        Remote {
+            client: LimitStore::new(Box::new(client), CONCURRENT_REQUESTS),
+        }
+    }
+
+    #[tokio::test]
+    async fn get_opts_counts_bounded_range_bytes() {
+        let org = "remote_get_opts_bounded_range";
+        let location = Path::from(format!("files/{org}/logs/test.parquet"));
+        let remote = remote_with_file(&location).await;
+        let labels = [org, "logs", "get_opts", "remote"];
+        let before = metrics::STORAGE_READ_BYTES.with_label_values(&labels).get();
+        let options = GetOptions {
+            range: Some((2..6).into()),
+            ..Default::default()
+        };
+
+        let result = remote.get_opts(&location, options).await.unwrap();
+
+        assert_eq!(result.range, 2..6);
+        assert_eq!(result.bytes().await.unwrap(), Bytes::from_static(b"2345"));
+        assert_eq!(
+            metrics::STORAGE_READ_BYTES.with_label_values(&labels).get() - before,
+            4
+        );
+    }
+
+    #[tokio::test]
+    async fn get_opts_counts_clamped_range_bytes() {
+        let org = "remote_get_opts_clamped_range";
+        let location = Path::from(format!("files/{org}/logs/test.parquet"));
+        let remote = remote_with_file(&location).await;
+        let labels = [org, "logs", "get_opts", "remote"];
+        let before = metrics::STORAGE_READ_BYTES.with_label_values(&labels).get();
+        let options = GetOptions {
+            range: Some((8..20).into()),
+            ..Default::default()
+        };
+
+        let result = remote.get_opts(&location, options).await.unwrap();
+
+        assert_eq!(result.range, 8..10);
+        assert_eq!(result.bytes().await.unwrap(), Bytes::from_static(b"89"));
+        assert_eq!(
+            metrics::STORAGE_READ_BYTES.with_label_values(&labels).get() - before,
+            2
+        );
+    }
+
+    #[tokio::test]
+    async fn get_opts_counts_whole_object_bytes() {
+        let org = "remote_get_opts_whole_object";
+        let location = Path::from(format!("files/{org}/logs/test.parquet"));
+        let remote = remote_with_file(&location).await;
+        let labels = [org, "logs", "get_opts", "remote"];
+        let before = metrics::STORAGE_READ_BYTES.with_label_values(&labels).get();
+
+        let result = remote
+            .get_opts(&location, GetOptions::default())
+            .await
+            .unwrap();
+
+        assert_eq!(result.range, 0..TEST_DATA.len() as u64);
+        assert_eq!(result.bytes().await.unwrap(), Bytes::from_static(TEST_DATA));
+        assert_eq!(
+            metrics::STORAGE_READ_BYTES.with_label_values(&labels).get() - before,
+            TEST_DATA.len() as u64
+        );
+    }
 }
