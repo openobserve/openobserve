@@ -34,7 +34,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span class="text-text-secondary min-w-0 flex-1 text-xs">
         {{ t("oncall.scheduleNeedsMembers") }}
       </span>
-      <OButton variant="outline" size="sm-action" @click="$emit('open-members')">
+      <OButton
+        variant="outline"
+        size="sm-action"
+        data-test="oncall-rotation-open-members"
+        @click="$emit('open-members')"
+      >
         {{ t("oncall.rotationOpenMembers") }}
       </OButton>
     </div>
@@ -48,12 +53,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :placeholder="t('oncall.rotationPickPlaceholder')"
       :options="memberOptions"
       :disabled="!hasTeamMembers"
+      :data-test="`oncall-schedule-members-${ruleIndex}`"
       @update:model-value="(v: unknown) => setMembers(rule, v as string[])"
     />
 
     <!-- The server refuses a rule with nobody in it, so this one would store
          nothing. Said next to the pick that fixes it. -->
-    <p v-if="!rule.members.length" class="text-status-warning-text text-xs">
+    <p
+      v-if="!rule.members.length"
+      class="text-status-warning-text text-xs"
+      :data-test="`oncall-rotation-needs-people-${ruleIndex}`"
+    >
       {{ t("oncall.rotationNeedsPeople") }}
     </p>
 
@@ -90,6 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         type="datetime-local"
         :label="t('oncall.firstHandover')"
         :help-text="handoverHint"
+        :data-test="`oncall-schedule-handover-${ruleIndex}`"
         @update:model-value="(v: string | number) => setAnchor(rule, String(v))"
       />
     </div>
@@ -115,6 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-for="(window, index) in rule.restrictions ?? []"
             :key="index"
             class="border-border-default rounded-default grid items-end gap-3 border p-3 sm:grid-cols-[1fr_auto_auto_auto]"
+            :data-test="`oncall-schedule-restriction-${ruleIndex}-${index}`"
           >
             <OSelect
               :model-value="window.days"
@@ -142,6 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="icon-sm"
               icon-left="delete-outline"
               :aria-label="t('oncall.rotationRestrictionRemove')"
+              :data-test="`oncall-schedule-restriction-remove-${ruleIndex}-${index}`"
               @click="removeRestriction(rule, index)"
             />
 
@@ -163,6 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline"
               size="sm-action"
               icon-left="add"
+              :data-test="`oncall-schedule-restriction-add-${ruleIndex}`"
               @click="addRestriction(rule)"
             >
               {{ t("oncall.rotationRestrictionAdd") }}
@@ -182,6 +196,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :help-text="t('oncall.rotationPriorityHint')"
             :options="priorityOptions"
             width="sm"
+            :data-test="`oncall-schedule-priority-${ruleIndex}`"
             @update:model-value="(v: unknown) => (rule.priority = Number(v))"
           />
         </template>
@@ -195,6 +210,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OCheckbox
             :model-value="isRetired(rule)"
             :label="t('oncall.rotationRetire')"
+            :data-test="`oncall-schedule-retire-${ruleIndex}`"
             @update:model-value="(on: CheckboxModelValue) => setRetired(rule, !!on)"
           />
           <OText variant="meta">{{ t("oncall.rotationRetireHint") }}</OText>
@@ -206,6 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :model-value="retiredAtLocal(rule)"
             :label="t('oncall.rotationRetiredOn')"
             :help-text="t('oncall.rotationRetiredOnHint', { zone: raw(timezone) })"
+            :data-test="`oncall-schedule-retire-at-${ruleIndex}`"
             @update:model-value="(v: string | number) => setRetiredAt(rule, v)"
           />
         </div>
@@ -215,7 +232,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Outside the fold on purpose: this one BLOCKS the save, and a reason
          for a dead Save button hidden behind a disclosure is how somebody
          concludes the form is broken. -->
-    <p v-if="priorityClashFor(rule)" class="text-status-warning-text text-xs">
+    <p
+      v-if="priorityClashFor(rule)"
+      class="text-status-warning-text text-xs"
+      :data-test="`oncall-schedule-priority-clash-${ruleIndex}`"
+    >
       {{ priorityClashFor(rule) }}
     </p>
   </div>
@@ -238,6 +259,8 @@ import { raw, useI18nTyped } from "@/types/i18n";
 
 const props = defineProps<{
   rule: ShiftRule;
+  /** Which tab this rule occupies — every data-test here is keyed by it so tests can address one rule among several. */
+  ruleIndex: number;
   hasTeamMembers: boolean;
   /** Whether this rotation has more than one rule — priority only matters once there's a rival. */
   multiRule: boolean;

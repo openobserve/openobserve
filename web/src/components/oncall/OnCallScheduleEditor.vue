@@ -256,6 +256,7 @@
 
                   <OnCallShiftRuleFields
                     :rule="rule"
+                    :rule-index="ruleIndex"
                     :multi-rule="multiRule"
                     :has-team-members="!!props.members.length"
                     :member-options="memberOptions"
