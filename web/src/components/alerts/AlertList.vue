@@ -794,7 +794,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click:secondary="showForm = false"
         @click:primary="submitForm"
       >
-        <div>
+        <div class="flex flex-col gap-4">
           <OInput
             data-test="to-be-clone-alert-name"
             v-model="toBeCloneAlertName"
@@ -807,7 +807,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :label="t('alerts.streamType')"
               :options="streamTypes"
               @update:model-value="updateStreams()"
-              class="mt-1"
             />
             <OSelect
               data-test="to-be-clone-stream-name"
@@ -817,16 +816,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :options="indexOptions"
               searchable
               @update:model-value="updateStreamName"
-              class="mt-1 mb-2"
             />
           </template>
-          <div class="mb-4">
-            <SelectFolderDropDown
-              :type="'alerts'"
-              @folder-selected="updateFolderIdToBeCloned"
-              :activeFolderId="folderIdToBeCloned"
-            />
-          </div>
+          <SelectFolderDropDown
+            :type="'alerts'"
+            @folder-selected="updateFolderIdToBeCloned"
+            :activeFolderId="folderIdToBeCloned"
+          />
         </div>
       </ODialog>
       <MoveAcrossFolders
