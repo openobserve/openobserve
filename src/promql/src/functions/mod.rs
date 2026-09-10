@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashSet, sync::LazyLock as Lazy, time::Duration};
+use std::time::Duration;
 
 use config::meta::promql::value::{
     CounterSeries, EvalContext, ExtrapolationKind, LabelsExt, RangeValue, Sample, Value,
@@ -67,6 +67,8 @@ pub(crate) use quantile_over_time::quantile_over_time;
 pub(crate) use scalar::scalar;
 pub(crate) use time_operations::*;
 pub(crate) use vector::vector;
+
+pub(crate) const KEEP_METRIC_NAME_FUNC: &str = "last_over_time";
 
 /// Reference: https://prometheus.io/docs/prometheus/latest/querying/functions/
 #[derive(Debug, Clone, Copy, PartialEq, EnumString)]
@@ -132,22 +134,22 @@ impl Func {
     /// The single-argument range function this name evaluates through [`eval_range`], if any.
     pub(crate) fn range_func(self) -> Option<Box<dyn RangeFunc>> {
         Some(match self {
-            Func::AvgOverTime => Box::new(avg_over_time::AvgOverTimeFunc::new()),
-            Func::Changes => Box::new(changes::ChangesFunc::new()),
-            Func::CountOverTime => Box::new(count_over_time::CountOverTimeFunc::new()),
-            Func::Delta => Box::new(delta::DeltaFunc::new()),
-            Func::Deriv => Box::new(deriv::DerivFunc::new()),
-            Func::Idelta => Box::new(idelta::IdeltaFunc::new()),
-            Func::Increase => Box::new(increase::IncreaseFunc::new()),
-            Func::Irate => Box::new(irate::IrateFunc::new()),
-            Func::LastOverTime => Box::new(last_over_time::LastOverTimeFunc::new()),
-            Func::MaxOverTime => Box::new(max_over_time::MaxOverTimeFunc::new()),
-            Func::MinOverTime => Box::new(min_over_time::MinOverTimeFunc::new()),
-            Func::Rate => Box::new(rate::RateFunc::new()),
-            Func::Resets => Box::new(resets::ResetsFunc::new()),
-            Func::StddevOverTime => Box::new(stddev_over_time::StddevOverTimeFunc::new()),
-            Func::StdvarOverTime => Box::new(stdvar_over_time::StdvarOverTimeFunc::new()),
-            Func::SumOverTime => Box::new(sum_over_time::SumOverTimeFunc::new()),
+            Func::AvgOverTime => Box::new(avg_over_time::AvgOverTimeFunc),
+            Func::Changes => Box::new(changes::ChangesFunc),
+            Func::CountOverTime => Box::new(count_over_time::CountOverTimeFunc),
+            Func::Delta => Box::new(delta::DeltaFunc),
+            Func::Deriv => Box::new(deriv::DerivFunc),
+            Func::Idelta => Box::new(idelta::IdeltaFunc),
+            Func::Increase => Box::new(increase::IncreaseFunc),
+            Func::Irate => Box::new(irate::IrateFunc),
+            Func::LastOverTime => Box::new(last_over_time::LastOverTimeFunc),
+            Func::MaxOverTime => Box::new(max_over_time::MaxOverTimeFunc),
+            Func::MinOverTime => Box::new(min_over_time::MinOverTimeFunc),
+            Func::Rate => Box::new(rate::RateFunc),
+            Func::Resets => Box::new(resets::ResetsFunc),
+            Func::StddevOverTime => Box::new(stddev_over_time::StddevOverTimeFunc),
+            Func::StdvarOverTime => Box::new(stdvar_over_time::StdvarOverTimeFunc),
+            Func::SumOverTime => Box::new(sum_over_time::SumOverTimeFunc),
             _ => return None,
         })
     }
@@ -180,9 +182,6 @@ impl<T: RangeFunc + ?Sized> RangeFunc for std::sync::Arc<T> {
         (**self).counter_extrapolation()
     }
 }
-
-pub static KEEP_METRIC_NAME_FUNC: Lazy<HashSet<&str>> =
-    Lazy::new(|| HashSet::from_iter(["last_over_time"]));
 
 /// Trait for PromQL range vector functions.
 ///
@@ -262,7 +261,7 @@ pub(crate) fn fusable_range_func(name: &str) -> Option<Box<dyn RangeFunc>> {
 
 /// The range function a bare instant selector streams as; it keeps the metric name.
 pub(crate) fn instant_lookback_func() -> std::sync::Arc<dyn RangeFunc> {
-    std::sync::Arc::new(last_over_time::LastOverTimeFunc::new())
+    std::sync::Arc::new(last_over_time::LastOverTimeFunc)
 }
 
 pub(crate) fn eval_range<F>(data: Value, func: F, eval_ctx: &EvalContext) -> Result<Value>
@@ -302,7 +301,7 @@ where
         .into_par_iter()
         .flat_map(|mut metric| {
             let mut labels = std::mem::take(&mut metric.labels);
-            if !KEEP_METRIC_NAME_FUNC.contains(func.name()) {
+            if func.name() != KEEP_METRIC_NAME_FUNC {
                 labels = labels.without_metric_name();
             }
             let time_window = metric.time_window.as_ref().unwrap();
@@ -495,9 +494,9 @@ mod tests {
 
     #[test]
     fn test_keep_metric_name_func_contains_last_over_time() {
-        assert!(KEEP_METRIC_NAME_FUNC.contains("last_over_time"));
-        assert!(!KEEP_METRIC_NAME_FUNC.contains("rate"));
-        assert!(!KEEP_METRIC_NAME_FUNC.contains("avg_over_time"));
+        assert_eq!(KEEP_METRIC_NAME_FUNC, "last_over_time");
+        assert_ne!(KEEP_METRIC_NAME_FUNC, "rate");
+        assert_ne!(KEEP_METRIC_NAME_FUNC, "avg_over_time");
     }
 
     #[test]

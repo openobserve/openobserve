@@ -23,14 +23,6 @@ impl MetricSelectorVisitor {
     pub fn new() -> Self {
         Self { exprs: vec![] }
     }
-
-    pub fn exprs_to_string(&self) -> String {
-        self.exprs
-            .iter()
-            .map(|e| e.to_string())
-            .collect::<Vec<String>>()
-            .join(",")
-    }
 }
 
 impl Default for MetricSelectorVisitor {
@@ -85,7 +77,13 @@ mod tests {
             "container_fs_reads_bytes_total{container!=\"\",device=~\"(/dev/)?(mmcblk[0-9]p[0-9]+|nvme.+|rbd.+|sd.+|vd.+|xvd.+|dm-.+|md.+|dasd.+)\"}[5m]",
             "container_fs_writes_bytes_total{container!=\"\",device=~\"(/dev/)?(mmcblk[0-9]p[0-9]+|nvme.+|rbd.+|sd.+|vd.+|xvd.+|dm-.+|md.+|dasd.+)\"}[5m]",
         ];
-        assert_eq!(visitor.exprs_to_string(), expected.join(","));
+        assert_eq!(
+            visitor.exprs,
+            expected
+                .into_iter()
+                .map(|expr| parser::parse(expr).unwrap())
+                .collect::<Vec<_>>()
+        );
 
         let promql = r#"http_requests_total{environment=~"staging|testing|development",method!="GET"} offset 5m"#;
 
@@ -95,13 +93,19 @@ mod tests {
         let expected = [
             "http_requests_total{environment=~\"staging|testing|development\",method!=\"GET\"} offset 5m",
         ];
-        assert_eq!(visitor.exprs_to_string(), expected.join(","));
+        assert_eq!(
+            visitor.exprs,
+            expected
+                .into_iter()
+                .map(|expr| parser::parse(expr).unwrap())
+                .collect::<Vec<_>>()
+        );
     }
 
     #[test]
-    fn test_selector_visitor_empty_exprs_to_string() {
+    fn test_selector_visitor_empty() {
         let visitor = MetricSelectorVisitor::new();
-        assert_eq!(visitor.exprs_to_string(), "");
+        assert!(visitor.exprs.is_empty());
     }
 
     #[test]
@@ -112,6 +116,5 @@ mod tests {
         let mut visitor = MetricSelectorVisitor::new();
         promql_parser::util::walk_expr(&mut visitor, &ast).unwrap();
         assert!(visitor.exprs.is_empty());
-        assert_eq!(visitor.exprs_to_string(), "");
     }
 }

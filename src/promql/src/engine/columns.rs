@@ -81,11 +81,9 @@ impl Engine {
                 if matches!(func.name, "label_replace" | "label_join") {
                     self.disable_label_selector = true;
                 }
-                _ = args
-                    .args
-                    .iter()
-                    .map(|expr| self.extract_columns_from_prom_expr(expr))
-                    .collect::<Vec<_>>();
+                for expr in &args.args {
+                    let _ = self.extract_columns_from_prom_expr(expr);
+                }
                 Ok(())
             }
             PromExpr::Extension(expr) => Err(DataFusionError::NotImplemented(format!(
@@ -450,10 +448,24 @@ mod tests {
             variadic: false,
             return_type: ValueType::Scalar,
         };
-        let expr = PromExpr::Call(Call { func, args });
+        let mut expr = PromExpr::Call(Call { func, args });
 
         let result = engine.extract_columns_from_prom_expr(&expr);
         assert!(result.is_ok());
+        let PromExpr::Call(call) = &mut expr else {
+            unreachable!();
+        };
+        call.args.args.insert(
+            0,
+            Box::new(PromExpr::Extension(Extension {
+                expr: Arc::new(TestExtension),
+            })),
+        );
+        call.args.args.push(Box::new(
+            promql_parser::parser::parse("sum by (job) (m)").unwrap(),
+        ));
+        assert!(engine.extract_columns_from_prom_expr(&expr).is_ok());
+        assert!(engine.label_selector.contains("job"));
     }
 
     #[test]

@@ -137,7 +137,7 @@ pub(crate) fn group_sources(
         .expect("range function input must have a time window")
         .range;
     // strip the metric name as the range function would have; visible to `sum by(__name__)`
-    if !KEEP_METRIC_NAME_FUNC.contains(func_name) {
+    if func_name != KEEP_METRIC_NAME_FUNC {
         matrix.par_iter_mut().for_each(|series| {
             series.labels.retain(|label| label.name != NAME_LABEL);
         });

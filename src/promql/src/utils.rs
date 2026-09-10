@@ -139,11 +139,7 @@ pub fn apply_label_selector(
             BUCKET_LABEL.to_string(),
             TIMESTAMP_COL_NAME.to_string(),
         ];
-        for label in label_selector.iter() {
-            if def_labels.contains(label) {
-                def_labels.retain(|x| x != label);
-            }
-        }
+        def_labels.retain(|label| !label_selector.contains(label));
         // include only found columns and required _timestamp, hash, value, le cols
         let selected_cols: Vec<_> = label_selector
             .iter()
@@ -186,10 +182,9 @@ pub(crate) fn apply_time_window(
         && (((end - start) / step) + 1) < OPTIMIZATION_MAX_STEPS;
     if use_optimization {
         let num_steps = ((end - start) / step) + 1;
-        let eval_timestamps: Vec<i64> = (0..num_steps).map(|i| start + (step * i)).collect();
-
         let mut conditions: Vec<Expr> = Vec::new();
-        for &eval_ts in &eval_timestamps {
+        for i in 0..num_steps {
+            let eval_ts = start + (step * i);
             let window_start = eval_ts - lookback;
             let window_end = eval_ts;
 

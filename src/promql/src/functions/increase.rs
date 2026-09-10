@@ -21,12 +21,6 @@ use crate::functions::RangeFunc;
 
 pub struct IncreaseFunc;
 
-impl IncreaseFunc {
-    pub fn new() -> Self {
-        IncreaseFunc {}
-    }
-}
-
 impl RangeFunc for IncreaseFunc {
     fn name(&self) -> &'static str {
         "increase"
@@ -57,7 +51,7 @@ mod tests {
     use super::*;
 
     fn increase(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
-        crate::functions::eval_range(data, IncreaseFunc::new(), eval_ctx)
+        crate::functions::eval_range(data, IncreaseFunc, eval_ctx)
     }
     // Test helper
     fn increase_test_helper(data: Value) -> Result<Value> {

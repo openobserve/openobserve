@@ -22,12 +22,6 @@ use crate::{common::variance, functions::RangeFunc};
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#stddev_over_time
 pub struct StddevOverTimeFunc;
 
-impl StddevOverTimeFunc {
-    pub fn new() -> Self {
-        StddevOverTimeFunc {}
-    }
-}
-
 impl RangeFunc for StddevOverTimeFunc {
     fn name(&self) -> &'static str {
         "stddev_over_time"
@@ -55,25 +49,25 @@ mod tests {
 
     #[test]
     fn test_stddev_over_time_name() {
-        assert_eq!(StddevOverTimeFunc::new().name(), "stddev_over_time");
+        assert_eq!(StddevOverTimeFunc.name(), "stddev_over_time");
     }
 
     #[test]
     fn test_stddev_over_time_empty() {
-        let func = StddevOverTimeFunc::new();
+        let func = StddevOverTimeFunc;
         assert!(func.exec(&[], 0, &Duration::from_secs(1)).is_none());
     }
 
     #[test]
     fn test_stddev_over_time_constant() {
-        let func = StddevOverTimeFunc::new();
+        let func = StddevOverTimeFunc;
         let samples = make_samples(&[3.0, 3.0, 3.0]);
         assert_eq!(func.exec(&samples, 0, &Duration::from_secs(1)), Some(0.0));
     }
 
     #[test]
     fn test_stddev_over_time_non_trivial() {
-        let func = StddevOverTimeFunc::new();
+        let func = StddevOverTimeFunc;
         // [1,2,3]: mean=2, variance=2/3, stddev=sqrt(2/3)
         let samples = make_samples(&[1.0, 2.0, 3.0]);
         let result = func.exec(&samples, 0, &Duration::from_secs(1)).unwrap();

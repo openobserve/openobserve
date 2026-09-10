@@ -101,12 +101,10 @@ impl Engine {
 
         let selector = named_selector(selector.clone(), "VectorSelector")?;
 
-        let data = self.selector_load_data_owned(&selector, None, ctxs).await?;
-
-        let metrics_cache = match data.get_range_values() {
-            Some(v) => v,
-            None => return Ok(vec![]),
-        };
+        let metrics_cache = self.selector_load_data_owned(&selector, None, ctxs).await?;
+        if metrics_cache.is_empty() {
+            return Ok(vec![]);
+        }
 
         let offset_modifier = get_offset_modifier(selector.offset);
 
@@ -180,14 +178,12 @@ impl Engine {
 
         let selector = named_selector(selector.clone(), "MatrixSelector")?;
 
-        let data = self
+        let mut values = self
             .selector_load_data_owned(&selector, Some(range), ctxs)
             .await?;
-
-        let mut values = match data.get_range_values() {
-            Some(v) => v,
-            None => return Ok(vec![]),
-        };
+        if values.is_empty() {
+            return Ok(vec![]);
+        }
 
         let start = std::time::Instant::now();
         values.par_iter_mut().for_each(|rv| {
@@ -219,7 +215,7 @@ impl Engine {
         selector: &VectorSelector,
         range: Option<Duration>,
         ctxs: Option<SelectorContexts>,
-    ) -> Result<Value> {
+    ) -> Result<Vec<RangeValue>> {
         let mut metric_values = match self.selector_load_data_inner(selector, range, ctxs).await {
             Ok(v) => v,
             Err(e) => {
@@ -233,7 +229,7 @@ impl Engine {
 
         // no data, return immediately
         if metric_values.is_empty() {
-            return Ok(Value::None);
+            return Ok(metric_values);
         }
 
         let start = std::time::Instant::now();
@@ -245,17 +241,12 @@ impl Engine {
                 exemplars.sort_by_key(|k| k.timestamp);
             }
         });
-        let values = if metric_values.is_empty() {
-            Value::None
-        } else {
-            Value::Matrix(metric_values)
-        };
         log::info!(
             "[trace_id: {}] [PromQL] sort samples by timestamps took: {:?}",
             self.trace_id,
             start.elapsed()
         );
-        Ok(values)
+        Ok(metric_values)
     }
 
     #[tracing::instrument(name = "promql:engine:load_data", skip_all)]

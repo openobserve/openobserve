@@ -21,12 +21,6 @@ use crate::functions::RangeFunc;
 
 pub struct IdeltaFunc;
 
-impl IdeltaFunc {
-    pub fn new() -> Self {
-        IdeltaFunc {}
-    }
-}
-
 impl RangeFunc for IdeltaFunc {
     fn name(&self) -> &'static str {
         "idelta"
@@ -50,7 +44,7 @@ mod tests {
     use super::*;
 
     fn idelta(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
-        crate::functions::eval_range(data, IdeltaFunc::new(), eval_ctx)
+        crate::functions::eval_range(data, IdeltaFunc, eval_ctx)
     }
     // Test helper
     fn idelta_test_helper(data: Value) -> Result<Value> {
@@ -72,7 +66,7 @@ mod tests {
 
     #[test]
     fn test_idelta_exec_fewer_than_two_samples_returns_none() {
-        let func = IdeltaFunc::new();
+        let func = IdeltaFunc;
         assert!(func.exec(&[], 0, &Duration::ZERO).is_none());
         let one = vec![Sample::new(1000, 5.0)];
         assert!(func.exec(&one, 0, &Duration::ZERO).is_none());

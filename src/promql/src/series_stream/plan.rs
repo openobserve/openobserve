@@ -219,7 +219,7 @@ pub(crate) fn group_label_columns(
                 && name != VALUE_LABEL
                 && name != EXEMPLARS_LABEL
                 // range functions strip the metric name before aggregation
-                && (name != NAME_LABEL || KEEP_METRIC_NAME_FUNC.contains(func_name))
+                && (name != NAME_LABEL || func_name == KEEP_METRIC_NAME_FUNC)
                 && schema.field_with_name(name).is_ok()
         })
         .cloned()
@@ -248,7 +248,7 @@ pub(crate) fn series_label_columns(
                 && (label_selector.is_empty()
                     || label_selector.contains(name)
                     || name == BUCKET_LABEL)
-                && (name != NAME_LABEL || KEEP_METRIC_NAME_FUNC.contains(func_name))
+                && (name != NAME_LABEL || func_name == KEEP_METRIC_NAME_FUNC)
         })
         .collect();
     cols.sort();

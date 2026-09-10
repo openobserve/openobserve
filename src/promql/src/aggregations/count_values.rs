@@ -127,7 +127,7 @@ pub fn count_values(
     // Step 3: Process each group in parallel
     // For each group, count unique sample values at each timestamp
     // Result structure: HashMap<value_string, HashMap<timestamp, count>>
-    let results: Vec<(Labels, Vec<Sample>)> = groups
+    let results: Vec<RangeValue> = groups
         .par_iter()
         .map(|(_, series_indices)| {
             // Get the base labels for this group (from the first series in the group)
@@ -164,7 +164,7 @@ pub fn count_values(
             }
 
             // For each unique value, create a series with the count at each timestamp
-            let mut value_series: Vec<(Labels, Vec<Sample>)> = Vec::new();
+            let mut value_series: Vec<RangeValue> = Vec::new();
             for value_str in unique_values {
                 // Create labels with the new label_name
                 let mut labels = base_labels.clone();
@@ -183,7 +183,12 @@ pub fn count_values(
                 samples.sort_by_key(|s| s.timestamp);
 
                 if !samples.is_empty() {
-                    value_series.push((labels, samples));
+                    value_series.push(RangeValue {
+                        labels,
+                        samples,
+                        exemplars: None,
+                        time_window: None,
+                    });
                 }
             }
 
@@ -203,23 +208,13 @@ pub fn count_values(
         return Ok(Value::None);
     }
 
-    let result_matrix: Vec<RangeValue> = results
-        .into_iter()
-        .map(|(labels, samples)| RangeValue {
-            labels,
-            samples,
-            exemplars: None,
-            time_window: None,
-        })
-        .collect();
-
     log::info!(
         "[trace_id: {}] [PromQL Timing] eval_aggregate({func_name}) completed in {:?}, produced {} series",
         eval_ctx.trace_id,
         start.elapsed(),
-        result_matrix.len()
+        results.len()
     );
-    Ok(Value::Matrix(result_matrix))
+    Ok(Value::Matrix(results))
 }
 
 #[cfg(test)]

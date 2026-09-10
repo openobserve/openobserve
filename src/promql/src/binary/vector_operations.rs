@@ -15,7 +15,7 @@
 
 use std::{
     collections::{HashMap, HashSet},
-    sync::{Arc, LazyLock as Lazy},
+    sync::Arc,
 };
 
 use config::meta::promql::{
@@ -29,16 +29,14 @@ use rayon::prelude::*;
 use crate::binary::scalar_binary_operations;
 
 // DROP_METRIC_BIN_OP if the operation is one of these, drop the metric __name__
-pub static DROP_METRIC_BIN_OP: Lazy<HashSet<u8>> = Lazy::new(|| {
-    HashSet::from_iter([
-        token::T_ADD,
-        token::T_SUB,
-        token::T_DIV,
-        token::T_MUL,
-        token::T_POW,
-        token::T_MOD,
-    ])
-});
+pub const DROP_METRIC_BIN_OP: [u8; 6] = [
+    token::T_ADD,
+    token::T_SUB,
+    token::T_DIV,
+    token::T_MUL,
+    token::T_POW,
+    token::T_MOD,
+];
 
 /// Implement the operation between a matrix and a float.
 ///

@@ -21,12 +21,6 @@ use crate::functions::RangeFunc;
 
 pub struct DeltaFunc;
 
-impl DeltaFunc {
-    pub fn new() -> Self {
-        DeltaFunc {}
-    }
-}
-
 impl RangeFunc for DeltaFunc {
     fn name(&self) -> &'static str {
         "delta"
@@ -53,7 +47,7 @@ mod tests {
     use super::*;
 
     fn delta(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
-        crate::functions::eval_range(data, DeltaFunc::new(), eval_ctx)
+        crate::functions::eval_range(data, DeltaFunc, eval_ctx)
     }
 
     // Test helper
@@ -117,7 +111,7 @@ mod tests {
 
     #[test]
     fn test_delta_function_name() {
-        let func = DeltaFunc::new();
+        let func = DeltaFunc;
         assert_eq!(func.name(), "delta");
     }
 }

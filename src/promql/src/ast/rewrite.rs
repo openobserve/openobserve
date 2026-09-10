@@ -19,26 +19,15 @@ use promql_parser::{
     parser::VectorSelector,
 };
 
-struct RemoveFilterAllRewriter {}
-
-impl RemoveFilterAllRewriter {
-    pub fn new() -> Self {
-        RemoveFilterAllRewriter {}
-    }
-}
-
-impl RemoveFilterAllRewriter {
-    pub fn rewrite(&self, vs: &mut VectorSelector) {
-        let placeholder = get_config().common.dashboard_placeholder.to_string();
-
-        vs.matchers
-            .matchers
-            .retain(|m| !match_placeholder(m, &placeholder));
-        vs.matchers
-            .or_matchers
-            .iter_mut()
-            .for_each(|vs| vs.retain(|m| !match_placeholder(m, &placeholder)));
-    }
+pub fn remove_filter_all(vs: &mut VectorSelector) {
+    let placeholder = get_config().common.dashboard_placeholder.to_string();
+    vs.matchers
+        .matchers
+        .retain(|m| !match_placeholder(m, &placeholder));
+    vs.matchers
+        .or_matchers
+        .iter_mut()
+        .for_each(|vs| vs.retain(|m| !match_placeholder(m, &placeholder)));
 }
 
 fn match_placeholder(matcher: &Matcher, placeholder: &str) -> bool {
@@ -48,10 +37,6 @@ fn match_placeholder(matcher: &Matcher, placeholder: &str) -> bool {
         MatchOp::Re(pattern) => pattern.to_string() == placeholder,
         MatchOp::NotRe(pattern) => pattern.to_string() == placeholder,
     }
-}
-
-pub fn remove_filter_all(vs: &mut VectorSelector) {
-    RemoveFilterAllRewriter::new().rewrite(vs);
 }
 
 #[cfg(test)]

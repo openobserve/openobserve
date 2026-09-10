@@ -21,12 +21,6 @@ use crate::functions::RangeFunc;
 
 pub struct RateFunc;
 
-impl RateFunc {
-    pub fn new() -> Self {
-        RateFunc {}
-    }
-}
-
 impl RangeFunc for RateFunc {
     fn name(&self) -> &'static str {
         "rate"
@@ -53,18 +47,18 @@ mod tests {
 
     #[test]
     fn test_rate_name() {
-        assert_eq!(RateFunc::new().name(), "rate");
+        assert_eq!(RateFunc.name(), "rate");
     }
 
     #[test]
     fn test_rate_empty_samples() {
-        let func = RateFunc::new();
+        let func = RateFunc;
         assert!(func.exec(&[], 0, &Duration::from_secs(60)).is_none());
     }
 
     #[test]
     fn test_rate_single_sample() {
-        let func = RateFunc::new();
+        let func = RateFunc;
         let sample = Sample {
             timestamp: 60_000_000,
             value: 100.0,
@@ -77,7 +71,7 @@ mod tests {
 
     #[test]
     fn test_rate_two_samples_returns_some() {
-        let func = RateFunc::new();
+        let func = RateFunc;
         // range=60s, eval_ts=120s, start=60s
         // samples within [60s, 120s]
         let samples = vec![

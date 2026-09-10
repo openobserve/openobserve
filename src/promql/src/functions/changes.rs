@@ -22,12 +22,6 @@ use crate::functions::RangeFunc;
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#changes
 pub struct ChangesFunc;
 
-impl ChangesFunc {
-    pub fn new() -> Self {
-        ChangesFunc {}
-    }
-}
-
 impl RangeFunc for ChangesFunc {
     fn name(&self) -> &'static str {
         "changes"
@@ -52,7 +46,7 @@ mod tests {
     use super::*;
 
     fn changes(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
-        crate::functions::eval_range(data, ChangesFunc::new(), eval_ctx)
+        crate::functions::eval_range(data, ChangesFunc, eval_ctx)
     }
     // Test helper
     fn changes_test_helper(data: Value) -> Result<Value> {
@@ -74,7 +68,7 @@ mod tests {
 
     #[test]
     fn test_changes_no_changes() {
-        let func = ChangesFunc::new();
+        let func = ChangesFunc;
         let samples = vec![
             Sample::new(1000, 5.0),
             Sample::new(2000, 5.0),

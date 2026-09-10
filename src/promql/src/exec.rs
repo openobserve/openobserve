@@ -104,7 +104,7 @@ impl PromqlContext {
                         .into_iter()
                         .filter_map(|range_val| {
                             range_val.samples.first().map(|sample| InstantValue {
-                                labels: range_val.labels.clone(),
+                                labels: range_val.labels,
                                 sample: *sample,
                             })
                         })
@@ -126,21 +126,11 @@ impl PromqlContext {
             match value {
                 Value::Float(scalar_val) => {
                     // Generate samples for each time point
-                    let timestamps = eval_ctx.timestamps();
-                    let samples: Vec<Sample> = timestamps
-                        .into_iter()
-                        .map(|ts| Sample::new(ts, scalar_val))
-                        .collect();
-
                     // Create a matrix with a single series containing all time points
-                    let range_value = RangeValue {
-                        labels: Labels::default(),
-                        samples,
-                        exemplars: None,
-                        time_window: None,
-                    };
-
-                    (Value::Matrix(vec![range_value]), Some("matrix".to_string()))
+                    (
+                        crate::functions::vector(Value::Float(scalar_val), &eval_ctx)?,
+                        Some("matrix".to_string()),
+                    )
                 }
                 Value::None => (Value::None, Some("matrix".to_string())),
                 other @ Value::Matrix(_) => (other, Some("matrix".to_string())),
@@ -174,7 +164,6 @@ impl PromqlContext {
         // pick all selectors from stmt
         let mut visitor = MetricSelectorVisitor::default();
         promql_parser::util::walk_expr(&mut visitor, &stmt.expr).unwrap();
-        let _selectors = visitor.exprs_to_string();
 
         let ctx = Arc::new(self.clone());
 

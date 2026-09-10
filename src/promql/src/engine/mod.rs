@@ -153,15 +153,13 @@ impl Engine {
                 let val = self.exec_expr(&expr.expr).await?;
                 let range = expr.range;
                 let matrix = match val {
-                    Value::Matrix(vs) => {
+                    Value::Matrix(mut vs) => {
                         // For matrix type, update the time_window range
-                        vs.into_iter()
-                            .map(|mut rv| {
-                                // Update time_window with new range
-                                rv.time_window = Some(TimeWindow::new(range));
-                                rv
-                            })
-                            .collect()
+                        for rv in &mut vs {
+                            // Update time_window with new range
+                            rv.time_window = Some(TimeWindow::new(range));
+                        }
+                        vs
                     }
                     v => {
                         return Err(DataFusionError::NotImplemented(format!(
