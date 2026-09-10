@@ -184,10 +184,18 @@ impl Engine {
                 functions::quantile_over_time(phi_quantile_f, input, &self.eval_ctx)?
             }
             Func::Round => {
-                let input = self
-                    .call_expr_arg(args, args.len().saturating_sub(1))
-                    .await?;
-                functions::round(input)?
+                let err = "Invalid args, expected round(v instant-vector, to_nearest=1 scalar)";
+                let input = self.call_expr_arg(args, 0).await?;
+                let to_nearest = match args.len() {
+                    1 => 1.0,
+                    2 => {
+                        let to_nearest = self.call_expr_arg(args, 1).await?;
+                        self.parse_f64_else_err(&to_nearest, err)?
+                    }
+                    _ => return Err(DataFusionError::NotImplemented(err.into())),
+                };
+
+                functions::round(input, to_nearest)?
             }
             Func::HistogramCount
             | Func::HistogramFraction
@@ -386,6 +394,10 @@ mod tests {
             ("clamp(vector(5), 1, 3)", 3.0),
             ("clamp_min(vector(5), 7)", 7.0),
             ("clamp_max(vector(5), 3)", 3.0),
+            ("round(vector(2.5))", 3.0),
+            ("round(vector(-2.5))", -2.0),
+            ("round(vector(2.6), 0.5)", 2.5),
+            ("round(vector(12.5), 5)", 15.0),
             ("3 < vector(5)", 5.0),
             ("3 < bool vector(5)", 1.0),
             ("7 < bool vector(5)", 0.0),
