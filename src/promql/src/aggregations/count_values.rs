@@ -23,7 +23,7 @@ use datafusion::error::{DataFusionError, Result};
 use promql_parser::parser::LabelModifier;
 use rayon::prelude::*;
 
-use crate::aggregations::{labels_to_exclude, labels_to_include};
+use crate::aggregations::projected_labels;
 
 /// Aggregates Matrix input for range queries
 /// count_values creates a new label with the metric value as the label value
@@ -94,15 +94,7 @@ pub fn count_values(
     let series_label_hashes: Vec<(u64, Labels)> = matrix
         .iter()
         .map(|rv| {
-            let grouped_labels = match modifier {
-                Some(LabelModifier::Include(labels)) => {
-                    labels_to_include(&labels.labels, rv.labels.clone())
-                }
-                Some(LabelModifier::Exclude(labels)) => {
-                    labels_to_exclude(&labels.labels, rv.labels.clone())
-                }
-                None => Labels::default(),
-            };
+            let grouped_labels = projected_labels(modifier, &rv.labels);
             let hash = grouped_labels.signature();
             (hash, grouped_labels)
         })
@@ -135,7 +127,7 @@ pub fn count_values(
     // Step 3: Process each group in parallel
     // For each group, count unique sample values at each timestamp
     // Result structure: HashMap<value_string, HashMap<timestamp, count>>
-    let results: Vec<Vec<(Labels, Vec<Sample>)>> = groups
+    let results: Vec<(Labels, Vec<Sample>)> = groups
         .par_iter()
         .map(|(_, series_indices)| {
             // Get the base labels for this group (from the first series in the group)
@@ -164,10 +156,10 @@ pub fn count_values(
 
             // Convert the nested HashMap to a flat structure: Vec<(value_string, Vec<Sample>)>
             // First, collect all unique values seen across all timestamps
-            let mut unique_values: hashbrown::HashSet<String> = hashbrown::HashSet::new();
+            let mut unique_values: hashbrown::HashSet<&String> = hashbrown::HashSet::new();
             for value_map in timestamp_value_counts.values() {
                 for value_str in value_map.keys() {
-                    unique_values.insert(value_str.clone());
+                    unique_values.insert(value_str);
                 }
             }
 
@@ -176,13 +168,13 @@ pub fn count_values(
             for value_str in unique_values {
                 // Create labels with the new label_name
                 let mut labels = base_labels.clone();
-                labels.push(Arc::new(Label::new(label_name, &value_str)));
+                labels.push(Arc::new(Label::new(label_name, value_str.as_str())));
                 labels.sort();
 
                 // Create samples for this value across all timestamps
                 let mut samples: Vec<Sample> = Vec::new();
                 for (&timestamp, value_map) in &timestamp_value_counts {
-                    if let Some(&count) = value_map.get(&value_str) {
+                    if let Some(&count) = value_map.get(value_str) {
                         samples.push(Sample::new(timestamp, count as f64));
                     }
                 }
@@ -197,10 +189,9 @@ pub fn count_values(
 
             value_series
         })
+        // Flatten the nested Vec
+        .flatten()
         .collect();
-
-    // Flatten the nested Vec
-    let results: Vec<(Labels, Vec<Sample>)> = results.into_iter().flatten().collect();
 
     log::info!(
         "[trace_id: {}] [PromQL Timing] eval_aggregate({func_name}) parallel aggregation took: {:?}",

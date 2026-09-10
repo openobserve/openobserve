@@ -13,13 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::promql::value::{EvalContext, RangeValue, Sample, Value};
+use config::meta::promql::value::{EvalContext, Sample, Value};
 use datafusion::error::Result;
 use hashbrown::HashMap;
 
 use crate::{
     aggregations::{Accumulate, AggFunc},
-    common::quantile_in_place as calculate_quantile,
+    common::quantile_in_place,
 };
 
 /// Note: quantile aggregates all series into a single result (no label grouping)
@@ -32,23 +32,8 @@ pub fn quantile(qtile: f64, data: Value, eval_ctx: &EvalContext) -> Result<Value
 
     // Handle invalid quantile parameter by returning special values
     if !(0.0..=1.0).contains(&qtile) || qtile.is_nan() {
-        let value = match qtile.signum() as i32 {
-            1 => f64::INFINITY,
-            -1 => f64::NEG_INFINITY,
-            _ => f64::NAN,
-        };
-        let timestamps = eval_ctx.timestamps();
-        let samples: Vec<Sample> = timestamps
-            .iter()
-            .map(|&ts| Sample::new(ts, value))
-            .collect();
-        let range_value = RangeValue {
-            labels: Default::default(),
-            samples,
-            exemplars: None,
-            time_window: None,
-        };
-        return Ok(Value::Matrix(vec![range_value]));
+        let value = quantile_in_place(&mut [], qtile).unwrap();
+        return crate::functions::vector(Value::Float(value), eval_ctx);
     }
 
     let result = super::eval_aggregate(&None, data, Quantile { qtile }, eval_ctx);
@@ -120,7 +105,7 @@ impl Accumulate for QuantileAccumulate {
                     return Some(Sample::new(timestamp, f64::NAN));
                 }
                 // Calculate quantile
-                calculate_quantile(&mut values, self.qtile)
+                quantile_in_place(&mut values, self.qtile)
                     .map(|quantile_val| Sample::new(timestamp, quantile_val))
             })
             .collect()
@@ -197,7 +182,7 @@ mod tests {
         let mut values = vec![10.0, 20.0, 30.0];
         let qtile = 0.5; // 50th percentile
 
-        let quantile_value = calculate_quantile(&mut values, qtile).unwrap();
+        let quantile_value = quantile_in_place(&mut values, qtile).unwrap();
         assert_eq!(quantile_value, 20.0); // 50th percentile should be 20.0
     }
 
@@ -207,11 +192,11 @@ mod tests {
         let mut values = vec![10.0, 20.0, 30.0];
 
         // 0th percentile (minimum)
-        let min_value = calculate_quantile(&mut values, 0.0).unwrap();
+        let min_value = quantile_in_place(&mut values, 0.0).unwrap();
         assert_eq!(min_value, 10.0);
 
         // 100th percentile (maximum)
-        let max_value = calculate_quantile(&mut values, 1.0).unwrap();
+        let max_value = quantile_in_place(&mut values, 1.0).unwrap();
         assert_eq!(max_value, 30.0);
     }
 }
