@@ -76,6 +76,10 @@
       "action": "Run query",
       "actionDesc": "Load events for the selected filters"
     },
+    "noAccess": {
+      "title": "You don't have access",
+      "description": "Contact your administrator if you believe you should have access."
+    },
     "noDashboards": {
       "title": "Create your first dashboard",
       "description": "Dashboards bring your metrics, logs, and traces together in one view. Build one to get started.",
@@ -9857,6 +9861,8 @@
       "outputTokens": "Output Tokens",
       "out": "Out",
       "totalCost": "Total Cost",
+      "scores": "Scores",
+      "notScoredYet": "Not scored yet",
       "preview": "Preview",
       "input": "Input",
       "output": "Output",
@@ -11171,6 +11177,10 @@
         "runSummary": "{trials} · {scorers}",
         "progress": "Task Progress",
         "scoring": "Scoring",
+        "tasks": "Tasks",
+        "scores": "Scores",
+        "taskDistribution": "{succeeded} succeeded · {failed} failed · {pending} pending · {skipped} skipped",
+        "scoreOutcomeDistribution": "{scored} scored · {failed} failed · {pending} pending · {skipped} skipped · {unscored} unscored",
         "scoringDistribution": "{success} successful · {failed} failed · {pending} pending · {skipped} skipped",
         "compare": "Compare",
         "comparePicker": {
@@ -11914,6 +11924,8 @@
       "schemaInvalidJson": "Schema must be valid JSON.",
       "schemaIgnored": "Schema · Ignored by this provider",
       "schemaUnsupported": "This provider has no structured-output field. The schema is kept on this column, but it is not sent and the model answers with plain text.",
+      "schemaApproximated": "Schema · Approximated by this provider",
+      "schemaApproximatedHelp": "This provider only supports JSON mode, not a JSON schema. The request is sent in JSON mode with the schema restated in the prompt, so the answer is JSON but its shape is not guaranteed.",
       "outputPlaceholder": "Output appears here — press Run.",
       "outputNotRun": "Not run",
       "retry": "Retry",
@@ -12017,6 +12029,12 @@
   },
   "onlineEvals": {
     "versionPrefix": "v",
+    "traceScoreChip": {
+      "reasoning": "Why",
+      "scoredAt": "Scored {time}",
+      "moreCount": "+{count} more",
+      "allScores": "All scores ({count})"
+    },
     "importNameRequired": "Name *",
     "importNewNameRequired": "New Name *",
     "importDataTypeRequired": "Data Type *",
@@ -12287,8 +12305,10 @@
       "sectionTitle": "Provider",
       "nameLabel": "Name",
       "typeLabel": "Provider type",
-      "endpointLabel": "Endpoint",
-      "endpointPlaceholder": "Full completions URL, e.g. https://your-host/v1/chat/completions",
+      "endpointLabel": "Base URL",
+      "endpointPlaceholder": "Base URL, e.g. https://your-host/v1",
+      "endpointHelpDefault": "Leave empty to use the default: {url}",
+      "endpointHelpRequired": "Required — this provider has no default base URL.",
       "defaultModelLabel": "Default model",
       "availableModelsLabel": "Available models",
       "apiKeyLabel": "API Key",
@@ -12297,7 +12317,6 @@
       "authSection": "Authentication",
       "authEditNote": "Credentials cannot be read back. To test a provider that requires authentication, enter its API key.",
       "cannotRename": "Cannot be renamed after creation.",
-      "availableModelsHelp": "Optional. Comma-separated list of models available on this Provider.",
       "saveError": "Failed to save provider",
       "nameRequired": "Provider name is required",
       "typeRequired": "Provider type is required",
@@ -12404,7 +12423,8 @@
         "nameRequired": "Name is required",
         "nameFormat": "Use lowercase letters, numbers, and underscores only",
         "minRequired": "Min is required",
-        "maxRequired": "Max is required"
+        "maxRequired": "Max is required",
+        "maxNotGreaterThanMin": "Max must be greater than Min"
       },
       "import": {
         "title": "Import Score Config",
@@ -12975,7 +12995,7 @@
     },
     "empty": {
       "title": "No LLM Providers Yet",
-      "description": "LLM Providers store the connection details (endpoint + credentials) for the language models your LLM Judge scorers call. Add one to start running judge-based evaluations."
+      "description": "LLM Providers store the connection details (base URL + credentials) for the language models your LLM Judge scorers call. Add one to start running judge-based evaluations."
     }
   },
   "logs": {
@@ -16072,6 +16092,12 @@
     "aiQueueDetail": "Queue",
     "aiQueueReview": "Queue Review",
     "aiDatasetDetail": "Dataset",
+    "aiExperimentCreate": "New Experiment",
+    "aiExperimentCompare": "Compare Experiments",
+    "aiExperimentDetail": "Experiment",
+    "aiRemoteTaskCreate": "New Remote Task",
+    "aiRemoteTaskEdit": "Edit Remote Task",
+    "aiRemoteTaskDetail": "Remote Task",
     "notFound": "404 - Not Found",
     "createReport": "Create Report",
     "addCheck": "Add Check",

@@ -76,6 +76,10 @@
       "action": "Query uitvoeren",
       "actionDesc": "Gebeurtenissen laden voor de geselecteerde filters"
     },
+    "noAccess": {
+      "title": "U heeft geen toegang",
+      "description": "Neem contact op met uw beheerder als u denkt dat u toegang zou moeten hebben."
+    },
     "noDashboards": {
       "title": "Maak je eerste dashboard",
       "description": "Dashboards brengen uw metrieken, logboeken en traces samen in één weergave. Bouw er een om te beginnen.",
@@ -9857,6 +9861,8 @@
       "outputTokens": "Uitvoertokens",
       "out": "Uit",
       "totalCost": "Totale kosten",
+      "scores": "Scores",
+      "notScoredYet": "Nog niet gescoord",
       "preview": "Voorbeeld",
       "input": "Invoer",
       "output": "Uitvoer",
@@ -11171,6 +11177,10 @@
         "runSummary": "{trials} · {scorers}",
         "progress": "Taakvoortgang",
         "scoring": "Scoren",
+        "tasks": "Taken",
+        "scores": "Scores",
+        "taskDistribution": "{succeeded} geslaagd · {failed} mislukt · {pending} in afwachting · {skipped} overgeslagen",
+        "scoreOutcomeDistribution": "{scored} gescoord · {failed} mislukt · {pending} in afwachting · {skipped} overgeslagen · {unscored} niet gescoord",
         "scoringDistribution": "{success} geslaagd · {failed} mislukt · {pending} in behandeling · {skipped} overgeslagen",
         "compare": "Vergelijken",
         "comparePicker": {
@@ -11914,6 +11924,8 @@
       "schemaInvalidJson": "Schema moet geldige JSON zijn.",
       "schemaIgnored": "Schema · Genegeerd door deze provider",
       "schemaUnsupported": "Deze provider heeft geen veld voor gestructureerde uitvoer. Het schema blijft in deze kolom bewaard, maar wordt niet verzonden en het model antwoordt met platte tekst.",
+      "schemaApproximated": "Schema · Benaderd door deze provider",
+      "schemaApproximatedHelp": "Deze provider ondersteunt alleen JSON-modus, geen JSON-schema. Het verzoek wordt in JSON-modus verzonden, waarbij het schema opnieuw in de prompt wordt vermeld, dus het antwoord is JSON, maar de structuur ervan is niet gegarandeerd.",
       "outputPlaceholder": "Uitvoer verschijnt hier — druk op Uitvoeren.",
       "outputNotRun": "Niet uitgevoerd",
       "retry": "Opnieuw proberen",
@@ -12017,6 +12029,12 @@
   },
   "onlineEvals": {
     "versionPrefix": "v",
+    "traceScoreChip": {
+      "reasoning": "Waarom",
+      "scoredAt": "Gescoord {time}",
+      "moreCount": "+{count} meer",
+      "allScores": "Alle scores ({count})"
+    },
     "importNameRequired": "Naam *",
     "importNewNameRequired": "Nieuwe naam *",
     "importDataTypeRequired": "Datatype *",
@@ -12287,8 +12305,10 @@
       "sectionTitle": "Aanbieder",
       "nameLabel": "Naam",
       "typeLabel": "Soort provider",
-      "endpointLabel": "Eindpunt",
-      "endpointPlaceholder": "Volledige completions-URL, bijv. https://your-host/v1/chat/completions",
+      "endpointLabel": "Basis-URL",
+      "endpointPlaceholder": "Basis-URL, bijv. https://your-host/v1",
+      "endpointHelpDefault": "Laat leeg om de standaard te gebruiken: {url}",
+      "endpointHelpRequired": "Verplicht — deze provider heeft geen standaard basis-URL.",
       "defaultModelLabel": "Standaardmodel",
       "availableModelsLabel": "Beschikbare modellen",
       "apiKeyLabel": "API-sleutel",
@@ -12297,7 +12317,6 @@
       "authSection": "Authenticatie",
       "authEditNote": "Inloggegevens kunnen niet worden teruggelezen. Om een provider te testen die authenticatie vereist, voer je de API-sleutel in.",
       "cannotRename": "Kan na het aanmaken niet worden hernoemd.",
-      "availableModelsHelp": "Optioneel. Door komma's gescheiden lijst van modellen die beschikbaar zijn op deze provider.",
       "saveError": "Het opslaan van de provider is mislukt",
       "nameRequired": "Provider name is required",
       "typeRequired": "Provider type is required",
@@ -12404,7 +12423,8 @@
         "nameRequired": "Name is required",
         "nameFormat": "Use lowercase letters, numbers, and underscores only",
         "minRequired": "Min is required",
-        "maxRequired": "Max is required"
+        "maxRequired": "Max is required",
+        "maxNotGreaterThanMin": "Max moet groter zijn dan Min"
       },
       "import": {
         "title": "Scoreconfiguratie importeren",
@@ -12975,7 +12995,7 @@
     },
     "empty": {
       "title": "Nog geen LLM-aanbieders",
-      "description": "LLM-providers slaan de verbindingsgegevens (eindpunt + inloggegevens) op voor de taalmodellen die uw LLM Judge-scorers aanroepen. Voeg er een toe om te beginnen met het uitvoeren van evaluaties op basis van rechters."
+      "description": "LLM-providers slaan de verbindingsgegevens (basis-URL en credentials) op voor de taalmodellen die uw LLM-judgescorers aanroepen. Voeg er een toe om evaluaties op basis van een judge uit te voeren."
     }
   },
   "logs": {
@@ -16072,6 +16092,12 @@
     "aiQueueDetail": "Wachtrij",
     "aiQueueReview": "Wachtrijcontrole",
     "aiDatasetDetail": "Dataset",
+    "aiExperimentCreate": "Nieuw experiment",
+    "aiExperimentCompare": "Experimenten vergelijken",
+    "aiExperimentDetail": "Experiment",
+    "aiRemoteTaskCreate": "Nieuwe remote-taak",
+    "aiRemoteTaskEdit": "Remote-taak bewerken",
+    "aiRemoteTaskDetail": "Remote-taak",
     "notFound": "404 - Niet gevonden",
     "createReport": "Rapport maken",
     "addCheck": "Controle toevoegen",

@@ -368,11 +368,8 @@ function handleClick(event: MouseEvent): void {
       <OIcon name="progress-activity" size="sm" class="animate-spin" />
     </span>
 
-    <!-- Original content — invisible (not hidden) when loading to preserve button dimensions -->
-    <span
-      :class="loading ? 'invisible inline-flex items-center' : 'contents'"
-      :style="loading ? { gap: 'inherit' } : undefined"
-    >
+    <!-- Keep display:contents while loading: a wrapper that later loses its box strands a child-mode OTooltip anchored to it at (0,0) -->
+    <span :class="loading ? 'invisible contents' : 'contents'">
       <slot name="icon-left">
         <OIcon v-if="iconLeft" :name="iconLeft" size="sm" />
       </slot>
