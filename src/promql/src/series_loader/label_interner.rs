@@ -40,11 +40,6 @@ pub(crate) struct LabelInterner {
     window_hits: usize,
 }
 
-pub(crate) enum LabelColumn<'a> {
-    Utf8(&'a StringArray),
-    Utf8View(&'a StringViewArray),
-}
-
 impl LabelInterner {
     pub(crate) fn new(name: String) -> Self {
         Self {
@@ -95,6 +90,11 @@ impl LabelInterner {
     fn is_enabled(&self) -> bool {
         self.values.is_some()
     }
+}
+
+pub(crate) enum LabelColumn<'a> {
+    Utf8(&'a StringArray),
+    Utf8View(&'a StringViewArray),
 }
 
 impl<'a> LabelColumn<'a> {

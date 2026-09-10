@@ -31,6 +31,35 @@ pub(crate) enum FusedAggOp {
     Sum,
 }
 
+impl FusedAggOp {
+    pub(crate) fn from_token(id: TokenId) -> Option<Self> {
+        match id {
+            token::T_AVG => Some(Self::Avg),
+            token::T_COUNT => Some(Self::Count),
+            token::T_GROUP => Some(Self::Group),
+            token::T_MAX => Some(Self::Max),
+            token::T_MIN => Some(Self::Min),
+            token::T_STDDEV => Some(Self::Stddev),
+            token::T_STDVAR => Some(Self::Stdvar),
+            token::T_SUM => Some(Self::Sum),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn name(self) -> &'static str {
+        match self {
+            Self::Avg => "avg",
+            Self::Count => "count",
+            Self::Group => "group",
+            Self::Max => "max",
+            Self::Min => "min",
+            Self::Stddev => "stddev",
+            Self::Stdvar => "stdvar",
+            Self::Sum => "sum",
+        }
+    }
+}
+
 /// Dense per-timestamp aggregation state for one output group.
 ///
 /// Each variant mirrors its [`crate::aggregations::Accumulate`] counterpart
@@ -64,35 +93,6 @@ pub(super) enum FusedAccumulator {
         sums: Vec<(f64, f64)>,
         present: Vec<bool>,
     },
-}
-
-impl FusedAggOp {
-    pub(crate) fn from_token(id: TokenId) -> Option<Self> {
-        match id {
-            token::T_AVG => Some(Self::Avg),
-            token::T_COUNT => Some(Self::Count),
-            token::T_GROUP => Some(Self::Group),
-            token::T_MAX => Some(Self::Max),
-            token::T_MIN => Some(Self::Min),
-            token::T_STDDEV => Some(Self::Stddev),
-            token::T_STDVAR => Some(Self::Stdvar),
-            token::T_SUM => Some(Self::Sum),
-            _ => None,
-        }
-    }
-
-    pub(crate) fn name(self) -> &'static str {
-        match self {
-            Self::Avg => "avg",
-            Self::Count => "count",
-            Self::Group => "group",
-            Self::Max => "max",
-            Self::Min => "min",
-            Self::Stddev => "stddev",
-            Self::Stdvar => "stdvar",
-            Self::Sum => "sum",
-        }
-    }
 }
 
 impl FusedAccumulator {

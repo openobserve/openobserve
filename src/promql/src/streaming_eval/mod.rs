@@ -52,7 +52,7 @@ where
 }
 
 #[cfg(test)]
-pub(crate) mod test_support {
+pub(crate) mod tests {
     use config::meta::promql::value::{EvalContext, Value};
     use promql_parser::parser::LabelModifier;
 

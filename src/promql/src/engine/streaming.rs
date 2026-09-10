@@ -33,8 +33,8 @@ use super::{
 };
 use crate::{
     functions, micros,
-    series_stream::merge::{
-        MergeSeriesStream, StreamingSelector, group_label_columns, series_label_columns,
+    series_stream::scan::{
+        StreamingSelector, execute_partitioned, group_label_columns, series_label_columns,
     },
     streaming_eval,
 };
@@ -159,7 +159,7 @@ impl Engine {
             let Some(label_cols) = group_label_columns(modifier, schema, func.name()) else {
                 return Ok(None);
             };
-            let Some(sources) = MergeSeriesStream::execute_partitioned(
+            let Some(sources) = execute_partitioned(
                 ctx,
                 schema,
                 &scan.streaming_selector(),
@@ -192,7 +192,7 @@ impl Engine {
                 series_label_columns(schema, &scan.label_selector, func.name())
             };
             let eval = Arc::new(streaming_eval::RangeExpr::new(func, range, &self.eval_ctx));
-            match MergeSeriesStream::execute_partitioned(
+            match execute_partitioned(
                 ctx,
                 schema,
                 &scan.streaming_selector(),

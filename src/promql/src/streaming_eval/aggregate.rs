@@ -160,7 +160,7 @@ mod tests {
     use datafusion::error::DataFusionError;
     use promql_parser::parser::LabelModifier;
 
-    use super::{super::test_support::*, *};
+    use super::{super::tests::*, *};
     use crate::{
         aggregations,
         functions::{self, RangeFunc},
