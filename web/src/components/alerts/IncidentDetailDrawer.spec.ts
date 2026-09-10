@@ -27,6 +27,20 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: (...args: any[]) => mockToast(...args),
 }));
 
+// acknowledgeIncident (and the severity reanalysis prompt) await a confirm
+// dialog that only resolves via user interaction with a rendered provider —
+// unmocked, that promise never settles and every caller hangs until timeout.
+const mockConfirm = vi.fn().mockResolvedValue(true);
+vi.mock("@/composables/useConfirmDialog", () => ({
+  useConfirmDialog: () => ({
+    currentDialog: { value: null },
+    confirm: mockConfirm,
+    handleConfirm: vi.fn(),
+    handleCancel: vi.fn(),
+    handleUpdateOpen: vi.fn(),
+  }),
+}));
+
 // Mock incidents service
 vi.mock("@/services/incidents", () => ({
   default: {
@@ -408,10 +422,21 @@ describe("IncidentDetailDrawer.vue", () => {
     });
 
     it("should set updating state during status update", async () => {
+      // acknowledgeIncident awaits the confirm dialog before it ever touches
+      // `updating`, so a fixed number of microtask hops can't be assumed here —
+      // hold the status update pending so the state is observable regardless.
+      let resolveUpdate: (value: any) => void;
+      const pendingUpdate = new Promise((resolve) => {
+        resolveUpdate = resolve;
+      });
+      (incidentsService.updateStatus as any).mockReturnValue(pendingUpdate);
+
       const updatePromise = wrapper.vm.acknowledgeIncident();
+      await flushPromises();
 
       expect(wrapper.vm.updating).toBe(true);
 
+      resolveUpdate!({ data: { status: "acknowledged" } });
       await updatePromise;
 
       expect(wrapper.vm.updating).toBe(false);
