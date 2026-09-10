@@ -349,10 +349,9 @@ pub async fn delete_folder(
             // below, which reports NotFound.
             if let Some(folder_pk) =
                 table::folders::get_pk_by_name(org_id, folder_id, folder_type).await?
+                && table::workflows::count_by_folder(org_id, &folder_pk).await? > 0
             {
-                if table::workflows::count_by_folder(org_id, &folder_pk).await? > 0 {
-                    return Err(FolderError::DeleteWithWorkflows);
-                }
+                return Err(FolderError::DeleteWithWorkflows);
             }
         }
     };
