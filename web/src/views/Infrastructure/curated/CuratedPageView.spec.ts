@@ -1335,6 +1335,145 @@ describe("CuratedPageView", () => {
       selector.unmount();
     });
 
+    // The three-picker chain the k8s pack actually declares, with the runtime
+    // shape useVariablesManager.initialize produces rather than hand-set flags:
+    // the scheduling contract under test is the manager's, so a fixture that
+    // pre-sets the flags would assert nothing about it.
+    const chainConfig = () => [
+      {
+        name: "cluster",
+        label: "K8s Cluster",
+        type: "query_values",
+        multiSelect: true,
+        scope: "global",
+        options: [],
+        query_data: { stream: "kube_pod_status_phase", field: "k8s_cluster", filter: [] },
+      },
+      {
+        name: "namespace",
+        label: "K8s Namespace",
+        type: "query_values",
+        multiSelect: true,
+        scope: "global",
+        options: [],
+        query_data: {
+          stream: "kube_pod_status_phase",
+          field: "namespace",
+          filter: [{ name: "k8s_cluster", operator: "IN", value: "$cluster" }],
+        },
+      },
+      {
+        name: "pod",
+        label: "Pod",
+        type: "query_values",
+        multiSelect: true,
+        scope: "global",
+        options: [],
+        query_data: {
+          stream: "kube_pod_status_phase",
+          field: "pod",
+          filter: [
+            { name: "k8s_cluster", operator: "IN", value: "$cluster" },
+            { name: "namespace", operator: "IN", value: "$namespace" },
+          ],
+        },
+      },
+    ];
+
+    /** checkAndLoadPendingVariables fires on this flag ALONE (VariablesValueSelector :1826-1833). */
+    const scheduled = (manager: any, name: string) =>
+      manager.variablesData.global.find((v: any) => v.name === name)?.isVariableLoadingPending ===
+      true;
+
+    const coldLoad = async (query: Record<string, string>) => {
+      const manager = useVariablesManager((key: string) => key);
+      await manager.initialize(chainConfig(), {});
+      manager.loadFromUrl({ query });
+      manager.commitAll();
+      await flushPromises();
+      return manager;
+    };
+
+    it("a URL-restored parent schedules its chained child, so namespace can still load", async () => {
+      // The reported URL: var-cluster only. loadFromUrl marks cluster loaded WITHOUT
+      // fetching, and only a completed fetch calls onVariablePartiallyLoaded — so the
+      // chain was never told to start and namespace stayed pending=false forever.
+      const manager = await coldLoad({ "var-cluster": "common-dev" });
+      expect(scheduled(manager, "namespace")).toBe(true);
+    });
+
+    it("the grandchild waits for its own parent rather than firing unnarrowed", async () => {
+      // Pod is chained on cluster AND namespace; scheduling it before namespace
+      // resolves would query every cluster's pods.
+      const manager = await coldLoad({ "var-cluster": "common-dev" });
+      expect(scheduled(manager, "pod")).toBe(false);
+
+      const namespace = manager.variablesData.global.find((v: any) => v.name === "namespace");
+      namespace.value = ["argocd"];
+      namespace.options = [{ label: "argocd", value: "argocd" }];
+      manager.onVariablePartiallyLoaded("namespace@global");
+      expect(scheduled(manager, "pod")).toBe(true);
+    });
+
+    it("a URL carrying the whole chain schedules nothing, because every value is already held", async () => {
+      const manager = await coldLoad({
+        "var-cluster": "common-dev",
+        "var-namespace": "argocd",
+        "var-pod": "ingester-0",
+      });
+      expect(scheduled(manager, "namespace")).toBe(false);
+      expect(scheduled(manager, "pod")).toBe(false);
+    });
+
+    it("a cold load with NO var- keys leaves the chain to the parent's own fetch", async () => {
+      // Cluster is parentless so initialize already scheduled it; the children must
+      // wait for its response, not race it.
+      const manager = await coldLoad({});
+      expect(scheduled(manager, "cluster")).toBe(true);
+      expect(scheduled(manager, "namespace")).toBe(false);
+      expect(scheduled(manager, "pod")).toBe(false);
+    });
+
+    it("valueless namespace and pod are RENDERED on that cold load, never omitted", async () => {
+      // partial=false is the un-settled state, so the omit test's third clause
+      // already spares them — this pins that b54f23ab09 did not widen omission
+      // onto the children.
+      const manager = await coldLoad({ "var-cluster": "common-dev" });
+      const selector = await mountRealSelector(manager.variablesData.global as any[]);
+      const vm = selector.vm as any;
+      expect(vm.isVariableOmitted(manager.variablesData.global[1])).toBe(false);
+      expect(vm.isVariableOmitted(manager.variablesData.global[2])).toBe(false);
+      selector.unmount();
+    });
+
+    it("a genuinely empty picker is still omitted once its own load has settled", async () => {
+      // The deliberate behaviour b54f23ab09 had to preserve: a settled, valueless,
+      // zero-option picker is unresolvable and must go.
+      const manager = await coldLoad({ "var-cluster": "common-dev" });
+      const selector = await mountRealSelector(manager.variablesData.global as any[]);
+      const vm = selector.vm as any;
+      const settledEmpty = {
+        ...manager.variablesData.global[1],
+        curatedOmitWhenValuesEmpty: true,
+        isVariablePartialLoaded: true,
+        isVariableLoadingPending: false,
+        isLoading: false,
+        options: [],
+        value: [],
+      };
+      expect(vm.isVariableOmitted(settledEmpty)).toBe(true);
+      selector.unmount();
+    });
+
+    it("a mid-chain reload re-schedules the child instead of stranding it empty", async () => {
+      // Changing cluster resets descendants with BOTH loading flags false
+      // (useVariablesManager :695-706); the child must be re-armed, not left settled.
+      const manager = await coldLoad({ "var-cluster": "common-dev" });
+      manager.updateVariableValue("cluster", "global", undefined, undefined, ["common-prod"]);
+      expect(scheduled(manager, "namespace")).toBe(true);
+      expect(scheduled(manager, "pod")).toBe(false);
+    });
+
     it("a curated picker is clearable, so a chosen scope can be undone", async () => {
       // The affordance is OSelect's own `clearable` X (used app-wide); the curated
       // page previously offered no way back out of a selection at all.

@@ -862,8 +862,30 @@ export const useVariablesManager = (t: TranslateFn) => {
   };
 
   // ========== URL SYNCHRONIZATION ==========
+  // A URL-restored value is marked loaded WITHOUT a fetch, and only a completed
+  // fetch notifies children, so a restored parent's chain would never start.
+  const scheduleChildrenOfRestored = (restoredKeys: string[]) => {
+    if (restoredKeys.length === 0) return;
+
+    const allVars = getAllVariablesFlat();
+    const restored = new Set(restoredKeys);
+
+    restoredKeys.forEach((parentKey) => {
+      (dependencyGraph.value[parentKey]?.children || []).forEach((childKey) => {
+        // The URL carried this child too, so its value stands and a fetch would overwrite it.
+        if (restored.has(childKey)) return;
+        const childVar = findVariableByKey(childKey, allVars);
+        if (!childVar || childVar.type !== "query_values") return;
+        if (childVar.isVariablePartialLoaded || childVar.isVariableLoadingPending) return;
+        if (!canVariableLoad(childVar)) return;
+        childVar.isVariableLoadingPending = true;
+      });
+    });
+  };
+
   const loadFromUrl = (route: any) => {
     const query = route.query;
+    const restoredKeys: string[] = [];
 
     Object.entries(query).forEach(([key, value]) => {
       if (!key.startsWith("var-")) return;
@@ -883,6 +905,7 @@ export const useVariablesManager = (t: TranslateFn) => {
           variable.isVariablePartialLoaded = true;
           variable.isVariableLoadingPending = false;
           variable.isLoading = false;
+          restoredKeys.push(getVariableKey(parsed.name, "global"));
         }
 
         // ALSO apply to all tab/panel instances of same name (drilldown compatibility)
@@ -895,6 +918,7 @@ export const useVariablesManager = (t: TranslateFn) => {
             tabVar.isVariablePartialLoaded = true;
             tabVar.isVariableLoadingPending = false;
             tabVar.isLoading = false;
+            restoredKeys.push(getVariableKey(tabVar.name, "tabs", tabVar.tabId));
           }
         });
 
@@ -907,6 +931,9 @@ export const useVariablesManager = (t: TranslateFn) => {
             panelVar.isVariablePartialLoaded = true;
             panelVar.isVariableLoadingPending = false;
             panelVar.isLoading = false;
+            restoredKeys.push(
+              getVariableKey(panelVar.name, "panels", panelVar.tabId, panelVar.panelId),
+            );
           }
         });
       } else {
@@ -919,9 +946,14 @@ export const useVariablesManager = (t: TranslateFn) => {
           variable.isVariablePartialLoaded = true;
           variable.isVariableLoadingPending = false;
           variable.isLoading = false;
+          restoredKeys.push(
+            getVariableKey(parsed.name, parsed.scope, parsed.tabId, parsed.panelId),
+          );
         }
       }
     });
+
+    scheduleChildrenOfRestored(restoredKeys);
   };
 
   interface ParsedUrlKey {
