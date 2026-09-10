@@ -101,6 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               show-index
               row-key="alert_id"
               :loading="loading"
+              :forbidden="forbidden"
               pagination="client"
               :page-size="pageSize"
               :page-size-options="pageSizeOptions"
@@ -796,7 +797,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click:secondary="showForm = false"
         @click:primary="submitForm"
       >
-        <div>
+        <div class="flex flex-col gap-4">
           <OInput
             data-test="to-be-clone-alert-name"
             v-model="toBeCloneAlertName"
@@ -809,7 +810,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :label="t('alerts.streamType')"
               :options="streamTypes"
               @update:model-value="updateStreams()"
-              class="mt-1"
             />
             <OSelect
               data-test="to-be-clone-stream-name"
@@ -819,16 +819,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :options="indexOptions"
               searchable
               @update:model-value="updateStreamName"
-              class="mt-1 mb-2"
             />
           </template>
-          <div class="mb-4">
-            <SelectFolderDropDown
-              :type="'alerts'"
-              @folder-selected="updateFolderIdToBeCloned"
-              :activeFolderId="folderIdToBeCloned"
-            />
-          </div>
+          <SelectFolderDropDown
+            :type="'alerts'"
+            @folder-selected="updateFolderIdToBeCloned"
+            :activeFolderId="folderIdToBeCloned"
+          />
         </div>
       </ODialog>
       <MoveAcrossFolders
@@ -1011,6 +1008,7 @@ export default defineComponent({
     // Start in the loading state so the table shows the skeleton on first
     // render instead of briefly flashing the empty state before the fetch.
     const loading = ref(true);
+    const forbidden = ref(false);
     const oTableRef: any = ref(null);
     // The first real load lands after mount and races TanStack's own auto-reset-on-data-change, which resolves through its own deferred microtask queue — setTimeout(0) runs strictly after that queue drains, so the restored page reliably wins.
     watch(
@@ -1774,6 +1772,7 @@ export default defineComponent({
         folderId = "";
       }
       loading.value = true;
+      forbidden.value = false;
       try {
         const res = await alertsService.listByFolderId(
           1,
@@ -1968,13 +1967,17 @@ export default defineComponent({
           }
         }
         dismiss();
-      } catch (error) {
+      } catch (error: any) {
         console.error(error);
         dismiss();
-        toast({
-          variant: "error",
-          message: t("toastMessages.alerts.errorWhilePullingAlerts"),
-        });
+        forbidden.value = error?.response?.status === 403;
+        // The grouped access toast already reports a 403; a second red toast adds nothing.
+        if (!forbidden.value) {
+          toast({
+            variant: "error",
+            message: t("toastMessages.alerts.errorWhilePullingAlerts"),
+          });
+        }
       } finally {
         loading.value = false;
       }
@@ -3469,6 +3472,7 @@ export default defineComponent({
       streams,
       isFetchingStreams,
       loading,
+      forbidden,
       isSubmitting,
       filterQuery,
       getImageURL,

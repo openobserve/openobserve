@@ -76,6 +76,10 @@
       "action": "Executar consulta",
       "actionDesc": "Carregar eventos para os filtros selecionados"
     },
+    "noAccess": {
+      "title": "Você não tem acesso",
+      "description": "Entre em contato com o administrador se você acredita que deveria ter acesso."
+    },
     "noDashboards": {
       "title": "Crie seu primeiro painel",
       "description": "Os painéis reúnem suas métricas, registros e rastros em uma única visualização. Crie um para começar.",

@@ -76,6 +76,10 @@
       "action": "Query uitvoeren",
       "actionDesc": "Gebeurtenissen laden voor de geselecteerde filters"
     },
+    "noAccess": {
+      "title": "U heeft geen toegang",
+      "description": "Neem contact op met uw beheerder als u denkt dat u toegang zou moeten hebben."
+    },
     "noDashboards": {
       "title": "Maak je eerste dashboard",
       "description": "Dashboards brengen uw metrieken, logboeken en traces samen in één weergave. Bouw er een om te beginnen.",

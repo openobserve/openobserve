@@ -53,6 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               row-key="report_id"
               :frame="false"
               :loading="isLoadingReports"
+              :forbidden="forbidden"
               pagination="client"
               selection="multiple"
               v-model:selected-ids="selectedReportIds"
@@ -370,6 +371,7 @@ const staticReportsList: Ref<any[]> = ref([]);
 // Start in the loading state so the table shows the skeleton on first render
 // instead of briefly flashing the empty state before the fetch completes.
 const isLoadingReports = ref(true);
+const forbidden = ref(false);
 const activeTab = ref("shared");
 const filterQuery = ref(""); // client-side filter within current folder
 const searchQuery = ref(""); // API search across all folders
@@ -497,6 +499,7 @@ const loadReports = async (folderId: string, nameQuery?: string) => {
   }
 
   isLoadingReports.value = true;
+  forbidden.value = false;
   const dismiss = toast({
     variant: "loading",
     message: t("toastMessages.reports.pleaseWaitWhileFetchingReports"),
@@ -541,7 +544,8 @@ const loadReports = async (folderId: string, nameQuery?: string) => {
     staticReportsList.value = mapped;
     filterReports();
   } catch (err: any) {
-    if (err?.response?.status !== 403) {
+    forbidden.value = err?.response?.status === 403;
+    if (!forbidden.value) {
       toast({
         variant: "error",
         message: err?.data?.message || t("reports.fetchReportsError"),
@@ -567,7 +571,8 @@ const filterReports = () => {
 onBeforeMount(async () => {
   // Ensure report folders are in the store before FolderList renders
   if (!store.state.organizationData.foldersByType?.["reports"]) {
-    await getFoldersListByType(store, "reports");
+    // A folder-list 403 must not abort the load below, or the skeleton never clears.
+    await getFoldersListByType(store, "reports").catch(() => null);
   }
   await loadReports(activeFolderId.value);
 });
