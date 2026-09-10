@@ -1,0 +1,25 @@
+{
+  "feature_slug": "trace-details-scores-gate",
+  "feature_title": "Trace Details Sidebar Scores Block (Enterprise/Cloud Gate)",
+  "area": "Traces",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "traceDetailsScores.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Traces/traceDetailsScores.spec.js",
+  "playwright_group": "Traces",
+  "source_files": [
+    "web/src/plugins/traces/TraceDetailsSidebar.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "The only changed paths are web/src/plugins/traces/TraceDetailsSidebar.vue and its .spec.ts sibling — both are core open-source (OSS) trace UI files, not under any enterprise-owned directory (no enterprise/, o2_enterprise/, or src/enterprise/ path). The diff gates an enterprise feature (LLM scoring) inside an OSS component, but the file itself is OSS, so path-based classification yields oss. Keywords like 'Scores'/'enterprise'/'cloud' appear only as gating conditions and comments, which never override path evidence.",
+    "skip": "Not skipping: feature_hint.txt and trigger_comment.txt are empty (no explicit opt-out or tests-added label), and the change alters a user-facing UI component (TraceDetailsSidebar.vue), so it is not docs/CI/comment-only.",
+    "e2e": "The change alters a user-facing UI flow in web/src/plugins/traces/: the 'Scores' block in the trace details sidebar is now rendered only when the build is enterprise or cloud (config.isEnterprise === 'true' || config.isCloud === 'true'), instead of for every LLM span. This changes what a user sees for LLM spans and needs verifying end-to-end.",
+    "area": "The change lives in web/src/plugins/traces/, and sibling E2E specs for trace details (traceDetails.spec.js, tracesSearch.spec.js, service-graph.spec.js) already exist under tests/ui-testing/playwright-tests/Traces/, so Traces is the natural area.",
+    "group": "The 'Traces' testfolder already exists in the ci-matrix (ci_matrix.ent.json append and ci_matrix_cloud.json) with actual_folder 'Traces', so the new spec should join that shard rather than a new group.",
+    "existing_tests": "No Playwright E2E specs in the diff — the only test file changed is web/src/plugins/traces/TraceDetailsSidebar.spec.ts, which is a Vitest unit test, not E2E coverage. existing_tests_in_diff is false."
+  }
+}

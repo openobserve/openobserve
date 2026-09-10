@@ -1,0 +1,2 @@
+web/src/plugins/traces/TraceDetailsSidebar.spec.ts
+web/src/plugins/traces/TraceDetailsSidebar.vue

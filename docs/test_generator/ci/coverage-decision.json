@@ -1,0 +1,11 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/Traces/traceDetailsScores.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Traces/traceGenAiParts.spec.js",
+    "tests/ui-testing/playwright-tests/Traces/traceDetails.spec.js"
+  ],
+  "needs_registration": true,
+  "registration_target": "tests/ui-testing/ci-matrix/ci_matrix.json -> entry {testfolder: Traces, actual_folder: Traces} -> run_files[]",
+  "rationale": "No existing Traces spec tests the Trace Details Sidebar Scores-block gate. traceGenAiParts.spec.js is themed around GenAI v5 `parts` rendering in the Preview/Thread panes (its helpers open the sidebar but never touch the header toolbar LLM-metrics row or the Scores block); traceDetails.spec.js covers timeline/copy-ID/related-logs/share-link. The Scores gate is a distinct feature (dedicated spec_filename traceDetailsScores.spec.js in run-context), so a new Traces-area spec is the least-duplicative home. The new spec reuses pm.tracesPage + pm.genAiTracesIngestionPage (the exact ingestion/open-sidebar pattern already proven by traceGenAiParts.spec.js)."
+}

@@ -1,0 +1,17 @@
+{
+  "feature_slug": "trace-details-scores-gate",
+  "feature_title": "Trace Details Sidebar Scores Block (Enterprise/Cloud Gate)",
+  "area": "Traces",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "traceDetailsScores.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Traces/traceDetailsScores.spec.js",
+  "playwright_group": "Traces",
+  "source_files": [
+    "web/src/plugins/traces/TraceDetailsSidebar.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": ""
+}

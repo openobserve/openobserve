@@ -1,0 +1,5 @@
+[
+  { "title": "OSS LLM span shows the LLM metrics row and hides the Scores block", "action": "new", "verifies": "an LLM span renders the observation badge and LLM metrics row while the Scores block stays hidden on an OSS build" },
+  { "title": "Non-LLM span shows no observation badge and no Scores block", "action": "new", "verifies": "a plain span opens the sidebar with no LLM badge and no Scores block (negative control)" },
+  { "title": "LLM span without a response model shows the badge but no metrics row / Scores", "action": "new", "verifies": "an LLM span lacking gen_ai_response_model shows the badge but not the metrics row or Scores block" }
+]

@@ -86,6 +86,8 @@ export class TracesPage {
     // sidebar / thread surfaces.
     this.llmPreviewTab = '[data-test="trace-details-sidebar-tabs-preview"]';
     this.llmObservationBadge = '[data-test="trace-details-sidebar-observation-badge"]';
+    // Scores-block empty state (enterprise/cloud only; absent on an OSS build).
+    this.llmScoresEmpty = '[data-test="trace-details-sidebar-scores-empty"]';
     this.llmIoSection = '[data-test="trace-details-sidebar"] .io-container .io-section';
     this.llmToolContent = '[data-test="trace-details-sidebar"] .tool-content';
     this.llmExpandBtn = '[data-test="traces-llm-content-renderer-expand-btn"]';
@@ -2707,6 +2709,61 @@ export class TracesPage {
    */
   async expectPreviewTabVisible() {
     await expect(this.page.locator(this.llmPreviewTab)).toBeVisible({ timeout: 15000 });
+  }
+
+  /**
+   * Assert the trace-details sidebar root is visible (any selected span opens
+   * the sidebar, LLM or not).
+   */
+  async expectTraceDetailsSidebarVisible() {
+    await expect(this.page.locator(this.traceDetailsSidebar)).toBeVisible({ timeout: 15000 });
+  }
+
+  /**
+   * Assert the LLM observation-type badge is visible (selected span is an LLM
+   * span — `isLLMTrace(span)` true).
+   */
+  async expectObservationBadgeVisible() {
+    await expect(this.page.locator(this.llmObservationBadge)).toBeVisible({ timeout: 15000 });
+  }
+
+  /**
+   * Assert the LLM observation-type badge is absent (selected span is not an
+   * LLM span).
+   */
+  async expectObservationBadgeHidden() {
+    await expect(this.page.locator(this.llmObservationBadge)).toHaveCount(0);
+  }
+
+  /**
+   * Assert the LLM metrics row rendered by checking the visible model-chip text
+   * (the `gen_ai_response_model` value). The `Input Tokens` / `Total Cost`
+   * labels are `:title` tooltips only — never visible text — so the model chip
+   * is the reliable visible positive control for the row.
+   * @param {string} modelName - expected `gen_ai_response_model` value
+   */
+  async expectLlmMetricsRowVisible(modelName = 'gpt-4') {
+    await expect(this.page.locator(this.traceDetailsSidebar)).toContainText(modelName, { timeout: 15000 });
+  }
+
+  /**
+   * Assert the LLM metrics row did NOT render (no `gen_ai_response_model`, so no
+   * model chip and no In/Out/cost chips).
+   * @param {string} modelName - the `gen_ai_response_model` value that must be absent
+   */
+  async expectLlmMetricsRowHidden(modelName = 'gpt-4') {
+    await expect(this.page.locator(this.traceDetailsSidebar)).not.toContainText(modelName, { timeout: 15000 });
+  }
+
+  /**
+   * Assert the Scores block is absent on an OSS build: the "Scores" label (a
+   * bare span with no data-test) and the `trace-details-sidebar-scores-empty`
+   * tag must both be absent. "Scores" is unique to this block on the sidebar.
+   */
+  async expectScoresBlockAbsent() {
+    const sidebar = this.page.locator(this.traceDetailsSidebar);
+    await expect(sidebar.getByText('Scores', { exact: true })).toHaveCount(0);
+    await expect(this.page.locator(this.llmScoresEmpty)).toHaveCount(0);
   }
 
   /**
