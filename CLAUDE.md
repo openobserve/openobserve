@@ -52,8 +52,9 @@ reworded:
 
 - CI runs on a PR only while it carries the `ready-for-ci` label and is not a draft
   (no label or draft = nothing runs except `ci-gate`, and no red checks). Add the
-  label when you want the run, not when you open the PR. Which suites run is decided by path detection, never by
-  a label. The merge queue only compiles and unit-tests the merged code, so the
+  label when you want the run, not when you open the PR; clicking "Merge when
+  ready" adds it automatically if it is missing. Which suites run is decided by
+  path detection, never by a label. The merge queue only compiles and unit-tests the merged code, so the
   labelled PR run is the one that has to be green.
 - PR titles starting with `feat:` require `Design at: #xxx` as the FIRST line
   of the description (enforced by `.github/workflows/feat-design-checker.yml`);
