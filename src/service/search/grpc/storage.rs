@@ -348,6 +348,81 @@ pub async fn cache_files(
         );
     }
 
+    let cfg = get_config();
+    let inline_start = std::time::Instant::now();
+    let inline_files = files
+        .iter()
+        .filter_map(|(_id, account, file, size, ts, _records)| {
+            let size = match usize::try_from(*size) {
+                Ok(size) => size,
+                Err(_) => return None,
+            };
+            if is_inline_download_eligible(
+                cached_files.contains(file),
+                cfg.disk_cache.enabled,
+                is_local_disk_storage(),
+                cfg.disk_cache.inline_download_max_size,
+                size,
+                crate::job::exceeds_cache_max_age(*ts, file_data::CacheType::Disk),
+            ) {
+                // Each future owns these strings so the bounded stream remains Send.
+                Some(((*account).clone(), (*file).clone(), size))
+            } else {
+                None
+            }
+        })
+        .collect_vec();
+    metrics::QUERY_DISK_CACHE_INLINE_DOWNLOAD_FILES_CONSIDERED
+        .with_label_values(&[file_type])
+        .inc_by(inline_files.len() as u64);
+
+    let mut inline_cached_files: HashSet<String> = HashSet::with_capacity(inline_files.len());
+    let mut inline_downloads = futures::StreamExt::map(
+        stream::iter(inline_files),
+        |(account, file, size)| async move {
+            let result = file_data::download_to_cache(
+                &account,
+                &file,
+                Some(size),
+                file_data::CacheType::Disk,
+            )
+            .await;
+            (file, result)
+        },
+    )
+    .buffer_unordered(cfg.limit.cpu_num);
+    while let Some((file, result)) = futures::StreamExt::next(&mut inline_downloads).await {
+        match result {
+            Ok((bytes, caller_ran_fetch)) => {
+                inline_cached_files.insert(file);
+                scan_stats.querier_disk_cached_files += 1;
+                cache_hits += 1;
+                cache_misses -= 1;
+                if caller_ran_fetch {
+                    metrics::QUERY_DISK_CACHE_INLINE_DOWNLOAD_FILES_FETCHED
+                        .with_label_values(&[file_type, "success"])
+                        .inc();
+                    metrics::QUERY_DISK_CACHE_INLINE_DOWNLOAD_BYTES
+                        .with_label_values(&[file_type])
+                        .inc_by(bytes as u64);
+                }
+            }
+            Err(error) => {
+                if error.caller_ran_fetch() {
+                    metrics::QUERY_DISK_CACHE_INLINE_DOWNLOAD_FILES_FETCHED
+                        .with_label_values(&[file_type, "error"])
+                        .inc();
+                }
+                log::debug!(
+                    "[trace_id {trace_id}] search->storage: inline cache download failed for {file}: {error}"
+                );
+            }
+        }
+    }
+    metrics::QUERY_DISK_CACHE_INLINE_DOWNLOAD_DURATION_SECONDS
+        .with_label_values(&[file_type])
+        .observe(inline_start.elapsed().as_secs_f64());
+
     let files_num = files.len() as i64;
     if files_num == scan_stats.querier_memory_cached_files + scan_stats.querier_disk_cached_files {
         // all files are cached
@@ -355,7 +430,6 @@ pub async fn cache_files(
     }
 
     // check cache size
-    let cfg = get_config();
     let cache_type = if cfg.memory_cache.enabled
         && scan_stats.compressed_size < cfg.memory_cache.skip_size as i64
     {
@@ -376,7 +450,10 @@ pub async fn cache_files(
     let files = files
         .iter()
         .filter_map(|(id, account, file, size, ts, records)| {
-            if cached_files.contains(file) || !crate::job::should_download(*records) {
+            if cached_files.contains(file)
+                || inline_cached_files.contains(file.as_str())
+                || !crate::job::should_download(*records)
+            {
                 None
             } else {
                 Some((*id, account.to_string(), file.to_string(), *size, *ts))
@@ -415,6 +492,22 @@ pub async fn cache_files(
     } else {
         (cache_type, cache_hits, cache_misses)
     }
+}
+
+fn is_inline_download_eligible(
+    is_cached: bool,
+    disk_cache_enabled: bool,
+    local_disk_storage: bool,
+    inline_download_max_size: usize,
+    file_size: usize,
+    exceeds_max_age: bool,
+) -> bool {
+    !is_cached
+        && disk_cache_enabled
+        && !local_disk_storage
+        && inline_download_max_size > 0
+        && file_size <= inline_download_max_size
+        && !exceeds_max_age
 }
 
 /// Filter file list using inverted index
@@ -1138,6 +1231,61 @@ mod tests {
             },
             ..Default::default()
         }
+    }
+
+    #[test]
+    fn test_is_inline_download_eligible() {
+        assert!(is_inline_download_eligible(
+            false,
+            true,
+            false,
+            2 * 1024 * 1024,
+            2 * 1024 * 1024,
+            false
+        ));
+        assert!(!is_inline_download_eligible(
+            true,
+            true,
+            false,
+            2 * 1024 * 1024,
+            1,
+            false
+        ));
+        assert!(!is_inline_download_eligible(
+            false,
+            false,
+            false,
+            2 * 1024 * 1024,
+            1,
+            false
+        ));
+        assert!(!is_inline_download_eligible(
+            false,
+            true,
+            true,
+            2 * 1024 * 1024,
+            1,
+            false
+        ));
+        assert!(!is_inline_download_eligible(
+            false, true, false, 0, 1, false
+        ));
+        assert!(!is_inline_download_eligible(
+            false,
+            true,
+            false,
+            2 * 1024 * 1024,
+            2 * 1024 * 1024 + 1,
+            false
+        ));
+        assert!(!is_inline_download_eligible(
+            false,
+            true,
+            false,
+            2 * 1024 * 1024,
+            1,
+            true
+        ));
     }
 
     #[test]

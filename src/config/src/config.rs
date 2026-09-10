@@ -1857,6 +1857,10 @@ pub struct DiskCache {
     pub gc_size: usize,
     #[env_config(name = "ZO_DISK_CACHE_GC_INTERVAL", default = 60)] // seconds
     pub gc_interval: u64,
+    // Bytes, files at or below this size are downloaded synchronously before a query starts.
+    // Set to 0 to disable inline downloading.
+    #[env_config(name = "ZO_DISK_CACHE_INLINE_DOWNLOAD_MAX_SIZE", default = 2097152)]
+    pub inline_download_max_size: usize,
     // Days, files with data older than this will not be downloaded into the cache,
     // queries read them directly from object storage. default 0 means no limit
     #[env_config(name = "ZO_DISK_CACHE_MAX_AGE_DAYS", default = 0)]
