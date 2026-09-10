@@ -287,19 +287,14 @@ export function priorityTone(priority: number): RowRailTone {
 /**
  * Whether a channel survives a locked, silenced phone.
  *
- * Mirrors the delivery reality rather than the intent: email and chat land in an
- * app that a night-mode phone will not ring for, so a P1 whose only channels are
- * these is deliverable but not wake-able. The policy editor says so out loud
- * instead of letting a team discover it at 3 a.m.
+ * Mirrors the delivery reality rather than the intent: both current channels land
+ * in an app that a night-mode phone will not ring for, so a P1 whose only channel
+ * is one of these is deliverable but not wake-able. The policy editor says so out
+ * loud instead of letting a team discover it at 3 a.m.
  */
 export const CHANNEL_WAKES: Record<Channel, boolean> = {
   email: false,
-  chat: false,
   webhook: false,
-  in_app: false,
-  push: true,
-  sms: true,
-  voice: true,
 };
 
 export function stateTagVariant(state: ResponseState): BadgeVariant {

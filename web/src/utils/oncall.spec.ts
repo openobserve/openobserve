@@ -1037,12 +1037,7 @@ describe("CHANNEL_WAKES", () => {
   // how a team discovers at 3 a.m. that their P1 only ever sent an email.
   it.each([
     ["email", false],
-    ["chat", false],
     ["webhook", false],
-    ["in_app", false],
-    ["push", true],
-    ["sms", true],
-    ["voice", true],
   ] as const)("%s wakes a locked phone: %s", (channel, expected) => {
     expect(CHANNEL_WAKES[channel]).toBe(expected);
   });
