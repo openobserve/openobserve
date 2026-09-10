@@ -400,7 +400,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         data-test="dashboard-panel-curated-no-data"
       >
-        <OIcon v-if="curatedAllClear" name="check" size="1rem" />
+        <OIcon v-if="curatedAllClear" name="check" size="sm" />
         <span>{{
           curatedAllClear ? t("infra.curated.tileAllClear") : t("infra.curated.tileNoData")
         }}</span>

@@ -820,14 +820,8 @@ function resolutionHash(
     theme: theme ?? null,
     panels: resolution.panels
       .filter((panel) => !panel.hidden)
-      // subtitleKey and noDataYet both branch what buildPanel emits, so both must move the hash.
-      .map((panel) => [
-        panel.id,
-        panel.queryStream,
-        panel.unit,
-        panel.resolvedFields,
-        panel.def.subtitleKey ?? null,
-      ]),
+      // noDataYet branches what buildPanel emits, so it must move the hash.
+      .map((panel) => [panel.id, panel.queryStream, panel.unit, panel.resolvedFields]),
     pickers: resolution.pickers.map((picker) => [picker.def.name, picker.field, picker.label]),
     stale: resolution.staleGroups.map((stale) => [
       stale.group.id,

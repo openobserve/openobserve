@@ -302,8 +302,9 @@ describe("DRY-RUN finding 10 — five phases exist, so the tiles are not a parti
   it("the phase fact is a SECTION note, and no tile carries a subtitle", () => {
     const overview = kubernetesPage.sections.find((s: any) => s.id === "overview")!;
     expect(overview.noteKey).toBe("infra.k8s.section.overviewNote");
-    for (const id of ["k8s_ov_pods_running", "k8s_ov_pods_pending", "k8s_ov_pods_failed"]) {
-      expect((panel(id) as any).subtitleKey, id).toBeUndefined();
+    // Pack-wide, not just the phase trio: CuratedPanelDef dropped subtitleKey, so a re-introduction would be read by nothing.
+    for (const p of allPanels()) {
+      expect((p as any).subtitleKey, p.id).toBeUndefined();
     }
   });
 });
