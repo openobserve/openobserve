@@ -431,14 +431,23 @@ pub async fn move_workflows(
     // The row stores the folder's primary key but tuples name folders by slug,
     // so resolve the source slug before the move overwrites it.
     let mut previous = Vec::with_capacity(workflow_ids.len());
+    let mut missing = Vec::new();
     for id in workflow_ids {
-        if let Some(w) = db::workflows::get_workflow(org_id, id).await? {
-            let src_slug = infra::table::folders::get_name_by_pk(&w.folder_id)
-                .await
-                .ok()
-                .flatten();
-            previous.push((w.id.clone(), src_slug));
+        match db::workflows::get_workflow(org_id, id).await? {
+            Some(w) => {
+                let src_slug = infra::table::folders::get_name_by_pk(&w.folder_id)
+                    .await
+                    .ok()
+                    .flatten();
+                previous.push((w.id.clone(), src_slug));
+            }
+            // Without this the update simply matches no rows and the caller is
+            // told the move succeeded.
+            None => missing.push(id.clone()),
         }
+    }
+    if !missing.is_empty() {
+        return Err(anyhow::anyhow!("workflows not found: {}", missing.join(", ")));
     }
 
     db::workflows::move_workflows(org_id, workflow_ids, dst_folder_slug).await?;
