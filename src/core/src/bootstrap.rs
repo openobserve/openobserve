@@ -93,8 +93,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     cache_instance_id(&get_or_create_instance_id().await?);
 
-    // _meta used to appear only once self-reporting wrote its first stream into it,
-    // so a deployment that reports nothing never had the org its history pages read.
+    // Open source only: enterprise and cloud already create _meta when they write
+    // usage into it, and this build reports nothing, so the org never appeared.
+    #[cfg(not(feature = "enterprise"))]
     crate::organization::check_and_create_org(config::META_ORG_ID).await?;
 
     wal::init()?;
