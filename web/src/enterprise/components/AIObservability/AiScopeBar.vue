@@ -44,6 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="{ 'border-border-default border-b': bordered }"
   >
     <OToggleGroup
+      v-if="showAgentToggle"
       :model-value="filterMode"
       type="single"
       :data-test="`${dataTest}-filter-mode`"
@@ -53,11 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OToggleGroupItem value="stream" size="sm">{{ labels.stream }}</OToggleGroupItem>
     </OToggleGroup>
 
-    <div
-      v-if="filterMode === 'stream'"
-      :data-test="`${dataTest}-stream-selector`"
-      class="w-64 flex-shrink-0"
-    >
+    <div v-if="isStreamMode" :data-test="`${dataTest}-stream-selector`" class="w-64 flex-shrink-0">
       <OSkeleton type="text" v-if="showStreamSkeleton && !streamsLoaded" class="h-8.5 w-full" />
       <OSelect
         v-else
@@ -73,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
     <StreamAgentCountBadge
-      v-if="filterMode === 'stream' && activeStreamModel"
+      v-if="isStreamMode && activeStreamModel"
       :count="selectedStreamCount"
       :data-test="countDataTest ?? `${dataTest}-stream-count`"
     />
@@ -81,7 +78,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Agent mode: the Env→Agent→Version cascade replaces the single grouped
          agent dropdown. The three dropdowns themselves SHOW the current
          selection, so the separate env/version scope badges are gone. The
-         skeleton gate is preserved (LLM gates until agents load). -->
+         skeleton gate is preserved (LLM gates until agents load). Never
+         reachable when `showAgentToggle` is false — there's no control to
+         switch into it and the parent never sets filterMode to "agent". -->
     <template v-else>
       <OSkeleton type="text" v-if="agentSkeleton && !agentsLoaded" class="h-8.5 w-44" />
       <AgentScopeCascade
@@ -186,6 +185,12 @@ const props = withDefaults(
         false because its topology is version-agnostic. Forwarded to
         AgentScopeCascade. */
     showVersion?: boolean;
+    /** Show the Stream/Agent toggle at all. Agent mode depends on the
+        enterprise-only agent-mapping API, so an OSS caller passes false to
+        hide the toggle entirely and pin the bar to Stream mode — there is no
+        control left to switch into Agent, and the parent must never set
+        filterMode to "agent" in that case. Defaults to true. */
+    showAgentToggle?: boolean;
   }>(),
   {
     allAgents: false,
@@ -195,8 +200,13 @@ const props = withDefaults(
     bordered: true,
     streamOptionTooltip: false,
     showVersion: true,
+    showAgentToggle: true,
   },
 );
+
+// Stream mode is also the only mode once the Agent toggle is hidden — there's
+// no way for filterMode to legitimately be "agent" then.
+const isStreamMode = computed(() => props.filterMode === "stream" || !props.showAgentToggle);
 
 const emit = defineEmits<{
   (e: "update:filterMode", value: FilterMode): void;

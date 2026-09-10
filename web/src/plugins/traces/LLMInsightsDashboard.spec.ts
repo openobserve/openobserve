@@ -117,6 +117,7 @@ vi.mock("vuex", async (importOriginal) => {
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import LLMInsightsDashboard from "./LLMInsightsDashboard.vue";
+import config from "@/aws-exports";
 // The KPI cache is a module singleton (survives remounts in the app); clear it
 // between tests so a warmed entry from one mount doesn't suppress the fetch in
 // the next.
@@ -505,5 +506,21 @@ describe("LLMInsightsDashboard — onViewTrace", () => {
     mockRouterPush.mockClear();
     (wrapper.vm as any).onViewTrace("");
     expect(mockRouterPush).not.toHaveBeenCalled();
+  });
+});
+
+describe("LLMInsightsDashboard — OSS builds (config.isEnterprise !== 'true')", () => {
+  const originalIsEnterprise = config.isEnterprise;
+
+  afterEach(() => {
+    config.isEnterprise = originalIsEnterprise;
+  });
+
+  it("hides the Stream/Agent toggle and the Compare entry — both need the enterprise-only agent-mapping API", async () => {
+    config.isEnterprise = "false";
+    const wrapper = mountDashboard();
+    await flushPromises();
+    expect(wrapper.find("[data-test='llm-insights-filter-mode']").exists()).toBe(false);
+    expect(wrapper.find("[data-test='llm-insights-compare-entry']").exists()).toBe(false);
   });
 });
