@@ -660,15 +660,7 @@ export function dimensionsSentence(dimensions: Record<string, string>): string {
     .join(" · ");
 }
 
-/**
- * Channels a page can actually be delivered on today.
- *
- * The `Channel` type carries every channel the design calls for so the stored
- * shape does not change when providers land, but only Email has a `Notifier`
- * behind it. Offering the others in the UI would let somebody tick SMS and
- * receive nothing, with no error — mirrors `Channel::is_deliverable` on the
- * server. Add to this list only when the provider actually sends.
- */
+/** Mirrors `Channel::deliverable()` on the server — add to this list only when a new channel's provider actually sends. */
 export const DELIVERABLE_CHANNELS: Channel[] = ["email", "webhook"];
 
 export function isDeliverableChannel(channel: Channel): boolean {
@@ -1101,8 +1093,8 @@ export function routingReasonOf(
   return hit ? hit.body : null;
 }
 
-/** Which of `RoutingDecision`'s five branches produced a sentence. */
-export type RoutingMechanism = "explicit" | "context" | "ownership" | "default" | "unrouted";
+/** Which of `RoutingDecision`'s four branches produced a sentence. */
+export type RoutingMechanism = "explicit" | "ownership" | "default" | "unrouted";
 
 /** A routing sentence read back into the parts a screen can render. */
 export interface RoutingReasonView {
@@ -1113,8 +1105,6 @@ export interface RoutingReasonView {
   dimensions: Record<string, string>;
   /** The team the sentence names, when it names one. */
   teamId: string | null;
-  /** The team NAME the alert's context attribute asked for (`context` only). */
-  namedTeam: string | null;
 }
 
 /**
@@ -1142,7 +1132,6 @@ export function parseRoutingReason(reason: string | null | undefined): RoutingRe
     mechanism,
     dimensions: {},
     teamId: null,
-    namedTeam: null,
     ...rest,
   });
 
@@ -1156,9 +1145,6 @@ export function parseRoutingReason(reason: string | null | undefined): RoutingRe
 
   const explicit = /^routed to (\S+) by the alert's own setting$/.exec(decision);
   if (explicit) return view("explicit", { teamId: explicit[1] });
-
-  const context = /^routed to (\S+) by the alert's context attribute team=`(.*)`$/.exec(decision);
-  if (context) return view("context", { teamId: context[1], namedTeam: context[2] });
 
   const fallback = /^no ownership rule matched, so it went to the default team (\S+)$/.exec(
     decision,

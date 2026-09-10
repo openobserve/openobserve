@@ -229,7 +229,6 @@ const routing = computed(() => parseRoutingReason(props.routingReason));
 const MECHANISM_COPY = {
   ownership: "oncall.routedByOwnership",
   explicit: "oncall.routedByAlert",
-  context: "oncall.routedByContext",
   default: "oncall.routedToDefault",
   unrouted: "oncall.routedNowhere",
 } as const satisfies Record<RoutingMechanism, I18nKey>;
@@ -237,9 +236,6 @@ const MECHANISM_COPY = {
 const mechanismLine = computed<I18nText>(() => {
   const parsed = routing.value;
   if (!parsed) return raw(props.routingReason);
-  if (parsed.mechanism === "context" && parsed.namedTeam) {
-    return t("oncall.routedByContextNamed", { team: raw(parsed.namedTeam) });
-  }
   return t(MECHANISM_COPY[parsed.mechanism]);
 });
 

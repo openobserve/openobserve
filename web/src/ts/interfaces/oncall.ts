@@ -74,13 +74,8 @@ export type AlertPriorityValue = 1 | 2 | 3 | 4 | 5;
 
 export type Channel =
   | "email"
-  | "sms"
-  | "voice"
-  | "chat"
   /** An existing alert Destination — Slack, Teams, or any HTTP endpoint. */
-  | "webhook"
-  | "push"
-  | "in_app";
+  | "webhook";
 
 export type ResponseState = "triggered" | "triaged" | "acknowledged" | "resolved";
 
@@ -135,7 +130,7 @@ export type ResponseEventKind =
  */
 export type ResponderRole = "owner" | "impacted";
 
-export type SubjectType = "alert" | "incident" | "synthetic" | "anomaly";
+export type SubjectType = "alert" | "incident";
 
 export interface OnCallTeam {
   id: string;
@@ -991,13 +986,8 @@ export interface OwnershipRule {
   updated_at: number;
 }
 
-/**
- * Why a subject routed the way it did. Five kinds, not three — `context` is
- * an alert's `context_attributes.team` naming a team, and `default` is the
- * org's nominated catch-all absorbing a signal nothing matched (drift caught
- * by the H5 contract spec on its first run).
- */
-export type RoutingDecisionKind = "explicit" | "context" | "ownership" | "default" | "unrouted";
+/** Why a subject routed the way it did — `context`-attribute routing was cut (D5); four kinds remain. */
+export type RoutingDecisionKind = "explicit" | "ownership" | "default" | "unrouted";
 
 /** A rule that also matched but did not win, and the server's reason it lost. */
 export interface AlsoMatchedRule {

@@ -120,9 +120,7 @@ const emit = defineEmits<{ escalate: []; "open-reachability": [] }>();
 
 /// Sends addressed to a person. A room post is a broadcast, and one that fails
 /// says nothing about whether the on-call was reached.
-const personSends = computed(() =>
-  props.deliveries.filter((d) => d.channel !== "chat" && d.channel !== "webhook"),
-);
+const personSends = computed(() => props.deliveries.filter((d) => d.channel !== "webhook"));
 
 /// Only what has happened since the last time anyone was actually reached. A
 /// send that landed hours or days ago and drew no acknowledgment does not

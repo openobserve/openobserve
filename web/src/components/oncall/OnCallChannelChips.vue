@@ -66,30 +66,15 @@ const { t } = useI18nTyped();
 /// compile, not render a missing glyph next to a person's name.
 const CHANNEL_ICON: Record<Channel, IconName> = {
   email: "mail",
-  chat: "chat",
   webhook: "webhook",
-  sms: "smartphone",
-  voice: "call-made",
-  push: "notifications",
-  in_app: "notifications-active",
 };
 
 function channelLabel(channel: Channel): I18nText {
   switch (channel) {
     case "email":
       return t("oncall.channel_email");
-    case "chat":
-      return t("oncall.channel_chat");
     case "webhook":
       return t("oncall.channel_webhook");
-    case "sms":
-      return t("oncall.channel_sms");
-    case "voice":
-      return t("oncall.channel_voice");
-    case "push":
-      return t("oncall.channel_push");
-    case "in_app":
-      return t("oncall.channel_in_app");
   }
 }
 
@@ -100,14 +85,8 @@ interface Chip {
   tip: I18nText;
 }
 
-// voice, push, and sms have no backing provider yet (see
-// Channel::is_deliverable on the server) — hide their icons here rather than
-// show a promise nothing can fulfil.
-const HIDDEN_CHANNELS: ReadonlySet<Channel> = new Set(["voice", "push", "sms"]);
-
 const chips = computed<Chip[]>(() =>
   props.channels
-    .filter((c) => !HIDDEN_CHANNELS.has(c.channel))
     .map((c) => {
       const label = channelLabel(c.channel);
       if (c.deliverable) {

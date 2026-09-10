@@ -131,10 +131,8 @@ const props = withDefaults(
 
 const { t } = useI18nTyped();
 
-/// The engine's own split (`is_broadcast`): chat and webhook resolve to a
-/// destination the whole team watches; everything else to one person's inbox,
-/// handset or screen. Typed on the record — never parsed from the recipient.
-const BROADCAST_CHANNELS = new Set<Channel>(["chat", "webhook"]);
+/// The engine's own split (`is_broadcast`): webhook is a room the whole team watches; email is one person's inbox. Typed on the record, never parsed from the recipient.
+const BROADCAST_CHANNELS = new Set<Channel>(["webhook"]);
 
 /// Newest run first — the current climb is the one being worked; the previous
 /// team's sends are context underneath it.
