@@ -505,8 +505,11 @@ pub async fn get_workflow_associations(
 fn is_permitted(workflow_id: &str, org_id: &str, permitted: Option<&Vec<String>>) -> bool {
     match permitted {
         Some(permitted) => {
-            permitted.contains(&format!("workflow:{}", workflow_id))
-                || permitted.contains(&format!("workflow:_all_{org_id}"))
+            // The OFGA type is "workflows"; the list this is filtered against is
+            // fetched under that key, so a singular prefix here matches nothing
+            // and hides every workflow from non-root users.
+            permitted.contains(&format!("workflows:{}", workflow_id))
+                || permitted.contains(&format!("workflows:_all_{org_id}"))
         }
         None => true,
     }
