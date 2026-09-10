@@ -79,7 +79,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="absolute -top-2.5 left-1 z-10 flex max-w-[calc(100%-2.25rem)] flex-wrap items-center gap-1"
       >
-
         <OBadge
           v-if="isDisabled"
           variant="default"
