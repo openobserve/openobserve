@@ -46,6 +46,14 @@ where
     F: Future<Output = Result<S>> + Send + 'static,
     S: SeriesStream + 'static,
 {
+    let start_time = std::time::Instant::now();
+    let func_name = eval.func.name();
+    let trace_id = eval.eval_ctx.trace_id.clone();
+    log::info!(
+        "[trace_id: {trace_id}] [PromQL Timing] fused {}({func_name}) started with {} partitions",
+        op.name(),
+        sources.len(),
+    );
     let folds = sources
         .into_iter()
         .map(|source| {
@@ -58,6 +66,15 @@ where
     let value = aggregate_final(
         folds.into_iter().map(|(groups, _)| groups).collect(),
         &eval.timestamps,
+    );
+    log::info!(
+        "[trace_id: {trace_id}] [PromQL Timing] fused {}({func_name}) execution took: {:?}, folded {series_count} series into {} series",
+        op.name(),
+        start_time.elapsed(),
+        match &value {
+            Value::Matrix(matrix) => matrix.len(),
+            _ => 0,
+        },
     );
     Ok((value, series_count))
 }

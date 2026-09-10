@@ -55,9 +55,6 @@ pub(crate) async fn fused_agg(
     modifier: &Option<LabelModifier>,
     eval_ctx: &EvalContext,
 ) -> Result<Option<Value>> {
-    let start_time = std::time::Instant::now();
-    let trace_id = eval_ctx.trace_id.clone();
-
     let Some(group_cols) = group_label_columns(modifier, schema, shape.func.name()) else {
         return Ok(None);
     };
@@ -69,25 +66,8 @@ pub(crate) async fn fused_agg(
     else {
         return Ok(None);
     };
-    log::info!(
-        "[trace_id: {trace_id}] [PromQL Timing] streaming fused {}({}) started with {} partitions",
-        shape.op.name(),
-        shape.func.name(),
-        sources.len(),
-    );
     let eval = Arc::new(RangeExpr::new(shape.func.clone(), shape.range, eval_ctx));
-    let (value, series_count) = aggregate(sources, shape.op, eval).await?;
-
-    log::info!(
-        "[trace_id: {trace_id}] [PromQL Timing] streaming fused {}({}) execution took: {:?}, folded {series_count} series into {} series",
-        shape.op.name(),
-        shape.func.name(),
-        start_time.elapsed(),
-        match &value {
-            Value::Matrix(matrix) => matrix.len(),
-            _ => 0,
-        },
-    );
+    let (value, _) = aggregate(sources, shape.op, eval).await?;
     Ok(Some(value))
 }
 

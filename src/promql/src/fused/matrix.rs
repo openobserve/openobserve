@@ -60,14 +60,6 @@ pub(crate) async fn fused_agg(
         return Ok(Value::None);
     }
 
-    let start = std::time::Instant::now();
-    let trace_id = &eval_ctx.trace_id;
-    let input_series = matrix.len();
-    log::info!(
-        "[trace_id: {trace_id}] [PromQL Timing] fused {}({func_name}) started with {input_series} series",
-        op.name()
-    );
-
     // Strip the metric name before grouping, as the range function would have;
     // visible to `sum by(__name__) (...)`.
     if !KEEP_METRIC_NAME_FUNC.contains(func_name) {
@@ -95,16 +87,6 @@ pub(crate) async fn fused_agg(
                     "[PromQL] fused agg timeout".to_string(),
                 ))
             })??;
-
-    log::info!(
-        "[trace_id: {trace_id}] [PromQL Timing] fused {}({func_name}) completed in {:?}, folded {input_series} series into {} series",
-        op.name(),
-        start.elapsed(),
-        match &value {
-            Value::Matrix(matrix) => matrix.len(),
-            _ => 0,
-        },
-    );
     Ok(value)
 }
 
