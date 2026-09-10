@@ -31,6 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :columns="otableColumns"
           row-key="pipeline_id"
           :loading="loading"
+          :forbidden="forbidden"
           :global-filter="filterQuery"
           :show-global-filter="false"
           :page-size="20"
@@ -970,8 +971,10 @@ const goToImportPipeline = () => {
 };
 
 const loading = ref(true);
+const forbidden = ref(false);
 const getPipelines = async () => {
   loading.value = true;
+  forbidden.value = false;
   try {
     const response = await pipelineService.getPipelines(
       store.state.selectedOrganization.identifier,
@@ -1028,8 +1031,9 @@ const getPipelines = async () => {
         ...pipeline,
       };
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error(error);
+    forbidden.value = error?.response?.status === 403;
   } finally {
     loading.value = false;
   }

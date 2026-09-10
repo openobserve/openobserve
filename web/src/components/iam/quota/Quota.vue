@@ -127,6 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :columns="generateColumns()"
           row-key="module_name"
           :loading="isApiLimitsLoading"
+          :forbidden="apiLimitsForbidden"
           :global-filter="searchQuery"
           pagination="client"
           :page-size="20"
@@ -212,6 +213,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :columns="roleLimitsColumns"
           row-key="uuid"
           :loading="isRolesLoading"
+          :forbidden="roleLimitsForbidden"
           :global-filter="searchQuery"
           pagination="client"
           :page-size="20"
@@ -457,6 +459,8 @@ export default defineComponent({
       getModulesToDisplay,
       isRoleLimitsLoading,
       isApiLimitsLoading,
+      apiLimitsForbidden,
+      roleLimitsForbidden,
     } = useRateLimiter();
     const rolesLimitRows = ref<any[]>([]);
     const rolesColumns = ref<any[]>([]);
@@ -1582,6 +1586,8 @@ export default defineComponent({
       jsonDiff,
       isRoleLimitsLoading,
       isApiLimitsLoading,
+      apiLimitsForbidden,
+      roleLimitsForbidden,
       isRolesLoading,
       activeTimeUnit,
       timeUnitTabs,

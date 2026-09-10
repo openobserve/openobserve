@@ -29,6 +29,10 @@
         <OSpinner size="md" />
       </div>
 
+      <div v-else-if="forbidden" class="flex flex-1 items-center justify-center">
+        <OEmptyState size="hero" preset="no-access" data-test="llm-providers-forbidden" />
+      </div>
+
       <div v-else-if="!providers.length" class="flex flex-1 items-center justify-center">
         <!-- First-run state — uses the same `no-llm-providers` preset the
              OTable's #empty slot uses for the filtered case, so the empty
@@ -51,6 +55,7 @@
           :columns="columns"
           row-key="id"
           :loading="isLoading"
+          :forbidden="forbidden"
           :footer-title="t('llmProviders.title')"
           :global-filter="searchQuery"
           :show-global-filter="false"
@@ -180,6 +185,7 @@ const router = useRouter();
 
 const providers = ref<Provider[]>([]);
 const isLoading = ref(false);
+const forbidden = ref(false);
 const searchQuery = ref("");
 const formPage = ref<{ mode: "create" | "edit"; row: Provider | null } | null>(null);
 
@@ -265,10 +271,13 @@ watch(
 async function loadProviders() {
   if (!orgId.value) return;
   isLoading.value = true;
+  forbidden.value = false;
   try {
     providers.value = await onlineEvalsService.providers.list(orgId.value);
   } catch (err: any) {
-    showError(err, t("llmProviders.loadError"));
+    forbidden.value = err?.response?.status === 403;
+    // The grouped access toast already reports a 403; a second red toast adds nothing.
+    if (!forbidden.value) showError(err, t("llmProviders.loadError"));
   } finally {
     isLoading.value = false;
   }
