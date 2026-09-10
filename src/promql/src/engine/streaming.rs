@@ -33,7 +33,7 @@ use super::{
 };
 use crate::{
     functions, micros,
-    series_stream::scan::{
+    series_stream::plan::{
         StreamingSelector, execute_partitioned, group_label_columns, series_label_columns,
     },
     streaming_eval,

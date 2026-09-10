@@ -20,7 +20,7 @@
 
 pub(crate) mod hash_sorted;
 pub(crate) mod matrix;
-pub(crate) mod scan;
+pub(crate) mod plan;
 
 use config::meta::promql::value::{Labels, Sample};
 use datafusion::error::Result;
@@ -62,7 +62,7 @@ mod tests {
 
     use super::{
         hash_sorted::HashSortedSeriesStream,
-        scan::{StreamingSelector, execute_partitioned, group_label_columns},
+        plan::{StreamingSelector, execute_partitioned, group_label_columns},
     };
     use crate::{
         functions::{self, RangeFunc},

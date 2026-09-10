@@ -230,7 +230,7 @@ mod tests {
     use config::meta::promql::value::Value;
     use hashbrown::HashSet;
 
-    use super::super::{matrix::group_sources, scan::series_label_columns, tests::*};
+    use super::super::{matrix::group_sources, plan::series_label_columns, tests::*};
     use crate::{
         functions::{self, RangeFunc},
         streaming_eval::{FusedAggOp, RangeExpr, aggregate, eval_range, tests::*},
