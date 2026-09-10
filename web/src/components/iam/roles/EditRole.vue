@@ -1352,7 +1352,8 @@ const updatePermissionVisibility = (
     permission.show =
       filter.value.permissions === "all" ? isResourceFiltered : showResource && isResourceFiltered;
 
-    if (forceShow) permission.show = true;
+    // The type node's own AllowList would otherwise re-show every ungranted stream under "selected".
+    if (forceShow && filter.value.permissions === "all") permission.show = true;
 
     // Recursively update the show property for entities
     if (!permission.entities?.length) return;

@@ -791,6 +791,33 @@ describe("EditRole - micro validations", () => {
     expect(Array.isArray(permissions[0].entities)).toBe(true);
   });
 
+  // The type node's own AllowList grant used to forceShow every sibling, so Selected listed all ~80 streams.
+  it("under the Selected filter a granted TYPE node keeps its ungranted children hidden", async () => {
+    const wrapper = await mountEditRole();
+    const granted = {
+      name: "k8s_node_cpu",
+      show: false,
+      permission: { AllowGet: { value: true } },
+    };
+    const ungranted = { name: "mysql_up", show: false, permission: { AllowGet: { value: false } } };
+    wrapper.vm.heavyResourceEntities = { metrics: [granted, ungranted] };
+    wrapper.vm.filter.permissions = "selected";
+    const permissions = [
+      {
+        name: "metrics",
+        resourceName: "metrics",
+        type: "Type",
+        // expandPermission seeds the visible slice, so the real node is never empty here.
+        entities: [granted, ungranted],
+        permission: { AllowList: { value: true } },
+      },
+    ];
+    wrapper.vm.updatePermissionVisibility(permissions);
+    expect(permissions[0].show).toBe(true);
+    expect(granted.show).toBe(true);
+    expect(ungranted.show).toBe(false);
+  });
+
   it("getResourceByName finds nested resource", async () => {
     const wrapper = await mountEditRole();
     const permissions = [
