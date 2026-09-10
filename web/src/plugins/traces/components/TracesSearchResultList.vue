@@ -261,6 +261,7 @@ import SpanStatusPill from "./SpanStatusPill.vue";
 import SpanStatusCodeBadge from "./SpanStatusCodeBadge.vue";
 import { isLLMTrace, extractLLMData, formatCost, formatTokens } from "../../../utils/llmUtils";
 import { formatTimeWithSuffix } from "../../../utils/zincutils";
+import { escapeSingleQuotes } from "../../../utils/queryUtils";
 import { useStore } from "vuex";
 import type { TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
 import { SPAN_KIND_MAP } from "@/utils/traces/constants";
@@ -377,7 +378,7 @@ const addSearchTerm = (
         : field === "span_kind"
           ? (SPAN_KIND_MAP[String(fieldValue)] ?? String(fieldValue))
           : String(fieldValue);
-    searchObj.data.stream.addToFilter = `${field} ${operator} '${displayValue.replace(/\\/g, "\\\\").replace(/'/g, "\\'")}'`;
+    searchObj.data.stream.addToFilter = `${field} ${operator} '${escapeSingleQuotes(displayValue)}'`;
   }
 };
 
