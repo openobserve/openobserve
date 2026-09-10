@@ -37,8 +37,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   data-test on each: `${prefix}-cascade-{env|agent|version}`.
 -->
 <template>
-  <div class="flex items-center gap-2 max-lg:flex-wrap">
-    <div class="w-44 flex-shrink-0">
+  <!-- < md the three scopes share one full row: at fixed widths each wrapped onto its own. -->
+  <div class="flex items-center gap-2 max-lg:flex-wrap max-md:basis-full max-md:flex-nowrap">
+    <div class="w-44 flex-shrink-0 max-md:w-auto max-md:min-w-0 max-md:flex-1 max-md:shrink">
       <OSelect
         :model-value="selectedEnv"
         :label="t('aiObservability.scope.env')"
@@ -51,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:model-value="onEnvChange"
       />
     </div>
-    <div class="w-48 flex-shrink-0">
+    <div class="w-48 flex-shrink-0 max-md:w-auto max-md:min-w-0 max-md:flex-1 max-md:shrink">
       <OSelect
         :model-value="selectedAgentName"
         :label="t('aiObservability.scope.agent')"
@@ -64,7 +65,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:model-value="onAgentNameChange"
       />
     </div>
-    <div v-if="showVersion" class="w-44 flex-shrink-0">
+    <div
+      v-if="showVersion"
+      class="w-44 flex-shrink-0 max-md:w-auto max-md:min-w-0 max-md:flex-1 max-md:shrink"
+    >
       <OSelect
         :model-value="selectedVersion"
         :label="t('aiObservability.scope.version')"

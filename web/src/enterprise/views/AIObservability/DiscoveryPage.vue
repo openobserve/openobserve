@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">
             <OSearchInput
               v-model="search"
-              class="min-w-0 flex-1 max-md:min-w-40"
+              class="min-w-0 flex-1 max-md:min-w-24"
               :placeholder="t('aiObservability.discovery.searchPlaceholder')"
               data-test="ai-discovery-search-input"
               clearable
@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               value-key="value"
               :searchable="false"
               width="sm"
-              class="shrink-0"
+              class="shrink-0 max-md:w-36"
               data-test="ai-discovery-in-queue-filter"
               @update:model-value="onQueueStatusChange"
             />

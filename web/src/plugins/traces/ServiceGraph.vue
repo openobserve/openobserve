@@ -45,9 +45,10 @@
         <div
           data-test="sg-legend"
           class="flex min-w-0 flex-row items-center gap-3 max-lg:flex-wrap max-lg:gap-y-1"
+          :title="`${t('traces.serviceGraph.borderColor')} | ${t('traces.serviceGraph.borderColorMetric')}`"
         >
-          <!-- Border Color -->
-          <div class="text-text-label! mb-0! text-xs font-bold whitespace-nowrap">
+          <!-- < md the heading and ranges move into tooltips so the four levels fit one line. -->
+          <div class="text-text-label! mb-0! text-xs font-bold whitespace-nowrap max-md:hidden">
             {{ t("traces.serviceGraph.borderColor") }}
             <span class="font-normal opacity-55"
               >| {{ t("traces.serviceGraph.borderColorMetric") }}</span
@@ -58,6 +59,7 @@
               v-for="level in healthLevels"
               :key="level.key"
               class="flex flex-none flex-row items-center gap-1.5"
+              :title="`${level.label} ${level.range}`"
               :data-test="`sg-legend-${level.key}`"
             >
               <span
@@ -73,12 +75,12 @@
                 <div class="text-text-secondary! text-left text-xs font-semibold">
                   {{ level.label }}
                 </div>
-                <div class="text-3xs text-left opacity-55">{{ level.range }}</div>
+                <div class="text-3xs text-left opacity-55 max-md:hidden">{{ level.range }}</div>
               </div>
             </div>
           </div>
         </div>
-        <OSeparator vertical class="mx-1 self-stretch" />
+        <OSeparator vertical class="mx-1 self-stretch max-md:hidden" />
         <!-- Inventory chip: total entity count. Click to expand the per-kind
              distribution (read-only; the show/hide toggles live in "Show types"). -->
         <ODropdown side="bottom" align="start">

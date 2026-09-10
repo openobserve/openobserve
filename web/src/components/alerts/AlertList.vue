@@ -157,6 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="@container/alert-toolbar flex min-w-0 flex-1 flex-wrap items-center gap-2 gap-y-1.5 max-md:contents"
                 >
                   <OToggleGroup
+                    mobile-dropdown
                     :model-value="activeTab"
                     data-test="alert-list-tabs"
                     @update:model-value="(v) => onAlertTabChange(v as string)"
@@ -170,17 +171,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :title="tab.label"
                       :data-test="`alert-list-tab-${tab.value}`"
                     >
-                      <span class="max-md:hidden @max-[34rem]/alert-toolbar:hidden">{{
-                        tab.label
-                      }}</span>
+                      <span class="@max-[34rem]/alert-toolbar:hidden">{{ tab.label }}</span>
                     </OToggleGroupItem>
                   </OToggleGroup>
-                  <!-- < md search takes its own full row below the icon controls
-                       instead of being crushed between them. -->
                   <!-- md:min-w-80: flex-1 is basis-0, so without a floor the input
                        shrinks and its embedded folder-scope chips spill out of the
                        box; the floor makes it wrap to its own row instead. -->
-                  <div class="min-w-0 flex-1 max-md:order-last max-md:basis-full md:min-w-80">
+                  <div class="min-w-0 flex-1 md:min-w-80">
                     <OInput
                       v-model="dynamicQueryModel"
                       :placeholder="
