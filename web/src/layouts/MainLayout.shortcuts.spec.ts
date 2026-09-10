@@ -119,4 +119,33 @@ describe("MainLayout — AI chat shortcut gate", () => {
     ctrlB()!.handler();
     expect(store.state.isAiChatEnabled).toBe(true);
   });
+
+  it("should switch the home AI tab instead of opening the sidebar on home", async () => {
+    config.isEnterprise = "true";
+    store.state.zoConfig.ai_enabled = true;
+
+    wrapper = mountMainLayout();
+    await router.push({ name: "home" });
+    await flushPromises();
+
+    const dispatch = vi.spyOn(window, "dispatchEvent");
+    ctrlB()!.handler();
+
+    expect(store.state.isAiChatEnabled).toBe(false);
+    expect(
+      dispatch.mock.calls.some(([e]) => (e as CustomEvent).type === "o2:home-switch-tab"),
+    ).toBe(true);
+    dispatch.mockRestore();
+  });
+
+  it("should not mount the AI sidebar on home", async () => {
+    config.isEnterprise = "true";
+    store.state.zoConfig.ai_enabled = true;
+
+    wrapper = mountMainLayout();
+    await router.push({ name: "home" });
+    await flushPromises();
+
+    expect(wrapper.find(".o2-sidebar-right").exists()).toBe(false);
+  });
 });
