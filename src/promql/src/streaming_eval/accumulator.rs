@@ -278,19 +278,19 @@ impl FusedAccumulator {
                 .filter(|(_, present)| *present)
                 .map(|(slot, _)| Sample::new(timestamps[slot], 1.0))
                 .collect(),
-            Self::Max { maxes, present } => maxes
+            Self::Max {
+                maxes: values,
+                present,
+            }
+            | Self::Min {
+                mins: values,
+                present,
+            } => values
                 .into_iter()
                 .zip(present)
                 .enumerate()
                 .filter(|(_, (_, present))| *present)
-                .map(|(slot, (max, _))| Sample::new(timestamps[slot], max))
-                .collect(),
-            Self::Min { mins, present } => mins
-                .into_iter()
-                .zip(present)
-                .enumerate()
-                .filter(|(_, (_, present))| *present)
-                .map(|(slot, (min, _))| Sample::new(timestamps[slot], min))
+                .map(|(slot, (value, _))| Sample::new(timestamps[slot], value))
                 .collect(),
             Self::Stddev { values } => values
                 .into_iter()

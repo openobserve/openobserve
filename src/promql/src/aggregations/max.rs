@@ -26,20 +26,13 @@ impl AggFunc for Max {
     }
 
     fn build(&self) -> Box<dyn super::Accumulate> {
-        Box::new(MaxAccumulate::new())
+        Box::<MaxAccumulate>::default()
     }
 }
 
+#[derive(Default)]
 pub struct MaxAccumulate {
     max: HashMap<i64, f64>,
-}
-
-impl MaxAccumulate {
-    fn new() -> Self {
-        MaxAccumulate {
-            max: HashMap::new(),
-        }
-    }
 }
 
 impl Accumulate for MaxAccumulate {

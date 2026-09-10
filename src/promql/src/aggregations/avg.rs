@@ -29,7 +29,7 @@ impl AggFunc for Avg {
     }
 
     fn build(&self) -> Box<dyn super::Accumulate> {
-        Box::new(AvgAccumulate::new())
+        Box::<AvgAccumulate>::default()
     }
 }
 
@@ -40,6 +40,7 @@ pub(crate) struct AvgState {
     count: usize,
 }
 
+#[derive(Default)]
 pub struct AvgAccumulate {
     states: HashMap<i64, AvgState>,
 }
@@ -65,14 +66,6 @@ impl AvgState {
 
     pub(crate) fn value(&self) -> Option<f64> {
         (self.count > 0).then(|| (self.sum + self.compensation) / self.count as f64)
-    }
-}
-
-impl AvgAccumulate {
-    fn new() -> Self {
-        Self {
-            states: HashMap::new(),
-        }
     }
 }
 

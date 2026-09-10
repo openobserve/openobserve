@@ -27,21 +27,14 @@ impl AggFunc for Group {
     }
 
     fn build(&self) -> Box<dyn super::Accumulate> {
-        Box::new(GroupAccumulate::new())
+        Box::<GroupAccumulate>::default()
     }
 }
 
+#[derive(Default)]
 pub struct GroupAccumulate {
     // Track which timestamps have been seen (group returns 1 if any series exists)
     timestamps: HashSet<i64>,
-}
-
-impl GroupAccumulate {
-    fn new() -> Self {
-        GroupAccumulate {
-            timestamps: HashSet::new(),
-        }
-    }
 }
 
 impl Accumulate for GroupAccumulate {

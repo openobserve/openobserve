@@ -26,20 +26,13 @@ impl AggFunc for Count {
     }
 
     fn build(&self) -> Box<dyn super::Accumulate> {
-        Box::new(CountAccumulate::new())
+        Box::<CountAccumulate>::default()
     }
 }
 
+#[derive(Default)]
 pub struct CountAccumulate {
     count: HashMap<i64, usize>,
-}
-
-impl CountAccumulate {
-    fn new() -> Self {
-        CountAccumulate {
-            count: HashMap::new(),
-        }
-    }
 }
 
 impl Accumulate for CountAccumulate {

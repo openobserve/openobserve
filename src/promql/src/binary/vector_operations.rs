@@ -51,40 +51,33 @@ pub fn vector_scalar_bin_op(
     let return_bool = expr.return_bool();
     let output: Vec<RangeValue> = left
         .into_par_iter()
-        .flat_map(|mut range| {
+        .filter_map(|mut range| {
             let new_samples: Vec<Sample> = range
                 .samples
                 .into_iter()
-                .flat_map(|sample| {
+                .filter_map(|sample| {
                     let (lhs, rhs) = if swapped_lhs_rhs {
                         (right, sample.value)
                     } else {
                         (sample.value, right)
                     };
-                    match scalar_binary_operations(
+                    let value = scalar_binary_operations(
                         expr.op.id(),
                         lhs,
                         rhs,
                         return_bool,
                         is_comparison_operator,
                     )
-                    .ok()
-                    {
-                        Some(value) => {
-                            let final_value =
-                                if is_comparison_operator && swapped_lhs_rhs && !return_bool {
-                                    sample.value
-                                } else {
-                                    value
-                                };
-
-                            Some(Sample {
-                                timestamp: sample.timestamp,
-                                value: final_value,
-                            })
-                        }
-                        None => None,
-                    }
+                    .ok()?;
+                    let value = if is_comparison_operator && swapped_lhs_rhs && !return_bool {
+                        sample.value
+                    } else {
+                        value
+                    };
+                    Some(Sample {
+                        timestamp: sample.timestamp,
+                        value,
+                    })
                 })
                 .collect();
 
@@ -95,12 +88,9 @@ pub fn vector_scalar_bin_op(
                 if return_bool || DROP_METRIC_BIN_OP.contains(&expr.op.id()) {
                     labels = labels.without_metric_name();
                 }
-                Some(RangeValue {
-                    labels,
-                    samples: new_samples,
-                    exemplars: range.exemplars,
-                    time_window: range.time_window,
-                })
+                range.labels = labels;
+                range.samples = new_samples;
+                Some(range)
             }
         })
         .collect();
@@ -242,11 +232,11 @@ fn vector_arithmetic_operators(
     // Iterate over left and pick up the corresponding range from rhs
     let output: Vec<RangeValue> = left
         .into_par_iter()
-        .flat_map(|range| {
+        .filter_map(|range| {
             let left_sig = labels_to_compare(&range.labels).signature();
             rhs_sig.get(&left_sig).map(|rhs_range| (range, rhs_range))
         })
-        .flat_map(|(mut lhs_range, rhs_range)| {
+        .filter_map(|(mut lhs_range, rhs_range)| {
             // Build a map of timestamps from rhs for quick lookup
             let rhs_map: HashMap<i64, f64> = rhs_range
                 .samples
@@ -258,7 +248,7 @@ fn vector_arithmetic_operators(
             let new_samples: Vec<Sample> = lhs_range
                 .samples
                 .into_iter()
-                .flat_map(|lhs_sample| {
+                .filter_map(|lhs_sample| {
                     rhs_map.get(&lhs_sample.timestamp).and_then(|&rhs_value| {
                         scalar_binary_operations(
                             operator,
@@ -299,12 +289,9 @@ fn vector_arithmetic_operators(
                         }
                     }
                 }
-                Some(RangeValue {
-                    labels,
-                    samples: new_samples,
-                    exemplars: lhs_range.exemplars,
-                    time_window: lhs_range.time_window,
-                })
+                lhs_range.labels = labels;
+                lhs_range.samples = new_samples;
+                Some(lhs_range)
             }
         })
         .collect();

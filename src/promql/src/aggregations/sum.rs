@@ -29,20 +29,13 @@ impl AggFunc for Sum {
     }
 
     fn build(&self) -> Box<dyn super::Accumulate> {
-        Box::new(SumAccumulate::new())
+        Box::<SumAccumulate>::default()
     }
 }
 
+#[derive(Default)]
 pub struct SumAccumulate {
     sum: HashMap<i64, (f64, f64)>,
-}
-
-impl SumAccumulate {
-    fn new() -> Self {
-        SumAccumulate {
-            sum: HashMap::new(),
-        }
-    }
 }
 
 impl Accumulate for SumAccumulate {

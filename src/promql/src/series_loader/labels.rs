@@ -32,9 +32,6 @@ use datafusion::{
         datatypes::DataType,
     },
     error::{DataFusionError, Result},
-    physical_plan::{
-        Partitioning, execute_stream_partitioned, expressions::Column, repartition::RepartitionExec,
-    },
     prelude::{DataFrame, col, lit},
 };
 use futures::TryStreamExt;
@@ -43,7 +40,7 @@ use hashbrown::{HashMap, HashSet};
 use super::{
     PartitionedMetrics, label_cache,
     label_interner::{LabelColumn, LabelInterner},
-    with_hash_label,
+    partition_streams, with_hash_label,
 };
 
 const MAX_HASH_INLIST_FILTER: usize = 8192;
@@ -190,10 +187,7 @@ async fn load_labels(
     selected_hashes: Option<Vec<HashSet<u64>>>,
     metrics: PartitionedMetrics,
 ) -> Result<PartitionedMetrics> {
-    let ctx = Arc::new(df.task_ctx());
-    let target_partitions = ctx.session_config().target_partitions();
-    let plan = df.create_physical_plan().await?;
-    let schema = plan.schema();
+    let (schema, streams) = partition_streams(trace_id, df).await?;
     let label_columns = Arc::new(
         schema
             .fields()
@@ -206,22 +200,6 @@ async fn load_labels(
             .map(|(index, field)| (index, field.name().clone()))
             .collect::<Vec<_>>(),
     );
-    let plan = Arc::new(RepartitionExec::try_new(
-        plan,
-        Partitioning::Hash(
-            vec![Arc::new(Column::new_with_schema(HASH_LABEL, &schema)?)],
-            target_partitions,
-        ),
-    )?);
-
-    if config::get_config().common.print_key_sql {
-        log::info!(
-            "{}",
-            config::meta::plan::generate_plan_string(trace_id, plan.as_ref())
-        );
-    }
-
-    let streams = execute_stream_partitioned(plan, ctx)?;
     if streams.len() != metrics.len() {
         return Err(DataFusionError::Execution(format!(
             "label partitions ({}) do not match metrics partitions ({})",

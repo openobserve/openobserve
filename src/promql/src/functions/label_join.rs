@@ -17,11 +17,11 @@ use std::{collections::HashSet, sync::Arc};
 
 use config::meta::promql::{
     NAME_LABEL,
-    value::{Label, RangeValue, Value},
+    value::{Label, Value},
 };
 use datafusion::error::{DataFusionError, Result};
 use itertools::Itertools;
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
+use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#label_join
 pub(crate) fn label_join(
@@ -31,29 +31,24 @@ pub(crate) fn label_join(
     source_labels: Vec<String>,
 ) -> Result<Value> {
     match data {
-        Value::Matrix(matrix) => {
+        Value::Matrix(mut matrix) => {
             let keep_source_labels: HashSet<String> = HashSet::from_iter(source_labels);
 
-            let out: Vec<RangeValue> = matrix
-                .into_par_iter()
-                .map(|mut range_value| {
-                    // Join the source label values into the new destination label
-                    let new_label_value = range_value
-                        .labels
-                        .iter()
-                        .filter(|l| l.name != NAME_LABEL && keep_source_labels.contains(&l.name))
-                        .map(|label| label.value.as_str())
-                        .join(separator);
+            matrix.par_iter_mut().for_each(|range_value| {
+                // Join the source label values into the new destination label
+                let new_label_value = range_value
+                    .labels
+                    .iter()
+                    .filter(|l| l.name != NAME_LABEL && keep_source_labels.contains(&l.name))
+                    .map(|label| label.value.as_str())
+                    .join(separator);
 
-                    range_value.labels.push(Arc::new(Label {
-                        name: dest_label.to_string(),
-                        value: new_label_value,
-                    }));
-
-                    range_value
-                })
-                .collect();
-            Ok(Value::Matrix(out))
+                range_value.labels.push(Arc::new(Label {
+                    name: dest_label.to_string(),
+                    value: new_label_value,
+                }));
+            });
+            Ok(Value::Matrix(matrix))
         }
         Value::None => Ok(Value::None),
         _ => Err(DataFusionError::Plan(

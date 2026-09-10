@@ -26,20 +26,13 @@ impl AggFunc for Min {
     }
 
     fn build(&self) -> Box<dyn super::Accumulate> {
-        Box::new(MinAccumulate::new())
+        Box::<MinAccumulate>::default()
     }
 }
 
+#[derive(Default)]
 pub struct MinAccumulate {
     min: HashMap<i64, f64>,
-}
-
-impl MinAccumulate {
-    fn new() -> Self {
-        MinAccumulate {
-            min: HashMap::new(),
-        }
-    }
 }
 
 impl Accumulate for MinAccumulate {

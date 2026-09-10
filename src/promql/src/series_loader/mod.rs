@@ -216,7 +216,7 @@ pub(super) async fn load_samples_from_datafusion(
     query_duration: i64,
 ) -> Result<(PartitionedMetrics, HashSet<i64>)> {
     let df = df.select_columns(&[TIMESTAMP_COL_NAME, HASH_LABEL, VALUE_LABEL])?;
-    let streams = partition_streams(trace_id, df).await?;
+    let (_, streams) = partition_streams(trace_id, df).await?;
     let mut tasks = Vec::with_capacity(streams.len());
     for mut stream in streams {
         let hash_field_type = hash_field_type.clone();
@@ -369,7 +369,7 @@ async fn load_exemplars_from_datafusion(
     let df = df
         .filter(col(EXEMPLARS_LABEL).is_not_null())?
         .select_columns(&[HASH_LABEL, EXEMPLARS_LABEL])?;
-    let streams = partition_streams(trace_id, df).await?;
+    let (_, streams) = partition_streams(trace_id, df).await?;
     let mut tasks = Vec::with_capacity(streams.len());
     for mut stream in streams {
         let hash_field_type = hash_field_type.clone();
@@ -426,7 +426,10 @@ async fn load_exemplars_from_datafusion(
 async fn partition_streams(
     trace_id: &str,
     df: DataFrame,
-) -> Result<Vec<datafusion::physical_plan::SendableRecordBatchStream>> {
+) -> Result<(
+    Arc<Schema>,
+    Vec<datafusion::physical_plan::SendableRecordBatchStream>,
+)> {
     let ctx = Arc::new(df.task_ctx());
     let target_partitions = ctx.session_config().target_partitions();
     let plan = df.create_physical_plan().await?;
@@ -446,7 +449,7 @@ async fn partition_streams(
         );
     }
 
-    execute_stream_partitioned(plan, ctx)
+    Ok((schema, execute_stream_partitioned(plan, ctx)?))
 }
 
 async fn collect_partitions(tasks: Vec<TokioResult>) -> Result<(PartitionedMetrics, HashSet<i64>)> {

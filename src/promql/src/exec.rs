@@ -186,10 +186,10 @@ impl PromqlContext {
                     drop(permit);
                     ret
                 });
-            tasks.push((time, task));
+            tasks.push(task);
         }
 
-        for (_time, ret) in tasks {
+        for ret in tasks {
             let (result, _result_type_exec) = match ret.await {
                 Ok(Ok((value, result_type))) => (value, result_type),
                 Ok(Err(e)) => {
@@ -215,22 +215,16 @@ impl PromqlContext {
 
         // merge data
         let mut merged_data = HashMap::new();
-        let mut merged_metrics = HashMap::new();
         for value in instant_vectors {
-            merged_data
+            let (labels, exemplars) = merged_data
                 .entry(signature(&value.labels))
-                .or_insert_with(Vec::new)
-                .extend(value.exemplars.unwrap_or_default());
-            merged_metrics.insert(signature(&value.labels), value.labels);
+                .or_insert_with(|| (Labels::default(), Vec::new()));
+            *labels = value.labels;
+            exemplars.extend(value.exemplars.unwrap_or_default());
         }
         let merged_data = merged_data
-            .into_iter()
-            .map(|(sig, exemplars)| {
-                RangeValue::new_with_exemplars(
-                    merged_metrics.get(&sig).unwrap().to_owned(),
-                    exemplars,
-                )
-            })
+            .into_values()
+            .map(|(labels, exemplars)| RangeValue::new_with_exemplars(labels, exemplars))
             .collect::<Vec<_>>();
 
         // sort data
