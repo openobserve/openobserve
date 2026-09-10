@@ -33,10 +33,7 @@ impl RangeFunc for MinOverTimeFunc {
     }
 
     fn exec(&self, samples: &[Sample], _eval_ts: i64, _range: &Duration) -> Option<f64> {
-        if samples.is_empty() {
-            return None;
-        }
-        Some(samples.iter().map(|s| s.value).min_by(sort_float).unwrap())
+        samples.iter().map(|s| s.value).min_by(sort_float)
     }
 }
 
