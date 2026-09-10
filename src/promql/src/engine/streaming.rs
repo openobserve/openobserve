@@ -64,14 +64,14 @@ impl Engine {
         let Some(scan) = self.selector_scan(vs, range, "MatrixSelector").await? else {
             return Ok(None);
         };
-        let shape = fused::stream::FusedShape {
+        let shape = fused::streaming::FusedShape {
             op,
             func: func.clone(),
             range,
         };
         let streamed = self
             .stream_scan_guarded(&scan, |ctx, schema| {
-                fused::stream::fused_agg(
+                fused::streaming::aggregate(
                     ctx,
                     schema,
                     scan.streaming_selector(),
@@ -92,7 +92,7 @@ impl Engine {
         let matrix = self
             .eval_matrix_selector(&scan.selector, range, Some(scan.ctxs))
             .await?;
-        self.fused_agg_matrix(modifier, Value::Matrix(matrix), func, op)
+        self.materialized_fused_agg(modifier, Value::Matrix(matrix), func, op)
             .await
             .map(Some)
     }

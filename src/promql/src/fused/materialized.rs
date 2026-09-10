@@ -18,10 +18,7 @@
 
 use std::time::Duration;
 
-use config::meta::promql::{
-    NAME_LABEL,
-    value::{RangeValue, Value},
-};
+use config::meta::promql::{NAME_LABEL, value::Value};
 use datafusion::error::{DataFusionError, Result};
 use promql_parser::parser::LabelModifier;
 use rayon::prelude::*;
@@ -32,7 +29,7 @@ use crate::{
 };
 
 /// A partition of the matrix, already open.
-pub(crate) type MatrixSource = std::future::Ready<Result<MatrixSeriesStream>>;
+pub(crate) type MaterializedSource = std::future::Ready<Result<MatrixSeriesStream>>;
 
 /// The matrix as group-ordered sources for the aggregate and the window the load applied to
 /// it; `None` for no input.
@@ -40,9 +37,17 @@ pub(crate) fn group_sources(
     data: Value,
     modifier: &Option<LabelModifier>,
     func_name: &str,
-) -> Result<Option<(Vec<MatrixSource>, Duration)>> {
-    let Some(matrix) = matrix_input(data, func_name)? else {
-        return Ok(None);
+) -> Result<Option<(Vec<MaterializedSource>, Duration)>> {
+    let mut matrix = match data {
+        Value::Matrix(matrix) if matrix.is_empty() => return Ok(None),
+        Value::Matrix(matrix) => matrix,
+        Value::None => return Ok(None),
+        value => {
+            return Err(DataFusionError::Plan(format!(
+                "{func_name}: matrix argument expected but got {}",
+                value.get_type()
+            )));
+        }
     };
     // the load applied one window to every series, so the first speaks for all
     let range = matrix[0]
@@ -50,45 +55,24 @@ pub(crate) fn group_sources(
         .as_ref()
         .expect("range function input must have a time window")
         .range;
-    let matrix = strip_metric_name(matrix, func_name);
-    let streams = matrix_streams(matrix, modifier, config::get_config().limit.cpu_num);
-    Ok(Some((sources(streams), range)))
-}
-
-fn matrix_input(data: Value, func_name: &str) -> Result<Option<Vec<RangeValue>>> {
-    match data {
-        Value::Matrix(matrix) if matrix.is_empty() => Ok(None),
-        Value::Matrix(matrix) => Ok(Some(matrix)),
-        Value::None => Ok(None),
-        value => Err(DataFusionError::Plan(format!(
-            "{func_name}: matrix argument expected but got {}",
-            value.get_type()
-        ))),
-    }
-}
-
-/// Strips the metric name as the range function would have; visible to `sum by(__name__)`.
-fn strip_metric_name(mut matrix: Vec<RangeValue>, func_name: &str) -> Vec<RangeValue> {
+    // strip the metric name as the range function would have; visible to `sum by(__name__)`
     if !KEEP_METRIC_NAME_FUNC.contains(func_name) {
         matrix.par_iter_mut().for_each(|series| {
             series.labels.retain(|label| label.name != NAME_LABEL);
         });
     }
-    matrix
-}
-
-fn sources(streams: Vec<MatrixSeriesStream>) -> Vec<MatrixSource> {
-    streams
+    let sources = matrix_streams(matrix, modifier, config::get_config().limit.cpu_num)
         .into_iter()
         .map(|stream| std::future::ready(Ok(stream)))
-        .collect()
+        .collect();
+    Ok(Some((sources, range)))
 }
 
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
 
-    use config::meta::promql::value::{EvalContext, Label, Sample, TimeWindow};
+    use config::meta::promql::value::{EvalContext, Label, RangeValue, Sample, TimeWindow};
 
     use super::{
         super::{aggregate::aggregate, op::FusedAggOp, range_expr::RangeExpr, test_support::*},
@@ -154,7 +138,7 @@ mod tests {
         functions::eval_range(data, functions::fusable_range_func(name).unwrap(), eval_ctx)
     }
 
-    async fn run_fused(
+    async fn run_materialized(
         modifier: &Option<LabelModifier>,
         matrix: Vec<RangeValue>,
         func_name: &str,
@@ -214,9 +198,10 @@ mod tests {
                         range_eval(func_name, Value::Matrix(matrix.clone()), &eval_ctx).unwrap();
                     let expected = generic_agg(modifier, generic_input, &eval_ctx).unwrap();
 
-                    let actual = run_fused(modifier, matrix.clone(), func_name, op, &eval_ctx)
-                        .await
-                        .unwrap();
+                    let actual =
+                        run_materialized(modifier, matrix.clone(), func_name, op, &eval_ctx)
+                            .await
+                            .unwrap();
 
                     assert_eq!(
                         canonical_matrix(expected),
@@ -268,7 +253,7 @@ mod tests {
                     range_eval("sum_over_time", Value::Matrix(matrix.clone()), &eval_ctx).unwrap();
                 let expected = generic_agg(&modifier, generic_input, &eval_ctx).unwrap();
                 let first = canonical_matrix(
-                    run_fused(&modifier, matrix.clone(), "sum_over_time", op, &eval_ctx)
+                    run_materialized(&modifier, matrix.clone(), "sum_over_time", op, &eval_ctx)
                         .await
                         .unwrap(),
                 );
@@ -279,7 +264,7 @@ mod tests {
                     op.name(),
                 );
                 let second = canonical_matrix(
-                    run_fused(&modifier, matrix.clone(), "sum_over_time", op, &eval_ctx)
+                    run_materialized(&modifier, matrix.clone(), "sum_over_time", op, &eval_ctx)
                         .await
                         .unwrap(),
                 );
@@ -324,7 +309,7 @@ mod tests {
                 range_eval("rate", Value::Matrix(matrix.clone()), &eval_ctx).unwrap();
             let expected = canonical_matrix(generic_agg(&None, generic_input, &eval_ctx).unwrap());
             let actual = canonical_matrix(
-                run_fused(&None, matrix.clone(), "rate", op, &eval_ctx)
+                run_materialized(&None, matrix.clone(), "rate", op, &eval_ctx)
                     .await
                     .unwrap(),
             );

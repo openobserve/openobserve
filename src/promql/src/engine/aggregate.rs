@@ -68,7 +68,7 @@ impl Engine {
             if let Some(range_arg) = shape.range_arg {
                 let range_input = self.exec_expr(range_arg).await?;
                 return self
-                    .fused_agg_matrix(modifier, range_input, shape.func, shape.op)
+                    .materialized_fused_agg(modifier, range_input, shape.func, shape.op)
                     .await;
             }
         }
@@ -147,14 +147,15 @@ impl Engine {
     }
 
     /// The fused fold over an already-materialized matrix, bounded by the query timeout.
-    pub(super) async fn fused_agg_matrix(
+    pub(super) async fn materialized_fused_agg(
         &self,
         modifier: &Option<LabelModifier>,
         data: Value,
         func: Arc<dyn functions::RangeFunc>,
         op: fused::FusedAggOp,
     ) -> Result<Value> {
-        let Some((sources, range)) = fused::matrix::group_sources(data, modifier, func.name())?
+        let Some((sources, range)) =
+            fused::materialized::group_sources(data, modifier, func.name())?
         else {
             return Ok(Value::None);
         };

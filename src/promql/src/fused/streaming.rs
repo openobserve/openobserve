@@ -30,10 +30,10 @@ use config::{
 use datafusion::{arrow::datatypes::Schema, error::Result, prelude::SessionContext};
 use promql_parser::parser::LabelModifier;
 
-use super::{aggregate::aggregate, range_expr::RangeExpr};
+use super::range_expr::RangeExpr;
 use crate::{
     functions::{KEEP_METRIC_NAME_FUNC, RangeFunc},
-    fused::FusedAggOp,
+    fused::{self, FusedAggOp},
     micros,
     series_stream::merge::{MergeSeriesStream, StreamingSelector},
 };
@@ -47,7 +47,7 @@ pub(crate) struct FusedShape {
 
 /// Folds from per-partition ordered streams; `None` when the layout or shape cannot stream. The
 /// caller bounds it: dropping the future aborts the partition folds.
-pub(crate) async fn fused_agg(
+pub(crate) async fn aggregate(
     ctx: &SessionContext,
     schema: &Schema,
     selector: StreamingSelector<'_>,
@@ -67,7 +67,7 @@ pub(crate) async fn fused_agg(
         return Ok(None);
     };
     let eval = Arc::new(RangeExpr::new(shape.func.clone(), shape.range, eval_ctx));
-    let (value, _) = aggregate(sources, shape.op, eval).await?;
+    let (value, _) = fused::aggregate(sources, shape.op, eval).await?;
     Ok(Some(value))
 }
 
@@ -121,7 +121,7 @@ mod tests {
     use promql_parser::label::{Labels as ModifierLabels, Matchers};
 
     use super::{
-        super::{eval_range::eval_range, matrix, range_expr::RangeExpr, test_support::*},
+        super::{eval_range::eval_range, materialized, test_support::*},
         *,
     };
     use crate::{functions, series_stream::merge::series_label_columns};
@@ -268,7 +268,7 @@ mod tests {
     ) -> Option<Value> {
         let func: Arc<dyn RangeFunc> = Arc::from(functions::fusable_range_func(func_name).unwrap());
         let eval_ctx = eval_ctx();
-        fused_agg(
+        aggregate(
             ctx,
             &arrow_schema(),
             StreamingSelector {
@@ -282,22 +282,6 @@ mod tests {
         )
         .await
         .unwrap()
-    }
-
-    /// The aggregate over the same data as matrix sources.
-    async fn run_materialized(
-        modifier: &Option<LabelModifier>,
-        func_name: &str,
-        op: FusedAggOp,
-        range: Duration,
-    ) -> Value {
-        let func: Arc<dyn RangeFunc> = Arc::from(functions::fusable_range_func(func_name).unwrap());
-        let (sources, range) =
-            matrix::group_sources(Value::Matrix(reference_matrix(range)), modifier, func_name)
-                .unwrap()
-                .unwrap();
-        let eval = Arc::new(RangeExpr::new(func, range, &eval_ctx()));
-        aggregate(sources, op, eval).await.unwrap().0
     }
 
     #[test]
@@ -351,7 +335,17 @@ mod tests {
         for op in agg_cases {
             for func_name in func_cases {
                 for modifier in &modifiers {
-                    let expected = run_materialized(modifier, func_name, op, range).await;
+                    let func: Arc<dyn RangeFunc> =
+                        Arc::from(functions::fusable_range_func(func_name).unwrap());
+                    let (sources, range) = materialized::group_sources(
+                        Value::Matrix(reference_matrix(range)),
+                        modifier,
+                        func_name,
+                    )
+                    .unwrap()
+                    .unwrap();
+                    let eval = Arc::new(RangeExpr::new(func, range, &eval_ctx()));
+                    let expected = fused::aggregate(sources, op, eval).await.unwrap().0;
 
                     let actual = run_streaming(&ctx, modifier, func_name, op, range)
                         .await
