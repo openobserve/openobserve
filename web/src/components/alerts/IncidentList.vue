@@ -28,6 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :columns="columns"
         :frame="false"
         :loading="loading"
+        :forbidden="forbidden"
         row-key="id"
         pagination="client"
         :page-size="pageSize"
@@ -318,6 +319,11 @@ export default defineComponent({
     // Request in flight with rows still on screen — the refresh button's
     // spinner. `loading` is the skeleton, for a cold read only.
     const fetching = incidentsList.isFetching;
+    // A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
+    const forbidden = computed(() => {
+      const e: any = incidentsList.error.value;
+      return e?.status === 403 || e?.response?.status === 403;
+    });
     // The first real load lands after mount and races TanStack's own auto-reset-on-data-change, which resolves through its own deferred microtask queue — setTimeout(0) runs strictly after that queue drains, so the restored page reliably wins.
     watch(
       loading,
@@ -598,7 +604,8 @@ export default defineComponent({
       { immediate: true },
     );
     watch(incidentsList.error, (error: any) => {
-      if (!error) return;
+      // The grouped access toast already reports a 403; a second red toast adds nothing.
+      if (!error || forbidden.value) return;
       toast({ variant: "error", message: t("alerts.incidents.errorLoading") });
       console.error("Failed to load incidents:", error);
     });
@@ -865,6 +872,7 @@ export default defineComponent({
       t,
       loading,
       fetching,
+      forbidden,
       allIncidents,
       visibleIncidents,
       severityStats,

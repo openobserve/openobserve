@@ -48,6 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :columns="columns"
             row-key="name"
             :loading="loading"
+            :forbidden="forbidden"
             pagination="client"
             :current-page="currentPage"
             @update:current-page="onPageChange"
@@ -364,6 +365,11 @@ export default defineComponent({
     // `isPending` is the cold read (OTable swaps in its skeleton), `isFetching`
     // is any request in flight, including one with rows already on screen.
     const loading = functions.isPending;
+    // A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
+    const forbidden = computed(() => {
+      const e: any = functions.error.value;
+      return e?.status === 403 || e?.response?.status === 403;
+    });
     const fetching = functions.isFetching;
     // main restored the page inside the old chain's `.finally`; the query has no
     // such hook, so the same restore rides the cold read settling instead.
@@ -768,6 +774,7 @@ export default defineComponent({
       loading,
       fetching,
       refreshJSTransforms,
+      forbidden,
       resultTotal,
       refreshList,
       pageSize,

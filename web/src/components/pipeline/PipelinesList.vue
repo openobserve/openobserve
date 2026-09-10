@@ -31,6 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :columns="otableColumns"
           row-key="pipeline_id"
           :loading="loading"
+          :forbidden="forbidden"
           :global-filter="filterQuery"
           :show-global-filter="false"
           :page-size="20"
@@ -1043,6 +1044,11 @@ const loading = pipelinesList.isPending;
 // Request in flight, with rows still on screen — the refresh button's
 // spinner. `loading` stays for the skeleton, which only a cold read wants.
 const fetching = pipelinesList.isFetching;
+// A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
+const forbidden = computed(() => {
+  const e: any = pipelinesList.error.value;
+  return e?.status === 403 || e?.response?.status === 403;
+});
 // Bound to the refresh button: always hits the server.
 const refreshPipelines = () => getPipelines(true);
 

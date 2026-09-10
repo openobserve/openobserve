@@ -76,6 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="pipeline-history-table bg-card-glass-bg h-full"
       >
         <OTable
+          :forbidden="forbidden"
           ref="tableRef"
           :frame="false"
           :data="rows"
@@ -481,6 +482,7 @@ const store = useStore();
 
 // Data
 const loading = ref(false);
+const forbidden = ref(false);
 const rows = ref<any[]>([]);
 const searchQuery = ref("");
 const selectedPipeline = ref<any>();
@@ -700,6 +702,7 @@ const clearSearch = () => {
 
 const fetchPipelineHistory = async (force = false) => {
   loading.value = true;
+  forbidden.value = false;
   try {
     const org = store.state.selectedOrganization.identifier;
 
@@ -754,11 +757,17 @@ const fetchPipelineHistory = async (force = false) => {
   } catch (error: any) {
     console.error("Error fetching pipeline history:", error);
     console.error("Error response:", error.response);
-    toast({
-      variant: "error",
-      message:
-        error.response?.data?.message || error.message || t("pipeline.fetchPipelineHistoryFailed"),
-    });
+    forbidden.value = error?.response?.status === 403;
+    // The grouped access toast already reports a 403; a second red toast adds nothing.
+    if (!forbidden.value) {
+      toast({
+        variant: "error",
+        message:
+          error.response?.data?.message ||
+          error.message ||
+          t("pipeline.fetchPipelineHistoryFailed"),
+      });
+    }
   } finally {
     loading.value = false;
   }

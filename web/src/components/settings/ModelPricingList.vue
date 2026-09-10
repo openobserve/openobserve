@@ -87,6 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :columns="columns"
           row-key="id"
           :loading="loading"
+          :forbidden="forbidden"
           :selected-ids="selectedIds"
           selection="multiple"
           pagination="client"
@@ -628,6 +629,11 @@ const loading = modelsQuery.isPending;
 // Request in flight, with rows still on screen — the refresh button's
 // spinner. `loading` stays for the skeleton, which only a cold read wants.
 const fetching = modelsQuery.isFetching;
+// A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
+const forbidden = computed(() => {
+  const e: any = modelsQuery.error.value;
+  return e?.status === 403 || e?.response?.status === 403;
+});
 const refreshing = ref(false);
 
 const showPricingDialog = ref(false);

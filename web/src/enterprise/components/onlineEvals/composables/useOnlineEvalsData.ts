@@ -24,6 +24,9 @@ export function useOnlineEvalsData() {
   const scoreConfigVersions = ref<Record<string, ScoreConfig[]>>({});
   const providers = ref<Provider[]>([]);
   const isLoading = ref(false);
+  const jobsForbidden = ref(false);
+  const scorersForbidden = ref(false);
+  const scoreConfigsForbidden = ref(false);
 
   const applyScoreConfigs = (rows: ScoreConfig[]) => {
     scoreConfigs.value = rows;
@@ -42,6 +45,9 @@ export function useOnlineEvalsData() {
       queryClient.getQueryData(onlineEvalKeys.scoreConfigs(orgId)) === undefined &&
       queryClient.getQueryData(onlineEvalKeys.scorers(orgId)) === undefined &&
       queryClient.getQueryData(onlineEvalKeys.jobs(orgId)) === undefined;
+    jobsForbidden.value = false;
+    scorersForbidden.value = false;
+    scoreConfigsForbidden.value = false;
     try {
       // The four requests still fan out in parallel, and each list settles on
       // its own so one failing endpoint cannot blank the other three.
@@ -58,12 +64,15 @@ export function useOnlineEvalsData() {
         showError(providerResult.reason, t("onlineEvals.loadError"));
       }
       if (scoreConfigResult.status === "rejected") {
+        scoreConfigsForbidden.value = scoreConfigResult.reason?.response?.status === 403;
         showError(scoreConfigResult.reason, t("onlineEvals.loadError"));
       }
       if (scorerResult.status === "rejected") {
+        scorersForbidden.value = scorerResult.reason?.response?.status === 403;
         showError(scorerResult.reason, t("onlineEvals.loadError"));
       }
       if (jobResult.status === "rejected") {
+        jobsForbidden.value = jobResult.reason?.response?.status === 403;
         showError(jobResult.reason, t("onlineEvals.loadError"));
       }
     } finally {
@@ -109,6 +118,9 @@ export function useOnlineEvalsData() {
     scoreConfigVersions,
     providers,
     isLoading,
+    jobsForbidden,
+    scorersForbidden,
+    scoreConfigsForbidden,
     loadAll,
     loadProviders,
     ensureScoreConfigVersions,

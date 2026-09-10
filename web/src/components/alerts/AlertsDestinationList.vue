@@ -54,6 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :columns="columns"
           row-key="name"
           :loading="loading"
+          :forbidden="forbidden"
           :selected-ids="selectedDestinationIds"
           selection="multiple"
           pagination="client"
@@ -542,6 +543,7 @@ export default defineComponent({
     };
 
     const loading = ref(false);
+    const forbidden = ref(false);
     // The first real load lands after mount and races TanStack's own auto-reset-on-data-change, which resolves through its own deferred microtask queue — setTimeout(0) runs strictly after that queue drains, so the restored page reliably wins.
     watch(
       loading,
@@ -587,6 +589,7 @@ export default defineComponent({
       if (cached !== undefined) applyRows(cached);
       loading.value = cached === undefined;
       fetching.value = true;
+      forbidden.value = false;
 
       // TODO: fold into `useQuery` — kept imperative for now because the
       // surrounding toast/dependency-graph flow is sequenced by hand.
@@ -610,7 +613,8 @@ export default defineComponent({
           loadDepGraph(org);
         })
         .catch((err: any) => {
-          if (err.response.status != 403) {
+          forbidden.value = err?.response?.status === 403;
+          if (!forbidden.value) {
             toast({
               variant: "error",
               message: t("toastMessages.alerts.errorWhilePullingDestinations"),
@@ -953,6 +957,7 @@ export default defineComponent({
       loading,
       fetching,
       refreshDestinations,
+      forbidden,
       conformDeleteDestination,
       filterQuery,
       filterData,

@@ -43,6 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :columns="columns"
         row-key="id"
         :loading="loading"
+        :forbidden="forbidden"
         @row-click="openDetail"
         :footer-title="t('aiObservability.datasets.listTitle')"
         :global-filter="search"
@@ -289,6 +290,11 @@ const datasets = computed<LlmDataset[]>(() => (datasetsList.data.value ?? []) as
 const loading = datasetsList.isPending;
 // Request in flight with rows still on screen — the refresh control's spinner.
 const fetching = datasetsList.isFetching;
+// A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
+const forbidden = computed(() => {
+  const e: any = datasetsList.error.value;
+  return e?.status === 403 || e?.response?.status === 403;
+});
 const search = ref("");
 
 const numberedRows = useNumberedRows(datasets);
@@ -387,7 +393,10 @@ async function refresh(force = true) {
     // refresh control. A plain mount passes false and keeps the cached rows.
     if (force) await datasetsList.refetch();
   } catch {
-    toast({ variant: "error", message: t("aiObservability.datasets.loadError") });
+    // The grouped access toast already reports a 403; a second red toast adds nothing.
+    if (!forbidden.value) {
+      toast({ variant: "error", message: t("aiObservability.datasets.loadError") });
+    }
   }
 }
 

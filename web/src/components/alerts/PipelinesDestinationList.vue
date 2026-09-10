@@ -40,6 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :columns="columns"
           row-key="name"
           :loading="loading"
+          :forbidden="forbidden"
           :selected-ids="selectedDestinationIds"
           selection="multiple"
           pagination="client"
@@ -343,6 +344,7 @@ export default defineComponent({
     // Request in flight with rows still on screen — the refresh button's
     // spinner. `loading` is the skeleton, for a cold read only.
     const fetching = ref(false);
+    const forbidden = ref(false);
     // Bound to refresh / post-write reloads: always reaches the server.
     const refreshDestinations = () => getDestinations(true);
 
@@ -368,6 +370,7 @@ export default defineComponent({
       if (cached !== undefined) applyRows(cached);
       loading.value = cached === undefined;
       fetching.value = true;
+      forbidden.value = false;
 
       // TODO: fold into `useQuery` when this list drops its imperative refresh.
       if (force) {
@@ -381,7 +384,8 @@ export default defineComponent({
         .fetchQuery(options)
         .then((list: any[]) => applyRows(list))
         .catch((err: any) => {
-          if (err.response.status != 403) {
+          forbidden.value = err?.response?.status === 403;
+          if (!forbidden.value) {
             toast({
               variant: "error",
               message: t("toastMessages.alerts.errorWhilePullingDestinations"),
@@ -687,6 +691,7 @@ export default defineComponent({
       loading,
       fetching,
       refreshDestinations,
+      forbidden,
       filterQuery,
       filterData,
       editingDestination,

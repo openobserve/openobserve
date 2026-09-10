@@ -23,6 +23,11 @@ import { deepCopy } from "@/utils/zincutils";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import type { TranslateFn, I18nText } from "@/types/i18n";
 
+// Keep the HTTP status on the rejection: callers need it to tell a denial (403)
+// apart from any other failure, and a bare Error would drop it.
+const withResponse = (err: Error, source: any): Error =>
+  Object.assign(err, { response: source?.response, status: source?.status });
+
 const useStreams = (t: TranslateFn) => {
   const store = useStore();
 
@@ -121,7 +126,7 @@ const useStreams = (t: TranslateFn) => {
                 })
                 .catch((e: any) => {
                   dismiss();
-                  reject(new Error(e.message));
+                  reject(withResponse(new Error(e.message), e));
                 });
             } else {
               queryClient
@@ -140,7 +145,7 @@ const useStreams = (t: TranslateFn) => {
                 })
                 .catch((e: any) => {
                   dismiss();
-                  reject(new Error(e.message));
+                  reject(withResponse(new Error(e.message), e));
                 });
             }
           } else {
@@ -151,7 +156,7 @@ const useStreams = (t: TranslateFn) => {
             }
           }
         } catch (e: any) {
-          reject(new Error(e.message));
+          reject(withResponse(new Error(e.message), e));
         }
       })();
     });
@@ -207,10 +212,10 @@ const useStreams = (t: TranslateFn) => {
             })
             .catch((e: any) => {
               dismiss();
-              reject(new Error(e.message));
+              reject(withResponse(new Error(e.message), e));
             });
         } catch (e: any) {
-          reject(new Error(e.message));
+          reject(withResponse(new Error(e.message), e));
         }
       })();
     });
@@ -247,7 +252,7 @@ const useStreams = (t: TranslateFn) => {
           try {
             await getStreams(streamType, false);
           } catch (e: any) {
-            reject(new Error(e.message));
+            reject(withResponse(new Error(e.message), e));
           }
         }
 
@@ -304,7 +309,7 @@ const useStreams = (t: TranslateFn) => {
             );
           }
         } catch (e: any) {
-          reject(new Error(e.message));
+          reject(withResponse(new Error(e.message), e));
         }
       })();
     });
@@ -356,7 +361,7 @@ const useStreams = (t: TranslateFn) => {
           return streamsCache[streamType].value?.list?.[streamIndex] || {};
         } catch (e: any) {
           // Use reject in Promise.all to catch errors specifically.
-          throw new Error(e.message);
+          throw withResponse(new Error(e.message), e);
         }
       }),
     );

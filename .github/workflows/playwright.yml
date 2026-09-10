@@ -322,6 +322,30 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
+      # One sticky comment per PR (found by the hidden marker) so the triage result updates
+      # in place on every push instead of spamming a fresh comment. Same idiom as Kinora below.
+      - name: Upsert shard-selection comment on PR
+        if: ${{ github.event_name == 'pull_request' }}
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}   # PAT: comment as a human, not github-actions[bot]
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          MATRIX: ${{ steps.gen.outputs.matrix }}
+          SMOKE_ACTIVE: ${{ steps.gen.outputs.smoke_active }}
+          ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          MARKER="<!-- playwright-shard-triage -->"
+          BODY=$(MARKER="$MARKER" node .github/scripts/pw-triage-comment.js /tmp/pw-select-log.txt)
+          CID=$(gh api "repos/$REPO/issues/$PR_NUMBER/comments" --paginate \
+                  -q ".[] | select(.body | contains(\"$MARKER\")) | .id" | head -1)
+          if [ -n "$CID" ]; then
+            gh api -X PATCH "repos/$REPO/issues/comments/$CID" -f body="$BODY" >/dev/null && echo "Updated triage comment ($CID)."
+          else
+            gh api -X POST "repos/$REPO/issues/$PR_NUMBER/comments" -f body="$BODY" >/dev/null && echo "Posted triage comment."
+          fi
+
   ui_integration_tests:
     timeout-minutes: 45
     name: e2e / ${{ matrix.testfolder }}

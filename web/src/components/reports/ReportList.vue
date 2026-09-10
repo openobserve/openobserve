@@ -53,6 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               row-key="report_id"
               :frame="false"
               :loading="isLoadingReports"
+              :forbidden="forbidden"
               pagination="client"
               selection="multiple"
               v-model:selected-ids="selectedReportIds"
@@ -390,6 +391,12 @@ const reportsList = useQuery(() =>
   }),
 );
 
+// A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
+const forbidden = computed(() => {
+  const e: any = reportsList.error.value;
+  return e?.status === 403 || e?.response?.status === 403;
+});
+
 const isLoadingReports = ref(true);
 // Request in flight with rows still on screen — the refresh button's spinner.
 const isRefreshingReports = ref(false);
@@ -606,7 +613,8 @@ const filterReports = () => {
 onBeforeMount(async () => {
   // Ensure report folders are in the store before FolderList renders
   if (!store.state.organizationData.foldersByType?.["reports"]) {
-    await getFoldersListByType(store, "reports");
+    // A folder-list 403 must not abort the load below, or the skeleton never clears.
+    await getFoldersListByType(store, "reports").catch(() => null);
   }
   await loadReports(activeFolderId.value);
 });

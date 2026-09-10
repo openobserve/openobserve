@@ -76,6 +76,10 @@
       "action": "クエリーを実行",
       "actionDesc": "選択したフィルターのイベントをロードします"
     },
+    "noAccess": {
+      "title": "アクセス権限がありません",
+      "description": "アクセス権があると思われる場合は、管理者に連絡してください。"
+    },
     "noDashboards": {
       "title": "はじめてのダッシュボードを作成",
       "description": "ダッシュボードはメトリクス、ログ、トレースを1つのビューにまとめます。1つ作成して始めましょう。",
@@ -9794,6 +9798,8 @@
       "outputTokens": "出力トークン",
       "out": "出力",
       "totalCost": "総コスト",
+      "scores": "スコア",
+      "notScoredYet": "未スコア",
       "preview": "プレビュー",
       "input": "入力",
       "output": "出力",
@@ -11108,6 +11114,10 @@
         "runSummary": "{trials} · {scorers}",
         "progress": "タスク進捗",
         "scoring": "スコアリング",
+        "tasks": "タスク",
+        "scores": "スコア",
+        "taskDistribution": "{succeeded} 成功 · {failed} 失敗 · {pending} 保留中 · {skipped} スキップ",
+        "scoreOutcomeDistribution": "{scored} スコア済み · {failed} 失敗 · {pending} 保留中 · {skipped} スキップ · {unscored} 未スコア",
         "scoringDistribution": "{success} 成功 · {failed} 失敗 · {pending} 保留 · {skipped} スキップ",
         "compare": "比較",
         "comparePicker": {
@@ -11851,6 +11861,8 @@
       "schemaInvalidJson": "スキーマは有効なJSONである必要があります。",
       "schemaIgnored": "スキーマ · このプロバイダーでは無視されます",
       "schemaUnsupported": "このプロバイダーには構造化出力のフィールドがありません。スキーマはこの列に保持されますが送信されず、モデルはプレーンテキストで応答します。",
+      "schemaApproximated": "スキーマ · このプロバイダーによる近似",
+      "schemaApproximatedHelp": "このプロバイダーはJSONスキーマではなくJSONモードのみをサポートしています。リクエストはJSONモードで送信され、スキーマはプロンプト内で言い直されるため、回答はJSONになりますが、その形式は保証されません。",
       "outputPlaceholder": "ここに出力が表示されます — 実行を押してください。",
       "outputNotRun": "未実行",
       "retry": "再試行",
@@ -11954,6 +11966,12 @@
   },
   "onlineEvals": {
     "versionPrefix": "v",
+    "traceScoreChip": {
+      "reasoning": "理由",
+      "scoredAt": "スコア済み: {time}",
+      "moreCount": "+{count} 件",
+      "allScores": "すべてのスコア ({count})"
+    },
     "importNameRequired": "名前 *",
     "importNewNameRequired": "新しい名前 *",
     "importDataTypeRequired": "データ型 *",
@@ -12224,8 +12242,10 @@
       "sectionTitle": "プロバイダー",
       "nameLabel": "[名前]",
       "typeLabel": "プロバイダーの種類",
-      "endpointLabel": "終点",
-      "endpointPlaceholder": "完全な completions URL (例: https://your-host/v1/chat/completions)",
+      "endpointLabel": "ベースURL",
+      "endpointPlaceholder": "ベースURL（例: https://your-host/v1）",
+      "endpointHelpDefault": "空欄の場合はデフォルトの{url}が使用されます",
+      "endpointHelpRequired": "必須 — このプロバイダーにはデフォルトのベースURLがありません。",
       "defaultModelLabel": "デフォルトモデル",
       "availableModelsLabel": "ご利用可能なモデル",
       "apiKeyLabel": "APIキー",
@@ -12234,7 +12254,6 @@
       "authSection": "認証",
       "authEditNote": "認証情報は読み戻すことはできません。認証が必要なプロバイダーをテストするには、そのAPIキーを入力してください。",
       "cannotRename": "作成後に名前を変更することはできません。",
-      "availableModelsHelp": "任意。このプロバイダーで利用可能なモデルのカンマ区切りリスト。",
       "saveError": "プロバイダを保存できませんでした",
       "nameRequired": "Provider name is required",
       "typeRequired": "Provider type is required",
@@ -12341,7 +12360,8 @@
         "nameRequired": "Name is required",
         "nameFormat": "Use lowercase letters, numbers, and underscores only",
         "minRequired": "Min is required",
-        "maxRequired": "Max is required"
+        "maxRequired": "Max is required",
+        "maxNotGreaterThanMin": "MaxはMinより大きい必要があります"
       },
       "import": {
         "title": "スコア設定をインポート",
@@ -12912,7 +12932,7 @@
     },
     "empty": {
       "title": "LLM プロバイダーはまだありません",
-      "description": "LLMプロバイダーは、LLMジャッジスコアラーが呼び出す言語モデルの接続詳細（エンドポイント+認証情報）を保存します。これを追加すると、ジャッジベースの評価を開始できます。"
+      "description": "LLMプロバイダーは、LLMジャッジスコアラーが呼び出す言語モデルの接続情報（ベースURLと認証情報）を保存します。プロバイダーを追加すると、ジャッジベースの評価を開始できます。"
     }
   },
   "logs": {
@@ -16000,6 +16020,12 @@
     "aiQueueDetail": "キュー",
     "aiQueueReview": "キューレビュー",
     "aiDatasetDetail": "データセット",
+    "aiExperimentCreate": "新規実験",
+    "aiExperimentCompare": "実験の比較",
+    "aiExperimentDetail": "実験",
+    "aiRemoteTaskCreate": "新規リモートタスク",
+    "aiRemoteTaskEdit": "リモートタスクの編集",
+    "aiRemoteTaskDetail": "リモートタスク",
     "notFound": "404 - 見つかりません",
     "createReport": "レポートを作成",
     "addCheck": "チェックを追加",

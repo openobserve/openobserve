@@ -202,6 +202,7 @@ the Free Software Foundation, either version 3 of the License, or
           />
           <ScoreConfigList
             v-else-if="activeTab === 'scoreConfigs'"
+            :forbidden="scoreConfigsForbidden"
             :rows="filteredRows as ScoreConfig[]"
             :all-score-configs="scoreConfigs"
             :scorers="scorers"
@@ -220,6 +221,7 @@ the Free Software Foundation, either version 3 of the License, or
           />
           <ScorerList
             v-else-if="activeTab === 'scorers'"
+            :forbidden="scorersForbidden"
             :rows="filteredRows as Scorer[]"
             :all-scorers="scorers"
             :jobs="jobs"
@@ -241,6 +243,7 @@ the Free Software Foundation, either version 3 of the License, or
           />
           <EvalJobList
             v-else-if="activeTab === 'jobs'"
+            :forbidden="jobsForbidden"
             :rows="filteredRows as EvalJob[]"
             :search="filterQuery"
             :loading="isLoading"
@@ -509,6 +512,9 @@ const {
   scoreConfigVersions,
   providers,
   isLoading,
+  jobsForbidden,
+  scorersForbidden,
+  scoreConfigsForbidden,
   loadAll,
   loadProviders,
   ensureScoreConfigVersions,

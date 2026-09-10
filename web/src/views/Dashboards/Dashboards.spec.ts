@@ -69,6 +69,7 @@ vi.mock("@/services/settings", async (importOriginal) => {
 });
 
 import settingsService from "@/services/settings";
+import * as commons from "@/utils/commons";
 import { useFavoriteDashboards } from "@/composables/useFavoriteDashboards";
 
 // Mock DOM methods to prevent errors from missing DOM APIs
@@ -395,6 +396,27 @@ describe("Dashboards.vue", () => {
 
       expect(wrapper.exists()).toBe(true);
       expect(wrapper.vm.activeFolderId).toBe("default");
+    });
+
+    it("should stop the loading skeleton when the folder list is forbidden", async () => {
+      // A 403 folder list used to abort mount before the landing decision ran,
+      // leaving the table on its skeleton forever instead of the empty state.
+      vi.mocked(commons.getFoldersList).mockRejectedValueOnce(
+        Object.assign(new Error("Request failed with status code 403"), {
+          response: { status: 403 },
+        }),
+      );
+
+      wrapper = shallowMount(Dashboards, {
+        global: buildGlobalConfig(store, router, i18n, {}),
+      });
+
+      await nextTick();
+      await nextTick();
+      await nextTick();
+
+      expect(wrapper.vm.activeFolderId).toBe("default");
+      expect(wrapper.vm.loading).toBe(false);
     });
 
     it("should have reactive activeFolderId property", async () => {

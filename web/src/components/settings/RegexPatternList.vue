@@ -61,6 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             table-id="settings-regex-patterns"
             :show-global-filter="false"
             :loading="listLoading"
+            :forbidden="forbidden"
             @update:selected-ids="handleSelectedIdsUpdate"
           >
             <template #toolbar>
@@ -326,6 +327,11 @@ export default defineComponent({
     const resultTotal = ref(0);
 
     const listLoading = regexPatternsList.isPending;
+    // A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
+    const forbidden = computed(() => {
+      const e: any = regexPatternsList.error.value;
+      return e?.status === 403 || e?.response?.status === 403;
+    });
     // Request in flight, with rows still on screen — the refresh button's
     // spinner. `listLoading` stays for the skeleton, which only a cold read wants.
     const fetching = regexPatternsList.isFetching;
@@ -394,7 +400,8 @@ export default defineComponent({
     // The query owns its failure now, so this reports it once per error however
     // the read was triggered.
     watch(regexPatternsList.error, (error: any) => {
-      if (!error) return;
+      // The grouped access toast already reports a 403; a second red toast adds nothing.
+      if (!error || forbidden.value) return;
       toast({
         message: error.data?.message || t("settings.regexPatternList.errorFetching"),
         variant: "error",
@@ -587,6 +594,7 @@ export default defineComponent({
       createRegexPattern,
       listLoading,
       fetching,
+      forbidden,
       editRegexPattern,
       deleteRegexPattern,
       deleteDialog,

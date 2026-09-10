@@ -74,6 +74,7 @@
         :columns="columnsToBeRendered"
         row-key="uuid"
         :loading="isLoading"
+        :forbidden="forbidden"
         pagination="client"
         :page-size="pageSize"
         :page-size-options="pageSizeOptions"
@@ -367,6 +368,7 @@ export default defineComponent({
     const columnsToBeRendered = ref<OTableColumnDef[]>([]);
     const expandedIds = ref<string[]>([]);
     const isLoading = ref(false);
+    const forbidden = ref(false);
     const moreDetailsToDisplay = ref("");
 
     const { extractTimestamps } = logsUtils();
@@ -448,6 +450,7 @@ export default defineComponent({
           router.currentRoute.value.query.org_identifier ||
           store.state.selectedOrganization.identifier;
         isLoading.value = true;
+        forbidden.value = false;
         if (dateTimeToBeSent.value.valueType === "relative") {
           const convertedData = extractTimestamps(dateTimeToBeSent.value.relativeTimePeriod);
           dateTimeToBeSent.value.startTime = convertedData.from * 1000;
@@ -524,12 +527,16 @@ export default defineComponent({
         });
         dataToBeLoaded.value = filteredHits;
         isLoading.value = false;
-      } catch (error) {
-        toast({
-          variant: "error",
-          message: t("logs.searchHistory.fetchFailed"),
-          timeout: 5000,
-        });
+      } catch (error: any) {
+        forbidden.value = error?.response?.status === 403;
+        // The grouped access toast already reports a 403; a second red toast adds nothing.
+        if (!forbidden.value) {
+          toast({
+            variant: "error",
+            message: t("logs.searchHistory.fetchFailed"),
+            timeout: 5000,
+          });
+        }
         console.log(error, "error");
         isLoading.value = false;
       } finally {
@@ -748,6 +755,7 @@ export default defineComponent({
       t,
       route,
       isLoading,
+      forbidden,
       updateDateTime,
       searchDateTimeRef,
       expandedIds,

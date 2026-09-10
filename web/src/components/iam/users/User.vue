@@ -44,6 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :columns="columns"
           row-key="email"
           :loading="loading"
+          :forbidden="forbidden"
           :selected-ids="selectedUserIds"
           v-model:global-filter="filterQuery"
           :show-global-filter="false"
@@ -758,6 +759,7 @@ export default defineComponent({
     // A request in flight while rows stay on screen — the refresh button's
     // spinner. `loading` is the skeleton, which only a cold read wants.
     const fetching = ref(false);
+    const forbidden = ref(false);
     // The ?email= deep link opens the edit dialog, so it is latched — the
     // cached paint and the fresh one must not open it twice.
     let deepLinkOpened = false;
@@ -845,6 +847,7 @@ export default defineComponent({
 
       loading.value = !warm;
       fetching.value = true;
+      forbidden.value = false;
       return new Promise((resolve, reject) => {
         (force
           ? queryClient
@@ -909,13 +912,17 @@ export default defineComponent({
           .catch((err: any) => {
             console.error("Failed to fetch org members:", err);
             dismiss();
-            toast({
-              variant: "error",
-              message: t("iam.user.failedToLoadUsers", {
-                error: err?.response?.data?.message || err?.message || t("iam.user.unknownError"),
-              }),
-              timeout: 5000,
-            });
+            forbidden.value = err?.response?.status === 403;
+            // The grouped access toast already reports a 403; a second red toast adds nothing.
+            if (!forbidden.value) {
+              toast({
+                variant: "error",
+                message: t("iam.user.failedToLoadUsers", {
+                  error: err?.response?.data?.message || err?.message || t("iam.user.unknownError"),
+                }),
+                timeout: 5000,
+              });
+            }
             reject(false);
           })
           .finally(() => {
@@ -1446,6 +1453,7 @@ export default defineComponent({
       columns,
       loading,
       fetching,
+      forbidden,
       orgData,
       confirmDelete,
       deleteUser,

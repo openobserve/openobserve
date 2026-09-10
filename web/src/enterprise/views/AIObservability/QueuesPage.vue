@@ -41,6 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :columns="columns"
         row-key="id"
         :loading="loading"
+        :forbidden="forbidden"
         :footer-title="t('aiObservability.queues.listTitle')"
         :global-filter="search"
         :show-global-filter="false"
@@ -398,6 +399,11 @@ const queues = computed<LlmQueue[]>(() => (queuesList.data.value ?? []) as LlmQu
 const loading = queuesList.isPending;
 // Request in flight with rows still on screen — the refresh control's spinner.
 const fetching = queuesList.isFetching;
+// A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
+const forbidden = computed(() => {
+  const e: any = queuesList.error.value;
+  return e?.status === 403 || e?.response?.status === 403;
+});
 const search = ref("");
 
 const numberedRows = useNumberedRows(queues);
@@ -519,7 +525,10 @@ async function refresh(force = true) {
     // open re-fetches.
     optionsLoaded.value = false;
   } catch {
-    toast({ variant: "error", message: t("aiObservability.queues.loadError") });
+    // The grouped access toast already reports a 403; a second red toast adds nothing.
+    if (!forbidden.value) {
+      toast({ variant: "error", message: t("aiObservability.queues.loadError") });
+    }
   } finally {
     loading.value = false;
   }

@@ -32,6 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="iam-roles-table-section"
           :data="rows"
           :loading="loading"
+          :forbidden="forbidden"
           :action-loading="bulkDeleteLoading"
           v-model:global-filter="filterQuery"
           :selected-ids="selectedRoleNames"
@@ -88,7 +89,7 @@ import { deleteRoleMutation, bulkDeleteRolesMutation } from "@/services/iam.quer
 import { rolesQuery } from "@/services/iam.queries";
 import { allUserRolesQuery } from "@/services/users.queries";
 import { queryClient } from "@/composables/query/queryClient";
-import { onBeforeMount, ref, watch } from "vue";
+import { computed, onBeforeMount, ref, watch } from "vue";
 import AddRole from "./AddRole.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -196,6 +197,11 @@ const loading = rolesList.isPending;
 // A request in flight while rows stay on screen — the refresh button's spinner.
 // `loading` is the skeleton, which only a cold read wants.
 const fetching = rolesList.isFetching;
+// A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
+const forbidden = computed(() => {
+  const e: any = rolesList.error.value;
+  return e?.status === 403 || e?.response?.status === 403;
+});
 
 // `GET /roles` returns role NAMES only, so a role row has nothing to show beyond
 // its name. The one fact worth surfacing — is anyone actually in this role — comes

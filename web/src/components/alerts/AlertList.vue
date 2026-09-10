@@ -101,6 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               show-index
               row-key="alert_id"
               :loading="loading"
+              :forbidden="forbidden"
               pagination="client"
               :page-size="pageSize"
               :page-size-options="pageSizeOptions"
@@ -796,37 +797,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click:secondary="showForm = false"
         @click:primary="submitForm"
       >
-        <div>
+        <div class="flex flex-col gap-4">
           <OInput
             data-test="to-be-clone-alert-name"
             v-model="toBeCloneAlertName"
             :label="t('alerts.alertName')"
           />
-          <OSelect
-            data-test="to-be-clone-stream-type"
-            v-model="toBeClonestreamType"
-            :label="t('alerts.streamType')"
-            :options="streamTypes"
-            @update:model-value="updateStreams()"
-            class="mt-1"
-          />
-          <OSelect
-            data-test="to-be-clone-stream-name"
-            v-model="toBeClonestreamName"
-            :disabled="!toBeClonestreamType"
-            :label="t('alerts.stream_name')"
-            :options="indexOptions"
-            searchable
-            @update:model-value="updateStreamName"
-            class="mt-1 mb-2"
-          />
-          <div class="mb-4">
-            <SelectFolderDropDown
-              :type="'alerts'"
-              @folder-selected="updateFolderIdToBeCloned"
-              :activeFolderId="folderIdToBeCloned"
+          <template v-if="!toBeClonedIsComposite">
+            <OSelect
+              data-test="to-be-clone-stream-type"
+              v-model="toBeClonestreamType"
+              :label="t('alerts.streamType')"
+              :options="streamTypes"
+              @update:model-value="updateStreams()"
             />
-          </div>
+            <OSelect
+              data-test="to-be-clone-stream-name"
+              v-model="toBeClonestreamName"
+              :disabled="!toBeClonestreamType"
+              :label="t('alerts.stream_name')"
+              :options="indexOptions"
+              searchable
+              @update:model-value="updateStreamName"
+            />
+          </template>
+          <SelectFolderDropDown
+            :type="'alerts'"
+            @folder-selected="updateFolderIdToBeCloned"
+            :activeFolderId="folderIdToBeCloned"
+          />
         </div>
       </ODialog>
       <MoveAcrossFolders
@@ -1017,6 +1016,7 @@ export default defineComponent({
     // A request in flight while rows stay on screen — the refresh button's
     // spinner. `loading` is the skeleton, which only a cold read wants.
     const fetching = ref(false);
+    const forbidden = ref(false);
     const oTableRef: any = ref(null);
     // The first real load lands after mount and races TanStack's own auto-reset-on-data-change, which resolves through its own deferred microtask queue — setTimeout(0) runs strictly after that queue drains, so the restored page reliably wins.
     watch(
@@ -1092,6 +1092,7 @@ export default defineComponent({
     const toBeCloneAlertName = ref("");
     const toBeClonedID = ref("");
     const toBeClonedIsAnomaly = ref(false);
+    const toBeClonedIsComposite = ref(false);
     const toBeClonestreamType = ref("");
     const toBeClonestreamName = ref("");
     const streamTypes = ref(["logs", "metrics", "traces"]);
@@ -1969,6 +1970,7 @@ export default defineComponent({
 
       loading.value = !painted;
       fetching.value = true;
+      forbidden.value = false;
       const dismiss = painted
         ? () => {}
         : toast({
@@ -1987,13 +1989,17 @@ export default defineComponent({
         // after every save: the post-save refresh reads the route before
         // hideForm's cleanup push lands, so it still sees the stale `action`.
         dismiss();
-      } catch (error) {
+      } catch (error: any) {
         console.error(error);
         dismiss();
-        toast({
-          variant: "error",
-          message: t("toastMessages.alerts.errorWhilePullingAlerts"),
-        });
+        forbidden.value = error?.response?.status === 403;
+        // The grouped access toast already reports a 403; a second red toast adds nothing.
+        if (!forbidden.value) {
+          toast({
+            variant: "error",
+            message: t("toastMessages.alerts.errorWhilePullingAlerts"),
+          });
+        }
       } finally {
         loading.value = false;
         fetching.value = false;
@@ -2335,11 +2341,12 @@ export default defineComponent({
       toBeClonedID.value = row.alert_id;
       toBeCloneAlertName.value = row.name;
       toBeClonedIsAnomaly.value = row.type === "anomaly";
+      toBeClonedIsComposite.value = row.alert_type === "Composite";
       toBeClonestreamName.value = "";
       toBeClonestreamType.value = "";
       showForm.value = true;
-      // Anomaly rows use the /clone endpoint — no need to pre-fetch full data
-      if (!toBeClonedIsAnomaly.value) {
+      // Anomaly and composite rows use the /clone endpoint — no need to pre-fetch full data
+      if (!toBeClonedIsAnomaly.value && !toBeClonedIsComposite.value) {
         toBeClonedAlert.value = await getAlertById(row.alert_id);
       }
     };
@@ -2391,6 +2398,46 @@ export default defineComponent({
           toast({
             variant: "error",
             message: e?.response?.data?.message || t("alerts.messages.cloneAnomalyFailed"),
+          });
+        } finally {
+          isSubmitting.value = false;
+        }
+        return;
+      }
+
+      // Composite rows: no single stream to select, so use the dedicated
+      // /clone endpoint the same way as anomaly rows, minus stream_type/stream_name
+      // (the backend rejects those fields on a composite payload).
+      if (toBeClonedIsComposite.value) {
+        isSubmitting.value = true;
+        const dismiss = toast({
+          variant: "loading",
+          message: t("toastMessages.alerts.pleaseWait"),
+          timeout: 0,
+        });
+        try {
+          await alertsService.clone_by_id(
+            store.state.selectedOrganization.identifier,
+            toBeClonedID.value,
+            {
+              name: toBeCloneAlertName.value,
+              folder_id: (folderIdToBeCloned.value as string) || "default",
+            },
+            folderIdToBeCloned.value,
+          );
+          dismiss();
+          toast({
+            variant: "success",
+            message: t("toastMessages.alerts.alertClonedSuccessfully"),
+          });
+          showForm.value = false;
+          await getAlertsFn(store, folderIdToBeCloned.value);
+          activeFolderId.value = folderIdToBeCloned.value;
+        } catch (e: any) {
+          dismiss();
+          toast({
+            variant: "error",
+            message: e?.response?.data?.message,
           });
         } finally {
           isSubmitting.value = false;
@@ -3458,6 +3505,7 @@ export default defineComponent({
       showForm,
       toBeCloneAlertName,
       toBeClonedIsAnomaly,
+      toBeClonedIsComposite,
       toBeClonestreamType,
       toBeClonestreamName,
       streamTypes,
@@ -3471,6 +3519,7 @@ export default defineComponent({
       isFetchingStreams,
       loading,
       fetching,
+      forbidden,
       isSubmitting,
       filterQuery,
       getImageURL,

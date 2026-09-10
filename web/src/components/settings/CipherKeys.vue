@@ -36,6 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :columns="columns"
           row-key="name"
           :loading="loading"
+          :forbidden="forbidden"
           :selected-ids="selectedKeyIds"
           selection="multiple"
           pagination="client"
@@ -197,6 +198,11 @@ export default defineComponent({
     // A request is in flight while rows stay on screen — the refresh button's
     // spinner. `loading` is the skeleton, which only a cold read wants.
     const fetching = cipherKeysList.isFetching;
+    // A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
+    const forbidden = computed(() => {
+      const e: any = cipherKeysList.error.value;
+      return e?.status === 403 || e?.response?.status === 403;
+    });
     const filterQuery = ref("");
     const columns: OTableColumnDef[] = [
       {
@@ -534,6 +540,7 @@ export default defineComponent({
       router,
       loading,
       fetching,
+      forbidden,
       tabledata,
       columns,
       showAddDialog,

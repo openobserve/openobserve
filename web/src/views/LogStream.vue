@@ -69,6 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :show-global-filter="false"
           :default-columns="false"
           :loading="loadingState"
+          :forbidden="forbidden"
           :enable-column-resize="true"
           :persist-columns="true"
           table-id="streams-log-stream-list"
@@ -455,6 +456,7 @@ export default defineComponent({
     // A refresh with rows already on screen: the button spins, the table does not
     // go back to a skeleton.
     const isRefreshing = ref(false);
+    const forbidden = ref(false);
     const searchKeyword = ref("");
     const deleteAssociatedAlertsPipelines = ref(true);
     const streamActiveTab = ref("logs");
@@ -687,6 +689,7 @@ export default defineComponent({
 
     const getLogStream = (_refresh?: boolean) => {
       if (store.state.selectedOrganization != null) {
+        forbidden.value = false;
         previousOrgIdentifier.value = store.state.selectedOrganization.identifier;
         const offset = (currentPage.value - 1) * pageSize.value;
         const org = store.state.selectedOrganization.identifier;
@@ -752,7 +755,8 @@ export default defineComponent({
             dismiss();
           })
           .catch((err) => {
-            if (err.response?.status != 403) {
+            forbidden.value = err?.response?.status === 403;
+            if (!forbidden.value) {
               toast({
                 variant: "error",
                 message: err.response?.data?.message || t("logStream.errorWhileFetchingStreams"),
@@ -1321,6 +1325,7 @@ export default defineComponent({
       onStreamsEmptyStateAction,
       loadingState,
       isRefreshing,
+      forbidden,
       isDeleting,
       searchKeyword,
       deleteAssociatedAlertsPipelines,

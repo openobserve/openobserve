@@ -49,6 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :columns="columns"
             row-key="name"
             :loading="loading"
+            :forbidden="forbidden"
             pagination="client"
             :page-size="selectedPerPage"
             :page-size-options="perPageOptionsList"
@@ -493,6 +494,7 @@ export default defineComponent({
     // Request in flight with rows still on screen — the refresh button's
     // spinner. `loading` is the skeleton, for a cold read only.
     const fetching = ref(false);
+    const forbidden = ref(false);
     // Plain ref, not URL/store-backed: only the OTable v-if branch unmounts on add/edit, not EnrichmentTableList itself.
     const currentPage = ref(1);
     const onPageChange = (page: number) => {
@@ -623,6 +625,7 @@ export default defineComponent({
         ) !== undefined;
       loading.value = !warm;
       fetching.value = true;
+      forbidden.value = false;
       const dismiss = warm
         ? () => {}
         : toast({
@@ -750,7 +753,8 @@ export default defineComponent({
       } catch (err: any) {
         console.info("Error while fetching enrichment tables", err);
         dismiss();
-        if (err.response?.status != 403) {
+        forbidden.value = err?.response?.status === 403;
+        if (!forbidden.value) {
           toast({
             variant: "error",
             message: err.response?.data?.message || t("functions.fetchFunctionsError"),
@@ -1101,6 +1105,7 @@ export default defineComponent({
       getLookupTables,
       loading,
       fetching,
+      forbidden,
       resultTotal,
       refreshList,
       perPageOptionsList,

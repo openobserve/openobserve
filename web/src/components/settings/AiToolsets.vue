@@ -38,6 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Table -->
       <div class="bg-card-glass-bg mt-2.5 overflow-hidden">
         <OTable
+          :forbidden="forbidden"
           :frame="false"
           :data="visibleRows"
           :columns="columns"
@@ -191,6 +192,11 @@ export default defineComponent({
     // A request is in flight while rows stay on screen — the refresh button's
     // spinner. `loading` is the skeleton, which only a cold read wants.
     const fetching = toolsetsList.isFetching;
+    // A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
+    const forbidden = computed(() => {
+      const e: any = toolsetsList.error.value;
+      return e?.status === 403 || e?.response?.status === 403;
+    });
     const filterQuery = ref("");
 
     const columns: OTableColumnDef[] = [
@@ -418,6 +424,7 @@ export default defineComponent({
       store,
       loading,
       fetching,
+      forbidden,
       tabledata,
       columns,
       showAddDialog,

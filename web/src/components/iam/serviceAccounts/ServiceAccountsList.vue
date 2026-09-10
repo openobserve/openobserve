@@ -42,6 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :columns="columns"
           row-key="email"
           :loading="loading"
+          :forbidden="forbidden"
           pagination="client"
           :page-size="20"
           :page-size-options="[20, 50, 100, 250, 500]"
@@ -760,6 +761,11 @@ export default defineComponent({
     // A request is in flight while rows stay on screen — the refresh button's
     // spinner. `loading` is the skeleton, which only a cold read wants.
     const fetching = serviceAccountsList.isFetching;
+    // A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
+    const forbidden = computed(() => {
+      const e: any = serviceAccountsList.error.value;
+      return e?.status === 403 || e?.response?.status === 403;
+    });
     // Bound to refresh / post-write reloads: always hits the server.
     const refreshServiceAccounts = () => getServiceAccountsUsers(true);
 
@@ -1125,6 +1131,7 @@ export default defineComponent({
       columns,
       loading,
       fetching,
+      forbidden,
       orgData,
       confirmDelete,
       serviceAccounts,

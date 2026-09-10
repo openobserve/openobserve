@@ -43,6 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :columns="advancedColumns"
           row-key="rowKey"
           :loading="loading"
+          :forbidden="forbidden"
           pagination="client"
           :page-size="20"
           :page-size-options="[10, 20, 50, 100]"
@@ -371,6 +372,7 @@ export default defineComponent({
       // Request in flight with rows still on screen — the refresh button's
       // spinner. `loading` is the skeleton, for a cold read only.
       fetching: false,
+      forbidden: false,
       filterQuery: "",
       showAddDrawer: false,
       editTargetIntegration: undefined as AlertSourceIntegration | undefined,
@@ -554,6 +556,7 @@ export default defineComponent({
         if (cached !== undefined) this.integrations = cached;
         this.loading = cached === undefined;
         this.fetching = true;
+        this.forbidden = false;
         // Options API, so this reads imperatively rather than through useQuery.
         // TODO: move to `useQuery` when this component moves to `setup()`.
         if (force) {
@@ -564,8 +567,12 @@ export default defineComponent({
           });
         }
         this.integrations = await queryClient.fetchQuery(options);
-      } catch (e) {
-        toast({ variant: "error", message: this.t("alert_sources.error") });
+      } catch (e: any) {
+        this.forbidden = e?.response?.status === 403;
+        // The grouped access toast already reports a 403; a second red toast adds nothing.
+        if (!this.forbidden) {
+          toast({ variant: "error", message: this.t("alert_sources.error") });
+        }
       } finally {
         this.loading = false;
         this.fetching = false;

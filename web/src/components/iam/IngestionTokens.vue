@@ -57,6 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :columns="columns"
           row-key="name"
           :loading="loading"
+          :forbidden="forbidden"
           v-model:global-filter="filterQuery"
           :show-global-filter="false"
           :default-columns="false"
@@ -306,6 +307,11 @@ export default defineComponent({
     // A request is in flight while rows stay on screen — the refresh button's
     // spinner. `loading` is the skeleton, which only a cold read wants.
     const fetching = tokensList.isFetching;
+    // A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
+    const forbidden = computed(() => {
+      const e: any = tokensList.error.value;
+      return e?.status === 403 || e?.response?.status === 403;
+    });
     const filterQuery = ref("");
     const showCreateForm = ref(false);
     const showRevealedDialog = ref(false);
@@ -373,7 +379,8 @@ export default defineComponent({
     // The query owns its failure now, so this reports it once per error however
     // the read was triggered.
     watch(tokensList.error, (e: any) => {
-      if (!e) return;
+      // The grouped access toast already reports a 403; a second red toast adds nothing.
+      if (!e || forbidden.value) return;
       toast({
         variant: "error",
         message: e.response?.data?.message || t("ingestion.tokenFetchError"),
@@ -501,6 +508,7 @@ export default defineComponent({
       tokens,
       loading,
       fetching,
+      forbidden,
       filterQuery,
       columns,
       showCreateForm,

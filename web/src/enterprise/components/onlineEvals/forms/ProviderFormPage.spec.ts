@@ -65,6 +65,7 @@ describe("ProviderFormPage", () => {
     vi.clearAllMocks();
     (onlineEvalsService.providers.create as any).mockResolvedValue({});
     (onlineEvalsService.providers.update as any).mockResolvedValue({});
+
     (onlineEvalsService.providers.testConfig as any).mockResolvedValue("Connection OK");
   });
 

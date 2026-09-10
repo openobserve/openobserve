@@ -168,7 +168,7 @@
     "vite": "^7.3.2",
     "vite-plugin-istanbul": "^7.2.1",
     "vite-plugin-monaco-editor": "^1.1.0",
-    "vitest": "^4.1.10",
+    "vitest": "^4.1.11",
     "vitest-canvas-mock": "^1.1.4",
     "vue-tsc": "^3.3.9"
   },
