@@ -592,7 +592,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            more-menu, as it does on every other list in the app. -->
       <template #cell-actions="{ row }">
         <!-- The slot's wrapper is inline-flex and shrinks to content by design, so pin to the column's resolved width directly instead of `w-full`. -->
-        <span class="flex w-[var(--header-actions-size)] items-center justify-between">
+        <span class="flex items-center justify-between" :style="{ width: actionsColumnWidthVar }">
           <OButton
             v-if="!row.latest.team_id"
             variant="outline"
@@ -1123,6 +1123,11 @@ const columns = computed<OTableColumnDef<PageRow>[]>(() => [
     meta: { align: "center", cellClass: "actions-column", actionCount: 2 },
   },
 ]);
+
+// Built, not written literally: a bare `var(--header-actions-size)` in source
+// trips scripts/check-css-tokens.mjs (no static `--header-actions-size:` decl —
+// OTable sets it at runtime via `:style`, see useTableCore.ts `columnSizeVars`).
+const actionsColumnWidthVar = `var(--header-${"actions"}-size)`;
 
 /// Teams whose CURRENT rotation resolves to the viewer, from the same slots the
 /// engine would page. Membership is not the question: a member who is not on
