@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          Settings shell; this component renders only the form content. -->
     <!-- platform settings section. The page gutter is owned by the Settings
          shell's ConstrainedPage; this block adds none of its own. -->
-    <div>
+    <div v-if="!trialExpired">
       <GroupHeader :title="t('settings.platformSettings')" :showIcon="false" />
       <div class="flex w-full flex-col">
         <OForm
@@ -174,6 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       id="enterpriseFeature"
       v-if="
+        !trialExpired &&
         config.isEnterprise == 'true' &&
         store.state.zoConfig.meta_org == store.state.selectedOrganization.identifier
       "
@@ -603,7 +604,7 @@ import configService from "@/services/config";
 import DOMPurify from "dompurify";
 import GroupHeader from "../common/GroupHeader.vue";
 import { applyThemeColors, switchThemeMode } from "@/utils/theme";
-import { useLocalOrganization } from "@/utils/zincutils";
+import { isTrialExpired, useLocalOrganization } from "@/utils/zincutils";
 import { formatSizeFromMB } from "@/utils/formatters";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -767,6 +768,10 @@ export default defineComponent({
     );
     const deleteConfirmMatches = computed(
       () => deleteConfirmInput.value.trim() === deleteOrgName.value,
+    );
+
+    const trialExpired = computed(() =>
+      isTrialExpired(store.state?.organizationData?.organizationSettings?.free_trial_expiry),
     );
 
     // Only cloud builds expose self-service org deletion. Backend enforces the
@@ -1385,6 +1390,7 @@ export default defineComponent({
       updateCustomColor,
       resetThemeColors,
       currentPickerMode,
+      trialExpired,
       // Delete organization (Danger Zone)
       canDeleteOrg,
       confirmDeleteOrg,

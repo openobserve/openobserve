@@ -53,16 +53,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="bg-card-glass-bg min-h-0 flex-1">
         <OTable
+          ref="oTableRef"
           data-test="alert-destinations-list-table"
           :data="visibleRows"
           :columns="columns"
           row-key="name"
           :loading="loading"
+          :forbidden="forbidden"
           :selected-ids="selectedDestinationIds"
           selection="multiple"
           pagination="client"
           :page-size="20"
           :page-size-options="[5, 10, 20, 50, 100]"
+          :current-page="currentPage"
           :footer-title="t('alert_destinations.header')"
           sorting="client"
           :default-columns="false"
@@ -72,6 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           show-index
           :show-global-filter="false"
           @update:selected-ids="handleSelectedIdsUpdate"
+          @update:current-page="onPageChange"
         >
           <template #toolbar>
             <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">
@@ -347,7 +351,7 @@ import destinationService from "@/services/alert_destination";
 import templateService from "@/services/alert_templates";
 import { useStore } from "vuex";
 import ConfirmDialog from "../ConfirmDialog.vue";
-import { useRouter } from "vue-router";
+import { useRouter, useRoute } from "vue-router";
 import type { DestinationPayload } from "@/ts/interfaces";
 import { usePrebuiltDestinations } from "@/composables/usePrebuiltDestinations";
 import type { Template } from "@/ts/interfaces/index";
@@ -506,9 +510,19 @@ export default defineComponent({
     const showDestinationEditor = ref(false);
     const showImportDestination = ref(false);
     const router = useRouter();
+    const route = useRoute();
     const filterQuery = ref("");
     const resultTotal = ref(0);
     const deletingDestinations = ref(new Set<string>());
+    const oTableRef: any = ref(null);
+
+    // URL-synced so returning from add/edit/import (Back/Update/Cancel) lands on the same page instead of resetting to page 1.
+    const currentPage = ref(Number(route.query.page) || 1);
+    const onPageChange = (page: number) => {
+      currentPage.value = page;
+      if (String(route.query.page ?? "1") === String(page)) return;
+      router.replace({ query: { ...route.query, page: String(page) } });
+    };
 
     const selectedDestinationIds = computed(() =>
       selectedDestinations.value.map((d: any) => d.name),
@@ -570,6 +584,18 @@ export default defineComponent({
     };
 
     const loading = ref(false);
+    const forbidden = ref(false);
+    // The first real load lands after mount and races TanStack's own auto-reset-on-data-change, which resolves through its own deferred microtask queue — setTimeout(0) runs strictly after that queue drains, so the restored page reliably wins.
+    watch(
+      loading,
+      (isLoading) => {
+        if (isLoading) return;
+        setTimeout(() => {
+          oTableRef.value?.table?.setPageIndex(currentPage.value - 1);
+        }, 0);
+      },
+      { once: true },
+    );
     const getDestinations = () => {
       const dismiss = toast({
         variant: "loading",
@@ -577,6 +603,7 @@ export default defineComponent({
         timeout: 0,
       });
       loading.value = true;
+      forbidden.value = false;
       destinationService
         .list({
           page_num: 1,
@@ -600,7 +627,8 @@ export default defineComponent({
           updateRoute();
         })
         .catch((err) => {
-          if (err.response.status != 403) {
+          forbidden.value = err?.response?.status === 403;
+          if (!forbidden.value) {
             toast({
               variant: "error",
               message: t("toastMessages.alerts.errorWhilePullingDestinations"),
@@ -639,9 +667,11 @@ export default defineComponent({
       toggleDestinationEditor();
       resetEditingDestination();
       if (!destination) {
+        const { name: _name, ...restQuery } = router.currentRoute.value.query;
         router.push({
           name: "alertDestinations",
           query: {
+            ...restQuery,
             action: "add",
             org_identifier: store.state.selectedOrganization.identifier,
           },
@@ -651,6 +681,7 @@ export default defineComponent({
         router.push({
           name: "alertDestinations",
           query: {
+            ...router.currentRoute.value.query,
             action: "update",
             name: destination.name,
             org_identifier: store.state.selectedOrganization.identifier,
@@ -701,13 +732,16 @@ export default defineComponent({
     };
     const toggleDestinationEditor = () => {
       showDestinationEditor.value = !showDestinationEditor.value;
-      if (!showDestinationEditor.value)
+      if (!showDestinationEditor.value) {
+        const { action: _action, name: _name, ...restQuery } = router.currentRoute.value.query;
         router.push({
           name: "alertDestinations",
           query: {
+            ...restQuery,
             org_identifier: store.state.selectedOrganization.identifier,
           },
         });
+      }
     };
     const filterData = (rows: any, terms: any) => {
       var filtered = [];
@@ -744,9 +778,11 @@ export default defineComponent({
     };
     const importDestination = () => {
       showImportDestination.value = true;
+      const { name: _name, ...restQuery } = router.currentRoute.value.query;
       router.push({
         name: "alertDestinations",
         query: {
+          ...restQuery,
           action: "import",
           org_identifier: store.state.selectedOrganization.identifier,
         },
@@ -932,6 +968,7 @@ export default defineComponent({
       editDestination,
       getImageURL,
       loading,
+      forbidden,
       conformDeleteDestination,
       filterQuery,
       filterData,
@@ -966,6 +1003,9 @@ export default defineComponent({
       getPrebuiltTypeName,
       getCustomDestinationLabel,
       isDefaultPrebuiltTemplate,
+      oTableRef,
+      currentPage,
+      onPageChange,
     };
   },
 });

@@ -40,6 +40,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
     </div>
 
+    <div v-else-if="forbidden" class="flex flex-1 items-center justify-center">
+      <OEmptyState size="hero" preset="no-access" data-test="discovered-services-forbidden" />
+    </div>
+
     <!-- Empty State -->
     <div v-else-if="services.length === 0" class="flex flex-1 items-center justify-center">
       <OEmptyState
@@ -161,6 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data="refreshing ? [] : flatRows"
             :columns="columns"
             :loading="refreshing"
+            :forbidden="forbidden"
             row-key="id"
             pagination="client"
             :page-size="pageSize"
@@ -535,6 +540,7 @@ interface ServiceGroup {
 const store = useStore();
 
 const loading = ref(true);
+const forbidden = ref(false);
 const refreshing = ref(false);
 const resetting = ref(false);
 const error = ref<string | null>(null);
@@ -798,6 +804,7 @@ const loadServices = async (isRefresh = false) => {
     loading.value = true;
   }
   error.value = null;
+  forbidden.value = false;
 
   try {
     const orgId = store.state.selectedOrganization?.identifier;
@@ -815,7 +822,10 @@ const loadServices = async (isRefresh = false) => {
     }));
   } catch (err: any) {
     console.error("Failed to load services:", err);
-    error.value = err?.message || t("settings.discoveredServices.failedToLoadServices");
+    forbidden.value = err?.response?.status === 403;
+    if (!forbidden.value) {
+      error.value = err?.message || t("settings.discoveredServices.failedToLoadServices");
+    }
   } finally {
     loading.value = false;
     refreshing.value = false;

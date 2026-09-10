@@ -76,6 +76,10 @@
       "action": "Abfrage ausführen",
       "actionDesc": "Ereignisse für die ausgewählten Filter laden"
     },
+    "noAccess": {
+      "title": "Sie haben keinen Zugriff",
+      "description": "Kontaktieren Sie Ihren Administrator, wenn Sie glauben, dass Sie Zugriff haben sollten."
+    },
     "noDashboards": {
       "title": "Erstelle dein erstes Dashboard",
       "description": "Dashboards bringen Ihre Metriken, Logs und Traces in einer Ansicht zusammen. Erstellen Sie eines, um loszulegen.",
@@ -885,7 +889,7 @@
     "queryFailed": "Abfrage fehlgeschlagen",
     "unknownError": "Unbekannter Fehler",
     "selectedLabel": "ausgewählt",
-    "selectToFilter": "Zum Filtern auswählen",
+    "selectToFilter": "Filter auswählen",
     "clearSelection": "Auswahl löschen",
     "includeModeHint": "Einschlussmodus (=)",
     "excludeModeHint": "Ausschlussmodus (≠)",
@@ -6314,7 +6318,7 @@
       "frequencyPositiveNumber": "Alarm - {index}: Die Häufigkeit sollte eine positive Zahl größer als 0 sein und eine Zahl sein.",
       "cronExpressionString": "Alarm - {index}: Der Cron-Ausdruck sollte eine Zeichenfolge sein.",
       "thresholdPositiveNumber": "Alarm - {index}: Der Schwellenwert sollte eine positive Zahl größer als 0 sein und eine Zahl sein.",
-      "silenceNonNegativeNumber": "Alarm - {index}: Die Stille sollte eine positive Zahl größer oder gleich 0 sein und eine Zahl sein.",
+      "silenceNonNegativeNumber": "Warnmeldung - {index}: Der Cooldown-Zeitraum sollte eine Zahl größer oder gleich 0 sein.",
       "frequencyTypeInvalid": "Alarm - {index}: Der Häufigkeitstyp muss 'minutes' oder 'cron' sein und sollte eine Zeichenfolge sein.",
       "cronExpressionInvalid": "Alarm - {index}: Der Cron-Ausdruck sollte ein gültiger Cron-Ausdruck sein."
     },
@@ -6524,7 +6528,7 @@
       "nameInvalidChars": "Zeichen wie :, ?, /, # und Leerzeichen sind nicht erlaubt.",
       "templateRequired": "Vorlage ist erforderlich!",
       "validEmails": "Bitte gültige E-Mail-Adressen hinzufügen!",
-      "silenceNonNegative": "Benachrichtigungsstummschaltung muss größer als oder gleich 0 sein",
+      "silenceNonNegative": "Der Cooldown-Zeitraum sollte größer oder gleich 0 sein.",
       "pendingPeriodNonNegative": "Die Wartezeit sollte größer oder gleich 0 sein.",
       "periodPositive": "Zeitraum muss größer als 0 sein",
       "destinationRequired": "Mindestens ein Ziel ist erforderlich.",
@@ -9794,6 +9798,8 @@
       "outputTokens": "Ausgabe-Tokens",
       "out": "Ausgang",
       "totalCost": "Gesamtkosten",
+      "scores": "Bewertungen",
+      "notScoredYet": "Noch nicht bewertet",
       "preview": "Vorschau",
       "input": "Eingabe",
       "output": "Ausgabe",
@@ -10793,7 +10799,8 @@
         "scoreConfigs": "Score-Konfigurationen",
         "targetDataset": "Zieldatensatz",
         "progress": "Fortschritt",
-        "updated": "Aktualisiert"
+        "updated": "Aktualisiert",
+        "actions": "Aktionen"
       },
       "create": {
         "title": "Neue Warteschlange",
@@ -10847,7 +10854,8 @@
           "refType": "Ref",
           "refId": "Referenz",
           "added": "Hinzugefügt",
-          "status": "Status"
+          "status": "Status",
+          "actions": "Aktionen"
         },
         "status": {
           "pending": "Ausstehend",
@@ -10959,6 +10967,8 @@
       "viewAll": "Experimente anzeigen",
       "baseline": "Basislinie",
       "setBaseline": "Basislinie festlegen",
+      "baselineRequiresCompleted": "Nur ein abgeschlossener Lauf kann als Baseline festgelegt werden.",
+      "baselineError": "Fehler beim Aktualisieren der Baseline.",
       "selectForComparison": "Für Vergleich auswählen",
       "progress": "{done} von {total} Slots",
       "noScores": "Keine aggregierten Bewertungen",
@@ -11069,8 +11079,10 @@
       "addToDataset": "Hinzufügen",
       "detail": {
         "by": "von {user}",
-        "p50Latency": "P50-Latenz",
+        "p50Latency": "P50-Aufgabenlatenz",
         "totalCost": "Gesamtkosten",
+        "costBreakdown": "Aufgabe {task} · Bewertung {scoring}",
+        "partialCostBreakdown": "Aufgabe {task} · Bewertung {scoring} · Teilweise",
         "highDispersion": "Fälle mit hoher Streuung",
         "highDispersionHint": "Zeilen, in denen Versuche voneinander abweichen",
         "scoredRows": "{scored}/{total} Zeilen bewertet",
@@ -11100,8 +11112,12 @@
           "run": "Lauf"
         },
         "runSummary": "{trials} · {scorers}",
-        "progress": "Fortschritt",
+        "progress": "Aufgabenfortschritt",
         "scoring": "Bewertung",
+        "tasks": "Aufgaben",
+        "scores": "Bewertungen",
+        "taskDistribution": "{succeeded} erfolgreich · {failed} fehlgeschlagen · {pending} ausstehend · {skipped} übersprungen",
+        "scoreOutcomeDistribution": "{scored} bewertet · {failed} fehlgeschlagen · {pending} ausstehend · {skipped} übersprungen · {unscored} unbewertet",
         "scoringDistribution": "{success} erfolgreich · {failed} fehlgeschlagen · {pending} ausstehend · {skipped} übersprungen",
         "compare": "Vergleichen",
         "comparePicker": {
@@ -11193,6 +11209,16 @@
           "typeCategorical": "Kategorisch",
           "typeBoolean": "Boolesch",
           "threshold": "Schwellenwert",
+          "thresholdTooltip": "Baseline- und Kandidatenwerte, die um höchstens {percent} voneinander abweichen, gelten als unverändert, nicht als verschlechtert oder verbessert.",
+          "outcomeDimensions": "Ergebniskriterien",
+          "outcomeTooltipNone": "Keine Spalten sind ausgewählt — jede vergleichbare Zeile wird als „Nicht verglichen“ angezeigt.",
+          "outcomeTooltipAll": "Alle infrage kommenden Spalten bestimmen das Ergebnis jeder Zeile.",
+          "outcomeTooltipPartial": "Nur {names} bestimmen das Ergebnis jeder Zeile. Andere Spalten werden angezeigt, haben aber keinen Einfluss darauf.",
+          "allOutcomeDimensions": "Alle infrage kommenden Spalten",
+          "noOutcomeDimensions": "Keine Spalten",
+          "selectedOutcomeDimensions": "{count} Spalte | {count} Spalten",
+          "outcomeDimensionUnavailable": "{name} (keine Vergleichsrichtlinie)",
+          "dimensionExcludedHint": "Diese Spalte ist von den Ergebnissen ausgeschlossen. Wählen Sie sie unter „Ergebniskriterien“ aus, um sie einzubeziehen.",
           "measurePerRow": "Mittelwert pro Zeile über alle Versuche",
           "dimensionImproved": "{count} Zeile verbessert | {count} Zeilen verbessert",
           "dimensionUnchanged": "{count} Zeile unverändert | {count} Zeilen unverändert",
@@ -11274,8 +11300,8 @@
         },
         "searchPlaceholder": "Elemente suchen...",
         "csvImport": {
-          "button": "CSV hochladen",
-          "title": "Dataset-Elemente hochladen",
+          "button": "Elemente importieren",
+          "title": "Elemente des Datensatzes importieren",
           "description": "Dataset-Elemente aus einer CSV-Datei importieren.",
           "fileLabel": "CSV-Datei",
           "placeholder": "CSV-Datei auswählen",
@@ -11835,6 +11861,8 @@
       "schemaInvalidJson": "Das Schema muss gültiges JSON sein.",
       "schemaIgnored": "Schema · Von diesem Anbieter ignoriert",
       "schemaUnsupported": "Dieser Anbieter hat kein Feld für strukturierte Ausgabe. Das Schema bleibt in dieser Spalte erhalten, wird aber nicht gesendet, und das Modell antwortet mit reinem Text.",
+      "schemaApproximated": "Schema · Von diesem Anbieter angenähert",
+      "schemaApproximatedHelp": "Dieser Anbieter unterstützt nur den JSON-Modus, kein JSON-Schema. Die Anfrage wird im JSON-Modus gesendet, wobei das Schema in der Eingabeaufforderung wiederholt wird. Die Antwort ist daher JSON, ihre Form ist jedoch nicht garantiert.",
       "outputPlaceholder": "Die Ausgabe erscheint hier — drücken Sie „Ausführen“.",
       "outputNotRun": "Nicht ausgeführt",
       "retry": "Wiederholen",
@@ -11938,6 +11966,12 @@
   },
   "onlineEvals": {
     "versionPrefix": "v",
+    "traceScoreChip": {
+      "reasoning": "Warum",
+      "scoredAt": "Bewertet {time}",
+      "moreCount": "+{count} weitere",
+      "allScores": "Alle Bewertungen ({count})"
+    },
     "importNameRequired": "Name *",
     "importNewNameRequired": "Neuer Name *",
     "importDataTypeRequired": "Datentyp *",
@@ -12187,7 +12221,8 @@
       "remove": "Entfernen",
       "save": "Speichern",
       "saveAsDraft": "Als Entwurf speichern",
-      "createAndActivate": "Speichern & Aktivieren"
+      "createAndActivate": "Speichern & Aktivieren",
+      "testConnection": "Verbindung testen"
     },
     "scorerTypeDialog": {
       "title": "Einen neuen Scorer erstellen",
@@ -12207,21 +12242,26 @@
       "sectionTitle": "Anbieter",
       "nameLabel": "Name",
       "typeLabel": "Anbietertyp",
-      "endpointLabel": "Endpunkt",
-      "endpointPlaceholder": "Vollständige Completions-URL, z. B. https://your-host/v1/chat/completions",
+      "endpointLabel": "Basis-URL",
+      "endpointPlaceholder": "Basis-URL, z. B. https://your-host/v1",
+      "endpointHelpDefault": "Leer lassen, um den Standardwert zu verwenden: {url}",
+      "endpointHelpRequired": "Erforderlich – dieser Anbieter hat keine Standard-Basis-URL.",
       "defaultModelLabel": "Standardmodell",
       "availableModelsLabel": "Verfügbare Modelle",
       "apiKeyLabel": "API-Schlüssel",
       "apiKeyPlaceholder": "API-Schlüssel eingeben",
-      "apiKeyHelp": "Im Ruhezustand verschlüsselt gespeichert und nie wieder ausgelesen. Lassen Sie das Feld beim Bearbeiten leer, um den vorhandenen Schlüssel beizubehalten.",
+      "apiKeyHelp": "Wird im Ruhezustand verschlüsselt gespeichert und nie wieder ausgelesen. Lassen Sie das Feld beim Speichern von Änderungen leer, um den vorhandenen Schlüssel zu behalten.",
       "authSection": "Authentifizierung",
-      "authEditNote": "Anmeldedaten können nicht ausgelesen werden. Geben Sie den API-Schlüssel nur erneut ein, wenn Sie ihn rotieren möchten.",
+      "authEditNote": "Anmeldedaten können nicht erneut ausgelesen werden. Um einen Anbieter zu testen, der Authentifizierung erfordert, geben Sie dessen API-Schlüssel ein.",
       "cannotRename": "Kann nach der Erstellung nicht umbenannt werden.",
-      "availableModelsHelp": "Optional. Kommagetrennte Liste der bei diesem Anbieter verfügbaren Modelle.",
       "saveError": "Anbieter konnte nicht gespeichert werden",
       "nameRequired": "Provider name is required",
       "typeRequired": "Provider type is required",
-      "defaultModelRequired": "Default model is required"
+      "defaultModelRequired": "Default model is required",
+      "testRunning": "Verbindung wird getestet...",
+      "testPassed": "Verbunden",
+      "testFailed": "Verbindung fehlgeschlagen",
+      "testError": "Fehler beim Testen der Verbindung"
     },
     "scoreConfig": {
       "gteSymbol": "≥",
@@ -12320,7 +12360,8 @@
         "nameRequired": "Name is required",
         "nameFormat": "Use lowercase letters, numbers, and underscores only",
         "minRequired": "Min is required",
-        "maxRequired": "Max is required"
+        "maxRequired": "Max is required",
+        "maxNotGreaterThanMin": "Max muss größer als Min sein"
       },
       "import": {
         "title": "Score-Konfiguration importieren",
@@ -12891,7 +12932,7 @@
     },
     "empty": {
       "title": "Noch keine LLM-Anbieter",
-      "description": "LLM-Anbieter speichern die Verbindungsdetails (Endpunkt und Anmeldeinformationen) für die Sprachmodelle, die Ihre LLM-Judge-Scorer aufrufen. Fügen Sie eines hinzu, um mit der Durchführung von Bewertungen durch Richter zu beginnen."
+      "description": "LLM-Anbieter speichern die Verbindungsdaten (Basis-URL + Zugangsdaten) für die Sprachmodelle, die von Ihren LLM-Judge-Scorern aufgerufen werden. Fügen Sie einen hinzu, um richterbasierte Bewertungen auszuführen."
     }
   },
   "logs": {
@@ -15696,7 +15737,6 @@
       "reservation": "Reservierung",
       "sliType": "SLI-Typ",
       "owner": "Besitzer",
-      "folder": "Ordner",
       "streamPlaceholder": "Stream auswählen"
     },
     "empty": {
@@ -15726,7 +15766,24 @@
       "sourceHint": "Verfügbarkeit ist der Anteil der gemessenen Zeit, in der dieses Alert nicht ausgelöst hat. Zeit, in der es nicht ausgewertet hat — pausiert, stummgeschaltet oder fehlgeschlagen — ist ungemessen und wird nie als Verfügbarkeit gezählt.",
       "loadFailed": "Die geeigneten Alerts konnten nicht geladen werden",
       "noneEligible": "In dieser Organisation kann noch kein Alert als Quelle verwendet werden.",
-      "ineligibleOption": "{name} — {reason}",
+      "ineligible": {
+        "notScheduled": "Nicht geplant",
+        "grouped": "Gruppiert",
+        "notReferenceable": "Nicht verwendbar",
+        "cron": "Cron-Zeitplan",
+        "tooInfrequent": "Läuft zu selten",
+        "silenced": "Mit Schweigephase",
+        "other": "Nicht geeignet",
+        "why": {
+          "notScheduled": "Echtzeit-Warnmeldungen speichern keinen Ausführungsverlauf, den ein SLO benötigt. Verwenden Sie stattdessen eine geplante Warnmeldung.",
+          "grouped": "Diese Warnmeldung wird nach Gruppen aufgeteilt, und ein Lauf zeichnet nicht auf, welche Gruppen sie geprüft hat. Entfernen Sie die Gruppierung, um sie hier zu verwenden.",
+          "notReferenceable": "SLO- und zusammengesetzte Warnmeldungen können nicht als Quelle verwendet werden. Wählen Sie stattdessen eine normale geplante Warnmeldung.",
+          "cron": "Diese Warnmeldung läuft nach einem Cron-Zeitplan, daher sind ihre Prüfungen nicht gleichmäßig verteilt und die Verfügbarkeit kann nicht berechnet werden. Stellen Sie sie auf ein festes Intervall um.",
+          "tooInfrequent": "Diese Warnmeldung läuft alle {frequency}. Sie muss mindestens alle {slice} laufen, damit keine Zeit ungeprüft bleibt.",
+          "silenced": "Nach dem Auslösen stoppt diese Warnmeldung ihre Prüfungen für eine Weile — und diese Lücke fällt immer in eine schlechte Phase, was das SLO besser dastehen ließe. Setzen Sie die Schweigephase auf 0."
+        },
+        "noFixedInterval": "Kein festes Intervall"
+      },
       "groupingLocked": "Ein alert-basiertes SLI kann nicht gruppiert werden: Das Verfügbarkeitsprotokoll erfasst einen Lauf pro Alert, nicht pro Gruppe, daher gibt es keine Abdeckung pro Gruppe, auf die man sich stützen kann.",
       "sourceLink": "Quell-Alert",
       "preview": {
@@ -15834,6 +15891,42 @@
       "editTargetMissing": "Dieser Alarm ist diesem SLO nicht mehr zugeordnet.",
       "describeBurn": "Burn-Rate > {critical} über {long} und {short}",
       "describeBudget": "Fehlerbudget verbraucht > {critical}%"
+    },
+    "validation": {
+      "nameRequired": "SLO-Name ist erforderlich",
+      "nameTooLong": "SLO-Name darf höchstens 256 Zeichen lang sein.",
+      "targetRequired": "Zielwert ist erforderlich",
+      "targetRange": "Zielwert muss größer als 0 und unter 100 liegen.",
+      "targetPrecision": "Zielwert unterstützt maximal 3 Dezimalstellen.",
+      "streamTypeRequired": "Stream-Typ ist erforderlich",
+      "streamRequired": "Stream ist erforderlich",
+      "goodExprRequired": "„Gut, wenn“ ist erforderlich.",
+      "promqlGoodRequired": "Gute Abfrage ist erforderlich.",
+      "promqlTotalRequired": "Gesamtabfrage ist erforderlich",
+      "aggregateRequired": "Aggregationsausdruck ist erforderlich",
+      "comparatorRequired": "Vergleichsoperator ist erforderlich",
+      "thresholdRequired": "Schwellenwert ist erforderlich",
+      "thresholdNumber": "Schwellenwert muss eine Zahl sein",
+      "alertSourceRequired": "Quellwarnmeldung ist erforderlich",
+      "groupedSlice": "Gruppierte SLOs müssen ein 5-Minuten-Intervall verwenden",
+      "alertCannotGroup": "Ein SLI auf Basis von Warnmeldungen kann nicht gruppiert werden",
+      "frequencyRequired": "Häufigkeit ist erforderlich",
+      "frequencyPositive": "Häufigkeit muss mindestens 1 Minute betragen",
+      "silenceRequired": "Stillezeitraum ist erforderlich",
+      "silenceNonNegative": "Stillezeitraum darf nicht negativ sein",
+      "targetsRequired": "Wählen Sie mindestens ein Ziel oder einen Workflow aus",
+      "criticalRequired": "Schwellenwert ist erforderlich",
+      "criticalPositive": "Schwellenwert muss größer als 0 sein",
+      "budgetRange": "Budgetverbrauch muss 100 % oder weniger betragen",
+      "longWindowRequired": "Langes Zeitfenster ist erforderlich",
+      "shortWindowRequired": "Kurzes Zeitfenster ist erforderlich",
+      "shortInsideLong": "Das kurze Zeitfenster muss kürzer sein als das lange Zeitfenster"
+    },
+    "duration": {
+      "seconds": "{count} Sekunde | {count} Sekunden",
+      "minutes": "{count} Minute | {count} Minuten",
+      "hours": "{count} Stunde | {count} Stunden",
+      "days": "{count} Tag | {count} Tage"
     }
   },
   "promql": {
@@ -15927,6 +16020,12 @@
     "aiQueueDetail": "Warteschlange",
     "aiQueueReview": "Warteschlangen-Überprüfung",
     "aiDatasetDetail": "Datensatz",
+    "aiExperimentCreate": "Neues Experiment",
+    "aiExperimentCompare": "Experimente vergleichen",
+    "aiExperimentDetail": "Experiment",
+    "aiRemoteTaskCreate": "Neue Remote-Aufgabe",
+    "aiRemoteTaskEdit": "Remote-Aufgabe bearbeiten",
+    "aiRemoteTaskDetail": "Remote-Aufgabe",
     "notFound": "404 - Nicht gefunden",
     "createReport": "Bericht erstellen",
     "addCheck": "Prüfung hinzufügen",

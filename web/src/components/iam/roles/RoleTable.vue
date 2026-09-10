@@ -17,6 +17,7 @@ const { t } = useI18nTyped();
 const props = defineProps<{
   data: any[];
   loading?: boolean;
+  forbidden?: boolean;
   actionLoading?: boolean;
   selectedIds?: string[];
   globalFilter?: string;
@@ -95,6 +96,7 @@ const isUnusedRole = (row: any): boolean => row?.user_count === 0;
     :data="data"
     :columns="columns"
     :loading="loading"
+    :forbidden="forbidden"
     :selected-ids="selectedIds"
     :global-filter="globalFilter"
     :show-global-filter="false"

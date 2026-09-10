@@ -76,6 +76,10 @@
       "action": "Esegui interrogazione",
       "actionDesc": "Carica eventi per i filtri selezionati"
     },
+    "noAccess": {
+      "title": "Non hai accesso",
+      "description": "Contatta il tuo amministratore se ritieni di dover avere accesso."
+    },
     "noDashboards": {
       "title": "Crea la tua prima dashboard",
       "description": "Le dashboard riuniscono metriche, log e tracce in un'unica vista. Creane una per iniziare.",
@@ -885,7 +889,7 @@
     "queryFailed": "Query non riuscita",
     "unknownError": "Errore sconosciuto",
     "selectedLabel": "selezionati",
-    "selectToFilter": "Seleziona per filtrare",
+    "selectToFilter": "Seleziona filtro",
     "clearSelection": "Cancella selezione",
     "includeModeHint": "Modalità di inclusione (=)",
     "excludeModeHint": "Modalità di esclusione (≠)",
@@ -6314,7 +6318,7 @@
       "frequencyPositiveNumber": "Avviso - {index}: la frequenza deve essere un numero positivo maggiore di 0 e deve essere un numero.",
       "cronExpressionString": "Avviso - {index}: l'espressione cron deve essere una stringa.",
       "thresholdPositiveNumber": "Avviso - {index}: la soglia deve essere un numero positivo maggiore di 0 e deve essere un numero.",
-      "silenceNonNegativeNumber": "Avviso - {index}: il silenzio deve essere un numero positivo maggiore o uguale a 0 e deve essere un numero.",
+      "silenceNonNegativeNumber": "Avviso - {index}: il periodo di raffreddamento deve essere maggiore o uguale a 0 e deve essere un numero.",
       "frequencyTypeInvalid": "Avviso - {index}: il tipo di frequenza deve essere 'minutes' o 'cron' e deve essere una stringa.",
       "cronExpressionInvalid": "Avviso - {index}: l'espressione cron deve essere un'espressione cron valida."
     },
@@ -6524,7 +6528,7 @@
       "nameInvalidChars": "Caratteri come :, ?, /, # e gli spazi non sono consentiti.",
       "templateRequired": "Il modello è obbligatorio!",
       "validEmails": "Aggiungi email valide!",
-      "silenceNonNegative": "Il silenziamento delle notifiche deve essere maggiore o uguale a 0",
+      "silenceNonNegative": "Il periodo di raffreddamento deve essere maggiore o uguale a 0.",
       "pendingPeriodNonNegative": "Il periodo di attesa deve essere maggiore o uguale a 0",
       "periodPositive": "Il periodo deve essere maggiore di 0",
       "destinationRequired": "È richiesta almeno una destinazione.",
@@ -9794,6 +9798,8 @@
       "outputTokens": "Token output",
       "out": "Out",
       "totalCost": "Costo totale",
+      "scores": "Punteggi",
+      "notScoredYet": "Non ancora valutato",
       "preview": "Anteprima",
       "input": "Input",
       "output": "Output",
@@ -10793,7 +10799,8 @@
         "scoreConfigs": "Configurazioni punteggio",
         "targetDataset": "Dataset di destinazione",
         "progress": "Avanzamento",
-        "updated": "Aggiornato"
+        "updated": "Aggiornato",
+        "actions": "Azioni"
       },
       "create": {
         "title": "Nuova coda",
@@ -10847,7 +10854,8 @@
           "refType": "Rif.",
           "refId": "Riferimento",
           "added": "Aggiunto",
-          "status": "Stato"
+          "status": "Stato",
+          "actions": "Azioni"
         },
         "status": {
           "pending": "In attesa",
@@ -10959,6 +10967,8 @@
       "viewAll": "Visualizza esperimenti",
       "baseline": "Baseline",
       "setBaseline": "Imposta baseline",
+      "baselineRequiresCompleted": "Solo un'esecuzione completata può essere impostata come baseline.",
+      "baselineError": "Impossibile aggiornare la baseline.",
       "selectForComparison": "Seleziona per il confronto",
       "progress": "{done} di {total} slot",
       "noScores": "Nessun punteggio aggregato",
@@ -11069,8 +11079,10 @@
       "addToDataset": "Aggiungi",
       "detail": {
         "by": "da {user}",
-        "p50Latency": "Latenza P50",
+        "p50Latency": "Latenza P50 delle attività.",
         "totalCost": "Costo totale",
+        "costBreakdown": "Attività {task} · Valutazione {scoring}",
+        "partialCostBreakdown": "Attività {task} · Valutazione {scoring} · Parziale",
         "highDispersion": "Casi ad alta dispersione",
         "highDispersionHint": "Righe in cui le prove differiscono",
         "scoredRows": "{scored}/{total} righe valutate",
@@ -11100,8 +11112,12 @@
           "run": "Esecuzione"
         },
         "runSummary": "{trials} · {scorers}",
-        "progress": "Avanzamento",
+        "progress": "Avanzamento delle attività",
         "scoring": "Valutazione",
+        "tasks": "Attività",
+        "scores": "Punteggi",
+        "taskDistribution": "{succeeded} riuscite · {failed} fallite · {pending} in sospeso · {skipped} saltate",
+        "scoreOutcomeDistribution": "{scored} valutati · {failed} falliti · {pending} in sospeso · {skipped} saltati · {unscored} non valutati",
         "scoringDistribution": "{success} riusciti · {failed} falliti · {pending} in sospeso · {skipped} saltati",
         "compare": "Confronta",
         "comparePicker": {
@@ -11193,6 +11209,16 @@
           "typeCategorical": "Categorico",
           "typeBoolean": "Booleano",
           "threshold": "Soglia",
+          "thresholdTooltip": "I valori della baseline e del candidato che si discostano tra loro al massimo del {percent} sono considerati invariati, non regrediti né migliorati.",
+          "outcomeDimensions": "Criteri di esito",
+          "outcomeTooltipNone": "Nessuna colonna è selezionata: ogni riga confrontabile verrà mostrata come Non confrontata.",
+          "outcomeTooltipAll": "Tutte le colonne idonee determinano l'esito di ogni riga.",
+          "outcomeTooltipPartial": "Solo {names} determinano l'esito di ogni riga. Le altre colonne sono mostrate ma non lo influenzano.",
+          "allOutcomeDimensions": "Tutte le colonne idonee",
+          "noOutcomeDimensions": "Nessuna colonna",
+          "selectedOutcomeDimensions": "{count} colonna | {count} colonne",
+          "outcomeDimensionUnavailable": "{name} (nessuna regola di confronto)",
+          "dimensionExcludedHint": "Questa colonna è esclusa dagli esiti. Selezionala in Criteri di esito per includerla.",
           "measurePerRow": "Media per riga, su tutte le prove",
           "dimensionImproved": "{count} riga migliorata | {count} righe migliorate",
           "dimensionUnchanged": "{count} riga invariata | {count} righe invariate",
@@ -11274,8 +11300,8 @@
         },
         "searchPlaceholder": "Cerca elementi...",
         "csvImport": {
-          "button": "Carica CSV",
-          "title": "Carica elementi del dataset",
+          "button": "Importa elementi",
+          "title": "Importa elementi del dataset",
           "description": "Importa elementi del dataset da un file CSV.",
           "fileLabel": "File CSV",
           "placeholder": "Scegli un file CSV",
@@ -11835,6 +11861,8 @@
       "schemaInvalidJson": "Lo schema deve essere JSON valido.",
       "schemaIgnored": "Schema · Ignorato da questo provider",
       "schemaUnsupported": "Questo provider non ha un campo per l'output strutturato. Lo schema viene mantenuto in questa colonna, ma non viene inviato e il modello risponde con testo semplice.",
+      "schemaApproximated": "Schema · Approssimato da questo provider",
+      "schemaApproximatedHelp": "Questo provider supporta solo la modalità JSON, non uno schema JSON. La richiesta viene inviata in modalità JSON con lo schema ripetuto nel prompt, quindi la risposta è JSON ma la sua struttura non è garantita.",
       "outputPlaceholder": "L'output appare qui — premi Esegui.",
       "outputNotRun": "Non eseguito",
       "retry": "Riprova",
@@ -11938,6 +11966,12 @@
   },
   "onlineEvals": {
     "versionPrefix": "v",
+    "traceScoreChip": {
+      "reasoning": "Perché",
+      "scoredAt": "Valutato {time}",
+      "moreCount": "+{count} altri",
+      "allScores": "Tutti i punteggi ({count})"
+    },
     "importNameRequired": "Nome *",
     "importNewNameRequired": "Nuovo nome *",
     "importDataTypeRequired": "Tipo di dati *",
@@ -12187,7 +12221,8 @@
       "remove": "Rimuovi",
       "save": "Salva",
       "saveAsDraft": "Salva come bozza",
-      "createAndActivate": "Salva e attiva"
+      "createAndActivate": "Salva e attiva",
+      "testConnection": "Verifica connessione"
     },
     "scorerTypeDialog": {
       "title": "Crea un nuovo segnapunti",
@@ -12207,21 +12242,26 @@
       "sectionTitle": "Fornitore",
       "nameLabel": "Nome",
       "typeLabel": "Tipo di fornitore",
-      "endpointLabel": "Endpoint",
-      "endpointPlaceholder": "URL completo delle completions, ad es. https://your-host/v1/chat/completions",
+      "endpointLabel": "URL di base",
+      "endpointPlaceholder": "URL di base, es. https://your-host/v1",
+      "endpointHelpDefault": "Lascia vuoto per usare l'URL predefinito: {url}",
+      "endpointHelpRequired": "Obbligatorio — questo provider non ha un URL di base predefinito.",
       "defaultModelLabel": "Modello predefinito",
       "availableModelsLabel": "Modelli disponibili",
       "apiKeyLabel": "Chiave API",
       "apiKeyPlaceholder": "Inserisci la chiave API",
-      "apiKeyHelp": "Memorizzata cifrata a riposo e mai riletta. Lascia vuoto durante la modifica per mantenere la chiave esistente.",
+      "apiKeyHelp": "Memorizzata crittografata a riposo e mai riletta. Lasciare vuoto quando si salvano le modifiche per mantenere la chiave esistente.",
       "authSection": "Autenticazione",
-      "authEditNote": "Le credenziali non possono essere rilette. Reinserisci la chiave API solo se vuoi ruotarla.",
+      "authEditNote": "Le credenziali non possono essere rilette. Per verificare un provider che richiede autenticazione, inserire la sua chiave API.",
       "cannotRename": "Non può essere rinominato dopo la creazione.",
-      "availableModelsHelp": "Facoltativo. Elenco di modelli disponibili su questo provider, separati da virgola.",
       "saveError": "Impossibile salvare il provider",
       "nameRequired": "Provider name is required",
       "typeRequired": "Provider type is required",
-      "defaultModelRequired": "Default model is required"
+      "defaultModelRequired": "Default model is required",
+      "testRunning": "Verifica della connessione in corso...",
+      "testPassed": "Connesso",
+      "testFailed": "Connessione non riuscita",
+      "testError": "Impossibile verificare la connessione."
     },
     "scoreConfig": {
       "gteSymbol": "≥",
@@ -12320,7 +12360,8 @@
         "nameRequired": "Name is required",
         "nameFormat": "Use lowercase letters, numbers, and underscores only",
         "minRequired": "Min is required",
-        "maxRequired": "Max is required"
+        "maxRequired": "Max is required",
+        "maxNotGreaterThanMin": "Il massimo deve essere maggiore del minimo."
       },
       "import": {
         "title": "Importa configurazione punteggio",
@@ -12891,7 +12932,7 @@
     },
     "empty": {
       "title": "Non ci sono ancora fornitori di LLM",
-      "description": "I provider LLM memorizzano i dettagli di connessione (endpoint + credenziali) per i modelli linguistici chiamati dai valutatori LLM Judge. Aggiungine uno per iniziare a eseguire valutazioni basate sui giudizi."
+      "description": "I provider LLM memorizzano i dettagli di connessione (URL di base + credenziali) per i modelli linguistici chiamati dai tuoi valutatori LLM Judge. Aggiungine uno per iniziare a eseguire valutazioni basate su LLM Judge."
     }
   },
   "logs": {
@@ -15696,7 +15737,6 @@
       "reservation": "Riserva",
       "sliType": "Tipo SLI",
       "owner": "Proprietario",
-      "folder": "Cartella",
       "streamPlaceholder": "Seleziona uno stream"
     },
     "empty": {
@@ -15726,7 +15766,24 @@
       "sourceHint": "La disponibilità è la frazione di tempo misurato in cui questo avviso non era attivo. Il tempo in cui non è stato valutato — in pausa, silenziato o in errore — non è misurato e non viene mai conteggiato come disponibilità.",
       "loadFailed": "Impossibile caricare gli avvisi idonei",
       "noneEligible": "Nessun avviso in questa organizzazione può ancora essere usato come sorgente.",
-      "ineligibleOption": "{name} — {reason}",
+      "ineligible": {
+        "notScheduled": "Non pianificato",
+        "grouped": "Raggruppato",
+        "notReferenceable": "Non utilizzabile",
+        "cron": "Pianificazione cron",
+        "tooInfrequent": "Eseguito troppo di rado",
+        "silenced": "Ha un silenziamento",
+        "other": "Non idoneo",
+        "why": {
+          "notScheduled": "Gli avvisi in tempo reale non conservano la cronologia delle esecuzioni di cui uno SLO ha bisogno. Usa invece un avviso pianificato.",
+          "grouped": "Questo avviso è suddiviso per gruppo e un'esecuzione non registra quali gruppi ha controllato. Rimuovi il suo raggruppamento per usarlo qui.",
+          "notReferenceable": "Gli avvisi SLO e quelli compositi non possono essere usati come fonte. Scegli un normale avviso pianificato.",
+          "cron": "Questo avviso viene eseguito con una pianificazione cron, quindi i suoi controlli non sono a intervalli regolari e non è possibile calcolare l'uptime. Impostalo su un intervallo fisso.",
+          "tooInfrequent": "Questo avviso viene eseguito ogni {frequency}. Deve essere eseguito almeno ogni {slice} affinché nessun intervallo di tempo rimanga senza controllo.",
+          "silenced": "Dopo l'attivazione, questo avviso smette di controllare per un po' — e quella pausa cade sempre in un brutto periodo, il che gonfierebbe lo SLO. Imposta il periodo di silenziamento a 0."
+        },
+        "noFixedInterval": "nessun intervallo fisso"
+      },
       "groupingLocked": "Uno SLI basato su avvisi non può essere raggruppato: il registro di disponibilità registra una esecuzione per avviso, non per gruppo, quindi non esiste una copertura per gruppo su cui basarsi.",
       "sourceLink": "Avviso sorgente",
       "preview": {
@@ -15834,6 +15891,42 @@
       "editTargetMissing": "Questo avviso non è più su questo SLO.",
       "describeBurn": "Tasso di consumo > {critical} su {long} e {short}",
       "describeBudget": "Budget errori consumato > {critical}%"
+    },
+    "validation": {
+      "nameRequired": "Il nome dello SLO è obbligatorio.",
+      "nameTooLong": "Il nome dello SLO deve contenere al massimo 256 caratteri.",
+      "targetRequired": "L'obiettivo è obbligatorio.",
+      "targetRange": "L'obiettivo deve essere maggiore di 0 e inferiore a 100.",
+      "targetPrecision": "L'obiettivo supporta al massimo 3 cifre decimali.",
+      "streamTypeRequired": "Il tipo di stream è obbligatorio.",
+      "streamRequired": "Lo stream è obbligatorio.",
+      "goodExprRequired": "\"Buono quando\" è obbligatorio.",
+      "promqlGoodRequired": "La query per gli eventi buoni è obbligatoria.",
+      "promqlTotalRequired": "La query totale è obbligatoria",
+      "aggregateRequired": "L'espressione di aggregazione è obbligatoria",
+      "comparatorRequired": "L'operatore di confronto è obbligatorio",
+      "thresholdRequired": "La soglia è obbligatoria",
+      "thresholdNumber": "La soglia deve essere un numero",
+      "alertSourceRequired": "L'avviso di origine è obbligatorio",
+      "groupedSlice": "Gli SLO raggruppati devono usare un intervallo di 5 minuti",
+      "alertCannotGroup": "Un SLI basato su avvisi non può essere raggruppato",
+      "frequencyRequired": "La frequenza è obbligatoria",
+      "frequencyPositive": "La frequenza deve essere di almeno 1 minuto",
+      "silenceRequired": "Il periodo di silenzio è obbligatorio",
+      "silenceNonNegative": "Il periodo di silenzio non può essere negativo",
+      "targetsRequired": "Seleziona almeno una destinazione o un workflow",
+      "criticalRequired": "La soglia è obbligatoria",
+      "criticalPositive": "La soglia deve essere maggiore di 0",
+      "budgetRange": "Il budget consumato deve essere pari o inferiore al 100%",
+      "longWindowRequired": "La finestra lunga è obbligatoria",
+      "shortWindowRequired": "La finestra breve è obbligatoria",
+      "shortInsideLong": "La finestra breve deve essere più corta della finestra lunga"
+    },
+    "duration": {
+      "seconds": "{count} secondo | {count} secondi",
+      "minutes": "{count} minuto | {count} minuti",
+      "hours": "{count} ora | {count} ore",
+      "days": "{count} giorno | {count} giorni"
     }
   },
   "promql": {
@@ -15927,6 +16020,12 @@
     "aiQueueDetail": "Coda",
     "aiQueueReview": "Revisione Coda",
     "aiDatasetDetail": "Dataset",
+    "aiExperimentCreate": "Nuovo esperimento",
+    "aiExperimentCompare": "Confronta esperimenti",
+    "aiExperimentDetail": "Esperimento",
+    "aiRemoteTaskCreate": "Nuova attività remota",
+    "aiRemoteTaskEdit": "Modifica attività remota",
+    "aiRemoteTaskDetail": "Attività remota",
     "notFound": "404 - Non Trovato",
     "createReport": "Crea Report",
     "addCheck": "Aggiungi Controllo",

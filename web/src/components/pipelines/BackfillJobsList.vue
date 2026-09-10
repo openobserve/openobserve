@@ -79,6 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           table-id="pipelines-backfill-jobs-list"
           row-key="job_id"
           :loading="loading"
+          :forbidden="forbidden"
           pagination="client"
           :page-size="selectedPerPage"
           :page-size-options="perPageOptionsList"
@@ -408,6 +409,7 @@ const { t } = useI18nTyped();
 const qTableRef = ref();
 
 const loading = ref(false);
+const forbidden = ref(false);
 const jobs = ref<BackfillJob[]>([]);
 const showDetailsDialog = ref(false);
 const selectedJobId = ref("");
@@ -505,6 +507,7 @@ onMounted(() => {
 
 const loadJobs = async () => {
   loading.value = true;
+  forbidden.value = false;
 
   try {
     const response = await backfillService.listBackfillJobs({
@@ -514,10 +517,14 @@ const loadJobs = async () => {
     loadPipelineOptions();
   } catch (error: any) {
     console.error("Error loading backfill jobs:", error);
-    toast({
-      variant: "error",
-      message: t("toastMessages.pipelines.failedToLoadBackfillJobs"),
-    });
+    forbidden.value = error?.response?.status === 403;
+    // The grouped access toast already reports a 403; a second red toast adds nothing.
+    if (!forbidden.value) {
+      toast({
+        variant: "error",
+        message: t("toastMessages.pipelines.failedToLoadBackfillJobs"),
+      });
+    }
   } finally {
     loading.value = false;
   }

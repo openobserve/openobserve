@@ -91,6 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :columns="columns"
           row-key="id"
           :loading="loading"
+          :forbidden="forbidden"
           :selected-ids="selectedIds"
           selection="multiple"
           pagination="client"
@@ -671,6 +672,7 @@ const router = useRouter();
 const qTableRef = ref<any>(null);
 const models = ref<any[]>([]);
 const loading = ref(true);
+const forbidden = ref(false);
 const refreshing = ref(false);
 
 const showPricingDialog = ref(false);
@@ -933,10 +935,12 @@ function notifyError(prefix: string, e: any) {
 
 async function fetchModels() {
   loading.value = true;
+  forbidden.value = false;
   try {
     const res = await modelPricingService.list(orgIdentifier.value);
     models.value = res.data || [];
   } catch (e: any) {
+    forbidden.value = e?.response?.status === 403;
     notifyError(t("modelPricing.errLoadModels"), e);
   } finally {
     loading.value = false;

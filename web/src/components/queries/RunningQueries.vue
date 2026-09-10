@@ -85,6 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <RunningQueriesList
               :rows="rowsQuery"
+              :forbidden="forbidden"
               :filtered="!!filterQuery"
               :last-refreshed="lastRefreshed"
               :search-type="selectedSearchType"
@@ -106,6 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <SummaryList
               :rows="summaryRows"
+              :forbidden="forbidden"
               :filtered="!!filterQuery"
               :last-refreshed="lastRefreshed"
               v-model:selectedRows="selectedRow['summary']"
@@ -303,6 +305,7 @@ export default defineComponent({
     };
 
     const loadingState = ref(false);
+    const forbidden = ref(false);
     const queries = ref([]);
 
     const deleteDialog = ref({
@@ -605,10 +608,14 @@ export default defineComponent({
           runningQueriesSummary.value = getRunningQueriesSummary();
         })
         .catch((error: any) => {
-          toast({
-            message: error.response?.data?.message || t("queries.fetchRunningQueriesFailed"),
-            variant: "error",
-          });
+          forbidden.value = error?.response?.status === 403;
+          // The grouped access toast already reports a 403; a second red toast adds nothing.
+          if (!forbidden.value) {
+            toast({
+              message: error.response?.data?.message || t("queries.fetchRunningQueriesFailed"),
+              variant: "error",
+            });
+          }
         })
         .finally(() => {
           dismiss();
@@ -773,6 +780,7 @@ export default defineComponent({
       cancel: "cancel",
       schemaData,
       loadingState,
+      forbidden,
       refreshData,
       lastRefreshed,
       isMetaOrg,

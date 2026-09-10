@@ -76,6 +76,10 @@
       "action": "运行查询",
       "actionDesc": "加载所选过滤器的事件"
     },
+    "noAccess": {
+      "title": "您没有访问权限",
+      "description": "如果您认为自己应有访问权限，请联系您的管理员。"
+    },
     "noDashboards": {
       "title": "创建您的第一个仪表板",
       "description": "仪表盘将指标、日志和追踪汇总到一个视图中。创建一个即可开始使用。",
@@ -885,7 +889,7 @@
     "queryFailed": "查询失败",
     "unknownError": "未知错误",
     "selectedLabel": "已选择",
-    "selectToFilter": "选择以筛选",
+    "selectToFilter": "选择过滤器",
     "clearSelection": "清除选择",
     "includeModeHint": "包含模式 (=)",
     "excludeModeHint": "排除模式 (≠)",
@@ -6314,7 +6318,7 @@
       "frequencyPositiveNumber": "告警 - {index}：频率应为大于 0 的正数，并且应为数字。",
       "cronExpressionString": "告警 - {index}：Cron 表达式应为字符串。",
       "thresholdPositiveNumber": "告警 - {index}：阈值应为大于 0 的正数，并且应为数字。",
-      "silenceNonNegativeNumber": "告警 - {index}：静默时间应为大于或等于 0 的数字，并且应为数字。",
+      "silenceNonNegativeNumber": "告警 - {index}：冷却期应大于等于 0，且必须为数字。",
       "frequencyTypeInvalid": "告警 - {index}：频率类型必须为 'minutes' 或 'cron'，并且应为字符串。",
       "cronExpressionInvalid": "告警 - {index}：Cron 表达式应为有效的 cron 表达式。"
     },
@@ -6524,7 +6528,7 @@
       "nameInvalidChars": "不允许使用 :, ?, /, # 和空格等字符。",
       "templateRequired": "模板为必填项！",
       "validEmails": "请添加有效的电子邮件！",
-      "silenceNonNegative": "通知静默应大于或等于 0",
+      "silenceNonNegative": "冷却期应大于等于 0",
       "pendingPeriodNonNegative": "等待时长应大于或等于 0",
       "periodPositive": "周期应大于 0",
       "destinationRequired": "至少需要一个目标。",
@@ -9794,6 +9798,8 @@
       "outputTokens": "输出令牌",
       "out": "出",
       "totalCost": "总成本",
+      "scores": "评分",
+      "notScoredYet": "尚未评分",
       "preview": "预览",
       "input": "输入",
       "output": "输出",
@@ -10793,7 +10799,8 @@
         "scoreConfigs": "评分配置",
         "targetDataset": "目标数据集",
         "progress": "进度",
-        "updated": "已更新"
+        "updated": "已更新",
+        "actions": "操作"
       },
       "create": {
         "title": "新建队列",
@@ -10847,7 +10854,8 @@
           "refType": "参考",
           "refId": "参考",
           "added": "已添加",
-          "status": "状态"
+          "status": "状态",
+          "actions": "操作"
         },
         "status": {
           "pending": "待审",
@@ -10959,6 +10967,8 @@
       "viewAll": "查看实验",
       "baseline": "基线",
       "setBaseline": "设置基线",
+      "baselineRequiresCompleted": "只有已完成的运行才能设置为基线",
+      "baselineError": "更新基线失败",
       "selectForComparison": "选择以进行比较",
       "progress": "{done}/{total} 个槽位",
       "noScores": "无汇总分数",
@@ -11069,8 +11079,10 @@
       "addToDataset": "添加",
       "detail": {
         "by": "由 {user}",
-        "p50Latency": "P50 延迟",
+        "p50Latency": "P50 任务延迟",
         "totalCost": "总成本",
+        "costBreakdown": "任务 {task} · 评分 {scoring}",
+        "partialCostBreakdown": "任务 {task} · 评分 {scoring} · 部分",
         "highDispersion": "高离散案例",
         "highDispersionHint": "试验结果不一致的行",
         "scoredRows": "已评分 {scored}/{total} 行",
@@ -11100,8 +11112,12 @@
           "run": "运行"
         },
         "runSummary": "{trials} · {scorers}",
-        "progress": "进度",
+        "progress": "任务进度",
         "scoring": "评分",
+        "tasks": "任务",
+        "scores": "评分",
+        "taskDistribution": "{succeeded} 成功 · {failed} 失败 · {pending} 等待中 · {skipped} 已跳过",
+        "scoreOutcomeDistribution": "{scored} 已评分 · {failed} 失败 · {pending} 等待中 · {skipped} 已跳过 · {unscored} 未评分",
         "scoringDistribution": "{success} 成功 · {failed} 失败 · {pending} 待处理 · {skipped} 跳过",
         "compare": "比较",
         "comparePicker": {
@@ -11193,6 +11209,16 @@
           "typeCategorical": "分类",
           "typeBoolean": "布尔",
           "threshold": "阈值",
+          "thresholdTooltip": "当基线和候选值彼此相差在 {percent} 以内时，视为未变化，而非退化或改进。",
+          "outcomeDimensions": "结果条件",
+          "outcomeTooltipNone": "未选择任何列 — 每个可比较的行都会显示为“未比较”。",
+          "outcomeTooltipAll": "所有符合条件的列决定每一行的结果。",
+          "outcomeTooltipPartial": "只有 {names} 决定每一行的结果。其他列会显示，但不影响结果。",
+          "allOutcomeDimensions": "所有符合条件的列",
+          "noOutcomeDimensions": "无列",
+          "selectedOutcomeDimensions": "{count} 列 | {count} 列",
+          "outcomeDimensionUnavailable": "{name}（无比较策略）",
+          "dimensionExcludedHint": "此列不参与结果判定。请在“结果条件”中选择它，以将其纳入。",
           "measurePerRow": "跨试验的每行均值",
           "dimensionImproved": "{count} 行改进 | {count} 行改进",
           "dimensionUnchanged": "{count} 行无变化 | {count} 行无变化",
@@ -11274,8 +11300,8 @@
         },
         "searchPlaceholder": "搜索条目...",
         "csvImport": {
-          "button": "上传 CSV",
-          "title": "上传数据集条目",
+          "button": "导入条目",
+          "title": "导入数据集条目",
           "description": "从 CSV 文件导入数据集条目。",
           "fileLabel": "CSV 文件",
           "placeholder": "选择 CSV 文件",
@@ -11835,6 +11861,8 @@
       "schemaInvalidJson": "模式必须是有效的 JSON。",
       "schemaIgnored": "模式 · 此提供商已忽略",
       "schemaUnsupported": "此提供商没有结构化输出字段。模式会保留在此列中，但不会发送，模型将以纯文本回答。",
+      "schemaApproximated": "Schema · 由该提供方近似生成",
+      "schemaApproximatedHelp": "此提供方仅支持 JSON 模式，不支持 JSON Schema。请求以 JSON 模式发送，并在提示中重述了 Schema，因此返回内容是 JSON，但其结构无法保证。",
       "outputPlaceholder": "输出将显示在此处 — 点击运行。",
       "outputNotRun": "未运行",
       "retry": "重试",
@@ -11938,6 +11966,12 @@
   },
   "onlineEvals": {
     "versionPrefix": "v",
+    "traceScoreChip": {
+      "reasoning": "为什么",
+      "scoredAt": "评分于 {time}",
+      "moreCount": "+{count} 更多",
+      "allScores": "所有评分 ({count})"
+    },
     "importNameRequired": "名称 *",
     "importNewNameRequired": "新名称 *",
     "importDataTypeRequired": "数据类型 *",
@@ -12187,7 +12221,8 @@
       "remove": "移除",
       "save": "保存",
       "saveAsDraft": "保存为草稿",
-      "createAndActivate": "保存并激活"
+      "createAndActivate": "保存并激活",
+      "testConnection": "测试连接"
     },
     "scorerTypeDialog": {
       "title": "创建新的评分器",
@@ -12207,21 +12242,26 @@
       "sectionTitle": "提供商",
       "nameLabel": "姓名",
       "typeLabel": "提供商类型",
-      "endpointLabel": "端点",
-      "endpointPlaceholder": "完整的 completions URL，例如 https://your-host/v1/chat/completions",
+      "endpointLabel": "基础 URL",
+      "endpointPlaceholder": "基础 URL，例如 https://your-host/v1",
+      "endpointHelpDefault": "留空则使用默认值：{url}",
+      "endpointHelpRequired": "必填 — 此提供方没有默认的基础 URL。",
       "defaultModelLabel": "默认模型",
       "availableModelsLabel": "可用模型",
       "apiKeyLabel": "API 密钥",
       "apiKeyPlaceholder": "输入 API 密钥",
-      "apiKeyHelp": "在静态时加密存储且永不回读。编辑时留空可保留现有密钥。",
+      "apiKeyHelp": "该密钥静态加密存储且不会回读。保存修改时请留空，以保留现有密钥。",
       "authSection": "身份验证",
-      "authEditNote": "凭据无法回读。仅当您想轮换 API 密钥时才重新输入。",
+      "authEditNote": "凭据无法回读。若要测试需要身份验证的提供方，请输入其 API 密钥。",
       "cannotRename": "创建后无法重命名。",
-      "availableModelsHelp": "可选。此提供商上可用模型的逗号分隔列表。",
       "saveError": "无法保存提供商",
       "nameRequired": "Provider name is required",
       "typeRequired": "Provider type is required",
-      "defaultModelRequired": "Default model is required"
+      "defaultModelRequired": "Default model is required",
+      "testRunning": "正在测试连接...",
+      "testPassed": "已连接",
+      "testFailed": "连接失败",
+      "testError": "测试连接失败"
     },
     "scoreConfig": {
       "gteSymbol": "≥",
@@ -12320,7 +12360,8 @@
         "nameRequired": "Name is required",
         "nameFormat": "Use lowercase letters, numbers, and underscores only",
         "minRequired": "Min is required",
-        "maxRequired": "Max is required"
+        "maxRequired": "Max is required",
+        "maxNotGreaterThanMin": "最大值必须大于最小值"
       },
       "import": {
         "title": "导入评分配置",
@@ -12891,7 +12932,7 @@
     },
     "empty": {
       "title": "还没有 LLM 提供商",
-      "description": "LLM 提供商存储 LLM 评判器所调用语言模型的连接信息（端点和凭据）。添加提供商后即可运行基于评判器的评估。"
+      "description": "LLM 提供方存储 LLM Judge 评分器所调用语言模型的连接详情（基础 URL + 凭据）。添加一个即可开始运行基于 LLM Judge 的评估。"
     }
   },
   "logs": {
@@ -15696,7 +15737,6 @@
       "reservation": "预留",
       "sliType": "SLI 类型",
       "owner": "所有者",
-      "folder": "文件夹",
       "streamPlaceholder": "选择数据流"
     },
     "empty": {
@@ -15726,7 +15766,24 @@
       "sourceHint": "正常运行时间是指此告警未触发的那部分已测量时间所占的比例。它未评估的时间——暂停、静默或失败——属于未测量时间，不计入正常运行时间。",
       "loadFailed": "无法加载符合条件的告警",
       "noneEligible": "此组织中还没有可用作源的告警。",
-      "ineligibleOption": "{name} — {reason}",
+      "ineligible": {
+        "notScheduled": "未定时",
+        "grouped": "分组",
+        "notReferenceable": "不可用",
+        "cron": "Cron 计划",
+        "tooInfrequent": "运行频率过低",
+        "silenced": "有静默期",
+        "other": "不符合条件",
+        "why": {
+          "notScheduled": "实时告警不会保留 SLO 所需的运行历史。请改用定时告警。",
+          "grouped": "此告警按组拆分，而一次运行不会记录它检查了哪些组。请移除其分组设置后再使用。",
+          "notReferenceable": "SLO 和复合告警不能作为来源。请选择普通的定时告警。",
+          "cron": "此告警按 Cron 计划运行，因此检查间隔不均匀，无法计算可用率。请将其改为固定间隔。",
+          "tooInfrequent": "此告警每 {frequency} 运行一次。它需要至少每 {slice} 运行一次，以避免出现未检查的时间段。",
+          "silenced": "此告警触发后会暂停检查一段时间，而这段空档总会落在故障时段，从而让 SLO 虚高。请将其静默期设置为 0。"
+        },
+        "noFixedInterval": "无固定间隔"
+      },
       "groupingLocked": "基于告警的 SLI 无法分组：可用性账本按告警而非按组记录每次运行，因此没有可依据的按组覆盖率。",
       "sourceLink": "源告警",
       "preview": {
@@ -15834,6 +15891,42 @@
       "editTargetMissing": "该告警已不在此 SLO 上。",
       "describeBurn": "燃烧速率 > {critical} 在 {long} 和 {short} 期间",
       "describeBudget": "错误预算消耗 > {critical}%"
+    },
+    "validation": {
+      "nameRequired": "SLO 名称是必填项",
+      "nameTooLong": "SLO 名称不得超过 256 个字符",
+      "targetRequired": "目标是必填项",
+      "targetRange": "目标必须大于 0 且小于 100",
+      "targetPrecision": "目标最多支持 3 位小数",
+      "streamTypeRequired": "数据流类型是必填项",
+      "streamRequired": "数据流是必填项",
+      "goodExprRequired": "“良好条件”是必填项",
+      "promqlGoodRequired": "良好查询是必填项",
+      "promqlTotalRequired": "总查询为必填项",
+      "aggregateRequired": "聚合表达式为必填项",
+      "comparatorRequired": "比较运算符为必填项",
+      "thresholdRequired": "阈值为必填项",
+      "thresholdNumber": "阈值必须是数字",
+      "alertSourceRequired": "源告警为必填项",
+      "groupedSlice": "分组 SLO 必须使用 5 分钟切片",
+      "alertCannotGroup": "基于告警的 SLI 不能进行分组",
+      "frequencyRequired": "频率为必填项",
+      "frequencyPositive": "频率必须至少为 1 分钟",
+      "silenceRequired": "静默期为必填项",
+      "silenceNonNegative": "静默期不能为负数",
+      "targetsRequired": "请至少选择一个目标或工作流",
+      "criticalRequired": "阈值为必填项",
+      "criticalPositive": "阈值必须大于 0",
+      "budgetRange": "消耗的预算必须小于或等于 100%",
+      "longWindowRequired": "长时间窗口为必填项",
+      "shortWindowRequired": "短时间窗口为必填项",
+      "shortInsideLong": "短时间窗口必须比长时间窗口短"
+    },
+    "duration": {
+      "seconds": "{count} 秒 | {count} 秒",
+      "minutes": "{count} 分钟 | {count} 分钟",
+      "hours": "{count} 小时 | {count} 小时",
+      "days": "{count} 天 | {count} 天"
     }
   },
   "promql": {
@@ -15927,6 +16020,12 @@
     "aiQueueDetail": "队列",
     "aiQueueReview": "队列审核",
     "aiDatasetDetail": "数据集",
+    "aiExperimentCreate": "新建实验",
+    "aiExperimentCompare": "比较实验",
+    "aiExperimentDetail": "实验",
+    "aiRemoteTaskCreate": "新建远程任务",
+    "aiRemoteTaskEdit": "编辑远程任务",
+    "aiRemoteTaskDetail": "远程任务",
     "notFound": "404 - 未找到",
     "createReport": "创建报告",
     "addCheck": "添加检查",

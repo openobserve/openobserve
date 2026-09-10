@@ -26,7 +26,7 @@ use datafusion::error::{DataFusionError, Result};
 use hashbrown::HashSet;
 use promql_parser::parser::{
     AggregateExpr, Call, Expr as PromExpr, MatrixSelector, NumberLiteral, ParenExpr, StringLiteral,
-    UnaryExpr,
+    UnaryExpr, value::ValueType,
 };
 
 use crate::{binaries, exec::PromqlContext, promql::label_usage::labels_dropped_at_root};
@@ -134,15 +134,8 @@ impl Engine {
                 let return_bool = expr.return_bool();
                 let op = expr.op.is_comparison_operator();
 
-                // This is a very special case, as we treat the float also a
-                // `Value::Matrix(vec![element])` therefore, better convert it
-                // back to its representation.
-                let rhs = match rhs {
-                    Value::Matrix(m) if m.len() == 1 && m[0].samples.len() == 1 => {
-                        Value::Float(m[0].samples[0].value)
-                    }
-                    _ => rhs,
-                };
+                let lhs = scalar_operand(lhs, &expr.lhs, &self.eval_ctx);
+                let rhs = scalar_operand(rhs, &expr.rhs, &self.eval_ctx);
                 match (lhs, rhs) {
                     (Value::Float(left), Value::Float(right)) => {
                         let value = binaries::scalar_binary_operations(
@@ -162,6 +155,13 @@ impl Engine {
                     }
                     (Value::Float(left), Value::Matrix(right)) => {
                         binaries::vector_scalar_bin_op(expr, right, left, true).await?
+                    }
+                    // a set operator keeps the other side when one side has no series at all
+                    (Value::None, Value::Matrix(right)) if expr.op.is_set_operator() => {
+                        binaries::vector_bin_op(expr, vec![], right)?
+                    }
+                    (Value::Matrix(left), Value::None) if expr.op.is_set_operator() => {
+                        binaries::vector_bin_op(expr, left, vec![])?
                     }
                     (Value::None, Value::None) => Value::None,
                     _ => {
@@ -201,8 +201,13 @@ impl Engine {
             PromExpr::NumberLiteral(NumberLiteral { val }) => Value::Float(*val),
             PromExpr::StringLiteral(StringLiteral { val }) => Value::String(val.clone()),
             PromExpr::VectorSelector(vs) => {
-                let vs = selector::plain_selector(vs, "VectorSelector")?;
-                let data = self.eval_vector_selector(&vs).await?;
+                let data = match self.try_streaming_instant_selector(vs).await? {
+                    Some(data) => data,
+                    None => {
+                        let vs = selector::plain_selector(vs, "VectorSelector")?;
+                        self.eval_vector_selector(&vs, None).await?
+                    }
+                };
                 if data.is_empty() {
                     Value::None
                 } else {
@@ -225,6 +230,22 @@ impl Engine {
                 )));
             }
         })
+    }
+}
+
+/// Folds a scalar-typed instant operand back into a scalar without broadcasting range samples.
+fn scalar_operand(value: Value, expr: &PromExpr, eval_ctx: &EvalContext) -> Value {
+    // a one-sample vector is not a scalar: it keeps its labels for matching
+    match value {
+        Value::Matrix(m)
+            if eval_ctx.is_instant()
+                && expr.value_type() == ValueType::Scalar
+                && m.len() == 1
+                && m[0].samples.len() == 1 =>
+        {
+            Value::Float(m[0].samples[0].value)
+        }
+        other => other,
     }
 }
 
@@ -635,6 +656,149 @@ pub(crate) mod tests {
         } else {
             panic!("Expected Value::Float");
         }
+    }
+
+    /// Evaluates `query` on the empty mock provider over `steps` one-minute steps.
+    async fn eval_on_empty(query: &str, steps: i64) -> Result<Value> {
+        let trace_id = "test_trace";
+        let ctx = Arc::new(PromqlContext::new(
+            create_test_query_ctx(trace_id, "test_org", 30),
+            SimpleMockProvider,
+            vec![],
+        ));
+        let start = 1640995200000000i64;
+        let eval_ctx = EvalContext::new(
+            start,
+            start + (steps - 1) * 60000000,
+            60000000,
+            trace_id.to_string(),
+        );
+        let expr = promql_parser::parser::parse(query).unwrap();
+        Engine::new(trace_id, ctx, eval_ctx).exec_expr(&expr).await
+    }
+
+    fn matrix(value: Value) -> Vec<RangeValue> {
+        match value {
+            Value::Matrix(series) => series,
+            other => panic!("expected a matrix, got {:?}", other.get_type()),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_set_operators_keep_the_other_side_when_one_is_empty() {
+        // `up` has no data on the mock provider, so the fallback vector must come through
+        for steps in [1, 3] {
+            let series = matrix(eval_on_empty("up or vector(0)", steps).await.unwrap());
+            assert_eq!(series.len(), 1, "{steps} steps");
+            assert_eq!(series[0].samples.len(), steps as usize);
+            assert!(series[0].samples.iter().all(|s| s.value == 0.0));
+        }
+        let series = matrix(eval_on_empty("vector(0) unless up", 3).await.unwrap());
+        assert_eq!(series.len(), 1);
+        assert!(matrix(eval_on_empty("vector(0) and up", 3).await.unwrap()).is_empty());
+
+        // a right side filtered down to one sample must stay a vector for the set operator
+        let sparse = r#"vector(0) or label_replace(timestamp(vector(1)) >= 1640995320, "source", "sparse", "", "")"#;
+        let series = matrix(eval_on_empty(sparse, 3).await.unwrap());
+        assert_eq!(series.len(), 2);
+        assert_eq!(series.iter().map(|s| s.samples.len()).sum::<usize>(), 4);
+    }
+
+    fn single_value(value: Value) -> f64 {
+        match value {
+            Value::Float(f) => f,
+            Value::Matrix(series) if series.len() == 1 && series[0].samples.len() == 1 => {
+                series[0].samples[0].value
+            }
+            other => panic!("expected one value, got {:?}", other.get_type()),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_scalar_typed_operands_fold_on_either_side() {
+        // a one-sample vector keeps label matching: the sum exists at that one step only
+        let series = matrix(
+            eval_on_empty("vector(1) + (timestamp(vector(1)) >= 1640995320)", 3)
+                .await
+                .unwrap(),
+        );
+        assert_eq!(series.len(), 1);
+        assert_eq!(series[0].samples.len(), 1);
+        assert_eq!(series[0].samples[0].value, 1640995321.0);
+
+        // a scalar-typed side folds whichever side it is on, even against a labelled vector
+        let labelled = r#"label_replace(vector(2), "job", "x", "", "")"#;
+        for query in [
+            "vector(1) + scalar(vector(2))".to_string(),
+            format!("scalar(vector(1)) + {labelled}"),
+            format!("sum(scalar(vector(1)) + {labelled})"),
+            format!("{labelled} + scalar(vector(1))"),
+            "scalar(vector(1)) + scalar(vector(2))".to_string(),
+        ] {
+            let value = eval_on_empty(&query, 1).await.unwrap();
+            assert_eq!(single_value(value), 3.0, "{query}");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_sparse_scalar_operands_preserve_timestamps() {
+        for (filter, timestamp) in [
+            ("== 1640995200", 1640995200000000),
+            (">= 1640995320", 1640995320000000),
+        ] {
+            let sparse = format!("scalar(timestamp(vector(1)) {filter})");
+            for query in [
+                format!("{sparse} + vector(1)"),
+                format!("vector(1) + {sparse}"),
+            ] {
+                let series = matrix(eval_on_empty(&query, 3).await.unwrap());
+                assert_eq!(series.len(), 1, "{query}");
+                assert_eq!(series[0].samples.len(), 1, "{query}");
+                assert_eq!(series[0].samples[0].timestamp, timestamp, "{query}");
+                assert_eq!(
+                    series[0].samples[0].value,
+                    timestamp as f64 / 1_000_000.0 + 1.0,
+                    "{query}"
+                );
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_constant_operands_preserve_range_steps() {
+        for query in [
+            "vector(2) + 1",
+            "1 + vector(2)",
+            "scalar(vector(1)) + vector(2)",
+            "vector(2) + scalar(vector(1))",
+        ] {
+            let series = matrix(eval_on_empty(query, 3).await.unwrap());
+            assert_eq!(series.len(), 1, "{query}");
+            let samples = &series[0].samples;
+            assert_eq!(samples.len(), 3, "{query}");
+            for (index, sample) in samples.iter().enumerate() {
+                assert_eq!(
+                    sample.timestamp,
+                    1640995200000000 + index as i64 * 60000000,
+                    "{query}"
+                );
+                assert_eq!(sample.value, 3.0, "{query}");
+            }
+        }
+    }
+
+    #[test]
+    fn test_scalar_operand_keeps_single_step_range_timestamp() {
+        let eval_ctx = EvalContext::new(1_000_000, 1_500_000, 1_000_000, "test".into());
+        assert_eq!(eval_ctx.timestamps(), vec![1_000_000]);
+        let expr = promql_parser::parser::parse("scalar(vector(1))").unwrap();
+        let value = Value::Matrix(vec![RangeValue {
+            samples: vec![Sample::new(1_000_000, 1.0)],
+            ..Default::default()
+        }]);
+        let series = matrix(scalar_operand(value, &expr, &eval_ctx));
+        assert_eq!(series[0].samples[0].timestamp, 1_000_000);
+        assert_eq!(series[0].samples[0].value, 1.0);
     }
 
     #[tokio::test]

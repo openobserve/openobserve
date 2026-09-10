@@ -45,6 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :columns="columns"
         row-key="entityId"
         :loading="loading"
+        :forbidden="forbidden"
         :footer-title="t('aiObservability.remoteTasks.listTitle')"
         :global-filter="search"
         :show-global-filter="false"
@@ -265,6 +266,7 @@ const orgId = computed<string>(() => store.state.selectedOrganization?.identifie
 
 const tasks = ref<RemoteTask[]>([]);
 const loading = ref(false);
+const forbidden = ref(false);
 const search = ref("");
 
 /**
@@ -438,13 +440,18 @@ async function loadReferenceCounts() {
 async function refresh() {
   if (!orgId.value) return;
   loading.value = true;
+  forbidden.value = false;
   try {
     tasks.value = await remoteTasksService.list(orgId.value);
   } catch (error: any) {
-    toast({
-      variant: "error",
-      message: raw(error?.response?.data?.message) || t("aiObservability.remoteTasks.loadError"),
-    });
+    forbidden.value = error?.response?.status === 403;
+    // The grouped access toast already reports a 403; a second red toast adds nothing.
+    if (!forbidden.value) {
+      toast({
+        variant: "error",
+        message: raw(error?.response?.data?.message) || t("aiObservability.remoteTasks.loadError"),
+      });
+    }
   } finally {
     loading.value = false;
   }

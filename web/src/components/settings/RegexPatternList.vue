@@ -61,6 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             table-id="settings-regex-patterns"
             :show-global-filter="false"
             :loading="listLoading"
+            :forbidden="forbidden"
             @update:selected-ids="handleSelectedIdsUpdate"
           >
             <template #toolbar>
@@ -352,6 +353,7 @@ export default defineComponent({
     const resultTotal = ref(0);
 
     const listLoading = ref(false);
+    const forbidden = ref(false);
 
     const showImportRegexPatternDialog = ref(false);
 
@@ -403,6 +405,7 @@ export default defineComponent({
 
     const getRegexPatterns = async () => {
       listLoading.value = true;
+      forbidden.value = false;
       try {
         const response = await regexPatternsService.list(
           store.state.selectedOrganization.identifier,
@@ -415,10 +418,14 @@ export default defineComponent({
         store.dispatch("setRegexPatterns", regexPatterns.value);
         resultTotal.value = regexPatterns.value.length;
       } catch (error: any) {
-        toast({
-          message: error.data.message || t("settings.regexPatternList.errorFetching"),
-          variant: "error",
-        });
+        forbidden.value = error?.response?.status === 403;
+        // The grouped access toast already reports a 403; a second red toast adds nothing.
+        if (!forbidden.value) {
+          toast({
+            message: error.data.message || t("settings.regexPatternList.errorFetching"),
+            variant: "error",
+          });
+        }
       } finally {
         listLoading.value = false;
       }
@@ -592,6 +599,7 @@ export default defineComponent({
       resultTotal,
       createRegexPattern,
       listLoading,
+      forbidden,
       editRegexPattern,
       deleteRegexPattern,
       deleteDialog,

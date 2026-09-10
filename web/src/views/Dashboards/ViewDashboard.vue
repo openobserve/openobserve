@@ -325,6 +325,7 @@ import { useRouter } from "vue-router";
 import { getDashboard, movePanelToAnotherTab, getFoldersList } from "../../utils/commons.ts";
 import { parseDuration, generateDurationLabel, getConsumableRelativeTime } from "../../utils/date";
 import { useRoute } from "vue-router";
+import { useListBackNavigation } from "@/composables/useListBackNavigation";
 import { deletePanel } from "../../utils/commons";
 import {
   getPanelTimeFromURL,
@@ -1192,36 +1193,17 @@ export default defineComponent({
 
     // [END] date picker related variables
 
-    // back button → the dashboards list the user actually came from.
-    //
-    // Prefer real history: a dashboard opened from the Favorites pseudo-folder
-    // carries the folder it *lives in* in the URL, so rebuilding the list route
-    // from route.query.folder would drop the user into that folder instead of
-    // Favorites. Going back restores whichever list view they left.
-    //
-    // Only honour history when the previous entry is the dashboards list itself
-    // (deep links have no previous entry; arriving via add_panel or another
-    // module would send the "Dashboards" button somewhere it doesn't name), and
-    // fall back to the folder-scoped push otherwise. In-view URL syncs use
-    // router.replace, so tab/time-range changes never bury the list entry.
-    const goBackToDashboardList = () => {
-      const back = (router.options?.history?.state as any)?.back;
-      if (typeof back === "string") {
-        // endsWith rather than === so a deployment served under a base path
-        // (getPath() can be "/web/") still matches if the base ever leaks in.
-        const path = back.split(/[?#]/)[0].replace(/\/$/, "");
-        if (path === "/dashboards" || path.endsWith("/dashboards")) {
-          return router.back();
-        }
-      }
-      return router.push({
+    // Fallback-only: a dashboard opened from the Favorites pseudo-folder carries the folder it lives in, so rebuilding from route.query.folder here (rather than Favorites) is only reached when there's no real history to go back to.
+    const goBackToDashboardList = useListBackNavigation({
+      isListPath: (path) => path === "/dashboards" || path.endsWith("/dashboards"),
+      fallback: () => ({
         path: "/dashboards",
         query: {
           folder: route.query.folder ?? "default",
           org_identifier: store.state.selectedOrganization.identifier,
         },
-      });
-    };
+      }),
+    });
 
     //add panel
     const addPanelData = () => {

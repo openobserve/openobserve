@@ -44,6 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :columns="columns"
           row-key="email"
           :loading="loading"
+          :forbidden="forbidden"
           :selected-ids="selectedUserIds"
           v-model:global-filter="filterQuery"
           :show-global-filter="false"
@@ -801,6 +802,7 @@ export default defineComponent({
     };
 
     const loading = ref(false);
+    const forbidden = ref(false);
     const getOrgMembers = () => {
       const dismiss = toast({
         variant: "loading",
@@ -809,6 +811,7 @@ export default defineComponent({
       });
 
       loading.value = true;
+      forbidden.value = false;
       return new Promise((resolve, reject) => {
         usersService
           .orgUsers(store.state.selectedOrganization.identifier)
@@ -923,13 +926,17 @@ export default defineComponent({
           .catch((err: any) => {
             console.error("Failed to fetch org members:", err);
             dismiss();
-            toast({
-              variant: "error",
-              message: t("iam.user.failedToLoadUsers", {
-                error: err?.response?.data?.message || err?.message || t("iam.user.unknownError"),
-              }),
-              timeout: 5000,
-            });
+            forbidden.value = err?.response?.status === 403;
+            // The grouped access toast already reports a 403; a second red toast adds nothing.
+            if (!forbidden.value) {
+              toast({
+                variant: "error",
+                message: t("iam.user.failedToLoadUsers", {
+                  error: err?.response?.data?.message || err?.message || t("iam.user.unknownError"),
+                }),
+                timeout: 5000,
+              });
+            }
             reject(false);
           })
           .finally(() => {
@@ -1458,6 +1465,7 @@ export default defineComponent({
       usersState,
       columns,
       loading,
+      forbidden,
       orgData,
       confirmDelete,
       deleteUser,

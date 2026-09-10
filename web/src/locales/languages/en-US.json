@@ -76,6 +76,10 @@
       "action": "Run query",
       "actionDesc": "Load events for the selected filters"
     },
+    "noAccess": {
+      "title": "You don't have access",
+      "description": "Contact your administrator if you believe you should have access."
+    },
     "noDashboards": {
       "title": "Create your first dashboard",
       "description": "Dashboards bring your metrics, logs, and traces together in one view. Build one to get started.",
@@ -887,7 +891,7 @@
     "queryFailed": "Query failed",
     "unknownError": "Unknown error",
     "selectedLabel": "selected",
-    "selectToFilter": "Select to filter",
+    "selectToFilter": "Select Filter",
     "clearSelection": "Clear selection",
     "includeModeHint": "Include mode (=)",
     "excludeModeHint": "Exclude mode (≠)",
@@ -6318,7 +6322,7 @@
       "frequencyPositiveNumber": "Alert - {index}: Frequency should be a positive number greater than 0 and should be a number.",
       "cronExpressionString": "Alert - {index}: Cron expression should be a string.",
       "thresholdPositiveNumber": "Alert - {index}: Threshold should be a positive number greater than 0 and should be a number.",
-      "silenceNonNegativeNumber": "Alert - {index}: Silence should be a positive number greater than or equal to 0 and should be a number.",
+      "silenceNonNegativeNumber": "Alert - {index}: Cooldown period should be a positive number greater than or equal to 0 and should be a number.",
       "frequencyTypeInvalid": "Alert - {index}: Frequency Type must be 'minutes' or 'cron' and should be a string.",
       "cronExpressionInvalid": "Alert - {index}: Cron expression should be a valid cron expression."
     },
@@ -6528,7 +6532,7 @@
       "nameInvalidChars": "Characters like :, ?, /, #, and spaces are not allowed.",
       "templateRequired": "Template is required!",
       "validEmails": "Add valid emails!",
-      "silenceNonNegative": "Silence notification should be greater than or equal to 0",
+      "silenceNonNegative": "Cooldown period should be greater than or equal to 0",
       "pendingPeriodNonNegative": "Pending period should be greater than or equal to 0",
       "periodPositive": "Period should be greater than 0",
       "destinationRequired": "At least one destination is required.",
@@ -9798,6 +9802,8 @@
       "outputTokens": "Output Tokens",
       "out": "Out",
       "totalCost": "Total Cost",
+      "scores": "Scores",
+      "notScoredYet": "Not scored yet",
       "preview": "Preview",
       "input": "Input",
       "output": "Output",
@@ -11112,6 +11118,10 @@
         "runSummary": "{trials} · {scorers}",
         "progress": "Task Progress",
         "scoring": "Scoring",
+        "tasks": "Tasks",
+        "scores": "Scores",
+        "taskDistribution": "{succeeded} succeeded · {failed} failed · {pending} pending · {skipped} skipped",
+        "scoreOutcomeDistribution": "{scored} scored · {failed} failed · {pending} pending · {skipped} skipped · {unscored} unscored",
         "scoringDistribution": "{success} successful · {failed} failed · {pending} pending · {skipped} skipped",
         "compare": "Compare",
         "comparePicker": {
@@ -11855,6 +11865,8 @@
       "schemaInvalidJson": "Schema must be valid JSON.",
       "schemaIgnored": "Schema · Ignored by this provider",
       "schemaUnsupported": "This provider has no structured-output field. The schema is kept on this column, but it is not sent and the model answers with plain text.",
+      "schemaApproximated": "Schema · Approximated by this provider",
+      "schemaApproximatedHelp": "This provider only supports JSON mode, not a JSON schema. The request is sent in JSON mode with the schema restated in the prompt, so the answer is JSON but its shape is not guaranteed.",
       "outputPlaceholder": "Output appears here — press Run.",
       "outputNotRun": "Not run",
       "retry": "Retry",
@@ -11958,6 +11970,12 @@
   },
   "onlineEvals": {
     "versionPrefix": "v",
+    "traceScoreChip": {
+      "reasoning": "Why",
+      "scoredAt": "Scored {time}",
+      "moreCount": "+{count} more",
+      "allScores": "All scores ({count})"
+    },
     "importNameRequired": "Name *",
     "importNewNameRequired": "New Name *",
     "importDataTypeRequired": "Data Type *",
@@ -12228,8 +12246,10 @@
       "sectionTitle": "Provider",
       "nameLabel": "Name",
       "typeLabel": "Provider type",
-      "endpointLabel": "Endpoint",
-      "endpointPlaceholder": "Full completions URL, e.g. https://your-host/v1/chat/completions",
+      "endpointLabel": "Base URL",
+      "endpointPlaceholder": "Base URL, e.g. https://your-host/v1",
+      "endpointHelpDefault": "Leave empty to use the default: {url}",
+      "endpointHelpRequired": "Required — this provider has no default base URL.",
       "defaultModelLabel": "Default model",
       "availableModelsLabel": "Available models",
       "apiKeyLabel": "API Key",
@@ -12238,7 +12258,6 @@
       "authSection": "Authentication",
       "authEditNote": "Credentials cannot be read back. To test a provider that requires authentication, enter its API key.",
       "cannotRename": "Cannot be renamed after creation.",
-      "availableModelsHelp": "Optional. Comma-separated list of models available on this Provider.",
       "saveError": "Failed to save provider",
       "nameRequired": "Provider name is required",
       "typeRequired": "Provider type is required",
@@ -12345,7 +12364,8 @@
         "nameRequired": "Name is required",
         "nameFormat": "Use lowercase letters, numbers, and underscores only",
         "minRequired": "Min is required",
-        "maxRequired": "Max is required"
+        "maxRequired": "Max is required",
+        "maxNotGreaterThanMin": "Max must be greater than Min"
       },
       "import": {
         "title": "Import Score Config",
@@ -12916,7 +12936,7 @@
     },
     "empty": {
       "title": "No LLM Providers Yet",
-      "description": "LLM Providers store the connection details (endpoint + credentials) for the language models your LLM Judge scorers call. Add one to start running judge-based evaluations."
+      "description": "LLM Providers store the connection details (base URL + credentials) for the language models your LLM Judge scorers call. Add one to start running judge-based evaluations."
     }
   },
   "logs": {
@@ -15721,7 +15741,6 @@
       "reservation": "Reservation",
       "sliType": "SLI type",
       "owner": "Owner",
-      "folder": "Folder",
       "streamPlaceholder": "Select a stream"
     },
     "empty": {
@@ -15751,7 +15770,24 @@
       "sourceHint": "Uptime is the fraction of measured time this alert was not firing. Time it did not evaluate — paused, silenced, or failing — is unmeasured, and never counted as uptime.",
       "loadFailed": "Could not load the eligible alerts",
       "noneEligible": "No alert in this organization can be used as a source yet.",
-      "ineligibleOption": "{name} — {reason}",
+      "ineligible": {
+        "notScheduled": "Not scheduled",
+        "grouped": "Grouped",
+        "notReferenceable": "Not usable",
+        "cron": "Cron schedule",
+        "tooInfrequent": "Runs too rarely",
+        "silenced": "Has silence",
+        "other": "Not eligible",
+        "why": {
+          "notScheduled": "Real-time alerts don't keep the run history an SLO needs. Use a scheduled alert instead.",
+          "grouped": "This alert is split by group, and a run doesn't record which groups it checked. Remove its group-by to use it here.",
+          "notReferenceable": "SLO and composite alerts can't be sources. Pick a plain scheduled alert.",
+          "cron": "This alert runs on a cron schedule, so its checks aren't evenly spaced and uptime can't be worked out. Change it to a fixed interval.",
+          "tooInfrequent": "This alert runs every {frequency}. It needs to run at least every {slice} so no time goes unchecked.",
+          "silenced": "After firing, this alert stops checking for a while — and that gap always lands on a bad patch, which would flatter the SLO. Set its silence period to 0."
+        },
+        "noFixedInterval": "no fixed interval"
+      },
       "groupingLocked": "An alert-based SLI cannot be grouped: the availability ledger records one run per alert, not per group, so there is no per-group coverage to stand on.",
       "sourceLink": "Source alert",
       "preview": {
@@ -15859,6 +15895,42 @@
       "editTargetMissing": "That alert is no longer on this SLO.",
       "describeBurn": "Burn rate > {critical} over {long} and {short}",
       "describeBudget": "Error budget consumed > {critical}%"
+    },
+    "validation": {
+      "nameRequired": "SLO name is required",
+      "nameTooLong": "SLO name must be 256 characters or fewer",
+      "targetRequired": "Target is required",
+      "targetRange": "Target must be greater than 0 and below 100",
+      "targetPrecision": "Target supports at most 3 decimal places",
+      "streamTypeRequired": "Stream type is required",
+      "streamRequired": "Stream is required",
+      "goodExprRequired": "\"Good when\" is required",
+      "promqlGoodRequired": "Good query is required",
+      "promqlTotalRequired": "Total query is required",
+      "aggregateRequired": "Aggregate expression is required",
+      "comparatorRequired": "Comparator is required",
+      "thresholdRequired": "Threshold is required",
+      "thresholdNumber": "Threshold must be a number",
+      "alertSourceRequired": "Source alert is required",
+      "groupedSlice": "Grouped SLOs must use a 5-minute slice",
+      "alertCannotGroup": "An alert-based SLI cannot be grouped",
+      "frequencyRequired": "Frequency is required",
+      "frequencyPositive": "Frequency must be at least 1 minute",
+      "silenceRequired": "Silence period is required",
+      "silenceNonNegative": "Silence period cannot be negative",
+      "targetsRequired": "Select at least one destination or workflow",
+      "criticalRequired": "Threshold is required",
+      "criticalPositive": "Threshold must be greater than 0",
+      "budgetRange": "Budget consumed must be 100% or less",
+      "longWindowRequired": "Long window is required",
+      "shortWindowRequired": "Short window is required",
+      "shortInsideLong": "Short window must be shorter than the long window"
+    },
+    "duration": {
+      "seconds": "{count} second | {count} seconds",
+      "minutes": "{count} minute | {count} minutes",
+      "hours": "{count} hour | {count} hours",
+      "days": "{count} day | {count} days"
     }
   },
   "promql": {
@@ -15952,6 +16024,12 @@
     "aiQueueDetail": "Queue",
     "aiQueueReview": "Queue Review",
     "aiDatasetDetail": "Dataset",
+    "aiExperimentCreate": "New Experiment",
+    "aiExperimentCompare": "Compare Experiments",
+    "aiExperimentDetail": "Experiment",
+    "aiRemoteTaskCreate": "New Remote Task",
+    "aiRemoteTaskEdit": "Edit Remote Task",
+    "aiRemoteTaskDetail": "Remote Task",
     "notFound": "404 - Not Found",
     "createReport": "Create Report",
     "addCheck": "Add Check",

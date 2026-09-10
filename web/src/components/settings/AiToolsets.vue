@@ -38,6 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Table -->
       <div class="bg-card-glass-bg mt-2.5 overflow-hidden">
         <OTable
+          :forbidden="forbidden"
           :frame="false"
           :data="visibleRows"
           :columns="columns"
@@ -205,6 +206,7 @@ export default defineComponent({
     const tabledata: any = ref([]);
     const showAddDialog = ref(false);
     const loading = ref(false);
+    const forbidden = ref(false);
     const filterQuery = ref("");
 
     const columns: OTableColumnDef[] = [
@@ -280,6 +282,7 @@ export default defineComponent({
     // -----------------------------------------------------------------------
     const getData = () => {
       loading.value = true;
+      forbidden.value = false;
       const dismiss = toast({
         variant: "loading",
         message: t("common.loading"),
@@ -299,7 +302,8 @@ export default defineComponent({
           resultTotal.value = tabledata.value.length;
         })
         .catch((err) => {
-          if (err?.status !== 403) {
+          forbidden.value = err?.status === 403 || err?.response?.status === 403;
+          if (!forbidden.value) {
             toast({
               variant: "error",
               message:
@@ -426,6 +430,7 @@ export default defineComponent({
       t,
       store,
       loading,
+      forbidden,
       tabledata,
       columns,
       showAddDialog,

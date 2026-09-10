@@ -22,6 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :columns="columns"
       row-key="trace_id"
       :loading="loadingState"
+      :forbidden="forbidden"
       :selected-ids="selectedRowIds"
       selection="multiple"
       pagination="client"
@@ -211,6 +212,10 @@ export default defineComponent({
       required: false,
     },
     filtered: {
+      type: Boolean,
+      default: false,
+    },
+    forbidden: {
       type: Boolean,
       default: false,
     },

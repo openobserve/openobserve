@@ -9,7 +9,8 @@
       "logs-9754.spec.js",
       "logs-9044-7354.spec.js",
       "logs-multistream-matchall-pagination.spec.js",
-      "logs-14283.spec.js"
+      "logs-14283.spec.js",
+      "logs-14303-streaming-render.spec.js"
     ],
     "disabled": []
   },

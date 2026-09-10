@@ -1918,11 +1918,8 @@ export default defineComponent({
     break-inside: avoid;
   }
 
-  /* Overflow must stay visible here: `hidden` clips each panel to its
-   * grid-cell rectangle which, paired with print pagination, prevents
-   * browsers from honouring panel heights. */
   .displayDiv :deep(.grid-stack-item-content) {
-    overflow: visible !important;
+    overflow: hidden !important;
   }
 }
 

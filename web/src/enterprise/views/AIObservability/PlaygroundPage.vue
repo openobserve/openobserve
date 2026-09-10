@@ -303,6 +303,7 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
+import { computeUserOrgKey } from "@/utils/userOrgKey";
 import PlaygroundExpectedBar from "@/enterprise/components/AIObservability/PlaygroundExpectedBar.vue";
 import PlaygroundSampleDialog from "@/enterprise/components/AIObservability/PlaygroundSampleDialog.vue";
 import PlaygroundScorersMenu from "@/enterprise/components/AIObservability/PlaygroundScorersMenu.vue";
@@ -491,13 +492,14 @@ function cellFor(variantId: string, rowKey: string): PlaygroundCell | undefined 
 // ── loading ───────────────────────────────────────────────────────
 
 onMounted(async () => {
-  // First, and synchronously: the bench is the work, and it must be on screen
-  // before anything that can fail or take a round trip.
-  restoreSession();
+  // Drop the old org-only keys so a prior user's drafts never resurface for the next login.
+  removeLegacyStorage();
+  // Before anything that can fail or take a round trip: the bench must be on screen first.
+  await restoreSession();
   applyHandoff();
   await Promise.all([loadProviders(), loadDatasets(), loadScorers()]);
   applyEntryParams();
-  loadRecentDrafts();
+  await loadRecentDrafts();
   const snapshotId = String(route.query.snapshot ?? "");
   if (snapshotId) await openSharedSnapshot(snapshotId);
   if (initialDatasetId.value) sampleOpen.value = true;
@@ -1171,11 +1173,36 @@ const recentDrafts = ref<RecentDraftEntry[]>([]);
 /** Identifies the draft being worked on now; a new one starts on Reset. */
 const draftSessionId = ref(playgroundId("draft"));
 
-const storageKey = computed(() => `o2-playground-drafts:${orgId.value}`);
+// Same hash O2AIChat uses; an org-only key leaks one user's drafts to the next login on a shared profile.
+let cachedUserOrgRaw = "";
+let cachedUserOrgKeyPromise: Promise<string> | null = null;
 
-function loadRecentDrafts() {
+function getUserOrgKey(): Promise<string> {
+  const email = store.state.userInfo?.email ?? "";
+  const raw = `${email}:${orgId.value}`;
+  if (raw !== cachedUserOrgRaw) {
+    cachedUserOrgRaw = raw;
+    cachedUserOrgKeyPromise = computeUserOrgKey(email, orgId.value);
+  }
+  return cachedUserOrgKeyPromise!;
+}
+
+async function storageKey(): Promise<string> {
+  return `o2-playground-drafts:${await getUserOrgKey()}`;
+}
+
+function removeLegacyStorage() {
   try {
-    const stored = localStorage.getItem(storageKey.value);
+    localStorage.removeItem(`o2-playground-drafts:${orgId.value}`);
+    localStorage.removeItem(`o2-playground-session:${orgId.value}`);
+  } catch {
+    // Nothing to do — the next save uses the new key regardless.
+  }
+}
+
+async function loadRecentDrafts() {
+  try {
+    const stored = localStorage.getItem(await storageKey());
     recentDrafts.value = stored ? (JSON.parse(stored) as RecentDraftEntry[]) : [];
   } catch {
     recentDrafts.value = [];
@@ -1242,11 +1269,13 @@ interface StoredSession {
   results: PlaygroundResults;
 }
 
-const sessionKey = computed(() => `o2-playground-session:${orgId.value}`);
+async function sessionKey(): Promise<string> {
+  return `o2-playground-session:${await getUserOrgKey()}`;
+}
 
-function restoreSession() {
+async function restoreSession() {
   try {
-    const stored = localStorage.getItem(sessionKey.value);
+    const stored = localStorage.getItem(await sessionKey());
     if (!stored) return;
     const session = JSON.parse(stored) as StoredSession;
     if (!session?.draft?.variants?.length) return;
@@ -1261,7 +1290,7 @@ function restoreSession() {
   }
 }
 
-function saveSession() {
+async function saveSession() {
   try {
     const session: StoredSession = {
       id: draftSessionId.value,
@@ -1270,15 +1299,15 @@ function saveSession() {
       // never finishes.
       results: settledResults(results),
     };
-    localStorage.setItem(sessionKey.value, JSON.stringify(session));
+    localStorage.setItem(await sessionKey(), JSON.stringify(session));
   } catch {
     // A full or disabled localStorage costs the convenience, never the session.
   }
 }
 
-function clearSession() {
+async function clearSession() {
   try {
-    localStorage.removeItem(sessionKey.value);
+    localStorage.removeItem(await sessionKey());
   } catch {
     // Nothing to do — the next save overwrites it anyway.
   }
@@ -1304,7 +1333,7 @@ watch(running, (isRunning, wasRunning) => {
   if (wasRunning && !isRunning) saveSession();
 });
 
-function persistDraft() {
+async function persistDraft() {
   const summary = draftSummary(draft);
   if (!summary) return;
   const entry: RecentDraftEntry = {
@@ -1319,7 +1348,7 @@ function persistDraft() {
   const others = recentDrafts.value.filter((candidate) => candidate.id !== entry.id);
   recentDrafts.value = [entry, ...others].slice(0, 10);
   try {
-    localStorage.setItem(storageKey.value, JSON.stringify(recentDrafts.value));
+    localStorage.setItem(await storageKey(), JSON.stringify(recentDrafts.value));
   } catch {
     // A full or disabled localStorage costs the convenience, never the session.
   }

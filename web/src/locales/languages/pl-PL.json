@@ -76,6 +76,10 @@
       "action": "Uruchom zapytanie",
       "actionDesc": "Załaduj zdarzenia dla wybranych filtrów"
     },
+    "noAccess": {
+      "title": "Nie masz dostępu",
+      "description": "Skontaktuj się z administratorem, jeśli uważasz, że powinieneś mieć dostęp."
+    },
     "noDashboards": {
       "title": "Utwórz swój pierwszy dashboard",
       "description": "Pulpity łączą metryki, logi i trace w jednym widoku. Zbuduj jeden, aby rozpocząć.",
@@ -885,7 +889,7 @@
     "queryFailed": "Zapytanie nie powiodło się",
     "unknownError": "Nieznany błąd",
     "selectedLabel": "wybrano",
-    "selectToFilter": "Wybierz, aby filtrować",
+    "selectToFilter": "Wybierz filtr",
     "clearSelection": "Wyczyść zaznaczenie",
     "includeModeHint": "Tryb uwzględniania (=)",
     "excludeModeHint": "Tryb wykluczania (≠)",
@@ -6314,7 +6318,7 @@
       "frequencyPositiveNumber": "Alert - {index}: Częstotliwość powinna być liczbą dodatnią większą od 0 i powinna być liczbą.",
       "cronExpressionString": "Alert - {index}: Wyrażenie cron powinno być ciągiem znaków.",
       "thresholdPositiveNumber": "Alert - {index}: Próg powinien być liczbą dodatnią większą od 0 i powinien być liczbą.",
-      "silenceNonNegativeNumber": "Alert - {index}: Wyciszenie powinno być liczbą nieujemną (większą lub równą 0) i powinno być liczbą.",
+      "silenceNonNegativeNumber": "Alert - {index}: Okres cooldownu powinien być liczbą nieujemną (większą lub równą 0).",
       "frequencyTypeInvalid": "Alert - {index}: Typ częstotliwości musi być 'minutes' lub 'cron' i powinien być ciągiem znaków.",
       "cronExpressionInvalid": "Alert - {index}: Wyrażenie cron powinno być prawidłowym wyrażeniem cron."
     },
@@ -6524,7 +6528,7 @@
       "nameInvalidChars": "Znaki takie jak :, ?, /, # oraz spacje są niedozwolone.",
       "templateRequired": "Szablon jest wymagany!",
       "validEmails": "Dodaj prawidłowe adresy e-mail!",
-      "silenceNonNegative": "Powiadomienie o wyciszeniu powinno być większe lub równe 0",
+      "silenceNonNegative": "Okres cooldownu powinien być większy lub równy 0",
       "pendingPeriodNonNegative": "Okres oczekiwania powinien być większy lub równy 0.",
       "periodPositive": "Okres powinien być większy niż 0",
       "destinationRequired": "Co najmniej jedno miejsce docelowe jest wymagane.",
@@ -9794,6 +9798,8 @@
       "outputTokens": "Tokeny wyjściowe",
       "out": "Wyjście",
       "totalCost": "Całkowity koszt",
+      "scores": "Oceny",
+      "notScoredYet": "Nie oceniono jeszcze",
       "preview": "Podgląd",
       "input": "Wejście",
       "output": "Wyjście",
@@ -10793,7 +10799,8 @@
         "scoreConfigs": "Konfiguracje ocen",
         "targetDataset": "Docelowy zbiór danych",
         "progress": "Postęp",
-        "updated": "Zaktualizowano"
+        "updated": "Zaktualizowano",
+        "actions": "Akcje"
       },
       "create": {
         "title": "Nowa kolejka",
@@ -10847,7 +10854,8 @@
           "refType": "Ref",
           "refId": "Referencja",
           "added": "Dodano",
-          "status": "Status"
+          "status": "Status",
+          "actions": "Akcje"
         },
         "status": {
           "pending": "Oczekujący",
@@ -10959,6 +10967,8 @@
       "viewAll": "Zobacz eksperymenty",
       "baseline": "Linia bazowa",
       "setBaseline": "Ustaw linię bazową",
+      "baselineRequiresCompleted": "Tylko ukończone uruchomienie może zostać ustawione jako linia bazowa",
+      "baselineError": "Nie udało się zaktualizować linii bazowej",
       "selectForComparison": "Wybierz do porównania",
       "progress": "{done} z {total} slotów",
       "noScores": "Brak zagregowanych wyników",
@@ -11069,8 +11079,10 @@
       "addToDataset": "Dodaj",
       "detail": {
         "by": "przez {user}",
-        "p50Latency": "Latencja P50",
+        "p50Latency": "P50 latencja zadania",
         "totalCost": "Całkowity koszt",
+        "costBreakdown": "Zadanie {task} · Ocenianie {scoring}",
+        "partialCostBreakdown": "Zadanie {task} · Ocenianie {scoring} · Częściowe",
         "highDispersion": "Przypadki o wysokim rozproszeniu",
         "highDispersionHint": "Wiersze, w których próby są rozbieżne",
         "scoredRows": "{scored}/{total} ocenionych wierszy",
@@ -11100,8 +11112,12 @@
           "run": "Uruchomienie"
         },
         "runSummary": "{trials} · {scorers}",
-        "progress": "Postęp",
+        "progress": "Postęp zadania",
         "scoring": "Punktacja",
+        "tasks": "Zadania",
+        "scores": "Oceny",
+        "taskDistribution": "Udane: {succeeded} · Nieudane: {failed} · Oczekujące: {pending} · Pominięte: {skipped}",
+        "scoreOutcomeDistribution": "Ocenione: {scored} · Nieudane: {failed} · Oczekujące: {pending} · Pominięte: {skipped} · Bez oceny: {unscored}",
         "scoringDistribution": "{success} sukcesów · {failed} porażek · {pending} oczekujących · {skipped} pominiętych",
         "compare": "Porównaj",
         "comparePicker": {
@@ -11193,6 +11209,16 @@
           "typeCategorical": "Kategoryczny",
           "typeBoolean": "Logiczny",
           "threshold": "Próg",
+          "thresholdTooltip": "Wartości bazowe i kandydackie w granicach {percent} od siebie uznawane są za niezmienione, a nie za regresję lub poprawę.",
+          "outcomeDimensions": "Kryteria wyniku",
+          "outcomeTooltipNone": "Nie wybrano żadnych kolumn — każdy porównywalny wiersz będzie wyświetlany jako Nie porównano.",
+          "outcomeTooltipAll": "Wszystkie kwalifikujące się kolumny decydują o wyniku każdego wiersza.",
+          "outcomeTooltipPartial": "Tylko {names} decydują o wyniku każdego wiersza. Pozostałe kolumny są wyświetlane, ale nie wpływają na wynik.",
+          "allOutcomeDimensions": "Wszystkie kwalifikujące się kolumny",
+          "noOutcomeDimensions": "Brak kolumn",
+          "selectedOutcomeDimensions": "{count} kolumna | {count} kolumny",
+          "outcomeDimensionUnavailable": "{name} (brak reguły porównania)",
+          "dimensionExcludedHint": "Ta kolumna jest wykluczona z wyników. Zaznacz ją w sekcji Kryteria wyniku, aby ją uwzględnić.",
           "measurePerRow": "Średnia na wiersz, po próbach",
           "dimensionImproved": "{count} wiersz poprawiony | {count} wiersze poprawione",
           "dimensionUnchanged": "{count} wiersz niezmieniony | {count} wiersze niezmienione",
@@ -11274,8 +11300,8 @@
         },
         "searchPlaceholder": "Szukaj elementów...",
         "csvImport": {
-          "button": "Prześlij CSV",
-          "title": "Prześlij elementy zbioru danych",
+          "button": "Importuj elementy",
+          "title": "Import elementów zbioru danych",
           "description": "Importuj elementy zbioru danych z pliku CSV.",
           "fileLabel": "Plik CSV",
           "placeholder": "Wybierz plik CSV",
@@ -11835,6 +11861,8 @@
       "schemaInvalidJson": "Schemat musi być poprawnym JSON.",
       "schemaIgnored": "Schemat · Ignorowany przez tego dostawcę",
       "schemaUnsupported": "Ten dostawca nie ma pola danych strukturalnych. Schemat pozostaje w tej kolumnie, ale nie jest wysyłany, a model odpowiada zwykłym tekstem.",
+      "schemaApproximated": "Schemat · Przybliżony przez tego dostawcę",
+      "schemaApproximatedHelp": "Ten dostawca obsługuje tylko tryb JSON, a nie schemat JSON. Żądanie jest wysyłane w trybie JSON, a schemat jest powtórzony w treści promptu, więc odpowiedź jest w formacie JSON, ale jej kształt nie jest gwarantowany.",
       "outputPlaceholder": "Wyjście pojawi się tutaj — naciśnij Uruchom.",
       "outputNotRun": "Nie uruchomiono",
       "retry": "Ponów",
@@ -11938,6 +11966,12 @@
   },
   "onlineEvals": {
     "versionPrefix": "v",
+    "traceScoreChip": {
+      "reasoning": "Dlaczego",
+      "scoredAt": "Oceniono {time}",
+      "moreCount": "+{count} więcej",
+      "allScores": "Wszystkie oceny ({count})"
+    },
     "importNameRequired": "Nazwa *",
     "importNewNameRequired": "Nowa nazwa *",
     "importDataTypeRequired": "Typ danych *",
@@ -12187,7 +12221,8 @@
       "remove": "Usuń",
       "save": "Zapisz",
       "saveAsDraft": "Zapisz jako szkic",
-      "createAndActivate": "Zapisz i aktywuj"
+      "createAndActivate": "Zapisz i aktywuj",
+      "testConnection": "Przetestuj połączenie"
     },
     "scorerTypeDialog": {
       "title": "Utwórz nowego Scorer",
@@ -12207,21 +12242,26 @@
       "sectionTitle": "Dostawca",
       "nameLabel": "Nazwa",
       "typeLabel": "Typ dostawcy",
-      "endpointLabel": "Endpoint",
-      "endpointPlaceholder": "Pełny adres URL completions, np. https://your-host/v1/chat/completions",
+      "endpointLabel": "Bazowy adres URL",
+      "endpointPlaceholder": "Bazowy adres URL, np. https://your-host/v1",
+      "endpointHelpDefault": "Pozostaw puste, aby użyć domyślnego: {url}",
+      "endpointHelpRequired": "Wymagane — ten dostawca nie ma domyślnego bazowego adresu URL.",
       "defaultModelLabel": "Domyślny model",
       "availableModelsLabel": "Dostępne modele",
       "apiKeyLabel": "Klucz API",
       "apiKeyPlaceholder": "Wprowadź klucz API",
-      "apiKeyHelp": "Przechowywany zaszyfrowany w spoczynku i nigdy nie odczytywany. Pozostaw puste podczas edycji, aby zachować istniejący klucz.",
+      "apiKeyHelp": "Klucz jest przechowywany w formie zaszyfrowanej i nigdy nie jest odczytywany ponownie. Pozostaw pole puste podczas zapisywania zmian, aby zachować istniejący klucz.",
       "authSection": "Uwierzytelnianie",
-      "authEditNote": "Poświadczenia nie mogą być odczytane. Ponownie wprowadź klucz API tylko wtedy, gdy chcesz go zmienić.",
+      "authEditNote": "Poświadczenia nie mogą być odczytane ponownie. Aby przetestować dostawcę wymagającego uwierzytelnienia, wprowadź jego klucz API.",
       "cannotRename": "Nie można zmienić nazwy po utworzeniu.",
-      "availableModelsHelp": "Opcjonalnie. Lista modeli dostępnych u tego dostawcy oddzielona przecinkami.",
       "saveError": "Nie udało się zapisać dostawcy",
       "nameRequired": "Nazwa dostawcy jest wymagana",
       "typeRequired": "Typ dostawcy jest wymagany",
-      "defaultModelRequired": "Domyślny model jest wymagany"
+      "defaultModelRequired": "Domyślny model jest wymagany",
+      "testRunning": "Testowanie połączenia...",
+      "testPassed": "Połączono",
+      "testFailed": "Połączenie nie powiodło się",
+      "testError": "Nie udało się przetestować połączenia"
     },
     "scoreConfig": {
       "gteSymbol": "≥",
@@ -12320,7 +12360,8 @@
         "nameRequired": "Nazwa jest wymagana",
         "nameFormat": "Używaj tylko małych liter, cyfr i podkreśleń",
         "minRequired": "Min jest wymagane",
-        "maxRequired": "Maks jest wymagane"
+        "maxRequired": "Maks jest wymagane",
+        "maxNotGreaterThanMin": "Maksimum musi być większe niż minimum"
       },
       "import": {
         "title": "Importuj konfigurację wyników",
@@ -12891,7 +12932,7 @@
     },
     "empty": {
       "title": "Brak jeszcze dostawców LLM",
-      "description": "Dostawcy LLM przechowują szczegóły połączenia (punkt końcowy + poświadczenia) dla modeli językowych, które wywołują twoi oceniający LLM Judge. Dodaj jednego, aby rozpocząć oceny oparte na sędziach."
+      "description": "Dostawcy LLM przechowują dane połączenia (bazowy adres URL + poświadczenia) dla modeli językowych, z których korzystają Twoje moduły oceniające LLM Judge. Dodaj dostawcę, aby rozpocząć oceny oparte na sędzim."
     }
   },
   "logs": {
@@ -15696,7 +15737,6 @@
       "reservation": "Rezerwacja",
       "sliType": "Typ SLI",
       "owner": "Właściciel",
-      "folder": "Folder",
       "streamPlaceholder": "Wybierz strumień"
     },
     "empty": {
@@ -15726,7 +15766,24 @@
       "sourceHint": "Uptime to ułamek zmierzonego czasu, w którym ten alert nie wyzwalał. Czas, w którym nie oceniał — wstrzymany, wyciszony lub zawodny — jest niezmierzony i nigdy nie jest liczony jako uptime.",
       "loadFailed": "Nie można wczytać kwalifikujących się alertów",
       "noneEligible": "Żaden alert w tej organizacji nie może być jeszcze użyty jako źródło.",
-      "ineligibleOption": "{name} — {reason}",
+      "ineligible": {
+        "notScheduled": "Niezaplanowany",
+        "grouped": "Pogrupowany",
+        "notReferenceable": "Nie można użyć",
+        "cron": "Harmonogram cron",
+        "tooInfrequent": "Uruchamiany zbyt rzadko",
+        "silenced": "Ma wyciszenie",
+        "other": "Nie kwalifikuje się",
+        "why": {
+          "notScheduled": "Alerty w czasie rzeczywistym nie przechowują historii uruchomień, której potrzebuje SLO. Użyj zamiast tego alertu zaplanowanego.",
+          "grouped": "Ten alert jest dzielony na grupy, a uruchomienie nie rejestruje, które grupy sprawdza. Usuń grupowanie, aby go tutaj użyć.",
+          "notReferenceable": "Alerty SLO i złożone nie mogą być źródłami. Wybierz zwykły alert zaplanowany.",
+          "cron": "Ten alert używa harmonogramu cron, przez co jego kontrole nie są wykonywane w równych odstępach i nie można obliczyć dostępności. Zmień go na stały interwał.",
+          "tooInfrequent": "Ten alert uruchamia się co {frequency}. Musi uruchamiać się co najmniej co {slice}, aby żaden przedział czasu nie pozostał niesprawdzony.",
+          "silenced": "Po wyzwoleniu alert przestaje sprawdzać na jakiś czas — a ta przerwa zawsze wypada w złym okresie, co zawyżałoby SLO. Ustaw jego okres wyciszenia na 0."
+        },
+        "noFixedInterval": "Brak stałego interwału"
+      },
       "groupingLocked": "SLI oparty na alertach nie może być grupowany: rejestr dostępności zapisuje jedno uruchomienie na alert, a nie na grupę, więc nie ma pokrycia dla poszczególnych grup, na którym można by się oprzeć.",
       "sourceLink": "Alert źródłowy",
       "preview": {
@@ -15834,6 +15891,42 @@
       "editTargetMissing": "Ten alert nie jest już przypisany do tego SLO.",
       "describeBurn": "Wskaźnik wypalania > {critical} w ciągu {long} i {short}",
       "describeBudget": "Zużyty budżet błędów > {critical}%"
+    },
+    "validation": {
+      "nameRequired": "Nazwa SLO jest wymagana",
+      "nameTooLong": "Nazwa SLO musi mieć nie więcej niż 256 znaków",
+      "targetRequired": "Cel jest wymagany",
+      "targetRange": "Cel musi być większy niż 0 i mniejszy niż 100",
+      "targetPrecision": "Cel może mieć co najwyżej 3 miejsca po przecinku",
+      "streamTypeRequired": "Typ strumienia jest wymagany",
+      "streamRequired": "Strumień jest wymagany",
+      "goodExprRequired": "„Dobre, gdy” jest wymagane",
+      "promqlGoodRequired": "Zapytanie dobre jest wymagane",
+      "promqlTotalRequired": "Zapytanie całkowite jest wymagane",
+      "aggregateRequired": "Wyrażenie agregujące jest wymagane",
+      "comparatorRequired": "Operator porównania jest wymagany",
+      "thresholdRequired": "Próg jest wymagany",
+      "thresholdNumber": "Próg musi być liczbą",
+      "alertSourceRequired": "Alert źródłowy jest wymagany",
+      "groupedSlice": "Zgrupowane SLO muszą używać okna 5-minutowego",
+      "alertCannotGroup": "SLI oparte na alertach nie może być zgrupowane",
+      "frequencyRequired": "Częstotliwość jest wymagana",
+      "frequencyPositive": "Częstotliwość musi wynosić co najmniej 1 minutę",
+      "silenceRequired": "Okres ciszy jest wymagany",
+      "silenceNonNegative": "Okres ciszy nie może być ujemny",
+      "targetsRequired": "Wybierz co najmniej jedno miejsce docelowe lub przepływ pracy",
+      "criticalRequired": "Próg jest wymagany",
+      "criticalPositive": "Próg musi być większy od 0",
+      "budgetRange": "Zużyty budżet musi wynosić 100% lub mniej",
+      "longWindowRequired": "Długie okno jest wymagane",
+      "shortWindowRequired": "Krótkie okno jest wymagane",
+      "shortInsideLong": "Krótkie okno musi być krótsze niż długie okno"
+    },
+    "duration": {
+      "seconds": "{count} sekunda | {count} sekund",
+      "minutes": "{count} minuta | {count} minut",
+      "hours": "{count} godzina | {count} godzin",
+      "days": "{count} dzień | {count} dni"
     }
   },
   "promql": {
@@ -15927,6 +16020,12 @@
     "aiQueueDetail": "Kolejka",
     "aiQueueReview": "Przegląd kolejki",
     "aiDatasetDetail": "Zbiór danych",
+    "aiExperimentCreate": "Nowy eksperyment",
+    "aiExperimentCompare": "Porównaj eksperymenty",
+    "aiExperimentDetail": "Eksperyment",
+    "aiRemoteTaskCreate": "Nowe zadanie zdalne",
+    "aiRemoteTaskEdit": "Edytuj zadanie zdalne",
+    "aiRemoteTaskDetail": "Zadanie zdalne",
     "notFound": "404 - Nie znaleziono",
     "createReport": "Utwórz raport",
     "addCheck": "Dodaj test",
