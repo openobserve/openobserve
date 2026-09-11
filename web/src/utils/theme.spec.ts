@@ -105,6 +105,13 @@ describe("applyThemeColors button-primary-foreground contrast", () => {
     ).toBe("#FFFFFF");
   });
 
+  it("keeps white text for the default theme's own light color (O2 Signature light, #6B76E3 vs white = 3.94:1, under the 4.5:1 AA bar but above the floor)", () => {
+    applyThemeColors("#6B76E3", "light", false);
+    expect(
+      document.documentElement.style.getPropertyValue("--color-button-primary-foreground"),
+    ).toBe("#FFFFFF");
+  });
+
   it("clears the override for the default theme so the stylesheet value applies", () => {
     applyThemeColors("#8B8DF0", "dark", false);
     applyThemeColors("#8B8DF0", "dark", true);

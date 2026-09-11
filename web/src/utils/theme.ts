@@ -134,15 +134,18 @@ const contrastRatio = (hexA: string, hexB: string): number => {
  * Pick white or dark label text for a button whose background is theme-color
  * derived. Predefined dark-mode theme colors are deliberately light/pastel (so
  * they double as readable text/link accents on dark surfaces) — which can drop
- * hardcoded white button-label text below WCAG AA's 4.5:1, e.g. O2 Signature's
- * dark accent #8B8DF0 with white text lands at 2.93:1. Picks whichever of
- * white / `--color-grey-900` contrasts better against the resolved background,
- * so this holds for every predefined theme and any custom color a user picks.
+ * hardcoded white button-label text well below readable, e.g. O2 Signature's
+ * dark accent #8B8DF0 with white text lands at 2.93:1. Falls back to dark text
+ * only below a floor, not the strict 4.5:1 AA text bar: every saturated brand
+ * color (e.g. O2 Signature light #6B76E3, white text at 3.94:1) already ships
+ * with white and sits just under that bar, so comparing "whichever wins" flips
+ * text to dark across the whole app over a fractional AA shortfall.
  */
 const pickButtonForeground = (bgHex: string): string => {
   const darkText = cssToken("--color-grey-900", "#171717");
   const white = "#FFFFFF";
-  return contrastRatio(white, bgHex) >= contrastRatio(darkText, bgHex) ? white : darkText;
+  const MIN_WHITE_CONTRAST = 3;
+  return contrastRatio(white, bgHex) >= MIN_WHITE_CONTRAST ? white : darkText;
 };
 
 /**
