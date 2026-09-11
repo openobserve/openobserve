@@ -73,7 +73,7 @@ struct LatestSessionsResponse {
         ("stream_name" = String, Path, description = "Stream name"),
         ("filter" = Option<String>, Query, description = "filter, eg: a=b AND c=d"),
         ("user_search" = Option<String>, Query, description = "Case-insensitive substring match on the session's user id. A session is returned when the user id on any of its spans contains the term. Literal text: no wildcards or operators. Trimmed and capped at 256 characters; combined with `filter` and `message_search` using AND."),
-        ("message_search" = Option<String>, Query, description = "Case-insensitive substring match on the conversation text (the input messages of any span in the session). Literal text, trimmed and capped at 256 characters; combined with `filter` and `user_search` using AND. Returns 400 when the stream has no input-messages column."),
+        ("message_search" = Option<String>, Query, description = "Case-insensitive substring match on the conversation text (the input or output messages of any span in the session). Literal text, trimmed and capped at 256 characters; combined with `filter` and `user_search` using AND. Returns 400 when the stream has neither an input-messages nor output-messages column."),
         ("from" = i64, Query, description = "from"),
         ("size" = i64, Query, description = "size"),
         ("start_time" = i64, Query, description = "start time"),
@@ -1307,8 +1307,8 @@ fn session_search_predicate(column: &str, term: &str) -> String {
 pub(super) struct LatestSessionSearch {
     /// Substring of the user id column (`user_id` / legacy `llm_user_id`).
     pub(super) user: Option<String>,
-    /// Substring of the input messages column (`gen_ai_input_messages` /
-    /// legacy `llm_input`): "some prompt in this conversation contains X".
+    /// Substring of the input or output messages columns: "some message in
+    /// this conversation contains X".
     pub(super) message: Option<String>,
 }
 
@@ -1324,13 +1324,16 @@ impl LatestSessionSearch {
         self.user.is_none() && self.message.is_none()
     }
 
-    /// A message search needs the input messages column; a stream without it
-    /// must get a clear error rather than an unfiltered list.
+    /// A message search needs at least one conversation messages column; a
+    /// stream without either must get a clear error rather than an unfiltered
+    /// list.
     fn validate(&self, validated: &super::schema_compat::ValidatedLlmSchema) -> Result<(), String> {
-        if self.message.is_some() && !validated.has_input_messages {
+        if self.message.is_some() && !validated.has_input_messages && !validated.has_output_messages
+        {
             return Err(format!(
-                "message search is not available for this stream: it has no '{}' column",
-                input_messages_column(validated)
+                "message search is not available for this stream: it has neither a '{}' nor '{}' column",
+                input_messages_column(validated),
+                output_messages_column(validated)
             ));
         }
         Ok(())
@@ -1343,12 +1346,29 @@ impl LatestSessionSearch {
             predicates.push(session_search_predicate(validated.columns.user_id, user));
         }
         if let Some(message) = &self.message {
-            predicates.push(session_search_predicate(
-                input_messages_column(validated),
-                message,
-            ));
+            predicates.push(message_search_predicate(validated, message));
         }
         predicates
+    }
+}
+
+fn message_search_predicate(
+    validated: &super::schema_compat::ValidatedLlmSchema,
+    term: &str,
+) -> String {
+    match (validated.has_input_messages, validated.has_output_messages) {
+        (true, true) => format!(
+            "({} OR {})",
+            session_search_predicate(input_messages_column(validated), term),
+            session_search_predicate(output_messages_column(validated), term)
+        ),
+        (false, true) => session_search_predicate(output_messages_column(validated), term),
+        // With a known schema, validation rejects the (false, false) case. With
+        // no cached schema, preserve the legacy fallback so the search request
+        // reaches the query layer and returns its authoritative stream error.
+        (true, false) | (false, false) => {
+            session_search_predicate(input_messages_column(validated), term)
+        }
     }
 }
 
@@ -1358,6 +1378,15 @@ fn input_messages_column(validated: &super::schema_compat::ValidatedLlmSchema) -
         "gen_ai_input_messages"
     } else {
         "llm_input"
+    }
+}
+
+/// Stored column holding the response text for the stream's schema generation.
+fn output_messages_column(validated: &super::schema_compat::ValidatedLlmSchema) -> &'static str {
+    if validated.has_gen_ai {
+        "gen_ai_output_messages"
+    } else {
+        "llm_output"
     }
 }
 
@@ -1901,6 +1930,7 @@ mod tests {
     fn gen_ai_with_messages() -> super::super::schema_compat::ValidatedLlmSchema {
         let mut validated = super::super::schema_compat::ValidatedLlmSchema::fallback(true);
         validated.has_input_messages = true;
+        validated.has_output_messages = true;
         validated
     }
 
@@ -1921,7 +1951,7 @@ mod tests {
     }
 
     #[test]
-    fn page_sql_message_search_reads_the_input_messages_column() {
+    fn page_sql_message_search_reads_input_and_output_messages() {
         let sql = build_latest_session_page_sql(
             "bench_traces",
             "",
@@ -1930,7 +1960,8 @@ mod tests {
         );
 
         assert!(sql.contains(
-            "HAVING max(CASE WHEN str_match_ignore_case(gen_ai_input_messages, 'refund') THEN 1 ELSE 0 END) = 1"
+            "HAVING max(CASE WHEN (str_match_ignore_case(gen_ai_input_messages, 'refund') OR \
+             str_match_ignore_case(gen_ai_output_messages, 'refund')) THEN 1 ELSE 0 END) = 1"
         ));
         assert!(!sql.contains("user_id"));
     }
@@ -1946,7 +1977,8 @@ mod tests {
 
         assert!(sql.contains(
             "HAVING max(CASE WHEN str_match_ignore_case(user_id, 'luis') AND \
-             str_match_ignore_case(gen_ai_input_messages, 'refund') THEN 1 ELSE 0 END) = 1"
+             (str_match_ignore_case(gen_ai_input_messages, 'refund') OR \
+             str_match_ignore_case(gen_ai_output_messages, 'refund')) THEN 1 ELSE 0 END) = 1"
         ));
     }
 
@@ -1963,7 +1995,8 @@ mod tests {
         assert!(sql.contains(
             "HAVING max(CASE WHEN (gen_ai_agent_id = 'agent-1' OR gen_ai_agent_id = 'agent-2') AND \
              str_match_ignore_case(user_id, 'luis') AND \
-             str_match_ignore_case(gen_ai_input_messages, 'refund') THEN 1 ELSE 0 END) = 1"
+             (str_match_ignore_case(gen_ai_input_messages, 'refund') OR \
+             str_match_ignore_case(gen_ai_output_messages, 'refund')) THEN 1 ELSE 0 END) = 1"
         ));
         assert_eq!(sql.matches("HAVING").count(), 1);
     }
@@ -1990,15 +2023,18 @@ mod tests {
     fn page_sql_search_uses_the_legacy_columns_on_a_legacy_stream() {
         let mut validated = super::super::schema_compat::ValidatedLlmSchema::fallback(false);
         validated.has_input_messages = true;
+        validated.has_output_messages = true;
         let sql = build_latest_session_page_sql(
             "legacy_traces",
             "",
             &search(Some("luis"), Some("refund")),
             &validated,
         );
-
         assert!(sql.contains("str_match_ignore_case(llm_user_id, 'luis')"));
-        assert!(sql.contains("str_match_ignore_case(llm_input, 'refund')"));
+        assert!(sql.contains(
+            "(str_match_ignore_case(llm_input, 'refund') OR \
+             str_match_ignore_case(llm_output, 'refund'))"
+        ));
         assert!(sql.contains("GROUP BY llm_session_id"));
     }
 
@@ -2021,23 +2057,67 @@ mod tests {
     }
 
     #[test]
-    fn search_validation_rejects_a_message_term_without_the_messages_column() {
-        let validated = super::super::schema_compat::ValidatedLlmSchema::fallback(true);
-        assert!(!validated.has_input_messages);
+    fn search_validation_accepts_either_message_column_and_rejects_neither() {
+        let mut input_only = super::super::schema_compat::ValidatedLlmSchema::fallback(true);
+        input_only.has_input_messages = true;
+        assert!(search(None, Some("refund")).validate(&input_only).is_ok());
 
-        let err = search(None, Some("refund"))
-            .validate(&validated)
-            .unwrap_err();
+        let mut output_only = super::super::schema_compat::ValidatedLlmSchema::fallback(true);
+        output_only.has_output_messages = true;
+        assert!(search(None, Some("refund")).validate(&output_only).is_ok());
+
+        let neither = super::super::schema_compat::ValidatedLlmSchema::fallback(true);
+        let err = search(None, Some("refund")).validate(&neither).unwrap_err();
         assert!(err.contains("message search is not available for this stream"));
         assert!(err.contains("gen_ai_input_messages"));
+        assert!(err.contains("gen_ai_output_messages"));
 
         let legacy = super::super::schema_compat::ValidatedLlmSchema::fallback(false);
         let err = search(None, Some("refund")).validate(&legacy).unwrap_err();
         assert!(err.contains("llm_input"));
+        assert!(err.contains("llm_output"));
 
-        // A user-only search never needs the messages column.
-        assert!(search(Some("luis"), None).validate(&validated).is_ok());
-        assert!(LatestSessionSearch::default().validate(&validated).is_ok());
+        // A user-only search never needs either messages column.
+        assert!(search(Some("luis"), None).validate(&neither).is_ok());
+        assert!(LatestSessionSearch::default().validate(&neither).is_ok());
+    }
+
+    #[test]
+    fn page_sql_message_search_uses_whichever_message_column_exists() {
+        let mut input_only = super::super::schema_compat::ValidatedLlmSchema::fallback(true);
+        input_only.has_input_messages = true;
+        let input_sql = build_latest_session_page_sql(
+            "bench_traces",
+            "",
+            &search(None, Some("refund")),
+            &input_only,
+        );
+        assert!(input_sql.contains("str_match_ignore_case(gen_ai_input_messages, 'refund')"));
+        assert!(!input_sql.contains("gen_ai_output_messages"));
+
+        let mut output_only = super::super::schema_compat::ValidatedLlmSchema::fallback(true);
+        output_only.has_output_messages = true;
+        let output_sql = build_latest_session_page_sql(
+            "bench_traces",
+            "",
+            &search(None, Some("refund")),
+            &output_only,
+        );
+        assert!(output_sql.contains("str_match_ignore_case(gen_ai_output_messages, 'refund')"));
+        assert!(!output_sql.contains("gen_ai_input_messages"));
+    }
+
+    #[test]
+    fn page_sql_message_search_preserves_the_unknown_schema_fallback() {
+        let fallback = super::super::schema_compat::ValidatedLlmSchema::fallback(false);
+        let sql = build_latest_session_page_sql(
+            "unknown_stream",
+            "",
+            &search(None, Some("refund")),
+            &fallback,
+        );
+
+        assert!(sql.contains("str_match_ignore_case(llm_input, 'refund')"));
     }
 
     #[test]
