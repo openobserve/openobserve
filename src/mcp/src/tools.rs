@@ -18,6 +18,7 @@ use std::collections::HashMap;
 use anyhow::{Ok, Result};
 use config::tantivy::tokenizer::{CollectType, O2_TOKENIZER, o2_tokenizer_build};
 use serde::Deserialize;
+use serde_json::Value;
 use tantivy::{
     Index, IndexWriter, TantivyDocument,
     collector::TopDocs,
@@ -74,6 +75,33 @@ fn default_enabled() -> bool {
 
 /// Extension key for MCP configuration
 const MCP_EXTENSION_KEY: &str = "x-o2-mcp";
+
+/// Build the schema exposed to MCP clients from the schema retained for HTTP execution.
+fn public_tool_schema(http_path: &str, mut execution_schema: Value) -> Value {
+    if !http_path.contains("{org_id}") {
+        return execution_schema;
+    }
+
+    let Some(schema) = execution_schema.as_object_mut() else {
+        return execution_schema;
+    };
+    if let Some(properties) = schema.get_mut("properties").and_then(Value::as_object_mut) {
+        properties.remove("org_id");
+    }
+
+    let required_is_empty =
+        if let Some(required) = schema.get_mut("required").and_then(Value::as_array_mut) {
+            required.retain(|field| field.as_str() != Some("org_id"));
+            required.is_empty()
+        } else {
+            false
+        };
+    if required_is_empty {
+        schema.remove("required");
+    }
+
+    execution_schema
+}
 
 /// Extract MCP extensions from OpenAPI spec
 ///
@@ -398,11 +426,10 @@ pub fn init_mcp_tools(api: &OpenApi) -> Result<()> {
         }
 
         // rmcp-openapi handles Draft 2020-12 compatibility, but has a bug where it doesn't
-        // deduplicate the `required` array when merging path + query parameters
-        let mut input_schema = metadata.parameters.clone();
-
-        // Deduplicate the required array
-        if let Some(obj) = input_schema.as_object_mut()
+        // deduplicate the `required` array when merging path + query parameters.
+        // Keep this complete schema for validation and HTTP path construction.
+        let mut execution_schema = metadata.parameters.clone();
+        if let Some(obj) = execution_schema.as_object_mut()
             && let Some(required) = obj.get_mut("required")
             && let Some(required_arr) = required.as_array_mut()
         {
@@ -410,8 +437,9 @@ pub fn init_mcp_tools(api: &OpenApi) -> Result<()> {
             required_arr.retain(|item| seen.insert(item.clone()));
         }
 
-        // Simplify schema for tools with large versioned schemas (e.g., Dashboard v1-v8)
-        let input_schema = simplify_schema(&metadata.name, input_schema);
+        // Simplify schemas for tools with large versioned schemas (e.g., Dashboard v1-v8).
+        let execution_schema = simplify_schema(&metadata.name, execution_schema);
+        let input_schema = public_tool_schema(&metadata.path, execution_schema.clone());
 
         // Get description from x-o2-mcp extension or fall back to OpenAPI description
         let description = if let Some(mcp_ext) = mcp_extensions.get(&metadata.name) {
@@ -463,10 +491,10 @@ pub fn init_mcp_tools(api: &OpenApi) -> Result<()> {
             pinned,
         };
 
-        // IMPORTANT: Also update the metadata's parameters with simplified schema
-        // to avoid oneOf validation errors when rmcp-openapi validates arguments
+        // Validation and HTTP execution retain private path parameters that are
+        // intentionally absent from the MCP-facing input schema.
         let mut updated_metadata = metadata;
-        updated_metadata.parameters = input_schema;
+        updated_metadata.parameters = execution_schema;
 
         metadata_map.insert(updated_metadata.name.clone(), updated_metadata);
         tools.push(mcp_tool);
@@ -680,4 +708,57 @@ pub async fn init_test_tools() {
             }
         })
         .await;
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::public_tool_schema;
+
+    #[test]
+    fn organization_path_parameter_is_private() {
+        let execution_schema = json!({
+            "type": "object",
+            "properties": {
+                "org_id": {
+                    "type": "string",
+                    "description": "Organization name"
+                },
+                "stream_name": {"type": "string"}
+            },
+            "required": ["org_id", "stream_name"]
+        });
+
+        let public_schema =
+            public_tool_schema("/api/{org_id}/{stream_name}", execution_schema.clone());
+
+        assert!(public_schema["properties"].get("org_id").is_none());
+        assert_eq!(public_schema["required"], json!(["stream_name"]));
+        assert!(execution_schema["properties"].get("org_id").is_some());
+        assert_eq!(
+            execution_schema["required"],
+            json!(["org_id", "stream_name"])
+        );
+    }
+
+    #[test]
+    fn body_organization_field_is_not_removed() {
+        let schema = json!({
+            "type": "object",
+            "properties": {
+                "request_body": {
+                    "type": "object",
+                    "properties": {
+                        "org_id": {"type": "string"}
+                    }
+                }
+            }
+        });
+
+        assert_eq!(
+            public_tool_schema("/api/organizations", schema.clone()),
+            schema
+        );
+    }
 }
