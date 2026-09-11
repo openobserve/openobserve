@@ -17,9 +17,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { useStore } from "vuex";
-import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { formatDistanceToNowStrict } from "date-fns";
+import { raw, useI18nTyped } from "@/types/i18n";
 import syntheticsService from "@/services/synthetics";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
+import { resolveBadgeLabel } from "@/lib/core/Badge/badgeGroups";
+import { syntheticsFolderName } from "@/utils/synthetics/routes";
+import { MAX_STEPS } from "@/utils/synthetics/runBudget";
 
 /**
  * `ownStepCount` is the EXECUTED count of the journey as it stands, not
@@ -47,19 +52,80 @@ const org = computed(() => store.state.selectedOrganization.identifier as string
 
 const DEFAULT_JOURNEY_BUDGET_MS = 300_000;
 
-const options = ref<{ label: I18nText; value: string }[]>([]);
+interface ListRow {
+  id: string;
+  name: string;
+  type: string;
+  folder_id?: string;
+  steps?: number | null;
+  referenced_by?: number;
+  references?: number | null;
+  enabled?: boolean;
+  status?: string;
+  last_check_at?: number | null;
+}
+
+const options = ref<SelectOption[]>([]);
+/** True only once the list has loaded and holds no other browser test. */
+const isEmpty = ref(false);
 const childSteps = ref<number | null>(null);
 const lastRunSeconds = ref<number | null>(null);
+
+/** Everything on a row comes from the list response — nothing costs a request per option. */
+function rowOption(r: ListRow): SelectOption {
+  const folders = store.state.organizationData?.foldersByType?.synthetics ?? [];
+  const steps =
+    r.steps != null ? t("synthetics.journey.subtest.pickSteps", { count: r.steps }) : "";
+  const usedByCount = r.referenced_by ?? 0;
+  const usedBy =
+    usedByCount > 0
+      ? t("synthetics.journey.subtest.pickUsedBy", { count: usedByCount }, usedByCount)
+      : "";
+  const paused = r.enabled === false ? resolveBadgeLabel("alertStatus", "paused") : "";
+  const lastRun =
+    r.last_check_at && r.status !== "unknown"
+      ? t("synthetics.journey.subtest.pickLastRun", {
+          status: resolveBadgeLabel("serviceStatus", r.status),
+          ago: formatDistanceToNowStrict(new Date(r.last_check_at / 1000), { addSuffix: true }),
+        })
+      : "";
+  return {
+    label: raw(r.name),
+    value: r.id,
+    badge: syntheticsFolderName(folders, r.folder_id),
+    badgeMuted: true,
+    subLabel: raw([steps, usedBy, paused, lastRun].filter(Boolean).join(" · ")),
+  };
+}
 
 onMounted(async () => {
   // `undefined` omits `?folder=`, which lists every folder — deliberate: §10
   // keeps references cross-folder, so the picker is not scoped to the
   // parent's folder.
   const res = await syntheticsService.listByFolderId(org.value, undefined);
-  const rows = (res.data.checks ?? []) as { id: string; name: string; type: string }[];
-  options.value = rows
-    .filter((r) => r.type === "browser" && r.id !== props.ownCheckId)
-    .map((r) => ({ label: raw(r.name), value: r.id }));
+  const rows = ((res.data.checks ?? []) as ListRow[]).filter(
+    (r) => r.type === "browser" && r.id !== props.ownCheckId,
+  );
+  // Nesting is one level deep, so a check that already holds a reference cannot be picked.
+  const eligible = rows.filter((r) => !((r.references ?? 0) > 0));
+  const ineligible = rows.filter((r) => (r.references ?? 0) > 0);
+  const next: SelectOption[] = [];
+  if (eligible.length > 0) {
+    next.push({ header: true, label: t("synthetics.journey.subtest.pickGroupEligible") });
+    next.push(...eligible.map(rowOption));
+  }
+  if (ineligible.length > 0) {
+    next.push({ header: true, label: t("synthetics.journey.subtest.pickGroupIneligible") });
+    next.push(
+      ...ineligible.map((r) => ({
+        ...rowOption(r),
+        disabled: true,
+        subLabel: t("synthetics.journey.subtest.pickNested"),
+      })),
+    );
+  }
+  options.value = next;
+  isEmpty.value = rows.length === 0;
 });
 
 async function onPick(id: string) {
@@ -98,10 +164,14 @@ const isSlow = computed(
       :model-value="modelValue?.id"
       :label="t('synthetics.journey.subtest.pickLabel')"
       :options="options"
+      :disabled="isEmpty"
       class="w-full"
       data-test="synthetics-subtest-select"
       @update:model-value="(v) => onPick(v as string)"
     />
+    <p v-if="isEmpty" class="text-text-secondary m-0 text-xs" data-test="synthetics-subtest-empty">
+      {{ t("synthetics.journey.subtest.pickEmpty") }}
+    </p>
 
     <div v-if="childSteps !== null" class="flex flex-col gap-1">
       <p
@@ -114,6 +184,7 @@ const isSlow = computed(
             name: modelValue?.name ?? "",
             before,
             after,
+            limit: MAX_STEPS,
           })
         }}
       </p>

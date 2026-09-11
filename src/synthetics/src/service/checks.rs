@@ -370,7 +370,7 @@ pub async fn list_synthetics(
                 slug
             }
         };
-        let (steps, referenced_by) = composition_fields(
+        let (steps, referenced_by, references) = composition_fields(
             &m.id,
             m.check_type == SyntheticType::Browser,
             &own,
@@ -398,6 +398,7 @@ pub async fn list_synthetics(
             last_response_ms: None,
             steps,
             referenced_by,
+            references,
         });
     }
 
@@ -718,7 +719,8 @@ async fn delete_synthetics_bulk_under_lock(
     Ok(())
 }
 
-/// A row's expanded step count (browser only, §5.11) and how many checks embed it as a subtest.
+/// A row's expanded steps (browser only, §5.11), its embed count, and the subtest steps it holds
+/// (browser only).
 fn composition_fields(
     id: &str,
     is_browser: bool,
@@ -726,10 +728,10 @@ fn composition_fields(
     refs: &HashMap<String, Vec<String>>,
     counts: &HashMap<String, usize>,
     used_by: &HashMap<String, i32>,
-) -> (Option<i32>, i32) {
+) -> (Option<i32>, i32, Option<i32>) {
     let referenced_by = used_by.get(id).copied().unwrap_or(0);
     if !is_browser {
-        return (None, referenced_by);
+        return (None, referenced_by, None);
     }
     let own_steps = own.get(id).copied().unwrap_or(0);
     let expanded = match refs.get(id) {
@@ -738,9 +740,13 @@ fn composition_fields(
         }
         None => own_steps,
     };
+    let references = refs
+        .get(id)
+        .map_or(0, |c| i32::try_from(c.len()).unwrap_or(i32::MAX));
     (
         Some(i32::try_from(expanded).unwrap_or(i32::MAX)),
         referenced_by,
+        Some(references),
     )
 }
 
@@ -752,17 +758,31 @@ mod tests {
 
     #[test]
     fn expanded_steps_and_referenced_by_are_attached_per_row() {
-        let own = HashMap::from([("p".to_string(), 4usize), ("a".to_string(), 13usize)]);
-        let refs = HashMap::from([("p".to_string(), vec!["a".to_string()])]);
+        let own = HashMap::from([
+            ("p".to_string(), 4usize),
+            ("a".to_string(), 13usize),
+            ("q".to_string(), 4usize),
+        ]);
+        // `refs` holds one entry per occurrence, so `q` referencing `a` twice lists it twice.
+        let refs = HashMap::from([
+            ("p".to_string(), vec!["a".to_string()]),
+            ("q".to_string(), vec!["a".to_string(), "a".to_string()]),
+        ]);
         let counts = HashMap::from([("a".to_string(), 13usize)]);
-        let used_by = HashMap::from([("a".to_string(), 1i32)]);
-        let (p_steps, p_used) = composition_fields("p", true, &own, &refs, &counts, &used_by);
-        assert_eq!((p_steps, p_used), (Some(16), 0));
-        let (a_steps, a_used) = composition_fields("a", true, &own, &refs, &counts, &used_by);
-        assert_eq!((a_steps, a_used), (Some(13), 1));
+        let used_by = HashMap::from([("a".to_string(), 2i32)]);
+        let (p_steps, p_used, p_refs) =
+            composition_fields("p", true, &own, &refs, &counts, &used_by);
+        assert_eq!((p_steps, p_used, p_refs), (Some(16), 0, Some(1)));
+        let (a_steps, a_used, a_refs) =
+            composition_fields("a", true, &own, &refs, &counts, &used_by);
+        assert_eq!((a_steps, a_used, a_refs), (Some(13), 2, Some(0)));
+        assert_eq!(
+            composition_fields("q", true, &own, &refs, &counts, &used_by),
+            (Some(28), 0, Some(2))
+        );
         assert_eq!(
             composition_fields("h", false, &own, &refs, &counts, &used_by),
-            (None, 0)
+            (None, 0, None)
         );
     }
 }

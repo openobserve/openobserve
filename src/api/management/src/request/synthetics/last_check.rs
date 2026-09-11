@@ -192,6 +192,7 @@ mod tests {
             last_response_ms: Some(1.0),
             steps: None,
             referenced_by: 0,
+            references: None,
         }
     }
 

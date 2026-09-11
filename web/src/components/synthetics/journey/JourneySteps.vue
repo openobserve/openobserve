@@ -56,8 +56,10 @@ const props = withDefaults(
   defineProps<{
     /** Step data rows. Each row must have an `id` field for selection/expansion keys. */
     data: TData[];
-    /** Render mode: editor (editable) or results (read-only). */
-    mode: "editor" | "results";
+    /** Render mode: editor (editable), results (read-only) or preview (a child's steps, no run). */
+    mode: "editor" | "results" | "preview";
+    /** Preview mode: the reference row's number, so child rows read `2.1`, `2.2`, … */
+    numberPrefix?: string;
     /** Accessor for the action field on each row. */
     actionKey?: string;
     /** Accessor for the step name field on each row. */
@@ -70,6 +72,8 @@ const props = withDefaults(
     dotStateFn?: (row: TData) => StepDotState | undefined;
     /** When set, renders a "{done}/{total}" counter on a collapsed reference row. */
     stepProgressFn?: (row: TData) => { done: number; total: number } | null;
+    /** When set, renders a badge on an editor row where the progress counter would sit. */
+    stepBadgeFn?: (row: TData) => { label: string; variant: "default" | "error" } | null;
     /** When true, hides row action buttons (during replay). */
     locked?: boolean;
     /**
@@ -215,6 +219,19 @@ function stepProgress(row: TData): { done: number; total: number } | null {
   return props.stepProgressFn?.(row) ?? null;
 }
 
+function stepBadge(row: TData): { label: string; variant: "default" | "error" } | null {
+  return props.stepBadgeFn?.(row) ?? null;
+}
+
+function isSkippedPreview(row: TData): boolean {
+  return props.mode === "preview" && getDotState(row) === "skip";
+}
+
+function stepNumber(row: TData): string {
+  const n = rowIndex(row) + 1;
+  return props.numberPrefix ? `${props.numberPrefix}.${n}` : String(n);
+}
+
 // ── Column definitions ─────────────────────────────────────────────
 const isEditor = computed(() => props.mode === "editor");
 
@@ -260,6 +277,10 @@ const columns = computed<OTableColumnDef<TData>[]>(() => {
       // out of the column entirely.
       { id: "actions", header: raw(""), size: 168, isAction: true },
     ];
+  }
+  // A child's steps are a definition, not a run: no shot, timeline, time or actions.
+  if (props.mode === "preview") {
+    return [{ id: "details", header: raw(""), meta: { autoWidth: true } }];
   }
   // Results mode. Headers are named here because results mode renders them —
   // the run's steps are a table an engineer reads down, and an unlabelled
@@ -402,7 +423,7 @@ function handleUpdateExpanded(ids: string[]) {
     :show-header="mode === 'results'"
     :selection="selectionEnabled ? 'multiple' : 'none'"
     :selected-ids="selectedIds"
-    :expansion="'multiple'"
+    :expansion="mode === 'preview' ? 'none' : 'multiple'"
     :expanded-ids="expandedIds"
     :enable-row-reorder="reorderEnabled"
     :disable-row-reorder="disableRowReorder"
@@ -414,7 +435,7 @@ function handleUpdateExpanded(ids: string[]) {
     :bordered="true"
     :default-columns="false"
     :fill-height="false"
-    :expand-on-row-click="true"
+    :expand-on-row-click="mode !== 'preview'"
     :get-row-status-color="getRowStatusColor"
     :get-cell-style="markerCellStyle"
     @row-reorder="handleRowReorder"
@@ -445,15 +466,21 @@ function handleUpdateExpanded(ids: string[]) {
     <!-- ── cell-details: Step content (both modes) ─────────────── -->
     <template #cell-details="{ row }">
       <div class="flex min-w-0 items-center gap-2">
-        <!-- Step number (editor mode — circle during replay, plain text otherwise) -->
         <span
-          v-if="mode === 'editor'"
+          v-if="mode !== 'results'"
           :class="[
             getDotState(row) ? dotClass(getDotState(row)) : '',
             'shrink-0 tabular-nums',
             getDotState(row) ? '' : 'text-text-muted w-6 text-center text-sm',
           ]"
-          :data-test="getDotState(row) ? `synthetics-journey-step-dot-${rowIndex(row)}` : undefined"
+          :data-test="
+            mode === 'preview'
+              ? `synthetics-journey-preview-step-${stepNumber(row)}`
+              : getDotState(row)
+                ? `synthetics-journey-step-dot-${rowIndex(row)}`
+                : undefined
+          "
+          :data-dot-state="mode === 'preview' ? getDotState(row) : undefined"
         >
           <OSpinner
             v-if="getDotState(row) === 'active'"
@@ -461,7 +488,7 @@ function handleUpdateExpanded(ids: string[]) {
             size="xs"
             class="text-accent"
           />
-          <template v-else>{{ rowIndex(row) + 1 }}</template>
+          <template v-else>{{ stepNumber(row) }}</template>
         </span>
 
         <!-- Selection is handled by OTable's built-in checkbox column when selection="multiple" -->
@@ -482,7 +509,12 @@ function handleUpdateExpanded(ids: string[]) {
         </div>
 
         <!-- Step display name -->
-        <span class="text-text-body min-w-0 flex-1 truncate text-sm">
+        <span
+          :class="[
+            isSkippedPreview(row) ? 'text-text-muted' : 'text-text-body',
+            'min-w-0 flex-1 truncate text-sm',
+          ]"
+        >
           {{ stepName(row) }}
         </span>
 
@@ -501,13 +533,19 @@ function handleUpdateExpanded(ids: string[]) {
           "
           >{{ stepProgress(row)!.done }}/{{ stepProgress(row)!.total }}</span
         >
+        <OBadge
+          v-else-if="mode === 'editor' && stepBadge(row)"
+          :variant="stepBadge(row)!.variant"
+          size="sm"
+          :data-test="`synthetics-journey-step-badge-${rowIndex(row)}`"
+          >{{ stepBadge(row)!.label }}</OBadge
+        >
 
-        <!-- Selector/value preview (editor mode only) -->
         <span
-          v-if="mode === 'editor' && stepDetail(row)"
+          v-if="mode !== 'results' && (stepDetail(row) || isSkippedPreview(row))"
           class="text-text-secondary max-w-[25%] shrink-0 truncate font-mono text-xs"
         >
-          {{ stepDetail(row) }}
+          {{ isSkippedPreview(row) ? t("synthetics.journey.subtest.notRun") : stepDetail(row) }}
         </span>
 
         <!-- Insertion marker: recorded steps land ABOVE this row. Absolutely

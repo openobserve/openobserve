@@ -41,9 +41,11 @@ const props = defineProps<{
   result: StepReplayResult;
   /** Position in the journey, so "re-run to here" can name what it will run. */
   stepNumber?: number;
+  /** Set only for a folded child result: the fix lives in that other test, so Open is offered. */
+  childName?: string;
 }>();
 
-const emit = defineEmits<{ "retry-replay": [] }>();
+const emit = defineEmits<{ "retry-replay": []; "open-child": [] }>();
 
 const { t } = useI18nTyped();
 
@@ -169,6 +171,16 @@ const fidelityNotes = computed(() => props.result.fidelity?.notes ?? []);
             ? t("synthetics.journey.reRunToHere", { step: stepNumber })
             : t("synthetics.journey.reRun")
         }}
+      </OButton>
+      <OButton
+        v-if="childName"
+        variant="outline"
+        size="xs"
+        icon-left="open-in-new"
+        data-test="synthetics-journey-error-open-child-btn"
+        @click="emit('open-child')"
+      >
+        {{ t("synthetics.journey.subtest.openChild", { name: childName }) }}
       </OButton>
     </div>
   </div>

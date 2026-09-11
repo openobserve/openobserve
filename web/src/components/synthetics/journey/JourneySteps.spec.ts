@@ -1016,4 +1016,156 @@ describe("JourneySteps", () => {
       );
     });
   });
+
+  // ── Preview mode ───────────────────────────────────────────────────
+  // A child's steps are a definition, not a run, so none of the results chrome applies.
+  describe("preview mode", () => {
+    const CELLS_ABSENT = [
+      "o2-table-cell-actions",
+      "o2-table-cell-step",
+      "o2-table-cell-screenshot",
+      "o2-table-cell-progress",
+      "o2-table-cell-duration",
+    ];
+
+    function mountPreview(props: Record<string, unknown> = {}) {
+      return mount(JourneySteps, {
+        props: { data: makeSteps(3), mode: "preview", numberPrefix: "2", ...props } as any,
+        global: { stubs: STUBS },
+      }) as VueWrapper;
+    }
+
+    it("renders only the details column — no header, shot, timeline, time or action cells", async () => {
+      wrapper = mountPreview();
+      await flushPromises();
+
+      const table = wrapper.findComponent({ name: "OTable" });
+      expect(table.props("showHeader")).toBe(false);
+      const cols = table.props("columns") as Array<{ id: string }>;
+      expect(cols.map((c) => c.id)).toEqual(["details"]);
+
+      expect(wrapper.findAll('[data-test="o2-table-cell-details"]')).toHaveLength(3);
+      for (const cell of CELLS_ABSENT) {
+        expect(wrapper.find(`[data-test="${cell}"]`).exists(), `${cell} rendered`).toBe(false);
+      }
+      expect(wrapper.find('[data-test="synthetics-journey-step-delete-btn"]').exists()).toBe(false);
+    });
+
+    it("numbers rows as {prefix}.{index+1}", async () => {
+      wrapper = mountPreview({ numberPrefix: "2" });
+      await flushPromises();
+
+      for (const n of [1, 2, 3]) {
+        const num = wrapper.find(`[data-test="synthetics-journey-preview-step-2.${n}"]`);
+        expect(num.exists(), `row ${n} carries no prefixed number`).toBe(true);
+        expect(num.text()).toBe(`2.${n}`);
+      }
+      wrapper.unmount();
+
+      // The prefix is whatever the caller passes, not a fixed "2".
+      wrapper = mountPreview({ numberPrefix: "7" });
+      await flushPromises();
+      const seventh = wrapper.find('[data-test="synthetics-journey-preview-step-7.1"]');
+      expect(seventh.exists()).toBe(true);
+      expect(seventh.text()).toBe("7.1");
+      expect(wrapper.find('[data-test="synthetics-journey-preview-step-2.1"]').exists()).toBe(
+        false,
+      );
+    });
+
+    it("does not expand or select a row on click", async () => {
+      wrapper = mount(JourneySteps, {
+        props: { data: makeSteps(2), mode: "preview", numberPrefix: "2" } as any,
+        global: { stubs: STUBS },
+        slots: { expansion: '<div data-test="preview-expansion">expanded</div>' },
+      });
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="o2-table-expand-cell"]').exists()).toBe(false);
+      expect(wrapper.find('input[type="checkbox"]').exists()).toBe(false);
+
+      await wrapper.find('[data-test="o2-table-row-0"]').trigger("click");
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="o2-table-expanded-row-0"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="preview-expansion"]').exists()).toBe(false);
+      expect(wrapper.emitted("update:expanded-ids")).toBeFalsy();
+      expect(wrapper.emitted("update:selected-ids")).toBeFalsy();
+    });
+
+    it("keeps the dot classes from dotStateFn on the numbered cell", async () => {
+      const states: Record<string, string> = {
+        "step-1": "pass",
+        "step-2": "fail",
+        "step-3": "skip",
+      };
+      wrapper = mountPreview({ dotStateFn: (row: BrowserStep) => states[row.id] });
+      await flushPromises();
+
+      const num = (n: number) =>
+        wrapper.find(`[data-test="synthetics-journey-preview-step-2.${n}"]`);
+      for (const n of [1, 2, 3])
+        expect(num(n).exists(), `row ${n} has no numbered cell`).toBe(true);
+      expect(num(1).attributes("data-dot-state")).toBe("pass");
+      expect(num(1).classes()).toContain("bg-badge-success-soft-bg");
+      expect(num(2).attributes("data-dot-state")).toBe("fail");
+      expect(num(2).classes()).toContain("bg-badge-error-soft-bg");
+      expect(num(3).attributes("data-dot-state")).toBe("skip");
+      expect(num(3).classes()).toContain("opacity-50");
+    });
+
+    it("renders the step badge in the progress slot on an editor row and nothing when the hook returns null", async () => {
+      wrapper = mount(JourneySteps, {
+        props: {
+          data: makeSteps(2),
+          mode: "editor",
+          stepBadgeFn: (row: BrowserStep) =>
+            row.id === "step-2" ? { label: "13 steps", variant: "error" } : null,
+        } as any,
+        global: { stubs: STUBS },
+      });
+      await flushPromises();
+
+      const badge = wrapper.find('[data-test="synthetics-journey-step-badge-1"]');
+      expect(badge.exists()).toBe(true);
+      expect(badge.text()).toBe("13 steps");
+      const badgeStub = wrapper
+        .findAllComponents(OBadgeStub)
+        .find((b) => b.attributes("data-test") === "synthetics-journey-step-badge-1");
+      expect(badgeStub?.props("variant")).toBe("error");
+      expect(wrapper.find('[data-test="synthetics-journey-step-badge-0"]').exists()).toBe(false);
+      wrapper.unmount();
+
+      // Editor rows only: a preview row has no progress slot to fill.
+      wrapper = mountPreview({ stepBadgeFn: () => ({ label: "3 steps", variant: "default" }) });
+      await flushPromises();
+      expect(wrapper.find('[data-test="synthetics-journey-step-badge-0"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="synthetics-journey-preview-step-2.1"]').exists()).toBe(true);
+    });
+
+    it("never renders a badge and a progress counter on the same row", async () => {
+      wrapper = mount(JourneySteps, {
+        props: {
+          data: makeSteps(2),
+          mode: "editor",
+          stepProgressFn: (row: BrowserStep) =>
+            row.id === "step-2" ? { done: 1, total: 3 } : null,
+          stepBadgeFn: () => ({ label: "3 steps", variant: "default" }),
+        } as any,
+        global: { stubs: STUBS },
+      });
+      await flushPromises();
+
+      // Row 1 is running its children: the counter wins and the badge yields.
+      expect(wrapper.find('[data-test="synthetics-journey-subtest-progress-1"]').exists()).toBe(
+        true,
+      );
+      expect(wrapper.find('[data-test="synthetics-journey-step-badge-1"]').exists()).toBe(false);
+      // Row 0 has no counter, so the badge renders there.
+      expect(wrapper.find('[data-test="synthetics-journey-subtest-progress-0"]').exists()).toBe(
+        false,
+      );
+      expect(wrapper.find('[data-test="synthetics-journey-step-badge-0"]').exists()).toBe(true);
+    });
+  });
 });

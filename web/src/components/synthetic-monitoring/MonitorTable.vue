@@ -112,7 +112,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #cell-referencedBy="{ row }">
       <span class="truncate" :data-test="`${dataTest}-cell-referencedBy`">{{
         (row as any).referencedBy
-          ? t("synthetics.table.usedByCount", { count: (row as any).referencedBy })
+          ? t(
+              "synthetics.table.usedByCount",
+              { count: (row as any).referencedBy },
+              (row as any).referencedBy,
+            )
           : "—"
       }}</span>
     </template>
