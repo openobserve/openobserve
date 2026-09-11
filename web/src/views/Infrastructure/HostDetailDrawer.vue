@@ -55,6 +55,11 @@ const props = defineProps<{
    * behind a live fleet would otherwise render un-badged (§5.3, §7.3).
    */
   lastSeenUs?: number | null;
+  /**
+   * This host's OWN first sample, µs — rides the list's existing last-seen aggregate.
+   * Stream stats only carry a fleet-wide doc_time_min, which cannot date an ephemeral pod.
+   */
+  firstSeenUs?: number | null;
 }>();
 
 const emit = defineEmits<{
@@ -191,6 +196,30 @@ const staleBanners = computed(() =>
     };
   }),
 );
+
+/** Below this share of the window the empty lead-in is too small to misread as a failure. */
+const LATE_START_MIN_SHARE = 0.1;
+
+/**
+ * The mirror of staleBanner: the leading empty axis is the host's age, not a
+ * collection gap. Yields to a stale banner — "it stopped" is the actionable half.
+ */
+const lateStartBanner = computed(() => {
+  const firstSeen = props.firstSeenUs;
+  if (firstSeen == null || firstSeen <= 0) return null;
+  if (staleBanners.value.length > 0) return null;
+  const span = drawerRange.value.to - drawerRange.value.from;
+  if (span <= 0) return null;
+  const gap = firstSeen - drawerRange.value.from;
+  if (gap / span < LATE_START_MIN_SHARE) return null;
+  // Same clock as the stale banner, so one drawer never shows two different ages.
+  const parts = durationParts(firstSeen, Math.max(drawerRange.value.to, Date.now() * 1000));
+  return {
+    duration: t(`infra.curated.${parts.key}` as never, { count: parts.count }),
+    date: timestampToTimezoneDate(Math.floor(firstSeen / 1000), store.state.timezone ?? "UTC"),
+  };
+});
+
 // MICROSECOND epoch, undivided — usePanelDataLoader reads these back as µs.
 const currentTimeObj = computed(() => ({
   __global: {
@@ -425,6 +454,18 @@ const statusLabel = computed(() =>
                 }}</OText
               >
             </div>
+            <OBanner
+              v-if="lateStartBanner"
+              variant="warning"
+              dense
+              data-test="curated-late-start-banner"
+              :content="
+                t('infra.curated.lateStartBanner', {
+                  duration: lateStartBanner.duration,
+                  date: lateStartBanner.date,
+                })
+              "
+            />
             <OBanner
               v-for="stale in staleBanners"
               :key="stale.id"

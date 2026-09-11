@@ -49,6 +49,13 @@ describe("hostsQueries — liveness & last-seen ride the 1-series-per-host load 
     expect(HOSTS_LAST_SEEN_SQL).toContain("GROUP BY host_name");
   });
 
+  it("first-seen rides the SAME aggregate as last-seen, so the banner costs no extra request", () => {
+    expect(HOSTS_LAST_SEEN_SQL).toContain("min(_timestamp)");
+    expect(HOSTS_LAST_SEEN_SQL).toContain("first_seen");
+    // One statement, one GROUP BY: a second SELECT here would be a second round trip.
+    expect(HOSTS_LAST_SEEN_SQL.match(/SELECT/gi)).toHaveLength(1);
+  });
+
   it("never keys liveness or last-seen on system_cpu_time (per-state × per-CPU blowup)", () => {
     expect(HOSTS_LIVENESS_QUERY).not.toContain("system_cpu_time");
     expect(HOSTS_LAST_SEEN_SQL).not.toContain("system_cpu_time");

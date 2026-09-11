@@ -451,6 +451,50 @@ describe("HostDetailDrawer", () => {
       expect(text).not.toContain("{capability}");
     });
 
+    it("a host whose data starts well into the window names when it started", async () => {
+      // 90% of the window is empty axis before the first point — the chart reads as
+      // a product failure until the banner says the host is simply younger than it.
+      const started = RANGE.to - Math.floor((RANGE.to - RANGE.from) * 0.1);
+      wrapper = await mountDrawer({ firstSeenUs: started });
+      const banner = wrapper.find('[data-test="curated-late-start-banner"]');
+      expect(banner.exists()).toBe(true);
+      const text = banner.text();
+      expect(text).toContain("started reporting");
+      expect(text).toMatch(/started reporting \d+ (minute|hour|day)s? ago/);
+      expect(text).not.toContain("{duration}");
+      expect(text).not.toContain("{date}");
+    });
+
+    it("no late-start banner when the host's data covers the window", async () => {
+      wrapper = await mountDrawer({ firstSeenUs: RANGE.from });
+      expect(wrapper.find('[data-test="curated-late-start-banner"]').exists()).toBe(false);
+    });
+
+    it("no late-start banner for a trivial gap under the 10% threshold", async () => {
+      // A host that starts 2% into the window has a full-looking chart; warning is noise.
+      const started = RANGE.from + Math.floor((RANGE.to - RANGE.from) * 0.02);
+      wrapper = await mountDrawer({ firstSeenUs: started });
+      expect(wrapper.find('[data-test="curated-late-start-banner"]').exists()).toBe(false);
+    });
+
+    it("no late-start banner without a firstSeenUs — silence beats a guess", async () => {
+      wrapper = await mountDrawer({ firstSeenUs: null });
+      expect(wrapper.find('[data-test="curated-late-start-banner"]').exists()).toBe(false);
+    });
+
+    it("a host that started late AND stopped reporting shows ONLY the stale banner", async () => {
+      // Both are true, but "it stopped" is the actionable one; stacking two warning
+      // bars over the same panels reads as noise and dilutes both.
+      const started = RANGE.to - Math.floor((RANGE.to - RANGE.from) * 0.1);
+      wrapper = await mountDrawer({
+        status: "INACTIVE",
+        lastSeenUs: STALE_LAST_SEEN,
+        firstSeenUs: started,
+      });
+      expect(wrapper.find('[data-test="curated-stale-banner"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="curated-late-start-banner"]').exists()).toBe(false);
+    });
+
     it("the per-host lastSeenUs BEATS a fleet-fresh stream max (§5.3 pin override)", async () => {
       // Stream stats are fleet-wide: a dead host behind a live fleet keeps every
       // system_* doc_time_max fresh, so per-stream staleness is the wrong granularity.

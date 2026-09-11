@@ -47,6 +47,9 @@ export interface HostRow {
   /** The raw µs behind `lastSeen` — the curated drawer badges off THIS host's
    * own last-seen, which a formatted string cannot be compared against. */
   lastSeenUs: number | null;
+  /** This host's OWN first sample, µs. Stream stats carry a fleet-wide doc_time_min,
+   * which says nothing about when an ephemeral pod started reporting. */
+  firstSeenUs: number | null;
 }
 
 export interface HostsRefreshArgs {
@@ -167,9 +170,14 @@ export function useHostsList() {
     }
 
     const lastSeenByHost = new Map<string, number>();
+    const firstSeenByHost = new Map<string, number>();
     if (lastSeen.status === "fulfilled") {
       for (const hit of lastSeen.value?.data?.hits ?? []) {
-        if (hit?.host_name) lastSeenByHost.set(hit.host_name, Number(hit.last_seen));
+        if (!hit?.host_name) continue;
+        lastSeenByHost.set(hit.host_name, Number(hit.last_seen));
+        // A missing or 0 first_seen would format as the Unix epoch, so it must stay absent.
+        const first = Number(hit.first_seen);
+        if (Number.isFinite(first) && first > 0) firstSeenByHost.set(hit.host_name, first);
       }
     }
 
@@ -209,6 +217,7 @@ export function useHostsList() {
             ? timestampToTimezoneDate(lastSeenRaw, timezone, LAST_SEEN_FORMAT)
             : null,
         lastSeenUs: lastSeenRaw ?? null,
+        firstSeenUs: firstSeenByHost.get(host) ?? null,
       });
     }
     rows.value = joined;
