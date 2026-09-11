@@ -6830,7 +6830,8 @@
         "time": "1235846a41c69aa3"
       },
       "unnamedInstance": "11ca9f99e438664d",
-      "unnamedInstanceHint": "d793c53a423bbdd2"
+      "unnamedInstanceHint": "d793c53a423bbdd2",
+      "viewMetrics": "7b19ee50ebad5717"
     },
     "deadlocks": {
       "chips": {
@@ -6995,10 +6996,10 @@
     "detail": {
       "alertMe": "1355b68662d07dfb",
       "ambiguousStream": "3c562653886e1647",
-      "backToActivity": "34d780645a414747",
-      "backToDeadlocks": "a6b541030fe3261a",
-      "backToQueries": "5ed06ee85e01f804",
-      "backToSamples": "8a6b8936570d755b",
+      "backToActivity": "0651863bf5d90226",
+      "backToDeadlocks": "89de8c20698b05f1",
+      "backToQueries": "983da7fa4c1ce759",
+      "backToSamples": "2fc98e7cbda69451",
       "belowTopN": {
         "body": "9ee77ac546b24b11",
         "capped": "cb6d6e6e5233fd45",
@@ -7342,6 +7343,129 @@
         "serverWait": "fc05f7d3f854cb6f"
       }
     },
+    "metrics": {
+      "byDims": {
+        "client": "0241e5a36a514a02",
+        "database": "09f90538154a4536",
+        "device": "2324c8a3e5ce8379",
+        "direction": "1d9cc201c6936074",
+        "host": "f065ffb94e4991a3",
+        "index": "de2d6f242dc9bfcf",
+        "lockType": "1f46349b13702ffe",
+        "mode": "148ac1311357dd76",
+        "operation": "a8ec4672c5ab75cb",
+        "query": "def5c0449a839a19",
+        "service": "7255f405884ea856",
+        "state": "683f53235f727136",
+        "table": "5ade50b92ff6640f"
+      },
+      "catalog": {
+        "activity": {
+          "desc": "ed234c491c5b02d5",
+          "title": "38da1505ca837328"
+        },
+        "blocks": {
+          "desc": "3eda16f0ceafcda6",
+          "title": "1cd5a6687bb76e39"
+        },
+        "host": {
+          "desc": "5ee58f8e8cd4ddb0",
+          "loopbackHint": "4c9e5f1d2fd3f51e",
+          "managedNote": "7d1298720ec7dfb6",
+          "matchHint": "06fce3b5d4ed6680",
+          "title": "4a823118b9ba8baa"
+        },
+        "indexes": {
+          "desc": "9c6d587e7fd7c080",
+          "title": "90b901a30c3f089e"
+        },
+        "locks": {
+          "desc": "ec6ba3dee221858a",
+          "title": "8ecd1d82f6dc6aa3"
+        },
+        "replication": {
+          "desc": "8ee1557b0b2dcb9a",
+          "title": "0b73ca14b5d89fd5"
+        },
+        "vacuum": {
+          "desc": "f99c8875ee0727bd",
+          "title": "f93faa368bc7aefa"
+        }
+      },
+      "catalogPanels": {
+        "avgDuration": "b49f533ad93bb449",
+        "blksDirtied": "d70d279c40175e9f",
+        "blksHit": "cb95caff82ba9917",
+        "blksRead": "f0a593793b314d34",
+        "calls": "cc9896903088b702",
+        "commits": "d09648c6058a4c84",
+        "cpuUtilization": "75c740bec59650c3",
+        "diskIo": "26b891891b3cf0d8",
+        "indexScans": "df3b7307edc7b638",
+        "indexSize": "adbb92cef497509b",
+        "locks": "8ecd1d82f6dc6aa3",
+        "memoryUsage": "c3963aedaac6c83c",
+        "networkIo": "c877e0d08555854d",
+        "rollbacks": "6b912ea0de9a8012",
+        "rowsByState": "f0240be28daf93f5",
+        "rowsModified": "f50888817dcd5ce5",
+        "walLag": "7efbb8c055abe0ae"
+      },
+      "explore": "1f415b8020f2fd3a",
+      "limitLegend": "82dd3a084fd8e4ce",
+      "load": {
+        "breakdowns": {
+          "database": "9b171ed3d717b7c5",
+          "query": "4a39c8f2c83d5901",
+          "user": "860ab0fed06c73cd",
+          "waitEvent": "820729b9136d20ce"
+        },
+        "hint": "1b9c76fac5982efd",
+        "sessionsAxis": "9f03f93c8a93c661",
+        "timeAxis": "33b93476cf597a33",
+        "title": "16279300a5041ae0",
+        "viewActivity": "e6fdce4b90b71677",
+        "waitEventAxis": "bfd4d98982c18ef7"
+      },
+      "noAccess": "e61e5d2a3ebc1667",
+      "notCollecting": {
+        "checklistTitle": "5d4b90accf7ef2da",
+        "checks": {
+          "enabled": {
+            "no": "e8852e30fff1ea6e",
+            "noDetail": "18af626e589ec22e",
+            "ok": "ffd2eb1c9f8b7584",
+            "okDetail": "0cdc447f4cd88638"
+          },
+          "receivers": {
+            "no": "bfaffcc577daa32a",
+            "noDetail": "0d2ba9e19a82c3bf"
+          }
+        },
+        "description": "58d40b3b9e70a5d5",
+        "title": "3484b15d466da396"
+      },
+      "railLabel": "12234a8e6ebf8518",
+      "roleTitle": "264dd06eafd6e223",
+      "roles": {
+        "cacheHit": "afce0ac33adb8ce6",
+        "cacheHitRatio": "3d26daa1cac85787",
+        "cacheRead": "fb43f3cee723b9b6",
+        "connectionLimit": "af530b891b8ece4d",
+        "connections": "dc273117482b4429",
+        "deadlocks": "cdc2395de66afa4f",
+        "replicationLag": "2015a82f970200d0"
+      },
+      "searchPlaceholder": "e85d6e4ee345e48c",
+      "sections": {
+        "featured": "7f647166bc698340",
+        "mysql": "cbe68c834f358536",
+        "postgresql": "61c2c3758d95d6e0"
+      },
+      "subtitle": "e461832b126875e3",
+      "title": "a58da793c7250f1b",
+      "triageOrder": "05030bd3c311c609"
+    },
     "page": {
       "tabs": {
         "activity": "38da1505ca837328",
@@ -7352,6 +7476,8 @@
         "deadlocks": "cdc2395de66afa4f",
         "deadlocksHint": "d222bc383310eb1a",
         "deadlocksLocked": "ceabd3594d40a0ff",
+        "metrics": "a58da793c7250f1b",
+        "metricsHint": "7424450a925d3006",
         "overview": "d4b1ea5708dd5329",
         "queries": "6fbe590f4fe13e19",
         "samples": "7e38c4258cbb11a2",
@@ -8322,6 +8448,8 @@
     "editRole": {
       "all": "a52ace420f2175d0",
       "childResource": "916cd7c979a0b3e2",
+      "dbmPresetNoMatch": "db8e3bdafce56e16",
+      "dbmPresetSeeded": "5248e9a5b6aace4f",
       "forAllInstances": "6407662fdde3ff55",
       "help": "b79cac926e0b2e34",
       "json": "db1a21a0bc2ef8fb",
@@ -8508,6 +8636,7 @@
       },
       "startFrom": {
         "custom": "65d4693d5515d59d",
+        "dbm": "80587b3a5bcb24cc",
         "label": "eb3f51dc872678ef",
         "readonly": "ed341b3c0f86483a"
       }

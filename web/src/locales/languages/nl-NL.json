@@ -2057,7 +2057,8 @@
       "startFrom": {
         "label": "Begin vanaf",
         "custom": "Aangepast (lege rol)",
-        "readonly": "Alleen-lezen (bekijk de toegang tot alle bronnen)"
+        "readonly": "Alleen-lezen (bekijk de toegang tot alle bronnen)",
+        "dbm": "Database Monitoring-viewer (alleen-lezen op de DB Monitoring-module en de metriekstreams die het tabblad Metrieken opvraagt)"
       },
       "name": {
         "required": "De naam van de rol is vereist.",
@@ -2093,7 +2094,9 @@
       "loadFailed": "Details van rol laden mislukt. Doorverwijzen naar rollenlijst.",
       "noUpdatesDetected": "Geen wijzigingen gedetecteerd.",
       "updateSuccess": "Rol succesvol bijgewerkt!",
-      "updateError": "Fout bij het bijwerken van rol!"
+      "updateError": "Fout bij het bijwerken van rol!",
+      "dbmPresetSeeded": "Vooraf geselecteerde leestoegang op {matched} van {total} DB Monitoring-metriekstreams, plus de DB Monitoring-module. Controleer vóór opslaan.",
+      "dbmPresetNoMatch": "Geen van de {total} DB Monitoring-metriekstreams bestaat nog in deze organisatie, dus er is niets vooraf geselecteerd op deze streams; de toekenning voor de DB Monitoring-module is alsnog klaargezet."
     },
     "rolesPage": {
       "subtitle": "Rollen bundelen machtigingen — wijs ze toe aan gebruikers, serviceaccounts of groepen om toegang te verlenen.",
@@ -16298,6 +16301,7 @@
       },
       "databaseCount": "1 database | {count} databases",
       "openQueries": "Bekijk de query's",
+      "viewMetrics": "Metrieken bekijken",
       "alertMe": "Waarschuw mij",
       "columnHints": {
         "qps": "Aanroepen per seconde — de aanroepen van dit venster gedeeld door de lengte ervan, zodat een weergave van 15 minuten en een van 4 uur vergelijkbaar blijven.",
@@ -16558,10 +16562,10 @@
         "missingDescription": "Deze pagina beschrijft één query, en het adres noemt er geen. Als je net van organisatie bent gewisseld, hoort de query die je aan het lezen was bij de organisatie die je hebt verlaten.",
         "action": "Blader door de queries van deze organisatie"
       },
-      "backToQueries": "Terug naar top-queries",
-      "backToActivity": "Terug naar activiteit",
-      "backToSamples": "Terug naar langzaamste aanroepen",
-      "backToDeadlocks": "Terug naar deadlocks",
+      "backToQueries": "Top Queries",
+      "backToActivity": "activiteit",
+      "backToSamples": "traagste aanroepen",
+      "backToDeadlocks": "deadlocks",
       "latencyTitle": "Snelheid over tijd",
       "volumeTitle": "Aanroepen en fouten over tijd",
       "endpointsTitle": "Waar het wordt aangeroepen",
@@ -16726,6 +16730,8 @@
     "page": {
       "tabs": {
         "overview": "Overzicht",
+        "metrics": "Metrieken",
+        "metricsHint": "Databaseload per wachtgebeurtenis, en elke metriek die je databasereceivers verzamelen.",
         "queries": "Top queries",
         "samples": "Langzaamste aanroepen",
         "samplesHintClient": "Voltooide aanroepen die uw geïnstrumenteerde services in dit venster hebben waargenomen — aanroepers zonder tracing worden niet meegeteld, dus dit is een ondergrens, niet het totaal. De tabel toont de langzaamste daarvan.",
@@ -16742,6 +16748,129 @@
         "deadlocksLocked": "Deadlocks is een Enterprise-functie. Upgrade om te zien welke queries tegen elkaar deadlocked zijn en waarom. De andere database-tabbladen werken op elk abonnement.",
         "blockedLocked": "Geblokkeerde queries is een Enterprise-functie. Upgrade om te zien welke sessies op een lock wachten en wat die vasthoudt. De andere database-tabbladen werken op elk abonnement.",
         "tableHealthLocked": "Tabelgezondheid is een Enterprise-functie. Upgrade om tabelgrootte, bloat en vacuumstatus bij te houden. De andere database-tabbladen werken op elk abonnement."
+      }
+    },
+    "metrics": {
+      "title": "Metrieken",
+      "subtitle": "Databaseload en elke metriek die je databasereceivers verzamelen, in grafieken weergegeven over dit venster",
+      "load": {
+        "title": "Databaseload",
+        "hint": "Gemiddeld aantal sessies dat actief werkt per interval, gestapeld op de gekozen dimensie. Inactieve verbindingen zijn uitgesloten; een sessie die op niets wacht, draait op CPU. Sleep over een piek om elke grafiek daarop in te zoomen.",
+        "timeAxis": "Tijd",
+        "sessionsAxis": "Gem. actieve sessies",
+        "waitEventAxis": "Wachtgebeurtenis",
+        "viewActivity": "Bekijk in Activiteit",
+        "breakdowns": {
+          "waitEvent": "Per wachtgebeurtenis",
+          "query": "Per query",
+          "database": "Per database",
+          "user": "Per gebruiker"
+        }
+      },
+      "limitLegend": "verbindingslimiet",
+      "explore": "Openen in Metrieken Verkenner",
+      "railLabel": "Metriekensecties",
+      "noAccess": "Je hebt geen toestemming om {stream} te lezen. Vraag een beheerder om leestoegang tot deze stream.",
+      "byDims": {
+        "query": "per query",
+        "database": "per database",
+        "service": "per service",
+        "operation": "per operatie",
+        "mode": "per modus",
+        "lockType": "per locktype",
+        "table": "per tabel",
+        "index": "per index",
+        "client": "per client",
+        "state": "per status",
+        "direction": "per richting",
+        "device": "per apparaat",
+        "host": "per host"
+      },
+      "catalog": {
+        "activity": {
+          "title": "Activiteit",
+          "desc": "Doorvoer, transacties en rijverloop"
+        },
+        "locks": {
+          "title": "Vergrendelingen",
+          "desc": "Vergrendelingsdruk en wat deze vasthoudt"
+        },
+        "replication": {
+          "title": "Replicatie",
+          "desc": "WAL-druk en replica-achterstand"
+        },
+        "indexes": {
+          "title": "Indexen",
+          "desc": "Indexgebruik en -grootte per tabel"
+        },
+        "blocks": {
+          "title": "Blokken",
+          "desc": "Shared-buffer-I/O toegeschreven aan query's, uit de eigen tellers van de database"
+        },
+        "vacuum": {
+          "title": "Vacuum",
+          "desc": "Levende en dode rijen per tabel"
+        },
+        "host": {
+          "managedNote": "Deze database draait op een cloud-beheerd endpoint (zoals Amazon RDS), dus de provider stelt geen host beschikbaar die uw collectors kunnen monitoren. Wis het databasefilter om hostmetrieken te zien voor de hosts die uw collectors wel rapporteren.",
+          "title": "Host",
+          "desc": "CPU, geheugen en I/O van de databasehost",
+          "loopbackHint": "instance verbonden via localhost — alle hosts worden getoond",
+          "matchHint": "hostmetrieken worden gekoppeld op hostnaam"
+        }
+      },
+      "catalogPanels": {
+        "calls": "Query-aanroepen",
+        "avgDuration": "Gemiddelde duur",
+        "commits": "Commits",
+        "rollbacks": "Rollbacks",
+        "rowsModified": "Gewijzigde rijen",
+        "locks": "Vergrendelingen",
+        "walLag": "WAL-achterstand",
+        "indexScans": "Indexscans",
+        "indexSize": "Indexgrootte",
+        "blksHit": "Shared blocks geraakt",
+        "blksRead": "Shared blocks gelezen",
+        "blksDirtied": "Shared blocks vervuild",
+        "rowsByState": "Rijen per status",
+        "cpuUtilization": "CPU-gebruik",
+        "memoryUsage": "Geheugen",
+        "diskIo": "Schijf-I/O",
+        "networkIo": "Netwerk-I/O"
+      },
+      "searchPlaceholder": "Metrieken filteren…",
+      "triageOrder": "gesorteerd op triage-relevantie",
+      "sections": {
+        "featured": "Belangrijkste gezondheidsmetrieken",
+        "postgresql": "PostgreSQL-metrieken",
+        "mysql": "MySQL- en MariaDB-metrieken"
+      },
+      "roleTitle": "{role} · {engine}",
+      "roles": {
+        "cacheHitRatio": "Cache-hitratio",
+        "connections": "Verbindingen",
+        "connectionLimit": "Verbindingslimiet",
+        "replicationLag": "Replicatie-achterstand",
+        "cacheHit": "Cache-hits",
+        "cacheRead": "Cache-schijflezingen",
+        "deadlocks": "Deadlocks"
+      },
+      "notCollecting": {
+        "title": "Er komen geen databasemetrieken binnen",
+        "description": "De belastingsgrafiek hierboven leest de activiteitsmonsters, maar er bestaan nog geen metriek-streams van een databasereceiver in deze organisatie. De collectorrecepten op de database-installatiekaarten leveren deze mee.",
+        "checklistTitle": "Wat u moet controleren",
+        "checks": {
+          "receivers": {
+            "no": "Geen enkele databasereceiver stuurt metrieken",
+            "noDetail": "De PostgreSQL- en MySQL-installatiekaarten onder Gegevensbronnen configureren de metriekreceiver van de collector naast de monitoringfeeds."
+          },
+          "enabled": {
+            "ok": "Databasemonitoring is ingeschakeld",
+            "okDetail": "zodat de metrieken hier worden weergegeven zodra een receiver ze levert",
+            "no": "Databasemonitoring is uitgeschakeld",
+            "noDetail": "ZO_DB_MONITORING_ENABLED staat uit voor deze deployment, dus de databasetabbladen verzamelen niets."
+          }
+        }
       }
     },
     "samples": {

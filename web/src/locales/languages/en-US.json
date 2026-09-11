@@ -2057,7 +2057,8 @@
       "startFrom": {
         "label": "Start from",
         "custom": "Custom (empty role)",
-        "readonly": "Read-only (view access to all resources)"
+        "readonly": "Read-only (view access to all resources)",
+        "dbm": "Database Monitoring viewer (read-only on the DB Monitoring module and the metric streams its Metrics tab queries)"
       },
       "name": {
         "required": "Role name is required.",
@@ -2093,7 +2094,9 @@
       "loadFailed": "Failed to load role details. Redirecting to roles list.",
       "noUpdatesDetected": "No updates detected.",
       "updateSuccess": "Updated role successfully!",
-      "updateError": "Error while updating role!"
+      "updateError": "Error while updating role!",
+      "dbmPresetSeeded": "Pre-selected read access on {matched} of {total} DB Monitoring metric streams, plus the DB Monitoring module. Review before saving.",
+      "dbmPresetNoMatch": "None of the {total} DB Monitoring metric streams exist in this organization yet, so nothing was pre-selected on them; the DB Monitoring module grant was still staged."
     },
     "rolesPage": {
       "subtitle": "Roles bundle permissions — assign them to Users, Service Accounts, or Groups to grant access.",
@@ -16298,6 +16301,7 @@
       },
       "databaseCount": "1 database | {count} databases",
       "openQueries": "See its queries",
+      "viewMetrics": "View metrics",
       "alertMe": "Alert me",
       "columnHints": {
         "qps": "Calls per second — this window's calls divided by its length, so a 15-minute view and a 4-hour view stay comparable.",
@@ -16558,10 +16562,10 @@
         "missingDescription": "This page describes one query, and the address doesn't name one. If you just switched organizations, the query you were reading belongs to the one you left.",
         "action": "Browse this organization's queries"
       },
-      "backToQueries": "Back to top queries",
-      "backToActivity": "Back to activity",
-      "backToSamples": "Back to slowest calls",
-      "backToDeadlocks": "Back to deadlocks",
+      "backToQueries": "top queries",
+      "backToActivity": "activity",
+      "backToSamples": "slowest calls",
+      "backToDeadlocks": "deadlocks",
       "latencyTitle": "Speed over time",
       "volumeTitle": "Calls and failures over time",
       "endpointsTitle": "Where it's called from",
@@ -16726,6 +16730,8 @@
     "page": {
       "tabs": {
         "overview": "Overview",
+        "metrics": "Metrics",
+        "metricsHint": "Database load by wait event, and every metric your database receivers collect.",
         "queries": "Top queries",
         "samples": "Slowest calls",
         "samplesHintClient": "Finished calls your instrumented services observed in this window — callers without tracing are not counted, so this is a floor, not the total. The table shows the slowest of them.",
@@ -16742,6 +16748,129 @@
         "deadlocksLocked": "Deadlocks is an Enterprise feature. Upgrade to see which queries deadlocked against each other, and why. The other database tabs work on every plan.",
         "blockedLocked": "Blocked queries is an Enterprise feature. Upgrade to see which sessions are waiting on a lock and what is holding it. The other database tabs work on every plan.",
         "tableHealthLocked": "Table health is an Enterprise feature. Upgrade to track table size, bloat and vacuum state. The other database tabs work on every plan."
+      }
+    },
+    "metrics": {
+      "title": "Metrics",
+      "subtitle": "Database load and every metric your database receivers collect, charted over this window",
+      "load": {
+        "title": "Database load",
+        "hint": "Average sessions actively working per interval, stacked by the chosen dimension. Idle connections are excluded; a session waiting on nothing is on CPU. Drag across a spike to zoom every chart to it.",
+        "timeAxis": "Time",
+        "sessionsAxis": "Avg active sessions",
+        "waitEventAxis": "Wait event",
+        "viewActivity": "View in Activity",
+        "breakdowns": {
+          "waitEvent": "By wait event",
+          "query": "By query",
+          "database": "By database",
+          "user": "By user"
+        }
+      },
+      "limitLegend": "connection limit",
+      "explore": "Open in Metrics Explorer",
+      "railLabel": "Metrics sections",
+      "noAccess": "You don't have permission to read {stream}. Ask an admin for read access to this stream.",
+      "byDims": {
+        "query": "by query",
+        "database": "by database",
+        "service": "by service",
+        "operation": "by operation",
+        "mode": "by mode",
+        "lockType": "by lock type",
+        "table": "by table",
+        "index": "by index",
+        "client": "by client",
+        "state": "by state",
+        "direction": "by direction",
+        "device": "by device",
+        "host": "by host"
+      },
+      "catalog": {
+        "activity": {
+          "title": "Activity",
+          "desc": "Throughput, transactions and row churn"
+        },
+        "locks": {
+          "title": "Locks",
+          "desc": "Locking pressure and what holds it"
+        },
+        "replication": {
+          "title": "Replication",
+          "desc": "WAL pressure and replica lag"
+        },
+        "indexes": {
+          "title": "Indexes",
+          "desc": "Index usage and size per table"
+        },
+        "blocks": {
+          "title": "Blocks",
+          "desc": "Shared-buffer I/O attributed to queries, from the database's own counters"
+        },
+        "vacuum": {
+          "title": "Vacuum",
+          "desc": "Live and dead rows per table"
+        },
+        "host": {
+          "managedNote": "This database runs on a cloud-managed endpoint (such as Amazon RDS), so its provider does not expose a host for your collectors to monitor. Clear the database filter to see host metrics for the hosts your collectors do report.",
+          "title": "Host",
+          "desc": "CPU, memory and I/O of the database host",
+          "loopbackHint": "instance dialled via localhost — showing all hosts",
+          "matchHint": "host metrics are matched by hostname"
+        }
+      },
+      "catalogPanels": {
+        "calls": "Query calls",
+        "avgDuration": "Average duration",
+        "commits": "Commits",
+        "rollbacks": "Rollbacks",
+        "rowsModified": "Rows modified",
+        "locks": "Locks",
+        "walLag": "WAL lag",
+        "indexScans": "Index scans",
+        "indexSize": "Index size",
+        "blksHit": "Shared blocks hit",
+        "blksRead": "Shared blocks read",
+        "blksDirtied": "Shared blocks dirtied",
+        "rowsByState": "Rows by state",
+        "cpuUtilization": "CPU utilization",
+        "memoryUsage": "Memory",
+        "diskIo": "Disk I/O",
+        "networkIo": "Network I/O"
+      },
+      "searchPlaceholder": "Filter metrics…",
+      "triageOrder": "ordered by triage relevance",
+      "sections": {
+        "featured": "Key health metrics",
+        "postgresql": "PostgreSQL metrics",
+        "mysql": "MySQL and MariaDB metrics"
+      },
+      "roleTitle": "{role} · {engine}",
+      "roles": {
+        "cacheHitRatio": "Cache hit ratio",
+        "connections": "Connections",
+        "connectionLimit": "Connection limit",
+        "replicationLag": "Replication lag",
+        "cacheHit": "Cache hits",
+        "cacheRead": "Cache disk reads",
+        "deadlocks": "Deadlocks"
+      },
+      "notCollecting": {
+        "title": "No database metrics are arriving",
+        "description": "The load chart above reads the activity samples, but no metric streams from a database receiver exist in this organization yet. The collector recipes on the database setup cards ship them.",
+        "checklistTitle": "What to check",
+        "checks": {
+          "receivers": {
+            "no": "No database receiver is sending metrics",
+            "noDetail": "The PostgreSQL and MySQL setup cards under Data sources configure the collector's metric receiver alongside the monitoring feeds."
+          },
+          "enabled": {
+            "ok": "Database monitoring is enabled",
+            "okDetail": "so the metrics will chart here as soon as a receiver ships them",
+            "no": "Database monitoring is disabled",
+            "noDetail": "ZO_DB_MONITORING_ENABLED is off for this deployment, so the database tabs are not collecting."
+          }
+        }
       }
     },
     "samples": {

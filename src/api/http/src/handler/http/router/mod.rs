@@ -106,6 +106,12 @@ pub fn cors_layer() -> CorsLayer {
             header::HeaderName::from_static("x-openobserve-span-id"),
             header::HeaderName::from_static("x-openobserve-trace-id"),
             header::HeaderName::from_static("x-openobserve-sampled"),
+            // The full set @openobserve/browser-rum's "openobserve" propagator
+            // injects — one missing name fails the preflight and kills every
+            // instrumented cross-origin API call as an opaque CORS error.
+            header::HeaderName::from_static("x-openobserve-origin"),
+            header::HeaderName::from_static("x-openobserve-parent-id"),
+            header::HeaderName::from_static("x-openobserve-sampling-priority"),
             X_O2_ASSISTANT_SESSION_ID,
         ])
         // Restrict CORS to the configured web_url origin, plus any extra origins in

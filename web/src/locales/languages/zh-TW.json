@@ -2057,7 +2057,8 @@
       "startFrom": {
         "label": "起始範本",
         "custom": "自訂（空白角色）",
-        "readonly": "唯讀（可檢視所有資源）"
+        "readonly": "唯讀（可檢視所有資源）",
+        "dbm": "資料庫監控檢視者（對資料庫監控模組及其指標分頁所查詢的指標串流皆為唯讀）"
       },
       "name": {
         "required": "角色名稱為必填。",
@@ -2093,7 +2094,9 @@
       "loadFailed": "載入角色詳細資料失敗。正在重新導向至角色列表。",
       "noUpdatesDetected": "未偵測到更新。",
       "updateSuccess": "角色更新成功！",
-      "updateError": "更新角色時發生錯誤！"
+      "updateError": "更新角色時發生錯誤！",
+      "dbmPresetSeeded": "已預先選取 {total} 個資料庫監控指標串流中的 {matched} 個的讀取權限，外加資料庫監控模組。儲存前請先檢閱。",
+      "dbmPresetNoMatch": "{total} 個資料庫監控指標串流在此組織中尚不存在，因此未在其上預先選取任何項目；資料庫監控模組的授權仍已暫存。"
     },
     "rolesPage": {
       "subtitle": "角色會綑綁多個權限——將角色指派給使用者、服務帳戶或群組，即可授予存取權限。",
@@ -16293,6 +16296,7 @@
       },
       "databaseCount": "1 個資料庫 | {count} 個資料庫",
       "openQueries": "查看其查詢",
+      "viewMetrics": "檢視指標",
       "alertMe": "提醒我",
       "columnHints": {
         "qps": "每秒呼叫數 — 此時間範圍的呼叫數除以時間長度，因此 15 分鐘檢視與 4 小時檢視仍然可比。",
@@ -16553,10 +16557,10 @@
         "missingDescription": "此頁面描述一個查詢，但網址未指明是哪一個。如果您剛切換了組織，您正在閱讀的查詢屬於您先前所在的組織。",
         "action": "瀏覽此組織的查詢"
       },
-      "backToQueries": "返回熱門查詢",
-      "backToActivity": "返回活動",
-      "backToSamples": "返回最慢的呼叫",
-      "backToDeadlocks": "返回死結",
+      "backToQueries": "熱門查詢",
+      "backToActivity": "活動",
+      "backToSamples": "最慢的呼叫",
+      "backToDeadlocks": "死鎖",
       "latencyTitle": "隨時間變化的速度",
       "volumeTitle": "隨時間變化的呼叫與失敗",
       "endpointsTitle": "呼叫來源位置",
@@ -16721,6 +16725,8 @@
     "page": {
       "tabs": {
         "overview": "總覽",
+        "metrics": "指標",
+        "metricsHint": "依等待事件顯示的資料庫負載，以及你的資料庫接收器所收集的每一項指標。",
         "queries": "熱門查詢",
         "samples": "最慢的呼叫",
         "samplesHintClient": "您的已埋點服務在此時間範圍內觀察到的已完成呼叫 — 未追蹤的呼叫端不會計入，因此這是下限而非總數。表格顯示其中最慢的呼叫。",
@@ -16737,6 +16743,129 @@
         "deadlocksLocked": "死結 (deadlock) 是 Enterprise 功能。升級以查看哪些查詢彼此發生死結，以及原因。其他資料庫分頁適用於所有方案。",
         "blockedLocked": "被封鎖的查詢是 Enterprise 功能。升級以查看哪些工作階段正在等待鎖定，以及什麼持有該鎖定。其他資料庫分頁適用於所有方案。",
         "tableHealthLocked": "資料表健康狀態是 Enterprise 功能。升級以追蹤資料表大小、膨脹與 vacuum 狀態。其他資料庫分頁適用於所有方案。"
+      }
+    },
+    "metrics": {
+      "title": "指標",
+      "subtitle": "資料庫負載，以及你的資料庫接收器所收集的每一項指標，皆繪製於此時間範圍內",
+      "load": {
+        "title": "資料庫負載",
+        "hint": "每個區間內平均正在工作的作用中工作階段數，依所選維度堆疊。閒置連線會排除；未等待任何項目的工作階段即在 CPU 上執行。在尖峰上拖曳即可將所有圖表縮放至該區間。",
+        "timeAxis": "時間",
+        "sessionsAxis": "平均作用中工作階段",
+        "waitEventAxis": "等待事件",
+        "viewActivity": "在活動中檢視",
+        "breakdowns": {
+          "waitEvent": "依等待事件",
+          "query": "依查詢",
+          "database": "依資料庫",
+          "user": "依使用者"
+        }
+      },
+      "limitLegend": "連線上限",
+      "explore": "在指標總管中開啟",
+      "railLabel": "指標區段",
+      "noAccess": "你沒有讀取 {stream} 的權限。請聯絡管理員以取得此串流的讀取權限。",
+      "byDims": {
+        "query": "依查詢",
+        "database": "依資料庫",
+        "service": "依服務",
+        "operation": "依操作",
+        "mode": "依模式",
+        "lockType": "依鎖定類型",
+        "table": "依資料表",
+        "index": "依索引",
+        "client": "依用戶端",
+        "state": "依狀態",
+        "direction": "依方向",
+        "device": "依裝置",
+        "host": "依主機"
+      },
+      "catalog": {
+        "activity": {
+          "title": "活動",
+          "desc": "輸送量、交易與資料列異動"
+        },
+        "locks": {
+          "title": "鎖定",
+          "desc": "鎖定壓力及其持有者"
+        },
+        "replication": {
+          "title": "複寫",
+          "desc": "WAL 壓力與複本延遲"
+        },
+        "indexes": {
+          "title": "索引",
+          "desc": "每張資料表的索引使用量與大小"
+        },
+        "blocks": {
+          "title": "區塊",
+          "desc": "歸因於查詢的共享緩衝區 I/O，來自資料庫本身的計數器"
+        },
+        "vacuum": {
+          "title": "Vacuum",
+          "desc": "每張表的即時與失效資料列"
+        },
+        "host": {
+          "managedNote": "此資料庫在雲端代管端點（例如 Amazon RDS）上執行，因此其供應商不會公開您收集器可監控的主機。清除資料庫篩選條件，即可查看您收集器確實回報之主機的主機指標。",
+          "title": "主機",
+          "desc": "資料庫主機的 CPU、記憶體與 I/O",
+          "loopbackHint": "執行個體透過 localhost 連線 — 顯示所有主機",
+          "matchHint": "主機指標會依主機名稱配對"
+        }
+      },
+      "catalogPanels": {
+        "calls": "查詢呼叫",
+        "avgDuration": "平均持續時間",
+        "commits": "提交",
+        "rollbacks": "回滾",
+        "rowsModified": "已修改的資料列",
+        "locks": "鎖定",
+        "walLag": "WAL 延遲",
+        "indexScans": "索引掃描",
+        "indexSize": "索引大小",
+        "blksHit": "共享區塊命中",
+        "blksRead": "共享區塊讀取",
+        "blksDirtied": "共享區塊變更",
+        "rowsByState": "依狀態分類的資料列",
+        "cpuUtilization": "CPU 使用率",
+        "memoryUsage": "記憶體",
+        "diskIo": "磁碟 I/O",
+        "networkIo": "網路 I/O"
+      },
+      "searchPlaceholder": "篩選指標…",
+      "triageOrder": "依分診相關性排序",
+      "sections": {
+        "featured": "重要健康指標",
+        "postgresql": "PostgreSQL 指標",
+        "mysql": "MySQL 與 MariaDB 指標"
+      },
+      "roleTitle": "{role} · {engine}",
+      "roles": {
+        "cacheHitRatio": "快取命中率",
+        "connections": "連線",
+        "connectionLimit": "連線限制",
+        "replicationLag": "複寫延遲",
+        "cacheHit": "快取命中",
+        "cacheRead": "快取磁碟讀取",
+        "deadlocks": "死鎖"
+      },
+      "notCollecting": {
+        "title": "沒有資料庫指標送達",
+        "description": "上方負載圖表會讀取活動樣本，但此組織中尚不存在來自資料庫接收器的指標串流。資料庫設定卡片上的收集器配方會傳送它們。",
+        "checklistTitle": "檢查重點",
+        "checks": {
+          "receivers": {
+            "no": "沒有資料庫接收器正在傳送指標",
+            "noDetail": "資料來源下的 PostgreSQL 與 MySQL 設定卡片會設定收集器的指標接收器，以及監控資料饋送。"
+          },
+          "enabled": {
+            "ok": "資料庫監控已啟用",
+            "okDetail": "因此一旦接收器傳送這些指標，它們就會在此繪製成圖表",
+            "no": "資料庫監控已停用",
+            "noDetail": "此部署的 ZO_DB_MONITORING_ENABLED 已關閉，因此資料庫分頁不會收集資料。"
+          }
+        }
       }
     },
     "samples": {

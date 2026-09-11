@@ -540,6 +540,7 @@ describe("groupNavLinks", () => {
     expect(dbm?.titleKey).toBe("menu.databases");
     // Every DbmSectionTabs destination, so the entry stays lit across all tabs.
     expect(dbm?.activeOnRoutes).toEqual([
+      "dbmMetrics",
       "dbmQueries",
       "dbmSamples",
       "dbmQueryDetail",
