@@ -2644,12 +2644,14 @@
     "triggerKind": {
       "alertFired": {
         "label": "Alert Fired",
+        "tab": "Alerts",
         "node": "Alert Trigger",
         "desc": "Run when an alert fires",
         "intro": "When a linked alert fires, every downstream step receives this payload."
       },
       "incidentEvent": {
         "label": "Incident Event",
+        "tab": "Incidents",
         "node": "Incident Trigger",
         "desc": "Run on an incident lifecycle event",
         "intro": "When an incident event occurs, every downstream step receives this payload."
