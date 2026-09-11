@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            scroll column, so any section is one click away instead of a scroll. -->
       <aside
         v-if="railItems.length >= 3"
-        class="border-border-default w-44 shrink-0 overflow-y-auto border-r"
+        class="border-border-default w-44 shrink-0 overflow-y-auto border-e"
       >
         <DbmMetricsRail
           :items="railItems"

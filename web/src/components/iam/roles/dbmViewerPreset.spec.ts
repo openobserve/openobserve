@@ -17,9 +17,9 @@ const OFGA_UNSUPPORTED = /[:#?\s'"%&]/;
 // Every raw metric stream the Metrics tab's themed catalog can chart.
 const sectionCatalogStreams = (): string[] =>
   DBM_METRIC_SECTIONS.flatMap((section) =>
-    section.panels.filter((panel) => panel.source === "promql" && panel.metric).map(
-      (panel) => panel.metric as string,
-    ),
+    section.panels
+      .filter((panel) => panel.source === "promql" && panel.metric)
+      .map((panel) => panel.metric as string),
   );
 
 // Every raw metric stream the instance-metrics rail (Databases page) can read.

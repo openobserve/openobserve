@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :href="exploreUrl"
         target="_blank"
         rel="noopener"
-        class="text-text-label hover:text-accent relative ml-auto shrink-0"
+        class="text-text-label hover:text-accent relative ms-auto shrink-0"
         :data-test="`dbm-metric-panel-explore-${panelKey}`"
       >
         <OIcon name="open-in-new" size="xs" />

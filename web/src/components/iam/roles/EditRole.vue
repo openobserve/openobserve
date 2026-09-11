@@ -946,10 +946,7 @@ const seedReadonlyPreset = () => {
   });
 };
 
-const collectVisibleDbmReadGrants = (
-  row: Entity,
-  perms: readonly (keyof Entity["permission"])[],
-) =>
+const collectVisibleDbmReadGrants = (row: Entity, perms: readonly (keyof Entity["permission"])[]) =>
   perms
     .filter((perm) => {
       const permDetail = row.permission?.[perm];
