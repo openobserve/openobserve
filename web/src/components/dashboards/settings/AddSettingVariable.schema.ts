@@ -68,7 +68,10 @@ export const makeAddSettingVariableSchema = (t: (_key: string) => string) =>
       hideOnDashboard: z.boolean().optional().default(false),
       selectAllValueForMultiSelect: z.string().optional().default("first"),
       customMultiSelectValue: z.array(z.string()).optional().default([]),
-      escapeSingleQuotes: z.boolean().optional().default(false),
+      // Substitution now always escapes embedded single quotes regardless of this
+      // field (see docs/sql-string-literal-escaping.md) — kept only so saved
+      // dashboards with the old opt-in setting still parse.
+      escapeSingleQuotes: z.boolean().optional().default(true),
     })
     .superRefine((val, ctx) => {
       if (

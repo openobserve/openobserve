@@ -312,6 +312,22 @@ describe("replaceQueryValue", () => {
     expect(query).toContain("'staging'");
   });
 
+  // Regression: escaping must apply regardless of the variable's own
+  // escapeSingleQuotes flag (makeInstWithVar sets it to false above) — the
+  // substitution now always doubles an embedded single quote.
+  it("escapes an embedded single quote in a scalar variable even when escapeSingleQuotes is false", () => {
+    const inst = makeInstWithVar("city", "O'Hare");
+    const { query } = inst.replaceQueryValue("SELECT * WHERE city='$city'", 0, 300_000_000, "sql");
+    expect(query).toContain("city='O''Hare'");
+  });
+
+  it("escapes an embedded single quote in each multi-select value", () => {
+    const inst = makeInstWithVar("city", ["O'Hare", "plain"], true);
+    const { query } = inst.replaceQueryValue("SELECT * WHERE city IN ($city)", 0, 300_000_000, "sql");
+    expect(query).toContain("'O''Hare'");
+    expect(query).toContain("'plain'");
+  });
+
   it("uses SELECT_ALL_VALUE (*) for null scalar variable value", () => {
     const varValues = [
       {
