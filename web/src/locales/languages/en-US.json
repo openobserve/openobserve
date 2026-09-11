@@ -16288,12 +16288,6 @@
       "columnLoad": "Load 15m (current)",
       "columnLastSeen": "Last seen",
       "memoryAbsolute": "{used} / {total}",
-      "logsEmpty": "No logs found in stream '{stream}' for this host in the selected range. If your agent writes to a different stream, open Logs and pick it.",
-      "logsNoStreams": "This organization has no log streams yet, so there are no host logs to show. Once an agent ships logs here, they appear on this tab.",
-      "logsNoHostField": "None of this organization's log streams carry a host field, so logs can't be narrowed to this host. Add a host attribute to your log pipeline, or open Logs to search them unfiltered.",
-      "exploreInLogs": "Explore in Logs",
-      "exploreTraces": "Explore traces for this host",
-      "tracesScopeNote": "Traces open in the Traces explorer scoped to this host and time range.",
       "openDashboard": "Open Host Metrics dashboard",
       "windowsLivenessNote": "Windows hosts appear in this list only when the agent reports the load metric (system_cpu_load_average_15m) — if your Windows agents are running but missing here, enable the load scraper in the collector config or update the agent.",
       "panel": {

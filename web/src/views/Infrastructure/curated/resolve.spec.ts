@@ -635,7 +635,7 @@ describe("token substitution", () => {
   });
 });
 
-describe("escaping helpers (moved from useHostDetail — §8.2 step 2)", () => {
+describe("escaping helpers", () => {
   it("promEscape backslash-escapes a backslash and a double quote, in that order", () => {
     expect(promEscape('he"llo')).toBe('he\\"llo');
     expect(promEscape("corp\\web-01")).toBe("corp\\\\web-01");
