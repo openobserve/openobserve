@@ -13685,6 +13685,8 @@
         "pickLabel": "Test to run here",
         "delta": "Adding \"{name}\" takes this test from {before} → {after} executed steps.",
         "lastRun": "Its last run took {seconds}s of the {budget}s allowance.",
+        "deltaUnknown": "Step impact unknown — a referenced test could not be loaded.",
+        "lastRunUnknown": "Time impact unknown — this test has not completed a run yet.",
         "raiseBudget": "Raise this test's run-time allowance if it starts being cut short.",
         "stepsBadge": "{count} steps",
         "ignoredEnv": "This test's own variables, auth and cookies are ignored here — the parent's apply.",

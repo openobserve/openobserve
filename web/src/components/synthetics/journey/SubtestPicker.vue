@@ -27,10 +27,8 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
  * executed steps, so a parent that already holds one reference must not
  * report its authored count when it executes more.
  *
- * Optional with a safe zero default (rather than the brief's strictly
- * required number) so a host that has not yet resolved the executed count —
- * `BrowserJourneyStepEditor`'s own `ownStepCount` prop is optional — can
- * still mount this component without failing type-check.
+ * It already includes this reference's own expansion, so it is the `after` figure; when the
+ * host cannot expand the journey it is `undefined` and the delta is withheld, never guessed.
  */
 const props = defineProps<{
   modelValue?: { id: string; name?: string };
@@ -66,17 +64,24 @@ onMounted(async () => {
 
 async function onPick(id: string) {
   const check = (await syntheticsService.get(org.value, id)).data;
-  childSteps.value = check.config?.steps?.length ?? 0;
   const runs = (await syntheticsService.getRuns(org.value, id, { page_size: 1 })).data.runs ?? [];
   const last = runs[0];
+  emit("update:modelValue", { id, name: check.name });
+  // Written after the emit and in one tick: a half-applied pick would render this component's
+  // new child against the host's previous count.
+  childSteps.value = check.config?.steps?.length ?? 0;
   lastRunSeconds.value = last?.completed_at
     ? Math.round((last.completed_at - last.created_at) / 1_000_000)
     : null;
-  emit("update:modelValue", { id, name: check.name });
 }
 
-const before = computed(() => props.ownStepCount ?? 0);
-const after = computed(() => before.value - 1 + (childSteps.value ?? 0));
+const after = computed(() => props.ownStepCount);
+const before = computed(() => {
+  const child = childSteps.value ?? 0;
+  // A count smaller than the child it is supposed to contain has not caught up with this pick.
+  if (after.value === undefined || after.value < child) return undefined;
+  return after.value - child;
+});
 const budgetSeconds = computed(() =>
   Math.round((props.journeyBudgetMs ?? DEFAULT_JOURNEY_BUDGET_MS) / 1000),
 );
@@ -99,7 +104,11 @@ const isSlow = computed(
     />
 
     <div v-if="childSteps !== null" class="flex flex-col gap-1">
-      <p class="text-text-secondary m-0 text-xs" data-test="synthetics-subtest-delta">
+      <p
+        v-if="before !== undefined"
+        class="text-text-secondary m-0 text-xs"
+        data-test="synthetics-subtest-delta"
+      >
         {{
           t("synthetics.journey.subtest.delta", {
             name: modelValue?.name ?? "",
@@ -107,6 +116,13 @@ const isSlow = computed(
             after,
           })
         }}
+      </p>
+      <p
+        v-else
+        class="text-text-secondary m-0 text-xs"
+        data-test="synthetics-subtest-delta-unknown"
+      >
+        {{ t("synthetics.journey.subtest.deltaUnknown") }}
       </p>
       <p
         v-if="lastRunSeconds !== null"
@@ -120,6 +136,14 @@ const isSlow = computed(
             budget: budgetSeconds,
           })
         }}
+      </p>
+      <!-- Silence would be indistinguishable from a broken warning, so say it is unknown. -->
+      <p
+        v-else
+        class="text-text-secondary m-0 text-xs"
+        data-test="synthetics-subtest-lastrun-unknown"
+      >
+        {{ t("synthetics.journey.subtest.lastRunUnknown") }}
       </p>
       <!-- The remedy comes before the number, mirroring validate_browser_config's
            convention of naming the fix before the figure that triggered it. -->

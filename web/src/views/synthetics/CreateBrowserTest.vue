@@ -517,16 +517,13 @@ const expansionMap = ref<ExpansionMap | undefined>(undefined);
  * How many steps this journey actually runs, expanding every subtest
  * reference — the number `SubtestPicker`'s insertion warning and the
  * server's 50-step cap are both measured in.
- *
- * Falls back to the authored `journey.length` until every referenced child
- * is in `childrenCache` (a first-paint case only — the cache is loaded on
- * mount).
  */
 const executedStepCount = computed(() => {
   try {
     return expandJourney(check.value.journey, childrenCache.value).steps.length;
   } catch {
-    return check.value.journey.length;
+    // `journey.length` is an AUTHORED count and cannot answer a question asked in executed steps.
+    return undefined;
   }
 });
 
@@ -553,8 +550,8 @@ const subtestIdsSignature = computed(() =>
  * reference row's preview, all of which render before any replay runs.
  * Fires once for the check as it loads (edit mode) and again whenever a
  * subtest step is added or removed. A failed fetch is logged, not fatal: the
- * affected surfaces fall back on their own (usage count 0, delta-only
- * warning, preview unavailable).
+ * affected surfaces fall back on their own (usage count 0, no step delta,
+ * preview unavailable).
  */
 watch(
   subtestIdsSignature,
