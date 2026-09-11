@@ -140,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, ref, h } from "vue";
+import { computed, ref, h, watch } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
@@ -208,6 +208,29 @@ function handleOTableExpansionChange(ids: string[]) {
     if (row) emits("expand:row", row);
   });
 }
+
+// Only the TRANSITIONS of the programmatic `row.expand` flag reach OTable's controlled `expandedRowIds`, so a row the user collapsed by hand stays collapsed.
+const rowExpandFlags = computed(() =>
+  props.rows.map((row: any) => ({ id: row?.name as string, expand: !!row?.expand })),
+);
+
+watch(
+  rowExpandFlags,
+  (flags, previous) => {
+    const wasExpanded = new Map((previous ?? []).map((flag) => [flag.id, flag.expand]));
+    const ids = new Set(expandedRowIds.value);
+    let changed = false;
+    flags.forEach(({ id, expand }) => {
+      if (!id || expand === (wasExpanded.get(id) ?? false)) return;
+      if (expand ? ids.has(id) : !ids.has(id)) return;
+      if (expand) ids.add(id);
+      else ids.delete(id);
+      changed = true;
+    });
+    if (changed) expandedRowIds.value = Array.from(ids);
+  },
+  { immediate: true, deep: true },
+);
 
 /**
  * Display label for the Object column. The underlying `row.type` is a machine value

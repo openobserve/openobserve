@@ -290,6 +290,7 @@ export const NAV_GROUPS: NavGroupDef[] = [
         // one list for both builds; the gate lives in the route, as it does for
         // the section itself.
         activeOnRoutes: [
+          "dbmMetrics",
           "dbmQueries",
           "dbmSamples",
           "dbmQueryDetail",

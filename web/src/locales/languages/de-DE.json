@@ -906,7 +906,7 @@
       "loadError": "Fehler beim Laden der Funktionen",
       "saved": "Funktion erfolgreich gespeichert",
       "updated": "Funktion erfolgreich aktualisiert",
-      "saveError": "Speichern der Funktion fehlgeschlagen",
+      "saveError": "Funktion konnte nicht gespeichert werden",
       "flatten": "Nach der Abflachung",
       "guidelinesTitle": "Richtlinien zur Funktionsausführung:",
       "rbf": "RBF (Ausführung vor der Abflachung):",
@@ -2096,7 +2096,8 @@
       "startFrom": {
         "label": "Beginne von",
         "custom": "Benutzerdefiniert (leere Rolle)",
-        "readonly": "Schreibgeschützt (Zugriff auf alle Ressourcen anzeigen)"
+        "readonly": "Schreibgeschützt (Zugriff auf alle Ressourcen anzeigen)",
+        "dbm": "Datenbanküberwachung-Viewer (schreibgeschützt für das Modul Datenbanküberwachung und die Metrik-Streams, die der Tab Metriken abfragt)"
       },
       "name": {
         "required": "Der Rollenname ist erforderlich.",
@@ -2132,7 +2133,9 @@
       "loadFailed": "Fehler beim Laden der Rollendetails. Weiterleitung zur Rollenliste.",
       "noUpdatesDetected": "Keine Aktualisierungen erkannt.",
       "updateSuccess": "Rolle erfolgreich aktualisiert!",
-      "updateError": "Fehler beim Aktualisieren der Rolle!"
+      "updateError": "Fehler beim Aktualisieren der Rolle!",
+      "dbmPresetSeeded": "Vorausgewählter Lesezugriff auf {matched} von {total} Metrik-Streams der Datenbanküberwachung, plus das Modul Datenbanküberwachung. Vor dem Speichern prüfen.",
+      "dbmPresetNoMatch": "Keiner der {total} Metrik-Streams der Datenbanküberwachung existiert bisher in dieser Organisation, daher wurde für sie nichts vorausgewählt; die Berechtigung für das Modul Datenbanküberwachung wurde dennoch vorbereitet."
     },
     "rolesPage": {
       "subtitle": "Rollen bündeln Berechtigungen — weisen Sie sie Benutzern, Dienstkonten oder Gruppen zu, um Zugriff zu gewähren.",
@@ -2631,7 +2634,7 @@
       "open": "Verlauf",
       "openFullView": "Vollständige Ausführungsansicht öffnen",
       "loadError": "Fehler beim Laden der Ausführungen",
-      "loadRunError": "Fehler beim Laden dieser Ausführung",
+      "loadRunError": "Fehler beim Laden dieses Durchlaufs",
       "retry": "Wiederholen",
       "retryTooltip": "Diesen fehlgeschlagenen Lauf mit den aufgezeichneten Eingaben erneut ausführen.",
       "retryTitle": "Diesen Lauf erneut ausführen?",
@@ -2643,16 +2646,16 @@
     "view": "Anzeigen",
     "delete": "Löschen",
     "deleteTitle": "Workflow löschen",
-    "deleteMessage": "Sind Sie sicher, dass Sie diesen Workflow löschen möchten?",
+    "deleteMessage": "Möchten Sie diesen Workflow wirklich löschen?",
     "deleteSuccess": "Workflow erfolgreich gelöscht",
     "deleteError": "Fehler beim Löschen des Workflows",
     "updateSuccess": "Workflow erfolgreich aktualisiert",
     "saveError": "Fehler beim Speichern des Workflows",
     "resumeSuccess": "{name} erfolgreich fortgesetzt",
-    "pauseSuccess": "{name} erfolgreich pausiert",
+    "pauseSuccess": "{name} erfolgreich angehalten",
     "toggleError": "Fehler beim Aktualisieren des Workflow-Status",
-    "triggerRequired": "Ein Trigger ist erforderlich",
-    "addStepRequired": "Fügen Sie mindestens einen Schritt nach dem Trigger hinzu",
+    "triggerRequired": "Ein Auslöser ist erforderlich",
+    "addStepRequired": "Fügen Sie mindestens einen Schritt nach dem Auslöser hinzu",
     "connectAllNodes": "Verbinden Sie alle Knoten vor dem Speichern",
     "branchPathsRequired": "Verbinden Sie jeden Verzweigungspfad mit einem Schritt | 1 Verzweigungsschritt hat Verbindungen, die nicht zu seinen Pfaden passen. Öffnen Sie ihn, definieren Sie die Pfade und schließen Sie die Verbindungen anschließend erneut an. | {count} Verzweigungsschritte haben Verbindungen, die nicht zu ihren Pfaden passen.",
     "finishStepsBeforePublish": "{count} Schritt benötigt Einrichtung vor der Veröffentlichung — auf der Arbeitsfläche hervorgehoben. | {count} Schritte benötigen Einrichtung vor der Veröffentlichung — auf der Arbeitsfläche hervorgehoben.",
@@ -2667,7 +2670,7 @@
     "triggerType": {
       "pick": "Wähle einen Trigger",
       "dialogTitle": "Neuen Workflow erstellen",
-      "dialogIntro": "Wähle, wie dieser Workflow ausgelöst wird. Weitere Trigger-Typen folgen bald.",
+      "dialogIntro": "Wählen Sie, wie dieser Workflow ausgelöst wird. Weitere Auslösertypen folgen in Kürze.",
       "cta": "Workflow erstellen",
       "soonCta": "Verfügbar in einer zukünftigen Version",
       "comingSoon": "In Kürze",
@@ -2776,18 +2779,18 @@
       "folderLabel": "Ordner",
       "alertsLabel": "Alarme",
       "alertsPlaceholder": "Alarme auswählen",
-      "noneSelected": "Noch keine Alarme ausgewählt.",
+      "noneSelected": "Noch keine Warnmeldungen ausgewählt.",
       "selectedCount": "{count} ausgewählt",
       "clear": "Alle löschen",
-      "empty": "Keine Alarme in dieser Organisation gefunden.",
-      "noAlertsInFolder": "Keine Alarme in diesem Ordner.",
-      "loadError": "Alarme konnten nicht geladen werden.",
+      "empty": "In dieser Organisation wurden keine Warnmeldungen gefunden.",
+      "noAlertsInFolder": "Keine Warnmeldungen in diesem Ordner.",
+      "loadError": "Warnmeldungen konnten nicht geladen werden.",
       "link": "Ausgewählte verknüpfen",
       "linkN": "{count} ausgewählte verknüpfen",
       "skip": "Jetzt überspringen",
-      "linkSuccess": "Mit {count} Alarm(en) verknüpft",
-      "linkPartial": "Verknüpft mit {count} Alert, {failed} fehlgeschlagen | Verknüpft mit {count} Alerts, {failed} fehlgeschlagen",
-      "linkError": "Alarme konnten nicht verknüpft werden."
+      "linkSuccess": "Mit {count} Warnmeldung verknüpft | Mit {count} Warnmeldungen verknüpft",
+      "linkPartial": "Mit {count} Warnmeldung verknüpft, {failed} fehlgeschlagen | Mit {count} Warnmeldungen verknüpft, {failed} fehlgeschlagen",
+      "linkError": "Warnmeldungen konnten nicht verknüpft werden."
     },
     "chooseTrigger": "Trigger auswählen",
     "start": {
@@ -2803,7 +2806,7 @@
       "branch": "Verzweigung",
       "function": "Funktion",
       "sendToDestination": "Ziel",
-      "configComingSoon": "Die Konfiguration von {node} erfolgt in einem späteren Schritt",
+      "configComingSoon": "Die Konfiguration für {node} folgt in einem späteren Schritt",
       "sectionTransform": "Transformieren",
       "sectionDestination": "Ziel",
       "stepSearchPlaceholder": "Schritte suchen...",
@@ -2818,13 +2821,13 @@
       "branchMoveDown": "Pfad nach unten verschieben",
       "branchPathNumber": "Pfad {index}",
       "branchElseTitle": "Sonstiges",
-      "branchElseHint": "Datensätze, auf die keiner der obigen Pfade zutrifft, werden hierher weitergeleitet.",
+      "branchElseHint": "Datensätze, die auf keinen der obigen Pfade passen, verlassen den Workflow hier.",
       "branchNoteTitle": "Hinweise zur Verzweigung",
-      "branchNoteFirstMatch": "Pfade werden von oben nach unten geprüft, und der ERSTE Treffer gewinnt. Daher verlässt jeder Datensatz über genau einen Pfad.",
-      "branchNoteUnwired": "Ein Pfad ohne Verbindung verwirft seine Datensätze einfach.",
+      "branchNoteFirstMatch": "Pfade werden von oben nach unten geprüft, und der ERSTE Treffer gewinnt, sodass jeder Datensatz genau einen Pfad verlässt.",
+      "branchNoteUnwired": "Ein Pfad, an dem nichts angeschlossen ist, verwirft seine Datensätze einfach.",
       "functionDesc": "Payload mit einer Funktion umformen",
       "destinationDesc": "An ein Ziel senden",
-      "triggerBody": "Wird ausgeführt, wenn ein zugehöriger Alarm ausgelöst wird",
+      "triggerBody": "Wird ausgeführt, wenn eine zugeordnete Warnmeldung ausgelöst wird",
       "triggerDataExampleNote": "Nur ein Beispiel – die tatsächlichen Spalten stammen aus der Abfrage Ihrer Benachrichtigung.",
       "incidentEventTypeLabel": "Ereignistyp",
       "incidentEventType": {
@@ -2849,7 +2852,7 @@
       "conditionNoteTitle": "Richtlinien für Bedingungen",
       "functionFlattenTitle": "Vor vs. nach dem Abflachen",
       "conditionNoteCustom": "Um eine benutzerdefinierte Spalte hinzuzufügen, geben Sie ihren Namen ein und drücken Sie die Eingabetaste.",
-      "functionBody": "Payload mit einer Funktion umformen",
+      "functionBody": "Formen Sie die Payload mit einer Funktion um",
       "functionBodySet": "Wendet {name} an",
       "functionSelect": "Funktion auswählen",
       "functionCreateNew": "Neue Funktion erstellen",
@@ -2904,11 +2907,11 @@
       "noMatchForwarded": "Keine Übereinstimmung — 0 von {total} Datensatz weitergeleitet | Keine Übereinstimmung — 0 von {total} Datensätzen weitergeleitet",
       "branchDropped": "{count} Datensatz passte zu keinem Pfad — verworfen | {count} Datensätze passten zu keinem Pfad — verworfen",
       "noUpstream": "Keine vorgelagerten Schritte.",
-      "noRunYet": "Noch kein Lauf.",
+      "noRunYet": "Noch kein Durchlauf.",
       "runLabel": "Ausführen",
       "switchRun": "Lauf wechseln",
-      "notInRun": "Dieser Schritt ist in diesem Lauf nicht enthalten.",
-      "noRunData": "Dieser Lauf hat keine Schrittdaten gespeichert.",
+      "notInRun": "Dieser Schritt ist in diesem Durchlauf nicht enthalten.",
+      "noRunData": "Dieser Lauf hat keine Schritt-Daten gespeichert.",
       "runTest": "Test ausführen",
       "noItems": "Keine Elemente",
       "itemsCount": "{count} Element | {count} Elemente",
@@ -2920,7 +2923,7 @@
       "editStep": "Schritt bearbeiten",
       "readOnlyRun": "Sie sehen einen früheren Lauf, daher kann die Konfiguration dieses Schritts hier nicht geändert werden.",
       "readOnlyRunEdit": "Im Workflow bearbeiten",
-      "testInputHint": "Testeingabe — Bearbeiten, dann Schritt ausführen.",
+      "testInputHint": "Testeingabe — bearbeiten, dann Schritt ausführen.",
       "noRunsList": "Noch keine Läufe.",
       "resetInput": "Auf Beispieldaten zurücksetzen",
       "eventPager": "{n} von {total}",
@@ -2945,7 +2948,7 @@
       "expand": "Aufklappen",
       "close": "Ergebnisse löschen und schließen",
       "nodesTitle": "Schritte",
-      "empty": "Führen Sie einen Test aus, um hier die Schrittergebnisse zu sehen.",
+      "empty": "Führen Sie einen Test aus, um die Schrittergebnisse hier zu sehen.",
       "openNode": "Knoten öffnen",
       "viewConfig": "Konfiguration anzeigen",
       "hideConfig": "Konfiguration ausblenden",
@@ -3712,29 +3715,31 @@
       "crossLinkBody": "{brand} stellt einen {product}-(MCP-)Endpunkt bereit, damit KI-Clients wie {client1}, {client2} und {client3} diese Organisation abfragen und Aktionen darin ausführen können. Einrichtung und Anmeldedaten befinden sich in IAM.",
       "crossLinkCta": "MCP-Einrichtung öffnen",
       "tagline": "Verbinden Sie {client1}, {client2} und {client3} sowie andere KI-Clients über {product} (MCP) mit dieser Organisation.",
-      "endpointLabel": "MCP-Endpunkt",
-      "authLabel": "1. Authentifizierung",
-      "clientLabel": "2. Wählen Sie Ihren Client",
-      "configLabel": "3. Konfiguration hinzufügen",
+      "connectLabel": "Endpunkt und Authentifizierung",
+      "connectHint": "Richten Sie Ihren MCP-Client auf diese URL aus und wählen Sie dann die Anmeldemethode.",
+      "configLabel": "Konfiguration hinzufügen",
+      "configHint": "Wählen Sie Ihren Client und fügen Sie die Konfiguration ein.",
       "auth": {
         "oauth": "OAuth — Anmeldung (empfohlen)",
         "token": "Zugriffstoken",
+        "oauthTitle": "Mit Ihrem Browser anmelden",
         "oauthNote": "Keine Anmeldedaten zu verwalten: Ihr MCP-Client öffnet einen Browser zur Anmeldung, und der Zugriff wird durch Ihre vorhandenen Berechtigungen beschränkt. Verwenden Sie dies, wann immer Ihr Client OAuth unterstützt."
       },
       "credential": {
-        "quickStartTitle": "Schnellstart — Ihr Konto",
-        "quickStartBody": "Snippets verwenden Ihre eigenen Anmeldedaten, die Ihre vollen Berechtigungen enthalten. Erstellen Sie für die Produktion stattdessen dedizierte schreibgeschützte Anmeldedaten.",
-        "generate": "Schreibgeschützte Anmeldedaten erstellen",
-        "created": "Schreibgeschützte Anmeldedaten erstellt",
+        "quickStartTitle": "Noch kein Token",
+        "quickStartBody": "Die folgenden Codeausschnitte enthalten einen Platzhalter-Header. Erzeugen Sie einen dedizierten Token für diesen MCP-Client oder fügen Sie stattdessen einen vorhandenen Dienstkonto-Token ein.",
+        "generate": "Dedizierten Token erzeugen",
+        "created": "Dedizierter Token erstellt",
         "shownOnce": "Für {email}. Kopieren Sie es jetzt – das Token wird nur einmal angezeigt, und die folgenden Snippets verwenden es jetzt.",
         "download": "Herunterladen",
         "manage": "Verwalten / widerrufen",
-        "readonlyWarn": "Das Konto wurde erstellt, aber die schreibgeschützte Rolle konnte nicht automatisch angewendet werden – überprüfen Sie ihre Berechtigungen in den Dienstkonten.",
+        "readonlyWarn": "Das Konto wurde erstellt, konnte aber nicht zur Rolle {role} hinzugefügt werden — es hat keine Berechtigungen, bis Sie ihm in IAM eine Rolle zuweisen.",
+        "readonlyNote": "Schreibgeschützter Zugriff über die Rolle {role} — überprüfen oder erweitern Sie diese unter IAM › Rollen.",
+        "rbacNote": "RBAC ist in dieser Bereitstellung deaktiviert; dieser Token kann daher nicht auf schreibgeschützten Zugriff eingeschränkt werden — er hat denselben Zugriff wie jede andere Anmeldeinformation dieser Organisation.",
         "error": "Anmeldedaten konnten nicht erstellt werden. Versuchen Sie es erneut oder erstellen Sie manuell ein Dienstkonto in IAM."
       },
       "securityTitle": "Verwenden Sie dedizierte Anmeldedaten mit minimalen Berechtigungen",
-      "securityBody": "Das Token verwendet standardmäßig Ihre eigenen Konto-Anmeldedaten. Erstellen Sie für die Produktion oben ein schreibgeschütztes Token (oder ein eingeschränktes Dienstkonto) und übergeben Sie Tokens niemals an die Versionskontrolle.",
-      "docsCta": "Lesen Sie die vollständige MCP-Dokumentation",
+      "securityBody": "Geben Sie dem MCP-Client ein eingeschränktes, schreibgeschütztes Dienstkonto statt Ihrer eigenen Konto-Anmeldedaten, und checken Sie das Token niemals in die Quellcodeverwaltung ein.",
       "clients": {
         "claudeCode": "Claude Code",
         "cursor": "Cursor",
@@ -3761,7 +3766,10 @@
         "hermes": "Zu ~/.hermes/config.yaml (YAML) hinzufügen, dann /reload-mcp ausführen.",
         "codex": "Zu ~/.codex/config.toml (TOML) hinzufügen, dann Codex neu starten."
       },
-      "installOneClick": "Zu {client} hinzufügen"
+      "installOneClick": "Zu {client} hinzufügen",
+      "skillsLabel": "{brand}-Skill hinzufügen (optional)",
+      "skillsHint": "Bringt Ihrem KI-Assistenten bei, wie er in {brand} Abfragen durchführt, Warnmeldungen einrichtet und Dashboards erstellt, damit er mehr aus den MCP-Tools herausholt. Führen Sie es in Ihrem Projekt aus und wählen Sie dann die Agenten aus, in denen es installiert werden soll.",
+      "skillsRepo": "Die Skills auf {host} anzeigen"
     },
     "manageTokensBtnLabel": "Tokens verwalten",
     "orgLevelExplanation": "Dabei handelt es sich um Erfassungs-Token auf Organisationsebene. Sie sind nicht an einzelne Benutzer gebunden und funktionieren auch dann weiter, wenn der Benutzer, der sie erstellt hat, die Organisation verlässt. Tokens können nur auf Datenerfassungsendpunkten verwendet werden.",
@@ -16365,6 +16373,7 @@
       },
       "databaseCount": "1 Datenbank | {count} Datenbanken",
       "openQueries": "Abfragen ansehen",
+      "viewMetrics": "Metriken anzeigen",
       "alertMe": "Benachrichtige mich",
       "columnHints": {
         "qps": "Aufrufe pro Sekunde — die Aufrufe dieses Zeitfensters geteilt durch dessen Länge, damit eine 15-Minuten-Ansicht und eine 4-Stunden-Ansicht vergleichbar bleiben.",
@@ -16625,10 +16634,10 @@
         "missingDescription": "Diese Seite beschreibt eine Abfrage, und die Adresse nennt keine. Wenn Sie gerade die Organisation gewechselt haben, gehört die Abfrage, die Sie gelesen haben, zu der, die Sie verlassen haben.",
         "action": "Abfragen dieser Organisation durchsuchen"
       },
-      "backToQueries": "Zurück zu den Top-Abfragen",
-      "backToActivity": "Zurück zur Aktivität",
-      "backToSamples": "Zurück zu den langsamsten Aufrufen",
-      "backToDeadlocks": "Zurück zu Deadlocks",
+      "backToQueries": "Top-Abfragen",
+      "backToActivity": "Aktivität",
+      "backToSamples": "langsamste Aufrufe",
+      "backToDeadlocks": "Deadlocks",
       "latencyTitle": "Geschwindigkeit im Zeitverlauf",
       "volumeTitle": "Aufrufe und Fehler im Zeitverlauf",
       "endpointsTitle": "Von wo es aufgerufen wird",
@@ -16793,6 +16802,8 @@
     "page": {
       "tabs": {
         "overview": "Übersicht",
+        "metrics": "Metriken",
+        "metricsHint": "Datenbanklast nach Warteereignis und jede Metrik, die Ihre Datenbank-Receiver erfassen.",
         "queries": "Top-Abfragen",
         "samples": "Langsamste Aufrufe",
         "samplesHintClient": "Abgeschlossene Aufrufe, die Ihre instrumentierten Dienste in diesem Fenster beobachtet haben – Aufrufer ohne Tracing werden nicht gezählt, dies ist also eine Untergrenze, nicht die Gesamtzahl. Die Tabelle zeigt die langsamsten davon.",
@@ -16809,6 +16820,129 @@
         "deadlocksLocked": "Deadlocks ist eine Enterprise-Funktion. Führen Sie ein Upgrade durch, um zu sehen, welche Abfragen sich gegenseitig blockiert haben und warum. Die anderen Datenbank-Registerkarten funktionieren in jedem Plan.",
         "blockedLocked": "Blockierte Abfragen ist eine Enterprise-Funktion. Führen Sie ein Upgrade durch, um zu sehen, welche Sitzungen auf eine Sperre warten und was sie hält. Die anderen Datenbank-Registerkarten funktionieren in jedem Plan.",
         "tableHealthLocked": "Tabellenzustand ist eine Enterprise-Funktion. Führen Sie ein Upgrade durch, um Tabellengröße, Bloat und Vakuumzustand zu verfolgen. Die anderen Datenbank-Registerkarten funktionieren in jedem Plan."
+      }
+    },
+    "metrics": {
+      "title": "Metriken",
+      "subtitle": "Datenbanklast und jede Metrik, die Ihre Datenbank-Receiver erfassen, im Diagramm für dieses Zeitfenster",
+      "load": {
+        "title": "Datenbanklast",
+        "hint": "Durchschnittlich aktiv arbeitende Sitzungen pro Intervall, gestapelt nach der gewählten Dimension. Idle-Verbindungen sind ausgeschlossen; eine Sitzung, die auf nichts wartet, läuft auf der CPU. Ziehen Sie über einen Ausschlag, um alle Diagramme darauf zu zoomen.",
+        "timeAxis": "Zeit",
+        "sessionsAxis": "Ø aktive Sitzungen",
+        "waitEventAxis": "Warteereignis",
+        "viewActivity": "In Aktivität anzeigen",
+        "breakdowns": {
+          "waitEvent": "Nach Warteereignis",
+          "query": "Nach Abfrage",
+          "database": "Nach Datenbank",
+          "user": "Nach Benutzer"
+        }
+      },
+      "limitLegend": "Verbindungslimit",
+      "explore": "Im Metriken-Explorer öffnen",
+      "railLabel": "Metriken-Bereiche",
+      "noAccess": "Sie haben keine Berechtigung, {stream} zu lesen. Bitten Sie einen Administrator um Lesezugriff auf diesen Stream.",
+      "byDims": {
+        "query": "nach Abfrage",
+        "database": "nach Datenbank",
+        "service": "nach Service",
+        "operation": "nach Operation",
+        "mode": "nach Modus",
+        "lockType": "nach Sperrtyp",
+        "table": "nach Tabelle",
+        "index": "nach Index",
+        "client": "nach Client",
+        "state": "nach Status",
+        "direction": "nach Richtung",
+        "device": "nach Gerät",
+        "host": "nach Host"
+      },
+      "catalog": {
+        "activity": {
+          "title": "Aktivität",
+          "desc": "Durchsatz, Transaktionen und Zeilenumschlag"
+        },
+        "locks": {
+          "title": "Sperren",
+          "desc": "Sperrdruck und was ihn hält"
+        },
+        "replication": {
+          "title": "Replikation",
+          "desc": "WAL-Druck und Replikat-Verzögerung"
+        },
+        "indexes": {
+          "title": "Indizes",
+          "desc": "Index-Nutzung und -Größe pro Tabelle"
+        },
+        "blocks": {
+          "title": "Blöcke",
+          "desc": "Shared-Buffer-I/O, das Abfragen zugeordnet wird, aus den eigenen Zählern der Datenbank"
+        },
+        "vacuum": {
+          "title": "Vacuum",
+          "desc": "Lebende und tote Zeilen pro Tabelle"
+        },
+        "host": {
+          "managedNote": "Diese Datenbank läuft auf einem cloud-verwalteten Endpunkt (wie Amazon RDS), daher stellt ihr Anbieter keinen Host für Ihre Collectors zur Überwachung bereit. Entfernen Sie den Datenbankfilter, um Host-Metriken für die Hosts anzuzeigen, die Ihre Collectors tatsächlich melden.",
+          "title": "Host",
+          "desc": "CPU, Arbeitsspeicher und E/A des Datenbank-Hosts",
+          "loopbackHint": "Instanz über localhost verbunden — alle Hosts werden angezeigt",
+          "matchHint": "Host-Metriken werden anhand des Hostnamens abgeglichen"
+        }
+      },
+      "catalogPanels": {
+        "calls": "Abfrageaufrufe",
+        "avgDuration": "Durchschnittliche Dauer",
+        "commits": "Commits",
+        "rollbacks": "Rollbacks",
+        "rowsModified": "Geänderte Zeilen",
+        "locks": "Sperren",
+        "walLag": "WAL-Verzögerung",
+        "indexScans": "Index-Scans",
+        "indexSize": "Indexgröße",
+        "blksHit": "Shared Blocks Treffer",
+        "blksRead": "Shared Blocks gelesen",
+        "blksDirtied": "Shared Blocks geändert",
+        "rowsByState": "Zeilen nach Status",
+        "cpuUtilization": "CPU-Auslastung",
+        "memoryUsage": "Arbeitsspeicher",
+        "diskIo": "Festplatten-E/A",
+        "networkIo": "Netzwerk-E/A"
+      },
+      "searchPlaceholder": "Metriken filtern…",
+      "triageOrder": "nach Triage-Relevanz sortiert",
+      "sections": {
+        "featured": "Wichtige Gesundheitsmetriken",
+        "postgresql": "PostgreSQL-Metriken",
+        "mysql": "MySQL- und MariaDB-Metriken"
+      },
+      "roleTitle": "{role} · {engine}",
+      "roles": {
+        "cacheHitRatio": "Cache-Trefferquote",
+        "connections": "Verbindungen",
+        "connectionLimit": "Verbindungslimit",
+        "replicationLag": "Replikationsverzögerung",
+        "cacheHit": "Cache-Treffer",
+        "cacheRead": "Cache-Festplattenlesevorgänge",
+        "deadlocks": "Deadlocks"
+      },
+      "notCollecting": {
+        "title": "Keine Datenbankmetriken kommen an",
+        "description": "Das Lastdiagramm oben liest die Aktivitätsproben, aber in dieser Organisation existieren noch keine Metrik-Streams von einem Datenbank-Receiver. Die Collector-Rezepte auf den Datenbank-Einrichtungskarten liefern sie mit.",
+        "checklistTitle": "Was zu prüfen ist",
+        "checks": {
+          "receivers": {
+            "no": "Kein Datenbank-Receiver sendet Metriken",
+            "noDetail": "Die PostgreSQL- und MySQL-Einrichtungskarten unter Datenquellen konfigurieren den Metrik-Receiver des Collectors zusammen mit den Überwachungsfeeds."
+          },
+          "enabled": {
+            "ok": "Datenbanküberwachung ist aktiviert",
+            "okDetail": "damit die Metriken hier dargestellt werden, sobald ein Receiver sie liefert",
+            "no": "Datenbanküberwachung ist deaktiviert",
+            "noDetail": "ZO_DB_MONITORING_ENABLED ist für diese Bereitstellung ausgeschaltet, daher erfassen die Datenbank-Tabs nicht."
+          }
+        }
       }
     },
     "samples": {

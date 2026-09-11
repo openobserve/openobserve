@@ -152,14 +152,19 @@ test.describe("Metrics Explorer Share & Visualize Deep-Link testcases", () => {
     await pm.metricsExplorerPage.gotoExplorer({ mode: 'visualize' });
     await pm.metricsExplorerPage.waitForVisualizeReady();
 
-    // A blank Visualize carries no blob — the param only appears once there is
-    // a query to encode.
-    expect(pm.metricsExplorerPage.hasMetricsDataParam()).toBe(false);
+    // No "param is absent" assertion here: the explorer auto-picks the first metric on mount, so a pre-existing blob is a race against that — what this test owns is that the query WE type reaches the URL, hence the baseline-and-change check.
+    const before = pm.metricsExplorerPage.getMetricsDataParam();
 
     await pm.metricsExplorerPage.enterVisualizeQuery(SEEDED_METRIC);
 
     // The write-back is debounced 300ms, so poll for it.
     await pm.metricsExplorerPage.waitForMetricsDataParam();
+    await expect
+      .poll(() => pm.metricsExplorerPage.getMetricsDataParam() !== before, {
+        timeout: 20000,
+        intervals: [200, 400, 800],
+      })
+      .toBe(true);
 
     const blob = pm.metricsExplorerPage.decodeMetricsBlob();
     expect(blob).not.toBeNull();
@@ -190,30 +195,31 @@ test.describe("Metrics Explorer Share & Visualize Deep-Link testcases", () => {
     testLogger.info('Stale blob stripped on leaving Visualize');
   });
 
-  test("A blank Visualize adds no metrics_data param", {
+  test("An unbuilt Visualize never encodes an empty query into metrics_data", {
     tag: ['@metrics-explorer-share', '@P2', '@url-sync', '@edge-case', '@all']
   }, async ({ page }, testInfo) => {
     const pm = await setupTest(page, testInfo);
-    testLogger.info('Testing an unbuilt chart contributes nothing to the URL');
+    testLogger.info('Testing the encoder short-circuit on an unbuilt chart');
 
     await pm.metricsExplorerPage.gotoExplorer();
     await pm.metricsExplorerPage.expectExplorerVisible();
     await pm.metricsExplorerPage.switchToVisualize();
     await pm.metricsExplorerPage.waitForVisualizeReady();
 
-    // visualizeBlob short-circuits on an empty queries[0].query, so nothing is
-    // encoded. Assert it stays absent rather than merely reading once — the
-    // debounce means an erroneous write would land shortly after mount.
-    await expect
-      .poll(() => pm.metricsExplorerPage.hasMetricsDataParam(), {
-        timeout: 5000,
-        intervals: [500, 1000],
-        message:
-          'metrics_data appeared for a blank Visualize — base64-decode it: a real queries[0].query means the panel was seeded, an empty one means the encoder guard is too loose',
-      })
-      .toBe(false);
+    // Opening Visualize with nothing selected does not leave the panel blank — the explorer auto-picks the first metric and builds `avg(<metric>{})` within ~200ms, and a blob for that is correct — so the guard worth asserting is visualizeBlob's short-circuit: never encode an EMPTY queries[0].query.
+    const blob = await pm.metricsExplorerPage.settleMetricsBlob();
 
-    testLogger.info('Blank Visualize left the URL clean');
+    if (blob === null) {
+      testLogger.info('No metrics_data written — nothing was built, nothing encoded');
+      return;
+    }
+    expect(blob.v, 'an emitted blob must carry the current envelope version').toBe(1);
+    expect(
+      blob.data?.queries?.[0]?.query,
+      'metrics_data was written with an empty queries[0].query — the encoder short-circuit is too loose',
+    ).toBeTruthy();
+
+    testLogger.info('Auto-selected chart encoded a real query', { query: blob.data.queries[0].query });
   });
 
   test("The metrics_data blob excludes volatile keys (id, title, description)", {

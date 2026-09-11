@@ -897,15 +897,15 @@
       "createNew": "Utwórz nowe miejsce docelowe",
       "select": "Miejsce docelowe",
       "loadError": "Błąd podczas pobierania miejsc docelowych.",
-      "unsupportedType": "Nieobsługiwany typ — Przepływy pracy obsługują tylko niestandardowe miejsca docelowe"
+      "unsupportedType": "Nieobsługiwany typ — przepływy pracy obsługują tylko niestandardowe miejsca docelowe"
     },
     "function": {
       "createNew": "Utwórz nową funkcję",
       "createNewNoteWorkflow": "Uwaga: Funkcja zostanie utworzona, a następnie zostaniesz przekierowany do poprzedniego formularza, aby powiązać nowo utworzoną funkcję z przepływem pracy.",
       "select": "Wybierz funkcję",
       "loadError": "Nie udało się załadować funkcji",
-      "saved": "Funkcja zapisana pomyślnie",
-      "updated": "Funkcja zaktualizowana pomyślnie",
+      "saved": "Funkcja została zapisana pomyślnie",
+      "updated": "Funkcja została zaktualizowana pomyślnie",
       "saveError": "Nie udało się zapisać funkcji",
       "flatten": "Po spłaszczeniu",
       "guidelinesTitle": "Wytyczne dotyczące wykonywania funkcji:",
@@ -2096,7 +2096,8 @@
       "startFrom": {
         "label": "Zacznij od",
         "custom": "Niestandardowa (pusta rola)",
-        "readonly": "Tylko do odczytu (dostęp do wszystkich zasobów)"
+        "readonly": "Tylko do odczytu (dostęp do wszystkich zasobów)",
+        "dbm": "Przeglądający Monitorowanie baz danych (tylko odczyt w module Monitorowanie baz danych oraz w strumieniach metryk odpytywanych przez jego kartę Metryki)"
       },
       "name": {
         "required": "Nazwa roli jest wymagana.",
@@ -2132,7 +2133,9 @@
       "loadFailed": "Nie udało się załadować szczegółów roli. Przekierowanie do listy ról.",
       "noUpdatesDetected": "Nie wykryto aktualizacji.",
       "updateSuccess": "Rola zaktualizowana pomyślnie!",
-      "updateError": "Błąd podczas aktualizacji roli!"
+      "updateError": "Błąd podczas aktualizacji roli!",
+      "dbmPresetSeeded": "Wstępnie wybrany dostęp do odczytu w {matched} z {total} strumieni metryk Monitorowania baz danych oraz do modułu Monitorowanie baz danych. Sprawdź przed zapisaniem.",
+      "dbmPresetNoMatch": "Żaden z {total} strumieni metryk Monitorowania baz danych nie istnieje jeszcze w tej organizacji, więc nic w nich nie zostało wstępnie wybrane; uprawnienie do modułu Monitorowanie baz danych zostało jednak przygotowane."
     },
     "rolesPage": {
       "subtitle": "Role łączą uprawnienia — przypisz je do użytkowników, kont serwisowych lub grup, aby przyznać dostęp.",
@@ -2593,7 +2596,7 @@
     "header": "Przepływy pracy",
     "subtitle": "Automatyzuj akcje za pomocą wyzwalaczy, logiki i miejsc docelowych",
     "create": "Nowy przepływ pracy",
-    "createSuccess": "Przepływ pracy utworzony pomyślnie",
+    "createSuccess": "Przepływ pracy został utworzony pomyślnie",
     "name": "Nazwa przepływu pracy",
     "nameRequired": "Nazwa jest wymagana",
     "search": "Szukaj przepływów pracy",
@@ -2630,8 +2633,8 @@
       "hideTestRuns": "Ukryj uruchomienia testowe",
       "open": "Historia",
       "openFullView": "Otwórz pełny widok uruchomień",
-      "loadError": "Błąd podczas ładowania uruchomień",
-      "loadRunError": "Błąd podczas ładowania tego uruchomienia",
+      "loadError": "Błąd podczas wczytywania uruchomień",
+      "loadRunError": "Błąd podczas wczytywania tego uruchomienia",
       "retry": "Ponów",
       "retryTooltip": "Ponów to nieudane uruchomienie na podstawie jego zapisanych danych wejściowych.",
       "retryTitle": "Ponowić to uruchomienie?",
@@ -2644,14 +2647,14 @@
     "delete": "Usuń",
     "deleteTitle": "Usuń przepływ pracy",
     "deleteMessage": "Czy na pewno chcesz usunąć ten przepływ pracy?",
-    "deleteSuccess": "Przepływ pracy został pomyślnie usunięty",
+    "deleteSuccess": "Przepływ pracy został usunięty pomyślnie",
     "deleteError": "Błąd podczas usuwania przepływu pracy",
-    "updateSuccess": "Przepływ pracy został pomyślnie zaktualizowany",
+    "updateSuccess": "Przepływ pracy został zaktualizowany pomyślnie",
     "saveError": "Błąd podczas zapisywania przepływu pracy",
-    "resumeSuccess": "{name} wznowiony pomyślnie",
-    "pauseSuccess": "{name} wstrzymany pomyślnie",
-    "toggleError": "Błąd podczas aktualizacji stanu przepływu pracy",
-    "triggerRequired": "Wymagany jest wyzwalacz",
+    "resumeSuccess": "{name} wznowiono pomyślnie",
+    "pauseSuccess": "{name} wstrzymano pomyślnie",
+    "toggleError": "Błąd podczas aktualizowania stanu przepływu pracy",
+    "triggerRequired": "Wyzwalacz jest wymagany",
     "addStepRequired": "Dodaj co najmniej jeden krok po wyzwalaczu",
     "connectAllNodes": "Połącz wszystkie węzły przed zapisaniem",
     "branchPathsRequired": "Połącz każdą ścieżkę rozgałęzienia z krokiem. | 1 krok rozgałęzienia ma połączenia, które nie pasują do jego ścieżek. Otwórz go, zdefiniuj ścieżki, a następnie połącz je ponownie. | Kroki rozgałęzienia ({count}) mają połączenia, które nie pasują do ich ścieżek.",
@@ -2660,14 +2663,14 @@
     "draft": "Wersja robocza",
     "saveDraft": "Zapisz jako wersję roboczą",
     "publish": "Opublikuj",
-    "draftSaveSuccess": "Wersja robocza zapisana pomyślnie",
-    "publishSuccess": "Przepływ pracy opublikowany pomyślnie",
+    "draftSaveSuccess": "Wersja robocza została zapisana pomyślnie",
+    "publishSuccess": "Przepływ pracy został opublikowany pomyślnie",
     "publishError": "Błąd podczas publikowania przepływu pracy",
     "comingSoon": "To pojawi się w późniejszym kroku",
     "triggerType": {
       "pick": "Wybierz wyzwalacz",
       "dialogTitle": "Utwórz nowy przepływ pracy",
-      "dialogIntro": "Wybierz, jak ten przepływ pracy jest wyzwalany. Wkrótce pojawi się więcej typów wyzwalaczy.",
+      "dialogIntro": "Wybierz, jak wyzwalany jest ten przepływ pracy. Więcej typów wyzwalaczy już wkrótce.",
       "cta": "Utwórz przepływ pracy",
       "soonCta": "Dostępne w przyszłej wersji",
       "comingSoon": "Wkrótce",
@@ -2700,7 +2703,7 @@
       "alertStartTime": "Najwcześniejszy znacznik czasu wśród pasujących rekordów.",
       "alertEndTime": "Najpóźniejszy znacznik czasu wśród pasujących rekordów."
     },
-    "loadError": "Nie można załadować przepływu pracy",
+    "loadError": "Nie można wczytać przepływu pracy",
     "deleteNode": "Usuń węzeł",
     "deleteNodeTitle": "Usuń krok",
     "deleteNodeConfirm": "Czy na pewno chcesz usunąć ten krok? Możesz to cofnąć.",
@@ -2781,13 +2784,13 @@
       "clear": "Wyczyść wszystko",
       "empty": "Nie znaleziono alertów w tej organizacji.",
       "noAlertsInFolder": "Brak alertów w tym folderze.",
-      "loadError": "Nie można załadować alertów.",
+      "loadError": "Nie można wczytać alertów.",
       "link": "Połącz wybrane",
       "linkN": "Połącz {count} wybranych",
       "skip": "Pomiń na razie",
-      "linkSuccess": "Połączono z {count} alertami",
-      "linkPartial": "Powiązane z {count} alertem, {failed} nieudanych | Powiązane z {count} alertami, {failed} nieudanych",
-      "linkError": "Nie udało się połączyć alertów."
+      "linkSuccess": "Połączono z {count} alertem | Połączono z {count} alertami",
+      "linkPartial": "Połączono z {count} alertem, {failed} nie powiodło się | Połączono z {count} alertami, {failed} nie powiodło się",
+      "linkError": "Nie można połączyć alertów."
     },
     "chooseTrigger": "Wybierz wyzwalacz",
     "start": {
@@ -2807,7 +2810,7 @@
       "sectionTransform": "Transformacja",
       "sectionDestination": "Miejsce docelowe",
       "stepSearchPlaceholder": "Szukaj kroków...",
-      "stepNoMatch": "Brak kroków pasujących do wyszukiwania.",
+      "stepNoMatch": "Żadne kroki nie pasują do wyszukiwania.",
       "conditionDesc": "Kontynuuj tylko, gdy reguła jest spełniona",
       "branchDesc": "Kieruj każdy rekord do pierwszej pasującej ścieżki",
       "branchCaseLabel": "Nazwa ścieżki (opcjonalnie)",
@@ -2818,10 +2821,10 @@
       "branchMoveDown": "Przesuń ścieżkę w dół",
       "branchPathNumber": "Ścieżka {index}",
       "branchElseTitle": "Wszystko inne",
-      "branchElseHint": "Tutaj trafiają rekordy niepasujące do żadnej z powyższych ścieżek.",
+      "branchElseHint": "Rekordy, które nie pasują do żadnej z powyższych ścieżek, wychodzą stąd.",
       "branchNoteTitle": "Wskazówki dotyczące rozgałęzień",
-      "branchNoteFirstMatch": "Ścieżki są sprawdzane od góry do dołu, a wygrywa pierwsze dopasowanie, więc każdy rekord jest przekazywany dalej dokładnie jedną ścieżką.",
-      "branchNoteUnwired": "Ścieżka, do której nic nie jest podłączone, po prostu odrzuca rekordy.",
+      "branchNoteFirstMatch": "Ścieżki są sprawdzane od góry do dołu i wygrywa PIERWSZE dopasowanie, więc każdy rekord wychodzi dokładnie jedną ścieżką.",
+      "branchNoteUnwired": "Ścieżka, do której nic nie jest podłączone, po prostu odrzuca swoje rekordy.",
       "functionDesc": "Przekształć ładunek za pomocą funkcji",
       "destinationDesc": "Wyślij do miejsca docelowego",
       "triggerBody": "Uruchamia się, gdy powiązany alert zostanie wyzwolony",
@@ -2849,7 +2852,7 @@
       "conditionNoteTitle": "Wytyczne dotyczące warunków",
       "functionFlattenTitle": "Przed vs Po spłaszczeniu",
       "conditionNoteCustom": "Aby dodać niestandardową kolumnę, wpisz jej nazwę i naciśnij Enter.",
-      "functionBody": "Przekształć dane wejściowe za pomocą funkcji",
+      "functionBody": "Przekształć ładunek za pomocą funkcji",
       "functionBodySet": "Stosuje {name}",
       "functionSelect": "Wybierz funkcję",
       "functionCreateNew": "Utwórz nową funkcję",
@@ -2898,13 +2901,13 @@
       "expandSteps": "Rozwiń kroki",
       "inputTag": "Wejście",
       "openStep": "Otwórz {name}",
-      "runToView": "Uruchom test, aby zobaczyć te dane.",
+      "runToView": "Uruchom test, aby wyświetlić te dane.",
       "noBranchItems": "Brak elementów w tej gałęzi.",
       "forwardedCount": "Przekazano {out} z {total} rekordów | Przekazano {out} z {total} rekordów",
       "noMatchForwarded": "Brak dopasowania — przekazano 0 z {total} rekordów | Brak dopasowania — przekazano 0 z {total} rekordów",
       "branchDropped": "Odrzucono rekord bez dopasowania do ścieżki: {count} | Odrzucono rekordy bez dopasowania do ścieżki: {count}",
-      "noUpstream": "Brak poprzedzających kroków.",
-      "noRunYet": "Brak uruchomienia.",
+      "noUpstream": "Brak kroków poprzedzających.",
+      "noRunYet": "Brak uruchomień.",
       "runLabel": "Uruchom",
       "switchRun": "Zmień uruchomienie",
       "notInRun": "Ten krok nie jest uwzględniony w tym uruchomieniu.",
@@ -2920,7 +2923,7 @@
       "editStep": "Edytuj krok",
       "readOnlyRun": "Przeglądasz wcześniejsze uruchomienie, więc konfiguracja tego kroku nie może zostać tutaj zmieniona.",
       "readOnlyRunEdit": "Edytuj w przepływie pracy",
-      "testInputHint": "Wejście testowe — edytuj, a następnie uruchom krok.",
+      "testInputHint": "Dane wejściowe testu — edytuj, a następnie uruchom krok.",
       "noRunsList": "Brak uruchomień.",
       "resetInput": "Resetuj do próbki",
       "eventPager": "{n} z {total}",
@@ -2945,7 +2948,7 @@
       "expand": "Rozwiń",
       "close": "Wyczyść i zamknij wyniki",
       "nodesTitle": "Kroki",
-      "empty": "Uruchom test, aby zobaczyć wyniki kroków tutaj.",
+      "empty": "Uruchom test, aby zobaczyć tutaj wyniki kroków.",
       "openNode": "Otwórz węzeł",
       "viewConfig": "Zobacz konfigurację",
       "hideConfig": "Ukryj konfigurację",
@@ -3712,29 +3715,31 @@
       "crossLinkBody": "{brand} udostępnia punkt końcowy {product} (MCP), dzięki czemu klienci AI, tacy jak {client1}, {client2} i {client3}, mogą wysyłać zapytania i działać w tej organizacji. Konfiguracja i poświadczenia znajdują się w IAM.",
       "crossLinkCta": "Otwórz konfigurację MCP",
       "tagline": "Połącz {client1}, {client2}, {client3} i innych klientów AI z tą organizacją przez {product} (MCP).",
-      "endpointLabel": "Punkt końcowy MCP",
-      "authLabel": "1. Uwierzytelnianie",
-      "clientLabel": "2. Wybierz swojego klienta",
-      "configLabel": "3. Dodaj konfigurację",
+      "connectLabel": "Endpoint i uwierzytelnianie",
+      "connectHint": "Skonfiguruj swojego klienta MCP pod tym adresem URL, a następnie wybierz sposób logowania.",
+      "configLabel": "Dodaj konfigurację",
+      "configHint": "Wybierz swojego klienta, a następnie skopiuj konfigurację w odpowiednie miejsce.",
       "auth": {
         "oauth": "OAuth — zaloguj się (zalecane)",
         "token": "Token dostępu",
+        "oauthTitle": "Zaloguj się przez przeglądarkę",
         "oauthNote": "Brak danych logowania do zarządzania: Twój klient MCP otwiera przeglądarkę, aby się zalogować, a dostęp jest ograniczony przez Twoje istniejące uprawnienia. Używaj go, gdy Twój klient obsługuje OAuth."
       },
       "credential": {
-        "quickStartTitle": "Szybki start — Twoje konto",
-        "quickStartBody": "Fragmenty kodu używają Twoich własnych danych logowania, które niosą pełne uprawnienia. W środowisku produkcyjnym wygeneruj zamiast tego dedykowane dane logowania tylko do odczytu.",
-        "generate": "Wygeneruj dane logowania tylko do odczytu",
-        "created": "Utworzono dane logowania tylko do odczytu",
+        "quickStartTitle": "Brak tokenu",
+        "quickStartBody": "Poniższe fragmenty kodu zawierają nagłówek zastępczy. Wygeneruj dedykowany token dla tego klienta MCP lub wklej istniejący token konta usługi w jego miejsce.",
+        "generate": "Wygeneruj dedykowany token",
+        "created": "Utworzono dedykowany token",
         "shownOnce": "Dla {email}. Skopiuj je teraz — token jest wyświetlany tylko raz, a poniższe fragmenty kodu już go używają.",
         "download": "Pobierz",
         "manage": "Zarządzaj / odwołaj",
-        "readonlyWarn": "Konto zostało utworzone, ale rola tylko do odczytu nie mogła zostać zastosowana automatycznie — sprawdź jej uprawnienia w Kontach usług.",
+        "readonlyWarn": "Konto zostało utworzone, ale nie można go było dodać do roli {role} — nie ma ono żadnych uprawnień, dopóki nie przypiszesz mu roli w IAM.",
+        "readonlyNote": "Dostęp tylko do odczytu przez rolę {role} — przejrzyj ją lub rozszerz w IAM › Role.",
+        "rbacNote": "W tym wdrożeniu RBAC jest wyłączony, więc ten token nie może być ograniczony do odczytu — ma takie same uprawnienia jak każde inne poświadczenie w tej organizacji.",
         "error": "Nie udało się utworzyć danych logowania. Spróbuj ponownie lub utwórz konto usługi ręcznie w IAM."
       },
       "securityTitle": "Użyj dedykowanych danych logowania z najmniejszymi uprawnieniami",
-      "securityBody": "Token domyślnie używa poświadczeń Twojego konta. W środowisku produkcyjnym wygeneruj powyżej poświadczenie tylko do odczytu (lub utwórz ograniczone konto usługi) i nigdy nie zatwierdzaj tokenów w systemie kontroli wersji.",
-      "docsCta": "Przeczytaj pełną dokumentację MCP",
+      "securityBody": "Nadaj klientowi MCP ograniczone konto usługi z uprawnieniami tylko do odczytu, a nie dane uwierzytelniające własnego konta, i nigdy nie wysyłaj jego tokenu do kontroli wersji.",
       "clients": {
         "claudeCode": "Claude Code",
         "cursor": "Cursor",
@@ -3761,7 +3766,10 @@
         "hermes": "Dodaj do ~/.hermes/config.yaml (YAML), a następnie uruchom /reload-mcp.",
         "codex": "Dodaj do ~/.codex/config.toml (TOML), a następnie uruchom ponownie Codex."
       },
-      "installOneClick": "Dodaj do {client}"
+      "installOneClick": "Dodaj do {client}",
+      "skillsLabel": "Dodaj umiejętność {brand} (opcjonalnie)",
+      "skillsHint": "Uczy Twojego asystenta AI, jak odpytywać dane, konfigurować alerty i tworzyć pulpity w {brand}, dzięki czemu lepiej wykorzysta narzędzia MCP. Uruchom ją w swoim projekcie, a następnie wybierz agentów, u których chcesz ją zainstalować.",
+      "skillsRepo": "Zobacz umiejętności na {host}"
     },
     "manageTokensBtnLabel": "Zarządzaj tokenami",
     "orgLevelExplanation": "Są to tokeny pozyskiwania danych na poziomie organizacji. Nie są powiązane z indywidualnymi użytkownikami i będą działać nawet jeśli użytkownik, który je utworzył, opuści organizację. Tokeny mogą być używane tylko w punktach końcowych pozyskiwania danych.",
@@ -16365,6 +16373,7 @@
       },
       "databaseCount": "1 baza danych | {count} baz danych",
       "openQueries": "Zobacz jej zapytania",
+      "viewMetrics": "Wyświetl metryki",
       "alertMe": "Powiadom mnie",
       "columnHints": {
         "qps": "Wywołania na sekundę — wywołania w tym oknie podzielone przez jego długość, dzięki czemu widok 15-minutowy i 4-godzinny pozostają porównywalne.",
@@ -16625,10 +16634,10 @@
         "missingDescription": "Ta strona opisuje jedno zapytanie, a adres nie wskazuje żadnego. Jeśli właśnie przełączyłeś organizację, czytane zapytanie należy do tej, którą opuściłeś.",
         "action": "Przeglądaj zapytania tej organizacji"
       },
-      "backToQueries": "Wróć do najczęstszych zapytań",
-      "backToActivity": "Wróć do aktywności",
-      "backToSamples": "Wróć do najwolniejszych wywołań",
-      "backToDeadlocks": "Wróć do zakleszczeń",
+      "backToQueries": "najczęstsze zapytania",
+      "backToActivity": "aktywność",
+      "backToSamples": "najwolniejsze wywołania",
+      "backToDeadlocks": "zakleszczenia",
       "latencyTitle": "Szybkość w czasie",
       "volumeTitle": "Wywołania i błędy w czasie",
       "endpointsTitle": "Skąd jest wywoływane",
@@ -16793,6 +16802,8 @@
     "page": {
       "tabs": {
         "overview": "Przegląd",
+        "metrics": "Metryki",
+        "metricsHint": "Obciążenie bazy danych według zdarzeń oczekiwania oraz wszystkie metryki zbierane przez odbiorniki bazy danych.",
         "queries": "Najczęstsze zapytania",
         "samples": "Najwolniejsze wywołania",
         "samplesHintClient": "Zakończone wywołania zaobserwowane przez Twoje instrumentowane usługi w tym oknie — wywołujący bez śledzenia nie są liczeni, więc to minimum, a nie suma. Tabela pokazuje najwolniejsze z nich.",
@@ -16809,6 +16820,129 @@
         "deadlocksLocked": "Zakleszczenia to funkcja Enterprise. Dokonaj upgrade'u, aby zobaczyć, które zapytania zablokowały się wzajemnie i dlaczego. Pozostałe zakładki bazy danych działają w każdym planie.",
         "blockedLocked": "Zablokowane zapytania to funkcja Enterprise. Dokonaj upgrade'u, aby zobaczyć, które sesje oczekują na blokadę i co ją trzyma. Pozostałe zakładki bazy danych działają w każdym planie.",
         "tableHealthLocked": "Zdrowie tabel to funkcja Enterprise. Dokonaj upgrade'u, aby śledzić rozmiar tabeli, stan bloat i vacuum. Pozostałe zakładki bazy danych działają w każdym planie."
+      }
+    },
+    "metrics": {
+      "title": "Metryki",
+      "subtitle": "Obciążenie bazy danych i wszystkie metryki zbierane przez odbiorniki bazy danych, przedstawione na wykresach w tym oknie",
+      "load": {
+        "title": "Obciążenie bazy danych",
+        "hint": "Średnia liczba sesji aktywnie pracujących w danym interwale, grupowana narastająco według wybranego wymiaru. Bezczynne połączenia są wykluczone; sesja, która na nic nie czeka, pracuje na CPU. Przeciągnij po szczycie, aby przybliżyć do niego wszystkie wykresy.",
+        "timeAxis": "Czas",
+        "sessionsAxis": "Śr. aktywnych sesji",
+        "waitEventAxis": "Zdarzenie oczekiwania",
+        "viewActivity": "Pokaż w Aktywności",
+        "breakdowns": {
+          "waitEvent": "Według zdarzenia oczekiwania",
+          "query": "Według zapytania",
+          "database": "Według bazy danych",
+          "user": "Według użytkownika"
+        }
+      },
+      "limitLegend": "limit połączeń",
+      "explore": "Otwórz w Eksploratorze metryk",
+      "railLabel": "Sekcje metryk",
+      "noAccess": "Nie masz uprawnień do odczytu {stream}. Poproś administratora o dostęp do odczytu tego strumienia.",
+      "byDims": {
+        "query": "według zapytania",
+        "database": "według bazy danych",
+        "service": "według usługi",
+        "operation": "według operacji",
+        "mode": "według trybu",
+        "lockType": "według typu blokady",
+        "table": "według tabeli",
+        "index": "według indeksu",
+        "client": "według klienta",
+        "state": "według stanu",
+        "direction": "według kierunku",
+        "device": "według urządzenia",
+        "host": "według hosta"
+      },
+      "catalog": {
+        "activity": {
+          "title": "Aktywność",
+          "desc": "Przepustowość, transakcje i rotacja wierszy"
+        },
+        "locks": {
+          "title": "Blokady",
+          "desc": "Presja blokad i to, co je utrzymuje"
+        },
+        "replication": {
+          "title": "Replikacja",
+          "desc": "Presja WAL i opóźnienie repliki"
+        },
+        "indexes": {
+          "title": "Indeksy",
+          "desc": "Użycie i rozmiar indeksów na tabelę"
+        },
+        "blocks": {
+          "title": "Bloki",
+          "desc": "Operacje I/O na buforze współdzielonym przypisane do zapytań, na podstawie własnych liczników bazy danych"
+        },
+        "vacuum": {
+          "title": "Vacuum",
+          "desc": "Wiersze żywe i martwe na tabelę"
+        },
+        "host": {
+          "managedNote": "Ta baza danych działa na zarządzanym w chmurze punkcie końcowym (takim jak Amazon RDS), więc jej dostawca nie udostępnia hosta do monitorowania przez Twoje kolektory. Wyczyść filtr bazy danych, aby zobaczyć metryki hostów raportowanych przez Twoje kolektory.",
+          "title": "Host",
+          "desc": "CPU, pamięć i I/O hosta bazy danych",
+          "loopbackHint": "instancja połączona przez localhost — pokazywane są wszystkie hosty",
+          "matchHint": "metryki hostów są dopasowywane po nazwie hosta"
+        }
+      },
+      "catalogPanels": {
+        "calls": "Wywołania zapytań",
+        "avgDuration": "Średni czas trwania",
+        "commits": "Zatwierdzenia",
+        "rollbacks": "Wycofania",
+        "rowsModified": "Zmodyfikowane wiersze",
+        "locks": "Blokady",
+        "walLag": "Opóźnienie WAL",
+        "indexScans": "Skanowania indeksu",
+        "indexSize": "Rozmiar indeksu",
+        "blksHit": "Trafienia bloków współdzielonych",
+        "blksRead": "Odczytane bloki współdzielone",
+        "blksDirtied": "Zabrudzone bloki współdzielone",
+        "rowsByState": "Wiersze według stanu",
+        "cpuUtilization": "Wykorzystanie CPU",
+        "memoryUsage": "Pamięć",
+        "diskIo": "I/O dysku",
+        "networkIo": "I/O sieci"
+      },
+      "searchPlaceholder": "Filtruj metryki…",
+      "triageOrder": "posortowane według istotności dla triage",
+      "sections": {
+        "featured": "Kluczowe metryki kondycji",
+        "postgresql": "Metryki PostgreSQL",
+        "mysql": "Metryki MySQL i MariaDB"
+      },
+      "roleTitle": "{role} · {engine}",
+      "roles": {
+        "cacheHitRatio": "Współczynnik trafień cache",
+        "connections": "Połączenia",
+        "connectionLimit": "Limit połączeń",
+        "replicationLag": "Opóźnienie replikacji",
+        "cacheHit": "Trafienia cache",
+        "cacheRead": "Odczyty z dysku cache",
+        "deadlocks": "Zakleszczenia"
+      },
+      "notCollecting": {
+        "title": "Nie napływają żadne metryki baz danych",
+        "description": "Powyższy wykres obciążenia odczytuje próbki aktywności, ale w tej organizacji nie ma jeszcze strumieni metryk pochodzących z odbiornika bazy danych. Dostarczają je przepisy kolektora na kartach konfiguracji bazy danych.",
+        "checklistTitle": "Co sprawdzić",
+        "checks": {
+          "receivers": {
+            "no": "Żaden odbiornik bazy danych nie wysyła metryk",
+            "noDetail": "Karty konfiguracji PostgreSQL i MySQL w sekcji Źródła danych konfigurują odbiornik metryk kolektora wraz z feedami monitorującymi."
+          },
+          "enabled": {
+            "ok": "Monitorowanie baz danych jest włączone",
+            "okDetail": "więc metryki pojawią się tutaj na wykresie, gdy tylko odbiornik je dostarczy",
+            "no": "Monitorowanie baz danych jest wyłączone",
+            "noDetail": "ZO_DB_MONITORING_ENABLED jest wyłączone dla tego wdrożenia, więc zakładki baz danych nie zbierają danych."
+          }
+        }
       }
     },
     "samples": {

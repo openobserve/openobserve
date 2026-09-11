@@ -2096,7 +2096,8 @@
       "startFrom": {
         "label": "从",
         "custom": "自定义（空角色）",
-        "readonly": "只读（查看对所有资源的访问权限）"
+        "readonly": "只读（查看对所有资源的访问权限）",
+        "dbm": "数据库监控查看者（对数据库监控模块及其“指标”标签页所查询的指标数据流具有只读权限）"
       },
       "name": {
         "required": "角色名称为必填项。",
@@ -2132,7 +2133,9 @@
       "loadFailed": "加载角色详情失败。正在重定向到角色列表。",
       "noUpdatesDetected": "未检测到更新。",
       "updateSuccess": "角色更新成功！",
-      "updateError": "更新角色时出错！"
+      "updateError": "更新角色时出错！",
+      "dbmPresetSeeded": "已预选对 {total} 个数据库监控指标数据流中 {matched} 个的读取权限，并预选数据库监控模块。请在保存前检查。",
+      "dbmPresetNoMatch": "此组织中尚不存在这 {total} 个数据库监控指标数据流，因此未对它们预选任何内容；但数据库监控模块的授权仍已暂存。"
     },
     "rolesPage": {
       "subtitle": "角色捆绑权限 — 将其分配给用户、服务帐号或群组以授予访问权限。",
@@ -2595,7 +2598,7 @@
     "create": "新建工作流",
     "createSuccess": "工作流创建成功",
     "name": "工作流名称",
-    "nameRequired": "名称为必填",
+    "nameRequired": "名称为必填项",
     "search": "搜索工作流",
     "refresh": "刷新工作流",
     "trigger": "触发器",
@@ -2630,8 +2633,8 @@
       "hideTestRuns": "隐藏测试运行",
       "open": "历史",
       "openFullView": "打开完整运行视图",
-      "loadError": "加载执行时出错",
-      "loadRunError": "加载本次运行时出错",
+      "loadError": "加载执行记录时出错",
+      "loadRunError": "加载此次运行时出错",
       "retry": "重试",
       "retryTooltip": "使用记录的输入重新运行此失败运行。",
       "retryTitle": "重试此运行？",
@@ -2643,17 +2646,17 @@
     "view": "查看",
     "delete": "删除",
     "deleteTitle": "删除工作流",
-    "deleteMessage": "您确定要删除此工作流吗？",
-    "deleteSuccess": "工作流已成功删除",
+    "deleteMessage": "确定要删除此工作流吗？",
+    "deleteSuccess": "工作流删除成功",
     "deleteError": "删除工作流时出错",
-    "updateSuccess": "工作流已成功更新",
+    "updateSuccess": "工作流更新成功",
     "saveError": "保存工作流时出错",
     "resumeSuccess": "{name} 已成功恢复",
     "pauseSuccess": "{name} 已成功暂停",
     "toggleError": "更新工作流状态时出错",
-    "triggerRequired": "需要触发器",
-    "addStepRequired": "在触发器后至少添加一个步骤",
-    "connectAllNodes": "保存前连接所有节点",
+    "triggerRequired": "必须设置触发器",
+    "addStepRequired": "请在触发器之后至少添加一个步骤",
+    "connectAllNodes": "保存前请连接所有节点",
     "branchPathsRequired": "请将每个分支路径连接到步骤 | 1 个分支步骤存在与其路径不匹配的连接。请打开该步骤，定义路径，然后重新连接。 | {count} 个分支步骤存在与其路径不匹配的连接。",
     "finishStepsBeforePublish": "{count} 个步骤在发布前需要设置 — 已在画布上高亮显示。 | {count} 个步骤在发布前需要设置 — 已在画布上高亮显示。",
     "noChangesToPublish": "没有可发布的更改——此工作流已与已发布版本一致。",
@@ -2663,7 +2666,7 @@
     "draftSaveSuccess": "草稿保存成功",
     "publishSuccess": "工作流发布成功",
     "publishError": "发布工作流时出错",
-    "comingSoon": "此功能将在后续步骤中提供",
+    "comingSoon": "此功能将在后续步骤中推出",
     "triggerType": {
       "pick": "选择触发器",
       "dialogTitle": "创建新工作流",
@@ -2776,18 +2779,18 @@
       "folderLabel": "文件夹",
       "alertsLabel": "告警",
       "alertsPlaceholder": "选择告警",
-      "noneSelected": "尚未选择告警。",
+      "noneSelected": "尚未选择任何告警。",
       "selectedCount": "已选择 {count} 个",
       "clear": "清除所有",
-      "empty": "在此组织中未找到告警。",
+      "empty": "此组织中没有找到告警。",
       "noAlertsInFolder": "此文件夹中没有告警。",
       "loadError": "无法加载告警。",
       "link": "链接已选",
       "linkN": "链接已选 {count} 个",
       "skip": "暂时跳过",
-      "linkSuccess": "已链接到 {count} 个告警",
-      "linkPartial": "已链接到 {count} 个告警，{failed} 个失败 | 已链接到 {count} 个告警，{failed} 个失败",
-      "linkError": "无法链接告警。"
+      "linkSuccess": "已关联 {count} 个告警 | 已关联 {count} 个告警",
+      "linkPartial": "已关联 {count} 个告警，{failed} 个失败 | 已关联 {count} 个告警，{failed} 个失败",
+      "linkError": "无法关联告警。"
     },
     "chooseTrigger": "选择触发器",
     "start": {
@@ -2803,11 +2806,11 @@
       "branch": "分支",
       "function": "函数",
       "sendToDestination": "目标",
-      "configComingSoon": "{node} 配置将在后续步骤中完成",
+      "configComingSoon": "{node} 配置将在后续步骤中推出",
       "sectionTransform": "转换",
       "sectionDestination": "目标",
       "stepSearchPlaceholder": "搜索步骤...",
-      "stepNoMatch": "没有步骤匹配您的搜索。",
+      "stepNoMatch": "没有匹配搜索的步骤。",
       "conditionDesc": "仅当规则匹配时才继续",
       "branchDesc": "将每条记录路由到第一条匹配的路径",
       "branchCaseLabel": "路径名称（可选）",
@@ -2818,10 +2821,10 @@
       "branchMoveDown": "下移路径",
       "branchPathNumber": "路径 {index}",
       "branchElseTitle": "其他所有",
-      "branchElseHint": "不匹配上述任何路径的记录将在此处输出。",
+      "branchElseHint": "不匹配上述任何路径的记录从这里输出。",
       "branchNoteTitle": "分支指南",
-      "branchNoteFirstMatch": "路径自上而下进行检查，第一个匹配项生效，因此每条记录最终只会沿一条路径离开。",
-      "branchNoteUnwired": "下游未连接任何内容的路径会直接丢弃其记录。",
+      "branchNoteFirstMatch": "路径自上而下依次检查，第一个匹配的路径生效，因此每条记录只会从一条路径输出。",
+      "branchNoteUnwired": "未连接任何内容的路径会直接丢弃其记录。",
       "functionDesc": "使用函数重塑数据负载",
       "destinationDesc": "发送到目标",
       "triggerBody": "当关联的告警触发时运行",
@@ -2848,18 +2851,18 @@
       "incidentNoExtraFields": "此事件除了公共字段外，不添加任何字段。",
       "conditionNoteTitle": "条件指南",
       "functionFlattenTitle": "展平前后对比",
-      "conditionNoteCustom": "要添加自定义列，请键入其名称并按回车。",
+      "conditionNoteCustom": "要添加自定义列，请输入列名并按 Enter 键。",
       "functionBody": "使用函数重塑负载",
       "functionBodySet": "应用 {name}",
       "functionSelect": "选择函数",
       "functionCreateNew": "创建新函数",
-      "functionRequired": "必须提供函数",
+      "functionRequired": "函数为必填项",
       "functionLoadError": "无法加载函数",
       "destinationBody": "发送到目标",
       "destinationBodySet": "发送到 {name}",
       "destinationSelect": "目标",
       "destinationCreateNew": "创建新目标",
-      "destinationRequired": "请选择目标",
+      "destinationRequired": "请选择一个目标",
       "destinationLoadError": "无法加载目标",
       "namePlaceholder": "命名此步骤（可选）",
       "commentLabel": "备注（可选）",
@@ -2904,7 +2907,7 @@
       "noMatchForwarded": "无匹配 — 0/{total} 条记录已转发 | 无匹配 — 0/{total} 条记录已转发",
       "branchDropped": "{count} 条记录未匹配任何路径 — 已丢弃 | {count} 条记录未匹配任何路径 — 已丢弃",
       "noUpstream": "没有上游步骤。",
-      "noRunYet": "尚未运行。",
+      "noRunYet": "暂无运行记录。",
       "runLabel": "运行",
       "switchRun": "切换运行",
       "notInRun": "此步骤未包含在此次运行中。",
@@ -2920,8 +2923,8 @@
       "editStep": "编辑步骤",
       "readOnlyRun": "您正在查看历史运行，因此无法在此处修改此步骤的配置。",
       "readOnlyRunEdit": "在工作流中编辑",
-      "testInputHint": "测试输入 — 编辑，然后运行步骤。",
-      "noRunsList": "尚无运行记录。",
+      "testInputHint": "测试输入 — 编辑后运行步骤。",
+      "noRunsList": "暂无运行记录。",
       "resetInput": "重置为示例",
       "eventPager": "{n} / {total}",
       "nextEvent": "下一个事件",
@@ -2945,7 +2948,7 @@
       "expand": "展开",
       "close": "清除并关闭结果",
       "nodesTitle": "步骤",
-      "empty": "运行测试以在此处查看步骤结果。",
+      "empty": "运行测试以在此查看步骤结果。",
       "openNode": "打开节点",
       "viewConfig": "查看配置",
       "hideConfig": "隐藏配置",
@@ -2955,7 +2958,7 @@
       "branchPathsLabel": "路径",
       "branchNoRule": "未设置规则",
       "destinationUnsupported": "不支持的类型",
-      "destinationMissing": "该目标已不存在或无法读取。",
+      "destinationMissing": "此目标已不存在或无法读取。",
       "headersLabel": "标头",
       "templateLabel": "模板",
       "outputFormatLabel": "输出格式",
@@ -3712,29 +3715,31 @@
       "crossLinkBody": "{brand} 暴露了一个 {product} (MCP) 端点，以便像 {client1}、{client2} 和 {client3} 这样的 AI 客户端可以查询并对此组织执行操作。设置和凭据位于 IAM 中。",
       "crossLinkCta": "打开 MCP 设置",
       "tagline": "通过 {product} (MCP) 将 {client1}、{client2}、{client3} 和其他 AI 客户端连接到此组织。",
-      "endpointLabel": "MCP 端点",
-      "authLabel": "1. 身份验证",
-      "clientLabel": "2. 选择您的客户端",
-      "configLabel": "3. 添加配置",
+      "connectLabel": "端点与身份验证",
+      "connectHint": "将 MCP 客户端指向此 URL，然后选择其登录方式。",
+      "configLabel": "添加配置",
+      "configHint": "选择你的客户端，然后将配置复制到相应位置。",
       "auth": {
         "oauth": "OAuth — 登录（推荐）",
         "token": "访问令牌",
+        "oauthTitle": "使用浏览器登录",
         "oauthNote": "无需管理凭证：您的 MCP 客户端会打开浏览器进行登录，访问权限受限于您现有的权限。只要您的客户端支持 OAuth，请使用此方式。"
       },
       "credential": {
-        "quickStartTitle": "快速入门 — 您的帐户",
-        "quickStartBody": "代码片段使用您自己的凭证，这些凭证具有您的完整权限。对于生产环境，请生成专用的只读凭证。",
-        "generate": "生成只读凭证",
-        "created": "只读凭证已创建",
+        "quickStartTitle": "暂无令牌",
+        "quickStartBody": "下面的代码片段带有占位请求头。请为此 MCP 客户端生成专用令牌，或粘贴现有的服务账号令牌替换占位内容。",
+        "generate": "生成专用令牌",
+        "created": "专用令牌已创建",
         "shownOnce": "用于 {email}。请立即复制 — 令牌仅显示一次，下面的代码片段现在将使用它。",
         "download": "下载",
         "manage": "管理/撤销",
-        "readonlyWarn": "帐户已创建，但只读角色无法自动应用 — 请在服务帐户中检查其权限。",
+        "readonlyWarn": "账号已创建，但无法添加到 {role} 角色中——在 IAM 中为其分配一个角色之前，它没有任何权限。",
+        "readonlyNote": "已通过 {role} 角色限定为只读——请在 IAM › 角色 中查看或扩展它。",
+        "rbacNote": "此部署中 RBAC 已关闭，因此此令牌无法被限定为只读——它与此组织中的任何其他凭证具有相同的访问权限。",
         "error": "无法创建凭证。请重试，或在 IAM 中手动创建服务帐户。"
       },
       "securityTitle": "使用专用的、最小权限的凭证",
-      "securityBody": "令牌默认为您自己的帐户凭证。对于生产环境，请生成上述只读凭证（或创建有范围的服务帐户），切勿将令牌提交到源代码管理。",
-      "docsCta": "阅读完整的 MCP 文档",
+      "securityBody": "请为 MCP 客户端提供范围受限的只读服务账号，而不是你自己的账号凭证，切勿将其令牌提交到源代码管理中。",
       "clients": {
         "claudeCode": "Claude Code",
         "cursor": "Cursor",
@@ -3761,7 +3766,10 @@
         "hermes": "添加到~/.hermes/config.yaml (YAML)，然后运行/reload-mcp。",
         "codex": "添加到~/.codex/config.toml (TOML)，然后重启Codex。"
       },
-      "installOneClick": "添加到{client}"
+      "installOneClick": "添加到{client}",
+      "skillsLabel": "添加 {brand} 技能（可选）",
+      "skillsHint": "教您的人工智能助手如何在 {brand} 中进行查询、告警和构建仪表盘，从而更充分地利用 MCP 工具。在您的项目中运行它，然后选择要安装到的智能体。",
+      "skillsRepo": "在 {host} 上查看技能"
     },
     "manageTokensBtnLabel": "管理令牌",
     "orgLevelExplanation": "这些是组织级别的写入令牌。它们与个人用户无关，即使创建它们的用户离开组织，它们也将继续工作。令牌只能在写入API上使用。",
@@ -16365,6 +16373,7 @@
       },
       "databaseCount": "1 个数据库 | {count} 个数据库",
       "openQueries": "查看其查询",
+      "viewMetrics": "查看指标",
       "alertMe": "提醒我",
       "columnHints": {
         "qps": "每秒调用次数——此窗口内的调用数除以其时长，因此 15 分钟视图和 4 小时视图具有可比性。",
@@ -16625,10 +16634,10 @@
         "missingDescription": "此页面描述一个查询，但地址未指定具体查询。如果您刚刚切换了组织，您正在阅读的查询属于您离开的那个组织。",
         "action": "浏览此组织的查询"
       },
-      "backToQueries": "返回热门查询",
-      "backToActivity": "返回活动",
-      "backToSamples": "返回最慢调用",
-      "backToDeadlocks": "返回死锁",
+      "backToQueries": "热门查询",
+      "backToActivity": "活动",
+      "backToSamples": "最慢调用",
+      "backToDeadlocks": "死锁",
       "latencyTitle": "速度随时间变化",
       "volumeTitle": "调用和失败随时间变化",
       "endpointsTitle": "调用来源",
@@ -16793,6 +16802,8 @@
     "page": {
       "tabs": {
         "overview": "概述",
+        "metrics": "指标",
+        "metricsHint": "按等待事件划分的数据库负载，以及数据库接收器收集的所有指标。",
         "queries": "Top 查询",
         "samples": "最慢的调用",
         "samplesHintClient": "您的已埋点服务在此时间窗口内观测到的已完成调用 — 未追踪的调用方不计入，因此这是下限而非总数。表格显示了其中最慢的调用。",
@@ -16809,6 +16820,129 @@
         "deadlocksLocked": "死锁是企业版功能。升级以查看哪些查询相互死锁以及原因。其他数据库选项卡在任何计划中都可用。",
         "blockedLocked": "被阻塞的查询是企业版功能。升级以查看哪些会话正在等待锁以及是什么持有锁。其他数据库选项卡在任何计划中都可用。",
         "tableHealthLocked": "表健康状况是企业版功能。升级以跟踪表大小、膨胀和清理状态。其他数据库选项卡在任何计划中都可用。"
+      }
+    },
+    "metrics": {
+      "title": "指标",
+      "subtitle": "数据库负载以及数据库接收器收集的所有指标，均在此时间窗口内以图表展示",
+      "load": {
+        "title": "数据库负载",
+        "hint": "每个间隔内活跃工作的平均会话数，按所选维度堆叠。空闲连接不计入；未等待任何资源的会话即在 CPU 上运行。在峰值上拖动即可将所有图表缩放到该峰值。",
+        "timeAxis": "时间",
+        "sessionsAxis": "平均活跃会话数",
+        "waitEventAxis": "等待事件",
+        "viewActivity": "在活动中查看",
+        "breakdowns": {
+          "waitEvent": "按等待事件",
+          "query": "按查询",
+          "database": "按数据库",
+          "user": "按用户"
+        }
+      },
+      "limitLegend": "连接限制",
+      "explore": "在指标浏览器中打开",
+      "railLabel": "指标分区",
+      "noAccess": "你没有权限读取 {stream}。请联系管理员获取此数据流的读取权限。",
+      "byDims": {
+        "query": "按查询",
+        "database": "按数据库",
+        "service": "按服务",
+        "operation": "按操作",
+        "mode": "按模式",
+        "lockType": "按锁类型",
+        "table": "按表",
+        "index": "按索引",
+        "client": "按客户端",
+        "state": "按状态",
+        "direction": "按方向",
+        "device": "按设备",
+        "host": "按主机"
+      },
+      "catalog": {
+        "activity": {
+          "title": "活动",
+          "desc": "吞吐量、事务和行变动"
+        },
+        "locks": {
+          "title": "锁",
+          "desc": "锁压力及其持有者"
+        },
+        "replication": {
+          "title": "复制",
+          "desc": "WAL 压力与副本延迟"
+        },
+        "indexes": {
+          "title": "索引",
+          "desc": "每个表的索引使用情况和大小"
+        },
+        "blocks": {
+          "title": "数据块",
+          "desc": "来自数据库自身计数器的、归因于查询的共享缓冲区 I/O"
+        },
+        "vacuum": {
+          "title": "Vacuum",
+          "desc": "每个表的活行与死行"
+        },
+        "host": {
+          "managedNote": "此数据库运行在云托管端点（例如 Amazon RDS）上，因此其提供商不会暴露供采集器监控的主机。清除数据库过滤器即可查看采集器实际上报的主机的主机指标。",
+          "title": "主机",
+          "desc": "数据库主机的 CPU、内存和 I/O",
+          "loopbackHint": "实例通过 localhost 连接 — 显示所有主机",
+          "matchHint": "主机指标按主机名匹配"
+        }
+      },
+      "catalogPanels": {
+        "calls": "查询调用",
+        "avgDuration": "平均耗时",
+        "commits": "提交",
+        "rollbacks": "回滚",
+        "rowsModified": "修改的行数",
+        "locks": "锁",
+        "walLag": "WAL 延迟",
+        "indexScans": "索引扫描",
+        "indexSize": "索引大小",
+        "blksHit": "共享块命中",
+        "blksRead": "共享块读取",
+        "blksDirtied": "共享块脏化",
+        "rowsByState": "按状态的行数",
+        "cpuUtilization": "CPU 使用率",
+        "memoryUsage": "内存",
+        "diskIo": "磁盘 I/O",
+        "networkIo": "网络 I/O"
+      },
+      "searchPlaceholder": "筛选指标…",
+      "triageOrder": "按分诊相关度排序",
+      "sections": {
+        "featured": "关键健康指标",
+        "postgresql": "PostgreSQL 指标",
+        "mysql": "MySQL 和 MariaDB 指标"
+      },
+      "roleTitle": "{role} · {engine}",
+      "roles": {
+        "cacheHitRatio": "缓存命中率",
+        "connections": "连接数",
+        "connectionLimit": "连接数上限",
+        "replicationLag": "复制延迟",
+        "cacheHit": "缓存命中",
+        "cacheRead": "缓存磁盘读取",
+        "deadlocks": "死锁"
+      },
+      "notCollecting": {
+        "title": "没有数据库指标到达",
+        "description": "上方的负载图表读取的是活动样本，但此组织中尚不存在来自数据库接收器的指标数据流。数据库设置卡片上的采集器配方会负责发送这些指标。",
+        "checklistTitle": "需要检查的内容",
+        "checks": {
+          "receivers": {
+            "no": "没有数据库接收器在发送指标",
+            "noDetail": "数据源下的 PostgreSQL 和 MySQL 设置卡片会在配置监控数据源的同时配置采集器的指标接收器。"
+          },
+          "enabled": {
+            "ok": "数据库监控已启用",
+            "okDetail": "因此一旦有接收器发送指标，这些指标就会在此处绘制成图",
+            "no": "数据库监控已禁用",
+            "noDetail": "此部署的 ZO_DB_MONITORING_ENABLED 处于关闭状态，因此数据库标签页不会采集数据。"
+          }
+        }
       }
     },
     "samples": {
