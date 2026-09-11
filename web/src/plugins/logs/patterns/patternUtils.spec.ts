@@ -79,7 +79,6 @@ describe("extractConstantsFromPattern", () => {
 // The backend's PostgreSqlDialect parser does not support backslash string-literal
 // escapes, so doubling an embedded single quote is the only escaping this needs —
 // backslash, double quotes, and control characters are all literal once quoted.
-// See docs/sql-string-literal-escaping.md.
 describe("escapeForMatchAll", () => {
   it("doubles an embedded single quote", () => {
     expect(escapeForMatchAll("it's")).toBe("it''s");
