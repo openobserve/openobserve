@@ -30,6 +30,9 @@ export interface PromQLChunkProcessorOptions {
 export interface ProcessingStats {
   chunkCount: number;
   totalMetricsReceived: number;
+  // Distinct series, so a series arriving in ten chunks counts once. totalMetricsReceived
+  // sums per-chunk arrivals, so only this can tell a drop from a re-delivery.
+  uniqueSeriesSeen: number;
   metricsStored: number;
   valuesAppended: number;
   startTime: number;
@@ -59,6 +62,7 @@ export function createPromQLChunkProcessor(options: PromQLChunkProcessorOptions)
   const stats: ProcessingStats = {
     chunkCount: 0,
     totalMetricsReceived: 0,
+    uniqueSeriesSeen: 0,
     metricsStored: 0,
     valuesAppended: 0,
     startTime: performance.now(),
@@ -89,6 +93,7 @@ export function createPromQLChunkProcessor(options: PromQLChunkProcessorOptions)
     }
 
     const selected = selectWithinCap();
+    stats.uniqueSeriesSeen = candidates.size;
     stats.metricsStored = selected.length;
 
     if (enableLogging) {
@@ -150,6 +155,7 @@ export function createPromQLChunkProcessor(options: PromQLChunkProcessorOptions)
 
     const selected = selectWithinCap();
     stats.valuesAppended += valuesAppended;
+    stats.uniqueSeriesSeen = candidates.size;
     stats.metricsStored = selected.length;
 
     if (enableLogging) {
