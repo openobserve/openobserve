@@ -119,6 +119,17 @@ export default defineComponent({
     const detailCardContent = ref("");
     const cardPosition = ref({ top: 0, left: 0, below: false });
 
+    // Escape before embedding in HTML — mirrors anomalySummaryGenerator.ts's esc().
+    // JSON.stringify doesn't escape </>/&, so an unescaped token (e.g. a string value
+    // containing "<b>") would be parsed as markup by DOMPurify instead of shown as text.
+    const esc = (s: string) =>
+      String(s)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+
     // Helper to format JSON with syntax highlighting
     const formatContent = (content: string): string => {
       try {
@@ -140,11 +151,10 @@ export default defineComponent({
             } else if (/null/.test(match)) {
               cls = "json-null";
             }
-            return `<span class="${cls}">${match}</span>`;
+            return `<span class="${cls}">${esc(match)}</span>`;
           },
         );
-        // matched tokens are substrings of the referenced content (log/dashboard data), so
-        // sanitize before v-html renders it
+        // matched tokens are already escaped above; DOMPurify stays as defense-in-depth
         return DOMPurify.sanitize(highlighted, {
           ALLOWED_TAGS: ["span"],
           ALLOWED_ATTR: ["class"],
