@@ -66,6 +66,34 @@ class WorkflowsPage {
     this.paletteCondition = '[data-test="workflow-palette-condition-default-btn"]';
     this.paletteFunction = '[data-test="workflow-palette-function-default-btn"]';
     this.paletteDestination = '[data-test="workflow-palette-destination-output-btn"]';
+    this.paletteBranch = '[data-test="workflow-palette-branch-default-btn"]';
+    // Branch node (N-way fan-out, #14027). Rows key on the case's STABLE handle, never
+    // its index: a surviving arm must keep the handle its edges are already wired to,
+    // so `case-N` comes off a high-water mark and is kept for the node's whole life.
+    this.stepBranch = '[data-test="workflow-step-branch"]';
+    this.branchBody = '[data-test="workflow-branch-body"]';
+    this.branchAddCase = '[data-test="workflow-branch-add-case"]';
+    this.branchElse = '[data-test="workflow-branch-else"]';
+    this.branchCaseRows = '[data-test^="workflow-branch-case-"]';
+    this.branchOrderBadges = '[data-test^="workflow-branch-order-"]';
+    this.branchCaseFor = (h) => `[data-test="workflow-branch-case-${h}"]`;
+    this.branchLabelFieldFor = (h) => `[data-test="workflow-branch-label-${h}-field"]`;
+    this.branchMoveUpFor = (h) => `[data-test="workflow-branch-move-up-${h}"]`;
+    this.branchMoveDownFor = (h) => `[data-test="workflow-branch-move-down-${h}"]`;
+    this.branchRemoveFor = (h) => `[data-test="workflow-branch-remove-case-${h}"]`;
+    // The else arm is a permanent row: it is what guarantees every record leaves by
+    // exactly one handle, so it renders WITHOUT a remove control.
+    this.branchElseRemove = '[data-test="workflow-branch-else-remove"]';
+    this.branchUnwiredBadge = '[data-test="workflow-node-branch-unwired-badge"]';
+    // Hover-only "+" on the canvas: one per OPEN (still unwired) source handle, in
+    // declared arm order, so nth(i) addresses arm i of what remains unwired.
+    this.flowAppendAdd = '[data-test="workflow-flow-append-add"]';
+    // Edge labels name the arm each connector leaves by — the only on-canvas evidence of
+    // which path a destination is actually wired to. They are HTML in vue-flow's label
+    // LAYER, not SVG <text>, and the layer also holds the (empty) hover-"+" wrappers, so
+    // callers must filter blanks rather than index children positionally. Note the class
+    // is plural: `.vue-flow__edge-label` matches nothing here.
+    this.edgeLabelLayer = '.vue-flow__edge-labels';
     // Trigger node (delete only visible on node hover). The hover-`+` add-out
     // button no longer exists — clicking the node's SOURCE HANDLE opens the step
     // picker instead.
@@ -98,6 +126,8 @@ class WorkflowsPage {
     this.destPickerCreateToggle = '[data-test="destination-picker-create-toggle-btn"]';
     this.destPickerSelectTrigger = '[data-test="destination-picker-select-trigger"]';
     this.destPickerSelectPopover = '[data-test="destination-picker-select-popover"]';
+    this.destPickerSelectSearch = '[data-test="destination-picker-select-search"]';
+    this.destPickerSelectOption = '[data-test="destination-picker-select-option"]';
     // Inline "create destination" wizard: step 1 choose-type card + continue, step 2 connection.
     this.destTypeCard = (t) => `[data-test="destination-type-card-${t}"]`;
     this.destStep1Continue = '[data-test="step1-continue-btn"]';
@@ -359,6 +389,152 @@ class WorkflowsPage {
     await node.waitFor({ state: 'visible', timeout: DRAWER_TIMEOUT_MS });
     await node.click({ timeout: DRAWER_TIMEOUT_MS });
     await this.page.locator(this.nodeDrawer).waitFor({ state: 'visible', timeout: DRAWER_TIMEOUT_MS });
+  }
+
+  /**
+   * Add a Branch from the palette and open its drawer. Same insert-immediately flow as
+   * addNodeFromPalette, but a Branch opens on one seeded row: a case-less Branch is
+   * rejected by the backend validator, so the panel never shows zero paths.
+   */
+  async addBranchFromPalette() {
+    await this.closeOpenDrawer();
+    await this.ensureNodePaletteOpen();
+    await this.page.locator(this.paletteBranch).click({ timeout: DRAWER_TIMEOUT_MS });
+    const node = this.page.locator(this.nodeFor('branch')).last();
+    await node.waitFor({ state: 'visible', timeout: DRAWER_TIMEOUT_MS });
+    await node.click({ timeout: DRAWER_TIMEOUT_MS });
+    await this.page.locator(this.branchBody).waitFor({ state: 'visible', timeout: DRAWER_TIMEOUT_MS });
+  }
+
+  async openBranchDrawer() {
+    await this.closeOpenDrawer();
+    await this.page.locator(this.nodeFor('branch')).first().dblclick({ timeout: DRAWER_TIMEOUT_MS });
+    await this.page.locator(this.branchBody).waitFor({ state: 'visible', timeout: DRAWER_TIMEOUT_MS });
+  }
+
+  async addBranchCase() {
+    const before = await this.branchCaseCount();
+    await this.page.locator(this.branchAddCase).click({ timeout: DRAWER_TIMEOUT_MS });
+    await expect.poll(async () => this.branchCaseCount(), { timeout: DRAWER_TIMEOUT_MS }).toBe(before + 1);
+  }
+
+  async removeBranchCase(handle) {
+    const before = await this.branchCaseCount();
+    await this.page.locator(this.branchRemoveFor(handle)).click({ timeout: DRAWER_TIMEOUT_MS });
+    await expect.poll(async () => this.branchCaseCount(), { timeout: DRAWER_TIMEOUT_MS }).toBe(before - 1);
+  }
+
+  async moveBranchCase(handle, direction /* 'up' | 'down' */) {
+    const sel = direction === 'up' ? this.branchMoveUpFor(handle) : this.branchMoveDownFor(handle);
+    await this.page.locator(sel).click({ timeout: DRAWER_TIMEOUT_MS });
+  }
+
+  async branchCaseCount() {
+    return this.page.locator(this.branchCaseRows).count();
+  }
+
+  /** Handles in RENDERED order — which is evaluation order, since first match wins. */
+  async branchCaseHandles() {
+    return this.page.locator(this.branchCaseRows).evaluateAll((els) =>
+      els.map((e) => (e.getAttribute('data-test') || '').replace('workflow-branch-case-', ''))
+    );
+  }
+
+  /**
+   * Path labels in rendered order. Scoped to the label field by data-test, NOT to `input`:
+   * every row also contains its ConditionBuilder's value input, which would interleave a
+   * blank entry after each label.
+   */
+  async branchCaseLabels() {
+    return this.page
+      .locator(`${this.branchCaseRows} [data-test^="workflow-branch-label-"][data-test$="-field"]`)
+      .evaluateAll((els) => els.map((e) => e.value));
+  }
+
+  /**
+   * Configure one path. Every branch row renders its OWN ConditionBuilder, so the
+   * column/operator triggers must be scoped to the row; the option popover is a portal
+   * and stays global (only one is open at a time).
+   */
+  async setBranchCase(handle, { label, column, operator = '=', value } = {}) {
+    const row = this.branchCaseFor(handle);
+    if (label !== undefined) {
+      await this.page.locator(this.branchLabelFieldFor(handle)).fill(label);
+    }
+    if (column !== undefined) {
+      await this.dismissConditionGuidelinesIfPresent();
+      await this.pickSelectOption(`${row} ${this.condColumnTrigger}`, this.condColumnOption, column);
+      await this.pickSelectOption(`${row} ${this.condOperatorTrigger}`, this.condOperatorOption, operator);
+      if (value !== undefined) {
+        await this.page.locator(`${row} ${this.condValueField}`).fill(value);
+      }
+    }
+  }
+
+  /**
+   * Wire the nth still-unwired arm to a destination. The per-arm "+" is hover-only, so
+   * the node must be hovered first; `nth` indexes the OPEN handles in declared order,
+   * which shifts as arms get wired — wire left to right and it stays predictable.
+   */
+  async wireArmToDestination(nth, { destName, url, existing } = {}) {
+    await this.page.locator(this.nodeFor('branch')).first().hover({ timeout: DRAWER_TIMEOUT_MS });
+    const plus = this.page.locator(this.flowAppendAdd).nth(nth);
+    await plus.waitFor({ state: 'visible', timeout: DRAWER_TIMEOUT_MS });
+    await plus.click({ timeout: DRAWER_TIMEOUT_MS });
+    await this.page.locator(this.stepDestination).click({ timeout: DRAWER_TIMEOUT_MS });
+    const node = this.page.locator(this.nodeFor('destination')).last();
+    await node.waitFor({ state: 'visible', timeout: DRAWER_TIMEOUT_MS });
+    await node.dblclick({ timeout: DRAWER_TIMEOUT_MS });
+    await this.page.locator(this.nodeDrawer).waitFor({ state: 'visible', timeout: DRAWER_TIMEOUT_MS });
+    if (existing) await this.pickExistingDestination(existing);
+    else await this.createDestinationInline({ name: destName, url });
+    await this.saveNodeDrawer();
+  }
+
+  /** The else arm renders after every case row, whatever the path count. */
+  async expectElseArmLast() {
+    const rows = this.page.locator(`${this.branchCaseRows}, ${this.branchElse}`);
+    await expect(rows.last()).toHaveAttribute('data-test', 'workflow-branch-else');
+  }
+
+  async expectElseArmVisible() {
+    await expect(this.page.locator(this.branchElse)).toBeVisible();
+  }
+
+  /** Non-deletable rows omit the control entirely — assert absence, not a disabled state. */
+  async expectElseArmNotRemovable() {
+    await expect(this.page.locator(this.branchElseRemove)).toHaveCount(0);
+  }
+
+  async expectBranchCaseNotRemovable(handle) {
+    await expect(this.page.locator(this.branchRemoveFor(handle))).toHaveCount(0);
+  }
+
+  async expectBranchUnwiredBadge() {
+    await expect(this.page.locator(this.branchUnwiredBadge)).toBeVisible();
+  }
+
+  /** Choose an already-saved destination by name (the picker's list is searchable). */
+  async pickExistingDestination(name) {
+    await this.page.locator(this.destPickerSelectTrigger).click({ timeout: DRAWER_TIMEOUT_MS });
+    await this.page.locator(this.destPickerSelectSearch).fill(name);
+    const option = this.page.locator(this.destPickerSelectOption).first();
+    await option.waitFor({ state: 'visible', timeout: DRAWER_TIMEOUT_MS });
+    await option.click({ timeout: DRAWER_TIMEOUT_MS });
+  }
+
+  /**
+   * Arm names as rendered on the connectors — the assertion that catches a silent reroute.
+   * vue-flow paints the label layer a tick after the edge itself, so poll until `expected`
+   * non-blank labels exist rather than reading once.
+   */
+  async edgeLabelTexts(expected = 1) {
+    const kids = this.page.locator(`${this.edgeLabelLayer} > *`);
+    const read = async () => (await kids.allTextContents()).map((t) => t.trim()).filter(Boolean);
+    await expect
+      .poll(async () => (await read()).length, { timeout: DRAWER_TIMEOUT_MS })
+      .toBeGreaterThanOrEqual(expected);
+    return read();
   }
 
   /**
