@@ -33,8 +33,6 @@ const CLOUD: ShortcutCapabilities = {
   rbacEnabled: true,
 };
 
-const groupByPage = new Map(SHORTCUT_REGISTRY.map((g) => [g.pageKey, g]));
-
 /** Mirrors ShortcutCheatsheet: a page shows unless its gate rejects the caps. */
 function visiblePages(caps: ShortcutCapabilities): Set<string> {
   const pages = new Set<string>();
@@ -111,14 +109,39 @@ describe("shortcut cheatsheet OSS gating", () => {
     expect(titles).not.toContain("shortcuts.modules.actions");
   });
 
-  it("restores every gated page on an enterprise or cloud build", () => {
-    for (const caps of [ENTERPRISE, CLOUD]) {
-      const pages = visiblePages(caps);
-      for (const p of GATED_IN_OSS) {
-        // Enterprise-only pages stay hidden on a pure cloud build.
-        const g = groupByPage.get(p)!;
-        expect(pages.has(p)).toBe(g.visible!(caps));
-      }
+  it("shows enterprise-only pages on enterprise and hides the cloud-only ones", () => {
+    const pages = visiblePages(ENTERPRISE);
+    for (const p of [
+      "shortcuts.pages.regexPatterns",
+      "shortcuts.pages.cipherKeys",
+      "shortcuts.pages.nodes",
+      "shortcuts.pages.searchSchedulers",
+      "shortcuts.pages.aiToolsets",
+      "shortcuts.pages.pipelineDestinations",
+      "shortcuts.pages.runningQueries",
+    ]) {
+      expect(pages.has(p), `${p} should show on enterprise`).toBe(true);
+    }
+    // Cloud-only pages stay hidden on a pure enterprise build.
+    expect(pages.has("shortcuts.pages.iamInvitations")).toBe(false);
+    expect(pages.has("shortcuts.pages.orgManagement")).toBe(false);
+  });
+
+  it("shows cloud-only pages on cloud and hides the enterprise-only ones", () => {
+    const pages = visiblePages(CLOUD);
+    expect(pages.has("shortcuts.pages.iamInvitations")).toBe(true);
+    expect(pages.has("shortcuts.pages.orgManagement")).toBe(true);
+    // Enterprise-only pages (incl. _meta-org cluster pages) stay hidden on cloud.
+    for (const p of [
+      "shortcuts.pages.regexPatterns",
+      "shortcuts.pages.cipherKeys",
+      "shortcuts.pages.nodes",
+      "shortcuts.pages.searchSchedulers",
+      "shortcuts.pages.aiToolsets",
+      "shortcuts.pages.pipelineDestinations",
+      "shortcuts.pages.runningQueries",
+    ]) {
+      expect(pages.has(p), `${p} should be hidden on cloud`).toBe(false);
     }
   });
 
