@@ -250,13 +250,45 @@ describe("buildAnomalyFilterExpression", () => {
   });
 
   describe("special characters in values", () => {
-    it("should embed single quotes in the value as-is for comparison operators", () => {
-      expect(buildAnomalyFilterExpression("env", "=", "prod")).toBe("env = 'prod'");
-    });
-
     it("should handle values with spaces for str_match", () => {
       expect(buildAnomalyFilterExpression("message", "str_match", "out of memory")).toBe(
         "str_match(message, 'out of memory')",
+      );
+    });
+
+    // Regression: an embedded ' must be doubled before being wrapped in the
+    // outer quotes, in every operator branch that quotes its value.
+    it("escapes an embedded single quote for a comparison operator", () => {
+      expect(buildAnomalyFilterExpression("city", "=", "O'Hare")).toBe("city = 'O''Hare'");
+    });
+
+    it("escapes an embedded single quote for str_match", () => {
+      expect(buildAnomalyFilterExpression("message", "str_match", "O'Hare")).toBe(
+        "str_match(message, 'O''Hare')",
+      );
+    });
+
+    it("escapes an embedded single quote for match_all", () => {
+      expect(buildAnomalyFilterExpression("message", "match_all", "O'Hare")).toBe(
+        "match_all('O''Hare')",
+      );
+    });
+
+    it("escapes an embedded single quote for Starts With", () => {
+      expect(buildAnomalyFilterExpression("city", "Starts With", "O'Hare")).toBe(
+        "city LIKE 'O''Hare%'",
+      );
+    });
+
+    it("escapes an embedded single quote for Ends With", () => {
+      expect(buildAnomalyFilterExpression("city", "Ends With", "O'Hare")).toBe(
+        "city LIKE '%O''Hare'",
+      );
+    });
+
+    it("escapes an embedded single quote for Not Contains", () => {
+      expect(buildAnomalyFilterExpression("city", "Not Contains", "O'Hare")).toBe(
+        "city NOT LIKE '%O''Hare%'",
       );
     });
   });
