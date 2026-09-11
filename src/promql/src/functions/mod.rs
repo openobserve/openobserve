@@ -128,7 +128,50 @@ pub(crate) enum Func {
     Year,
 }
 
+pub(crate) enum SingleArgFunc {
+    Value(fn(Value) -> Result<Value>),
+    Date(fn(Value) -> Result<Value>),
+    Context(fn(Value, &EvalContext) -> Result<Value>),
+}
+
+impl SingleArgFunc {
+    pub(crate) fn eval(self, input: Value, eval_ctx: &EvalContext) -> Result<Value> {
+        match self {
+            Self::Value(eval) | Self::Date(eval) => eval(input),
+            Self::Context(eval) => eval(input, eval_ctx),
+        }
+    }
+}
+
 impl Func {
+    pub(crate) fn single_arg_func(self) -> Option<SingleArgFunc> {
+        Some(match self {
+            Self::Abs => SingleArgFunc::Value(abs),
+            Self::Ceil => SingleArgFunc::Value(ceil),
+            Self::Exp => SingleArgFunc::Value(exp),
+            Self::Floor => SingleArgFunc::Value(floor),
+            Self::Ln => SingleArgFunc::Value(ln),
+            Self::Log10 => SingleArgFunc::Value(log10),
+            Self::Log2 => SingleArgFunc::Value(log2),
+            Self::Sgn => SingleArgFunc::Value(sgn),
+            Self::Sqrt => SingleArgFunc::Value(sqrt),
+            Self::Timestamp => SingleArgFunc::Value(timestamp),
+            Self::Absent => SingleArgFunc::Context(absent),
+            Self::AbsentOverTime => SingleArgFunc::Context(absent_over_time),
+            Self::Scalar => SingleArgFunc::Context(scalar),
+            Self::Vector => SingleArgFunc::Context(vector),
+            Self::DayOfMonth => SingleArgFunc::Date(day_of_month),
+            Self::DayOfWeek => SingleArgFunc::Date(day_of_week),
+            Self::DayOfYear => SingleArgFunc::Date(day_of_year),
+            Self::DaysInMonth => SingleArgFunc::Date(days_in_month),
+            Self::Hour => SingleArgFunc::Date(hour),
+            Self::Minute => SingleArgFunc::Date(minute),
+            Self::Month => SingleArgFunc::Date(month),
+            Self::Year => SingleArgFunc::Date(year),
+            _ => return None,
+        })
+    }
+
     /// The single-argument range function this name evaluates through [`eval_range`], if any.
     pub(crate) fn range_func(self) -> Option<Box<dyn RangeFunc>> {
         Some(match self {

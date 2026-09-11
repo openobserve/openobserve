@@ -23,7 +23,7 @@ use datafusion::error::{DataFusionError, Result};
 use promql_parser::parser::{Expr as PromExpr, Function, FunctionArgs, MatrixSelector};
 
 use super::Engine;
-use crate::functions::{self, Func};
+use crate::functions::{self, Func, RangeFunc, SingleArgFunc};
 
 impl Engine {
     pub(super) async fn call_expr(
@@ -35,30 +35,35 @@ impl Engine {
             DataFusionError::NotImplemented(format!("Unsupported function: {}", func.name))
         })?;
 
-        // a range function over a plain matrix selector streams its series one at a time
-        if let Some(range_func) = func_name.range_func()
-            && let [arg] = args.args.as_slice()
-            && let PromExpr::MatrixSelector(MatrixSelector { vs, range }) = arg.as_ref()
-            && let Some(value) = self
-                .try_streaming_range_func(vs, *range, Arc::from(range_func))
-                .await?
-        {
-            return Ok(value);
-        }
-
+        // TODO: check this implementation
         if func_name == Func::Time {
             self.ensure_args_len(args, 0, "Invalid args passed to the function")?;
-            // TODO: check this implementation
             return Ok(Value::Float((self.eval_ctx.start / 1_000_000) as f64));
         }
 
         let start = std::time::Instant::now();
         let result = if let Some(range_func) = func_name.range_func() {
-            let input = self.call_expr_arg(args, 0).await?;
-            functions::eval_range(input, range_func, &self.eval_ctx)?
+            // a range function over a plain matrix selector streams its series one at a time
+            if let [arg] = args.args.as_slice()
+                && let PromExpr::MatrixSelector(MatrixSelector { vs, range }) = arg.as_ref()
+            {
+                let range_func: Arc<dyn RangeFunc> = Arc::from(range_func);
+                if let Some(value) = self
+                    .try_streaming_range_func(vs, *range, Arc::clone(&range_func))
+                    .await?
+                {
+                    return Ok(value);
+                }
+                let input = self.call_expr_arg(args, 0).await?;
+                functions::eval_range(input, range_func, &self.eval_ctx)?
+            } else {
+                let input = self.call_expr_arg(args, 0).await?;
+                functions::eval_range(input, range_func, &self.eval_ctx)?
+            }
         } else {
             self.call_builtin(func_name, args).await?
         };
+
         log::info!(
             "[trace_id: {}] [PromQL Timing] call_expr({}) execution took: {:?}",
             self.trace_id,
@@ -205,17 +210,8 @@ impl Engine {
         func_name: Func,
         args: &FunctionArgs,
     ) -> Result<Value> {
-        let input = if matches!(
-            func_name,
-            Func::DayOfMonth
-                | Func::DayOfWeek
-                | Func::DayOfYear
-                | Func::DaysInMonth
-                | Func::Hour
-                | Func::Minute
-                | Func::Month
-                | Func::Year
-        ) {
+        let single_arg_func = func_name.single_arg_func();
+        let input = if matches!(single_arg_func, Some(SingleArgFunc::Date(_))) {
             match args.len() {
                 0 => Value::Matrix(vec![RangeValue {
                     labels: Labels::default(),
@@ -239,35 +235,13 @@ impl Engine {
             self.call_expr_arg(args, 0).await?
         };
 
-        Ok(match func_name {
-            Func::Abs => functions::abs(input)?,
-            Func::Absent => functions::absent(input, &self.eval_ctx)?,
-            Func::AbsentOverTime => functions::absent_over_time(input, &self.eval_ctx)?,
-            Func::Ceil => functions::ceil(input)?,
-            Func::DayOfMonth => functions::day_of_month(input)?,
-            Func::DayOfWeek => functions::day_of_week(input)?,
-            Func::DayOfYear => functions::day_of_year(input)?,
-            Func::DaysInMonth => functions::days_in_month(input)?,
-            Func::Exp => functions::exp(input)?,
-            Func::Floor => functions::floor(input)?,
-            Func::Hour => functions::hour(input)?,
-            Func::Ln => functions::ln(input)?,
-            Func::Log10 => functions::log10(input)?,
-            Func::Log2 => functions::log2(input)?,
-            Func::Minute => functions::minute(input)?,
-            Func::Month => functions::month(input)?,
-            Func::Scalar => functions::scalar(input, &self.eval_ctx)?,
-            Func::Sgn => functions::sgn(input)?,
-            Func::Sqrt => functions::sqrt(input)?,
-            Func::Timestamp => functions::timestamp(input)?,
-            Func::Vector => functions::vector(input, &self.eval_ctx)?,
-            Func::Year => functions::year(input)?,
-            _ => {
-                return Err(DataFusionError::Internal(format!(
+        single_arg_func
+            .ok_or_else(|| {
+                DataFusionError::Internal(format!(
                     "{func_name:?} must be evaluated before builtin dispatch"
-                )));
-            }
-        })
+                ))
+            })?
+            .eval(input, &self.eval_ctx)
     }
 
     async fn call_expr_arg(&mut self, args: &FunctionArgs, index: usize) -> Result<Value> {
@@ -429,6 +403,51 @@ mod tests {
                 value => panic!("unexpected result for {query}: {value:?}"),
             }
         }
+    }
+
+    #[tokio::test]
+    async fn test_single_arg_dispatch_preserves_argument_handling() {
+        let calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let mut engine = Engine::new(
+            "test",
+            Arc::new(PromqlContext::new(
+                create_test_query_ctx("test", "test_org", 30),
+                CountingProvider(calls.clone()),
+                vec![],
+            )),
+            create_test_eval_ctx(),
+        );
+        let args = FunctionArgs {
+            args: ["vector(-5)", "m"]
+                .into_iter()
+                .map(|expr| Box::new(promql_parser::parser::parse(expr).unwrap()))
+                .collect(),
+        };
+        let Value::Matrix(series) = engine.call_builtin(Func::Abs, &args).await.unwrap() else {
+            panic!("expected absolute values");
+        };
+        assert_eq!(series[0].samples[0].value, 5.0);
+        for func in [
+            Func::DayOfMonth,
+            Func::DayOfWeek,
+            Func::DayOfYear,
+            Func::DaysInMonth,
+            Func::Hour,
+            Func::Minute,
+            Func::Month,
+            Func::Year,
+        ] {
+            assert!(matches!(
+                engine.call_builtin(func, &args).await,
+                Err(DataFusionError::NotImplemented(message))
+                    if message == "Invalid args passed to the function"
+            ));
+        }
+        assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 0);
+        assert!(matches!(
+            engine.call_builtin(Func::Abs, &FunctionArgs { args: vec![] }).await,
+            Err(DataFusionError::NotImplemented(message)) if message == "Missing argument 0"
+        ));
     }
 
     #[test]
