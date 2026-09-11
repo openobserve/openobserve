@@ -13,25 +13,44 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { computed, type ComputedRef } from "vue";
 import { useRouter, type RouteLocationRaw } from "vue-router";
 
-// Real browser back replays the listing's exact previous URL (any URL-synced state included); the fallback push is for when history.state.back isn't that listing at all (deep link, arrived from elsewhere).
+// A login bounce or OAuth callback is a redirect the user never chose, so no back button may return to one.
+const AUTH_PATHS = new Set(["/login", "/logout", "/cb", "/slack/oauth/callback"]);
+
+export interface ListBackNavigation {
+  (): void;
+  // Lets a caller word the button for where it will actually land, instead of always naming the listing.
+  popsHistory: ComputedRef<boolean>;
+}
+
+// Any in-app page can link into a detail view, so real browser back — which replays the previous URL with all its URL-synced state — is right by default; the fallback is for a deep link, a new tab, or an entry point isExcluded rejects because going there would dead-end or loop.
 export function useListBackNavigation(options: {
-  isListPath: (path: string) => boolean;
+  isExcluded?: (path: string) => boolean;
   fallback: () => RouteLocationRaw;
-}) {
+}): ListBackNavigation {
   const router = useRouter();
 
-  return function goBack(): void {
+  const backPath = (): string | null => {
     const back = (router.options?.history?.state as { back?: unknown } | undefined)?.back;
-    if (typeof back === "string") {
-      // endsWith rather than === so a deployment served under a base path still matches.
-      const path = back.split(/[?#]/)[0].replace(/\/$/, "");
-      if (options.isListPath(path)) {
-        router.back();
-        return;
-      }
+    // state.back is stored base-stripped, so a leading "/" is what separates a real route from a cross-origin referrer.
+    if (typeof back !== "string" || !back.startsWith("/")) return null;
+    return back.split(/[?#]/)[0].replace(/\/+$/, "") || "/";
+  };
+
+  const canPop = (): boolean => {
+    const path = backPath();
+    return path !== null && !AUTH_PATHS.has(path) && !options.isExcluded?.(path);
+  };
+
+  const goBack = (): void => {
+    if (canPop()) {
+      router.back();
+      return;
     }
     router.push(options.fallback());
   };
+
+  return Object.assign(goBack, { popsHistory: computed(canPop) }) as ListBackNavigation;
 }

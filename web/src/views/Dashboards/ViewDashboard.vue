@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :back="
           !isFullscreen && store.state.printMode !== true
             ? {
-                label: t('dashboard.header'),
+                label: goBackToDashboardList.popsHistory.value ? undefined : t('dashboard.header'),
                 onClick: goBackToDashboardList,
                 dataTest: 'dashboard-back-btn',
               }
@@ -1204,9 +1204,13 @@ export default defineComponent({
 
     // [END] date picker related variables
 
+    // Another dashboard or the panel editor is a bounce-through, not a place to return to: going back there loops between dashboards or reopens a form the user already left.
+    const isDashboardSurface = (path: string) =>
+      path === "/dashboards/view" || path === "/dashboards/add_panel";
+
     // Fallback-only: a dashboard opened from the Favorites pseudo-folder carries the folder it lives in, so rebuilding from route.query.folder here (rather than Favorites) is only reached when there's no real history to go back to.
     const goBackToDashboardList = useListBackNavigation({
-      isListPath: (path) => path === "/dashboards" || path.endsWith("/dashboards"),
+      isExcluded: isDashboardSurface,
       fallback: () => ({
         path: "/dashboards",
         query: {
