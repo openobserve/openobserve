@@ -58,8 +58,7 @@ beforeEach(() => {
   s.loadedOrg.value = null;
   s.currentPage.value = 1;
   s.rowsPerPage.value = 20;
-  s.searchUser.value = "";
-  s.searchMessage.value = "";
+  s.searchKeyword.value = "";
   s.agents.value = [];
   s.agentsLoaded.value = false;
 });
@@ -233,47 +232,25 @@ describe("useSessions — fetchPage: field mapping", () => {
 });
 
 describe("useSessions — fetchPage: search", () => {
-  it("sends the user term as user_search only", async () => {
+  it("sends the term as keyword", async () => {
     mockSessionsList.mockResolvedValue({ data: { hits: [], total: 0 } });
     const { fetchPage } = useSessions();
-    await fetchPage("stream", 1000, 2000, 0, 25, "", { user: "  luis " });
-    expect(mockSessionsList).toHaveBeenCalledWith(
-      expect.objectContaining({ userSearch: "luis", messageSearch: undefined }),
-    );
-  });
-
-  it("sends both terms when both are given", async () => {
-    mockSessionsList.mockResolvedValue({ data: { hits: [], total: 0 } });
-    const { fetchPage } = useSessions();
-    await fetchPage("stream", 1000, 2000, 0, 25, "", { user: "luis", message: "refund" });
-    expect(mockSessionsList).toHaveBeenCalledWith(
-      expect.objectContaining({ userSearch: "luis", messageSearch: "refund" }),
-    );
-  });
-
-  it("sends the message term as message_search only", async () => {
-    mockSessionsList.mockResolvedValue({ data: { hits: [], total: 0 } });
-    const { fetchPage } = useSessions();
-    await fetchPage("stream", 1000, 2000, 0, 25, "", { message: "refund" });
-    expect(mockSessionsList).toHaveBeenCalledWith(
-      expect.objectContaining({ userSearch: undefined, messageSearch: "refund" }),
-    );
+    await fetchPage("stream", 1000, 2000, 0, 25, "", { keyword: "  luis " });
+    expect(mockSessionsList).toHaveBeenCalledWith(expect.objectContaining({ keyword: "luis" }));
   });
 
   it("treats a blank term as no search", async () => {
     mockSessionsList.mockResolvedValue({ data: { hits: [], total: 0 } });
     const { fetchPage } = useSessions();
-    await fetchPage("stream", 1000, 2000, 0, 25, "", { user: "   ", message: "" });
-    expect(mockSessionsList).toHaveBeenCalledWith(
-      expect.objectContaining({ userSearch: undefined, messageSearch: undefined }),
-    );
+    await fetchPage("stream", 1000, 2000, 0, 25, "", { keyword: "   " });
+    expect(mockSessionsList).toHaveBeenCalledWith(expect.objectContaining({ keyword: undefined }));
   });
 
   it("caps the term at 256 characters", async () => {
     mockSessionsList.mockResolvedValue({ data: { hits: [], total: 0 } });
     const { fetchPage } = useSessions();
-    await fetchPage("stream", 1000, 2000, 0, 25, "", { user: "x".repeat(300) });
-    expect(mockSessionsList.mock.calls[0][0].userSearch).toHaveLength(256);
+    await fetchPage("stream", 1000, 2000, 0, 25, "", { keyword: "x".repeat(300) });
+    expect(mockSessionsList.mock.calls[0][0].keyword).toHaveLength(256);
   });
 
   it("drops a late response from a superseded run (last request wins)", async () => {
@@ -286,8 +263,8 @@ describe("useSessions — fetchPage: search", () => {
       });
 
     const { sessions, loading, fetchPage } = useSessions();
-    const p1 = fetchPage("stream", 1000, 2000, 0, 25, "", { user: "a" });
-    const p2 = fetchPage("stream", 1000, 2000, 0, 25, "", { user: "ab" });
+    const p1 = fetchPage("stream", 1000, 2000, 0, 25, "", { keyword: "a" });
+    const p2 = fetchPage("stream", 1000, 2000, 0, 25, "", { keyword: "ab" });
     await p2;
     expect(sessions.value.map((r) => r.sessionId)).toEqual(["second"]);
     expect(loading.value).toBe(false);

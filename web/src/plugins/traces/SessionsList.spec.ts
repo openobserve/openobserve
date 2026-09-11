@@ -21,9 +21,8 @@ const mockLastRunAt = ref<number | null>(null);
 const mockLoadedOrg = ref<string | null>(null);
 const mockCurrentPage = ref(1);
 const mockRowsPerPage = ref(20);
-// Applied search terms — module-scoped in the real composable, like the pagination.
-const mockSearchUser = ref("");
-const mockSearchMessage = ref("");
+// Applied search term — module-scoped in the real composable, like the pagination.
+const mockSearchKeyword = ref("");
 const mockAgents = ref<any[]>([]);
 const mockAgentsLoaded = ref(false);
 const mockFetchPage = vi.fn();
@@ -53,8 +52,7 @@ vi.mock("./composables/useSessions", () => ({
     loadedOrg: mockLoadedOrg,
     currentPage: mockCurrentPage,
     rowsPerPage: mockRowsPerPage,
-    searchUser: mockSearchUser,
-    searchMessage: mockSearchMessage,
+    searchKeyword: mockSearchKeyword,
     agents: mockAgents,
     agentsLoaded: mockAgentsLoaded,
     fetchPage: mockFetchPage,
@@ -251,8 +249,7 @@ beforeEach(() => {
   mockLoadedOrg.value = null;
   mockCurrentPage.value = 1;
   mockRowsPerPage.value = 20;
-  mockSearchUser.value = "";
-  mockSearchMessage.value = "";
+  mockSearchKeyword.value = "";
   mockAgents.value = [];
   mockAgentsLoaded.value = false;
   mockRouteQuery = {};
@@ -688,8 +685,7 @@ describe("SessionsList — OSS builds (neither isEnterprise nor isCloud is 'true
 // ---------------------------------------------------------------------------
 
 describe("SessionsList — search", () => {
-  const USER = "[data-test='sessions-list-search-user-field']";
-  const MESSAGE = "[data-test='sessions-list-search-message-field']";
+  const SEARCH = "[data-test='sessions-list-search-field']";
   const value = (wrapper: any, sel: string) =>
     (wrapper.find(sel).element as HTMLInputElement).value;
   const NO_SEARCH = ["test-stream", 1000, 2000, 0, 20, "", undefined] as const;
@@ -703,111 +699,78 @@ describe("SessionsList — search", () => {
     return wrapper;
   }
 
-  it("renders a User box and a Message box on the scope row", async () => {
+  it("renders one full-width search box on the scope row, matched against the user id or the message", async () => {
     const wrapper = await mountInStreamMode();
-    expect(wrapper.find(USER).attributes("placeholder")).toBe("Search by user");
-    expect(wrapper.find(MESSAGE).attributes("placeholder")).toBe("Search message text");
+    expect(wrapper.find(SEARCH).attributes("placeholder")).toBe("Search by user or message");
   });
 
-  it("typing alone does not fetch; Enter fetches page 1 with the user term", async () => {
+  // Live search, same as LogStream.vue's Streams search: the box's own
+  // `:debounce="300"` settles typing into one value before it ever reaches
+  // `searchKeyword` — no Enter/Escape affordance. Setting the mocked
+  // composable's ref directly is the same instance the component's `watch`
+  // observes, so it exercises the exact re-fetch path without fighting a real
+  // setTimeout in the test.
+  it("a settled term re-fetches page 1", async () => {
     mockCurrentPage.value = 3;
     const wrapper = await mountInStreamMode();
-    await wrapper.find(USER).setValue("  luis ");
-    await flushPromises();
-    expect(mockFetchPage).not.toHaveBeenCalled();
-
-    await wrapper.find(USER).trigger("keydown", { key: "Enter" });
+    mockSearchKeyword.value = "luis";
     await flushPromises();
     expect(mockFetchPage).toHaveBeenCalledTimes(1);
     expect(mockFetchPage).toHaveBeenCalledWith("test-stream", 1000, 2000, 0, 20, "", {
-      user: "luis",
-      message: undefined,
+      keyword: "luis",
     });
     expect(mockCurrentPage.value).toBe(1);
-    expect(mockSearchUser.value).toBe("luis");
+    expect(value(wrapper, SEARCH)).toBe("luis");
   });
 
-  it("Enter in either box submits both terms together", async () => {
-    const wrapper = await mountInStreamMode();
-    await wrapper.find(USER).setValue("luis");
-    await wrapper.find(MESSAGE).setValue("refund");
-    await wrapper.find(MESSAGE).trigger("keydown", { key: "Enter" });
-    await flushPromises();
-    expect(mockFetchPage).toHaveBeenCalledWith("test-stream", 1000, 2000, 0, 20, "", {
-      user: "luis",
-      message: "refund",
-    });
+  it("debounces real typing in the box — no fetch until the input settles", async () => {
+    vi.useFakeTimers();
+    try {
+      const wrapper = await mountInStreamMode();
+      await wrapper.find(SEARCH).setValue("luis");
+      expect(mockFetchPage).not.toHaveBeenCalled();
+
+      await vi.advanceTimersByTimeAsync(300);
+      expect(mockFetchPage).toHaveBeenCalledWith("test-stream", 1000, 2000, 0, 20, "", {
+        keyword: "luis",
+      });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
-  it("caps an applied term at 256 characters", async () => {
+  it("the clear control drops the term and re-fetches unfiltered", async () => {
+    mockSearchKeyword.value = "luis";
     const wrapper = await mountInStreamMode();
-    await wrapper.find(MESSAGE).setValue("x".repeat(300));
-    await wrapper.find(MESSAGE).trigger("keydown", { key: "Enter" });
-    await flushPromises();
-    expect(mockSearchMessage.value).toHaveLength(256);
-  });
+    expect(value(wrapper, SEARCH)).toBe("luis");
 
-  it("Enter on empty boxes does not apply a search", async () => {
-    const wrapper = await mountInStreamMode();
-    await wrapper.find(USER).trigger("keydown", { key: "Enter" });
+    await wrapper.find("[data-test='sessions-list-search-clear']").trigger("click");
     await flushPromises();
-    expect(mockFetchPage).toHaveBeenCalledWith(...NO_SEARCH);
-    expect(mockSearchUser.value).toBe("");
-  });
-
-  it("a box's clear control drops only that term and re-fetches with the other", async () => {
-    mockSearchUser.value = "luis";
-    mockSearchMessage.value = "refund";
-    const wrapper = await mountInStreamMode();
-    expect(value(wrapper, USER)).toBe("luis");
-    expect(value(wrapper, MESSAGE)).toBe("refund");
-
-    await wrapper.find("[data-test='sessions-list-search-user-clear']").trigger("click");
-    await flushPromises();
-    expect(mockSearchUser.value).toBe("");
-    expect(mockSearchMessage.value).toBe("refund");
-    expect(mockFetchPage).toHaveBeenCalledWith("test-stream", 1000, 2000, 0, 20, "", {
-      user: undefined,
-      message: "refund",
-    });
-  });
-
-  it("Escape in a box clears that term and loads the list without it", async () => {
-    mockSearchUser.value = "luis";
-    const wrapper = await mountInStreamMode();
-    await wrapper.find(USER).trigger("keydown", { key: "Escape" });
-    await flushPromises();
-    expect(value(wrapper, USER)).toBe("");
-    expect(mockSearchUser.value).toBe("");
+    expect(mockSearchKeyword.value).toBe("");
     expect(mockFetchPage).toHaveBeenCalledWith(...NO_SEARCH);
   });
 
-  it("writes the applied terms to the URL and removes them when cleared", async () => {
+  it("writes the applied term to the URL and removes it when cleared", async () => {
     const wrapper = await mountInStreamMode();
-    await wrapper.find(USER).setValue("luis");
-    await wrapper.find(MESSAGE).setValue("refund");
-    await wrapper.find(USER).trigger("keydown", { key: "Enter" });
+    mockSearchKeyword.value = "luis";
     await flushPromises();
     expect(mockRouterReplace).toHaveBeenLastCalledWith({
-      query: expect.objectContaining({ type: "stream", user: "luis", message: "refund" }),
+      query: expect.objectContaining({ type: "stream", keyword: "luis" }),
     });
 
-    await wrapper.find(MESSAGE).trigger("keydown", { key: "Escape" });
+    await wrapper.find("[data-test='sessions-list-search-clear']").trigger("click");
     await flushPromises();
     const query = mockRouterReplace.mock.lastCall?.[0].query;
-    expect(query).toMatchObject({ user: "luis" });
-    expect(query).not.toHaveProperty("message");
+    expect(query).not.toHaveProperty("keyword");
   });
 
-  it("applies terms from the URL before the first fetch", async () => {
-    mockRouteQuery = { type: "stream", user: "luis", message: "refund" };
+  it("applies the term from the URL before the first fetch", async () => {
+    mockRouteQuery = { type: "stream", keyword: "luis" };
     const wrapper = await mountComponent();
     await refreshComponent(wrapper);
-    expect(value(wrapper, USER)).toBe("luis");
-    expect(value(wrapper, MESSAGE)).toBe("refund");
+    expect(value(wrapper, SEARCH)).toBe("luis");
     expect(mockFetchPage).toHaveBeenCalledWith("test-stream", 1000, 2000, 0, 20, "", {
-      user: "luis",
-      message: "refund",
+      keyword: "luis",
     });
   });
 
@@ -815,24 +778,23 @@ describe("SessionsList — search", () => {
     // Cached rows were fetched without a search; the pasted link carries one.
     mockHasLoadedOnce.value = true;
     mockLoadedOrg.value = "test-org";
-    mockRouteQuery = { type: "stream", user: "luis" };
+    mockRouteQuery = { type: "stream", keyword: "luis" };
     const wrapper = await mountComponent();
     // Non-forced mount replay — normally served from the cache.
     await wrapper.vm.refresh(1000, 2000, false);
     await flushPromises();
     expect(mockFetchPage).toHaveBeenCalledWith("test-stream", 1000, 2000, 0, 20, "", {
-      user: "luis",
-      message: undefined,
+      keyword: "luis",
     });
   });
 
-  it("back navigation restores the filtered rows and the terms from the singleton", async () => {
+  it("back navigation restores the filtered rows and the term from the singleton", async () => {
     mockHasLoadedOnce.value = true;
     mockLoadedOrg.value = "test-org";
-    mockSearchUser.value = "luis";
+    mockSearchKeyword.value = "luis";
     mockSessions.value = [makeSession({ sessionId: "sess-luis", userId: "luis@example.com" })];
     mockTotal.value = 1;
-    mockRouteQuery = { type: "stream", user: "luis" };
+    mockRouteQuery = { type: "stream", keyword: "luis" };
 
     const wrapper = await mountComponent();
     await wrapper.vm.refresh(1000, 2000, false);
@@ -840,13 +802,12 @@ describe("SessionsList — search", () => {
 
     expect(mockFetchPage).not.toHaveBeenCalled();
     expect(wrapper.find("[data-session-id='sess-luis']").exists()).toBe(true);
-    expect(value(wrapper, USER)).toBe("luis");
+    expect(value(wrapper, SEARCH)).toBe("luis");
   });
 
   it("shows the filtered empty state, not the first-run screen, and its Clear action re-fetches", async () => {
     mockHasLoadedOnce.value = true;
-    mockSearchUser.value = "nobody";
-    mockSearchMessage.value = "nothing";
+    mockSearchKeyword.value = "nobody";
     const wrapper = await mountInStreamMode();
 
     expect(wrapper.find("[data-test='sessions-empty-search']").exists()).toBe(true);
@@ -855,46 +816,18 @@ describe("SessionsList — search", () => {
 
     await wrapper.find("[data-test='sessions-empty-search'] button").trigger("click");
     await flushPromises();
-    expect(mockSearchUser.value).toBe("");
-    expect(mockSearchMessage.value).toBe("");
-    expect(value(wrapper, USER)).toBe("");
-    expect(value(wrapper, MESSAGE)).toBe("");
+    expect(mockSearchKeyword.value).toBe("");
+    expect(value(wrapper, SEARCH)).toBe("");
     expect(mockFetchPage).toHaveBeenCalledWith(...NO_SEARCH);
   });
 
-  it("shows an Enter hint only while a box's text differs from the applied term", async () => {
-    const HINT = "[data-test='sessions-list-search-user-enter']";
-    const wrapper = await mountInStreamMode();
-    expect(wrapper.find(HINT).exists()).toBe(false);
-
-    await wrapper.find(USER).setValue("luis");
-    expect(wrapper.find(HINT).exists()).toBe(true);
-    expect(wrapper.find(HINT).text()).toContain("↵");
-
-    await wrapper.find(USER).trigger("keydown", { key: "Enter" });
-    await flushPromises();
-    expect(wrapper.find(HINT).exists()).toBe(false);
-  });
-
-  it("clicking the Enter hint runs the search", async () => {
-    const wrapper = await mountInStreamMode();
-    await wrapper.find(MESSAGE).setValue("refund");
-    await wrapper.find("[data-test='sessions-list-search-message-enter']").trigger("click");
-    await flushPromises();
-    expect(mockFetchPage).toHaveBeenCalledWith("test-stream", 1000, 2000, 0, 20, "", {
-      user: undefined,
-      message: "refund",
-    });
-  });
-
-  it("keeps the terms across an explicit refresh", async () => {
-    mockSearchUser.value = "luis";
+  it("keeps the term across an explicit refresh", async () => {
+    mockSearchKeyword.value = "luis";
     const wrapper = await mountInStreamMode();
     await refreshComponent(wrapper);
-    expect(mockSearchUser.value).toBe("luis");
+    expect(mockSearchKeyword.value).toBe("luis");
     expect(mockFetchPage).toHaveBeenCalledWith("test-stream", 1000, 2000, 0, 20, "", {
-      user: "luis",
-      message: undefined,
+      keyword: "luis",
     });
   });
 });
