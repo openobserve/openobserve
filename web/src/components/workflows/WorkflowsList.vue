@@ -350,7 +350,7 @@ const activeFolderId = computed(() => (route.query.folder as string) || "default
 const activeTab = ref("all");
 const workflowTabs = computed(() => [
   { value: "all", label: t("workflow.tabAll") },
-  ...enabledTriggers().map((tr) => ({ value: tr.key, label: t(tr.labelKey) })),
+  ...enabledTriggers().map((tr) => ({ value: tr.kind, label: t(tr.labelKey) })),
 ]);
 
 const searchAcrossFolders = ref(false);
