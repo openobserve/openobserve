@@ -65,6 +65,7 @@ vi.mock("@/services/organizations", () => ({
     extend_external_contract: vi.fn(),
     revoke_external_contract: vi.fn(),
     set_quota_usage_limit: vi.fn(),
+    resurrect_org: vi.fn(),
   },
 }));
 
@@ -166,8 +167,8 @@ const ODialogStub = {
   `,
 };
 
-// Stub OTable so tests are fast. The stub renders the #cell-actions slot
-// for every row in `data` so action-button tests can find rendered buttons.
+// Stub OTable so tests are fast. The stub renders the #cell-actions and
+// #cell-status slots for every row in `data` so cell tests find real output.
 const OTableStub = {
   name: "OTable",
   inheritAttrs: false,
@@ -176,6 +177,7 @@ const OTableStub = {
     <div data-test="org-management-list-table">
       <slot name="toolbar" />
       <div v-for="(row, idx) in (data || [])" :key="idx" :data-test="'otable-row-' + idx">
+        <span :data-test="'otable-status-' + idx"><slot name="cell-status" :row="row" /></span>
         <slot name="cell-actions" :row="row" />
       </div>
       <slot name="empty" v-if="!data || data.length === 0" />
@@ -301,21 +303,22 @@ describe("OrganizationManagement.vue", () => {
     it("should have correct column configuration", () => {
       wrapper = createWrapper();
       const columns = wrapper.vm.columns;
-      expect(columns).toHaveLength(14);
+      expect(columns).toHaveLength(15);
       expect(columns[0].id).toBe("name");
       expect(columns[1].id).toBe("identifier");
       expect(columns[2].id).toBe("subscription_status");
-      expect(columns[3].id).toBe("billing_provider");
-      expect(columns[4].id).toBe("ai_credits_used");
-      expect(columns[5].id).toBe("ai_credits_total");
-      expect(columns[6].id).toBe("browser_steps_used");
-      expect(columns[7].id).toBe("browser_steps_total");
-      expect(columns[8].id).toBe("protocol_steps_used");
-      expect(columns[9].id).toBe("protocol_steps_total");
-      expect(columns[10].id).toBe("created_on");
-      expect(columns[11].id).toBe("trial_expiry");
-      expect(columns[12].id).toBe("contract_end_date");
-      expect(columns[13].id).toBe("actions");
+      expect(columns[3].id).toBe("status");
+      expect(columns[4].id).toBe("billing_provider");
+      expect(columns[5].id).toBe("ai_credits_used");
+      expect(columns[6].id).toBe("ai_credits_total");
+      expect(columns[7].id).toBe("browser_steps_used");
+      expect(columns[8].id).toBe("browser_steps_total");
+      expect(columns[9].id).toBe("protocol_steps_used");
+      expect(columns[10].id).toBe("protocol_steps_total");
+      expect(columns[11].id).toBe("created_on");
+      expect(columns[12].id).toBe("trial_expiry");
+      expect(columns[13].id).toBe("contract_end_date");
+      expect(columns[14].id).toBe("actions");
     });
 
     it("should have subscription plans mapping", () => {
@@ -470,6 +473,9 @@ describe("OrganizationManagement.vue", () => {
         contract_end_date: 0,
         contract_end_date_display: "-",
         org_storage_enabled: false,
+        status: "active",
+        deleted_at: null,
+        grace_period_days: null,
       });
     });
 
@@ -1051,6 +1057,115 @@ describe("OrganizationManagement.vue", () => {
       // Storage enable button should NOT show
       const storageEnableBtn = wrapper.find('[data-test="org-management-storage-enable-btn"]');
       expect(storageEnableBtn.exists()).toBe(false);
+    });
+  });
+
+  describe("Organization Deletion Status", () => {
+    const orgRow = (overrides: Record<string, any> = {}) => ({
+      id: 1,
+      name: "Test Org",
+      identifier: "test-org",
+      plan: "0",
+      created_at: 123456789,
+      trial_expires_at: 987654321,
+      billing_provider: "-",
+      org_storage_enabled: true,
+      ...overrides,
+    });
+
+    const mountWithRow = async (row: Record<string, any>) => {
+      store.state.zoConfig.meta_org = "default";
+      mockGetAdminOrg.mockResolvedValue({ data: { data: [row] } });
+      wrapper = createWrapper();
+      await flushPromises();
+      await nextTick();
+    };
+
+    it("should default a row with no status field to active", async () => {
+      await mountWithRow(orgRow());
+      expect(wrapper.vm.tabledata[0].status).toBe("active");
+      expect(wrapper.vm.tabledata[0].deleted_at).toBeNull();
+      expect(wrapper.vm.tabledata[0].grace_period_days).toBeNull();
+    });
+
+    it("should render the status badge for an active org", async () => {
+      await mountWithRow(orgRow({ status: "active" }));
+      expect(wrapper.find('[data-test="otable-status-0"]').text()).toBe("Active");
+      expect(wrapper.find('[data-test="org-management-resurrect-btn"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="org-management-cleanup-tasks-btn"]').exists()).toBe(false);
+    });
+
+    it("should render the pending-deletion badge with the days remaining", async () => {
+      const threeDaysAgoMicros = (Date.now() - 3 * 86400000) * 1000;
+      await mountWithRow(
+        orgRow({
+          status: "pending_deletion",
+          deleted_at: threeDaysAgoMicros,
+          grace_period_days: 10,
+        }),
+      );
+      expect(wrapper.find('[data-test="otable-status-0"]').text()).toBe(
+        "Pending deletion — 7 days left",
+      );
+    });
+
+    it("should fall back to the bare pending label without a grace period", async () => {
+      await mountWithRow(orgRow({ status: "pending_deletion" }));
+      expect(wrapper.find('[data-test="otable-status-0"]').text()).toBe("Pending deletion");
+    });
+
+    it("should show only the resurrect button for a pending_deletion org", async () => {
+      await mountWithRow(orgRow({ status: "pending_deletion" }));
+      expect(wrapper.find('[data-test="org-management-resurrect-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="org-management-cleanup-tasks-btn"]').exists()).toBe(false);
+    });
+
+    it("should show only the cleanup-tasks button for a deleting org", async () => {
+      await mountWithRow(orgRow({ status: "deleting" }));
+      expect(wrapper.find('[data-test="org-management-cleanup-tasks-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="org-management-resurrect-btn"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="otable-status-0"]').text()).toBe("Deleting");
+    });
+
+    it("should open the cleanup dialog targeting the clicked org", async () => {
+      await mountWithRow(orgRow({ status: "deleting" }));
+      await wrapper.find('[data-test="org-management-cleanup-tasks-btn"]').trigger("click");
+      expect(wrapper.vm.showCleanupDialog).toBe(true);
+      expect(wrapper.vm.cleanupTargetOrg).toEqual({ id: "test-org", name: "Test Org" });
+    });
+
+    it("should resurrect against the configured meta org and refresh the list", async () => {
+      const { default: mockedOrgService } = await import("@/services/organizations");
+      const mockResurrect = (mockedOrgService as any).resurrect_org;
+      mockResurrect.mockResolvedValue({});
+      await mountWithRow(orgRow({ status: "pending_deletion" }));
+      mockGetAdminOrg.mockClear();
+      // meta org is read at call time and must differ from the selected org so
+      // the assertion proves resurrect targets zoConfig.meta_org, not the selection.
+      store.state.zoConfig.meta_org = "meta-distinct";
+
+      await wrapper.find('[data-test="org-management-resurrect-btn"]').trigger("click");
+      await flushPromises();
+
+      expect(mockResurrect).toHaveBeenCalledWith("meta-distinct", "test-org");
+      expect(mockToastFn).toHaveBeenCalledWith(
+        expect.objectContaining({ variant: "success", message: "Organization resurrected." }),
+      );
+      expect(mockGetAdminOrg).toHaveBeenCalled();
+    });
+
+    it("should surface the server message when resurrect fails", async () => {
+      const { default: mockedOrgService } = await import("@/services/organizations");
+      const mockResurrect = (mockedOrgService as any).resurrect_org;
+      mockResurrect.mockRejectedValue({ response: { data: { message: "Grace period expired" } } });
+      await mountWithRow(orgRow({ status: "pending_deletion" }));
+
+      await wrapper.find('[data-test="org-management-resurrect-btn"]').trigger("click");
+      await flushPromises();
+
+      expect(mockToastFn).toHaveBeenCalledWith(
+        expect.objectContaining({ variant: "error", message: "Grace period expired" }),
+      );
     });
   });
 

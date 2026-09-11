@@ -2425,7 +2425,9 @@
     "subscription_plan": "서브스크립션 플랜",
     "pendingDeletion": "삭제 대기 중",
     "daysLeft": "{n}일 남음",
-    "resurrect": "조직 복구"
+    "resurrect": "조직 복구",
+    "statusActive": "활성",
+    "statusDeleting": "삭제 중"
   },
   "template": {
     "search": "검색 템플릿"

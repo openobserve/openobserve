@@ -2425,7 +2425,9 @@
     "subscription_plan": "Gói đăng ký",
     "pendingDeletion": "Đang chờ xóa",
     "daysLeft": "Còn {n} ngày",
-    "resurrect": "Khôi phục tổ chức"
+    "resurrect": "Khôi phục tổ chức",
+    "statusActive": "Hoạt động",
+    "statusDeleting": "Đang xóa"
   },
   "template": {
     "search": "Tìm kiếm mẫu"
