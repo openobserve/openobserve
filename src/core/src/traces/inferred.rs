@@ -38,6 +38,27 @@ pub const INFER_SERVICE_NAME: &str = "infer_service_name";
 pub const INFER_SERVICE_TYPE: &str = "infer_service_type";
 pub const INFER_SERVICE_SYSTEM: &str = "infer_service_system";
 
+/// Service-graph join keys; unlike `infer_service_*` they keep IP literals, to join on.
+pub const INFER_PEER_KEY: &str = "infer_peer_key";
+pub const INFER_PEER_PORT: &str = "infer_peer_port";
+pub const INFER_PEER_IP: &str = "infer_peer_ip";
+pub const INFER_SELF_KEY: &str = "infer_self_key";
+pub const INFER_SELF_PORT: &str = "infer_self_port";
+pub const INFER_SELF_IP: &str = "infer_self_ip";
+
+/// Every column this module derives, for the ingest paths that handle them as one set.
+pub const ALL_INFER_FIELDS: [&str; 9] = [
+    INFER_SERVICE_NAME,
+    INFER_SERVICE_TYPE,
+    INFER_SERVICE_SYSTEM,
+    INFER_PEER_KEY,
+    INFER_PEER_PORT,
+    INFER_PEER_IP,
+    INFER_SELF_KEY,
+    INFER_SELF_PORT,
+    INFER_SELF_IP,
+];
+
 /// `infer_service_type` values.
 pub const INFER_TYPE_DATABASE: &str = "database";
 pub const INFER_TYPE_QUEUE: &str = "queue";
@@ -45,8 +66,34 @@ pub const INFER_TYPE_RPC: &str = "rpc";
 pub const INFER_TYPE_EXTERNAL: &str = "external";
 
 // OTLP proto span kind values as stored in the `span_kind` field.
+const SPAN_KIND_SERVER: i32 = 2;
 const SPAN_KIND_CLIENT: i32 = 3;
 const SPAN_KIND_PRODUCER: i32 = 4;
+const SPAN_KIND_CONSUMER: i32 = 5;
+
+const PEER_HOST_KEYS: [&str; 3] = ["server.address", "net.peer.name", "http.host"];
+const PEER_ADDR_KEYS: [&str; 4] = [
+    "peer.address",
+    "net.peer.ip",
+    "network.peer.address",
+    "net.sock.peer.addr",
+];
+const PEER_PORT_KEYS: [&str; 2] = ["server.port", "net.peer.port"];
+const PEER_IP_KEYS: [&str; 5] = [
+    "net.peer.ip",
+    "network.peer.address",
+    "net.sock.peer.addr",
+    "peer.address",
+    "server.address",
+];
+const SELF_HOST_KEYS: [&str; 3] = ["server.address", "net.host.name", "http.host"];
+const SELF_PORT_KEYS: [&str; 2] = ["server.port", "net.host.port"];
+const SELF_IP_KEYS: [&str; 4] = [
+    "k8s.pod.ip",
+    "net.host.ip",
+    "net.sock.host.addr",
+    "network.local.address",
+];
 
 /// An uninstrumented dependency inferred from a span's peer attributes.
 #[derive(Debug, Clone, PartialEq)]
@@ -54,6 +101,27 @@ pub struct InferredService {
     pub name: String,
     pub service_type: &'static str,
     pub system: Option<String>,
+}
+
+/// Callee-side join keys of a CLIENT/PRODUCER span; `ip` is a second key, not a fallback of `key`.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct PeerKeys {
+    pub key: Option<String>,
+    pub port: Option<i64>,
+    pub ip: Option<String>,
+}
+
+/// Own-identity join keys of a SERVER/CONSUMER span: how other services address it.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct SelfKeys {
+    pub key: Option<String>,
+    pub port: Option<i64>,
+    pub ip: Option<String>,
+}
+
+struct HostKey {
+    key: String,
+    port: Option<i64>,
 }
 
 /// Parse a stored `span_kind` value ("3" or "SPAN_KIND_CLIENT") to the OTLP
@@ -193,6 +261,135 @@ where
     })
 }
 
+/// Peer join keys of a CLIENT/PRODUCER span: host chain, url host, then `PEER_ADDR_KEYS`.
+pub fn derive_peer_keys<F>(span_kind: i32, get_attr: F) -> Option<PeerKeys>
+where
+    F: Fn(&str) -> Option<String>,
+{
+    if span_kind != SPAN_KIND_CLIENT && span_kind != SPAN_KIND_PRODUCER {
+        return None;
+    }
+
+    let host = first_host_key(&get_attr, &PEER_HOST_KEYS)
+        .or_else(|| url_host_key(&get_attr))
+        .or_else(|| first_host_key(&get_attr, &PEER_ADDR_KEYS));
+    let port = resolve_port(&get_attr, &PEER_PORT_KEYS, host.as_ref());
+    let key = host.map(|host| host.key);
+    // the rollup tries the host key before the ip key, so storing the same value twice buys nothing
+    let ip = first_ip_key(&get_attr, &PEER_IP_KEYS).filter(|ip| Some(ip) != key.as_ref());
+
+    (key.is_some() || port.is_some() || ip.is_some()).then_some(PeerKeys { key, port, ip })
+}
+
+/// Self join keys of a SERVER/CONSUMER span; `get_attr` must also resolve resource attributes.
+pub fn derive_self_keys<F>(span_kind: i32, get_attr: F) -> Option<SelfKeys>
+where
+    F: Fn(&str) -> Option<String>,
+{
+    if span_kind != SPAN_KIND_SERVER && span_kind != SPAN_KIND_CONSUMER {
+        return None;
+    }
+
+    let host = first_host_key(&get_attr, &SELF_HOST_KEYS);
+    let port = resolve_port(&get_attr, &SELF_PORT_KEYS, host.as_ref());
+    let key = host.map(|host| host.key);
+    let ip = first_ip_key(&get_attr, &SELF_IP_KEYS);
+
+    (key.is_some() || port.is_some() || ip.is_some()).then_some(SelfKeys { key, port, ip })
+}
+
+fn lookup<F>(get_attr: &F, key: &str) -> Option<String>
+where
+    F: Fn(&str) -> Option<String>,
+{
+    get_attr(key)
+        .or_else(|| get_attr(&key.replace('.', "_")))
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+}
+
+fn first_host_key<F>(get_attr: &F, keys: &[&str]) -> Option<HostKey>
+where
+    F: Fn(&str) -> Option<String>,
+{
+    keys.iter()
+        .find_map(|key| lookup(get_attr, key).and_then(|value| normalize_host(&value)))
+}
+
+// IP hosts are kept here, unlike in the display-name chain
+fn url_host_key<F>(get_attr: &F) -> Option<HostKey>
+where
+    F: Fn(&str) -> Option<String>,
+{
+    let raw = lookup(get_attr, "url.full").or_else(|| lookup(get_attr, "http.url"))?;
+    let parsed = url::Url::parse(&raw).ok()?;
+    let host = match parsed.host()? {
+        url::Host::Domain(domain) => domain.to_string(),
+        url::Host::Ipv4(addr) => addr.to_string(),
+        url::Host::Ipv6(addr) => addr.to_string(),
+    };
+    let mut host_key = normalize_host(&host)?;
+    // `Url::port` hides a port equal to the scheme default, so take it from the raw authority
+    host_key.port = url_authority(&raw)
+        .and_then(normalize_host)
+        .and_then(|authority| authority.port);
+    Some(host_key)
+}
+
+fn url_authority(raw: &str) -> Option<&str> {
+    let rest = raw.split_once("://")?.1;
+    let end = rest.find(['/', '?', '#']).unwrap_or(rest.len());
+    let authority = &rest[..end];
+    Some(
+        authority
+            .rsplit_once('@')
+            .map_or(authority, |(_, host)| host),
+    )
+}
+
+fn first_ip_key<F>(get_attr: &F, keys: &[&str]) -> Option<String>
+where
+    F: Fn(&str) -> Option<String>,
+{
+    keys.iter().find_map(|key| {
+        lookup(get_attr, key)
+            .and_then(|value| normalize_host(&value))
+            .map(|host| host.key)
+            .filter(|host| is_ip_address(host))
+    })
+}
+
+// a present explicit attribute wins even when invalid, so a bad port omits the column
+fn resolve_port<F>(get_attr: &F, keys: &[&str], host: Option<&HostKey>) -> Option<i64>
+where
+    F: Fn(&str) -> Option<String>,
+{
+    match keys.iter().find_map(|key| lookup(get_attr, key)) {
+        Some(explicit) => parse_port(&explicit),
+        None => host.and_then(|host| host.port),
+    }
+}
+
+fn normalize_host(value: &str) -> Option<HostKey> {
+    let lowered = value.trim().to_ascii_lowercase();
+    let host = strip_port(&lowered);
+    let port = (host.len() < lowered.len())
+        .then(|| lowered.rsplit(':').next().and_then(parse_port))
+        .flatten();
+    // the FQDN root dot goes after the port, so `host.:8080` and `host` end up on the same key
+    let key = host.trim_end_matches('.').to_string();
+    (!key.is_empty()).then_some(HostKey { key, port })
+}
+
+fn parse_port(value: &str) -> Option<i64> {
+    value
+        .trim()
+        .parse::<u16>()
+        .ok()
+        .filter(|port| *port > 0)
+        .map(i64::from)
+}
+
 /// Strip a trailing `:port` from a host value. Handles bracketed IPv6
 /// (`[::1]:6379` → `::1`) and leaves bare IPv6 addresses untouched.
 fn strip_port(host: &str) -> &str {
@@ -231,6 +428,26 @@ mod tests {
         derive_inferred_service(span_kind, |key| {
             map.get(key).and_then(|v| v.as_str()).map(String::from)
         })
+    }
+
+    fn peer_keys(span_kind: i32, attrs: &[(&str, &str)]) -> Option<PeerKeys> {
+        let map: HashMap<String, String> = attrs
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect();
+        derive_peer_keys(span_kind, |key| map.get(key).cloned())
+    }
+
+    fn self_keys(span_kind: i32, attrs: &[(&str, &str)]) -> Option<SelfKeys> {
+        let map: HashMap<String, String> = attrs
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect();
+        derive_self_keys(span_kind, |key| map.get(key).cloned())
+    }
+
+    fn peer_key(attrs: &[(&str, &str)]) -> Option<String> {
+        peer_keys(SPAN_KIND_CLIENT, attrs).and_then(|keys| keys.key)
     }
 
     #[test]
@@ -457,6 +674,417 @@ mod tests {
         assert_eq!(strip_port("::1"), "::1"); // bare ipv6 untouched
         assert_eq!(strip_port("10.0.0.5:3306"), "10.0.0.5");
         assert_eq!(strip_port("example.com:"), "example.com:"); // no digits
+    }
+
+    #[test]
+    fn test_peer_key_chain_order() {
+        // the four address keys are reached only after every host-shaped candidate
+        let chain = [
+            ("server.address", "a.svc"),
+            ("net.peer.name", "b.svc"),
+            ("http.host", "c.svc"),
+            ("url.full", "http://d.svc/path"),
+            ("peer.address", "10.0.0.1:8080"),
+            ("net.peer.ip", "10.0.0.2"),
+            ("network.peer.address", "10.0.0.3"),
+            ("net.sock.peer.addr", "10.0.0.4"),
+        ];
+        let expected = [
+            "a.svc", "b.svc", "c.svc", "d.svc", "10.0.0.1", "10.0.0.2", "10.0.0.3", "10.0.0.4",
+        ];
+        for (idx, want) in expected.iter().enumerate() {
+            assert_eq!(
+                peer_key(&chain[idx..]).as_deref(),
+                Some(*want),
+                "candidate {idx} must win"
+            );
+        }
+    }
+
+    #[test]
+    fn test_peer_key_keeps_ip_that_the_display_name_redacts() {
+        let attrs = [("db.system", "redis"), ("server.address", "10.0.0.5:6379")];
+        let keys = peer_keys(SPAN_KIND_CLIENT, &attrs).unwrap();
+        assert_eq!(keys.key.as_deref(), Some("10.0.0.5"));
+        assert_eq!(keys.port, Some(6379));
+        // same attributes, display name still falls through to db.system
+        assert_eq!(derive(SPAN_KIND_CLIENT, &attrs).unwrap().name, "redis");
+    }
+
+    #[test]
+    fn test_peer_key_from_url_host() {
+        let keys = peer_keys(
+            SPAN_KIND_CLIENT,
+            &[("url.full", "https://API.github.com/repos?page=2")],
+        )
+        .unwrap();
+        assert_eq!(keys.key.as_deref(), Some("api.github.com"));
+        assert_eq!(keys.port, None); // the default port is not in the data
+
+        let keys = peer_keys(SPAN_KIND_CLIENT, &[("http.url", "http://10.0.0.9:8080/v1")]).unwrap();
+        assert_eq!(keys.key.as_deref(), Some("10.0.0.9"));
+        assert_eq!(keys.port, Some(8080));
+
+        let keys = peer_keys(
+            SPAN_KIND_CLIENT,
+            &[("http.url", "http://[2001:db8::1]:8080/v1")],
+        )
+        .unwrap();
+        assert_eq!(keys.key.as_deref(), Some("2001:db8::1"));
+        assert_eq!(keys.port, Some(8080));
+    }
+
+    #[test]
+    fn test_key_normalization() {
+        assert_eq!(
+            peer_key(&[("server.address", "  API.Example.COM  ")]).as_deref(),
+            Some("api.example.com")
+        );
+        assert_eq!(
+            peer_key(&[("server.address", "api.example.com.")]).as_deref(),
+            Some("api.example.com")
+        );
+        let keys = peer_keys(
+            SPAN_KIND_CLIENT,
+            &[("server.address", "Api.Example.com.:8080")],
+        )
+        .unwrap();
+        assert_eq!(keys.key.as_deref(), Some("api.example.com"));
+        assert_eq!(keys.port, Some(8080));
+        let keys = peer_keys(SPAN_KIND_CLIENT, &[("net.peer.name", "[::1]:6379")]).unwrap();
+        assert_eq!(keys.key.as_deref(), Some("::1"));
+        assert_eq!(keys.port, Some(6379));
+        assert_eq!(
+            peer_keys(SPAN_KIND_CLIENT, &[("server.address", "   ")]),
+            None
+        );
+    }
+
+    #[test]
+    fn test_peer_port_resolution() {
+        // explicit attribute beats the port inside the host value
+        let keys = peer_keys(
+            SPAN_KIND_CLIENT,
+            &[("server.address", "db.prod:5432"), ("server.port", "6432")],
+        )
+        .unwrap();
+        assert_eq!(keys.key.as_deref(), Some("db.prod"));
+        assert_eq!(keys.port, Some(6432));
+
+        let keys = peer_keys(
+            SPAN_KIND_CLIENT,
+            &[("net.peer.name", "db.prod"), ("net.peer.port", "5432")],
+        )
+        .unwrap();
+        assert_eq!(keys.port, Some(5432));
+
+        // no explicit attribute: the port split off the chosen host value
+        let keys = peer_keys(SPAN_KIND_CLIENT, &[("server.address", "db.prod:5432")]).unwrap();
+        assert_eq!(keys.port, Some(5432));
+
+        for bad in ["70000", "0", "-1", "not-a-port"] {
+            let keys = peer_keys(
+                SPAN_KIND_CLIENT,
+                &[("net.peer.name", "db.prod"), ("server.port", bad)],
+            )
+            .unwrap();
+            assert_eq!(keys.port, None, "port {bad} must be omitted");
+        }
+    }
+
+    #[test]
+    fn test_port_attribute_present_but_invalid_omits_the_column() {
+        // a present explicit attribute is the answer even when its value is unusable
+        let keys = peer_keys(
+            SPAN_KIND_CLIENT,
+            &[("server.address", "db.prod:5432"), ("server.port", "70000")],
+        )
+        .unwrap();
+        assert_eq!(keys.key.as_deref(), Some("db.prod"));
+        assert_eq!(keys.port, None);
+
+        // a lower-priority attribute does not rescue an invalid server.port
+        let keys = peer_keys(
+            SPAN_KIND_CLIENT,
+            &[
+                ("net.peer.name", "db.prod"),
+                ("server.port", "70000"),
+                ("net.peer.port", "5432"),
+            ],
+        )
+        .unwrap();
+        assert_eq!(keys.port, None);
+
+        // a valid lower-priority attribute still beats the embedded port
+        let keys = peer_keys(
+            SPAN_KIND_CLIENT,
+            &[
+                ("server.address", "db.prod:5432"),
+                ("net.peer.port", "6432"),
+            ],
+        )
+        .unwrap();
+        assert_eq!(keys.port, Some(6432));
+
+        let keys = self_keys(
+            SPAN_KIND_SERVER,
+            &[("server.address", "cart.svc:8080"), ("server.port", "0")],
+        )
+        .unwrap();
+        assert_eq!(keys.key.as_deref(), Some("cart.svc"));
+        assert_eq!(keys.port, None);
+
+        let keys = self_keys(
+            SPAN_KIND_SERVER,
+            &[
+                ("net.host.name", "cart.svc:8080"),
+                ("net.host.port", "9090"),
+            ],
+        )
+        .unwrap();
+        assert_eq!(keys.port, Some(9090));
+    }
+
+    #[test]
+    fn test_blank_port_attribute_is_treated_as_absent() {
+        // same rule as test_empty_values_treated_as_absent, applied to the port chains
+        for blank in ["", "   "] {
+            let keys = peer_keys(
+                SPAN_KIND_CLIENT,
+                &[("server.address", "db.prod:5432"), ("server.port", blank)],
+            )
+            .unwrap();
+            assert_eq!(keys.port, Some(5432));
+
+            let keys = peer_keys(
+                SPAN_KIND_CLIENT,
+                &[
+                    ("server.address", "db.prod:5432"),
+                    ("server.port", blank),
+                    ("net.peer.port", "6432"),
+                ],
+            )
+            .unwrap();
+            assert_eq!(keys.port, Some(6432));
+
+            let keys = self_keys(
+                SPAN_KIND_SERVER,
+                &[("server.address", "cart.svc:8080"), ("server.port", blank)],
+            )
+            .unwrap();
+            assert_eq!(keys.port, Some(8080));
+
+            // and on the key chain, where §1.1 spells the same rule out
+            let keys = peer_keys(
+                SPAN_KIND_CLIENT,
+                &[("server.address", blank), ("net.peer.name", "db.prod")],
+            )
+            .unwrap();
+            assert_eq!(keys.key.as_deref(), Some("db.prod"));
+        }
+    }
+
+    #[test]
+    fn test_url_port_equal_to_the_scheme_default_is_kept() {
+        for (url, want) in [
+            ("https://api.example.com:443/path", Some(443)),
+            ("http://api.example.com:80/path", Some(80)),
+            ("http://user:pw@api.example.com:80/path", Some(80)),
+            ("https://api.example.com/path", None),
+            ("https://api.example.com:8443/path", Some(8443)),
+        ] {
+            let keys = peer_keys(SPAN_KIND_CLIENT, &[("url.full", url)]).unwrap();
+            assert_eq!(keys.key.as_deref(), Some("api.example.com"), "{url}");
+            assert_eq!(keys.port, want, "{url}");
+        }
+
+        // an explicit port attribute still outranks the one inside the url
+        let keys = peer_keys(
+            SPAN_KIND_CLIENT,
+            &[
+                ("url.full", "https://api.example.com:443/path"),
+                ("server.port", "8443"),
+            ],
+        )
+        .unwrap();
+        assert_eq!(keys.port, Some(8443));
+    }
+
+    #[test]
+    fn test_peer_ip_is_an_independent_key() {
+        let keys = peer_keys(
+            SPAN_KIND_CLIENT,
+            &[
+                ("server.address", "opaque-alias"),
+                ("net.peer.ip", "10.0.0.8"),
+            ],
+        )
+        .unwrap();
+        assert_eq!(keys.key.as_deref(), Some("opaque-alias"));
+        assert_eq!(keys.ip.as_deref(), Some("10.0.0.8"));
+
+        // ip chain order, with a host key so the equality rule does not apply
+        let keys = peer_keys(
+            SPAN_KIND_CLIENT,
+            &[
+                ("server.address", "alias.svc"),
+                ("network.peer.address", "10.0.0.3"),
+                ("net.peer.ip", "10.0.0.2"),
+                ("peer.address", "10.0.0.1"),
+            ],
+        )
+        .unwrap();
+        assert_eq!(keys.ip.as_deref(), Some("10.0.0.2"));
+
+        // no candidate is an IP
+        let keys = peer_keys(
+            SPAN_KIND_CLIENT,
+            &[
+                ("server.address", "db.prod"),
+                ("peer.address", "db-alias:5432"),
+            ],
+        )
+        .unwrap();
+        assert_eq!(keys.ip, None);
+
+        // identical to the host key
+        let keys = peer_keys(SPAN_KIND_CLIENT, &[("server.address", "10.0.0.8:8080")]).unwrap();
+        assert_eq!(keys.key.as_deref(), Some("10.0.0.8"));
+        assert_eq!(keys.ip, None);
+    }
+
+    #[test]
+    fn test_self_key_chain_and_port() {
+        let keys = self_keys(
+            SPAN_KIND_SERVER,
+            &[
+                ("server.address", "cart.svc:8080"),
+                ("net.host.name", "pod-7"),
+                ("http.host", "cart"),
+            ],
+        )
+        .unwrap();
+        assert_eq!(keys.key.as_deref(), Some("cart.svc"));
+        assert_eq!(keys.port, Some(8080));
+
+        let keys = self_keys(
+            SPAN_KIND_SERVER,
+            &[("net.host.name", "pod-7"), ("http.host", "cart")],
+        )
+        .unwrap();
+        assert_eq!(keys.key.as_deref(), Some("pod-7"));
+
+        let keys = self_keys(SPAN_KIND_CONSUMER, &[("http.host", "cart")]).unwrap();
+        assert_eq!(keys.key.as_deref(), Some("cart"));
+
+        let keys = self_keys(
+            SPAN_KIND_SERVER,
+            &[("net.host.name", "pod-7"), ("net.host.port", "9090")],
+        )
+        .unwrap();
+        assert_eq!(keys.port, Some(9090));
+    }
+
+    #[test]
+    fn test_self_ip_chain() {
+        let keys = self_keys(
+            SPAN_KIND_SERVER,
+            &[
+                ("net.host.ip", "10.1.2.3"),
+                ("net.sock.host.addr", "10.1.2.4"),
+            ],
+        )
+        .unwrap();
+        assert_eq!(keys.ip.as_deref(), Some("10.1.2.3"));
+
+        let keys = self_keys(
+            SPAN_KIND_SERVER,
+            &[("network.local.address", "10.1.2.9:8080")],
+        )
+        .unwrap();
+        assert_eq!(keys.ip.as_deref(), Some("10.1.2.9"));
+
+        // a non-IP candidate is skipped, not returned
+        let keys = self_keys(
+            SPAN_KIND_SERVER,
+            &[("net.host.ip", "pod-7"), ("net.sock.host.addr", "10.1.2.4")],
+        )
+        .unwrap();
+        assert_eq!(keys.ip.as_deref(), Some("10.1.2.4"));
+
+        assert_eq!(
+            self_keys(SPAN_KIND_SERVER, &[("net.host.name", "pod-7")])
+                .unwrap()
+                .ip,
+            None
+        );
+    }
+
+    #[test]
+    fn test_self_ip_from_resource_k8s_pod_ip() {
+        // k8s.pod.ip is a resource attribute: the call site widens the lookup
+        for resource_key in ["service_k8s.pod.ip", "service_k8s_pod_ip"] {
+            let span: HashMap<String, String> =
+                HashMap::from([("net.host.name".to_string(), "pod-7".to_string())]);
+            let resource: HashMap<String, String> =
+                HashMap::from([(resource_key.to_string(), "10.42.0.7".to_string())]);
+            let keys = derive_self_keys(SPAN_KIND_SERVER, |key| {
+                span.get(key)
+                    .or_else(|| resource.get(key))
+                    .or_else(|| resource.get(&format!("service_{key}")))
+                    .cloned()
+            })
+            .unwrap();
+            assert_eq!(keys.key.as_deref(), Some("pod-7"));
+            assert_eq!(keys.ip.as_deref(), Some("10.42.0.7"), "via {resource_key}");
+        }
+    }
+
+    #[test]
+    fn test_span_kind_gating_for_graph_keys() {
+        let attrs = [
+            ("server.address", "host.svc:8080"),
+            ("net.peer.ip", "10.0.0.2"),
+            ("k8s.pod.ip", "10.42.0.7"),
+        ];
+        for kind in [SPAN_KIND_CLIENT, SPAN_KIND_PRODUCER] {
+            assert!(peer_keys(kind, &attrs).is_some(), "span_kind {kind}");
+            assert_eq!(self_keys(kind, &attrs), None, "span_kind {kind}");
+        }
+        for kind in [SPAN_KIND_SERVER, SPAN_KIND_CONSUMER] {
+            assert!(self_keys(kind, &attrs).is_some(), "span_kind {kind}");
+            assert_eq!(peer_keys(kind, &attrs), None, "span_kind {kind}");
+        }
+        for kind in [0, 1] {
+            assert_eq!(peer_keys(kind, &attrs), None, "span_kind {kind}");
+            assert_eq!(self_keys(kind, &attrs), None, "span_kind {kind}");
+        }
+    }
+
+    #[test]
+    fn test_graph_keys_from_flattened_spellings() {
+        let dotted = [
+            ("server.address", "cart.svc"),
+            ("server.port", "8080"),
+            ("net.peer.ip", "10.0.0.8"),
+        ];
+        let flattened = [
+            ("server_address", "cart.svc"),
+            ("server_port", "8080"),
+            ("net_peer_ip", "10.0.0.8"),
+        ];
+        let expected = PeerKeys {
+            key: Some("cart.svc".to_string()),
+            port: Some(8080),
+            ip: Some("10.0.0.8".to_string()),
+        };
+        assert_eq!(peer_keys(SPAN_KIND_CLIENT, &dotted), Some(expected.clone()));
+        assert_eq!(peer_keys(SPAN_KIND_CLIENT, &flattened), Some(expected));
+
+        assert_eq!(
+            self_keys(SPAN_KIND_SERVER, &[("net.host.name", "cart.svc")]),
+            self_keys(SPAN_KIND_SERVER, &[("net_host_name", "cart.svc")])
+        );
     }
 
     #[test]
