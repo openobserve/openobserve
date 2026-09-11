@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              leaves the tab order, and this reveal is focus-driven too: tabbing
              into the first (invisible) action expands the row for keyboards. -->
         <div
-          class="flex w-0 flex-nowrap items-center overflow-hidden opacity-0 group-focus-within:w-auto group-focus-within:opacity-100 group-hover:w-auto group-hover:opacity-100"
+          class="flex w-0 flex-nowrap items-center overflow-hidden opacity-0 group-focus-within:w-auto group-focus-within:opacity-100 group-hover:w-auto group-hover:opacity-100 max-md:w-auto max-md:opacity-100"
           :data-test="`metrics-explorer-card-actions-${card.name}`"
         >
           <!-- Help — the SAME element the dashboard panel bar uses for its panel
@@ -180,7 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :class="
             preview?.cachedDataDiffersFromTimeRange
               ? 'flex items-center'
-              : 'flex w-0 items-center overflow-hidden opacity-0 group-focus-within:w-auto group-focus-within:opacity-100 group-hover:w-auto group-hover:opacity-100'
+              : 'flex w-0 items-center overflow-hidden opacity-0 group-focus-within:w-auto group-focus-within:opacity-100 group-hover:w-auto group-hover:opacity-100 max-md:w-auto max-md:opacity-100'
           "
         >
           <OButton

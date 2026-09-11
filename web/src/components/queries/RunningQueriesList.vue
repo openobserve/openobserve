@@ -90,6 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           icon-left="format-list-bulleted"
           variant="ghost"
           size="icon-sm"
+          class="max-md:hidden"
           :title="t('queries.queryList')"
           data-test="queryList-btn"
           @click="listSchema(row)"
@@ -98,10 +99,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           icon-left="close"
           variant="ghost-destructive"
           size="icon-sm"
+          class="max-md:hidden"
           :title="t('queries.cancelQuery')"
           data-test="cancelQuery-btn"
           @click="confirmDeleteAction(row)"
         />
+        <ODropdown side="bottom" align="end">
+          <template #trigger>
+            <OButton
+              icon-left="more-vert"
+              variant="ghost"
+              size="icon-xs-sq"
+              class="md:hidden"
+              data-test="running-queries-row-more-actions"
+              @click.stop
+            />
+          </template>
+          <ODropdownItem
+            icon-left="format-list-bulleted"
+            class="md:hidden"
+            data-test="queryList-btn-menu"
+            @select="listSchema(row)"
+          >
+            <span>{{ t("queries.queryList") }}</span>
+          </ODropdownItem>
+          <ODropdownItem
+            icon-left="close"
+            variant="destructive"
+            class="md:hidden"
+            data-test="cancelQuery-btn-menu"
+            @select="confirmDeleteAction(row)"
+          >
+            <span>{{ t("queries.cancelQuery") }}</span>
+          </ODropdownItem>
+        </ODropdown>
       </template>
       <template #cell-user_id="{ row }">
         <OUserCell :value="row.user_id" />
@@ -142,6 +173,8 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { useStore } from "vuex";
 import QueryList from "@/components/queries/QueryList.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -159,6 +192,8 @@ export default defineComponent({
     QueryList,
     OEmptyState,
     OButton,
+    ODropdown,
+    ODropdownItem,
     OTooltip,
     OToggleGroup,
     OToggleGroupItem,

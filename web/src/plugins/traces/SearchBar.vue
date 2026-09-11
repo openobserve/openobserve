@@ -16,10 +16,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="search-bar-component flex h-full flex-col pb-px" id="searchBarComponent">
-    <div class="border-border-default m-0! flex w-full items-center justify-between border-b p-1.5">
+    <div
+      class="border-border-default m-0! flex w-full items-center justify-between border-b p-1.5 max-lg:flex-wrap max-lg:gap-y-1"
+    >
       <div
         ref="toolbarLeftRef"
-        class="flex min-w-0 flex-1 flex-row items-center gap-1.5 overflow-hidden"
+        class="flex min-w-0 flex-1 flex-row items-center gap-1.5 overflow-hidden max-lg:w-full max-lg:flex-none max-lg:flex-wrap max-lg:gap-y-1 max-lg:overflow-visible"
       >
         <!-- Unified View Toggle: Service Graph / Traces / Spans -->
         <OToggleGroup
@@ -109,6 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline"
               size="xs"
               icon-left="more-horiz"
+              class="max-lg:ms-auto"
             >
               {{ t("search.menuMore") }}
             </OButton>
@@ -122,13 +125,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </ODropdown>
       </div>
       <!-- Right toolbar — persistent wrapper so toolbarRightRef is always observable -->
-      <div ref="toolbarRightRef" class="flex flex-shrink-0 items-center">
+      <div
+        ref="toolbarRightRef"
+        class="flex flex-shrink-0 items-center max-lg:w-full max-lg:justify-end"
+      >
         <div
           v-if="
             searchObj.meta.searchMode !== 'service-graph' &&
             searchObj.meta.searchMode !== 'services-catalog'
           "
-          class="flex items-center gap-1.5"
+          class="flex items-center gap-1.5 max-lg:w-full"
         >
           <DateTime
             ref="dateTimeRef"
@@ -143,7 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="logs-search-bar-date-time-dropdown"
             :queryRangeRestrictionInHour="searchObj.data.datetime.queryRangeRestrictionInHour"
             :queryRangeRestrictionMsg="searchObj.data.datetime.queryRangeRestrictionMsg"
-            class="h-8"
+            class="h-8 max-lg:me-auto"
             @on:date-change="updateDateTime"
             @on:timezone-change="updateTimezone"
           />
@@ -248,8 +254,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Service Graph right toolbar: DateTime, Refresh, Tree/Graph tabs, Layout -->
-        <div v-if="searchObj.meta.searchMode === 'service-graph'" class="ms-auto">
-          <div class="flex items-center gap-2">
+        <div v-if="searchObj.meta.searchMode === 'service-graph'" class="ms-auto max-lg:ms-0">
+          <div class="flex items-center gap-2 max-lg:w-full max-lg:justify-end max-lg:gap-1.5">
             <DateTime
               ref="dateTimeRef"
               auto-apply
@@ -281,18 +287,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template #icon-left>
                   <OIcon name="git-branch" size="sm" />
                 </template>
-                {{ t("traces.treeView") }}
+                <span class="max-lg:hidden">{{ t("traces.treeView") }}</span>
               </OToggleGroupItem>
               <OToggleGroupItem data-test="service-graph-graph-view-btn" value="graph" size="sm">
                 <template #icon-left><OIcon name="share" size="sm" class="shrink-0" /></template>
-                {{ t("traces.graphView") }}
+                <span class="max-lg:hidden">{{ t("traces.graphView") }}</span>
               </OToggleGroupItem>
             </OToggleGroup>
             <OSelect
               v-model="searchObj.meta.serviceGraphLayoutType"
               :options="serviceGraphLayoutOptions"
               :searchable="false"
-              class="h-8! min-h-8! w-[7.5rem]"
+              class="h-8! min-h-8! w-[7.5rem] max-lg:w-24!"
               :disabled="searchObj.meta.serviceGraphVisualizationType === 'graph'"
               @update:model-value="onServiceGraphLayoutChange"
             />

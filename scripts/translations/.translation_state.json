@@ -4477,6 +4477,7 @@
     "minuteWithValue": "1b1794a11c6d012e",
     "minutes": "4f846a84e7fc9ef6",
     "months": "09ca7551b3e90626",
+    "more": "d47d7cb0e4f8fd2b",
     "move": "6ecc3df6bffdd06c",
     "name": "dcd1d5223f73b3a9",
     "nameIsRequired": "604fd1b2e29c688a",
@@ -4576,6 +4577,7 @@
       "redirecting": "cd23991b4e02a17e"
     },
     "showMore": "ba8a80fdd7376631",
+    "sidePanel": "c28cdd98645b370f",
     "sidebar": {
       "folderCreateFailed": "4bb050aa86768e25",
       "folderUpdateFailed": "ff2c3beb908479a5"
@@ -14373,6 +14375,7 @@
     "quickPickStreamsLabel": "aa2db1e403a5ced8",
     "range": "99379c2fee16dece",
     "recordsChip": "d135619da331f2a4",
+    "recordsChipShort": "fd8f122cce20482f",
     "recordsPerPage": "7051b8bbc62daa11",
     "redirect_to_logs_page": "2445f40404b0508b",
     "refreshCacheAndRunQuery": "e90aca13f125a692",
@@ -14416,6 +14419,7 @@
     "sessionRefreshedRetrySearch": "a5f9f50b88e0d55d",
     "shareLink": "6480bb463dff4777",
     "showEditor": "a314f8725f27e525",
+    "showFields": "c47c7b14bdf3c94b",
     "showHideColumns": "0b71f0103a1f85d5",
     "showHistogramLabel": "b32dc489fba87a9a",
     "showOnlyInterestingFields": "fb62632df8bc2208",

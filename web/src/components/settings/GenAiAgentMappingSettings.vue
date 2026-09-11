@@ -1,5 +1,6 @@
 <template>
   <OPageLayout
+    overflow-first
     data-test="gen-ai-agent-mapping-settings"
     :subtitle="t('settings.genAiAgentMapping.description')"
     icon="smart-toy"
@@ -12,7 +13,7 @@
     </template>
     <!-- Content helpers (populate / clear the fields) live in the header,
            separate from the primary Save action at the bottom. -->
-    <template #actions>
+    <template #actions-overflow>
       <OButton
         data-test="gen-ai-agent-mapping-apply-defaults-btn"
         variant="outline"
@@ -30,6 +31,8 @@
       >
         {{ t("settings.genAiAgentMapping.resetToEmpty") }}
       </OButton>
+    </template>
+    <template #actions>
       <OButton
         data-test="gen-ai-agent-registry-clear-btn"
         variant="outline-destructive"

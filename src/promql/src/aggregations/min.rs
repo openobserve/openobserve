@@ -15,6 +15,7 @@
 
 use crate::aggregations::{AggFunc, extrema::ExtremaAccumulator};
 
+#[derive(Clone, Copy)]
 pub struct Min;
 
 impl AggFunc for Min {
@@ -24,8 +25,8 @@ impl AggFunc for Min {
         "min"
     }
 
-    fn build(&self) -> Self::Accumulator {
-        Self::Accumulator::default()
+    fn build(&self, slots: usize) -> Self::Accumulator {
+        ExtremaAccumulator::new(slots)
     }
 }
 

@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::{collections::HashSet, sync::Arc};
 
 use async_trait::async_trait;
 use config::{meta::stream::StreamType, spawn_pausable_job};
@@ -426,6 +426,19 @@ async fn delete_org_cipher_keys(org_id: &str) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+/// Per-group service delete so stored files, caches and cluster events are torn down too.
+async fn delete_org_sourcemaps(org_id: &str) -> Result<(), anyhow::Error> {
+    let files = crate::db::sourcemaps::list_files(org_id, None, None, None).await?;
+    let groups: HashSet<_> = files
+        .into_iter()
+        .map(|f| (f.service, f.env, f.version))
+        .collect();
+    for (service, env, version) in groups {
+        crate::db::sourcemaps::delete_group(org_id, service, env, version).await?;
+    }
+    Ok(())
+}
+
 async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     #[cfg(not(feature = "enterprise"))]
     use infra::table::service_streams;
@@ -598,6 +611,9 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     short_urls::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/short_urls: {e}"))?;
+    delete_org_sourcemaps(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/sourcemaps: {e}"))?;
     compactor_manual_jobs::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/compactor_manual_jobs: {e}"))?;

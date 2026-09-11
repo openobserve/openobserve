@@ -27,10 +27,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:model-value="(v: number) => (splitterModel = v)"
       :limits="[0, 250]"
       unit="px"
+      :horizontal="isMobile"
       class="min-h-0 flex-1 overflow-hidden"
     >
       <template #before>
-        <div class="border-r4 border-border-default flex h-full flex-col border-e">
+        <div
+          class="border-r4 border-border-default flex h-full flex-col border-e max-md:overflow-y-auto max-md:border-e-0 max-md:border-b"
+        >
           <div class="sticky top-0 shrink-0 px-2">
             <div class="flex items-center justify-between p-2 text-lg">
               <span class="flex items-center gap-1">
@@ -551,7 +554,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, reactive, ref, computed } from "vue";
+import { defineComponent, reactive, ref, computed, watch } from "vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -620,6 +624,14 @@ export default defineComponent({
     const originalData: any = ref([]);
     const loading = ref(false);
     const splitterModel = ref(250);
+    const { isMobile } = useBreakpoint();
+    watch(
+      isMobile,
+      (mobile) => {
+        splitterModel.value = mobile ? 180 : 250;
+      },
+      { immediate: true },
+    );
     const filterQuery = ref("");
 
     const filterOTableColumns: OTableColumnDef[] = [
@@ -1227,6 +1239,7 @@ export default defineComponent({
       onStatSelect,
       summaryStats,
       splitterModel,
+      isMobile,
       getData,
       resultTotal,
       cpuUsage,

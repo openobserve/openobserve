@@ -51,7 +51,7 @@ const { t } = useI18nTyped();
     <button
       v-if="copy"
       type="button"
-      class="text-text-body shrink-0 cursor-pointer leading-none opacity-0 transition-opacity group-hover/code:opacity-60 hover:opacity-100!"
+      class="text-text-body shrink-0 cursor-pointer leading-none opacity-0 transition-opacity group-hover/code:opacity-60 hover:opacity-100! max-md:opacity-60"
       :title="copied ? t('common.copiedExclaim') : t('common.copy')"
       @click="handleCopy"
     >

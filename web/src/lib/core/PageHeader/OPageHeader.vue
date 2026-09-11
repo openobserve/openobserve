@@ -37,7 +37,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   Tailwind utilities (unlayered CSS wins over layered utilities in v4).
 
   Props: title | titleDataTest | subtitle | icon | back | tabsBelow
-  Slots: title-prefix | title | subtitle | actions | tabs | back
+  Slots: title-prefix | title | subtitle | actions | actions-overflow | tabs | back
+
+  #actions-overflow — secondary actions. Inline on desktop; < md they collapse
+  behind a single "More" button so the primary ones keep one row.
 -->
 <template>
   <!-- No overflow-hidden here: it clipped the focus ring of the right-most
@@ -50,19 +53,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
        61px on some pages and 60px on others. -->
   <header
     class="app-page-header px-page-edge border-border-default shrink-0 border-b"
-    :class="[
-      tabsBelow
-        ? 'flex flex-col'
-        : 'flex h-15 items-center justify-between gap-4 max-sm:h-auto max-sm:flex-wrap max-sm:gap-y-2 max-sm:py-2.5',
-    ]"
+    :data-drawer-anchor="ownsSidebarTrigger ? 'page-layout-sidebar' : undefined"
+    :class="[tabsBelow ? 'flex flex-col' : ROW_CLASS]"
   >
     <!-- Row 1. In two-row mode this is its own flex row; otherwise it collapses
          (display:contents) so the title block + actions stay direct children of
-         the header — preserving the original single-row inline-tabs layout.
-         Below `sm` the header itself (not this wrapper) is the flex container
-         doing the wrapping, since `contents` promotes these children up to it. -->
-    <div :class="tabsBelow ? 'flex h-15 items-center justify-between gap-4' : 'contents'">
-      <div class="flex h-full min-w-0 flex-1 items-center gap-3.25">
+         the header — preserving the original single-row inline-tabs layout. -->
+    <div :class="tabsBelow ? ROW_CLASS : 'contents'">
+      <!-- flex-1 is basis-0, so the min-w floor is what forces the actions to wrap. -->
+      <div
+        class="flex h-full min-w-0 flex-1 items-center gap-3.25 max-lg:h-auto max-lg:self-stretch md:max-lg:min-w-40"
+        :class="[
+          hasBack ? 'max-md:min-w-40' : 'max-md:min-w-24',
+          hasTabs && !tabsBelow ? 'max-md:flex-wrap' : 'max-md:flex-nowrap',
+        ]"
+      >
+        <OButton
+          v-if="ownsSidebarTrigger"
+          variant="ghost"
+          size="icon-toolbar"
+          data-test="o-page-layout-mobile-sidebar-btn"
+          :aria-label="t('common.sidePanel')"
+          @click="layoutSidebar?.open()"
+        >
+          <OIcon name="menu" size="sm" />
+        </OButton>
         <slot name="title-prefix" />
 
         <!-- Sub-page: the module-icon tile BECOMES a Back button (same 8×8
@@ -85,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Listing/index page: the module icon tile. -->
         <span
           v-else-if="icon"
-          class="rounded-default bg-tabs-active-bg text-tabs-active-text inline-flex h-9.5 w-9.5 shrink-0 items-center justify-center"
+          class="rounded-default bg-tabs-active-bg text-tabs-active-text inline-flex h-9.5 w-9.5 shrink-0 items-center justify-center max-md:hidden"
           aria-hidden="true"
         >
           <OIcon :name="icon" size="md" />
@@ -97,7 +112,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              row and only ellipsise once genuinely out of room. -->
         <div
           class="flex min-w-0 flex-col justify-center"
-          :class="titleOverflow === 'visible' ? '' : 'shrink-0'"
+          :class="
+            titleOverflow === 'visible'
+              ? ''
+              : hasTabs && !tabsBelow
+                ? 'shrink-0 max-md:shrink'
+                : 'shrink-0 max-lg:shrink md:max-lg:min-w-32'
+          "
         >
           <h1
             class="text-text-heading min-h-6 text-base! leading-[1.45]! font-semibold! tracking-[-0.02em]!"
@@ -114,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="hasSubtitle"
             variant="meta"
             as="div"
-            class="-mt-0.5 flex h-5 min-w-0 items-center"
+            class="-mt-0.5 flex h-5 min-w-0 items-center max-md:hidden"
           >
             <slot name="subtitle">
               <!-- leading-normal (not the meta variant's leading-none): truncate
@@ -131,16 +152,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Module tabs (Level-2 nav), inline to the right of the title.
            Two-row mode renders them as a full-width strip below instead. -->
-        <div v-if="hasTabs && !tabsBelow" class="flex h-full min-w-0 flex-1 items-center">
+        <div
+          v-if="hasTabs && !tabsBelow"
+          class="flex h-full min-w-0 flex-1 items-center max-md:h-auto max-md:basis-full max-md:flex-wrap"
+        >
           <slot name="tabs" />
         </div>
       </div>
 
+      <!-- max-w-full + shrink let the group wrap within its row; shrink-0 alone runs it off-screen. -->
       <div
-        v-if="hasActions"
-        class="flex shrink-0 items-center gap-2 max-sm:w-full max-sm:flex-wrap"
+        v-if="hasActions || hasActionsOverflow"
+        class="flex shrink-0 items-center gap-2 max-lg:ms-auto max-md:max-w-full max-md:shrink max-md:flex-wrap max-md:justify-end"
       >
+        <slot v-if="hasActionsOverflow && !isMobile && overflowFirst" name="actions-overflow" />
         <slot name="actions" />
+
+        <template v-if="hasActionsOverflow">
+          <slot v-if="!isMobile && !overflowFirst" name="actions-overflow" />
+          <ODropdown v-else-if="isMobile" side="bottom" align="end">
+            <template #trigger>
+              <OButton
+                variant="outline"
+                size="icon-toolbar"
+                data-test="app-page-header-more-btn"
+                :aria-label="t('common.more')"
+              >
+                <OIcon name="more-vert" size="sm" />
+              </OButton>
+            </template>
+            <div class="flex max-w-56 flex-wrap gap-1 p-1.5">
+              <slot name="actions-overflow" />
+            </div>
+          </ODropdown>
+        </template>
       </div>
     </div>
 
@@ -158,10 +203,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import { Comment, Text, computed, useSlots } from "vue";
+import {
+  Comment,
+  Text,
+  computed,
+  inject,
+  onActivated,
+  onBeforeUnmount,
+  onDeactivated,
+  onMounted,
+  useSlots,
+} from "vue";
 import { useRouter } from "vue-router";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
+import { PAGE_LAYOUT_SIDEBAR_KEY } from "@/lib/core/PageLayout/pageLayoutSidebar";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 
 interface BackTarget {
@@ -193,17 +252,42 @@ const props = withDefaults(
      * owns its own overflow (an inline-edited page name does exactly this).
      */
     titleOverflow?: "truncate" | "visible";
+    /** Render #actions-overflow BEFORE #actions on desktop, so a trailing primary CTA stays last. */
+    overflowFirst?: boolean;
   }>(),
   {
     title: raw(""),
     subtitle: raw(""),
     titleOverflow: "truncate",
+    overflowFirst: false,
   },
 );
+
+// Fixed h-15 so h-full slot content (inline tabs, dividers) spans the row; < lg it may wrap.
+const ROW_CLASS =
+  "flex h-15 items-center justify-between gap-4 max-lg:h-auto max-lg:min-h-15 max-lg:flex-wrap max-lg:gap-y-1 max-lg:py-1.5";
 
 const router = useRouter();
 const slots = useSlots();
 const { t } = useI18nTyped();
+const { isMobile } = useBreakpoint();
+
+// The first header inside a sidebar layout carries its phone trigger, saving the layout a row.
+const layoutSidebar = inject(PAGE_LAYOUT_SIDEBAR_KEY, null);
+const sidebarClaim = Symbol("page-header");
+const claimSidebarTrigger = () => {
+  if (layoutSidebar && layoutSidebar.owner.value === null) layoutSidebar.owner.value = sidebarClaim;
+};
+const releaseSidebarTrigger = () => {
+  if (layoutSidebar?.owner.value === sidebarClaim) layoutSidebar.owner.value = null;
+};
+onMounted(claimSidebarTrigger);
+onActivated(claimSidebarTrigger);
+onBeforeUnmount(releaseSidebarTrigger);
+onDeactivated(releaseSidebarTrigger);
+const ownsSidebarTrigger = computed(
+  () => isMobile.value && layoutSidebar?.owner.value === sidebarClaim,
+);
 
 // A slot passed with an always-present <template> but a falsy inner v-if still
 // yields a comment placeholder node — so checking `$slots.x` is truthy even
@@ -222,6 +306,7 @@ const slotHasContent = (name: string): boolean => {
 const hasSubtitle = computed(() => Boolean(props.subtitle) || slotHasContent("subtitle"));
 const hasTabs = computed(() => slotHasContent("tabs"));
 const hasActions = computed(() => slotHasContent("actions"));
+const hasActionsOverflow = computed(() => slotHasContent("actions-overflow"));
 const hasBack = computed(() => Boolean(props.back) || slotHasContent("back"));
 const backLabel = computed(() =>
   props.back?.label ? t("common.backTo", { label: props.back.label }) : t("common.back"),

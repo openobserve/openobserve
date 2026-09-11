@@ -3,7 +3,7 @@ name: ui-architect
 description: >-
   Authoring guardrails for building ANY new frontend UI in the OpenObserve web
   app (web/) — new views, pages, panels, dialogs, feature components, or edits
-  to existing ones. Enforce six house rules the moment you write Vue/template
+  to existing ones. Enforce seven house rules the moment you write Vue/template
   markup: (1) use OPageHeader for every page/module header, (2) build UI from
   O2 library components in web/src/lib — never bare HTML controls when an O2
   equivalent exists, (3) NEVER write px — always rem, including inside Tailwind class
@@ -29,7 +29,12 @@ description: >-
   is banned) with keys added to web/src/locales/languages/en-US.json; text-carrying
   props/fields are typed I18nText and i18n keys stored as data are typed I18nKey,
   and the ONLY opt-out for a genuinely non-translatable string is raw() — never an
-  eslint-disable. It also settles the recurring
+  eslint-disable, (7) every page is responsive — phones and tablets adapt through
+  max-md:/max-lg: variants and useBreakpoint() while the laptop (≥lg) view stays
+  identical; headers, toolbars and stat strips keep one row, filter toggles collapse
+  to dropdowns (mobile-dropdown), secondary header actions go to #actions-overflow,
+  side panels become drawers that open from their own row, row actions fold into a
+  kebab, and popups fit the viewport. It also settles the recurring
   structural decisions: use OTable for any tabular data, follow the
   view → service → Vuex/local-ref layering for fetching list data, choose the
   right form container (ConfirmDialog vs ODialog vs ODrawer vs a full in-page
@@ -38,7 +43,8 @@ description: >-
   v-model/ref mirrors, automatic submit/loading, correct field-array keys).
   Trigger this whenever the user asks to create, add, build, scaffold, lay out,
   validate, or restyle any screen, component, header, table, list, dialog,
-  drawer, form, field, or panel in the web frontend, or asks where a
+  drawer, form, field, or panel in the web frontend, asks to make any of them
+  work on mobile / phone / tablet / small screens (responsive), or asks where a
   form/table/fetch should live, how to validate a form, how to add a keyboard
   shortcut, how to build a new reusable/common O2 component when nothing existing
   fits (create one in web/src/lib instead of assembling divs and classes),
@@ -61,7 +67,7 @@ token system, one spacing scale.
 
 This skill governs **feature/app UI** — views under `web/src/views` and components
 under `web/src/components` — built from the shared **O2 component library** in
-`web/src/lib`. This page is the **contract + map**: the six laws and the
+`web/src/lib`. This page is the **contract + map**: the seven laws and the
 recurring structural decisions, each in a line or two, each pointing to the
 reference that carries the full rationale, examples, and per-component detail.
 Open the linked reference before you implement that specific thing — don't guess a
@@ -69,10 +75,11 @@ prop, a class string, or a path.
 
 ---
 
-## The six house rules
+## The seven house rules
 
 The always-true laws. Each is stated here in brief; the full **what / why / how +
-code** for all six is in [references/house-rules.md](references/house-rules.md) —
+code** for rules 1–6 is in [references/house-rules.md](references/house-rules.md), and
+rule 7 has its own [references/responsive.md](references/responsive.md) —
 read it once, it is the backbone of everything below.
 
 1. **Every page/module header is `OPageHeader`** — never a hand-rolled
@@ -513,6 +520,33 @@ read it once, it is the backbone of everything below.
    > Toast/notification copy added by this convention lives under `toastMessages.*`,
    > grouped by module.
 
+7. **Every page is responsive — and the laptop view does not move.** New pages
+   are built for 375 px phones and 768 px tablets from the first commit, using the
+   method in [references/responsive.md](references/responsive.md):
+   - **Desktop is frozen.** Responsive rules are additive below a breakpoint —
+     `max-md:` (phone), `max-lg:` / `md:max-lg:` (tablet) — or a JS branch on
+     `useBreakpoint()`'s `isMobile` / `!lgUp`. An unprefixed class change or a bare
+     `md:`/`lg:` class that alters ≥1024 px is a blocker. JS is only for structure
+     (rail → drawer, toggle strip → dropdown, splitter locked shut).
+   - **One row of chrome.** Header: primaries in `#actions`, secondaries in
+     `#actions-overflow` (inline on desktop, one ⋮ below md; `overflow-first` when
+     they precede the CTA). Toolbar: wrapper `max-md:contents`, filter
+     `OToggleGroup mobile-dropdown`, search `min-w-0 flex-1 max-md:min-w-40`.
+     Stat tiles: `OStatStrip` / `KpiCard` (compact to icon + value below lg).
+   - **Side panels open from their own row.** `OPageLayout #sidebar` and
+     `FolderList` already become drawers; any other rail renders in an
+     `ODrawer` with `anchor` set to its trigger's row. Only the main nav opens from
+     the top.
+   - **Tables keep every column** and scroll within the frame (OTable does it);
+     inline row actions get `max-md:hidden` plus one `md:hidden` kebab mirroring them
+     with `<data-test>-menu` items; the footer count is `max-md:hidden`.
+   - **Nothing clipped, nothing hover-only.** Popups use library components and
+     `min(<w>, calc(100vw - 1.5rem))` widths; an `h-full` pane beside a stacked
+     sibling gets `max-md:h-auto max-md:min-h-0`; hover-revealed controls get
+     `max-md:opacity-100`.
+   - **Verify** at 375 / 360 / 768 / 1280 in the in-app browser, and at 1280 compare
+     against main — identical is the bar.
+
 ## Structural decisions
 
 *What* to reach for and *where the code lives* — the recurring calls that
@@ -535,6 +569,7 @@ and each domain has its own reference below.
 | **New page in nav** | a route **+ exactly one** surface (rail item / flyout child / Settings / IAM sub-page) **+** an env/role gate — the route condition, the nav-entry gate, and the SectionRail `visible` all express the same rule | [navigation-menus](references/navigation-menus.md) |
 | **Keyboard shortcuts** | registry-driven — declare in `shortcutRegistry.ts`, bind with `useShortcuts([{ id, handler }])`; never an ad-hoc `keydown` listener or a hardcoded `⌘N` in a template | [keyboard-shortcuts](references/keyboard-shortcuts.md) |
 | **Cancel / Save row** | cancel = `variant="outline"`, save = `variant="primary"`, both `size="sm-action"`, spaced with `gap-2` on the parent | [conventions](references/conventions.md) |
+| **Responsive** | `max-md:`/`max-lg:` variants + `useBreakpoint()` for structure; desktop unchanged; one row of header/toolbar/stat chrome; rails → anchored drawers; row actions → kebab; popups ≤ viewport | [responsive](references/responsive.md) |
 | **Nothing fits** | build a reusable component — generic primitive → a new `O*` in `web/src/lib`; app-specific composition → a named component in `web/src/components`. Never hand-assemble `<div>` + utility classes to fake a component | [creating-components](references/creating-components.md) |
 
 **Dark mode is automatic** — every O2 component and token resolves correctly in
@@ -748,9 +783,21 @@ considering the UI done:
 - [ ] `data-test` on every interactive and key output element, pattern
       `<module>-<filename>-<descriptor>` (see the project FE rules).
 - [ ] New component uses `<script setup lang="ts">`, no `// @ts-nocheck`.
-- [ ] **Comments are one or two lines** — the *why* of a non-obvious choice, not
-      a re-telling of the code or the history of the PR that added it (no ticket
-      ids, "review finding", "as discussed"). Same in specs. See
+- [ ] **Responsive, desktop untouched** — every new/changed class that affects
+      layout is `max-md:` / `max-lg:` gated (run the grep in
+      [responsive § The contract](references/responsive.md#the-contract)); the page
+      was checked at 375, 768 and 1280 and 1280 matches main.
+- [ ] **Phone chrome is one row** — secondary header actions in
+      `#actions-overflow`, toolbar filter `OToggleGroup mobile-dropdown`, search with
+      a `max-md:min-w-*` floor, stat tiles via `OStatStrip` / `KpiCard`.
+- [ ] **Rails and row actions adapt** — side rails render in an `ODrawer` anchored
+      to their trigger's row (or come from `OPageLayout #sidebar` / `FolderList`);
+      inline row actions are `max-md:hidden` with a `md:hidden` kebab mirroring them
+      (`<data-test>-menu`); no hover-only affordance without `max-md:opacity-100`.
+- [ ] **Comments are one line, or none** — the *why* of a non-obvious constraint,
+      never layout narration ("< md this wraps"), a re-telling of the code, or the
+      history of the PR that added it (no ticket ids, "review finding", "as
+      discussed"). Same in specs. See
       [conventions § Comments stay short](references/conventions.md).
 - [ ] `cd web && npm run lint && npm run type-check:app` pass. **`type-check:app`,
       not `type-check`** — the latter runs `tsconfig.vitest.json`, whose `include`

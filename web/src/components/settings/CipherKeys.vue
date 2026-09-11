@@ -90,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-row-action="edit"
               variant="ghost"
               size="icon-sm"
-              class="ms-1"
+              class="ms-1 max-md:hidden"
               :title="t('common.edit')"
               @click="editCipherKey(row)"
               icon-left="edit"
@@ -100,11 +100,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-row-action="delete"
               variant="ghost-destructive"
               size="icon-sm"
-              class="ms-1"
+              class="ms-1 max-md:hidden"
               :title="t('common.delete')"
               @click="confirmDeleteCipherKey(row)"
               icon-left="delete"
             />
+            <ODropdown side="bottom" align="end">
+              <template #trigger>
+                <OButton
+                  icon-left="more-vert"
+                  variant="ghost"
+                  size="icon-xs-sq"
+                  class="md:hidden"
+                  data-test="cipher-keys-row-more-actions"
+                  @click.stop
+                />
+              </template>
+              <ODropdownItem
+                icon-left="edit"
+                class="md:hidden"
+                :data-test="`cipherkey-list-${row.name}-update-menu`"
+                @select="editCipherKey(row)"
+              >
+                <span>{{ t("common.edit") }}</span>
+              </ODropdownItem>
+              <ODropdownItem
+                icon-left="delete"
+                variant="destructive"
+                class="md:hidden"
+                :data-test="`cipherkey-list-${row.name}-delete-menu`"
+                @select="confirmDeleteCipherKey(row)"
+              >
+                <span>{{ t("common.delete") }}</span>
+              </ODropdownItem>
+            </ODropdown>
           </template>
           <template v-if="selectedKeys.length > 0" #bottom>
             <span class="text-text-body text-xs font-medium">
@@ -156,6 +185,8 @@ import AddCipherKey from "@/components/cipherkeys/AddCipherKey.vue";
 import CipherKeysService from "@/services/cipher_keys";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -174,6 +205,8 @@ export default defineComponent({
     AddCipherKey,
     ConfirmDialog,
     OButton,
+    ODropdown,
+    ODropdownItem,
     OTooltip,
     OSearchInput,
     OTable,

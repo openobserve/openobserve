@@ -256,6 +256,7 @@ const hasInsideLabel = computed(
           :class="[
             'z-10001 w-(--reka-combobox-trigger-width) max-w-(--reka-combobox-trigger-width) min-w-(--reka-combobox-trigger-width)',
             'max-h-60 overflow-hidden',
+            'max-lg:max-h-[var(--reka-popper-available-height,15rem)]',
             'rounded-default border shadow-lg',
             'bg-select-content-bg border-select-content-border',
             'p-1',
@@ -268,7 +269,9 @@ const hasInsideLabel = computed(
             'data-[side=top]:data-[state=closed]:animate-[o2-reveal-up-out_100ms_cubic-bezier(0.4,0,1,1)]',
           ]"
         >
-          <ComboboxViewport class="max-h-56 overflow-y-auto">
+          <ComboboxViewport
+            class="max-h-56 overflow-y-auto max-lg:max-h-[calc(var(--reka-popper-available-height,14rem)-0.5rem)]"
+          >
             <ComboboxEmpty class="text-select-placeholder px-3 py-2 text-center text-sm">
               {{ t("components.combobox.noOptionsFound") }}
             </ComboboxEmpty>

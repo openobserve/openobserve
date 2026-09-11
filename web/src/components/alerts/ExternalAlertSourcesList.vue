@@ -201,6 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost"
                 size="icon-sm"
                 icon-left="edit"
+                class="max-md:hidden"
                 :title="t('alert_sources.edit')"
                 :data-test="`alert-sources-edit-${row.integration.id}`"
                 @click="openEditFor(row.integration)"
@@ -209,6 +210,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost"
                 size="icon-sm"
                 icon-left="autorenew"
+                class="max-md:hidden"
                 :title="t('alert_sources.rotateToken')"
                 :data-test="`alert-sources-rotate-${row.integration.id}`"
                 @click="confirmRotate(row.integration)"
@@ -217,6 +219,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :variant="row.integration.enabled ? 'ghost-destructive' : 'ghost-success'"
                 size="icon-sm"
                 :icon-left="row.integration.enabled ? 'pause' : 'play-arrow'"
+                class="max-md:hidden"
                 :title="
                   row.integration.enabled ? t('alert_sources.disable') : t('alert_sources.enable')
                 "
@@ -227,6 +230,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost-destructive"
                 size="icon-sm"
                 icon-left="delete"
+                class="max-md:hidden"
                 :disabled="row.integration.name === 'default'"
                 :title="
                   row.integration.name === 'default'
@@ -236,6 +240,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-test="`alert-sources-delete-${row.integration.id}`"
                 @click="confirmDelete(row.integration)"
               />
+              <ODropdown side="bottom" align="end">
+                <template #trigger>
+                  <OButton
+                    icon-left="more-vert"
+                    variant="ghost"
+                    size="icon-xs-sq"
+                    class="md:hidden"
+                    data-test="alert-sources-row-more-actions"
+                    @click.stop
+                  />
+                </template>
+                <ODropdownItem
+                  icon-left="edit"
+                  class="md:hidden"
+                  :data-test="`alert-sources-edit-${row.integration.id}-menu`"
+                  @select="openEditFor(row.integration)"
+                >
+                  <span>{{ t("alert_sources.edit") }}</span>
+                </ODropdownItem>
+                <ODropdownItem
+                  icon-left="autorenew"
+                  class="md:hidden"
+                  :data-test="`alert-sources-rotate-${row.integration.id}-menu`"
+                  @select="confirmRotate(row.integration)"
+                >
+                  <span>{{ t("alert_sources.rotateToken") }}</span>
+                </ODropdownItem>
+                <ODropdownItem
+                  :icon-left="row.integration.enabled ? 'pause' : 'play-arrow'"
+                  class="md:hidden"
+                  :data-test="`alert-sources-toggle-enabled-${row.integration.id}-menu`"
+                  @select="toggleEnabledFor(row.integration)"
+                >
+                  <span>{{
+                    row.integration.enabled ? t("alert_sources.disable") : t("alert_sources.enable")
+                  }}</span>
+                </ODropdownItem>
+                <ODropdownItem
+                  icon-left="delete"
+                  variant="destructive"
+                  class="md:hidden"
+                  :disabled="row.integration.name === 'default'"
+                  :data-test="`alert-sources-delete-${row.integration.id}-menu`"
+                  @select="confirmDelete(row.integration)"
+                >
+                  <span>{{
+                    row.integration.name === "default"
+                      ? t("alert_sources.defaultCannotDelete")
+                      : t("alert_sources.delete")
+                  }}</span>
+                </ODropdownItem>
+              </ODropdown>
             </div>
             <span
               v-else
@@ -285,6 +341,8 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import AddExternalAlertSource from "./AddExternalAlertSource.vue";
 import alertSources from "@/services/alert_sources";
@@ -332,6 +390,8 @@ export default defineComponent({
     OSearchInput,
     OEmptyState,
     OTooltip,
+    ODropdown,
+    ODropdownItem,
     ConfirmDialog,
     AddExternalAlertSource,
   },

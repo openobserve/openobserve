@@ -26,14 +26,14 @@ use promql_parser::parser::{
 
 use super::Engine;
 use crate::{
-    aggregations::{self, Avg, Count, Group, Max, Min, Stddev, Stdvar, Sum, eval_aggregate},
+    aggregations::{self, AggOp},
     functions, series_stream, streaming_eval,
 };
 
 /// A recognized fused shape: `agg(range_func(...))`, or `agg(instant_selector)` read as
 /// `last_over_time` over the lookback window.
 struct FusedAggShape<'a> {
-    op: streaming_eval::FusedAggOp,
+    op: AggOp,
     func: Arc<dyn functions::RangeFunc>,
     /// The range function's argument to materialize; `None` for the instant shape, which has
     /// no range function and stays generic when it cannot stream.
@@ -80,15 +80,10 @@ impl Engine {
 
         let eval_ctx = self.eval_ctx.clone();
 
+        if let Some(agg_op) = AggOp::from_token(op.id()) {
+            return agg_op.eval_aggregate(modifier, input, &eval_ctx);
+        }
         match op.id() {
-            token::T_SUM => eval_aggregate(modifier, input, Sum, &eval_ctx),
-            token::T_AVG => eval_aggregate(modifier, input, Avg, &eval_ctx),
-            token::T_COUNT => eval_aggregate(modifier, input, Count, &eval_ctx),
-            token::T_MIN => eval_aggregate(modifier, input, Min, &eval_ctx),
-            token::T_MAX => eval_aggregate(modifier, input, Max, &eval_ctx),
-            token::T_GROUP => eval_aggregate(modifier, input, Group, &eval_ctx),
-            token::T_STDDEV => eval_aggregate(modifier, input, Stddev, &eval_ctx),
-            token::T_STDVAR => eval_aggregate(modifier, input, Stdvar, &eval_ctx),
             token::T_TOPK | token::T_BOTTOMK | token::T_QUANTILE => {
                 let name = match op.id() {
                     token::T_TOPK => "topk",
@@ -130,7 +125,7 @@ impl Engine {
         modifier: &Option<LabelModifier>,
         data: Value,
         func: Arc<dyn functions::RangeFunc>,
-        op: streaming_eval::FusedAggOp,
+        op: AggOp,
     ) -> Result<Value> {
         let Some((sources, range)) =
             series_stream::matrix::group_sources(data, modifier, func.name())?
@@ -158,7 +153,7 @@ fn fused_agg_shape<'a>(op: &token::TokenType, expr: &'a PromExpr) -> Option<Fuse
     {
         return None;
     }
-    let agg_op = streaming_eval::FusedAggOp::from_token(op.id())?;
+    let agg_op = AggOp::from_token(op.id())?;
     match expr {
         PromExpr::Call(Call { func, args }) => {
             let [range_arg] = args.args.as_slice() else {

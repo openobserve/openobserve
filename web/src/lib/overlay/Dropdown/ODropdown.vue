@@ -32,12 +32,15 @@ import {
   DropdownMenuContent,
 } from "reka-ui";
 import { computed, inject, onBeforeUnmount, provide, ref, watch, type Ref } from "vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import {
   O_DROPDOWN_NESTED_KEY,
   type DropdownNestedRegistry,
   setActiveOverlay,
   clearActiveOverlay,
 } from "./ODropdown.context";
+
+const { lgUp } = useBreakpoint();
 
 const props = withDefaults(defineProps<DropdownProps>(), {
   modal: false,
@@ -292,11 +295,13 @@ onBeforeUnmount(() => {
         :align="align"
         :side-offset="sideOffset"
         :hide-when-detached="true"
+        :collision-padding="lgUp ? 0 : 8"
         @pointer-down-outside="handlePointerDownOutside"
         @focus-outside="handleFocusOutside"
         :style="{ zIndex: contentZIndex }"
         :class="[
-          'min-w-40 p-1',
+          'min-w-40 p-1 max-lg:max-w-[calc(100vw-1rem)]',
+          'max-lg:max-h-[var(--reka-popper-available-height,75vh)] max-lg:overflow-y-auto',
           // Surface
           'bg-dropdown-bg border-dropdown-border rounded-default border shadow-md',
           // Typography

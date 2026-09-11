@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <OPageLayout
+    overflow-first
     bleed
     :key="store.state.selectedOrganization.identifier"
     :title="t('dashboard.header')"
@@ -26,6 +27,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :main-panel="false"
   >
     <template #actions>
+      <!-- new dashboard button -->
+      <OButton variant="primary" size="sm" data-test="dashboard-new" @click="addDashboard">
+        {{ t(`dashboard.add`) }}
+      </OButton>
+    </template>
+
+    <template #actions-overflow>
       <!-- Org home dashboard shortcut: shows which dashboard is pinned to
              the home page and jumps straight to it. -->
       <OButton
@@ -94,16 +102,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </ODropdownItem>
       </ODropdown>
-      <!-- new dashboard button -->
-      <OButton variant="primary" size="sm" data-test="dashboard-new" @click="addDashboard">
-        {{ t(`dashboard.add`) }}
-      </OButton>
     </template>
 
     <!-- Folder rail + table — matches the Alerts/Reports layout. -->
-    <div class="flex min-h-0 flex-1">
+    <div class="flex min-h-0 flex-1 max-md:flex-col">
       <!-- Left: shared folder list (same component as Alerts/Reports) -->
-      <div class="w-rail h-full shrink-0">
+      <div
+        class="w-rail max-md:border-border-default h-full shrink-0 max-md:h-auto max-md:w-full max-md:border-b"
+      >
         <div class="h-full">
           <FolderList
             type="dashboards"
@@ -113,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <!-- Right: dashboards table -->
-      <div class="h-full min-w-0 flex-1">
+      <div class="h-full min-w-0 flex-1 max-md:h-auto max-md:min-h-0">
         <div class="bg-card-glass-bg h-full">
           <OTable
             class="h-full w-full"
@@ -143,8 +149,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <!-- Toolbar inside the table frame: scoped search (fills the bar) + refresh -->
             <template #toolbar>
-              <div class="flex w-full items-center gap-2">
-                <div class="min-w-0 flex-1">
+              <!-- min-w-0: otherwise the wrapper can't shrink below the search's min-content and pushes controls off-edge. -->
+              <div class="flex w-full items-center gap-2 max-lg:min-w-0 max-md:contents">
+                <div class="min-w-0 flex-1 max-md:min-w-40">
                   <OInput
                     v-model="dynamicQueryModel"
                     :placeholder="
@@ -171,7 +178,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           icon-left="folder-outline"
                           data-test="dashboard-search-scope-current"
                           :title="t('dashboard.searchThisFolderTitle')"
-                          >{{ t("dashboard.searchThisFolder") }}</OToggleGroupItem
+                          ><span class="max-md:hidden">{{
+                            t("dashboard.searchThisFolder")
+                          }}</span></OToggleGroupItem
                         >
                         <OToggleGroupItem
                           value="all"
@@ -179,7 +188,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           icon-left="search"
                           data-test="dashboard-search-across-folders-toggle"
                           :title="t('dashboard.searchAllFoldersTitle')"
-                          >{{ t("dashboard.searchAllFolders") }}</OToggleGroupItem
+                          ><span class="max-md:hidden">{{
+                            t("dashboard.searchAllFolders")
+                          }}</span></OToggleGroupItem
                         >
                       </OToggleGroup>
                     </template>
@@ -276,6 +287,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="t('dashboard.move_to_another_folder')"
                   variant="ghost"
                   size="icon-xs-sq"
+                  class="max-md:hidden"
                   data-test="dashboard-move-to-another-folder"
                   @click.stop="showMoveDashboardPanel(row)"
                 />
@@ -285,6 +297,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="t('dashboard.duplicate')"
                   variant="ghost"
                   size="icon-xs-sq"
+                  class="max-md:hidden"
                   data-test="dashboard-duplicate"
                   data-row-action="duplicate"
                   @click.stop="duplicateDashboard(row.id, row.folder_id)"
@@ -295,6 +308,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="t('dashboard.delete')"
                   variant="ghost-destructive"
                   size="icon-xs-sq"
+                  class="max-md:hidden"
                   data-test="dashboard-delete"
                   data-row-action="delete"
                   @click.stop="showDeleteDialogFn({ row })"
@@ -313,6 +327,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @click.stop
                     />
                   </template>
+                  <ODropdownItem
+                    icon-left="drive-file-move"
+                    class="md:hidden"
+                    data-test="dashboard-move-to-another-folder-menu"
+                    @select="showMoveDashboardPanel(row)"
+                  >
+                    <span>{{ t("dashboard.move_to_another_folder") }}</span>
+                  </ODropdownItem>
+                  <ODropdownItem
+                    icon-left="content-copy"
+                    class="md:hidden"
+                    data-test="dashboard-duplicate-menu"
+                    @select="duplicateDashboard(row.id, row.folder_id)"
+                  >
+                    <span>{{ t("dashboard.duplicate") }}</span>
+                  </ODropdownItem>
+                  <ODropdownItem
+                    icon-left="delete"
+                    variant="destructive"
+                    class="md:hidden"
+                    data-test="dashboard-delete-menu"
+                    @select="showDeleteDialogFn({ row })"
+                  >
+                    <span>{{ t("dashboard.delete") }}</span>
+                  </ODropdownItem>
                   <ODropdownItem
                     :icon-left="isHome(row.id) ? 'keep' : 'keep-outline'"
                     data-test="dashboard-list-set-home-btn"
@@ -351,7 +390,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <template #bottom>
               <div class="flex w-full items-center justify-between gap-4 py-1">
-                <div class="flex shrink-0 items-center text-xs font-normal">
+                <div class="flex shrink-0 items-center text-xs font-normal max-md:hidden">
                   {{ resultTotal || 0 }} {{ t("dashboard.header") }}
                 </div>
                 <div v-if="selectedIds.length > 0" class="bulk-action-bar flex items-center gap-2">

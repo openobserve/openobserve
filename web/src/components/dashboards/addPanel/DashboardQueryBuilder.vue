@@ -25,7 +25,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     "
   >
     <!-- x axis container -->
-    <div class="flex w-full flex-row ps-3" v-if="dashboardPanelData.data.type != 'metric'">
+    <div
+      class="flex w-full flex-row ps-3 max-md:flex-col"
+      v-if="dashboardPanelData.data.type != 'metric'"
+    >
       <div class="flex-1">
         <div class="flex flex-row">
           <div class="layout-name flex items-center whitespace-nowrap" :class="labelWidthClass">
@@ -111,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                   <div
                     :data-test="`dashboard-x-item-${itemX?.alias}-menu`"
-                    class="field-function-menu-popup dashboard-query-builder-dropdown overflow-hidden p-0"
+                    class="field-function-menu-popup dashboard-query-builder-dropdown overflow-hidden p-0 max-lg:max-h-[var(--reka-popper-available-height,75vh)] max-lg:overflow-y-auto"
                     :style="{
                       width:
                         dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
@@ -174,10 +177,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dashboardPanelData.data.type == 'stacked'
         "
       >
-        <div class="flex h-full flex-row ps-3">
+        <div
+          class="max-md:border-border-default flex h-full flex-row ps-3 max-md:border-t max-md:ps-0"
+        >
           <!-- Separator between X and Breakdown/Pivot -->
-          <OSeparator vertical class="me-4" />
-          <div class="layout-name flex min-w-0 items-center whitespace-nowrap">
+          <OSeparator vertical class="me-4 max-md:hidden" />
+          <!-- shrink-0, not min-w-0: the nowrap label would overflow onto the drop-zone hint if it shrank. -->
+          <div class="layout-name flex min-w-0 items-center whitespace-nowrap max-lg:shrink-0">
             <span
               class="rounded-default bg-badge-orange-ol-text me-1.5 h-2 w-2 shrink-0"
               aria-hidden="true"
@@ -276,7 +282,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                   <div
                     :data-test="`dashboard-b-item-${itemB?.alias}-menu`"
-                    class="field-function-menu-popup dashboard-query-builder-dropdown overflow-hidden p-0"
+                    class="field-function-menu-popup dashboard-query-builder-dropdown overflow-hidden p-0 max-lg:max-h-[var(--reka-popper-available-height,75vh)] max-lg:overflow-y-auto"
                     :style="{
                       width:
                         dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
@@ -411,7 +417,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
               <div
                 :data-test="`dashboard-y-item-${itemY?.alias}-menu`"
-                class="field-function-menu-popup dashboard-query-builder-dropdown overflow-hidden p-0"
+                class="field-function-menu-popup dashboard-query-builder-dropdown overflow-hidden p-0 max-lg:max-h-[var(--reka-popper-available-height,75vh)] max-lg:overflow-y-auto"
                 :style="{
                   width:
                     dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
@@ -545,7 +551,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
                 <div
                   :data-test="`dashboard-z-item-${itemZ?.alias}-menu`"
-                  class="field-function-menu-popup dashboard-query-builder-dropdown overflow-hidden p-0"
+                  class="field-function-menu-popup dashboard-query-builder-dropdown overflow-hidden p-0 max-lg:max-h-[var(--reka-popper-available-height,75vh)] max-lg:overflow-y-auto"
                   :style="{
                     width:
                       dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]

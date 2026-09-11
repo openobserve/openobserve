@@ -13,11 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::promql::value::Sample;
-use hashbrown::HashMap;
+use config::meta::promql::value::{Labels, RangeValue, Sample};
 
-use crate::aggregations::{Accumulate, AggFunc, SumState};
+use crate::aggregations::{Accumulate, AggFunc, SeriesKey, SumState, group_series};
 
+#[derive(Clone, Copy)]
 pub struct Avg;
 
 impl AggFunc for Avg {
@@ -27,8 +27,10 @@ impl AggFunc for Avg {
         "avg"
     }
 
-    fn build(&self) -> Self::Accumulator {
-        Self::Accumulator::default()
+    fn build(&self, slots: usize) -> Self::Accumulator {
+        AvgAccumulate {
+            states: vec![AvgState::default(); slots],
+        }
     }
 }
 
@@ -36,11 +38,6 @@ impl AggFunc for Avg {
 pub(crate) struct AvgState {
     sum: SumState,
     count: usize,
-}
-
-#[derive(Default)]
-pub struct AvgAccumulate {
-    states: HashMap<i64, AvgState>,
 }
 
 impl AvgState {
@@ -65,27 +62,33 @@ impl AvgState {
     }
 }
 
+pub struct AvgAccumulate {
+    states: Vec<AvgState>,
+}
+
 impl Accumulate for AvgAccumulate {
-    fn accumulate(&mut self, sample: &Sample) {
-        self.states
-            .entry(sample.timestamp)
-            .or_default()
-            .push(sample.value);
+    fn push(&mut self, slot: usize, value: f64, _series: &SeriesKey<'_>) {
+        self.states[slot].push(value);
     }
 
     fn merge(&mut self, other: Self) {
-        for (timestamp, other) in other.states {
-            self.states.entry(timestamp).or_default().merge(other);
+        for (state, other) in self.states.iter_mut().zip(other.states) {
+            state.merge(other);
         }
     }
 
-    fn evaluate(self) -> Vec<Sample> {
-        self.states
+    fn evaluate(self, group_labels: Labels, timestamps: &[i64]) -> Vec<RangeValue> {
+        let samples = self
+            .states
             .into_iter()
-            .filter_map(|(timestamp, state)| {
-                state.value().map(|value| Sample::new(timestamp, value))
+            .enumerate()
+            .filter_map(|(slot, state)| {
+                state
+                    .value()
+                    .map(|value| Sample::new(timestamps[slot], value))
             })
-            .collect()
+            .collect();
+        group_series(group_labels, samples)
     }
 }
 

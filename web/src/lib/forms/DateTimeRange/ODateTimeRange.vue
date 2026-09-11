@@ -372,7 +372,7 @@ const triggerClasses = computed(() => [
       <PopoverContent
         :side-offset="4"
         align="start"
-        class="rounded-default bg-datepicker-popup-bg border-datepicker-popup-border z-50 w-80 border shadow-lg outline-none"
+        class="rounded-default bg-datepicker-popup-bg border-datepicker-popup-border z-50 w-80 border shadow-lg outline-none max-lg:max-h-[var(--reka-popper-available-height,75vh)] max-lg:overflow-y-auto"
         data-test="datetimerange-popup"
       >
         <!-- Tab bar -->
@@ -553,7 +553,7 @@ const triggerClasses = computed(() => [
         <!-- ── ABSOLUTE TAB ──────────────────────────────────── -->
         <div
           v-if="activeTab === 'absolute'"
-          class="flex max-h-[70vh] flex-col gap-3 overflow-y-auto p-3"
+          class="flex max-h-[70vh] flex-col gap-3 overflow-y-auto p-3 max-lg:max-h-none max-lg:overflow-visible"
           data-test="datetimerange-absolute-panel"
         >
           <!-- Range calendar -->

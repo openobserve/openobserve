@@ -13,11 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::promql::value::Sample;
-use hashbrown::HashMap;
+use config::meta::promql::value::{Labels, RangeValue, Sample};
 
-use crate::aggregations::{Accumulate, AggFunc};
+use crate::aggregations::{Accumulate, AggFunc, SeriesKey, group_series};
 
+#[derive(Clone, Copy)]
 pub struct Count;
 
 impl AggFunc for Count {
@@ -27,33 +27,37 @@ impl AggFunc for Count {
         "count"
     }
 
-    fn build(&self) -> Self::Accumulator {
-        Self::Accumulator::default()
+    fn build(&self, slots: usize) -> Self::Accumulator {
+        CountAccumulate {
+            counts: vec![0; slots],
+        }
     }
 }
 
-#[derive(Default)]
 pub struct CountAccumulate {
-    count: HashMap<i64, usize>,
+    counts: Vec<u64>,
 }
 
 impl Accumulate for CountAccumulate {
-    fn accumulate(&mut self, sample: &Sample) {
-        let entry = self.count.entry(sample.timestamp).or_insert(0);
-        *entry += 1;
+    fn push(&mut self, slot: usize, _value: f64, _series: &SeriesKey<'_>) {
+        self.counts[slot] += 1;
     }
 
     fn merge(&mut self, other: Self) {
-        for (timestamp, count) in other.count {
-            *self.count.entry(timestamp).or_insert(0) += count;
+        for (count, other) in self.counts.iter_mut().zip(other.counts) {
+            *count += other;
         }
     }
 
-    fn evaluate(self) -> Vec<Sample> {
-        self.count
+    fn evaluate(self, group_labels: Labels, timestamps: &[i64]) -> Vec<RangeValue> {
+        let samples = self
+            .counts
             .into_iter()
-            .map(|(timestamp, count)| Sample::new(timestamp, count as f64))
-            .collect()
+            .enumerate()
+            .filter(|(_, count)| *count > 0)
+            .map(|(slot, count)| Sample::new(timestamps[slot], count as f64))
+            .collect();
+        group_series(group_labels, samples)
     }
 }
 

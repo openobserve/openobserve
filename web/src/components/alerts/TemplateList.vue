@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="flex h-full flex-col p-0">
     <OPageLayout
+      overflow-first
       bleed
       v-if="!showImportTemplate && !showTemplateEditor"
       :title="t('alerts.header')"
@@ -30,13 +31,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <template #actions>
         <OButton
-          variant="outline"
-          size="sm-action"
-          @click="importTemplate"
-          data-test="template-import"
-          >{{ t(`dashboard.import`) }}</OButton
-        >
-        <OButton
           data-test="template-list-add-btn"
           variant="primary"
           size="sm"
@@ -44,6 +38,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >{{ t(`alert_templates.add`) }}</OButton
         >
       </template>
+      <template #actions-overflow>
+        <OButton
+          variant="outline"
+          size="sm-action"
+          @click="importTemplate"
+          data-test="template-import"
+          >{{ t(`dashboard.import`) }}</OButton
+        >
+      </template>
+
       <div class="bg-card-glass-bg min-h-0 flex-1 overflow-hidden">
         <OTable
           ref="oTableRef"
@@ -71,8 +75,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:current-page="onPageChange"
         >
           <template #toolbar>
-            <div class="flex w-full items-center gap-2">
+            <div class="flex w-full items-center gap-2 max-lg:min-w-0 max-md:contents">
               <OToggleGroup
+                mobile-dropdown
                 :model-value="activeTab"
                 @update:model-value="
                   (v: any) => {
@@ -96,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OToggleGroup>
               <OSearchInput
                 v-model="filterQuery"
-                class="flex-1"
+                class="flex-1 max-lg:min-w-0 max-md:min-w-40"
                 :placeholder="t('template.search')"
                 data-test="template-list-search-input"
               />
@@ -168,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #cell-actions="{ row }">
             <OButton
               :title="t('alert_templates.exportTemplate')"
-              class="ms-1"
+              class="ms-1 max-md:hidden"
               variant="ghost"
               size="icon-sm"
               @click.stop="exportTemplate(row)"
@@ -179,7 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
             <OButton
               :data-test="`alert-template-list-${row.name}-update-template`"
-              class="ms-1"
+              class="ms-1 max-md:hidden"
               variant="ghost"
               size="icon-sm"
               :title="
@@ -193,7 +198,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
             <OButton
               :data-test="`alert-template-list-${row.name}-clone-template`"
-              class="ms-1"
+              class="ms-1 max-md:hidden"
               variant="ghost"
               size="icon-sm"
               :title="t('alert_templates.clone')"
@@ -204,7 +209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
             <OButton
               :data-test="`alert-template-list-${row.name}-delete-template`"
-              class="ms-1"
+              class="ms-1 max-md:hidden"
               variant="ghost"
               size="icon-sm"
               :title="
@@ -219,6 +224,62 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <OIcon name="delete" size="sm" />
             </OButton>
+            <ODropdown side="bottom" align="end">
+              <template #trigger>
+                <OButton
+                  icon-left="more-vert"
+                  :title="t('dashboard.moreActions')"
+                  variant="ghost"
+                  size="icon-xs-sq"
+                  class="md:hidden"
+                  data-test="alert-template-list-row-more-actions"
+                  @click.stop
+                />
+              </template>
+              <ODropdownItem
+                icon-left="download"
+                class="md:hidden"
+                data-test="destination-export-menu"
+                @select="exportTemplate(row)"
+              >
+                <span>{{ t("alert_templates.exportTemplate") }}</span>
+              </ODropdownItem>
+              <ODropdownItem
+                icon-left="edit"
+                class="md:hidden"
+                :disabled="row.isPrebuilt"
+                :data-test="`alert-template-list-${row.name}-update-template-menu`"
+                @select="editTemplate(row)"
+              >
+                <span>{{
+                  row.isPrebuilt
+                    ? t("alert_templates.systemReadOnlyEdit")
+                    : t("alert_templates.edit")
+                }}</span>
+              </ODropdownItem>
+              <ODropdownItem
+                icon-left="content-copy"
+                class="md:hidden"
+                :data-test="`alert-template-list-${row.name}-clone-template-menu`"
+                @select="cloneTemplate(row)"
+              >
+                <span>{{ t("alert_templates.clone") }}</span>
+              </ODropdownItem>
+              <ODropdownItem
+                icon-left="delete"
+                variant="destructive"
+                class="md:hidden"
+                :disabled="row.isPrebuilt"
+                :data-test="`alert-template-list-${row.name}-delete-template-menu`"
+                @select="conformDeleteDestination(row)"
+              >
+                <span>{{
+                  row.isPrebuilt
+                    ? t("alert_templates.systemReadOnlyDelete")
+                    : t("alert_templates.delete")
+                }}</span>
+              </ODropdownItem>
+            </ODropdown>
           </template>
           <template #cell-used_by="{ row }">
             <DependencyUsageCell
@@ -292,6 +353,8 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import AlertSectionTabs from "@/components/alerts/AlertSectionTabs.vue";

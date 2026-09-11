@@ -13,12 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::promql::value::{EvalContext, Sample, Value};
+use config::meta::promql::value::{EvalContext, Labels, RangeValue, Sample, Value};
 use datafusion::error::Result;
-use hashbrown::HashMap;
 
 use crate::{
-    aggregations::{Accumulate, AggFunc},
+    aggregations::{Accumulate, AggFunc, SeriesKey, group_series},
     common::quantile_in_place,
 };
 
@@ -49,6 +48,13 @@ pub struct Quantile {
     qtile: f64,
 }
 
+#[cfg(test)]
+impl Quantile {
+    pub(super) fn new(qtile: f64) -> Self {
+        Self { qtile }
+    }
+}
+
 impl AggFunc for Quantile {
     type Accumulator = QuantileAccumulate;
 
@@ -56,8 +62,11 @@ impl AggFunc for Quantile {
         "quantile"
     }
 
-    fn build(&self) -> Self::Accumulator {
-        QuantileAccumulate::new(self.qtile)
+    fn build(&self, slots: usize) -> Self::Accumulator {
+        QuantileAccumulate {
+            qtile: self.qtile,
+            values: vec![Vec::new(); slots],
+        }
     }
 
     // Buffers every sample; merging partials would re-copy them at each
@@ -69,43 +78,34 @@ impl AggFunc for Quantile {
 
 pub struct QuantileAccumulate {
     qtile: f64,
-    // Store all values per timestamp for quantile calculation
-    values: HashMap<i64, Vec<f64>>,
-}
-
-impl QuantileAccumulate {
-    fn new(qtile: f64) -> Self {
-        QuantileAccumulate {
-            qtile,
-            values: HashMap::new(),
-        }
-    }
+    values: Vec<Vec<f64>>,
 }
 
 impl Accumulate for QuantileAccumulate {
-    fn accumulate(&mut self, sample: &Sample) {
-        let entry = self.values.entry(sample.timestamp).or_default();
-        entry.push(sample.value);
+    fn push(&mut self, slot: usize, value: f64, _series: &SeriesKey<'_>) {
+        self.values[slot].push(value);
     }
 
     fn merge(&mut self, other: Self) {
-        for (timestamp, values) in other.values {
-            self.values.entry(timestamp).or_default().extend(values);
+        for (values, other) in self.values.iter_mut().zip(other.values) {
+            values.extend(other);
         }
     }
 
-    fn evaluate(self) -> Vec<Sample> {
-        self.values
+    fn evaluate(self, group_labels: Labels, timestamps: &[i64]) -> Vec<RangeValue> {
+        let samples = self
+            .values
             .into_iter()
-            .filter_map(|(timestamp, mut values)| {
+            .enumerate()
+            .filter_map(|(slot, mut values)| {
                 if values.is_empty() {
-                    return Some(Sample::new(timestamp, f64::NAN));
+                    return None;
                 }
-                // Calculate quantile
                 quantile_in_place(&mut values, self.qtile)
-                    .map(|quantile_val| Sample::new(timestamp, quantile_val))
+                    .map(|quantile_val| Sample::new(timestamps[slot], quantile_val))
             })
-            .collect()
+            .collect();
+        group_series(group_labels, samples)
     }
 }
 

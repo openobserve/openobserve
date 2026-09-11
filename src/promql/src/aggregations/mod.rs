@@ -23,7 +23,10 @@ use config::{
     utils::hash::gxhash,
 };
 use datafusion::error::{DataFusionError, Result};
-use promql_parser::parser::LabelModifier;
+use promql_parser::parser::{
+    LabelModifier,
+    token::{self, TokenId},
+};
 use rayon::prelude::*;
 
 mod avg;
@@ -41,7 +44,7 @@ mod stdvar;
 mod sum;
 mod topk;
 
-pub(crate) use avg::{Avg, AvgState};
+pub(crate) use avg::Avg;
 pub(crate) use bottomk::bottomk;
 pub(crate) use count::Count;
 pub(crate) use count_values::count_values;
@@ -57,108 +60,220 @@ pub(crate) use topk::topk;
 /// Series per parallel partial-aggregation chunk when a single group is large.
 const AGG_PARALLEL_CHUNK: usize = 32768;
 
-/// Trait for PromQL aggregation functions.
+/// Trait for PromQL aggregation operators.
 ///
-/// This trait defines the interface for aggregation functions (e.g., sum, avg, max, min, topk)
-/// used in PromQL query evaluation. Each aggregation function implements this trait to provide
-/// its name and create accumulator instances for processing time series data.
+/// One implementation per operator (`sum`, `avg`, `min`, `max`, `count`, `group`, `stddev`,
+/// `stdvar`, ...) shared by both evaluation paths: the generic path folds a materialized
+/// matrix through it in [`eval_aggregate`], and the streaming path folds each hash partition
+/// of a series stream through it in `streaming_eval::aggregate`. The operator itself is
+/// stateless; all per-group state lives in the [`Accumulate`] it builds, so a query holds one
+/// accumulator per label group (and per partition on the streaming path) and merges them.
 ///
 /// # Examples
 ///
 /// ```ignore
-/// struct SumAgg;
+/// #[derive(Clone, Copy)]
+/// struct Sum;
 ///
-/// impl AggFunc for SumAgg {
-///     type Accumulator = SumAccumulator;
+/// impl AggFunc for Sum {
+///     type Accumulator = SumAccumulate;
 ///
 ///     fn name(&self) -> &'static str {
 ///         "sum"
 ///     }
 ///
-///     fn build(&self) -> Self::Accumulator {
-///         SumAccumulator::new()
+///     fn build(&self, slots: usize) -> Self::Accumulator {
+///         SumAccumulate::with_slots(slots)
 ///     }
 /// }
 /// ```
 pub trait AggFunc: Sync {
     type Accumulator: Accumulate;
 
-    /// Returns the name of the aggregation function (e.g., "sum", "avg", "max").
+    /// Returns the operator name as it appears in PromQL and in the timing logs (e.g. "sum").
     fn name(&self) -> &'static str;
 
-    /// Creates a new accumulator instance for this aggregation function.
+    /// Creates a fresh accumulator with one empty state per evaluation slot.
     ///
-    /// Each call to `build()` should return a fresh accumulator that can independently
-    /// collect and aggregate samples. This allows for parallel processing of multiple
-    /// label groups.
-    fn build(&self) -> Self::Accumulator;
+    /// `slots` is the number of evaluation timestamps of the query (`(end - start) / step + 1`,
+    /// or 1 for an instant query). Every call returns an independent accumulator, so groups
+    /// and partitions can be folded in parallel and combined with [`Accumulate::merge`].
+    fn build(&self, slots: usize) -> Self::Accumulator;
 
-    /// Whether a huge group may be split into parallel chunks whose partial
-    /// accumulators are combined with [`Accumulate::merge`]. Value-buffering
-    /// accumulators (quantile/stddev/stdvar) opt out: each reduction level
-    /// re-copies every buffered sample, costing `O(N log P)` copying and extra
-    /// transient memory versus the sequential append.
+    /// Whether a huge group may be split into parallel chunks whose partial accumulators are
+    /// combined with [`Accumulate::merge`].
+    ///
+    /// Value-buffering accumulators (`quantile`, `stddev`, `stdvar`) opt out: each reduction
+    /// level re-copies every buffered sample, costing `O(N log P)` copying and extra transient
+    /// memory versus the sequential append. Partition merging on the streaming path is not
+    /// affected by this flag.
     fn mergeable(&self) -> bool {
         true
     }
 }
 
-/// Trait for accumulating and aggregating time series samples.
+/// Trait for the per-group state of an aggregation.
 ///
-/// This trait defines the interface for accumulators that collect samples from one or more
-/// time series and compute aggregated results. Accumulators are created by [`AggFunc::build()`]
-/// and are used to process samples in a stateful manner.
+/// An accumulator is created by [`AggFunc::build`] for one label group and holds one state
+/// per evaluation slot, where slot `i` is the `i`-th timestamp of the evaluation grid
+/// `start + i * step`. Values arrive already assigned to their slot: the generic path maps a
+/// sample's timestamp onto the grid, the streaming path evaluates the range function per slot.
+/// Keying by slot instead of by timestamp keeps the state a plain `Vec` on both paths.
 ///
 /// The typical lifecycle is:
-/// 1. Create accumulator via `AggFunc::build()`
-/// 2. Call `accumulate()` for each sample to include in the aggregation
-/// 3. Call `evaluate()` to compute and return the final aggregated samples
+/// 1. `AggFunc::build(slots)` for each label group (and each partition on the streaming path)
+/// 2. `push(slot, value, series)` for every value that belongs to the group
+/// 3. `merge(other)` to fold the partial accumulators of the same group together
+/// 4. `evaluate(group_labels, timestamps)` to produce the output series
 ///
 /// # Examples
 ///
 /// ```ignore
-/// let mut acc = sum_agg.build();
-/// for sample in samples {
-///     acc.accumulate(&sample);
+/// let mut acc = Sum.build(timestamps.len());
+/// for (slot, value, series) in values {
+///     acc.push(slot, value, &series);
 /// }
-/// let results = acc.evaluate();
+/// let series: Vec<RangeValue> = acc.evaluate(group_labels, &timestamps);
 /// ```
 pub trait Accumulate: Send + Sync + Sized {
-    /// Adds a sample to this accumulator.
+    /// Adds one value to the state of `slot`.
     ///
-    /// This method is called for each sample that should be included in the aggregation.
-    /// The accumulator maintains internal state to track the accumulated values across
-    /// all samples.
-    ///
-    /// # Parameters
-    ///
-    /// * `sample` - The sample to accumulate, containing a timestamp and value
-    fn accumulate(&mut self, sample: &Sample);
+    /// `series` identifies the series the value comes from. The scalar aggregations ignore it;
+    /// an aggregation whose output is a subset of the input series (`topk`, `bottomk`) keeps
+    /// the labels of the series that make it into its output.
+    fn push(&mut self, slot: usize, value: f64, series: &SeriesKey<'_>);
 
-    /// Folds another accumulator of the same type into this one, as if all of
-    /// its samples had been accumulated here. Lets a large group be
-    /// aggregated in parallel chunks whose partials are merged at the end.
+    /// Folds another accumulator of the same group into this one, as if all of its values had
+    /// been pushed here after this accumulator's own.
     ///
-    /// Floating-point caveat: if a partial sum overflows to ±Inf, merging
-    /// opposite infinities yields NaN where a sequential fold may yield ±Inf.
-    /// Summing such inputs is inherently order-dependent (sequentially,
-    /// `MAX, -MAX, MAX, -MAX` gives 0 while `MAX, MAX, -MAX, -MAX` gives
-    /// +Inf), so no chunking-independent result exists; NaN at least signals
-    /// the Inf - Inf cancellation.
+    /// This is how a large group aggregated in parallel chunks, and the per-partition folds of
+    /// the streaming path, are combined. Both accumulators must have been built with the same
+    /// number of slots.
     ///
-    /// Both accumulators must have the same concrete type.
+    /// Floating-point caveat: if a partial sum overflows to ±Inf, merging opposite infinities
+    /// yields NaN where a sequential fold may yield ±Inf. Summing such inputs is inherently
+    /// order-dependent (sequentially, `MAX, -MAX, MAX, -MAX` gives 0 while
+    /// `MAX, MAX, -MAX, -MAX` gives +Inf), so no chunking-independent result exists; NaN at
+    /// least signals the Inf - Inf cancellation.
     fn merge(&mut self, other: Self);
 
-    /// Computes and returns the final aggregated results.
+    /// Consumes the accumulator and produces the output series of the group.
     ///
-    /// This method consumes the accumulator (takes ownership via `self`) and produces
-    /// the final aggregated samples. The returned vector typically contains one sample per
-    /// unique timestamp that was accumulated.
-    ///
-    /// # Returns
-    ///
-    /// A vector of samples representing the aggregated results
-    fn evaluate(self) -> Vec<Sample>;
+    /// `group_labels` are the labels the group was keyed by (`by(...)` / `without(...)`
+    /// projection) and `timestamps` is the evaluation grid, indexed by slot. A scalar
+    /// aggregation returns exactly one series under `group_labels` with one sample per slot
+    /// that produced a value, in slot order; the caller decides what to do with an empty one.
+    /// An aggregation that selects input series returns one series per selected input, under
+    /// that input's own labels.
+    fn evaluate(self, group_labels: Labels, timestamps: &[i64]) -> Vec<RangeValue>;
+}
+
+/// The aggregation operators that fold through the shared accumulators.
+///
+/// This is the single table from a parser token to an operator: the generic path dispatches
+/// through [`AggOp::eval_aggregate`] and the streaming path through `streaming_eval::aggregate`,
+/// each matching once into the monomorphized fold for the chosen [`AggFunc`]. Operators that
+/// are not listed here (`quantile`, `count_values`) are evaluated by their own functions.
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum AggOp {
+    Avg,
+    Count,
+    Group,
+    Max,
+    Min,
+    Stddev,
+    Stdvar,
+    Sum,
+}
+
+impl AggOp {
+    pub(crate) fn from_token(id: TokenId) -> Option<Self> {
+        match id {
+            token::T_AVG => Some(Self::Avg),
+            token::T_COUNT => Some(Self::Count),
+            token::T_GROUP => Some(Self::Group),
+            token::T_MAX => Some(Self::Max),
+            token::T_MIN => Some(Self::Min),
+            token::T_STDDEV => Some(Self::Stddev),
+            token::T_STDVAR => Some(Self::Stdvar),
+            token::T_SUM => Some(Self::Sum),
+            _ => None,
+        }
+    }
+
+    /// The generic fold over a materialized matrix.
+    pub(crate) fn eval_aggregate(
+        self,
+        modifier: &Option<LabelModifier>,
+        data: Value,
+        eval_ctx: &EvalContext,
+    ) -> Result<Value> {
+        match self {
+            Self::Avg => eval_aggregate(modifier, data, Avg, eval_ctx),
+            Self::Count => eval_aggregate(modifier, data, Count, eval_ctx),
+            Self::Group => eval_aggregate(modifier, data, Group, eval_ctx),
+            Self::Max => eval_aggregate(modifier, data, Max, eval_ctx),
+            Self::Min => eval_aggregate(modifier, data, Min, eval_ctx),
+            Self::Stddev => eval_aggregate(modifier, data, Stddev, eval_ctx),
+            Self::Stdvar => eval_aggregate(modifier, data, Stdvar, eval_ctx),
+            Self::Sum => eval_aggregate(modifier, data, Sum, eval_ctx),
+        }
+    }
+}
+
+/// Identifies the series a pushed value comes from.
+///
+/// Borrowed rather than owned on purpose: neither path has a per-series signature or an
+/// `Arc<Labels>` for free, so carrying one would cost a hash or an allocation per series. The
+/// scalar accumulators never read it; an accumulator that keeps series identity clones the
+/// labels only for the entries that enter its output.
+pub(crate) struct SeriesKey<'a> {
+    // only a ranking accumulator reads the labels; the scalar ones take the value alone
+    #[allow(dead_code)]
+    pub(crate) labels: &'a Labels,
+}
+
+/// The evaluation grid `start + i * step` a sample timestamp maps onto.
+struct EvalGrid {
+    start: i64,
+    step: i64,
+    slots: usize,
+    instant: bool,
+}
+
+impl EvalGrid {
+    fn new(eval_ctx: &EvalContext, slots: usize) -> Self {
+        Self {
+            start: eval_ctx.start,
+            step: eval_ctx.step,
+            slots,
+            instant: eval_ctx.is_instant(),
+        }
+    }
+
+    /// The slot of a timestamp on the grid; off-grid timestamps have none.
+    fn slot(&self, timestamp: i64) -> Option<usize> {
+        if self.instant {
+            return (timestamp == self.start).then_some(0);
+        }
+        let offset = timestamp.checked_sub(self.start)?;
+        if offset % self.step != 0 {
+            return None;
+        }
+        usize::try_from(offset / self.step)
+            .ok()
+            .filter(|&slot| slot < self.slots)
+    }
+}
+
+/// One series under the group labels, kept when empty because the generic path emits every group.
+pub(crate) fn group_series(group_labels: Labels, samples: Vec<Sample>) -> Vec<RangeValue> {
+    vec![RangeValue {
+        labels: group_labels,
+        samples,
+        exemplars: None,
+        time_window: None,
+    }]
 }
 
 /// Projects a series' labels onto the grouping set of the label modifier
@@ -252,12 +367,11 @@ where
         return Ok(Value::None);
     }
 
-    // Use the eval timestamps from the context to ensure consistent alignment
-    let eval_timestamps = eval_ctx.timestamps();
-    let eval_timestamps: hashbrown::HashSet<i64> = eval_timestamps.iter().cloned().collect();
+    let timestamps = eval_ctx.timestamps();
+    let grid = EvalGrid::new(eval_ctx, timestamps.len());
     log::info!(
         "[trace_id: {trace_id}] [PromQL Timing] eval_aggregate({func_name}) processing {} time points",
-        eval_timestamps.len()
+        timestamps.len()
     );
 
     // Step 1: Group series indices by their projected label signature
@@ -276,17 +390,20 @@ where
     let start3 = std::time::Instant::now();
     let results: Vec<RangeValue> = groups
         .par_iter()
-        .map(|(_, series_indices)| {
+        .flat_map_iter(|(_, series_indices)| {
             // Get the labels for this group (from the first series in the group)
             let labels = projected_labels(param, &matrix[series_indices[0]].labels);
 
             let accumulate_chunk = |chunk: &[usize]| {
-                let mut acc = func.build();
+                let mut acc = func.build(timestamps.len());
                 for &series_idx in chunk {
-                    for sample in &matrix[series_idx].samples {
-                        // Only include timestamps that are in eval_timestamps
-                        if eval_timestamps.contains(&sample.timestamp) {
-                            acc.accumulate(sample);
+                    let series = &matrix[series_idx];
+                    let key = SeriesKey {
+                        labels: &series.labels,
+                    };
+                    for sample in &series.samples {
+                        if let Some(slot) = grid.slot(sample.timestamp) {
+                            acc.push(slot, sample.value, &key);
                         }
                     }
                 }
@@ -301,7 +418,7 @@ where
                     .par_chunks(AGG_PARALLEL_CHUNK)
                     .map(accumulate_chunk)
                     .reduce(
-                        || func.build(),
+                        || func.build(timestamps.len()),
                         |mut a, b| {
                             a.merge(b);
                             a
@@ -311,18 +428,7 @@ where
                 accumulate_chunk(series_indices)
             };
 
-            // Evaluate the aggregated results
-            let mut samples = acc.evaluate();
-
-            // Sort by timestamp to maintain order
-            samples.sort_by_key(|s| s.timestamp);
-
-            RangeValue {
-                labels,
-                samples,
-                exemplars: None,
-                time_window: None,
-            }
+            acc.evaluate(labels, &timestamps)
         })
         .collect();
 
@@ -389,25 +495,130 @@ mod tests {
         assert!(!result.iter().any(|l| l.name == "__name__"));
     }
 
+    /// The samples of the lone series a scalar accumulator evaluates to.
+    fn samples_of<A: Accumulate>(acc: A, timestamps: &[i64]) -> Vec<Sample> {
+        let mut series = acc.evaluate(Labels::default(), timestamps);
+        assert_eq!(series.len(), 1);
+        series.pop().unwrap().samples
+    }
+
+    /// Pushes `(slot, value)` pairs sequentially, and again split into every possible
+    /// contiguous chunking merged in order; every fold must produce the same bits.
+    fn assert_chunkings_match<F: AggFunc>(func: F, slots: usize, points: &[(usize, f64)]) {
+        let timestamps: Vec<i64> = (1..=slots as i64).collect();
+        let labels = Labels::default();
+        let key = SeriesKey { labels: &labels };
+        let mut sequential = func.build(slots);
+        for &(slot, value) in points {
+            sequential.push(slot, value, &key);
+        }
+        let expected = samples_of(sequential, &timestamps);
+        for split in 0..=points.len() {
+            for second_split in split..=points.len() {
+                let mut merged = func.build(slots);
+                for chunk in [
+                    &points[..split],
+                    &points[split..second_split],
+                    &points[second_split..],
+                ] {
+                    let mut partial = func.build(slots);
+                    for &(slot, value) in chunk {
+                        partial.push(slot, value, &key);
+                    }
+                    merged.merge(partial);
+                }
+                let actual = samples_of(merged, &timestamps);
+                assert_eq!(expected.len(), actual.len(), "{}", func.name());
+                for (e, a) in expected.iter().zip(&actual) {
+                    assert_eq!(e.timestamp, a.timestamp, "{}", func.name());
+                    assert_eq!(e.value.to_bits(), a.value.to_bits(), "{}", func.name());
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_every_accumulator_merges_like_the_sequential_fold() {
+        // Integer values keep float addition exact regardless of order.
+        let points = [
+            (0, 3.0),
+            (1, 5.0),
+            (0, 7.0),
+            (1, 11.0),
+            (2, 2.0),
+            (0, 4.0),
+            (2, -6.0),
+        ];
+        let mut reversed = points;
+        reversed.reverse();
+        for points in [&points[..], &reversed[..]] {
+            assert_chunkings_match(Sum, 4, points);
+            assert_chunkings_match(Avg, 4, points);
+            assert_chunkings_match(Count, 4, points);
+            assert_chunkings_match(Min, 4, points);
+            assert_chunkings_match(Max, 4, points);
+            assert_chunkings_match(Group, 4, points);
+        }
+        // The buffering accumulators merge by appending, so only the chunking may vary.
+        assert_chunkings_match(Stddev, 4, &points);
+        assert_chunkings_match(Stdvar, 4, &points);
+        assert_chunkings_match(quantile::Quantile::new(0.5), 4, &points);
+        assert!(samples_of(Sum.build(0), &[]).is_empty());
+    }
+
+    #[test]
+    fn test_scalar_accumulators_agree_on_slot_and_order() {
+        fn check<F: AggFunc>(func: F, expected: &[(i64, f64)]) {
+            let labels = Labels::default();
+            let key = SeriesKey { labels: &labels };
+            let mut acc = func.build(3);
+            for (slot, value) in [(2, 4.0), (0, 1.0), (2, 2.0), (0, 3.0)] {
+                acc.push(slot, value, &key);
+            }
+            let group = vec![Arc::new(Label::new("job", "api"))];
+            let mut series = acc.evaluate(group.clone(), &[10, 20, 30]);
+            assert_eq!(series.len(), 1, "{}", func.name());
+            let series = series.pop().unwrap();
+            assert_eq!(series.labels, group, "{}", func.name());
+            assert!(series.time_window.is_none() && series.exemplars.is_none());
+            let actual: Vec<(i64, f64)> = series
+                .samples
+                .iter()
+                .map(|s| (s.timestamp, s.value))
+                .collect();
+            assert_eq!(actual, expected, "{}", func.name());
+        }
+        check(Sum, &[(10, 4.0), (30, 6.0)]);
+        check(Avg, &[(10, 2.0), (30, 3.0)]);
+        check(Count, &[(10, 2.0), (30, 2.0)]);
+        check(Min, &[(10, 1.0), (30, 2.0)]);
+        check(Max, &[(10, 3.0), (30, 4.0)]);
+        check(Group, &[(10, 1.0), (30, 1.0)]);
+        check(Stdvar, &[(10, 1.0), (30, 1.0)]);
+        check(Stddev, &[(10, 1.0), (30, 1.0)]);
+        check(quantile::Quantile::new(1.0), &[(10, 3.0), (30, 4.0)]);
+    }
+
     #[test]
     fn test_extrema_merge_preserves_nan_and_signed_zero_behavior() {
         fn check(func: impl AggFunc, initial: f64) {
+            let labels = Labels::default();
+            let key = SeriesKey { labels: &labels };
             for (values, expected) in [
                 (vec![f64::NAN], initial),
                 (vec![f64::NAN, 7.0, f64::NAN], 7.0),
                 (vec![-0.0, 0.0], -0.0),
                 (vec![0.0, -0.0], 0.0),
             ] {
-                let mut sequential = func.build();
-                let mut merged = func.build();
+                let mut sequential = func.build(1);
+                let mut merged = func.build(1);
                 for value in values {
-                    let sample = Sample::new(1, value);
-                    sequential.accumulate(&sample);
-                    let mut partial = func.build();
-                    partial.accumulate(&sample);
+                    sequential.push(0, value, &key);
+                    let mut partial = func.build(1);
+                    partial.push(0, value, &key);
                     merged.merge(partial);
                 }
-                for samples in [sequential.evaluate(), merged.evaluate()] {
+                for samples in [samples_of(sequential, &[1]), samples_of(merged, &[1])] {
                     assert_eq!(samples.len(), 1);
                     assert_eq!(samples[0].timestamp, 1);
                     assert_eq!(
@@ -424,42 +635,104 @@ mod tests {
     }
 
     #[test]
-    fn test_accumulate_merge_matches_sequential() {
-        use super::{avg::Avg, count::Count, group::Group, max::Max, min::Min, sum::Sum};
-
-        fn check(func: impl AggFunc) {
-            // Integer values keep float addition exact regardless of order.
-            let part_a = [(1000, 3.0), (2000, 5.0), (1000, 7.0)];
-            let part_b = [(2000, 11.0), (3000, 2.0), (1000, 4.0)];
-            let mut sequential = func.build();
-            let mut acc_a = func.build();
-            let mut acc_b = func.build();
-            for &(ts, v) in part_a.iter() {
-                sequential.accumulate(&Sample::new(ts, v));
-                acc_a.accumulate(&Sample::new(ts, v));
-            }
-            for &(ts, v) in part_b.iter() {
-                sequential.accumulate(&Sample::new(ts, v));
-                acc_b.accumulate(&Sample::new(ts, v));
-            }
-            acc_a.merge(acc_b);
-
-            let mut expected = sequential.evaluate();
-            let mut merged = acc_a.evaluate();
-            expected.sort_by_key(|s| s.timestamp);
-            merged.sort_by_key(|s| s.timestamp);
-            assert_eq!(expected.len(), merged.len(), "{}", func.name());
-            for (e, m) in expected.iter().zip(merged.iter()) {
-                assert_eq!(e.timestamp, m.timestamp, "{}", func.name());
-                assert_eq!(e.value, m.value, "{}", func.name());
+    fn test_statistics_with_partial_merges() {
+        fn check<F: AggFunc>(func: F, values: &[f64], expected: f64) {
+            let labels = Labels::default();
+            let key = SeriesKey { labels: &labels };
+            for merge in [false, true] {
+                let mut accumulator = func.build(2);
+                for &value in values {
+                    if merge {
+                        let mut partial = func.build(2);
+                        partial.push(0, value, &key);
+                        accumulator.merge(partial);
+                    } else {
+                        accumulator.push(0, value, &key);
+                    }
+                }
+                let samples = samples_of(accumulator, &[1, 2]);
+                assert_eq!(samples.len(), 1);
+                assert!(
+                    samples[0].value == expected
+                        || (samples[0].value.is_nan() && expected.is_nan()),
+                    "{}, {values:?}, merge={merge}",
+                    func.name()
+                );
             }
         }
-        check(Sum);
-        check(Count);
-        check(Min);
-        check(Max);
-        check(Avg);
-        check(Group);
+        for (values, avg, variance) in [
+            (vec![1.0, 2.0, 3.0], 2.0, 2.0 / 3.0),
+            (vec![1e308, 1e308], f64::INFINITY, f64::INFINITY),
+            (vec![f64::INFINITY, f64::INFINITY], f64::INFINITY, f64::NAN),
+            (vec![f64::INFINITY, f64::NEG_INFINITY], f64::NAN, f64::NAN),
+            (vec![f64::NAN, 1.0], f64::NAN, f64::NAN),
+        ] {
+            check(Avg, &values, avg);
+            check(Stdvar, &values, variance);
+            check(Stddev, &values, variance.sqrt());
+        }
+    }
+
+    #[test]
+    fn test_agg_op_token_coverage() {
+        assert!(AggOp::from_token(token::T_SUM).is_some());
+        assert!(AggOp::from_token(token::T_AVG).is_some());
+        assert!(AggOp::from_token(token::T_TOPK).is_none());
+        assert!(AggOp::from_token(token::T_QUANTILE).is_none());
+        assert!(AggOp::from_token(token::T_COUNT_VALUES).is_none());
+    }
+
+    #[test]
+    fn test_eval_grid_maps_only_grid_timestamps() {
+        let range = EvalGrid::new(&EvalContext::new(1000, 3000, 1000, "t".into()), 3);
+        assert_eq!(range.slot(1000), Some(0));
+        assert_eq!(range.slot(2000), Some(1));
+        assert_eq!(range.slot(3000), Some(2));
+        assert_eq!(range.slot(4000), None);
+        assert_eq!(range.slot(0), None);
+        assert_eq!(range.slot(1500), None);
+        assert_eq!(range.slot(i64::MIN), None);
+        let instant = EvalGrid::new(&EvalContext::new(1000, 1000, 0, "t".into()), 1);
+        assert_eq!(instant.slot(1000), Some(0));
+        assert_eq!(instant.slot(2000), None);
+    }
+
+    #[test]
+    fn test_eval_aggregate_keeps_off_grid_group_and_sorts_by_slot() {
+        let matrix = vec![
+            RangeValue::new(
+                vec![Arc::new(Label::new("job", "a"))],
+                [
+                    Sample::new(3000, 3.0),
+                    Sample::new(1000, 1.0),
+                    Sample::new(1500, 9.0),
+                ],
+            ),
+            RangeValue::new(
+                vec![Arc::new(Label::new("job", "b"))],
+                [Sample::new(500, 9.0)],
+            ),
+        ];
+        let eval_ctx = EvalContext::new(1000, 3000, 1000, "test".to_string());
+        let param = Some(LabelModifier::Include(promql_parser::label::Labels {
+            labels: vec!["job".to_string()],
+        }));
+        let Value::Matrix(mut result) =
+            eval_aggregate(&param, Value::Matrix(matrix), Sum, &eval_ctx).unwrap()
+        else {
+            panic!("expected matrix");
+        };
+        result.sort_by(|x, y| x.labels[0].value.cmp(&y.labels[0].value));
+        assert_eq!(result.len(), 2);
+        assert_eq!(
+            result[0]
+                .samples
+                .iter()
+                .map(|s| (s.timestamp, s.value))
+                .collect::<Vec<_>>(),
+            [(1000, 1.0), (3000, 3.0)]
+        );
+        assert!(result[1].samples.is_empty());
     }
 
     /// Runs `eval_aggregate` over a single group large enough to take the
@@ -492,8 +765,6 @@ mod tests {
 
     #[test]
     fn test_eval_aggregate_chunked_sum_avg_numerically_safe() {
-        use super::{avg::Avg, sum::Sum};
-
         // Catastrophic cancellation across chunk boundaries: a naive chunked
         // merge collapses `1e16 ... -1e16 ... 1.0` to 0.0 because the lone
         // 1.0 is rounded away inside the second chunk's partial sum. The

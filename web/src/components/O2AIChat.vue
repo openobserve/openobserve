@@ -65,7 +65,7 @@
                       <OButton
                         variant="ghost"
                         size="icon-xs-circle"
-                        class="delete-history-btn opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+                        class="delete-history-btn opacity-0 transition-opacity duration-200 group-hover:opacity-100 max-md:opacity-100"
                         @click.stop="deleteChat(chat.id)"
                       >
                         <OIcon name="delete" size="sm" />

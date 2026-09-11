@@ -23,28 +23,52 @@ use config::meta::promql::value::{Labels, RangeValue, Value};
 use datafusion::error::Result;
 use hashbrown::{HashMap, hash_map::Entry};
 
-use super::{
-    accumulator::{FusedAccumulator, FusedAggOp},
-    evaluate_partitions,
-    range_expr::RangeExpr,
+use super::{evaluate_partitions, range_expr::RangeExpr};
+use crate::{
+    aggregations::{
+        Accumulate, AggFunc, AggOp, Avg, Count, Group, Max, Min, SeriesKey, Stddev, Stdvar, Sum,
+    },
+    series_stream::SeriesStream,
 };
-use crate::series_stream::SeriesStream;
 
-pub(super) type GroupAccs = HashMap<u64, GroupEntry>;
+pub(super) type GroupAccs<A> = HashMap<u64, GroupEntry<A>>;
 
-pub(super) struct GroupEntry {
+pub(super) struct GroupEntry<A> {
     labels: Labels,
-    acc: FusedAccumulator,
+    acc: A,
 }
 
 /// Aggregates every partition, partial then final; each source opens inside its own task, and
 /// dropping the future aborts them all.
 pub(crate) async fn aggregate<F, S>(
     sources: Vec<F>,
-    op: FusedAggOp,
+    op: AggOp,
     eval: Arc<RangeExpr>,
 ) -> Result<(Value, usize)>
 where
+    F: Future<Output = Result<S>> + Send + 'static,
+    S: SeriesStream + 'static,
+{
+    match op {
+        AggOp::Avg => aggregate_with(sources, Avg, eval).await,
+        AggOp::Count => aggregate_with(sources, Count, eval).await,
+        AggOp::Group => aggregate_with(sources, Group, eval).await,
+        AggOp::Max => aggregate_with(sources, Max, eval).await,
+        AggOp::Min => aggregate_with(sources, Min, eval).await,
+        AggOp::Stddev => aggregate_with(sources, Stddev, eval).await,
+        AggOp::Stdvar => aggregate_with(sources, Stdvar, eval).await,
+        AggOp::Sum => aggregate_with(sources, Sum, eval).await,
+    }
+}
+
+async fn aggregate_with<A, F, S>(
+    sources: Vec<F>,
+    func: A,
+    eval: Arc<RangeExpr>,
+) -> Result<(Value, usize)>
+where
+    A: AggFunc + Copy + Send + 'static,
+    A::Accumulator: 'static,
     F: Future<Output = Result<S>> + Send + 'static,
     S: SeriesStream + 'static,
 {
@@ -53,17 +77,17 @@ where
     let trace_id = &eval.eval_ctx.trace_id;
     log::info!(
         "[trace_id: {trace_id}] [PromQL Timing] fused {}({func_name}) started with {} partitions",
-        op.name(),
+        func.name(),
         sources.len(),
     );
     let (folds, series_count) = evaluate_partitions(sources, &eval, move |source, eval| {
-        aggregate_partial(source, op, eval)
+        aggregate_partial(source, func, eval)
     })
     .await?;
     let value = aggregate_final(folds, &eval.timestamps);
     log::info!(
         "[trace_id: {trace_id}] [PromQL Timing] fused {}({func_name}) execution took: {:?}, folded {series_count} series into {} series",
-        op.name(),
+        func.name(),
         start_time.elapsed(),
         match &value {
             Value::Matrix(matrix) => matrix.len(),
@@ -75,23 +99,25 @@ where
 
 /// The partial aggregate of one partition: its series folded into group accumulators, each
 /// dropped as it goes.
-async fn aggregate_partial<S: SeriesStream>(
+async fn aggregate_partial<A: AggFunc, S: SeriesStream>(
     mut source: S,
-    op: FusedAggOp,
+    func: A,
     eval: Arc<RangeExpr>,
-) -> Result<(GroupAccs, usize)> {
+) -> Result<(GroupAccs<A::Accumulator>, usize)> {
     let mut groups = GroupAccs::new();
     let mut series_count = 0;
     while let Some(sig) = source.advance().await? {
-        let entry = match groups.entry(sig) {
+        let GroupEntry { labels, acc } = match groups.entry(sig) {
             Entry::Occupied(entry) => entry.into_mut(),
             Entry::Vacant(entry) => entry.insert(GroupEntry {
                 labels: source.labels(),
-                acc: FusedAccumulator::new(op, eval.timestamps.len()),
+                acc: func.build(eval.timestamps.len()),
             }),
         };
         let samples = source.consume().await?;
-        eval.evaluate(samples, |slot, value| entry.acc.push(slot, value));
+        // the stream exposes only the group projection of a series' labels
+        let series = SeriesKey { labels };
+        eval.evaluate(samples, |slot, value| acc.push(slot, value, &series));
         series_count += 1;
         // the fold is pure CPU: give the runtime a chance to time out or abort it
         tokio::task::consume_budget().await;
@@ -101,7 +127,10 @@ async fn aggregate_partial<S: SeriesStream>(
 
 /// The final aggregate: partial groups merged in partition order, groups without output dropped
 /// like the generic path.
-fn aggregate_final(folds: impl IntoIterator<Item = GroupAccs>, timestamps: &[i64]) -> Value {
+fn aggregate_final<A: Accumulate>(
+    folds: impl IntoIterator<Item = GroupAccs<A>>,
+    timestamps: &[i64],
+) -> Value {
     let mut folds = folds.into_iter();
     let Some(mut merged) = folds.next() else {
         return Value::None;
@@ -118,18 +147,8 @@ fn aggregate_final(folds: impl IntoIterator<Item = GroupAccs>, timestamps: &[i64
     }
     let results: Vec<RangeValue> = merged
         .into_values()
-        .filter_map(|entry| {
-            let samples = entry.acc.into_samples(timestamps);
-            if samples.is_empty() {
-                return None;
-            }
-            Some(RangeValue {
-                labels: entry.labels,
-                samples,
-                exemplars: None,
-                time_window: None,
-            })
-        })
+        .flat_map(|entry| entry.acc.evaluate(entry.labels, timestamps))
+        .filter(|series| !series.samples.is_empty())
         .collect();
     if results.is_empty() {
         Value::None
@@ -265,7 +284,7 @@ mod tests {
         modifier: &Option<LabelModifier>,
         matrix: Vec<RangeValue>,
         func_name: &str,
-        op: FusedAggOp,
+        op: AggOp,
         eval_ctx: &EvalContext,
     ) -> Result<Value> {
         let func: Arc<dyn RangeFunc> = Arc::from(functions::fusable_range_func(func_name).unwrap());
@@ -277,29 +296,29 @@ mod tests {
 
     #[tokio::test]
     async fn test_fused_range_agg_matches_generic_for_all_pairs() {
-        let agg_cases: [(FusedAggOp, GenericAgg); 8] = [
-            (FusedAggOp::Avg, |modifier, input, eval_ctx| {
+        let agg_cases: [(AggOp, GenericAgg); 8] = [
+            (AggOp::Avg, |modifier, input, eval_ctx| {
                 aggregations::eval_aggregate(modifier, input, aggregations::Avg, eval_ctx)
             }),
-            (FusedAggOp::Count, |modifier, input, eval_ctx| {
+            (AggOp::Count, |modifier, input, eval_ctx| {
                 aggregations::eval_aggregate(modifier, input, aggregations::Count, eval_ctx)
             }),
-            (FusedAggOp::Group, |modifier, input, eval_ctx| {
+            (AggOp::Group, |modifier, input, eval_ctx| {
                 aggregations::eval_aggregate(modifier, input, aggregations::Group, eval_ctx)
             }),
-            (FusedAggOp::Max, |modifier, input, eval_ctx| {
+            (AggOp::Max, |modifier, input, eval_ctx| {
                 aggregations::eval_aggregate(modifier, input, aggregations::Max, eval_ctx)
             }),
-            (FusedAggOp::Min, |modifier, input, eval_ctx| {
+            (AggOp::Min, |modifier, input, eval_ctx| {
                 aggregations::eval_aggregate(modifier, input, aggregations::Min, eval_ctx)
             }),
-            (FusedAggOp::Stddev, |modifier, input, eval_ctx| {
+            (AggOp::Stddev, |modifier, input, eval_ctx| {
                 aggregations::eval_aggregate(modifier, input, aggregations::Stddev, eval_ctx)
             }),
-            (FusedAggOp::Stdvar, |modifier, input, eval_ctx| {
+            (AggOp::Stdvar, |modifier, input, eval_ctx| {
                 aggregations::eval_aggregate(modifier, input, aggregations::Stdvar, eval_ctx)
             }),
-            (FusedAggOp::Sum, |modifier, input, eval_ctx| {
+            (AggOp::Sum, |modifier, input, eval_ctx| {
                 aggregations::eval_aggregate(modifier, input, aggregations::Sum, eval_ctx)
             }),
         ];
@@ -345,8 +364,7 @@ mod tests {
                     assert_eq!(
                         canonical_matrix(expected),
                         canonical_matrix(actual),
-                        "fused {}({func_name}) diverged from generic (modifier: {modifier:?})",
-                        op.name(),
+                        "fused {op:?}({func_name}) diverged from generic (modifier: {modifier:?})",
                     );
                 }
             }
@@ -376,29 +394,29 @@ mod tests {
             })
             .collect::<Vec<_>>();
 
-        let agg_cases: [(FusedAggOp, GenericAgg); 8] = [
-            (FusedAggOp::Avg, |modifier, input, eval_ctx| {
+        let agg_cases: [(AggOp, GenericAgg); 8] = [
+            (AggOp::Avg, |modifier, input, eval_ctx| {
                 aggregations::eval_aggregate(modifier, input, aggregations::Avg, eval_ctx)
             }),
-            (FusedAggOp::Count, |modifier, input, eval_ctx| {
+            (AggOp::Count, |modifier, input, eval_ctx| {
                 aggregations::eval_aggregate(modifier, input, aggregations::Count, eval_ctx)
             }),
-            (FusedAggOp::Group, |modifier, input, eval_ctx| {
+            (AggOp::Group, |modifier, input, eval_ctx| {
                 aggregations::eval_aggregate(modifier, input, aggregations::Group, eval_ctx)
             }),
-            (FusedAggOp::Max, |modifier, input, eval_ctx| {
+            (AggOp::Max, |modifier, input, eval_ctx| {
                 aggregations::eval_aggregate(modifier, input, aggregations::Max, eval_ctx)
             }),
-            (FusedAggOp::Min, |modifier, input, eval_ctx| {
+            (AggOp::Min, |modifier, input, eval_ctx| {
                 aggregations::eval_aggregate(modifier, input, aggregations::Min, eval_ctx)
             }),
-            (FusedAggOp::Stddev, |modifier, input, eval_ctx| {
+            (AggOp::Stddev, |modifier, input, eval_ctx| {
                 aggregations::eval_aggregate(modifier, input, aggregations::Stddev, eval_ctx)
             }),
-            (FusedAggOp::Stdvar, |modifier, input, eval_ctx| {
+            (AggOp::Stdvar, |modifier, input, eval_ctx| {
                 aggregations::eval_aggregate(modifier, input, aggregations::Stdvar, eval_ctx)
             }),
-            (FusedAggOp::Sum, |modifier, input, eval_ctx| {
+            (AggOp::Sum, |modifier, input, eval_ctx| {
                 aggregations::eval_aggregate(modifier, input, aggregations::Sum, eval_ctx)
             }),
         ];
@@ -415,8 +433,7 @@ mod tests {
                 assert_eq!(
                     canonical_matrix(expected),
                     first,
-                    "chunked fused {}(sum_over_time) diverged from generic (modifier: {modifier:?})",
-                    op.name(),
+                    "chunked fused {op:?}(sum_over_time) diverged from generic (modifier: {modifier:?})",
                 );
                 let second = canonical_matrix(
                     run_materialized(&modifier, matrix.clone(), "sum_over_time", op, &eval_ctx)
@@ -424,10 +441,8 @@ mod tests {
                         .unwrap(),
                 );
                 assert_eq!(
-                    first,
-                    second,
-                    "chunked fused {}(sum_over_time) must be deterministic",
-                    op.name(),
+                    first, second,
+                    "chunked fused {op:?}(sum_over_time) must be deterministic",
                 );
             }
         }
@@ -458,13 +473,13 @@ mod tests {
 
         for (op, generic_agg) in [
             (
-                FusedAggOp::Sum,
+                AggOp::Sum,
                 (|modifier, input, eval_ctx| {
                     aggregations::eval_aggregate(modifier, input, aggregations::Sum, eval_ctx)
                 }) as GenericAgg,
             ),
             (
-                FusedAggOp::Avg,
+                AggOp::Avg,
                 (|modifier, input, eval_ctx| {
                     aggregations::eval_aggregate(modifier, input, aggregations::Avg, eval_ctx)
                 }) as GenericAgg,
@@ -493,8 +508,7 @@ mod tests {
                     let tolerance = expected_value.abs().max(actual_value.abs()) * 1e-12;
                     assert!(
                         (expected_value - actual_value).abs() <= tolerance,
-                        "fused {}(rate) diverged beyond epsilon: {expected_value} vs {actual_value}",
-                        op.name(),
+                        "fused {op:?}(rate) diverged beyond epsilon: {expected_value} vs {actual_value}",
                     );
                 }
             }
@@ -511,9 +525,15 @@ mod tests {
         };
         let failing = FailingStream;
         let folds = vec![
-            Box::pin(aggregate_partial(endless, FusedAggOp::Sum, eval.clone()))
-                as std::pin::Pin<Box<dyn Future<Output = Result<(GroupAccs, usize)>> + Send>>,
-            Box::pin(aggregate_partial(failing, FusedAggOp::Sum, eval)),
+            Box::pin(aggregate_partial(endless, Sum, eval.clone()))
+                as std::pin::Pin<
+                    Box<
+                        dyn Future<
+                                Output = Result<(GroupAccs<<Sum as AggFunc>::Accumulator>, usize)>,
+                            > + Send,
+                    >,
+                >,
+            Box::pin(aggregate_partial(failing, Sum, eval)),
         ];
 
         let start = std::time::Instant::now();

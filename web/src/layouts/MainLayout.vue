@@ -76,6 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @change-language="changeLanguage"
         @open-predefined-themes="openPredefinedThemes"
         @open-shortcuts="openShortcutsList"
+        @toggle-mobile-nav="mobileNavOpen = !mobileNavOpen"
         @signout="signout"
       />
     </header>
@@ -90,6 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
       <ONavbar
         v-if="store.state.printMode !== true"
+        class="max-md:hidden"
         :links-list="navLinks"
         :mini-mode="miniMode"
         :visible="leftDrawerOpen"
@@ -97,17 +99,59 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @menu-hover="handleMenuHover"
       />
 
+      <!-- Not seamless: the scrim gives tap-outside-to-close a target. -->
+      <ODrawer
+        v-model:open="mobileNavOpen"
+        side="left"
+        :width="30"
+        bleed
+        :show-close="false"
+        data-test="main-layout-mobile-nav-drawer"
+      >
+        <div class="flex h-full min-h-0 flex-col">
+          <div
+            class="border-border-default flex shrink-0 items-center justify-between border-b px-4 py-3"
+          >
+            <img
+              class="h-6 w-auto"
+              :src="
+                getImageURL(
+                  isDark
+                    ? 'images/common/openobserve_latest_dark_2.svg'
+                    : 'images/common/openobserve_latest_light_2.svg',
+                )
+              "
+              :alt="raw('OpenObserve')"
+            />
+            <OButton
+              variant="ghost"
+              size="icon"
+              icon-left="close"
+              data-test="main-layout-mobile-nav-close"
+              @click="mobileNavOpen = false"
+            />
+          </div>
+          <ONavbar
+            class="min-h-0 flex-1 overflow-y-auto"
+            :links-list="navLinks"
+            :visible="true"
+            @menu-hover="handleMenuHover"
+          />
+        </div>
+      </ODrawer>
+
       <div class="flex h-full min-h-0 min-w-0 flex-1">
         <!-- Main Panel -->
         <main
           data-test="main-content"
-          class="bg-surface-chrome-deeper flex min-h-0 flex-col pe-2 pb-2"
+          class="bg-surface-chrome-deeper flex min-h-0 flex-col pe-2 pb-2 max-md:pe-0"
           :style="{
-            width: !store.state.isAiChatEnabled
-              ? '100%'
-              : store.state.isAiChatExpanded
-                ? '50%'
-                : '75%',
+            width:
+              !store.state.isAiChatEnabled || isMobile
+                ? '100%'
+                : store.state.isAiChatExpanded
+                  ? '50%'
+                  : '75%',
           }"
         >
           <!-- Content card — all pages render inside this. The border stays present in both
@@ -131,7 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Right Panel (AI Chat - unified for both general and context-specific usage) -->
         <aside
           v-show="store.state.isAiChatEnabled && isLoading"
-          class="o2-sidebar o2-sidebar-right bg-surface-chrome-deeper sticky top-[var(--navbar-height,2.25rem)] shrink-0 self-start overflow-y-auto"
+          class="o2-sidebar o2-sidebar-right bg-surface-chrome-deeper shrink-0 overflow-y-auto"
           :class="[
             isDark ? 'dark-mode-chat-container' : 'light-mode-chat-container',
             { 'o2-sidebar--expanded': store.state.isAiChatExpanded },
@@ -139,17 +183,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             // card's right/bottom gap (+ rounded-surface corners) so they read as
             // the same card. Expanding only widens it; it never overlays the header.
             'pe-2 pb-2',
+            isMobile
+              ? 'fixed inset-x-0 bottom-0 z-50 ps-2'
+              : 'sticky top-[var(--navbar-height,2.25rem)] self-start',
           ]"
           :style="[
             {
               height: 'calc(100vh - var(--navbar-height, 2.25rem))',
               maxWidth: '100%',
             },
-            // Full-screen just widens the panel (25% → 50%) beside the content —
-            // same top position + height, so the main header stays visible.
-            store.state.isAiChatExpanded
-              ? { width: '50%', minWidth: '18.75rem' }
-              : { width: '25%', minWidth: '4.688rem' },
+            isMobile
+              ? { width: '100%', top: 'var(--navbar-height, 2.25rem)' }
+              : // Full-screen just widens the panel (25% → 50%) beside the content —
+                // same top position + height, so the main header stays visible.
+                store.state.isAiChatExpanded
+                ? { width: '50%', minWidth: '18.75rem' }
+                : { width: '25%', minWidth: '4.688rem' },
           ]"
         >
           <O2AIChat
@@ -224,6 +273,9 @@ import { usePredefinedThemes } from "@/composables/usePredefinedThemes";
 import GetStarted from "@/components/login/GetStarted.vue";
 import CommunitySlackInvite from "@/components/CommunitySlackInvite.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import SlackIcon from "@/components/icons/SlackIcon.vue";
 import ManagementIcon from "@/components/icons/ManagementIcon.vue";
 import organizations from "@/services/organizations";
@@ -265,6 +317,8 @@ export default defineComponent({
     GetStarted,
     CommunitySlackInvite,
     ODialog,
+    ODrawer,
+    OButton,
   },
   methods: {
     navigateToDocs() {
@@ -346,6 +400,15 @@ export default defineComponent({
     };
     const zoBackendUrl = store.state.API_ENDPOINT;
     const isLoading = ref(false);
+
+    const { isMobile } = useBreakpoint();
+    const mobileNavOpen = ref(false);
+    watch(
+      () => router.currentRoute.value.fullPath,
+      () => {
+        mobileNavOpen.value = false;
+      },
+    );
 
     const { getStreams, resetStreams } = useStreams(t);
     const { closeSocket } = useSearchWebSocket();
@@ -1417,6 +1480,7 @@ export default defineComponent({
     return {
       isDark,
       t,
+      raw,
       router,
       store,
       config,
@@ -1431,6 +1495,8 @@ export default defineComponent({
       toggleDrawer,
       isMobile,
       miniMode,
+      isMobile,
+      mobileNavOpen,
       user,
       zoBackendUrl,
       isLoading,
