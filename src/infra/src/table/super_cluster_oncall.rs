@@ -837,6 +837,83 @@ mod tests {
         assert_eq!(rows[0].at, 200);
     }
 
+    /// The revision has to be allocated by the database, not by a clock.
+    ///
+    /// Two writes inside one microsecond, or a second node whose clock runs
+    /// behind, both hand the record a revision at or below the one it already
+    /// carries — and a replica holding the higher value then refuses every
+    /// snapshot after it, including the one that says the page was answered.
+    #[tokio::test]
+    async fn test_a_revision_never_stands_still_or_goes_backwards() {
+        let db = db().await;
+        put_response_in(&db, &a_response()).await.unwrap();
+        let start = a_response().updated_at;
+
+        let mut previous = start;
+        for now in [start, start, start - 5_000_000] {
+            oncall_responses::Entity::update_many()
+                .col_expr(
+                    oncall_responses::Column::UpdatedAt,
+                    super::super::oncall_responses::next_revision(now),
+                )
+                .filter(oncall_responses::Column::Id.eq("resp_1"))
+                .exec(&db)
+                .await
+                .unwrap();
+            let row = oncall_responses::Entity::find_by_id("resp_1")
+                .one(&db)
+                .await
+                .unwrap()
+                .unwrap();
+            assert!(
+                row.updated_at > previous,
+                "a write at {now} left the revision at {} (was {previous})",
+                row.updated_at
+            );
+            previous = row.updated_at;
+        }
+    }
+
+    /// Once a page has landed, nothing may say it did not.
+    ///
+    /// `at` is the tick's clock, stamped before the transport is called, so it
+    /// orders attempts by which dispatch started rather than which one landed —
+    /// and two dispatches of one rung overlap whenever a lease expires under a
+    /// worker that is still sending. Both arrival orders are checked, because a
+    /// stamp-ordered guard alone loses the success in each of them.
+    #[tokio::test]
+    async fn test_a_landed_page_stays_landed_whichever_order_arrives() {
+        for (first, second, label) in [
+            ((200, true), (300, false), "success then a later failure"),
+            ((300, false), (200, true), "failure then an earlier success"),
+            (
+                (200, true),
+                (200, false),
+                "failure sharing the success's stamp",
+            ),
+        ] {
+            let db = db().await;
+            put_event_in(&db, "resp_1", &a_delivery(first.0, first.1))
+                .await
+                .unwrap();
+            put_event_in(&db, "resp_1", &a_delivery(second.0, second.1))
+                .await
+                .unwrap();
+
+            let rows = oncall_response_events::Entity::find()
+                .all(&db)
+                .await
+                .unwrap();
+            assert_eq!(rows.len(), 1, "{label}: one page to one person");
+            assert_eq!(
+                rows[0].delivered,
+                Some(true),
+                "{label}: the ledger forgot a page that landed, so the next \
+                 promotion's delta sends it again"
+            );
+        }
+    }
+
     /// Redelivery is normal on this path, and a note leaves every ledger column
     /// null. Deduped with `= NULL` the check never matches, and each replay
     /// appends another copy of the same line to somebody's timeline.

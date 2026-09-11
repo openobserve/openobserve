@@ -183,7 +183,6 @@ mod m20260825_000001_add_steps_configured_to_synthetics_jobs;
 mod m20260825_000001_create_status_page_custom_domains;
 mod m20260827_000001_drop_table_action_scripts;
 mod m20260831_000001_add_exhausted_at_to_oncall_responses;
-mod m20260911_000001_add_updated_at_to_oncall_responses;
 
 #[cfg(test)]
 pub(crate) async fn create_scheduled_jobs_for_test(
@@ -450,7 +449,6 @@ impl MigratorTrait for Migrator {
             Box::new(m20260813_000001_create_oncall_unavailability::Migration),
             Box::new(m20260824_000001_add_incident_acknowledged_columns::Migration),
             Box::new(m20260831_000001_add_exhausted_at_to_oncall_responses::Migration),
-            Box::new(m20260911_000001_add_updated_at_to_oncall_responses::Migration),
         ]
     }
 }

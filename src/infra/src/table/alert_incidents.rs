@@ -142,6 +142,11 @@ pub async fn create_and_attach_to_oncall_response(
             oncall_responses::Column::IncidentId,
             Expr::value(incident.id.clone()),
         )
+        // Writes the record, so it moves the revision a replica orders snapshots by.
+        .col_expr(
+            oncall_responses::Column::UpdatedAt,
+            super::oncall_responses::next_revision(config::utils::time::now_micros()),
+        )
         .filter(oncall_responses::Column::OrgId.eq(org_id))
         .filter(oncall_responses::Column::Id.eq(response_id))
         .filter(oncall_responses::Column::IncidentId.is_null())

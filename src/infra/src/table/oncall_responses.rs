@@ -26,7 +26,7 @@ use config::{
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, FromQueryResult, PaginatorTrait,
     QueryFilter, QueryOrder, QuerySelect, Select, Set,
-    sea_query::{Expr, ExprTrait},
+    sea_query::{Expr, ExprTrait, SimpleExpr},
 };
 
 use super::entity::{oncall_response_events, oncall_responses};
@@ -66,14 +66,54 @@ fn to_response(m: oncall_responses::Model) -> Option<Response> {
     })
 }
 
+/// The next revision for a record, computed by the database rather than here.
+///
+/// A wall-clock stamp assigned in Rust is not ordered by commit: a write that
+/// prepares one and then waits on the pool can commit behind a later write that
+/// took a lower reading, and two nodes whose clocks differ regress it with no
+/// concurrency at all. Either way the source row ends up labelled below the
+/// replica's high-water mark, and every snapshot after it is refused as stale
+/// until something climbs back over — which, for a page somebody has answered,
+/// may be never.
+///
+/// `CASE` rather than `GREATEST`: sqlite has no `GREATEST` and postgres has no
+/// two-argument `MAX`.
+pub(super) fn next_revision(now: i64) -> SimpleExpr {
+    Expr::case(
+        Expr::col(oncall_responses::Column::UpdatedAt).gte(now),
+        Expr::col(oncall_responses::Column::UpdatedAt).add(1),
+    )
+    .finally(now)
+    .into()
+}
+
 /// Applies one record edit, moving the revision a replica orders snapshots by.
 ///
-/// Every mutating path goes through it: a write that forgot to move the
-/// revision would be refused by the replica as stale, and the two regions would
-/// silently disagree about who holds the page.
-async fn save(mut model: oncall_responses::ActiveModel) -> Result<Option<Response>, errors::Error> {
-    model.updated_at = Set(now_micros());
-    Ok(to_response(model.update(get_orm_client_rw().await).await?))
+/// Every mutating path goes through it, or through a `col_expr` that calls
+/// [`next_revision`] itself: a write that forgot to move the revision would be
+/// refused by the replica as stale, and the two regions would silently disagree
+/// about who holds the page.
+///
+/// Reads the row back rather than returning what was sent, because the revision
+/// is computed in SQL — the caller cannot otherwise know the label its snapshot
+/// will be published under.
+async fn save(
+    org_id: &str,
+    id: &str,
+    columns: Vec<(oncall_responses::Column, SimpleExpr)>,
+) -> Result<Option<Response>, errors::Error> {
+    let mut query = oncall_responses::Entity::update_many()
+        .col_expr(
+            oncall_responses::Column::UpdatedAt,
+            next_revision(now_micros()),
+        )
+        .filter(oncall_responses::Column::Id.eq(id))
+        .filter(oncall_responses::Column::OrgId.eq(org_id));
+    for (column, value) in columns {
+        query = query.col_expr(column, value);
+    }
+    query.exec(get_orm_client_rw().await).await?;
+    get(org_id, id).await
 }
 
 fn to_event(m: oncall_response_events::Model) -> Option<ResponseEvent> {
@@ -496,9 +536,12 @@ pub async fn mark_exhausted(
     if existing.exhausted_at.is_some() {
         return Ok(to_response(existing));
     }
-    let mut model: oncall_responses::ActiveModel = existing.into();
-    model.exhausted_at = Set(Some(at));
-    save(model).await
+    save(
+        org_id,
+        id,
+        vec![(oncall_responses::Column::ExhaustedAt, Expr::value(at))],
+    )
+    .await
 }
 
 pub async fn snooze(
@@ -520,7 +563,6 @@ pub async fn snooze(
         existing.opened_at,
         existing.snoozed_until,
     );
-    let mut model: oncall_responses::ActiveModel = existing.into();
     let anchor = config::meta::oncall::response::snoozed_ladder_anchor(
         existing_anchor,
         opened_at,
@@ -528,9 +570,15 @@ pub async fn snooze(
         from,
         until,
     );
-    model.snoozed_until = Set(Some(until));
-    model.ladder_anchor = Set(Some(anchor));
-    save(model).await
+    save(
+        org_id,
+        id,
+        vec![
+            (oncall_responses::Column::SnoozedUntil, Expr::value(until)),
+            (oncall_responses::Column::LadderAnchor, Expr::value(anchor)),
+        ],
+    )
+    .await
 }
 
 /// Writes a new severity onto an open record.
@@ -543,17 +591,14 @@ pub async fn set_priority(
     id: &str,
     priority: i32,
 ) -> Result<Option<Response>, errors::Error> {
-    let client = get_orm_client_rw().await;
-    let Some(existing) = oncall_responses::Entity::find_by_id(id)
-        .filter(oncall_responses::Column::OrgId.eq(org_id))
-        .one(client)
-        .await?
-    else {
-        return Ok(None);
-    };
-    let mut model: oncall_responses::ActiveModel = existing.into();
-    model.priority = Set(priority);
-    save(model).await
+    // No existence read: `save` filters on the same key, and reads the row back,
+    // so a record that is not there comes back as `None` from one round trip.
+    save(
+        org_id,
+        id,
+        vec![(oncall_responses::Column::Priority, Expr::value(priority))],
+    )
+    .await
 }
 
 /// Moves a record to another team and starts its ladder again.
@@ -637,7 +682,7 @@ async fn hand_over(
         )
         .col_expr(
             oncall_responses::Column::UpdatedAt,
-            Expr::value(now_micros()),
+            next_revision(now),
         )
         .filter(oncall_responses::Column::Id.eq(id))
         .filter(oncall_responses::Column::OrgId.eq(org_id))
@@ -753,6 +798,7 @@ pub async fn acknowledge(
     user_email: &str,
 ) -> Result<Option<Response>, errors::Error> {
     let client = get_orm_client_rw().await;
+    let now = now_micros();
     oncall_responses::Entity::update_many()
         .col_expr(
             oncall_responses::Column::State,
@@ -762,11 +808,8 @@ pub async fn acknowledge(
             oncall_responses::Column::AckedBy,
             Expr::value(user_email.to_string()),
         )
-        .col_expr(oncall_responses::Column::AckedAt, Expr::value(now_micros()))
-        .col_expr(
-            oncall_responses::Column::UpdatedAt,
-            Expr::value(now_micros()),
-        )
+        .col_expr(oncall_responses::Column::AckedAt, Expr::value(now))
+        .col_expr(oncall_responses::Column::UpdatedAt, next_revision(now))
         .filter(oncall_responses::Column::Id.eq(id))
         .filter(oncall_responses::Column::OrgId.eq(org_id))
         .filter(oncall_responses::Column::State.is_in(escalating_states()))
@@ -819,25 +862,37 @@ pub async fn resolve(
         if cause.is_none() && note.is_none() {
             return Ok(to_response(existing));
         }
-        let mut model: oncall_responses::ActiveModel = existing.into();
-        if let Some(c) = cause {
-            model.cause = Set(Some(c.as_str().to_string()));
-        }
-        if let Some(n) = note {
-            model.cause_note = Set(Some(n.to_string()));
-        }
-        return save(model).await;
+        return save(org_id, id, cause_columns(cause, note)).await;
     }
-    let mut model: oncall_responses::ActiveModel = existing.into();
-    model.state = Set(ResponseState::Resolved.to_i32());
-    model.closed_at = Set(Some(now_micros()));
+    let mut columns = vec![
+        (
+            oncall_responses::Column::State,
+            Expr::value(ResponseState::Resolved.to_i32()),
+        ),
+        (
+            oncall_responses::Column::ClosedAt,
+            Expr::value(now_micros()),
+        ),
+    ];
+    columns.extend(cause_columns(cause, note));
+    save(org_id, id, columns).await
+}
+
+/// The cause and its note, each written only when the caller supplied one — a
+/// resolve that says nothing about the cause must not erase one recorded
+/// earlier.
+fn cause_columns(
+    cause: Option<ResolutionCause>,
+    note: Option<&str>,
+) -> Vec<(oncall_responses::Column, SimpleExpr)> {
+    let mut columns = Vec::new();
     if let Some(c) = cause {
-        model.cause = Set(Some(c.as_str().to_string()));
+        columns.push((oncall_responses::Column::Cause, Expr::value(c.as_str())));
     }
     if let Some(n) = note {
-        model.cause_note = Set(Some(n.to_string()));
+        columns.push((oncall_responses::Column::CauseNote, Expr::value(n)));
     }
-    save(model).await
+    columns
 }
 
 pub async fn attach_incident(
@@ -845,17 +900,15 @@ pub async fn attach_incident(
     id: &str,
     incident_id: &str,
 ) -> Result<Option<Response>, errors::Error> {
-    let client = get_orm_client_rw().await;
-    let Some(existing) = oncall_responses::Entity::find_by_id(id)
-        .filter(oncall_responses::Column::OrgId.eq(org_id))
-        .one(client)
-        .await?
-    else {
-        return Ok(None);
-    };
-    let mut model: oncall_responses::ActiveModel = existing.into();
-    model.incident_id = Set(Some(incident_id.to_string()));
-    save(model).await
+    save(
+        org_id,
+        id,
+        vec![(
+            oncall_responses::Column::IncidentId,
+            Expr::value(incident_id),
+        )],
+    )
+    .await
 }
 
 /// The paging record for an incident, newest firing first. Keyed on the column
@@ -924,11 +977,27 @@ pub(super) async fn add_event_in<C: ConnectionTrait>(
     }
     // Only a delivery row can have collided, so every key column below is known to hold a value.
     //
-    // Filtered on `At` because the queue redelivers an unacked message behind
-    // the ones that overtook it: replaying the failed attempt over its own
-    // successful retry would leave the ledger reading `delivered: false` for a
-    // page that landed, and `is_delivery_of` would let the next tick send it
-    // again.
+    // The guard is asymmetric because `at` is the tick's clock, stamped before
+    // the transport is called — so it orders attempts by which dispatch started
+    // first, never by which one landed. Two dispatches of one rung overlap
+    // whenever a lease expires under a worker that is still sending.
+    //
+    // A success therefore applies even when its stamp is older, unless the row
+    // already records one; a failure applies only when it is newer AND the row
+    // is not already a success. Once a page has landed, nothing may say it did
+    // not: `is_delivery_of` answers on `delivered`, and a cleared flag puts the
+    // recipient back in the next promotion's delta.
+    // Spelled with an explicit `IS NULL` arm: `NOT (delivered = TRUE)` is NULL
+    // rather than true for a NULL column, which would freeze the row instead.
+    let not_delivered = oncall_response_events::Column::Delivered
+        .ne(true)
+        .or(oncall_response_events::Column::Delivered.is_null());
+    let newer = oncall_response_events::Column::At.lte(event.at);
+    let guard = if event.delivered == Some(true) {
+        not_delivered.or(newer)
+    } else {
+        newer.and(not_delivered)
+    };
     oncall_response_events::Entity::update_many()
         .col_expr(oncall_response_events::Column::At, Expr::value(event.at))
         .col_expr(
@@ -948,7 +1017,7 @@ pub(super) async fn add_event_in<C: ConnectionTrait>(
         .filter(oncall_response_events::Column::RungMicros.eq(event.rung_micros))
         .filter(oncall_response_events::Column::Recipient.eq(event.recipient.clone()))
         .filter(oncall_response_events::Column::Channel.eq(event.channel.map(|c| c.to_i32())))
-        .filter(oncall_response_events::Column::At.lte(event.at))
+        .filter(guard)
         .exec(conn)
         .await?;
     Ok(())
