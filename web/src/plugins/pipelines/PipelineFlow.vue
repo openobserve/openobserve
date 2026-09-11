@@ -283,12 +283,12 @@ export default {
     onMounted(async () => {
       setTimeout(fitToNodes, 100);
     });
-    // < lg existing pipelines load nodes after the mount-time fit, so desktop-saved coordinates land off-screen.
+    // < lg a loaded pipeline (a new object, not a node pushed by the user) re-fits: desktop-saved coordinates land off-screen.
     const { lgUp } = useBreakpoint();
     watch(
-      () => pipelineObj.currentSelectedPipeline.nodes.length,
-      (len, prev) => {
-        if (!lgUp.value && len > 0 && !prev) setTimeout(fitToNodes, 100);
+      () => pipelineObj.currentSelectedPipeline,
+      (pipeline) => {
+        if (!lgUp.value && pipeline?.nodes?.length) setTimeout(fitToNodes, 100);
       },
     );
 
