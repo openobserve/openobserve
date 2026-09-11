@@ -288,11 +288,112 @@ describe("HostsPage", () => {
       expect(cool.text()).toContain("42");
     });
 
-    it("exposes the used/total-GB tooltip on the memory cell", async () => {
+    it("prints the absolute used/total memory in the cell, not only on hover", async () => {
       wrapper = await mountPage();
-      const mem = wrapper.find('[data-test="hosts-cell-memory-web-01"]');
-      expect(mem.attributes("title")).toContain("GB");
-      expect(mem.attributes("title")).toContain("/");
+      const abs = wrapper.find('[data-test="hosts-memory-absolute-web-01"]');
+      expect(abs.exists()).toBe(true);
+      // 8e9 / 16e9 through the shared base-1024 byte scaler.
+      expect(abs.text()).toBe("7.5GB / 14.9GB");
+    });
+
+    it("scales the absolutes per host instead of forcing GB", async () => {
+      hostsListState.pagedRows.value = [
+        makeRow({ host_name: "tiny", memoryUsedBytes: 300_000_000, memoryTotalBytes: 900_000_000 }),
+        makeRow({ host_name: "huge", memoryUsedBytes: 4e12, memoryTotalBytes: 8e12 }),
+      ];
+      wrapper = await mountPage();
+      expect(wrapper.find('[data-test="hosts-memory-absolute-tiny"]').text()).toBe(
+        "286.1MB / 858.3MB",
+      );
+      expect(wrapper.find('[data-test="hosts-memory-absolute-huge"]').text()).toBe("3.6TB / 7.3TB");
+    });
+
+    it.each([
+      ["used", { memoryUsedBytes: null }],
+      ["total", { memoryTotalBytes: null }],
+    ])("renders no absolutes when %s bytes is missing", async (_label, over) => {
+      hostsListState.pagedRows.value = [makeRow({ host_name: "partial", ...over })];
+      wrapper = await mountPage();
+      expect(wrapper.find('[data-test="hosts-memory-absolute-partial"]').exists()).toBe(false);
+      // The percentage is still a real reading, so the cell must not fall back to the em-dash.
+      expect(wrapper.find('[data-test="hosts-cell-memory-partial"]').text()).toContain("50%");
+    });
+
+    it("keeps the bar and percentage alongside the absolutes", async () => {
+      wrapper = await mountPage();
+      const cell = wrapper.find('[data-test="hosts-cell-memory-web-01"]');
+      expect(cell.find('[role="progressbar"]').exists()).toBe(true);
+      expect(cell.find("span.tabular-nums").text()).toBe("75%");
+      expect(cell.find('[data-test="hosts-memory-absolute-web-01"]').exists()).toBe(true);
+    });
+  });
+
+  describe("utilization bars", () => {
+    it.each([
+      ["cpu", 95],
+      ["memory", 75],
+      ["disk", 45],
+    ])("renders a bar alongside the %s number", async (column, value) => {
+      wrapper = await mountPage();
+      const cell = wrapper.find(`[data-test="hosts-cell-${column}-web-01"]`);
+      const bar = cell.find('[role="progressbar"]');
+      expect(bar.exists()).toBe(true);
+      expect(bar.attributes("aria-valuenow")).toBe(String(value));
+      // The bar is an addition, never a replacement — the digits stay readable and sortable.
+      expect(cell.text()).toContain(`${value}%`);
+    });
+
+    it("keeps the numeric value in tabular numerals so columns line up", async () => {
+      wrapper = await mountPage();
+      const value = wrapper.find('[data-test="hosts-cell-cpu-web-01"] span.tabular-nums');
+      expect(value.exists()).toBe(true);
+      expect(value.text()).toBe("95%");
+    });
+
+    it("gives the bar the same threshold semantics as the number", async () => {
+      wrapper = await mountPage();
+      const hot = wrapper.findComponent({ name: "OProgressBar" });
+      expect(hot.props("variant")).toBe("danger");
+
+      const warnCell = wrapper.find('[data-test="hosts-cell-memory-web-01"]');
+      expect(warnCell.findComponent({ name: "OProgressBar" }).props("variant")).toBe("warning");
+      expect(warnCell.find("span.tabular-nums").classes()).toContain("text-warning");
+
+      const coolCell = wrapper.find('[data-test="hosts-cell-cpu-web-02"]');
+      expect(coolCell.findComponent({ name: "OProgressBar" }).props("variant")).toBe("default");
+      expect(coolCell.find("span.tabular-nums").classes()).not.toContain("text-warning");
+    });
+
+    it("draws no bar for a null reading but still prints the em-dash", async () => {
+      wrapper = await mountPage();
+      const cell = wrapper.find('[data-test="hosts-cell-cpu-db-01"]');
+      expect(cell.find('[role="progressbar"]').exists()).toBe(false);
+      expect(cell.text()).toContain("—");
+    });
+
+    it("keeps the % columns sortable on their accessorKey through the custom cell", async () => {
+      wrapper = await mountPage();
+      const columns = wrapper.findComponent({ name: "OTable" }).props("columns") as any[];
+      for (const [id, accessorKey] of [
+        ["cpu", "cpu"],
+        ["memory", "memoryPct"],
+        ["disk", "disk"],
+      ]) {
+        const col = columns.find((c) => c.id === id);
+        expect(col.sortable).toBe(true);
+        expect(col.accessorKey).toBe(accessorKey);
+        expect(col.meta.align).toBe("right");
+      }
+    });
+
+    it("routes a sort on a bar column back through the field map", async () => {
+      wrapper = await mountPage();
+      wrapper
+        .findComponent({ name: "OTable" })
+        .vm.$emit("sort-change", { column: "memory", order: "asc" });
+      await flushPromises();
+      expect(hostsListState.sortBy.value).toBe("memoryPct");
+      expect(hostsListState.sortDesc.value).toBe(false);
     });
   });
 
@@ -394,6 +495,35 @@ describe("HostsPage", () => {
         "hosts-facet-status-INACTIVE",
         "hosts-facet-status-UNKNOWN",
       ]);
+    });
+
+    it("pads every facet row by the same step so the group reads as one column", async () => {
+      wrapper = await mountPage();
+      const rows = wrapper.findAll(
+        '[data-test^="hosts-facet-status-"], [data-test^="hosts-facet-os-"]',
+      );
+      expect(rows.length).toBeGreaterThan(0);
+      // The heading shares this inline padding, so heading and label sit on one edge.
+      for (const row of rows) expect(row.classes()).toContain("px-2");
+    });
+
+    it("renders each count as a chip in its own row, not a loose right-edge number", async () => {
+      wrapper = await mountPage();
+      const row = wrapper.find('[data-test="hosts-facet-os-linux"]');
+      const chip = row.findComponent({ name: "OTag" });
+      expect(chip.exists()).toBe(true);
+      expect(chip.props("type")).toBe("countChip");
+      expect(row.text()).toContain("linux");
+      expect(row.text()).toContain("2");
+    });
+
+    it("marks a checked facet row so the selection is visible on the row, not just the box", async () => {
+      wrapper = await mountPage();
+      const row = () => wrapper.find('[data-test="hosts-facet-status-ACTIVE"]');
+      expect(row().classes()).not.toContain("bg-surface-subtle");
+      hostsListState.statusFilter.value = ["ACTIVE"];
+      await flushPromises();
+      expect(row().classes()).toContain("bg-surface-subtle");
     });
   });
 

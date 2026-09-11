@@ -33,12 +33,15 @@ import OText from "@/lib/core/Typography/OText.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
+import type { ProgressBarVariant } from "@/lib/data/ProgressBar/OProgressBar.types";
 import DateTime from "@/components/DateTime.vue";
 import DataSourceSetupCard from "@/components/ingestion/setupCard/DataSourceSetupCard.vue";
 import HostDetailDrawer from "./HostDetailDrawer.vue";
 import { useHostsList, utilizationTint, type HostRow } from "./useHostsList";
 import { HOSTS_DEFAULT_RELATIVE_PERIOD, HOSTS_DEFAULT_WINDOW_US } from "./hostsQueries";
 import { useWorkloadDetection } from "@/composables/useWorkloadDetection";
+import { formatUnitValue, getUnitValue } from "@/utils/dashboard/convertDataIntoUnitValue";
 
 const store = useStore();
 const route = useRoute();
@@ -221,11 +224,13 @@ const columns = computed<OTableColumnDef<HostRow>[]>(() => [
     size: 110,
     sortable: true,
   },
+  // Wider than a bare "100%" — the utilization bar shares the cell with the number.
   {
     id: "cpu",
     header: t("infra.hosts.columnCpu"),
     accessorKey: "cpu",
-    size: 96,
+    size: 150,
+    minSize: 110,
     sortable: true,
     meta: { align: "right" },
   },
@@ -233,7 +238,8 @@ const columns = computed<OTableColumnDef<HostRow>[]>(() => [
     id: "memory",
     header: t("infra.hosts.columnMemory"),
     accessorKey: "memoryPct",
-    size: 110,
+    size: 150,
+    minSize: 110,
     sortable: true,
     meta: { align: "right" },
   },
@@ -241,7 +247,8 @@ const columns = computed<OTableColumnDef<HostRow>[]>(() => [
     id: "disk",
     header: t("infra.hosts.columnDisk"),
     accessorKey: "disk",
-    size: 96,
+    size: 150,
+    minSize: 110,
     sortable: true,
     meta: { align: "right" },
   },
@@ -288,15 +295,26 @@ const tintClass = (value: number | null) => {
   return tint === "critical" ? "text-error font-medium" : tint === "warn" ? "text-warning" : "";
 };
 
+// Bar tone reads the same utilizationTint as the number, so the two can never disagree.
+const tintVariant = (value: number | null): ProgressBarVariant => {
+  const tint = utilizationTint(value);
+  return tint === "critical" ? "danger" : tint === "warn" ? "warning" : "default";
+};
+
+const barValue = (value: number | null) => (value == null ? 0 : value / 100);
+
 const pct = (value: number | null) => (value == null ? raw("—") : raw(`${Math.round(value)}%`));
 const num = (value: number | null) => (value == null ? raw("—") : raw(value.toFixed(2)));
-const gb = (bytes: number) => (bytes / 1e9).toFixed(1);
 
-const memoryTooltip = (row: HostRow) =>
+// The shared dashboard byte scaler, so a 900MB container and a 512GB host both read correctly.
+const bytes = (value: number) => formatUnitValue(getUnitValue(value, "bytes", "", 1));
+
+// Either byte value missing means no absolutes — the percentage already carries the em-dash.
+const memoryAbsolute = (row: HostRow) =>
   row.memoryUsedBytes != null && row.memoryTotalBytes != null
-    ? t("infra.hosts.memoryTooltip", {
-        used: gb(row.memoryUsedBytes),
-        total: gb(row.memoryTotalBytes),
+    ? t("infra.hosts.memoryAbsolute", {
+        used: bytes(row.memoryUsedBytes),
+        total: bytes(row.memoryTotalBytes),
       })
     : undefined;
 
@@ -404,47 +422,65 @@ const osToggleLabel = (slug: string) =>
 
       <div class="flex min-h-0 flex-1 gap-4">
         <!-- Facet rail — fixed order; UNKNOWN appends last only when present. -->
-        <div class="flex w-52 shrink-0 flex-col gap-4 overflow-y-auto">
+        <div class="w-rail flex shrink-0 flex-col gap-3 overflow-y-auto px-2">
           <OSearchInput
             v-model="nameFilter"
             :placeholder="t('infra.hosts.filterPlaceholder')"
             data-test="hosts-name-filter"
           />
-          <div class="flex flex-col gap-1">
-            <OText variant="label" class="font-semibold">{{ t("infra.hosts.statusFacet") }}</OText>
+          <section class="flex flex-col gap-1">
+            <OText variant="label" class="px-2 font-semibold">{{
+              t("infra.hosts.statusFacet")
+            }}</OText>
             <div
               v-for="facet in facets.status"
               :key="facet.value"
               :data-test="`hosts-facet-status-${facet.value}`"
-              class="flex items-center justify-between gap-2 py-0.5"
+              class="rounded-default hover:bg-surface-subtle flex items-center justify-between gap-2 px-2 py-1"
+              :class="statusFilter.includes(facet.value) ? 'bg-surface-subtle' : ''"
             >
               <OCheckbox
                 :model-value="statusFilter.includes(facet.value)"
                 size="sm"
-                :label="statusLabel(facet.value)"
+                class="min-w-0 flex-1"
                 @update:model-value="toggleStatus(facet.value)"
-              />
-              <span class="text-text-secondary text-xs">{{ facet.count }}</span>
+              >
+                <template #label>
+                  <span class="truncate text-xs">{{ statusLabel(facet.value) }}</span>
+                </template>
+              </OCheckbox>
+              <OTag type="countChip" value="neutral" size="xs" shape="rounded">{{
+                facet.count
+              }}</OTag>
             </div>
-          </div>
-          <div v-if="facets.os.length" class="flex flex-col gap-1">
-            <OText variant="label" class="font-semibold">{{ t("infra.hosts.osFacet") }}</OText>
+          </section>
+          <section v-if="facets.os.length" class="flex flex-col gap-1">
+            <OText variant="label" class="px-2 font-semibold">{{ t("infra.hosts.osFacet") }}</OText>
             <div
               v-for="facet in facets.os"
               :key="facet.value"
               :data-test="`hosts-facet-os-${facet.value}`"
-              class="flex items-center justify-between gap-2 py-0.5"
+              class="rounded-default hover:bg-surface-subtle flex items-center justify-between gap-2 px-2 py-1"
+              :class="osFilter.includes(facet.value) ? 'bg-surface-subtle' : ''"
             >
               <OCheckbox
                 :model-value="osFilter.includes(facet.value)"
                 size="sm"
-                :label="raw(facet.value)"
+                class="min-w-0 flex-1"
                 @update:model-value="toggleOs(facet.value)"
-              />
-              <span class="text-text-secondary text-xs">{{ facet.count }}</span>
+              >
+                <template #label>
+                  <span class="truncate text-xs" :title="raw(facet.value)">{{
+                    raw(facet.value)
+                  }}</span>
+                </template>
+              </OCheckbox>
+              <OTag type="countChip" value="neutral" size="xs" shape="rounded">{{
+                facet.count
+              }}</OTag>
             </div>
-          </div>
-          <OText variant="meta">{{ t("infra.hosts.rangeNote") }}</OText>
+          </section>
+          <OText variant="meta" class="px-2 pb-2">{{ t("infra.hosts.rangeNote") }}</OText>
         </div>
 
         <div class="min-h-0 flex-1">
@@ -491,29 +527,70 @@ const osToggleLabel = (slug: string) =>
               >
             </template>
             <template #cell-cpu="{ row }">
-              <span
+              <div
+                class="flex w-full min-w-0 items-center justify-end gap-2"
                 :data-test="`hosts-cell-cpu-${row.host_name}`"
                 :data-tint="utilizationTint(row.cpu)"
-                :class="tintClass(row.cpu)"
-                >{{ pct(row.cpu) }}</span
               >
+                <OProgressBar
+                  v-if="row.cpu != null"
+                  size="xs"
+                  class="min-w-0 flex-1"
+                  :value="barValue(row.cpu)"
+                  :variant="tintVariant(row.cpu)"
+                  :data-test="`hosts-bar-cpu-${row.host_name}`"
+                />
+                <span class="shrink-0 tabular-nums" :class="tintClass(row.cpu)">{{
+                  pct(row.cpu)
+                }}</span>
+              </div>
             </template>
             <template #cell-memory="{ row }">
-              <span
+              <div
+                class="flex w-full min-w-0 flex-col items-end"
                 :data-test="`hosts-cell-memory-${row.host_name}`"
                 :data-tint="utilizationTint(row.memoryPct)"
-                :class="tintClass(row.memoryPct)"
-                :title="memoryTooltip(row)"
-                >{{ pct(row.memoryPct) }}</span
               >
+                <div class="flex w-full min-w-0 items-center justify-end gap-2">
+                  <OProgressBar
+                    v-if="row.memoryPct != null"
+                    size="xs"
+                    class="min-w-0 flex-1"
+                    :value="barValue(row.memoryPct)"
+                    :variant="tintVariant(row.memoryPct)"
+                    :data-test="`hosts-bar-memory-${row.host_name}`"
+                  />
+                  <span class="shrink-0 tabular-nums" :class="tintClass(row.memoryPct)">{{
+                    pct(row.memoryPct)
+                  }}</span>
+                </div>
+                <OText
+                  v-if="memoryAbsolute(row)"
+                  variant="meta"
+                  class="text-2xs tabular-nums"
+                  :data-test="`hosts-memory-absolute-${row.host_name}`"
+                  >{{ memoryAbsolute(row) }}</OText
+                >
+              </div>
             </template>
             <template #cell-disk="{ row }">
-              <span
+              <div
+                class="flex w-full min-w-0 items-center justify-end gap-2"
                 :data-test="`hosts-cell-disk-${row.host_name}`"
                 :data-tint="utilizationTint(row.disk)"
-                :class="tintClass(row.disk)"
-                >{{ pct(row.disk) }}</span
               >
+                <OProgressBar
+                  v-if="row.disk != null"
+                  size="xs"
+                  class="min-w-0 flex-1"
+                  :value="barValue(row.disk)"
+                  :variant="tintVariant(row.disk)"
+                  :data-test="`hosts-bar-disk-${row.host_name}`"
+                />
+                <span class="shrink-0 tabular-nums" :class="tintClass(row.disk)">{{
+                  pct(row.disk)
+                }}</span>
+              </div>
             </template>
             <template #cell-load="{ row }">
               <span>{{ num(row.load) }}</span>
