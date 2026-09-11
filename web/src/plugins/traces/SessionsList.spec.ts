@@ -11,7 +11,7 @@ import { ref } from "vue";
 // Reactive state that tests can mutate to drive component rendering
 const mockSessions = ref<any[]>([]);
 const mockTotal = ref(0);
-const mockTotalIsExact = ref(true);
+const mockHasMore = ref(false);
 const mockLoading = ref(false);
 const mockError = ref<string | null>(null);
 const mockHasLoadedOnce = ref(false);
@@ -21,6 +21,10 @@ const mockLastRunAt = ref<number | null>(null);
 const mockLoadedOrg = ref<string | null>(null);
 const mockCurrentPage = ref(1);
 const mockRowsPerPage = ref(20);
+const mockSortBy = ref("end_time");
+const mockSortOrder = ref<"asc" | "desc">("desc");
+// Applied search term — module-scoped in the real composable, like the pagination.
+const mockSearchKeyword = ref("");
 const mockAgents = ref<any[]>([]);
 const mockAgentsLoaded = ref(false);
 const mockFetchPage = vi.fn();
@@ -30,11 +34,19 @@ const mockRouterPush = vi.fn();
 const mockRouterReplace = vi.fn(() => Promise.resolve());
 let mockRouteQuery: Record<string, any> = {};
 
+// The real module pulls in the streaming-search stack (vuex store et al), so
+// the term helper the component imports is mirrored here instead of pulled
+// from `importOriginal`.
 vi.mock("./composables/useSessions", () => ({
+  SESSION_SEARCH_MAX_LEN: 256,
+  normalizeSearchTerm: (raw: string) =>
+    String(raw ?? "")
+      .trim()
+      .slice(0, 256),
   useSessions: vi.fn(() => ({
     sessions: mockSessions,
     total: mockTotal,
-    totalIsExact: mockTotalIsExact,
+    hasMore: mockHasMore,
     loading: mockLoading,
     error: mockError,
     hasLoadedOnce: mockHasLoadedOnce,
@@ -42,6 +54,9 @@ vi.mock("./composables/useSessions", () => ({
     loadedOrg: mockLoadedOrg,
     currentPage: mockCurrentPage,
     rowsPerPage: mockRowsPerPage,
+    searchKeyword: mockSearchKeyword,
+    sortBy: mockSortBy,
+    sortOrder: mockSortOrder,
     agents: mockAgents,
     agentsLoaded: mockAgentsLoaded,
     fetchPage: mockFetchPage,
@@ -94,8 +109,20 @@ vi.mock("vuex", () => ({
 vi.mock("@/lib/core/Table/OTable.vue", () => ({
   default: {
     name: "OTable",
-    props: ["data", "columns", "loading", "rowKey", "totalCount", "totalCountExact", "footerTitle"],
-    emits: ["row-click"],
+    props: [
+      "data",
+      "columns",
+      "loading",
+      "rowKey",
+      "totalCount",
+      "totalCountExact",
+      "footerTitle",
+      "sorting",
+      "sortBy",
+      "sortOrder",
+      "sortFieldMap",
+    ],
+    emits: ["row-click", "sort-change"],
     // Mirrors the OTable contract the component relies on: a loading state, one
     // row per item, the `#empty` slot when there are no rows, and a footer that
     // surfaces the server-side total (the old count pill now lives here).
@@ -230,7 +257,7 @@ beforeEach(() => {
   localStorage.clear();
   mockSessions.value = [];
   mockTotal.value = 0;
-  mockTotalIsExact.value = true;
+  mockHasMore.value = false;
   mockLoading.value = false;
   mockError.value = null;
   mockHasLoadedOnce.value = false;
@@ -238,6 +265,9 @@ beforeEach(() => {
   mockLoadedOrg.value = null;
   mockCurrentPage.value = 1;
   mockRowsPerPage.value = 20;
+  mockSearchKeyword.value = "";
+  mockSortBy.value = "end_time";
+  mockSortOrder.value = "desc";
   mockAgents.value = [];
   mockAgentsLoaded.value = false;
   mockRouteQuery = {};
@@ -364,6 +394,48 @@ describe("SessionsList — sessions table", () => {
     expect(wrapper.text()).not.toContain("2023-11-14 22:13:20");
   });
 
+  it("uses server sorting and reloads the first page with the selected field", async () => {
+    mockRouteQuery = { type: "stream" };
+    mockCurrentPage.value = 3;
+    const wrapper = await mountComponent();
+    const table = wrapper.findComponent({ name: "OTable" });
+
+    expect(table.props("sorting")).toBe("server");
+    expect(table.props("sortBy")).toBe("end_time");
+    expect(table.props("sortOrder")).toBe("desc");
+    expect(table.props("sortFieldMap")).toMatchObject({
+      turns: "trace_count",
+      durationNanos: "duration",
+      tokens: "gen_ai_usage_total_tokens",
+      lastSeenNanos: "end_time",
+    });
+
+    mockFetchPage.mockClear();
+    table.vm.$emit("sort-change", { column: "trace_count", order: "asc" });
+    await flushPromises();
+
+    expect(mockSortBy.value).toBe("trace_count");
+    expect(mockSortOrder.value).toBe("asc");
+    expect(mockCurrentPage.value).toBe(1);
+    expect(mockFetchPage).toHaveBeenCalledWith("test-stream", 1000, 2000, 0, 20, "", undefined);
+  });
+
+  it("cycles a descending server sort back to ascending instead of clearing it", async () => {
+    mockRouteQuery = { type: "stream" };
+    mockSortBy.value = "gen_ai_usage_cost";
+    mockSortOrder.value = "desc";
+    const wrapper = await mountComponent();
+    const table = wrapper.findComponent({ name: "OTable" });
+
+    mockFetchPage.mockClear();
+    table.vm.$emit("sort-change", { column: "", order: "asc" });
+    await flushPromises();
+
+    expect(mockSortBy.value).toBe("gen_ai_usage_cost");
+    expect(mockSortOrder.value).toBe("asc");
+    expect(mockFetchPage).toHaveBeenCalledTimes(1);
+  });
+
   it("should fetch stream sessions with no agent filter when in stream mode", async () => {
     // Default scope is "agent" now — stream mode is opted into ONLY via the URL
     // `?type=stream` param (a stale saved preference must not land on stream).
@@ -371,7 +443,7 @@ describe("SessionsList — sessions table", () => {
     const wrapper = await mountComponent();
     await refreshComponent(wrapper);
 
-    expect(mockFetchPage).toHaveBeenCalledWith("test-stream", 1000, 2000, 0, 20, "");
+    expect(mockFetchPage).toHaveBeenCalledWith("test-stream", 1000, 2000, 0, 20, "", undefined);
   });
 
   it("should not load agents while refreshing when in stream mode", async () => {
@@ -409,11 +481,11 @@ describe("SessionsList — sessions table", () => {
     expect(footer.text()).toContain("42");
   });
 
-  it("passes lower-bound count metadata to server pagination", async () => {
+  it("derives lower-bound count metadata from has-more", async () => {
     mockHasLoadedOnce.value = true;
     mockSessions.value = [makeSession()];
     mockTotal.value = 21;
-    mockTotalIsExact.value = false;
+    mockHasMore.value = true;
 
     const wrapper = await mountComponent();
     const table = wrapper.findComponent({ name: "OTable" });
@@ -487,6 +559,7 @@ describe("SessionsList — agent filter", () => {
       0,
       20,
       `gen_ai_agent_id = 'agent-1'`,
+      undefined,
     );
   });
 
@@ -664,5 +737,157 @@ describe("SessionsList — OSS builds (neither isEnterprise nor isCloud is 'true
     const wrapper = await mountComponent();
     await flushPromises();
     expect(wrapper.findComponent(AgentScopeCascade).exists()).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// List search
+// ---------------------------------------------------------------------------
+
+describe("SessionsList — search", () => {
+  const SEARCH = "[data-test='sessions-list-search-field']";
+  const value = (wrapper: any, sel: string) =>
+    (wrapper.find(sel).element as HTMLInputElement).value;
+  const NO_SEARCH = ["test-stream", 1000, 2000, 0, 20, "", undefined] as const;
+
+  async function mountInStreamMode() {
+    mockRouteQuery = { type: "stream", ...mockRouteQuery };
+    const wrapper = await mountComponent();
+    await refreshComponent(wrapper);
+    mockFetchPage.mockClear();
+    mockRouterReplace.mockClear();
+    return wrapper;
+  }
+
+  it("renders one full-width search box on the scope row, matched against the user id or the message", async () => {
+    const wrapper = await mountInStreamMode();
+    expect(wrapper.find(SEARCH).attributes("placeholder")).toBe("Search by user or message");
+  });
+
+  // Live search, same as LogStream.vue's Streams search: the box's own
+  // `:debounce="300"` settles typing into one value before it ever reaches
+  // `searchKeyword` — no Enter/Escape affordance. Setting the mocked
+  // composable's ref directly is the same instance the component's `watch`
+  // observes, so it exercises the exact re-fetch path without fighting a real
+  // setTimeout in the test.
+  it("a settled term re-fetches page 1", async () => {
+    mockCurrentPage.value = 3;
+    const wrapper = await mountInStreamMode();
+    mockSearchKeyword.value = "luis";
+    await flushPromises();
+    expect(mockFetchPage).toHaveBeenCalledTimes(1);
+    expect(mockFetchPage).toHaveBeenCalledWith("test-stream", 1000, 2000, 0, 20, "", {
+      keyword: "luis",
+    });
+    expect(mockCurrentPage.value).toBe(1);
+    expect(value(wrapper, SEARCH)).toBe("luis");
+  });
+
+  it("debounces real typing in the box — no fetch until the input settles", async () => {
+    vi.useFakeTimers();
+    try {
+      const wrapper = await mountInStreamMode();
+      await wrapper.find(SEARCH).setValue("luis");
+      expect(mockFetchPage).not.toHaveBeenCalled();
+
+      await vi.advanceTimersByTimeAsync(300);
+      expect(mockFetchPage).toHaveBeenCalledWith("test-stream", 1000, 2000, 0, 20, "", {
+        keyword: "luis",
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("the clear control drops the term and re-fetches unfiltered", async () => {
+    mockSearchKeyword.value = "luis";
+    const wrapper = await mountInStreamMode();
+    expect(value(wrapper, SEARCH)).toBe("luis");
+
+    await wrapper.find("[data-test='sessions-list-search-clear']").trigger("click");
+    await flushPromises();
+    expect(mockSearchKeyword.value).toBe("");
+    expect(mockFetchPage).toHaveBeenCalledWith(...NO_SEARCH);
+  });
+
+  it("writes the applied term to the URL and removes it when cleared", async () => {
+    const wrapper = await mountInStreamMode();
+    mockSearchKeyword.value = "luis";
+    await flushPromises();
+    expect(mockRouterReplace).toHaveBeenLastCalledWith({
+      query: expect.objectContaining({ type: "stream", keyword: "luis" }),
+    });
+
+    await wrapper.find("[data-test='sessions-list-search-clear']").trigger("click");
+    await flushPromises();
+    const query = mockRouterReplace.mock.lastCall?.[0].query;
+    expect(query).not.toHaveProperty("keyword");
+  });
+
+  it("applies the term from the URL before the first fetch", async () => {
+    mockRouteQuery = { type: "stream", keyword: "luis" };
+    const wrapper = await mountComponent();
+    await refreshComponent(wrapper);
+    expect(value(wrapper, SEARCH)).toBe("luis");
+    expect(mockFetchPage).toHaveBeenCalledWith("test-stream", 1000, 2000, 0, 20, "", {
+      keyword: "luis",
+    });
+  });
+
+  it("a URL term that differs from the cached list bypasses the mount cache", async () => {
+    // Cached rows were fetched without a search; the pasted link carries one.
+    mockHasLoadedOnce.value = true;
+    mockLoadedOrg.value = "test-org";
+    mockRouteQuery = { type: "stream", keyword: "luis" };
+    const wrapper = await mountComponent();
+    // Non-forced mount replay — normally served from the cache.
+    await wrapper.vm.refresh(1000, 2000, false);
+    await flushPromises();
+    expect(mockFetchPage).toHaveBeenCalledWith("test-stream", 1000, 2000, 0, 20, "", {
+      keyword: "luis",
+    });
+  });
+
+  it("back navigation restores the filtered rows and the term from the singleton", async () => {
+    mockHasLoadedOnce.value = true;
+    mockLoadedOrg.value = "test-org";
+    mockSearchKeyword.value = "luis";
+    mockSessions.value = [makeSession({ sessionId: "sess-luis", userId: "luis@example.com" })];
+    mockTotal.value = 1;
+    mockRouteQuery = { type: "stream", keyword: "luis" };
+
+    const wrapper = await mountComponent();
+    await wrapper.vm.refresh(1000, 2000, false);
+    await flushPromises();
+
+    expect(mockFetchPage).not.toHaveBeenCalled();
+    expect(wrapper.find("[data-session-id='sess-luis']").exists()).toBe(true);
+    expect(value(wrapper, SEARCH)).toBe("luis");
+  });
+
+  it("shows the filtered empty state, not the first-run screen, and its Clear action re-fetches", async () => {
+    mockHasLoadedOnce.value = true;
+    mockSearchKeyword.value = "nobody";
+    const wrapper = await mountInStreamMode();
+
+    expect(wrapper.find("[data-test='sessions-empty-search']").exists()).toBe(true);
+    expect(wrapper.find("[data-test='sessions-empty']").exists()).toBe(false);
+    expect(wrapper.text()).toContain("No sessions match your search");
+
+    await wrapper.find("[data-test='sessions-empty-search'] button").trigger("click");
+    await flushPromises();
+    expect(mockSearchKeyword.value).toBe("");
+    expect(value(wrapper, SEARCH)).toBe("");
+    expect(mockFetchPage).toHaveBeenCalledWith(...NO_SEARCH);
+  });
+
+  it("keeps the term across an explicit refresh", async () => {
+    mockSearchKeyword.value = "luis";
+    const wrapper = await mountInStreamMode();
+    await refreshComponent(wrapper);
+    expect(mockSearchKeyword.value).toBe("luis");
+    expect(mockFetchPage).toHaveBeenCalledWith("test-stream", 1000, 2000, 0, 20, "", {
+      keyword: "luis",
+    });
   });
 });

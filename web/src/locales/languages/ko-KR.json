@@ -9484,7 +9484,17 @@
       "agent": "에이전트",
       "noAgentsTitle": "이 범위에 에이전트 없음",
       "noAgentsDescription": "선택한 시간 범위에서 GenAI 에이전트가 감지되지 않았습니다. 더 넓은 범위를 시도하거나 스트림 보기로 전환하세요.",
-      "viewByStream": "스트림별 보기"
+      "viewByStream": "스트림별 보기",
+      "search": {
+        "placeholderUser": "사용자로 검색",
+        "placeholderMessage": "메시지 텍스트 검색",
+        "userTitle": "사용자 ID에 텍스트가 포함된 세션 일치",
+        "messageTitle": "대화 메시지에서 텍스트 검색",
+        "noResultsTitle": "검색과 일치하는 세션이 없습니다",
+        "noResultsDescription": "다른 검색어, 다른 필드 또는 더 넓은 시간 범위를 시도하세요.",
+        "clear": "검색 지우기",
+        "pressEnter": "Enter 키를 눌러 검색"
+      }
     },
     "sessionDetail": {
       "currencySymbol": "$",

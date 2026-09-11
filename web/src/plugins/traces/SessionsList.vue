@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -63,7 +63,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :agents-loaded="agentsLoaded"
       @filter-mode-change="onFilterModeChange"
       @stream-change="onStreamChange"
-    />
+    >
+      <!-- List search — one box, matched against the user id OR the
+           conversation text server-side (whichever the stream has). Live,
+           debounced (300ms — same as the Streams list's search), same
+           pattern as LogStream.vue: no Enter/run-query affordance, a settled
+           value just re-fetches. The applied term lives in useSessions'
+           singleton next to the page/size so back-navigation restores the
+           filtered page. -->
+      <template #trailing>
+        <div class="flex min-w-0 flex-1 items-center gap-2">
+          <label :for="SEARCH_INPUT_ID" class="sr-only">
+            {{ t("traces.sessionsList.search.placeholder") }}
+          </label>
+          <OSearchInput
+            :id="SEARCH_INPUT_ID"
+            v-model="searchKeyword"
+            :placeholder="t('traces.sessionsList.search.placeholder')"
+            :title="t('traces.sessionsList.search.title')"
+            size="sm"
+            clearable
+            :debounce="300"
+            class="w-full"
+            data-test="sessions-list-search"
+          />
+        </div>
+      </template>
+    </AiScopeBar>
 
     <!-- Streams exist: OTable owns the data surface (column chooser, server-side
          pagination footer, column resize, empty/error body). The scope control
@@ -79,9 +105,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       row-key="sessionId"
       show-index
       pagination="server"
+      sorting="server"
+      :sort-by="sortBy"
+      :sort-order="sortOrder"
+      :sort-field-map="sessionSortFieldMap"
       :current-page="currentPage"
       :total-count="total"
-      :total-count-exact="totalIsExact"
+      :total-count-exact="!hasMore"
       :page-size="rowsPerPage"
       :page-size-options="rowsPerPageOptions"
       :footer-title="t('traces.sessionsList.sessions')"
@@ -96,6 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="sessions-list-table"
       @row-click="(row: any) => handleRowClick(row)"
       @pagination-change="onPaginationChange"
+      @sort-change="onSortChange"
     >
       <!-- Empty / error body — rendered inside the frame so the toolbar (and
            thus the stream selector) stays visible. -->
@@ -121,6 +152,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :description="t('traces.sessionsList.noAgentsDescription')"
           :action-label="t('traces.sessionsList.viewByStream')"
           @action="onFilterModeChange('stream')"
+        />
+        <!-- A search that matched nothing is NOT a first-run situation — the
+             stream has sessions, just none for this term — so never show the
+             "instrument your app" screen here; offer to clear the search. -->
+        <OEmptyState
+          v-else-if="searchActive"
+          size="hero"
+          illustration="no-results"
+          data-test="sessions-empty-search"
+          :title="t('traces.sessionsList.search.noResultsTitle')"
+          :description="t('traces.sessionsList.search.noResultsDescription')"
+          :action-label="t('traces.sessionsList.search.clear')"
+          @action="clearSearch"
         />
         <div v-else class="flex items-center justify-center py-12" data-test="sessions-empty">
           <OEmptyState size="hero" preset="no-llm-sessions" @action="onEmptyAction" />
@@ -220,13 +264,20 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import { useLlmTraceStreams } from "@/enterprise/composables/useLlmTraceStreams";
 import { useAgentScope } from "@/enterprise/composables/useAgentScope";
-import { useSessions, type SessionRow } from "./composables/useSessions";
+import {
+  useSessions,
+  normalizeSearchTerm,
+  type SessionRow,
+  type SessionSearch,
+} from "./composables/useSessions";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import type { AcceptableValue } from "reka-ui";
 import genAiAgentMappingService from "@/services/gen-ai-agent-mapping.service";
+import type { SessionSortField, SessionSortOrder } from "@/services/sessions";
 import { buildAgentSessionFilter } from "./llmAgentFilter";
 import { splitNumberWithUnit, splitDuration } from "./llmInsightsDashboard.utils";
 import AiScopeBar from "@/enterprise/components/AIObservability/AiScopeBar.vue";
@@ -255,7 +306,7 @@ const store = useStore();
 const {
   sessions,
   total,
-  totalIsExact,
+  hasMore,
   loading,
   error,
   hasLoadedOnce,
@@ -263,6 +314,9 @@ const {
   loadedOrg,
   currentPage,
   rowsPerPage,
+  searchKeyword,
+  sortBy,
+  sortOrder,
   agents,
   agentsLoaded,
   fetchPage,
@@ -274,6 +328,33 @@ const urlStream = typeof route.query.stream === "string" ? route.query.stream : 
 const urlAgentName = typeof route.query.agent === "string" ? route.query.agent : "";
 const urlEnv = typeof route.query.env === "string" ? route.query.env : "";
 const urlVersion = typeof route.query.version === "string" ? route.query.version : "";
+// Search deep-link: `?keyword=<term>`. Read once at setup, like the scope.
+const urlKeyword = normalizeSearchTerm(
+  typeof route.query.keyword === "string" ? route.query.keyword : "",
+);
+
+// ── List search ─────────────────────────────────────────────────────────────
+// `searchKeyword` is module-scoped in useSessions so back-navigation restores
+// the filtered page with its term, and it's the search box's own v-model —
+// there's no separate draft/applied split. The input's own `:debounce="300"`
+// (same as the Streams list's search) settles typing into one value; the
+// watch below re-fetches whenever it changes, live, same as LogStream.vue.
+// Matched server-side against the user id OR the conversation text,
+// whichever the stream has.
+const SEARCH_INPUT_ID = "sessions-list-search";
+// A term in the URL overrides whatever the singleton holds: a pasted link
+// must reproduce its filtered view. When it differs from what the cached rows
+// were fetched with, the cache guard in `loadSessions` is bypassed once so the
+// mount fetch runs with the URL's term instead of restoring the stale page.
+let searchChangedByUrl = false;
+if (urlKeyword && urlKeyword !== searchKeyword.value) {
+  searchKeyword.value = urlKeyword;
+  searchChangedByUrl = true;
+}
+const searchActive = computed(() => searchKeyword.value.length > 0);
+const activeSearch = computed<SessionSearch | undefined>(() =>
+  searchActive.value ? { keyword: searchKeyword.value || undefined } : undefined,
+);
 
 const activeStream = ref<string>(
   urlStream || localStorage.getItem(STREAM_LS_KEY) || props.streamName || "",
@@ -331,6 +412,15 @@ const pendingVersion = ref<string | null>(
 // Page-size options match the dashboards' table pagination
 // (TablePaginationControls) so the AI module stays consistent.
 const rowsPerPageOptions = [20, 50, 100, 250, 500];
+const sessionSortFieldMap: Record<string, SessionSortField> = {
+  userId: "user_id",
+  turns: "trace_count",
+  durationNanos: "duration",
+  tokens: "gen_ai_usage_total_tokens",
+  cost: "gen_ai_usage_cost",
+  status: "status",
+  lastSeenNanos: "end_time",
+};
 
 // Shared derived scope computeds come from useAgentScope. Sessions injects its
 // OWN refs so the composable only produces the derived outputs: `agents`/
@@ -579,13 +669,17 @@ function syncFilterUrl() {
     if (activeStream.value) query.stream = activeStream.value;
     else delete query.stream;
   }
+  // Only the applied term — so the filtered view has a link and survives a
+  // reload, and a cleared box leaves no stale param behind.
+  if (searchKeyword.value) query.keyword = searchKeyword.value;
+  else delete query.keyword;
   router.replace({ query }).catch(() => {});
 }
 
 function clearSessionRows() {
   sessions.value = [];
   total.value = 0;
-  totalIsExact.value = true;
+  hasMore.value = false;
 }
 
 async function loadSessions(startTime?: number, endTime?: number, force = false) {
@@ -599,8 +693,20 @@ async function loadSessions(startTime?: number, endTime?: number, force = false)
   // an explicit refresh or a real date change passes `force`. A prior error or
   // an org switch invalidates the cache so those still re-fetch.
   const orgId = store.state.selectedOrganization?.identifier || "default";
-  if (!force && hasLoadedOnce.value && !error.value && loadedOrg.value === orgId) {
+  if (
+    !force &&
+    !searchChangedByUrl &&
+    hasLoadedOnce.value &&
+    !error.value &&
+    loadedOrg.value === orgId
+  ) {
     return;
+  }
+  searchChangedByUrl = false;
+  // An org switch invalidates the list (see the guard above); the search
+  // belonged to the previous org's data, so it goes with it.
+  if (loadedOrg.value && loadedOrg.value !== orgId && searchActive.value) {
+    searchKeyword.value = "";
   }
 
   localStorage.setItem(MODE_LS_KEY, filterMode.value);
@@ -655,7 +761,24 @@ async function loadSessions(startTime?: number, endTime?: number, force = false)
     currentPage.value - 1,
     rowsPerPage.value,
     agentFilterClause.value,
+    activeSearch.value,
   );
+}
+
+// ── Search handlers ─────────────────────────────────────────────────────────
+// Live search, same pattern as LogStream.vue: the box's own `:debounce="300"`
+// settles typing into one value on `searchKeyword` (its v-model); this watch
+// is the ONLY re-fetch trigger — typing, the built-in clear (x) button, and
+// clearSearch() below all just change the ref and let this fire. No Enter /
+// Escape handling needed. `fetchPage` drops the response of any run a later
+// change supersedes.
+watch(searchKeyword, () => {
+  currentPage.value = 1;
+  loadSessions(undefined, undefined, true);
+});
+
+function clearSearch() {
+  searchKeyword.value = "";
 }
 
 // Filter / pagination changes are deliberate user actions — force a re-fetch
@@ -701,6 +824,16 @@ function onPaginationChange({ page, size }: { page: number; size: number }) {
   } else {
     currentPage.value = page;
   }
+  loadSessions(undefined, undefined, true);
+}
+
+function onSortChange({ column, order }: { column: string; order: SessionSortOrder }) {
+  // OTable's third state clears the column. This list is always ordered, so
+  // fold that state back to ascending on the same field and expose a simple
+  // ascending/descending toggle.
+  if (column) sortBy.value = column as SessionSortField;
+  sortOrder.value = column ? order : "asc";
+  currentPage.value = 1;
   loadSessions(undefined, undefined, true);
 }
 

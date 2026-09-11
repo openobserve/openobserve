@@ -9484,7 +9484,17 @@
       "agent": "Agente",
       "noAgentsTitle": "No hay agentes en este rango",
       "noAgentsDescription": "No se detectaron agentes GenAI para la ventana de tiempo seleccionada. Pruebe con un rango más amplio o vuelva a la vista de stream.",
-      "viewByStream": "Ver por stream"
+      "viewByStream": "Ver por stream",
+      "search": {
+        "placeholderUser": "Buscar por usuario",
+        "placeholderMessage": "Buscar texto del mensaje",
+        "userTitle": "Coincidir sesiones cuyo ID de usuario contenga el texto",
+        "messageTitle": "Buscar texto en los mensajes de la conversación",
+        "noResultsTitle": "Ninguna sesión coincide con su búsqueda",
+        "noResultsDescription": "Pruebe otro término, otro campo o un rango de tiempo más amplio.",
+        "clear": "Borrar búsqueda",
+        "pressEnter": "Pulse Intro para buscar"
+      }
     },
     "sessionDetail": {
       "currencySymbol": "$",

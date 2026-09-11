@@ -50,7 +50,7 @@ beforeEach(() => {
   const s = useSessions();
   s.sessions.value = [];
   s.total.value = 0;
-  s.totalIsExact.value = true;
+  s.hasMore.value = false;
   s.loading.value = false;
   s.error.value = null;
   s.hasLoadedOnce.value = false;
@@ -58,6 +58,9 @@ beforeEach(() => {
   s.loadedOrg.value = null;
   s.currentPage.value = 1;
   s.rowsPerPage.value = 20;
+  s.searchKeyword.value = "";
+  s.sortBy.value = "end_time";
+  s.sortOrder.value = "desc";
   s.agents.value = [];
   s.agentsLoaded.value = false;
 });
@@ -179,16 +182,16 @@ describe("useSessions — fetchPage: field mapping", () => {
     expect(total.value).toBe(42);
   });
 
-  it("marks a lower-bound total as inexact while another page exists", async () => {
+  it("tracks whether another page exists", async () => {
     mockSessionsList.mockResolvedValue({
-      data: { hits: [], total: 21, has_more: true, total_is_exact: false },
+      data: { hits: [], total: 21, has_more: true },
     });
 
-    const { total, totalIsExact, fetchPage } = useSessions();
+    const { total, hasMore, fetchPage } = useSessions();
     await fetchPage("stream", 1000, 2000, 0, 20);
 
     expect(total.value).toBe(21);
-    expect(totalIsExact.value).toBe(false);
+    expect(hasMore.value).toBe(true);
   });
 
   it("sets hasLoadedOnce=true after successful fetch", async () => {
@@ -227,6 +230,85 @@ describe("useSessions — fetchPage: field mapping", () => {
     await fetchPage("stream", 1000, 2000, 0, 25, filter);
 
     expect(mockSessionsList).toHaveBeenCalledWith(expect.objectContaining({ filter }));
+  });
+});
+
+describe("useSessions — fetchPage: sorting", () => {
+  it("sends the selected server sort with every page request", async () => {
+    mockSessionsList.mockResolvedValue({ data: { hits: [], total: 0, has_more: false } });
+    const { sortBy, sortOrder, fetchPage } = useSessions();
+    sortBy.value = "trace_count";
+    sortOrder.value = "asc";
+
+    await fetchPage("stream", 1000, 2000, 2, 25);
+
+    expect(mockSessionsList).toHaveBeenCalledWith(
+      expect.objectContaining({
+        page: 2,
+        sortBy: "trace_count",
+        sortOrder: "asc",
+      }),
+    );
+  });
+});
+
+describe("useSessions — fetchPage: search", () => {
+  it("sends the term as keyword", async () => {
+    mockSessionsList.mockResolvedValue({ data: { hits: [], total: 0 } });
+    const { fetchPage } = useSessions();
+    await fetchPage("stream", 1000, 2000, 0, 25, "", { keyword: "  luis " });
+    expect(mockSessionsList).toHaveBeenCalledWith(expect.objectContaining({ keyword: "luis" }));
+  });
+
+  it("treats a blank term as no search", async () => {
+    mockSessionsList.mockResolvedValue({ data: { hits: [], total: 0 } });
+    const { fetchPage } = useSessions();
+    await fetchPage("stream", 1000, 2000, 0, 25, "", { keyword: "   " });
+    expect(mockSessionsList).toHaveBeenCalledWith(expect.objectContaining({ keyword: undefined }));
+  });
+
+  it("caps the term at 256 characters", async () => {
+    mockSessionsList.mockResolvedValue({ data: { hits: [], total: 0 } });
+    const { fetchPage } = useSessions();
+    await fetchPage("stream", 1000, 2000, 0, 25, "", { keyword: "x".repeat(300) });
+    expect(mockSessionsList.mock.calls[0][0].keyword).toHaveLength(256);
+  });
+
+  it("drops a late response from a superseded run (last request wins)", async () => {
+    let resolveFirst!: (v: any) => void;
+    const first = new Promise((r) => (resolveFirst = r));
+    mockSessionsList
+      .mockImplementationOnce(() => first)
+      .mockResolvedValueOnce({
+        data: { hits: [{ session_id: "second" }], total: 1, has_more: false },
+      });
+
+    const { sessions, loading, fetchPage } = useSessions();
+    const p1 = fetchPage("stream", 1000, 2000, 0, 25, "", { keyword: "a" });
+    const p2 = fetchPage("stream", 1000, 2000, 0, 25, "", { keyword: "ab" });
+    await p2;
+    expect(sessions.value.map((r) => r.sessionId)).toEqual(["second"]);
+    expect(loading.value).toBe(false);
+
+    resolveFirst({ data: { hits: [{ session_id: "first" }], total: 1, has_more: false } });
+    await p1;
+    expect(sessions.value.map((r) => r.sessionId)).toEqual(["second"]);
+  });
+
+  it("ignores an error from a superseded run", async () => {
+    let rejectFirst!: (e: any) => void;
+    const first = new Promise((_, r) => (rejectFirst = r));
+    mockSessionsList
+      .mockImplementationOnce(() => first)
+      .mockResolvedValueOnce({ data: { hits: [], total: 0, has_more: false } });
+
+    const { error, fetchPage } = useSessions();
+    const p1 = fetchPage("stream", 1000, 2000, 0, 25);
+    const p2 = fetchPage("stream", 1000, 2000, 0, 25);
+    await p2;
+    rejectFirst(new Error("boom"));
+    await p1;
+    expect(error.value).toBeNull();
   });
 });
 

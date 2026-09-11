@@ -9484,7 +9484,17 @@
       "agent": "وكيل",
       "noAgentsTitle": "لا يوجد عملاء في هذا النطاق",
       "noAgentsDescription": "لم يتم اكتشاف أي عوامل GenAI خلال الفترة الزمنية المحددة. جرب مدى أوسع أو عد إلى عرض البث.",
-      "viewByStream": "العرض عبر البث"
+      "viewByStream": "العرض عبر البث",
+      "search": {
+        "placeholderUser": "البحث حسب المستخدم",
+        "placeholderMessage": "البحث في نص الرسالة",
+        "userTitle": "مطابقة الجلسات التي يحتوي معرّف المستخدم فيها على النص",
+        "messageTitle": "البحث عن نص في رسائل المحادثة",
+        "noResultsTitle": "لا توجد جلسات مطابقة لبحثك",
+        "noResultsDescription": "جرّب مصطلحًا آخر أو حقلًا آخر أو نطاقًا زمنيًا أوسع.",
+        "clear": "مسح البحث",
+        "pressEnter": "اضغط Enter للبحث"
+      }
     },
     "sessionDetail": {
       "currencySymbol": "$",

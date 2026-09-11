@@ -51,7 +51,6 @@ struct LatestSessionsResponse {
     #[serde(skip_serializing_if = "String::is_empty")]
     function_error: String,
     has_more: bool,
-    total_is_exact: bool,
 }
 
 /// GetLatestSessions
@@ -72,18 +71,20 @@ struct LatestSessionsResponse {
         ("org_id" = String, Path, description = "Organization name"),
         ("stream_name" = String, Path, description = "Stream name"),
         ("filter" = Option<String>, Query, description = "filter, eg: a=b AND c=d"),
+        ("keyword" = Option<String>, Query, description = "Case-insensitive substring match on the session's user id or conversation text (the input or output messages of any span in the session). Literal text: no wildcards or operators. Trimmed and capped at 256 characters; combined with `filter` using AND."),
         ("from" = i64, Query, description = "from"),
         ("size" = i64, Query, description = "size"),
         ("start_time" = i64, Query, description = "start time"),
         ("end_time" = i64, Query, description = "end time"),
         ("timeout" = Option<i64>, Query, description = "timeout, seconds"),
+        ("sort_by" = Option<String>, Query, description = "Session field to sort by: end_time, user_id, trace_count, duration, gen_ai_usage_total_tokens, gen_ai_usage_cost, status (default: end_time)"),
+        ("sort_order" = Option<String>, Query, description = "Sort order: asc or desc (default: desc)"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
             "took": 155,
             "total": 11,
             "has_more": true,
-            "total_is_exact": false,
             "from": 0,
             "size": 10,
             "hits": [
@@ -105,7 +106,7 @@ struct LatestSessionsResponse {
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-mcp" = json!({"description": "List recent LLM sessions from a trace stream: session_id, trace count, token usage, cost, error count.", "category": "traces"}))
+        ("x-o2-mcp" = json!({"description": "List recent LLM sessions from a trace stream: session_id, trace count, token usage, cost, error count. An optional keyword narrows the list by matching either the user id or conversation text.", "category": "traces"}))
     )
 )]
 pub async fn get_latest_sessions(
@@ -147,6 +148,11 @@ pub async fn get_latest_sessions(
     let filter = match query.get("filter") {
         Some(v) => v.to_string(),
         None => "".to_string(),
+    };
+    let search = LatestSessionSearch::from_query(&query);
+    let sort = match LatestSessionSort::from_query(&query) {
+        Ok(sort) => sort,
+        Err(message) => return MetaHttpResponse::bad_request(message),
     };
 
     let from = query
@@ -216,7 +222,6 @@ pub async fn get_latest_sessions(
                         trace_id,
                         function_error: String::new(),
                         has_more: false,
-                        total_is_exact: true,
                     });
                 }
                 Some(v)
@@ -237,11 +242,11 @@ pub async fn get_latest_sessions(
                 trace_id,
                 function_error: String::new(),
                 has_more: false,
-                total_is_exact: true,
             });
         }
     };
-    let query_sql = build_latest_session_page_sql(&stream_name, &filter, &validated);
+    let query_sql =
+        build_latest_session_page_sql(&stream_name, &filter, &search, &sort, &validated);
     let user_id_opt = Some(user_id.to_string());
 
     let mut req = config::meta::search::Request {
@@ -321,7 +326,6 @@ pub async fn get_latest_sessions(
             trace_id,
             function_error: range_error,
             has_more,
-            total_is_exact: !has_more,
         });
     }
 
@@ -402,7 +406,6 @@ pub async fn get_latest_sessions(
         trace_id,
         function_error: range_error,
         has_more,
-        total_is_exact: !has_more,
     })
 }
 
@@ -1243,26 +1246,280 @@ fn normalize_latest_session_filter(
         .unwrap_or_else(|| trimmed.to_string())
 }
 
+/// Hard cap on the list search `keyword`, in characters. Longer input is
+/// truncated, never rejected; the UI applies the same cap before sending.
+const SESSION_SEARCH_MAX_LEN: usize = 256;
+
+/// Trims a raw search term and caps it at [`SESSION_SEARCH_MAX_LEN`]
+/// characters. An empty result means "no search" and yields `None`.
+fn normalize_session_search_term(raw: Option<&String>) -> Option<String> {
+    let trimmed = raw?.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    Some(trimmed.chars().take(SESSION_SEARCH_MAX_LEN).collect())
+}
+
+/// Case-insensitive substring predicate on one span column.
+///
+/// `str_match_ignore_case` takes the term as literal text — unlike `LIKE` it
+/// has no wildcards, so `%` and `_` need no escaping — and a backslash is not
+/// an escape in the SQL dialect either. The only character that must be
+/// escaped is the single quote closing the literal.
+fn session_search_predicate(column: &str, term: &str) -> String {
+    format!(
+        "str_match_ignore_case({column}, '{}')",
+        term.replace('\'', "''")
+    )
+}
+
+/// The list search `keyword`, already normalised. It is ORed across the user
+/// id and available message columns, then ANDed with `filter` inside the
+/// phase-1 session membership `HAVING`.
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub(super) struct LatestSessionSearch {
+    pub(super) keyword: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum LatestSessionSortField {
+    EndTime,
+    UserId,
+    TraceCount,
+    Duration,
+    TotalTokens,
+    Cost,
+    Status,
+}
+
+impl LatestSessionSortField {
+    fn parse(value: &str) -> Result<Self, String> {
+        match value.to_ascii_lowercase().as_str() {
+            "end_time" => Ok(Self::EndTime),
+            "user_id" => Ok(Self::UserId),
+            "trace_count" => Ok(Self::TraceCount),
+            "duration" => Ok(Self::Duration),
+            "gen_ai_usage_total_tokens" => Ok(Self::TotalTokens),
+            "gen_ai_usage_cost" => Ok(Self::Cost),
+            "status" => Ok(Self::Status),
+            _ => Err(format!(
+                "Invalid sort_by field: '{value}'. Valid fields are: end_time, user_id, \
+                 trace_count, duration, gen_ai_usage_total_tokens, gen_ai_usage_cost, status"
+            )),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum LatestSessionSortOrder {
+    Asc,
+    Desc,
+}
+
+impl LatestSessionSortOrder {
+    fn parse(value: &str) -> Result<Self, String> {
+        match value.to_ascii_lowercase().as_str() {
+            "asc" => Ok(Self::Asc),
+            "desc" => Ok(Self::Desc),
+            _ => Err(format!(
+                "Invalid sort_order: '{value}'. Valid values are: asc, desc"
+            )),
+        }
+    }
+
+    const fn sql(self) -> &'static str {
+        match self {
+            Self::Asc => "ASC",
+            Self::Desc => "DESC",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct LatestSessionSort {
+    field: LatestSessionSortField,
+    order: LatestSessionSortOrder,
+}
+
+impl Default for LatestSessionSort {
+    fn default() -> Self {
+        Self {
+            field: LatestSessionSortField::EndTime,
+            order: LatestSessionSortOrder::Desc,
+        }
+    }
+}
+
+impl LatestSessionSort {
+    fn from_query(query: &HashMap<String, String>) -> Result<Self, String> {
+        let field = query
+            .get("sort_by")
+            .map(|value| LatestSessionSortField::parse(value))
+            .transpose()?
+            .unwrap_or(LatestSessionSortField::EndTime);
+        let order = query
+            .get("sort_order")
+            .map(|value| LatestSessionSortOrder::parse(value))
+            .transpose()?
+            .unwrap_or(LatestSessionSortOrder::Desc);
+        Ok(Self { field, order })
+    }
+}
+
+impl LatestSessionSearch {
+    fn from_query(query: &HashMap<String, String>) -> Self {
+        Self {
+            keyword: normalize_session_search_term(query.get("keyword")),
+        }
+    }
+
+    fn is_empty(&self) -> bool {
+        self.keyword.is_none()
+    }
+
+    fn predicate(&self, validated: &super::schema_compat::ValidatedLlmSchema) -> Option<String> {
+        let keyword = self.keyword.as_deref()?;
+        let user = session_search_predicate(validated.columns.user_id, keyword);
+        Some(match message_search_predicate(validated, keyword) {
+            Some(messages) => format!("({user} OR {messages})"),
+            None => format!("({user})"),
+        })
+    }
+}
+
+fn message_search_predicate(
+    validated: &super::schema_compat::ValidatedLlmSchema,
+    term: &str,
+) -> Option<String> {
+    match (validated.has_input_messages, validated.has_output_messages) {
+        (true, true) => Some(format!(
+            "({} OR {})",
+            session_search_predicate(input_messages_column(validated), term),
+            session_search_predicate(output_messages_column(validated), term)
+        )),
+        (false, true) => Some(session_search_predicate(
+            output_messages_column(validated),
+            term,
+        )),
+        (true, false) => Some(session_search_predicate(
+            input_messages_column(validated),
+            term,
+        )),
+        (false, false) => None,
+    }
+}
+
+/// Stored column holding the prompt text for the stream's schema generation.
+fn input_messages_column(validated: &super::schema_compat::ValidatedLlmSchema) -> &'static str {
+    if validated.has_gen_ai {
+        "gen_ai_input_messages"
+    } else {
+        "llm_input"
+    }
+}
+
+/// Stored column holding the response text for the stream's schema generation.
+fn output_messages_column(validated: &super::schema_compat::ValidatedLlmSchema) -> &'static str {
+    if validated.has_gen_ai {
+        "gen_ai_output_messages"
+    } else {
+        "llm_output"
+    }
+}
+
 fn build_latest_session_page_sql(
     stream_name: &str,
     filter: &str,
+    search: &LatestSessionSearch,
+    sort: &LatestSessionSort,
     validated: &super::schema_compat::ValidatedLlmSchema,
 ) -> String {
     let session_id_col = validated.columns.session_id;
     let filter = normalize_latest_session_filter(filter, stream_name, session_id_col);
-    let membership_filter = if filter.is_empty() {
+    // The agent-scope filter alone keeps its historical shape (the frontend
+    // relies on the exact SQL for nothing, but the query cache key does). A
+    // search ANDs onto it, so the caller's predicate is parenthesised in case
+    // it contains an OR.
+    let mut predicates = Vec::with_capacity(2);
+    if !filter.is_empty() {
+        if search.is_empty() {
+            predicates.push(filter);
+        } else {
+            predicates.push(format!("({filter})"));
+        }
+    }
+    if let Some(search) = search.predicate(validated) {
+        predicates.push(search);
+    }
+    let membership_filter = if predicates.is_empty() {
         String::new()
     } else {
-        format!(" HAVING max(CASE WHEN {filter} THEN 1 ELSE 0 END) = 1")
+        format!(
+            " HAVING max(CASE WHEN {} THEN 1 ELSE 0 END) = 1",
+            predicates.join(" AND ")
+        )
+    };
+    let direction = sort.order.sql();
+    let (sort_projection, order_by) = match sort.field {
+        LatestSessionSortField::EndTime => (
+            String::new(),
+            format!("session_last_activity {direction}, session_id {direction}"),
+        ),
+        field => {
+            let sort_expression = latest_session_sort_expression(field, validated);
+            (
+                format!(", {sort_expression} as session_sort_value"),
+                format!(
+                    "session_sort_value {direction} NULLS LAST, \
+                     session_last_activity DESC, session_id DESC"
+                ),
+            )
+        }
     };
     format!(
         "SELECT {session_id_col} as session_id, \
-         max(end_time) as session_last_activity \
+         max(end_time) as session_last_activity{sort_projection} \
          FROM \"{stream_name}\" \
          WHERE {session_id_col} IS NOT NULL AND {session_id_col} != '' \
          GROUP BY {session_id_col}{membership_filter} \
-         ORDER BY session_last_activity DESC, session_id DESC"
+         ORDER BY {order_by}"
     )
+}
+
+fn latest_session_sort_expression(
+    field: LatestSessionSortField,
+    validated: &super::schema_compat::ValidatedLlmSchema,
+) -> String {
+    match field {
+        LatestSessionSortField::EndTime => "max(end_time)".to_string(),
+        LatestSessionSortField::UserId => {
+            format!("min(NULLIF({}, ''))", validated.columns.user_id)
+        }
+        LatestSessionSortField::TraceCount => "count(DISTINCT trace_id)".to_string(),
+        LatestSessionSortField::Duration => "CASE WHEN max(end_time) > min(start_time) \
+             THEN max(end_time) - min(start_time) ELSE 0 END"
+            .to_string(),
+        LatestSessionSortField::TotalTokens if validated.has_total_tokens => {
+            let column = if validated.has_gen_ai {
+                "gen_ai_usage_total_tokens"
+            } else {
+                "llm_usage_tokens_total"
+            };
+            format!("COALESCE(sum({column}), 0)")
+        }
+        LatestSessionSortField::TotalTokens => "0".to_string(),
+        LatestSessionSortField::Cost => {
+            let column = if validated.has_gen_ai {
+                "gen_ai_usage_cost"
+            } else {
+                "llm_usage_cost_total"
+            };
+            format!("COALESCE(sum({column}), 0)")
+        }
+        LatestSessionSortField::Status => {
+            "max(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END)".to_string()
+        }
+    }
 }
 
 fn build_latest_sessions_sql(
@@ -1278,24 +1535,23 @@ fn build_latest_sessions_sql(
         .collect::<Vec<_>>()
         .join(",");
 
-    let (input_tokens_col, output_tokens_col, total_tokens_col, cost_col, input_messages_col) =
-        if validated.has_gen_ai {
-            (
-                "gen_ai_usage_input_tokens",
-                "gen_ai_usage_output_tokens",
-                "gen_ai_usage_total_tokens",
-                "gen_ai_usage_cost",
-                "gen_ai_input_messages",
-            )
-        } else {
-            (
-                "llm_usage_tokens_input",
-                "llm_usage_tokens_output",
-                "llm_usage_tokens_total",
-                "llm_usage_cost_total",
-                "llm_input",
-            )
-        };
+    let input_messages_col = input_messages_column(validated);
+    let (input_tokens_col, output_tokens_col, total_tokens_col, cost_col) = if validated.has_gen_ai
+    {
+        (
+            "gen_ai_usage_input_tokens",
+            "gen_ai_usage_output_tokens",
+            "gen_ai_usage_total_tokens",
+            "gen_ai_usage_cost",
+        )
+    } else {
+        (
+            "llm_usage_tokens_input",
+            "llm_usage_tokens_output",
+            "llm_usage_tokens_total",
+            "llm_usage_cost_total",
+        )
+    };
 
     let total_tokens_expr = optional_sum_expr(
         validated.has_total_tokens,
@@ -1406,24 +1662,15 @@ fn normalize_latest_session_hits(
         .enumerate()
         .map(|(index, session_id)| (session_id.as_str(), index))
         .collect();
-    // Both phases use the latest span end_time across the full session.
-    // Keep the explicit final sort because distributed aggregation does not
-    // guarantee phase 2 row order. Preserve phase 1 order as a deterministic
-    // tie-breaker for sessions with the same last activity time.
-    hits.sort_by(|left, right| {
-        let last_activity =
-            |hit: &json::Value| json::get_int_value(hit.get("end_time").unwrap_or_default());
-        let page_index = |hit: &json::Value| {
-            hit.get("session_id")
-                .and_then(|value| value.as_str())
-                .and_then(|session_id| page_order.get(session_id))
-                .copied()
-                .unwrap_or(usize::MAX)
-        };
-
-        last_activity(right)
-            .cmp(&last_activity(left))
-            .then_with(|| page_index(left).cmp(&page_index(right)))
+    // Phase 1 owns pagination and ordering. Distributed phase-2 aggregation
+    // does not preserve its input order, so restore the exact selected-ID
+    // sequence for every sort field.
+    hits.sort_by_key(|hit| {
+        hit.get("session_id")
+            .and_then(|value| value.as_str())
+            .and_then(|session_id| page_order.get(session_id))
+            .copied()
+            .unwrap_or(usize::MAX)
     });
     hits
 }
@@ -1692,7 +1939,13 @@ mod tests {
         validated.has_total_tokens = true;
         validated.has_cache_read_input_tokens = true;
         let filter = "gen_ai_conversation_id IN (SELECT gen_ai_conversation_id FROM \"bench_traces\" WHERE gen_ai_conversation_id IS NOT NULL AND gen_ai_conversation_id != '' AND gen_ai_agent_id = 'agent-123' GROUP BY gen_ai_conversation_id)";
-        let page_sql = build_latest_session_page_sql("bench_traces", filter, &validated);
+        let page_sql = build_latest_session_page_sql(
+            "bench_traces",
+            filter,
+            &LatestSessionSearch::default(),
+            &LatestSessionSort::default(),
+            &validated,
+        );
         let sql = build_latest_sessions_sql(
             "bench_traces",
             &["session-1".to_string(), "session'2".to_string()],
@@ -1720,7 +1973,13 @@ mod tests {
     #[test]
     fn latest_session_page_sql_without_filter_has_no_membership_having() {
         let validated = super::super::schema_compat::ValidatedLlmSchema::fallback(true);
-        let sql = build_latest_session_page_sql("bench_traces", "", &validated);
+        let sql = build_latest_session_page_sql(
+            "bench_traces",
+            "",
+            &LatestSessionSearch::default(),
+            &LatestSessionSort::default(),
+            &validated,
+        );
 
         assert!(
             sql.contains(
@@ -1735,9 +1994,333 @@ mod tests {
     fn latest_session_page_sql_keeps_unrelated_subqueries_unchanged() {
         let validated = super::super::schema_compat::ValidatedLlmSchema::fallback(true);
         let filter = "gen_ai_conversation_id IN (SELECT other_id FROM other_stream WHERE active = true GROUP BY other_id)";
-        let sql = build_latest_session_page_sql("bench_traces", filter, &validated);
+        let sql = build_latest_session_page_sql(
+            "bench_traces",
+            filter,
+            &LatestSessionSearch::default(),
+            &LatestSessionSort::default(),
+            &validated,
+        );
 
         assert!(sql.contains(filter));
+    }
+
+    fn sort(field: LatestSessionSortField, order: LatestSessionSortOrder) -> LatestSessionSort {
+        LatestSessionSort { field, order }
+    }
+
+    #[test]
+    fn session_sort_query_defaults_and_validates_allowlisted_values() {
+        let mut query = HashMap::new();
+        assert_eq!(
+            LatestSessionSort::from_query(&query).unwrap(),
+            LatestSessionSort::default()
+        );
+
+        query.insert("sort_by".to_string(), "TRACE_COUNT".to_string());
+        query.insert("sort_order".to_string(), "ASC".to_string());
+        assert_eq!(
+            LatestSessionSort::from_query(&query).unwrap(),
+            sort(
+                LatestSessionSortField::TraceCount,
+                LatestSessionSortOrder::Asc
+            )
+        );
+
+        for unsupported in ["start_time", "session_id"] {
+            query.insert("sort_by".to_string(), unsupported.to_string());
+            assert!(LatestSessionSort::from_query(&query).is_err());
+        }
+
+        query.insert("sort_by".to_string(), "drop table".to_string());
+        assert!(LatestSessionSort::from_query(&query).is_err());
+        query.insert("sort_by".to_string(), "end_time".to_string());
+        query.insert("sort_order".to_string(), "sideways".to_string());
+        assert!(LatestSessionSort::from_query(&query).is_err());
+    }
+
+    #[test]
+    fn session_page_sql_preserves_default_order_and_reverses_it_explicitly() {
+        let validated = super::super::schema_compat::ValidatedLlmSchema::fallback(true);
+        let default_sql = build_latest_session_page_sql(
+            "bench_traces",
+            "",
+            &LatestSessionSearch::default(),
+            &LatestSessionSort::default(),
+            &validated,
+        );
+        assert!(default_sql.contains("ORDER BY session_last_activity DESC, session_id DESC"));
+        assert!(!default_sql.contains("session_sort_value"));
+
+        let ascending_sql = build_latest_session_page_sql(
+            "bench_traces",
+            "",
+            &LatestSessionSearch::default(),
+            &sort(LatestSessionSortField::EndTime, LatestSessionSortOrder::Asc),
+            &validated,
+        );
+        assert!(ascending_sql.contains("ORDER BY session_last_activity ASC, session_id ASC"));
+        assert!(!ascending_sql.contains("session_sort_value"));
+    }
+
+    #[test]
+    fn session_page_sql_orders_by_each_summary_value_before_pagination() {
+        let mut validated = super::super::schema_compat::ValidatedLlmSchema::fallback(true);
+        validated.has_total_tokens = true;
+        let cases = [
+            (
+                LatestSessionSortField::UserId,
+                "min(NULLIF(user_id, '')) as session_sort_value",
+            ),
+            (
+                LatestSessionSortField::TraceCount,
+                "count(DISTINCT trace_id) as session_sort_value",
+            ),
+            (
+                LatestSessionSortField::Duration,
+                "THEN max(end_time) - min(start_time) ELSE 0 END as session_sort_value",
+            ),
+            (
+                LatestSessionSortField::TotalTokens,
+                "COALESCE(sum(gen_ai_usage_total_tokens), 0) as session_sort_value",
+            ),
+            (
+                LatestSessionSortField::Cost,
+                "COALESCE(sum(gen_ai_usage_cost), 0) as session_sort_value",
+            ),
+            (
+                LatestSessionSortField::Status,
+                "max(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) as session_sort_value",
+            ),
+        ];
+
+        for (field, projection) in cases {
+            let sql = build_latest_session_page_sql(
+                "bench_traces",
+                "",
+                &LatestSessionSearch::default(),
+                &sort(field, LatestSessionSortOrder::Asc),
+                &validated,
+            );
+            assert!(sql.contains(projection), "{field:?}: {sql}");
+            assert!(sql.contains(
+                "ORDER BY session_sort_value ASC NULLS LAST, \
+                 session_last_activity DESC, session_id DESC"
+            ));
+        }
+    }
+
+    #[test]
+    fn session_page_sort_uses_legacy_usage_columns_and_missing_token_default() {
+        let mut legacy = super::super::schema_compat::ValidatedLlmSchema::fallback(false);
+        legacy.has_total_tokens = true;
+        assert_eq!(
+            latest_session_sort_expression(LatestSessionSortField::UserId, &legacy),
+            "min(NULLIF(llm_user_id, ''))"
+        );
+        assert_eq!(
+            latest_session_sort_expression(LatestSessionSortField::TotalTokens, &legacy),
+            "COALESCE(sum(llm_usage_tokens_total), 0)"
+        );
+        assert_eq!(
+            latest_session_sort_expression(LatestSessionSortField::Cost, &legacy),
+            "COALESCE(sum(llm_usage_cost_total), 0)"
+        );
+
+        legacy.has_total_tokens = false;
+        assert_eq!(
+            latest_session_sort_expression(LatestSessionSortField::TotalTokens, &legacy),
+            "0"
+        );
+    }
+
+    // ── List search (`keyword`) ─────────────────────────────────────────────
+
+    fn search(keyword: Option<&str>) -> LatestSessionSearch {
+        LatestSessionSearch {
+            keyword: keyword.map(str::to_string),
+        }
+    }
+
+    fn gen_ai_with_messages() -> super::super::schema_compat::ValidatedLlmSchema {
+        let mut validated = super::super::schema_compat::ValidatedLlmSchema::fallback(true);
+        validated.has_input_messages = true;
+        validated.has_output_messages = true;
+        validated
+    }
+
+    #[test]
+    fn page_sql_keywords_user_and_messages_with_or_in_one_having_clause() {
+        let sql = build_latest_session_page_sql(
+            "bench_traces",
+            "",
+            &search(Some("refund")),
+            &LatestSessionSort::default(),
+            &gen_ai_with_messages(),
+        );
+
+        assert!(sql.contains(
+            "HAVING max(CASE WHEN (str_match_ignore_case(user_id, 'refund') OR \
+             (str_match_ignore_case(gen_ai_input_messages, 'refund') OR \
+             str_match_ignore_case(gen_ai_output_messages, 'refund'))) THEN 1 ELSE 0 END) = 1"
+        ));
+        assert_eq!(sql.matches("HAVING").count(), 1);
+        assert!(sql.contains("ORDER BY session_last_activity DESC, session_id DESC"));
+    }
+
+    #[test]
+    fn page_sql_ands_keyword_onto_a_parenthesised_agent_filter() {
+        let filter = "gen_ai_agent_id = 'agent-1' OR gen_ai_agent_id = 'agent-2'";
+        let sql = build_latest_session_page_sql(
+            "bench_traces",
+            filter,
+            &search(Some("refund")),
+            &LatestSessionSort::default(),
+            &gen_ai_with_messages(),
+        );
+
+        assert!(sql.contains(
+            "HAVING max(CASE WHEN (gen_ai_agent_id = 'agent-1' OR gen_ai_agent_id = 'agent-2') AND \
+             (str_match_ignore_case(user_id, 'refund') OR \
+             (str_match_ignore_case(gen_ai_input_messages, 'refund') OR \
+             str_match_ignore_case(gen_ai_output_messages, 'refund'))) THEN 1 ELSE 0 END) = 1"
+        ));
+        assert_eq!(sql.matches("HAVING").count(), 1);
+    }
+
+    #[test]
+    fn page_sql_keyword_unwraps_the_legacy_membership_subquery_filter() {
+        let filter = "gen_ai_conversation_id IN (SELECT gen_ai_conversation_id FROM \"bench_traces\" WHERE gen_ai_conversation_id IS NOT NULL AND gen_ai_conversation_id != '' AND gen_ai_agent_id = 'agent-123' GROUP BY gen_ai_conversation_id)";
+        let sql = build_latest_session_page_sql(
+            "bench_traces",
+            filter,
+            &search(Some("luis")),
+            &LatestSessionSort::default(),
+            &gen_ai_with_messages(),
+        );
+
+        assert!(!sql.contains("IN (SELECT"));
+        assert!(sql.contains(
+            "gen_ai_agent_id = 'agent-123') AND \
+             (str_match_ignore_case(user_id, 'luis') OR"
+        ));
+    }
+
+    #[test]
+    fn page_sql_keyword_uses_legacy_columns_on_a_legacy_stream() {
+        let mut validated = super::super::schema_compat::ValidatedLlmSchema::fallback(false);
+        validated.has_input_messages = true;
+        validated.has_output_messages = true;
+        let sql = build_latest_session_page_sql(
+            "legacy_traces",
+            "",
+            &search(Some("refund")),
+            &LatestSessionSort::default(),
+            &validated,
+        );
+
+        assert!(sql.contains("str_match_ignore_case(llm_user_id, 'refund')"));
+        assert!(sql.contains(
+            "(str_match_ignore_case(llm_input, 'refund') OR \
+             str_match_ignore_case(llm_output, 'refund'))"
+        ));
+        assert!(sql.contains("GROUP BY llm_session_id"));
+    }
+
+    #[test]
+    fn search_predicate_escapes_only_the_single_quote() {
+        // A quote must not close the literal; nothing else is special for
+        // str_match_ignore_case (no LIKE wildcards, no backslash escapes).
+        assert_eq!(
+            session_search_predicate("user_id", "o'brien"),
+            "str_match_ignore_case(user_id, 'o''brien')"
+        );
+        assert_eq!(
+            session_search_predicate("user_id", "a'; DROP TABLE x; --"),
+            "str_match_ignore_case(user_id, 'a''; DROP TABLE x; --')"
+        );
+        assert_eq!(
+            session_search_predicate("gen_ai_input_messages", "100% off_the\\path"),
+            "str_match_ignore_case(gen_ai_input_messages, '100% off_the\\path')"
+        );
+    }
+
+    #[test]
+    fn page_sql_keyword_uses_only_available_message_columns() {
+        let mut input_only = super::super::schema_compat::ValidatedLlmSchema::fallback(true);
+        input_only.has_input_messages = true;
+        let input_sql = build_latest_session_page_sql(
+            "bench_traces",
+            "",
+            &search(Some("refund")),
+            &LatestSessionSort::default(),
+            &input_only,
+        );
+        assert!(input_sql.contains("str_match_ignore_case(user_id, 'refund') OR"));
+        assert!(input_sql.contains("str_match_ignore_case(gen_ai_input_messages, 'refund')"));
+        assert!(!input_sql.contains("gen_ai_output_messages"));
+
+        let user_only = super::super::schema_compat::ValidatedLlmSchema::fallback(true);
+        let user_sql = build_latest_session_page_sql(
+            "bench_traces",
+            "",
+            &search(Some("refund")),
+            &LatestSessionSort::default(),
+            &user_only,
+        );
+        assert!(user_sql.contains(
+            "HAVING max(CASE WHEN (str_match_ignore_case(user_id, 'refund')) \
+             THEN 1 ELSE 0 END) = 1"
+        ));
+        assert!(!user_sql.contains("gen_ai_input_messages"));
+        assert!(!user_sql.contains("gen_ai_output_messages"));
+    }
+
+    #[test]
+    fn keyword_is_trimmed_capped_and_empty_means_absent() {
+        let mut query: HashMap<String, String> = HashMap::new();
+        assert_eq!(
+            LatestSessionSearch::from_query(&query),
+            LatestSessionSearch::default()
+        );
+
+        query.insert("keyword".into(), "  refund  ".into());
+        assert_eq!(
+            LatestSessionSearch::from_query(&query),
+            search(Some("refund"))
+        );
+
+        query.insert("keyword".into(), "é".repeat(300));
+        let parsed = LatestSessionSearch::from_query(&query);
+        assert_eq!(
+            parsed.keyword.as_deref().map(|s| s.chars().count()),
+            Some(256)
+        );
+
+        query.insert("keyword".into(), "   ".into());
+        assert_eq!(
+            LatestSessionSearch::from_query(&query),
+            LatestSessionSearch::default()
+        );
+    }
+
+    #[test]
+    fn page_sql_with_keyword_still_plans_as_a_simple_session_level_aggregate() {
+        let sql = build_latest_session_page_sql(
+            "bench_traces",
+            "gen_ai_agent_id = 'agent-1'",
+            &search(Some("100% refund")),
+            &LatestSessionSort::default(),
+            &gen_ai_with_messages(),
+        );
+
+        assert_eq!(
+            config::utils::sql::is_simple_aggregate_query(&sql),
+            Ok(true),
+            "{sql}"
+        );
+        assert!(sql.contains("GROUP BY gen_ai_conversation_id HAVING max(CASE WHEN"));
+        assert!(!sql.contains("IN (SELECT"));
     }
 
     #[test]
@@ -1782,9 +2365,10 @@ mod tests {
             hits,
             &["session-2".to_string(), "session-1".to_string()],
         );
-        assert_eq!(normalized[0]["session_id"], "session-1");
-        assert_eq!(normalized[0]["first_user_message"], "show me the weather");
-        assert_eq!(normalized[0]["user_ids"], json!(["alpha", "zeta"]));
+        assert_eq!(normalized[0]["session_id"], "session-2");
+        assert_eq!(normalized[1]["first_user_message"], "show me the weather");
+        assert_eq!(normalized[1]["user_ids"], json!(["alpha", "zeta"]));
+        assert_eq!(normalized[1]["session_id"], "session-1");
         assert!(normalized[0].get("zo_sql_timestamp").is_none());
         assert!(normalized[0].get("gen_ai_input_messages").is_none());
     }

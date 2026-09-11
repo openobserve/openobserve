@@ -124,7 +124,6 @@ pub(super) struct ValidatedLlmSchema {
     pub(super) has_gen_ai: bool,
     pub(super) columns: LlmColumns,
     pub(super) has_input_messages: bool,
-    #[allow(dead_code)]
     pub(super) has_output_messages: bool,
     pub(super) has_total_tokens: bool,
     pub(super) has_cache_read_input_tokens: bool,

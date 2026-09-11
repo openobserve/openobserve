@@ -9484,7 +9484,17 @@
       "agent": "Tác nhân",
       "noAgentsTitle": "Không có tác nhân nào trong khoảng này",
       "noAgentsDescription": "Không phát hiện tác nhân GenAI nào trong khoảng thời gian đã chọn. Hãy thử khoảng rộng hơn hoặc chuyển lại chế độ luồng.",
-      "viewByStream": "Xem theo luồng"
+      "viewByStream": "Xem theo luồng",
+      "search": {
+        "placeholderUser": "Tìm theo người dùng",
+        "placeholderMessage": "Tìm nội dung tin nhắn",
+        "userTitle": "Khớp các phiên có ID người dùng chứa văn bản",
+        "messageTitle": "Tìm văn bản trong các tin nhắn hội thoại",
+        "noResultsTitle": "Không có phiên nào khớp với tìm kiếm của bạn",
+        "noResultsDescription": "Hãy thử từ khóa khác, trường khác hoặc khoảng thời gian rộng hơn.",
+        "clear": "Xóa tìm kiếm",
+        "pressEnter": "Nhấn Enter để tìm kiếm"
+      }
     },
     "sessionDetail": {
       "currencySymbol": "$",

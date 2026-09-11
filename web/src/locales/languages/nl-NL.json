@@ -9484,7 +9484,17 @@
       "agent": "Agent",
       "noAgentsTitle": "Geen agenten in dit bereik",
       "noAgentsDescription": "Er zijn geen GenAI-agenten gedetecteerd voor het geselecteerde tijdsvenster. Probeer een groter bereik of schakel terug naar streamweergave.",
-      "viewByStream": "Bekijken op stream"
+      "viewByStream": "Bekijken op stream",
+      "search": {
+        "placeholderUser": "Zoeken op gebruiker",
+        "placeholderMessage": "Berichttekst zoeken",
+        "userTitle": "Sessies waarvan de gebruikers-ID de tekst bevat",
+        "messageTitle": "Tekst zoeken in gespreksberichten",
+        "noResultsTitle": "Geen sessies komen overeen met uw zoekopdracht",
+        "noResultsDescription": "Probeer een andere term, een ander veld of een ruimer tijdsbereik.",
+        "clear": "Zoekopdracht wissen",
+        "pressEnter": "Druk op Enter om te zoeken"
+      }
     },
     "sessionDetail": {
       "currencySymbol": "$",
