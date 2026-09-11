@@ -59,6 +59,8 @@ beforeEach(() => {
   s.currentPage.value = 1;
   s.rowsPerPage.value = 20;
   s.searchKeyword.value = "";
+  s.sortBy.value = "end_time";
+  s.sortOrder.value = "desc";
   s.agents.value = [];
   s.agentsLoaded.value = false;
 });
@@ -228,6 +230,25 @@ describe("useSessions — fetchPage: field mapping", () => {
     await fetchPage("stream", 1000, 2000, 0, 25, filter);
 
     expect(mockSessionsList).toHaveBeenCalledWith(expect.objectContaining({ filter }));
+  });
+});
+
+describe("useSessions — fetchPage: sorting", () => {
+  it("sends the selected server sort with every page request", async () => {
+    mockSessionsList.mockResolvedValue({ data: { hits: [], total: 0, has_more: false } });
+    const { sortBy, sortOrder, fetchPage } = useSessions();
+    sortBy.value = "trace_count";
+    sortOrder.value = "asc";
+
+    await fetchPage("stream", 1000, 2000, 2, 25);
+
+    expect(mockSessionsList).toHaveBeenCalledWith(
+      expect.objectContaining({
+        page: 2,
+        sortBy: "trace_count",
+        sortOrder: "asc",
+      }),
+    );
   });
 });
 

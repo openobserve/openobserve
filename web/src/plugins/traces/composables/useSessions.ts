@@ -17,7 +17,7 @@ import { gt, type I18nText } from "@/types/i18n";
 
 import { ref } from "vue";
 import { useStore } from "vuex";
-import sessionsService from "@/services/sessions";
+import sessionsService, { type SessionSortField, type SessionSortOrder } from "@/services/sessions";
 import { type GenAiAgentListItem } from "@/services/gen-ai-agent-mapping.service";
 import { useLLMStreamQuery } from "./useLLMStreamQuery";
 import { compactSql } from "../config/llmInsightsPanels";
@@ -160,6 +160,10 @@ const loadedOrg = ref<string | null>(null);
 // unmount/remount cycle and stays in sync with the restored rows.
 const currentPage = ref(1);
 const rowsPerPage = ref(20);
+// Sort state travels with the server-paginated rows. Keeping it module-scoped
+// preserves the exact list when navigating into a session and back.
+const sortBy = ref<SessionSortField>("end_time");
+const sortOrder = ref<SessionSortOrder>("desc");
 // Active list search (the search box on the scope row) — this ref IS the
 // box's v-model directly (live, debounced), no separate draft. Module-scoped
 // like the pagination so a back-navigation from a session detail restores the
@@ -252,6 +256,8 @@ export function useSessions() {
         pageSize,
         filter,
         keyword: keywordTerm || undefined,
+        sortBy: sortBy.value,
+        sortOrder: sortOrder.value,
       });
       // Stale: a newer fetch has started since — its result (or error) owns
       // the list now, so leave every piece of state to it.
@@ -593,6 +599,8 @@ export function useSessions() {
     currentPage,
     rowsPerPage,
     searchKeyword,
+    sortBy,
+    sortOrder,
     agents,
     agentsLoaded,
     fetchPage,

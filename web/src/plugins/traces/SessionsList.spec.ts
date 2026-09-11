@@ -21,6 +21,8 @@ const mockLastRunAt = ref<number | null>(null);
 const mockLoadedOrg = ref<string | null>(null);
 const mockCurrentPage = ref(1);
 const mockRowsPerPage = ref(20);
+const mockSortBy = ref("end_time");
+const mockSortOrder = ref<"asc" | "desc">("desc");
 // Applied search term — module-scoped in the real composable, like the pagination.
 const mockSearchKeyword = ref("");
 const mockAgents = ref<any[]>([]);
@@ -53,6 +55,8 @@ vi.mock("./composables/useSessions", () => ({
     currentPage: mockCurrentPage,
     rowsPerPage: mockRowsPerPage,
     searchKeyword: mockSearchKeyword,
+    sortBy: mockSortBy,
+    sortOrder: mockSortOrder,
     agents: mockAgents,
     agentsLoaded: mockAgentsLoaded,
     fetchPage: mockFetchPage,
@@ -105,8 +109,20 @@ vi.mock("vuex", () => ({
 vi.mock("@/lib/core/Table/OTable.vue", () => ({
   default: {
     name: "OTable",
-    props: ["data", "columns", "loading", "rowKey", "totalCount", "totalCountExact", "footerTitle"],
-    emits: ["row-click"],
+    props: [
+      "data",
+      "columns",
+      "loading",
+      "rowKey",
+      "totalCount",
+      "totalCountExact",
+      "footerTitle",
+      "sorting",
+      "sortBy",
+      "sortOrder",
+      "sortFieldMap",
+    ],
+    emits: ["row-click", "sort-change"],
     // Mirrors the OTable contract the component relies on: a loading state, one
     // row per item, the `#empty` slot when there are no rows, and a footer that
     // surfaces the server-side total (the old count pill now lives here).
@@ -250,6 +266,8 @@ beforeEach(() => {
   mockCurrentPage.value = 1;
   mockRowsPerPage.value = 20;
   mockSearchKeyword.value = "";
+  mockSortBy.value = "end_time";
+  mockSortOrder.value = "desc";
   mockAgents.value = [];
   mockAgentsLoaded.value = false;
   mockRouteQuery = {};
@@ -374,6 +392,48 @@ describe("SessionsList — sessions table", () => {
     expect(column.accessorKey).toBe("lastSeenNanos");
     expect(wrapper.text()).toContain("2023-11-14 22:30:00");
     expect(wrapper.text()).not.toContain("2023-11-14 22:13:20");
+  });
+
+  it("uses server sorting and reloads the first page with the selected field", async () => {
+    mockRouteQuery = { type: "stream" };
+    mockCurrentPage.value = 3;
+    const wrapper = await mountComponent();
+    const table = wrapper.findComponent({ name: "OTable" });
+
+    expect(table.props("sorting")).toBe("server");
+    expect(table.props("sortBy")).toBe("end_time");
+    expect(table.props("sortOrder")).toBe("desc");
+    expect(table.props("sortFieldMap")).toMatchObject({
+      turns: "trace_count",
+      durationNanos: "duration",
+      tokens: "gen_ai_usage_total_tokens",
+      lastSeenNanos: "end_time",
+    });
+
+    mockFetchPage.mockClear();
+    table.vm.$emit("sort-change", { column: "trace_count", order: "asc" });
+    await flushPromises();
+
+    expect(mockSortBy.value).toBe("trace_count");
+    expect(mockSortOrder.value).toBe("asc");
+    expect(mockCurrentPage.value).toBe(1);
+    expect(mockFetchPage).toHaveBeenCalledWith("test-stream", 1000, 2000, 0, 20, "", undefined);
+  });
+
+  it("cycles a descending server sort back to ascending instead of clearing it", async () => {
+    mockRouteQuery = { type: "stream" };
+    mockSortBy.value = "gen_ai_usage_cost";
+    mockSortOrder.value = "desc";
+    const wrapper = await mountComponent();
+    const table = wrapper.findComponent({ name: "OTable" });
+
+    mockFetchPage.mockClear();
+    table.vm.$emit("sort-change", { column: "", order: "asc" });
+    await flushPromises();
+
+    expect(mockSortBy.value).toBe("gen_ai_usage_cost");
+    expect(mockSortOrder.value).toBe("asc");
+    expect(mockFetchPage).toHaveBeenCalledTimes(1);
   });
 
   it("should fetch stream sessions with no agent filter when in stream mode", async () => {

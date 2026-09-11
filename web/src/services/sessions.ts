@@ -15,6 +15,17 @@
 
 import http from "./http";
 
+export type SessionSortField =
+  | "end_time"
+  | "user_id"
+  | "trace_count"
+  | "duration"
+  | "gen_ai_usage_total_tokens"
+  | "gen_ai_usage_cost"
+  | "status";
+
+export type SessionSortOrder = "asc" | "desc";
+
 /** Single session row returned by the backend's session endpoint. */
 export interface SessionApiHit {
   session_id: string;
@@ -105,9 +116,9 @@ const sessions = {
    * Fetch the paginated session list from
    * `GET /api/{org_id}/{stream_name}/traces/session`.
    *
-   * Server expects microsecond timestamps for `start_time`/`end_time` and
-   * pages by the complete session's latest end_time, then aggregates the
-   * selected session IDs, so the frontend doesn't need to build SQL itself.
+   * Server expects microsecond timestamps for `start_time`/`end_time`, orders
+   * complete sessions by the selected aggregate, and only then aggregates the
+   * selected page of session IDs.
    *
    * @example
    *   await sessions.list({
@@ -129,6 +140,8 @@ const sessions = {
     filter = "",
     keyword,
     timeout,
+    sortBy = "end_time",
+    sortOrder = "desc",
   }: {
     orgId: string;
     streamName: string;
@@ -145,6 +158,8 @@ const sessions = {
      * with no message column at all just fall back to matching the user id.
      */
     keyword?: string;
+    sortBy?: SessionSortField;
+    sortOrder?: SessionSortOrder;
     timeout?: number;
   }) => {
     const params = new URLSearchParams({
@@ -155,6 +170,8 @@ const sessions = {
     });
     if (filter) params.set("filter", filter);
     if (keyword) params.set("keyword", keyword);
+    params.set("sort_by", sortBy);
+    params.set("sort_order", sortOrder);
     if (timeout) params.set("timeout", String(timeout));
     const url = `/api/${orgId}/${encodeURIComponent(
       streamName,
