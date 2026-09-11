@@ -16,8 +16,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="logs-search-bar-component" id="searchBarComponent">
-    <!-- < md: the toolbar wraps (overflow-visible) so the date picker + Run
-         controls drop to their own line instead of being clipped. -->
     <div
       class="solid border-b-card-glass-border m-0! flex w-full items-center! overflow-hidden border-b p-1.5! max-md:flex-wrap max-md:gap-y-1 max-md:overflow-visible"
     >
@@ -5509,7 +5507,6 @@ export default defineComponent({
   height: calc(100% - 2.9rem) !important;
 }
 
-/* < md the toolbar wraps to two rows, so one row's worth of reserve clips the editor. */
 @media (max-width: 47.99rem) {
   .logs-search-bar-component .query-editor-container {
     height: calc(100% - 5rem) !important;

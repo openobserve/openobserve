@@ -85,7 +85,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </OPageHeader>
 
-    <!-- < lg: master-detail side by side leaves the runs panel too narrow to read. -->
     <div
       class="relative flex min-h-0 flex-1 gap-2 px-2 pt-3 max-lg:flex-col max-lg:overflow-y-auto"
     >

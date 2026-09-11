@@ -274,7 +274,6 @@ const emit = defineEmits<{
 const slots = useSlots();
 const { t } = useI18nTyped();
 
-// < md the rail has no room beside the content — it moves into a drawer.
 const { isMobile } = useBreakpoint();
 const mobileSidebarOpen = ref(false);
 // Picking a destination from the phone sidebar is the end of that interaction.

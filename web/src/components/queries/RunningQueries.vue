@@ -24,7 +24,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- Filters live in the sub-nav band directly above the table. -->
     <template #subnav>
-      <!-- < md the filter band wraps; the search takes the leftover width. -->
       <div
         data-test="running-queries-filter-container"
         class="px-page-edge flex items-center justify-start gap-3 py-2 max-md:flex-wrap max-md:gap-2"

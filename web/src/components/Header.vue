@@ -18,7 +18,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="bg-surface-chrome-deeper flex h-10 w-full shrink-0 flex-nowrap items-center">
     <!-- LEFT SIDE: Logo -->
     <div class="flex shrink-0 items-center justify-start gap-1 ps-3 max-md:ps-1.5">
-      <!-- MOBILE NAV TOGGLE: opens the nav rail as a drawer (< md only) -->
       <OButton
         variant="ghost"
         size="icon-toolbar"
@@ -249,8 +248,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </template>
 
-          <!-- THEME SWITCHER: Toggle between light and dark mode.
-               < md it hides — theme stays reachable via the profile menu. -->
+          <!-- THEME SWITCHER: Toggle between light and dark mode -->
           <ThemeSwitcher class="max-md:hidden"></ThemeSwitcher>
 
           <!-- SLACK COMMUNITY LINK -->
@@ -377,8 +375,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </span>
                 <OIcon size="xs" name="chevron-right" />
 
-                <!-- Submenu — flyout to the left of the dropdown; < md there is no
-                     room on either side, so it expands inline below the row. -->
+                <!-- Submenu — absolutely positioned to the left of parent dropdown -->
                 <div
                   v-if="showLanguageSubmenu"
                   class="rounded-default bg-dropdown-bg border-dropdown-border absolute end-full top-0 z-9999 me-1 min-w-50 border py-1 shadow-lg max-md:static max-md:me-0 max-md:mt-1 max-md:w-full max-md:min-w-0 max-md:basis-full max-md:shadow-none dark:shadow-lg"

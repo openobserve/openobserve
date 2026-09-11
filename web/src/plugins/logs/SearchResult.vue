@@ -20,14 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="flex h-full max-h-full flex-col overflow-hidden">
     <div class="flex h-full max-h-full w-full flex-col overflow-hidden" ref="searchListContainer">
       <!-- Section header: static at top -->
-      <!-- < md the header wraps into tidy rows instead of truncating the
-           count chip against the pager. -->
       <div
         class="border-card-glass-border bg-card-glass-bg flex h-9 shrink-0 items-center border-b max-md:h-auto max-md:min-h-9 max-md:flex-wrap max-md:gap-y-1 max-md:py-0.5"
       >
-        <!-- Field panel toggle — same style as add-panel config sidebar.
-             < md the field list is a drawer, so this button opens it instead
-             of collapsing an (absent) side pane. -->
+        <!-- Field panel toggle — same style as add-panel config sidebar -->
         <OButton
           variant="outline"
           size="icon-xs-sq"
@@ -81,8 +77,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTag type="logsResultChip" value="neutral" data-test="logs-result-records-chip">{{
                 recordsChips.records
               }}</OTag>
-              <!-- max-md:hidden: the fixed-height toolbar fits one chip beside
-                   the pager — extra chips wrapped onto the histogram beneath. -->
               <OTag
                 type="logsResultChip"
                 value="info"
@@ -1210,7 +1204,6 @@ export default defineComponent({
       if (!parts) return null;
 
       return {
-        // < md the long form collides with the pager cluster beside it.
         records: t(isMobile.value ? "search.recordsChipShort" : "search.recordsChip", {
           start: parts.start,
           end: parts.end,

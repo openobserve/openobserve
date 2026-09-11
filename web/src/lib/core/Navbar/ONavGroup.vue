@@ -72,7 +72,6 @@ const { t } = useI18nTyped();
 
 const isLinkMode = computed(() => !!props.parentItem);
 
-// Touch has no hover: < md the submenu is an inline accordion (see template).
 const { isMobile } = useBreakpoint();
 
 // Submenu text is pure black in light mode (the dropdown-item-text token is
@@ -354,8 +353,7 @@ function close() {
 }
 
 function scheduleOpen() {
-  // < md the accordion is tap-driven; some touch browsers still emit a synthetic
-  // mouseenter, which would open a group the user only scrolled past.
+  // Some touch browsers emit a synthetic mouseenter, which would open a group the user only scrolled past.
   if (isMobile.value) return;
   clearTimers();
   openTimer = setTimeout(() => open(), OPEN_DELAY);
@@ -481,10 +479,7 @@ function onChildMouseenter(event: MouseEvent) {
     <!-- Link mode: a navigating MenuLink that also reveals sub-pages on hover.
          `active` is driven by "is any child active" so a group tile (e.g. Data,
          whose children span several path roots) highlights on all its pages. -->
-    <!-- Touch has no hover, so < md the tile only toggles the (inline) submenu
-         instead of navigating — otherwise it would route away and close the nav
-         drawer before its sub-pages could be tapped. Nothing is lost: every
-         group lists its own parent page as the first child (navGroups.ts). -->
+    <!-- < md a tap toggles instead of routing away and closing the drawer; each group lists its own page as a child. -->
     <MenuLink
       v-if="isLinkMode && parentItem && !isMobile"
       submenu
@@ -509,8 +504,7 @@ function onChildMouseenter(event: MouseEvent) {
       @keydown="onTileKeydown"
     />
 
-    <!-- < md: the same rows rendered INLINE under the tile (an accordion). A
-         teleported flyout anchored to the rail is unreachable on a phone. -->
+    <!-- A teleported flyout anchored to the rail is unreachable on a phone, so < md the rows render inline. -->
     <div
       v-if="isMobile && isOpen"
       :data-test="`nav-group-inline-${groupKey}`"
@@ -576,7 +570,7 @@ function onChildMouseenter(event: MouseEvent) {
     </div>
 
     <!-- Flyout submenu — teleported to escape the rail's overflow clip; styled
-         exactly like O2's native dropdown for consistency. Desktop only. -->
+         exactly like O2's native dropdown for consistency. -->
     <Teleport to="body">
       <div
         v-if="isOpen && !isMobile"

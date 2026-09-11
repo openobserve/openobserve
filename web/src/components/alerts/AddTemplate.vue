@@ -30,8 +30,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     }"
     bleed
   >
-    <!-- < md the form/preview panes stack vertically (horizontal splitter)
-         instead of splitting the narrow viewport side-by-side. -->
     <OSplitter class="h-full" v-model="splitterModel" unit="%" :horizontal="isMobile">
       <template v-slot:before>
         <OForm :form="form" v-slot="{ isSubmitting }" class="bg-card-glass-bg flex h-full flex-col">

@@ -16,8 +16,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="search-bar-component flex h-full flex-col pb-px" id="searchBarComponent">
-    <!-- < md the toolbar wraps so the mode toggle and the run/date controls each
-         get a full row instead of the right group squeezing the left to nothing. -->
     <div
       class="border-border-default m-0! flex w-full items-center justify-between border-b p-1.5 max-lg:flex-wrap max-lg:gap-y-1"
     >
@@ -255,9 +253,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
 
-        <!-- Service Graph right toolbar: DateTime, Refresh, Tree/Graph tabs, Layout.
-             < md the tab labels drop to icons and the select narrows so the
-             whole cluster fits one row. -->
+        <!-- Service Graph right toolbar: DateTime, Refresh, Tree/Graph tabs, Layout -->
         <div v-if="searchObj.meta.searchMode === 'service-graph'" class="ms-auto max-lg:ms-0">
           <div class="flex items-center gap-2 max-lg:w-full max-lg:justify-end max-lg:gap-1.5">
             <DateTime

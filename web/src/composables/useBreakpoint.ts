@@ -15,22 +15,18 @@
 
 import { computed, ref } from "vue";
 
-// Mirrors Tailwind's default `md` (48rem) and `lg` (64rem) screens so JS-driven
-// layout (inline widths, drawers) switches at the same point as CSS variants.
+// Must mirror Tailwind's default `md`/`lg` screens so JS-driven layout switches with the CSS variants.
 const MD_QUERY = "(min-width: 48rem)";
 const LG_QUERY = "(min-width: 64rem)";
 
-// Module-level singletons: one pair of matchMedia listeners for the whole app,
-// alive for the app's lifetime — every consumer shares the same refs.
+// Module-level singletons: one pair of app-lifetime matchMedia listeners shared by every consumer.
 const mdUp = ref(true);
 const lgUp = ref(true);
 let initialized = false;
 
 const track = (query: string, target: typeof mdUp) => {
   const mql = window.matchMedia(query);
-  // A reset test mock (vi.resetAllMocks()) or a non-standard embed can make
-  // matchMedia() return a falsy value instead of a MediaQueryList — fall back
-  // to the desktop-like default (ref stays `true`) rather than crashing.
+  // A reset test mock or non-standard embed can return a falsy matchMedia(); keep the desktop default.
   if (!mql) return;
   target.value = mql.matches;
   // Older WebKit exposes only addListener; jsdom mocks may expose neither.
@@ -52,11 +48,7 @@ const ensureInit = () => {
   track(LG_QUERY, lgUp);
 };
 
-/**
- * Reactive viewport breakpoints: mobile < md ≤ tablet < lg ≤ desktop.
- * Use for JS-driven layout only — pure styling belongs in Tailwind
- * `max-md:` / `lg:` variants so it needs no runtime.
- */
+/** Reactive viewport breakpoints for JS-driven layout only; pure styling belongs in Tailwind variants. */
 const useBreakpoint = () => {
   ensureInit();
   return {

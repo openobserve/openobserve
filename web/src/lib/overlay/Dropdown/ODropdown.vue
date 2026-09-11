@@ -40,7 +40,6 @@ import {
   clearActiveOverlay,
 } from "./ODropdown.context";
 
-// < lg popups keep an 8px margin from the viewport edge; desktop positioning is unchanged.
 const { lgUp } = useBreakpoint();
 
 const props = withDefaults(defineProps<DropdownProps>(), {
@@ -302,7 +301,6 @@ onBeforeUnmount(() => {
         :style="{ zIndex: contentZIndex }"
         :class="[
           'min-w-40 p-1 max-lg:max-w-[calc(100vw-1rem)]',
-          // < lg a menu taller than the space below its trigger ran off-screen unreachable.
           'max-lg:max-h-[var(--reka-popper-available-height,75vh)] max-lg:overflow-y-auto',
           // Surface
           'bg-dropdown-bg border-dropdown-border rounded-default border shadow-md',

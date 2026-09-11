@@ -282,8 +282,6 @@ export default defineComponent({
       }
     };
 
-    // < md the 220px rail leaves no room for the content — start collapsed
-    // (the expand chevron stays as the way back in).
     const { isMobile } = useBreakpoint();
     watch(
       isMobile,

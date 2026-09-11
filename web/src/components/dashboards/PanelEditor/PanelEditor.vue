@@ -16,7 +16,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="flex h-full min-h-0 w-full flex-1" data-test="panel-editor-container">
-    <!-- < md the chart-type sidebar becomes a horizontal strip on top. -->
     <div class="flex max-md:flex-col" :style="rowStyle">
       <!-- Chart Type Selection Sidebar -->
       <div class="max-md:shrink-0">
@@ -37,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :class="mainContentContainerClass"
         :style="mainContentContainerStyle"
       >
-        <!-- Collapsed field list bar (< md the fields drawer replaces it) -->
+        <!-- Collapsed field list bar -->
         <div
           v-if="!dashboardPanelData.layout.showFieldList && !isMobile"
           class="bg-surface-panel! border-border-default flex h-full w-12.5 shrink-0 cursor-pointer flex-col items-center justify-start overflow-y-auto border-e"
@@ -95,7 +94,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @scroll.passive="onBuilderScroll"
               >
                 <div class="flex h-full w-full flex-col" :style="layoutPanelContainerStyle">
-                  <!-- < md fields are added from a drawer; this is its opener. -->
                   <div
                     v-if="isMobile"
                     class="border-border-default flex items-center border-b px-2 py-1.5"
@@ -414,7 +412,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="flex"
         :style="{ height: contentHeight, flex: 1, overflow: 'hidden' }"
       >
-        <!-- Collapsed field list bar for custom chart (< md the drawer replaces it) -->
+        <!-- Collapsed field list bar for custom chart -->
         <div
           v-if="!dashboardPanelData.layout.showFieldList && !isMobile"
           class="bg-surface-panel! border-border-default flex h-full w-12.5 shrink-0 cursor-pointer flex-col items-center justify-start overflow-y-auto border-e"
@@ -482,7 +480,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :style="{ height: contentHeight, overflow: 'hidden' }"
             >
               <div class="scroll flex h-full min-w-0 flex-1 flex-col">
-                <!-- < md fields open in the drawer instead of the splitter pane. -->
                 <div
                   v-if="isMobile"
                   class="border-border-default flex items-center border-b px-2 py-1.5"
@@ -643,8 +640,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <!-- < md field list drawer: stays open across adds so several fields can
-         be placed on the axes in one visit. -->
+    <!-- Stays open across adds so several fields can be placed on the axes in one visit. -->
     <ODrawer
       v-if="isMobile"
       v-model:open="mobileFieldsOpen"
@@ -873,10 +869,7 @@ const {
   validatePanel,
 });
 
-// ── Mobile (< md) ───────────────────────────────────────────────────────────
-// The field list starts collapsed (the vertical Fields bar remains the way
-// in), and expanding it opens at ~half width — the desktop 20% splitter is
-// unusable on a phone.
+// The desktop 20% field-list splitter is unusable on a phone, so there it opens at ~half width.
 const { isMobile } = useBreakpoint();
 const mobileFieldsOpen = ref(false);
 const MOBILE_FIELD_SPLITTER = 45;
@@ -886,9 +879,7 @@ const collapseFieldList = (): void => {
     dashboardPanelData.layout.splitter = MOBILE_FIELD_SPLITTER;
   }
 };
-// Keep the pane closed on phones whenever something OTHER than the user's own
-// toggle opens it (page init resets layout state after mount) — the wrapper
-// above marks a deliberate open with the mobile splitter width.
+// Page init reopens the pane after mount, so on phones only the user's toggle (MOBILE_FIELD_SPLITTER) may open it.
 watch(
   [isMobile, () => dashboardPanelData.layout.showFieldList],
   ([mobile, show]) => {
@@ -900,9 +891,7 @@ watch(
   { immediate: true },
 );
 
-// One panel at a time on phones: the field list (45%) and the config sidebar
-// (300px, full-width here) can't share a 375px row without crushing the chart
-// to nothing, so opening either closes the other.
+// The field list and config sidebar can't share a phone-width row, so opening either closes the other.
 watch(
   () => isMobile.value && dashboardPanelData.layout.isConfigPanelOpen,
   (configOpenOnMobile) => {
@@ -1003,8 +992,6 @@ const chartAreaStyle = computed(() => {
 });
 
 // Main content area class - logs needs flat background without card styling
-// `max-md:relative` anchors the config sidebar, which overlays this row on
-// phones instead of splitting it (see configPanelClass).
 const mainContentAreaClass = computed(() => {
   if (props.pageType === "logs") {
     return "flex bg-card-glass-bg max-md:relative";
@@ -1012,9 +999,6 @@ const mainContentAreaClass = computed(() => {
   return "flex bg-card-glass-bg h-full overflow-y-hidden max-md:relative";
 });
 
-// < md an open config panel covers the builder rather than sharing the row —
-// side by side leaves the builder ~115px wide and its labels wrap one word per
-// line. Collapsed, it stays in flow as the usual vertical rail.
 const configPanelClass = computed(() => [
   "col-auto max-md:min-w-0",
   isMobile.value && dashboardPanelData.layout.isConfigPanelOpen
@@ -1055,8 +1039,7 @@ const mainContentContainerStyle = computed<CSSProperties>(() => {
   };
 });
 
-// Splitter limits - logs/build uses [0, 100], others use [0, 20].
-// < md the field list opens at ~half width, so the cap must allow it.
+// Splitter limits - logs/build uses [0, 100], others use [0, 20]
 const splitterLimits = computed<[number, number]>(() => {
   if (isMobile.value) {
     return [0, 60];
@@ -1067,7 +1050,7 @@ const splitterLimits = computed<[number, number]>(() => {
   return [0, 20];
 });
 
-// Splitter style (< md there is no collapsed bar to reserve width for)
+// Splitter style
 const splitterStyle = computed(() => {
   return {
     width:
@@ -1116,8 +1099,6 @@ const layoutPanelContainerStyle = computed(() => {
 });
 
 // Field list wrapper class - logs/build doesn't need padding-bottom
-// < md an open field list covers the row (like the config panel): sharing it
-// left ~180px where the always-visible +X/+Y actions covered the field names.
 const fieldListPaneClass = computed(() =>
   isMobile.value && dashboardPanelData.layout.showFieldList
     ? "max-md:absolute max-md:inset-y-0 max-md:left-0 max-md:z-30 max-md:w-full!"

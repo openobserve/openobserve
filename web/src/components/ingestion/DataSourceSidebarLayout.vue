@@ -31,12 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   #tabs slot — it receives { tabs, filter } so you can render/filter yourself.
 -->
 <template>
-  <!-- < lg: the data-source rail moves into a left drawer behind a toggle bar
-       (same pattern as OPageLayout's mobile sidebar); beside a second rail it
-       left the tablet content column under 6rem. -->
   <div v-if="compact" class="flex h-full min-h-0 flex-col">
-    <!-- strip mode: a short rail (Logs/Metrics/Traces) reads better as one tab
-         row than as a second drawer trigger stacked under its parent's. -->
     <div
       v-if="compactMode === 'strip'"
       class="border-border-default shrink-0 border-b px-2"
@@ -264,7 +259,6 @@ watch(
 
 const filter = ref("");
 
-// < lg the rail is a drawer (see template).
 const { lgUp } = useBreakpoint();
 const compact = computed(() => !lgUp.value);
 const mobileSidebarOpen = ref(false);

@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTab>
       </OTabs>
     </template>
-    <!-- CONTENT AREA: sidebar + main (< md: sidebar stacks above main) -->
+    <!-- CONTENT AREA: sidebar + main -->
     <div class="flex flex-1 overflow-hidden max-md:flex-col">
       <!-- LEFT SIDEBAR: folder navigation (locations are org-level, no folders) -->
       <div
@@ -166,9 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Toolbar content rendered inside OTable's toolbar bar -->
           <template #toolbar>
-            <!-- ≥ md it is a named container: the folder rail can squeeze this
-                 toolbar at any viewport width, so the tab labels key off the
-                 container's own width, not a viewport breakpoint. -->
+            <!-- A container, not a viewport breakpoint: the folder rail squeezes this toolbar at any width. -->
             <div
               class="@container/synthetics-toolbar flex min-w-0 flex-1 flex-wrap items-center gap-2 gap-y-1.5 max-md:contents"
             >
@@ -192,8 +190,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OToggleGroup>
 
               <!-- Search -->
-              <!-- md:min-w-60: flex-1 is basis-0, so without a floor the input
-                   shrinks to nothing instead of wrapping to its own row. -->
+              <!-- flex-1 is basis-0, so the min-w floor is what wraps the input instead of shrinking it to nothing. -->
               <div class="min-w-0 flex-1 md:min-w-60">
                 <OInput
                   v-model="search"

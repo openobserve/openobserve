@@ -30,7 +30,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          so the row keeps every control on one centred line rather than items-start. -->
     <!-- `p-1.5`, the SAME padding the Logs and Traces toolbars use
          (SearchBar.vue:23 / traces SearchBar.vue:19), so the toolbars share geometry. -->
-    <!-- < md auto-refresh and Refresh go icon-only so the whole toolbar fits one row. -->
     <div
       class="border-border-default flex shrink-0 items-center gap-2 border-b p-1.5 max-md:flex-wrap max-md:gap-x-1 max-md:gap-y-1"
       data-test="metrics-explorer-filter-bar"
@@ -171,7 +170,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- EXPLORE + FAVOURITES — the same browse grid. Favourites is that grid
          narrowed to the metrics you ♥'d, so the body is identical bar the facet
          panel (Explore only): the right column is the search row + grid. -->
-    <!-- < md the facet panel stacks above the grid as a bounded panel. -->
     <div v-if="isGridMode" class="flex min-h-0 flex-1 max-md:flex-col">
       <!-- Facet panel — EXPLORE only. It is an editing control (filter by
            prefix/suffix/type); Workspace is a read-only lens viewer, so it shows
@@ -314,8 +312,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            the cards (not the full page), and the facet panel to its left runs
            the full height alongside it. -->
       <div class="flex min-h-0 min-w-0 flex-1 flex-col">
-        <!-- < md: search takes the full first line; count + sort/view toggles
-             wrap to their own row instead of crushing the field. -->
         <div
           class="border-border-default flex items-center gap-2 border-b px-3 py-2 max-md:flex-wrap max-md:gap-y-1"
         >

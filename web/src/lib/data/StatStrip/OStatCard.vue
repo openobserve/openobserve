@@ -138,8 +138,6 @@ const trendClass = computed(() =>
 </script>
 
 <template>
-  <!-- < lg the tile compacts to icon + value (label moves to the title
-       tooltip) so a five-tile strip fits one row without scrolling. -->
   <component
     :is="clickable ? 'button' : 'div'"
     :type="clickable ? 'button' : undefined"

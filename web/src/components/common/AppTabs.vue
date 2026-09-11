@@ -82,7 +82,6 @@ const props = withDefaults(
     size?: ToggleGroupItemSize;
     // Tooltip shown when hovering an unsaved-changes dot (optional).
     dirtyTitle?: I18nText;
-    // Collapse to a dropdown below md (see OToggleGroup `mobileDropdown`).
     mobileDropdown?: boolean;
   }>(),
   {

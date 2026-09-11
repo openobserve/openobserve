@@ -38,7 +38,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >{{ t(`alert_templates.add`) }}</OButton
         >
       </template>
-      <!-- Secondary: inline on desktop, behind "More" < md. -->
       <template #actions-overflow>
         <OButton
           variant="outline"

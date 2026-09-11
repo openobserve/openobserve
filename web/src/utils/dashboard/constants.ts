@@ -19,8 +19,7 @@ export const PIVOT_TABLE_DEFAULT_HEADER_HEIGHT = 48;
 export const PIVOT_TABLE_TOTAL_COLUMN_WIDTH = 150;
 
 // UI constants
-// Capped to the viewport: the menu is wider than a phone, and the overflow
-// (the whole Configuration pane) is unreachable rather than merely cut.
+// Capped to the viewport: on a phone the overflow (the whole Configuration pane) would be unreachable.
 export const FIELD_FUNCTION_MENU_WIDTH = "min(48.1875rem, calc(100vw - 1.5rem))";
 
 // Chart types whose queries are always hand-written (custom) rather than

@@ -20,7 +20,6 @@
     bleed
     overflow-first
   >
-    <!-- Secondary: inline on desktop, behind "More" < md so Run All keeps the title row. -->
     <template #actions-overflow>
       <ODropdown v-if="recentDrafts.length" align="end" content-class="w-100">
         <template #trigger>

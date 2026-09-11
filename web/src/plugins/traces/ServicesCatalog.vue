@@ -212,7 +212,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Body: left rail (entity-type filter) + table — mirrors the Dashboards
          folder-rail + table layout (panel bg + vertical separator, 230px). -->
-    <!-- < md: entity-filter rail stacks above the table. -->
     <div class="flex min-h-0 flex-1 max-md:flex-col">
       <!-- Left rail: the entity-type filter. Panel background + right border
            match FolderList.vue so the rail reads like the app's other left
@@ -227,8 +226,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              text the app's other left rails use. Row = label left, total +
              unhealthy badge right. -->
         <div v-if="!isLoading && services.length > 0" class="catalog-type-filter overflow-y-auto">
-          <!-- < md the rail lies down: horizontal tabs keep the filter to one
-               row above the table instead of a stacked block. -->
           <OTabs
             :orientation="isMobile ? 'horizontal' : 'vertical'"
             dense

@@ -30,7 +30,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :tabs-below="tabOrder.length > 1"
       bleed
     >
-      <!-- < md the chat-history opener rides the title row rather than taking one of its own. -->
       <template v-if="isMobile && activeHomeTab === 'ai'" #actions>
         <OButton
           variant="outline"
@@ -97,8 +96,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="activeHomeTab === 'ai'"
           class="home-ai-panel flex min-h-0 flex-1 flex-row overflow-hidden max-md:flex-col"
         >
-          <!-- < md the chat-history rail moves into a drawer so the chat gets
-               the full width. -->
           <HomeChatHistory class="max-md:hidden" @load-chat="onLoadChat" @new-chat="onNewChat" />
           <O2AIChat ref="homeChat" :is-open="true" :header-height="0" :centered-start="true" />
           <ODrawer
@@ -356,7 +353,6 @@ export default defineComponent({
     onMounted(() => window.addEventListener("o2:home-switch-tab", onSwitchTab));
     onUnmounted(() => window.removeEventListener("o2:home-switch-tab", onSwitchTab));
 
-    // < md: the chat-history rail lives in a drawer (see template).
     const { isMobile } = useBreakpoint();
     const mobileChatsOpen = ref(false);
 

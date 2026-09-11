@@ -35,7 +35,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :class="{
             [selectedType + 'type']: !disableRelative,
             hideRelative: disableRelative,
-            // md+ only: on phones the full-range min-width would overflow the toolbar.
             'md:min-w-71.5': !disableRelative && selectedType === 'absolute',
             'w-fit': disableRelative,
           }"
@@ -973,7 +972,6 @@ export default defineComponent({
 
     const { isMobile } = useBreakpoint();
 
-    // < md the trigger label is shortened to fit the toolbar; the picker itself keeps full precision.
     const compactRangeLabel = (label: string) => {
       const REL_UNIT: Record<string, string> = {
         second: "s",

@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="report-list-splitter"
         class="report-list-table flex min-h-0 flex-1 max-md:flex-col"
       >
-        <!-- Left: folder list (< md: stacks above the table, bounded height) -->
+        <!-- Left: folder list -->
         <div
           class="w-rail max-md:border-border-default h-full shrink-0 max-md:h-auto max-md:w-full max-md:border-b"
         >
@@ -71,10 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               table-id="reports-report-list"
             >
               <!-- Toolbar: Scheduled/Cached tabs + search (inline folder scope) + refresh -->
-              <!-- < md the toolbar wraps: tabs row, then a full-width search row. -->
               <template #toolbar>
-                <!-- max-md:contents flattens this wrapper so the tabs, the search
-                     and OTable's own controls share one wrapping toolbar. -->
                 <div
                   class="flex w-full min-w-0 flex-wrap items-center gap-2 gap-y-1.5 max-md:contents"
                 >
@@ -91,10 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       "
                     />
                   </div>
-                  <!-- < md search takes its own full row below the icon controls. -->
-                  <!-- md:min-w-80: flex-1 is basis-0, so without a floor the input
-                       shrinks and its embedded folder-scope chips spill out of the
-                       box; the floor makes it wrap to its own row instead. -->
+                  <!-- flex-1 is basis-0, so the min-w floor is what wraps the input before its scope chips spill. -->
                   <div class="min-w-0 flex-1 max-md:order-last max-md:basis-full md:min-w-80">
                     <OInput
                       v-model="dynamicQueryModel"

@@ -67,8 +67,6 @@
         </OButton>
       </div>
     </template>
-    <!-- < md the delay notice leaves the header (it is wider than the viewport
-         allows there) and shows as a strip above the table instead. -->
     <div
       class="text-status-warning-text border-border-default flex shrink-0 items-center border-b px-3 py-1.5 text-xs md:hidden"
     >

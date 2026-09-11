@@ -1,7 +1,6 @@
 ﻿<template>
   <OCard class="flex h-full flex-col">
-    <!-- Top toolbar: [stream-selector] [search-input]  ···spacer···  [legends]
-         < lg it wraps and the search sheds its fixed width. -->
+    <!-- Top toolbar: [stream-selector] [search-input]  ···spacer···  [legends] -->
     <div class="flex items-center gap-2 p-1.5 pb-0 max-lg:flex-wrap max-lg:gap-y-1">
       <!-- Stream selector (hidden when a parent drives selection, e.g. the
            Agent Graph page which selects by agent). -->
@@ -47,7 +46,6 @@
           class="flex min-w-0 flex-row items-center gap-3 max-lg:flex-wrap max-lg:gap-y-1"
           :title="`${t('traces.serviceGraph.borderColor')} | ${t('traces.serviceGraph.borderColorMetric')}`"
         >
-          <!-- < md the heading and ranges move into tooltips so the four levels fit one line. -->
           <div class="text-text-label! mb-0! text-xs font-bold whitespace-nowrap max-md:hidden">
             {{ t("traces.serviceGraph.borderColor") }}
             <span class="font-normal opacity-55"

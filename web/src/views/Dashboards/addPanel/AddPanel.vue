@@ -51,8 +51,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
           <template #actions>
-            <!-- < md Tutorial / Inspector / Discard move behind More (below)
-                 so the primary run controls keep a single row. -->
             <template v-if="!isMobile">
               <OButton
                 variant="outline"

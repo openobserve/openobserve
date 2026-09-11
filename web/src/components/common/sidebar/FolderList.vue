@@ -21,9 +21,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="bg-surface-panel flex flex-col"
     :class="mobileRail ? '' : 'border-border-default h-full border-e pb-1'"
   >
-    <!-- < md the rail moves into a left drawer: a folder panel stacked above
-         the list it filters pushed the list itself off a phone screen. This
-         trigger row names the active folder so the scope stays visible. -->
     <div
       v-if="mobileRail"
       class="flex items-center justify-between gap-1 py-1 ps-1.5 pe-1.5"
@@ -229,8 +226,7 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
-    // Off when the rail already lives inside another drawer (OPageLayout
-    // #sidebar) — nesting a drawer trigger inside a drawer double-wraps it.
+    // Off when the rail already lives inside another drawer (OPageLayout #sidebar), or the triggers double-wrap.
     drawerOnMobile: {
       type: Boolean,
       default: true,
@@ -242,7 +238,6 @@ export default defineComponent({
     const { t } = useI18nTyped();
     const { showPositiveNotification, showErrorNotification } = useNotifications();
     const activeFolderId = ref("");
-    // < md the rail collapses to one row (see template).
     const { isMobile } = useBreakpoint();
     const mobileDrawerOpen = ref(false);
     const mobileRail = computed(() => isMobile.value && props.drawerOnMobile);

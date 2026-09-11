@@ -62,7 +62,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          double the inset and push the content past the header icon. -->
     <div class="flex min-h-0 flex-1" :class="contentWrapperClass">
       <div class="flex min-h-0 w-full" :style="contentStyle">
-        <!-- < lg the form/output panes stack — side by side neither fits. -->
         <OSplitter
           v-if="showSplitter"
           class="logs-search-splitter h-full min-h-0 w-full"

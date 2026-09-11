@@ -70,7 +70,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="height: calc(100vh - 3.75rem)"
           >
             <!-- this the grid section the tiles section -->
-            <!-- < md: 2×2 so the values don't clip out of the tiles. -->
             <div class="stats-grid mb-2 grid grid-cols-4 gap-2 max-md:grid-cols-2">
               <!-- Docs Count Tile -->
               <div
@@ -171,8 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="rounded-default bg-surface-base border-border-default flex h-full min-h-0 w-full flex-col overflow-hidden border p-2"
               >
                 <div>
-                  <!-- min-w-0/max-w-full let OTabs' own arrow-scroller engage in
-                       the narrow mobile drawer instead of clipping silently. -->
+                  <!-- min-w-0/max-w-full let OTabs' own arrow-scroller engage instead of clipping silently. -->
                   <div class="flex max-w-full min-w-0 justify-start">
                     <OTabs v-model="activeMainTab" dense>
                       <!-- Schema Settings Tab with conditional class -->
@@ -341,8 +339,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                     <!-- OTable fills the remaining height inside the schemaSettings flex column -->
                     <div class="flex min-h-0 flex-1 flex-col overflow-hidden">
-                      <!-- < md: content-sized columns + x-scroll, or the elastic
-                           name column collapses to 0 beside the fixed columns. -->
+                      <!-- horizontal-scroll: otherwise the elastic name column collapses to 0 beside the fixed ones. -->
                       <OTable
                         data-test="schema-log-stream-field-mapping-table"
                         :data="filteredSchemaData"

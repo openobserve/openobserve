@@ -95,7 +95,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @hide="setTimeForVariables"
             data-test="dashboard-global-date-time-picker"
           />
-          <!-- Desktop keeps main's order (before Refresh); < md it moves behind More. -->
           <AutoRefreshInterval
             v-if="!isMobile"
             v-model="refreshInterval"

@@ -94,8 +94,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   class="relative-position border-border-default bg-surface-panel h-full border-e pt-2.5"
                 >
-                  <!-- < md the field list moves into a drawer (see below), so the
-                       in-splitter copy is desktop/tablet only. -->
                   <IndexList
                     v-if="searchObj.meta.showFields && !isMobile"
                     data-test="logs-search-index-list"
@@ -106,7 +104,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #after>
                 <div class="h-full">
                   <div class="bg-card-glass-bg relative-position h-full w-full">
-                    <!-- Scrolls: on a phone the ingestion empty state is taller than this pane. -->
                     <div
                       v-if="
                         !searchObj.loadingStream &&
@@ -297,7 +294,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OSplitter>
     </div>
 
-    <!-- < md: the field list, hosted in a left drawer instead of a side pane. -->
     <ODrawer
       v-if="isMobile"
       v-model:open="mobileFieldsOpen"
@@ -592,14 +588,8 @@ export default defineComponent({
     const expandedLogs = ref([]);
     const splitterModel = ref(90);
 
-    // ── Mobile (< md) field-list handling ──────────────────────────────────
-    // On a phone the field list can't be a side-by-side splitter pane — it
-    // would crush the results. Below md we collapse the inner splitter to 0 and
-    // surface the same IndexList inside a left drawer, toggled by a button.
     const { isMobile, isTablet } = useBreakpoint();
     const mobileFieldsOpen = ref(false);
-    // Lock the inner field-list splitter shut on mobile (results take 100%);
-    // restore the default width when returning to a larger viewport.
     watch(
       isMobile,
       (mobile) => {
@@ -1411,8 +1401,7 @@ export default defineComponent({
     };
 
     const onSelectStream = () => {
-      // < md the stream selector lives inside the fields drawer — open it first,
-      // then focus the trigger once the drawer content has mounted.
+      // < md the stream selector lives in the fields drawer, so it must open before the trigger can focus.
       if (isMobile.value) {
         mobileFieldsOpen.value = true;
         setTimeout(() => {
@@ -2332,16 +2321,13 @@ export default defineComponent({
       },
     );
 
-    // Auto-expand splitter to 130px when either editor has >2 lines; collapse to
-    // the base height otherwise. Never overrides a user-set value above 130px.
-    // < md the toolbar wraps to a second row, so the base height is taller.
+    // Auto-expand the splitter when either editor has >2 lines; never overrides a larger user-set value.
     watch(
       [() => searchObj.data.editorValue, () => searchObj.data.tempFunctionContent, isMobile],
       ([queryValue, fnValue, mobile]) => {
         const queryLines = (queryValue || "").split("\n").length;
         const fnLines = (fnValue || "").split("\n").length;
         const hasMoreThanTwoLines = queryLines > 2 || fnLines > 2;
-        // Base (≤2 lines): 165px on mobile clears the two wrapped toolbar rows + editor, else 83px.
         const baseHeight = mobile ? 165 : 83;
         const expandedHeight = mobile ? 205 : 130;
 

@@ -62,8 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #title>
-        <!-- < md: the name's sizer grid can't shrink below its text, so cap it and
-             drop the badges — otherwise the actions paint over the title. -->
+        <!-- The name's sizer grid can't shrink below its text, so < md it needs an explicit max-w cap. -->
         <span class="inline-flex min-w-0 items-center gap-2">
           <OInlineEdit
             v-model="workflowObj.currentSelectedWorkflow.name"
@@ -93,7 +92,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            gated to the create route). Enable/disable status isn't shown here —
            it's managed from the list, same as pipelines. -->
 
-      <!-- Secondary: inline on desktop, behind "More" < md so Publish keeps the title row. -->
       <template #actions-overflow>
         <!-- Past-run chip — shown when a run is loaded onto the canvas (arrived via
              "Fix This Step" or picked from History). Compact provenance in place of

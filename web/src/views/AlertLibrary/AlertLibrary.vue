@@ -62,8 +62,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <div class="flex min-h-0 flex-1">
-        <!-- < md the facet rail moves into a drawer (Filters button by the
-             search); side by side it left the card grid ~270px. -->
         <div class="w-rail border-border-default h-full shrink-0 border-e max-md:hidden">
           <LibraryRail
             :categories="categoryFacets"
@@ -123,7 +121,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="border-border-default px-page-edge flex shrink-0 items-center gap-3 border-b py-2"
               data-test="alert-library-toolbar"
             >
-              <!-- < md the facet rail is a drawer, so its trigger leads this row. -->
               <OButton
                 variant="outline"
                 size="icon-toolbar"

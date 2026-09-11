@@ -51,8 +51,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Workflows (hideTestPanel): the NDV supplies Input · Output around this
              pane, so the embedded test panel is redundant — collapse the splitter to
              an editor-only, full-width surface (no drag handle). -->
-        <!-- < md the editor and test panes stack: side by side each gets ~180px
-             and the JSON panes wrap one character per line. -->
         <OSplitter
           v-model="splitterModel"
           :limits="hideTestPanel ? [100, 100] : [30, 100]"

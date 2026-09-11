@@ -38,7 +38,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :data-test="`pipeline-section-tab-${s.key}`"
     >
       <OIcon :name="s.icon" size="sm" class="shrink-0" />
-      <!-- < md inactive tabs go icon-only so the strip fits one row. -->
       <span :class="s.key === activeSectionKey ? '' : 'max-md:hidden'">{{ s.label }}</span>
       <span
         v-if="s.count != null"

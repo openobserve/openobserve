@@ -3,7 +3,6 @@
 <template>
   <div data-test="dynamic-function-popup-root" class="flex flex-col">
     <!-- Body -->
-    <!-- < md the two panes stack: side by side the configuration half sits past the screen edge. -->
     <div :class="fullMode ? 'flex min-h-0 max-md:flex-col' : 'flex flex-col'">
       <!-- Property pane -->
       <div

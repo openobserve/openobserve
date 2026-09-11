@@ -76,11 +76,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :get-row-style="streamRowStyle"
           class="h-full w-full"
         >
-          <!-- Toolbar inside the table frame: stream-type filter + search.
-               < md the search wraps to its own full-width row. -->
+          <!-- Toolbar inside the table frame: stream-type filter + search. -->
           <template #toolbar>
-            <!-- max-md:contents flattens this wrapper so the tabs, the search and
-                 OTable's own controls share one wrapping toolbar. -->
             <div class="flex w-full items-center justify-between gap-2 max-md:contents">
               <OToggleGroup
                 mobile-dropdown

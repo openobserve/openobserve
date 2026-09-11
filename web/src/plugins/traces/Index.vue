@@ -115,7 +115,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <template #before>
                   <div class="border-border-default bg-surface-panel h-full border-e">
-                    <!-- < md the field list moves into a drawer (see below). -->
                     <IndexList
                       v-show="searchObj.meta.showFields && !isMobile"
                       ref="indexListRef"
@@ -276,7 +275,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OSplitter>
     </div>
 
-    <!-- < md: the field list, hosted in a left drawer instead of a side pane. -->
     <ODrawer
       v-if="isMobile"
       v-model:open="mobileFieldsOpen"
@@ -438,8 +436,6 @@ const servicesCatalogRef = ref<any>(null);
 const splitterModel = ref(90);
 const fieldValues = ref({});
 
-// ── Mobile (< md) field-list handling — same recipe as the Logs page: the
-// side pane is locked shut and the same IndexList opens as a left drawer.
 const { isMobile, isTablet } = useBreakpoint();
 const mobileFieldsOpen = ref(false);
 watch(
@@ -450,8 +446,6 @@ watch(
     } else if (searchObj.config.splitterModel === 0 && searchObj.meta.showFields) {
       searchObj.config.splitterModel = searchObj.config.lastSplitterPosition || 20;
     }
-    // < md the toolbar wraps to two rows, so the fixed 90px top pane clips the
-    // query editor; give it room and restore the desktop height on the way out.
     splitterModel.value = mobile ? 150 : 90;
   },
   { immediate: true },
@@ -1609,8 +1603,7 @@ const onJumpToPanelStreamData = (fromUs: number, toUs: number) => {
 };
 
 const onSelectTracesStream = () => {
-  // < md the stream selector lives inside the fields drawer — open it first,
-  // then focus the trigger once the drawer content has mounted.
+  // < md the stream selector lives in the fields drawer, so it must open before the trigger can focus.
   if (isMobile.value) {
     mobileFieldsOpen.value = true;
     setTimeout(() => {

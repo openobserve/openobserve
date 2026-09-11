@@ -26,12 +26,7 @@ export interface OTabsProps {
    * responsible for applying it. Default: false
    */
   reorderable?: boolean;
-  /**
-   * Below md, inactive tabs drop their label and keep only their icon; the
-   * active tab keeps its label so the current location stays readable. For
-   * prop-driven tabs (icon + label props) on strips wider than a phone.
-   * Default: false
-   */
+  /** Below md, inactive tabs show only their icon while the active tab keeps its label. Default: false */
   collapseLabels?: boolean;
 }
 

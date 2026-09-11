@@ -15,7 +15,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <!-- < md the four cards share ONE row: label + value, caption in the title. -->
   <section
     class="grid h-full grid-cols-2 gap-2 max-md:grid-cols-4 max-md:gap-1.5"
     data-test="rum-errors-kpi-cards"

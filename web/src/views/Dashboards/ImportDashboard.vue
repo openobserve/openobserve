@@ -49,8 +49,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <div class="flex min-h-0 w-full flex-1">
       <div class="flex min-h-0 w-full min-w-0">
-        <!-- < lg the form/preview panes stack: side by side leaves the upload pane
-             ~224px and clips its controls. -->
         <OSplitter
           v-model="splitterModel"
           :horizontal="stackPanes"
@@ -71,8 +69,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @update:active-tab="updateActiveTab"
                     />
                   </div>
-                  <!-- < md this secondary action leaves the header so Cancel +
-                       Import keep the title row to one line. -->
                   <OButton
                     variant="outline"
                     size="sm-action"
@@ -338,8 +334,6 @@ export default defineComponent({
     const stackPanes = computed(() => !lgUp.value);
     const splitterModel = ref(60);
 
-    // < lg the error pane earns its half of the screen only once it has
-    // something to show — empty, it buried the form's own controls.
     watch(
       [stackPanes, () => dashboardErrorsToDisplay.value.length],
       ([stacked, errCount]) => {

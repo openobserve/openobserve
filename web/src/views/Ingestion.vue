@@ -45,7 +45,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         style="min-width: 13.75rem"
         @update:model-value="onTokenSelected"
       />
-      <!-- < md icon-only so the search and this button share the title row. -->
       <OButton
         v-if="!isRUMPage"
         variant="primary"
@@ -85,8 +84,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Pull the strip left (cancel the header's px-4) so the first tab lines
              up with the vertical sub-nav (Kubernetes/…) in the section below. -->
       <div class="-ms-3 w-full">
-        <!-- < md the token select leaves the actions row (its full width would
-             push the search under the title) and sits above the tab strip. -->
         <div v-if="isMobile && !isRUMPage && tokenOptions.length > 0" class="ms-3 pb-2">
           <OSelect
             v-model="selectedTokenName"

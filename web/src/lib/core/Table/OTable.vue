@@ -95,7 +95,7 @@ const props = withDefaults(defineProps<OTableProps<TData>>(), {
 const emit = defineEmits<OTableEmits<TData>>();
 const slots = defineSlots<OTableSlots<TData>>();
 
-// < md every column stays reachable by scrolling within the table instead of being crushed to the name column.
+// < md columns scroll within the table rather than being crushed down to the name column.
 const { isMobile: isMobileViewport, lgUp } = useBreakpoint();
 const horizontalScrollOn = computed(() => !!props.horizontalScroll || isMobileViewport.value);
 
@@ -831,9 +831,7 @@ const allowHorizontalScroll = computed(() => {
     // (table-fixed otherwise grows past 100% and the overflow is clipped).
     return fillMinSum() > containerWidth.value + 1;
   }
-  // Below lg a filler absorbs leftover only while the other columns fit; past
-  // that the table grows anyway and the trailing columns are clipped out of
-  // reach. Desktop keeps main's clipping so laptop layouts are untouched.
+  // < lg past the columns' min widths the table grows anyway, clipping trailing columns out of reach.
   if (!lgUp.value) return fillMinSum() > containerWidth.value + 1;
   return false;
 });
@@ -1011,8 +1009,7 @@ const computedTableWidth = computed<string | undefined>(() => {
   return `${Math.max(containerWidth.value || 0, realSum())}px`;
 });
 
-// < md a fill-layout table refuses to crush its columns below their defined
-// sizes: their sum becomes the table's floor and the container scrolls.
+// < md the column sizes' sum is the table's floor, so the container scrolls instead of crushing them.
 const mobileMinTableWidth = computed<string | undefined>(() => {
   if (!isMobileViewport.value || props.horizontalScroll || props.defaultColumns) return undefined;
   const sum = table.getVisibleLeafColumns().reduce((a, c) => a + c.getSize(), 0);

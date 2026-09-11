@@ -22,8 +22,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :subtitle="t('settings.nodesPage.subtitle')"
     bleed
   >
-    <!-- < md the splitter flips horizontal: filters stack above the table
-         instead of crushing it to a third of the screen. -->
     <OSplitter
       :model-value="splitterModel"
       @update:model-value="(v: number) => (splitterModel = v)"

@@ -15,7 +15,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <!-- < lg the five cards keep ONE row: label + value only, caption in the title. -->
   <section
     class="grid grid-cols-5 gap-2 p-2 max-lg:gap-1.5 max-lg:p-1.5"
     data-test="rum-sessions-metrics-strip"

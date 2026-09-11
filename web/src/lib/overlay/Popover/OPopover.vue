@@ -49,7 +49,6 @@ import {
   clearActiveOverlay,
 } from "@/lib/overlay/Dropdown/ODropdown.context";
 
-// < lg popups keep an 8px margin from the viewport edge; desktop positioning is unchanged.
 const { lgUp } = useBreakpoint();
 
 const props = withDefaults(
@@ -234,7 +233,6 @@ onBeforeUnmount(() => {
         @focus-outside="handleFocusOutside"
         :class="[
           'outline-none max-lg:max-w-[calc(100vw-1rem)]',
-          // < lg a popover taller than the space below its trigger ran off-screen unreachable.
           'max-lg:max-h-[var(--reka-popper-available-height,75vh)] max-lg:overflow-y-auto',
           // Surface
           'bg-dropdown-bg border-dropdown-border rounded-default border shadow-md',

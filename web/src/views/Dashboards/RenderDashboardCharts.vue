@@ -1816,11 +1816,7 @@ export default defineComponent({
   cursor: move;
 }
 
-/* < md: stack every panel full-width, one below the other, at a fixed viewable
-   height — presentation only. GridStack's engine still holds the 192-column
-   desktop layout (its own oneColumnMode is kept OFF because the `change`
-   handler persists positions; a CSS-only stack can never write a mangled
-   layout back). Section headers keep their natural short height. */
+/* CSS-only stack: GridStack's oneColumnMode stays off because the change handler would persist it. */
 @media (max-width: 47.99rem) {
   .displayDiv :deep(.grid-stack) {
     display: flex;
@@ -1837,7 +1833,6 @@ export default defineComponent({
     height: 20rem !important;
     min-height: 20rem !important;
   }
-  /* Single-value tiles don't earn a chart's height or width: two per row. */
   .displayDiv :deep(.grid-stack > .grid-stack-item:has([data-panel-type="metric"])),
   .displayDiv :deep(.grid-stack > .grid-stack-item:has([data-panel-type="gauge"])) {
     width: calc(50% - 0.25rem) !important;

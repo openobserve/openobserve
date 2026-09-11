@@ -159,8 +159,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
 
-      <!-- < lg the form and Preview/Summary panes stack: side by side each gets
-           ~180px and every control clips. -->
       <div class="flex min-h-0 flex-1 max-lg:flex-col">
         <!-- LEFT column wrapper (flex: 6.5) -->
         <div

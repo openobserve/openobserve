@@ -30,10 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="create-report-page flex min-h-0 w-full flex-1 flex-col"
     >
       <div class="bg-card-glass-bg flex min-h-0 flex-1 overflow-auto">
-        <!-- w-256 (64rem) capped to the viewport — the fixed inline width made
-             the whole form overflow on phones. The arbitrary variant caps the
-             form's many inline `style="width: …"` fields the same way (< md);
-             max-width beats an inline width without touching each field. -->
+        <!-- The [style*=width] variant caps the fields' inline widths: max-width beats an inline width. -->
         <div
           ref="addAlertFormRef"
           class="my-3 w-256 max-w-full px-4 max-md:[&_[style*=width]]:max-w-full"

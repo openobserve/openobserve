@@ -13,7 +13,6 @@
     </template>
     <!-- Content helpers (populate / clear the fields) live in the header,
            separate from the primary Save action at the bottom. -->
-    <!-- Secondary: inline on desktop, behind "More" < md. -->
     <template #actions-overflow>
       <OButton
         data-test="gen-ai-agent-mapping-apply-defaults-btn"

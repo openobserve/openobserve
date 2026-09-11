@@ -196,15 +196,10 @@ const sizeClasses = computed(() => {
 // When portaled into a specific container, use absolute positioning scoped to that element.
 const isContained = computed(() => !!props.portalTarget);
 
-// Explicit width override — vw when full-viewport, % when container-scoped.
-// < md a percent width is meaningless (a "40%" editor drawer would be ~150px
-// on a phone), so it clamps to 88% — near-full for content, while the visible
-// overlay strip keeps it reading as a drawer rather than a page swap.
+// Explicit width override — vw when full-viewport, % when container-scoped
 const { isMobile } = useBreakpoint();
 
-// ── Anchored top edge ────────────────────────────────────────────────────────
-// Measured (not CSS) because the anchor row lives in the page while the drawer
-// is portaled to <body>; re-measured on resize so rotation keeps it aligned.
+// Measured, not CSS: the drawer is portaled to <body>, away from its anchor row.
 const anchorTop = ref(0);
 function measureAnchor() {
   const a = props.anchor;

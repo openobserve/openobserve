@@ -42,7 +42,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTooltip :content="t('modelPricing.matchingPriorityTooltip')" />
         </OButton>
       </template>
-      <!-- Secondary: inline on desktop, behind "More" < md. -->
       <template #actions-overflow>
         <OButton
           variant="outline"

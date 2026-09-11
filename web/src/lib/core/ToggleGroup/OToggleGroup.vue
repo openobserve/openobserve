@@ -376,8 +376,7 @@ provide(TOGGLE_GROUP_CONTEXT_KEY, context);
       orientation === 'vertical' ? 'flex-col' : 'flex-row',
       'bg-toggle-track-bg rounded-default p-0.5',
       'border-toggle-border border',
-      // A segment strip must stay ONE row: wrapped toggle chips read as two
-      // unrelated controls. Overflow scrolls within the track instead.
+      // Wrapped toggle chips read as two unrelated controls, so the strip scrolls within its track.
       orientation !== 'vertical' && 'max-md:max-w-full max-md:overflow-x-auto',
     ]"
     v-bind="dragListeners"

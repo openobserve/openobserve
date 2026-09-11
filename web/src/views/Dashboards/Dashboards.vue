@@ -33,7 +33,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
     </template>
 
-    <!-- Secondary: inline on desktop (BEFORE the primary, via overflow-first), behind "More" < md. -->
     <template #actions-overflow>
       <!-- Org home dashboard shortcut: shows which dashboard is pinned to
              the home page and jumps straight to it. -->
@@ -106,7 +105,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <!-- Folder rail + table — matches the Alerts/Reports layout. -->
-    <!-- < md: rail stacks above the table as a bounded, scrollable panel. -->
     <div class="flex min-h-0 flex-1 max-md:flex-col">
       <!-- Left: shared folder list (same component as Alerts/Reports) -->
       <div
@@ -151,11 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <!-- Toolbar inside the table frame: scoped search (fills the bar) + refresh -->
             <template #toolbar>
-              <!-- max-md:contents flattens this wrapper so the search and
-                   OTable's own controls share one row on mobile. -->
-              <!-- min-w-0: without it the wrapper cannot shrink below the search
-                   box's min-content width, so a rail-narrowed toolbar pushes the
-                   trailing controls off the right edge instead of squeezing. -->
+              <!-- min-w-0: otherwise the wrapper can't shrink below the search's min-content and pushes controls off-edge. -->
               <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">
                 <div class="min-w-0 flex-1 max-md:min-w-40">
                   <OInput
@@ -287,8 +281,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <template #cell-actions="{ row }">
               <span class="row-actions flex items-center justify-end gap-0.5">
-                <!-- < md the inline icons fold into the overflow menu so the
-                     actions column stops eating half the table's width. -->
                 <OButton
                   v-if="row.actions == 'true'"
                   icon-left="drive-file-move"

@@ -408,8 +408,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="tab === 'json' || tab === 'table'"
       class="px-page-edge bg-dialog-bg sticky bottom-0 z-10 py-4"
     >
-      <!-- < md: Previous/Next keep the first row, the search-around cluster
-           wraps to its own full-width row (nowrap overlapped all three). -->
       <div class="flex flex-nowrap items-center justify-between max-md:flex-wrap max-md:gap-2">
         <div class="w-1/12 max-md:w-auto">
           <OButton

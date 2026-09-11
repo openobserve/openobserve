@@ -36,8 +36,6 @@
       />
     </template>
     <template #tabs>
-      <!-- < md the language toggle wraps to its own row: sharing the title row
-           pushed it off-screen. -->
       <div class="o2-input flex h-full items-center gap-4 max-md:h-auto max-md:basis-full">
         <!-- Divider between the function name (header #title) and the language
              toggle — they are separate controls sharing one header row. h-full +

@@ -17,13 +17,9 @@
 <template>
   <div class="flex h-full flex-col overflow-hidden" data-test="view-panel-screen">
     <div class="flex items-center justify-between p-3 max-md:flex-wrap max-md:gap-y-2">
-      <!-- max-md:basis-full: the controls alone fill a phone row, so the title
-           takes its own row rather than truncating to a couple of characters. -->
       <div
         class="me-3 flex min-w-0 flex-1 items-center text-xl tracking-[0.005em] max-md:me-0 max-md:basis-full"
       >
-        <!-- truncate, not wrap: a long panel name would otherwise grow the header
-             to two lines and leave the controls floating beside a ragged block. -->
         <span
           class="truncate"
           :title="dashboardPanelData.data.title"

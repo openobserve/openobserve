@@ -15,8 +15,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <!-- < lg: categories become a tab strip, the integration list a drawer, so the
-       detail pane gets the full width (two rails left it under 6rem). -->
   <div v-if="compact" class="flex h-full min-h-0 flex-col">
     <div class="border-border-default shrink-0 border-b px-2">
       <OTabs v-model="selectedCategory" dense>
@@ -220,7 +218,6 @@ export default defineComponent({
   name: "AIIntegrationsPage",
   components: { OTabs, OTab, OSearchInput, OSplitter, ODrawer, OButton, OIcon },
   setup() {
-    // < lg the two rails collapse (see template).
     const { lgUp } = useBreakpoint();
     const compact = computed(() => !lgUp.value);
     const listDrawerOpen = ref(false);

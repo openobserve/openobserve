@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("about.logoMsg") }}
             </OText>
 
-            <!-- One-line meta bar (< md: long chips clip inside the viewport) -->
+            <!-- One-line meta bar -->
             <div
               class="mt-5 inline-flex flex-wrap items-center gap-2 max-md:max-w-full max-md:[&>span]:max-w-full max-md:[&>span]:overflow-hidden"
             >

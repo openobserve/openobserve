@@ -282,9 +282,7 @@ export default {
     onMounted(async () => {
       setTimeout(fitToNodes, 100);
     });
-    // Editing an existing pipeline loads its nodes async, after the mount-time
-    // fit ran on an empty graph — desktop-saved coordinates then sit outside a
-    // small viewport entirely. Re-fit when the nodes actually arrive.
+    // Existing pipelines load nodes after the mount-time fit ran on an empty graph, so re-fit when they arrive.
     watch(
       () => pipelineObj.currentSelectedPipeline.nodes.length,
       (len, prev) => {

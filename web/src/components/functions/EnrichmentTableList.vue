@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             width="100%"
             class="h-full w-full"
           >
-            <!-- Toolbar: type filter + search (< md: search wraps to its own row) -->
+            <!-- Toolbar: type filter + search -->
             <template #toolbar>
               <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">
                 <OToggleGroup

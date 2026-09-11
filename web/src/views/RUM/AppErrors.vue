@@ -21,7 +21,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="bg-card-glass-bg border-border-default px-page-edge border-b py-1.5"
         data-drawer-anchor="rum-errors-toolbar"
       >
-        <!-- < md the editor takes its own row and the controls wrap below. -->
         <div class="flex items-start gap-1 max-md:flex-wrap">
           <!-- Query editor (flex-grow to fill available space) -->
           <div class="relative min-w-0 flex-1 max-md:basis-full">
@@ -117,7 +116,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- end bg-card-glass-bg -->
     </div>
     <!-- end toolbar wrapper -->
-    <!-- < md the field list moves into a drawer (menu button in the toolbar). -->
     <ODrawer
       v-if="isMobile"
       v-model:open="mobileFieldsOpen"
@@ -172,8 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #after>
         <div class="flex h-full min-h-0 flex-col">
           <!-- Errors-over-time chart + KPI summary -->
-          <!-- h-44 fits the desktop 5-col row; stacked < lg the grid must size
-               itself or it overflows into the filter bar below. -->
+          <!-- Stacked < lg the grid must size itself, or it overflows into the filter bar below. -->
           <div
             class="px-page-edge grid shrink-0 grid-cols-1 gap-2 pt-1.5 max-lg:auto-rows-min lg:h-44 lg:grid-cols-5"
           >

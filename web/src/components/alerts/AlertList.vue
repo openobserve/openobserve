@@ -61,7 +61,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
       </template>
 
-      <!-- Secondary: inline on desktop (BEFORE the primary, via overflow-first), behind "More" < md. -->
       <template #actions-overflow>
         <IacRegistryLinks data-test="alert-list-iac-registries" />
         <!-- Import button -->
@@ -84,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <div data-test="alert-list-splitter" class="flex min-h-0 flex-1 max-md:flex-col">
-        <!-- Left: FolderList (< md: stacks above the table, bounded height) -->
+        <!-- Left: FolderList -->
         <div
           class="w-rail max-md:border-border-default h-full shrink-0 max-md:h-auto max-md:w-full max-md:border-b"
         >
@@ -144,15 +143,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </template>
 
-              <!-- Toolbar: alert-type filter + search (inline folder scope) + refresh.
-                   < md it wraps: type filter row, then the search row. -->
+              <!-- Toolbar: alert-type filter + search (inline folder scope) + refresh. -->
               <template #toolbar>
-                <!-- max-md:contents flattens this wrapper so the tabs, the search
-                     and OTable's own controls share one wrapping toolbar: tabs
-                     row, then search + columns + refresh on a single row. -->
-                <!-- ≥ md it is a named container: the folder rail can squeeze this
-                     toolbar at any viewport width, so the tab labels key off the
-                     container's own width, not a viewport breakpoint. -->
+                <!-- A container, not a viewport breakpoint: the folder rail squeezes this toolbar at any width. -->
                 <div
                   class="@container/alert-toolbar flex min-w-0 flex-1 flex-wrap items-center gap-2 gap-y-1.5 max-md:contents"
                 >
@@ -174,9 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <span class="@max-[34rem]/alert-toolbar:hidden">{{ tab.label }}</span>
                     </OToggleGroupItem>
                   </OToggleGroup>
-                  <!-- md:min-w-80: flex-1 is basis-0, so without a floor the input
-                       shrinks and its embedded folder-scope chips spill out of the
-                       box; the floor makes it wrap to its own row instead. -->
+                  <!-- flex-1 is basis-0, so the min-w floor is what wraps the input before its scope chips spill. -->
                   <div class="min-w-0 flex-1 md:min-w-80">
                     <OInput
                       v-model="dynamicQueryModel"

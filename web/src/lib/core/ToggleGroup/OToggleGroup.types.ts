@@ -46,10 +46,7 @@ export interface ToggleGroupProps {
    * responsible for applying it. Default: false
    */
   reorderable?: boolean;
-  /**
-   * Below md, render as a dropdown that shows the active item, so a labelled
-   * filter no longer claims a whole toolbar row on a phone. Single-select only.
-   */
+  /** Below md, render as a dropdown showing the active item (single-select only). */
   mobileDropdown?: boolean;
 }
 

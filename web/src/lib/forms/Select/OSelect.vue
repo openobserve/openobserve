@@ -91,7 +91,6 @@ const DEFAULT_OPTION_LABEL = "label";
 const DEFAULT_OPTION_VALUE = "value";
 const DEFAULT_OPTION_DISABLED = "disabled";
 
-// < lg popups keep an 8px margin from the viewport edge; desktop positioning is unchanged.
 const { lgUp } = useBreakpoint();
 
 const props = withDefaults(defineProps<SelectProps>(), {

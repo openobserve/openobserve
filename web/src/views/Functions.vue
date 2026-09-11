@@ -133,7 +133,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <!-- Detail sub-pages (editor/history/backfill) teleport their actions
              here, so the bar owns the single header and pages never render a 2nd. -->
-          <!-- < md the teleported action cluster wraps within the header row. -->
           <div
             v-else-if="isDetailView"
             id="o2-page-actions"

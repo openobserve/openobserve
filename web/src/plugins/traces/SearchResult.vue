@@ -30,8 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="traces-section-header"
         class="border-border-default flex h-9 shrink-0 items-center border-b px-[0.4rem]! max-md:h-auto max-md:min-h-9 max-md:flex-wrap max-md:gap-y-1 max-md:py-0.5"
       >
-        <!-- Field panel toggle — same style as logs page. < md the field list
-             is a drawer, so this button opens it instead of collapsing the pane. -->
+        <!-- Field panel toggle — same style as logs page -->
         <OButton
           variant="outline"
           size="icon-xs-sq"

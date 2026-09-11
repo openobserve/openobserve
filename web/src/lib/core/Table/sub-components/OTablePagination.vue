@@ -70,8 +70,7 @@ const pageSizeSelectOptions = computed(() => {
          The footer-title typography lives on this wrapper so BOTH the default
          row count and any custom #bottom (actions) slot content inherit it —
          font-size / weight / line-height are inherited properties. -->
-    <!-- < md the plain count is hidden: "Showing x - y of z" already carries
-         it, and the footer must stay ONE row. Bulk actions still show. -->
+    <!-- < md hidden unless it hosts bulk actions: the pager's "Showing x - y of z" already has the count. -->
     <div
       class="flex items-center gap-2 text-xs font-normal"
       :class="slots.actions ? '' : 'max-md:hidden'"
@@ -90,7 +89,7 @@ const pageSizeSelectOptions = computed(() => {
       </span>
     </div>
 
-    <!-- Right: controls. < md this cluster IS the footer row. -->
+    <!-- Right: controls -->
     <div class="flex items-center gap-3 max-md:flex-1 max-md:justify-between max-md:gap-2">
       <span
         v-if="loading"

@@ -24,9 +24,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:open="$emit('update:open', $event)"
   >
     <div data-test="dashboard-settings-main-container" class="h-full [min-height:inherit] p-0">
-      <!-- < md the 220px vertical tab rail leaves ~150px for the settings form,
-           so the tabs become a strip across the top and the content takes the
-           full drawer width. -->
       <OSplitter class="h-full" v-model="splitterModel" unit="px" disabled :horizontal="isMobile">
         <template v-slot:before>
           <div class="functions-tabs w-full">
@@ -124,8 +121,7 @@ export default defineComponent({
     const router = useRouter();
     const activeTab: any = ref("generalSettings");
     const templates = ref([]);
-    // < md the rail is a horizontal strip on top, so the splitter size is its
-    // height rather than the 220px sidebar width.
+    // < md the splitter is horizontal, so its size is the tab strip's height, not the rail width.
     const { isMobile } = useBreakpoint();
     const splitterWidth = ref(220);
     const splitterModel = computed({
@@ -173,7 +169,6 @@ export default defineComponent({
   border-right: 1px solid var(--color-border-default);
 }
 
-/* < md the rail sits above the content, so its divider is the bottom edge. */
 @media (max-width: 47.99rem) {
   :deep(.o-splitter__before) {
     border-right: none;

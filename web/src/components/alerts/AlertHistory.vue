@@ -78,8 +78,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTooltip :content="t('common.refresh')" />
       </OButton>
     </template>
-    <!-- < md the alert filter leaves the header (its 250px select forces a
-         wrap there) and gets its own full-width row above the table. -->
     <div
       class="border-border-default flex shrink-0 items-center gap-1 border-b px-3 py-1.5 md:hidden"
     >

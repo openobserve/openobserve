@@ -89,9 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @menu-hover="handleMenuHover"
       />
 
-      <!-- Mobile nav: the same rail, slid in as an off-canvas drawer (< md).
-           Not seamless: the scrim is what makes the 88%-wide panel read as a
-           drawer over the page (and gives tap-outside-to-close a target). -->
+      <!-- Not seamless: the scrim gives tap-outside-to-close a target. -->
       <ODrawer
         v-model:open="mobileNavOpen"
         side="left"
@@ -175,8 +173,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             // card's right/bottom gap (+ rounded-surface corners) so they read as
             // the same card. Expanding only widens it; it never overlays the header.
             'pe-2 pb-2',
-            // < md there is no room beside the content: the chat becomes a
-            // full-width overlay under the header instead of a side panel.
             isMobile
               ? 'fixed inset-x-0 bottom-0 z-50 ps-2'
               : 'sticky top-[var(--navbar-height,2.25rem)] self-start',
@@ -382,7 +378,6 @@ export default defineComponent({
     const zoBackendUrl = store.state.API_ENDPOINT;
     const isLoading = ref(false);
 
-    // Mobile (< md) shell state: rail hidden, hamburger opens it as a drawer.
     const { isMobile } = useBreakpoint();
     const mobileNavOpen = ref(false);
     watch(

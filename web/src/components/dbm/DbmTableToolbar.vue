@@ -28,7 +28,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     class="flex min-w-0 flex-1 items-center gap-2 overflow-hidden max-lg:flex-wrap max-lg:overflow-visible"
   >
-    <!-- < lg the fixed 16rem box clipped the trailing controls; search takes its own row instead. -->
     <div class="w-64 shrink-0 max-lg:order-last max-lg:w-full max-lg:basis-full">
       <OSearchInput
         :model-value="search"

@@ -21,7 +21,6 @@
           class="mx-1.25 my-0.5 flex flex-wrap items-center gap-2"
         >
           <!-- Legend -->
-          <!-- < md the legend field takes its own full row; the input flexes. -->
           <div
             data-test="promql-builder-options-field-wrapper"
             class="ms-2.5 flex flex-row items-center gap-2 max-md:ms-0 max-md:w-full"

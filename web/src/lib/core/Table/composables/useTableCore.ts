@@ -67,9 +67,6 @@ export function useTableCore<TData>(
   // value is derived from the row's position so pages need not hand-roll a
   // `"#"` field in their data. Under server pagination we add the page offset
   // so numbering stays continuous across pages.
-  // < md the table scrolls horizontally within itself (see OTable's
-  // horizontalScrollOn), so every column stays available; only oversized
-  // identity columns are capped so the FIRST screen shows name + neighbours.
   const MOBILE_MAX_COL_SIZE = 200;
   const { isMobile } = useBreakpoint();
   const responsiveColumns = computed<OTableColumnDef<TData>[]>(() => {
@@ -176,8 +173,7 @@ export function useTableCore<TData>(
   // cell's right padding, in px. Keep in sync with the token (0.75rem = 12px).
   const PAGE_EDGE_PX = 12;
   const actionColumnWidth = (actionCount?: number): number => {
-    // < md rows collapse their inline action icons behind one overflow kebab,
-    // so the column budgets a single button there.
+    // < md row actions collapse behind one overflow kebab, so the column budgets a single button.
     const n = isMobile.value ? 1 : Math.max(1, Number(actionCount) || 2);
     // Cell padding: px-2 is 8+8=16. When the actions column is the row's last
     // cell (no trailing spacer) the edge inset replaces its right padding with
@@ -185,8 +181,7 @@ export function useTableCore<TData>(
     // land on the same right-edge grid line as everything else (no over-width).
     const cellPad = hasTrailingSpacer.value ? 16 : 8 + PAGE_EDGE_PX;
     const content = n * ACTION_ICON_BTN + (n - 1) * ACTION_BTN_GAP + cellPad;
-    // < md the column holds one kebab — the "Actions" header floor would leave
-    // it mostly dead width, so the header truncates instead.
+    // < md the "Actions" header floor would leave the one-kebab column mostly dead width.
     return Math.max(content, isMobile.value ? 0 : ACTIONS_HEADER_MIN);
   };
 
@@ -197,8 +192,7 @@ export function useTableCore<TData>(
   const userReorderedColumns = ref(false);
 
   // Track column sizing — seeded with persisted values when provided
-  // Persisted sizes were dragged on a desktop; honouring them < md would undo
-  // the mobile column cap and reintroduce the horizontal scroll.
+  // Persisted sizes were dragged on desktop; honouring them < md would undo the mobile column cap.
   const columnSizing = ref<Record<string, number>>(
     isMobile.value ? {} : (props.initialColumnSizes ?? {}),
   );
@@ -263,8 +257,6 @@ export function useTableCore<TData>(
       // DETERMINISTICALLY from its icon count (not DOM-measured at runtime) so
       // the loading skeleton and the loaded table render it at the exact same
       // width — no flash when data arrives.
-      // < md the page's own action size (sized for its inline icon row) would
-      // defeat the one-kebab width, so the computed width alone decides.
       const size = isActionCol
         ? isMobile.value
           ? actionColumnWidth((col.meta as any)?.actionCount)

@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          (display:contents) so the title block + actions stay direct children of
          the header — preserving the original single-row inline-tabs layout. -->
     <div :class="tabsBelow ? ROW_CLASS : 'contents'">
-      <!-- < lg the min-w floor is what forces the actions to wrap (flex-1 is basis-0); self-stretch keeps h-full children spanning the wrapped row. -->
+      <!-- flex-1 is basis-0, so the min-w floor is what forces the actions to wrap. -->
       <div
         class="flex h-full min-w-0 flex-1 items-center gap-3.25 max-lg:h-auto max-lg:self-stretch md:max-lg:min-w-40"
         :class="[
@@ -97,9 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </slot>
         </template>
 
-        <!-- Listing/index page: the module icon tile. Decorative, so < md it
-             yields its 2.375rem to the title and actions (the Back tile above
-             is navigation and always stays). -->
+        <!-- Listing/index page: the module icon tile. -->
         <span
           v-else-if="icon"
           class="rounded-default bg-tabs-active-bg text-tabs-active-text inline-flex h-9.5 w-9.5 shrink-0 items-center justify-center max-md:hidden"
@@ -133,8 +131,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Fixed-height subtitle band: keeps the <h1> at an identical Y whether
              the subtitle is present or not, so the title doesn't appear to shift
              when navigating between views. Content is vertically centered. -->
-          <!-- max-md:hidden: on phones a truncated tagline reads as clutter next
-               to the actions — the title carries the page alone. -->
           <OText
             v-if="hasSubtitle"
             variant="meta"
@@ -156,8 +152,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Module tabs (Level-2 nav), inline to the right of the title.
            Two-row mode renders them as a full-width strip below instead. -->
-        <!-- < md inline tabs get their own full row: squeezed next to the title
-             they overflow the header instead of wrapping. -->
         <div
           v-if="hasTabs && !tabsBelow"
           class="flex h-full min-w-0 flex-1 items-center max-md:h-auto max-md:basis-full max-md:flex-wrap"
@@ -166,24 +160,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <!-- < md the actions stay on the title's row while it still has its 8rem
-           floor (above), and wrap to their own row only when it doesn't — so a
-           short title with one button keeps a single-row header instead of
-           always spending a second row on a button beside empty space. -->
-      <!-- max-w-full + shrink are what let the wrap above actually happen: with
-           shrink-0 and no max-width a five-button group just runs off the screen
-           instead of wrapping within its own row. -->
+      <!-- max-w-full + shrink let the group wrap within its row; shrink-0 alone runs it off-screen. -->
       <div
         v-if="hasActions || hasActionsOverflow"
         class="ms-auto flex shrink-0 items-center gap-2 max-md:max-w-full max-md:shrink max-md:flex-wrap max-md:justify-end"
       >
-        <!-- overflowFirst: the secondary group precedes the primary CTA on desktop. -->
         <slot v-if="hasActionsOverflow && !isMobile && overflowFirst" name="actions-overflow" />
         <slot name="actions" />
 
-        <!-- Secondary actions. Inline on desktop; < md they collapse behind one
-             "More" button so a long toolbar keeps the primary actions on a
-             single row instead of wrapping into a block of icons. -->
         <template v-if="hasActionsOverflow">
           <slot v-if="!isMobile && !overflowFirst" name="actions-overflow" />
           <ODropdown v-else-if="isMobile" side="bottom" align="end">
@@ -279,14 +263,13 @@ const props = withDefaults(
   },
 );
 
-// Desktop keeps a fixed h-15 row so h-full slot content (inline tabs, dividers) spans it; < lg the row may wrap.
+// Fixed h-15 so h-full slot content (inline tabs, dividers) spans the row; < lg it may wrap.
 const ROW_CLASS =
   "flex h-15 items-center justify-between gap-4 max-lg:h-auto max-lg:min-h-15 max-lg:flex-wrap max-lg:gap-y-1 max-lg:py-1.5";
 
 const router = useRouter();
 const slots = useSlots();
 const { t } = useI18nTyped();
-// < md the secondary actions collapse behind a "More" button (see template).
 const { isMobile } = useBreakpoint();
 
 // The first header inside a sidebar layout carries its phone trigger, saving the layout a row.

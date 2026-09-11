@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     :class="[
-      // < lg the hero stack outgrows its pane, so it scrolls there instead of clipping; safe centering keeps the top reachable.
+      // Safe centering keeps the top reachable once the stack overflows its pane and scrolls.
       'o2-empty-state relative flex flex-col items-center justify-center overflow-hidden',
       'max-lg:justify-center-safe max-lg:overflow-x-hidden max-lg:overflow-y-auto',
       '[--empty-dot:var(--color-grey-300)] dark:[--empty-dot:var(--color-grey-800)]',
@@ -103,8 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :class="[
           props.columns
             ? 'flex flex-wrap justify-center'
-            : // < lg the single-row card strip wraps instead of overflowing.
-              'flex items-stretch justify-center max-lg:flex-wrap lg:flex-nowrap',
+            : 'flex items-stretch justify-center max-lg:flex-wrap lg:flex-nowrap',
           sizeClass.actions,
         ]"
       >
