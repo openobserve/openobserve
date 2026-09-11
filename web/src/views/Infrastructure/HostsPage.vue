@@ -73,6 +73,8 @@ const range = ref({ start: nowUs() - HOSTS_DEFAULT_WINDOW_US, end: nowUs() });
 
 const orgId = computed(() => store.state.selectedOrganization?.identifier ?? "");
 
+const dateTimePickerRef = ref<{ refresh?: () => void } | null>(null);
+
 const refreshList = async () => {
   loading.value = true;
   try {
@@ -82,10 +84,39 @@ const refreshList = async () => {
   }
 };
 
+// Set while picker.refresh() runs so its programmatic re-emit may fetch; the
+// mount replay, which carries the same userChangedValue:false, still must not.
+let reAnchoring = false;
+let reAnchorFetched = false;
+
+/**
+ * Re-anchor before fetching: the picker defaults to a RELATIVE 3h, so replaying
+ * the window captured at mount would never notice a host that died since.
+ */
+const onRefreshClick = () => {
+  const picker = dateTimePickerRef.value;
+  if (!picker?.refresh) {
+    refreshList();
+    return;
+  }
+  reAnchoring = true;
+  reAnchorFetched = false;
+  try {
+    picker.refresh();
+  } finally {
+    reAnchoring = false;
+  }
+  // DateTime.refresh() emits synchronously today; if that ever changes, the
+  // window is merely stale rather than the button going dead.
+  if (!reAnchorFetched) refreshList();
+};
+
 const onDateChange = (date: { startTime: number; endTime: number; userChangedValue?: boolean }) => {
   range.value = { start: date.startTime, end: date.endTime };
   // DateTime replays on mount with userChangedValue:false — "do not fetch" (DateTime.vue contract).
-  if (date.userChangedValue === false) return;
+  if (date.userChangedValue === false && !reAnchoring) return;
+  // The picker re-emitted, so the window is current whether or not we fetch.
+  if (reAnchoring) reAnchorFetched = true;
   if (hostsState.value !== "detected") return;
   refreshList();
 };
@@ -339,6 +370,7 @@ const osToggleLabel = (slug: string) =>
           }}
         </OText>
         <DateTime
+          ref="dateTimePickerRef"
           auto-apply
           menu-align="end"
           default-type="relative"
@@ -352,7 +384,7 @@ const osToggleLabel = (slug: string) =>
           icon-left="refresh"
           data-test="hosts-refresh"
           :loading="loading"
-          @click="refreshList"
+          @click="onRefreshClick"
         >
           {{ t("infra.hosts.refresh") }}
         </OButton>
@@ -480,7 +512,9 @@ const osToggleLabel = (slug: string) =>
               }}</OTag>
             </div>
           </section>
-          <OText variant="meta" class="px-2 pb-2">{{ t("infra.hosts.rangeNote") }}</OText>
+          <OText variant="meta" class="px-2 pb-2" data-test="hosts-range-note">{{
+            t("infra.hosts.rangeNote")
+          }}</OText>
         </div>
 
         <div class="min-h-0 flex-1">

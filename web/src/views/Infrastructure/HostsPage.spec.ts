@@ -103,11 +103,17 @@ const passthrough = (name: string) =>
     },
   });
 
-const dateTimeStub = {
+// Mirrors DateTime.vue's exposed refresh(): the page re-anchors a relative
+// range by calling it, so the stub has to expose a spy rather than a no-op.
+const dateTimeRefreshSpy = vi.fn();
+const dateTimeStub = defineComponent({
   name: "DateTime",
   emits: ["on:date-change"],
-  template: "<div data-test='hosts-datetime-stub' />",
-};
+  setup(_p, { expose }) {
+    expose({ refresh: dateTimeRefreshSpy });
+    return () => h("div", { "data-test": "hosts-datetime-stub" });
+  },
+});
 
 const drawerStub = {
   name: "HostDetailDrawer",
@@ -196,6 +202,8 @@ describe("HostsPage", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // clearAllMocks keeps implementations, so a per-test re-emit would leak.
+    dateTimeRefreshSpy.mockReset();
     workloadStates.value = { hosts: "detected", kubernetes: "undetected", aws: "undetected" };
     hostsListState.rows.value = [];
     hostsListState.filteredRows.value = [];
@@ -258,6 +266,28 @@ describe("HostsPage", () => {
       await flushPromises();
       expect(wrapper.find('[data-test="setup-card-stub"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="hosts-table-stub"]').exists()).toBe(true);
+    });
+  });
+
+  describe("instant-value honesty", () => {
+    // The utilization columns are instant samples taken at the window's end
+    // (/api/v1/query has no start parameter), so the page must never present
+    // them as an aggregate over the picked range.
+    it("labels the utilization columns as current, not as window aggregates", async () => {
+      wrapper = await mountPage();
+      const columns = wrapper.findComponent({ name: "OTable" }).props("columns") as any[];
+      const header = (id: string) => columns.find((c) => c.id === id)?.header;
+      expect(header("cpu")).toBe("CPU % (current)");
+      expect(header("memory")).toBe("Memory (current)");
+      expect(header("disk")).toBe("Disk % (current)");
+      expect(header("load")).toBe("Load 15m (current)");
+    });
+
+    it("says plainly that utilization is a latest sample while the range drives membership", async () => {
+      wrapper = await mountPage();
+      const note = wrapper.find('[data-test="hosts-range-note"]');
+      expect(note.exists()).toBe(true);
+      expect(note.text()).toMatch(/latest sample/i);
     });
   });
 
@@ -566,6 +596,51 @@ describe("HostsPage", () => {
       await wrapper.find('[data-test="hosts-refresh"]').trigger("click");
       await flushPromises();
       expect(hostsListState.refresh).toHaveBeenCalledTimes(1);
+    });
+
+    it("re-anchors a relative range through the picker instead of replaying the mount window", async () => {
+      // The picker defaults to a RELATIVE 3h. Refreshing an hour later must ask
+      // the picker for "3h from now" — a captured absolute window would leave a
+      // host that died since reading ACTIVE, with last-seen frozen.
+      wrapper = await mountPage();
+      hostsListState.refresh.mockClear();
+      await wrapper.find('[data-test="hosts-refresh"]').trigger("click");
+      await flushPromises();
+      expect(dateTimeRefreshSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it("still does not fan out on Refresh while the org is undetected", async () => {
+      // The re-anchor fallback must not become a second way past the detection gate.
+      dateTimeRefreshSpy.mockImplementation(() => {
+        wrapper
+          .findComponent({ name: "DateTime" })
+          .vm.$emit("on:date-change", { startTime: 900, endTime: 1000, userChangedValue: false });
+      });
+      workloadStates.value = { ...workloadStates.value, hosts: "undetected" };
+      wrapper = await mountPage();
+      hostsListState.refresh.mockClear();
+      await wrapper.find('[data-test="hosts-refresh"]').trigger("click");
+      await flushPromises();
+      expect(hostsListState.refresh).not.toHaveBeenCalled();
+    });
+
+    it("fetches the window the re-anchored picker reports, not the one captured at mount", async () => {
+      // Refresh must fan out with the window the picker recomputes at click
+      // time. A page that re-queries its captured absolute window never sees a
+      // host that died since mount, and freezes last-seen.
+      const advanced = { startTime: 900, endTime: 1000 };
+      dateTimeRefreshSpy.mockImplementation(() => {
+        wrapper
+          .findComponent({ name: "DateTime" })
+          .vm.$emit("on:date-change", { ...advanced, userChangedValue: false });
+      });
+      wrapper = await mountPage();
+      hostsListState.refresh.mockClear();
+      await wrapper.find('[data-test="hosts-refresh"]').trigger("click");
+      await flushPromises();
+      expect(hostsListState.refresh).toHaveBeenLastCalledWith(
+        expect.objectContaining({ start: 900, end: 1000 }),
+      );
     });
   });
 
