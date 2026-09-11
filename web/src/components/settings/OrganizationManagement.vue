@@ -826,10 +826,7 @@ export default defineComponent({
 
     const resurrectOrganization = async (row: any) => {
       try {
-        await OrganizationServices.resurrect_org(
-          store.state.zoConfig.meta_org,
-          row.identifier,
-        );
+        await OrganizationServices.resurrect_org(store.state.zoConfig.meta_org, row.identifier);
         toast({ variant: "success", message: t("iam.listOrganizations.organizationResurrected") });
         getData();
       } catch (e: any) {
