@@ -20,10 +20,13 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 
-vi.mock("@/services/iam", () => ({
-  getGroup: vi.fn(() => Promise.resolve({ data: {} })),
-  updateGroup: vi.fn(() => Promise.resolve({})),
-}));
+vi.mock("@/services/iam", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    getGroup: vi.fn(() => Promise.resolve({ data: {} })),
+    updateGroup: vi.fn(() => Promise.resolve({})),
+  });
+});
 
 vi.mock("@/composables/iam/usePermissions", () => ({
   default: vi.fn(() => ({

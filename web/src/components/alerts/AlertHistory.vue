@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         icon-left="refresh"
         @click="refreshData"
         data-test="alert-history-refresh-btn"
-        :loading="loading"
+        :loading="fetching"
       >
         <OTooltip :content="t('common.refresh')" />
       </OButton>
@@ -467,7 +467,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch } from "vue";
+import type { AlertHistoryQuery } from "@/services/alerts";
+import { useOrgId } from "@/composables/query/useOrgId";
+import { useQuery } from "@tanstack/vue-query";
+import { alertHistoryQuery, alertsListQuery } from "@/services/alerts.queries";
+import { queryClient } from "@/composables/query/queryClient";
+import { ref, onMounted, watch, nextTick } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -476,7 +481,6 @@ import DateTime from "@/components/DateTime.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import alertsService from "@/services/alerts";
 import NoData from "@/components/shared/grid/NoData.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -495,7 +499,33 @@ const store = useStore();
 const router = useRouter();
 
 // Data
-const loading = ref(false);
+// The query shape this page is currently reading (range + page + sort +
+// filter). Held reactively so the key forks per shape — paging back to a page
+// already seen renders from cache instead of blanking the table.
+const orgIdForHistory = useOrgId();
+const readQuery = ref<AlertHistoryQuery | null>(null);
+const hasRequestedHistory = ref(false);
+
+// `enabled: false` does not stop the options factory from running, and the key
+// builder reads fields off the query — so a placeholder stands in until the page
+// has actually asked for a page of history.
+const EMPTY_HISTORY_QUERY = {
+  start_time: 0,
+  end_time: 0,
+  from: 0,
+  size: 0,
+} as unknown as AlertHistoryQuery;
+
+const historyList = useQuery(() =>
+  Object.assign(alertHistoryQuery(orgIdForHistory.value, readQuery.value ?? EMPTY_HISTORY_QUERY), {
+    enabled: hasRequestedHistory.value && !!readQuery.value && !!orgIdForHistory.value,
+  }),
+);
+
+const loading = historyList.isLoading;
+// A request in flight while rows stay on screen — the refresh button's
+// spinner. `loading` is the skeleton, which only a cold read wants.
+const fetching = historyList.isFetching;
 const rows = ref<any[]>([]);
 const searchQuery = ref("");
 const selectedAlert = ref<any>(null);
@@ -664,28 +694,18 @@ const fetchAlertsList = async () => {
   try {
     const org = store.state.selectedOrganization.identifier;
 
-    // Fetch all alerts for the organization
-    const res = await alertsService.listByFolderId(
-      1,
-      1000,
-      "name",
-      false,
-      "",
-      org,
-      "", // all folders
-      "", // no query filter
-    );
+    // All folders ("") — through the cached list read, so revisits share the
+    // entry instead of re-downloading every alert for the name filter.
+    const list = await queryClient.fetchQuery(alertsListQuery(org, ""));
 
-    if (res.data && res.data.list) {
-      // Store complete alert objects and sort by name
-      allAlerts.value = res.data.list
-        .map((alert: any) => ({
-          label: alert.name,
-          value: alert.alert_id,
-        }))
-        .sort((a: { label: string }, b: { label: string }) => a.label.localeCompare(b.label));
-      filteredAlertOptions.value = [...allAlerts.value];
-    }
+    // Store complete alert objects and sort by name
+    allAlerts.value = (list ?? [])
+      .map((alert: any) => ({
+        label: alert.name,
+        value: alert.alert_id,
+      }))
+      .sort((a: { label: string }, b: { label: string }) => a.label.localeCompare(b.label));
+    filteredAlertOptions.value = [...allAlerts.value];
   } catch (error: any) {
     console.error("Error fetching alerts list:", error);
     // Silently fail - user can still type alert names manually
@@ -710,10 +730,12 @@ const clearSearch = () => {
 
 const manualSearch = () => {
   currentPage.value = 1;
-  fetchAlertHistory();
+  // The user explicitly asked for results, so this always hits the server even
+  // when the filter shape is unchanged.
+  fetchAlertHistory(true);
 };
 
-const fetchAlertHistory = async () => {
+const fetchAlertHistory = async (force = false) => {
   loading.value = true;
   try {
     const org = store.state.selectedOrganization.identifier;
@@ -737,16 +759,40 @@ const fetchAlertHistory = async () => {
       query.sort_order = sortOrder.value;
     }
 
-    const response = await alertsService.getHistory(org, query);
-    if (response.data) {
-      const historyData = response.data;
-
-      rows.value = (historyData.hits || []).map((hit: any, index: number) => ({
+    const applyHistory = (data: any) => {
+      rows.value = (data.hits || []).map((hit: any, index: number) => ({
         ...hit,
         id: `${hit.timestamp}_${index}`,
       }));
+      totalCount.value = data.total || 0;
+    };
 
-      totalCount.value = historyData.total || 0;
+    // Cached per query shape (range + page + sort + filter), so paging back to
+    // a page already seen renders from cache instead of blanking the table.
+    // Stale-while-revalidate otherwise: the page keeps its rows while the
+    // refetch runs.
+    readQuery.value = query;
+    // Let the key pick up the new query shape before asking for the data.
+    await nextTick();
+
+    if (!hasRequestedHistory.value) {
+      hasRequestedHistory.value = true;
+      await nextTick();
+      await historyList.suspense();
+    } else if (force) {
+      await historyList.refetch();
+    } else {
+      await historyList.suspense();
+    }
+    await nextTick();
+
+    {
+      if (historyList.data.value) applyHistory(historyList.data.value);
+
+      const nextFrom = currentPage.value * pageSize.value;
+      if (nextFrom < totalCount.value) {
+        queryClient.prefetchQuery(alertHistoryQuery(org, { ...query, from: nextFrom.toString() }));
+      }
 
       if (rows.value.length === 0) {
         console.warn("No alert history found for the selected time range");
@@ -800,7 +846,7 @@ const onSortChange = (params: { column: string; order: "asc" | "desc" }) => {
 };
 
 const refreshData = () => {
-  fetchAlertHistory();
+  fetchAlertHistory(true);
 };
 
 const formatHistoryDate = (timestamp: number) => {

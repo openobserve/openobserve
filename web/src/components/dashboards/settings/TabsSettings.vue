@@ -136,7 +136,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, nextTick, ref } from "vue";
+import {
+  defineComponent,
+  nextTick,
+  ref,
+  reactive,
+  onMounted,
+  onActivated,
+  onBeforeUnmount,
+} from "vue";
 import Sortable from "sortablejs";
 import { raw, useI18nTyped } from "@/types/i18n";
 import DashboardHeader from "./common/DashboardHeader.vue";
@@ -148,8 +156,6 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
-import { reactive } from "vue";
-import { onMounted, onActivated, onBeforeUnmount } from "vue";
 import AddTab from "@/components/dashboards/tabs/AddTab.vue";
 import TabsDeletePopUp from "./TabsDeletePopUp.vue";
 import useNotifications from "@/composables/useNotifications";

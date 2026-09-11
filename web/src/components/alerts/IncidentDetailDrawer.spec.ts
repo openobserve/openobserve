@@ -28,16 +28,19 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 }));
 
 // Mock incidents service
-vi.mock("@/services/incidents", () => ({
-  default: {
-    get: vi.fn(),
-    updateStatus: vi.fn(),
-    triggerRca: vi.fn(),
-    getCorrelatedStreams: vi.fn(),
-    getEvents: vi.fn(),
-    updateIncident: vi.fn(),
-  },
-}));
+vi.mock("@/services/incidents", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      get: vi.fn(),
+      updateStatus: vi.fn(),
+      triggerRca: vi.fn(),
+      getCorrelatedStreams: vi.fn(),
+      getEvents: vi.fn(),
+      updateIncident: vi.fn(),
+    },
+  });
+});
 
 // Mock service streams API
 vi.mock("@/services/service_streams", () => ({
@@ -314,7 +317,10 @@ describe("IncidentDetailDrawer.vue", () => {
       // Resolve the promise
       resolvePromise!({ data: createIncidentWithAlerts({ id: "test-123" }) });
       await flushPromises();
-      await nextTick(); // Give Vue time to update reactive state
+      // The query layer defers its fetch a microtask, so the loader settles a
+      // tick after the service promise does.
+      await flushPromises();
+      await nextTick();
 
       // Now loading should be false
       expect(incidentsService.get).toHaveBeenCalled();

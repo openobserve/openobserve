@@ -41,20 +41,26 @@ vi.mock("@/composables/useStreams", () => ({
   }),
 }));
 
-vi.mock("../../services/jstransform", () => ({
-  default: {
-    list: mockJsTransformList,
-    apply_stream_function: mockApplyStreamFunction,
-    stream_function: mockStreamFunction,
-    remove_stream_function: mockRemoveStreamFunction,
-  },
-}));
+vi.mock("../../services/jstransform", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list: mockJsTransformList,
+      apply_stream_function: mockApplyStreamFunction,
+      stream_function: mockStreamFunction,
+      remove_stream_function: mockRemoveStreamFunction,
+    },
+  });
+});
 
-vi.mock("../../services/stream", () => ({
-  default: {
-    delete: vi.fn(),
-  },
-}));
+vi.mock("../../services/stream", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      delete: vi.fn(),
+    },
+  });
+});
 
 vi.mock("@/services/segment_analytics", () => ({
   default: {

@@ -198,6 +198,7 @@ the Free Software Foundation, either version 3 of the License, or
             :configs-loading="isLoading"
             @update:agent-key="onQualityAgentChange"
             @ready="reloadQuality"
+            @reload-configs="loadAll(orgId, true)"
           />
           <ScoreConfigList
             v-else-if="activeTab === 'scoreConfigs'"
@@ -216,7 +217,7 @@ the Free Software Foundation, either version 3 of the License, or
             @import-custom="goToImportScoreConfig"
             @export="exportScoreConfigRow"
             @export-bulk="exportScoreConfigBulk"
-            @refresh="loadAll(orgId)"
+            @refresh="loadAll(orgId, true)"
           />
           <ScorerList
             v-else-if="activeTab === 'scorers'"
@@ -238,7 +239,7 @@ the Free Software Foundation, either version 3 of the License, or
             @export="exportScorerRow"
             @export-bulk="exportScorerBulk"
             @add-provider="goToAddProvider"
-            @refresh="loadAll(orgId)"
+            @refresh="loadAll(orgId, true)"
           />
           <EvalJobList
             v-else-if="activeTab === 'jobs'"
@@ -256,7 +257,7 @@ the Free Software Foundation, either version 3 of the License, or
             @pause="(row: EvalJob) => pauseJob(row)"
             @delete="(row: EvalJob) => deleteRow(row)"
             @delete-bulk="(ids: string[]) => deleteJobsBulk(ids)"
-            @refresh="loadAll(orgId)"
+            @refresh="loadAll(orgId, true)"
           />
         </div>
       </section>
@@ -370,12 +371,17 @@ the Free Software Foundation, either version 3 of the License, or
 </template>
 
 <script setup lang="ts">
+import {
+  setJobActiveMutation,
+  deleteEvalEntityMutation,
+} from "@/services/online-evals.service.queries";
+import { useMutation } from "@tanstack/vue-query";
 import { computed, nextTick, onBeforeMount, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import onlineEvalsService, {
+import {
   type EvalJob,
   type ScoreConfig,
   type Scorer,
@@ -828,6 +834,7 @@ watch(
 );
 
 onBeforeMount(async () => {
+  // Mount reads the cache; only the refresh button and post-write reloads force.
   await loadAll(orgId.value);
   syncFromRoute();
 });
@@ -917,16 +924,19 @@ function crossNavigateToJob(row: EvalJob) {
   router.push({ name: route.name as string, query }).catch(() => {});
 }
 
+const setJobActive = useMutation(() => setJobActiveMutation(orgId.value));
+const deleteEvalEntity = useMutation(() => deleteEvalEntityMutation(orgId.value));
+
 async function activateJob(row: EvalJob) {
   if (pendingJobStatusId.value !== null) return;
   pendingJobStatusId.value = row.id;
   try {
-    await onlineEvalsService.jobs.activate(orgId.value, row.id);
+    await setJobActive.mutateAsync({ id: row.id, active: true });
     toast({
       variant: "success",
       message: t("onlineEvals.actions.activated"),
     });
-    await loadAll(orgId.value);
+    await loadAll(orgId.value, true);
   } catch (err: any) {
     showError(err, t("onlineEvals.actions.activateError"));
   } finally {
@@ -938,12 +948,12 @@ async function pauseJob(row: EvalJob) {
   if (pendingJobStatusId.value !== null) return;
   pendingJobStatusId.value = row.id;
   try {
-    await onlineEvalsService.jobs.pause(orgId.value, row.id);
+    await setJobActive.mutateAsync({ id: row.id, active: false });
     toast({
       variant: "success",
       message: t("onlineEvals.actions.paused"),
     });
-    await loadAll(orgId.value);
+    await loadAll(orgId.value, true);
   } catch (err: any) {
     showError(err, t("onlineEvals.actions.pauseError"));
   } finally {
@@ -972,7 +982,7 @@ async function handleSaved() {
   dialog.value = { open: false, mode: "create", row: null };
   scorerTypeDialog.value = false;
   clearRouteAction();
-  await loadAll(orgId.value);
+  await loadAll(orgId.value, true);
 }
 
 function goToImportScoreConfig() {
@@ -985,7 +995,7 @@ function closeImport() {
 
 async function handleImportSaved() {
   importingEntity.value = null;
-  await loadAll(orgId.value);
+  await loadAll(orgId.value, true);
 }
 
 function openScoreConfigLibrary() {
@@ -1004,7 +1014,7 @@ async function triggerScoreConfigLibraryImport() {
 
 async function handleScoreConfigLibraryImported() {
   showScoreConfigLibrary.value = false;
-  await loadAll(orgId.value);
+  await loadAll(orgId.value, true);
 }
 
 function exportScoreConfigRow(row: ScoreConfig) {
@@ -1046,7 +1056,7 @@ async function triggerScorerLibraryImport() {
 
 async function handleScorerLibraryImported() {
   showScorerLibrary.value = false;
-  await loadAll(orgId.value);
+  await loadAll(orgId.value, true);
 }
 
 function exportScorerRow(row: Scorer) {
@@ -1210,17 +1220,19 @@ async function performDelete() {
   if (!row || !tab) return;
   const singular = t(`onlineEvals.singular.${tab}`);
   try {
-    if (tab === "scoreConfigs")
-      await onlineEvalsService.scoreConfigs.delete(orgId.value, entityId(row as ScoreConfig));
-    else if (tab === "scorers")
-      await onlineEvalsService.scorers.delete(orgId.value, entityId(row as Scorer));
-    else if (tab === "jobs") await onlineEvalsService.jobs.delete(orgId.value, (row as EvalJob).id);
+    const id =
+      tab === "scoreConfigs"
+        ? entityId(row as ScoreConfig)
+        : tab === "scorers"
+          ? entityId(row as Scorer)
+          : (row as EvalJob).id;
+    await deleteEvalEntity.mutateAsync({ tab, id });
 
     toast({
       variant: "success",
       message: t("onlineEvals.deleted", { label: singular }),
     });
-    await loadAll(orgId.value);
+    await loadAll(orgId.value, true);
   } catch (err: any) {
     showError(err, t("onlineEvals.deleteError", { label: singular.toLowerCase() }));
   } finally {
@@ -1237,7 +1249,7 @@ async function performBulkJobsDelete() {
   jobsBulkDeleting.value = true;
   try {
     const results = await Promise.allSettled(
-      ids.map((id) => onlineEvalsService.jobs.delete(orgId.value, id)),
+      ids.map((id) => deleteEvalEntity.mutateAsync({ tab: "jobs", id })),
     );
     const failed = results.filter((r) => r.status === "rejected").length;
     if (failed > 0) {
@@ -1253,7 +1265,7 @@ async function performBulkJobsDelete() {
         message: t("onlineEvals.job.deletedBulk", { count: ids.length }),
       });
     }
-    await loadAll(orgId.value);
+    await loadAll(orgId.value, true);
   } finally {
     pendingBulkDeleteIds.value = [];
     pendingDeleteTab.value = null;

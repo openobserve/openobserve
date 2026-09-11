@@ -50,11 +50,14 @@ vi.mock("vue-router", () => ({
 const listWorkflowsMock = vi.fn(async () => ({
   data: { list: [{ id: "wf-1", name: "Escalate to PagerDuty" }] },
 }));
-vi.mock("@/services/workflows", () => ({
-  default: {
-    listWorkflows: (...args: any[]) => listWorkflowsMock(...args),
-  },
-}));
+vi.mock("@/services/workflows", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      listWorkflows: (...args: any[]) => listWorkflowsMock(...args),
+    },
+  });
+});
 
 function makeStore() {
   return createStore({

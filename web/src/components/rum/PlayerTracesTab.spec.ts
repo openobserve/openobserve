@@ -27,11 +27,14 @@ import { nextTick } from "vue";
 const mockSearch = vi.fn();
 const mockFetchQueryDataWithHttpStream = vi.fn();
 
-vi.mock("@/services/search", () => ({
-  default: {
-    search: (...args: any[]) => mockSearch(...args),
-  },
-}));
+vi.mock("@/services/search", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      search: (...args: any[]) => mockSearch(...args),
+    },
+  });
+});
 
 // Fix 1: generateTraceContext lives in zincutils, not @/utils/trace.
 // Fix 2: formatTimeWithSuffix mock kept for deterministic duration assertions.

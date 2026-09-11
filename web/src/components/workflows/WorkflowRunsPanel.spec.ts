@@ -19,7 +19,7 @@
 // children (OTable, DateTime, timeline) are stubbed; the run-click wiring and the
 // highlight function are what matter.
 
-import { vi } from "vitest";
+import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
 
 const { mockList, mockToast, mockRetry } = vi.hoisted(() => ({
   mockList: vi.fn().mockResolvedValue({ data: [] }),
@@ -27,12 +27,15 @@ const { mockList, mockToast, mockRetry } = vi.hoisted(() => ({
   mockRetry: vi.fn().mockResolvedValue({ data: {} }),
 }));
 
-vi.mock("@/services/workflows", () => ({
-  default: {
-    getWorkflowHistory: (...a: any[]) => mockList(...a),
-    retryWorkflow: (...a: any[]) => mockRetry(...a),
-  },
-}));
+vi.mock("@/services/workflows", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      getWorkflowHistory: (...a: any[]) => mockList(...a),
+      retryWorkflow: (...a: any[]) => mockRetry(...a),
+    },
+  });
+});
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: (...a: any[]) => mockToast(...a),
 }));
@@ -91,7 +94,6 @@ const DateTimeStub = {
   },
 };
 
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises, enableAutoUnmount } from "@vue/test-utils";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";

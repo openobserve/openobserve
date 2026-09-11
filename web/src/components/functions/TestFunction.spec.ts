@@ -25,17 +25,23 @@ vi.mock("@/composables/useParser", () => ({
   }),
 }));
 
-vi.mock("@/services/search", () => ({
-  default: {
-    search: vi.fn(),
-  },
-}));
+vi.mock("@/services/search", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      search: vi.fn(),
+    },
+  });
+});
 
-vi.mock("@/services/jstransform", () => ({
-  default: {
-    test: vi.fn(),
-  },
-}));
+vi.mock("@/services/jstransform", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      test: vi.fn(),
+    },
+  });
+});
 
 vi.mock("@/utils/date", () => ({
   getConsumableRelativeTime: vi.fn(),

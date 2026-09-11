@@ -58,20 +58,26 @@ vi.mock("vue-router", () => ({
   onBeforeRouteLeave: vi.fn(),
 }));
 
-vi.mock("@/services/synthetics", () => ({
-  default: {
-    getLocations: mockServiceGetLocations,
-    create: mockServiceCreate,
-    update: mockServiceUpdate,
-    get: mockServiceGet,
-  },
-}));
+vi.mock("@/services/synthetics", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      getLocations: mockServiceGetLocations,
+      create: mockServiceCreate,
+      update: mockServiceUpdate,
+      get: mockServiceGet,
+    },
+  });
+});
 
-vi.mock("@/services/alert_destination", () => ({
-  default: {
-    list: vi.fn().mockResolvedValue({ data: [] }),
-  },
-}));
+vi.mock("@/services/alert_destination", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list: vi.fn().mockResolvedValue({ data: [] }),
+    },
+  });
+});
 
 vi.mock("@/utils/commons", () => ({
   getFoldersListByType: vi.fn().mockResolvedValue([]),

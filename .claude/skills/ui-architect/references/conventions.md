@@ -33,7 +33,7 @@ and [references/page-recipes.md](page-recipes.md).
   background, no border). Every card must carry explicit surface classes, e.g.
   `bg-card-glass-bg rounded-default border border-border-default` (the AI
   Observability panel family) or `bg-surface-base border border-border-default
-  rounded-default` (synthetics). Copy the class string from the sibling family
+rounded-default` (synthetics). Copy the class string from the sibling family
   verbatim.
 - **A fixed set of stacked panels must not make the page scroll.** When a page
   is N cards tall (dashboards, signal panels), give it the full-height split:
@@ -98,13 +98,14 @@ looking for one to reshape a component, that's the signal you need a new
 The visual of an O2 component is produced by its own `variant`/`size`, never by
 patching it from outside. Banned on an O2 component:
 
-| Banned | Why | Instead |
-| --- | --- | --- |
-| `style="color: #fff; padding: 10px"` | hardcoded colors/px, bypasses tokens | use `variant` / `size` / component design |
-| `class="tw:px-2 tw:text-sm"` (`tw:` prefix) | prefix removed — `tw:*` doesn't resolve | use component `variant`/`size` props |
-| `<style scoped>` targeting its class | invisible fork of the design system | move the intent into a `variant` |
+| Banned                                      | Why                                     | Instead                                   |
+| ------------------------------------------- | --------------------------------------- | ----------------------------------------- |
+| `style="color: #fff; padding: 10px"`        | hardcoded colors/px, bypasses tokens    | use `variant` / `size` / component design |
+| `class="tw:px-2 tw:text-sm"` (`tw:` prefix) | prefix removed — `tw:*` doesn't resolve | use component `variant`/`size` props      |
+| `<style scoped>` targeting its class        | invisible fork of the design system     | move the intent into a `variant`          |
 
 Decision flow for any visual that differs from the default:
+
 1. Expressible via `variant` / `size`? → use the prop.
 2. No variant covers it? → add a new named variant to the component source, then
    use it.
@@ -148,7 +149,7 @@ conditional.
 
 ### Comments stay short
 
-**One or two lines.** A comment carries the *why* behind a non-obvious choice —
+**One or two lines.** A comment carries the _why_ behind a non-obvious choice —
 not a re-telling of the code, and not the history of the PR that added it.
 
 ```vue
@@ -190,8 +191,8 @@ Decide where it lives:
   component in **`web/src/components/…`**, itself made of O2 components. Still a
   real component with a name and props, not inline markup.
 
-The trigger is simple: *if you're about to write a self-contained UI element —
-especially one you'd repeat — stop and make it a component.* Inline utility
+The trigger is simple: _if you're about to write a self-contained UI element —
+especially one you'd repeat — stop and make it a component._ Inline utility
 classes are for **layout/composition** of components (flex, grid, gap, spacing),
 never for reconstructing a component the library should own. This is the same
 reason a missing **variant** becomes a new variant and a missing **token**
@@ -210,8 +211,8 @@ before writing a new `O*` component.
 
 ## Choosing components & structure
 
-The rules above cover *how* you style. This section covers *what* to reach for
-and *where the code lives* — the recurring decisions that otherwise get answered
+The rules above cover _how_ you style. This section covers _what_ to reach for
+and _where the code lives_ — the recurring decisions that otherwise get answered
 differently on every screen.
 
 ### Page anatomy & the listing-page recipe
@@ -234,7 +235,7 @@ Lay out a whole page from a recipe, not from scratch — full recipes in
     `:show-global-filter="false"`. Only a search-only list with no other filters
     uses the built-in `show-global-filter` + `v-model:global-filter`.
   - **Refresh** — an `OButton variant="outline" size="icon-sm" icon-left="refresh"
-    :loading` in the `#toolbar-trailing` slot, wired to the fetch fn, with a
+:loading` in the `#toolbar-trailing` slot, wired to the fetch fn, with a
     tooltip carrying the `r` shortcut.
   - **Column show/hide toggle** — `OTable` **auto-injects** it (between `#toolbar`
     and `#toolbar-trailing`) when `:persist-columns="true"` + a stable `table-id` +
@@ -286,6 +287,7 @@ view (src/views)
 ```
 
 **How.**
+
 - **Never call `http`/axios directly from a component.** Fetch through the
   domain service in `src/services` (e.g. `dashboardService.list(...)`). Get
   `org_identifier` from `store.state.selectedOrganization` — don't thread it down
@@ -319,6 +321,7 @@ English value will diverge the first time someone edits one. Sharing the key is
 what makes the two surfaces stay in sync.
 
 **How.**
+
 - Before adding a formatter, grep `utils/formatters.ts` (and the sibling screen)
   for one that already exists — `formatEventCount`, `formatSizeFromMB`,
   `addCommasToNumber`, `formatLargeNumber`, `formatTimeWithSuffix`.
@@ -326,7 +329,7 @@ what makes the two surfaces stay in sync.
   (`t("home.totalDataIngested")` from the Streams page is correct, not a
   duplicate). A new key is for a genuinely new label.
 - Match the icon and tone family too when the tiles sit on comparable surfaces —
-  but never copy a *semantic* colour (green/amber/red) onto a non-health number
+  but never copy a _semantic_ colour (green/amber/red) onto a non-health number
   just to match; that's the one thing worth diverging on.
 
 ### Registering a new page in navigation
@@ -340,12 +343,12 @@ shapes, gating expressions, checklists) in
 
 **How — pick the surface by what the page is:**
 
-| The page is… | Surface | Edit |
-| --- | --- | --- |
-| A top-level product area | plain **left-rail item** | `linksList` in `web/src/layouts/MainLayout.vue` |
-| One of several related data destinations | **hover-flyout child** under a rail group | `NAV_GROUPS` in `web/src/lib/core/Navbar/navGroups.ts` |
-| An admin/config screen | **Settings sub-page** (SectionRail) | `settingsItems` in `web/src/components/settings/index.vue` |
-| An access-control screen | **IAM sub-page** (SectionRail) | `web/src/views/IdentityAccessManagement.vue` |
+| The page is…                             | Surface                                   | Edit                                                       |
+| ---------------------------------------- | ----------------------------------------- | ---------------------------------------------------------- |
+| A top-level product area                 | plain **left-rail item**                  | `linksList` in `web/src/layouts/MainLayout.vue`            |
+| One of several related data destinations | **hover-flyout child** under a rail group | `NAV_GROUPS` in `web/src/lib/core/Navbar/navGroups.ts`     |
+| An admin/config screen                   | **Settings sub-page** (SectionRail)       | `settingsItems` in `web/src/components/settings/index.vue` |
+| An access-control screen                 | **IAM sub-page** (SectionRail)            | `web/src/views/IdentityAccessManagement.vue`               |
 
 Plus a **route** (lazy `component`, `meta.title`, `beforeEnter: routeGuard`) in the
 composable that owns the domain, and a **gate** built from `config.isEnterprise` /
@@ -368,19 +371,20 @@ without RBAC). A hand-rolled sidebar link bypasses the flyout reshaping, the
 Match the container to the **weight** of the interaction. This is the
 established split in the codebase, not a preference:
 
-| Interaction | Container | Typical size |
-| --- | --- | --- |
-| Confirmation / destructive-action prompt | `ConfirmDialog` (`@/components/ConfirmDialog.vue`) + `useConfirmDialog` (`@/composables/useConfirmDialog`) | — |
-| Short, atomic form — one to a few fields, single decision (rename, clone, add-stream, create-link) | `ODialog` | `sm` / `md` |
-| Small detail or preview popup | `ODialog` | `sm` / `md` |
-| Medium-to-large form or config panel needing vertical room, or where seeing page context helps (pipeline node config, schema/regex/query editor) | `ODrawer` (side `right`) | `md` / `lg` or `:width` vw override |
-| Detail / inspector panel (trace details, job detail) | `ODrawer` | `lg` / `xl` |
-| Large **primary** multi-section create/edit flow (e.g. Add/Edit Alert) | full **in-page view** swapped with `v-if` — NOT an overlay | — |
+| Interaction                                                                                                                                      | Container                                                                                                  | Typical size                        |
+| ------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| Confirmation / destructive-action prompt                                                                                                         | `ConfirmDialog` (`@/components/ConfirmDialog.vue`) + `useConfirmDialog` (`@/composables/useConfirmDialog`) | —                                   |
+| Short, atomic form — one to a few fields, single decision (rename, clone, add-stream, create-link)                                               | `ODialog`                                                                                                  | `sm` / `md`                         |
+| Small detail or preview popup                                                                                                                    | `ODialog`                                                                                                  | `sm` / `md`                         |
+| Medium-to-large form or config panel needing vertical room, or where seeing page context helps (pipeline node config, schema/regex/query editor) | `ODrawer` (side `right`)                                                                                   | `md` / `lg` or `:width` vw override |
+| Detail / inspector panel (trace details, job detail)                                                                                             | `ODrawer`                                                                                                  | `lg` / `xl`                         |
+| Large **primary** multi-section create/edit flow (e.g. Add/Edit Alert)                                                                           | full **in-page view** swapped with `v-if` — NOT an overlay                                                 | —                                   |
 
 Rules of thumb:
+
 - Reach for `ODialog` first for anything short and modal-by-nature. Reach for
   `ODrawer` when the form is tall/multi-field or the user benefits from side
-  context. Promote to a full page when it's the screen's *primary* task and has
+  context. Promote to a full page when it's the screen's _primary_ task and has
   multiple sections.
 - Don't cram a tall multi-section form into a dialog (it scrolls awkwardly
   against the viewport), and don't use a drawer for a yes/no confirmation (too
@@ -422,13 +426,13 @@ read it before building a form. The non-negotiables:
 - **Build the payload with explicit keys**, never `{ ...value }` (it leaks
   `.optional()` helper fields and string-typed numbers — `OFormInput` emits
   strings, so coerce with `Number(...)` / `z.coerce.number()`).
-- **Conditional rendering off form state** — the component that *owns* `<OForm>`
+- **Conditional rendering off form state** — the component that _owns_ `<OForm>`
   creates it with `useOForm({ defaultValues, schema, onSubmit })` and passes
-  `<OForm :form>`; a child *inside* uses `inject(FORM_CONTEXT_KEY)` +
+  `<OForm :form>`; a child _inside_ uses `inject(FORM_CONTEXT_KEY)` +
   `form.useStore`. Both read the one form — never mirror it.
 - **Field arrays** use `z.array` + indexed names (`rows[${i}].key`) and
   **`:key="index"` — never a `uuid`** (a stable-id key blanks inputs on a mid-list
-  delete). Ship a delete-a-non-last-row test that asserts the *rendered* inputs.
+  delete). Ship a delete-a-non-last-row test that asserts the _rendered_ inputs.
 
 ### Keyboard shortcuts
 
@@ -448,4 +452,3 @@ The essentials:
   with a focus check so they don't fire while the user is typing.
 
 ---
-

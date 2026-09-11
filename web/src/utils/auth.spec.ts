@@ -12,17 +12,25 @@ vi.mock("vuex", () => ({
   useStore: vi.fn(),
 }));
 
-vi.mock("@/services/users", () => ({
-  default: {
-    logout: vi.fn().mockResolvedValue({}),
-  },
-}));
+vi.mock("@/services/users", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      logout: vi.fn().mockResolvedValue({}),
+    },
+  });
+});
 
-vi.mock("@/services/organizations", () => ({
-  default: {
-    get_organization_summary: vi.fn().mockResolvedValue({ data: { streams: { num_streams: 5 } } }),
-  },
-}));
+vi.mock("@/services/organizations", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      get_organization_summary: vi
+        .fn()
+        .mockResolvedValue({ data: { streams: { num_streams: 5 } } }),
+    },
+  });
+});
 
 vi.mock("@/utils/formatters", () => ({
   b64DecodeUnicode: vi.fn(),

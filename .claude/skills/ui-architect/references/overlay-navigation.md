@@ -20,13 +20,13 @@ O2 overlay primitives (Dialog, Drawer, Dropdown, Popover, Tooltip) and navigatio
 
 ## Overlay decision guide
 
-| If you need… | Use | Not |
-|---|---|---|
-| A hover/focus hint describing an element (no interaction inside) | **OTooltip** | Popover — a tooltip is dismissable-free and passive |
-| A menu of **actions** (Edit, Duplicate, Delete) triggered by a button | **ODropdown** + items | Popover — dropdown gives menu semantics (arrow-key nav, typeahead, `role="menu"`) |
-| **Freeform** floating content (filter form, color picker, mini info card) | **OPopover** | Dropdown — popover keeps normal Tab order and frees arrow keys for the content |
-| A focused **modal task** centred on screen (create/edit form, confirm) | **ODialog** | Drawer — dialog is for short, self-contained tasks |
-| A **side panel** task (details inspector, long form, contextual editor) | **ODrawer** | Dialog — drawer slides from an edge and can stay `seamless` (page still usable) |
+| If you need…                                                              | Use                   | Not                                                                               |
+| ------------------------------------------------------------------------- | --------------------- | --------------------------------------------------------------------------------- |
+| A hover/focus hint describing an element (no interaction inside)          | **OTooltip**          | Popover — a tooltip is dismissable-free and passive                               |
+| A menu of **actions** (Edit, Duplicate, Delete) triggered by a button     | **ODropdown** + items | Popover — dropdown gives menu semantics (arrow-key nav, typeahead, `role="menu"`) |
+| **Freeform** floating content (filter form, color picker, mini info card) | **OPopover**          | Dropdown — popover keeps normal Tab order and frees arrow keys for the content    |
+| A focused **modal task** centred on screen (create/edit form, confirm)    | **ODialog**           | Drawer — dialog is for short, self-contained tasks                                |
+| A **side panel** task (details inspector, long form, contextual editor)   | **ODrawer**           | Dialog — drawer slides from an edge and can stay `seamless` (page still usable)   |
 
 Rule of thumb: **Tooltip = hint, Dropdown = action menu, Popover = anything freeform, Dialog/Drawer = modal task.** Dialog and Drawer share the exact same surface, header/footer, built-in footer buttons, and `formId` auto-loading — choose by placement (center vs edge), not capability.
 
@@ -35,10 +35,12 @@ Rule of thumb: **Tooltip = hint, Dropdown = action menu, Popover = anything free
 ## Overlay
 
 ### ODialog
+
 **Import:** `@/lib/overlay/Dialog/ODialog.vue`
 **Use when:** A user must complete a short, self-contained task without leaving the page — create/edit forms, confirmations, focused settings.
 **Don't use for:** Long or contextual side-panel work (use **ODrawer**); a menu of actions (use **ODropdown**); a passive hint (use **OTooltip**).
 **Key props:**
+
 - `open` (boolean — controlled, use `v-model:open`)
 - `size` (`"xs"|"sm"|"md"|"lg"|"xl"|"full"` — default `"md"`; xs=320px, sm=480px, md=640px, lg=800px, xl=1024px, full=screen)
 - `width` (number 1–100 → `vw`; overrides `size` width entirely)
@@ -77,10 +79,12 @@ Rule of thumb: **Tooltip = hint, Dropdown = action menu, Popover = anything free
 ---
 
 ### ODrawer
+
 **Import:** `@/lib/overlay/Drawer/ODrawer.vue`
 **Use when:** A contextual or longer task belongs in a panel sliding from a viewport edge — details inspectors, long forms, side editors. Can stay `seamless` so the page underneath remains interactive.
 **Don't use for:** A short centred task or confirmation (use **ODialog**); a compact action menu (use **ODropdown**).
 **Key props:** (superset of ODialog — same header/footer/formId/built-in buttons) plus:
+
 - `side` (`"right"|"left"` — default `"right"`)
 - `size` (`"sm"|"md"|"lg"|"xl"|"full"` — default `"md"`; sm=360px, md=480px, lg=640px, xl=800px, full=100vw)
 - `width` (number 1–100 → `vw`, or `%` when `portalTarget` set; overrides `size`)
@@ -116,6 +120,7 @@ Rule of thumb: **Tooltip = hint, Dropdown = action menu, Popover = anything free
 ---
 
 ### ODropdown
+
 **Import:** `@/lib/overlay/Dropdown/ODropdown.vue`
 **Use when:** A trigger (icon button, "•••", "Actions") opens a menu of discrete actions. Gives full menu semantics — arrow-key navigation, typeahead, `role="menu"`.
 **Don't use for:** Freeform content like forms or pickers (use **OPopover**); a persistent tab strip (use **OTabs**).
@@ -141,6 +146,7 @@ Rule of thumb: **Tooltip = hint, Dropdown = action menu, Popover = anything free
 ---
 
 ### ODropdownItem
+
 **Import:** `@/lib/overlay/Dropdown/ODropdownItem.vue`
 **Use when:** A single selectable action row inside an ODropdown.
 **Don't use for:** A section heading (use **ODropdownGroup**'s `label`); a visual divider (use **ODropdownSeparator**).
@@ -150,7 +156,11 @@ Rule of thumb: **Tooltip = hint, Dropdown = action menu, Popover = anything free
 **Example:**
 
 ```vue
-<ODropdownItem icon-left="download" shortcut-id="export.csv" @select="exportCsv">
+<ODropdownItem
+  icon-left="download"
+  shortcut-id="export.csv"
+  @select="exportCsv"
+>
   Export CSV
 </ODropdownItem>
 ```
@@ -160,6 +170,7 @@ Rule of thumb: **Tooltip = hint, Dropdown = action menu, Popover = anything free
 ---
 
 ### ODropdownGroup
+
 **Import:** `@/lib/overlay/Dropdown/ODropdownGroup.vue`
 **Use when:** Grouping related items under an optional label inside an ODropdown.
 **Don't use for:** A plain divider without a heading (use **ODropdownSeparator**).
@@ -180,6 +191,7 @@ Rule of thumb: **Tooltip = hint, Dropdown = action menu, Popover = anything free
 ---
 
 ### ODropdownSeparator
+
 **Import:** `@/lib/overlay/Dropdown/ODropdownSeparator.vue`
 **Use when:** A thin visual divider between groups of dropdown items.
 **Don't use for:** A labelled section (use **ODropdownGroup**).
@@ -197,6 +209,7 @@ Rule of thumb: **Tooltip = hint, Dropdown = action menu, Popover = anything free
 ---
 
 ### OPopover
+
 **Import:** `@/lib/overlay/Popover/OPopover.vue`
 **Use when:** Floating content that isn't a list of actions — filter forms, pickers, info cards, mini editors. Keeps normal Tab order; arrow keys belong to the content. Non-modal by default. Descendant overlays (OSelect / OCombobox / nested dropdowns) opened inside won't dismiss it.
 **Don't use for:** A menu of actions (use **ODropdown** for menu semantics); a passive text hint (use **OTooltip**); a large modal task (use **ODialog**/**ODrawer**).
@@ -261,6 +274,7 @@ unfiltered page spends one button and a filtered one shows its scope as chips).
 ---
 
 ### OTooltip
+
 **Import:** `@/lib/overlay/Tooltip/OTooltip.vue`
 **Use when:** A passive hover/focus hint describing an element — icon-button labels, truncated text, disabled-state explanations. Two modes: **wrapper** (default slot wraps the trigger) or **child** (no default slot).
 **Child mode binds to the nearest previous VISIBLE ELEMENT SIBLING, and only falls back to the parent when there is none** — it is not simply "the parent". So put a child-mode `OTooltip` **first** inside the element you want as the trigger; placed after an `<OIcon>` it silently binds to that icon, and only the icon becomes hoverable. Text nodes do not count as siblings, so `<OIcon/> {{ count }} <OTooltip/>` binds to the icon and leaves the count dead. This shipped in the alert-dependency count chips, where the tooltip fired on a 12px glyph inside a 52px chip.
@@ -290,6 +304,7 @@ unfiltered page spends one button and a filtered one shows its scope as chips).
 ## Navigation
 
 ### OPagination
+
 **Import:** `@/lib/navigation/Pagination/OPagination.vue`
 **Use when:** Navigating a paged list/table — a centred window of page-number buttons with prev/next.
 **Don't use for:** Switching between content sections (use **OTabs**); a linear multi-step flow (use **OStepper**).
@@ -307,6 +322,7 @@ unfiltered page spends one button and a filtered one shows its scope as chips).
 ---
 
 ### OStepper
+
 **Import:** `@/lib/navigation/Stepper/OStepper.vue`
 **Use when:** A guided linear flow across multiple steps — a wizard, or (with `expanded`) a progress checklist/timeline. Root container owns the active-step state and only the active step's panel shows by default.
 **Don't use for:** Peer content sections switched in any order (use **OTabs**); paging a list (use **OPagination**).
@@ -334,6 +350,7 @@ unfiltered page spends one button and a filtered one shows its scope as chips).
 ---
 
 ### OStep
+
 **Import:** `@/lib/navigation/Stepper/OStep.vue`
 **Use when:** One step within an OStepper — registers itself and renders its content when active.
 **Don't use for:** Standalone use — must be a child of OStepper.
@@ -343,7 +360,13 @@ unfiltered page spends one button and a filtered one shows its scope as chips).
 **Example:**
 
 ```vue
-<OStep :name="2" title="Transform" description="Optional" :done="step > 2" :error="hasError">
+<OStep
+  :name="2"
+  title="Transform"
+  description="Optional"
+  :done="step > 2"
+  :error="hasError"
+>
   <TransformConfig />
 </OStep>
 ```
@@ -353,6 +376,7 @@ unfiltered page spends one button and a filtered one shows its scope as chips).
 ---
 
 ### OTabs
+
 **Import:** `@/lib/navigation/Tabs/OTabs.vue`
 **Use when:** The tab-bar container for switching between peer content sections. Owns the active-tab state; pair with OTabPanels/OTabPanel for the content area.
 **Don't use for:** A linear wizard (use **OStepper**); route-per-tab navigation without a shared panel area — use **ORouteTab** children instead of OTab.
@@ -365,6 +389,7 @@ unfiltered page spends one button and a filtered one shows its scope as chips).
 ---
 
 ### OTab
+
 **Import:** `@/lib/navigation/Tabs/OTab.vue`
 **Use when:** A single **content-switching** tab trigger inside OTabs — clicking it just changes the active tab (via OTabs' `v-model`), no routing.
 **Don't use for:** A tab that should navigate to a route (use **ORouteTab**).
@@ -382,6 +407,7 @@ unfiltered page spends one button and a filtered one shows its scope as chips).
 ---
 
 ### ORouteTab
+
 **Import:** `@/lib/navigation/Tabs/ORouteTab.vue`
 **Use when:** A tab that is **route-driven** — clicking navigates via Vue Router (`to`), and the active tab auto-syncs when the route matches `name`. Use for URL-addressable sections (deep links, back-button support).
 **Don't use for:** In-place content switching with no URL change (use **OTab**).
@@ -402,6 +428,7 @@ unfiltered page spends one button and a filtered one shows its scope as chips).
 ---
 
 ### OTabPanels
+
 **Import:** `@/lib/navigation/Tabs/OTabPanels.vue`
 **Use when:** The container that shows the correct OTabPanel for the active tab. Keep its `modelValue` in sync with OTabs' `v-model`.
 **Don't use for:** The tab strip itself (use **OTabs**).
@@ -414,6 +441,7 @@ unfiltered page spends one button and a filtered one shows its scope as chips).
 ---
 
 ### OTabPanel
+
 **Import:** `@/lib/navigation/Tabs/OTabPanel.vue`
 **Use when:** The content area for one tab, shown when its `name` matches the active tab.
 **Don't use for:** Standalone use — must be a child of OTabPanels.
@@ -424,8 +452,8 @@ unfiltered page spends one button and a filtered one shows its scope as chips).
 
 ```vue
 <script setup lang="ts">
-import { ref } from 'vue'
-const activeTab = ref('logs')
+import { ref } from "vue";
+const activeTab = ref("logs");
 </script>
 
 <template>

@@ -3,7 +3,7 @@
 // page. The key behavior is that one list failing must not blank the other
 // three (Promise.allSettled, not Promise.all).
 
-import { vi } from "vitest";
+import { vi, describe, it, expect, beforeEach } from "vitest";
 
 const {
   mockProvidersList,
@@ -21,14 +21,17 @@ const {
   mockShowError: vi.fn(),
 }));
 
-vi.mock("@/services/online-evals.service", () => ({
-  default: {
-    providers: { list: mockProvidersList },
-    scoreConfigs: { list: mockScoreConfigsList, versions: mockScoreConfigsVersions },
-    scorers: { list: mockScorersList },
-    jobs: { list: mockJobsList },
-  },
-}));
+vi.mock("@/services/online-evals.service", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      providers: { list: mockProvidersList },
+      scoreConfigs: { list: mockScoreConfigsList, versions: mockScoreConfigsVersions },
+      scorers: { list: mockScorersList },
+      jobs: { list: mockJobsList },
+    },
+  });
+});
 
 vi.mock("../utils/evalFormat", () => ({
   showError: mockShowError,
@@ -38,7 +41,6 @@ vi.mock("vue-i18n", () => ({
   useI18n: () => ({ t: (key: string) => key }),
 }));
 
-import { describe, it, expect, beforeEach } from "vitest";
 import { useOnlineEvalsData } from "./useOnlineEvalsData";
 
 beforeEach(() => {
@@ -138,6 +140,10 @@ describe("useOnlineEvalsData — loadAll", () => {
     const inFlight = data.loadAll("org-1");
     expect(data.isLoading.value).toBe(true);
 
+    // The query layer defers the fetch to a microtask, so the mock's promise
+    // (and `resolveProviders`) only exists after a tick.
+    await Promise.resolve();
+    await Promise.resolve();
     resolveProviders([]);
     await inFlight;
     expect(data.isLoading.value).toBe(false);

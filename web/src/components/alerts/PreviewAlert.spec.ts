@@ -37,14 +37,17 @@ vi.mock("../dashboards/PanelSchemaRenderer.vue", () => ({
   },
 }));
 
-vi.mock("@/services/search", () => ({
-  default: {
-    result_schema: vi.fn().mockResolvedValue({
-      data: { group_by: [], projections: [], timeseries_field: null },
-    }),
-    search: vi.fn().mockResolvedValue({ data: { hits: [], total: 0 } }),
-  },
-}));
+vi.mock("@/services/search", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      result_schema: vi.fn().mockResolvedValue({
+        data: { group_by: [], projections: [], timeseries_field: null },
+      }),
+      search: vi.fn().mockResolvedValue({ data: { hits: [], total: 0 } }),
+    },
+  });
+});
 
 const baseFormData = () => ({
   stream_name: "test-stream",

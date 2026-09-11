@@ -20,11 +20,14 @@ import { usePanelDrilldown } from "./usePanelDrilldown";
 
 const resultSchemaMock = vi.fn();
 
-vi.mock("@/services/search", () => ({
-  default: {
-    result_schema: (...args: any[]) => resultSchemaMock(...args),
-  },
-}));
+vi.mock("@/services/search", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      result_schema: (...args: any[]) => resultSchemaMock(...args),
+    },
+  });
+});
 
 vi.mock("@/utils/zincutils", () => ({
   b64EncodeUnicode: (v: string) => `b64(${v})`,

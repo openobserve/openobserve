@@ -498,6 +498,8 @@ import { useRouter } from "vue-router";
 import { formatDistanceToNow } from "date-fns";
 import jstransform from "@/services/jstransform";
 import organizations from "@/services/organizations";
+import { queryClient } from "@/composables/query/queryClient";
+import { organizationKeys } from "@/services/organizations.querykeys";
 import searchService from "@/services/search";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import ORadio from "@/lib/forms/Radio/ORadio.vue";
@@ -859,6 +861,11 @@ const saveClaimParserFunction = async () => {
       store.state.zoConfig.meta_org,
       orgSettingsPayload,
     );
+
+    // Writes the meta org, so that is the scope MainLayout would serve back stale on an org switch.
+    await queryClient.invalidateQueries({
+      queryKey: organizationKeys.settings(store.state.zoConfig.meta_org),
+    });
 
     // Update store with new settings
     const updatedSettings: any = {

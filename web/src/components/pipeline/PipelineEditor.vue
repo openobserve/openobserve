@@ -251,6 +251,8 @@ import usePipelines from "@/composables/usePipelines";
 
 import config from "@/aws-exports";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { queryClient } from "@/composables/query/queryClient";
+import { pipelineKeys } from "@/services/pipelines.querykeys";
 
 const PipelineFlow = defineAsyncComponent(() => import("@/plugins/pipelines/PipelineFlow.vue"));
 
@@ -916,6 +918,10 @@ const onSubmitPipeline = async () => {
 
   saveOperation
     .then(() => {
+      // Drop the scope the list renders from, or the router.push below lands on pre-save rows.
+      void queryClient.invalidateQueries({
+        queryKey: pipelineKeys.all(store.state.selectedOrganization.identifier),
+      });
       if (pipelineObj.isEditPipeline && showJsonEditorDialog.value == false) {
         pipelineObj.isEditPipeline = false;
 

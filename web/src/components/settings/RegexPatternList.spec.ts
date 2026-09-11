@@ -21,12 +21,15 @@ import regexPatternsService from "@/services/regex_pattern";
 import { convertUnixToDateFormat } from "@/utils/zincutils";
 
 // Mock dependencies
-vi.mock("@/services/regex_pattern", () => ({
-  default: {
-    list: vi.fn(),
-    delete: vi.fn(),
-  },
-}));
+vi.mock("@/services/regex_pattern", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list: vi.fn(),
+      delete: vi.fn(),
+    },
+  });
+});
 
 vi.mock("@/utils/zincutils", async (importOriginal) => {
   // Preserve all real exports (the mounted component pulls in modules that

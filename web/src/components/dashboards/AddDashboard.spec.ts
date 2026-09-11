@@ -16,12 +16,15 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 // Mock dashboard service
-vi.mock("@/services/dashboards", () => ({
-  default: {
-    create: vi.fn(),
-    update: vi.fn(),
-  },
-}));
+vi.mock("@/services/dashboards", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      create: vi.fn(),
+      update: vi.fn(),
+    },
+  });
+});
 
 // Mock commons utility
 vi.mock("@/utils/commons", () => ({

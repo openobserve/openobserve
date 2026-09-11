@@ -31,26 +31,35 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 }));
 
 // Mock external services and composables
-vi.mock("@/services/organizations", () => ({
-  default: {
-    post_organization_settings: vi.fn(),
-  },
-}));
+vi.mock("@/services/organizations", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      post_organization_settings: vi.fn(),
+    },
+  });
+});
 
-vi.mock("@/services/settings", () => ({
-  default: {
-    createLogo: vi.fn(),
-    deleteLogo: vi.fn(),
-    updateCustomText: vi.fn(),
-  },
-}));
+vi.mock("@/services/settings", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      createLogo: vi.fn(),
+      deleteLogo: vi.fn(),
+      updateCustomText: vi.fn(),
+    },
+  });
+});
 
-vi.mock("@/services/config", () => ({
-  default: {
-    get_config: vi.fn(),
-    get_config_full: vi.fn(),
-  },
-}));
+vi.mock("@/services/config", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      get_config: vi.fn(),
+      get_config_full: vi.fn(),
+    },
+  });
+});
 
 vi.mock("@/composables/useLoading", () => ({
   useLoading: (fn: Function) => ({

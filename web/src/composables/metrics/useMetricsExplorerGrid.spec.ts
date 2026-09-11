@@ -159,7 +159,10 @@ vi.mock("@/composables/dashboard/usePanelCache", () => ({
 }));
 
 // The factory is hoisted above STREAMS, so the resolved value is set per test.
-vi.mock("@/services/stream", () => ({ default: { nameList: vi.fn() } }));
+vi.mock("@/services/stream", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), { default: { nameList: vi.fn() } });
+});
 vi.mock("@/services/metrics", () => ({
   default: { labels: vi.fn(), labelValues: vi.fn(), metadata: vi.fn() },
 }));

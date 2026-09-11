@@ -27,11 +27,14 @@ const { notifyMock, toastMock, routerPushMock } = vi.hoisted(() => ({
 }));
 
 // vi.mock calls are hoisted — must come before component import
-vi.mock("@/services/search", () => ({
-  default: {
-    search: vi.fn().mockResolvedValue({ data: { hits: [] } }),
-  },
-}));
+vi.mock("@/services/search", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      search: vi.fn().mockResolvedValue({ data: { hits: [] } }),
+    },
+  });
+});
 
 vi.mock("@/services/service_streams", () => ({
   correlate: vi.fn().mockResolvedValue({

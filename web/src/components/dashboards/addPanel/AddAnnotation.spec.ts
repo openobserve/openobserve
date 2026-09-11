@@ -21,13 +21,16 @@ import router from "@/test/unit/helpers/router";
 import { annotationService } from "@/services/dashboard_annotations";
 
 // Mock the annotation service
-vi.mock("@/services/dashboard_annotations", () => ({
-  annotationService: {
-    create_timed_annotations: vi.fn(),
-    update_timed_annotations: vi.fn(),
-    delete_timed_annotations: vi.fn(),
-  },
-}));
+vi.mock("@/services/dashboard_annotations", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    annotationService: {
+      create_timed_annotations: vi.fn(),
+      update_timed_annotations: vi.fn(),
+      delete_timed_annotations: vi.fn(),
+    },
+  });
+});
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");

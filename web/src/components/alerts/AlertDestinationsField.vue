@@ -73,7 +73,8 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import AlertTargetsSelect from "@/components/alerts/AlertTargetsSelect.vue";
-import workflowService from "@/services/workflows";
+import { workflowsQuery } from "@/services/workflows.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import config from "@/aws-exports";
 
 type RawOption = string | { label: I18nText; value: string };
@@ -132,8 +133,11 @@ const workflowOptions = ref<{ label: I18nText; value: string }[]>([]);
 const fetchWorkflows = async () => {
   if (!workflowsEnabled.value) return;
   try {
-    const res = await workflowService.listWorkflows(store.state.selectedOrganization.identifier);
-    const list = Array.isArray(res.data) ? res.data : (res.data?.list ?? []);
+    // Shares the Workflows page's cache entry — the dropdown must not issue
+    // its own request on every form open.
+    const list = await queryClient.fetchQuery(
+      workflowsQuery(store.state.selectedOrganization.identifier),
+    );
     // Drafts aren't runnable/published, so they can't be linked to an alert —
     // only offer non-draft (published) workflows.
     workflowOptions.value = list

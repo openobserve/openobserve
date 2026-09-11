@@ -26,18 +26,28 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 
-vi.mock("@/services/slos", () => ({
-  default: {
-    list: vi.fn(),
-    delete: vi.fn(),
-    move: vi.fn(),
-    setEnabled: vi.fn(),
-  },
-}));
+// Overlay, not replace: SloList reads its rows through `slosQuery`, which a
+// wholesale mock of this module would strip.
+vi.mock("@/services/slos", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list: vi.fn(),
+      delete: vi.fn(),
+      move: vi.fn(),
+      setEnabled: vi.fn(),
+    },
+  });
+});
 
-vi.mock("@/services/alerts", () => ({
-  default: { list_by_slo: vi.fn() },
-}));
+// Overlay, not replace: this module also exports the co-located queries the
+// component reads, and a wholesale mock strips them.
+vi.mock("@/services/alerts", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { list_by_slo: vi.fn() },
+  });
+});
 
 import SloList from "@/views/slos/SloList.vue";
 import i18n from "@/locales";

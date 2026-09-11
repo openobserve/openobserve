@@ -106,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="outline"
             size="icon-sm"
             icon-left="refresh"
-            :loading="loading"
+            :loading="fetching"
             data-test="incident-list-refresh-btn"
             @click="refreshIncidents"
           >
@@ -254,6 +254,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { useOrgId } from "@/composables/query/useOrgId";
+import { useQuery } from "@tanstack/vue-query";
+import { incidentsQuery } from "@/services/incidents.queries";
 import { defineComponent, ref, shallowRef, computed, onMounted, watch, nextTick } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
@@ -304,9 +307,23 @@ export default defineComponent({
     const route = useRoute();
 
     const qTableRef: any = ref(null);
-    // Starts true so the skeleton shows on first render and the once-off page-restore watch below fires on the real true→false transition.
-    const loading = ref(true);
-    const forbidden = ref(false);
+    const orgIdForList = useOrgId();
+    const incidentsList = useQuery(() =>
+      Object.assign(incidentsQuery(orgIdForList.value, undefined as unknown as string, 1000, 0), {
+        enabled: !!orgIdForList.value,
+      }),
+    );
+
+    // `isPending` also starts true on a cold read, so the page-restore watch below still sees a real true→false transition.
+    const loading = incidentsList.isPending;
+    // Request in flight with rows still on screen — the refresh button's
+    // spinner. `loading` is the skeleton, for a cold read only.
+    const fetching = incidentsList.isFetching;
+    // A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
+    const forbidden = computed(() => {
+      const e: any = incidentsList.error.value;
+      return e?.status === 403 || e?.response?.status === 403;
+    });
     // The first real load lands after mount and races TanStack's own auto-reset-on-data-change, which resolves through its own deferred microtask queue — setTimeout(0) runs strictly after that queue drains, so the restored page reliably wins.
     watch(
       loading,
@@ -566,36 +583,37 @@ export default defineComponent({
       return { boxShadow: `var(--shadow-rail-geom) ${color}` };
     };
 
-    const loadIncidents = async () => {
-      loading.value = true;
-      forbidden.value = false;
-      try {
-        const org = store.state.selectedOrganization.identifier;
-        const limit = 1000;
-        const offset = 0;
-        const keyword = undefined;
+    // Freezing and the Vuex dispatch are both idempotent, so this is safe to
+    // run twice — the cached rows paint, then the server's.
+    const applyIncidents = (data: any) => {
+      const items: Incident[] = data?.incidents || [];
+      // Frozen objects are never made reactive, so Vue leaves the hundreds of
+      // rows raw both here and in the Vuex cache below.
+      for (const it of items) Object.freeze(it);
+      allIncidents.value = items;
+      store.dispatch("incidents/setCachedData", items);
+    };
 
-        const response = await incidentsService.list(org, undefined, limit, offset, keyword);
+    // The list is the query now: anything that invalidates the incidents scope
+    // repaints these rows without this component asking.
+    watch(
+      incidentsList.data,
+      (data: any) => {
+        if (data) applyIncidents(data);
+      },
+      { immediate: true },
+    );
+    watch(incidentsList.error, (error: any) => {
+      // The grouped access toast already reports a 403; a second red toast adds nothing.
+      if (!error || forbidden.value) return;
+      toast({ variant: "error", message: t("alerts.incidents.errorLoading") });
+      console.error("Failed to load incidents:", error);
+    });
 
-        // Freeze each row so Vue leaves it raw (frozen objects are never made
-        // reactive), both here and once it lands in the Vuex cache below.
-        const items: Incident[] = response.data.incidents || [];
-        for (const it of items) Object.freeze(it);
-        allIncidents.value = items;
-        store.dispatch("incidents/setCachedData", items);
-      } catch (error: any) {
-        forbidden.value = error?.response?.status === 403;
-        // The grouped access toast already reports a 403; a second red toast adds nothing.
-        if (!forbidden.value) {
-          toast({
-            variant: "error",
-            message: t("alerts.incidents.errorLoading"),
-          });
-        }
-        console.error("Failed to load incidents:", error);
-      } finally {
-        loading.value = false;
-      }
+    // Only an explicit call reads: refresh, post-write reload, search. Mount and
+    // invalidation-driven repaints come from the query itself.
+    const loadIncidents = async (force = false) => {
+      if (force) await incidentsList.refetch();
     };
 
     const viewIncident = (incident: Incident) => {
@@ -649,7 +667,8 @@ export default defineComponent({
           variant: "success",
           message: t("alerts.incidents.statusUpdated"),
         });
-        loadIncidents();
+        // Post-write reload: must reach the server.
+        loadIncidents(true);
         store.dispatch("incidents/setShouldRefresh", true);
       } catch (error: any) {
         toast({
@@ -830,7 +849,8 @@ export default defineComponent({
     watch(() => searchQuery.value, savePageState);
 
     const refreshIncidents = async () => {
-      await loadIncidents();
+      // Explicit refresh: must reach the server.
+      await loadIncidents(true);
       toast({
         variant: "success",
         message: t("toastMessages.alerts.incidentsRefreshed"),
@@ -851,6 +871,7 @@ export default defineComponent({
       raw,
       t,
       loading,
+      fetching,
       forbidden,
       allIncidents,
       visibleIncidents,

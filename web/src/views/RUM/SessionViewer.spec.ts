@@ -67,13 +67,16 @@ vi.mock("@/composables/rum/usePerformance", () => ({
   }),
 }));
 
-vi.mock("@/services/search", () => ({
-  default: {
-    search: vi.fn().mockResolvedValue({
-      data: { hits: [] },
-    }),
-  },
-}));
+vi.mock("@/services/search", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      search: vi.fn().mockResolvedValue({
+        data: { hits: [] },
+      }),
+    },
+  });
+});
 
 vi.mock("@/utils/date", () => ({
   formatDate: vi.fn().mockReturnValue("Jun 04, 2026 12:00:00 +0000"),

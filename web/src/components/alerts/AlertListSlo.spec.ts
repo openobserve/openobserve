@@ -40,20 +40,25 @@ vi.mock("@/aws-exports", () => ({
   default: { isCloud: "false", isEnterprise: "false" },
 }));
 
-vi.mock("@/services/alerts", () => ({
-  default: {
-    listByFolderId: vi.fn(),
-    get_by_alert_id: vi.fn(),
-    toggle_state_by_alert_id: vi.fn(),
-    delete_by_alert_id: vi.fn(),
-    create_by_alert_id: vi.fn(),
-    clone_by_id: vi.fn(),
-    getHistory: vi.fn(),
-    export_by_id: vi.fn(),
-    retrain_by_id: vi.fn(),
-    trigger_alert: vi.fn(),
-  },
-}));
+// Overlay, not replace: this module also exports the co-located queries the
+// component reads, and a wholesale mock strips them.
+vi.mock("@/services/alerts", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      listByFolderId: vi.fn(),
+      get_by_alert_id: vi.fn(),
+      toggle_state_by_alert_id: vi.fn(),
+      delete_by_alert_id: vi.fn(),
+      create_by_alert_id: vi.fn(),
+      clone_by_id: vi.fn(),
+      getHistory: vi.fn(),
+      export_by_id: vi.fn(),
+      retrain_by_id: vi.fn(),
+      trigger_alert: vi.fn(),
+    },
+  });
+});
 vi.mock("@/services/alert_templates", () => ({ default: { list: vi.fn() } }));
 vi.mock("@/services/alert_destination", () => ({ default: { list: vi.fn() } }));
 vi.mock("@/services/slos", () => ({ default: { list: vi.fn() } }));
@@ -566,7 +571,10 @@ describe("AlertList — SLO alert rows", () => {
           folder: "default",
           org_identifier: "default",
         };
-        await (w.vm as any).getAlertsFn(store, "default");
+        // The route object is not reactive in tests, so the `query.action`
+        // watcher cannot be fired by the assignment above — drive its named
+        // handler directly instead.
+        await (w.vm as any).handleActionQuery("update");
         await settle();
         return w;
       };

@@ -13,29 +13,25 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { functionsQuery } from "@/services/jstransform.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import { useStore } from "vuex";
-import TransformService from "@/services/jstransform";
 
 const useFunctions = () => {
   const store = useStore();
 
+  /**
+   * Called on every Logs entry, alert form open and panel editor open. Outside a
+   * component scope, so the same options object is read imperatively — no
+   * request while the entry is fresh, and concurrent callers share the promise.
+   */
   const getAllFunctions = async () => {
     try {
-      return await TransformService.list(
-        1,
-        100000,
-        "name",
-        false,
-        "",
-        store.state.selectedOrganization.identifier,
-      )
-        .then((res: any) => {
-          store.dispatch("setFunctions", res.data.list);
-          return;
-        })
-        .catch((e: any) => {
-          throw new Error(e.message);
-        });
+      const list = await queryClient.fetchQuery(
+        functionsQuery(store.state.selectedOrganization.identifier),
+      );
+      // Bridge for consumers still reading `organizationData.functions`.
+      store.dispatch("setFunctions", list);
     } catch (e: any) {
       throw new Error(e.message);
     }

@@ -25,18 +25,30 @@ import mockOverview from "@/test/unit/mockData/overview";
 // Data payloads are wired up per-test in beforeEach so each `it()` owns its
 // own state; the factories below stay data-free to survive vi.mock hoisting.
 
-vi.mock("@/services/alerts", () => ({
-  default: { getHistory: vi.fn() },
-}));
-vi.mock("@/services/anomaly_detection", () => ({
-  default: { list: vi.fn(), getAllHistory: vi.fn(), getHistory: vi.fn() },
-}));
-vi.mock("@/services/incidents", () => ({
-  default: { list: vi.fn() },
-}));
-vi.mock("@/services/service_graph", () => ({
-  default: { getCurrentTopology: vi.fn() },
-}));
+vi.mock("@/services/alerts", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { getHistory: vi.fn() },
+  });
+});
+vi.mock("@/services/anomaly_detection", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { list: vi.fn(), getAllHistory: vi.fn(), getHistory: vi.fn() },
+  });
+});
+vi.mock("@/services/incidents", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { list: vi.fn() },
+  });
+});
+vi.mock("@/services/service_graph", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { getCurrentTopology: vi.fn() },
+  });
+});
 
 // Heavy children — stubbed to keep the suite focused on OverviewTab's own
 // render gating. OverviewSkeleton and OEmptyState are deliberately left REAL

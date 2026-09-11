@@ -37,15 +37,18 @@ vi.mock("vue-router", async () => {
   };
 });
 
-vi.mock("@/services/ai_toolsets", () => ({
-  default: {
-    get: vi.fn(),
-    create: vi.fn(),
-    update: vi.fn(),
-    list: vi.fn(),
-    delete: vi.fn(),
-  },
-}));
+vi.mock("@/services/ai_toolsets", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      get: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      list: vi.fn(),
+      delete: vi.fn(),
+    },
+  });
+});
 
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: vi.fn(() => vi.fn()),

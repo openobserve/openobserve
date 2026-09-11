@@ -22,9 +22,12 @@ import FunctionPicker from "./FunctionPicker.vue";
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn() }));
 
 const mockList = vi.fn();
-vi.mock("@/services/jstransform", () => ({
-  default: { list: (...args: any[]) => mockList(...args) },
-}));
+vi.mock("@/services/jstransform", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { list: (...args: any[]) => mockList(...args) },
+  });
+});
 
 // The live editor code AddFunction.getCode() returns — tests set it to simulate the
 // user typing / editing (the real editor is imperative; the picker reads it on demand).

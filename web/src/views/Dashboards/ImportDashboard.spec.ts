@@ -17,11 +17,14 @@ vi.mock("@/utils/commons", async () => {
   };
 });
 
-vi.mock("@/services/dashboards", () => ({
-  default: {
-    create: vi.fn(),
-  },
-}));
+vi.mock("@/services/dashboards", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      create: vi.fn(),
+    },
+  });
+});
 
 vi.mock("@/composables/useNotifications", () => ({
   default: vi.fn(() => ({

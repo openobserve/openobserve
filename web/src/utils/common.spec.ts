@@ -18,7 +18,10 @@ import { getDefaultOrganization, redirectUser, logsErrorMessage } from "@/utils/
 import organizationsService from "@/services/organizations";
 import * as zincutils from "@/utils/zincutils";
 
-vi.mock("@/services/organizations");
+vi.mock("@/services/organizations", async (importOriginal) => {
+  const { automockService } = await import("@/test/unit/helpers/mockService");
+  return automockService(await importOriginal());
+});
 vi.mock("@/utils/zincutils");
 vi.mock("vuex", () => ({
   useStore: () => ({

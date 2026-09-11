@@ -53,34 +53,43 @@ const replaceExistingFieldConditionForTest = (
 };
 
 // Mock all external services at the top level
-vi.mock("@/services/search", () => ({
-  default: {
-    search: vi.fn(),
-    search_around: vi.fn(),
-    sql_query: vi.fn(),
-    metrics_query_range: vi.fn(),
-    get_promql_series: vi.fn(),
-    get_cached_results: vi.fn(),
-    cache_results: vi.fn(),
-  },
-}));
+vi.mock("@/services/search", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      search: vi.fn(),
+      search_around: vi.fn(),
+      sql_query: vi.fn(),
+      metrics_query_range: vi.fn(),
+      get_promql_series: vi.fn(),
+      get_cached_results: vi.fn(),
+      cache_results: vi.fn(),
+    },
+  });
+});
 
-vi.mock("@/services/saved_views", () => ({
-  default: {
-    create: vi.fn(),
-    update: vi.fn(),
-    delete: vi.fn(),
-    list: vi.fn(),
-  },
-}));
+vi.mock("@/services/saved_views", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      create: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+      list: vi.fn(),
+    },
+  });
+});
 
-vi.mock("@/services/stream", () => ({
-  default: {
-    nameList: vi.fn(),
-    schema: vi.fn(),
-    fieldNames: vi.fn(),
-  },
-}));
+vi.mock("@/services/stream", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      nameList: vi.fn(),
+      schema: vi.fn(),
+      fieldNames: vi.fn(),
+    },
+  });
+});
 
 vi.mock("@/services/segment_analytics", () => ({
   default: {
@@ -90,13 +99,16 @@ vi.mock("@/services/segment_analytics", () => ({
   },
 }));
 
-vi.mock("@/services/organizations", () => ({
-  default: {
-    get: vi.fn(),
-    list: vi.fn(),
-    update_org_setting: vi.fn(),
-  },
-}));
+vi.mock("@/services/organizations", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      get: vi.fn(),
+      list: vi.fn(),
+      update_org_setting: vi.fn(),
+    },
+  });
+});
 
 // Test the component methods directly without mounting
 describe("SearchBar.vue Methods", () => {

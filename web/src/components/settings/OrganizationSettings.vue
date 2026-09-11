@@ -95,6 +95,8 @@
 import { computed, ref, watch } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import organizations from "@/services/organizations";
+import { queryClient } from "@/composables/query/queryClient";
+import { organizationKeys } from "@/services/organizations.querykeys";
 import { useStore } from "vuex";
 import CrossLinkManager from "@/components/cross-linking/CrossLinkManager.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -159,6 +161,11 @@ const saveOrgSettings = async (value: OrganizationSettingsForm) => {
       store.state.selectedOrganization.identifier,
       payload,
     );
+
+    // MainLayout re-reads this scope on every org switch and would serve the pre-save payload back.
+    await queryClient.invalidateQueries({
+      queryKey: organizationKeys.settings(store.state.selectedOrganization.identifier),
+    });
 
     const updatedSettings: any = {
       ...store.state?.organizationData?.organizationSettings,

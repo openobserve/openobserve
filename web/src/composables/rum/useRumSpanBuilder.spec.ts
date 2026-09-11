@@ -25,11 +25,14 @@ const t = (i18nInstance.global as any).t;
 // Module mocks — hoisted before any import is executed
 // ---------------------------------------------------------------------------
 
-vi.mock("@/services/search", () => ({
-  default: {
-    search: vi.fn(),
-  },
-}));
+vi.mock("@/services/search", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      search: vi.fn(),
+    },
+  });
+});
 
 const mockGetStream = vi.fn();
 

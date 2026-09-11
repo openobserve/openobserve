@@ -31,8 +31,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <AddExternalAlertSource
       v-model:open="showAddDrawer"
       :editing-integration="editTargetIntegration"
-      @created="fetchAll"
-      @updated="fetchAll"
+      @created="fetchAll(true)"
+      @updated="fetchAll(true)"
     />
 
     <div class="min-h-0 w-full flex-1 overflow-hidden">
@@ -71,9 +71,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline"
               size="icon-sm"
               icon-left="refresh"
-              :loading="loading"
+              :loading="fetching"
               data-test="alert-sources-refresh-btn"
-              @click="fetchAll"
+              @click="refreshAll"
             >
               <OTooltip
                 side="bottom"
@@ -274,6 +274,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { alertSourcesQuery } from "@/services/alert_sources.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import { defineComponent, getCurrentInstance } from "vue";
 import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -353,7 +355,7 @@ export default defineComponent({
       {
         id: "alertSourcesRefresh",
         handler: () => {
-          if (!isInputFocused()) vm()?.fetchAll();
+          if (!isInputFocused()) vm()?.refreshAll();
         },
       },
       {
@@ -367,6 +369,9 @@ export default defineComponent({
   data() {
     return {
       loading: false,
+      // Request in flight with rows still on screen — the refresh button's
+      // spinner. `loading` is the skeleton, for a cold read only.
+      fetching: false,
       forbidden: false,
       filterQuery: "",
       showAddDrawer: false,
@@ -525,8 +530,13 @@ export default defineComponent({
     this.fetchAll();
   },
   methods: {
-    async fetchAll() {
-      await this.fetchIntegrations();
+    // Named handler: binding fetchAll straight to @click puts the MouseEvent in
+    // `force`.
+    refreshAll() {
+      return this.fetchAll(true);
+    },
+    async fetchAll(force = false) {
+      await this.fetchIntegrations(force);
       const fetches: Promise<void>[] = [];
       if (this.defaultSource) {
         fetches.push(this.fetchSenders(this.defaultSource.id));
@@ -536,12 +546,27 @@ export default defineComponent({
       }
       await Promise.all(fetches);
     },
-    async fetchIntegrations() {
-      this.loading = true;
-      this.forbidden = false;
+    async fetchIntegrations(force = false) {
       try {
-        const res = await alertSources.list(this.orgIdentifier);
-        this.integrations = res.data.integrations;
+        // `force` only bypasses staleTime — the rows on screen stay either way,
+        // and the skeleton is reserved for a genuinely cold read.
+        const options = alertSourcesQuery(this.orgIdentifier);
+        // Paint what is already cached before the request goes out.
+        const cached = queryClient.getQueryData<any>(options.queryKey);
+        if (cached !== undefined) this.integrations = cached;
+        this.loading = cached === undefined;
+        this.fetching = true;
+        this.forbidden = false;
+        // Options API, so this reads imperatively rather than through useQuery.
+        // TODO: move to `useQuery` when this component moves to `setup()`.
+        if (force) {
+          await queryClient.invalidateQueries({
+            queryKey: options.queryKey,
+            exact: true,
+            refetchType: "none",
+          });
+        }
+        this.integrations = await queryClient.fetchQuery(options);
       } catch (e: any) {
         this.forbidden = e?.response?.status === 403;
         // The grouped access toast already reports a 403; a second red toast adds nothing.
@@ -550,6 +575,7 @@ export default defineComponent({
         }
       } finally {
         this.loading = false;
+        this.fetching = false;
       }
     },
     async fetchSenders(integrationId: string) {
@@ -657,7 +683,7 @@ export default defineComponent({
         toast({ variant: "success", message: this.t("alert_sources.deletedSuccess") });
         this.revealedIds = this.revealedIds.filter((id) => id !== this.deleteTarget?.id);
         this.deleteTarget = undefined;
-        await this.fetchAll();
+        await this.fetchAll(true);
       } catch (e) {
         toast({ variant: "error", message: this.t("alert_sources.error") });
       }
@@ -671,7 +697,7 @@ export default defineComponent({
             ? this.t("alert_sources.disabledSuccess")
             : this.t("alert_sources.enabledSuccess"),
         });
-        await this.fetchIntegrations();
+        await this.fetchIntegrations(true);
       } catch (e) {
         toast({ variant: "error", message: this.t("alert_sources.error") });
       }

@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="showImportModelPricingPage"
       :existing-models="models.filter((m: any) => !isReadOnly(m)).map((m: any) => m.name)"
       @cancel:hideform="showImportModelPricingPage = false"
-      @update:list="fetchModels"
+      @update:list="refreshModels"
     />
 
     <!-- Test Match Dialog -->
@@ -130,9 +130,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline"
               size="icon-sm"
               icon-left="refresh"
-              :loading="loading"
+              :loading="fetching"
               data-test="model-pricing-list-refresh-btn"
-              @click="fetchModels"
+              @click="refreshModels"
             >
               <OTooltip
                 side="bottom"
@@ -575,7 +575,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts" setup>
-import { ref, computed, onBeforeMount, onActivated } from "vue";
+import { useQuery } from "@tanstack/vue-query";
+import { modelPricingQuery } from "@/services/model_pricing.queries";
+import { modelPricingKeys } from "@/services/model_pricing.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
+import { ref, computed, onBeforeMount, onActivated, watch } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
@@ -612,9 +616,24 @@ const { isDark } = useTheme();
 const router = useRouter();
 
 const qTableRef = ref<any>(null);
-const models = ref<any[]>([]);
-const loading = ref(true);
-const forbidden = ref(false);
+const orgIdentifier = computed(() => store.state.selectedOrganization?.identifier || "");
+
+const modelsQuery = useQuery(() =>
+  Object.assign(modelPricingQuery(orgIdentifier.value), { enabled: !!orgIdentifier.value }),
+);
+
+// The list is the query, not a copy of it: any invalidation of the scope
+// repaints these rows with no wiring here.
+const models = computed(() => modelsQuery.data.value ?? []);
+const loading = modelsQuery.isPending;
+// Request in flight, with rows still on screen — the refresh button's
+// spinner. `loading` stays for the skeleton, which only a cold read wants.
+const fetching = modelsQuery.isFetching;
+// A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
+const forbidden = computed(() => {
+  const e: any = modelsQuery.error.value;
+  return e?.status === 403 || e?.response?.status === 403;
+});
 const refreshing = ref(false);
 
 const showPricingDialog = ref(false);
@@ -855,8 +874,6 @@ function getOverflowCount(model: any): number {
   return Math.max(0, total - MAX_VISIBLE_PRICES);
 }
 
-const orgIdentifier = computed(() => store.state.selectedOrganization?.identifier || "");
-
 const ooLogo = computed(() =>
   isDark.value
     ? getImageURL("openobserve_favicon_dark.ico")
@@ -873,19 +890,21 @@ function notifyError(prefix: string, e: any) {
   });
 }
 
-async function fetchModels() {
-  loading.value = true;
-  forbidden.value = false;
-  try {
-    const res = await modelPricingService.list(orgIdentifier.value);
-    models.value = res.data || [];
-  } catch (e: any) {
-    forbidden.value = e?.response?.status === 403;
-    notifyError(t("modelPricing.errLoadModels"), e);
-  } finally {
-    loading.value = false;
-  }
+// Bound to the refresh button and to child "list changed" events: both must
+// reach the server, and a named handler keeps the event payload out of `force`.
+const refreshModels = () => fetchModels(true);
+
+// `force` is only meaningful for an explicit refresh now: a write that
+// invalidates the model-pricing scope repaints these rows on its own.
+async function fetchModels(force = false) {
+  if (force) await modelsQuery.refetch();
 }
+
+// The query owns its failure, so this reports it once per error however the
+// read was triggered.
+watch(modelsQuery.error, (e: any) => {
+  if (e) notifyError(t("modelPricing.errLoadModels"), e);
+});
 
 function openEditor(model: any) {
   if (model) {
@@ -906,7 +925,7 @@ async function toggleEnabled(model: any, enabled: boolean) {
     const { __sectionStart, ...clean } = model;
     const updated = { ...clean, enabled };
     await modelPricingService.update(orgIdentifier.value, model.id, updated);
-    await fetchModels();
+    await fetchModels(true);
     const displayName = model.name.length > 30 ? model.name.slice(0, 30) + "…" : model.name;
     const message = enabled
       ? t("modelPricing.modelEnabledNotif", { name: displayName })
@@ -940,7 +959,13 @@ function confirmDelete(model: any) {
           variant: "success",
           message: t("modelPricing.modelPricingDeleted"),
         });
-        await fetchModels();
+        // Drop the row from the cache first so it disappears now, not when the
+        // refetch lands; the forced reload re-persists the corrected list.
+        queryClient.setQueriesData(
+          { queryKey: modelPricingKeys.all(orgIdentifier.value) },
+          (list: any) => (Array.isArray(list) ? list.filter((m: any) => m.id !== model.id) : list),
+        );
+        await fetchModels(true);
       } catch (e: any) {
         notifyError(t("modelPricing.errDelete"), e);
       }
@@ -967,7 +992,7 @@ async function refreshBuiltIn() {
       variant: "success",
       message: t("modelPricing.builtInRefreshed"),
     });
-    await fetchModels();
+    await fetchModels(true);
   } catch (e: any) {
     notifyError(t("modelPricing.errRefresh"), e);
   } finally {
@@ -1031,7 +1056,7 @@ function confirmDeleteSelected() {
             }),
           });
           selectedIds.value = [];
-          await fetchModels();
+          await fetchModels(true);
         }
       } finally {
         bulkDeleteLoading.value = false;
@@ -1058,7 +1083,7 @@ useShortcuts([
   {
     id: "modelPricingRefresh",
     handler: () => {
-      if (!isInputFocused()) fetchModels();
+      if (!isInputFocused()) fetchModels(true);
     },
   },
 ]);

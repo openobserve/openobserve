@@ -16,13 +16,16 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { gt } from "@/types/i18n";
 
-vi.mock("@/services/settings", () => ({
-  default: {
-    getSetting: vi.fn(),
-    setOrgSetting: vi.fn(),
-    deleteOrgSetting: vi.fn(),
-  },
-}));
+vi.mock("@/services/settings", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      getSetting: vi.fn(),
+      setOrgSetting: vi.fn(),
+      deleteOrgSetting: vi.fn(),
+    },
+  });
+});
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn() }));
 
 import settings from "@/services/settings";
@@ -41,7 +44,8 @@ describe("useHomeDashboard", () => {
     (settings.getSetting as any).mockResolvedValue({ data: { setting_value: D } });
     const { load, homeDashboard } = useHomeDashboard(gt);
     await load("org1");
-    expect(settings.getSetting).toHaveBeenCalledWith("org1", "home_dashboard");
+    // userId is passed through as undefined — the home pin is org-scoped.
+    expect(settings.getSetting).toHaveBeenCalledWith("org1", "home_dashboard", undefined);
     expect(homeDashboard.value).toEqual(D);
   });
 

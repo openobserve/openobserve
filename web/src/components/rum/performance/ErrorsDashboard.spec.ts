@@ -57,9 +57,12 @@ vi.mock("@/utils/rum/errors.json", () => ({
   },
 }));
 
-vi.mock("@/services/search", () => ({
-  default: { search: vi.fn() },
-}));
+vi.mock("@/services/search", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { search: vi.fn() },
+  });
+});
 
 vi.mock("../../../utils/dashboard/convertDashboardSchemaVersion", () => ({
   convertDashboardSchemaVersion: vi.fn((data) => data),

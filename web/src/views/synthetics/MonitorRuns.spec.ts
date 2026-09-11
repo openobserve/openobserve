@@ -139,12 +139,15 @@ vi.mock("vue-i18n", () => ({
   useI18n: vi.fn(() => ({ t: $t })),
 }));
 
-vi.mock("@/services/synthetics", () => ({
-  default: {
-    run: mockRun,
-    getLocations: mockSyntheticsServiceGetLocations,
-  },
-}));
+vi.mock("@/services/synthetics", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      run: mockRun,
+      getLocations: mockSyntheticsServiceGetLocations,
+    },
+  });
+});
 
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: vi.fn(() => vi.fn()),
@@ -191,7 +194,10 @@ vi.mock("@/composables/synthetics/syntheticResultsSchema", () => {
   };
 });
 
-vi.mock("vuex", () => ({
+// Partial: the overlaid synthetics service loads `@/stores`, which needs the real
+// `createStore` — a wholesale vuex mock leaves it undefined at import time.
+vi.mock("vuex", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("vuex")>()),
   useStore: () => ({
     state: {
       selectedOrganization: { identifier: "test-org" },

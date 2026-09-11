@@ -40,12 +40,15 @@ vi.mock("@/composables/useTraces", () => ({
 }));
 
 // Mock stream service
-vi.mock("@/services/stream", () => ({
-  default: {
-    tracesFieldValues: vi.fn(),
-    fieldValues: vi.fn(),
-  },
-}));
+vi.mock("@/services/stream", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      tracesFieldValues: vi.fn(),
+      fieldValues: vi.fn(),
+    },
+  });
+});
 
 // Mock SQL parser
 vi.mock("@/composables/useParser", () => ({

@@ -24,18 +24,24 @@ import i18n from "@/locales";
 import { nextTick } from "vue";
 
 // Mock the billings service
-vi.mock("@/services/billings", () => ({
-  default: {
-    get_data_usage: vi.fn(),
-    get_ai_usage: vi.fn(),
-  },
-}));
+vi.mock("@/services/billings", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      get_data_usage: vi.fn(),
+      get_ai_usage: vi.fn(),
+    },
+  });
+});
 
-vi.mock("@/services/organizations", () => ({
-  default: {
-    post_organization_settings: vi.fn(),
-  },
-}));
+vi.mock("@/services/organizations", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      post_organization_settings: vi.fn(),
+    },
+  });
+});
 
 // Mock the router
 const mockRouter = {

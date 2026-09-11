@@ -472,10 +472,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </OPageLayout>
 </template>
 <script lang="ts" setup>
+import { saveDestinationMutation } from "@/services/alert_destination.queries";
+import { useOrgId } from "@/composables/query/useOrgId";
+import { useMutation } from "@tanstack/vue-query";
 import { ref, computed, onBeforeMount, onActivated, watch } from "vue";
 import type { PropType } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import destinationService from "@/services/alert_destination";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
@@ -654,6 +656,13 @@ const slackManifestReady = ref(false);
 const originalSlackWebhookUrl = ref("");
 
 const isUpdatingDestination = ref(false);
+
+const orgId = useOrgId();
+// One mutation for both branches: the caller picks create vs update, the
+// declaration owns the cache consequence.
+const saveDestinationWrite = useMutation(() =>
+  saveDestinationMutation(orgId.value, () => isUpdatingDestination.value),
+);
 const router = useRouter();
 
 // Prebuilt destinations composable
@@ -1294,6 +1303,8 @@ async function handlePrebuiltSave(value: AddDestinationForm) {
       );
     }
 
+    // `createDestination`/`updateDestination` above come from usePrebuiltDestinations,
+    // which invalidates the scope itself.
     emit("get:destinations");
     emit("cancel:hideform");
   } catch {
@@ -1341,12 +1352,8 @@ function saveCustomDestination(value: AddDestinationForm) {
       button: "Update Destination",
       page: "Add Destination",
     });
-    return destinationService
-      .update({
-        org_identifier: store.state.selectedOrganization.identifier,
-        destination_name: value.name,
-        data: payload,
-      })
+    return saveDestinationWrite
+      .mutateAsync({ destination_name: value.name, data: payload })
       .then(() => {
         dismiss();
         emit("get:destinations");
@@ -1371,12 +1378,8 @@ function saveCustomDestination(value: AddDestinationForm) {
       button: "Create Destination",
       page: "Add Destination",
     });
-    return destinationService
-      .create({
-        org_identifier: store.state.selectedOrganization.identifier,
-        destination_name: value.name,
-        data: payload,
-      })
+    return saveDestinationWrite
+      .mutateAsync({ destination_name: value.name, data: payload })
       .then(() => {
         dismiss();
         emit("get:destinations");

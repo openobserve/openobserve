@@ -255,6 +255,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts" setup>
+import { destinationsQuery } from "@/services/alert_destination.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
@@ -489,15 +491,12 @@ const isTestSending = ref(false);
 
 const loadDestinations = async () => {
   try {
-    const response = await destinationService.list({
-      org_identifier: store.state.selectedOrganization?.identifier,
-      page_num: 1,
-      page_size: 100000,
-      sort_by: "name",
-      desc: false,
-      module: "alert",
-    });
-    destinationOptions.value = (response.data ?? []).map((dest: { name: string }) => ({
+    // Same shared query the alert form and destination lists read, so opening
+    // this panel reuses their cached list instead of issuing its own request.
+    const destinations = await queryClient.fetchQuery(
+      destinationsQuery(store.state.selectedOrganization?.identifier, "alert"),
+    );
+    destinationOptions.value = destinations.map((dest: { name: string }) => ({
       // Destination names are user data, not prose — nothing to translate.
       label: raw(dest.name),
       value: dest.name,

@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { queryClient } from "@/composables/query/queryClient";
 import { mount, flushPromises } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import AppGroups from "@/components/iam/groups/AppGroups.vue";
@@ -20,16 +21,20 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 
-vi.mock("@/services/iam", () => ({
-  getGroups: vi.fn(),
-  deleteGroup: vi.fn(),
-  bulkDeleteGroups: vi.fn(async () => ({
-    data: { successful: [], unsuccessful: [] },
-  })),
-  getGroup: vi.fn(async () => ({
-    data: { name: "dev", users: ["u1@o2.ai", "u2@o2.ai"], roles: ["admin"] },
-  })),
-}));
+vi.mock("@/services/iam", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  const getGroups = vi.fn();
+  return overlayServiceMock(await importOriginal(), {
+    getGroups,
+    deleteGroup: vi.fn(),
+    bulkDeleteGroups: vi.fn(async () => ({
+      data: { successful: [], unsuccessful: [] },
+    })),
+    getGroup: vi.fn(async () => ({
+      data: { name: "dev", users: ["u1@o2.ai", "u2@o2.ai"], roles: ["admin"] },
+    })),
+  });
+});
 
 vi.mock("@/services/reodotdev_analytics", () => ({
   useReo: () => ({
@@ -110,6 +115,8 @@ describe("AppGroups Component", () => {
     vi.mocked(getGroups).mockResolvedValue(
       createMockAxiosResponse(["admin", "developers", "users"]) as any,
     );
+    // Drop the cached read so this override is the one that runs.
+    queryClient.clear();
 
     // Update the mock groups state
     mockGroupsState.groups = [
@@ -176,8 +183,11 @@ describe("AppGroups Component", () => {
       vi.mocked(getGroups).mockResolvedValue(
         createMockAxiosResponse(["admin", "developers", "users"]) as any,
       );
+      // Drop the cached read so this override is the one that runs.
+      queryClient.clear();
 
-      await wrapper.vm.setupGroups();
+      // Explicit read: mount-path reads now come from the query itself.
+      await wrapper.vm.setupGroups(true);
       await flushPromises();
 
       expect(wrapper.vm.rows).toHaveLength(3);
@@ -267,6 +277,8 @@ describe("AppGroups Component", () => {
       vi.mocked(getGroups).mockResolvedValue(
         createMockAxiosResponse(["admin", "developers", "users"]) as any,
       );
+      // Drop the cached read so this override is the one that runs.
+      queryClient.clear();
       mockGroupsState.groups = [
         { group_name: "admin" },
         { group_name: "developers" },
@@ -337,6 +349,8 @@ describe("AppGroups Component", () => {
       routerPushSpy.mockClear();
       vi.mocked(getGroups).mockClear();
       vi.mocked(getGroups).mockResolvedValue(createMockAxiosResponse([]) as any);
+      // Drop the cached read so this override is the one that runs.
+      queryClient.clear();
       await wrapper.vm.onGroupAdded({});
       expect(routerPushSpy).not.toHaveBeenCalled();
       expect(getGroups).toHaveBeenCalled();
@@ -459,6 +473,8 @@ describe("AppGroups Component", () => {
     it("loads groups on component mount", async () => {
       const { getGroups } = await import("@/services/iam");
       vi.mocked(getGroups).mockResolvedValue(createMockAxiosResponse(["group1", "group2"]) as any);
+      // Drop the cached read so this override is the one that runs.
+      queryClient.clear();
 
       mount(AppGroups, {
         global: {
@@ -476,8 +492,11 @@ describe("AppGroups Component", () => {
       const { getGroups } = await import("@/services/iam");
       const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
       vi.mocked(getGroups).mockRejectedValue(new Error("Network error"));
+      // Drop the cached read so this override is the one that runs.
+      queryClient.clear();
 
-      await wrapper.vm.setupGroups();
+      // Explicit read: mount-path reads now come from the query itself.
+      await wrapper.vm.setupGroups(true);
 
       expect(consoleSpy).toHaveBeenCalled();
       consoleSpy.mockRestore();
@@ -525,8 +544,11 @@ describe("AppGroups Component", () => {
     it("handles empty groups list", async () => {
       const { getGroups } = await import("@/services/iam");
       vi.mocked(getGroups).mockResolvedValue(createMockAxiosResponse([]) as any);
+      // Drop the cached read so this override is the one that runs.
+      queryClient.clear();
 
-      await wrapper.vm.setupGroups();
+      // Explicit read: mount-path reads now come from the query itself.
+      await wrapper.vm.setupGroups(true);
       await flushPromises();
 
       expect(wrapper.vm.rows).toHaveLength(0);

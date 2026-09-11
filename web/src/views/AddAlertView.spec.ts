@@ -6,17 +6,23 @@ import AddAlertView from "./AddAlertView.vue";
 import destinationService from "@/services/alert_destination";
 import alertsService from "@/services/alerts";
 
-vi.mock("@/services/alert_destination", () => ({
-  default: {
-    list: vi.fn(),
-  },
-}));
+vi.mock("@/services/alert_destination", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list: vi.fn(),
+    },
+  });
+});
 
-vi.mock("@/services/alerts", () => ({
-  default: {
-    get_by_alert_id: vi.fn(),
-  },
-}));
+vi.mock("@/services/alerts", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      get_by_alert_id: vi.fn(),
+    },
+  });
+});
 
 describe("AddAlertView.vue", () => {
   let store: any;
@@ -91,10 +97,9 @@ describe("AddAlertView.vue", () => {
 
     await flushPromises();
 
-    expect(destinationService.list).toHaveBeenCalledWith({
-      org_identifier: "test-org",
-      module: "alert",
-    });
+    expect(destinationService.list).toHaveBeenCalledWith(
+      expect.objectContaining({ org_identifier: "test-org", module: "alert" }),
+    );
   });
 
   it("should not render AddAlert when destinations are empty", async () => {

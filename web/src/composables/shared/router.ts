@@ -18,6 +18,7 @@ import {
   useLocalUserInfo,
   useLocalCurrentUser,
   invalidateLoginData,
+  getPath,
 } from "@/utils/zincutils";
 import type { LocationQuery, LocationQueryRaw, RouteLocationRaw } from "vue-router";
 import config from "@/aws-exports";
@@ -180,13 +181,21 @@ const useRoutes = () => {
     },
     {
       path: "/logout",
+      // vue-router drops a record with no component/children/redirect, which
+      // made this deep link a 404 — the component never renders (the guard
+      // hard-navigates first), it only keeps the record registrable.
+      component: Login,
       beforeEnter(_to: any, _from: any, _next: any) {
-        // Clear backend auth cookies before redirecting to login
-        invalidateLoginData();
-        useLocalCurrentUser("", true);
-        useLocalUserInfo("", true);
-
-        window.location.href = "/login";
+        // Clear backend auth cookies before redirecting to login. The redirect
+        // must run even if a clear throws, and must respect the app base —
+        // a bare "/login" 404s when the app is served under /web/.
+        try {
+          invalidateLoginData();
+          useLocalCurrentUser("", true);
+          useLocalUserInfo("", true);
+        } finally {
+          window.location.href = `${getPath()}login`;
+        }
       },
     },
     {

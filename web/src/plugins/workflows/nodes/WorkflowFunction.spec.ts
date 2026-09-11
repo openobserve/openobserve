@@ -30,7 +30,10 @@ vi.mock("@/utils/zincutils", () => ({
   getImageURL: (p: string) => p,
   getUUID: () => "uuid",
 }));
-vi.mock("@/services/workflows", () => ({ default: {} }));
+vi.mock("@/services/workflows", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), { default: {} });
+});
 
 const pickerSubmit = vi.fn();
 vi.mock("@/components/flow/forms/FunctionPicker.vue", () => ({

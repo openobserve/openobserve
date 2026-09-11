@@ -84,12 +84,15 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 const mockSyntheticsServiceGet = vi.fn().mockResolvedValue({
   data: { name: "Test Monitor", status: "healthy", last_triggered_at: 0 },
 });
-vi.mock("@/services/synthetics", () => ({
-  default: {
-    get: (...args: any[]) => mockSyntheticsServiceGet(...args),
-    run: vi.fn().mockResolvedValue({}),
-  },
-}));
+vi.mock("@/services/synthetics", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      get: (...args: any[]) => mockSyntheticsServiceGet(...args),
+      run: vi.fn().mockResolvedValue({}),
+    },
+  });
+});
 
 import MonitorResults from "./MonitorResults.vue";
 

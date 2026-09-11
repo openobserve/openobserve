@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :last-run-at="lastFetched ? lastFetched.getTime() : null"
           :loading="isLoading"
           :disabled="isLoading"
-          @click="loadAll"
+          @click="() => loadAll(true)"
         />
         <DateTime
           ref="dateTimeRef"
@@ -498,23 +498,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import { alertHistoryQuery } from "@/services/alerts.queries";
+import { incidentsQuery } from "@/services/incidents.queries";
+import { serviceTopologyQuery } from "@/services/service_graph.queries";
+import { queryClient } from "@/composables/query/queryClient";
+import { anomalyConfigsQuery } from "@/services/anomaly_detection.queries";
+import { anomalyHistoryQuery } from "@/services/anomaly_detection.queries";
 import { ref, reactive, computed, defineAsyncComponent, onMounted, watch, nextTick } from "vue";
 
-// Module-level cache for anomaly history — survives re-renders, cleared on org change
-const ANOMALY_CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes
-const _anomalyCache = new Map<
-  string,
-  { ts: number; startTime: number; endTime: number; data: any[] }
->();
 import { raw, useI18nTyped } from "@/types/i18n";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import { isFiringOutcome, isErrorOutcome } from "@/utils/alerts/runOutcome";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import alertsService from "@/services/alerts";
 import anomalyService from "@/services/anomaly_detection";
-import incidentsService from "@/services/incidents";
-import serviceGraphService from "@/services/service_graph";
 import config from "@/aws-exports";
 import DateTime from "@/components/DateTime.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
@@ -525,6 +522,8 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import ServiceGraphNodeSidePanel from "@/plugins/traces/ServiceGraphNodeSidePanel.vue";
+import { overviewRange } from "@/services/service_graph";
+
 const AlertHistoryDrawer = defineAsyncComponent(
   () => import("@/components/alerts/AlertHistoryDrawer.vue"),
 );
@@ -685,52 +684,53 @@ const servicePanelVisible = ref(false);
 // ── Data loading ─────────────────────────────────────────────────────────────
 const orgId = computed(() => store.state.selectedOrganization?.identifier);
 
-const loadAll = async () => {
+// `force` comes from the Refresh button. A mount or a tab switch reads the
+// cache instead, which is what stops every tab switch re-requesting.
+const loadAll = async (force = false) => {
   if (!orgId.value) return;
   isLoading.value = true;
   await Promise.allSettled([
-    runSection("recentEvents", loadHistoryAndSplit),
-    runSection("anomalies", loadAnomalies),
-    runSection("incidents", loadIncidents),
-    runSection("services", loadServiceGraph),
+    runSection("recentEvents", () => loadHistoryAndSplit(force)),
+    runSection("anomalies", () => loadAnomalies(force)),
+    runSection("incidents", () => loadIncidents(force)),
+    runSection("services", () => loadServiceGraph(force)),
   ]);
   isLoading.value = false;
   lastFetched.value = new Date();
 };
 
 // Dedicated anomaly loader — uses anomaly_detection service for reliable results
-const loadAnomalies = async () => {
+const loadAnomalies = async (force = false) => {
   try {
     const org = orgId.value;
     const { startTime, endTime } = timeRange.value;
-    const cacheKey = org;
-    const cached = _anomalyCache.get(cacheKey);
 
     let rawHits: Array<{ cfg: any; hits: any[] }>;
 
-    if (
-      cached &&
-      Date.now() - cached.ts < ANOMALY_CACHE_TTL_MS &&
-      cached.startTime === startTime &&
-      cached.endTime === endTime
-    ) {
-      // Serve from cache — no network calls
-      anomalies.value = cached.data;
-      return;
-    }
+    // `force` bypasses staleTime; the options object is the same either way.
+    const read = <T,>(options: any): Promise<T> => {
+      if (force) {
+        void queryClient.invalidateQueries({
+          queryKey: options.queryKey,
+          exact: true,
+          refetchType: "none",
+        });
+      }
+      return queryClient.fetchQuery(options);
+    };
+    const readConfigs = (org: string) => read<any[]>(anomalyConfigsQuery(org));
+    const readHistory = (org: string, limit: number) => read<any>(anomalyHistoryQuery(org, limit));
 
     // Fire list first; only fetch history if configs exist
     try {
-      const listRes = await anomalyService.list(org);
-      const configs: any[] = listRes.data ?? [];
+      const configs: any[] = await readConfigs(org);
       if (!configs.length) {
         anomalies.value = [];
-        _anomalyCache.set(cacheKey, { ts: Date.now(), startTime, endTime, data: [] });
         return;
       }
       const configById = new Map(configs.map((c: any) => [c.id ?? c.anomaly_id, c]));
-      const bulkRes = await anomalyService.getAllHistory(org, 20);
-      const bulkConfigs: any[] = bulkRes.data?.configs ?? [];
+      const bulkRes = await readHistory(org, 20);
+      const bulkConfigs: any[] = bulkRes?.configs ?? [];
       // Merge bulk history hits with config metadata
       rawHits = bulkConfigs.map((entry: any) => ({
         cfg: configById.get(entry.cfg?.id) ?? entry.cfg,
@@ -738,11 +738,9 @@ const loadAnomalies = async () => {
       }));
     } catch {
       // Bulk endpoint not available — fall back to per-config requests
-      const listRes = await anomalyService.list(org);
-      const configs: any[] = listRes.data ?? [];
+      const configs: any[] = await readConfigs(org);
       if (!configs.length) {
         anomalies.value = [];
-        _anomalyCache.set(cacheKey, { ts: Date.now(), startTime, endTime, data: [] });
         return;
       }
       const limitPerConfig = Math.min(20, Math.ceil(500 / configs.length));
@@ -795,7 +793,6 @@ const loadAnomalies = async () => {
       .sort((a, b) => b.ts - a.ts)
       .slice(0, 3);
 
-    _anomalyCache.set(cacheKey, { ts: Date.now(), startTime, endTime, data: result });
     anomalies.value = result;
   } catch {
     anomalies.value = [];
@@ -803,17 +800,28 @@ const loadAnomalies = async () => {
 };
 
 // Alert trigger history feeds recentEvents only
-const loadHistoryAndSplit = async () => {
+const loadHistoryAndSplit = async (force = false) => {
   try {
-    const res = await alertsService.getHistory(orgId.value, {
-      start_time: timeRange.value.startTime.toString(),
-      end_time: timeRange.value.endTime.toString(),
+    // Quantised range: the raw timestamps move on every mount, so a key built
+    // from them could never hit — which is why switching tabs re-requested this.
+    const q = overviewRange(timeRange.value.startTime, timeRange.value.endTime);
+    const historyOptions = alertHistoryQuery(orgId.value, {
+      start_time: q.start,
+      end_time: q.end,
       from: 0,
       size: 500,
       sort_by: "timestamp",
       sort_order: "desc",
     });
-    const hits: any[] = res.data?.hits ?? [];
+    if (force) {
+      await queryClient.invalidateQueries({
+        queryKey: historyOptions.queryKey,
+        exact: true,
+        refetchType: "none",
+      });
+    }
+    const res: any = await queryClient.fetchQuery(historyOptions);
+    const hits: any[] = res?.hits ?? [];
 
     // Recent events: firing shown per-occurrence; failed deduped by alert_name with count.
     // This previously filtered on the literal strings ["firing", "error"], neither
@@ -866,29 +874,45 @@ const loadHistoryAndSplit = async () => {
   }
 };
 
-const loadIncidents = async () => {
+const loadIncidents = async (force = false) => {
   if (!isIncidentsEnabled.value) return;
   try {
-    const res = await incidentsService.list(orgId.value, "open", 4, 0);
-    incidents.value = res.data?.incidents ?? [];
-    incidentsTotal.value = res.data?.total ?? incidents.value.length;
+    const incidentOptions = incidentsQuery(orgId.value, "open", 4, 0);
+    if (force) {
+      await queryClient.invalidateQueries({
+        queryKey: incidentOptions.queryKey,
+        exact: true,
+        refetchType: "none",
+      });
+    }
+    const res: any = await queryClient.fetchQuery(incidentOptions);
+    incidents.value = res?.incidents ?? [];
+    incidentsTotal.value = res?.total ?? incidents.value.length;
   } catch {
     incidents.value = [];
     incidentsTotal.value = 0;
   }
 };
 
-const loadServiceGraph = async () => {
+const loadServiceGraph = async (force = false) => {
   if (!isEnterpriseOrCloud.value) return;
   try {
     graphStream.value = "all";
 
-    const res = await serviceGraphService.getCurrentTopology(orgId.value, {
+    const topologyOptions = serviceTopologyQuery(orgId.value, {
       startTime: timeRange.value.startTime,
       endTime: timeRange.value.endTime,
     });
-    const nodes: any[] = res.data?.nodes ?? [];
-    const edges: any[] = res.data?.edges ?? [];
+    if (force) {
+      await queryClient.invalidateQueries({
+        queryKey: topologyOptions.queryKey,
+        exact: true,
+        refetchType: "none",
+      });
+    }
+    const res: any = await queryClient.fetchQuery(topologyOptions);
+    const nodes: any[] = res?.nodes ?? [];
+    const edges: any[] = res?.edges ?? [];
     graphData.value = { nodes, edges };
 
     // Build per-node latency flag from incoming edges that have a baseline
@@ -1108,7 +1132,7 @@ watch(
   () => store.state.selectedOrganization?.identifier,
   (val, old) => {
     if (val && val !== old) {
-      _anomalyCache.delete(old ?? "");
+      // The org-switch purge in MainLayout drops the previous org's entries.
       loadAll();
     }
   },

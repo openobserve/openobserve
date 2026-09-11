@@ -101,6 +101,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { groupsQuery } from "@/services/iam.queries";
+import { rolesQuery } from "@/services/iam.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import { defineComponent, computed, ref, watch } from "vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
@@ -112,7 +115,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import config from "@/aws-exports";
 import service_accounts from "@/services/service_accounts";
-import { getRoles, getGroups, updateRole, updateGroup } from "@/services/iam";
+import { updateRole, updateGroup } from "@/services/iam";
 import { seedReadonlyRolePermissions } from "@/components/iam/roles/readonlyPreset";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -199,17 +202,18 @@ export default defineComponent({
       if (!showAccessPickers.value) return;
       try {
         const [rolesRes, groupsRes] = await Promise.all([
-          getRoles(orgId.value),
-          getGroups(orgId.value),
+          queryClient.fetchQuery(rolesQuery(orgId.value)),
+          queryClient.fetchQuery(groupsQuery(orgId.value)),
         ]);
-        roleOptions.value = (rolesRes.data ?? []).map((role: string) => ({
-          label: role,
-          value: role,
-        }));
-        groupOptions.value = (groupsRes.data ?? []).map((group: string) => ({
-          label: group,
-          value: group,
-        }));
+        // Merged, not replaced: a role created inline while this load is still
+        // in flight would otherwise be wiped from the picker when it lands.
+        const merge = (existing: any[], names: string[]) => {
+          const fromServer = names.map((name: string) => ({ label: name, value: name }));
+          const seen = new Set(fromServer.map((o) => o.value));
+          return [...fromServer, ...existing.filter((o: any) => !seen.has(o.value))];
+        };
+        roleOptions.value = merge(roleOptions.value, rolesRes ?? []);
+        groupOptions.value = merge(groupOptions.value, groupsRes ?? []);
       } catch (err) {
         console.error("Failed to load roles/groups for service account form", err);
       }

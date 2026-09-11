@@ -19,15 +19,18 @@ import i18n from "@/locales";
 
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn() }));
 
-vi.mock("@/services/online-evals.service", () => ({
-  default: {
-    jobs: {
-      create: vi.fn(),
-      update: vi.fn(),
-      activate: vi.fn(),
+vi.mock("@/services/online-evals.service", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      jobs: {
+        create: vi.fn(),
+        update: vi.fn(),
+        activate: vi.fn(),
+      },
     },
-  },
-}));
+  });
+});
 
 vi.mock("@/composables/useStreams", () => ({
   default: () => ({

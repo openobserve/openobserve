@@ -109,9 +109,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="outline"
                 size="icon-sm"
                 icon-left="refresh"
-                :loading="loading"
+                :loading="fetching"
                 data-test="workflow-list-refresh"
-                @click="getWorkflows"
+                @click="refreshWorkflows"
               >
                 <OTooltip side="bottom" :content="t('workflow.refresh')" />
               </OButton>
@@ -244,7 +244,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from "vue";
+import { useQuery } from "@tanstack/vue-query";
+import { workflowsQuery } from "@/services/workflows.queries";
+import { workflowKeys } from "@/services/workflows.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
+import { ref, computed, watch, onMounted } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -275,10 +279,38 @@ const store = useStore();
 const currentRouteName = computed(() => router.currentRoute.value.name);
 const orgId = computed(() => store.state.selectedOrganization.identifier as string);
 
-const loading = ref(true);
-const forbidden = ref(false);
+const shapeWorkflows = (list: any[]) =>
+  list.map((wf: any, index: number) => ({
+    ...wf,
+    "#": index + 1 <= 9 ? `0${index + 1}` : index + 1,
+    trigger: triggerLabel(wf),
+    updated_at_display: formatTs(wf.updated_at),
+  }));
+
+const workflowsList = useQuery(() =>
+  Object.assign(workflowsQuery(orgId.value), { enabled: !!orgId.value }),
+);
+
+// The list is the query, not a copy of it: an invalidation anywhere repaints
+// these rows with no wiring here.
+const loading = workflowsList.isPending;
+// Request in flight, with rows still on screen — the refresh button's
+// spinner. `loading` stays for the skeleton, which only a cold read wants.
+const fetching = workflowsList.isFetching;
+// A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
+const forbidden = computed(() => {
+  const e: any = workflowsList.error.value;
+  return e?.status === 403 || e?.response?.status === 403;
+});
 const filterQuery = ref("");
-const workflows = ref<any[]>([]);
+const workflows = computed(() => shapeWorkflows(workflowsList.data.value ?? []));
+
+// The query owns its failure now, so this reports it once per error however the
+// read was triggered — mount, refetch, or an invalidation elsewhere.
+watch(workflowsList.error, (error) => {
+  if (error) console.error(error);
+});
+
 const oTableRef: any = ref(null);
 // Plain ref, not URL/store-backed: WorkflowsList stays mounted across create/edit/runs child-route navigation, so this alone survives the round trip.
 const currentPage = ref(1);
@@ -385,24 +417,16 @@ const columns = computed(() => [
 ]);
 const otableColumns = computed(() => columns.value);
 
-const getWorkflows = async () => {
-  loading.value = true;
-  forbidden.value = false;
+// Bound to refresh / "saved" events: always hits the server.
+const refreshWorkflows = () => getWorkflows(true);
+
+// `force` is now only meaningful for an explicit refresh: any write that
+// invalidates the workflows scope repaints these rows on its own.
+const getWorkflows = async (force = false) => {
   try {
-    const response = await workflowService.listWorkflows(orgId.value);
-    // list handler returns a bare array of Workflow.
-    const list = Array.isArray(response.data) ? response.data : (response.data?.list ?? []);
-    workflows.value = list.map((wf: any, index: number) => ({
-      ...wf,
-      "#": index + 1 <= 9 ? `0${index + 1}` : index + 1,
-      trigger: triggerLabel(wf),
-      updated_at_display: formatTs(wf.updated_at),
-    }));
-  } catch (error: any) {
+    if (force) await workflowsList.refetch();
+  } catch (error) {
     console.error(error);
-    forbidden.value = error?.response?.status === 403;
-  } finally {
-    loading.value = false;
   }
 };
 
@@ -462,7 +486,7 @@ const toggleWorkflow = (row: any) => {
           : t("workflow.pauseSuccess", { name: row.name }),
         variant: "success",
       });
-      getWorkflows();
+      getWorkflows(true);
     })
     .catch((error: any) => {
       if (error?.response?.status !== 403) {
@@ -507,7 +531,12 @@ const deleteWorkflow = async () => {
       draft: !!row.is_draft,
     });
     toast({ message: t("workflow.deleteSuccess"), variant: "success" });
-    await getWorkflows();
+    // Drop the row from the cache first so it disappears now, not when the
+    // refetch lands; the forced reload re-persists the corrected list.
+    queryClient.setQueriesData({ queryKey: workflowKeys.all(orgId.value) }, (list: any) =>
+      Array.isArray(list) ? list.filter((w: any) => w.id !== row.id) : list,
+    );
+    await getWorkflows(true);
   } catch (error: any) {
     if (error?.response?.status !== 403) {
       toast({
@@ -522,7 +551,7 @@ const deleteWorkflow = async () => {
 
 // Chained (not fire-and-forget) so restorePageIndex schedules its macrotask after the fetch's data update, not before.
 const onEditorSaved = async () => {
-  await getWorkflows();
+  await refreshWorkflows();
   restorePageIndex();
 };
 

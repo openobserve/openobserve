@@ -77,12 +77,17 @@
 </template>
 
 <script setup lang="ts">
+import {
+  createAnnotationMutation,
+  updateAnnotationMutation,
+  deleteAnnotationMutation,
+} from "@/services/dashboard_annotations.queries";
+import { useMutation } from "@tanstack/vue-query";
 import { ref, computed, watch } from "vue";
 import type { PropType } from "vue";
 import { useStore } from "vuex";
 import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
 import { useLoading } from "@/composables/useLoading";
-import { annotationService } from "@/services/dashboard_annotations";
 import useNotifications from "@/composables/useNotifications";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
@@ -125,6 +130,7 @@ const props = defineProps({
 const emit = defineEmits<{
   (e: "remove"): void;
   (e: "close"): void;
+  (e: "saved"): void;
 }>();
 
 const store = useStore();
@@ -235,12 +241,11 @@ const handleSave = async () => {
           tags: annotationData.value.tags,
         };
         const annotationId = annotationData.value.annotation_id ?? "";
-        await annotationService.update_timed_annotations(
-          organization,
-          props.dashboardId,
+        // Was: invalidate, then write — the refetch raced the request.
+        await updateAnnotation.mutateAsync({
           annotationId,
-          annotationToUpdate,
-        );
+          annotation: annotationToUpdate,
+        });
       } catch (error) {
         showErrorNotification(
           raw(errorMessage(error)) ||
@@ -251,9 +256,7 @@ const handleSave = async () => {
     } else {
       try {
         // create annotation
-        await annotationService.create_timed_annotations(organization, props.dashboardId, [
-          annotationData.value,
-        ]);
+        await createAnnotation.mutateAsync([annotationData.value]);
       } catch (error) {
         showErrorNotification(
           raw(errorMessage(error)) ||
@@ -263,9 +266,20 @@ const handleSave = async () => {
       }
     }
 
+    emit("saved");
     handleClose();
   }
 };
+
+const createAnnotation = useMutation(() =>
+  createAnnotationMutation(organization, props.dashboardId),
+);
+const updateAnnotation = useMutation(() =>
+  updateAnnotationMutation(organization, props.dashboardId),
+);
+const deleteAnnotationWrite = useMutation(() =>
+  deleteAnnotationMutation(organization, props.dashboardId),
+);
 
 const handleDeleteWithConfirm = () => {
   showDeleteConfirm.value = true;
@@ -274,8 +288,9 @@ const handleDeleteWithConfirm = () => {
 const confirmDelete = async () => {
   // Delete is reachable only for a persisted annotation, so `annotation_id` is a string.
   const annotationId = annotationData.value.annotation_id ?? "";
-  await annotationService.delete_timed_annotations(organization, props.dashboardId, [annotationId]);
+  await deleteAnnotationWrite.mutateAsync([annotationId]);
 
+  emit("saved");
   handleClose();
 };
 

@@ -25,16 +25,19 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: vi.fn(),
 }));
 
-vi.mock("@/services/billings", () => ({
-  default: {
-    get_billing_group_membership: vi.fn(),
-    list_billing_group_members: vi.fn(),
-    list_billing_group_invites: vi.fn(),
-    send_billing_group_invite: vi.fn(),
-    accept_billing_group_invite: vi.fn(),
-    reject_billing_group_invite: vi.fn(),
-  },
-}));
+vi.mock("@/services/billings", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      get_billing_group_membership: vi.fn(),
+      list_billing_group_members: vi.fn(),
+      list_billing_group_invites: vi.fn(),
+      send_billing_group_invite: vi.fn(),
+      accept_billing_group_invite: vi.fn(),
+      reject_billing_group_invite: vi.fn(),
+    },
+  });
+});
 
 const billing = BillingService as unknown as {
   get_billing_group_membership: ReturnType<typeof vi.fn>;

@@ -18,11 +18,14 @@ import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import store from "@/test/unit/helpers/store";
 
 // vi.mock calls are hoisted — must appear before imports of mocked modules
-vi.mock("@/services/search", () => ({
-  default: {
-    search: vi.fn(),
-  },
-}));
+vi.mock("@/services/search", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      search: vi.fn(),
+    },
+  });
+});
 
 vi.mock("@/services/service_streams", () => ({
   correlate: vi.fn(),

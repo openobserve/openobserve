@@ -33,11 +33,14 @@ vi.mock("@/aws-exports", () => ({
 }));
 
 // Mock organizations service
-vi.mock("@/services/organizations", () => ({
-  default: {
-    post_organization_settings: vi.fn(),
-  },
-}));
+vi.mock("@/services/organizations", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      post_organization_settings: vi.fn(),
+    },
+  });
+});
 
 import organizations from "@/services/organizations";
 const mockPostOrganizationSettings = organizations.post_organization_settings as any;
