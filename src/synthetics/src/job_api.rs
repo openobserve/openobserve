@@ -480,7 +480,7 @@ pub(crate) mod billing {
     }
 }
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use config::meta::{
     self_reporting::usage::UsageData,
@@ -1056,6 +1056,7 @@ pub enum AlertDecision {
 pub const REASON_CONFIG_STEPS_EXCEEDED: &str = "config_steps_exceeded";
 pub const REASON_CONFIG_REFERENCE_MISSING: &str = "config_reference_missing";
 pub const REASON_CONFIG_REFERENCE_INVALID: &str = "config_reference_invalid";
+pub const REASON_CONFIG_VARIABLE_UNDEFINED: &str = "config_variable_undefined";
 
 /// Expansion could not produce a runnable journey (§5.11); `guard_failure` marks family 2 — a guard
 /// of ours failed.
@@ -1331,13 +1332,21 @@ fn redact_auth(auth: SyntheticAuth) -> SyntheticAuth {
     }
 }
 
+/// The variable names a check defines, as the placeholder guard compares them: by NAME, never
+/// value.
+fn defined_names(vars: &[config::meta::synthetics::SyntheticVariable]) -> HashSet<String> {
+    vars.iter().map(|v| v.name.clone()).collect()
+}
+
 fn expand_journey(
     parent_steps: &[serde_json::Value],
     children: &HashMap<String, config::meta::synthetics_composition::ChildJourney>,
+    vars: &[config::meta::synthetics::SyntheticVariable],
 ) -> Result<Vec<serde_json::Value>, ConfigError> {
+    let defined = defined_names(vars);
     use config::meta::{
         synthetics::is_composition_action,
-        synthetics_composition::{ExpansionError, expand_steps},
+        synthetics_composition::{ExpansionError, expand_steps, placeholders_in, subtest_refs},
     };
     // Keyed on the ACTION, not on `subtest_refs`: a malformed step (action `subtest`, no
     // `subtest.id`) yields no ref, so keying the early return on the ref list would hand it
@@ -1391,6 +1400,26 @@ fn expand_journey(
             ),
             guard_failure: false,
         });
+    }
+    // Saving a CHILD never re-validates its parents, so the parent-save guard cannot hold this
+    // alone.
+    for child_id in subtest_refs(parent_steps) {
+        let Some(child) = children.get(&child_id) else {
+            continue;
+        };
+        if let Some(var) = placeholders_in(&child.steps)
+            .into_iter()
+            .find(|p| !defined.contains(p))
+        {
+            return Err(ConfigError {
+                status_reason: REASON_CONFIG_VARIABLE_UNDEFINED,
+                message: format!(
+                    "'{}' uses {{{{{var}}}}}, which this test does not define",
+                    child.name
+                ),
+                guard_failure: false,
+            });
+        }
     }
     Ok(expanded)
 }
@@ -1447,7 +1476,7 @@ async fn expand_for_resolve<C: sea_orm::ConnectionTrait>(
             );
         }
     }
-    let expanded = expand_journey(&steps, &children).map_err(|e| {
+    let expanded = expand_journey(&steps, &children, &synthetic.variables).map_err(|e| {
         if e.guard_failure {
             config::metrics::SYNTHETICS_COMPOSITION_GUARD_FAILURES_TOTAL.inc();
         }
@@ -2911,7 +2940,7 @@ mod tests {
         #[test]
         fn a_plain_journey_passes_through_untouched() {
             let steps = parent(&[], 3);
-            assert_eq!(expand_journey(&steps, &HashMap::new()).unwrap(), steps);
+            assert_eq!(expand_journey(&steps, &HashMap::new(), &[]).unwrap(), steps);
         }
 
         #[test]
@@ -2919,7 +2948,7 @@ mod tests {
             let children = HashMap::from([("big".to_string(), child("big", 40))]);
             // `parent`'s `own` count EXCLUDES the reference it appends, so this is
             // 11 own steps + 40 child steps = 51 executed: exactly one over the cap.
-            let err = expand_journey(&parent(&["big"], 11), &children).unwrap_err();
+            let err = expand_journey(&parent(&["big"], 11), &children, &[]).unwrap_err();
             assert_eq!(err.status_reason, REASON_CONFIG_STEPS_EXCEEDED);
             assert!(!err.guard_failure);
             assert!(err.message.contains("51"), "{}", err.message);
@@ -2929,16 +2958,66 @@ mod tests {
         fn a_malformed_reference_never_reaches_a_browser() {
             // No `subtest.id`, so it yields no ref — the early return must still catch it.
             let steps = vec![nav("s0"), json!({ "id": "r0", "action": "subtest" })];
-            let err = expand_journey(&steps, &HashMap::new()).unwrap_err();
+            let err = expand_journey(&steps, &HashMap::new(), &[]).unwrap_err();
             assert_eq!(err.status_reason, REASON_CONFIG_REFERENCE_INVALID);
             assert!(err.guard_failure);
         }
 
         #[test]
         fn a_missing_child_is_our_guard_failure() {
-            let err = expand_journey(&parent(&["gone"], 1), &HashMap::new()).unwrap_err();
+            let err = expand_journey(&parent(&["gone"], 1), &HashMap::new(), &[]).unwrap_err();
             assert_eq!(err.status_reason, REASON_CONFIG_REFERENCE_MISSING);
             assert!(err.guard_failure);
+        }
+
+        fn var(name: &str) -> config::meta::synthetics::SyntheticVariable {
+            config::meta::synthetics::SyntheticVariable {
+                name: name.into(),
+                value: "sekret".into(),
+                ..Default::default()
+            }
+        }
+
+        #[test]
+        fn a_variable_is_matched_by_name_never_by_value() {
+            // Transposing these two `&str`s compiles, and would hard-fail every composed check.
+            let mut c = child("login", 1);
+            c.steps[0]["url"] = json!("https://x/{{TOKEN}}");
+            let children = HashMap::from([("login".to_string(), c)]);
+            assert!(expand_journey(&parent(&["login"], 1), &children, &[var("TOKEN")]).is_ok());
+            assert!(expand_journey(&parent(&["login"], 1), &children, &[var("sekret")]).is_err());
+        }
+
+        #[test]
+        fn the_first_referenced_child_is_the_one_named() {
+            let mut a = child("a", 1);
+            a.steps[0]["url"] = json!("https://x/{{AAA}}");
+            let mut b = child("b", 1);
+            b.steps[0]["url"] = json!("https://x/{{BBB}}");
+            let children = HashMap::from([("a".to_string(), a), ("b".to_string(), b)]);
+            let err = expand_journey(&parent(&["a", "b"], 1), &children, &[]).unwrap_err();
+            assert!(err.message.contains("AAA"), "{}", err.message);
+        }
+
+        #[test]
+        fn a_child_placeholder_the_parent_does_not_define_is_a_config_error() {
+            let mut c = child("login", 1);
+            c.steps[0]["url"] = json!("https://x/{{TOKEN}}");
+            let children = HashMap::from([("login".to_string(), c)]);
+            let err = expand_journey(&parent(&["login"], 1), &children, &[]).unwrap_err();
+            assert_eq!(err.status_reason, REASON_CONFIG_VARIABLE_UNDEFINED);
+            // Customer-fixable, so it must not be counted as one of our guards failing.
+            assert!(!err.guard_failure);
+            assert!(err.message.contains("TOKEN"), "{}", err.message);
+        }
+
+        #[test]
+        fn a_child_placeholder_the_parent_defines_expands_normally() {
+            let mut c = child("login", 1);
+            c.steps[0]["url"] = json!("https://x/{{TOKEN}}");
+            let children = HashMap::from([("login".to_string(), c)]);
+            let out = expand_journey(&parent(&["login"], 1), &children, &[var("TOKEN")]).unwrap();
+            assert_eq!(out.len(), 2);
         }
 
         #[test]
@@ -2948,7 +3027,7 @@ mod tests {
                 .steps
                 .push(json!({ "id": "z", "action": "subtest", "subtest": { "id": "other" } }));
             let children = HashMap::from([("nested".to_string(), nested)]);
-            let err = expand_journey(&parent(&["nested"], 1), &children).unwrap_err();
+            let err = expand_journey(&parent(&["nested"], 1), &children, &[]).unwrap_err();
             assert_eq!(err.status_reason, REASON_CONFIG_REFERENCE_INVALID);
             assert!(err.guard_failure);
         }
