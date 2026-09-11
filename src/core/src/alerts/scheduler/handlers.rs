@@ -5950,6 +5950,7 @@ mod tests {
             acked_at: None,
             closed_at,
             incident_id: None,
+            updated_at: 0,
         }
     }
 

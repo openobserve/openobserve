@@ -297,6 +297,14 @@ impl MigrationTrait for Migration {
                     )
                     // Nullable: an incident renders a record rather than owning one.
                     .col(ColumnDef::new(OncallResponses::IncidentId).string().null())
+                    // The revision a replica orders snapshots by. NOT NULL with a
+                    // default: a NULL would fail the `<= incoming` filter for ever.
+                    .col(
+                        ColumnDef::new(OncallResponses::UpdatedAt)
+                            .big_integer()
+                            .not_null()
+                            .default(0),
+                    )
                     .to_owned(),
             )
             .await?;
@@ -547,6 +555,7 @@ enum OncallResponses {
     AckedAt,
     ClosedAt,
     IncidentId,
+    UpdatedAt,
 }
 
 #[derive(DeriveIden)]

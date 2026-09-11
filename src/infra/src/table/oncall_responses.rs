@@ -62,7 +62,18 @@ fn to_response(m: oncall_responses::Model) -> Option<Response> {
         closed_at: m.closed_at,
         incident_id: m.incident_id,
         exhausted_at: m.exhausted_at,
+        updated_at: m.updated_at,
     })
+}
+
+/// Applies one record edit, moving the revision a replica orders snapshots by.
+///
+/// Every mutating path goes through it: a write that forgot to move the
+/// revision would be refused by the replica as stale, and the two regions would
+/// silently disagree about who holds the page.
+async fn save(mut model: oncall_responses::ActiveModel) -> Result<Option<Response>, errors::Error> {
+    model.updated_at = Set(now_micros());
+    Ok(to_response(model.update(get_orm_client_rw().await).await?))
 }
 
 fn to_event(m: oncall_response_events::Model) -> Option<ResponseEvent> {
@@ -119,6 +130,7 @@ pub async fn open(
         // Copied at open, so the page keeps pointing where the alert pointed when it fired.
         runbook_url: Set(runbook_for(org_id, subject).await),
         exhausted_at: Set(None),
+        updated_at: Set(now_micros()),
     };
     let inserted = model.insert(client).await?;
     to_response(inserted).ok_or_else(|| {
@@ -486,7 +498,7 @@ pub async fn mark_exhausted(
     }
     let mut model: oncall_responses::ActiveModel = existing.into();
     model.exhausted_at = Set(Some(at));
-    Ok(to_response(model.update(client).await?))
+    save(model).await
 }
 
 pub async fn snooze(
@@ -518,7 +530,7 @@ pub async fn snooze(
     );
     model.snoozed_until = Set(Some(until));
     model.ladder_anchor = Set(Some(anchor));
-    Ok(to_response(model.update(client).await?))
+    save(model).await
 }
 
 /// Writes a new severity onto an open record.
@@ -541,7 +553,7 @@ pub async fn set_priority(
     };
     let mut model: oncall_responses::ActiveModel = existing.into();
     model.priority = Set(priority);
-    Ok(to_response(model.update(client).await?))
+    save(model).await
 }
 
 /// Moves a record to another team and starts its ladder again.
@@ -622,6 +634,10 @@ async fn hand_over(
         .col_expr(
             oncall_responses::Column::ExhaustedAt,
             Expr::value(next.exhausted_at),
+        )
+        .col_expr(
+            oncall_responses::Column::UpdatedAt,
+            Expr::value(now_micros()),
         )
         .filter(oncall_responses::Column::Id.eq(id))
         .filter(oncall_responses::Column::OrgId.eq(org_id))
@@ -747,6 +763,10 @@ pub async fn acknowledge(
             Expr::value(user_email.to_string()),
         )
         .col_expr(oncall_responses::Column::AckedAt, Expr::value(now_micros()))
+        .col_expr(
+            oncall_responses::Column::UpdatedAt,
+            Expr::value(now_micros()),
+        )
         .filter(oncall_responses::Column::Id.eq(id))
         .filter(oncall_responses::Column::OrgId.eq(org_id))
         .filter(oncall_responses::Column::State.is_in(escalating_states()))
@@ -806,7 +826,7 @@ pub async fn resolve(
         if let Some(n) = note {
             model.cause_note = Set(Some(n.to_string()));
         }
-        return Ok(to_response(model.update(client).await?));
+        return save(model).await;
     }
     let mut model: oncall_responses::ActiveModel = existing.into();
     model.state = Set(ResponseState::Resolved.to_i32());
@@ -817,7 +837,7 @@ pub async fn resolve(
     if let Some(n) = note {
         model.cause_note = Set(Some(n.to_string()));
     }
-    Ok(to_response(model.update(client).await?))
+    save(model).await
 }
 
 pub async fn attach_incident(
@@ -835,7 +855,7 @@ pub async fn attach_incident(
     };
     let mut model: oncall_responses::ActiveModel = existing.into();
     model.incident_id = Set(Some(incident_id.to_string()));
-    Ok(to_response(model.update(client).await?))
+    save(model).await
 }
 
 /// The paging record for an incident, newest firing first. Keyed on the column
@@ -903,6 +923,12 @@ pub(super) async fn add_event_in<C: ConnectionTrait>(
         return Err(e.into());
     }
     // Only a delivery row can have collided, so every key column below is known to hold a value.
+    //
+    // Filtered on `At` because the queue redelivers an unacked message behind
+    // the ones that overtook it: replaying the failed attempt over its own
+    // successful retry would leave the ledger reading `delivered: false` for a
+    // page that landed, and `is_delivery_of` would let the next tick send it
+    // again.
     oncall_response_events::Entity::update_many()
         .col_expr(oncall_response_events::Column::At, Expr::value(event.at))
         .col_expr(
@@ -922,6 +948,7 @@ pub(super) async fn add_event_in<C: ConnectionTrait>(
         .filter(oncall_response_events::Column::RungMicros.eq(event.rung_micros))
         .filter(oncall_response_events::Column::Recipient.eq(event.recipient.clone()))
         .filter(oncall_response_events::Column::Channel.eq(event.channel.map(|c| c.to_i32())))
+        .filter(oncall_response_events::Column::At.lte(event.at))
         .exec(conn)
         .await?;
     Ok(())
@@ -1509,6 +1536,7 @@ mod tests {
             incident_id: None,
             runbook_url: None,
             exhausted_at: None,
+            updated_at: 1_000,
         }
     }
 
