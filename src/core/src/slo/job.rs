@@ -248,7 +248,7 @@ async fn fetch_rows(
             ))
         }
         SliQueryPlan::PromQl { good, total } => {
-            let ctx = SearchEventContext::with_slo(&slo);
+            let ctx = SearchEventContext::with_slo(slo);
             let good_series = prom_search(&slo.org, &good, ctx.clone()).await?;
             let total_series = prom_search(&slo.org, &total, ctx).await?;
             Ok((
@@ -262,7 +262,7 @@ async fn fetch_rows(
             ))
         }
         SliQueryPlan::PromQlValue(q) => {
-            let ctx = SearchEventContext::with_slo(&slo);
+            let ctx = SearchEventContext::with_slo(slo);
             let series = prom_search(&slo.org, &q, ctx).await?;
             Ok(promql_value_rows(
                 series,
