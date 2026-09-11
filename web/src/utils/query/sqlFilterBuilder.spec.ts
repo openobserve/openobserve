@@ -19,7 +19,7 @@ import { sqlLiteral, sqlEquals, sqlIn, sqlLike, sqlIsNull } from "./sqlFilterBui
 // Values here are arbitrary log/trace field data. The backend's PostgreSqlDialect
 // parser (sqlparser-rs) does not support backslash string-literal escapes, so only
 // an embedded single quote needs escaping (by doubling) — every other character
-// listed is safe once wrapped in quotes. See docs/sql-string-literal-escaping.md.
+// listed is safe once wrapped in quotes.
 const SPECIAL_CHAR_CASES: Array<[label: string, input: string]> = [
   ["embedded single quote", "notificationHandling's"],
   ["multiple embedded quotes", "it's a 'test'"],

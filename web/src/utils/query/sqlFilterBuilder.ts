@@ -20,7 +20,6 @@ export type LikePosition = "start" | "end" | "contains";
 // The backend parses these filter strings with sqlparser-rs's PostgreSqlDialect,
 // which does not support backslash string-literal escapes — doubling an embedded
 // single quote is the only escaping a '...' literal needs or accepts.
-// See docs/sql-string-literal-escaping.md for the full analysis.
 export const sqlLiteral = (value: unknown): string =>
   `'${escapeSingleQuotes(String(value ?? ""))}'`;
 
