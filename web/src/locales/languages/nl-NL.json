@@ -2464,7 +2464,9 @@
     "subscription_plan": "Abonnementsplan",
     "pendingDeletion": "Verwijdering in behandeling",
     "daysLeft": "{n} dagen resterend",
-    "resurrect": "Organisatie herstellen"
+    "resurrect": "Organisatie herstellen",
+    "statusActive": "Actief",
+    "statusDeleting": "Wordt verwijderd"
   },
   "template": {
     "search": "Sjabloon zoeken"

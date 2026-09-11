@@ -2464,7 +2464,9 @@
     "subscription_plan": "Abonelik Planı",
     "pendingDeletion": "Silme bekliyor",
     "daysLeft": "{n} gün kaldı",
-    "resurrect": "Organizasyonu canlandır"
+    "resurrect": "Organizasyonu canlandır",
+    "statusActive": "Etkin",
+    "statusDeleting": "Siliniyor"
   },
   "template": {
     "search": "Arama Şablonu"

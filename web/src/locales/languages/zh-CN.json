@@ -2464,7 +2464,9 @@
     "subscription_plan": "订阅计划",
     "pendingDeletion": "待删除",
     "daysLeft": "剩余 {n} 天",
-    "resurrect": "恢复组织"
+    "resurrect": "恢复组织",
+    "statusActive": "活跃",
+    "statusDeleting": "删除中"
   },
   "template": {
     "search": "搜索模板"
