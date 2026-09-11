@@ -33,7 +33,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::service::{
     ingestion::get_thread_id,
-    logs::hec::{HecParseError, parse_body},
+    logs::hec::{HecParseError, parse_body, preflight_streams},
 };
 
 /// Maximum decompressed body the collector will accept.
@@ -281,19 +281,40 @@ async fn ingest_collector_body(
     };
 
     let user = IngestUser::User(format!("hec-{}@hec.local", auth.token_id));
-    let responses =
-        match crate::service::logs::hec::ingest_parsed(get_thread_id(), &auth.org_id, parsed, user)
-            .await
-        {
-            Ok(v) => v,
-            Err(e) => {
-                log::error!("[SPLUNK_HEC] write failed for org {}: {e}", auth.org_id);
-                return match e {
-                    infra::errors::Error::ResourceError(_) => HecCollectorStatus::ServerBusy,
-                    _ => HecCollectorStatus::InternalError,
-                };
-            }
+    let streams: Vec<_> = parsed.streams.into_iter().collect();
+    // Admission checks for EVERY group run here, before the first write, so a
+    // rejection is reported with nothing persisted rather than as a 500 after a
+    // partial commit.
+    if let Err(e) = preflight_streams(&auth.org_id, &streams, &user).await {
+        log::warn!(
+            "[SPLUNK_HEC] rejected before write for org {}: {e}",
+            auth.org_id
+        );
+        return match e {
+            infra::errors::Error::ResourceError(_) => HecCollectorStatus::ServerBusy,
+            _ => HecCollectorStatus::IncorrectIndex,
         };
+    }
+
+    let responses = match crate::service::logs::hec::ingest_prepared(
+        get_thread_id(),
+        &auth.org_id,
+        streams,
+        user,
+    )
+    .await
+    {
+        Ok(v) => v,
+        Err(e) => {
+            // Reached only after preflight passed, i.e. a genuine storage failure;
+            // earlier streams in the batch may already be committed.
+            log::error!("[SPLUNK_HEC] write failed for org {}: {e}", auth.org_id);
+            return match e {
+                infra::errors::Error::ResourceError(_) => HecCollectorStatus::ServerBusy,
+                _ => HecCollectorStatus::InternalError,
+            };
+        }
+    };
 
     for resp in &responses {
         if resp.code >= 500 {
