@@ -995,8 +995,17 @@ mod tests {
     /// A real sqlite: `get_by_id` names its columns in a raw SELECT, so a column
     /// forgotten there is a runtime "column not found" no mock reproduces. One
     /// connection — separate connections to `sqlite::memory:` are separate DBs.
+    ///
+    /// The dedup index comes from the migration rather than being copied here,
+    /// because copying it is what let this fixture fall a schema change behind
+    /// `enqueue`'s `ON CONFLICT` target. Running the migrator outright would be
+    /// better still, but it cannot: migrations from `m20241115` onwards read
+    /// the `meta` table, which `db::sqlite`'s bootstrap creates outside the
+    /// migrator.
     async fn jobs_db() -> sea_orm::DatabaseConnection {
         use sea_orm::{ConnectOptions, Database, Schema};
+
+        use crate::table::migration::m20260828_000001_add_env_to_synthetics_jobs::new_dedup_sql;
 
         let mut opts = ConnectOptions::new("sqlite::memory:".to_string());
         opts.max_connections(1);
@@ -1006,15 +1015,10 @@ mod tests {
         db.execute(backend.build(&schema.create_table_from_entity(Entity)))
             .await
             .unwrap();
-        // sqlite rejects `enqueue`'s ON CONFLICT target without a matching
-        // unique index. The FK to `synthetics_runs` is deliberately absent:
-        // sqlite ignores FKs without `PRAGMA foreign_keys=ON`.
-        db.execute_unprepared(
-            "CREATE UNIQUE INDEX synthetics_jobs_dedup_uq \
-             ON synthetics_jobs (synthetics_id, location, scheduled_ts)",
-        )
-        .await
-        .unwrap();
+        // The FK to `synthetics_runs` is absent on purpose: sqlite ignores FKs without the pragma.
+        db.execute_unprepared(&new_dedup_sql(backend))
+            .await
+            .unwrap();
         db
     }
 
@@ -1035,6 +1039,36 @@ mod tests {
             steps_configured,
             metadata: r#"{"tags":["prod"],"synthetic_type":"browser"}"#,
         }
+    }
+
+    /// Fan-out, end to end: without `env` in the conflict target every
+    /// environment after the first is swallowed by `DO NOTHING` and the check
+    /// silently runs against one environment.
+    #[tokio::test]
+    async fn one_tick_against_two_environments_enqueues_two_jobs() {
+        let db = jobs_db().await;
+
+        for env in [Some("prod"), Some("staging"), None] {
+            let params = EnqueueParams {
+                env,
+                ..browser_params(1)
+            };
+            enqueue(&db, params).await.unwrap();
+        }
+
+        // Same environment, same tick: still one job.
+        let repeat = EnqueueParams {
+            env: Some("prod"),
+            ..browser_params(1)
+        };
+        enqueue(&db, repeat).await.unwrap();
+
+        let rows = Entity::find().all(&db).await.unwrap();
+        assert_eq!(
+            rows.len(),
+            3,
+            "prod, staging and unscoped — no more, no less"
+        );
     }
 
     /// The missed-SELECT-column catcher: adding a field to `LeasedRow` without
