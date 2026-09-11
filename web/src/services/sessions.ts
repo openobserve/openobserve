@@ -147,7 +147,7 @@ const sessions = {
      * never builds SQL for search.
      */
     userSearch?: string;
-    /** Same rule on the span's input-messages text ("conversation contains"). */
+    /** Same rule across the span's input and output messages ("conversation contains"). */
     messageSearch?: string;
     timeout?: number;
   }) => {
