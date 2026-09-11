@@ -118,6 +118,36 @@ const hostDashboard = computed(() => {
 const staleGroups = computed(() => (suppressBadges.value ? [] : curated.staleGroups.value));
 
 /**
+ * A curated tab is READ-ONLY, so RenderDashboardCharts' generic empty state — "Add
+ * a panel to start visualizing…" — is an instruction the user cannot follow here.
+ * It leaked whenever resolution produced no tab, so the non-ready faces are named
+ * explicitly and the renderer is only ever handed a dashboard that has panels.
+ */
+const hasPanels = computed(() =>
+  ((hostDashboard.value?.tabs ?? []) as { panels?: unknown[] }[]).some(
+    (tab) => (tab.panels ?? []).length > 0,
+  ),
+);
+
+/** Streams that exist but stopped reporting — the dormant face's evidence. */
+const dormantStreams = computed(() =>
+  curated.hiddenGroups.value.flatMap((hidden) =>
+    hidden.missingStreams.filter((entry) => entry.state === "stale"),
+  ),
+);
+
+const dormantDate = computed(() => {
+  const seen = dormantStreams.value
+    .map((entry) => entry.lastSeenUs ?? 0)
+    .filter((value) => value > 0);
+  if (seen.length === 0) return "";
+  return timestampToTimezoneDate(
+    Math.floor(Math.max(...seen) / 1000),
+    store.state.timezone ?? "UTC",
+  );
+});
+
+/**
  * The banner's own copy, not the group's capability sentence: under a warning
  * chrome, a neutral description of what a group DOES says nothing about the
  * outage. Same key, same params and same clock as the full page's banner.
@@ -385,8 +415,50 @@ const statusLabel = computed(() =>
           >
             <OSpinner size="md" />
           </div>
+          <!-- The streams exist and merely stopped reporting: "install a collector"
+               is the wrong instruction for a host that already had one. -->
+          <div
+            v-else-if="curated.face.value === 'dormant'"
+            class="flex flex-col gap-2 py-6"
+            data-test="host-drawer-metrics-dormant"
+          >
+            <OText tag="h3" class="text-lg font-semibold">{{
+              t("infra.curated.dormantHeadline", { workload: t("menu.hosts") })
+            }}</OText>
+            <OText variant="meta">{{ t("infra.curated.dormantBody") }}</OText>
+            <OBanner
+              v-if="dormantStreams.length"
+              variant="warning"
+              dense
+              data-test="host-drawer-metrics-dormant-streams"
+              :content="
+                t('infra.curated.streamsStale', {
+                  list: raw(dormantStreams.map((entry) => entry.name).join(', ')),
+                  date: dormantDate,
+                })
+              "
+            />
+          </div>
+
+          <!-- No host metrics at all: name the missing receiver rather than offering
+               a panel editor this read-only tab does not have. -->
+          <div
+            v-else-if="curated.face.value === 'undetected' || !hasPanels"
+            class="flex flex-col gap-2 py-6"
+            data-test="host-drawer-metrics-undetected"
+          >
+            <OText variant="meta">{{ t("infra.curated.partialTelemetryHosts") }}</OText>
+            <a
+              :href="exploreLogsHref"
+              target="_blank"
+              class="text-text-link text-sm"
+              data-test="host-drawer-metrics-undetected-logs"
+              >{{ t("infra.hosts.exploreInLogs") }}</a
+            >
+          </div>
+
           <RenderDashboardCharts
-            v-else-if="hostDashboard"
+            v-else
             :dashboardData="hostDashboard"
             :currentTimeObj="currentTimeObj"
             :viewOnly="true"
