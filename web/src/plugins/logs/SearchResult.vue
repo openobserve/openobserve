@@ -2698,21 +2698,24 @@ export default defineComponent({
   backdrop-filter: blur(0.625rem);
   margin-top: 0;
   overflow: visible;
+}
 
-  :deep(.o-pagination__btn) {
-    padding: 0.125rem 0.25rem !important;
-    height: 1.5rem !important;
-    min-height: 1.5rem !important;
-    min-width: 1.5rem !important;
-    font-size: var(--text-xs) !important;
-    border-radius: 0.25rem !important;
-    line-height: 1rem !important;
+/* keep(deep-nesting): without lang="scss", Vue's scoped compiler doesn't flatten a
+   nested :deep() with its parent selector, so it silently never matches — keep these
+   top-level instead of nested inside .paginator-section/.select-pagination. */
+.paginator-section :deep(.o-pagination__btn) {
+  padding: 0.125rem 0.25rem !important;
+  height: 1.5rem !important;
+  min-height: 1.5rem !important;
+  min-width: 1.5rem !important;
+  font-size: var(--text-xs) !important;
+  border-radius: 0.25rem !important;
+  line-height: 1rem !important;
+}
 
-    svg {
-      width: 1rem !important;
-      height: 1rem !important;
-    }
-  }
+.paginator-section :deep(.o-pagination__btn) svg {
+  width: 1rem !important;
+  height: 1rem !important;
 }
 
 .select-pagination {
@@ -2720,13 +2723,13 @@ export default defineComponent({
   width: 4rem !important;
   height: 1.5rem !important;
   margin-top: 0;
+}
 
-  :deep(button) {
-    height: 1.5rem !important;
-    min-height: 1.5rem !important;
-    font-size: var(--text-xs) !important;
-    padding-inline: 0.5rem !important;
-  }
+.select-pagination :deep(button) {
+  height: 1.5rem !important;
+  min-height: 1.5rem !important;
+  font-size: var(--text-xs) !important;
+  padding-inline: 0.5rem !important;
 }
 /* keep(keyframes): the histogram skeleton's shimmer @keyframes and the
    animation: that references it must stay in the same scoped block so Vue
