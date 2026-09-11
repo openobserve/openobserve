@@ -35,6 +35,9 @@ export class CompositeAlertsPage {
       listExpression: (id) => `[data-test="alert-list-composite-expression-${id}"]`,
       listReferenceCount: (id) => `[data-test="alert-list-reference-count-${id}"]`,
       listEnableToggle: (name) => `[data-test="alert-list-${name}-pause-start-alert"]`,
+      listNameCell: (name) => `[data-test="alert-list-${name}-name-cell"]`,
+      listLastTriggeredCell: '[data-test="o2-table-cell-last_triggered_at"]',
+      listLastSatisfiedCell: '[data-test="o2-table-cell-last_satisfied_at"]',
 
       // ---- references drawer ------------------------------------------
       referenceChip: '[data-test="alerts-composite-reference-chip"]',
@@ -104,6 +107,8 @@ export class CompositeAlertsPage {
       detailChild: (id) => `[data-test="alerts-composite-detail-child-${id}"]`,
       detailChildLink: (id) => `[data-test="alerts-composite-detail-child-link-${id}"]`,
       detailStaleReason: (id) => `[data-test="alerts-composite-detail-stale-reason-${id}"]`,
+      detailLevelAt: (id) => `[data-test="alerts-composite-detail-level-at-${id}"]`,
+      detailEvaluationTimestamp: '[data-test="alerts-composite-detail-evaluated-at"]',
       missingJob: '[data-test="alerts-composite-detail-missing-job"]',
 
       // ---- status timeline -------------------------------------------------
@@ -178,6 +183,23 @@ export class CompositeAlertsPage {
 
   listEnableToggle(name) {
     return this.page.locator(this.locators.listEnableToggle(name));
+  }
+
+  listNameCell(name) {
+    return this.page.locator(this.locators.listNameCell(name));
+  }
+
+  /** The whole table row a composite occupies, reached via its rendered name. */
+  listRowByName(name) {
+    return this.page.locator('tr', { has: this.page.locator(this.locators.listNameCell(name)) });
+  }
+
+  listLastTriggeredCell(name) {
+    return this.listRowByName(name).locator(this.locators.listLastTriggeredCell);
+  }
+
+  listLastSatisfiedCell(name) {
+    return this.listRowByName(name).locator(this.locators.listLastSatisfiedCell);
   }
 
   /** The whole table row a composite occupies, reached via its badge. */
@@ -564,6 +586,14 @@ export class CompositeAlertsPage {
 
   detailStaleReason(id) {
     return this.page.locator(this.locators.detailStaleReason(id));
+  }
+
+  detailLevelAt(id) {
+    return this.page.locator(this.locators.detailLevelAt(id));
+  }
+
+  detailEvaluationTimestamp() {
+    return this.page.locator(this.locators.detailEvaluationTimestamp);
   }
 
   missingJob() {
