@@ -263,7 +263,7 @@ mod tests {
     use promql_parser::label::Labels as ModifierLabels;
 
     use super::{super::tests::*, *};
-    use crate::streaming_eval::{FusedAggOp, tests::by};
+    use crate::{aggregations::AggOp, streaming_eval::tests::by};
 
     #[test]
     fn test_group_label_columns_resolution() {
@@ -349,14 +349,7 @@ mod tests {
         let table = MemTable::try_new(arrow_schema(), sorted_partitions()).unwrap();
         ctx.register_table("m", Arc::new(table)).unwrap();
 
-        let result = run_streaming(
-            &ctx,
-            &None,
-            "rate",
-            FusedAggOp::Sum,
-            Duration::from_secs(60),
-        )
-        .await;
+        let result = run_streaming(&ctx, &None, "rate", AggOp::Sum, Duration::from_secs(60)).await;
         assert!(result.is_none());
     }
 
@@ -369,14 +362,7 @@ mod tests {
         ctx.register_table(format!("m{HASH_SORTED_TABLE_SUFFIX}"), Arc::new(table))
             .unwrap();
 
-        let result = run_streaming(
-            &ctx,
-            &None,
-            "rate",
-            FusedAggOp::Sum,
-            Duration::from_secs(60),
-        )
-        .await;
+        let result = run_streaming(&ctx, &None, "rate", AggOp::Sum, Duration::from_secs(60)).await;
         assert!(result.is_none());
     }
 }
