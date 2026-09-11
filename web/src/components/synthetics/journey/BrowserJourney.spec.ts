@@ -17,7 +17,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
 import type { BrowserStep } from "@/types/synthetics";
-import type { ExpansionMap } from "@/utils/synthetics/expandJourney";
+import type { ChildJourney, ExpansionMap } from "@/utils/synthetics/expandJourney";
 
 // `t` still returns the bare key — every existing assertion compares against one.
 // It is a spy as well so the interpolation params can be asserted, which is the
@@ -485,6 +485,30 @@ describe("BrowserJourney step validation", () => {
 
   it("should fail when the first step does not navigate", () => {
     expect(validate([{ id: "1", action: "click", selector: "#login" }])).toBe(false);
+  });
+
+  // The expanded journey starts with the child's own navigate, which is why the save
+  // schema and the server already accept this; the client rule has to agree.
+  it("accepts a subtest as the first step, like the save schema does", async () => {
+    mockToast.mockClear();
+    expect(
+      validate([
+        { id: "s1", action: "subtest", name: "Login", subtest: { id: "child-1" } },
+        {
+          id: "s2",
+          action: "click",
+          name: "Sign in",
+          locator: { candidates: [{ kind: "css", value: "#login" }] },
+        },
+      ]),
+    ).toBe(true);
+    await wrapper.vm.$nextTick();
+    expect(mockToast).not.toHaveBeenCalledWith(
+      expect.objectContaining({ message: "synthetics.validation.firstStepMustNavigate" }),
+    );
+    expect(mockToast).not.toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
+    // No first-step error means nothing auto-expands row 0.
+    expect(wrapper.findComponent(JourneyStepsStub).props("expandedIds")).not.toContain("s1");
   });
 
   // The case above is not isolated: that step names no element either, so it
@@ -1065,8 +1089,17 @@ function mountWithRealSteps(props: Record<string, unknown> = {}) {
   }) as VueWrapper;
 }
 
+/** Every real JourneySteps in the tree — the parent list first, a reference row's preview second. */
+function journeyLists(w: VueWrapper) {
+  return w.findAllComponents({ name: "JourneySteps" }) as VueWrapper<any>[];
+}
+
 describe("BrowserJourney with a subtest reference", () => {
   let w: VueWrapper;
+
+  beforeEach(() => {
+    mockT.mockClear();
+  });
 
   afterEach(() => {
     w?.unmount();
@@ -1115,10 +1148,20 @@ describe("BrowserJourney with a subtest reference", () => {
       expansionMap: map,
     });
     await nextTick();
-    // One card, on the reference row, naming the child step by its position inside the child.
+    // The §5.6 failure string is shared with the banner, so the two never disagree about the child.
     const cards = w.findAll('[data-test="synthetics-journey-step-error-card"]');
     expect(cards).toHaveLength(1);
-    expect(cards[0].text()).toContain("2. fill email");
+    expect(mockT).toHaveBeenCalledWith("synthetics.journey.subtest.failedAt", {
+      number: "2.2",
+      child: "Login",
+      step: "fill email",
+    });
+    expect(cards[0].find('[data-test="synthetics-journey-step-error-name"]').text()).toBe(
+      "synthetics.journey.subtest.failedAt",
+    );
+    const banner = w.find('[data-test="synthetics-journey-failed-banner"]');
+    expect(banner.text()).toContain("synthetics.journey.subtest.failedAt");
+    expect(banner.text()).not.toContain("2. fill email");
     // The dot hook is index-based and 0-based, so the reference row — authored
     // position 2 — is index 1.
     expect(w.find('[data-test="synthetics-journey-step-dot-1"]').exists()).toBe(true);
@@ -1152,6 +1195,750 @@ describe("BrowserJourney with a subtest reference", () => {
     const dot = w.find('[data-test="synthetics-journey-step-dot-1"]');
     expect(dot.exists()).toBe(true);
     expect(dot.classes().join(" ")).toContain("badge-primary-soft-bg");
+  });
+
+  // ── Phase C — replay inside a child ─────────────────────────────────────
+  // Named differently from `subtest.name` so the cache is proven to win the child-name lookup.
+  const loginChild: ChildJourney = {
+    id: "login-test",
+    name: "Login (shared)",
+    folderId: "shared",
+    steps: [
+      { id: "c1", action: "navigate", name: "Open login", value: "https://example.com/login" },
+      {
+        id: "c2",
+        action: "type",
+        name: "fill email",
+        value: "{{USER}}",
+        locator: { candidates: [{ kind: "css", value: "#email" }] },
+      },
+      {
+        id: "c3",
+        action: "click",
+        name: "submit",
+        locator: { candidates: [{ kind: "css", value: "#go" }] },
+      },
+    ],
+  };
+  const cacheWithLogin = () => new Map<string, ChildJourney>([["login-test", loginChild]]);
+  const pass = (stepId: string, stepName: string) =>
+    [stepId, { stepId, stepName, passed: true, durationMs: 100 }] as const;
+  const failedInChild = () =>
+    new Map<string, any>([
+      pass("s1", "Open"),
+      pass("s2_c1", "Open login"),
+      [
+        "s2_c2",
+        {
+          stepId: "s2_c2",
+          stepName: "fill email",
+          passed: false,
+          durationMs: 3200,
+          error: "timeout",
+        },
+      ],
+    ]);
+  const previewDot = (w: VueWrapper, n: string) =>
+    w.find(`[data-test="synthetics-journey-preview-step-${n}"]`);
+
+  it("offers Open on the card only for a folded child result and emits open-child with the child", async () => {
+    w = mountWithRealSteps({
+      modelValue: journey,
+      replayPhase: "failed",
+      stepResults: failedInChild(),
+      expansionMap: map,
+      childrenCache: cacheWithLogin(),
+    });
+    await nextTick();
+    const open = w.find('[data-test="synthetics-journey-error-open-child-btn"]');
+    expect(open.exists()).toBe(true);
+    // Read off the card itself: the preview's Open button in the same row calls `t` the same way.
+    expect(open.text()).toContain("synthetics.journey.subtest.openChild");
+    expect(mockT).toHaveBeenCalledWith("synthetics.journey.subtest.openChild", {
+      name: "Login (shared)",
+    });
+    // The cached name outranks the reference's display cache in the failure string too.
+    expect(mockT).toHaveBeenCalledWith("synthetics.journey.subtest.failedAt", {
+      number: "2.2",
+      child: "Login (shared)",
+      step: "fill email",
+    });
+    await open.trigger("click");
+    const emitted = w.emitted("open-child")!;
+    expect(emitted.length).toBeGreaterThan(0);
+    for (const call of emitted) {
+      expect(call[0]).toMatchObject({ id: "login-test", name: "Login (shared)" });
+    }
+    w.unmount();
+
+    // The same card on an ordinary step names no child, so there is nothing to open.
+    w = mountWithRealSteps({
+      modelValue: journey,
+      replayPhase: "failed",
+      stepResults: new Map([
+        ["s1", { stepId: "s1", stepName: "Open", passed: false, durationMs: 100, error: "boom" }],
+      ]),
+      childrenCache: cacheWithLogin(),
+    });
+    await nextTick();
+    expect(w.find('[data-test="synthetics-journey-step-error-card"]').exists()).toBe(true);
+    expect(w.find('[data-test="synthetics-journey-error-open-child-btn"]').exists()).toBe(false);
+  });
+
+  it("lights preview rows: pass before the failure, fail on it, skip with Not run after it", async () => {
+    w = mountWithRealSteps({
+      modelValue: journey,
+      replayPhase: "failed",
+      stepResults: failedInChild(),
+      expansionMap: map,
+      childrenCache: cacheWithLogin(),
+    });
+    await nextTick();
+    await flushPromises();
+    // `failed` is not locked, so the collapsed-row counter has already yielded.
+    expect(w.find('[data-test="synthetics-journey-subtest-progress-1"]').exists()).toBe(false);
+    // The failed watcher opened the reference row, so its preview is on screen.
+    expect(previewDot(w, "2.1").exists()).toBe(true);
+    expect(previewDot(w, "2.1").attributes("data-dot-state")).toBe("pass");
+    expect(previewDot(w, "2.2").attributes("data-dot-state")).toBe("fail");
+    expect(previewDot(w, "2.3").attributes("data-dot-state")).toBe("skip");
+    const skippedRow = previewDot(w, "2.3").element.closest("tr")!;
+    expect(skippedRow.textContent).toContain("synthetics.journey.subtest.notRun");
+    expect(previewDot(w, "2.1").element.closest("tr")!.textContent).not.toContain(
+      "synthetics.journey.subtest.notRun",
+    );
+  });
+
+  it("shows the active child as active and later children as pending while running", async () => {
+    w = mountWithRealSteps({
+      modelValue: journey,
+      replayPhase: "running",
+      stepResults: new Map([pass("s1", "Open"), pass("s2_c1", "Open login")]),
+      activeStepId: "s2_c2",
+      expansionMap: map,
+      childrenCache: cacheWithLogin(),
+    });
+    await nextTick();
+    // Nothing auto-expands while running, so the author opens the row.
+    await w.find('[data-test="o2-table-expand-1"]').trigger("click");
+    await flushPromises();
+    expect(previewDot(w, "2.1").exists()).toBe(true);
+    expect(previewDot(w, "2.1").attributes("data-dot-state")).toBe("pass");
+    expect(previewDot(w, "2.2").attributes("data-dot-state")).toBe("active");
+    expect(previewDot(w, "2.3").attributes("data-dot-state")).toBe("pending");
+
+    // Stopping is still live: nothing has been skipped yet, so no child reads "Not run".
+    await w.setProps({ replayPhase: "stopping", activeStepId: null });
+    await flushPromises();
+    expect(previewDot(w, "2.1").attributes("data-dot-state")).toBe("pass");
+    expect(previewDot(w, "2.2").attributes("data-dot-state")).toBe("pending");
+    expect(previewDot(w, "2.3").attributes("data-dot-state")).toBe("pending");
+    expect(w.find('[data-test="synthetics-journey-subtest-preview"]').text()).not.toContain(
+      "synthetics.journey.subtest.notRun",
+    );
+  });
+
+  it("hides the child progress counter after the run and shows the steps badge instead", async () => {
+    w = mountWithRealSteps({
+      modelValue: journey,
+      replayPhase: "passed",
+      stepResults: new Map([
+        pass("s1", "Open"),
+        pass("s2_c1", "Open login"),
+        pass("s2_c2", "fill email"),
+        pass("s2_c3", "submit"),
+        pass("s3", "Logs"),
+      ]),
+      expansionMap: map,
+      childrenCache: cacheWithLogin(),
+    });
+    await nextTick();
+    expect(w.find('[data-test="synthetics-journey-subtest-progress-1"]').exists()).toBe(false);
+    const badge = w.find('[data-test="synthetics-journey-step-badge-1"]');
+    expect(badge.exists()).toBe(true);
+    expect(mockT).toHaveBeenCalledWith("synthetics.journey.subtest.stepsBadge", { count: 3 });
+  });
+
+  // C6: executed total = authored non-reference rows + expansionMap.size (2 + 3), never 3.
+  it("counts executed steps in the running banner", async () => {
+    w = mountWithRealSteps({
+      modelValue: journey,
+      replayPhase: "running",
+      stepResults: new Map([pass("s1", "Open"), pass("s2_c1", "Open login")]),
+      activeStepId: "s2_c2",
+      expansionMap: map,
+    });
+    await nextTick();
+    expect(mockT).toHaveBeenCalledWith("synthetics.journey.replayProgress", {
+      current: 2,
+      total: 5,
+    });
+    w.unmount();
+
+    // Two references: 3 own + 3 + 3 = 9, which `length + size - 1` (10) gets wrong.
+    const twoRefs: BrowserStep[] = [
+      journey[0],
+      journey[1],
+      { id: "s4", action: "subtest", name: "Log in again", subtest: { id: "login-test" } },
+      journey[2],
+      { id: "s5", action: "assert", name: "Landed", value: "1" },
+    ];
+    const twoRefsMap: ExpansionMap = new Map([
+      ...map,
+      ...(["c1", "c2", "c3"] as const).map(
+        (c, i) =>
+          [
+            `s4_${c}`,
+            { authoredStepId: "s4", childIndex: i, childStepName: c, childCount: 3 },
+          ] as const,
+      ),
+    ]);
+    mockT.mockClear();
+    w = mountWithRealSteps({
+      modelValue: twoRefs,
+      replayPhase: "running",
+      stepResults: new Map([pass("s1", "Open")]),
+      activeStepId: "s2_c1",
+      expansionMap: twoRefsMap,
+    });
+    await nextTick();
+    expect(mockT).toHaveBeenCalledWith("synthetics.journey.replayProgress", {
+      current: 1,
+      total: 9,
+    });
+  });
+
+  it("counts executed steps in the passed banner", async () => {
+    w = mountWithRealSteps({
+      modelValue: journey,
+      replayPhase: "passed",
+      stepResults: new Map([
+        pass("s1", "Open"),
+        pass("s2_c1", "Open login"),
+        pass("s2_c2", "fill email"),
+        pass("s2_c3", "submit"),
+        pass("s3", "Logs"),
+      ]),
+      expansionMap: map,
+    });
+    await nextTick();
+    expect(mockT).toHaveBeenCalledWith("synthetics.journey.replayPassed", { count: 5 });
+  });
+
+  it("keeps authored totals in the failed banner", async () => {
+    w = mountWithRealSteps({
+      modelValue: journey,
+      replayPhase: "failed",
+      stepResults: failedInChild(),
+      expansionMap: map,
+    });
+    await nextTick();
+    expect(mockT).toHaveBeenCalledWith("synthetics.journey.replayFailed", { failed: 2, total: 3 });
+  });
+});
+
+// ── Reference row preview (Phase A) ─────────────────────────────────────────
+// Ruled order is fields → environment note → preview.
+describe("BrowserJourney reference row preview", () => {
+  let w: VueWrapper;
+
+  const journey: BrowserStep[] = [
+    { id: "s1", action: "navigate", name: "Open", value: "https://example.com" },
+    {
+      id: "s2",
+      action: "subtest",
+      name: "Log in (shared)",
+      subtest: { id: "login-test", name: "Login" },
+    },
+    {
+      id: "s3",
+      action: "click",
+      name: "Logs",
+      locator: { candidates: [{ kind: "css", value: "#logs" }] },
+    },
+  ];
+  const loginChild: ChildJourney = {
+    id: "login-test",
+    name: "Login",
+    folderId: "shared",
+    steps: [
+      { id: "c1", action: "navigate", name: "Open login", value: "https://example.com/login" },
+      {
+        id: "c2",
+        action: "type",
+        name: "fill email",
+        value: "{{USER}}",
+        locator: { candidates: [{ kind: "css", value: "#email" }] },
+      },
+      {
+        id: "c3",
+        action: "click",
+        name: "submit",
+        locator: { candidates: [{ kind: "css", value: "#go" }] },
+      },
+      { id: "c4", action: "click", name: "legacy click", selector: "#v1" },
+    ],
+  };
+  const cacheWithLogin = () => new Map<string, ChildJourney>([["login-test", loginChild]]);
+
+  /** `a` comes before `b` in document order. */
+  const precedes = (a: Node, b: Node) =>
+    !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+
+  async function expandReferenceRow(wrapper: VueWrapper) {
+    await wrapper.find('[data-test="o2-table-expand-1"]').trigger("click");
+    await flushPromises();
+  }
+
+  beforeEach(() => {
+    mockT.mockClear();
+    mockSyntheticsGet.mockReset();
+  });
+
+  afterEach(() => {
+    w?.unmount();
+  });
+
+  it("renders the step editor before the environment note and the preview", async () => {
+    w = mountWithRealSteps({ modelValue: journey, childrenCache: cacheWithLogin() });
+    await expandReferenceRow(w);
+
+    const editor = w.find(".step-editor-stub");
+    const env = w.find('[data-test="synthetics-journey-subtest-ignored-env"]');
+    const previewBlock = w.find('[data-test="synthetics-journey-subtest-preview"]');
+    const previewList = journeyLists(w)[1];
+    expect(editor.exists()).toBe(true);
+    expect(env.exists()).toBe(true);
+    expect(previewBlock.exists()).toBe(true);
+    expect(previewList, "no nested preview list rendered").toBeDefined();
+
+    expect(precedes(editor.element, previewBlock.element), "preview block before the editor").toBe(
+      true,
+    );
+    expect(precedes(editor.element, env.element), "environment note before the editor").toBe(true);
+    expect(
+      precedes(env.element, previewList.element),
+      "preview list before the environment note",
+    ).toBe(true);
+  });
+
+  it("passes the child's steps to a preview-mode JourneySteps with the reference row's number as prefix", async () => {
+    w = mountWithRealSteps({ modelValue: journey, childrenCache: cacheWithLogin() });
+    await expandReferenceRow(w);
+
+    const lists = journeyLists(w);
+    expect(lists).toHaveLength(2);
+    const preview = lists[1];
+    expect(preview.props("mode")).toBe("preview");
+    expect(preview.props("numberPrefix")).toBe("2");
+    const rows = preview.props("data") as Array<{ id: string; detail: string }>;
+    expect(rows).toHaveLength(4);
+    // URL for navigate, typed text for type, then the v1 selector, then the locator — never blank.
+    expect(rows.map((r) => r.detail)).toEqual([
+      "https://example.com/login",
+      "{{USER}}",
+      "#go",
+      "#v1",
+    ]);
+    // At rest no replay is active, so no row is lit and none reads "Not run".
+    const first = w.find('[data-test="synthetics-journey-preview-step-2.1"]');
+    expect(first.exists()).toBe(true);
+    expect(first.attributes("data-dot-state")).toBeUndefined();
+    expect(w.find('[data-test="synthetics-journey-subtest-preview"]').text()).not.toContain(
+      "synthetics.journey.subtest.notRun",
+    );
+    w.unmount();
+
+    // The prefix is the reference row's own number, wherever it sits.
+    w = mountWithRealSteps({
+      modelValue: [journey[0], journey[2], journey[1]],
+      childrenCache: cacheWithLogin(),
+    });
+    await w.find('[data-test="o2-table-expand-2"]').trigger("click");
+    await flushPromises();
+    expect(journeyLists(w)[1].props("numberPrefix")).toBe("3");
+    expect(w.find('[data-test="synthetics-journey-preview-step-3.1"]').exists()).toBe(true);
+  });
+
+  it("shows the previewLabel, the bare child count and an Open button naming the child", async () => {
+    w = mountWithRealSteps({ modelValue: journey, childrenCache: cacheWithLogin() });
+    await expandReferenceRow(w);
+
+    const block = w.find('[data-test="synthetics-journey-subtest-preview"]');
+    expect(block.text()).toContain("synthetics.journey.subtest.previewLabel");
+    expect(block.find('[data-test="synthetics-journey-subtest-count"]').text()).toBe("4");
+    const open = block.find('[data-test="synthetics-journey-subtest-open-child"]');
+    expect(open.exists()).toBe(true);
+    expect(mockT).toHaveBeenCalledWith("synthetics.journey.subtest.openChild", { name: "Login" });
+  });
+
+  it("emits open-child with the cached child (id, folderId) when Open is clicked", async () => {
+    w = mountWithRealSteps({ modelValue: journey, childrenCache: cacheWithLogin() });
+    await expandReferenceRow(w);
+
+    const open = w.find('[data-test="synthetics-journey-subtest-open-child"]');
+    expect(open.exists()).toBe(true);
+    await open.trigger("click");
+    const emitted = w.emitted("open-child")!;
+    expect(emitted?.length).toBeGreaterThan(0);
+    for (const call of emitted) {
+      expect(call[0]).toMatchObject({ id: "login-test", folderId: "shared" });
+    }
+  });
+
+  it("shows the N steps badge on the collapsed reference row and none on ordinary rows", async () => {
+    w = mountWithRealSteps({ modelValue: journey, childrenCache: cacheWithLogin() });
+    await flushPromises();
+
+    const badge = w.find('[data-test="synthetics-journey-step-badge-1"]');
+    expect(badge.exists()).toBe(true);
+    expect(badge.text()).toBe("synthetics.journey.subtest.stepsBadge");
+    expect(mockT).toHaveBeenCalledWith("synthetics.journey.subtest.stepsBadge", { count: 4 });
+    expect(w.find('[data-test="synthetics-journey-step-badge-0"]').exists()).toBe(false);
+    expect(w.find('[data-test="synthetics-journey-step-badge-2"]').exists()).toBe(false);
+    // Nothing is expanded, so the badge is what says how heavy the reference is.
+    expect(w.find('[data-test="synthetics-journey-subtest-preview"]').exists()).toBe(false);
+    w.unmount();
+
+    // Neither loaded nor refused: there is no count to show yet.
+    w = mountWithRealSteps({ modelValue: journey, childrenCache: new Map() });
+    await flushPromises();
+    expect(w.find('[data-test="synthetics-journey-step-badge-1"]').exists()).toBe(false);
+  });
+
+  it("marks a refused child with the no access badge without expanding the row", async () => {
+    w = mountWithRealSteps({
+      modelValue: journey,
+      childrenCache: new Map(),
+      refusedChildIds: new Set(["login-test"]),
+    });
+    await flushPromises();
+
+    const badge = w.find('[data-test="synthetics-journey-step-badge-1"]');
+    expect(badge.exists()).toBe(true);
+    expect(badge.text()).toBe("synthetics.journey.subtest.noAccessBadge");
+    // The stub forwards unknown props as attributes, so the variant is readable here.
+    expect(badge.attributes("variant")).toBe("error");
+    expect(w.find('[data-test="synthetics-journey-subtest-preview"]').exists()).toBe(false);
+    expect(mockSyntheticsGet).not.toHaveBeenCalled();
+  });
+
+  it("does not fetch a child the host already reported as refused when the row expands", async () => {
+    w = mountWithRealSteps({
+      modelValue: journey,
+      childrenCache: new Map(),
+      refusedChildIds: new Set(["login-test"]),
+    });
+    await flushPromises();
+
+    // The declared `expand` emit is the only path into ensureChildLoaded; the UI never fires it.
+    journeyLists(w)[0].vm.$emit("expand", journey[1]);
+    await flushPromises();
+
+    expect(w.find('[data-test="synthetics-journey-subtest-refused"]').exists()).toBe(true);
+    expect(w.find('[data-test="synthetics-journey-subtest-loading"]').exists()).toBe(false);
+    expect(mockSyntheticsGet).not.toHaveBeenCalled();
+  });
+
+  it("shows the remedy line under the refused alert and keeps the fields visible", async () => {
+    w = mountWithRealSteps({
+      modelValue: journey,
+      childrenCache: new Map(),
+      refusedChildIds: new Set(["login-test"]),
+    });
+    await expandReferenceRow(w);
+
+    const refused = w.find('[data-test="synthetics-journey-subtest-refused"]');
+    expect(refused.exists()).toBe(true);
+    expect(refused.text()).toContain("synthetics.journey.subtest.noAccess");
+    const remedy = refused.find('[data-test="synthetics-journey-subtest-refused-remedy"]');
+    expect(remedy.exists()).toBe(true);
+    expect(remedy.text()).toBe("synthetics.journey.subtest.noAccessRemedy");
+    // The author can still replace or remove the reference.
+    expect(w.find(".step-editor-stub").exists()).toBe(true);
+    expect(w.find('[data-test="synthetics-journey-subtest-loading"]').exists()).toBe(false);
+  });
+
+  it("stores the child's folder_id from the GET response in the shared cache", async () => {
+    mockSyntheticsGet.mockResolvedValue({
+      data: {
+        name: "Login",
+        folder_id: "shared",
+        config: { steps: [{ id: "w1", action: "navigate", url: "https://example.com/login" }] },
+      },
+    });
+    const cache = new Map<string, ChildJourney>();
+    w = mountWithRealSteps({ modelValue: journey, childrenCache: cache });
+    await flushPromises();
+
+    // The declared `expand` emit is the only path into ensureChildLoaded; the UI never fires it.
+    journeyLists(w)[0].vm.$emit("expand", journey[1]);
+    await flushPromises();
+
+    expect(mockSyntheticsGet).toHaveBeenCalledTimes(1);
+    expect(cache.get("login-test")).toMatchObject({
+      id: "login-test",
+      name: "Login",
+      folderId: "shared",
+    });
+  });
+});
+
+// ── Undefined placeholders (Phase B) ────────────────────────────────────────
+// A child reading a name the parent lacks fails at resolve time; naming it here moves that to the pick.
+describe("BrowserJourney undefined placeholders", () => {
+  let w: VueWrapper;
+
+  const journey: BrowserStep[] = [
+    { id: "s1", action: "navigate", name: "Open", value: "https://example.com" },
+    {
+      id: "s2",
+      action: "subtest",
+      name: "Log in (shared)",
+      subtest: { id: "login-test", name: "Login" },
+    },
+  ];
+  const loginChild: ChildJourney = {
+    id: "login-test",
+    name: "Login",
+    folderId: "shared",
+    steps: [
+      { id: "c1", action: "navigate", name: "Open login", value: "https://example.com/login" },
+      { id: "c2", action: "type", name: "fill email", value: "{{USER}}" },
+      { id: "c3", action: "type", name: "fill password", value: "{{ PASSWORD }}" },
+      { id: "c4", action: "assert", name: "landed", value: "{{TOKEN}}" },
+    ],
+  };
+
+  function mountExpanded(variableNames: string[]) {
+    return mountWithRealSteps({
+      modelValue: journey,
+      childrenCache: new Map([["login-test", loginChild]]),
+      variableNames,
+      variablesPanelOpen: false,
+    });
+  }
+
+  beforeEach(() => {
+    mockT.mockClear();
+  });
+
+  afterEach(() => {
+    w?.unmount();
+  });
+
+  it("names the child's undefined placeholders under the fields and offers the Variables toggle", async () => {
+    w = mountExpanded([]);
+    await w.find('[data-test="o2-table-expand-1"]').trigger("click");
+    await flushPromises();
+
+    const line = w.find('[data-test="synthetics-journey-subtest-undefined-variable"]');
+    expect(line.exists()).toBe(true);
+    // One line for all missing names, sorted; the assert step's `{{TOKEN}}` is not scanned.
+    expect(mockT).toHaveBeenCalledWith("synthetics.journey.subtest.undefinedVariable", {
+      name: "Login",
+      variable: "PASSWORD, USER",
+    });
+    // Under the fields and above the environment note — the third impact line.
+    const editor = w.find(".step-editor-stub");
+    const env = w.find('[data-test="synthetics-journey-subtest-ignored-env"]');
+    expect(
+      editor.element.compareDocumentPosition(line.element) & Node.DOCUMENT_POSITION_FOLLOWING,
+      "the placeholder line is not under the fields",
+    ).toBeTruthy();
+    expect(
+      line.element.compareDocumentPosition(env.element) & Node.DOCUMENT_POSITION_FOLLOWING,
+      "the placeholder line is not above the environment note",
+    ).toBeTruthy();
+
+    const action = line.find('[data-test="synthetics-journey-subtest-add-variable"]');
+    expect(action.exists()).toBe(true);
+    expect(action.text()).toBe("synthetics.journey.subtest.undefinedVariableAction");
+    await action.trigger("click");
+    expect(w.emitted("toggle-variables-panel")?.length).toBeGreaterThan(0);
+  });
+
+  it("renders no placeholder line when the parent defines every name", async () => {
+    w = mountExpanded(["USER", "PASSWORD"]);
+    await w.find('[data-test="o2-table-expand-1"]').trigger("click");
+    await flushPromises();
+
+    expect(w.find('[data-test="synthetics-journey-subtest-preview"]').exists()).toBe(true);
+    expect(w.find('[data-test="synthetics-journey-subtest-undefined-variable"]').exists()).toBe(
+      false,
+    );
+    expect(mockT).not.toHaveBeenCalledWith(
+      "synthetics.journey.subtest.undefinedVariable",
+      expect.anything(),
+    );
+  });
+});
+
+// ── Step cap (Phase D) ──────────────────────────────────────────────────────
+// Refused before any request and decomposed per §5.4 — an undecomposed count is unactionable.
+describe("BrowserJourney step cap", () => {
+  let w: VueWrapper;
+
+  const CAP_NOTICE = '[data-test="synthetics-journey-cap-notice"]';
+  const EXECUTED_BADGE = '[data-test="synthetics-journey-executed-badge"]';
+
+  const journey: BrowserStep[] = [
+    { id: "s1", action: "navigate", name: "Open shop", value: "https://shop.example.com" },
+    {
+      id: "s2",
+      action: "subtest",
+      name: "Login (shared)",
+      subtest: { id: "a", name: "Login (shared)" },
+    },
+    {
+      id: "s3",
+      action: "subtest",
+      name: "Add items",
+      subtest: { id: "b", name: "Add items to cart" },
+    },
+    {
+      id: "s4",
+      action: "click",
+      name: "Cart",
+      locator: { candidates: [{ kind: "css", value: "#cart" }] },
+    },
+    { id: "s5", action: "assert", name: "Cart has items", value: "1" },
+  ];
+  const plainJourney: BrowserStep[] = [journey[0], journey[3], journey[4]];
+  const childOf = (id: string, name: string, count: number): ChildJourney => ({
+    id,
+    name,
+    folderId: "shared",
+    steps: Array.from({ length: count }, (_, i) => ({
+      id: `${id}-${i + 1}`,
+      action: "click" as const,
+      name: `step ${i + 1}`,
+      locator: { candidates: [{ kind: "css" as const, value: `#s${i + 1}` }] },
+    })),
+  });
+  // Inserted b before a so Map iteration order is not the journey order the notice must follow.
+  const cache = () =>
+    new Map<string, ChildJourney>([
+      ["b", childOf("b", "Add items to cart", 17)],
+      ["a", childOf("a", "Login (shared)", 31)],
+    ]);
+
+  const capCalls = (key: string) =>
+    mockT.mock.calls.filter(([k]) => k === `synthetics.journey.subtest.${key}`);
+
+  beforeEach(() => {
+    mockT.mockClear();
+  });
+
+  afterEach(() => {
+    w?.unmount();
+  });
+
+  it("renders no notice at or under the limit, and none when the count is unknown", async () => {
+    w = mountWithRealSteps({ modelValue: journey, childrenCache: cache(), ownStepCount: 50 });
+    await flushPromises();
+    expect(w.find(CAP_NOTICE).exists()).toBe(false);
+    expect(capCalls("capTitle")).toHaveLength(0);
+    w.unmount();
+
+    // A child that cannot be loaded leaves the count unknown; the server backstop applies.
+    w = mountWithRealSteps({
+      modelValue: journey,
+      childrenCache: cache(),
+      ownStepCount: undefined,
+    });
+    await flushPromises();
+    expect(w.find(CAP_NOTICE).exists()).toBe(false);
+  });
+
+  it("renders the decomposed notice over the limit — own count, one entry per reference in journey order, remedy", async () => {
+    w = mountWithRealSteps({ modelValue: journey, childrenCache: cache(), ownStepCount: 51 });
+    await flushPromises();
+
+    const notice = w.find(CAP_NOTICE);
+    expect(notice.exists()).toBe(true);
+    expect(notice.attributes("role")).toBe("alert");
+    expect(mockT).toHaveBeenCalledWith("synthetics.journey.subtest.capTitle", {
+      total: 51,
+      limit: 50,
+    });
+    expect(mockT).toHaveBeenCalledWith("synthetics.journey.subtest.capOwn", { count: 3 });
+    // Deduped: a re-render calls `t()` again, and only the set and order of entries matter.
+    const childParams = [...new Set(capCalls("capChild").map(([, p]) => JSON.stringify(p)))].map(
+      (p) => JSON.parse(p),
+    );
+    expect(childParams).toEqual([
+      { count: 31, name: "Login (shared)" },
+      { count: 17, name: "Add items to cart" },
+    ]);
+    expect(mockT).toHaveBeenCalledWith("synthetics.journey.subtest.capRemedy");
+    expect(
+      notice
+        .find('[data-test="synthetics-journey-cap-breakdown"]')
+        .text()
+        .replace(/\s+/g, " ")
+        .trim(),
+    ).toBe(
+      "synthetics.journey.subtest.capOwn · synthetics.journey.subtest.capChild · synthetics.journey.subtest.capChild.",
+    );
+    expect(notice.text()).toContain("synthetics.journey.subtest.capRemedy");
+    expect(notice.find("button").exists()).toBe(false);
+  });
+
+  it("does not tint any row while over the cap", async () => {
+    w = mountWithRealSteps({ modelValue: journey, childrenCache: cache(), ownStepCount: 51 });
+    await flushPromises();
+
+    expect(w.find(CAP_NOTICE).exists()).toBe(true);
+    expect(w.findAll('[data-status-bar="true"]')).toHaveLength(0);
+  });
+
+  it("shows the executed badge only when the journey holds a reference, in the error variant past the limit", async () => {
+    w = mountWithRealSteps({ modelValue: plainJourney, childrenCache: cache(), ownStepCount: 3 });
+    await flushPromises();
+    expect(w.find(EXECUTED_BADGE).exists()).toBe(false);
+    w.unmount();
+
+    // A reference with an unknown count has no number to show.
+    w = mountWithRealSteps({
+      modelValue: journey,
+      childrenCache: cache(),
+      ownStepCount: undefined,
+    });
+    await flushPromises();
+    expect(w.find(EXECUTED_BADGE).exists()).toBe(false);
+    w.unmount();
+
+    w = mountWithRealSteps({ modelValue: journey, childrenCache: cache(), ownStepCount: 48 });
+    await flushPromises();
+    let badge = w.find(EXECUTED_BADGE);
+    expect(badge.exists()).toBe(true);
+    expect(mockT).toHaveBeenCalledWith("synthetics.journey.subtest.executedBadge", { count: 48 });
+    expect(badge.attributes("variant")).toBe("default");
+    w.unmount();
+
+    w = mountWithRealSteps({ modelValue: journey, childrenCache: cache(), ownStepCount: 51 });
+    await flushPromises();
+    badge = w.find(EXECUTED_BADGE);
+    expect(badge.exists()).toBe(true);
+    expect(mockT).toHaveBeenCalledWith("synthetics.journey.subtest.executedBadge", { count: 51 });
+    expect(badge.attributes("variant")).toBe("error");
+  });
+
+  it("exposes revealCapNotice which scrolls the notice into view", async () => {
+    w = mountWithRealSteps({ modelValue: journey, childrenCache: cache(), ownStepCount: 51 });
+    await flushPromises();
+
+    const notice = w.find(CAP_NOTICE);
+    expect(notice.exists()).toBe(true);
+    const scrollIntoView = vi.fn();
+    (notice.element as HTMLElement).scrollIntoView = scrollIntoView;
+
+    (w.vm as any).revealCapNotice();
+    await nextTick();
+
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: "nearest", behavior: "smooth" });
   });
 });
 

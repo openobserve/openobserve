@@ -579,6 +579,8 @@ pub struct SyntheticListItem {
     pub steps: Option<i32>,
     /// How many checks embed this one as a subtest.
     pub referenced_by: i32,
+    /// Subtest steps this browser check holds; None for protocol checks.
+    pub references: Option<i32>,
 }
 
 // ── Query params / responses ──────────────────────────────────────────────────

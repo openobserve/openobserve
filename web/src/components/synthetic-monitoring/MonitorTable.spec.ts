@@ -646,7 +646,18 @@ describe("MonitorTable", () => {
         data: [{ id: "a", name: "checkout", steps: 16, referencedBy: 3 }],
       });
       expect(wrapper.find('[data-test="monitor-table-cell-steps"]').text()).toContain("16");
-      expect(wrapper.find('[data-test="monitor-table-cell-referencedBy"]').text()).toContain("3");
+      expect(wrapper.find('[data-test="monitor-table-cell-referencedBy"]').text()).toBe("3 tests");
+    });
+
+    // The column header already says "Used by"; the cell has to agree with its count.
+    it("reads '1 test' for a single referrer", () => {
+      wrapper = mountMonitorTable({
+        mode: "browser",
+        data: [{ id: "a", name: "login", steps: 13, referencedBy: 1 }],
+      });
+      const cell = wrapper.find('[data-test="monitor-table-cell-referencedBy"]').text();
+      expect(cell).toBe("1 test");
+      expect(cell).not.toContain("tests");
     });
 
     it("renders a dash for a check nothing references", () => {

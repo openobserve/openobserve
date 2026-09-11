@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
 import store from "@/test/unit/helpers/store";
@@ -70,9 +70,11 @@ describe("SubtestPicker", () => {
     });
     const w = mountPicker();
     await flushPromises();
-    expect(w.findComponent(OSelect).props("options")).toEqual([
-      { label: "Login", value: "login-test" },
-    ]);
+    const options = w.findComponent(OSelect).props("options") as unknown as {
+      header?: boolean;
+      value?: string;
+    }[];
+    expect(options.filter((o) => !o.header).map((o) => o.value)).toEqual(["login-test"]);
   });
 
   it("emits the reference and states the executed-step delta and the run time", async () => {
@@ -181,5 +183,246 @@ describe("SubtestPicker", () => {
     expect(w.find('[data-test="synthetics-subtest-delta"]').exists()).toBe(false);
     expect(w.text()).not.toMatch(/-\d+/);
     expect(w.find('[data-test="synthetics-subtest-delta-unknown"]').exists()).toBe(true);
+  });
+});
+
+// ── Grouped, annotated rows (Phase B) ────────────────────────────────────────
+// Everything on a row comes from the list response; nothing costs a request per option.
+describe("SubtestPicker rows", () => {
+  const NOW = new Date("2026-09-11T12:00:00Z");
+  const MINUTE_US = 60 * 1_000_000;
+  const usAgo = (minutes: number) => NOW.getTime() * 1000 - minutes * MINUTE_US;
+
+  const ROWS = [
+    {
+      id: "self",
+      name: "Checkout",
+      type: "browser",
+      folder_id: "default",
+      steps: 4,
+      referenced_by: 0,
+      references: 0,
+      enabled: true,
+      status: "passed",
+      last_check_at: usAgo(1),
+    },
+    {
+      id: "login-test",
+      name: "Login",
+      type: "browser",
+      folder_id: "shared",
+      steps: 13,
+      referenced_by: 5,
+      references: 0,
+      enabled: true,
+      status: "passed",
+      last_check_at: usAgo(4),
+    },
+    {
+      id: "login-staging",
+      name: "Login (staging)",
+      type: "browser",
+      folder_id: "staging",
+      steps: 13,
+      referenced_by: 1,
+      references: 0,
+      enabled: false,
+      status: "failed",
+      last_check_at: usAgo(2 * 24 * 60),
+    },
+    {
+      id: "checkout-full",
+      name: "Checkout — full flow",
+      type: "browser",
+      folder_id: "checkout",
+      steps: 20,
+      referenced_by: 0,
+      references: 1,
+      enabled: true,
+      status: "unknown",
+      last_check_at: null,
+    },
+    { id: "api-1", name: "Orders API", type: "http" },
+  ];
+
+  type Row = {
+    header?: boolean;
+    label: string;
+    value?: string;
+    disabled?: boolean;
+    badge?: string;
+    badgeMuted?: boolean;
+    subLabel?: string;
+  };
+
+  async function mountWithRows(rows: unknown[], props: Record<string, unknown> = {}) {
+    (syntheticsService.listByFolderId as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: { checks: rows },
+    });
+    const w = mountPicker(props);
+    await flushPromises();
+    return w;
+  }
+
+  const optionsOf = (w: ReturnType<typeof mountPicker>) =>
+    w.findComponent(OSelect).props("options") as unknown as Row[];
+  const rowOf = (w: ReturnType<typeof mountPicker>, value: string) =>
+    optionsOf(w).find((o) => o.value === value)!;
+
+  beforeEach(() => {
+    store.commit("setFoldersByType", {
+      synthetics: [
+        { folderId: "default", name: "default" },
+        { folderId: "shared", name: "Shared" },
+        { folderId: "staging", name: "Staging" },
+        { folderId: "checkout", name: "Checkout" },
+      ],
+    });
+    // "4 minutes ago" is measured from a pinned clock, not from whenever the test runs.
+    vi.setSystemTime(NOW);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("groups eligible and ineligible checks under header rows, in that order", async () => {
+    const w = await mountWithRows(ROWS);
+    const shape = optionsOf(w).map((o) =>
+      o.header ? { header: true, label: o.label } : { value: o.value },
+    );
+    expect(shape).toEqual([
+      { header: true, label: "Can be used here" },
+      { value: "login-test" },
+      { value: "login-staging" },
+      { header: true, label: "Can't be used here" },
+      { value: "checkout-full" },
+    ]);
+    expect(w.findComponent(OSelect).props("disabled")).toBe(false);
+  });
+
+  it("disables a check that already contains a subtest and explains why", async () => {
+    const w = await mountWithRows(ROWS);
+    const nested = rowOf(w, "checkout-full");
+    expect(nested.disabled).toBe(true);
+    expect(nested.subLabel).toBe("Already contains a subtest — nesting is limited to one level");
+    expect(nested.badgeMuted).toBe(true);
+    // Eligible rows stay selectable.
+    expect(rowOf(w, "login-test").disabled).not.toBe(true);
+  });
+
+  it("omits the ineligible header when every check is eligible", async () => {
+    const w = await mountWithRows(ROWS.filter((r) => r.id !== "checkout-full"));
+    const headers = optionsOf(w).filter((o) => o.header);
+    expect(headers.map((h) => h.label)).toEqual(["Can be used here"]);
+    expect(optionsOf(w).some((o) => o.label === "Can't be used here")).toBe(false);
+    w.unmount();
+
+    // The mirror: a header with no rows under it is noise, whichever group is empty.
+    const allNested = ROWS.map((r) =>
+      r.type === "browser" && r.id !== "self" ? { ...r, references: 1 } : r,
+    );
+    const w2 = await mountWithRows(allNested);
+    const shape = optionsOf(w2).map((o) =>
+      o.header ? { header: true, label: o.label } : { value: o.value, disabled: o.disabled },
+    );
+    expect(shape).toEqual([
+      { header: true, label: "Can't be used here" },
+      { value: "login-test", disabled: true },
+      { value: "login-staging", disabled: true },
+      { value: "checkout-full", disabled: true },
+    ]);
+    w2.unmount();
+  });
+
+  it("annotates a row with folder, step count, used-by (pluralised) and last run", async () => {
+    const neverRun = {
+      id: "fresh",
+      name: "Fresh",
+      type: "browser",
+      folder_id: "default",
+      steps: null,
+      referenced_by: 0,
+      references: 0,
+      enabled: true,
+      status: "unknown",
+      last_check_at: usAgo(1),
+    };
+    const passedNeverTimed = {
+      ...neverRun,
+      id: "passed-no-time",
+      name: "Passed, untimed",
+      steps: 2,
+      status: "passed",
+      last_check_at: null,
+    };
+    const w = await mountWithRows([...ROWS, neverRun, passedNeverTimed]);
+    const login = rowOf(w, "login-test");
+    expect(login.label).toBe("Login");
+    expect(login.badge).toBe("Shared");
+    expect(login.badgeMuted).toBe(true);
+    expect(login.subLabel).toBe("13 steps · Used by 5 tests · Passed 4 minutes ago");
+    // A single referrer reads in the singular.
+    expect(rowOf(w, "login-staging").subLabel).toContain("Used by 1 test ·");
+    // Null steps, no referrers and an unknown status contribute no fragment, even with a timestamp.
+    const fresh = rowOf(w, "fresh");
+    expect(fresh.disabled).not.toBe(true);
+    expect(fresh.subLabel ?? "").toBe("");
+    // A known status without a timestamp is just as silent about the last run.
+    expect(rowOf(w, "passed-no-time").subLabel).toBe("2 steps");
+  });
+
+  it("marks a paused check and still offers it", async () => {
+    const w = await mountWithRows(ROWS);
+    const options = optionsOf(w);
+    const paused = rowOf(w, "login-staging");
+    expect(paused.disabled).not.toBe(true);
+    expect(paused.subLabel).toBe("13 steps · Used by 1 test · Paused · Failed 2 days ago");
+    // Offered: it sits in the eligible group, above the ineligible header.
+    const ineligibleHeader = options.findIndex((o) => o.header && o.label === "Can't be used here");
+    expect(options.indexOf(paused)).toBeLessThan(ineligibleHeader);
+    expect(rowOf(w, "login-test").subLabel).not.toContain("Paused");
+  });
+
+  it("shows the empty state and disables the select when no other browser test exists", async () => {
+    const w = await mountWithRows(ROWS.filter((r) => r.id === "self" || r.id === "api-1"));
+    const empty = w.find('[data-test="synthetics-subtest-empty"]');
+    expect(empty.exists()).toBe(true);
+    expect(empty.text()).toBe("No other browser tests in this organization yet.");
+    expect(w.findComponent(OSelect).props("disabled")).toBe(true);
+    expect(optionsOf(w)).toEqual([]);
+  });
+
+  it("states the limit in the delta line", async () => {
+    (syntheticsService.get as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: { name: "Login", config: { steps: new Array(13).fill({ id: "c", action: "click" }) } },
+    });
+    (syntheticsService.getRuns as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: { runs: [] },
+    });
+    const w = await mountWithRows(ROWS, { ownStepCount: 16 });
+    await w.findComponent(OSelect).vm.$emit("update:modelValue", "login-test");
+    await flushPromises();
+
+    const delta = w.find('[data-test="synthetics-subtest-delta"]').text();
+    expect(delta).toContain("3 → 16");
+    expect(delta).toContain("The limit is 50.");
+  });
+
+  it("uses the passed journey budget in the run-time line", async () => {
+    (syntheticsService.get as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: { name: "Login", config: { steps: new Array(13).fill({ id: "c", action: "click" }) } },
+    });
+    (syntheticsService.getRuns as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: { runs: [{ created_at: 0, completed_at: 20_000_000 }] },
+    });
+    const w = await mountWithRows(ROWS, { ownStepCount: 16, journeyBudgetMs: 120_000 });
+    await w.findComponent(OSelect).vm.$emit("update:modelValue", "login-test");
+    await flushPromises();
+
+    const lastRun = w.find('[data-test="synthetics-subtest-lastrun"]').text();
+    expect(lastRun).toContain("20s");
+    expect(lastRun).toContain("120s allowance");
+    expect(lastRun).not.toContain("300s");
   });
 });

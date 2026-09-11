@@ -20,9 +20,15 @@ import { useOrgId } from "@/composables/query/useOrgId";
 import { useMutation } from "@tanstack/vue-query";
 import { destinationsQuery } from "@/services/alert_destination.queries";
 import { queryClient } from "@/composables/query/queryClient";
-import { computed, onMounted, onBeforeUnmount, ref, watch } from "vue";
+import { computed, nextTick, onMounted, onBeforeUnmount, ref, watch } from "vue";
 import { cloneDeep } from "lodash-es";
-import { useRouter, useRoute, onBeforeRouteLeave } from "vue-router";
+import {
+  useRouter,
+  useRoute,
+  onBeforeRouteLeave,
+  onBeforeRouteUpdate,
+  type NavigationGuard,
+} from "vue-router";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import type {
@@ -51,7 +57,12 @@ import {
   type ChildJourney,
   type ExpansionMap,
 } from "@/utils/synthetics/expandJourney";
-import { computeRunBudget, formatBudgetDuration, JOB_LEASE_MS } from "@/utils/synthetics/runBudget";
+import {
+  computeRunBudget,
+  formatBudgetDuration,
+  JOB_LEASE_MS,
+  MAX_STEPS,
+} from "@/utils/synthetics/runBudget";
 import { classifyPreflightFailure } from "@/utils/synthetics/replayFailure";
 import {
   buildCreateBrowserTestPayload,
@@ -63,7 +74,7 @@ import {
 } from "@/components/synthetics/CreateBrowserTest.schema";
 import { CHROME_UI_LABELS, SETUP_QUERY_PARAM } from "@/constants/synthetics";
 import { getFoldersListByType } from "@/utils/commons";
-import { syntheticsListRoute } from "@/utils/synthetics/routes";
+import { syntheticsEditRoute, syntheticsListRoute } from "@/utils/synthetics/routes";
 import syntheticsService from "@/services/synthetics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -390,6 +401,8 @@ async function loadForEdit(id: string) {
     const mapped = mapResponseToBrowserCheck(res.data as Record<string, unknown>);
     check.value = mapped;
     savedCheck.value = cloneDeep(mapped);
+    // Not on `BrowserCheck`: `buildCreateBrowserTestPayload` spreads it, and the form never sends it.
+    journeyBudgetMs.value = (res.data as any).config?.journey_budget_ms;
     checkName.value = mapped.name;
     startUrl.value = mapped.url;
     journeyStepDone.value = true;
@@ -522,6 +535,14 @@ const check = ref<BrowserCheck>({
  * `executedStepCount` below and vice versa.
  */
 const childrenCache = ref<Map<string, ChildJourney>>(new Map());
+
+/** Child ids the prefetch was refused (403) — the journey marks them without a second GET. */
+const refusedChildIds = ref<Set<string>>(new Set());
+
+/** The saved check's run-time allowance; undefined in create mode means the server default. */
+const journeyBudgetMs = ref<number | undefined>();
+
+const variableNames = computed(() => check.value.variables?.map((v) => v.name.trim()));
 
 /**
  * Composed-child-id → authored-row map for the run currently on screen — set by
@@ -728,7 +749,8 @@ onBeforeUnmount(() => {
   recorder.cleanup();
 });
 
-onBeforeRouteLeave((to, from, next) => {
+// Registered for updates too: opening a child is a param-only push on this same route record.
+const guardUnsavedChanges: NavigationGuard = (to, from, next) => {
   if (forceLeave) {
     forceLeave = false;
     next();
@@ -742,7 +764,12 @@ onBeforeRouteLeave((to, from, next) => {
   next(false);
   pendingLeavePath = to.fullPath;
   showUnsavedDialog.value = true;
-});
+};
+onBeforeRouteLeave(guardUnsavedChanges);
+// Only an id change leaves this check: a query-only update (the setup `router.replace`) must pass.
+onBeforeRouteUpdate((to, from, next) =>
+  to.params.id === from.params.id ? next() : guardUnsavedChanges(to, from, next),
+);
 
 function beforeUnloadHandler(e: BeforeUnloadEvent) {
   if (!isDirty.value) return;
@@ -974,6 +1001,13 @@ let pendingSaveAction: (() => Promise<void>) | null = null;
  * proceeds as if nothing was referencing it.
  */
 async function checkUsageThenSave(afterPersist: () => Promise<void>) {
+  // Before the usage lookup, so an over-cap save sends no request at all.
+  if (executedStepCount.value !== undefined && executedStepCount.value > MAX_STEPS) {
+    currentStep.value = 1;
+    toast({ variant: "error", message: t("synthetics.validation.subtestCap") });
+    nextTick(() => journeyRef.value?.revealCapNotice());
+    return;
+  }
   if (!check.value.id) {
     await afterPersist();
     return;
@@ -1170,14 +1204,28 @@ function startReplay(steps: WireStep[]) {
 async function fetchChildJourney(id: string): Promise<ChildJourney> {
   const cached = childrenCache.value.get(id);
   if (cached) return cached;
-  const res = await syntheticsService.get(orgIdentifier.value, id);
+  const res = await syntheticsService.get(orgIdentifier.value, id).catch((err: any) => {
+    if (err?.response?.status === 403) {
+      refusedChildIds.value = new Set([...refusedChildIds.value, id]);
+    }
+    throw err;
+  });
   const child: ChildJourney = {
     id,
     name: res.data.name ?? "",
+    folderId: res.data.folder_id,
     steps: mapWireSteps(res.data.config?.steps ?? []),
   };
+  // A reference re-added after access was granted must not stay "no access".
+  refusedChildIds.value = new Set([...refusedChildIds.value].filter((r) => r !== id));
   childrenCache.value.set(id, child);
   return child;
+}
+
+function onOpenChild(child: ChildJourney) {
+  router.push(
+    syntheticsEditRoute({ orgIdentifier: orgIdentifier.value, folderId: child.folderId }, child.id),
+  );
 }
 
 function onStopReplay() {
@@ -1402,10 +1450,14 @@ function onClearResults() {
                     :variables-panel-open="variablesPanelOpen"
                     :own-check-id="check.id"
                     :own-step-count="executedStepCount"
+                    :journey-budget-ms="journeyBudgetMs"
+                    :variable-names="variableNames"
                     :children-cache="childrenCache"
+                    :refused-child-ids="refusedChildIds"
                     :expansion-map="expansionMap"
                     class="h-full!"
                     @toggle-variables-panel="variablesPanelOpen = !variablesPanelOpen"
+                    @open-child="onOpenChild"
                     @replay="onReplay"
                     @verify-extension="reverifyExtension"
                     @replay-up-to="onReplayUpTo"

@@ -30,6 +30,7 @@ const {
   mockServiceGet,
   mockServiceListEnvironments,
   mockServiceListGlobalVariables,
+  mockServiceReferencedBy,
   mockRouterPush,
   mockRouterReplace,
   mockToast,
@@ -40,6 +41,7 @@ const {
   mockJourneyToWireSteps,
   mockGetFoldersListByType,
   mockRoute,
+  mockOnBeforeRouteUpdate,
 } = vi.hoisted(() => ({
   mockServiceGetLocations: vi.fn().mockResolvedValue({
     data: { locations: [], browsers: [], devices: [] },
@@ -50,6 +52,10 @@ const {
   // The shared tiers replay resolves against; empty unless a case fills them.
   mockServiceListEnvironments: vi.fn().mockResolvedValue({ data: [] }),
   mockServiceListGlobalVariables: vi.fn().mockResolvedValue({ data: [] }),
+  // Only reached when the loaded check carries an `id`; nothing references it by default.
+  mockServiceReferencedBy: vi.fn().mockResolvedValue({
+    data: { references: [], hidden_reference_count: 0 },
+  }),
   mockRouterPush: vi.fn(),
   mockRouterReplace: vi.fn(),
   mockToast: vi.fn(() => vi.fn()),
@@ -68,6 +74,8 @@ const {
   // Mutable so a test can drive `?folder=` — the preselected folder is read
   // from the route on mount.
   mockRoute: { params: {} as Record<string, string>, query: {} as Record<string, string> },
+  // Captures the guard the view registers for a same-record navigation (parent → child id).
+  mockOnBeforeRouteUpdate: vi.fn(),
 }));
 
 vi.mock("vue-router", () => ({
@@ -77,6 +85,7 @@ vi.mock("vue-router", () => ({
     replace: mockRouterReplace,
   }),
   onBeforeRouteLeave: vi.fn(),
+  onBeforeRouteUpdate: mockOnBeforeRouteUpdate,
 }));
 
 vi.mock("@/composables/useSyntheticsRecorder", () => ({
@@ -112,6 +121,7 @@ vi.mock("@/services/synthetics", async (importOriginal) => {
       get: mockServiceGet,
       listEnvironments: mockServiceListEnvironments,
       listGlobalVariables: mockServiceListGlobalVariables,
+      referencedBy: mockServiceReferencedBy,
     },
   });
 });
@@ -140,6 +150,8 @@ vi.mock("@/utils/synthetics/buildPayload", () => ({
 
 vi.mock("@/utils/synthetics/mapRecordedStep", () => ({
   journeyToWireSteps: mockJourneyToWireSteps,
+  // Identity: a readable child's steps only need to reach the cache, not be remapped.
+  mapWireSteps: vi.fn((steps: any[]) => steps),
 }));
 
 vi.mock("@/components/synthetics/CreateBrowserTest.schema", () => {
@@ -178,10 +190,17 @@ vi.mock("@/components/synthetics/CreateBrowserTest.schema", () => {
 
 import CreateBrowserTest from "./CreateBrowserTest.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
+import { syntheticsEditRoute } from "@/utils/synthetics/routes";
+import { mapResponseToBrowserCheck } from "@/utils/synthetics/buildPayload";
+import type { BrowserStep } from "@/types/synthetics";
+import type { ChildJourney } from "@/utils/synthetics/expandJourney";
 import { VARIABLES_SPLITTER_LIMITS } from "@/composables/synthetics/useCheckWizardUi";
 import destinationService from "@/services/alert_destination";
 
 // ── Stubs ────────────────────────────────────────────────────────────────
+// Exposed by the real BrowserJourney; the host calls it after a refused save.
+const mockRevealCapNotice = vi.fn();
+
 const baseStubs = {
   OPageHeader: {
     template: '<div data-test="synthetics-header"><slot name="title" /><slot /></div>',
@@ -255,8 +274,13 @@ const baseStubs = {
       "blockedReason",
       "blockedDetail",
       "variablesPanelOpen",
+      "refusedChildIds",
+      "journeyBudgetMs",
+      "variableNames",
+      "ownStepCount",
       "class",
     ],
+    methods: { revealCapNotice: mockRevealCapNotice },
   },
   CheckConfigure: {
     template: '<div data-test="synthetics-check-configure" />',
@@ -356,6 +380,9 @@ describe("CreateBrowserTest", () => {
     mockServiceCreate.mockResolvedValue({ data: { id: "new-check-1" } });
     mockServiceUpdate.mockResolvedValue({});
     mockServiceGet.mockResolvedValue({ data: {} });
+    mockServiceReferencedBy.mockResolvedValue({
+      data: { references: [], hidden_reference_count: 0 },
+    });
     mockGetFoldersListByType.mockResolvedValue([]);
     // Re-primed here because clearAllMocks keeps implementations — a test that
     // resolves the probe true must not leak into the next one.
@@ -809,6 +836,308 @@ describe("CreateBrowserTest", () => {
       // Validation should fail before any API call
       expect(mockServiceCreate).not.toHaveBeenCalled();
       expect(mockServiceUpdate).not.toHaveBeenCalled();
+    });
+  });
+
+  // ── Subtest references: what the host hands the journey and does for it ──
+  describe("edit mode — subtest references", () => {
+    const journeyStub = (w: VueWrapper) =>
+      w.findComponent('[data-test="synthetics-browser-journey"]') as VueWrapper<any>;
+    const subtestStep: BrowserStep = {
+      id: "s2",
+      action: "subtest",
+      name: "Log in (shared)",
+      subtest: { id: "login-test", name: "Login" },
+    };
+    const loadedCheck = (extra: Record<string, unknown> = {}) => ({
+      name: "Test Check",
+      url: "https://example.com",
+      folder: "folder-1",
+      journey: [],
+      ...extra,
+    });
+
+    it("navigates to the child's edit route with its folder when the journey emits open-child", async () => {
+      wrapper = await mountValidEdit();
+      const child: ChildJourney = {
+        id: "login-test",
+        name: "Login",
+        folderId: "shared",
+        steps: [],
+      };
+
+      journeyStub(wrapper).vm.$emit("open-child", child);
+      await flushPromises();
+
+      expect(mockRouterPush).toHaveBeenCalledTimes(1);
+      expect(mockRouterPush).toHaveBeenCalledWith(
+        syntheticsEditRoute({ orgIdentifier: "default", folderId: "shared" }, "login-test"),
+      );
+    });
+
+    it("asks before leaving a dirty parent when the route only changes its id", async () => {
+      wrapper = await mountValidEdit();
+      expect(mockOnBeforeRouteUpdate).toHaveBeenCalledTimes(1);
+      const guard = mockOnBeforeRouteUpdate.mock.calls[0][0] as (
+        to: unknown,
+        from: unknown,
+        next: (arg?: unknown) => void,
+      ) => void;
+      const from = { fullPath: "/web/synthetics/edit/parent", params: { id: "parent" }, query: {} };
+      const toChild = {
+        fullPath: "/web/synthetics/edit/child",
+        params: { id: "child" },
+        query: {},
+      };
+      const toSameId = {
+        fullPath: "/web/synthetics/edit/parent?setup=1",
+        params: { id: "parent" },
+        query: { ...from.query, setup: "1" },
+      };
+      const dialog = () => wrapper.find('[data-test="synthetics-create-unsaved-dialog"]');
+
+      // Clean: nothing to lose, so the navigation goes straight through.
+      const nextClean = vi.fn();
+      guard(toChild, from, nextClean);
+      await nextTick();
+      expect(nextClean).toHaveBeenCalledTimes(1);
+      expect(nextClean).toHaveBeenCalledWith();
+      expect(dialog().exists()).toBe(false);
+
+      (wrapper.vm as any).check.journey = [
+        { id: "s1", action: "navigate", name: "Open", value: "https://example.com" },
+      ];
+      await flushPromises();
+
+      // Dirty but the id is unchanged (query-only, e.g. the setup mirror): still the same editor.
+      const nextSameId = vi.fn();
+      guard(toSameId, from, nextSameId);
+      await nextTick();
+      expect(nextSameId).toHaveBeenCalledTimes(1);
+      expect(nextSameId).toHaveBeenCalledWith();
+      expect(dialog().exists()).toBe(false);
+
+      // Dirty and a different id: same guard as onBeforeRouteLeave — cancel and ask.
+      const nextDirty = vi.fn();
+      guard(toChild, from, nextDirty);
+      await nextTick();
+      expect(nextDirty).toHaveBeenCalledTimes(1);
+      expect(nextDirty).toHaveBeenCalledWith(false);
+      expect(dialog().exists()).toBe(true);
+    });
+
+    it("records a 403'd child in refusedChildIds and passes the set to the journey", async () => {
+      const readableStep: BrowserStep = {
+        id: "s3",
+        action: "subtest",
+        name: "Shared setup",
+        subtest: { id: "shared-child", name: "Setup" },
+      };
+      const childFor = (status: number) => async (_org: string, id: string) => {
+        if (id === "check-123") {
+          return { data: loadedCheck({ journey: [subtestStep, readableStep] }) };
+        }
+        if (id === "shared-child") {
+          return { data: { name: "Setup", folder_id: "shared", config: { steps: [] } } };
+        }
+        throw { response: { status } };
+      };
+      mockServiceGet.mockImplementation(childFor(403));
+      wrapper = mountPage({ editId: "check-123" });
+      await flushPromises();
+
+      // The host's prefetch is the one request; the journey must not issue a second.
+      expect(mockServiceGet).toHaveBeenCalledWith("default", "login-test");
+      const refused = journeyStub(wrapper).props("refusedChildIds") as Set<string>;
+      expect(refused).toBeInstanceOf(Set);
+      expect([...refused]).toEqual(["login-test"]);
+      // The readable sibling lands in the shared cache with its folder (the host construction site).
+      const cache = (wrapper.vm as any).childrenCache as Map<string, ChildJourney>;
+      expect(cache.get("shared-child")).toMatchObject({
+        id: "shared-child",
+        name: "Setup",
+        folderId: "shared",
+      });
+
+      // Access granted since: re-adding the reference refetches, and the refusal is cleared.
+      mockServiceGet.mockImplementation(async (_org: string, id: string) =>
+        id === "login-test"
+          ? { data: { name: "Login", folder_id: "shared", config: { steps: [] } } }
+          : childFor(403)(_org, id),
+      );
+      (wrapper.vm as any).check.journey = [readableStep];
+      await flushPromises();
+      (wrapper.vm as any).check.journey = [subtestStep, readableStep];
+      await flushPromises();
+      expect(cache.get("login-test")).toMatchObject({ id: "login-test", folderId: "shared" });
+      const cleared = journeyStub(wrapper).props("refusedChildIds") as Set<string>;
+      expect(cleared.has("login-test")).toBe(false);
+      wrapper.unmount();
+
+      // Only a 403 is a refusal; any other failure leaves the set alone.
+      mockServiceGet.mockImplementation(childFor(500));
+      wrapper = mountPage({ editId: "check-123" });
+      await flushPromises();
+      const unrefused = journeyStub(wrapper).props("refusedChildIds") as Set<string>;
+      expect(unrefused).toBeInstanceOf(Set);
+      expect(unrefused.size).toBe(0);
+    });
+
+    it("passes config.journey_budget_ms from the loaded check to the journey", async () => {
+      mockServiceGet.mockResolvedValue({
+        data: loadedCheck({ config: { journey_budget_ms: 120_000 } }),
+      });
+      // The real mapper drops `config`, so only a read from the GET response can pass.
+      vi.mocked(mapResponseToBrowserCheck).mockImplementationOnce(
+        ({ config: _config, ...rest }: any) => rest,
+      );
+      wrapper = mountPage({ editId: "check-123" });
+      await flushPromises();
+
+      expect(journeyStub(wrapper).props("journeyBudgetMs")).toBe(120_000);
+    });
+
+    it("passes the check's variable names to the journey", async () => {
+      mockServiceGet.mockResolvedValue({
+        data: loadedCheck({
+          variables: [
+            { name: " USER ", value: "alice" },
+            { name: "PASSWORD", value: "", secure: true },
+          ],
+        }),
+      });
+      wrapper = mountPage({ editId: "check-123" });
+      await flushPromises();
+
+      expect(journeyStub(wrapper).props("variableNames")).toEqual(["USER", "PASSWORD"]);
+    });
+  });
+
+  // ── Executed step cap (Phase D) ──────────────────────────────────────────
+  // The host already computes the executed count, so Save refuses before any request is sent.
+  describe("edit mode — executed step cap", () => {
+    const CAP_TOAST = "Too many executed steps — see the notice above the steps.";
+    const executedCount = (w: VueWrapper) =>
+      (w.findComponent('[data-test="synthetics-browser-journey"]') as VueWrapper<any>).props(
+        "ownStepCount",
+      );
+
+    const childOf = (id: string, name: string, count: number): ChildJourney => ({
+      id,
+      name,
+      folderId: "shared",
+      steps: Array.from({ length: count }, (_, i) => ({
+        id: `${id}-${i + 1}`,
+        action: "click" as const,
+        name: `step ${i + 1}`,
+        locator: { candidates: [{ kind: "css" as const, value: `#s${i + 1}` }] },
+      })),
+    });
+    const composedJourney: BrowserStep[] = [
+      { id: "s1", action: "navigate", name: "Open shop", value: "https://shop.example.com" },
+      {
+        id: "s2",
+        action: "subtest",
+        name: "Login (shared)",
+        subtest: { id: "a", name: "Login (shared)" },
+      },
+      {
+        id: "s3",
+        action: "subtest",
+        name: "Add items",
+        subtest: { id: "b", name: "Add items to cart" },
+      },
+      {
+        id: "s4",
+        action: "click",
+        name: "Cart",
+        locator: { candidates: [{ kind: "css", value: "#cart" }] },
+      },
+      { id: "s5", action: "assert", name: "Cart has items", value: "1" },
+    ];
+
+    /** Edit mode with a saved id (so the usage lookup would run), children cached, then the journey. */
+    async function mountComposed(bSteps: number) {
+      mockServiceGet.mockResolvedValue({
+        data: {
+          id: "check-123",
+          name: "Test Check",
+          url: "https://example.com",
+          folder: "folder-1",
+          journey: [],
+        },
+      });
+      const w = mountPage({ editId: "check-123" });
+      await flushPromises();
+      seedComposition(w, bSteps);
+      await flushPromises();
+      return w;
+    }
+
+    function seedComposition(w: VueWrapper, bSteps: number) {
+      const cache = (w.vm as any).childrenCache as Map<string, ChildJourney>;
+      cache.set("a", childOf("a", "Login (shared)", 31));
+      cache.set("b", childOf("b", "Add items to cart", bSteps));
+      (w.vm as any).check.journey = composedJourney;
+    }
+
+    it("refuses Save & Exit before any request when the executed count is over 50", async () => {
+      wrapper = await mountComposed(17);
+      // Precondition: the seeded composition really is 3 + 31 + 17 executed steps.
+      expect(executedCount(wrapper)).toBe(51);
+
+      await wrapper.find('[data-test="synthetics-create-save-exit-btn"]').trigger("click");
+      await flushPromises();
+
+      expect(mockServiceReferencedBy).not.toHaveBeenCalled();
+      expect(mockServiceUpdate).not.toHaveBeenCalled();
+      expect(mockServiceCreate).not.toHaveBeenCalled();
+      expect(mockRouterPush).not.toHaveBeenCalled();
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({ variant: "error", message: CAP_TOAST }),
+      );
+      // Already on the Journey step, so the mounted journey is asked to scroll to the notice.
+      expect(mockRevealCapNotice).toHaveBeenCalledTimes(1);
+    });
+
+    it("switches to the Journey step so the notice is on screen", async () => {
+      wrapper = await mountComposed(16);
+      // Reach Configure while the composition is still within the cap…
+      await wrapper.find('[data-test="synthetics-create-save-continue-btn"]').trigger("click");
+      await flushPromises();
+      expect(wrapper.find('[data-test="synthetics-create-save-btn"]').exists()).toBe(true);
+      mockServiceUpdate.mockClear();
+      mockServiceReferencedBy.mockClear();
+      mockToast.mockClear();
+
+      // …then push it over from there and save.
+      (wrapper.vm as any).childrenCache.set("b", childOf("b", "Add items to cart", 17));
+      await flushPromises();
+      await wrapper.find('[data-test="synthetics-create-save-btn"]').trigger("click");
+      await flushPromises();
+
+      expect(mockServiceUpdate).not.toHaveBeenCalled();
+      expect(mockServiceReferencedBy).not.toHaveBeenCalled();
+      expect(wrapper.find('[data-test="synthetics-browser-journey"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="synthetics-create-save-btn"]').exists()).toBe(false);
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({ variant: "error", message: CAP_TOAST }),
+      );
+    });
+
+    it("saves normally at exactly 50 executed steps", async () => {
+      wrapper = await mountComposed(16);
+      expect(executedCount(wrapper)).toBe(50);
+
+      await wrapper.find('[data-test="synthetics-create-save-exit-btn"]').trigger("click");
+      await flushPromises();
+
+      expect(mockServiceUpdate).toHaveBeenCalledTimes(1);
+      expect(mockRouterPush).toHaveBeenCalledWith({
+        name: "synthetics",
+        query: { org_identifier: "default", folder: "folder-1" },
+      });
+      expect(mockToast).not.toHaveBeenCalledWith(expect.objectContaining({ message: CAP_TOAST }));
     });
   });
 

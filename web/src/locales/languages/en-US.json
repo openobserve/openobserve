@@ -14096,7 +14096,7 @@
       "unboundVariables": "{names} is not defined in this check, its environments or global, so it is typed as written. | {names} are not defined in this check, its environments or global, so they are typed as written.",
       "subtest": {
         "pickLabel": "Test to run here",
-        "delta": "Adding \"{name}\" takes this test from {before} → {after} executed steps.",
+        "delta": "Adding \"{name}\" takes this test from {before} → {after} executed steps. The limit is {limit}.",
         "lastRun": "Its last run took {seconds}s of the {budget}s allowance.",
         "deltaUnknown": "Step impact unknown — a referenced test could not be loaded.",
         "lastRunUnknown": "Time impact unknown — this test has not completed a run yet.",
@@ -14105,7 +14105,27 @@
         "ignoredEnv": "This test's own variables, auth and cookies are ignored here — the parent's apply.",
         "noAccess": "You don't have access to \"{name}\", so its steps can't be shown here.",
         "noAccessToast": "You don't have access to one of the tests this test references.",
-        "progressAria": "{done} of {total} sub-steps complete"
+        "progressAria": "{done} of {total} sub-steps complete",
+        "previewLabel": "Steps it runs here",
+        "openChild": "Open \"{name}\"",
+        "noAccessRemedy": "Ask for read access to its folder, or remove the reference.",
+        "noAccessBadge": "no access",
+        "pickGroupEligible": "Can be used here",
+        "pickGroupIneligible": "Can't be used here",
+        "pickNested": "Already contains a subtest — nesting is limited to one level",
+        "pickUsedBy": "Used by {count} test | Used by {count} tests",
+        "pickSteps": "{count} steps",
+        "pickLastRun": "{status} {ago}",
+        "pickEmpty": "No other browser tests in this organization yet.",
+        "undefinedVariable": "\"{name}\" uses {variable}, which this test doesn't define.",
+        "undefinedVariableAction": "Add it under Variables",
+        "failedAt": "{number} — {child} › {step}",
+        "notRun": "Not run",
+        "capTitle": "This test executes {total} steps — the limit is {limit}.",
+        "capOwn": "{count} of its own",
+        "capChild": "{count} from \"{name}\"",
+        "capRemedy": "Remove a subtest, or shorten this test's own steps.",
+        "executedBadge": "{count} executed"
       }
     },
     "labels": {
@@ -14669,7 +14689,7 @@
       "uptime": "Uptime 7d",
       "url": "URL",
       "usedBy": "Used by",
-      "usedByCount": "{count} tests"
+      "usedByCount": "{count} test | {count} tests"
     },
     "tabs": {
       "all": "All",
@@ -14734,7 +14754,8 @@
       "runBudgetExceeded": "This check could take up to {worstCase} per run, over the {limit} limit. Remove a browser/device combo, or lower retries. ({combos} combo(s) × {attempts} attempt(s) × {perAttempt} each.)",
       "runBudgetRetriesHint": "Lowering retries brings this check back inside the {limit} run limit.",
       "folderUnavailable": "Folder \"{folder}\" is not available in this organization — saving to the default folder.",
-      "compositionChildFailed": "\"{name}\" failed validation on save — open it to see which step needs fixing."
+      "compositionChildFailed": "\"{name}\" failed validation on save — open it to see which step needs fixing.",
+      "subtestCap": "Too many executed steps — see the notice above the steps."
     },
     "privateLocations": {
       "searchPlaceholder": "Search locations...",

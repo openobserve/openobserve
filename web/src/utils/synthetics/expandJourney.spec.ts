@@ -21,6 +21,7 @@ import {
   expandJourney,
   loadChildren,
   translateStepId,
+  undefinedPlaceholders,
   type ChildJourney,
 } from "./expandJourney";
 
@@ -128,5 +129,58 @@ describe("expandJourney", () => {
     expect(composedStepId("s2", "c7")).toBe("s2_c7");
     expect(composedStepName(undefined, "Login", "fill")).toBe("Login › fill");
     expect(composedStepName("Log in", "Login", undefined)).toBe("Log in › step");
+  });
+});
+
+// Mirrors the server's PLACEHOLDER_FIELDS scan; an undefined token otherwise fails at resolve time.
+describe("undefinedPlaceholders", () => {
+  const typeStep = (id: string, value: string): BrowserStep => ({
+    id,
+    action: "type",
+    name: id,
+    value,
+    locator: { candidates: [{ kind: "css", value: "#x" }] },
+  });
+
+  it("lists placeholders the child uses that the parent does not define, once each, sorted", () => {
+    const child: ChildJourney = {
+      id: "login-test",
+      name: "Login",
+      steps: [
+        { id: "c1", action: "navigate", name: "Open", value: "https://{{BASE_URL}}/login" },
+        typeStep("c2", "{{USER}}"),
+        typeStep("c3", "{{ PASSWORD }}"),
+        typeStep("c4", "{{USER}}@{{DOMAIN}}"),
+      ],
+    };
+    expect(undefinedPlaceholders(child, ["BASE_URL"])).toEqual(["DOMAIN", "PASSWORD", "USER"]);
+    expect(undefinedPlaceholders(child, new Set<string>())).toEqual([
+      "BASE_URL",
+      "DOMAIN",
+      "PASSWORD",
+      "USER",
+    ]);
+  });
+
+  it("ignores assert steps and defined names", () => {
+    const child: ChildJourney = {
+      id: "login-test",
+      name: "Login",
+      steps: [
+        typeStep("c1", "{{USER}}"),
+        // assert/select/upload `value`s map to wire `text`/`options`/`files`, which the server never scans.
+        { id: "c2", action: "assert", name: "Landed", value: "{{TOKEN}}" },
+        { id: "c4", action: "select", name: "Pick plan", value: "{{PLAN}}" },
+        { id: "c5", action: "upload", name: "Attach", value: "{{FILE}}" },
+        {
+          id: "c3",
+          action: "click",
+          name: "Go",
+          locator: { candidates: [{ kind: "css", value: "#go" }] },
+        },
+      ],
+    };
+    expect(undefinedPlaceholders(child, ["USER"])).toEqual([]);
+    expect(undefinedPlaceholders(child, [])).toEqual(["USER"]);
   });
 });

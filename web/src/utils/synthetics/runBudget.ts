@@ -38,6 +38,9 @@ export const JOB_LEASE_MS = 900_000;
 /** `DEFAULT_JOURNEY_BUDGET_MS` — wall-clock ceiling for ONE browser attempt. */
 export const DEFAULT_JOURNEY_BUDGET_MS = 300_000;
 
+/** `MAX_STEPS` — executed-step cap on a browser check, measured after subtest expansion. */
+export const MAX_STEPS = 50;
+
 export interface RunBudgetInput {
   /** Number of browser x device combos. The probe runs them SEQUENTIALLY inside
    * one leased job, so the lease covers all of them, not one. */
