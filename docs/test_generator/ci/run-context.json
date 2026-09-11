@@ -1,0 +1,21 @@
+{
+  "feature_slug": "mobile-navigation",
+  "feature_title": "Responsive Mobile Navigation",
+  "area": "GeneralTests",
+  "edition": "both",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "mobileNavigation.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/GeneralTests/mobileNavigation.spec.js",
+  "playwright_group": "GeneralTests",
+  "source_files": [
+    "web/src/layouts/MainLayout.vue",
+    "web/src/components/Header.vue",
+    "web/src/composables/useBreakpoint.ts",
+    "web/src/lib/overlay/Drawer/ODrawer.vue",
+    "web/src/lib/core/Navbar/ONavbar.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": ""
+}

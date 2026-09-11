@@ -1,0 +1,14 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/GeneralTests/mobileNavigation.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/GeneralTests/edition-features.spec.js",
+    "tests/ui-testing/playwright-tests/GeneralTests/logoManagement.spec.js",
+    "tests/ui-testing/playwright-tests/GeneralTests/landingPage.spec.js",
+    "tests/ui-testing/playwright-tests/Alerts/alerts-help-drawer.spec.js",
+    "tests/ui-testing/playwright-tests/Reports/scheduledReportsDrawer.spec.js",
+    "tests/ui-testing/playwright-tests/Correlation/correlation-drawer.spec.js"
+  ],
+  "needs_registration": true,
+  "rationale": "No existing spec exercises the responsive <768px mobile navigation drawer (hamburger toggle, ODrawer, inline ONavGroup submenus). A repo-wide grep for 'mobile', 'hamburger', 'navbar-main-nav' surfaced only the auth-verification rail check (global-setup/enhanced-baseFixtures) and unrelated drawer usage in Alerts/Reports/Correlation specs. The feature is a self-contained new area under GeneralTests, so a dedicated spec (run-context spec_path) is warranted and must be registered in ci_matrix.json under the GeneralTests shard's run_files."
+}

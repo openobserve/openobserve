@@ -1,0 +1,6 @@
+{
+  "group": "GeneralTests",
+  "spec_filename": "mobileNavigation.spec.js",
+  "create_group": false,
+  "browser": "chrome"
+}

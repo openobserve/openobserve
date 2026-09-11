@@ -1,0 +1,7 @@
+[
+  { "title": "should open the mobile drawer via the hamburger and close it with the X button", "action": "new", "verifies": "below 768px the desktop rail hides, the hamburger opens a drawer populated with nav links, and the X button closes it" },
+  { "title": "should navigate to Logs from the drawer and auto-close it", "action": "new", "verifies": "clicking the Logs link inside the drawer navigates to the Logs page and the route watcher auto-closes the drawer" },
+  { "title": "should expand the Data group inline on mobile and navigate to Streams", "action": "new", "verifies": "the Data group expands as an inline submenu (no hover flyout) and the Streams child navigates and auto-closes" },
+  { "title": "should close the drawer when tapping the overlay scrim", "action": "new", "verifies": "tapping the overlay scrim closes the drawer via interact-outside" },
+  { "title": "should close the drawer when pressing Escape", "action": "new", "verifies": "pressing Escape closes the drawer via the escape-key-down handler" }
+]

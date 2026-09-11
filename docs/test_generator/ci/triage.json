@@ -1,0 +1,29 @@
+{
+  "feature_slug": "mobile-navigation",
+  "feature_title": "Responsive Mobile Navigation",
+  "area": "GeneralTests",
+  "edition": "both",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "mobileNavigation.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/GeneralTests/mobileNavigation.spec.js",
+  "playwright_group": "GeneralTests",
+  "source_files": [
+    "web/src/layouts/MainLayout.vue",
+    "web/src/components/Header.vue",
+    "web/src/composables/useBreakpoint.ts",
+    "web/src/lib/overlay/Drawer/ODrawer.vue",
+    "web/src/lib/core/Navbar/ONavbar.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "The changed file list spans both layers of the web source tree: ~229 OSS frontend paths under web/src/components, web/src/plugins, web/src/views, web/src/layouts, web/src/lib, web/src/composables and web/src/locales, plus 19 enterprise-owned paths under web/src/enterprise/components (billings, onlineEvals, AIObservability) and web/src/enterprise/views. Because the diff touches OSS UI and the enterprise web layer together, edition is 'both'. No enterprise-only keywords (SSO/SAML/RBAC/SDR/cipher) define the change; it is a shared responsive-refactor touching both trees.",
+    "skip": "Not skipped. The trigger comment and feature hint are empty, so there is no explicit opt-out or tests-added marker. The change is user-facing: it adds a mobile nav toggle (Header.vue), a mobile navigation drawer (MainLayout.vue), a reactive viewport breakpoint composable, and responsive 'max-md:*' classes across the whole UI, so it is not a docs-only or CI-only change.",
+    "e2e": "E2E is warranted. The diff introduces a new user-exercisable interaction — tapping the header hamburger on a narrow viewport opens a left navigation drawer and closes on route change — and rewires the main layout so the AI chat panel becomes a fixed full-width bottom sheet on mobile. Responsive layout behavior across Logs/Dashboards/etc. is user-facing and cannot be validated by unit tests alone.",
+    "area": "Area is GeneralTests. The most concrete new behavior is cross-cutting app chrome (global header + main layout + nav), not a single product surface like Logs or Dashboards, so it fits the GeneralTests shard rather than a feature-specific area. The change also fans out into every product area, but the navigation shell is the shared, testable entry point.",
+    "group": "playwright_group is GeneralTests. ci_matrix.json (OSS, mirrored in ci_matrix_cloud.json as GeneralTests -> GeneralTests, and extended by the ENT overlay's GeneralTests append) already owns global, cross-feature specs, so a mobile-navigation spec belongs there rather than a Logs-/Dashboards-* shard.",
+    "existing_tests": "No E2E specs in the diff. changed_files.txt contains zero paths under tests/ui-testing/playwright-tests/. The only test files are Vitest unit specs (web/src/**/*.spec.ts such as useBreakpoint.spec.ts, DbmTableToolbar.spec.ts, WorkflowEditor.spec.ts) and a Rust-free tree, none of which constitute Playwright E2E coverage of the new responsive navigation."
+  }
+}
