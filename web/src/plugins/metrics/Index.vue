@@ -562,8 +562,9 @@ export default defineComponent({
       showAddToDashboardDialog.value = false;
     };
 
+    // Unlike a dashboard, this editor is usually entered by a replace: true redirect from /metrics, so state.back points PAST the explorer — accepting it would skip the page this button names. Only the explorer itself is a valid pop.
     const goBackToExplorer = useListBackNavigation({
-      isListPath: (path) => path.startsWith("/metrics") && !path.startsWith("/metrics/editor"),
+      isExcluded: (path) => !path.startsWith("/metrics") || path.startsWith("/metrics/editor"),
       fallback: () => ({
         name: "metrics",
         query: {
