@@ -862,7 +862,7 @@ function cancelDrawer() {
 /// has filled it in, and the ✕, Esc and the backdrop all close through
 /// `v-model:open` without passing Cancel — so an abandoned row stayed in the
 /// draft and failed the NEXT save, naming a rotation that was no longer on
-/// screen ("`Primary` has nobody in it"). The save is all-or-nothing at the
+/// screen ("Primary" has nobody in it). The save is all-or-nothing at the
 /// server, so one ghost blocks every rotation after it.
 ///
 /// A save clears `isNew` before it closes, so the rotation it just stored is

@@ -53,7 +53,7 @@ describe("OnCallPriorCauses", () => {
     const row = wrapper.find('[data-test="oncall-prior-cause-config_change_or_deploy"]');
 
     expect(row.text()).toContain("3×");
-    expect(row.text()).toContain("Config change / deploy");
+    expect(row.text()).toContain("Config change or deploy");
     expect(row.text()).toContain("rolled back the 14:02 deploy");
   });
 
@@ -94,7 +94,7 @@ describe("OnCallPriorCauses", () => {
     const wrapper = render([group({ note: null })]);
     expect(
       wrapper.find('[data-test="oncall-prior-cause-config_change_or_deploy"]').text(),
-    ).toContain("Config change / deploy");
+    ).toContain("Config change or deploy");
   });
 
   /// While the fetch is in flight `groups` is `[]` — indistinguishable from a
