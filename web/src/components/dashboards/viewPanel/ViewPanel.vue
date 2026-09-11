@@ -18,11 +18,11 @@
   <div class="flex h-full flex-col overflow-hidden" data-test="view-panel-screen">
     <div class="flex items-center justify-between p-3 max-md:flex-wrap max-md:gap-y-2">
       <div
-        class="me-3 flex min-w-0 flex-1 items-center text-xl tracking-[0.005em] max-md:me-0 max-md:basis-full"
+        class="me-3 flex min-w-0 items-center text-xl tracking-[0.005em] max-md:me-0 max-md:flex-1 max-md:basis-full"
       >
         <span
           class="truncate"
-          :title="dashboardPanelData.data.title"
+          :title="isMobile ? dashboardPanelData.data.title : undefined"
           data-test="dashboard-viewpanel-title"
         >
           {{ dashboardPanelData.data.title }}
@@ -184,6 +184,7 @@ import {
 } from "vue";
 
 import { useI18nTyped } from "@/types/i18n";
+import useBreakpoint from "@/composables/useBreakpoint";
 import { getDashboard, getPanel, checkIfVariablesAreLoaded } from "../../../utils/commons";
 import { useRoute } from "vue-router";
 import { useStore } from "vuex";
@@ -264,6 +265,7 @@ export default defineComponent({
     const showLegendsDialog = ref(false);
     const panelSchemaRendererRef: any = ref(null);
     const { t } = useI18nTyped();
+    const { isMobile } = useBreakpoint();
     const route = useRoute();
     const store = useStore();
 
@@ -795,6 +797,7 @@ export default defineComponent({
     });
 
     return {
+      isMobile,
       t,
       setTimeForVariables,
       dateTimeForVariables,

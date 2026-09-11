@@ -440,13 +440,16 @@ const { isMobile, isTablet } = useBreakpoint();
 const mobileFieldsOpen = ref(false);
 watch(
   isMobile,
-  (mobile) => {
+  (mobile, wasMobile) => {
     if (mobile) {
       searchObj.config.splitterModel = 0;
-    } else if (searchObj.config.splitterModel === 0 && searchObj.meta.showFields) {
-      searchObj.config.splitterModel = searchObj.config.lastSplitterPosition || 20;
+      splitterModel.value = 150;
+    } else if (wasMobile) {
+      if (searchObj.config.splitterModel === 0 && searchObj.meta.showFields) {
+        searchObj.config.splitterModel = searchObj.config.lastSplitterPosition || 20;
+      }
+      splitterModel.value = 90;
     }
-    splitterModel.value = mobile ? 150 : 90;
   },
   { immediate: true },
 );

@@ -24,8 +24,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-for="card in cards"
       :key="card.key"
       type="button"
-      class="metric-card rounded-default bg-card-glass-bg enabled:hover:border-accent flex min-w-0 flex-col items-start gap-0.5 border p-3 text-left transition-colors enabled:cursor-pointer disabled:cursor-default max-lg:p-1.5"
-      :title="card.caption"
+      class="metric-card rounded-default bg-card-glass-bg enabled:hover:border-accent flex flex-col items-start gap-0.5 border p-3 text-left transition-colors enabled:cursor-pointer disabled:cursor-default max-lg:min-w-0 max-lg:p-1.5"
+      :title="lgUp ? undefined : card.caption"
       :class="card.key === activeCard ? 'border-accent' : 'border-border-default'"
       :aria-pressed="card.key === activeCard"
       :disabled="!card.selectable"
@@ -58,6 +58,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import { durationFormatter } from "@/utils/zincutils";
+import useBreakpoint from "@/composables/useBreakpoint";
+
+const { lgUp } = useBreakpoint();
 
 export type SessionsMetricCardKey = "sessions" | "errors" | "frustrated" | "duration" | "bounced";
 

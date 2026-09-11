@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- The [style*=width] variant caps the fields' inline widths: max-width beats an inline width. -->
         <div
           ref="addAlertFormRef"
-          class="my-3 w-256 max-w-full px-4 max-md:[&_[style*=width]]:max-w-full"
+          class="my-3 w-256 px-4 max-md:max-w-full max-md:[&_[style*=width]]:max-w-full"
         >
           <OForm :id="formId" :form="form" class="create-report-form">
             <div class="flex items-start gap-4 px-2 pt-3 max-md:flex-wrap">
@@ -125,8 +125,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           required
                           :loading="isFetchingFolders"
                           @update:model-value="(v: any) => onFolderSelection(v, index)"
-                          class="max-md:min-w-0!"
-                          style="min-width: 15.625rem; width: 100% !important"
+                          class="min-w-62.5! max-md:min-w-0!"
+                          style="width: 100% !important"
                         />
                       </div>
                       <div
@@ -142,8 +142,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           required
                           :loading="isFetchingDashboard || isFetchingFolders"
                           @update:model-value="(v: any) => onDashboardSelection(v, index)"
-                          class="max-md:min-w-0!"
-                          style="min-width: 15.625rem; width: 100% !important"
+                          class="min-w-62.5! max-md:min-w-0!"
+                          style="width: 100% !important"
                         />
                       </div>
                       <div
@@ -158,8 +158,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :label="t('reports.dashboardTab')"
                           required
                           :loading="isFetchingDashboard || isFetchingFolders"
-                          class="max-md:min-w-0!"
-                          style="min-width: 15.625rem; width: 100% !important"
+                          class="min-w-62.5! max-md:min-w-0!"
+                          style="width: 100% !important"
                         />
                       </div>
                     </div>

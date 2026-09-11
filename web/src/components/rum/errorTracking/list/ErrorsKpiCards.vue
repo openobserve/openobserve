@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-for="card in cards"
       :key="card.key"
       class="bg-card-glass-bg rounded-default border-border-default flex min-w-0 flex-col items-start border px-2.5 py-1.5 max-md:px-1.5"
-      :title="card.caption"
+      :title="isMobile ? card.caption : undefined"
       :data-test="`rum-errors-kpi-${card.key}-card`"
     >
       <span
@@ -66,6 +66,9 @@ import { useI18nTyped } from "@/types/i18n";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import { addCommasToNumber, formatLargeNumber } from "@/utils/formatters";
+import useBreakpoint from "@/composables/useBreakpoint";
+
+const { isMobile } = useBreakpoint();
 
 export interface ErrorKpis {
   totalErrors: number;

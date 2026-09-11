@@ -82,6 +82,7 @@ import {
   inject,
 } from "vue";
 import { useStore } from "vuex";
+import useBreakpoint from "@/composables/useBreakpoint";
 import { useTheme } from "@/composables/useTheme";
 import { chartColor } from "@/utils/chartTheme";
 import * as echarts from "echarts/core";
@@ -643,9 +644,10 @@ export default defineComponent({
       zeroSizeReinitObserver.observe(chartRef.value);
     };
 
-    // The window resize listener misses container-only size changes (a rail collapsing, the mobile pane stack).
+    // < lg the window resize listener misses container-only size changes (rails collapsing, stacked panes).
     let containerResizeObserver: ResizeObserver | null = null;
     let containerResizeRaf = 0;
+    const { lgUp } = useBreakpoint();
     let lastObservedSize = { w: 0, h: 0 };
     const resizeToContainer = () => {
       containerResizeRaf = 0;
@@ -665,6 +667,7 @@ export default defineComponent({
       };
       // Coalesced to one resize per frame: drawer and splitter animations notify every frame.
       containerResizeObserver = new ResizeObserver(() => {
+        if (lgUp.value) return;
         if (!containerResizeRaf) containerResizeRaf = requestAnimationFrame(resizeToContainer);
       });
       containerResizeObserver.observe(chartRef.value);

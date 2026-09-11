@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Toolbar: Scheduled/Cached tabs + search (inline folder scope) + refresh -->
               <template #toolbar>
                 <div
-                  class="flex w-full min-w-0 flex-wrap items-center gap-2 gap-y-1.5 max-md:contents"
+                  class="flex w-full items-center gap-2 max-lg:min-w-0 max-lg:flex-wrap max-lg:gap-y-1.5 max-md:contents"
                 >
                   <div class="app-tabs-container">
                     <AppTabs
@@ -89,7 +89,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                   </div>
                   <!-- flex-1 is basis-0, so the min-w floor is what wraps the input before its scope chips spill. -->
-                  <div class="min-w-0 flex-1 max-md:order-last max-md:basis-full md:min-w-80">
+                  <div
+                    class="min-w-0 flex-1 max-md:order-last max-md:basis-full md:max-lg:min-w-80"
+                  >
                     <OInput
                       v-model="dynamicQueryModel"
                       :placeholder="

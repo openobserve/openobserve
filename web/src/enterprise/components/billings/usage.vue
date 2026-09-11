@@ -108,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :key="tile.key"
           data-test="billings-usage-tile"
           class="usage-tile bg-card-glass-bg border-card-glass-border rounded-default flex flex-col gap-2 border px-3 py-3 transition-shadow duration-200 ease-in-out max-lg:shrink-0 max-lg:basis-auto max-lg:flex-row-reverse max-lg:items-center max-lg:gap-1.5 max-lg:px-1.5 max-lg:py-1"
-          :title="tile.label"
+          :title="lgUp ? undefined : tile.label"
         >
           <div class="flex items-center justify-between gap-2">
             <div
@@ -225,6 +225,7 @@ import { defineComponent, ref, onMounted, watch, computed, inject } from "vue";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
+import useBreakpoint from "@/composables/useBreakpoint";
 import BillingService from "@/services/billings";
 import organizations from "@/services/organizations";
 import { useRouter } from "vue-router";
@@ -247,6 +248,7 @@ export default defineComponent({
   },
   setup() {
     const { t } = useI18nTyped();
+    const { lgUp } = useBreakpoint();
     const store = useStore();
     const { isDark } = useTheme();
     const router = useRouter();
@@ -823,6 +825,7 @@ export default defineComponent({
     });
 
     return {
+      lgUp,
       t,
       store,
       chartData,

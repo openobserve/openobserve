@@ -56,11 +56,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Step: Services -->
       <div class="mb-6">
         <div
-          class="rounded-default flex cursor-pointer items-center justify-between gap-2 px-3 py-2 max-md:flex-wrap"
+          class="rounded-default flex cursor-pointer items-center justify-between px-3 py-2 max-md:flex-wrap max-md:gap-2"
           :class="collapsibleHeaderClass"
           @click="showServices = !showServices"
         >
-          <div class="flex min-w-0 items-center gap-2">
+          <div class="flex items-center gap-2 max-md:min-w-0">
             <OIcon :name="showServices ? 'expand-less' : 'expand-more'" size="sm" color="primary" />
             <div class="text-sm font-semibold" :class="stepLabelClass">
               {{ t("ingestion.selectServicesToMonitor") }}
@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("ingestion.selected") }}
             </OTag>
           </div>
-          <div class="flex shrink-0 gap-2 max-md:ms-auto" @click.stop>
+          <div class="flex gap-2 max-md:ms-auto max-md:shrink-0" @click.stop>
             <OButton variant="ghost-primary" size="xs" @click="selectAll">{{
               t("ingestion.selectAll")
             }}</OButton>
@@ -136,11 +136,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div class="mb-6">
           <div
-            class="rounded-default flex cursor-pointer items-center justify-between gap-2 px-3 py-2 max-md:flex-wrap"
+            class="rounded-default flex cursor-pointer items-center justify-between px-3 py-2 max-md:flex-wrap max-md:gap-2"
             :class="collapsibleHeaderClass"
             @click="showTargetRegions = !showTargetRegions"
           >
-            <div class="flex min-w-0 items-center gap-2">
+            <div class="flex items-center gap-2 max-md:min-w-0">
               <OIcon
                 :name="showTargetRegions ? 'expand-less' : 'expand-more'"
                 size="sm"
@@ -156,7 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >{{ targetRegions.length }} {{ t("ingestion.selected") }}</OTag
               >
             </div>
-            <div class="flex shrink-0 gap-2 max-md:ms-auto" @click.stop>
+            <div class="flex gap-2 max-md:ms-auto max-md:shrink-0" @click.stop>
               <OButton variant="ghost-primary" size="xs" @click="selectAllRegions">{{
                 t("ingestion.selectAll")
               }}</OButton>

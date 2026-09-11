@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="primary"
         size="sm"
         icon-left="key"
-        :title="t('ingestion.manageTokensBtnLabel')"
+        :title="isMobile ? t('ingestion.manageTokensBtnLabel') : undefined"
         @click="navigateToIngestionTokens"
       >
         <span class="max-md:hidden">{{ t("ingestion.manageTokensBtnLabel") }}</span>

@@ -163,7 +163,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- max-w-full + shrink let the group wrap within its row; shrink-0 alone runs it off-screen. -->
       <div
         v-if="hasActions || hasActionsOverflow"
-        class="ms-auto flex shrink-0 items-center gap-2 max-md:max-w-full max-md:shrink max-md:flex-wrap max-md:justify-end"
+        class="flex shrink-0 items-center gap-2 max-lg:ms-auto max-md:max-w-full max-md:shrink max-md:flex-wrap max-md:justify-end"
       >
         <slot v-if="hasActionsOverflow && !isMobile && overflowFirst" name="actions-overflow" />
         <slot name="actions" />

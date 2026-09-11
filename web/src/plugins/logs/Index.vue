@@ -592,10 +592,10 @@ export default defineComponent({
     const mobileFieldsOpen = ref(false);
     watch(
       isMobile,
-      (mobile) => {
+      (mobile, wasMobile) => {
         if (mobile) {
           searchObj.config.splitterModel = 0;
-        } else if (searchObj.config.splitterModel === 0 && searchObj.meta.showFields) {
+        } else if (wasMobile && searchObj.config.splitterModel === 0 && searchObj.meta.showFields) {
           searchObj.config.splitterModel = searchObj.config.lastSplitterPosition || 20;
         }
       },

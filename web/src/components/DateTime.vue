@@ -38,13 +38,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             'md:min-w-71.5': !disableRelative && selectedType === 'absolute',
             'w-fit': disableRelative,
           }"
-          class="max-w-full min-w-0"
+          class="max-md:max-w-full max-md:min-w-0"
           :disabled="disable"
           icon-left="schedule"
         >
-          <span class="date-time-label min-w-0 flex-1 truncate text-left font-semibold">{{
-            triggerLabel
-          }}</span>
+          <span
+            class="date-time-label flex-1 text-left font-semibold max-md:min-w-0 max-md:truncate"
+            >{{ triggerLabel }}</span
+          >
           <template #icon-right
             ><OIcon
               name="arrow-drop-down"

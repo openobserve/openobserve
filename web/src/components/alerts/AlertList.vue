@@ -147,7 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #toolbar>
                 <!-- A container, not a viewport breakpoint: the folder rail squeezes this toolbar at any width. -->
                 <div
-                  class="@container/alert-toolbar flex min-w-0 flex-1 flex-wrap items-center gap-2 gap-y-1.5 max-md:contents"
+                  class="flex w-full items-center gap-2 max-lg:@container/alert-toolbar max-lg:min-w-0 max-lg:flex-1 max-lg:flex-wrap max-lg:gap-y-1.5 max-md:contents"
                 >
                   <OToggleGroup
                     mobile-dropdown
@@ -161,14 +161,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :value="tab.value"
                       size="sm"
                       :icon-left="tab.icon"
-                      :title="tab.label"
+                      :title="lgUp ? undefined : tab.label"
                       :data-test="`alert-list-tab-${tab.value}`"
                     >
                       <span class="@max-[34rem]/alert-toolbar:hidden">{{ tab.label }}</span>
                     </OToggleGroupItem>
                   </OToggleGroup>
                   <!-- flex-1 is basis-0, so the min-w floor is what wraps the input before its scope chips spill. -->
-                  <div class="min-w-0 flex-1 md:min-w-80">
+                  <div class="min-w-0 flex-1 md:max-lg:min-w-80">
                     <OInput
                       v-model="dynamicQueryModel"
                       :placeholder="
@@ -954,6 +954,7 @@ import FolderList from "../common/sidebar/FolderList.vue";
 import MoveAcrossFolders from "../common/sidebar/MoveAcrossFolders.vue";
 import { invalidateDependencyGraphCache } from "@/composables/alerts/useDependencyGraph";
 import { nextTick } from "vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -1023,6 +1024,7 @@ export default defineComponent({
   setup() {
     const store = useStore();
     const { t } = useI18nTyped();
+    const { lgUp } = useBreakpoint();
     const router = useRouter();
     const { track } = useReo();
     const formData: Ref<Alert | {}> = ref({});
@@ -3470,6 +3472,7 @@ export default defineComponent({
     ]);
 
     return {
+      lgUp,
       raw,
       t,
       store,

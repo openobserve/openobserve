@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:current-page="onPageChange"
         >
           <template #toolbar>
-            <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">
+            <div class="flex w-full items-center gap-2 max-lg:min-w-0 max-md:contents">
               <OToggleGroup
                 mobile-dropdown
                 :model-value="activeTab"
@@ -104,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OSearchInput
                 v-model="filterQuery"
                 data-test="destination-list-search-input"
-                class="min-w-0 flex-1 max-md:min-w-40"
+                class="flex-1 max-lg:min-w-0 max-md:min-w-40"
                 :placeholder="t('alert_destinations.search')"
               />
             </div>

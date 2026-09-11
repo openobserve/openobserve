@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <template #before>
         <div
-          class="border-r4 border-border-default flex h-full flex-col overflow-y-auto border-e max-md:border-e-0 max-md:border-b"
+          class="border-r4 border-border-default flex h-full flex-col border-e max-md:overflow-y-auto max-md:border-e-0 max-md:border-b"
         >
           <div class="sticky top-0 shrink-0 px-2">
             <div class="flex items-center justify-between p-2 text-lg">

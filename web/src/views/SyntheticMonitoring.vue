@@ -168,7 +168,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #toolbar>
             <!-- A container, not a viewport breakpoint: the folder rail squeezes this toolbar at any width. -->
             <div
-              class="@container/synthetics-toolbar flex min-w-0 flex-1 flex-wrap items-center gap-2 gap-y-1.5 max-md:contents"
+              class="flex min-w-0 flex-1 items-center gap-2 max-lg:@container/synthetics-toolbar max-lg:flex-wrap max-lg:gap-y-1.5 max-md:contents"
             >
               <!-- Type tabs -->
               <OToggleGroup
@@ -183,7 +183,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :value="tab.key"
                   size="sm"
                   :icon-left="tab.icon"
-                  :title="tab.label"
+                  :title="lgUp ? undefined : tab.label"
                 >
                   <span class="@max-[38rem]/synthetics-toolbar:hidden">{{ tab.label }}</span>
                 </OToggleGroupItem>
@@ -191,7 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Search -->
               <!-- flex-1 is basis-0, so the min-w floor is what wraps the input instead of shrinking it to nothing. -->
-              <div class="min-w-0 flex-1 md:min-w-60">
+              <div class="min-w-0 flex-1 md:max-lg:min-w-60">
                 <OInput
                   v-model="search"
                   :placeholder="
@@ -218,7 +218,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         size="xs"
                         icon-left="folder-outline"
                         data-test="synthetic-monitoring-search-this-folder-btn"
-                        :title="t('synthetics.search.thisFolder')"
+                        :title="isMobile ? t('synthetics.search.thisFolder') : undefined"
                       >
                         <span class="max-md:hidden">{{ t("synthetics.search.thisFolder") }}</span>
                       </OToggleGroupItem>
@@ -227,7 +227,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         size="xs"
                         icon-left="search"
                         data-test="synthetic-monitoring-search-all-folders-btn"
-                        :title="t('synthetics.search.allFolders')"
+                        :title="isMobile ? t('synthetics.search.allFolders') : undefined"
                       >
                         <span class="max-md:hidden">{{ t("synthetics.search.allFolders") }}</span>
                       </OToggleGroupItem>
@@ -487,12 +487,14 @@ import {
 import { getFoldersListByType } from "@/utils/commons";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
+import useBreakpoint from "@/composables/useBreakpoint";
 
 const router = useRouter();
 const route = useRoute();
 const store = useStore();
 const { t } = useI18nTyped();
 const { confirm } = useConfirmDialog();
+const { isMobile, lgUp } = useBreakpoint();
 
 // ── API types ──────────────────────────────────────────────────────────
 type SyntheticsSection = "checks" | "private" | "status-pages";

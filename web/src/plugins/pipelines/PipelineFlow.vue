@@ -164,6 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { ref, onMounted, watch, computed } from "vue";
 import type { Ref } from "vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import { VueFlow, useVueFlow } from "@vue-flow/core";
 import type { VueFlowStore } from "@vue-flow/core";
 import { Controls, ControlButton } from "@vue-flow/controls";
@@ -282,11 +283,12 @@ export default {
     onMounted(async () => {
       setTimeout(fitToNodes, 100);
     });
-    // Existing pipelines load nodes after the mount-time fit ran on an empty graph, so re-fit when they arrive.
+    // < lg existing pipelines load nodes after the mount-time fit, so desktop-saved coordinates land off-screen.
+    const { lgUp } = useBreakpoint();
     watch(
       () => pipelineObj.currentSelectedPipeline.nodes.length,
       (len, prev) => {
-        if (len > 0 && !prev) setTimeout(fitToNodes, 100);
+        if (!lgUp.value && len > 0 && !prev) setTimeout(fitToNodes, 100);
       },
     );
 

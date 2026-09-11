@@ -187,7 +187,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-for="card in kpiCards"
             :key="card.label"
             class="bg-card-glass-bg rounded-default border-border-default flex flex-col gap-1 border px-3.5 py-2.5 max-lg:shrink-0 max-lg:basis-auto max-lg:px-1.5 max-lg:py-1"
-            :title="card.label"
+            :title="lgUp ? undefined : card.label"
           >
             <!-- P95 rides its own (slower) query — skeleton the WHOLE card while
                it loads, matching the initial strip skeleton tile (see
@@ -289,6 +289,7 @@ import type { AcceptableValue } from "reka-ui";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import useBreakpoint from "@/composables/useBreakpoint";
 import { useLLMInsights } from "./composables/useLLMInsights";
 import { splitNumberWithUnit, splitDuration, splitCost } from "./llmInsightsDashboard.utils";
 import KpiSparkline from "./KpiSparkline.vue";
@@ -315,6 +316,7 @@ import { useVersionCompare } from "./composables/useVersionCompare";
 import config from "@/aws-exports";
 
 const { t } = useI18nTyped();
+const { lgUp } = useBreakpoint();
 const { getStreams } = useStreams(t);
 const router = useRouter();
 const route = useRoute();

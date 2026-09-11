@@ -183,7 +183,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Separator between X and Breakdown/Pivot -->
           <OSeparator vertical class="me-4 max-md:hidden" />
           <!-- shrink-0, not min-w-0: the nowrap label would overflow onto the drop-zone hint if it shrank. -->
-          <div class="layout-name flex shrink-0 items-center whitespace-nowrap">
+          <div class="layout-name flex min-w-0 items-center whitespace-nowrap max-lg:shrink-0">
             <span
               class="rounded-default bg-badge-orange-ol-text me-1.5 h-2 w-2 shrink-0"
               aria-hidden="true"

@@ -171,7 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <div>
                   <!-- min-w-0/max-w-full let OTabs' own arrow-scroller engage instead of clipping silently. -->
-                  <div class="flex max-w-full min-w-0 justify-start">
+                  <div class="flex justify-start max-md:max-w-full max-md:min-w-0">
                     <OTabs v-model="activeMainTab" dense>
                       <!-- Schema Settings Tab with conditional class -->
                       <OTab
@@ -225,7 +225,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <div v-if="indexData.defaultFts" class="mt-3 font-normal">
                         <label
-                          class="bg-banner-warning-bg rounded-default border-banner-warning-border text-banner-warning-text inline-block max-w-full border px-4 py-1 font-semibold"
+                          class="bg-banner-warning-bg rounded-default border-banner-warning-border text-banner-warning-text border px-4 py-1 font-semibold max-md:inline-block max-md:max-w-full"
                         >
                           {{ t("logStream.mapping") }}
                           {{ t("logStream.defaultFtsKeysUsed") }}</label

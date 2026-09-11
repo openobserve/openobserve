@@ -6,7 +6,7 @@
         'hover:border-accent focus-visible:ring-accent cursor-pointer focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:outline-none',
     ]"
     :data-test="`quality-kpi-${kpi.id}`"
-    :title="t(`onlineEvals.quality.kpis.${kpi.id}.title`)"
+    :title="lgUp ? undefined : t(`onlineEvals.quality.kpis.${kpi.id}.title`)"
     :role="clickable ? 'button' : undefined"
     :tabindex="clickable ? 0 : undefined"
     @click="activate"
@@ -98,6 +98,9 @@ import { useI18nTyped } from "@/types/i18n";
 import KpiSparkline from "@/plugins/traces/KpiSparkline.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { KpiCard } from "../composables/useQualityData";
+import useBreakpoint from "@/composables/useBreakpoint";
+
+const { lgUp } = useBreakpoint();
 
 const props = defineProps<{
   kpi: KpiCard;

@@ -44,7 +44,11 @@
         <div
           data-test="sg-legend"
           class="flex min-w-0 flex-row items-center gap-3 max-lg:flex-wrap max-lg:gap-y-1"
-          :title="`${t('traces.serviceGraph.borderColor')} | ${t('traces.serviceGraph.borderColorMetric')}`"
+          :title="
+            isMobile
+              ? `${t('traces.serviceGraph.borderColor')} | ${t('traces.serviceGraph.borderColorMetric')}`
+              : undefined
+          "
         >
           <div class="text-text-label! mb-0! text-xs font-bold whitespace-nowrap max-md:hidden">
             {{ t("traces.serviceGraph.borderColor") }}
@@ -57,7 +61,7 @@
               v-for="level in healthLevels"
               :key="level.key"
               class="flex flex-none flex-row items-center gap-1.5"
-              :title="`${level.label} ${level.range}`"
+              :title="isMobile ? `${level.label} ${level.range}` : undefined"
               :data-test="`sg-legend-${level.key}`"
             >
               <span
@@ -369,6 +373,7 @@ import {
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
 import { raw, useI18nTyped } from "@/types/i18n";
+import useBreakpoint from "@/composables/useBreakpoint";
 import serviceGraphService from "@/services/service_graph";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import ServiceGraphSidePanel from "./ServiceGraphNodeSidePanel.vue";
@@ -506,6 +511,7 @@ export default defineComponent({
     const store = useStore();
     const { isDark } = useTheme();
     const { t } = useI18nTyped();
+    const { isMobile } = useBreakpoint();
     const { getStreams } = useStreams(t);
     const { searchObj } = useTraces();
 
@@ -1896,6 +1902,7 @@ export default defineComponent({
     });
 
     return {
+      isMobile,
       raw,
       t,
       loading,

@@ -22,6 +22,9 @@ import { computed, useSlots } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import type { StatTone, StatTrend } from "./OStatStrip.types";
+import useBreakpoint from "@/composables/useBreakpoint";
+
+const { lgUp } = useBreakpoint();
 
 const props = withDefaults(
   defineProps<{
@@ -148,7 +151,7 @@ const trendClass = computed(() =>
       clickable ? 'cursor-pointer' : '',
       clickable && !selected ? 'hover:border-accent' : '',
     ]"
-    :title="label ? String(label) : undefined"
+    :title="label && !lgUp ? String(label) : undefined"
     :data-test="dataTest"
   >
     <div class="flex min-w-0 items-center justify-between gap-2">

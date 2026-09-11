@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         variant="ghost"
         size="icon"
-        @click="addFolder"
+        @click.stop="addFolder"
         data-test="dashboard-new-folder-btn"
         :title="t('common.addFolder')"
       >
@@ -56,16 +56,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="!mobileRail"
             class="text-text-heading ps-page-edge flex items-center justify-between gap-2 py-1.5 pe-1.5 text-sm font-semibold"
           >
-            <span class="truncate">{{ t("dashboard.folders") }}</span>
-            <OButton
-              variant="ghost"
-              size="icon"
-              @click="addFolder"
-              data-test="dashboard-new-folder-btn"
-              :title="t('common.addFolder')"
-            >
-              <OIcon name="add" size="sm" />
-            </OButton>
+            {{ t("dashboard.folders") }}
+            <div>
+              <OButton
+                variant="ghost"
+                size="icon"
+                @click.stop="addFolder"
+                data-test="dashboard-new-folder-btn"
+                :title="t('common.addFolder')"
+              >
+                <OIcon name="add" size="sm" />
+              </OButton>
+            </div>
           </div>
           <!-- Search Input -->
           <div class="px-1.5 pb-1.5" :class="mobileRail ? 'pt-1' : ''">
@@ -118,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     tab.folderId.toLowerCase() != 'default' && tab.folderId !== FAVORITES_FOLDER_ID
                   "
                   class="hidden shrink-0 items-center group-hover/row:flex has-[[data-state=open]]:flex max-md:flex"
-                  @click.stop
+                  @click="isMobile && $event.stopPropagation()"
                 >
                   <ODropdown side="bottom" align="start">
                     <template #trigger>

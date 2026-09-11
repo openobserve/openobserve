@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OForm id="import-dashboard-form" :form="form" class="flex h-full min-h-0 flex-col">
               <div class="flex h-full min-h-0 w-full flex-col">
                 <div
-                  class="bg-card-glass-bg px-page-edge mb-1 flex shrink-0 items-center justify-between gap-2 py-2.5 max-md:flex-wrap"
+                  class="bg-card-glass-bg px-page-edge mb-1 shrink-0 py-2.5 max-md:flex max-md:flex-wrap max-md:items-center max-md:justify-between max-md:gap-2"
                 >
                   <div class="app-tabs-container h-9 w-fit">
                     <AppTabs
