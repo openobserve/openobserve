@@ -10,18 +10,21 @@ const OSS: ShortcutCapabilities = {
   isCloud: false,
   onlineEvalsEnabled: false,
   incidentsEnabled: false,
+  modelPricingEnabled: false,
 };
 const ENTERPRISE: ShortcutCapabilities = {
   isEnterprise: true,
   isCloud: false,
   onlineEvalsEnabled: true,
   incidentsEnabled: true,
+  modelPricingEnabled: true,
 };
 const CLOUD: ShortcutCapabilities = {
   isEnterprise: false,
   isCloud: true,
   onlineEvalsEnabled: true,
   incidentsEnabled: true,
+  modelPricingEnabled: true,
 };
 
 const groupByPage = new Map(SHORTCUT_REGISTRY.map((g) => [g.pageKey, g]));
@@ -113,14 +116,18 @@ describe("shortcut cheatsheet OSS gating", () => {
     }
   });
 
-  it("still gates online-evals and incidents behind their /config flags", () => {
+  it("keeps flag-gated pages hidden on enterprise/cloud when their /config flag is off", () => {
     const entNoFlags: ShortcutCapabilities = {
       ...ENTERPRISE,
       onlineEvalsEnabled: false,
       incidentsEnabled: false,
+      modelPricingEnabled: false,
     };
     const pages = visiblePages(entNoFlags);
     expect(pages.has("shortcuts.pages.scorers")).toBe(false);
     expect(pages.has("shortcuts.pages.alertIncidents")).toBe(false);
+    // llmProviders follows online_evals_enabled; modelPricing follows model_pricing_enabled.
+    expect(pages.has("shortcuts.pages.llmProviders")).toBe(false);
+    expect(pages.has("shortcuts.pages.modelPricing")).toBe(false);
   });
 });
