@@ -2425,7 +2425,9 @@
     "subscription_plan": "訂閱方案",
     "pendingDeletion": "待刪除中",
     "daysLeft": "剩餘 {n} 天",
-    "resurrect": "恢復組織"
+    "resurrect": "恢復組織",
+    "statusActive": "啟用中",
+    "statusDeleting": "刪除中"
   },
   "template": {
     "search": "搜尋範本"

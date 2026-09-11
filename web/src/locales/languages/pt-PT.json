@@ -2425,7 +2425,9 @@
     "subscription_plan": "Plano de assinatura",
     "pendingDeletion": "Exclusão pendente",
     "daysLeft": "Restam {n} dias",
-    "resurrect": "Ressuscitar organização"
+    "resurrect": "Ressuscitar organização",
+    "statusActive": "Ativo",
+    "statusDeleting": "Excluindo"
   },
   "template": {
     "search": "Modelo de pesquisa"

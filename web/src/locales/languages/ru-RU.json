@@ -2425,7 +2425,9 @@
     "subscription_plan": "План подписки",
     "pendingDeletion": "Ожидает удаления",
     "daysLeft": "{n} дней осталось",
-    "resurrect": "Восстановить организацию"
+    "resurrect": "Восстановить организацию",
+    "statusActive": "Активна",
+    "statusDeleting": "Удаляется"
   },
   "template": {
     "search": "Поиск шаблона"
