@@ -67,9 +67,7 @@ describe("sqlEquals", () => {
   });
 
   it("builds an exclude (!=) expression when negated", () => {
-    expect(sqlEquals("op", "notificationHandling's", true)).toBe(
-      "op!='notificationHandling''s'",
-    );
+    expect(sqlEquals("op", "notificationHandling's", true)).toBe("op!='notificationHandling''s'");
   });
 });
 
@@ -97,9 +95,7 @@ describe("sqlLike", () => {
   });
 
   it("negates to NOT LIKE", () => {
-    expect(sqlLike("message", "o'brien", "contains", true)).toBe(
-      "message NOT LIKE '%o''brien%'",
-    );
+    expect(sqlLike("message", "o'brien", "contains", true)).toBe("message NOT LIKE '%o''brien%'");
   });
 });
 

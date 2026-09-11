@@ -323,7 +323,12 @@ describe("replaceQueryValue", () => {
 
   it("escapes an embedded single quote in each multi-select value", () => {
     const inst = makeInstWithVar("city", ["O'Hare", "plain"], true);
-    const { query } = inst.replaceQueryValue("SELECT * WHERE city IN ($city)", 0, 300_000_000, "sql");
+    const { query } = inst.replaceQueryValue(
+      "SELECT * WHERE city IN ($city)",
+      0,
+      300_000_000,
+      "sql",
+    );
     expect(query).toContain("'O''Hare'");
     expect(query).toContain("'plain'");
   });

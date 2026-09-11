@@ -360,8 +360,8 @@ describe("useRumSpanBuilder", () => {
       // Call order: tracedResources(0), viewEvents(1), actionEvents(2), allViewEvents(3)
       const viewEventsSql: string = vi.mocked(searchService.search).mock.calls[1][0].query.query
         .sql as string;
-      const allViewEventsSql: string = vi.mocked(searchService.search).mock.calls[3][0].query
-        .query.sql as string;
+      const allViewEventsSql: string = vi.mocked(searchService.search).mock.calls[3][0].query.query
+        .sql as string;
 
       expect(viewEventsSql).toContain("view_id IN ('view''1')");
       expect(allViewEventsSql).toContain("view_id IN ('view''1')");

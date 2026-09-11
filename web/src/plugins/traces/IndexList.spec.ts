@@ -744,11 +744,7 @@ describe("IndexList Component", () => {
 
   describe("handleAddMultipleSearchTerms value escaping", () => {
     it("escapes an embedded single quote in each OR'd include expression", () => {
-      wrapper.vm.handleAddMultipleSearchTerms(
-        "service_name",
-        ["o'brien", "plain"],
-        "include",
-      );
+      wrapper.vm.handleAddMultipleSearchTerms("service_name", ["o'brien", "plain"], "include");
       expect(wrapper.vm.searchObj.data.stream.addToFilter).toBe(
         "(service_name='o''brien' or service_name='plain')",
       );

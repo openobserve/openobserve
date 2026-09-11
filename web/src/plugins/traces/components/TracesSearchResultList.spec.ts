@@ -658,7 +658,12 @@ describe("TracesSearchResultList", () => {
       wrapper = mount_({ hits: [hit], loading: false });
       const cellActions = wrapper.findComponent({ name: "CellActions" });
       expect(cellActions.exists()).toBe(true);
-      await cellActions.vm.$emit("add-search-term", "service_name", "notificationHandling's", "include");
+      await cellActions.vm.$emit(
+        "add-search-term",
+        "service_name",
+        "notificationHandling's",
+        "include",
+      );
       expect(sharedSearchObj.data.stream.addToFilter).toBe(
         "service_name = 'notificationHandling''s'",
       );
