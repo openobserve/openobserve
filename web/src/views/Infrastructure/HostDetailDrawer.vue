@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   Traces (scoped handoff) tabs. Opens from the Hosts page's ?host= param.
 -->
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onMounted, provide, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -127,6 +127,29 @@ const hasPanels = computed(() =>
   ((hostDashboard.value?.tabs ?? []) as { panels?: unknown[] }[]).some(
     (tab) => (tab.panels ?? []).length > 0,
   ),
+);
+
+/**
+ * RenderDashboardCharts scopes its panels to an INJECTED selectedTabId, defaulting
+ * to the literal "default" (RenderDashboardCharts.vue:452,590). The curated builder
+ * names tabs after their section (resolve.ts:765), so without this the renderer
+ * matches no tab, finds zero panels and prints its "Add a panel" empty state.
+ */
+const selectedTabId = ref<string | null>(null);
+provide("selectedTabId", selectedTabId);
+
+watch(
+  () => (hostDashboard.value?.tabs ?? []) as { tabId?: string }[],
+  (tabs) => {
+    if (tabs.length === 0) {
+      selectedTabId.value = null;
+      return;
+    }
+    if (!tabs.some((tab) => tab.tabId === selectedTabId.value)) {
+      selectedTabId.value = tabs[0].tabId ?? null;
+    }
+  },
+  { immediate: true },
 );
 
 /** Streams that exist but stopped reporting — the dormant face's evidence. */

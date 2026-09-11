@@ -22,8 +22,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { createStore } from "vuex";
 import { createRouter, createMemoryHistory } from "vue-router";
-import { computed, defineComponent, ref } from "vue";
+import { computed, defineComponent, inject, ref } from "vue";
+import type { Ref } from "vue";
 import HostDetailDrawer from "./HostDetailDrawer.vue";
+import { __resetSchemaReadsForTest } from "./curated/useCuratedPage";
 import searchService from "@/services/search";
 import { b64DecodeUnicode } from "@/utils/zincutils";
 import i18n from "@/locales";
@@ -209,7 +211,10 @@ describe("HostDetailDrawer", () => {
   let wrapper: VueWrapper<any>;
   let router: any;
 
-  const mountDrawer = async (props: Record<string, any> = {}) => {
+  const mountDrawer = async (
+    props: Record<string, any> = {},
+    renderStub: any = renderChartsStub,
+  ) => {
     const store = createStore({
       state: {
         selectedOrganization: { identifier: "test-org" },
@@ -233,7 +238,7 @@ describe("HostDetailDrawer", () => {
       global: {
         plugins: [store, router, i18n],
         stubs: {
-          RenderDashboardCharts: renderChartsStub,
+          RenderDashboardCharts: renderStub,
           DateTime: dateTimeStub,
           ODrawer: { template: "<div><slot /><slot name='footer' /></div>" },
           teleport: true,
@@ -246,6 +251,8 @@ describe("HostDetailDrawer", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // Schema reads are cached MODULE-side, so one case's reads would answer the next one's.
+    __resetSchemaReadsForTest();
     curatedOverride.current = null;
     lastDashboardData = null;
     for (const k of Object.keys(dateTimeCapture)) delete dateTimeCapture[k];
@@ -522,6 +529,42 @@ describe("HostDetailDrawer", () => {
         );
         wrapper.unmount();
       }
+    });
+
+    // Every case above asserts against a STUB, so the renderer's own tab selection
+    // was never exercised: it reads `inject("selectedTabId", ref("default"))` and
+    // scopes panels to THAT tab (RenderDashboardCharts.vue:452,590), while the
+    // curated builder mints tabId = section id (resolve.ts:765) — never "default".
+    describe("the tab the real renderer would select", () => {
+      const tabAwareStub = defineComponent({
+        name: "RenderDashboardCharts",
+        props: ["dashboardData", "currentTimeObj", "viewOnly", "searchType"],
+        setup(props) {
+          const selectedTabId = inject<Ref<string | null>>("selectedTabId", ref("default"));
+          const panels = computed(
+            () =>
+              (props.dashboardData?.tabs ?? []).find(
+                (tab: any) => tab.tabId === selectedTabId.value,
+              )?.panels ?? [],
+          );
+          return { panels };
+        },
+        template:
+          "<div><div v-if='!panels.length' data-test='render-no-panel'>Add a panel to start visualizing</div><div v-else data-test='render-panels'>{{ panels.length }}</div></div>",
+      });
+
+      const mountWithRealTabSelection = () => mountDrawer({}, tabAwareStub);
+
+      it("selects a tab that EXISTS, so the panels actually render", async () => {
+        wrapper = await mountWithRealTabSelection();
+        expect(wrapper.find('[data-test="render-no-panel"]').exists()).toBe(false);
+        expect(wrapper.find('[data-test="render-panels"]').exists()).toBe(true);
+      });
+
+      it("never leaves the renderer on the 'Add a panel' copy for a ready host", async () => {
+        wrapper = await mountWithRealTabSelection();
+        expect(wrapper.text()).not.toContain("Add a panel");
+      });
     });
   });
 
