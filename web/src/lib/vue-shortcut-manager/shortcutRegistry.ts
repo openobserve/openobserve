@@ -54,13 +54,15 @@ export interface ShortcutGroup {
   shortcuts: ShortcutEntry[];
 }
 
-/** Runtime edition + `/config` flags that gate feature-specific pages. */
+/** Runtime edition + org scope + `/config` flags that gate feature-specific pages. */
 export interface ShortcutCapabilities {
   isEnterprise: boolean;
   isCloud: boolean;
+  isMetaOrg: boolean;
   onlineEvalsEnabled: boolean;
   incidentsEnabled: boolean;
   modelPricingEnabled: boolean;
+  rbacEnabled: boolean;
 }
 
 export interface ShortcutModule {
@@ -83,6 +85,10 @@ const enterpriseOrCloud = (c: ShortcutCapabilities) => c.isEnterprise || c.isClo
 const incidents = (c: ShortcutCapabilities) => enterpriseOrCloud(c) && c.incidentsEnabled;
 const onlineEvals = (c: ShortcutCapabilities) => enterpriseOrCloud(c) && c.onlineEvalsEnabled;
 const modelPricing = (c: ShortcutCapabilities) => enterpriseOrCloud(c) && c.modelPricingEnabled;
+const rbac = (c: ShortcutCapabilities) => enterpriseOrCloud(c) && c.rbacEnabled;
+// Cluster-scoped admin surfaces only render inside the _meta org.
+const metaAdmin = (c: ShortcutCapabilities) => c.isEnterprise && c.isMetaOrg;
+const cloudMetaAdmin = (c: ShortcutCapabilities) => c.isCloud && c.isMetaOrg;
 
 /**
  * Groups the flat SHORTCUT_REGISTRY into modules for the cheatsheet. Each module
@@ -474,7 +480,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.alertSources",
     scope: "alert-sources",
-    visible: enterpriseOrCloud,
+    visible: incidents,
     shortcuts: [
       { id: "alertSourcesAdd", key: "n", descriptionKey: "shortcuts.actions.alertSourcesAdd" },
       {
@@ -615,7 +621,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.iamRoles",
     scope: "iam-roles",
-    visible: enterpriseOrCloud,
+    visible: rbac,
     shortcuts: [
       { id: "iamRolesAdd", key: "n", descriptionKey: "shortcuts.actions.iamRolesAdd" },
       { id: "iamRolesRefresh", key: "r", descriptionKey: "shortcuts.actions.iamRolesRefresh" },
@@ -633,7 +639,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.iamGroups",
     scope: "iam-groups",
-    visible: enterpriseOrCloud,
+    visible: rbac,
     shortcuts: [
       { id: "iamGroupsAdd", key: "n", descriptionKey: "shortcuts.actions.iamGroupsAdd" },
       { id: "iamGroupsRefresh", key: "r", descriptionKey: "shortcuts.actions.iamGroupsRefresh" },
@@ -730,7 +736,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.runningQueries",
     scope: "running-queries",
-    visible: enterprise,
+    visible: metaAdmin,
     shortcuts: [
       {
         id: "runningQueriesRefresh",
@@ -841,7 +847,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.nodes",
     scope: "nodes",
-    visible: enterprise,
+    visible: metaAdmin,
     shortcuts: [{ id: "nodesRefresh", key: "r", descriptionKey: "shortcuts.actions.nodesRefresh" }],
   },
 
@@ -981,7 +987,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.orgManagement",
     scope: "organization-management",
-    visible: cloud,
+    visible: cloudMetaAdmin,
     shortcuts: [
       {
         id: "orgManagementRefresh",

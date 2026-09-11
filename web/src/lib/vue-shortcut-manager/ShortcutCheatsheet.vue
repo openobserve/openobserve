@@ -254,9 +254,13 @@ const store = useStore();
 const capabilities = computed<ShortcutCapabilities>(() => ({
   isEnterprise: config.isEnterprise === "true",
   isCloud: config.isCloud === "true",
+  isMetaOrg:
+    !!store.state.zoConfig?.meta_org &&
+    store.state.selectedOrganization?.identifier === store.state.zoConfig.meta_org,
   onlineEvalsEnabled: Boolean(store.state.zoConfig?.online_evals_enabled),
   incidentsEnabled: Boolean(store.state.zoConfig?.incidents_enabled),
   modelPricingEnabled: Boolean(store.state.zoConfig?.model_pricing_enabled),
+  rbacEnabled: Boolean(store.state.zoConfig?.rbac_enabled),
 }));
 
 const open = computed({

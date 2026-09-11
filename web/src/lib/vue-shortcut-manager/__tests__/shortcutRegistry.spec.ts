@@ -8,23 +8,29 @@ import {
 const OSS: ShortcutCapabilities = {
   isEnterprise: false,
   isCloud: false,
+  isMetaOrg: false,
   onlineEvalsEnabled: false,
   incidentsEnabled: false,
   modelPricingEnabled: false,
+  rbacEnabled: false,
 };
 const ENTERPRISE: ShortcutCapabilities = {
   isEnterprise: true,
   isCloud: false,
+  isMetaOrg: true,
   onlineEvalsEnabled: true,
   incidentsEnabled: true,
   modelPricingEnabled: true,
+  rbacEnabled: true,
 };
 const CLOUD: ShortcutCapabilities = {
   isEnterprise: false,
   isCloud: true,
+  isMetaOrg: true,
   onlineEvalsEnabled: true,
   incidentsEnabled: true,
   modelPricingEnabled: true,
+  rbacEnabled: true,
 };
 
 const groupByPage = new Map(SHORTCUT_REGISTRY.map((g) => [g.pageKey, g]));
@@ -126,8 +132,25 @@ describe("shortcut cheatsheet OSS gating", () => {
     const pages = visiblePages(entNoFlags);
     expect(pages.has("shortcuts.pages.scorers")).toBe(false);
     expect(pages.has("shortcuts.pages.alertIncidents")).toBe(false);
+    // Alert Sources rides the same incidents gate — the nav only reaches it via Incidents.
+    expect(pages.has("shortcuts.pages.alertSources")).toBe(false);
     // llmProviders follows online_evals_enabled; modelPricing follows model_pricing_enabled.
     expect(pages.has("shortcuts.pages.llmProviders")).toBe(false);
     expect(pages.has("shortcuts.pages.modelPricing")).toBe(false);
+  });
+
+  it("gates IAM Roles/Groups behind rbac_enabled on enterprise/cloud", () => {
+    const entNoRbac: ShortcutCapabilities = { ...ENTERPRISE, rbacEnabled: false };
+    const pages = visiblePages(entNoRbac);
+    expect(pages.has("shortcuts.pages.iamRoles")).toBe(false);
+    expect(pages.has("shortcuts.pages.iamGroups")).toBe(false);
+  });
+
+  it("gates cluster-scoped pages to the _meta org", () => {
+    const entNonMeta = visiblePages({ ...ENTERPRISE, isMetaOrg: false });
+    expect(entNonMeta.has("shortcuts.pages.nodes")).toBe(false);
+    expect(entNonMeta.has("shortcuts.pages.runningQueries")).toBe(false);
+    const cloudNonMeta = visiblePages({ ...CLOUD, isMetaOrg: false });
+    expect(cloudNonMeta.has("shortcuts.pages.orgManagement")).toBe(false);
   });
 });
