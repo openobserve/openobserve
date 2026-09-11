@@ -13,13 +13,20 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 use axum::body::Bytes;
+#[cfg(not(feature = "enterprise"))]
+use config::meta::self_reporting::usage::is_enterprise_only_usage_stream;
+#[cfg(feature = "cloud")]
+use config::meta::self_reporting::usage::is_reserved_internal_stream;
 use config::{
     get_config,
-    meta::stream::{StreamParams, StreamType},
+    meta::{
+        self_reporting::usage::is_internal_rollup_stream,
+        stream::{StreamParams, StreamType},
+    },
     utils::{json, schema::format_stream_name},
 };
 use hashbrown::HashMap;
-use infra::errors::Result;
+use infra::errors::{Error, Result};
 use ingestion_common::{
     HecResponse, HecStatus, IngestUser, IngestionRequest, IngestionResponse, IngestionValueType,
 };
@@ -88,21 +95,15 @@ pub async fn ingest(
         }
     };
 
-    for (stream, entries) in parsed.streams {
-        let in_req = IngestionRequest::JsonValues(IngestionValueType::Hec, entries);
-        if let Err(e) = super::ingest::ingest(
-            thread_id,
-            org_id,
-            &stream,
-            in_req,
-            IngestUser::from_user_email(user_email.to_string()),
-            None,
-            false,
-        )
-        .await
-        {
-            return Ok(HecStatus::Custom(e.to_string(), 400).into());
-        }
+    let user = IngestUser::from_user_email(user_email.to_string());
+    let streams: Vec<(String, Vec<json::Value>)> = parsed.streams.into_iter().collect();
+    // Admission checks for every group before the first write; the response shape
+    // for a rejection is unchanged (still `Custom(_, 400)`).
+    if let Err(e) = preflight_streams(org_id, &streams, &user).await {
+        return Ok(HecStatus::Custom(e.to_string(), 400).into());
+    }
+    if let Err(e) = ingest_prepared(thread_id, org_id, streams, user).await {
+        return Ok(HecStatus::Custom(e.to_string(), 400).into());
     }
 
     Ok(HecStatus::Success.into())
@@ -110,18 +111,34 @@ pub async fn ingest(
 
 /// Ingest an already-parsed HEC body, returning each stream's write outcome.
 ///
-/// Every stream group is validated and every event prepared by [`parse_body`]
-/// before the first write, so a client-side rejection commits nothing. A write
-/// failure partway through can still leave earlier streams committed; the
-/// storage layer offers no cross-stream transaction to prevent that.
+/// [`parse_body`] prepares every event and [`preflight_streams`] runs every
+/// admission check for every stream group before the first write, so anything
+/// rejectable is rejected while nothing is persisted. A storage failure after
+/// the first stream has been written still cannot be rolled back — there is no
+/// cross-stream transaction — but it is reported rather than masked as success.
 pub async fn ingest_parsed(
     thread_id: usize,
     org_id: &str,
     parsed: HecParsed,
     user: IngestUser,
 ) -> Result<Vec<IngestionResponse>> {
-    let mut responses = Vec::with_capacity(parsed.streams.len());
-    for (stream, entries) in parsed.streams {
+    let streams: Vec<(String, Vec<json::Value>)> = parsed.streams.into_iter().collect();
+    preflight_streams(org_id, &streams, &user).await?;
+    ingest_prepared(thread_id, org_id, streams, user).await
+}
+
+/// Write stream groups that [`preflight_streams`] has already admitted.
+///
+/// Any error from here is a storage failure, not a rejection: groups written
+/// before it are already committed and cannot be rolled back.
+pub async fn ingest_prepared(
+    thread_id: usize,
+    org_id: &str,
+    streams: Vec<(String, Vec<json::Value>)>,
+    user: IngestUser,
+) -> Result<Vec<IngestionResponse>> {
+    let mut responses = Vec::with_capacity(streams.len());
+    for (stream, entries) in streams {
         let in_req = IngestionRequest::JsonValues(IngestionValueType::Hec, entries);
         let resp = super::ingest::ingest(
             thread_id,
@@ -136,6 +153,57 @@ pub async fn ingest_parsed(
         responses.push(resp);
     }
     Ok(responses)
+}
+
+/// Run every admission check `logs::ingest::ingest` would apply, for all stream
+/// groups, before any of them is written.
+///
+/// Mirrors the guards at the top of that function in the same order. Without
+/// this the checks run inside the per-stream write loop, so a group rejected
+/// second leaves the group written first committed — and `HashMap` iteration
+/// order makes which one lands nondeterministic.
+pub async fn preflight_streams(
+    org_id: &str,
+    streams: &[(String, Vec<json::Value>)],
+    user: &IngestUser,
+) -> Result<()> {
+    for (stream, _) in streams {
+        if let Some(reason) = stream_rejection(stream, user) {
+            return Err(Error::IngestionError(reason));
+        }
+        check_ingestion_allowed(org_id, StreamType::Logs, Some(stream)).await?;
+    }
+    Ok(())
+}
+
+/// Why `logs::ingest::ingest` would refuse to write this stream, if it would.
+///
+/// Kept verbatim in wording and order with the guards at the top of that
+/// function, so a preflight rejection and a per-stream rejection stay in step.
+fn stream_rejection(stream: &str, user: &IngestUser) -> Option<String> {
+    if stream.is_empty() {
+        return Some("Stream name is empty".to_string());
+    }
+    // `need_usage_report` is always true on a HEC write, so the guard always applies.
+    #[cfg(feature = "cloud")]
+    if is_reserved_internal_stream(stream) {
+        return Some(format!(
+            "stream '{stream}' is reserved and cannot be ingested into"
+        ));
+    }
+    #[cfg(not(feature = "enterprise"))]
+    if is_enterprise_only_usage_stream(stream) {
+        return Some(format!(
+            "stream '{stream}' is reserved for enterprise usage reporting"
+        ));
+    }
+    // `is_derived` is always false on a HEC write, so the exemption never applies.
+    if is_internal_rollup_stream(stream) && matches!(user, IngestUser::User(_)) {
+        return Some(format!(
+            "stream '{stream}' is an internal rollup stream and cannot be ingested into"
+        ));
+    }
+    None
 }
 
 /// Parse a HEC body into per-stream record batches.
@@ -521,5 +589,47 @@ mod tests {
                 assert!(!e.to_string().is_empty());
             }
         }
+    }
+
+    #[test]
+    fn rollup_stream_is_rejected_for_a_hec_user() {
+        let user = IngestUser::User("hec-abc@hec.local".to_string());
+        assert!(stream_rejection("_o2_service_graph", &user).is_some());
+        assert!(stream_rejection("_agent_signals", &user).is_some());
+    }
+
+    #[test]
+    fn an_empty_stream_name_is_rejected() {
+        let user = IngestUser::User("hec-abc@hec.local".to_string());
+        assert_eq!(
+            stream_rejection("", &user).as_deref(),
+            Some("Stream name is empty")
+        );
+    }
+
+    #[test]
+    fn an_ordinary_stream_is_admitted() {
+        let user = IngestUser::User("hec-abc@hec.local".to_string());
+        assert!(stream_rejection("default", &user).is_none());
+        assert!(stream_rejection("app_logs", &user).is_none());
+    }
+
+    #[tokio::test]
+    async fn preflight_rejects_the_whole_batch_when_any_group_is_bad() {
+        let user = IngestUser::User("hec-abc@hec.local".to_string());
+        let streams = vec![
+            ("good".to_string(), vec![json::json!({"log": "a"})]),
+            (
+                "_o2_service_graph".to_string(),
+                vec![json::json!({"log": "b"})],
+            ),
+        ];
+        // The bad group is second, so a per-stream loop would already have written
+        // the first one; preflight must refuse before any write.
+        assert!(
+            preflight_streams("test-org", &streams, &user)
+                .await
+                .is_err()
+        );
     }
 }

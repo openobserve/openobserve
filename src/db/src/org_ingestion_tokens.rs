@@ -47,6 +47,19 @@ fn sync_splunk_token(record: &OrgIngestionTokenRecord, enabled: bool) {
     }
 }
 
+/// Drop one org's tokens from both local lookup maps.
+///
+/// Neither map has a TTL and the validator answers from a cache hit before any
+/// DB lookup, so a row deleted without this stays usable on every node forever.
+fn evict_token_caches(org_id: &str, records: &[OrgIngestionTokenListRecord]) {
+    for record in records {
+        ORG_INGESTION_TOKENS.remove(&cache_key(org_id, &record.token));
+        if let Some(guid) = &record.splunk_token {
+            SPLUNK_HEC_TOKENS.remove(guid);
+        }
+    }
+}
+
 /// Insert a new org ingestion token and notify the cluster.
 pub async fn add(record: &OrgIngestionTokenRecord) -> Result<(), anyhow::Error> {
     org_ingestion_tokens::add(record).await?;
@@ -140,6 +153,28 @@ pub async fn set_splunk_token(
         super_cluster::org_ingestion_token_put(&key, &committed).await?;
     }
     Ok(new_value)
+}
+
+/// Delete every token for an org and evict the caches cluster-wide.
+///
+/// The table-layer delete alone leaves each node's `ORG_INGESTION_TOKENS` /
+/// `SPLUNK_HEC_TOKENS` entries resident forever (neither map has a TTL, and the
+/// validator answers from a cache hit before any DB lookup), so a hard-deleted
+/// org would keep ingesting on its old tokens.
+pub async fn delete_by_org(org_id: &str) -> Result<(), anyhow::Error> {
+    let existing = org_ingestion_tokens::list_by_org(org_id).await?;
+
+    org_ingestion_tokens::delete_by_org(org_id).await?;
+
+    evict_token_caches(org_id, &existing);
+
+    for record in &existing {
+        let key = event_key(org_id, &record.token);
+        let _ = delete_from_db_coordinator(&key, false, true, None).await;
+        #[cfg(feature = "enterprise")]
+        super_cluster::org_ingestion_token_delete(&key).await?;
+    }
+    Ok(())
 }
 
 /// Find an enabled token by org_id and token value.
@@ -334,5 +369,64 @@ mod tests {
     fn test_event_key_format() {
         let key = event_key("default", "o2oi_abc123");
         assert_eq!(key, "/org_ingestion_tokens/default/o2oi_abc123");
+    }
+
+    fn list_record(token: &str, splunk_token: Option<&str>) -> OrgIngestionTokenListRecord {
+        OrgIngestionTokenListRecord {
+            name: token.to_string(),
+            token: token.to_string(),
+            description: String::new(),
+            is_default: false,
+            enabled: true,
+            created_by: String::new(),
+            created_at: 0,
+            splunk_token: splunk_token.map(str::to_string),
+        }
+    }
+
+    /// A cached token outliving its deleted org is how a hard-deleted org keeps
+    /// ingesting: the validator answers from a cache hit before any DB lookup.
+    #[test]
+    fn evict_token_caches_drops_only_the_named_org() {
+        ORG_INGESTION_TOKENS.insert(cache_key("gone", "o2oi_a"), "a".to_string());
+        ORG_INGESTION_TOKENS.insert(cache_key("gone", "o2oi_b"), "b".to_string());
+        ORG_INGESTION_TOKENS.insert(cache_key("kept", "o2oi_c"), "c".to_string());
+        SPLUNK_HEC_TOKENS.insert(
+            "guid-a".to_string(),
+            ("gone".to_string(), "id-a".to_string()),
+        );
+        SPLUNK_HEC_TOKENS.insert(
+            "guid-c".to_string(),
+            ("kept".to_string(), "id-c".to_string()),
+        );
+
+        evict_token_caches(
+            "gone",
+            &[
+                list_record("o2oi_a", Some("guid-a")),
+                list_record("o2oi_b", None),
+            ],
+        );
+
+        assert!(!ORG_INGESTION_TOKENS.contains_key(&cache_key("gone", "o2oi_a")));
+        assert!(!ORG_INGESTION_TOKENS.contains_key(&cache_key("gone", "o2oi_b")));
+        assert!(!SPLUNK_HEC_TOKENS.contains_key("guid-a"));
+        assert!(ORG_INGESTION_TOKENS.contains_key(&cache_key("kept", "o2oi_c")));
+        assert!(SPLUNK_HEC_TOKENS.contains_key("guid-c"));
+
+        ORG_INGESTION_TOKENS.remove(&cache_key("kept", "o2oi_c"));
+        SPLUNK_HEC_TOKENS.remove("guid-c");
+    }
+
+    /// A token row with no GUID must not take an unrelated Splunk entry with it.
+    #[test]
+    fn evict_token_caches_leaves_other_guids_alone() {
+        SPLUNK_HEC_TOKENS.insert(
+            "guid-other".to_string(),
+            ("other".to_string(), "id".to_string()),
+        );
+        evict_token_caches("gone", &[list_record("o2oi_x", None)]);
+        assert!(SPLUNK_HEC_TOKENS.contains_key("guid-other"));
+        SPLUNK_HEC_TOKENS.remove("guid-other");
     }
 }
