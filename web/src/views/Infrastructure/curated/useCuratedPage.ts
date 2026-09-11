@@ -87,25 +87,6 @@ const clearSchemaReadsForOrg = (orgId: string) => {
 /** The cache outlives every mount, so a test that counts schema reads must start from empty. */
 export const __resetSchemaReadsForTest = () => schemaReads.clear();
 
-/**
- * One schema read, shared through the module cache above. Exported so the host
- * drawer's logs-target walk reuses these reads rather than minting a second,
- * parallel cache that would double every org's schema traffic.
- */
-export const readStreamSchemaCached = (
-  orgId: string,
-  type: string,
-  name: string,
-  read: () => Promise<StreamListEntry | undefined>,
-): Promise<StreamListEntry | undefined> => {
-  const key = schemaKey(orgId, type, name);
-  const hit = cachedSchemaRead(key);
-  if (hit) return hit;
-  const started = read();
-  schemaReads.set(key, { at: Date.now(), read: started });
-  return started;
-};
-
 /** `${theme:NAME}` → an EXISTING design token (+ optional alpha), the sandbox's only route to a themed colour. */
 const CHART_THEME_TOKENS: Record<string, { token: `--${string}`; alpha?: number }> = {
   // The four status ramps are theme-independent by design, so one value reads on both surfaces.

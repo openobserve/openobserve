@@ -14,9 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 // Host detail drawer (design 4.8/§6) — assertions run on the captured dashboard
-// object, never ECharts. The Metrics tab is now the curated engine driven by the
-// hosts pack (curated-pages design §7.3/§8.2); the Logs/Traces/footer cases below
-// must stay green through that retrofit — they are its safety net.
+// object, never ECharts. The drawer is metrics-only: it is the curated engine
+// driven by the hosts pack (curated-pages design §7.3/§8.2), with no Logs or
+// Traces surface and no logs-target schema walk behind one.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
@@ -27,7 +27,6 @@ import type { Ref } from "vue";
 import HostDetailDrawer from "./HostDetailDrawer.vue";
 import { __resetSchemaReadsForTest } from "./curated/useCuratedPage";
 import searchService from "@/services/search";
-import { b64DecodeUnicode } from "@/utils/zincutils";
 import i18n from "@/locales";
 import goldenDashboard from "./curated/packs/__fixtures__/hostDashboard.golden.json";
 
@@ -138,10 +137,11 @@ const streamEntry = (name: string, docTimeMax = NOW_US - 60_000_000) => ({
   schema: [{ name: "host_name", type: "Utf8" }],
 });
 
-/** The org's log streams and the host field each one carries, for the logs-target resolve. */
-let logStreamFields: Record<string, string[]> = {};
-
-/** A live fleet: every system_* stream present and fresh. */
+/**
+ * A live fleet: every system_* stream present and fresh. The org has real LOG streams
+ * too, so a drawer that regressed into resolving one would succeed rather than error —
+ * the metrics-only assertions must fail on the call, not on an empty org.
+ */
 const primeStreams = (names: string[] = HOST_STREAMS, docTimeMax?: number) => {
   getStreamsMock.mockImplementation(async (type: string) => ({
     name: type,
@@ -150,25 +150,9 @@ const primeStreams = (names: string[] = HOST_STREAMS, docTimeMax?: number) => {
       type === "metrics"
         ? names.map((n) => streamEntry(n, docTimeMax))
         : type === "logs"
-          ? Object.keys(logStreamFields).map((n) => ({ name: n, stream_type: "logs" }))
+          ? [{ name: "applogs", stream_type: "logs" }]
           : [],
   }));
-};
-
-/**
- * Gives the org real LOG streams, so the drawer's logs target resolves by evidence.
- * Without this the org has none and the Logs tab is legitimately unresolvable.
- */
-const primeLogStreams = (fields: Record<string, string[]>) => {
-  logStreamFields = fields;
-  getStreamMock.mockImplementation(async (name: string, type: string) => {
-    if (type === "logs") {
-      const schema = logStreamFields[name];
-      if (!schema) throw new Error("stream not found");
-      return { name, schema: schema.map((f) => ({ name: f, type: "Utf8" })) };
-    }
-    return streamEntry(name);
-  });
 };
 
 const allDashboardQueries = (): string[] => {
@@ -256,16 +240,17 @@ describe("HostDetailDrawer", () => {
     curatedOverride.current = null;
     lastDashboardData = null;
     for (const k of Object.keys(dateTimeCapture)) delete dateTimeCapture[k];
-    searchMock.mockResolvedValue({ data: { hits: [{ _timestamp: 1, log: "x" }] } } as any);
+    searchMock.mockResolvedValue({ data: { hits: [] } } as any);
     importHostMetricsDashboard.mockResolvedValue({
       status: "created",
       dashboardId: "dash-1",
       folderId: "default",
     });
-    logStreamFields = {};
-    getStreamMock.mockResolvedValue(streamEntry("system_cpu_time"));
-    // The default org has one log stream carrying host_name — the resolvable case.
-    primeLogStreams({ applogs: ["_timestamp", "host_name", "log"] });
+    // Resolvable on purpose: a regression that walked log schemas would otherwise
+    // throw and read as a crash rather than as the metrics-only rule being broken.
+    getStreamMock.mockImplementation(async (name: string, type: string) =>
+      type === "logs" ? { name, schema: [{ name: "host_name", type: "Utf8" }] } : streamEntry(name),
+    );
     primeStreams();
     loadSemanticGroupsMock.mockResolvedValue([]);
   });
@@ -274,11 +259,54 @@ describe("HostDetailDrawer", () => {
     if (wrapper) wrapper.unmount();
   });
 
-  it("renders the Metrics / Logs / Traces tabs", async () => {
-    wrapper = await mountDrawer();
-    expect(wrapper.find('[data-test="host-drawer-tab-metrics"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="host-drawer-tab-logs"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="host-drawer-tab-traces"]').exists()).toBe(true);
+  // The drawer is metrics-ONLY. The Logs tab cost up to 25 schema reads per open just
+  // to guess which stream held the host's logs; Traces was a bare link. Both are gone,
+  // and nothing here may quietly bring back a tab strip or the reads behind it.
+  describe("metrics-only — no Logs or Traces surface", () => {
+    it("renders no tab strip at all", async () => {
+      wrapper = await mountDrawer();
+      for (const tab of ["metrics", "logs", "traces"]) {
+        expect(wrapper.find(`[data-test="host-drawer-tab-${tab}"]`).exists()).toBe(false);
+      }
+      expect(wrapper.findComponent({ name: "OTabs" }).exists()).toBe(false);
+    });
+
+    it("renders the metrics dashboard directly, with no tab to click first", async () => {
+      wrapper = await mountDrawer();
+      expect(lastDashboardData).toBeTruthy();
+    });
+
+    it("renders no Logs or Traces affordance in any form", async () => {
+      wrapper = await mountDrawer();
+      for (const target of [
+        "host-drawer-explore-logs",
+        "host-drawer-traces-link",
+        "host-drawer-logs-empty",
+        "host-drawer-logs-unresolved",
+        "host-drawer-metrics-undetected-logs",
+      ]) {
+        expect(wrapper.find(`[data-test="${target}"]`).exists(), target).toBe(false);
+      }
+      expect(wrapper.html()).not.toContain("/traces");
+    });
+
+    it("never runs a logs search, on open or on a host switch", async () => {
+      wrapper = await mountDrawer();
+      await wrapper.setProps({ hostName: "web-02" });
+      await flushPromises();
+      expect(searchMock).not.toHaveBeenCalled();
+    });
+
+    // The undetected face used to carry an Explore-in-Logs link, and resolving its
+    // href is what dragged the whole schema walk into a metrics-only drawer.
+    it("the undetected face names the missing receiver without resolving a log stream", async () => {
+      primeStreams([]);
+      wrapper = await mountDrawer();
+      expect(wrapper.find('[data-test="host-drawer-metrics-undetected"]').exists()).toBe(true);
+      expect(getStreamsMock).not.toHaveBeenCalledWith("logs", expect.anything(), expect.anything());
+      expect(loadSemanticGroupsMock).not.toHaveBeenCalled();
+      expect(searchMock).not.toHaveBeenCalled();
+    });
   });
 
   // ── §8.2 golden parity — the red-first bridge across the builder's deletion ─
@@ -447,25 +475,6 @@ describe("HostDetailDrawer", () => {
       expect(getStreamsMock).toHaveBeenCalledWith("metrics", false, false, true);
     });
 
-    it("the Logs and Traces tabs render normally in BOTH non-ready states", async () => {
-      // They never wait on metrics resolution — only the METRICS list fails here.
-      getStreamsMock.mockImplementation(async (type: string) => {
-        if (type === "metrics") throw new Error("network");
-        return {
-          name: type,
-          schema: false,
-          list: Object.keys(logStreamFields).map((n) => ({ name: n, stream_type: "logs" })),
-        };
-      });
-      wrapper = await mountDrawer();
-      await wrapper.find('[data-test="host-drawer-tab-logs"]').trigger("click");
-      await flushPromises();
-      expect(searchMock).toHaveBeenCalled();
-      await wrapper.find('[data-test="host-drawer-tab-traces"]').trigger("click");
-      await flushPromises();
-      expect(wrapper.find('[data-test="host-drawer-traces-link"]').exists()).toBe(true);
-    });
-
     // The drawer handled `unknown` only, so `dormant` and `undetected` both fell
     // through to RenderDashboardCharts with tabs:[] — and its generic empty state
     // told the user to "Add a panel" on a read-only curated surface.
@@ -568,279 +577,7 @@ describe("HostDetailDrawer", () => {
     });
   });
 
-  // ── Everything below is UNCHANGED by the retrofit — the safety net ─────────
-
-  // The Logs/Traces panes may render lazily — open the tab before asserting.
-  const openTab = async (tab: string) => {
-    await wrapper.find(`[data-test="host-drawer-tab-${tab}"]`).trigger("click");
-    await flushPromises();
-  };
-
-  describe("logs tab", () => {
-    it("previews the last 100 logs for the host over the picker window", async () => {
-      wrapper = await mountDrawer();
-      await openTab("logs");
-      expect(searchMock).toHaveBeenCalled();
-      const args: any = searchMock.mock.calls[0][0];
-      const sql: string = args.query.query.sql;
-      // The RESOLVED stream, not the "default" the drawer used to hardcode.
-      expect(sql).toContain('FROM "applogs"');
-      expect(sql).not.toContain('"default"');
-      expect(sql).toContain("host_name = 'web-01'");
-      expect(sql).toContain("ORDER BY _timestamp DESC");
-      expect(sql).toContain("LIMIT 100");
-      expect(args.query.query.start_time).toBe(RANGE.from);
-      expect(args.query.query.end_time).toBe(RANGE.to);
-    });
-
-    it("doubles a single quote in the host name in the SQL literal", async () => {
-      wrapper = await mountDrawer({ hostName: "o'brien" });
-      await openTab("logs");
-      const args: any = searchMock.mock.calls[0][0];
-      expect(args.query.query.sql).toContain("'o''brien'");
-    });
-
-    it("names the RESOLVED stream in the zero-row state so a wrong target self-diagnoses", async () => {
-      searchMock.mockResolvedValue({ data: { hits: [] } } as any);
-      wrapper = await mountDrawer();
-      await openTab("logs");
-      const empty = wrapper.find('[data-test="host-drawer-logs-empty"]');
-      expect(empty.exists()).toBe(true);
-      expect(empty.text()).toContain("No logs found in stream");
-      expect(empty.text()).toContain("applogs");
-      expect(empty.text()).not.toContain("default");
-    });
-
-    it("builds the Explore-in-Logs URL with all nine constructLogsUrl params", async () => {
-      wrapper = await mountDrawer();
-      await openTab("logs");
-      const link = wrapper.find('[data-test="host-drawer-explore-logs"]');
-      expect(link.exists()).toBe(true);
-      const href = link.attributes("href") ?? "";
-      for (const param of [
-        "stream_type",
-        "stream",
-        "from",
-        "to",
-        "sql_mode",
-        "query",
-        "org_identifier",
-        "quick_mode",
-        "show_histogram",
-      ]) {
-        expect(href, param).toContain(`${param}=`);
-      }
-    });
-  });
-
-  // The drawer hardcoded HOST_LOGS_STREAM = "default" for both the preview and the
-  // handoff, so an org with no such stream searched a stream that does not exist.
-  describe("logs target is RESOLVED, never the 'default' constant", () => {
-    it("queries the stream whose schema actually carries a host field", async () => {
-      primeLogStreams({
-        audit: ["_timestamp", "user"],
-        syslog: ["_timestamp", "hostname", "message"],
-      });
-      loadSemanticGroupsMock.mockResolvedValue([
-        { id: "host", display: "Host", fields: ["hostname", "host_name"] },
-      ]);
-      wrapper = await mountDrawer();
-      await openTab("logs");
-      const sql: string = (searchMock.mock.calls[0][0] as any).query.query.sql;
-      expect(sql).toContain('FROM "syslog"');
-      expect(sql).toContain("hostname = 'web-01'");
-      expect(sql).not.toContain("default");
-    });
-
-    it("uses the RESOLVED host field, not a hardcoded host_name spelling", async () => {
-      primeLogStreams({ otel: ["_timestamp", "resource_attributes_host_name"] });
-      loadSemanticGroupsMock.mockResolvedValue([
-        { id: "host", display: "Host", fields: ["resource_attributes_host_name"] },
-      ]);
-      wrapper = await mountDrawer();
-      await openTab("logs");
-      const sql: string = (searchMock.mock.calls[0][0] as any).query.query.sql;
-      expect(sql).toContain("resource_attributes_host_name = 'web-01'");
-    });
-
-    it("carries the resolved stream into the Explore-in-Logs handoff", async () => {
-      primeLogStreams({ syslog: ["_timestamp", "host_name"] });
-      wrapper = await mountDrawer();
-      await openTab("logs");
-      const href = wrapper.find('[data-test="host-drawer-explore-logs"]').attributes("href") ?? "";
-      expect(href).toContain("stream=syslog");
-      expect(href).not.toContain("stream=default");
-      const encoded = new URL(href, "http://localhost").searchParams.get("query") ?? "";
-      expect(b64DecodeUnicode(encoded)).toContain('FROM "syslog"');
-    });
-
-    it("an org with NO log streams is told that, not shown an empty result", async () => {
-      primeLogStreams({});
-      wrapper = await mountDrawer();
-      await openTab("logs");
-      const miss = wrapper.find('[data-test="host-drawer-logs-unresolved"]');
-      expect(miss.exists()).toBe(true);
-      expect(miss.attributes("data-reason")).toBe("no-log-streams");
-      expect(miss.text()).toContain("no log streams");
-      // Nothing to search — the drawer must not fire a query at a guessed stream.
-      expect(searchMock).not.toHaveBeenCalled();
-      expect(wrapper.find('[data-test="host-drawer-logs-empty"]').exists()).toBe(false);
-    });
-
-    it("an org whose log streams carry NO host field gets the other reason", async () => {
-      primeLogStreams({ audit: ["_timestamp", "user"], billing: ["_timestamp", "amount"] });
-      wrapper = await mountDrawer();
-      await openTab("logs");
-      const miss = wrapper.find('[data-test="host-drawer-logs-unresolved"]');
-      expect(miss.exists()).toBe(true);
-      expect(miss.attributes("data-reason")).toBe("no-host-field");
-      expect(miss.text()).toContain("host field");
-      expect(searchMock).not.toHaveBeenCalled();
-    });
-
-    it("the two unresolvable reasons render DIFFERENT copy", async () => {
-      primeLogStreams({});
-      wrapper = await mountDrawer();
-      await openTab("logs");
-      const noStreams = wrapper.find('[data-test="host-drawer-logs-unresolved"]').text();
-      wrapper.unmount();
-
-      primeLogStreams({ audit: ["_timestamp", "user"] });
-      wrapper = await mountDrawer();
-      await openTab("logs");
-      const noField = wrapper.find('[data-test="host-drawer-logs-unresolved"]').text();
-      expect(noField).not.toBe(noStreams);
-    });
-
-    it("offers no Explore-in-Logs link when there is no stream to explore", async () => {
-      primeLogStreams({});
-      wrapper = await mountDrawer();
-      await openTab("logs");
-      expect(wrapper.find('[data-test="host-drawer-explore-logs"]').exists()).toBe(false);
-    });
-
-    // Resolution reads a schema per log stream, so the tab renders before it settles.
-    it("shows the spinner while resolving — never a false 'no logs' or miss message", async () => {
-      let releaseSchema: (v: any) => void = () => {};
-      logStreamFields = { syslog: ["_timestamp", "host_name"] };
-      getStreamsMock.mockImplementation(async (type: string) => ({
-        name: type,
-        schema: false,
-        list: type === "logs" ? [{ name: "syslog", stream_type: "logs" }] : [],
-      }));
-      getStreamMock.mockImplementation((name: string, type: string) =>
-        type === "logs"
-          ? new Promise((resolve) => {
-              releaseSchema = resolve;
-            })
-          : Promise.resolve(streamEntry(name)),
-      );
-
-      wrapper = await mountDrawer();
-      await wrapper.find('[data-test="host-drawer-tab-logs"]').trigger("click");
-      await flushPromises();
-
-      // Mid-resolve: no verdict is available yet, so no verdict may be rendered.
-      expect(wrapper.find('[data-test="host-drawer-logs-empty"]').exists()).toBe(false);
-      expect(wrapper.find('[data-test="host-drawer-logs-unresolved"]').exists()).toBe(false);
-      expect(wrapper.find(".o-spinner, [data-test*='spinner']").exists() || true).toBe(true);
-      expect(wrapper.text()).not.toContain("No logs found");
-
-      releaseSchema({ name: "syslog", schema: [{ name: "host_name", type: "Utf8" }] });
-      await flushPromises();
-      expect(searchMock).toHaveBeenCalled();
-      const sql: string = (searchMock.mock.calls[0][0] as any).query.query.sql;
-      expect(sql).toContain('FROM "syslog"');
-    });
-  });
-
-  describe("traces tab", () => {
-    it("hands off to /traces with a b64 query that decodes to the host filter", async () => {
-      wrapper = await mountDrawer();
-      await openTab("traces");
-      const link = wrapper.find('[data-test="host-drawer-traces-link"]');
-      expect(link.exists()).toBe(true);
-      const href = link.attributes("href") ?? "";
-      expect(href).toContain("/traces");
-      expect(href).toContain("from=");
-      expect(href).toContain("to=");
-      // The traces page b64-decodes ?query= (Index.vue restoreUrlQueryParams) — raw SQL would garble.
-      const query = new URL(href, "http://localhost").searchParams.get("query") ?? "";
-      expect(b64DecodeUnicode(query)).toBe(
-        "(service_host_name = 'web-01' OR host_name = 'web-01')",
-      );
-    });
-
-    // OTel resource attrs are stored `service_`-prefixed with dots as underscores
-    // (core/src/traces/mod.rs resource_attribute_key + flatten.rs format_key), so a
-    // bare `host_name` filter silently matches zero spans.
-    it("filters on the service_-prefixed resource attribute, not bare host_name", async () => {
-      wrapper = await mountDrawer();
-      await openTab("traces");
-      const href = wrapper.find('[data-test="host-drawer-traces-link"]').attributes("href") ?? "";
-      const query = new URL(href, "http://localhost").searchParams.get("query") ?? "";
-      expect(b64DecodeUnicode(query)).toContain("service_host_name = 'web-01'");
-    });
-
-    // The JSON ingest path flattens caller keys directly (traces/mod.rs
-    // strip_client_supplied_derived_fields docs), so bare host_name spans exist too.
-    it("still tolerates the unprefixed spelling from the JSON ingest path", async () => {
-      wrapper = await mountDrawer();
-      await openTab("traces");
-      const href = wrapper.find('[data-test="host-drawer-traces-link"]').attributes("href") ?? "";
-      const decoded = b64DecodeUnicode(
-        new URL(href, "http://localhost").searchParams.get("query") ?? "",
-      );
-      expect(decoded).toContain("OR host_name = 'web-01'");
-      expect(decoded.startsWith("(")).toBe(true);
-    });
-
-    it("escapes a single quote in the host name on both sides of the OR", async () => {
-      wrapper = await mountDrawer({ hostName: "o'brien" });
-      await openTab("traces");
-      const href = wrapper.find('[data-test="host-drawer-traces-link"]').attributes("href") ?? "";
-      const decoded = b64DecodeUnicode(
-        new URL(href, "http://localhost").searchParams.get("query") ?? "",
-      );
-      expect(decoded).toBe("(service_host_name = 'o''brien' OR host_name = 'o''brien')");
-    });
-  });
-
   describe("host switch while open (?host= edited)", () => {
-    it("resets the logs preview and refetches for the new host", async () => {
-      wrapper = await mountDrawer();
-      await openTab("logs");
-      expect(searchMock).toHaveBeenCalledTimes(1);
-      await wrapper.setProps({ hostName: "web-02" });
-      await flushPromises();
-      // The previous host's hits must not linger behind the new host's name.
-      expect(searchMock).toHaveBeenCalledTimes(2);
-      const args: any = searchMock.mock.calls[1][0];
-      expect(args.query.query.sql).toContain("host_name = 'web-02'");
-    });
-
-    it("drops a stale logs response that resolves after the host switched (out-of-order)", async () => {
-      let resolveStale!: (v: any) => void;
-      searchMock.mockImplementationOnce(
-        () =>
-          new Promise((resolve) => {
-            resolveStale = resolve;
-          }) as any,
-      );
-      searchMock.mockResolvedValue({
-        data: { hits: [{ _timestamp: 2, log: "NEW-HOST-LINE" }] },
-      } as any);
-      wrapper = await mountDrawer();
-      await openTab("logs");
-      // Host switches while web-01's fetch is still in flight; web-02's resolves first.
-      await wrapper.setProps({ hostName: "web-02" });
-      await flushPromises();
-      resolveStale({ data: { hits: [{ _timestamp: 1, log: "OLD-HOST-LINE" }] } });
-      await flushPromises();
-      expect(wrapper.text()).toContain("NEW-HOST-LINE");
-      expect(wrapper.text()).not.toContain("OLD-HOST-LINE");
-    });
-
     it("EVERY metrics query carries the NEW host after the switch — the drawer instance is reused", async () => {
       // opts.pins was read once at setup, so the reused instance kept plotting the
       // host the drawer first opened on while the header said otherwise.
@@ -879,20 +616,6 @@ describe("HostDetailDrawer", () => {
         .flatMap((tab) => tab.panels ?? [])
         .filter((panel: any) => panel.config?.curated_badge);
       expect(badgedAfter.length).toBeGreaterThan(0);
-    });
-
-    it("clears the loaded flag when the host changes off the logs tab", async () => {
-      wrapper = await mountDrawer();
-      await openTab("logs");
-      await openTab("metrics");
-      searchMock.mockClear();
-      await wrapper.setProps({ hostName: "web-02" });
-      await flushPromises();
-      expect(searchMock).not.toHaveBeenCalled();
-      // Re-opening the tab fetches fresh for the new host instead of trusting stale hits.
-      await openTab("logs");
-      expect(searchMock).toHaveBeenCalledTimes(1);
-      expect((searchMock.mock.calls[0][0] as any).query.query.sql).toContain("web-02");
     });
   });
 
