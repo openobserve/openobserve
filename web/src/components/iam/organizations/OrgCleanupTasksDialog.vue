@@ -399,7 +399,7 @@ export default defineComponent({
       loading.value = true;
       try {
         const res = await organizationsService.get_cleanup_tasks(
-          store.state.selectedOrganization.identifier,
+          store.state.zoConfig.meta_org,
           props.orgId,
         );
         tasks.value = res.data ?? [];

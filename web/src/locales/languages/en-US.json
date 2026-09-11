@@ -2422,7 +2422,9 @@
     "subscription_plan": "Subscription Plan",
     "pendingDeletion": "Pending deletion",
     "daysLeft": "{n} days left",
-    "resurrect": "Resurrect organization"
+    "resurrect": "Resurrect organization",
+    "statusActive": "Active",
+    "statusDeleting": "Deleting"
   },
   "template": {
     "search": "Search Template"

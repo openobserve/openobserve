@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
               size="sm"
             >
-              {{ row.status === "pending_deletion" ? pendingLabel(row) : row.status }}
+              {{ statusLabel(row) }}
             </OBadge>
           </template>
           <template #cell-actions="{ row }">
@@ -807,8 +807,16 @@ export default defineComponent({
       showCleanupDialog.value = true;
     };
 
+    const statusLabel = (row: any): string => {
+      if (row.status === "pending_deletion") return pendingLabel(row);
+      if (row.status === "deleting") return t("organization.statusDeleting");
+      if (row.status === "active") return t("organization.statusActive");
+      return row.status;
+    };
+
     const pendingLabel = (row: any): string => {
       if (!row.deleted_at || !row.grace_period_days) return t("organization.pendingDeletion");
+      // deleted_at is micros → ms
       const deletedAtMs = row.deleted_at / 1000;
       const windowMs = row.grace_period_days * 86400 * 1000;
       const msLeft = deletedAtMs + windowMs - Date.now();
@@ -819,7 +827,7 @@ export default defineComponent({
     const resurrectOrganization = async (row: any) => {
       try {
         await OrganizationServices.resurrect_org(
-          store.state.selectedOrganization.identifier,
+          store.state.zoConfig.meta_org,
           row.identifier,
         );
         toast({ variant: "success", message: t("iam.listOrganizations.organizationResurrected") });
@@ -1199,6 +1207,7 @@ export default defineComponent({
       cleanupTargetOrg,
       viewCleanupTasks,
       pendingLabel,
+      statusLabel,
       resurrectOrganization,
       store,
       // Form wiring (Options-API: schemas/defaults MUST be returned so :schema
