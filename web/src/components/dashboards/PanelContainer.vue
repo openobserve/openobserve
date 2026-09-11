@@ -443,6 +443,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import CreateAlertAction from "@/components/alerts/CreateAlertAction.vue";
 import { buildPrefillFromPanel } from "@/utils/alerts/prefill/fromPanel";
+import { getVariablesReferencedInQueries } from "@/utils/dashboard/variables/variablesUtils";
 
 const QueryInspector = defineAsyncComponent(() => {
   return import("@/components/dashboards/QueryInspector.vue");
@@ -808,20 +809,8 @@ export default defineComponent({
         isPanelLoading.value = false;
       }
     };
-    const createVariableRegex = (name: any) =>
-      new RegExp(
-        `(?:\\$\\{?\\s*${name}\\s*(?::\\s*(?:csv|pipe|doublequote|singlequote)\\s*)?\\}?)|(?:\\{\\{\\s*${name}\\s*(?::\\s*(?:csv|pipe|doublequote|singlequote)\\s*)?\\}\\})`,
-      );
-
     const getDependentVariablesData = () =>
-      props.variablesData?.values
-        ?.filter((it: any) => it.type != "dynamic_filters") // ad hoc filters are not considered as dependent filters as they are globally applied
-        ?.filter((it: any) => {
-          const regexForVariable = createVariableRegex(it.name);
-          return props.data.queries
-            ?.map((q: any) => regexForVariable.test(q?.query))
-            ?.includes(true);
-        });
+      getVariablesReferencedInQueries(props.variablesData?.values, props.data.queries);
 
     // Check if any dependent variable's value has changed
     const variablesDataUpdated = computed(() => {
