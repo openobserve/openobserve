@@ -40,9 +40,9 @@ import DateTime from "@/components/DateTime.vue";
 import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue";
 import {
   buildLogsPreviewSql,
-  HOST_LOGS_STREAM,
   LOGS_PREVIEW_LIMIT,
   sqlEscape,
+  useHostLogsTarget,
 } from "./useHostDetail";
 import { timestampToTimezoneDate } from "@/utils/timezone";
 import { durationParts } from "./curated/resolve";
@@ -197,6 +197,33 @@ const logsHits = ref<any[]>([]);
 const logsLoading = ref(false);
 const logsLoaded = ref(false);
 
+const { target: logsTarget, resolve: resolveLogsTarget } = useHostLogsTarget();
+
+// Both the Logs tab and the metrics `undetected` link need the target; whichever renders first pays for it once.
+let logsTargetInFlight: Promise<unknown> | null = null;
+const ensureLogsTarget = () => {
+  if (!logsTargetInFlight) logsTargetInFlight = resolveLogsTarget(org.value);
+  return logsTargetInFlight;
+};
+
+/**
+ * Null until the schema walk settles, so the template can tell "still resolving"
+ * from "resolved to nothing" — rendering the miss copy on the former would flash
+ * a false negative on every open.
+ */
+const logsMiss = computed(() => logsTarget.value?.reason ?? null);
+
+/** The resolved pair, or null while unresolved — the single source for SQL and the handoff. */
+const logsQueryTarget = computed(() => {
+  const resolved = logsTarget.value;
+  if (!resolved?.stream || !resolved.field) return null;
+  return { stream: resolved.stream, field: resolved.field };
+});
+
+const logsPreviewSql = computed(() =>
+  logsQueryTarget.value ? buildLogsPreviewSql(props.hostName, logsQueryTarget.value) : "",
+);
+
 // search takes no AbortSignal — a host/date change mid-flight must drop the stale response.
 let logsGeneration = 0;
 
@@ -205,12 +232,23 @@ const fetchLogs = async () => {
   logsLoading.value = true;
   logsLoaded.value = true;
   try {
+    await ensureLogsTarget();
+    const resolved = logsTarget.value;
+    if (gen !== logsGeneration || !resolved) return;
+    // An unresolvable org gets the named reason, never a query against a guessed stream.
+    if (!resolved.stream || !resolved.field) {
+      logsHits.value = [];
+      return;
+    }
     const res = await searchService.search(
       {
         org_identifier: org.value,
         query: {
           query: {
-            sql: buildLogsPreviewSql(props.hostName),
+            sql: buildLogsPreviewSql(props.hostName, {
+              stream: resolved.stream,
+              field: resolved.field,
+            }),
             start_time: drawerRange.value.from,
             end_time: drawerRange.value.to,
             from: 0,
@@ -234,6 +272,19 @@ const fetchLogs = async () => {
 watch(activeTab, (tab) => {
   if (tab === "logs" && !logsLoaded.value) fetchLogs();
 });
+
+// The undetected face offers Explore-in-Logs, a dead href until the target resolves. Not
+// `immediate`: at mount the face is still `unknown`, and resolving there would make the
+// Metrics tab await a logs schema walk it never needs.
+watch(
+  () =>
+    activeTab.value === "metrics" &&
+    curated.face.value !== "unknown" &&
+    (curated.face.value === "undetected" || !hasPanels.value),
+  (offersLogsLink) => {
+    if (offersLogsLink) void ensureLogsTarget();
+  },
+);
 
 onMounted(() => void resolveMetrics(false));
 
@@ -260,23 +311,31 @@ watch(
 const logLine = (hit: any): string =>
   String(hit?.log ?? hit?.message ?? hit?.body ?? JSON.stringify(hit));
 
-const exploreLogsHref = computed(
-  () =>
-    router.resolve({
-      path: "/logs",
-      query: {
-        stream_type: "logs",
-        stream: HOST_LOGS_STREAM,
-        from: String(drawerRange.value.from),
-        to: String(drawerRange.value.to),
-        sql_mode: "true",
-        query: b64EncodeUnicode(buildLogsPreviewSql(props.hostName)) ?? "",
-        org_identifier: org.value,
-        quick_mode: "false",
-        show_histogram: "false",
-      },
-    }).href,
-);
+// OTel resource attrs land as `service_host_name` (traces/mod.rs resource_attribute_key +
+// flatten.rs format_key), but the JSON ingest path keeps a caller's bare `host_name`.
+const tracesHostFilter = (hostName: string): string => {
+  const escaped = sqlEscape(hostName);
+  return `(service_host_name = '${escaped}' OR host_name = '${escaped}')`;
+};
+
+const exploreLogsHref = computed(() => {
+  const resolved = logsQueryTarget.value;
+  if (!resolved) return "";
+  return router.resolve({
+    path: "/logs",
+    query: {
+      stream_type: "logs",
+      stream: resolved.stream,
+      from: String(drawerRange.value.from),
+      to: String(drawerRange.value.to),
+      sql_mode: "true",
+      query: b64EncodeUnicode(logsPreviewSql.value) ?? "",
+      org_identifier: org.value,
+      quick_mode: "false",
+      show_histogram: "false",
+    },
+  }).href;
+});
 
 const exploreTracesHref = computed(
   () =>
@@ -287,7 +346,7 @@ const exploreTracesHref = computed(
         from: String(drawerRange.value.from),
         to: String(drawerRange.value.to),
         // The traces page b64-decodes ?query= (plugins/traces/Index.vue restoreUrlQueryParams).
-        query: b64EncodeUnicode(`host_name = '${sqlEscape(props.hostName)}'`) ?? "",
+        query: b64EncodeUnicode(tracesHostFilter(props.hostName)) ?? "",
       },
     }).href,
 );
@@ -449,6 +508,7 @@ const statusLabel = computed(() =>
           >
             <OText variant="meta">{{ t("infra.curated.partialTelemetryHosts") }}</OText>
             <a
+              v-if="exploreLogsHref"
               :href="exploreLogsHref"
               target="_blank"
               class="text-text-link text-sm"
@@ -507,7 +567,7 @@ const statusLabel = computed(() =>
         </div>
 
         <div v-else-if="activeTab === 'logs'" class="flex flex-col gap-2">
-          <div class="flex justify-end">
+          <div v-if="exploreLogsHref" class="flex justify-end">
             <a
               :href="exploreLogsHref"
               target="_blank"
@@ -517,12 +577,27 @@ const statusLabel = computed(() =>
             >
           </div>
           <div v-if="logsLoading" class="flex justify-center py-6"><OSpinner size="md" /></div>
+          <!-- Named before the zero-row state: "no logs found" would blame the range for an org that has no host field at all. -->
           <div
-            v-else-if="logsHits.length === 0"
+            v-else-if="logsMiss"
+            data-test="host-drawer-logs-unresolved"
+            :data-reason="logsMiss"
+            class="text-text-secondary py-6 text-center text-sm"
+          >
+            {{
+              t(
+                logsMiss === "no-log-streams"
+                  ? "infra.hosts.logsNoStreams"
+                  : "infra.hosts.logsNoHostField",
+              )
+            }}
+          </div>
+          <div
+            v-else-if="logsHits.length === 0 && logsQueryTarget"
             data-test="host-drawer-logs-empty"
             class="text-text-secondary py-6 text-center text-sm"
           >
-            {{ t("infra.hosts.logsEmpty", { stream: HOST_LOGS_STREAM }) }}
+            {{ t("infra.hosts.logsEmpty", { stream: raw(logsQueryTarget.stream) }) }}
           </div>
           <div v-else class="flex flex-col gap-1">
             <div
