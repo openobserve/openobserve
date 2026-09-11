@@ -495,12 +495,8 @@ export const usePanelVariableSubstitution = ({
           // If no data found (empty array), use SELECT_ALL_VALUE
           const valueToUse = variable.value.length === 0 ? [SELECT_ALL_VALUE] : variable.value;
           const value =
-            valueToUse
-              .map(
-                (value: any) =>
-                  `'${variable.escapeSingleQuotes ? escapeSingleQuotes(value) : value}'`,
-              )
-              .join(",") || "''";
+            valueToUse.map((value: any) => `'${escapeSingleQuotes(String(value))}'`).join(",") ||
+            "''";
           const possibleVariablesPlaceHolderTypes = [
             // Mustache forms
             {
@@ -563,7 +559,7 @@ export const usePanelVariableSubstitution = ({
         } else {
           // If no data found (null value), use SELECT_ALL_VALUE
           const valueToUse = variable.value === null ? SELECT_ALL_VALUE : variable.value;
-          variableValue = `${variable.escapeSingleQuotes ? escapeSingleQuotes(valueToUse) : valueToUse}`;
+          variableValue = `${escapeSingleQuotes(String(valueToUse))}`;
           const mustachePlaceholder = `{{${variable.name}}}`;
           if (
             query.includes(variableName) ||
