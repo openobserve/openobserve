@@ -33,13 +33,19 @@ test.describe('Workflows branch node', { tag: ['@workflows', '@enterprise', '@al
     await pm.workflowsPage.assertEnabled();
   });
 
+  /** A named workflow on the editor with one Branch placed and its drawer open. */
+  const withBranch = async (name = `wf_auto_br_${uniq()}`) => {
+    await pm.workflowsPage.goToAdd();
+    await pm.workflowsPage.setName(name);
+    await pm.workflowsPage.addBranchFromPalette();
+    return name;
+  };
+
   // BR-06 — Add Path mints a new arm, and the else row stays pinned last however many
   // paths exist. The ordinal badges are the user-visible statement of evaluation order,
   // so they must read 1..N over the case rows.
   test('BR-06: Add Path appends an arm and Everything Else stays last', { tag: ['@workflowsBranch'] }, async () => {
-    await pm.workflowsPage.goToAdd();
-    await pm.workflowsPage.setName(`wf_auto_br_${uniq()}`);
-    await pm.workflowsPage.addBranchFromPalette();
+    await withBranch();
 
     expect(await pm.workflowsPage.branchCaseCount()).toBe(1);
     await pm.workflowsPage.addBranchCase();
@@ -53,9 +59,7 @@ test.describe('Workflows branch node', { tag: ['@workflows', '@enterprise', '@al
   // BR-07 — the else arm is what guarantees every record leaves by exactly one handle, so
   // it is deliberately not deletable. Assert ABSENCE of a remove control, not a disabled one.
   test('BR-07: the Everything Else arm cannot be removed', { tag: ['@workflowsBranch'] }, async () => {
-    await pm.workflowsPage.goToAdd();
-    await pm.workflowsPage.setName(`wf_auto_br_${uniq()}`);
-    await pm.workflowsPage.addBranchFromPalette();
+    await withBranch();
 
     await pm.workflowsPage.expectElseArmVisible();
     await pm.workflowsPage.expectElseArmNotRemovable();
@@ -68,9 +72,7 @@ test.describe('Workflows branch node', { tag: ['@workflows', '@enterprise', '@al
   // BR-05 — move up/down reorders evaluation. Because first match wins, the rendered order
   // IS the routing, so the labels must follow the move rather than the handles being renamed.
   test('BR-05: move up/down reorders the paths without renaming handles', { tag: ['@workflowsBranch'] }, async () => {
-    await pm.workflowsPage.goToAdd();
-    await pm.workflowsPage.setName(`wf_auto_br_${uniq()}`);
-    await pm.workflowsPage.addBranchFromPalette();
+    await withBranch();
 
     const [first] = await pm.workflowsPage.branchCaseHandles();
     await pm.workflowsPage.setBranchCase(first, { label: 'FIRST' });
@@ -92,9 +94,7 @@ test.describe('Workflows branch node', { tag: ['@workflows', '@enterprise', '@al
   // BR-09 — handles are minted off a high-water mark and kept for the node's life. Deleting
   // a path must not re-index the survivors, or every edge wired to them would silently move.
   test('BR-09: deleting a path leaves surviving handles untouched', { tag: ['@workflowsBranch'] }, async () => {
-    await pm.workflowsPage.goToAdd();
-    await pm.workflowsPage.setName(`wf_auto_br_${uniq()}`);
-    await pm.workflowsPage.addBranchFromPalette();
+    await withBranch();
     await pm.workflowsPage.addBranchCase();
     await pm.workflowsPage.addBranchCase();
 
@@ -115,9 +115,7 @@ test.describe('Workflows branch node', { tag: ['@workflows', '@enterprise', '@al
   // BR-08 — an arm with no outgoing edge is flagged on the canvas. A fresh Branch has every
   // arm open, so the badge must be present before anything is wired.
   test('BR-08: an unwired arm is flagged on the node', { tag: ['@workflowsBranch'] }, async () => {
-    await pm.workflowsPage.goToAdd();
-    await pm.workflowsPage.setName(`wf_auto_br_${uniq()}`);
-    await pm.workflowsPage.addBranchFromPalette();
+    await withBranch();
     await pm.workflowsPage.saveNodeDrawer();
 
     await pm.workflowsPage.expectBranchUnwiredBadge();
@@ -129,9 +127,7 @@ test.describe('Workflows branch node', { tag: ['@workflows', '@enterprise', '@al
   test('BR-02: builds and publishes a two-path branch with labelled arms', { tag: ['@workflowsBranch'] }, async () => {
     const name = `wf_auto_br_${uniq()}`;
     const dest = `wf_auto_dest_${uniq()}`;
-    await pm.workflowsPage.goToAdd();
-    await pm.workflowsPage.setName(name);
-    await pm.workflowsPage.addBranchFromPalette();
+    await withBranch(name);
 
     const [h0] = await pm.workflowsPage.branchCaseHandles();
     await pm.workflowsPage.setBranchCase(h0, {
@@ -163,9 +159,7 @@ test.describe('Workflows branch node', { tag: ['@workflows', '@enterprise', '@al
   test('BR-04: deleting a wired path blocks publish', { tag: ['@workflowsBranch'] }, async () => {
     const name = `wf_auto_br_${uniq()}`;
     const dest = `wf_auto_dest_${uniq()}`;
-    await pm.workflowsPage.goToAdd();
-    await pm.workflowsPage.setName(name);
-    await pm.workflowsPage.addBranchFromPalette();
+    await withBranch(name);
 
     const [h0] = await pm.workflowsPage.branchCaseHandles();
     await pm.workflowsPage.setBranchCase(h0, {
@@ -194,9 +188,7 @@ test.describe('Workflows branch node', { tag: ['@workflows', '@enterprise', '@al
   // checkpoint and come back in the same order, since order is evaluation order.
   test('BR-11: path labels survive a draft save and reopen', { tag: ['@workflowsBranch'] }, async () => {
     const name = `wf_auto_br_${uniq()}`;
-    await pm.workflowsPage.goToAdd();
-    await pm.workflowsPage.setName(name);
-    await pm.workflowsPage.addBranchFromPalette();
+    await withBranch(name);
 
     const [h0] = await pm.workflowsPage.branchCaseHandles();
     await pm.workflowsPage.setBranchCase(h0, { label: 'ALPHA' });
