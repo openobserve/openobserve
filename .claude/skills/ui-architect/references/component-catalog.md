@@ -23,6 +23,7 @@ markup — don't guess a prop name.
 | [references/page-recipes.md](page-recipes.md) | **Whole-page layouts: the listing/table page (full-height flush skeleton, mandatory search · refresh · column-visibility toggle, filtered-vs-first-run empty state) and the detail/editor page** |
 | [references/navigation-menus.md](navigation-menus.md) | **Registering a new page in navigation: the route composables, the left-rail item (`linksList`), Settings/IAM sub-pages (`SectionRail`), hover-flyout children (`navGroups.ts`), and cloud/enterprise/RBAC gating** |
 | [references/overlay-navigation.md](overlay-navigation.md) | Dialog, Drawer, Dropdown, Popover, Tooltip · Pagination, Stepper, Tabs |
+| [references/responsive.md](responsive.md) | **Phones & tablets with an unchanged laptop view: breakpoints + `useBreakpoint`, one-row header/toolbar/stat chrome, rails → anchored drawers, row-action kebab, popup sizing, clipping and touch gotchas, verification** |
 | [references/feedback-data.md](feedback-data.md) | Banner, Toast (+ useToast), Spinner, Skeleton, InnerLoading · ProgressBar, Timeline, Tree · FieldList |
 
 > **Headless vs form-bound.** Most form controls come as a pair: `OInput`
@@ -54,6 +55,9 @@ markup — don't guess a prop name.
 | Mutually exclusive choice | `ORadioGroup` (few) / `OSelect` (many) | forms-inputs |
 | Instant on/off toggle | `OSwitch` | forms-inputs |
 | Segmented control | `OToggleGroup` | core-controls-table |
+| Filter strip that must fit a phone row | `OToggleGroup mobile-dropdown` | **responsive** |
+| Side rail / field list on a phone | `ODrawer` with `anchor` (or `OPageLayout #sidebar` / `FolderList`) | **responsive** |
+| Secondary header actions on a phone | `OPageHeader`/`OPageLayout` `#actions-overflow` | **responsive** |
 | Build a validated form | `OForm` + Zod schema (binding rules) | **forms-validation** |
 | Read form state for conditional rendering | `useOForm` (owner) / `inject`+`useStore` (child) | forms-validation |
 | Add repeatable/dynamic field rows | `z.array` + indexed `name`, `:key="index"` | forms-validation |
