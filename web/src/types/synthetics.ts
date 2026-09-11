@@ -659,6 +659,14 @@ export interface BrowserCheck {
     password: string;
   };
   variables?: { id?: string; name: string; value: string; secure?: boolean; example?: string }[];
+  /**
+   * Environment ids this check runs against. Empty means one unscoped run.
+   *
+   * Carried but not yet edited here - the editor lands in a later phase. It is
+   * round-tripped so a check pinned to an environment through the API does not
+   * lose that pin the first time someone saves it from this form.
+   */
+  environments?: string[];
   secrets?: { id?: string; name: string; value: string }[];
   headers?: { id?: string; key: string; value: string }[];
   cookies?: { id?: string; name: string; value: string; domain: string }[];
@@ -723,4 +731,47 @@ export interface SyntheticLocationDetail extends SyntheticLocation {
   agents: SyntheticLocationAgent[];
   checks: SyntheticLocationCheck[];
   install?: string;
+}
+
+// ── Shared variables and environments ────────────────────────────────────────
+
+/**
+ * One shared variable, as every read path returns it.
+ *
+ * There is no `value` field, deliberately - the server's read DTO has none
+ * either, so a secret's value cannot arrive here to be leaked into a DOM node.
+ * `example` stands in wherever the UI needs to show the shape of a value.
+ */
+export interface SyntheticsVariable {
+  id: string;
+  name: string;
+  kind: "plain" | "secret";
+  description: string;
+  example: string;
+  tags: string[];
+  /**
+   * A plain variable's value. Absent for a secret - the server's read DTO has
+   * no field to put one in, so it can never arrive here.
+   */
+  value?: string;
+  /** Whether a secret has a value stored. Absent for a plain variable. */
+  has_value?: boolean;
+  /** Checks whose definition references `{{NAME}}`. Drives the deletion guard. */
+  used_by_checks: number;
+  owner?: string;
+  created_at: number;
+  updated_at: number;
+}
+
+/** One environment, with its variables inline - the list renders the whole tab. */
+export interface SyntheticsEnvironment {
+  id: string;
+  name: string;
+  description: string;
+  owner?: string;
+  created_at: number;
+  updated_at: number;
+  /** Checks pinned to this environment. Not derivable from this response. */
+  checks_count: number;
+  variables: SyntheticsVariable[];
 }

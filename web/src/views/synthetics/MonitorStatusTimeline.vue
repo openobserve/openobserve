@@ -56,92 +56,126 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OIcon name="chevron-left" size="xs" />
         </OButton>
+        <!-- One label per lane; row heights mirror the cells beside them. -->
+        <div
+          v-if="isLaned"
+          class="flex shrink-0 flex-col gap-0.5"
+          data-test="synthetics-timeline-lane-labels"
+        >
+          <span
+            v-for="lane in lanes"
+            :key="lane.label"
+            class="text-3xs text-text-secondary h-3 max-w-24 truncate pe-1 text-right font-mono leading-3"
+          >
+            {{ lane.label }}
+          </span>
+        </div>
         <div
           ref="scrollRef"
-          class="rounded-default flex h-6.5 flex-1 gap-0.5 overflow-hidden"
+          :class="['rounded-default flex flex-1 gap-0.5 overflow-hidden', isLaned ? '' : 'h-6.5']"
           @scroll="onScroll"
         >
           <div
-            v-for="seg in segments"
-            :key="seg.runId"
-            class="h-full min-w-[0.1875rem] shrink-0 cursor-pointer transition-all duration-100 hover:scale-y-[1.35]"
+            v-for="col in columns"
+            :key="col.key"
+            :class="['flex min-w-[0.1875rem] shrink-0 flex-col gap-0.5', isLaned ? '' : 'h-full']"
             :style="{ width: segmentWidthPct }"
-            :class="seg.color"
           >
-            <OTooltip side="top" :delay="0" :max-width="'auto'">
-              <template #content>
-                <div class="min-w-50 py-0.5">
-                  <!-- Passed · Warning · Failed always sum to the execution
+            <div
+              v-for="(cell, ci) in col.cells"
+              :key="ci"
+              :class="[
+                isLaned ? 'h-3' : 'h-full',
+                cell.seg
+                  ? cell.seg.color +
+                    ' cursor-pointer transition-all duration-100 hover:scale-y-[1.35]'
+                  : 'bg-border-default/40',
+              ]"
+            >
+              <OTooltip v-if="cell.seg" side="top" :delay="0" :max-width="'auto'">
+                <template #content>
+                  <div class="min-w-50 py-0.5">
+                    <div
+                      v-if="cell.laneLabel"
+                      class="text-text-secondary px-1 pb-0.5 font-mono text-xs font-semibold"
+                    >
+                      {{ cell.laneLabel }}
+                    </div>
+                    <!-- Passed · Warning · Failed always sum to the execution
                        count. `error` aggregates into failed rather than falling
                        out of both buckets, which is what used to make a run of
                        [pass, fail, error] read as "1 passed · 1 failed". -->
-                  <div
-                    class="text-text-secondary mb-1.5 flex flex-wrap items-center gap-1.5 border-b px-1 pb-1 text-xs font-semibold"
-                  >
-                    <span class="bg-badge-success-solid-bg h-2 w-2 shrink-0 rounded-full" />
-                    <span class="text-text-secondary">{{
-                      t("synthetics.timeline.tooltipPassed", { count: seg.tally.passed })
-                    }}</span>
-                    <template v-if="seg.tally.warning > 0">
-                      <span class="bg-badge-warning-solid-bg h-2 w-2 shrink-0 rounded-full" />
+                    <div
+                      class="text-text-secondary mb-1.5 flex flex-wrap items-center gap-1.5 border-b px-1 pb-1 text-xs font-semibold"
+                    >
+                      <span class="bg-badge-success-solid-bg h-2 w-2 shrink-0 rounded-full" />
                       <span class="text-text-secondary">{{
-                        t("synthetics.timeline.tooltipWarning", { count: seg.tally.warning })
+                        t("synthetics.timeline.tooltipPassed", { count: cell.seg.tally.passed })
                       }}</span>
-                    </template>
-                    <span class="bg-badge-error-solid-bg h-2 w-2 shrink-0 rounded-full" />
-                    <span class="text-text-secondary">{{
-                      t("synthetics.timeline.tooltipFailed", { count: seg.tally.failed })
-                    }}</span>
-                  </div>
-                  <template v-for="(group, gIdx) in groupedByLocation(seg.executions)" :key="gIdx">
-                    <div class="mt-1 mb-0.5 flex items-center gap-1.5 px-1 first:mt-0">
-                      <span
-                        class="h-2 w-2 shrink-0 rounded-full"
-                        :class="{
-                          'bg-badge-success-solid-bg': group.status === 'all-pass',
-                          'bg-badge-warning-solid-bg':
-                            group.status === 'mixed' || group.status === 'all-warning',
-                          'bg-badge-error-solid-bg': group.status === 'all-fail',
-                        }"
-                      />
-                      <span class="text-text-secondary text-xs font-semibold">
-                        {{ group.location }}
-                      </span>
+                      <template v-if="cell.seg.tally.warning > 0">
+                        <span class="bg-badge-warning-solid-bg h-2 w-2 shrink-0 rounded-full" />
+                        <span class="text-text-secondary">{{
+                          t("synthetics.timeline.tooltipWarning", { count: cell.seg.tally.warning })
+                        }}</span>
+                      </template>
+                      <span class="bg-badge-error-solid-bg h-2 w-2 shrink-0 rounded-full" />
+                      <span class="text-text-secondary">{{
+                        t("synthetics.timeline.tooltipFailed", { count: cell.seg.tally.failed })
+                      }}</span>
                     </div>
-                    <!--
+                    <template
+                      v-for="(group, gIdx) in groupedByLocation(cell.seg.executions)"
+                      :key="gIdx"
+                    >
+                      <div class="mt-1 mb-0.5 flex items-center gap-1.5 px-1 first:mt-0">
+                        <span
+                          class="h-2 w-2 shrink-0 rounded-full"
+                          :class="{
+                            'bg-badge-success-solid-bg': group.status === 'all-pass',
+                            'bg-badge-warning-solid-bg':
+                              group.status === 'mixed' || group.status === 'all-warning',
+                            'bg-badge-error-solid-bg': group.status === 'all-fail',
+                          }"
+                        />
+                        <span class="text-text-secondary text-xs font-semibold">
+                          {{ group.location }}
+                        </span>
+                      </div>
+                      <!--
                       Per-execution detail rows: only rendered for browser monitors
                       where each execution carries a browser engine + device.
                       Non-browser monitors only have locations — the group header
                       above (dot + location name) is the full summary.
                     -->
-                    <template v-if="isBrowser">
-                      <div
-                        v-for="(exec, eIdx) in group.executions"
-                        :key="eIdx"
-                        class="flex items-center gap-1.5 py-0.5 ps-4"
-                      >
-                        <span
-                          class="h-2 w-2 shrink-0 rounded-full"
-                          :class="{
-                            'bg-badge-success-solid-bg': exec.status === 'pass',
-                            'bg-badge-warning-solid-bg': exec.status === 'warning',
-                            'bg-badge-error-solid-bg':
-                              exec.status === 'fail' || exec.status === 'error',
-                          }"
-                        />
-                        <img
-                          v-if="browserIconUrl(exec.browserEngine)"
-                          :src="browserIconUrl(exec.browserEngine)"
-                          class="h-3.5 w-3.5"
-                          alt=""
-                        />
-                        <span class="text-text-secondary text-xs">{{ exec.device }}</span>
-                      </div>
+                      <template v-if="isBrowser">
+                        <div
+                          v-for="(exec, eIdx) in group.executions"
+                          :key="eIdx"
+                          class="flex items-center gap-1.5 py-0.5 ps-4"
+                        >
+                          <span
+                            class="h-2 w-2 shrink-0 rounded-full"
+                            :class="{
+                              'bg-badge-success-solid-bg': exec.status === 'pass',
+                              'bg-badge-warning-solid-bg': exec.status === 'warning',
+                              'bg-badge-error-solid-bg':
+                                exec.status === 'fail' || exec.status === 'error',
+                            }"
+                          />
+                          <img
+                            v-if="browserIconUrl(exec.browserEngine)"
+                            :src="browserIconUrl(exec.browserEngine)"
+                            class="h-3.5 w-3.5"
+                            alt=""
+                          />
+                          <span class="text-text-secondary text-xs">{{ exec.device }}</span>
+                        </div>
+                      </template>
                     </template>
-                  </template>
-                </div>
-              </template>
-            </OTooltip>
+                  </div>
+                </template>
+              </OTooltip>
+            </div>
           </div>
         </div>
         <OButton
@@ -214,8 +248,17 @@ interface TimelineSegment {
   tally: StatusTally;
 }
 
+interface TimelineLane {
+  label: string;
+  /** Aligned with `segments` by index; null = this run never touched the lane's
+   *  environment, rendered as an empty slot so columns stay comparable. */
+  segments: (TimelineSegment | null)[];
+}
+
 interface Props {
   segments: TimelineSegment[];
+  /** One strip per environment; null/empty keeps the single blended strip. */
+  lanes?: TimelineLane[] | null;
   failCount: string;
   passCount: string;
   mixedCount: string;
@@ -227,9 +270,30 @@ interface Props {
   truncated?: boolean;
 }
 const props = withDefaults(defineProps<Props>(), {
+  lanes: null,
   isBrowser: true,
   truncated: false,
 });
+
+const isLaned = computed(() => (props.lanes?.length ?? 0) > 0);
+
+interface TimelineCell {
+  seg: TimelineSegment | null;
+  laneLabel: string | null;
+}
+
+/** One column per logical run; single mode is just the one-cell case. */
+const columns = computed<{ key: string; cells: TimelineCell[] }[]>(() =>
+  isLaned.value
+    ? props.segments.map((seg, i) => ({
+        key: seg.runId,
+        cells: props.lanes!.map((lane) => ({
+          seg: lane.segments[i] ?? null,
+          laneLabel: lane.label,
+        })),
+      }))
+    : props.segments.map((seg) => ({ key: seg.runId, cells: [{ seg, laneLabel: null }] })),
+);
 
 const browserIconUrl = (name: string): string => {
   switch (name) {

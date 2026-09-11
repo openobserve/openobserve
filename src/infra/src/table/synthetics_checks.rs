@@ -153,6 +153,7 @@ impl TryFrom<synthetics_checks::Model> for Synthetic {
             alert_if_fails: settings.alert_if_fails,
             collect_rum_data: settings.collect_rum_data,
             session_replay: settings.session_replay,
+            environments: settings.environments,
             auth,
             cookies,
             variables,
@@ -324,6 +325,34 @@ pub async fn list_referencing_location<C: ConnectionTrait>(
         }
     }
     Ok(out)
+}
+
+/// How many checks in an org are pinned to each environment, keyed by
+/// environment id.
+///
+/// One pass over the org's settings blobs rather than one query per
+/// environment: the environments list needs every count at once, and JSON
+/// containment syntax differs across Postgres and SQLite. Same reasoning as
+/// `count_referencing_location`.
+pub async fn count_by_environment<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+) -> Result<std::collections::HashMap<String, u64>, errors::Error> {
+    let rows: Vec<serde_json::Value> = Entity::find()
+        .select_only()
+        .column(Column::Settings)
+        .filter(Column::OrgId.eq(org_id))
+        .into_tuple()
+        .all(conn)
+        .await?;
+    let mut counts = std::collections::HashMap::new();
+    for settings in rows {
+        let parsed: SyntheticSettings = serde_json::from_value(settings).unwrap_or_default();
+        for env in parsed.environments {
+            *counts.entry(env).or_insert(0) += 1;
+        }
+    }
+    Ok(counts)
 }
 
 /// Picks the primary key for a new row. Split out of [`create`] so the
@@ -498,6 +527,9 @@ pub struct DueCheck {
     pub org_id: String,
     pub check_type: SyntheticType,
     pub locations: Vec<String>,
+    /// Environments to fan out over, beside locations. Empty = one unscoped job
+    /// per location, which is every check that pre-dates environments.
+    pub environments: Vec<String>,
     pub frequency: SyntheticFrequency,
     /// Minutes from UTC — used for cron scheduling. 0 = UTC.
     pub tz_offset: i32,
@@ -554,12 +586,17 @@ impl TryFrom<synthetics_checks::Model> for DueCheck {
 
         let tags: Vec<String> = serde_json::from_value(m.tags).unwrap_or_default();
 
+        // `environments` rides in the settings blob, which is also where the
+        // scheduler's own retry/alert settings live.
+        let settings: SyntheticSettings = serde_json::from_value(m.settings).unwrap_or_default();
+
         Ok(DueCheck {
             id: m.id,
             name: m.name,
             org_id: m.org_id,
             check_type,
             locations,
+            environments: settings.environments,
             frequency,
             tz_offset: m.tz_offset,
             next_run_at: m.next_run_at,
@@ -949,6 +986,7 @@ fn pack_settings(check: &Synthetic) -> Result<serde_json::Value, errors::Error> 
         collect_rum_data: check.collect_rum_data,
         session_replay: check.session_replay,
         start: check.start,
+        environments: check.environments.clone(),
     })?)
 }
 

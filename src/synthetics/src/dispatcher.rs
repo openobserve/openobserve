@@ -363,7 +363,7 @@ async fn report_to_stream(
         .and_then(|s| serde_json::from_str(s).ok())
         .unwrap_or_default();
 
-    let records: Vec<serde_json::Value> = if bds.is_empty() {
+    let mut records: Vec<serde_json::Value> = if bds.is_empty() {
         vec![serde_json::json!({
             "_timestamp": now_us,
             "job_id": row.id,
@@ -417,6 +417,14 @@ async fn report_to_stream(
             })
             .collect()
     };
+
+    // Absent — never null — for unscoped jobs, so GROUP BYs see no fake env.
+    if let Some(env_id) = row.env.as_deref() {
+        let env_name = crate::job_api::environment_display_name(&row.org_id, env_id).await;
+        for record in &mut records {
+            record["environment"] = serde_json::json!(env_name);
+        }
+    }
 
     let payload = serde_json::Value::Array(records);
     let url = format!(

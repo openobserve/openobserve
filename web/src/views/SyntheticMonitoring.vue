@@ -48,6 +48,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("statusPages.newPage") }}
       </OButton>
       <OButton
+        v-else-if="activeSection === 'variables'"
+        size="sm"
+        variant="primary"
+        data-test="synthetic-monitoring-add-variable-btn"
+        @click="variablesTabRef?.addVariable()"
+      >
+        {{ t("synthetics.variables.newButton") }}
+      </OButton>
+      <OButton
         v-else
         size="sm"
         variant="primary"
@@ -76,6 +85,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon name="monitor-heart" size="sm" />
           <span>{{ t("statusPages.tabTitle") }}</span>
         </OTab>
+        <OTab name="variables">
+          <OIcon name="data-object" size="sm" />
+          <span>{{ t("synthetics.tabs.variables") }}</span>
+        </OTab>
       </OTabs>
     </template>
     <!-- CONTENT AREA: sidebar + main -->
@@ -98,6 +111,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @copy-setup="openSetupDrawer"
         @delete="confirmDeleteLocation"
       />
+
+      <!-- ── VARIABLES TAB ── every scope, selected from its own rail -->
+      <SyntheticsVariablesTab v-if="activeSection === 'variables'" ref="variablesTabRef" />
 
       <!-- RIGHT MAIN: filter bar + table -->
       <div v-if="activeSection === 'checks'" class="flex min-w-0 flex-1 flex-col overflow-hidden">
@@ -436,6 +452,7 @@ import statusPagesService, {
   type StatusPageListItem,
   type PreviewResponse,
 } from "@/services/status_pages";
+import SyntheticsVariablesTab from "@/components/synthetics/variables/SyntheticsVariablesTab.vue";
 import AgentSetupDrawer from "@/components/synthetic-monitoring/AgentSetupDrawer.vue";
 import CheckTypePicker from "@/components/synthetics/CheckTypePicker.vue";
 import FolderList from "@/components/common/sidebar/FolderList.vue";
@@ -477,7 +494,10 @@ const { t } = useI18nTyped();
 const { confirm } = useConfirmDialog();
 
 // ── API types ──────────────────────────────────────────────────────────
-type SyntheticsSection = "checks" | "private" | "status-pages";
+// Variables is unconditional: unlike Private Locations it is not
+// feature-flagged, and a check can reference a shared variable on any
+// deployment. Environments live inside it, on the scope rail.
+type SyntheticsSection = "checks" | "private" | "status-pages" | "variables";
 
 interface ApiMonitorFrequency {
   type: string;
@@ -646,8 +666,10 @@ const initialSection = ((): SyntheticsSection => {
   const s = route.query.section;
   if (s === "private" && privateLocationsEnabled.value) return "private";
   if (s === "status-pages") return "status-pages";
+  if (s === "variables") return "variables";
   return "checks";
 })();
+const variablesTabRef = ref<InstanceType<typeof SyntheticsVariablesTab> | null>(null);
 const activeSection = ref<SyntheticsSection>(initialSection);
 // Private Locations data is never fetched on initial render (only on manual
 // refresh or after a delete) — load it the first time the tab is actually

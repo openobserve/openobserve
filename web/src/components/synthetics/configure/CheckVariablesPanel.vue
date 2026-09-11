@@ -15,7 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref } from "vue";
+import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
+import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import type { BrowserCheck, BrowserStep } from "@/types/synthetics";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -27,6 +28,14 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { getUUID } from "@/utils/uuid";
+import syntheticsService from "@/services/synthetics";
+import SyntheticsInheritedVariables from "@/components/synthetics/variables/SyntheticsInheritedVariables.vue";
+import {
+  RESOLVED_VARIABLE_CAP,
+  coverageGaps,
+  inheritedUnion,
+  type ResolvedVariablesGrouped,
+} from "@/components/synthetics/variables/resolved";
 
 type CheckVariable = NonNullable<BrowserCheck["variables"]>[number];
 
@@ -55,15 +64,63 @@ function usageCount(name: string): number {
 
 const usageCounts = computed(() => variables.value.map((v) => usageCount(v.name)));
 
-function usageText(count: number): I18nText {
-  return count > 0
-    ? t("synthetics.variablesPanel.usedInSteps", { count }, count)
-    : t("synthetics.variablesPanel.notReferenced");
+// ── Resolution — the union of every selected environment plus globals ──────
+
+const store = useStore();
+/** Empty while the check is unsaved — there is nothing to resolve against yet. */
+const checkId = computed(() => ((props.check as { id?: string }).id ?? "") as string);
+const grouped = ref<ResolvedVariablesGrouped | null>(null);
+
+async function fetchGrouped() {
+  if (!checkId.value) {
+    grouped.value = null;
+    return;
+  }
+  try {
+    const org = store.state.selectedOrganization.identifier;
+    const res = await syntheticsService.resolvedVariablesGrouped(org, checkId.value);
+    grouped.value = res.data ?? null;
+  } catch {
+    // A failure here costs the author a hint, not their work — the panel and
+    // the save path both stand on their own, so it stays silent.
+    grouped.value = null;
+  }
 }
 
-// In script because `{{` in the template collides with Vue's delimiters. Static
-// so a long variable name can't turn the syntax example into a value to copy.
-const hintToken = "{{VARIABLE_NAME}}";
+watch(checkId, fetchGrouped, { immediate: true });
+
+const gaps = computed(() => (grouped.value ? coverageGaps(grouped.value) : new Map()));
+
+const localNames = computed(() => new Set(variables.value.map((v) => v.name.trim())));
+const unionRows = computed(() =>
+  grouped.value ? inheritedUnion(grouped.value, localNames.value) : [],
+);
+const unionNames = computed(() => new Set(unionRows.value.map((row) => row.name)));
+const environmentNames = computed(() =>
+  (grouped.value?.environments ?? []).filter((env) => env !== ""),
+);
+
+/** Distinct resolved names across local and inherited — a shadowed name counts once. */
+const headerCount = computed(() =>
+  grouped.value ? new Set([...localNames.value, ...unionNames.value]).size : variables.value.length,
+);
+
+/** Value on hover, per the 4b brief — masked when the author marked it secure. */
+function localValueTooltip(variable: CheckVariable): I18nText {
+  if (variable.secure) return raw(`${variable.name}: ••••••`);
+  if (!variable.value) {
+    return t("synthetics.variablesPanel.valueTooltipEmpty", { name: variable.name });
+  }
+  return raw(`${variable.name}: ${variable.value}`);
+}
+const headerCountText = computed<I18nText>(() =>
+  headerCount.value >= RESOLVED_VARIABLE_CAP - 10
+    ? t("synthetics.variablesPanel.countOfCap", {
+        count: headerCount.value,
+        cap: RESOLVED_VARIABLE_CAP,
+      })
+    : raw(String(headerCount.value)),
+);
 
 // ── Edit / add — one open form at a time; opening either closes the other ──
 
@@ -222,6 +279,15 @@ function undoRemove() {
   if (undoTimer) clearTimeout(undoTimer);
 }
 
+/** The sources whose value takes over if this override is removed. */
+const pendingRemoveFallbackScope = computed(() => {
+  const row = unionRows.value.find((r) => r.name === pendingRemove.value?.name);
+  if (!row) return "";
+  const sources = [...row.envs];
+  if (row.global) sources.push("Global");
+  return sources.join(", ");
+});
+
 onBeforeUnmount(() => {
   if (undoTimer) clearTimeout(undoTimer);
 });
@@ -241,12 +307,9 @@ onBeforeUnmount(() => {
           {{ t("synthetics.variablesPanel.title") }}
         </h3>
         <OBadge variant="default" size="sm" data-test="synthetics-check-variables-panel-count">{{
-          variables.length
+          headerCountText
         }}</OBadge>
-        <OTooltip
-          :content="t('synthetics.variablesPanel.referenceHint', { token: hintToken })"
-          side="bottom"
-        >
+        <OTooltip :content="t('synthetics.variablesPanel.resolutionOrder')" side="bottom">
           <OIcon
             name="info"
             size="sm"
@@ -279,10 +342,9 @@ onBeforeUnmount(() => {
         </OButton>
       </div>
 
-      <!-- Empty state — its action is the only Add affordance while the list
-           is empty (the standalone button below only renders alongside cards) -->
+      <!-- Panel-wide empty state; Local's + is the add affordance otherwise -->
       <OEmptyState
-        v-if="variables.length === 0 && !adding"
+        v-if="variables.length === 0 && !adding && !unionRows.length"
         size="block"
         illustration="function"
         :title="t('synthetics.variablesPanel.emptyTitle')"
@@ -293,221 +355,215 @@ onBeforeUnmount(() => {
         @action="openAdd"
       />
 
-      <!-- Variable cards -->
-      <ul v-if="variables.length" class="m-0 flex list-none flex-col gap-2 p-0">
-        <li
-          v-for="(variable, index) in variables"
-          :key="variable.id ?? index"
-          :data-test="`synthetics-check-variables-panel-card-${index}`"
-        >
-          <!-- Edit mode — swaps the card in place, visually highlighted -->
-          <div
-            v-if="editingIndex === index"
-            class="rounded-default border-accent flex flex-col gap-3 border px-3 py-2.5"
-            :data-test="`synthetics-check-variables-panel-edit-form-${index}`"
-          >
-            <OInput
-              v-model="draft.name"
-              :placeholder="t('synthetics.variablesPanel.namePlaceholder')"
-              :error="!!draftNameError"
-              :error-message="draftNameError"
-              :data-test="`synthetics-check-variables-panel-edit-name-${index}-input`"
-            />
-            <OInput
-              v-model="draft.value"
-              :type="draft.secure ? 'password' : 'text'"
-              :placeholder="t('synthetics.authNetwork.variableValuePlaceholder')"
-              :data-test="`synthetics-check-variables-panel-edit-value-${index}-input`"
-            />
-            <div class="flex items-center gap-2">
-              <OButton
-                size="sm"
-                variant="outline"
-                class="gap-1.5"
-                :data-test="`synthetics-check-variables-panel-edit-secure-${index}-switch`"
-                @click="draft.secure = !draft.secure"
-              >
-                <OSwitch :model-value="draft.secure" size="md" />
-                <OIcon name="lock" size="sm" />
-                <OTooltip
-                  :content="
-                    draft.secure
-                      ? t('synthetics.authNetwork.variableSecureTooltipShow')
-                      : t('synthetics.authNetwork.variableSecureTooltipHide')
-                  "
-                  side="top"
-                />
-              </OButton>
-              <span class="flex-1" aria-hidden="true" />
-              <OButton
-                variant="outline"
-                size="sm-action"
-                :data-test="`synthetics-check-variables-panel-edit-cancel-${index}-btn`"
-                @click="closeForm"
-              >
-                {{ t("common.cancel") }}
-              </OButton>
-              <OButton
-                variant="primary"
-                size="sm-action"
-                :data-test="`synthetics-check-variables-panel-edit-save-${index}-btn`"
-                @click="commitEdit"
-              >
-                {{ t("common.save") }}
-              </OButton>
-            </div>
-          </div>
-
-          <!-- Display mode -->
-          <div
-            v-else
-            class="rounded-default border-border-default flex flex-col gap-1 border px-3 py-2.5"
-          >
-            <div class="flex min-w-0 items-center gap-1.5">
-              <OTooltip
-                v-if="variable.secure"
-                :content="t('synthetics.variablesPanel.secretTooltip')"
-                side="top"
-              >
-                <OIcon name="lock" size="xs" class="text-text-muted shrink-0 cursor-help" />
-              </OTooltip>
-              <span class="text-text-heading min-w-0 truncate font-mono text-sm font-semibold">
-                {{ variable.name }}
-                <!-- Full name on hover — the row truncates long names -->
-                <OTooltip :content="raw(variable.name)" side="top" />
-              </span>
-              <OBadge
-                :variant="usageCounts[index] ? 'primary-soft' : 'default-soft'"
-                size="sm"
-                class="ms-1"
-                :data-test="`synthetics-check-variables-panel-usage-${index}-badge`"
-              >
-                {{ usageCounts[index] }}
-                <OTooltip :content="usageText(usageCounts[index] ?? 0)" side="top" />
-              </OBadge>
-              <span class="flex-1" aria-hidden="true" />
-              <OButton
-                icon-only
-                icon-left="edit"
-                variant="ghost"
-                size="icon"
-                :aria-label="t('synthetics.variablesPanel.editVariable', { name: variable.name })"
-                :data-test="`synthetics-check-variables-panel-edit-${index}-btn`"
-                @click="openEdit(index)"
-              >
-                <OTooltip :content="t('common.edit')" side="top" />
-              </OButton>
-              <OButton
-                icon-only
-                icon-left="delete"
-                variant="ghost"
-                size="icon"
-                :aria-label="t('synthetics.variablesPanel.removeVariable', { name: variable.name })"
-                :data-test="`synthetics-check-variables-panel-remove-${index}-btn`"
-                @click="pendingRemoveIndex = index"
-              >
-                <OTooltip :content="t('common.remove')" side="top" />
-              </OButton>
-            </div>
-            <span
-              class="text-text-secondary truncate font-mono text-xs"
-              :data-test="`synthetics-check-variables-panel-value-${index}`"
-            >
-              {{
-                variable.secure ? t("synthetics.authNetwork.passwordPlaceholder") : variable.value
-              }}
-              <!-- Full value on hover — the row truncates. Never for secrets. -->
-              <OTooltip
-                v-if="!variable.secure && variable.value"
-                :content="raw(variable.value)"
-                side="top"
-              />
-            </span>
-            <span v-if="usageCounts[index]" class="text-text-muted flex items-center gap-1 text-xs">
-              <OIcon name="stacked-line-chart" size="xs" aria-hidden="true" />
-              {{ usageText(usageCounts[index] ?? 0) }}
-            </span>
-          </div>
-        </li>
-      </ul>
-
-      <!-- Add form — at the end of the list, scrolled into view on open -->
-      <div
-        v-if="adding"
-        ref="addFormRef"
-        class="rounded-default border-border-default bg-surface-subtle flex flex-col gap-3 border px-3 py-2.5"
-        data-test="synthetics-check-variables-panel-add-form"
-      >
-        <h4 class="text-text-heading m-0 text-sm font-semibold">
-          {{ t("synthetics.variablesPanel.newVariable") }}
-        </h4>
-        <OInput
-          v-model="draft.name"
-          :placeholder="t('synthetics.variablesPanel.namePlaceholder')"
-          :error="!!draftNameError"
-          :error-message="draftNameError"
-          data-test="synthetics-check-variables-panel-add-name-input"
-        />
-        <OInput
-          v-model="draft.value"
-          :type="draft.secure ? 'password' : 'text'"
-          :placeholder="t('synthetics.authNetwork.variableValuePlaceholder')"
-          data-test="synthetics-check-variables-panel-add-value-input"
-        />
+      <!-- Local — the only editable group, so Add lives on its header -->
+      <section v-else class="flex flex-col gap-2">
         <div class="flex items-center gap-2">
+          <h4 class="text-text-heading m-0 text-sm font-semibold">
+            {{ t("synthetics.variablesPanel.local") }}
+          </h4>
+          <OBadge variant="default" size="sm">{{ variables.length }}</OBadge>
           <OButton
-            size="sm"
+            icon-only
+            icon-left="add"
             variant="outline"
-            class="gap-1.5"
-            data-test="synthetics-check-variables-panel-add-secure-switch"
-            @click="draft.secure = !draft.secure"
+            size="icon"
+            class="ms-auto"
+            :aria-label="t('synthetics.authNetwork.addVariable')"
+            data-test="synthetics-check-variables-panel-add-variable-btn"
+            @click="openAdd"
           >
-            <OSwitch :model-value="draft.secure" size="md" />
-            <OIcon name="lock" size="sm" />
-            <OTooltip
-              :content="
-                draft.secure
-                  ? t('synthetics.authNetwork.variableSecureTooltipShow')
-                  : t('synthetics.authNetwork.variableSecureTooltipHide')
-              "
-              side="top"
-            />
-          </OButton>
-          <span class="flex-1" aria-hidden="true" />
-          <OButton
-            variant="outline"
-            size="sm-action"
-            data-test="synthetics-check-variables-panel-add-cancel-btn"
-            @click="closeForm"
-          >
-            {{ t("common.cancel") }}
-          </OButton>
-          <OButton
-            variant="primary"
-            size="sm-action"
-            data-test="synthetics-check-variables-panel-add-btn"
-            @click="commitAdd"
-          >
-            {{ t("common.add") }}
+            <OTooltip :content="t('synthetics.authNetwork.addVariable')" side="top" />
           </OButton>
         </div>
-      </div>
-    </div>
 
-    <!-- Add — pinned below the scroll region so the affordance never scrolls
-         away with a long variable list. Hidden while the list is empty: the
-         empty state's CTA is the sole Add affordance there. -->
-    <div v-if="variables.length" class="border-border-default shrink-0 border-t px-4 pt-3">
-      <OButton
-        variant="outline"
-        size="sm"
-        icon-left="add"
-        class="w-full"
-        data-test="synthetics-check-variables-panel-add-variable-btn"
-        @click="openAdd"
-      >
-        {{ t("synthetics.authNetwork.addVariable") }}
-      </OButton>
+        <ul v-if="variables.length" class="m-0 flex list-none flex-col gap-2 p-0">
+          <li
+            v-for="(variable, index) in variables"
+            :key="variable.id ?? index"
+            :data-test="`synthetics-check-variables-panel-card-${index}`"
+          >
+            <!-- Edit mode — swaps the card in place, visually highlighted -->
+            <div
+              v-if="editingIndex === index"
+              class="rounded-default border-accent flex flex-col gap-3 border px-3 py-2.5"
+              :data-test="`synthetics-check-variables-panel-edit-form-${index}`"
+            >
+              <OInput
+                v-model="draft.name"
+                :placeholder="t('synthetics.variablesPanel.namePlaceholder')"
+                :error="!!draftNameError"
+                :error-message="draftNameError"
+                :data-test="`synthetics-check-variables-panel-edit-name-${index}-input`"
+              />
+              <OInput
+                v-model="draft.value"
+                :type="draft.secure ? 'password' : 'text'"
+                :placeholder="t('synthetics.authNetwork.variableValuePlaceholder')"
+                :data-test="`synthetics-check-variables-panel-edit-value-${index}-input`"
+              />
+              <div class="flex items-center gap-2">
+                <OButton
+                  size="sm"
+                  variant="outline"
+                  class="gap-1.5"
+                  :data-test="`synthetics-check-variables-panel-edit-secure-${index}-switch`"
+                  @click="draft.secure = !draft.secure"
+                >
+                  <OSwitch :model-value="draft.secure" size="md" />
+                  <OIcon name="lock" size="sm" />
+                  <OTooltip
+                    :content="
+                      draft.secure
+                        ? t('synthetics.authNetwork.variableSecureTooltipShow')
+                        : t('synthetics.authNetwork.variableSecureTooltipHide')
+                    "
+                    side="top"
+                  />
+                </OButton>
+                <span class="flex-1" aria-hidden="true" />
+                <OButton
+                  variant="outline"
+                  size="sm-action"
+                  :data-test="`synthetics-check-variables-panel-edit-cancel-${index}-btn`"
+                  @click="closeForm"
+                >
+                  {{ t("common.cancel") }}
+                </OButton>
+                <OButton
+                  variant="primary"
+                  size="sm-action"
+                  :data-test="`synthetics-check-variables-panel-edit-save-${index}-btn`"
+                  @click="commitEdit"
+                >
+                  {{ t("common.save") }}
+                </OButton>
+              </div>
+            </div>
+
+            <!-- Display mode — names only; the value lives on the name's hover -->
+            <div v-else class="flex min-w-0 items-center gap-2 text-sm">
+              <OIcon
+                name="edit-note"
+                size="sm"
+                class="text-text-secondary shrink-0"
+                aria-hidden="true"
+              />
+              <span class="text-text-secondary min-w-0 truncate font-mono">
+                {{ variable.name }}
+                <OTooltip :content="localValueTooltip(variable)" side="top" />
+              </span>
+              <!-- This local wins over an inherited name of the same spelling.
+                   shrink-0 so an overflowing name ellipsizes, never the badge. -->
+              <span v-if="unionNames.has(variable.name)" class="flex shrink-0">
+                <OTooltip :content="t('synthetics.variablesPanel.overridesInherited')" side="top">
+                  <OIcon
+                    name="warning"
+                    size="xs"
+                    class="text-warning cursor-help"
+                    role="img"
+                    :aria-label="t('synthetics.variablesPanel.overridesInherited')"
+                    :data-test="`synthetics-check-variables-panel-overrides-${index}-badge`"
+                  />
+                </OTooltip>
+              </span>
+              <div class="ms-auto flex shrink-0 items-center gap-1">
+                <OButton
+                  icon-only
+                  icon-left="edit"
+                  variant="ghost"
+                  size="icon"
+                  :aria-label="t('synthetics.variablesPanel.editVariable', { name: variable.name })"
+                  :data-test="`synthetics-check-variables-panel-edit-${index}-btn`"
+                  @click="openEdit(index)"
+                >
+                  <OTooltip :content="t('common.edit')" side="top" />
+                </OButton>
+                <OButton
+                  icon-only
+                  icon-left="delete"
+                  variant="ghost"
+                  size="icon"
+                  :aria-label="
+                    t('synthetics.variablesPanel.removeVariable', { name: variable.name })
+                  "
+                  :data-test="`synthetics-check-variables-panel-remove-${index}-btn`"
+                  @click="pendingRemoveIndex = index"
+                >
+                  <OTooltip :content="t('common.remove')" side="top" />
+                </OButton>
+              </div>
+            </div>
+          </li>
+        </ul>
+
+        <!-- Add form — at the end of the list, scrolled into view on open -->
+        <div
+          v-if="adding"
+          ref="addFormRef"
+          class="rounded-default border-border-default bg-surface-subtle flex flex-col gap-3 border px-3 py-2.5"
+          data-test="synthetics-check-variables-panel-add-form"
+        >
+          <h4 class="text-text-heading m-0 text-sm font-semibold">
+            {{ t("synthetics.variablesPanel.newVariable") }}
+          </h4>
+          <OInput
+            v-model="draft.name"
+            :placeholder="t('synthetics.variablesPanel.namePlaceholder')"
+            :error="!!draftNameError"
+            :error-message="draftNameError"
+            data-test="synthetics-check-variables-panel-add-name-input"
+          />
+          <OInput
+            v-model="draft.value"
+            :type="draft.secure ? 'password' : 'text'"
+            :placeholder="t('synthetics.authNetwork.variableValuePlaceholder')"
+            data-test="synthetics-check-variables-panel-add-value-input"
+          />
+          <div class="flex items-center gap-2">
+            <OButton
+              size="sm"
+              variant="outline"
+              class="gap-1.5"
+              data-test="synthetics-check-variables-panel-add-secure-switch"
+              @click="draft.secure = !draft.secure"
+            >
+              <OSwitch :model-value="draft.secure" size="md" />
+              <OIcon name="lock" size="sm" />
+              <OTooltip
+                :content="
+                  draft.secure
+                    ? t('synthetics.authNetwork.variableSecureTooltipShow')
+                    : t('synthetics.authNetwork.variableSecureTooltipHide')
+                "
+                side="top"
+              />
+            </OButton>
+            <span class="flex-1" aria-hidden="true" />
+            <OButton
+              variant="outline"
+              size="sm-action"
+              data-test="synthetics-check-variables-panel-add-cancel-btn"
+              @click="closeForm"
+            >
+              {{ t("common.cancel") }}
+            </OButton>
+            <OButton
+              variant="primary"
+              size="sm-action"
+              data-test="synthetics-check-variables-panel-add-btn"
+              @click="commitAdd"
+            >
+              {{ t("common.add") }}
+            </OButton>
+          </div>
+        </div>
+      </section>
+
+      <SyntheticsInheritedVariables
+        :rows="unionRows"
+        :environments="environmentNames"
+        :gaps="gaps"
+      />
     </div>
 
     <!-- Remove confirmation — names the steps that break, which is the whole
@@ -533,6 +589,16 @@ onBeforeUnmount(() => {
             )
           }}
         </template>
+      </p>
+      <!-- Removing an override is a silent value change, not a breakage —
+           steps keep referencing the name and start resolving the fallback. -->
+      <p v-if="pendingRemoveFallbackScope" class="pb-2">
+        {{
+          t("synthetics.variablesPanel.removeOverrideNote", {
+            name: pendingRemove?.name ?? "",
+            scope: pendingRemoveFallbackScope,
+          })
+        }}
       </p>
     </ODialog>
   </aside>

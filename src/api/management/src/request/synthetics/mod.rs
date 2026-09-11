@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 mod last_check;
+mod variables;
 
 use axum::{
     Json,
@@ -24,6 +25,7 @@ use axum::{
 use common::meta::http::HttpResponse as MetaHttpResponse;
 use openobserve_api_common::extractors::Headers;
 use serde::Deserialize;
+pub use variables::*;
 
 use crate::service::auth::UserEmail;
 // OSS has an arm that always returns false, so every guard below is gated
@@ -74,6 +76,103 @@ pub struct BulkDeleteSyntheticsRequestBody {
 pub struct MoveSyntheticsRequestBody {
     pub synthetic_ids: Vec<String>,
     pub dst_folder_id: String,
+}
+
+// ── Environment access for checks ─────────────────────────────────────────────
+
+/// Refuses a check that pins itself to an environment the caller cannot use.
+///
+/// The only synthetics route whose authorization target is not in the path: a
+/// check's `environments` arrives in the request *body*, so route middleware has
+/// nothing to resolve. Without this, folder access alone would let someone aim a
+/// check at production credentials they may not read.
+///
+/// `GET` rather than a write verb — referencing an environment is using it, and
+/// the check's own `PUT` already covers editing the check.
+#[cfg(feature = "enterprise")]
+async fn require_env_access(
+    org_id: &str,
+    user_id: &str,
+    environments: &[String],
+) -> Result<(), Response> {
+    for id in environments {
+        let name = env_name(org_id, id).await?;
+        if !can_reach_env(org_id, user_id, &name).await {
+            return Err(MetaHttpResponse::forbidden(format!(
+                "Forbidden: no access to environment '{name}'"
+            )));
+        }
+    }
+    Ok(())
+}
+
+/// Reconciles a check's environments on update against what the caller reaches.
+///
+/// Additions are validated; a stored environment the caller cannot reach is
+/// re-attached rather than treated as removed, because a body without it means a
+/// client that never rendered it far more often than a deliberate removal and the
+/// two are indistinguishable here. One the caller *can* reach stays removed —
+/// that omission is intent. Design §9.8.
+#[cfg(feature = "enterprise")]
+async fn reconcile_environments(
+    org_id: &str,
+    user_id: &str,
+    submitted: &[String],
+    stored: &[String],
+) -> Result<Vec<String>, Response> {
+    let added: Vec<String> = submitted
+        .iter()
+        .filter(|id| !stored.contains(id))
+        .cloned()
+        .collect();
+    require_env_access(org_id, user_id, &added).await?;
+
+    let mut out = submitted.to_vec();
+    for id in stored.iter().filter(|id| !submitted.contains(id)) {
+        // A stored id that no longer resolves is a deleted environment, not a
+        // permission failure — leave it dropped rather than 400 the update.
+        let Ok(Some(name)) =
+            openobserve_synthetics::service::get_environment_name(org_id, id).await
+        else {
+            continue;
+        };
+        if !can_reach_env(org_id, user_id, &name).await {
+            out.push(id.clone());
+        }
+    }
+    Ok(out)
+}
+
+/// Grants name the environment, not its primary key, so an id on a check has to
+/// be resolved back to a name before it can be checked.
+#[cfg(feature = "enterprise")]
+async fn env_name(org_id: &str, id: &str) -> Result<String, Response> {
+    match openobserve_synthetics::service::get_environment_name(org_id, id).await {
+        Ok(Some(name)) => Ok(name),
+        Ok(None) => Err(MetaHttpResponse::bad_request(format!(
+            "environments: no environment with id '{id}' in this org"
+        ))),
+        Err(e) => {
+            tracing::error!("[synthetics] env_name: {e}");
+            Err(MetaHttpResponse::forbidden("Forbidden"))
+        }
+    }
+}
+
+#[cfg(feature = "enterprise")]
+async fn can_reach_env(org_id: &str, user_id: &str, name: &str) -> bool {
+    check_permissions(
+        name,
+        org_id,
+        user_id,
+        "synthetic_environment",
+        "GET",
+        None,
+        false,
+        false,
+        true,
+    )
+    .await
 }
 
 // ── Runs API ──────────────────────────────────────────────────────────────────
@@ -370,6 +469,13 @@ pub async fn create_synthetic(
         .filter(|f| !f.is_empty())
         .unwrap_or_else(|| config::meta::folder::DEFAULT_FOLDER.to_string());
 
+    #[cfg(feature = "enterprise")]
+    if let Err(response) =
+        require_env_access(&org_id, &user_email.user_id, &body.environments).await
+    {
+        return response;
+    }
+
     let created_by = user_email.user_id.as_str();
     match openobserve_synthetics::service::create_synthetic(&org_id, body, created_by).await {
         Ok(check) => MetaHttpResponse::json(check),
@@ -500,6 +606,25 @@ pub async fn update_synthetic(
         }
     }
 
+    // An unloadable check leaves stored empty, so every id is an addition and the
+    // update below reports the missing check rather than this doing it twice.
+    #[cfg(feature = "enterprise")]
+    let mut body = body;
+    #[cfg(feature = "enterprise")]
+    {
+        let stored = openobserve_synthetics::service::get_synthetic(&org_id, &id)
+            .await
+            .ok()
+            .flatten()
+            .map(|c| c.environments)
+            .unwrap_or_default();
+        match reconcile_environments(&org_id, &user_email.user_id, &body.environments, &stored)
+            .await
+        {
+            Ok(environments) => body.environments = environments,
+            Err(response) => return response,
+        }
+    }
     match openobserve_synthetics::service::update_synthetic(&org_id, &id, body).await {
         Ok(check) => MetaHttpResponse::json(check),
         Err(e) => {
@@ -1116,6 +1241,7 @@ async fn process_ack(
             degraded,
             status_reason: resp.status_reason.clone(),
             failing_locations: resp.failing_locations.clone(),
+            failing_environments: resp.failing_environments.clone(),
             passing_locations: resp.passing_locations.clone(),
         };
         tokio::spawn(async move {
@@ -1721,6 +1847,7 @@ mod tests {
             consecutive_failures: 0,
             failing_locations: Vec::new(),
             passing_locations: Vec::new(),
+            failing_environments: Vec::new(),
             usage_events,
         }
     }

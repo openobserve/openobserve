@@ -226,6 +226,18 @@ pub(crate) fn encrypt_secret(dek: &[u8], value: &str) -> anyhow::Result<String> 
         .map_err(|e| anyhow::anyhow!("AES encrypt failed: {e}"))
 }
 
+/// Encrypts a value for storage, keeping an empty one empty.
+///
+/// "Unset" is stored as an empty column and read back as `has_value: false`.
+/// Encrypting an empty string yields a non-empty ciphertext, so routing it
+/// through [`encrypt_secret`] would make an unset secret report as set.
+pub(crate) fn store_value(dek: &[u8], value: &str) -> anyhow::Result<String> {
+    if value.is_empty() {
+        return Ok(String::new());
+    }
+    encrypt_secret(dek, value)
+}
+
 #[cfg(test)]
 mod dek_tests {
     use super::*;
@@ -252,5 +264,23 @@ mod dek_tests {
         let stored = encrypt_secret(&dek, "s3cret").unwrap();
         assert!(stored.starts_with("AESenc:"));
         assert_eq!(decrypt_secret(&dek, &stored).unwrap(), "s3cret");
+    }
+
+    /// `has_value` is `!value.is_empty()`, so an encrypted empty string would
+    /// report an unset secret as set — and a run would inject "" rather than
+    /// trip the unset guard.
+    #[test]
+    fn an_empty_value_is_stored_empty_not_as_ciphertext() {
+        let dek = vec![3u8; 64];
+        assert_eq!(store_value(&dek, "").unwrap(), "");
+        assert!(!encrypt_secret(&dek, "").unwrap().is_empty());
+    }
+
+    #[test]
+    fn a_non_empty_value_still_round_trips_through_store_value() {
+        let dek = vec![3u8; 64];
+        let stored = store_value(&dek, "hunter2").unwrap();
+        assert!(stored.starts_with("AESenc:"));
+        assert_eq!(decrypt_secret(&dek, &stored).unwrap(), "hunter2");
     }
 }

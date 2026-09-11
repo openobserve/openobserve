@@ -52,6 +52,7 @@ import ContentPaste from "~icons/material-symbols/content-paste";
 import Delete from "~icons/material-symbols/delete-outline";
 import Download from "~icons/material-symbols/download";
 import Edit from "~icons/material-symbols/edit-outline";
+import EditNote from "~icons/material-symbols/edit-note-outline";
 import Error from "~icons/material-symbols/error-outline";
 import ErrorOutline from "~icons/material-symbols/error-outline";
 import Event from "~icons/material-symbols/event-outline";
@@ -150,6 +151,7 @@ import Group from "~icons/material-symbols/group-outline";
 import HourglassEmpty from "~icons/material-symbols/hourglass-empty";
 import Label from "~icons/material-symbols/label-outline";
 import Layers from "~icons/material-symbols/layers-outline";
+import Public from "~icons/material-symbols/public";
 import Mail from "~icons/material-symbols/mail-outline";
 import ManageSearch from "~icons/material-symbols/manage-search";
 import Merge from "~icons/material-symbols/merge";
@@ -396,6 +398,7 @@ export const iconRegistry = {
   delete: Delete,
   download: Download,
   edit: Edit,
+  "edit-note": EditNote,
   error: Error,
   "error-outline": ErrorOutline,
   event: Event,
@@ -526,6 +529,7 @@ export const iconRegistry = {
   "hourglass-empty": HourglassEmpty,
   label: Label,
   layers: Layers,
+  public: Public,
   mail: Mail,
   "manage-search": ManageSearch,
   merge: Merge,

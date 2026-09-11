@@ -23,6 +23,7 @@ import {
   bucketInterval,
   buildHistogramSql,
   buildLastRunSql,
+  buildP95Sql,
   buildRunsSql,
   buildRunDetailSql,
   buildRunsWithStepsSql,
@@ -37,6 +38,7 @@ import {
   deviceIconName,
   deviceLabelKey,
   mapHistogram,
+  mapHistogramSplit,
   deriveKpiFromHistogram,
   mapRun,
   evidenceOriginTs,
@@ -159,6 +161,34 @@ describe("syntheticResultsSchema query builders", () => {
     expect(ERROR_SOURCE.queue).toBe("queue");
     expect(ERROR_SOURCE.probe).toBe("probe");
   });
+
+  it("should scope every overview query to an environment only when one is given", () => {
+    // The caller gates on the stream schema having the column; the builders
+    // just honour the argument.
+    expect(buildRunsSql("mon-1", 50, null, "ap1")).toContain("AND environment = 'ap1'");
+    expect(buildRunsSql("mon-1", 50, null)).not.toContain("environment =");
+    expect(buildHistogramSql("mon-1", "1 hour", false, false, "ap1")).toContain(
+      "AND environment = 'ap1'",
+    );
+    expect(buildP95Sql("mon-1", "ap1")).toContain("AND environment = 'ap1'");
+    expect(buildLastRunSql("mon-1", "ap1")).toContain("AND environment = 'ap1'");
+    expect(buildLastRunSql("mon-1")).not.toContain("environment =");
+    // An env named with a quote cannot break out of the predicate.
+    expect(buildP95Sql("mon-1", "a'p1")).toContain("environment = 'a''p1'");
+  });
+
+  it("should split the histogram by environment only when asked", () => {
+    const split = buildHistogramSql("mon-1", "1 hour", false, false, undefined, true);
+    expect(split).toContain("environment,");
+    expect(split).toContain("GROUP BY ts, environment");
+    const plain = buildHistogramSql("mon-1", "1 hour");
+    expect(plain).not.toContain("environment");
+  });
+
+  it("should select environment with a literal fallback like every optional column", () => {
+    expect(buildRunsSql("mon-1", 50, null)).toContain("environment as environment");
+    expect(buildRunsSql("mon-1", 50, new Set())).toContain("'' as environment");
+  });
 });
 
 describe("bucketInterval", () => {
@@ -222,6 +252,12 @@ describe("mapRun", () => {
     expect(run.location).toBe("ap-southeast-1");
     expect(run.device).toBe("desktop");
     expect(run.error).toBe("Timeout waiting for selector");
+  });
+
+  it("should carry the environment, defaulting to unattributed", () => {
+    expect(mapRun({ status: "passed", environment: "ap1" }).environment).toBe("ap1");
+    // '' — not a fake environment — for unscoped checks and pre-stamp rows.
+    expect(mapRun({ status: "passed" }).environment).toBe("");
   });
 
   it("should map probe status values to RunStatus", () => {
@@ -334,6 +370,59 @@ describe("foldStepDefs", () => {
 
   it("should tolerate rows with no recorded_steps", () => {
     expect(foldStepDefs([{}, { recorded_steps: "" }]).size).toBe(0);
+  });
+});
+
+describe("mapHistogramSplit", () => {
+  const HOUR = 60 * 60 * 1_000_000;
+  const start = 1_700_000_000_000_000;
+  const end = start + HOUR;
+  const ts = new Date(start / 1000).toISOString().slice(0, 19);
+  const row = (env: string, over: Record<string, unknown> = {}) => ({
+    ts,
+    environment: env,
+    total_runs: 2,
+    passed_runs: 1,
+    failed_runs: 1,
+    warning_runs: 0,
+    error_runs: 0,
+    avg_duration: 100,
+    p95_duration: 150,
+    ...over,
+  });
+
+  it("should build one bucket series per environment", () => {
+    const { byEnv } = mapHistogramSplit(
+      [row("cloud"), row("ap1", { avg_duration: 300 })],
+      start,
+      end,
+    );
+    expect([...byEnv.keys()].sort()).toEqual(["ap1", "cloud"]);
+    const cloudBucket = byEnv.get("cloud")!.find((b) => b.tsMs === start / 1000)!;
+    expect(cloudBucket.avgMs).toBe(100);
+  });
+
+  it("should blend counts by sum and averages by weight, leaving p95 unrendered", () => {
+    const { blended } = mapHistogramSplit(
+      [
+        row("cloud", { total_runs: 3, avg_duration: 100 }),
+        row("ap1", { total_runs: 1, avg_duration: 500 }),
+      ],
+      start,
+      end,
+    );
+    const bucket = blended.find((b) => b.tsMs === start / 1000)!;
+    expect(bucket.failedRuns).toBe(2);
+    expect(bucket.avgMs).toBe(200); // (100*3 + 500*1) / 4
+    // Percentiles do not recombine; nothing renders the blended per-bucket p95
+    // in split mode, so 0 is honest rather than invented.
+    expect(bucket.p95Ms).toBe(0);
+  });
+
+  it("should fold unattributed rows into the blended series only", () => {
+    const { blended, byEnv } = mapHistogramSplit([row("cloud"), row("")], start, end);
+    expect([...byEnv.keys()]).toEqual(["cloud"]);
+    expect(blended.find((b) => b.tsMs === start / 1000)!.failedRuns).toBe(2);
   });
 });
 

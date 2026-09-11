@@ -6,8 +6,10 @@ import { throttle } from "lodash-es";
 interface UseResizerOptions {
   direction: "horizontal" | "vertical";
   initialValue: number;
-  minValue?: number;
-  maxValue?: number;
+  /** A getter keeps a limit live — a number is frozen at setup, which is wrong
+   *  for callers whose limits change after mount (OSplitter's do). */
+  minValue?: number | (() => number);
+  maxValue?: number | (() => number);
   unit: "px" | "%";
   containerRef?: Ref<HTMLElement | null>;
   throttleMs?: number;
@@ -30,6 +32,9 @@ function useResizer(options: UseResizerOptions) {
 
   const value = ref(initialValue);
   const isResizing = ref(false);
+
+  const resolveMin = () => (typeof minValue === "function" ? minValue() : minValue);
+  const resolveMax = () => (typeof maxValue === "function" ? maxValue() : maxValue);
 
   let initialCoord = 0;
   let initialSize = 0;
@@ -62,7 +67,7 @@ function useResizer(options: UseResizerOptions) {
       newValue = initialSize + deltaPercent;
     }
 
-    newValue = Math.max(minValue, Math.min(maxValue, newValue));
+    newValue = Math.max(resolveMin(), Math.min(resolveMax(), newValue));
     value.value = newValue;
     onResize?.(newValue);
   }, throttleMs);

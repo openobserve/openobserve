@@ -402,7 +402,7 @@ fn is_remote_task_secret_write(method: &Method, path: &str) -> bool {
         return false;
     };
     let task_path = &segments[tasks + 1..];
-    (method == Method::POST && (task_path.is_empty() || task_path == &["test"]))
+    (method == Method::POST && (task_path.is_empty() || task_path == ["test"]))
         || task_path
             .iter()
             .any(|segment| matches!(*segment, "auth" | "headers" | "signing"))
@@ -1465,7 +1465,24 @@ pub fn service_routes() -> Router {
             .route("/{org_id}/synthetics/agent-tokens/rotate", post(synthetics::rotate_agent_token))
             .route("/{org_id}/synthetics/agent-tokens/{name}", patch(synthetics::set_agent_token_enabled))
             .route("/{org_id}/synthetics/locations/{id}", get(synthetics::get_location).put(synthetics::update_location).delete(synthetics::delete_location))
+            // Shared variables and environments. Registered before the generic
+            // "{id}" entry to match the order the OpenFGA route table needs —
+            // there, a "{placeholder}" matches a literal segment and the first
+            // structural match wins, so "variables" would authorize against a
+            // per-check object instead of its own resource.
+            .route("/{org_id}/synthetics/variables", get(synthetics::list_synthetics_variables).post(synthetics::create_synthetics_variable))
+            .route("/{org_id}/synthetics/variables/{id}", put(synthetics::update_synthetics_variable).delete(synthetics::delete_synthetics_variable))
+            .route("/{org_id}/synthetics/variables/{id}/split", post(synthetics::split_synthetics_variable))
+            .route("/{org_id}/synthetics/environments", get(synthetics::list_synthetics_environments).post(synthetics::create_synthetics_environment))
+            .route("/{org_id}/synthetics/environments/{env}", put(synthetics::update_synthetics_environment).delete(synthetics::delete_synthetics_environment))
+            .route("/{org_id}/synthetics/environments/{env}/duplicate", post(synthetics::duplicate_synthetics_environment))
+            .route("/{org_id}/synthetics/environments/{env}/variables", get(synthetics::list_synthetics_environment_variables).post(synthetics::create_synthetics_environment_variable))
+            .route("/{org_id}/synthetics/environments/{env}/variables/{id}", put(synthetics::update_synthetics_environment_variable).delete(synthetics::delete_synthetics_environment_variable))
+            .route("/{org_id}/synthetics/environments/{env}/variables/{id}/promote", post(synthetics::promote_environment_variable))
             .route("/{org_id}/synthetics/{id}", get(synthetics::get_synthetic).put(synthetics::update_synthetic).delete(synthetics::delete_synthetic))
+            .route("/{org_id}/synthetics/{id}/resolved-variables", get(synthetics::get_synthetic_resolved_variables))
+            .route("/{org_id}/synthetics/{id}/variables/{name}/promote", post(synthetics::promote_synthetic_variable))
+            .route("/{org_id}/synthetics/{id}/replay-secrets", post(synthetics::get_synthetic_replay_secrets))
             .route("/{org_id}/synthetics/{id}/run", post(synthetics::run_synthetic_now))
             .route("/{org_id}/synthetics/{id}/enable", put(synthetics::set_synthetic_enabled))
             .route("/{org_id}/synthetics/{id}/artifact", get(synthetics::get_artifact))

@@ -173,7 +173,9 @@ mod m20260824_000001_create_llm_playground_snapshots;
 mod m20260825_000001_add_alert_pending_period_col;
 mod m20260825_000001_add_steps_configured_to_synthetics_jobs;
 mod m20260825_000001_create_status_page_custom_domains;
+mod m20260827_000001_create_synthetics_shared_variables;
 mod m20260827_000001_drop_table_action_scripts;
+pub(crate) mod m20260828_000001_add_env_to_synthetics_jobs;
 
 #[cfg(test)]
 pub(crate) async fn create_scheduled_jobs_for_test(
@@ -431,6 +433,8 @@ impl MigratorTrait for Migrator {
             Box::new(m20260827_000001_drop_table_action_scripts::Migration),
             Box::new(m20260822_000001_create_status_pages_tables::Migration),
             Box::new(m20260825_000001_create_status_page_custom_domains::Migration),
+            Box::new(m20260827_000001_create_synthetics_shared_variables::Migration),
+            Box::new(m20260828_000001_add_env_to_synthetics_jobs::Migration),
         ]
     }
 }
@@ -456,22 +460,47 @@ mod tests {
         assert_eq!(get_text_type(), "text");
     }
 
+    /// Registration order, asserted relatively so appending a migration does
+    /// not break it — an absolute "this one is last" assertion has now been
+    /// invalidated twice by the next person to add a migration.
     #[test]
-    fn composite_alert_migration_is_registered_after_existing_migrations() {
+    fn each_migration_is_registered_once_and_after_the_schema_it_builds_on() {
         let names: Vec<String> = Migrator::migrations()
             .into_iter()
             .map(|migration| migration.name().to_string())
             .collect();
-        assert_eq!(
-            names.last().map(String::as_str),
-            Some("m20260825_000001_create_status_page_custom_domains")
-        );
-        assert_eq!(
-            names
+        let position = |name: &str| {
+            let found: Vec<usize> = names
                 .iter()
-                .filter(|name| name.as_str() == "m20260812_000001_create_composite_alerts")
-                .count(),
-            1
-        );
+                .enumerate()
+                .filter(|(_, n)| n.as_str() == name)
+                .map(|(i, _)| i)
+                .collect();
+            assert_eq!(found.len(), 1, "{name} is registered {} times", found.len());
+            found[0]
+        };
+
+        let unique: std::collections::HashSet<&String> = names.iter().collect();
+        assert_eq!(unique.len(), names.len(), "a migration is registered twice");
+
+        // Registration alone is what makes a migration run at all.
+        position("m20260812_000001_create_composite_alerts");
+
+        // Each pair is a migration and the one whose schema it alters.
+        for (earlier, later) in [
+            (
+                "m20260707_000003_create_synthetics_jobs",
+                "m20260828_000001_add_env_to_synthetics_jobs",
+            ),
+            (
+                "m20260827_000001_create_synthetics_shared_variables",
+                "m20260828_000001_add_env_to_synthetics_jobs",
+            ),
+        ] {
+            assert!(
+                position(earlier) < position(later),
+                "{later} must be registered after {earlier}"
+            );
+        }
     }
 }
