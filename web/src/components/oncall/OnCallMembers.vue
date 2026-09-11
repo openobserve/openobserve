@@ -143,7 +143,7 @@
           icon-left="close"
           :aria-label="t('oncall.removeMember')"
           :data-test="`oncall-members-remove-${row.id}`"
-          @click.stop="removeMember(row)"
+          @click.stop="memberToRemove = row"
         />
       </template>
 
@@ -230,6 +230,14 @@
         </div>
       </template>
     </ODialog>
+
+    <ConfirmDialog
+      :model-value="!!memberToRemove"
+      :title="t('oncall.removeMemberTitle')"
+      :message="t('oncall.removeMemberMessage')"
+      @update:ok="confirmRemoveMember"
+      @update:cancel="memberToRemove = null"
+    />
   </div>
 </template>
 
@@ -237,6 +245,7 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
 
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import ODate from "@/lib/forms/Date/ODate.vue";
@@ -717,7 +726,12 @@ async function commitMembers(emails: string[]) {
   }
 }
 
-async function removeMember(member: OnCallTeamMember) {
+const memberToRemove = ref<OnCallTeamMember | null>(null);
+
+async function confirmRemoveMember() {
+  const member = memberToRemove.value;
+  memberToRemove.value = null;
+  if (!member) return;
   try {
     await oncallService.removeMember({
       org_identifier: orgId.value,

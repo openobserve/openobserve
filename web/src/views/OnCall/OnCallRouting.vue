@@ -250,11 +250,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :message="t('oncall.removeRuleMessage')"
       @update:ok="deleteRule"
       @update:cancel="ruleToDelete = null"
-      @update:model-value="
-        (v: boolean) => {
-          if (!v) ruleToDelete = null;
-        }
-      "
     />
   </OPageLayout>
 </template>

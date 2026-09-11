@@ -55,11 +55,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :message="t('oncall.removeRuleMessage')"
       @update:ok="deleteRule"
       @update:cancel="ruleToDelete = null"
-      @update:model-value="
-        (v: boolean) => {
-          if (!v) ruleToDelete = null;
-        }
-      "
     />
 
     <!-- Claiming everything writes one rule per signal, so it is confirmed:
@@ -72,11 +67,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       "
       @update:ok="claimAll"
       @update:cancel="claimAllOpen = false"
-      @update:model-value="
-        (v: boolean) => {
-          if (!v) claimAllOpen = false;
-        }
-      "
     />
   </div>
 </template>

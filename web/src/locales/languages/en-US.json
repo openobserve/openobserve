@@ -17864,6 +17864,8 @@
     "membersHint": "Everyone who can be paged for this team. Levels are set in Schedule, not here.",
     "memberEmailPlaceholder": "engineer{'@'}example.com, another{'@'}example.com",
     "removeMember": "Remove member",
+    "removeMemberTitle": "Remove this member?",
+    "removeMemberMessage": "They will no longer be paged for this team. Any rotation position they hold goes with them.",
     "addMemberFailed": "Could not add the member",
     "removeMemberFailed": "Could not remove the member",
     "schedule": "Schedule",
