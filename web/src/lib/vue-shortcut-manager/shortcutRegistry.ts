@@ -49,7 +49,17 @@ export interface ShortcutGroup {
   pageKey: I18nKey;
   /** Manager scope shared by this group's registerable shortcuts (omit = global). */
   scope?: string;
+  /** Hide this page in the cheatsheet unless the edition/config exposes the feature. */
+  visible?: (caps: ShortcutCapabilities) => boolean;
   shortcuts: ShortcutEntry[];
+}
+
+/** Runtime edition + `/config` flags that gate feature-specific pages. */
+export interface ShortcutCapabilities {
+  isEnterprise: boolean;
+  isCloud: boolean;
+  onlineEvalsEnabled: boolean;
+  incidentsEnabled: boolean;
 }
 
 export interface ShortcutModule {
@@ -64,6 +74,13 @@ export interface ShortcutModule {
   /** pageKeys (ShortcutGroup.pageKey) grouped under this module, in display order */
   pages: I18nKey[];
 }
+
+// Gates mirror each feature's own route guard, so the cheatsheet never lists a page OSS cannot reach.
+const enterprise = (c: ShortcutCapabilities) => c.isEnterprise;
+const cloud = (c: ShortcutCapabilities) => c.isCloud;
+const enterpriseOrCloud = (c: ShortcutCapabilities) => c.isEnterprise || c.isCloud;
+const incidents = (c: ShortcutCapabilities) => enterpriseOrCloud(c) && c.incidentsEnabled;
+const onlineEvals = (c: ShortcutCapabilities) => enterpriseOrCloud(c) && c.onlineEvalsEnabled;
 
 /**
  * Groups the flat SHORTCUT_REGISTRY into modules for the cheatsheet. Each module
@@ -455,6 +472,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.alertSources",
     scope: "alert-sources",
+    visible: enterpriseOrCloud,
     shortcuts: [
       { id: "alertSourcesAdd", key: "n", descriptionKey: "shortcuts.actions.alertSourcesAdd" },
       {
@@ -595,6 +613,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.iamRoles",
     scope: "iam-roles",
+    visible: enterpriseOrCloud,
     shortcuts: [
       { id: "iamRolesAdd", key: "n", descriptionKey: "shortcuts.actions.iamRolesAdd" },
       { id: "iamRolesRefresh", key: "r", descriptionKey: "shortcuts.actions.iamRolesRefresh" },
@@ -612,6 +631,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.iamGroups",
     scope: "iam-groups",
+    visible: enterpriseOrCloud,
     shortcuts: [
       { id: "iamGroupsAdd", key: "n", descriptionKey: "shortcuts.actions.iamGroupsAdd" },
       { id: "iamGroupsRefresh", key: "r", descriptionKey: "shortcuts.actions.iamGroupsRefresh" },
@@ -708,6 +728,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.runningQueries",
     scope: "running-queries",
+    visible: enterprise,
     shortcuts: [
       {
         id: "runningQueriesRefresh",
@@ -726,6 +747,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.alertIncidents",
     scope: "alert-incidents",
+    visible: incidents,
     shortcuts: [
       {
         id: "alertIncidentsRefresh",
@@ -739,6 +761,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.pipelineDestinations",
     scope: "pipeline-destinations",
+    visible: enterprise,
     shortcuts: [
       {
         id: "pipelineDestinationsRefresh",
@@ -765,6 +788,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.iamInvitations",
     scope: "iam-invitations",
+    visible: cloud,
     shortcuts: [
       {
         id: "iamInvitationsRefresh",
@@ -791,6 +815,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.regexPatterns",
     scope: "regex-patterns",
+    visible: enterprise,
     shortcuts: [
       {
         id: "regexPatternsRefresh",
@@ -804,6 +829,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.cipherKeys",
     scope: "cipher-keys",
+    visible: enterprise,
     shortcuts: [
       { id: "cipherKeysRefresh", key: "r", descriptionKey: "shortcuts.actions.cipherKeysRefresh" },
     ],
@@ -813,6 +839,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.nodes",
     scope: "nodes",
+    visible: enterprise,
     shortcuts: [{ id: "nodesRefresh", key: "r", descriptionKey: "shortcuts.actions.nodesRefresh" }],
   },
 
@@ -820,6 +847,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.modelPricing",
     scope: "model-pricing",
+    visible: enterpriseOrCloud,
     shortcuts: [
       {
         id: "modelPricingRefresh",
@@ -833,6 +861,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.searchSchedulers",
     scope: "search-schedulers",
+    visible: enterprise,
     shortcuts: [
       {
         id: "searchSchedulersRefresh",
@@ -868,6 +897,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.evalTemplates",
     scope: "eval-templates",
+    visible: onlineEvals,
     shortcuts: [
       {
         id: "evalTemplatesRefresh",
@@ -881,6 +911,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.scorers",
     scope: "scorers",
+    visible: onlineEvals,
     shortcuts: [
       { id: "scorersRefresh", key: "r", descriptionKey: "shortcuts.actions.scorersRefresh" },
     ],
@@ -890,6 +921,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.evalJobs",
     scope: "eval-jobs",
+    visible: onlineEvals,
     shortcuts: [
       { id: "evalJobsRefresh", key: "r", descriptionKey: "shortcuts.actions.evalJobsRefresh" },
     ],
@@ -899,6 +931,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.scoreConfigs",
     scope: "score-configs",
+    visible: onlineEvals,
     shortcuts: [
       {
         id: "scoreConfigsRefresh",
@@ -912,6 +945,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.actions",
     scope: "actions",
+    visible: enterpriseOrCloud,
     shortcuts: [
       { id: "actionsRefresh", key: "r", descriptionKey: "shortcuts.actions.actionsRefresh" },
     ],
@@ -921,6 +955,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.llmProviders",
     scope: "llm-providers",
+    visible: enterpriseOrCloud,
     shortcuts: [
       {
         id: "llmProvidersRefresh",
@@ -934,6 +969,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.aiToolsets",
     scope: "ai-toolsets",
+    visible: enterprise,
     shortcuts: [
       { id: "aiToolsetsRefresh", key: "r", descriptionKey: "shortcuts.actions.aiToolsetsRefresh" },
     ],
@@ -943,6 +979,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.orgManagement",
     scope: "organization-management",
+    visible: cloud,
     shortcuts: [
       {
         id: "orgManagementRefresh",

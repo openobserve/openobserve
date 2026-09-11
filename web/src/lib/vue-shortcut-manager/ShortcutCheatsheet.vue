@@ -220,6 +220,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch, onUnmounted } from "vue";
+import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
@@ -227,7 +228,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { useShortcut } from "./composables";
 import { SHORTCUT_REGISTRY, SHORTCUT_MODULES } from "./shortcutRegistry";
-import type { ShortcutEntry } from "./shortcutRegistry";
+import type { ShortcutEntry, ShortcutCapabilities } from "./shortcutRegistry";
 import { isMacOS } from "@/utils/keyboardShortcuts";
 import config from "@/aws-exports";
 
@@ -247,6 +248,15 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
+const store = useStore();
+
+// Edition + `/config` flags that decide which feature pages the build can reach.
+const capabilities = computed<ShortcutCapabilities>(() => ({
+  isEnterprise: config.isEnterprise === "true",
+  isCloud: config.isCloud === "true",
+  onlineEvalsEnabled: Boolean(store.state.zoConfig?.online_evals_enabled),
+  incidentsEnabled: Boolean(store.state.zoConfig?.incidents_enabled),
+}));
 
 const open = computed({
   get: () => props.open,
@@ -291,11 +301,12 @@ function entryDisplay(e: ShortcutEntry): string {
 }
 
 const allModules = computed<DisplayModule[]>(() => {
+  const caps = capabilities.value;
   return SHORTCUT_MODULES.map((m) => ({
     title: m.title ? raw(m.title) : t(m.titleKey),
     sections: m.pages.flatMap((pageKey) => {
       const group = groupByPage.get(pageKey);
-      if (!group) return [];
+      if (!group || (group.visible && !group.visible(caps))) return [];
       return [
         {
           title: t(group.pageKey, PAGE_TITLE_PARAMS[group.pageKey] ?? {}),
@@ -310,7 +321,8 @@ const allModules = computed<DisplayModule[]>(() => {
         },
       ];
     }),
-  }));
+    // A module whose every page is gated off (e.g. Settings on OSS) drops its chip entirely.
+  })).filter((m) => m.sections.length > 0);
 });
 
 const filteredModules = computed<DisplayModule[]>(() => {
