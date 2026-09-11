@@ -33,7 +33,6 @@ env:
   ZO_FEATURE_QUERY_EXCLUDE_ALL: false
   ZO_USAGE_BATCH_SIZE: 200
   ZO_USAGE_PUBLISH_INTERVAL: 2
-  ZO_USAGE_REPORTING_ENABLED: true
   ZO_MIN_AUTO_REFRESH_INTERVAL: 5
   ZO_STREAMING_ENABLED: true
   ZO_COLS_PER_RECORD_LIMIT: "80000"
@@ -727,7 +726,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
       LABEL: ci-regression-failure
-      NOTIFY: hengfeiyang,oasisk,Shrinath-O2
+      NOTIFY: hengfeiyang,oasisk,Shrinath-O2,neha00290,vamsikarthikr
       RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
       RESULT: ${{ needs.playwright_summary.result }}
     steps:

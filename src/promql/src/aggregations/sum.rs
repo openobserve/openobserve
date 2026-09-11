@@ -13,32 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::promql::value::{EvalContext, Sample, Value};
-use datafusion::error::Result;
+use config::meta::promql::value::Sample;
 use hashbrown::HashMap;
-use promql_parser::parser::LabelModifier;
 
 use crate::{
     aggregations::{Accumulate, AggFunc},
     common::kahan_sum_increment,
 };
-
-/// Aggregates Matrix input for range queries
-pub fn sum(param: &Option<LabelModifier>, data: Value, eval_ctx: &EvalContext) -> Result<Value> {
-    let start = std::time::Instant::now();
-    log::info!(
-        "[trace_id: {}] [PromQL Timing] sum() started",
-        eval_ctx.trace_id
-    );
-
-    let result = super::eval_aggregate(param, data, Sum, eval_ctx);
-    log::info!(
-        "[trace_id: {}] [PromQL Timing] sum() execution took: {:?}",
-        eval_ctx.trace_id,
-        start.elapsed()
-    );
-    result
-}
 
 pub struct Sum;
 
@@ -98,16 +79,17 @@ impl Accumulate for SumAccumulate {
 mod tests {
     use std::sync::Arc;
 
-    use config::meta::promql::value::{Label, RangeValue, Sample, Value};
+    use config::meta::promql::value::{EvalContext, Label, RangeValue, Sample, Value};
     use promql_parser::parser::LabelModifier;
 
     use super::*;
+    use crate::aggregations::eval_aggregate;
 
     #[test]
     fn test_sum_value_none_input() {
         let ts = 1640995200;
         let eval_ctx = EvalContext::new(ts, ts + 1, 1, "test".to_string());
-        let result = sum(&None, Value::None, &eval_ctx).unwrap();
+        let result = eval_aggregate(&None, Value::None, Sum, &eval_ctx).unwrap();
         assert!(matches!(result, Value::None));
     }
 
@@ -115,7 +97,7 @@ mod tests {
     fn test_sum_invalid_input_returns_err() {
         let ts = 1640995200;
         let eval_ctx = EvalContext::new(ts, ts + 1, 1, "test".to_string());
-        let result = sum(&None, Value::Float(1.0), &eval_ctx);
+        let result = eval_aggregate(&None, Value::Float(1.0), Sum, &eval_ctx);
         assert!(result.is_err());
     }
 
@@ -123,7 +105,7 @@ mod tests {
     fn test_sum_empty_matrix_returns_none() {
         let ts = 1640995200;
         let eval_ctx = EvalContext::new(ts, ts + 1, 1, "test".to_string());
-        let result = sum(&None, Value::Matrix(vec![]), &eval_ctx).unwrap();
+        let result = eval_aggregate(&None, Value::Matrix(vec![]), Sum, &eval_ctx).unwrap();
         assert!(matches!(result, Value::None));
     }
 
@@ -188,7 +170,7 @@ mod tests {
         let eval_ctx = EvalContext::new(ts1, ts3 + 1, 1000, "test".to_string());
 
         // Test 1: sum without label grouping (all series summed together)
-        let result = sum(&None, Value::Matrix(matrix.clone()), &eval_ctx).unwrap();
+        let result = eval_aggregate(&None, Value::Matrix(matrix.clone()), Sum, &eval_ctx).unwrap();
 
         match result {
             Value::Matrix(result_matrix) => {
@@ -210,7 +192,7 @@ mod tests {
         let param = Some(LabelModifier::Include(promql_parser::label::Labels {
             labels: vec!["job".to_string()],
         }));
-        let result = sum(&param, Value::Matrix(matrix.clone()), &eval_ctx).unwrap();
+        let result = eval_aggregate(&param, Value::Matrix(matrix.clone()), Sum, &eval_ctx).unwrap();
 
         match result {
             Value::Matrix(result_matrix) => {

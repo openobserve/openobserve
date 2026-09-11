@@ -76,7 +76,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            the step is muted (T6) and a note glyph when it carries a comment (T3).
            Sit at the card's top-left so they never collide with the hover actions
            (top-right) or the test badge (top-right corner). -->
-      <div class="absolute -top-2.5 left-1 z-10 flex items-center gap-1">
+      <div
+        class="absolute -top-2.5 left-1 z-10 flex max-w-[calc(100%-2.25rem)] flex-wrap items-center gap-1"
+      >
         <OBadge
           v-if="isDisabled"
           variant="default"

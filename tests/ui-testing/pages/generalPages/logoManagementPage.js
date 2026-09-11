@@ -1,5 +1,6 @@
 import { expect } from '@playwright/test';
 import path from 'path';
+import { reauthenticateAlpha1 } from '../../playwright-tests/utils/reauth-alpha1.js';
 
 export
     class LogoManagementPage {
@@ -88,6 +89,11 @@ export
         const url = process.env["ZO_BASE_URL"] + "/web/settings/general?org_identifier=_meta";
         await expect(async () => {
             await this.page.goto(url, { waitUntil: 'domcontentloaded' });
+            // The shared alpha1 session can expire mid-run (minted once, reused by every shard); self-heal like navigateToBase() does, since this goto bypasses that helper and would otherwise dead-end on the Dex login page.
+            if (/\/dex\/|\/web\/login/.test(this.page.url())) {
+                await reauthenticateAlpha1(this.page);
+                await this.page.goto(url, { waitUntil: 'domcontentloaded' });
+            }
             await expect(this.page).toHaveURL(/settings\/general\?org_identifier=_meta/, { timeout: 5000 });
             await this.submitButton.waitFor({ state: 'visible', timeout: 10000 });
         }).toPass({ timeout: 45000 });

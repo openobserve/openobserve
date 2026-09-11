@@ -27,7 +27,7 @@ pub enum MathOperationsType {
     Ln,
     Log10,
     Log2,
-    Round,
+    Round { to_nearest: f64 },
     Sgn,
     Sqrt,
 }
@@ -45,7 +45,11 @@ impl MathOperationsType {
             Self::Log10 => input.log10(),
             Self::Sgn => input.signum(),
             Self::Sqrt => input.sqrt(),
-            Self::Round => input.round(),
+            // Prometheus semantics: ties round up, and the inverse keeps e.g. 0.1 steps exact
+            Self::Round { to_nearest } => {
+                let inverse = 1.0 / to_nearest;
+                (input * inverse + 0.5).floor() / inverse
+            }
         }
     }
 }
@@ -82,8 +86,8 @@ pub(crate) fn sqrt(data: Value) -> Result<Value> {
     exec(data, &MathOperationsType::Sqrt)
 }
 
-pub(crate) fn round(data: Value) -> Result<Value> {
-    exec(data, &MathOperationsType::Round)
+pub(crate) fn round(data: Value, to_nearest: f64) -> Result<Value> {
+    exec(data, &MathOperationsType::Round { to_nearest })
 }
 
 pub(crate) fn sgn(data: Value) -> Result<Value> {
@@ -185,11 +189,23 @@ mod tests {
         assert_eq!(MathOperationsType::Sqrt.apply(1.0), 1.0);
         assert_eq!(MathOperationsType::Sqrt.apply(4.0), 2.0);
 
-        assert_eq!(MathOperationsType::Round.apply(3.2), 3.0);
-        assert_eq!(MathOperationsType::Round.apply(3.5), 4.0);
-        assert_eq!(MathOperationsType::Round.apply(3.7), 4.0);
-        assert_eq!(MathOperationsType::Round.apply(-3.2), -3.0);
-        assert_eq!(MathOperationsType::Round.apply(-3.5), -4.0);
+        let round = MathOperationsType::Round { to_nearest: 1.0 };
+        assert_eq!(round.apply(3.2), 3.0);
+        assert_eq!(round.apply(3.5), 4.0);
+        assert_eq!(round.apply(3.7), 4.0);
+        assert_eq!(round.apply(-3.2), -3.0);
+        assert_eq!(round.apply(-3.5), -3.0);
+        let round = MathOperationsType::Round { to_nearest: 0.5 };
+        assert_eq!(round.apply(3.2), 3.0);
+        assert_eq!(round.apply(3.25), 3.5);
+        assert_eq!(round.apply(3.7), 3.5);
+        assert_eq!(round.apply(-3.2), -3.0);
+        let round = MathOperationsType::Round { to_nearest: 0.1 };
+        assert_eq!(round.apply(2.345), 2.3);
+        assert_eq!(round.apply(0.3), 0.3);
+        let round = MathOperationsType::Round { to_nearest: 5.0 };
+        assert_eq!(round.apply(12.5), 15.0);
+        assert_eq!(round.apply(12.4), 10.0);
 
         assert_eq!(MathOperationsType::Sgn.apply(5.0), 1.0);
         assert_eq!(MathOperationsType::Sgn.apply(0.0), 1.0);
@@ -323,7 +339,7 @@ mod tests {
     fn test_round() {
         let eval_ts = 1000;
         let value = create_matrix(eval_ts, vec![3.2, 3.5, -3.2]);
-        let result = round(value).unwrap();
+        let result = round(value, 1.0).unwrap();
 
         if let Value::Matrix(result_matrix) = result {
             assert_eq!(result_matrix.len(), 3);

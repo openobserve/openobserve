@@ -32,6 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="iam-roles-table-section"
           :data="rows"
           :loading="loading"
+          :forbidden="forbidden"
           :action-loading="bulkDeleteLoading"
           v-model:global-filter="filterQuery"
           :selected-ids="selectedRoleNames"
@@ -180,6 +181,7 @@ const editRole = (role: any) => {
 };
 
 const loading = ref(false);
+const forbidden = ref(false);
 
 // `GET /roles` returns role NAMES only, so a role row has nothing to show beyond
 // its name. The one fact worth surfacing — is anyone actually in this role — comes
@@ -221,6 +223,7 @@ const applyRoleUserCounts = () => {
 
 const setupRoles = async () => {
   loading.value = true;
+  forbidden.value = false;
   await getRoles(store.state.selectedOrganization.identifier)
     .then((res) => {
       rolesState.roles = res.data.map((role: string) => ({
@@ -233,8 +236,9 @@ const setupRoles = async () => {
       // whole table hostage to a secondary, enterprise-only endpoint.
       void loadRoleUserCounts().then(applyRoleUserCounts);
     })
-    .catch((err) => {
+    .catch((err: any) => {
       console.log(err);
+      forbidden.value = err?.response?.status === 403;
     })
     .finally(() => {
       loading.value = false;

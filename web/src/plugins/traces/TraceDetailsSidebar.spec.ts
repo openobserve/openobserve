@@ -2145,4 +2145,51 @@ describe("TraceDetailsSidebar", async () => {
       expect(componentSource).toMatch(/\.vjs-tree/);
     });
   });
+
+  describe("Scores block — enterprise/cloud only (scoring itself is not an OSS feature)", () => {
+    const mockScoredLLMSpan = {
+      ...mockSpan,
+      span_id: "score-span-1",
+      gen_ai_operation_name: "chat",
+      gen_ai_response_model: "gpt-4",
+      llm_input: '{"messages": [{"role": "user", "content": "Hi"}]}',
+      llm_output: '{"choices": [{"message": {"content": "Hello!"}}]}',
+    };
+
+    const originalIsEnterprise = config.isEnterprise;
+    const originalIsCloud = config.isCloud;
+
+    afterEach(() => {
+      config.isEnterprise = originalIsEnterprise;
+      config.isCloud = originalIsCloud;
+    });
+
+    function hasScoresLabel(w: ReturnType<typeof mountSidebar>): boolean {
+      return w.findAll("span").some((el) => el.text() === "Scores");
+    }
+
+    it("shows the Scores label for an LLM span on an enterprise build", () => {
+      config.isEnterprise = "true";
+      config.isCloud = "false";
+      const w = mountSidebar({ span: mockScoredLLMSpan });
+      expect(hasScoresLabel(w)).toBe(true);
+      w.unmount();
+    });
+
+    it("hides the Scores block entirely on a true OSS build — _llm_scores can never be written to there", () => {
+      config.isEnterprise = "false";
+      config.isCloud = "false";
+      const w = mountSidebar({ span: mockScoredLLMSpan });
+      expect(hasScoresLabel(w)).toBe(false);
+      w.unmount();
+    });
+
+    it("still shows on a cloud build even with isEnterprise false — cloud registers the same enterprise backend", () => {
+      config.isEnterprise = "false";
+      config.isCloud = "true";
+      const w = mountSidebar({ span: mockScoredLLMSpan });
+      expect(hasScoresLabel(w)).toBe(true);
+      w.unmount();
+    });
+  });
 });

@@ -35,6 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :columns="columns"
           row-key="group_name"
           :loading="loading"
+          :forbidden="forbidden"
           :selected-ids="selectedGroupNames"
           v-model:global-filter="filterQuery"
           :show-global-filter="false"
@@ -276,8 +277,10 @@ const editGroup = (group: any) => {
 };
 
 const loading = ref(false);
+const forbidden = ref(false);
 const setupGroups = async () => {
   loading.value = true;
+  forbidden.value = false;
   await getGroups(store.state.selectedOrganization.identifier)
     .then((res) => {
       groupsState.groups = res.data.map((group: string) => ({
@@ -285,8 +288,9 @@ const setupGroups = async () => {
       }));
       updateTable();
     })
-    .catch((err) => {
+    .catch((err: any) => {
       console.log(err);
+      forbidden.value = err?.response?.status === 403;
     })
     .finally(() => {
       loading.value = false;

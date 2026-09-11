@@ -39,6 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :columns="columns"
           row-key="identifier"
           :loading="loading"
+          :forbidden="forbidden"
           v-model:global-filter="filterQuery"
           :show-global-filter="false"
           pagination="client"
@@ -354,6 +355,7 @@ export default defineComponent({
     });
 
     const loading = ref(false);
+    const forbidden = ref(false);
     const getOrganizations = () => {
       const dismiss = toast({
         variant: "loading",
@@ -361,6 +363,7 @@ export default defineComponent({
         timeout: 0,
       });
       loading.value = true;
+      forbidden.value = false;
       // In the _meta admin context on cloud, use the admin endpoint so admins can
       // track org deletion status; otherwise use the regular list. Access is always
       // enforced server-side.
@@ -437,6 +440,10 @@ export default defineComponent({
             return commonOrganization;
           });
 
+          dismiss();
+        })
+        .catch((err: any) => {
+          forbidden.value = err?.response?.status === 403;
           dismiss();
         })
         .finally(() => {
@@ -597,6 +604,7 @@ export default defineComponent({
       router,
       config,
       loading,
+      forbidden,
       organizations,
       organization,
       columns,
