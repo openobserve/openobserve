@@ -79,6 +79,8 @@
       />
     </OContent>
 
+    <OnCallTeamDetailSkeleton v-else-if="!loaded" />
+
     <template v-else>
       <!-- What needs doing about this team, above the tabs that do it. The
            dry run of a P1 that used to sit here restated the Escalation tab a
@@ -402,6 +404,7 @@ import OnCallCoverForm from "@/components/oncall/OnCallCoverForm.vue";
 import OnCallEscalationLadder from "@/components/oncall/OnCallEscalationLadder.vue";
 import OnCallTeamAttention from "@/components/oncall/OnCallTeamAttention.vue";
 import OnCallTeamForm from "@/components/oncall/OnCallTeamForm.vue";
+import OnCallTeamDetailSkeleton from "@/views/OnCall/OnCallTeamDetailSkeleton.vue";
 import { useOnCallPermissions } from "@/composables/useOnCallPermissions";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";

@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="flex flex-col gap-3" data-test="oncall-routing-list">
     <div
-      class="card-container rounded-surface bg-surface-base border-border-default overflow-hidden border"
+      class="card-container rounded-surface bg-surface-base border-border-default relative overflow-hidden border"
     >
       <span
         class="border-border-default flex flex-wrap items-center gap-x-2 gap-y-2 border-b px-4 py-3"

@@ -17735,6 +17735,7 @@
     "backToResponses": "Pages",
     "backToTeams": "Teams",
     "teamDetail": "Team",
+    "teamDetailLoading": "Loading team",
     "searchResponses": "Search by alert or responder",
     "allTeams": "All teams",
     "priority": "Priority",

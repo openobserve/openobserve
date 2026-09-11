@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   and transport on it buried the one rung that would reach nobody.
 -->
 <template>
-  <div class="flex flex-col gap-4" data-test="oncall-escalation-ladder">
+  <div class="relative flex flex-col gap-4" data-test="oncall-escalation-ladder">
     <!-- Every priority, including the ones that wake nobody. A priority absent
          from this strip is one nobody would think to check. The edit button
          rides along on the same row rather than a title above it — this

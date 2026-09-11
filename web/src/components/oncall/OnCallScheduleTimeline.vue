@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   gap impossible to miss rather than something inferred from a hole.
 -->
 <template>
-  <div class="flex flex-col gap-3" data-test="oncall-schedule-timeline">
+  <div class="relative flex flex-col gap-3" data-test="oncall-schedule-timeline">
     <!-- Where you are, and how to move. Paging the window is the thing done
          most often here, so it leads rather than sitting under a menu. -->
     <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
