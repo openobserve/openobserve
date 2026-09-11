@@ -84,20 +84,20 @@
     <template v-else>
       <!-- What needs doing about this team, above the tabs that do it. The
            dry run of a P1 that used to sit here restated the Escalation tab a
-           click away; what survives is the part that names a problem. -->
-      <OContent y>
-        <OnCallTeamAttention
-          :risks="configRisks"
-          :timezone="team?.timezone ?? 'UTC'"
-          :viewer-timezone="store.state.timezone"
-          :reachability="reachability"
-          :overview="overview"
-          :checked-at="insightsCheckedAt"
-          :has-members="hasMembers"
-          @act="onAttentionAct"
-          @recheck="fetchInsights"
-        />
-      </OContent>
+           click away; what survives is the part that names a problem.
+           No OContent wrapper here: with nothing to show, the component
+           renders nothing, and its own inset only applies when it does. -->
+      <OnCallTeamAttention
+        :risks="configRisks"
+        :timezone="team?.timezone ?? 'UTC'"
+        :viewer-timezone="store.state.timezone"
+        :reachability="reachability"
+        :overview="overview"
+        :checked-at="insightsCheckedAt"
+        :has-members="hasMembers"
+        @act="onAttentionAct"
+        @recheck="fetchInsights"
+      />
 
       <!-- What the team HAS been doing, then the chain that decides it: when each
            person is on, what happens if nobody answers, what reaches the team at

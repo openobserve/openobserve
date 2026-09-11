@@ -29,54 +29,59 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <template v-if="rows.length">
-    <OBanner
-      variant="warning"
-      icon="warning-amber"
-      inline-actions
-      dense
-      data-test="oncall-team-attention"
-    >
-      <span class="flex min-w-0 items-center gap-x-3">
-        <span class="text-text-secondary text-2xs shrink-0 tracking-wide uppercase">
-          {{ t("oncall.attentionHeading") }}
-        </span>
-        <span class="flex min-w-0 items-center gap-1.5" data-test="oncall-attention-worst">
-          <span
-            class="size-1.5 shrink-0 rounded-full"
-            :class="DOT_CLASS[worst.bucket]"
-            aria-hidden="true"
-          />
-          <!-- The worst finding whole, on one line. The count moved into the
-               disclosure button, so nothing here can wrap the strip. -->
-          <span class="text-text-body min-w-0 truncate text-sm">
-            {{ worst.message }}
-            <OTooltip side="bottom" :content="worst.message" />
+    <!-- Owns its own vertical inset rather than relying on the caller to wrap
+         it: with no findings this whole template renders nothing, and a
+         caller-side wrapper would still add blank padding around it. -->
+    <OContent y data-test="oncall-team-attention-content">
+      <OBanner
+        variant="warning"
+        icon="warning-amber"
+        inline-actions
+        dense
+        data-test="oncall-team-attention"
+      >
+        <span class="flex min-w-0 items-center gap-x-3">
+          <span class="text-text-secondary text-2xs shrink-0 tracking-wide uppercase">
+            {{ t("oncall.attentionHeading") }}
+          </span>
+          <span class="flex min-w-0 items-center gap-1.5" data-test="oncall-attention-worst">
+            <span
+              class="size-1.5 shrink-0 rounded-full"
+              :class="DOT_CLASS[worst.bucket]"
+              aria-hidden="true"
+            />
+            <!-- The worst finding whole, on one line. The count moved into the
+                 disclosure button, so nothing here can wrap the strip. -->
+            <span class="text-text-body min-w-0 truncate text-sm">
+              {{ worst.message }}
+              <OTooltip side="bottom" :content="worst.message" />
+            </span>
           </span>
         </span>
-      </span>
 
-      <template #actions>
-        <span class="flex shrink-0 items-center gap-2">
-          <OButton
-            v-if="worst.fix"
-            variant="outline"
-            size="xs"
-            data-test="oncall-attention-fix-now"
-            @click="emit('act', worst.fix, worst.rotation)"
-          >
-            {{ t(worst.cta) }}
-          </OButton>
-          <OButton
-            variant="outline"
-            size="xs"
-            data-test="oncall-attention-expand"
-            @click="expanded = true"
-          >
-            {{ t("oncall.attentionFindings", { count: findingCount }, findingCount) }}
-          </OButton>
-        </span>
-      </template>
-    </OBanner>
+        <template #actions>
+          <span class="flex shrink-0 items-center gap-2">
+            <OButton
+              v-if="worst.fix"
+              variant="outline"
+              size="xs"
+              data-test="oncall-attention-fix-now"
+              @click="emit('act', worst.fix, worst.rotation)"
+            >
+              {{ t(worst.cta) }}
+            </OButton>
+            <OButton
+              variant="outline"
+              size="xs"
+              data-test="oncall-attention-expand"
+              @click="expanded = true"
+            >
+              {{ t("oncall.attentionFindings", { count: findingCount }, findingCount) }}
+            </OButton>
+          </span>
+        </template>
+      </OBanner>
+    </OContent>
 
     <ODrawer
       v-model:open="expanded"
@@ -199,6 +204,7 @@ import { computed, ref } from "vue";
 import { useOnCallClock } from "@/composables/useOnCallClock";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OContent from "@/lib/core/Content/OContent.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
