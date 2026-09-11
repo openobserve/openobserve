@@ -1599,6 +1599,12 @@ pub struct Search {
     )]
     pub feature_broadcast_join_enabled: bool,
     #[env_config(
+        name = "ZO_FEATURE_SHARED_CTE_ENABLED",
+        default = true,
+        help = "Execute a CTE or subquery that is referenced several times only once on the leader; the result may use half of the query memory pool before it spills to disk"
+    )]
+    pub feature_shared_cte_enabled: bool,
+    #[env_config(
         name = "ZO_FEATURE_BROADCAST_JOIN_LEFT_SIDE_MAX_ROWS",
         default = 0,
         help = "Max rows for left side of broadcast join, default to 10_000 rows"

@@ -299,7 +299,7 @@ impl<'a> DataFusionContextBuilder<'a> {
         for rule in self.physical_optimizer_rules {
             builder = builder.with_physical_optimizer_rule(rule);
         }
-        if cfg.search.feature_join_match_one_enabled {
+        if cfg.search.feature_join_match_one_enabled || cfg.search.feature_shared_cte_enabled {
             builder = builder.with_query_planner(Arc::new(OpenobserveQueryPlanner::new()));
         }
         Ok(SessionContext::new_with_state(builder.build()))

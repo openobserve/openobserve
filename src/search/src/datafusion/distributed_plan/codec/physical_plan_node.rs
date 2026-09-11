@@ -31,7 +31,7 @@ use crate::datafusion::{
         enrichment_exec::EnrichmentExec, streaming_aggs_exec::exec::StreamingAggsExec,
         tmp_exec::TmpExec,
     },
-    plan::deduplication_exec::DeduplicationExec,
+    plan::{deduplication_exec::DeduplicationExec, shared_subplan_exec::SharedSubplanMarkerExec},
 };
 
 /// A PhysicalExtensionCodec that can serialize and deserialize ChildExec
@@ -69,6 +69,9 @@ impl PhysicalExtensionCodec for PhysicalPlanNodePhysicalExtensionCodec {
             Some(cluster_rpc::physical_plan_node::Plan::EnrichmentExec(node)) => {
                 super::enrichment_exec::try_decode(node, inputs, ctx)
             }
+            Some(cluster_rpc::physical_plan_node::Plan::SharedSubplanMarker(node)) => {
+                super::shared_subplan_marker::try_decode(node, inputs, ctx)
+            }
             None => {
                 internal_err!("PhysicalPlanNode is required")
             }
@@ -88,6 +91,8 @@ impl PhysicalExtensionCodec for PhysicalPlanNodePhysicalExtensionCodec {
             super::tmp_exec::try_encode(node, buf)
         } else if node.downcast_ref::<EnrichmentExec>().is_some() {
             super::enrichment_exec::try_encode(node, buf)
+        } else if node.downcast_ref::<SharedSubplanMarkerExec>().is_some() {
+            super::shared_subplan_marker::try_encode(node, buf)
         } else {
             internal_err!("Not supported")
         }
