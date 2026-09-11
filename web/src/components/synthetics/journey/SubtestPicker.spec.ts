@@ -85,15 +85,16 @@ describe("SubtestPicker", () => {
     (syntheticsService.getRuns as ReturnType<typeof vi.fn>).mockResolvedValue({
       data: { runs: [{ created_at: 0, completed_at: 20_000_000 }] },
     });
-    const w = mountPicker();
+    // What the host really passes: the expanded count, already including the child's 13 steps.
+    const w = mountPicker({ ownStepCount: 16 });
     await flushPromises();
     await w.findComponent(OSelect).vm.$emit("update:modelValue", "login-test");
     await flushPromises();
 
     expect(syntheticsService.get).toHaveBeenCalledTimes(1);
     expect(w.emitted("update:modelValue")![0][0]).toEqual({ id: "login-test", name: "Login" });
-    // 4 executed now, one of them replaced by the child's 13 → 16.
-    expect(w.find('[data-test="synthetics-subtest-delta"]').text()).toContain("4 → 16");
+    // 3 own steps before this reference existed, 16 executed after it resolves.
+    expect(w.find('[data-test="synthetics-subtest-delta"]').text()).toContain("3 → 16");
     expect(w.find('[data-test="synthetics-subtest-lastrun"]').text()).toContain("20");
   });
 
@@ -113,6 +114,72 @@ describe("SubtestPicker", () => {
     await flushPromises();
     // Assert the node is absent rather than matching copy, which changes with the locale.
     expect(w.find('[data-test="synthetics-subtest-delta"]').exists()).toBe(true);
+    // A 0-step child adds nothing; the old arithmetic rendered "4 \u2192 3", backwards.
+    expect(w.find('[data-test="synthetics-subtest-delta"]').text()).toContain("4 \u2192 4");
     expect(w.find('[data-test="synthetics-subtest-lastrun"]').exists()).toBe(false);
+    // Design 5.11 state 3: show the delta only AND say the time impact is unknown.
+    expect(w.find('[data-test="synthetics-subtest-lastrun-unknown"]').exists()).toBe(true);
+  });
+
+  it("counts the child's steps once, not twice", async () => {
+    // The host's count already includes the pick, so adding the child again double-counts it.
+    (syntheticsService.listByFolderId as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: { checks: CHECKS },
+    });
+    (syntheticsService.get as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: { name: "Login", config: { steps: new Array(3).fill({ id: "c", action: "click" }) } },
+    });
+    (syntheticsService.getRuns as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: { runs: [] },
+    });
+    const w = mountPicker({ ownStepCount: 4 });
+    await flushPromises();
+    await w.findComponent(OSelect).vm.$emit("update:modelValue", "login-test");
+    await flushPromises();
+
+    expect(w.find('[data-test="synthetics-subtest-delta"]').text()).toContain("1 \u2192 4");
+  });
+
+  it("withholds the delta entirely when the host cannot expand the journey", async () => {
+    // `ownStepCount` is undefined whenever `expandJourney` throws; inventing a number there lies.
+    (syntheticsService.listByFolderId as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: { checks: CHECKS },
+    });
+    (syntheticsService.get as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: { name: "Login", config: { steps: new Array(13).fill({ id: "c", action: "click" }) } },
+    });
+    (syntheticsService.getRuns as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: { runs: [] },
+    });
+    const w = mountPicker({ ownStepCount: undefined });
+    await flushPromises();
+    await w.findComponent(OSelect).vm.$emit("update:modelValue", "login-test");
+    await flushPromises();
+
+    expect(w.find('[data-test="synthetics-subtest-delta"]').exists()).toBe(false);
+    expect(w.text()).not.toContain("0 \u2192");
+    expect(w.find('[data-test="synthetics-subtest-delta-unknown"]').exists()).toBe(true);
+  });
+
+  it("withholds the delta when the host count cannot contain the child", async () => {
+    // Re-picking a bigger child: the host's count still describes the previous one, so it is
+    // stale. Subtracting anyway rendered a negative "before" against the old child's name.
+    (syntheticsService.listByFolderId as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: { checks: CHECKS },
+    });
+    (syntheticsService.get as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: { name: "Login", config: { steps: new Array(10).fill({ id: "c", action: "click" }) } },
+    });
+    (syntheticsService.getRuns as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: { runs: [] },
+    });
+    const w = mountPicker({ ownStepCount: 3 });
+    await flushPromises();
+    await w.findComponent(OSelect).vm.$emit("update:modelValue", "login-test");
+    await flushPromises();
+
+    expect(w.find('[data-test="synthetics-subtest-delta"]').exists()).toBe(false);
+    expect(w.text()).not.toMatch(/-\d+/);
+    expect(w.find('[data-test="synthetics-subtest-delta-unknown"]').exists()).toBe(true);
   });
 });
