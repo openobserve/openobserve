@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -105,6 +105,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       row-key="sessionId"
       show-index
       pagination="server"
+      sorting="server"
+      :sort-by="sortBy"
+      :sort-order="sortOrder"
+      :sort-field-map="sessionSortFieldMap"
       :current-page="currentPage"
       :total-count="total"
       :total-count-exact="!hasMore"
@@ -122,6 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="sessions-list-table"
       @row-click="(row: any) => handleRowClick(row)"
       @pagination-change="onPaginationChange"
+      @sort-change="onSortChange"
     >
       <!-- Empty / error body — rendered inside the frame so the toolbar (and
            thus the stream selector) stays visible. -->
@@ -272,6 +277,7 @@ import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import type { AcceptableValue } from "reka-ui";
 import genAiAgentMappingService from "@/services/gen-ai-agent-mapping.service";
+import type { SessionSortField, SessionSortOrder } from "@/services/sessions";
 import { buildAgentSessionFilter } from "./llmAgentFilter";
 import { splitNumberWithUnit, splitDuration } from "./llmInsightsDashboard.utils";
 import AiScopeBar from "@/enterprise/components/AIObservability/AiScopeBar.vue";
@@ -309,6 +315,8 @@ const {
   currentPage,
   rowsPerPage,
   searchKeyword,
+  sortBy,
+  sortOrder,
   agents,
   agentsLoaded,
   fetchPage,
@@ -404,6 +412,15 @@ const pendingVersion = ref<string | null>(
 // Page-size options match the dashboards' table pagination
 // (TablePaginationControls) so the AI module stays consistent.
 const rowsPerPageOptions = [20, 50, 100, 250, 500];
+const sessionSortFieldMap: Record<string, SessionSortField> = {
+  userId: "user_id",
+  turns: "trace_count",
+  durationNanos: "duration",
+  tokens: "gen_ai_usage_total_tokens",
+  cost: "gen_ai_usage_cost",
+  status: "status",
+  lastSeenNanos: "end_time",
+};
 
 // Shared derived scope computeds come from useAgentScope. Sessions injects its
 // OWN refs so the composable only produces the derived outputs: `agents`/
@@ -807,6 +824,16 @@ function onPaginationChange({ page, size }: { page: number; size: number }) {
   } else {
     currentPage.value = page;
   }
+  loadSessions(undefined, undefined, true);
+}
+
+function onSortChange({ column, order }: { column: string; order: SessionSortOrder }) {
+  // OTable's third state clears the column. This list is always ordered, so
+  // fold that state back to ascending on the same field and expose a simple
+  // ascending/descending toggle.
+  if (column) sortBy.value = column as SessionSortField;
+  sortOrder.value = column ? order : "asc";
+  currentPage.value = 1;
   loadSessions(undefined, undefined, true);
 }
 
