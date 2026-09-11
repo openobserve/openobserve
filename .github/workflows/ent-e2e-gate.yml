@@ -135,7 +135,7 @@ jobs:
 
           # Sister ENT resolution. An OPEN same-named ENT PR is the live counterpart — let ITS checks
           # own enterprise validation; we DEFER (don't build here), just link. Only a branch (no PR) →
-          # build against that branch. Neither → build against main.
+          # build against that branch. Neither → the PR's base-line ENT branch if it exists, else main.
           SISTER_PR=$(gh pr list --repo "$REPO" --head "$HEAD_REF" --state open --json number -q '.[0].number' 2>/dev/null || echo "")
           if [ -n "$SISTER_PR" ] && [ "$SISTER_PR" != "null" ]; then
           sticky "### ⏭️ Playwright E2E Crosscheck — handled by the sister ENT PR
