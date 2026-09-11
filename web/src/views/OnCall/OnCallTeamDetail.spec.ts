@@ -304,18 +304,14 @@ describe("OnCallTeamDetail", () => {
       expect(router.push).not.toHaveBeenCalled();
     });
 
-    /// Rewriting the URL while the first fetch is still deciding where to land
-    /// would overwrite the address somebody just typed.
+    /// The skeleton keeps the tabs out of the DOM until load finishes, so
+    /// nothing can attempt a switch that would overwrite the address bar.
     it("does not rewrite the URL before the team has loaded", async () => {
       service.getTeam.mockReturnValue(new Promise(() => {}) as any);
       const wrapper = render();
       await flushPromises();
 
-      // Even a tab change mid-load must not overwrite the address somebody
-      // just typed — the landing tab has not been decided yet.
-      wrapper.findComponent({ name: "OTabPanels" }).vm.$emit("update:modelValue", "policy");
-      await flushPromises();
-
+      expect(wrapper.findComponent({ name: "OTabPanels" }).exists()).toBe(false);
       expect(router.replace).not.toHaveBeenCalled();
     });
   });
