@@ -36,7 +36,7 @@ use datafusion::{
 };
 use futures::TryStreamExt;
 
-use super::SeriesStream;
+use super::{SeriesStream, plan::LabelColumns};
 use crate::{
     series_loader::label_interner::{LabelColumn, LabelInterner},
     utils::batch_run_len,
@@ -46,53 +46,59 @@ use crate::{
 /// the next series.
 pub(crate) struct HashSortedSeriesStream {
     cursors: Vec<ChainCursor>,
-    group_cols: Arc<Vec<String>>,
-    /// One interner per group column, so the emitted series share label allocations.
+    cols: Arc<LabelColumns>,
+    /// One interner per series label column, so the emitted series share label allocations.
     interners: Vec<LabelInterner>,
     offset: i64,
     /// Hash of the series `advance` yielded, until `consume` takes it.
     current: Option<u64>,
-    samples: Vec<Sample>,
+    /// The head row of that series, kept past `consume` so its labels can still be read.
+    head: Option<(Arc<RecordBatch>, usize)>,
 }
 
 impl HashSortedSeriesStream {
     pub(super) async fn start(
         streams: Vec<SendableRecordBatchStream>,
-        group_cols: Arc<Vec<String>>,
+        cols: Arc<LabelColumns>,
         offset: i64,
     ) -> Result<Self> {
         let mut cursors = Vec::with_capacity(streams.len());
         for stream in streams {
-            cursors.push(ChainCursor::start(stream).await?);
+            let cursor = ChainCursor::start(stream).await?;
+            // every batch shares the plan's schema, so the head proves the series columns
+            if let Some(batch) = &cursor.batch {
+                Self::label_columns(&cols.series, batch)?;
+            }
+            cursors.push(cursor);
         }
-        let interners = group_cols
+        let interners = cols
+            .series
             .iter()
             .map(|name| LabelInterner::new(name.clone()))
             .collect();
         Ok(Self {
             cursors,
-            group_cols,
+            cols,
             interners,
             offset,
             current: None,
-            samples: Vec::new(),
+            head: None,
         })
     }
 
-    /// The head batch and row of the first chain holding the current series.
-    fn head(&self) -> (&RecordBatch, usize) {
-        let hash = self.current.expect("a series is current");
+    /// The head batch and row of the first chain holding series `hash`.
+    fn chain_head(&self, hash: u64) -> (Arc<RecordBatch>, usize) {
         let cursor = self
             .cursors
             .iter()
             .find(|cursor| cursor.head_hash() == Some(hash))
             .expect("the minimum head hash has a contributing chain");
         let batch = cursor.batch.as_ref().expect("head_hash implies a batch");
-        (batch, cursor.row)
+        (Arc::clone(batch), cursor.row)
     }
 
-    fn label_columns<'a>(&self, batch: &'a RecordBatch) -> Result<Vec<LabelColumn<'a>>> {
-        self.group_cols
+    fn label_columns<'a>(names: &[String], batch: &'a RecordBatch) -> Result<Vec<LabelColumn<'a>>> {
+        names
             .iter()
             .map(|name| {
                 LabelColumn::try_from_array(batch[name.as_str()].as_ref()).ok_or_else(|| {
@@ -109,27 +115,28 @@ impl SeriesStream for HashSortedSeriesStream {
     async fn advance(&mut self) -> Result<Option<u64>> {
         let Some(hash) = self.cursors.iter().filter_map(ChainCursor::head_hash).min() else {
             self.current = None;
+            self.head = None;
             return Ok(None);
         };
         self.current = Some(hash);
-        let (batch, row) = self.head();
-        let cols = self.label_columns(batch)?;
+        let (batch, row) = self.chain_head(hash);
+        let cols = Self::label_columns(&self.cols.group, &batch)?;
         let mut hasher = gxhash::new_hasher();
-        for (values, name) in cols.iter().zip(self.group_cols.iter()) {
+        for (values, name) in cols.iter().zip(self.cols.group.iter()) {
             if !values.is_null(row) {
                 hasher.write(name.as_bytes());
                 hasher.write(values.value(row).as_bytes());
             }
         }
+        self.head = Some((batch, row));
         Ok(Some(hasher.finish()))
     }
 
     fn labels(&mut self) -> Labels {
-        let (batch, row) = self.head();
-        let batch = batch.clone();
-        let cols = self
-            .label_columns(&batch)
-            .expect("advance validated the group columns");
+        let (batch, row) = self.head.as_ref().expect("a series is current");
+        let row = *row;
+        let cols = Self::label_columns(&self.cols.series, batch)
+            .expect("start validated the series columns");
         cols.iter()
             .zip(self.interners.iter_mut())
             .filter(|(values, _)| !values.is_null(row))
@@ -137,26 +144,24 @@ impl SeriesStream for HashSortedSeriesStream {
             .collect()
     }
 
-    async fn consume(&mut self) -> Result<&[Sample]> {
+    async fn consume(&mut self, samples: &mut Vec<Sample>) -> Result<()> {
         let hash = self.current.take().expect("advance yielded a series");
-        self.samples.clear();
+        samples.clear();
         for cursor in &mut self.cursors {
             if cursor.head_hash() == Some(hash) {
-                cursor
-                    .consume_run(hash, self.offset, &mut self.samples)
-                    .await?;
+                cursor.consume_run(hash, self.offset, samples).await?;
             }
         }
         // classic parity: chains interleave in time, so restore per-series order
-        self.samples.sort_unstable_by_key(|sample| sample.timestamp);
-        Ok(&self.samples)
+        samples.sort_unstable_by_key(|sample| sample.timestamp);
+        Ok(())
     }
 }
 
 /// One hash-ordered chain of non-overlapping files; a series is a single run per chain.
 struct ChainCursor {
     stream: SendableRecordBatchStream,
-    batch: Option<RecordBatch>,
+    batch: Option<Arc<RecordBatch>>,
     row: usize,
 }
 
@@ -182,7 +187,7 @@ impl ChainCursor {
             match self.stream.try_next().await? {
                 Some(batch) if batch.num_rows() == 0 => continue,
                 batch => {
-                    self.batch = batch;
+                    self.batch = batch.map(Arc::new);
                     return Ok(());
                 }
             }
@@ -230,7 +235,11 @@ mod tests {
     use config::meta::promql::value::Value;
     use hashbrown::HashSet;
 
-    use super::super::{matrix::group_sources, plan::series_label_columns, tests::*};
+    use super::super::{
+        matrix::group_sources,
+        plan::{LabelColumns, series_label_columns},
+        tests::*,
+    };
     use crate::{
         aggregations::AggOp,
         functions::{self, RangeFunc},
@@ -245,6 +254,8 @@ mod tests {
 
         let agg_cases = [
             AggOp::Avg,
+            AggOp::Bottomk(1),
+            AggOp::Bottomk(2),
             AggOp::Count,
             AggOp::Group,
             AggOp::Max,
@@ -252,6 +263,8 @@ mod tests {
             AggOp::Stddev,
             AggOp::Stdvar,
             AggOp::Sum,
+            AggOp::Topk(2),
+            AggOp::Topk(10),
         ];
         let func_cases = ["rate", "increase", "sum_over_time", "last_over_time"];
         let modifiers = [
@@ -266,10 +279,14 @@ mod tests {
                 for modifier in &modifiers {
                     let func: Arc<dyn RangeFunc> =
                         Arc::from(functions::fusable_range_func(func_name).unwrap());
-                    let (sources, range) =
-                        group_sources(Value::Matrix(reference_matrix(range)), modifier, func_name)
-                            .unwrap()
-                            .unwrap();
+                    let (sources, range) = group_sources(
+                        Value::Matrix(reference_matrix(range)),
+                        modifier,
+                        func_name,
+                        op.needs_series_labels(),
+                    )
+                    .unwrap()
+                    .unwrap();
                     let eval = Arc::new(RangeExpr::new(func, range, &eval_ctx()));
                     let expected = aggregate(sources, op, eval).await.unwrap().0;
 
@@ -322,7 +339,7 @@ mod tests {
             )
             .unwrap();
             let label_cols = series_label_columns(&arrow_schema(), &all_labels, func_name);
-            let sources = sorted_table_sources(&ctx, label_cols, range)
+            let sources = sorted_table_sources(&ctx, LabelColumns::grouped(label_cols), range)
                 .await
                 .expect("the sorted table streams");
             let eval = Arc::new(RangeExpr::new(func, range, &eval_ctx));

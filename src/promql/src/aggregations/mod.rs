@@ -23,14 +23,10 @@ use config::{
     utils::hash::gxhash,
 };
 use datafusion::error::{DataFusionError, Result};
-use promql_parser::parser::{
-    LabelModifier,
-    token::{self, TokenId},
-};
+use promql_parser::parser::{LabelModifier, token};
 use rayon::prelude::*;
 
 mod avg;
-mod bottomk;
 mod count;
 mod count_values;
 mod dispersion;
@@ -39,23 +35,22 @@ mod group;
 mod max;
 mod min;
 mod quantile;
+mod rank;
 mod stddev;
 mod stdvar;
 mod sum;
-mod topk;
 
 pub(crate) use avg::Avg;
-pub(crate) use bottomk::bottomk;
 pub(crate) use count::Count;
 pub(crate) use count_values::count_values;
 pub(crate) use group::Group;
 pub(crate) use max::Max;
 pub(crate) use min::Min;
 pub(crate) use quantile::quantile;
+pub(crate) use rank::Rank;
 pub(crate) use stddev::Stddev;
 pub(crate) use stdvar::Stdvar;
 pub(crate) use sum::{Sum, SumState};
-pub(crate) use topk::topk;
 
 /// Series per parallel partial-aggregation chunk when a single group is large.
 const AGG_PARALLEL_CHUNK: usize = 32768;
@@ -63,11 +58,12 @@ const AGG_PARALLEL_CHUNK: usize = 32768;
 /// Trait for PromQL aggregation operators.
 ///
 /// One implementation per operator (`sum`, `avg`, `min`, `max`, `count`, `group`, `stddev`,
-/// `stdvar`, ...) shared by both evaluation paths: the generic path folds a materialized
-/// matrix through it in [`eval_aggregate`], and the streaming path folds each hash partition
-/// of a series stream through it in `streaming_eval::aggregate`. The operator itself is
-/// stateless; all per-group state lives in the [`Accumulate`] it builds, so a query holds one
-/// accumulator per label group (and per partition on the streaming path) and merges them.
+/// `stdvar`, `quantile`, `topk`/`bottomk`) shared by both evaluation paths: the generic path
+/// folds a materialized matrix through it in [`eval_aggregate`], and the streaming path folds
+/// each hash partition of a series stream through it in `streaming_eval::aggregate`. The
+/// operator carries only its parameter (k, φ), if any; all per-group state lives in the
+/// [`Accumulate`] it builds, so a query holds one accumulator per label group (and per
+/// partition on the streaming path) and merges them.
 ///
 /// # Examples
 ///
@@ -116,13 +112,14 @@ pub trait AggFunc: Sync {
 ///
 /// An accumulator is created by [`AggFunc::build`] for one label group and holds one state
 /// per evaluation slot, where slot `i` is the `i`-th timestamp of the evaluation grid
-/// `start + i * step`. Values arrive already assigned to their slot: the generic path maps a
-/// sample's timestamp onto the grid, the streaming path evaluates the range function per slot.
-/// Keying by slot instead of by timestamp keeps the state a plain `Vec` on both paths.
+/// `start + i * step`. Values arrive one series at a time, already assigned to their slot: the
+/// generic path maps a sample's timestamp onto the grid, the streaming path evaluates the range
+/// function per slot. Keying by slot instead of by timestamp keeps the state a plain `Vec` on
+/// both paths.
 ///
 /// The typical lifecycle is:
 /// 1. `AggFunc::build(slots)` for each label group (and each partition on the streaming path)
-/// 2. `push(slot, value, series)` for every value that belongs to the group
+/// 2. `push_series(values, labels)` for every series that belongs to the group
 /// 3. `merge(other)` to fold the partial accumulators of the same group together
 /// 4. `evaluate(group_labels, timestamps)` to produce the output series
 ///
@@ -130,18 +127,23 @@ pub trait AggFunc: Sync {
 ///
 /// ```ignore
 /// let mut acc = Sum.build(timestamps.len());
-/// for (slot, value, series) in values {
-///     acc.push(slot, value, &series);
+/// for series in matrix {
+///     acc.push_series(series.values(), || series.labels.clone());
 /// }
 /// let series: Vec<RangeValue> = acc.evaluate(group_labels, &timestamps);
 /// ```
 pub trait Accumulate: Send + Sync + Sized {
-    /// Adds one value to the state of `slot`.
+    /// Adds one series' values, `(slot, value)` in ascending slot order, to the slots' states.
     ///
-    /// `series` identifies the series the value comes from. The scalar aggregations ignore it;
-    /// an aggregation whose output is a subset of the input series (`topk`, `bottomk`) keeps
-    /// the labels of the series that make it into its output.
-    fn push(&mut self, slot: usize, value: f64, series: &SeriesKey<'_>);
+    /// `labels` produces the series' own labels; it is called at most once, and only by an
+    /// accumulator whose output keeps the series' own labels (`topk`, `bottomk`) for a series
+    /// that may make it into the output. The scalar aggregations never call it, so a fold over
+    /// a million series materializes no per-series labels.
+    fn push_series(
+        &mut self,
+        values: impl Iterator<Item = (usize, f64)>,
+        labels: impl FnOnce() -> Labels,
+    );
 
     /// Folds another accumulator of the same group into this one, as if all of its values had
     /// been pushed here after this accumulator's own.
@@ -164,11 +166,11 @@ pub trait Accumulate: Send + Sync + Sized {
     /// aggregation returns exactly one series under `group_labels` with one sample per slot
     /// that produced a value, in slot order; the caller decides what to do with an empty one.
     /// An aggregation that selects input series returns one series per selected input, under
-    /// that input's own labels.
+    /// that input's own labels. No output carries a time window.
     fn evaluate(self, group_labels: Labels, timestamps: &[i64]) -> Vec<RangeValue>;
 }
 
-/// The aggregation operators that fold through the shared accumulators.
+/// The aggregation operators that fold through the shared accumulators, with their parameter.
 ///
 /// This is the single table from a parser token to an operator: the generic path dispatches
 /// through [`AggOp::eval_aggregate`] and the streaming path through `streaming_eval::aggregate`,
@@ -177,6 +179,7 @@ pub trait Accumulate: Send + Sync + Sized {
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum AggOp {
     Avg,
+    Bottomk(usize),
     Count,
     Group,
     Max,
@@ -184,21 +187,42 @@ pub(crate) enum AggOp {
     Stddev,
     Stdvar,
     Sum,
+    Topk(usize),
 }
 
 impl AggOp {
-    pub(crate) fn from_token(id: TokenId) -> Option<Self> {
-        match id {
-            token::T_AVG => Some(Self::Avg),
-            token::T_COUNT => Some(Self::Count),
-            token::T_GROUP => Some(Self::Group),
-            token::T_MAX => Some(Self::Max),
-            token::T_MIN => Some(Self::Min),
-            token::T_STDDEV => Some(Self::Stddev),
-            token::T_STDVAR => Some(Self::Stdvar),
-            token::T_SUM => Some(Self::Sum),
-            _ => None,
-        }
+    /// The operator of a token with its evaluated parameter; the error of an unsupported
+    /// operator or of a k that is not a number.
+    pub(crate) fn new(op: &token::TokenType, param: Option<Value>) -> Result<Self> {
+        let k = |name: &str| match param {
+            Some(Value::Float(value)) => Ok(value as usize),
+            _ => Err(DataFusionError::Plan(format!(
+                "[{name}] param must be a number"
+            ))),
+        };
+        Ok(match op.id() {
+            token::T_AVG => Self::Avg,
+            token::T_BOTTOMK => Self::Bottomk(k("bottomk")?),
+            token::T_COUNT => Self::Count,
+            token::T_GROUP => Self::Group,
+            token::T_MAX => Self::Max,
+            token::T_MIN => Self::Min,
+            token::T_STDDEV => Self::Stddev,
+            token::T_STDVAR => Self::Stdvar,
+            token::T_SUM => Self::Sum,
+            token::T_TOPK => Self::Topk(k("topk")?),
+            _ => {
+                return Err(DataFusionError::NotImplemented(format!(
+                    "Unsupported Aggregate: {op:?}"
+                )));
+            }
+        })
+    }
+
+    /// Whether the output keeps the input series' own labels, so a source must carry every
+    /// label of a series rather than its group projection.
+    pub(crate) fn needs_series_labels(&self) -> bool {
+        matches!(self, Self::Topk(_) | Self::Bottomk(_))
     }
 
     /// The generic fold over a materialized matrix.
@@ -210,6 +234,7 @@ impl AggOp {
     ) -> Result<Value> {
         match self {
             Self::Avg => eval_aggregate(modifier, data, Avg, eval_ctx),
+            Self::Bottomk(k) => eval_aggregate(modifier, data, Rank::new(k, true), eval_ctx),
             Self::Count => eval_aggregate(modifier, data, Count, eval_ctx),
             Self::Group => eval_aggregate(modifier, data, Group, eval_ctx),
             Self::Max => eval_aggregate(modifier, data, Max, eval_ctx),
@@ -217,20 +242,9 @@ impl AggOp {
             Self::Stddev => eval_aggregate(modifier, data, Stddev, eval_ctx),
             Self::Stdvar => eval_aggregate(modifier, data, Stdvar, eval_ctx),
             Self::Sum => eval_aggregate(modifier, data, Sum, eval_ctx),
+            Self::Topk(k) => eval_aggregate(modifier, data, Rank::new(k, false), eval_ctx),
         }
     }
-}
-
-/// Identifies the series a pushed value comes from.
-///
-/// Borrowed rather than owned on purpose: neither path has a per-series signature or an
-/// `Arc<Labels>` for free, so carrying one would cost a hash or an allocation per series. The
-/// scalar accumulators never read it; an accumulator that keeps series identity clones the
-/// labels only for the entries that enter its output.
-pub(crate) struct SeriesKey<'a> {
-    // only a ranking accumulator reads the labels; the scalar ones take the value alone
-    #[allow(dead_code)]
-    pub(crate) labels: &'a Labels,
 }
 
 /// The evaluation grid `start + i * step` a sample timestamp maps onto.
@@ -398,14 +412,12 @@ where
                 let mut acc = func.build(timestamps.len());
                 for &series_idx in chunk {
                     let series = &matrix[series_idx];
-                    let key = SeriesKey {
-                        labels: &series.labels,
-                    };
-                    for sample in &series.samples {
-                        if let Some(slot) = grid.slot(sample.timestamp) {
-                            acc.push(slot, sample.value, &key);
-                        }
-                    }
+                    acc.push_series(
+                        series.samples.iter().filter_map(|sample| {
+                            grid.slot(sample.timestamp).map(|slot| (slot, sample.value))
+                        }),
+                        || series.labels.clone(),
+                    );
                 }
                 acc
             };
@@ -447,6 +459,10 @@ where
         start4.elapsed()
     );
 
+    // a scalar aggregation emits every group; one that selects series may emit nothing
+    if results.is_empty() {
+        return Ok(Value::None);
+    }
     Ok(Value::Matrix(results))
 }
 
@@ -495,6 +511,11 @@ mod tests {
         assert!(!result.iter().any(|l| l.name == "__name__"));
     }
 
+    /// One value of a label-less series, for the scalar accumulators that never read labels.
+    fn push<A: Accumulate>(acc: &mut A, slot: usize, value: f64) {
+        acc.push_series(std::iter::once((slot, value)), Labels::default);
+    }
+
     /// The samples of the lone series a scalar accumulator evaluates to.
     fn samples_of<A: Accumulate>(acc: A, timestamps: &[i64]) -> Vec<Sample> {
         let mut series = acc.evaluate(Labels::default(), timestamps);
@@ -506,11 +527,9 @@ mod tests {
     /// contiguous chunking merged in order; every fold must produce the same bits.
     fn assert_chunkings_match<F: AggFunc>(func: F, slots: usize, points: &[(usize, f64)]) {
         let timestamps: Vec<i64> = (1..=slots as i64).collect();
-        let labels = Labels::default();
-        let key = SeriesKey { labels: &labels };
         let mut sequential = func.build(slots);
         for &(slot, value) in points {
-            sequential.push(slot, value, &key);
+            push(&mut sequential, slot, value);
         }
         let expected = samples_of(sequential, &timestamps);
         for split in 0..=points.len() {
@@ -523,7 +542,7 @@ mod tests {
                 ] {
                     let mut partial = func.build(slots);
                     for &(slot, value) in chunk {
-                        partial.push(slot, value, &key);
+                        push(&mut partial, slot, value);
                     }
                     merged.merge(partial);
                 }
@@ -569,11 +588,9 @@ mod tests {
     #[test]
     fn test_scalar_accumulators_agree_on_slot_and_order() {
         fn check<F: AggFunc>(func: F, expected: &[(i64, f64)]) {
-            let labels = Labels::default();
-            let key = SeriesKey { labels: &labels };
             let mut acc = func.build(3);
             for (slot, value) in [(2, 4.0), (0, 1.0), (2, 2.0), (0, 3.0)] {
-                acc.push(slot, value, &key);
+                push(&mut acc, slot, value);
             }
             let group = vec![Arc::new(Label::new("job", "api"))];
             let mut series = acc.evaluate(group.clone(), &[10, 20, 30]);
@@ -602,8 +619,6 @@ mod tests {
     #[test]
     fn test_extrema_merge_preserves_nan_and_signed_zero_behavior() {
         fn check(func: impl AggFunc, initial: f64) {
-            let labels = Labels::default();
-            let key = SeriesKey { labels: &labels };
             for (values, expected) in [
                 (vec![f64::NAN], initial),
                 (vec![f64::NAN, 7.0, f64::NAN], 7.0),
@@ -613,9 +628,9 @@ mod tests {
                 let mut sequential = func.build(1);
                 let mut merged = func.build(1);
                 for value in values {
-                    sequential.push(0, value, &key);
+                    push(&mut sequential, 0, value);
                     let mut partial = func.build(1);
-                    partial.push(0, value, &key);
+                    push(&mut partial, 0, value);
                     merged.merge(partial);
                 }
                 for samples in [samples_of(sequential, &[1]), samples_of(merged, &[1])] {
@@ -637,17 +652,15 @@ mod tests {
     #[test]
     fn test_statistics_with_partial_merges() {
         fn check<F: AggFunc>(func: F, values: &[f64], expected: f64) {
-            let labels = Labels::default();
-            let key = SeriesKey { labels: &labels };
             for merge in [false, true] {
                 let mut accumulator = func.build(2);
                 for &value in values {
                     if merge {
                         let mut partial = func.build(2);
-                        partial.push(0, value, &key);
+                        push(&mut partial, 0, value);
                         accumulator.merge(partial);
                     } else {
-                        accumulator.push(0, value, &key);
+                        push(&mut accumulator, 0, value);
                     }
                 }
                 let samples = samples_of(accumulator, &[1, 2]);
@@ -674,12 +687,100 @@ mod tests {
     }
 
     #[test]
-    fn test_agg_op_token_coverage() {
-        assert!(AggOp::from_token(token::T_SUM).is_some());
-        assert!(AggOp::from_token(token::T_AVG).is_some());
-        assert!(AggOp::from_token(token::T_TOPK).is_none());
-        assert!(AggOp::from_token(token::T_QUANTILE).is_none());
-        assert!(AggOp::from_token(token::T_COUNT_VALUES).is_none());
+    fn test_agg_op_new_keeps_the_generic_errors() {
+        let op = |id| token::TokenType::new(id);
+        assert!(matches!(
+            AggOp::new(&op(token::T_SUM), None),
+            Ok(AggOp::Sum)
+        ));
+        assert!(matches!(
+            AggOp::new(&op(token::T_AVG), None),
+            Ok(AggOp::Avg)
+        ));
+        assert!(matches!(
+            AggOp::new(&op(token::T_TOPK), Some(Value::Float(3.7))),
+            Ok(AggOp::Topk(3))
+        ));
+        assert!(matches!(
+            AggOp::new(&op(token::T_BOTTOMK), Some(Value::Float(1.0))),
+            Ok(AggOp::Bottomk(1))
+        ));
+        assert!(matches!(
+            AggOp::new(&op(token::T_TOPK), Some(Value::Float(-1.0))),
+            Ok(AggOp::Topk(0))
+        ));
+        for (id, message) in [
+            (token::T_TOPK, "[topk] param must be a number"),
+            (token::T_BOTTOMK, "[bottomk] param must be a number"),
+        ] {
+            for param in [None, Some(Value::None), Some(Value::String("k".into()))] {
+                let result = AggOp::new(&op(id), param);
+                assert!(
+                    matches!(&result, Err(DataFusionError::Plan(m)) if m == message),
+                    "{result:?}"
+                );
+            }
+        }
+        for id in [token::T_QUANTILE, token::T_COUNT_VALUES, token::T_ADD] {
+            let unsupported = op(id);
+            assert!(matches!(
+                AggOp::new(&unsupported, Some(Value::Float(0.5))),
+                Err(DataFusionError::NotImplemented(m)) if m == format!("Unsupported Aggregate: {unsupported:?}")
+            ));
+        }
+    }
+
+    #[test]
+    fn test_agg_op_series_labels() {
+        for op in [AggOp::Topk(1), AggOp::Bottomk(1)] {
+            assert!(op.needs_series_labels());
+        }
+        for op in [
+            AggOp::Avg,
+            AggOp::Count,
+            AggOp::Group,
+            AggOp::Max,
+            AggOp::Min,
+            AggOp::Stddev,
+            AggOp::Stdvar,
+            AggOp::Sum,
+        ] {
+            assert!(!op.needs_series_labels());
+        }
+    }
+
+    /// An aggregation that selects series returns `None` rather than an empty matrix when
+    /// nothing ranks.
+    #[test]
+    fn test_eval_aggregate_selecting_nothing_is_none() {
+        let eval_ctx = EvalContext::new(1000, 3000, 1000, "test".to_string());
+        let matrix = vec![RangeValue::new(
+            vec![Arc::new(Label::new("job", "a"))],
+            [Sample::new(1000, 1.0)],
+        )];
+        assert!(matches!(
+            AggOp::Topk(0).eval_aggregate(&None, Value::Matrix(matrix.clone()), &eval_ctx),
+            Ok(Value::None)
+        ));
+        let off_grid = vec![RangeValue::new(
+            vec![Arc::new(Label::new("job", "a"))],
+            [Sample::new(1500, 1.0)],
+        )];
+        assert!(matches!(
+            AggOp::Topk(2).eval_aggregate(&None, Value::Matrix(off_grid), &eval_ctx),
+            Ok(Value::None)
+        ));
+        assert!(matches!(
+            AggOp::Topk(2).eval_aggregate(&None, Value::Matrix(vec![]), &eval_ctx),
+            Ok(Value::None)
+        ));
+        let Value::Matrix(result) = AggOp::Topk(2)
+            .eval_aggregate(&None, Value::Matrix(matrix), &eval_ctx)
+            .unwrap()
+        else {
+            panic!("expected a matrix");
+        };
+        assert_eq!(result.len(), 1);
     }
 
     #[test]

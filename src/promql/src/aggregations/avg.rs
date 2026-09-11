@@ -15,7 +15,7 @@
 
 use config::meta::promql::value::{Labels, RangeValue, Sample};
 
-use crate::aggregations::{Accumulate, AggFunc, SeriesKey, SumState, group_series};
+use crate::aggregations::{Accumulate, AggFunc, SumState, group_series};
 
 #[derive(Clone, Copy)]
 pub struct Avg;
@@ -66,9 +66,21 @@ pub struct AvgAccumulate {
     states: Vec<AvgState>,
 }
 
-impl Accumulate for AvgAccumulate {
-    fn push(&mut self, slot: usize, value: f64, _series: &SeriesKey<'_>) {
+impl AvgAccumulate {
+    fn push(&mut self, slot: usize, value: f64) {
         self.states[slot].push(value);
+    }
+}
+
+impl Accumulate for AvgAccumulate {
+    fn push_series(
+        &mut self,
+        values: impl Iterator<Item = (usize, f64)>,
+        _labels: impl FnOnce() -> Labels,
+    ) {
+        for (slot, value) in values {
+            self.push(slot, value);
+        }
     }
 
     fn merge(&mut self, other: Self) {
