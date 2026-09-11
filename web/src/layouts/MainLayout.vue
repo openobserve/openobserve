@@ -62,8 +62,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :organizations="orgOptions"
         :is-hovered="isHovered"
         :get-btn-logo="getBtnLogo"
-        :is-mobile="isMobile"
-        @toggle-menu="toggleDrawer"
         @update:selected-org="selectedOrg = $event"
         @update:is-hovered="isHovered = $event"
         @update-organization="updateOrganization"
@@ -82,20 +80,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </header>
 
     <div class="flex min-h-0 flex-1">
-      <!-- Mobile-only scrim behind the overlaid rail; tap to dismiss. -->
-      <div
-        v-if="isMobile && leftDrawerOpen"
-        class="bg-dialog-overlay fixed inset-0 z-30"
-        data-test="navbar-mobile-backdrop"
-        @click="toggleDrawer"
-      />
       <ONavbar
         v-if="store.state.printMode !== true"
         class="max-md:hidden"
         :links-list="navLinks"
         :mini-mode="miniMode"
-        :visible="leftDrawerOpen"
-        :overlay="isMobile"
         @menu-hover="handleMenuHover"
       />
 
@@ -256,7 +245,6 @@ import {
 } from "vue";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
-import { useIsMobile } from "@/composables/useIsMobile";
 import { useRouter, RouterView } from "vue-router";
 import config from "../aws-exports";
 
@@ -386,22 +374,10 @@ export default defineComponent({
     const router: any = useRouter();
     const { t } = useI18nTyped();
     const miniMode = ref(false);
-    const { isMobile } = useIsMobile();
-    // The nav rail permanently reserves ~90px on desktop; on mobile it starts
-    // hidden and slides over content as an overlay via the header hamburger
-    // toggle (see toggleDrawer/AppHeader below) instead of eating a quarter of
-    // a 390px viewport.
-    const leftDrawerOpen = ref(!isMobile.value);
-    watch(isMobile, (mobile) => {
-      leftDrawerOpen.value = !mobile;
-    });
-    const toggleDrawer = () => {
-      leftDrawerOpen.value = !leftDrawerOpen.value;
-    };
+    const { isMobile } = useBreakpoint();
     const zoBackendUrl = store.state.API_ENDPOINT;
     const isLoading = ref(false);
 
-    const { isMobile } = useBreakpoint();
     const mobileNavOpen = ref(false);
     watch(
       () => router.currentRoute.value.fullPath,
@@ -1436,15 +1412,6 @@ export default defineComponent({
       prefetchRoute(routePath);
     };
 
-    // Close the mobile overlay rail once a nav selection lands, so it doesn't
-    // stay open covering the newly-navigated page.
-    watch(
-      () => router.currentRoute.value.fullPath,
-      () => {
-        if (isMobile.value) leftDrawerOpen.value = false;
-      },
-    );
-
     // Sync the user-clicked org with the selected org
     watch(
       selectedOrg,
@@ -1491,11 +1458,8 @@ export default defineComponent({
       navLinks,
       selectedOrg,
       orgOptions,
-      leftDrawerOpen,
-      toggleDrawer,
       isMobile,
       miniMode,
-      isMobile,
       mobileNavOpen,
       user,
       zoBackendUrl,
