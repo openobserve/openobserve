@@ -211,6 +211,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <GetStarted @removeFirstTimeLogin="removeFirstTimeLogin" />
     </ODialog>
+    <ConnectDataSourcePopup />
     <CommunitySlackInvite />
     <PredefinedThemes />
     <ShortcutCheatsheet v-model:open="showShortcuts" />
@@ -261,6 +262,7 @@ import PredefinedThemes from "../components/PredefinedThemes.vue";
 import { usePredefinedThemes } from "@/composables/usePredefinedThemes";
 import GetStarted from "@/components/login/GetStarted.vue";
 import CommunitySlackInvite from "@/components/CommunitySlackInvite.vue";
+import ConnectDataSourcePopup from "@/components/ConnectDataSourcePopup.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -305,6 +307,7 @@ export default defineComponent({
     ShortcutCheatsheet,
     GetStarted,
     CommunitySlackInvite,
+    ConnectDataSourcePopup,
     ODialog,
     ODrawer,
     OButton,

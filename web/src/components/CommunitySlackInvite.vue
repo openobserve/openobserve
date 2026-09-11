@@ -28,16 +28,22 @@ import SlackIcon from "@/components/icons/SlackIcon.vue";
 const { t } = useI18nTyped();
 const store = useStore();
 
-// ── One-time first-login invite (self-contained) ───────────────────────────
-// Shown once on a Cloud user's first login, then never again for that user.
-// Cloud-only — never shown on self-hosted Enterprise or open source.
+// ── Exit-intent invite (self-contained) ─────────────────────────────────────
+// Shown when the cursor heads toward the browser chrome (tab/window close),
+// capped at VISIT_CAP lifetime shows, and never again once dismissed or
+// joined. Cloud-only — never shown on self-hosted Enterprise or open source.
 // All trigger/persistence state lives here so the host layout stays clean.
 const isOpen = ref(false);
 
-// Per-user "seen" record + a pending flag that survives reloads until the user
-// actually dismisses the invite (so it still appears if they leave mid-onboarding).
+// Per-user "seen" record — set permanently on every dismissal path (see
+// dismiss() below), independent of the visit cap.
 const seenKey = `communitySlackInviteSeen:${store.state.userInfo?.email ?? "anonymous"}`;
-const PENDING_KEY = "communitySlackInvitePending";
+
+// Lifetime cap on how many qualifying sessions may trigger the dialog via
+// exit intent, regardless of whether the user interacts with it — a backstop
+// for a user who sees it and closes the tab without dismissing.
+const VISIT_CAP = 3;
+const visitCountKey = `communitySlackInviteVisitCount:${store.state.userInfo?.email ?? "anonymous"}`;
 
 // Community Slack URL — enterprise can override it via backend config.
 const slackUrl = computed(() => {
@@ -47,40 +53,34 @@ const slackUrl = computed(() => {
   return "https://short.openobserve.ai/community";
 });
 
-const maybeShow = () => {
-  if (localStorage.getItem(PENDING_KEY) === "true" && localStorage.getItem(seenKey) !== "true") {
-    isOpen.value = true;
-  }
-};
+const onExitIntent = (event: MouseEvent) => {
+  // Cursor exiting toward the browser chrome/tab bar, not moving between
+  // in-page elements.
+  if (event.clientY > 0) return;
+  if (localStorage.getItem(seenKey) === "true") return;
 
-// GetStarted (full-screen onboarding) dispatches this when it completes; for
-// brand-new users we wait for it so two dialogs never stack.
-const onOnboardingComplete = () => maybeShow();
+  const currentCount = Number(localStorage.getItem(visitCountKey) ?? "0");
+  if (currentCount >= VISIT_CAP) return;
+
+  localStorage.setItem(visitCountKey, String(currentCount + 1));
+  isOpen.value = true;
+  document.removeEventListener("mouseleave", onExitIntent);
+};
 
 onMounted(() => {
   // Cloud-only: bail out entirely on Enterprise / open source so nothing is
   // captured, listened for, or shown there.
   if (config.isCloud !== "true") return;
+  if (localStorage.getItem(seenKey) === "true") return;
 
-  // `isFirstTimeLogin` is set on the new_user_login callback (Cloud only).
-  // Capture it into a pending flag before GetStarted clears it.
-  const isFirstLogin = localStorage.getItem("isFirstTimeLogin") === "true";
+  const currentCount = Number(localStorage.getItem(visitCountKey) ?? "0");
+  if (currentCount >= VISIT_CAP) return;
 
-  if (isFirstLogin && localStorage.getItem(seenKey) !== "true") {
-    localStorage.setItem(PENDING_KEY, "true");
-  }
-
-  if (isFirstLogin) {
-    // GetStarted is taking over the screen — show the invite once it finishes.
-    window.addEventListener("o2:onboarding-complete", onOnboardingComplete);
-  } else {
-    // Returning session with the invite still pending — show it now.
-    maybeShow();
-  }
+  document.addEventListener("mouseleave", onExitIntent);
 });
 
 onBeforeUnmount(() => {
-  window.removeEventListener("o2:onboarding-complete", onOnboardingComplete);
+  document.removeEventListener("mouseleave", onExitIntent);
 });
 
 // Real member count, sourced from the backend `/config` response
@@ -123,7 +123,6 @@ const avatarBgClasses = [
 const dismiss = () => {
   isOpen.value = false;
   localStorage.setItem(seenKey, "true");
-  localStorage.removeItem(PENDING_KEY);
 };
 
 const handleOpenChange = (open: boolean) => {
