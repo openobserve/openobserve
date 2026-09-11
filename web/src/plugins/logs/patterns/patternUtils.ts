@@ -15,6 +15,7 @@
 
 import { extractStatusFromTemplate, extractStatusFromLog } from "@/utils/logs/statusParser";
 import type { I18nKey } from "@/types/i18n";
+import { escapeSingleQuotes } from "@/utils/queryUtils";
 
 /**
  * Extract constant (non-variable) string segments from a pattern template.
@@ -230,19 +231,8 @@ export const compactCount = (n: number): string => {
   return `${(n / 1_000_000_000).toFixed(1)}B`;
 };
 
-/**
- * Escape a string for use inside a match_all('...') SQL clause.
- * Order matters: backslash must be escaped first.
- */
-export const escapeForMatchAll = (str: string): string => {
-  return str
-    .replace(/\\/g, "\\\\")
-    .replace(/'/g, "\\'")
-    .replace(/"/g, '\\"')
-    .replace(/\n/g, "\\n")
-    .replace(/\r/g, "\\r")
-    .replace(/\t/g, "\\t");
-};
+// PostgreSqlDialect doesn't support backslash escapes, so doubling ' is the only escaping match_all('...') needs.
+export const escapeForMatchAll = (str: string): string => escapeSingleQuotes(str);
 
 /**
  * One pattern's clause: every invariant constant must be present, so the
