@@ -26,6 +26,16 @@ export class CompositeAlertsPage {
       listBadge: (id) => `[data-test="alert-list-composite-badge-${id}"]`,
       listChildCount: (id) => `[data-test="alert-list-child-count-${id}"]`,
       listReferenceCount: (id) => `[data-test="alert-list-reference-count-${id}"]`,
+      alertListCompositeTab: '[data-test="alert-list-tab-composite"]',
+      cloneButton: (name) => `[data-test="alert-list-${name}-clone-alert"]`,
+      cloneDialog: '[data-test="alert-list-form-dialog"]',
+      cloneNameInputField: '[data-test="to-be-clone-alert-name-field"]',
+      cloneStreamType: '[data-test="to-be-clone-stream-type"]',
+      cloneStreamName: '[data-test="to-be-clone-stream-name"]',
+      cloneSubmitButton: '[data-test="alert-list-form-dialog"] [data-test="o-dialog-primary-btn"]',
+      cloneCancelButton: '[data-test="alert-list-form-dialog"] [data-test="o-dialog-secondary-btn"]',
+      cloneFolderPicker: '[data-test="alert-list-form-dialog"] [data-test="alerts-index-dropdown-stream_type"]',
+      toastMessage: '[data-test="o-toast-message"]',
       detailResult: '[data-test="alerts-composite-detail-result"]',
       detailExpression: '[data-test="alerts-composite-detail-expression"]',
       detailChildren: '[data-test="alerts-composite-detail-children-table"]',
@@ -177,5 +187,97 @@ export class CompositeAlertsPage {
 
   async expectPreviewChild(id, pattern) {
     await expect(this.page.locator(this.locators.previewRow(id))).toContainText(pattern);
+  }
+
+  // ---- Composite clone dialog (AlertList.vue clone flow) ----
+
+  alertListCompositeTab() {
+    return this.page.locator(this.locators.alertListCompositeTab);
+  }
+
+  cloneButton(name) {
+    return this.page.locator(this.locators.cloneButton(name));
+  }
+
+  cloneDialog() {
+    return this.page.locator(this.locators.cloneDialog);
+  }
+
+  cloneNameInputField() {
+    return this.page.locator(this.locators.cloneNameInputField);
+  }
+
+  cloneStreamTypeSelect() {
+    return this.page.locator(this.locators.cloneStreamType);
+  }
+
+  cloneStreamNameSelect() {
+    return this.page.locator(this.locators.cloneStreamName);
+  }
+
+  cloneSubmitButton() {
+    return this.page.locator(this.locators.cloneSubmitButton);
+  }
+
+  cloneCancelButton() {
+    return this.page.locator(this.locators.cloneCancelButton);
+  }
+
+  cloneFolderPicker() {
+    return this.page.locator(this.locators.cloneFolderPicker);
+  }
+
+  successToast(message) {
+    return this.page.locator(this.locators.toastMessage).filter({ hasText: message }).first();
+  }
+
+  async openCompositeTab() {
+    await this.alertListCompositeTab().click();
+  }
+
+  async clickCloneButton(name) {
+    await this.cloneButton(name).click();
+  }
+
+  async fillCloneName(name) {
+    await this.cloneNameInputField().fill(name);
+  }
+
+  async submitClone() {
+    await this.cloneSubmitButton().click();
+  }
+
+  async cancelClone() {
+    await this.cloneCancelButton().click();
+  }
+
+  async selectCloneFolder(folderId) {
+    await this.cloneFolderPicker().locator('[data-test$="-trigger"]').first().click();
+    const option = this.page
+      .locator(`[data-test="alerts-index-dropdown-stream_type-option"][data-test-value="${folderId}"]`)
+      .first();
+    await expect(option).toBeVisible({ timeout: 10000 });
+    await option.click();
+  }
+
+  async expectCloneDialogVisible() {
+    await expect(this.cloneDialog()).toBeVisible({ timeout: 10000 });
+  }
+
+  async expectCloneDialogHidden() {
+    await expect(this.cloneDialog()).toBeHidden({ timeout: 10000 });
+  }
+
+  async expectCloneNamePrefilled(name) {
+    await expect(this.cloneNameInputField()).toHaveValue(name);
+  }
+
+  async expectStreamSelectsHidden() {
+    await expect(this.cloneStreamTypeSelect()).toHaveCount(0);
+    await expect(this.cloneStreamNameSelect()).toHaveCount(0);
+  }
+
+  async expectCloneSuccessToast() {
+    await expect(this.successToast('Alert Cloned Successfully')).toBeVisible({ timeout: 30000 });
   }
 }
