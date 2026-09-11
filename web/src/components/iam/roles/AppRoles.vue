@@ -147,7 +147,7 @@ const addRole = () => {
 
 // After a role is created, route straight into EditRole on the Permissions tab
 // so the user can start assigning permissions instead of being dropped back on
-// the list with an empty, useless role. The "Read-only" preset is passed
+// the list with an empty, useless role. Any non-"custom" preset is passed
 // through so EditRole can seed the starting permissions.
 const onRoleAdded = (payload: { role_name: string; startFrom?: string }) => {
   if (!payload?.role_name) {
@@ -163,7 +163,7 @@ const onRoleAdded = (payload: { role_name: string; startFrom?: string }) => {
     query: {
       org_identifier: store.state.selectedOrganization.identifier,
       tab: "permissions",
-      ...(payload.startFrom === "readonly" ? { preset: "readonly" } : {}),
+      ...(payload.startFrom && payload.startFrom !== "custom" ? { preset: payload.startFrom } : {}),
     },
   });
 };

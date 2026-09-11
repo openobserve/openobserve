@@ -13,10 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::promql::value::{EvalContext, RangeValue, Value};
-use datafusion::error::{DataFusionError, Result};
+use config::meta::promql::value::{EvalContext, Value};
+use datafusion::error::Result;
 use promql_parser::parser::LabelModifier;
-use rayon::prelude::*;
 
 /// Aggregates Matrix input for range queries
 /// For each timestamp, selects the bottom K series by value
@@ -26,56 +25,7 @@ pub fn bottomk(
     data: Value,
     eval_ctx: &EvalContext,
 ) -> Result<Value> {
-    let start = std::time::Instant::now();
-    let matrix = match data {
-        Value::Matrix(m) => m,
-        Value::None => return Ok(Value::None),
-        _ => {
-            return Err(DataFusionError::Plan(
-                "[bottomk] function only accept matrix values".to_string(),
-            ));
-        }
-    };
-
-    if matrix.is_empty() || k == 0 {
-        return Ok(Value::None);
-    }
-
-    log::info!(
-        "[trace_id: {}] [PromQL Timing] bottomk(k={k}) started with {} series and {} timestamps",
-        eval_ctx.trace_id,
-        matrix.len(),
-        eval_ctx.timestamps().len()
-    );
-
-    // For bottomk, we select the bottom k series at each timestamp
-    // We need to preserve the original series structure
-    let eval_timestamps = eval_ctx.timestamps();
-
-    // Group series by label modifier
-    let grouped_series = super::group_series_by_labels(&matrix, modifier);
-
-    // Process each group - reuse the efficient topk implementation with is_bottom=true
-    let result: Vec<RangeValue> = grouped_series
-        .par_iter()
-        .flat_map(|(_, series_indices)| {
-            // For each timestamp, select bottom k series from this group
-            super::topk::select_topk_series(&matrix, series_indices, k, &eval_timestamps, true)
-        })
-        .collect();
-
-    log::info!(
-        "[trace_id: {}] [PromQL Timing] bottomk(k={k}) completed in {:?}, produced {} series",
-        eval_ctx.trace_id,
-        start.elapsed(),
-        result.len()
-    );
-
-    if result.is_empty() {
-        Ok(Value::None)
-    } else {
-        Ok(Value::Matrix(result))
-    }
+    super::topk::eval_topk(k, modifier, data, eval_ctx, true)
 }
 
 #[cfg(test)]

@@ -140,6 +140,10 @@ describe("AddRole", () => {
       w.unmount();
     });
 
+    it("offers the DB Monitoring viewer start-from option", () => {
+      expect(wrapper.find('[data-test="add-role-start-from-dbm-radio"]').exists()).toBe(true);
+    });
+
     it("preserves the maxlength attribute on the input", () => {
       expect(getNameInput(wrapper).attributes("maxlength")).toBe("100");
     });

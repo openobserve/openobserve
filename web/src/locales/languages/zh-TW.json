@@ -904,8 +904,8 @@
       "createNewNoteWorkflow": "注意：函式將會建立，然後您將被重新導向至先前的表單，以將新建立的函式與工作流程關聯。",
       "select": "選取函式",
       "loadError": "無法載入函式",
-      "saved": "函式已成功儲存",
-      "updated": "函式已成功更新",
+      "saved": "函式儲存成功",
+      "updated": "函式更新成功",
       "saveError": "儲存函式失敗",
       "flatten": "扁平化後",
       "guidelinesTitle": "函式執行指南：",
@@ -2096,7 +2096,8 @@
       "startFrom": {
         "label": "起始範本",
         "custom": "自訂（空白角色）",
-        "readonly": "唯讀（可檢視所有資源）"
+        "readonly": "唯讀（可檢視所有資源）",
+        "dbm": "資料庫監控檢視者（對資料庫監控模組及其指標分頁所查詢的指標串流皆為唯讀）"
       },
       "name": {
         "required": "角色名稱為必填。",
@@ -2132,7 +2133,9 @@
       "loadFailed": "載入角色詳細資料失敗。正在重新導向至角色列表。",
       "noUpdatesDetected": "未偵測到更新。",
       "updateSuccess": "角色更新成功！",
-      "updateError": "更新角色時發生錯誤！"
+      "updateError": "更新角色時發生錯誤！",
+      "dbmPresetSeeded": "已預先選取 {total} 個資料庫監控指標串流中的 {matched} 個的讀取權限，外加資料庫監控模組。儲存前請先檢閱。",
+      "dbmPresetNoMatch": "{total} 個資料庫監控指標串流在此組織中尚不存在，因此未在其上預先選取任何項目；資料庫監控模組的授權仍已暫存。"
     },
     "rolesPage": {
       "subtitle": "角色會綑綁多個權限——將角色指派給使用者、服務帳戶或群組，即可授予存取權限。",
@@ -2593,7 +2596,7 @@
     "header": "工作流程",
     "subtitle": "使用觸發器、邏輯與目標自動化動作",
     "create": "新增工作流程",
-    "createSuccess": "工作流程已成功建立",
+    "createSuccess": "工作流程建立成功",
     "name": "工作流程名稱",
     "nameRequired": "名稱為必填",
     "search": "搜尋工作流程",
@@ -2630,8 +2633,8 @@
       "hideTestRuns": "隱藏測試執行",
       "open": "歷史",
       "openFullView": "開啟完整執行檢視",
-      "loadError": "載入執行記錄時發生錯誤",
-      "loadRunError": "載入此次執行時發生錯誤",
+      "loadError": "載入執行紀錄時發生錯誤",
+      "loadRunError": "載入此執行時發生錯誤",
       "retry": "重試",
       "retryTooltip": "使用此失敗執行所記錄的輸入重新執行。",
       "retryTitle": "要重試此執行嗎？",
@@ -2643,31 +2646,31 @@
     "view": "檢視",
     "delete": "刪除",
     "deleteTitle": "刪除工作流程",
-    "deleteMessage": "您確定要刪除此工作流程嗎？",
-    "deleteSuccess": "工作流程已成功刪除",
+    "deleteMessage": "確定要刪除此工作流程嗎？",
+    "deleteSuccess": "工作流程刪除成功",
     "deleteError": "刪除工作流程時發生錯誤",
-    "updateSuccess": "工作流程已成功更新",
+    "updateSuccess": "工作流程更新成功",
     "saveError": "儲存工作流程時發生錯誤",
     "resumeSuccess": "{name} 已成功恢復",
     "pauseSuccess": "{name} 已成功暫停",
     "toggleError": "更新工作流程狀態時發生錯誤",
-    "triggerRequired": "需要觸發器",
-    "addStepRequired": "在觸發器之後至少新增一個步驟",
-    "connectAllNodes": "儲存前連接所有節點",
+    "triggerRequired": "必須要有觸發器",
+    "addStepRequired": "請在觸發器後至少新增一個步驟",
+    "connectAllNodes": "儲存前請先連接所有節點",
     "branchPathsRequired": "Connect each Branch path to a step | 1 Branch step has connections that do not match its paths. Open it, define the paths, then re-connect them. | {count} Branch steps have connections that do not match their paths.",
     "finishStepsBeforePublish": "{count} 個步驟需要在發布前設定 — 已在畫布上標示。 | {count} 個步驟需要在發布前設定 — 已在畫布上標示。",
     "noChangesToPublish": "沒有可發佈的變更——此工作流程已與已發佈的版本相符。",
     "draft": "草稿",
     "saveDraft": "儲存為草稿",
     "publish": "發布",
-    "draftSaveSuccess": "草稿已成功儲存",
-    "publishSuccess": "工作流程已成功發布",
+    "draftSaveSuccess": "草稿儲存成功",
+    "publishSuccess": "工作流程發布成功",
     "publishError": "發布工作流程時發生錯誤",
-    "comingSoon": "這將在後續步驟中提供",
+    "comingSoon": "此功能將在後續步驟推出",
     "triggerType": {
       "pick": "選擇觸發器",
       "dialogTitle": "建立新的工作流程",
-      "dialogIntro": "選擇此工作流程的觸發方式。更多觸發器類型即將推出。",
+      "dialogIntro": "選擇此工作流程的觸發方式。更多觸發類型即將推出。",
       "cta": "建立工作流程",
       "soonCta": "將於未來版本提供",
       "comingSoon": "即將推出",
@@ -2776,16 +2779,16 @@
       "folderLabel": "資料夾",
       "alertsLabel": "警示",
       "alertsPlaceholder": "選擇警示",
-      "noneSelected": "尚未選擇任何警示。",
+      "noneSelected": "尚未選取任何警示。",
       "selectedCount": "{count} 個已選擇",
       "clear": "全部清除",
-      "empty": "在此組織中找不到任何警示。",
-      "noAlertsInFolder": "在此資料夾中沒有警示。",
+      "empty": "此組織中找不到任何警示。",
+      "noAlertsInFolder": "此資料夾中沒有警示。",
       "loadError": "無法載入警示。",
       "link": "連結所選項目",
       "linkN": "連結 {count} 個所選項目",
       "skip": "暫時跳過",
-      "linkSuccess": "已連結至 {count} 個警示",
+      "linkSuccess": "已連結至 {count} 個警示 | 已連結至 {count} 個警示",
       "linkPartial": "已連結至 {count} 個警示，{failed} 個失敗 | 已連結至 {count} 個警示，{failed} 個失敗",
       "linkError": "無法連結警示。"
     },
@@ -2803,7 +2806,7 @@
       "branch": "分支",
       "function": "函數",
       "sendToDestination": "目標",
-      "configComingSoon": "{node} 設定將在後續步驟中出現",
+      "configComingSoon": "{node} 設定將在後續步驟推出",
       "sectionTransform": "轉換",
       "sectionDestination": "目標",
       "stepSearchPlaceholder": "搜尋步驟...",
@@ -2818,13 +2821,13 @@
       "branchMoveDown": "下移路徑",
       "branchPathNumber": "路徑 {index}",
       "branchElseTitle": "所有其他",
-      "branchElseHint": "不符合以上任何路徑的記錄會由此離開。",
+      "branchElseHint": "不符合上述任何路徑的記錄會由此離開。",
       "branchNoteTitle": "分支指南",
-      "branchNoteFirstMatch": "路徑會從上到下依序檢查，並且由第一個符合條件的路徑勝出，因此每筆記錄只會經由恰好一條路徑輸出。",
-      "branchNoteUnwired": "未連接任何下游節點的路徑會直接丟棄其記錄。",
+      "branchNoteFirstMatch": "路徑會由上至下依序檢查，並以第一個符合者為準，因此每筆記錄只會經由一個路徑離開。",
+      "branchNoteUnwired": "未連接任何內容的路徑會直接捨棄其記錄。",
       "functionDesc": "使用函數重新調整負載",
       "destinationDesc": "傳送至目標",
-      "triggerBody": "當關聯警示觸發時執行",
+      "triggerBody": "當關聯的警示觸發時執行",
       "triggerDataExampleNote": "僅為範例 — 實際欄位來自您的警示查詢。",
       "incidentEventTypeLabel": "事件類型",
       "incidentEventType": {
@@ -2848,18 +2851,18 @@
       "incidentNoExtraFields": "此事件除了常見欄位外，不會新增任何欄位。",
       "conditionNoteTitle": "條件指南",
       "functionFlattenTitle": "扁平化前後比較",
-      "conditionNoteCustom": "若要新增自訂欄位，請輸入其名稱並按 Enter。",
-      "functionBody": "使用函數重塑 Payload",
+      "conditionNoteCustom": "若要新增自訂欄，請輸入其名稱並按下 Enter。",
+      "functionBody": "使用函式重塑酬載",
       "functionBodySet": "套用 {name}",
       "functionSelect": "選擇函數",
       "functionCreateNew": "建立新函數",
-      "functionRequired": "必須提供函數",
-      "functionLoadError": "無法載入函數",
+      "functionRequired": "函式為必填",
+      "functionLoadError": "無法載入函式",
       "destinationBody": "傳送至目標",
       "destinationBodySet": "傳送至 {name}",
       "destinationSelect": "目標",
       "destinationCreateNew": "建立新目標",
-      "destinationRequired": "請選擇目標",
+      "destinationRequired": "請選取目標",
       "destinationLoadError": "無法載入目標",
       "namePlaceholder": "命名此步驟（選填）",
       "commentLabel": "備註（選填）",
@@ -2907,8 +2910,8 @@
       "noRunYet": "尚未執行。",
       "runLabel": "執行",
       "switchRun": "切換執行",
-      "notInRun": "此步驟未包含在此次執行中。",
-      "noRunData": "此執行未儲存步驟資料。",
+      "notInRun": "此執行不包含此步驟。",
+      "noRunData": "此次執行未儲存步驟資料。",
       "runTest": "執行測試",
       "noItems": "沒有項目",
       "itemsCount": "{count} 個項目 | {count} 個項目",
@@ -2921,7 +2924,7 @@
       "readOnlyRun": "您正在檢視過去的執行，因此無法在此變更此步驟的設定。",
       "readOnlyRunEdit": "在工作流程中編輯",
       "testInputHint": "測試輸入 — 編輯後執行步驟。",
-      "noRunsList": "尚無執行記錄。",
+      "noRunsList": "尚無執行。",
       "resetInput": "重設為範例",
       "eventPager": "{n} / {total}",
       "nextEvent": "下一個事件",
@@ -2945,7 +2948,7 @@
       "expand": "展开",
       "close": "清除并关闭结果",
       "nodesTitle": "步骤",
-      "empty": "运行测试以在此处查看步骤结果。",
+      "empty": "執行測試以在此查看步驟結果。",
       "openNode": "開啟節點",
       "viewConfig": "檢視配置",
       "hideConfig": "隱藏配置",
@@ -3712,29 +3715,31 @@
       "crossLinkBody": "{brand} 公開 {product} (MCP) 端點，以便像 {client1}、{client2} 和 {client3} 這樣的 AI 用戶端可以查詢並對此組織採取動作。設定和憑證位於 IAM 中。",
       "crossLinkCta": "開啟 MCP 設定",
       "tagline": "透過 {product} (MCP) 將 {client1}、{client2}、{client3} 及其他 AI 用戶端連線至此組織。",
-      "endpointLabel": "MCP 端點",
-      "authLabel": "1. 驗證",
-      "clientLabel": "2. 選擇用戶端",
-      "configLabel": "3. 新增設定",
+      "connectLabel": "端點與驗證",
+      "connectHint": "將您的 MCP 用戶端指向此 URL，然後選擇其登入方式。",
+      "configLabel": "新增設定",
+      "configHint": "選擇您的用戶端，然後將設定複製到對應位置。",
       "auth": {
         "oauth": "OAuth — 登入（建議使用）",
         "token": "存取權杖",
+        "oauthTitle": "使用瀏覽器登入",
         "oauthNote": "無需管理憑證：您的 MCP 用戶端會開啟瀏覽器進行登入，存取範圍受限於您現有的權限。只要您的用戶端支援 OAuth，即可使用此方式。"
       },
       "credential": {
-        "quickStartTitle": "快速開始 — 您的帳戶",
-        "quickStartBody": "程式碼片段使用您自己的憑證，這會帶有您的完整權限。針對生產環境，請改為產生專用的唯讀憑證。",
-        "generate": "產生唯讀憑證",
-        "created": "已建立唯讀憑證",
+        "quickStartTitle": "尚無 Token",
+        "quickStartBody": "下方的程式碼片段帶有預留位置的標頭。請為此 MCP 用戶端產生專用 Token，或將現有的服務帳戶 Token 貼到該處。",
+        "generate": "產生專用 Token",
+        "created": "已建立專用 Token",
         "shownOnce": "適用於 {email}。請立即複製 — 權杖僅顯示一次，下方的程式碼片段現在會使用它。",
         "download": "下載",
         "manage": "管理 / 撤銷",
-        "readonlyWarn": "帳戶已建立，但無法自動套用唯讀角色 — 請在服務帳戶中檢視其權限。",
+        "readonlyWarn": "帳戶已建立，但無法加入 {role} 角色 — 在 IAM 中指派角色前，它沒有任何權限。",
+        "readonlyNote": "透過 {role} 角色限定為唯讀 — 請在 IAM › 角色 中檢視或擴充。",
+        "rbacNote": "此部署中已停用 RBAC，因此此 Token 無法限定為唯讀 — 它與此組織的任何其他憑證擁有一樣的存取權限。",
         "error": "無法建立憑證。請重試，或在 IAM 中手動建立服務帳戶。"
       },
       "securityTitle": "使用專用、最小權限的憑證",
-      "securityBody": "權杖預設為您自己的帳戶憑證。針對生產環境，請在上方產生唯讀憑證（或建立限定的服務帳戶），切勿將權杖提交至原始碼控制。",
-      "docsCta": "閱讀完整的 MCP 文件",
+      "securityBody": "請給予 MCP 用戶端一個限定範圍的唯讀服務帳戶，而不是您自己的帳戶憑證，而且絕不要將其 Token 提交至版本控制。",
       "clients": {
         "claudeCode": "Claude Code",
         "cursor": "Cursor",
@@ -3761,7 +3766,10 @@
         "hermes": "新增至 ~/.hermes/config.yaml（YAML），然後執行 /reload-mcp。",
         "codex": "新增至 ~/.codex/config.toml（TOML），然後重新啟動 Codex。"
       },
-      "installOneClick": "新增至 {client}"
+      "installOneClick": "新增至 {client}",
+      "skillsLabel": "新增 {brand} 技能（選填）",
+      "skillsHint": "教導您的 AI 助手如何在 {brand} 中查詢、設定警示及建立儀表板，讓它能更充分利用 MCP 工具。在您的專案中執行它，然後選擇要安裝到的代理程式。",
+      "skillsRepo": "在 {host} 上檢視技能"
     },
     "manageTokensBtnLabel": "管理權杖",
     "orgLevelExplanation": "這些是組織層級的擷取權杖。它們不與個別使用者綁定，即使建立它們的使用者離開組織後仍可繼續運作。權杖僅可用於擷取端點。",
@@ -16360,6 +16368,7 @@
       },
       "databaseCount": "1 個資料庫 | {count} 個資料庫",
       "openQueries": "查看其查詢",
+      "viewMetrics": "檢視指標",
       "alertMe": "提醒我",
       "columnHints": {
         "qps": "每秒呼叫數 — 此時間範圍的呼叫數除以時間長度，因此 15 分鐘檢視與 4 小時檢視仍然可比。",
@@ -16620,10 +16629,10 @@
         "missingDescription": "此頁面描述一個查詢，但網址未指明是哪一個。如果您剛切換了組織，您正在閱讀的查詢屬於您先前所在的組織。",
         "action": "瀏覽此組織的查詢"
       },
-      "backToQueries": "返回熱門查詢",
-      "backToActivity": "返回活動",
-      "backToSamples": "返回最慢的呼叫",
-      "backToDeadlocks": "返回死結",
+      "backToQueries": "熱門查詢",
+      "backToActivity": "活動",
+      "backToSamples": "最慢的呼叫",
+      "backToDeadlocks": "死鎖",
       "latencyTitle": "隨時間變化的速度",
       "volumeTitle": "隨時間變化的呼叫與失敗",
       "endpointsTitle": "呼叫來源位置",
@@ -16788,6 +16797,8 @@
     "page": {
       "tabs": {
         "overview": "總覽",
+        "metrics": "指標",
+        "metricsHint": "依等待事件顯示的資料庫負載，以及你的資料庫接收器所收集的每一項指標。",
         "queries": "熱門查詢",
         "samples": "最慢的呼叫",
         "samplesHintClient": "您的已埋點服務在此時間範圍內觀察到的已完成呼叫 — 未追蹤的呼叫端不會計入，因此這是下限而非總數。表格顯示其中最慢的呼叫。",
@@ -16804,6 +16815,129 @@
         "deadlocksLocked": "死結 (deadlock) 是 Enterprise 功能。升級以查看哪些查詢彼此發生死結，以及原因。其他資料庫分頁適用於所有方案。",
         "blockedLocked": "被封鎖的查詢是 Enterprise 功能。升級以查看哪些工作階段正在等待鎖定，以及什麼持有該鎖定。其他資料庫分頁適用於所有方案。",
         "tableHealthLocked": "資料表健康狀態是 Enterprise 功能。升級以追蹤資料表大小、膨脹與 vacuum 狀態。其他資料庫分頁適用於所有方案。"
+      }
+    },
+    "metrics": {
+      "title": "指標",
+      "subtitle": "資料庫負載，以及你的資料庫接收器所收集的每一項指標，皆繪製於此時間範圍內",
+      "load": {
+        "title": "資料庫負載",
+        "hint": "每個區間內平均正在工作的作用中工作階段數，依所選維度堆疊。閒置連線會排除；未等待任何項目的工作階段即在 CPU 上執行。在尖峰上拖曳即可將所有圖表縮放至該區間。",
+        "timeAxis": "時間",
+        "sessionsAxis": "平均作用中工作階段",
+        "waitEventAxis": "等待事件",
+        "viewActivity": "在活動中檢視",
+        "breakdowns": {
+          "waitEvent": "依等待事件",
+          "query": "依查詢",
+          "database": "依資料庫",
+          "user": "依使用者"
+        }
+      },
+      "limitLegend": "連線上限",
+      "explore": "在指標總管中開啟",
+      "railLabel": "指標區段",
+      "noAccess": "你沒有讀取 {stream} 的權限。請聯絡管理員以取得此串流的讀取權限。",
+      "byDims": {
+        "query": "依查詢",
+        "database": "依資料庫",
+        "service": "依服務",
+        "operation": "依操作",
+        "mode": "依模式",
+        "lockType": "依鎖定類型",
+        "table": "依資料表",
+        "index": "依索引",
+        "client": "依用戶端",
+        "state": "依狀態",
+        "direction": "依方向",
+        "device": "依裝置",
+        "host": "依主機"
+      },
+      "catalog": {
+        "activity": {
+          "title": "活動",
+          "desc": "輸送量、交易與資料列異動"
+        },
+        "locks": {
+          "title": "鎖定",
+          "desc": "鎖定壓力及其持有者"
+        },
+        "replication": {
+          "title": "複寫",
+          "desc": "WAL 壓力與複本延遲"
+        },
+        "indexes": {
+          "title": "索引",
+          "desc": "每張資料表的索引使用量與大小"
+        },
+        "blocks": {
+          "title": "區塊",
+          "desc": "歸因於查詢的共享緩衝區 I/O，來自資料庫本身的計數器"
+        },
+        "vacuum": {
+          "title": "Vacuum",
+          "desc": "每張表的即時與失效資料列"
+        },
+        "host": {
+          "managedNote": "此資料庫在雲端代管端點（例如 Amazon RDS）上執行，因此其供應商不會公開您收集器可監控的主機。清除資料庫篩選條件，即可查看您收集器確實回報之主機的主機指標。",
+          "title": "主機",
+          "desc": "資料庫主機的 CPU、記憶體與 I/O",
+          "loopbackHint": "執行個體透過 localhost 連線 — 顯示所有主機",
+          "matchHint": "主機指標會依主機名稱配對"
+        }
+      },
+      "catalogPanels": {
+        "calls": "查詢呼叫",
+        "avgDuration": "平均持續時間",
+        "commits": "提交",
+        "rollbacks": "回滾",
+        "rowsModified": "已修改的資料列",
+        "locks": "鎖定",
+        "walLag": "WAL 延遲",
+        "indexScans": "索引掃描",
+        "indexSize": "索引大小",
+        "blksHit": "共享區塊命中",
+        "blksRead": "共享區塊讀取",
+        "blksDirtied": "共享區塊變更",
+        "rowsByState": "依狀態分類的資料列",
+        "cpuUtilization": "CPU 使用率",
+        "memoryUsage": "記憶體",
+        "diskIo": "磁碟 I/O",
+        "networkIo": "網路 I/O"
+      },
+      "searchPlaceholder": "篩選指標…",
+      "triageOrder": "依分診相關性排序",
+      "sections": {
+        "featured": "重要健康指標",
+        "postgresql": "PostgreSQL 指標",
+        "mysql": "MySQL 與 MariaDB 指標"
+      },
+      "roleTitle": "{role} · {engine}",
+      "roles": {
+        "cacheHitRatio": "快取命中率",
+        "connections": "連線",
+        "connectionLimit": "連線限制",
+        "replicationLag": "複寫延遲",
+        "cacheHit": "快取命中",
+        "cacheRead": "快取磁碟讀取",
+        "deadlocks": "死鎖"
+      },
+      "notCollecting": {
+        "title": "沒有資料庫指標送達",
+        "description": "上方負載圖表會讀取活動樣本，但此組織中尚不存在來自資料庫接收器的指標串流。資料庫設定卡片上的收集器配方會傳送它們。",
+        "checklistTitle": "檢查重點",
+        "checks": {
+          "receivers": {
+            "no": "沒有資料庫接收器正在傳送指標",
+            "noDetail": "資料來源下的 PostgreSQL 與 MySQL 設定卡片會設定收集器的指標接收器，以及監控資料饋送。"
+          },
+          "enabled": {
+            "ok": "資料庫監控已啟用",
+            "okDetail": "因此一旦接收器傳送這些指標，它們就會在此繪製成圖表",
+            "no": "資料庫監控已停用",
+            "noDetail": "此部署的 ZO_DB_MONITORING_ENABLED 已關閉，因此資料庫分頁不會收集資料。"
+          }
+        }
       }
     },
     "samples": {

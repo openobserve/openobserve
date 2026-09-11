@@ -897,7 +897,7 @@
       "createNew": "Criar novo destino",
       "select": "Destino",
       "loadError": "Erro ao carregar destinos.",
-      "unsupportedType": "Tipo não suportado — Fluxos de trabalho suportam apenas destinos personalizados"
+      "unsupportedType": "Tipo não suportado — os fluxos de trabalho suportam apenas destinos personalizados"
     },
     "function": {
       "createNew": "Criar nova função",
@@ -906,7 +906,7 @@
       "loadError": "Falha ao carregar funções",
       "saved": "Função salva com sucesso",
       "updated": "Função atualizada com sucesso",
-      "saveError": "Falha ao salvar função",
+      "saveError": "Falha ao salvar a função",
       "flatten": "Após achatamento",
       "guidelinesTitle": "Diretrizes de execução da função:",
       "rbf": "RBF (Executar antes do achatamento):",
@@ -2096,7 +2096,8 @@
       "startFrom": {
         "label": "Comece a partir de",
         "custom": "Personalizado (função vazia)",
-        "readonly": "Somente leitura (veja o acesso a todos os recursos)"
+        "readonly": "Somente leitura (veja o acesso a todos os recursos)",
+        "dbm": "Visualizador de Monitoramento de bancos de dados (somente leitura no módulo Monitoramento de bancos de dados e nos streams de métricas consultados pela aba Métricas)"
       },
       "name": {
         "required": "O nome da função é obrigatório.",
@@ -2132,7 +2133,9 @@
       "loadFailed": "Falha ao carregar detalhes da função. Redirecionando para a lista de funções.",
       "noUpdatesDetected": "Nenhuma atualização detectada.",
       "updateSuccess": "Função atualizada com sucesso!",
-      "updateError": "Erro ao atualizar função!"
+      "updateError": "Erro ao atualizar função!",
+      "dbmPresetSeeded": "Acesso de leitura pré-selecionado em {matched} de {total} streams de métricas do Monitoramento de bancos de dados, além do módulo Monitoramento de bancos de dados. Revise antes de salvar.",
+      "dbmPresetNoMatch": "Nenhum dos {total} streams de métricas do Monitoramento de bancos de dados existe nesta organização ainda, então nada foi pré-selecionado neles; a concessão do módulo Monitoramento de bancos de dados ainda foi preparada."
     },
     "rolesPage": {
       "subtitle": "As funções agrupam permissões — atribua-as a usuários, contas de serviço ou grupos para conceder acesso.",
@@ -2595,7 +2598,7 @@
     "create": "Novo workflow",
     "createSuccess": "Fluxo de trabalho criado com sucesso",
     "name": "Nome do workflow",
-    "nameRequired": "Nome é obrigatório",
+    "nameRequired": "O nome é obrigatório",
     "search": "Pesquisar fluxos de trabalho",
     "refresh": "Atualizar fluxos de trabalho",
     "trigger": "Gatilho",
@@ -2630,8 +2633,8 @@
       "hideTestRuns": "Ocultar execuções de teste",
       "open": "Histórico",
       "openFullView": "Abrir visão completa de execuções",
-      "loadError": "Erro ao Carregar Execuções",
-      "loadRunError": "Erro ao Carregar Esta Execução",
+      "loadError": "Erro ao carregar execuções",
+      "loadRunError": "Erro ao carregar esta execução",
       "retry": "Repetir",
       "retryTooltip": "Repetir esta execução com falha a partir da entrada registrada.",
       "retryTitle": "Repetir esta execução?",
@@ -2643,17 +2646,17 @@
     "view": "Visualizar",
     "delete": "Excluir",
     "deleteTitle": "Excluir Fluxo de Trabalho",
-    "deleteMessage": "Tem Certeza de que Deseja Excluir Este Fluxo de Trabalho?",
-    "deleteSuccess": "Fluxo de Trabalho Excluído com Sucesso",
-    "deleteError": "Erro ao Excluir Fluxo de Trabalho",
-    "updateSuccess": "Fluxo de Trabalho Atualizado com Sucesso",
-    "saveError": "Erro ao Salvar Fluxo de Trabalho",
-    "resumeSuccess": "{name} Retomado com Sucesso",
-    "pauseSuccess": "{name} Pausado com Sucesso",
-    "toggleError": "Erro ao Atualizar Estado do Fluxo de Trabalho",
-    "triggerRequired": "Um Acionador é Obrigatório",
-    "addStepRequired": "Adicione pelo Menos Uma Etapa Após o Acionador",
-    "connectAllNodes": "Conecte Todos os Nós Antes de Salvar",
+    "deleteMessage": "Tem certeza de que deseja excluir este fluxo de trabalho?",
+    "deleteSuccess": "Fluxo de trabalho excluído com sucesso",
+    "deleteError": "Erro ao excluir o fluxo de trabalho",
+    "updateSuccess": "Fluxo de trabalho atualizado com sucesso",
+    "saveError": "Erro ao salvar o fluxo de trabalho",
+    "resumeSuccess": "{name} retomado com sucesso",
+    "pauseSuccess": "{name} pausado com sucesso",
+    "toggleError": "Erro ao atualizar o estado do fluxo de trabalho",
+    "triggerRequired": "Um gatilho é obrigatório",
+    "addStepRequired": "Adicione pelo menos uma etapa após o gatilho",
+    "connectAllNodes": "Conecte todos os nós antes de salvar",
     "branchPathsRequired": "Conecte cada caminho do Branch a uma etapa | 1 etapa do Branch tem conexões que não correspondem aos seus caminhos. Abra-a, defina os caminhos e reconecte-os. | {count} etapas do Branch têm conexões que não correspondem aos seus caminhos.",
     "finishStepsBeforePublish": "{count} passo precisa de configuração antes de publicar — destacado no canvas. | {count} passos precisam de configuração antes de publicar — destacados no canvas.",
     "noChangesToPublish": "Nenhuma alteração para publicar — este fluxo de trabalho já corresponde à versão publicada.",
@@ -2663,11 +2666,11 @@
     "draftSaveSuccess": "Rascunho salvo com sucesso",
     "publishSuccess": "Fluxo de trabalho publicado com sucesso",
     "publishError": "Erro ao publicar o fluxo de trabalho",
-    "comingSoon": "Isso virá em uma etapa posterior",
+    "comingSoon": "Isso estará disponível em uma etapa posterior",
     "triggerType": {
       "pick": "Escolha um gatilho",
       "dialogTitle": "Criar um novo fluxo de trabalho",
-      "dialogIntro": "Escolha como este fluxo de trabalho é acionado. Mais tipos de gatilho estão por vir.",
+      "dialogIntro": "Escolha como este fluxo de trabalho é acionado. Mais tipos de gatilho estarão disponíveis em breve.",
       "cta": "Criar fluxo de trabalho",
       "soonCta": "Disponível em uma versão futura",
       "comingSoon": "Em breve",
@@ -2700,7 +2703,7 @@
       "alertStartTime": "Timestamp mais antigo entre os registros correspondentes.",
       "alertEndTime": "Timestamp mais recente entre os registros correspondentes."
     },
-    "loadError": "Não foi possível carregar o Workflow",
+    "loadError": "Não foi possível carregar o fluxo de trabalho",
     "deleteNode": "Excluir Nó",
     "deleteNodeTitle": "Excluir Etapa",
     "deleteNodeConfirm": "Tem certeza de que deseja excluir esta etapa? Você pode desfazer isso.",
@@ -2785,8 +2788,8 @@
       "link": "Vincular selecionados",
       "linkN": "Vincular {count} selecionados",
       "skip": "Pular por agora",
-      "linkSuccess": "Vinculado a {count} alerta(s)",
-      "linkPartial": "Vinculado a {count} alerta, {failed} falhou | Vinculado a {count} alertas, {failed} falharam",
+      "linkSuccess": "Vinculado a {count} alerta | Vinculado a {count} alertas",
+      "linkPartial": "Vinculado a {count} alerta, {failed} falharam | Vinculado a {count} alertas, {failed} falharam",
       "linkError": "Não foi possível vincular os alertas."
     },
     "chooseTrigger": "Escolher um Gatilho",
@@ -2803,7 +2806,7 @@
       "branch": "Branch",
       "function": "Função",
       "sendToDestination": "Destino",
-      "configComingSoon": "A configuração de {node} virá em uma etapa posterior",
+      "configComingSoon": "A configuração de {node} estará disponível em uma etapa posterior",
       "sectionTransform": "Transformar",
       "sectionDestination": "Destino",
       "stepSearchPlaceholder": "Pesquisar etapas...",
@@ -2818,13 +2821,13 @@
       "branchMoveDown": "Mover caminho para baixo",
       "branchPathNumber": "Caminho {index}",
       "branchElseTitle": "Tudo o mais",
-      "branchElseHint": "Registros que não correspondem a nenhum caminho acima saem por aqui.",
+      "branchElseHint": "Os registros que não correspondem a nenhum caminho acima saem por aqui.",
       "branchNoteTitle": "Diretrizes do Branch",
-      "branchNoteFirstMatch": "Os caminhos são verificados de cima para baixo e a PRIMEIRA correspondência vence, portanto cada registro sai por exatamente um caminho.",
-      "branchNoteUnwired": "Um caminho sem nada conectado simplesmente descarta seus registros.",
+      "branchNoteFirstMatch": "Os caminhos são verificados de cima para baixo e a PRIMEIRA correspondência prevalece, portanto cada registro sai por exatamente um caminho.",
+      "branchNoteUnwired": "Um caminho sem nada conectado a ele simplesmente descarta seus registros.",
       "functionDesc": "Remodelar o payload com uma função",
       "destinationDesc": "Enviar para um destino",
-      "triggerBody": "Executa quando um alerta associado dispara",
+      "triggerBody": "Executa quando um alerta associado é disparado",
       "triggerDataExampleNote": "Apenas exemplo — as colunas reais vêm da consulta do seu alerta.",
       "incidentEventTypeLabel": "Tipo de evento",
       "incidentEventType": {
@@ -2848,13 +2851,13 @@
       "incidentNoExtraFields": "Este evento não adiciona campos além dos comuns.",
       "conditionNoteTitle": "Diretrizes de Condição",
       "functionFlattenTitle": "Antes vs Depois do Achatamento",
-      "conditionNoteCustom": "Para adicionar uma coluna personalizada, digite seu nome e pressione Enter.",
-      "functionBody": "Reformate o payload com uma função",
+      "conditionNoteCustom": "Para adicionar uma coluna personalizada, digite o nome dela e pressione Enter.",
+      "functionBody": "Remodele o payload com uma função",
       "functionBodySet": "Aplica {name}",
       "functionSelect": "Selecionar função",
       "functionCreateNew": "Criar nova função",
       "functionRequired": "A função é obrigatória",
-      "functionLoadError": "Não foi possível carregar funções",
+      "functionLoadError": "Não foi possível carregar as funções",
       "destinationBody": "Enviar para um destino",
       "destinationBodySet": "Envia para {name}",
       "destinationSelect": "Destino",
@@ -2920,7 +2923,7 @@
       "editStep": "Editar etapa",
       "readOnlyRun": "Você está visualizando uma execução anterior, portanto a configuração desta etapa não pode ser alterada aqui.",
       "readOnlyRunEdit": "Editar no fluxo de trabalho",
-      "testInputHint": "Entrada de teste — Edite e depois execute a etapa.",
+      "testInputHint": "Entrada de teste — edite e execute a etapa.",
       "noRunsList": "Nenhuma execução ainda.",
       "resetInput": "Redefinir para amostra",
       "eventPager": "{n} de {total}",
@@ -2945,7 +2948,7 @@
       "expand": "Expandir",
       "close": "Limpar e Fechar Resultados",
       "nodesTitle": "Etapas",
-      "empty": "Execute um teste para ver os resultados das etapas aqui.",
+      "empty": "Execute um teste para ver os resultados da etapa aqui.",
       "openNode": "Abrir Nó",
       "viewConfig": "Ver Configuração",
       "hideConfig": "Ocultar Configuração",
@@ -2955,7 +2958,7 @@
       "branchPathsLabel": "Caminhos",
       "branchNoRule": "Nenhuma regra definida",
       "destinationUnsupported": "Tipo Não Suportado",
-      "destinationMissing": "Este destino não existe mais ou não pode ser lido.",
+      "destinationMissing": "Este Destino não existe mais ou não pode ser lido.",
       "headersLabel": "Cabeçalhos",
       "templateLabel": "Modelo",
       "outputFormatLabel": "Formato de Saída",
@@ -3712,29 +3715,31 @@
       "crossLinkBody": "{brand} expõe um endpoint {product} (MCP) para que clientes de IA como {client1}, {client2} e {client3} possam consultar e agir nesta organização. A configuração e as credenciais ficam no IAM.",
       "crossLinkCta": "Abrir configuração do MCP",
       "tagline": "Conecte {client1}, {client2}, {client3} e outros clientes de IA a esta organização através do {product} (MCP).",
-      "endpointLabel": "Endpoint MCP",
-      "authLabel": "1. Autenticação",
-      "clientLabel": "2. Escolha seu cliente",
-      "configLabel": "3. Adicione a configuração",
+      "connectLabel": "Endpoint e autenticação",
+      "connectHint": "Aponte seu cliente MCP para esta URL e escolha como ele se autentica.",
+      "configLabel": "Adicione a configuração",
+      "configHint": "Escolha seu cliente e cole a configuração onde ela deve ficar.",
       "auth": {
         "oauth": "OAuth — faça login (recomendado)",
         "token": "Token de acesso",
+        "oauthTitle": "Faça login com seu navegador",
         "oauthNote": "Nenhuma credencial para gerenciar: seu cliente MCP abre um navegador para fazer login e o acesso é limitado pelas suas permissões existentes. Use sempre que seu cliente suportar OAuth."
       },
       "credential": {
-        "quickStartTitle": "Início rápido — sua conta",
-        "quickStartBody": "Os snippets usam suas próprias credenciais, que carregam todas as suas permissões. Para produção, gere uma credencial somente leitura dedicada.",
-        "generate": "Gerar credencial somente leitura",
-        "created": "Credencial somente leitura criada",
+        "quickStartTitle": "Ainda sem token",
+        "quickStartBody": "Os trechos abaixo contêm um cabeçalho de espaço reservado. Gere um token dedicado para este cliente MCP ou cole um token de conta de serviço existente no lugar do cabeçalho.",
+        "generate": "Gerar token dedicado",
+        "created": "Token dedicado criado",
         "shownOnce": "Para {email}. Copie agora — o token é mostrado apenas uma vez e os snippets abaixo agora o utilizam.",
         "download": "Baixar",
         "manage": "Gerenciar / revogar",
-        "readonlyWarn": "A conta foi criada, mas a função somente leitura não pôde ser aplicada automaticamente — revise suas permissões em Contas de Serviço.",
+        "readonlyWarn": "A conta foi criada, mas não pôde ser adicionada à função {role} — ela não tem permissões até que você atribua uma no IAM.",
+        "readonlyNote": "Acesso limitado a somente leitura pela função {role} — revise ou estenda em IAM › Funções.",
+        "rbacNote": "O RBAC está desativado nesta implantação, portanto este token não pode ser limitado a somente leitura — ele tem o mesmo acesso que qualquer outra credencial desta organização.",
         "error": "Não foi possível criar a credencial. Tente novamente ou crie uma conta de serviço manualmente no IAM."
       },
       "securityTitle": "Use uma credencial dedicada com privilégios mínimos",
-      "securityBody": "O token usa por padrão as credenciais da sua conta. Para produção, gere uma credencial somente leitura acima (ou crie uma conta de serviço com escopo) e nunca envie tokens para o controle de versão.",
-      "docsCta": "Leia a documentação completa do MCP",
+      "securityBody": "Forneça ao cliente MCP uma conta de serviço com escopo somente leitura, em vez de suas próprias credenciais de conta, e nunca faça commit do token dessa conta no controle de versão.",
       "clients": {
         "claudeCode": "Claude Code",
         "cursor": "Cursor",
@@ -3761,7 +3766,10 @@
         "hermes": "Adicione a ~/.hermes/config.yaml (YAML), depois execute /reload-mcp.",
         "codex": "Adicione a ~/.codex/config.toml (TOML), depois reinicie o Codex."
       },
-      "installOneClick": "Adicione a {client}"
+      "installOneClick": "Adicione a {client}",
+      "skillsLabel": "Adicionar a skill {brand} (opcional)",
+      "skillsHint": "Ensina seu Assistente de IA a consultar, alertar e criar painéis no {brand}, para aproveitar melhor as ferramentas MCP. Execute-a no seu projeto e depois escolha os agentes onde instalá-la.",
+      "skillsRepo": "Ver as skills em {host}"
     },
     "manageTokensBtnLabel": "Gerenciar tokens",
     "orgLevelExplanation": "Esses são tokens de ingestão no nível da organização. Eles não estão vinculados a usuários individuais e continuarão funcionando mesmo que o usuário que os criou deixe a organização. Os tokens só podem ser usados em terminais de ingestão.",
@@ -16365,6 +16373,7 @@
       },
       "databaseCount": "1 banco de dados | {count} bancos de dados",
       "openQueries": "Ver suas consultas",
+      "viewMetrics": "Ver métricas",
       "alertMe": "Alertar-me",
       "columnHints": {
         "qps": "Chamadas por segundo — as chamadas desta janela divididas pela sua duração, para que uma visão de 15 minutos e uma de 4 horas permaneçam comparáveis.",
@@ -16625,10 +16634,10 @@
         "missingDescription": "Esta página descreve uma consulta, e o endereço não nomeia uma. Se você acabou de mudar de organização, a consulta que você estava lendo pertence à que você saiu.",
         "action": "Navegar pelas consultas desta organização"
       },
-      "backToQueries": "Voltar para as principais consultas",
-      "backToActivity": "Voltar para atividade",
-      "backToSamples": "Voltar para chamadas mais lentas",
-      "backToDeadlocks": "Voltar para deadlocks",
+      "backToQueries": "principais consultas",
+      "backToActivity": "atividade",
+      "backToSamples": "chamadas mais lentas",
+      "backToDeadlocks": "deadlocks",
       "latencyTitle": "Velocidade ao longo do tempo",
       "volumeTitle": "Chamadas e falhas ao longo do tempo",
       "endpointsTitle": "De onde ela é chamada",
@@ -16793,6 +16802,8 @@
     "page": {
       "tabs": {
         "overview": "Visão geral",
+        "metrics": "Métricas",
+        "metricsHint": "Carga do banco de dados por evento de espera e todas as métricas que seus receptores de banco de dados coletam.",
         "queries": "Principais consultas",
         "samples": "Chamadas mais lentas",
         "samplesHintClient": "Chamadas concluídas que seus serviços instrumentados observaram nesta janela — chamadores sem rastreamento não são contados, então este é um mínimo, não o total. A tabela mostra as mais lentas delas.",
@@ -16809,6 +16820,129 @@
         "deadlocksLocked": "Deadlocks é um recurso Enterprise. Faça upgrade para ver quais consultas entraram em deadlock entre si e por quê. As outras abas de banco de dados funcionam em todos os planos.",
         "blockedLocked": "Consultas bloqueadas é um recurso Enterprise. Faça upgrade para ver quais sessões estão esperando por um lock e o que o está segurando. As outras abas de banco de dados funcionam em todos os planos.",
         "tableHealthLocked": "Saúde da tabela é um recurso Enterprise. Faça upgrade para acompanhar o tamanho da tabela, o estado de bloat e vacuum. As outras abas de banco de dados funcionam em todos os planos."
+      }
+    },
+    "metrics": {
+      "title": "Métricas",
+      "subtitle": "Carga do banco de dados e todas as métricas que seus receptores de banco de dados coletam, plotadas nesta janela",
+      "load": {
+        "title": "Carga do banco de dados",
+        "hint": "Média de sessões trabalhando ativamente por intervalo, empilhadas pela dimensão escolhida. Conexões ociosas são excluídas; uma sessão que não espera por nada está na CPU. Arraste sobre um pico para ampliar todos os gráficos até ele.",
+        "timeAxis": "Tempo",
+        "sessionsAxis": "Média de sessões ativas",
+        "waitEventAxis": "Evento de espera",
+        "viewActivity": "Ver em Atividade",
+        "breakdowns": {
+          "waitEvent": "Por evento de espera",
+          "query": "Por consulta",
+          "database": "Por banco de dados",
+          "user": "Por usuário"
+        }
+      },
+      "limitLegend": "limite de conexões",
+      "explore": "Abrir no Explorador de métricas",
+      "railLabel": "Seções de métricas",
+      "noAccess": "Você não tem permissão para ler {stream}. Peça a um administrador acesso de leitura a este stream.",
+      "byDims": {
+        "query": "por consulta",
+        "database": "por banco de dados",
+        "service": "por serviço",
+        "operation": "por operação",
+        "mode": "por modo",
+        "lockType": "por tipo de bloqueio",
+        "table": "por tabela",
+        "index": "por índice",
+        "client": "por cliente",
+        "state": "por estado",
+        "direction": "por direção",
+        "device": "por dispositivo",
+        "host": "por host"
+      },
+      "catalog": {
+        "activity": {
+          "title": "Atividade",
+          "desc": "Taxa de transferência, transações e rotatividade de linhas"
+        },
+        "locks": {
+          "title": "Bloqueios",
+          "desc": "Pressão de bloqueios e o que os mantém"
+        },
+        "replication": {
+          "title": "Replicação",
+          "desc": "Pressão de WAL e atraso de réplica"
+        },
+        "indexes": {
+          "title": "Índices",
+          "desc": "Uso e tamanho de índices por tabela"
+        },
+        "blocks": {
+          "title": "Blocos",
+          "desc": "E/S de buffer compartilhado atribuída a consultas, a partir dos próprios contadores do banco de dados"
+        },
+        "vacuum": {
+          "title": "Vacuum",
+          "desc": "Linhas vivas e mortas por tabela"
+        },
+        "host": {
+          "managedNote": "Este banco de dados é executado em um endpoint gerenciado na nuvem (como o Amazon RDS), portanto seu provedor não expõe um host para seus coletores monitorarem. Limpe o filtro de banco de dados para ver as métricas de host dos hosts que seus coletores relatam.",
+          "title": "Host",
+          "desc": "CPU, memória e E/S do host do banco de dados",
+          "loopbackHint": "instância acessada via localhost — exibindo todos os hosts",
+          "matchHint": "as métricas de host são correspondidas pelo nome do host"
+        }
+      },
+      "catalogPanels": {
+        "calls": "Chamadas de consulta",
+        "avgDuration": "Duração média",
+        "commits": "Commits",
+        "rollbacks": "Rollbacks",
+        "rowsModified": "Linhas modificadas",
+        "locks": "Bloqueios",
+        "walLag": "Atraso do WAL",
+        "indexScans": "Varreduras de índice",
+        "indexSize": "Tamanho do índice",
+        "blksHit": "Acertos de blocos compartilhados",
+        "blksRead": "Leituras de blocos compartilhados",
+        "blksDirtied": "Blocos compartilhados sujos",
+        "rowsByState": "Linhas por estado",
+        "cpuUtilization": "Utilização de CPU",
+        "memoryUsage": "Memória",
+        "diskIo": "E/S de disco",
+        "networkIo": "E/S de rede"
+      },
+      "searchPlaceholder": "Filtrar métricas…",
+      "triageOrder": "ordenado por relevância de triagem",
+      "sections": {
+        "featured": "Métricas principais de integridade",
+        "postgresql": "Métricas do PostgreSQL",
+        "mysql": "Métricas do MySQL e MariaDB"
+      },
+      "roleTitle": "{role} · {engine}",
+      "roles": {
+        "cacheHitRatio": "Taxa de acertos de cache",
+        "connections": "Conexões",
+        "connectionLimit": "Limite de conexões",
+        "replicationLag": "Atraso de replicação",
+        "cacheHit": "Acertos de cache",
+        "cacheRead": "Leituras de disco do cache",
+        "deadlocks": "Deadlocks"
+      },
+      "notCollecting": {
+        "title": "Nenhuma métrica de banco de dados está chegando",
+        "description": "O gráfico de carga acima lê as amostras de atividade, mas ainda não existem streams de métricas de um receptor de banco de dados nesta organização. As receitas de coletor nos cartões de configuração de banco de dados as fornecem.",
+        "checklistTitle": "O que verificar",
+        "checks": {
+          "receivers": {
+            "no": "Nenhum receptor de banco de dados está enviando métricas",
+            "noDetail": "Os cartões de configuração do PostgreSQL e do MySQL em Fontes de dados configuram o receptor de métricas do coletor junto com os feeds de monitoramento."
+          },
+          "enabled": {
+            "ok": "O monitoramento de banco de dados está habilitado",
+            "okDetail": "portanto as métricas serão exibidas aqui assim que um receptor as enviar",
+            "no": "O monitoramento de banco de dados está desabilitado",
+            "noDetail": "ZO_DB_MONITORING_ENABLED está desativado para esta implantação, portanto as abas de banco de dados não estão coletando."
+          }
+        }
       }
     },
     "samples": {

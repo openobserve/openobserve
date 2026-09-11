@@ -13,83 +13,75 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::promql::value::{EvalContext, Sample, Value};
-use datafusion::error::Result;
+use config::meta::promql::value::Sample;
 use hashbrown::HashMap;
-use promql_parser::parser::LabelModifier;
 
 use crate::{
     aggregations::{Accumulate, AggFunc},
     common::kahan_sum_increment,
 };
 
-/// Aggregates Matrix input for range queries
-pub fn sum(param: &Option<LabelModifier>, data: Value, eval_ctx: &EvalContext) -> Result<Value> {
-    let start = std::time::Instant::now();
-    log::info!(
-        "[trace_id: {}] [PromQL Timing] sum() started",
-        eval_ctx.trace_id
-    );
-
-    let result = super::eval_aggregate(param, data, Sum, eval_ctx);
-    log::info!(
-        "[trace_id: {}] [PromQL Timing] sum() execution took: {:?}",
-        eval_ctx.trace_id,
-        start.elapsed()
-    );
-    result
-}
-
 pub struct Sum;
 
+#[derive(Clone, Copy, Default)]
+pub(crate) struct SumState {
+    sum: f64,
+    compensation: f64,
+}
+
+impl SumState {
+    pub(crate) fn push(&mut self, value: f64) {
+        (self.sum, self.compensation) = kahan_sum_increment(value, self.sum, self.compensation);
+    }
+
+    pub(crate) fn merge(&mut self, other: Self) {
+        // Fold the other partial's sum and compensation in as two
+        // separate compensated increments: a plain `c + other_c` add
+        // rounds residuals away before the main sums get to cancel.
+        self.push(other.sum);
+        self.push(other.compensation);
+    }
+
+    pub(crate) fn value(&self) -> f64 {
+        self.sum + self.compensation
+    }
+}
+
 impl AggFunc for Sum {
+    type Accumulator = SumAccumulate;
+
     fn name(&self) -> &'static str {
         "sum"
     }
 
-    fn build(&self) -> Box<dyn super::Accumulate> {
-        Box::new(SumAccumulate::new())
+    fn build(&self) -> Self::Accumulator {
+        Self::Accumulator::default()
     }
 }
 
+#[derive(Default)]
 pub struct SumAccumulate {
-    sum: HashMap<i64, (f64, f64)>,
-}
-
-impl SumAccumulate {
-    fn new() -> Self {
-        SumAccumulate {
-            sum: HashMap::new(),
-        }
-    }
+    sum: HashMap<i64, SumState>,
 }
 
 impl Accumulate for SumAccumulate {
     fn accumulate(&mut self, sample: &Sample) {
-        let (sum, c) = self.sum.entry(sample.timestamp).or_insert((0.0, 0.0));
-        (*sum, *c) = kahan_sum_increment(sample.value, *sum, *c);
+        self.sum
+            .entry(sample.timestamp)
+            .or_default()
+            .push(sample.value);
     }
 
-    fn merge(&mut self, other: Box<dyn Accumulate>) {
-        let other = other.into_any().downcast::<Self>().expect("same type");
-        for (timestamp, (other_sum, other_c)) in other.sum {
-            let (sum, c) = self.sum.entry(timestamp).or_insert((0.0, 0.0));
-            // Fold the other partial's sum and compensation in as two
-            // separate compensated increments: a plain `c + other_c` add
-            // rounds residuals away before the main sums get to cancel.
-            (*sum, *c) = kahan_sum_increment(other_sum, *sum, *c);
-            (*sum, *c) = kahan_sum_increment(other_c, *sum, *c);
+    fn merge(&mut self, other: Self) {
+        for (timestamp, other) in other.sum {
+            self.sum.entry(timestamp).or_default().merge(other);
         }
     }
 
-    fn into_any(self: Box<Self>) -> Box<dyn std::any::Any> {
-        self
-    }
-
-    fn evaluate(self: Box<Self>) -> Vec<Sample> {
+    fn evaluate(self) -> Vec<Sample> {
         self.sum
             .into_iter()
-            .map(|(timestamp, (sum, c))| Sample::new(timestamp, sum + c))
+            .map(|(timestamp, sum)| Sample::new(timestamp, sum.value()))
             .collect()
     }
 }
@@ -98,16 +90,47 @@ impl Accumulate for SumAccumulate {
 mod tests {
     use std::sync::Arc;
 
-    use config::meta::promql::value::{Label, RangeValue, Sample, Value};
+    use config::meta::promql::value::{EvalContext, Label, RangeValue, Sample, Value};
     use promql_parser::parser::LabelModifier;
 
     use super::*;
+    use crate::aggregations::eval_aggregate;
+
+    #[test]
+    fn test_sum_state_preserves_compensation_and_special_values() {
+        for (values, expected) in [
+            (vec![], 0.0_f64),
+            (vec![-0.0], 0.0),
+            (vec![1e16, 1.0, -1e16], 1.0),
+            (vec![f64::MAX, f64::MAX], f64::INFINITY),
+            (vec![f64::NEG_INFINITY, 1.0], f64::NEG_INFINITY),
+            (vec![f64::INFINITY, f64::NEG_INFINITY], f64::NAN),
+            (vec![f64::NAN, 1.0], f64::NAN),
+        ] {
+            for split in 0..=values.len() {
+                let mut sum = SumState::default();
+                for &value in &values[..split] {
+                    sum.push(value);
+                }
+                let mut partial = SumState::default();
+                for &value in &values[split..] {
+                    partial.push(value);
+                }
+                sum.merge(partial);
+                if expected.is_nan() {
+                    assert!(sum.value().is_nan());
+                } else {
+                    assert_eq!(sum.value().to_bits(), expected.to_bits());
+                }
+            }
+        }
+    }
 
     #[test]
     fn test_sum_value_none_input() {
         let ts = 1640995200;
         let eval_ctx = EvalContext::new(ts, ts + 1, 1, "test".to_string());
-        let result = sum(&None, Value::None, &eval_ctx).unwrap();
+        let result = eval_aggregate(&None, Value::None, Sum, &eval_ctx).unwrap();
         assert!(matches!(result, Value::None));
     }
 
@@ -115,7 +138,7 @@ mod tests {
     fn test_sum_invalid_input_returns_err() {
         let ts = 1640995200;
         let eval_ctx = EvalContext::new(ts, ts + 1, 1, "test".to_string());
-        let result = sum(&None, Value::Float(1.0), &eval_ctx);
+        let result = eval_aggregate(&None, Value::Float(1.0), Sum, &eval_ctx);
         assert!(result.is_err());
     }
 
@@ -123,7 +146,7 @@ mod tests {
     fn test_sum_empty_matrix_returns_none() {
         let ts = 1640995200;
         let eval_ctx = EvalContext::new(ts, ts + 1, 1, "test".to_string());
-        let result = sum(&None, Value::Matrix(vec![]), &eval_ctx).unwrap();
+        let result = eval_aggregate(&None, Value::Matrix(vec![]), Sum, &eval_ctx).unwrap();
         assert!(matches!(result, Value::None));
     }
 
@@ -188,7 +211,7 @@ mod tests {
         let eval_ctx = EvalContext::new(ts1, ts3 + 1, 1000, "test".to_string());
 
         // Test 1: sum without label grouping (all series summed together)
-        let result = sum(&None, Value::Matrix(matrix.clone()), &eval_ctx).unwrap();
+        let result = eval_aggregate(&None, Value::Matrix(matrix.clone()), Sum, &eval_ctx).unwrap();
 
         match result {
             Value::Matrix(result_matrix) => {
@@ -210,7 +233,7 @@ mod tests {
         let param = Some(LabelModifier::Include(promql_parser::label::Labels {
             labels: vec!["job".to_string()],
         }));
-        let result = sum(&param, Value::Matrix(matrix.clone()), &eval_ctx).unwrap();
+        let result = eval_aggregate(&param, Value::Matrix(matrix.clone()), Sum, &eval_ctx).unwrap();
 
         match result {
             Value::Matrix(result_matrix) => {

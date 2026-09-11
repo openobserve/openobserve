@@ -26,14 +26,14 @@ use promql_parser::{
 
 use super::{
     Engine,
-    selector::{
-        SelectorContexts, equal_matcher_filters, get_offset_modifier, named_selector,
-        plain_selector,
-    },
+    selector::{SelectorContexts, named_selector, plain_selector},
 };
 use crate::{
-    functions, fused, micros,
-    series_stream::merge::{MergeSeriesStream, StreamingSelector, series_label_columns},
+    functions, micros,
+    series_stream::plan::{
+        StreamingSelector, execute_partitioned, group_label_columns, series_label_columns,
+    },
+    streaming_eval,
 };
 
 /// What scanning a selector takes: the normalized selector, its offset and label set, the
@@ -56,7 +56,7 @@ impl Engine {
         range: Duration,
         modifier: &Option<LabelModifier>,
         func: Arc<dyn functions::RangeFunc>,
-        op: fused::FusedAggOp,
+        op: streaming_eval::FusedAggOp,
     ) -> Result<Option<Value>> {
         if matches!(modifier, Some(LabelModifier::Exclude(_))) {
             return Ok(None);
@@ -64,23 +64,8 @@ impl Engine {
         let Some(scan) = self.selector_scan(vs, range, "MatrixSelector").await? else {
             return Ok(None);
         };
-        let timeout = self.ctx.query_ctx.timeout;
-        let shape = fused::stream::FusedShape {
-            op,
-            func: func.clone(),
-            range,
-        };
         let streamed = self
-            .stream_scan_guarded(&scan, |ctx, schema| {
-                fused::stream::fused_agg(
-                    ctx,
-                    schema,
-                    scan.streaming_selector(),
-                    shape,
-                    modifier,
-                    &self.eval_ctx,
-                )
-            })
+            .stream_fused_agg(&scan, modifier, func.clone(), op, range)
             .await?;
         if let Some(value) = streamed {
             if self.result_type.is_none() {
@@ -93,12 +78,7 @@ impl Engine {
         let matrix = self
             .eval_matrix_selector(&scan.selector, range, Some(scan.ctxs))
             .await?;
-        let input = if matrix.is_empty() {
-            Value::None
-        } else {
-            Value::Matrix(matrix)
-        };
-        fused::matrix::fused_agg(modifier, input, func, op, &self.eval_ctx, timeout)
+        self.materialized_fused_agg(modifier, Value::Matrix(matrix), func, op)
             .await
             .map(Some)
     }
@@ -164,6 +144,38 @@ impl Engine {
             .map(Some)
     }
 
+    async fn stream_fused_agg(
+        &self,
+        scan: &SelectorScan,
+        modifier: &Option<LabelModifier>,
+        func: Arc<dyn functions::RangeFunc>,
+        op: streaming_eval::FusedAggOp,
+        range: Duration,
+    ) -> Result<Option<Value>> {
+        self.stream_scan_guarded(scan, |ctx, schema| async move {
+            let Some(label_cols) = group_label_columns(modifier, schema, func.name()) else {
+                return Ok(None);
+            };
+            let Some(sources) = execute_partitioned(
+                ctx,
+                schema,
+                &scan.streaming_selector(),
+                label_cols,
+                micros(range),
+                &self.eval_ctx,
+            )
+            .await?
+            else {
+                return Ok(None);
+            };
+            let eval = Arc::new(streaming_eval::RangeExpr::new(func, range, &self.eval_ctx));
+            streaming_eval::aggregate(sources, op, eval)
+                .await
+                .map(|(value, _)| Some(value))
+        })
+        .await
+    }
+
     async fn stream_range_func(
         &self,
         scan: &SelectorScan,
@@ -176,8 +188,8 @@ impl Engine {
             } else {
                 series_label_columns(schema, &scan.label_selector, func.name())
             };
-            let eval = Arc::new(fused::RangeExpr::new(func, range, &self.eval_ctx));
-            match MergeSeriesStream::execute_partitioned(
+            let eval = Arc::new(streaming_eval::RangeExpr::new(func, range, &self.eval_ctx));
+            match execute_partitioned(
                 ctx,
                 schema,
                 &scan.streaming_selector(),
@@ -188,7 +200,7 @@ impl Engine {
             .await?
             {
                 None => Ok(None),
-                Some(sources) => fused::eval_range(sources, eval).await.map(Some),
+                Some(sources) => streaming_eval::eval_range(sources, eval).await.map(Some),
             }
         })
         .await
@@ -269,26 +281,10 @@ impl Engine {
             return Ok(None);
         }
         let selector = named_selector(plain_selector(vs, kind)?, kind)?;
-        let table_name = selector.name.clone().unwrap();
-
-        let offset = get_offset_modifier(selector.offset.clone());
-        let start = self.ctx.start - micros(range) - offset;
-        let end = self.ctx.end - offset;
-        let mut filters = equal_matcher_filters(&selector.matchers);
-        let mut label_selector = self.label_selector.clone();
-        label_selector.extend(self.ctx.label_selector.iter().cloned());
-
+        let (start, end, offset) = self.selector_time_range(&selector, Some(range));
+        let label_selector = self.selector_labels();
         let ctxs = self
-            .ctx
-            .table_provider
-            .create_context(
-                &query_ctx.org_id,
-                &table_name,
-                (start, end),
-                selector.matchers.clone(),
-                label_selector.clone(),
-                &mut filters,
-            )
+            .create_selector_contexts(&selector, (start, end), &label_selector)
             .await?;
         let scan_matchers = match ctxs.as_slice() {
             [(_, _, _, false)] => Matchers::empty(),
@@ -593,17 +589,45 @@ mod tests {
     async fn test_instant_agg_matches_generic_streaming_and_materialized() {
         type Agg = fn(&Option<LabelModifier>, Value, &EvalContext) -> Result<Value>;
         let cases: [(&str, &str, Agg); 4] = [
-            ("sum(m)", "m", crate::aggregations::sum),
-            ("count(m)", "m", crate::aggregations::count),
+            ("sum(m)", "m", |modifier, input, eval_ctx| {
+                crate::aggregations::eval_aggregate(
+                    modifier,
+                    input,
+                    crate::aggregations::Sum,
+                    eval_ctx,
+                )
+            }),
+            ("count(m)", "m", |modifier, input, eval_ctx| {
+                crate::aggregations::eval_aggregate(
+                    modifier,
+                    input,
+                    crate::aggregations::Count,
+                    eval_ctx,
+                )
+            }),
             (
                 "avg(m offset 30s)",
                 "m offset 30s",
-                crate::aggregations::avg,
+                |modifier, input, eval_ctx| {
+                    crate::aggregations::eval_aggregate(
+                        modifier,
+                        input,
+                        crate::aggregations::Avg,
+                        eval_ctx,
+                    )
+                },
             ),
             (
                 "max(m offset 30s)",
                 "m offset 30s",
-                crate::aggregations::max,
+                |modifier, input, eval_ctx| {
+                    crate::aggregations::eval_aggregate(
+                        modifier,
+                        input,
+                        crate::aggregations::Max,
+                        eval_ctx,
+                    )
+                },
             ),
         ];
         for (query, selector, agg) in cases {
