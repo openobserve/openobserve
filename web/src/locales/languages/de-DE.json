@@ -2425,7 +2425,9 @@
     "subscription_plan": "Abonnementplan",
     "pendingDeletion": "Löschung ausstehend",
     "daysLeft": "{n} Tage verbleibend",
-    "resurrect": "Organisation wiederherstellen"
+    "resurrect": "Organisation wiederherstellen",
+    "statusActive": "Aktiv",
+    "statusDeleting": "Wird gelöscht"
   },
   "template": {
     "search": "Vorlage durchsuchen"

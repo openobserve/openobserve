@@ -103,8 +103,8 @@ const organizations = {
     return http().delete(`/api/${orgIdentifier}/external_contract/${targetOrgId}`);
   },
 
-  get_cleanup_tasks: (targetOrgId: string) => {
-    return http().get(`/api/_meta/org_cleanup_tasks/${targetOrgId}`);
+  get_cleanup_tasks: (metaOrg: string, targetOrgId: string) => {
+    return http().get(`/api/${metaOrg}/org_cleanup_tasks/${targetOrgId}`);
   },
   delete_org: (orgIdentifier: string) => {
     return http().delete(`/api/${orgIdentifier}/organizations`);
