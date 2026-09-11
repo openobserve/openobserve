@@ -16,13 +16,15 @@
 use std::sync::Arc;
 
 use bytes::Bytes;
-use common::infra::config::ORG_INGESTION_TOKENS;
+use common::infra::config::{ORG_INGESTION_TOKENS, SPLUNK_HEC_TOKENS};
 use infra::{
     db::{self, delete_from_db_coordinator, get_coordinator, put_into_db_coordinator},
     table::org_ingestion_tokens::{self, OrgIngestionTokenListRecord, OrgIngestionTokenRecord},
 };
 
 const ORG_INGESTION_TOKENS_KEY_PREFIX: &str = "/org_ingestion_tokens/";
+/// Matches `DEFAULT_TOKEN_CACHE_TTL` in the table layer.
+const SPLUNK_TOKEN_RELOAD_INTERVAL: std::time::Duration = std::time::Duration::from_secs(60);
 
 #[inline]
 pub fn cache_key(org_id: &str, token: &str) -> String {
@@ -31,6 +33,18 @@ pub fn cache_key(org_id: &str, token: &str) -> String {
 
 fn event_key(org_id: &str, token: &str) -> String {
     format!("{ORG_INGESTION_TOKENS_KEY_PREFIX}{}/{}", org_id, token)
+}
+
+/// Mirror one row's Splunk GUID into the lookup map, or evict it.
+fn sync_splunk_token(record: &OrgIngestionTokenRecord, enabled: bool) {
+    let Some(guid) = record.splunk_token.clone().flatten() else {
+        return;
+    };
+    if enabled {
+        SPLUNK_HEC_TOKENS.insert(guid, (record.org_id.clone(), record.id.clone()));
+    } else {
+        SPLUNK_HEC_TOKENS.remove(&guid);
+    }
 }
 
 /// Insert a new org ingestion token and notify the cluster.
@@ -62,11 +76,11 @@ pub async fn rotate_token(org_id: &str, name: &str) -> Result<String, anyhow::Er
     #[cfg(feature = "enterprise")]
     {
         super_cluster::org_ingestion_token_delete(&old_key).await?;
-        let new_record = OrgIngestionTokenRecord {
-            token: new_token.clone(),
-            ..existing
-        };
-        super_cluster::org_ingestion_token_put(&new_key, &new_record).await?;
+        // Replicate the committed row, not a patched pre-update copy, so a
+        // concurrent write to another column is not replicated away.
+        if let Some(committed) = org_ingestion_tokens::get_by_name(org_id, name).await? {
+            super_cluster::org_ingestion_token_put(&new_key, &committed).await?;
+        }
     }
     Ok(new_token)
 }
@@ -88,14 +102,44 @@ pub async fn set_enabled(org_id: &str, name: &str, enabled: bool) -> Result<(), 
     // Always replicate the token with its new `enabled` state; the receiving
     // cluster fires the matching coordinator event based on the flag.
     #[cfg(feature = "enterprise")]
-    {
-        let record = OrgIngestionTokenRecord {
-            enabled,
-            ..existing
-        };
-        super_cluster::org_ingestion_token_put(&key, &record).await?;
+    if let Some(committed) = org_ingestion_tokens::get_by_name(org_id, name).await? {
+        super_cluster::org_ingestion_token_put(&key, &committed).await?;
     }
     Ok(())
+}
+
+/// Generate or revoke a token's Splunk HEC GUID and notify the cluster.
+///
+/// Returns the new GUID, or `None` when revoked.
+pub async fn set_splunk_token(
+    org_id: &str,
+    name: &str,
+    generate: bool,
+) -> Result<Option<String>, anyhow::Error> {
+    let existing = org_ingestion_tokens::get_by_name(org_id, name)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("Token '{}' not found", name))?;
+
+    let new_value = generate.then(org_ingestion_tokens::generate_splunk_token);
+    org_ingestion_tokens::set_splunk_token(org_id, name, new_value.clone()).await?;
+
+    if let Some(old) = existing.splunk_token.flatten() {
+        SPLUNK_HEC_TOKENS.remove(&old);
+    }
+    if let Some(new) = &new_value
+        && existing.enabled
+    {
+        SPLUNK_HEC_TOKENS.insert(new.clone(), (org_id.to_string(), existing.id.clone()));
+    }
+
+    let key = event_key(org_id, &existing.token);
+    let _ = put_into_db_coordinator(&key, Bytes::new(), true, None).await;
+
+    #[cfg(feature = "enterprise")]
+    if let Some(committed) = org_ingestion_tokens::get_by_name(org_id, name).await? {
+        super_cluster::org_ingestion_token_put(&key, &committed).await?;
+    }
+    Ok(new_value)
 }
 
 /// Find an enabled token by org_id and token value.
@@ -135,7 +179,35 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         "Org ingestion tokens cached: {}",
         ORG_INGESTION_TOKENS.len()
     );
+    reload_splunk_tokens().await
+}
+
+/// Rebuild the Splunk HEC token map from the database, dropping stale entries.
+pub async fn reload_splunk_tokens() -> Result<(), anyhow::Error> {
+    let records = org_ingestion_tokens::list_all_enabled_splunk().await?;
+    let mut seen = std::collections::HashSet::with_capacity(records.len());
+    for (splunk_token, org_id, id) in records {
+        seen.insert(splunk_token.clone());
+        SPLUNK_HEC_TOKENS.insert(splunk_token, (org_id, id));
+    }
+    SPLUNK_HEC_TOKENS.retain(|guid, _| seen.contains(guid));
     Ok(())
+}
+
+/// Periodic full reload of the Splunk HEC token map.
+///
+/// Coordinator put/delete failures are discarded by every write path here, and
+/// `watch` exits `Ok(())` when its channel closes, so a lost event would
+/// otherwise leave the map wrong forever with nothing to repair it.
+pub async fn run_splunk_token_reload() -> Result<(), anyhow::Error> {
+    let mut interval = tokio::time::interval(SPLUNK_TOKEN_RELOAD_INTERVAL);
+    interval.tick().await;
+    loop {
+        interval.tick().await;
+        if let Err(e) = reload_splunk_tokens().await {
+            log::error!("[SPLUNK_HEC] failed to reload splunk token cache: {e}");
+        }
+    }
 }
 
 /// Watch for cluster-wide cache invalidation events.
@@ -169,16 +241,27 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     if let Ok(Some(record)) =
                         org_ingestion_tokens::find_enabled_token(parts[0], parts[1]).await
                     {
+                        sync_splunk_token(&record, true);
                         ORG_INGESTION_TOKENS.insert(item_key.to_string(), record.name);
                     } else {
+                        if let Ok(Some(record)) =
+                            org_ingestion_tokens::find_token_any_state(parts[0], parts[1]).await
+                        {
+                            sync_splunk_token(&record, false);
+                        }
                         ORG_INGESTION_TOKENS.remove(item_key);
                     }
                 }
             }
             db::Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
-                if let Some((org_id, _)) = item_key.split_once('/') {
+                if let Some((org_id, token)) = item_key.split_once('/') {
                     org_ingestion_tokens::invalidate_default_cache(org_id);
+                    if let Ok(Some(record)) =
+                        org_ingestion_tokens::find_token_any_state(org_id, token).await
+                    {
+                        sync_splunk_token(&record, false);
+                    }
                 }
                 ORG_INGESTION_TOKENS.remove(item_key);
             }

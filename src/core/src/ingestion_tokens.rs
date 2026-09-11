@@ -33,6 +33,7 @@ pub async fn create_default_token(org_id: &str, created_by: &str) -> Result<(), 
         created_by: created_by.to_string(),
         created_at: chrono::Utc::now().timestamp_micros(),
         updated_at: chrono::Utc::now().timestamp_micros(),
+        splunk_token: Some(None),
     };
     db::org_ingestion_tokens::add(&record).await?;
     Ok(())
@@ -60,6 +61,7 @@ pub async fn list_tokens(org_id: &str) -> Result<Vec<OrgIngestionToken>, anyhow:
             enabled: r.enabled,
             created_by: r.created_by,
             created_at: r.created_at,
+            splunk_token: r.splunk_token,
         })
         .collect();
     Ok(tokens)
@@ -71,6 +73,7 @@ pub async fn create_token(
     name: &str,
     description: &str,
     created_by: &str,
+    with_splunk_token: bool,
 ) -> Result<OrgIngestionToken, anyhow::Error> {
     // Validate name
     let name = name.trim();
@@ -100,6 +103,7 @@ pub async fn create_token(
     }
 
     let token_value = org_ingestion_tokens::generate_token();
+    let splunk_token = with_splunk_token.then(org_ingestion_tokens::generate_splunk_token);
     let now = chrono::Utc::now().timestamp_micros();
     let record = org_ingestion_tokens::OrgIngestionTokenRecord {
         id: ider::uuid(),
@@ -112,8 +116,13 @@ pub async fn create_token(
         created_by: created_by.to_string(),
         created_at: now,
         updated_at: now,
+        splunk_token: Some(splunk_token.clone()),
     };
     db::org_ingestion_tokens::add(&record).await?;
+    if let Some(guid) = &splunk_token {
+        common::infra::config::SPLUNK_HEC_TOKENS
+            .insert(guid.clone(), (org_id.to_string(), record.id.clone()));
+    }
 
     Ok(OrgIngestionToken {
         name: name.to_string(),
@@ -123,6 +132,7 @@ pub async fn create_token(
         enabled: true,
         created_by: created_by.to_string(),
         created_at: now,
+        splunk_token,
     })
 }
 
@@ -142,6 +152,7 @@ pub async fn rotate_token(org_id: &str, name: &str) -> Result<OrgIngestionToken,
         enabled: existing.enabled,
         created_by: existing.created_by,
         created_at: existing.created_at,
+        splunk_token: existing.splunk_token.flatten(),
     })
 }
 
@@ -152,6 +163,16 @@ pub async fn set_enabled_token(
     enabled: bool,
 ) -> Result<(), anyhow::Error> {
     db::org_ingestion_tokens::set_enabled(org_id, name, enabled).await
+}
+
+/// Generate or revoke a token's Splunk HEC GUID. Returns the new GUID, or `None`
+/// when revoked.
+pub async fn set_splunk_token(
+    org_id: &str,
+    name: &str,
+    generate: bool,
+) -> Result<Option<String>, anyhow::Error> {
+    db::org_ingestion_tokens::set_splunk_token(org_id, name, generate).await
 }
 
 /// Validate an org token credential. Returns Some(token_record) if valid, None if not found.

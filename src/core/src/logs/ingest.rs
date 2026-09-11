@@ -681,10 +681,14 @@ pub async fn ingest(
             .inc();
     }
 
-    Ok(IngestionResponse::new(
-        http::StatusCode::OK.into(),
-        vec![response_body],
-    ))
+    // A write failure used to be visible only in the metric label while the
+    // caller still saw 200; report it so the HTTP handler can surface it.
+    let code = if metric_rpt_status_code == "500" {
+        http::StatusCode::INTERNAL_SERVER_ERROR
+    } else {
+        http::StatusCode::OK
+    };
+    Ok(IngestionResponse::new(code.into(), vec![response_body]))
 }
 
 /// Finalize a log record (flatten, resolve timestamp, apply UDS, add

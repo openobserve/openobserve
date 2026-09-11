@@ -39,8 +39,11 @@ use config::{
 };
 use futures::StreamExt;
 use hashbrown::HashMap;
-use http_body_util::BodyExt;
+use http_body_util::{BodyExt, Limited};
 use infra::cluster;
+
+/// Compressed-body cap on the router hop for the unauthenticated collector path.
+const SPLUNK_COLLECTOR_PROXY_BODY_LIMIT: usize = 10 * 1024 * 1024;
 
 /// Global HTTP client for connection pooling.
 /// Using OnceLock ensures thread-safe lazy initialization.
@@ -155,8 +158,20 @@ async fn resolve_candidates(path: &str, base_uri: &str) -> Result<(String, Vec<N
     }
 
     let nodes = order_nodes(nodes);
-    let full_path = format!("{}{}", base_uri, path);
+    // The collector is mounted at the server root on the ingester, outside the
+    // base_uri nest, so its path must be forwarded unchanged.
+    let full_path = if is_splunk_collector_route(api_path) {
+        api_path.to_string()
+    } else {
+        format!("{}{}", base_uri, path)
+    };
     Ok((full_path, nodes))
+}
+
+/// True for the Splunk HEC collector paths, which are never under `base_uri`.
+pub fn is_splunk_collector_route(path: &str) -> bool {
+    let path = extract_path_without_query(path);
+    path == "/services/collector" || path.starts_with("/services/collector/")
 }
 
 /// Orders the candidate nodes so the preferred node (per dispatch strategy) is
@@ -230,18 +245,33 @@ async fn proxy_request(
     let headers = build_request_headers(req.headers(), is_streaming);
 
     // Read the request body once and keep it buffered so it can be re-sent on
-    // each fail-over attempt. The body is held fully in memory (bounded by the
-    // usual request size limits); buffering is required because a consumed
-    // stream cannot be replayed onto another node.
-    let body = match req.into_body().collect().await {
-        Ok(collected) => collected.to_bytes(),
-        Err(e) => {
-            log::error!("Failed to read request body: {:?}", e);
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "Failed to read request body",
-            )
-                .into_response();
+    // each fail-over attempt. The body is held fully in memory; buffering is
+    // required because a consumed stream cannot be replayed onto another node.
+    //
+    // `collect()` bypasses the extractor-based DefaultBodyLimit, so unauthenticated
+    // root-level routes have to carry their own cap here.
+    let body = if is_splunk_collector_route(query_path) {
+        match Limited::new(req.into_body(), SPLUNK_COLLECTOR_PROXY_BODY_LIMIT)
+            .collect()
+            .await
+        {
+            Ok(collected) => collected.to_bytes(),
+            Err(e) => {
+                log::warn!("Collector request body rejected: {e}");
+                return (StatusCode::PAYLOAD_TOO_LARGE, "Request entity too large").into_response();
+            }
+        }
+    } else {
+        match req.into_body().collect().await {
+            Ok(collected) => collected.to_bytes(),
+            Err(e) => {
+                log::error!("Failed to read request body: {:?}", e);
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Failed to read request body",
+                )
+                    .into_response();
+            }
         }
     };
 
@@ -757,11 +787,38 @@ pub fn create_router_routes() -> axum::Router {
         .route("/aws/{*path}", any(dispatch))
         .route("/gcp/{*path}", any(dispatch))
         .route("/rum/{*path}", any(dispatch))
+        // Splunk forwarders POST to a bare host, so the collector has to be
+        // reachable on a router node too.
+        .route("/services/collector", any(dispatch))
+        .route("/services/collector/{*path}", any(dispatch))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_splunk_collector_route_detection() {
+        assert!(is_splunk_collector_route("/services/collector"));
+        assert!(is_splunk_collector_route("/services/collector/event"));
+        assert!(is_splunk_collector_route("/services/collector/health"));
+        assert!(is_splunk_collector_route("/services/collector?channel=x"));
+        assert!(!is_splunk_collector_route("/services/collectorfoo"));
+        assert!(!is_splunk_collector_route("/api/default/_hec"));
+        assert!(!is_splunk_collector_route("/services"));
+    }
+
+    #[test]
+    fn test_collector_is_an_ingester_route_not_a_querier_route() {
+        // Wrong here means every forwarder is proxied to a querier.
+        assert!(!is_querier_route("/services/collector"));
+        assert!(!is_querier_route("/services/collector/event"));
+    }
+
+    #[test]
+    fn test_collector_is_rate_limit_exempt() {
+        assert!(config::router::INGESTER_ROUTES.contains(&"/services/collector"));
+    }
 
     #[test]
     fn test_is_querier_route() {

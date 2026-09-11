@@ -7898,6 +7898,7 @@ dependencies = [
  "chrono",
  "common",
  "config",
+ "db",
  "flate2",
  "hashbrown 0.16.1",
  "infra",

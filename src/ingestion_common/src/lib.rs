@@ -773,6 +773,27 @@ mod tests {
         assert_eq!(custom.code, 418);
     }
 
+    /// D3: `/api/{org_id}/_hec` response bodies are a frozen wire contract
+    /// shared with existing clients. The Splunk collector has its own status
+    /// type precisely so these do not change.
+    #[test]
+    fn test_legacy_hec_response_bodies_are_byte_identical() {
+        for (status, expected) in [
+            (HecStatus::Success, r#"{"text":"Success","code":200}"#),
+            (
+                HecStatus::InvalidFormat,
+                r#"{"text":"Invalid data format","code":400}"#,
+            ),
+            (
+                HecStatus::InvalidIndex,
+                r#"{"text":"Incorrect index","code":400}"#,
+            ),
+        ] {
+            let resp: HecResponse = status.into();
+            assert_eq!(json::to_string(&resp).unwrap(), expected);
+        }
+    }
+
     /// Verifies that `IngestionRequest::Usage` does NOT trigger usage reporting,
     /// preventing circular reporting where usage events generate more usage events.
     #[test]
