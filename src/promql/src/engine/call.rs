@@ -52,10 +52,11 @@ impl Engine {
                     .try_streaming_range_func(vs, *range, Arc::clone(&range_func))
                     .await?
                 {
-                    return Ok(value);
+                    value
+                } else {
+                    let input = self.call_expr_arg(args, 0).await?;
+                    functions::eval_range(input, range_func, &self.eval_ctx)?
                 }
-                let input = self.call_expr_arg(args, 0).await?;
-                functions::eval_range(input, range_func, &self.eval_ctx)?
             } else {
                 let input = self.call_expr_arg(args, 0).await?;
                 functions::eval_range(input, range_func, &self.eval_ctx)?
@@ -74,7 +75,7 @@ impl Engine {
     }
 
     async fn call_builtin(&mut self, func_name: Func, args: &FunctionArgs) -> Result<Value> {
-        Ok(match func_name {
+        match func_name {
             Func::Clamp => {
                 let err = "Invalid args, expected clamp(v instant-vector, min scalar, max scalar)";
                 self.ensure_args_len(args, 3, err)?;
@@ -85,23 +86,25 @@ impl Engine {
                 if min_f > max_f {
                     return Ok(Value::Matrix(vec![]));
                 }
-                functions::clamp(input, min_f, max_f)?
+                functions::clamp(input, min_f, max_f)
             }
-            Func::ClampMax => {
-                let err = "Invalid args, expected clamp(v instant-vector, max scalar)";
+            Func::ClampMax | Func::ClampMin => {
+                let is_max = func_name == Func::ClampMax;
+                let err = if is_max {
+                    "Invalid args, expected clamp(v instant-vector, max scalar)"
+                } else {
+                    "Invalid args, expected clamp(v instant-vector, min scalar)"
+                };
                 self.ensure_args_len(args, 2, err)?;
                 let input = self.call_expr_arg(args, 0).await?;
-                let max_f = self.call_scalar_arg(args, 1, err).await?;
+                let bound = self.call_scalar_arg(args, 1, err).await?;
+                let (min, max) = if is_max {
+                    (f64::MIN, bound)
+                } else {
+                    (bound, f64::MAX)
+                };
 
-                functions::clamp(input, f64::MIN, max_f)?
-            }
-            Func::ClampMin => {
-                let err = "Invalid args, expected clamp(v instant-vector, min scalar)";
-                self.ensure_args_len(args, 2, err)?;
-                let input = self.call_expr_arg(args, 0).await?;
-                let min_f = self.call_scalar_arg(args, 1, err).await?;
-
-                functions::clamp(input, min_f, f64::MAX)?
+                functions::clamp(input, min, max)
             }
             Func::HistogramQuantile => {
                 let err = "Invalid args, expected histogram_quantile(phi scalar, b instant-vector)";
@@ -109,7 +112,7 @@ impl Engine {
                 let phi_f = self.call_scalar_arg(args, 0, err).await?;
                 let input = self.call_expr_arg(args, 1).await?;
 
-                functions::histogram_quantile(phi_f, input, &self.eval_ctx)?
+                functions::histogram_quantile(phi_f, input, &self.eval_ctx)
             }
             Func::HoltWinters => {
                 let err =
@@ -119,7 +122,7 @@ impl Engine {
                 let scaling_factor = self.call_scalar_arg(args, 1, err).await?;
                 let trend_factor = self.call_scalar_arg(args, 2, err).await?;
 
-                functions::holt_winters(input, scaling_factor, trend_factor, &self.eval_ctx)?
+                functions::holt_winters(input, scaling_factor, trend_factor, &self.eval_ctx)
             }
             Func::LabelJoin => {
                 let err = "Invalid args, expected label_join(v instant-vector, dst string, sep string, src_1 string, src_2 string, ...)";
@@ -144,7 +147,7 @@ impl Engine {
                         "source labels can not be empty or invalid".into(),
                     ));
                 }
-                functions::label_join(input, &dst_label, &separator, source_labels)?
+                functions::label_join(input, &dst_label, &separator, source_labels)
             }
             Func::LabelReplace => {
                 let err = "Invalid args, expected label_replace(v instant-vector, dst_label string, replacement string, src_label string, regex string)";
@@ -163,7 +166,7 @@ impl Engine {
                     .call_string_arg(args, 4, "Invalid regex string found")
                     .await?;
 
-                functions::label_replace(input, &dst_label, &replacement, &src_label, &regex)?
+                functions::label_replace(input, &dst_label, &replacement, &src_label, &regex)
             }
             Func::PredictLinear => {
                 let err = "Invalid args, expected predict_linear(v range-vector, t scalar)";
@@ -171,7 +174,7 @@ impl Engine {
                 let input = self.call_expr_arg(args, 0).await?;
                 let prediction_steps_f = self.call_scalar_arg(args, 1, err).await?;
 
-                functions::predict_linear(input, prediction_steps_f, &self.eval_ctx)?
+                functions::predict_linear(input, prediction_steps_f, &self.eval_ctx)
             }
             Func::QuantileOverTime => {
                 let err = "Invalid args, expected quantile_over_time(scalar, range-vector)";
@@ -179,7 +182,7 @@ impl Engine {
                 let phi_quantile_f = self.call_scalar_arg(args, 0, err).await?;
                 let input = self.call_expr_arg(args, 1).await?;
 
-                functions::quantile_over_time(phi_quantile_f, input, &self.eval_ctx)?
+                functions::quantile_over_time(phi_quantile_f, input, &self.eval_ctx)
             }
             Func::Round => {
                 let err = "Invalid args, expected round(v instant-vector, to_nearest=1 scalar)";
@@ -190,19 +193,17 @@ impl Engine {
                     _ => return Err(DataFusionError::NotImplemented(err.into())),
                 };
 
-                functions::round(input, to_nearest)?
+                functions::round(input, to_nearest)
             }
             Func::HistogramCount
             | Func::HistogramFraction
             | Func::HistogramSum
             | Func::Sort
-            | Func::SortDesc => {
-                return Err(DataFusionError::NotImplemented(format!(
-                    "Unsupported Function: {func_name:?}"
-                )));
-            }
-            _ => self.call_single_arg_builtin(func_name, args).await?,
-        })
+            | Func::SortDesc => Err(DataFusionError::NotImplemented(format!(
+                "Unsupported Function: {func_name:?}"
+            ))),
+            _ => self.call_single_arg_builtin(func_name, args).await,
+        }
     }
 
     async fn call_single_arg_builtin(
@@ -211,28 +212,24 @@ impl Engine {
         args: &FunctionArgs,
     ) -> Result<Value> {
         let single_arg_func = func_name.single_arg_func();
-        let input = if matches!(single_arg_func, Some(SingleArgFunc::Date(_))) {
-            match args.len() {
-                0 => Value::Matrix(vec![RangeValue {
-                    labels: Labels::default(),
-                    samples: self
-                        .eval_ctx
-                        .timestamps()
-                        .into_iter()
-                        .map(|ts| Sample::new(ts, ts as f64))
-                        .collect(),
-                    exemplars: None,
-                    time_window: None,
-                }]),
-                1 => self.call_expr_arg(args, 0).await?,
-                _ => {
-                    return Err(DataFusionError::NotImplemented(
-                        "Invalid args passed to the function".into(),
-                    ));
-                }
+        let input = match (&single_arg_func, args.len()) {
+            (Some(SingleArgFunc::Date(_)), 0) => Value::Matrix(vec![RangeValue {
+                labels: Labels::default(),
+                samples: self
+                    .eval_ctx
+                    .timestamps()
+                    .into_iter()
+                    .map(|ts| Sample::new(ts, ts as f64))
+                    .collect(),
+                exemplars: None,
+                time_window: None,
+            }]),
+            (Some(SingleArgFunc::Date(_)), 2..) => {
+                return Err(DataFusionError::NotImplemented(
+                    "Invalid args passed to the function".into(),
+                ));
             }
-        } else {
-            self.call_expr_arg(args, 0).await?
+            _ => self.call_expr_arg(args, 0).await?,
         };
 
         single_arg_func
