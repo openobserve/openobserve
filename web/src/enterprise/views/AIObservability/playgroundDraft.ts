@@ -212,6 +212,19 @@ export function renderTemplate(text: string, vars: Record<string, string>): stri
   });
 }
 
+/** The variable name of the completed `{{name}}` token the caret sits inside
+ *  (either edge counts as inside), or null if it isn't in one. */
+export function tokenAtCaret(text: string, caret: number): string | null {
+  VARIABLE_PATTERN.lastIndex = 0;
+  let found: RegExpExecArray | null;
+  while ((found = VARIABLE_PATTERN.exec(text))) {
+    const start = found.index;
+    const end = start + found[0].length;
+    if (caret >= start && caret <= end) return found[1];
+  }
+  return null;
+}
+
 // ── labels ────────────────────────────────────────────────────────
 
 const VARIANT_LETTERS = ["A", "B", "C", "D"];

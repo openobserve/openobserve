@@ -57,6 +57,9 @@ export interface SloEligibleAlert {
   eligible: boolean;
   /** The server's own rejection message, verbatim. */
   reason: string | null;
+  /** A stable id for `reason` — the picker labels the row from this, never by
+   *  matching on the sentence. */
+  reason_code: string | null;
 }
 
 /** What an alert SLI would have measured over a window. */

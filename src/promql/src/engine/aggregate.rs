@@ -19,22 +19,26 @@ use std::{sync::Arc, time::Duration};
 
 use config::meta::promql::value::*;
 use datafusion::error::{DataFusionError, Result};
+use infra::errors::ErrorCodes;
 use promql_parser::parser::{
     Call, Expr as PromExpr, LabelModifier, MatrixSelector, VectorSelector, token,
 };
 
 use super::Engine;
-use crate::{aggregations, functions, fused};
+use crate::{
+    aggregations::{self, Avg, Count, Group, Max, Min, Stddev, Stdvar, Sum, eval_aggregate},
+    functions, series_stream, streaming_eval,
+};
 
 /// A recognized fused shape: `agg(range_func(...))`, or `agg(instant_selector)` read as
 /// `last_over_time` over the lookback window.
 struct FusedAggShape<'a> {
-    op: fused::FusedAggOp,
+    op: streaming_eval::FusedAggOp,
     func: Arc<dyn functions::RangeFunc>,
     /// The range function's argument to materialize; `None` for the instant shape, which has
     /// no range function and stays generic when it cannot stream.
     range_arg: Option<&'a PromExpr>,
-    /// The plain selector under the shape, when it can be planned as ordered shard streams;
+    /// The plain selector under the shape, when it can be planned as ordered partition streams;
     /// a `None` range is the instant lookback.
     selector: Option<(&'a VectorSelector, Option<Duration>)>,
 }
@@ -50,8 +54,7 @@ impl Engine {
         // fused shapes fold the range function into the aggregation; others stay generic
         if let Some(shape) = fused_agg_shape(op, expr) {
             if let Some((selector, range)) = shape.selector {
-                let range =
-                    range.unwrap_or_else(|| Duration::from_micros(self.ctx.lookback_delta as u64));
+                let range = range.unwrap_or_else(|| self.ctx.lookback());
                 if let Some(value) = self
                     .try_streaming_fused_agg(
                         selector,
@@ -67,15 +70,9 @@ impl Engine {
             }
             if let Some(range_arg) = shape.range_arg {
                 let range_input = self.exec_expr(range_arg).await?;
-                return fused::matrix::fused_agg(
-                    modifier,
-                    range_input,
-                    shape.func,
-                    shape.op,
-                    &self.eval_ctx,
-                    self.ctx.query_ctx.timeout,
-                )
-                .await;
+                return self
+                    .materialized_fused_agg(modifier, range_input, shape.func, shape.op)
+                    .await;
             }
         }
 
@@ -83,18 +80,18 @@ impl Engine {
 
         let eval_ctx = self.eval_ctx.clone();
 
-        Ok(match op.id() {
-            token::T_SUM => aggregations::sum(modifier, input, &eval_ctx)?,
-            token::T_AVG => aggregations::avg(modifier, input, &eval_ctx)?,
-            token::T_COUNT => aggregations::count(modifier, input, &eval_ctx)?,
-            token::T_MIN => aggregations::min(modifier, input, &eval_ctx)?,
-            token::T_MAX => aggregations::max(modifier, input, &eval_ctx)?,
-            token::T_GROUP => aggregations::group(modifier, input, &eval_ctx)?,
-            token::T_STDDEV => aggregations::stddev(modifier, input, &eval_ctx)?,
-            token::T_STDVAR => aggregations::stdvar(modifier, input, &eval_ctx)?,
+        match op.id() {
+            token::T_SUM => eval_aggregate(modifier, input, Sum, &eval_ctx),
+            token::T_AVG => eval_aggregate(modifier, input, Avg, &eval_ctx),
+            token::T_COUNT => eval_aggregate(modifier, input, Count, &eval_ctx),
+            token::T_MIN => eval_aggregate(modifier, input, Min, &eval_ctx),
+            token::T_MAX => eval_aggregate(modifier, input, Max, &eval_ctx),
+            token::T_GROUP => eval_aggregate(modifier, input, Group, &eval_ctx),
+            token::T_STDDEV => eval_aggregate(modifier, input, Stddev, &eval_ctx),
+            token::T_STDVAR => eval_aggregate(modifier, input, Stdvar, &eval_ctx),
             token::T_TOPK => {
-                let param_expr = param.clone().unwrap();
-                let k_value = self.exec_expr(&param_expr).await?;
+                let param_expr = param.as_ref().unwrap();
+                let k_value = self.exec_expr(param_expr).await?;
                 let k = match k_value {
                     Value::Float(f) => f as usize,
                     _ => {
@@ -103,11 +100,11 @@ impl Engine {
                         ));
                     }
                 };
-                aggregations::topk(k, modifier, input, &eval_ctx)?
+                aggregations::topk(k, modifier, input, &eval_ctx)
             }
             token::T_BOTTOMK => {
-                let param_expr = param.clone().unwrap();
-                let k_value = self.exec_expr(&param_expr).await?;
+                let param_expr = param.as_ref().unwrap();
+                let k_value = self.exec_expr(param_expr).await?;
                 let k = match k_value {
                     Value::Float(f) => f as usize,
                     _ => {
@@ -116,11 +113,11 @@ impl Engine {
                         ));
                     }
                 };
-                aggregations::bottomk(k, modifier, input, &eval_ctx)?
+                aggregations::bottomk(k, modifier, input, &eval_ctx)
             }
             token::T_COUNT_VALUES => {
-                let param_expr = param.clone().unwrap();
-                let label_name = self.exec_expr(&param_expr).await?;
+                let param_expr = param.as_ref().unwrap();
+                let label_name = self.exec_expr(param_expr).await?;
                 let label_name_str = match label_name {
                     Value::String(s) => s,
                     _ => {
@@ -129,11 +126,11 @@ impl Engine {
                         ));
                     }
                 };
-                aggregations::count_values(&label_name_str, modifier, input, &eval_ctx)?
+                aggregations::count_values(&label_name_str, modifier, input, &eval_ctx)
             }
             token::T_QUANTILE => {
-                let param_expr = param.clone().unwrap();
-                let qtile_value = self.exec_expr(&param_expr).await?;
+                let param_expr = param.as_ref().unwrap();
+                let qtile_value = self.exec_expr(param_expr).await?;
                 let qtile = match qtile_value {
                     Value::Float(f) => f,
                     _ => {
@@ -142,14 +139,38 @@ impl Engine {
                         ));
                     }
                 };
-                aggregations::quantile(qtile, input, &eval_ctx)?
+                aggregations::quantile(qtile, input, &eval_ctx)
             }
-            _ => {
-                return Err(DataFusionError::NotImplemented(format!(
-                    "Unsupported Aggregate: {op:?}"
-                )));
-            }
-        })
+            _ => Err(DataFusionError::NotImplemented(format!(
+                "Unsupported Aggregate: {op:?}"
+            ))),
+        }
+    }
+
+    /// The fused fold over an already-materialized matrix, bounded by the query timeout.
+    pub(super) async fn materialized_fused_agg(
+        &self,
+        modifier: &Option<LabelModifier>,
+        data: Value,
+        func: Arc<dyn functions::RangeFunc>,
+        op: streaming_eval::FusedAggOp,
+    ) -> Result<Value> {
+        let Some((sources, range)) =
+            series_stream::matrix::group_sources(data, modifier, func.name())?
+        else {
+            return Ok(Value::None);
+        };
+        let eval = Arc::new(streaming_eval::RangeExpr::new(func, range, &self.eval_ctx));
+        let timeout = Duration::from_secs(self.ctx.query_ctx.timeout);
+        let (value, _) =
+            tokio::time::timeout(timeout, streaming_eval::aggregate(sources, op, eval))
+                .await
+                .map_err(|_| {
+                    DataFusionError::from(ErrorCodes::SearchTimeout(
+                        "[PromQL] fused agg timeout".to_string(),
+                    ))
+                })??;
+        Ok(value)
     }
 }
 
@@ -160,7 +181,7 @@ fn fused_agg_shape<'a>(op: &token::TokenType, expr: &'a PromExpr) -> Option<Fuse
     {
         return None;
     }
-    let agg_op = fused::FusedAggOp::from_token(op.id())?;
+    let agg_op = streaming_eval::FusedAggOp::from_token(op.id())?;
     match expr {
         PromExpr::Call(Call { func, args }) => {
             let [range_arg] = args.args.as_slice() else {
@@ -183,7 +204,7 @@ fn fused_agg_shape<'a>(op: &token::TokenType, expr: &'a PromExpr) -> Option<Fuse
         // name, which is exactly last_over_time
         PromExpr::VectorSelector(selector) => Some(FusedAggShape {
             op: agg_op,
-            func: Arc::from(functions::fusable_range_func("last_over_time")?),
+            func: functions::instant_lookback_func(),
             range_arg: None,
             selector: Some((selector, None)),
         }),

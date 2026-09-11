@@ -24,7 +24,7 @@ use axum::{
 use axum_extra::extract::Query as ExtraQuery;
 use config::meta::{
     alerts::alert::{Alert as MetaAlert, AlertTypeFilter},
-    triggers::{Trigger, TriggerModule},
+    triggers::{ScheduledTriggerData, Trigger, TriggerModule},
 };
 use db::scheduler;
 use hashbrown::HashMap;
@@ -41,7 +41,7 @@ use openobserve_core::{
 use svix_ksuid::Ksuid;
 #[cfg(feature = "enterprise")]
 use {
-    openobserve_core::auth::check_permissions,
+    openobserve_core::auth::{check_folder_write_permissions, check_permissions},
     openobserve_core::authz::{StreamPermissionResourceType, check_stream_permissions},
 };
 
@@ -98,12 +98,13 @@ pub mod templates;
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("folder" = Option<String>, Query, description = "Folder ID for the alert. The default folder is used when absent."),
+        ("folder" = Option<String>, Query, description = "Folder ID for the alert. Authoritative: it overrides any folder_id in the body. The default folder is used when absent."),
       ),
     request_body(content = inline(CreateAlertRequestBody), description = "Alert data", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = ()),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "create"})),
@@ -118,6 +119,17 @@ pub async fn create_alert(
 ) -> Response {
     let query_str = uri.query().unwrap_or("");
     let folder_id = get_folder(query_str);
+
+    // The body folder is ignored in favour of the gated `?folder=`. Rejecting a
+    // disagreement rather than silently creating elsewhere: a client that sets
+    // only the body field would otherwise land in the default folder unnoticed.
+    if let Some(body_folder) = req_body.folder_id.as_deref().filter(|f| !f.is_empty())
+        && body_folder != folder_id
+    {
+        return MetaHttpResponse::bad_request(format!(
+            "folder_id in the body ({body_folder}) disagrees with the folder query parameter ({folder_id}); send the folder as ?folder= only"
+        ));
+    }
 
     // Anomaly detection path: delegate to anomaly config creation (enterprise only).
     #[cfg(feature = "enterprise")]
@@ -304,7 +316,7 @@ fn composite_input(
         warning_counts_as_firing: condition.warning_counts_as_firing,
         stale_child_policy: condition.stale_child_policy.storage_id(),
         destinations: alert.destinations,
-        template: alert.template,
+        template: alert.template.filter(|s| !s.is_empty()),
         context_attributes: alert
             .context_attributes
             .map(|value| serde_json::json!(value)),
@@ -482,12 +494,26 @@ async fn composite_detail_response(
 fn composite_list_item(
     definition: infra::table::entity::alert_composites::Model,
     folder_name: &str,
+    trigger_data: &mut HashMap<String, Trigger>,
 ) -> Option<ListAlertsResponseBodyItem> {
     let alert_id = Ksuid::from_str(&definition.id).ok()?;
     let tags = definition
         .tags
         .and_then(|tags| serde_json::from_value(tags).ok())
         .unwrap_or_default();
+
+    let (last_triggered_at, last_satisfied_at) =
+        if let Some(trigger) = trigger_data.remove(&alert_id.to_string()) {
+            (
+                trigger.end_time,
+                serde_json::from_str::<ScheduledTriggerData>(&trigger.data)
+                    .ok()
+                    .and_then(|trigger_data| trigger_data.last_satisfied_at),
+            )
+        } else {
+            (None, None)
+        };
+
     Some(ListAlertsResponseBodyItem {
         alert_id,
         folder_id: definition.folder_id.clone(),
@@ -499,8 +525,8 @@ fn composite_list_item(
         condition: None,
         trigger_condition: None,
         enabled: definition.enabled,
-        last_triggered_at: None,
-        last_satisfied_at: None,
+        last_triggered_at,
+        last_satisfied_at,
         is_real_time: false,
         last_trained_at: None,
         status: None,
@@ -1155,12 +1181,9 @@ async fn create_anomaly_alert(
         alert_enabled: anomaly_fields.alert_enabled,
         alert_destinations: req_body.alert.destinations,
         enabled: Some(req_body.alert.enabled),
-        // Prefer explicit folder_id in JSON body; fall back to the ?folder= query param
-        // (same mechanism regular alerts use — the UI sends folder as a query param).
-        folder_id: req_body
-            .folder_id
-            .filter(|f| !f.is_empty())
-            .or_else(|| Some(query_folder_id.to_string()).filter(|f| !f.is_empty())),
+        // The route's permission gate resolves `?folder=`, so the write must use the same value — a
+        // body folder_id would create the config in an unauthorized folder.
+        folder_id: Some(query_folder_id.to_string()).filter(|f| !f.is_empty()),
         owner,
         // Feature 2: anomaly configs take the same triage metadata as
         // alerts, threaded from the shared request body.
@@ -1562,7 +1585,7 @@ pub async fn export_alert(Path((org_id, alert_id)): Path<(String, String)>) -> R
     tag = "Alerts",
     operation_id = "CloneAlert",
     summary = "Clone an alert or anomaly detection config",
-    description = "Creates a copy of an existing alert or anomaly detection config. For anomaly configs, the clone starts untrained with counters reset. Provide an optional name and folder_id in the request body.",
+    description = "Creates a copy of an existing alert or anomaly detection config. For anomaly configs, the clone starts untrained with counters reset. Provide an optional name and folder_id in the request body; a folder_id requires write access to that destination folder.",
     security(
         ("Authorization"= [])
     ),
@@ -1574,6 +1597,7 @@ pub async fn export_alert(Path((org_id, alert_id)): Path<(String, String)>) -> R
     request_body(content = inline(CloneAlertRequestBody), description = "Clone options", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = ()),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
@@ -1598,13 +1622,47 @@ pub async fn clone_alert(
     // Check if this is a regular alert first
     match alert::get_by_id(client, &org_id, alert_id).await {
         Ok((folder, mut src_alert)) => {
+            // A clone copies the whole definition, so reading the source must be
+            // authorized too — the destination check alone would let a caller
+            // lift an alert out of a folder they cannot read.
+            #[cfg(feature = "enterprise")]
+            if !check_permissions(
+                &alert_id_str,
+                &org_id,
+                &user_email.user_id,
+                "alerts",
+                "GET",
+                Some(&folder.folder_id),
+                false,
+                true,
+                false,
+            )
+            .await
+            {
+                return MetaHttpResponse::forbidden("Unauthorized Access");
+            }
             // Clone the alert: copy fields, generate new name
             let new_name = req_body
                 .name
                 .unwrap_or_else(|| format!("{}_copy", src_alert.name));
+            // Resolve the effective destination BEFORE authorizing it: an absent
+            // folder_id falls back to the source folder, which `?folder=` need
+            // not have covered.
             let dst_folder = req_body
                 .folder_id
+                .filter(|f| !f.is_empty())
                 .unwrap_or_else(|| folder.folder_id.clone());
+            #[cfg(feature = "enterprise")]
+            if !check_folder_write_permissions(
+                &org_id,
+                &user_email.user_id,
+                "alert_folders",
+                &dst_folder,
+            )
+            .await
+            {
+                return MetaHttpResponse::forbidden("Unauthorized Access");
+            }
             src_alert.name = new_name;
             // Clear the ID so a new one is assigned on insert
             src_alert.id = None;
@@ -1620,21 +1678,55 @@ pub async fn clone_alert(
                     .ok()
                     .flatten()
             {
+                // Resolved here so the folder authorized below is the one written.
+                let dst_folder = req_body
+                    .folder_id
+                    .clone()
+                    .filter(|f| !f.is_empty())
+                    .unwrap_or_else(|| _composite.definition.folder_id.clone());
                 #[cfg(feature = "enterprise")]
-                if composite_subject_unauthorized(
-                    &_composite.definition,
-                    &user_email.user_id,
-                    "GET",
-                )
-                .await
                 {
-                    return MetaHttpResponse::forbidden("Unauthorized Access");
+                    // The composite itself, not only the alerts it references.
+                    if !check_permissions(
+                        &alert_id_str,
+                        &org_id,
+                        &user_email.user_id,
+                        "alerts",
+                        "GET",
+                        Some(&_composite.definition.folder_id),
+                        false,
+                        true,
+                        false,
+                    )
+                    .await
+                    {
+                        return MetaHttpResponse::forbidden("Unauthorized Access");
+                    }
+                    if composite_subject_unauthorized(
+                        &_composite.definition,
+                        &user_email.user_id,
+                        "GET",
+                    )
+                    .await
+                    {
+                        return MetaHttpResponse::forbidden("Unauthorized Access");
+                    }
+                    if !check_folder_write_permissions(
+                        &org_id,
+                        &user_email.user_id,
+                        "alert_folders",
+                        &dst_folder,
+                    )
+                    .await
+                    {
+                        return MetaHttpResponse::forbidden("Unauthorized Access");
+                    }
                 }
                 return match openobserve_core::alerts::composite::clone_composite(
                     &org_id,
                     &alert_id_str,
                     req_body.name,
-                    req_body.folder_id,
+                    Some(dst_folder),
                     "api".to_string(),
                 )
                 .await
@@ -1653,12 +1745,62 @@ pub async fn clone_alert(
             }
             #[cfg(feature = "enterprise")]
             {
+                // Source read, then the folder the clone lands in, both resolved here.
+                let src_cfg =
+                    match openobserve_core::anomaly_detection::get_config(&org_id, &alert_id_str)
+                        .await
+                    {
+                        Ok(Some(cfg)) => cfg,
+                        Ok(None) => {
+                            return MetaHttpResponse::not_found(format!(
+                                "alert {alert_id_str} not found"
+                            ));
+                        }
+                        Err(e) => return MetaHttpResponse::internal_error(e.to_string()),
+                    };
+                let Some(src_folder) = src_cfg
+                    .get("folder_id")
+                    .and_then(|f| f.as_str())
+                    .map(str::to_string)
+                else {
+                    return MetaHttpResponse::forbidden("Unauthorized Access");
+                };
+                if !check_permissions(
+                    &alert_id_str,
+                    &org_id,
+                    &user_email.user_id,
+                    "alerts",
+                    "GET",
+                    Some(&src_folder),
+                    false,
+                    true,
+                    false,
+                )
+                .await
+                {
+                    return MetaHttpResponse::forbidden("Unauthorized Access");
+                }
+                let dst_folder = req_body
+                    .folder_id
+                    .clone()
+                    .filter(|f| !f.is_empty())
+                    .unwrap_or(src_folder);
+                if !check_folder_write_permissions(
+                    &org_id,
+                    &user_email.user_id,
+                    "alert_folders",
+                    &dst_folder,
+                )
+                .await
+                {
+                    return MetaHttpResponse::forbidden("Unauthorized Access");
+                }
                 // Fall back to anomaly detection config clone
                 match openobserve_core::anomaly_detection::clone_config(
                     &org_id,
                     &alert_id_str,
                     req_body.name,
-                    req_body.folder_id,
+                    Some(dst_folder),
                 )
                 .await
                 {
@@ -1699,6 +1841,7 @@ pub async fn clone_alert(
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = ()),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
@@ -1780,6 +1923,13 @@ async fn build_and_run_anomaly_update(
     alert: crate::models::alerts::Alert,
 ) -> Response {
     use openobserve_core::anomaly_detection::UpdateAnomalyConfigRequest;
+
+    // A folder_id on the update is a move, and the route gate only covers `?folder=`.
+    if let Some(folder) = fields.folder_id.as_deref().filter(|f| !f.is_empty())
+        && !check_folder_write_permissions(org_id, &user_id, "alert_folders", folder).await
+    {
+        return MetaHttpResponse::forbidden("Unauthorized Access");
+    }
 
     let owner = fields
         .owner
@@ -2496,7 +2646,12 @@ pub async fn list_alerts(
                         .collect()
                 })
                 .unwrap_or_default();
-
+        let mut trigger_data = scheduler::list_by_org(&org_id, Some(TriggerModule::CompositeAlert))
+            .await
+            .unwrap_or_default()
+            .into_iter()
+            .map(|t| (t.module_key.clone(), t))
+            .collect();
         for definition in composite_definitions {
             if !folder_slug
                 .as_ref()
@@ -2523,7 +2678,8 @@ pub async fn list_alerts(
                 .get(&definition.folder_id)
                 .cloned()
                 .unwrap_or_else(|| definition.folder_id.clone());
-            let Some(item) = composite_list_item(definition, &folder_name) else {
+            let Some(item) = composite_list_item(definition, &folder_name, &mut trigger_data)
+            else {
                 continue;
             };
             let priority_matches = match &priority_filter {
@@ -3261,6 +3417,7 @@ pub async fn retrain_alert(Path((org_id, alert_id)): Path<(String, String)>) -> 
     request_body(content = inline(MoveAlertsRequestBody), description = "Identifies alerts and the destination folder", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = ()),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
         (status = 500, description = "Failure",  content_type = "application/json", body = ()),
     ),
@@ -3303,11 +3460,58 @@ pub async fn move_alerts(
     #[cfg(feature = "enterprise")]
     let anomaly_ids: Vec<Ksuid> = req_body.anomaly_config_ids;
 
+    // The route is bypass:true, so the destination is only authorized here — the
+    // anomaly and composite branches below have no folder check of their own.
+    #[cfg(feature = "enterprise")]
+    if !check_folder_write_permissions(
+        &org_id,
+        &user_email.user_id,
+        "alert_folders",
+        &req_body.dst_folder_id,
+    )
+    .await
+    {
+        return MetaHttpResponse::forbidden("Unauthorized Access");
+    }
+
     // Move anomaly configs first (enterprise only) so that if this fails,
     // regular alerts have not yet been relocated (reduces partial-move risk).
     #[cfg(feature = "enterprise")]
     for id in anomaly_ids {
         use openobserve_core::anomaly_detection::UpdateAnomalyConfigRequest;
+        // Source side: `update_config` performs no check of its own, so without
+        // this a caller could pull a config out of a folder they cannot reach.
+        let id_str = id.to_string();
+        // Fail closed: a read error or a config without a folder must deny, not
+        // skip the check and let the move through.
+        let src_folder = match openobserve_core::anomaly_detection::get_config(&org_id, &id_str)
+            .await
+        {
+            Ok(Some(cfg)) => cfg
+                .get("folder_id")
+                .and_then(|f| f.as_str())
+                .map(str::to_string),
+            Ok(None) => return MetaHttpResponse::not_found(format!("alert {id_str} not found")),
+            Err(e) => return MetaHttpResponse::internal_error(e.to_string()),
+        };
+        let Some(src_folder) = src_folder else {
+            return MetaHttpResponse::forbidden("Unauthorized Access");
+        };
+        if !check_permissions(
+            &id_str,
+            &org_id,
+            &user_email.user_id,
+            "alerts",
+            "PUT",
+            Some(&src_folder),
+            false,
+            true,
+            false,
+        )
+        .await
+        {
+            return MetaHttpResponse::forbidden("Unauthorized Access");
+        }
         let req = UpdateAnomalyConfigRequest {
             folder_id: Some(req_body.dst_folder_id.clone()),
             ..Default::default()

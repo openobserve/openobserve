@@ -38,9 +38,10 @@ use rayon::iter::{IntoParallelIterator, IntoParallelRefMutIterator, ParallelIter
 
 use super::Engine;
 use crate::{
-    load_series::{LoadedMetrics, PartitionedMetrics, selector_load_data_from_datafusion},
+    ast::rewrite::remove_filter_all,
     micros,
-    promql::rewrite::remove_filter_all,
+    series_loader::{LoadedMetrics, PartitionedMetrics, selector_load_data_from_datafusion},
+    utils::metric_name,
 };
 
 /// One context per selected schema with its scan stats and whether the matchers still apply.
@@ -54,6 +55,7 @@ impl Engine {
     pub(super) async fn eval_vector_selector(
         &mut self,
         selector: &VectorSelector,
+        ctxs: Option<SelectorContexts>,
     ) -> Result<Vec<RangeValue>> {
         if self.result_type.is_none() {
             self.result_type = Some("vector".to_string());
@@ -61,7 +63,7 @@ impl Engine {
 
         let selector = named_selector(selector.clone(), "VectorSelector")?;
 
-        let data = self.selector_load_data_owned(&selector, None, None).await?;
+        let data = self.selector_load_data_owned(&selector, None, ctxs).await?;
 
         let metrics_cache = match data.get_range_values() {
             Some(v) => v,
@@ -73,15 +75,14 @@ impl Engine {
         // Get all evaluation timestamps from the context
         let eval_timestamps = self.eval_ctx.timestamps();
 
-        // For each metric, select appropriate samples at each evaluation timestamp
-        // TODO: make it parallel
-        let mut result = Vec::with_capacity(metrics_cache.len());
-        for metric in metrics_cache {
+        let lookback_delta = self.ctx.lookback_delta;
+        // every series selects independently, so fan the selection out
+        let result = metrics_cache.into_par_iter().filter_map(|metric| {
             let mut selected_samples = Vec::with_capacity(eval_timestamps.len());
 
             for &eval_ts in &eval_timestamps {
                 // Calculate lookback window for this evaluation timestamp
-                let start = eval_ts - self.ctx.lookback_delta;
+                let start = eval_ts - lookback_delta;
 
                 // Find the sample for this evaluation timestamp
                 // Binary search for the last sample before or at eval_ts (considering offset)
@@ -111,17 +112,15 @@ impl Engine {
             }
 
             // Only include metrics that have at least one sample
-            if !selected_samples.is_empty() {
-                result.push(RangeValue {
-                    labels: metric.labels,
-                    samples: selected_samples,
-                    exemplars: metric.exemplars,
-                    time_window: metric.time_window,
-                });
-            }
-        }
+            (!selected_samples.is_empty()).then_some(RangeValue {
+                labels: metric.labels,
+                samples: selected_samples,
+                exemplars: metric.exemplars,
+                time_window: metric.time_window,
+            })
+        });
 
-        Ok(result)
+        Ok(result.collect())
     }
 
     /// Range vector selector --- select a whole time range at each evaluation
@@ -502,12 +501,7 @@ pub(super) fn named_selector(mut selector: VectorSelector, kind: &str) -> Result
     if selector.name.is_some() {
         return Ok(selector);
     }
-    let Some(name) = selector
-        .matchers
-        .find_matchers(NAME_LABEL)
-        .first()
-        .map(|mat| mat.value.clone())
-    else {
+    let Some(name) = metric_name(&selector) else {
         return Err(DataFusionError::Plan(format!(
             "{kind}: metric name is required"
         )));
@@ -691,7 +685,7 @@ mod tests {
             at: None,
         };
 
-        engine.eval_vector_selector(&selector).await.unwrap();
+        engine.eval_vector_selector(&selector, None).await.unwrap();
 
         let matchers = captured.lock().unwrap().take().unwrap();
         assert!(matchers.matchers.iter().all(|m| m.name != NAME_LABEL));
@@ -729,7 +723,7 @@ mod tests {
             at: None,
         };
 
-        let result = engine.eval_vector_selector(&selector).await;
+        let result = engine.eval_vector_selector(&selector, None).await;
         assert!(result.is_ok());
         let values = result.unwrap();
         assert_eq!(values.len(), 0); // Mock provider returns empty data
@@ -765,7 +759,7 @@ mod tests {
             at: None,
         };
 
-        let result = engine.eval_vector_selector(&selector).await;
+        let result = engine.eval_vector_selector(&selector, None).await;
         assert!(result.is_ok());
         let values = result.unwrap();
         assert_eq!(values.len(), 0); // Mock provider returns empty data
@@ -801,7 +795,7 @@ mod tests {
             at: None,
         };
 
-        let result = engine.eval_vector_selector(&selector).await;
+        let result = engine.eval_vector_selector(&selector, None).await;
         assert!(result.is_ok());
         let values = result.unwrap();
         assert_eq!(values.len(), 0); // Mock provider returns empty data
@@ -874,7 +868,7 @@ mod tests {
             at: None,
         };
 
-        let result = engine.eval_vector_selector(&selector).await;
+        let result = engine.eval_vector_selector(&selector, None).await;
 
         assert!(result.is_err(), "expected an error, not a panic");
         assert!(

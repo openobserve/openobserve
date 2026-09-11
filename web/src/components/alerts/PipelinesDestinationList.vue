@@ -40,6 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :columns="columns"
           row-key="name"
           :loading="loading"
+          :forbidden="forbidden"
           :selected-ids="selectedDestinationIds"
           selection="multiple"
           pagination="client"
@@ -334,6 +335,7 @@ export default defineComponent({
     });
 
     const loading = ref(false);
+    const forbidden = ref(false);
     const getDestinations = () => {
       const dismiss = toast({
         variant: "loading",
@@ -341,6 +343,7 @@ export default defineComponent({
         timeout: 0,
       });
       loading.value = true;
+      forbidden.value = false;
       destinationService
         .list({
           page_num: 1,
@@ -356,7 +359,8 @@ export default defineComponent({
           updateRoute();
         })
         .catch((err) => {
-          if (err.response.status != 403) {
+          forbidden.value = err?.response?.status === 403;
+          if (!forbidden.value) {
             toast({
               variant: "error",
               message: t("toastMessages.alerts.errorWhilePullingDestinations"),
@@ -377,9 +381,17 @@ export default defineComponent({
         .then((res) => (templates.value = res.data));
     };
     const updateRoute = () => {
-      if (router.currentRoute.value.query.action === "add") editDestination(null);
-      if (router.currentRoute.value.query.action === "update")
-        editDestination(getDestinationByName(router.currentRoute.value.query.name as string));
+      const action = router.currentRoute.value.query.action;
+      const name = router.currentRoute.value.query.name as string;
+      // No-op when the editor already matches the route; a stale getDestinations().then() resolution re-invokes editDestination() and flips the just-opened editor closed.
+      if (action === "add" && !showDestinationEditor.value) {
+        editDestination(null);
+      } else if (
+        action === "update" &&
+        !(showDestinationEditor.value && editingDestination.value?.name === name)
+      ) {
+        editDestination(getDestinationByName(name));
+      }
     };
     const getDestinationByName = (name: string) => {
       return destinations.value.find((destination) => destination.name === name);
@@ -651,6 +663,7 @@ export default defineComponent({
       getImageURL,
       conformDeleteDestination,
       loading,
+      forbidden,
       filterQuery,
       filterData,
       editingDestination,

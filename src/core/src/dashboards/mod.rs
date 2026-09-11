@@ -57,7 +57,7 @@ use o2_openfga::{
 };
 
 #[cfg(feature = "enterprise")]
-use crate::auth::check_permissions;
+use crate::auth::{check_folder_write_permissions, check_permissions};
 
 /// An error that occurs interacting with dashboards.
 #[derive(Debug, thiserror::Error)]
@@ -363,15 +363,12 @@ pub async fn create_dashboard(
         .await;
         Ok(saved)
     } else if folder_id == DEFAULT_FOLDER {
-        let folder = Folder {
-            folder_id: DEFAULT_FOLDER.to_string(),
-            name: DEFAULT_FOLDER.to_string(),
-            description: DEFAULT_FOLDER.to_string(),
-            icon: None,
-        };
-        folders::save_folder(org_id, folder, FolderType::Dashboards, true)
+        folders::ensure_default_folder(org_id, FolderType::Dashboards)
             .await
-            .map_err(|_| DashboardError::CreateDefaultFolder)?;
+            .map_err(|e| {
+                log::error!("[dashboards] creating default folder for org {org_id}: {e}");
+                DashboardError::CreateDefaultFolder
+            })?;
         let dashboard_id = ider::generate();
         let saved = put(org_id, &dashboard_id, folder_id, None, dashboard, None).await?;
         set_ownership(
@@ -633,6 +630,16 @@ pub async fn move_dashboard(
         {
             return Err(DashboardError::PermissionDenied);
         }
+    }
+
+    // Outside `_check_openfga`: the source gate differs per route (the single
+    // move relies on the middleware), but the destination is never authorized
+    // anywhere else, so this must run for every caller.
+    #[cfg(feature = "enterprise")]
+    if get_openfga_config().enabled
+        && !check_folder_write_permissions(org_id, _user_id, "folders", to_folder).await
+    {
+        return Err(DashboardError::PermissionDenied);
     }
 
     let hash = dashboard.hash.clone();

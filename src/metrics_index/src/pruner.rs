@@ -20,11 +20,12 @@ use std::{
 
 use arrow::datatypes::Schema;
 use config::{
-    PARQUET_MAX_ROW_GROUP_SIZE,
+    PARQUET_MAX_ROW_GROUP_SIZE, get_config,
     meta::{
         promql::is_metrics_hash_excluded_label,
         stream::{FileKey, FileSelection},
     },
+    metrics,
 };
 use datafusion::{
     common::{DFSchema, DataFusionError, Result},
@@ -70,6 +71,7 @@ pub async fn search(
     // Keep the complete matcher set in the key. A short hash collision could
     // otherwise reuse physical row ranges selected by a different query.
     let filter_key = format!("{matchers:?}");
+    let selection_cache_enabled = get_config().search.metrics_index_selection_cache_enabled;
     let mut index_files = BTreeMap::new();
     for file in files.iter() {
         // only indexed metrics files own a sidecar; other layouts stay as they are
@@ -91,13 +93,17 @@ pub async fn search(
             );
             continue;
         };
-        let cache_key = selection_cache_key(
-            &file.account,
-            &sidecar_path,
-            expected_rows,
-            &matcher_labels,
-            &filter_key,
-        );
+        let cache_key = if selection_cache_enabled {
+            selection_cache_key(
+                &file.account,
+                &sidecar_path,
+                expected_rows,
+                &matcher_labels,
+                &filter_key,
+            )
+        } else {
+            String::new()
+        };
         index_files.entry(file.key.clone()).or_insert((
             file.account.clone(),
             sidecar_path,
@@ -113,18 +119,30 @@ pub async fn search(
     let start = std::time::Instant::now();
     let mut evaluated = Vec::with_capacity(index_files.len());
     let mut misses = Vec::new();
-    {
+    if selection_cache_enabled {
         let mut cache = METRICS_INDEX_SELECTION_CACHE
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         for (data_path, (account, sidecar_path, cache_key, expected_rows)) in index_files {
-            if let Some(ranges) = cache.get(&cache_key) {
+            metrics::METRICS_INDEX_SELECTION_CACHE_REQUESTS_TOTAL
+                .with_label_values::<&str>(&[])
+                .inc();
+            if let Some((ranges, row_group_size)) = cache.get(&cache_key) {
+                metrics::METRICS_INDEX_SELECTION_CACHE_HITS_TOTAL
+                    .with_label_values::<&str>(&[])
+                    .inc();
                 // only complete selections are cached, so a hit implies exactness
-                evaluated.push((data_path, ranges, true));
+                evaluated.push((data_path, ranges, true, row_group_size));
             } else {
                 misses.push((data_path, account, sidecar_path, cache_key, expected_rows));
             }
         }
+    } else {
+        misses.extend(index_files.into_iter().map(
+            |(data_path, (account, sidecar_path, cache_key, expected_rows))| {
+                (data_path, account, sidecar_path, cache_key, expected_rows)
+            },
+        ));
     }
     let cache_hits = evaluated.len();
     let concurrency = target_partitions.max(1).saturating_mul(2).min(64);
@@ -140,10 +158,14 @@ pub async fn search(
                             .await?;
                     tokio::task::spawn_blocking(move || {
                         let complete = sidecar_covers_labels(data.schema.as_ref(), &labels);
+                        // indexes without the key predate it: written with the fixed size
+                        let row_group_size = data
+                            .row_group_size
+                            .unwrap_or(PARQUET_MAX_ROW_GROUP_SIZE as u32);
                         let physical_filter =
                             create_physical_filter(data.schema.as_ref(), &matchers)?;
                         evaluate_metrics_index(&data, physical_filter.as_deref(), expected_rows)
-                            .map(|ranges| (cache_key, Arc::new(ranges), complete))
+                            .map(|ranges| (cache_key, Arc::new(ranges), complete, row_group_size))
                     })
                     .await
                     .map_err(|error| DataFusionError::External(Box::new(error)))?
@@ -161,14 +183,14 @@ pub async fn search(
     let mut failed_files = 0usize;
     while let Some((data_path, result)) = evaluations.next().await {
         match result {
-            Ok((cache_key, ranges, complete)) => {
-                if complete {
+            Ok((cache_key, ranges, complete, row_group_size)) => {
+                if complete && selection_cache_enabled {
                     METRICS_INDEX_SELECTION_CACHE
                         .lock()
                         .unwrap_or_else(|poisoned| poisoned.into_inner())
-                        .insert(cache_key, Arc::clone(&ranges));
+                        .insert(cache_key, (Arc::clone(&ranges), row_group_size));
                 }
-                evaluated.push((data_path, ranges, complete));
+                evaluated.push((data_path, ranges, complete, row_group_size));
             }
             Err(error) => {
                 failed_files += 1;
@@ -182,11 +204,11 @@ pub async fn search(
 
     let selected_files = evaluated
         .iter()
-        .filter(|(_, ranges, _)| !ranges.is_empty())
+        .filter(|(_, ranges, ..)| !ranges.is_empty())
         .count();
     let selected_ranges = evaluated
         .iter()
-        .map(|(_, ranges, _)| ranges.len())
+        .map(|(_, ranges, ..)| ranges.len())
         .sum::<usize>();
     let indexed_file_count = evaluated.len() + failed_files;
     // An empty selection drops its file, so an incomplete matcher set cannot
@@ -196,23 +218,20 @@ pub async fn search(
         && residual_matchers_covered(table_schema, &matchers, &matcher_labels)
         && evaluated
             .iter()
-            .all(|(_, ranges, complete)| *complete || ranges.is_empty());
+            .all(|(_, ranges, complete, _)| *complete || ranges.is_empty());
     let mut selections = evaluated
         .into_iter()
-        .map(|(data_path, ranges, _)| (data_path, ranges))
+        .map(|(data_path, ranges, _, row_group_size)| (data_path, (ranges, row_group_size)))
         .collect::<HashMap<_, _>>();
     files.retain_mut(|file| {
-        let Some(ranges) = selections.remove(&file.key) else {
+        let Some((ranges, row_group_size)) = selections.remove(&file.key) else {
             // not indexed metrics: untouched, the caller decides how to scan it
             return true;
         };
         if ranges.is_empty() {
             return false;
         }
-        file.with_selection(
-            FileSelection::RowRanges(ranges),
-            Some(PARQUET_MAX_ROW_GROUP_SIZE as u32),
-        );
+        file.with_selection(FileSelection::RowRanges(ranges), Some(row_group_size));
         true
     });
 

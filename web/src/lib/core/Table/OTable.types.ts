@@ -363,6 +363,12 @@ export interface OTableProps<TData = any> {
   /** Data is arriving incrementally (SSE/WebSocket). Shows a pulsing indicator. */
   streaming?: boolean;
   error?: string | null;
+  /**
+   * The data this table lists was denied (403). Shows the no-access state
+   * instead of the first-run empty state, which would otherwise invite the
+   * user to create something they are not allowed to create.
+   */
+  forbidden?: boolean;
   /** Text shown when data is empty and not loading */
   emptyMessage?: I18nText;
   dense?: boolean;

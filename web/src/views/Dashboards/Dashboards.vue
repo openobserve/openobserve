@@ -95,13 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </ODropdownItem>
       </ODropdown>
       <!-- new dashboard button -->
-      <OButton
-        variant="primary"
-        size="sm"
-        icon-left="add"
-        data-test="dashboard-new"
-        @click="addDashboard"
-      >
+      <OButton variant="primary" size="sm" data-test="dashboard-new" @click="addDashboard">
         {{ t(`dashboard.add`) }}
       </OButton>
     </template>
@@ -128,6 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :columns="columns"
             row-key="id"
             :loading="loading"
+            :forbidden="forbidden"
             :frame="false"
             :default-columns="false"
             show-index
@@ -136,6 +131,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :footer-title="t('dashboard.header')"
             :page-size="20"
             :page-size-options="[20, 50, 100, 250, 500]"
+            :current-page="currentPage"
+            @update:current-page="onPageChange"
             selection="multiple"
             v-model:selected-ids="selectedIds"
             :enable-column-resize="true"
@@ -642,6 +639,14 @@ export default defineComponent({
     const selectedIds = ref<string[]>([]);
     const { track } = useReo();
 
+    // URL-synced so returning from a dashboard (Back/Update/Cancel) lands on the same page instead of resetting to page 1.
+    const currentPage = ref(Number(route.query.page) || 1);
+    const onPageChange = (page: number) => {
+      currentPage.value = page;
+      if (String(route.query.page ?? "1") === String(page)) return;
+      router.replace({ query: { ...route.query, page: String(page) } });
+    };
+
     const { showPositiveNotification, showErrorNotification } = useNotifications();
 
     const { isHome, setHomeDashboard, clearHomeDashboard, homeDashboard } = useHomeDashboard(t);
@@ -851,8 +856,12 @@ export default defineComponent({
     const selectedDashboardIds = computed(() => selectedIds.value);
 
     onMounted(async () => {
-      //get folders list
-      await getFoldersList(store);
+      // Awaited so the landing decision settles after FolderList's async init emission.
+      try {
+        await getFoldersList(store);
+      } catch {
+        // Already reported by the grouped access toast; the empty rail stands in.
+      }
 
       // Load favorites BEFORE picking the landing view — the favorites-first
       // landing below depends on knowing whether any exist.
@@ -898,6 +907,7 @@ export default defineComponent({
           router.push({
             path: "/dashboards",
             query: {
+              ...route.query,
               org_identifier: store.state.selectedOrganization.identifier,
               folder: activeFolderId.value,
             },
@@ -908,21 +918,27 @@ export default defineComponent({
         // String() matches JS's own null→"null" key coercion (behavior-neutral).
         loading.value =
           !store.state.organizationData.allDashboardList[String(activeFolderId.value)];
+        forbidden.value = false;
         try {
           const response = await getAllDashboardsByFolderId(store, activeFolderId.value);
 
           dashboardList.value = response || [];
         } catch (error) {
           console.error("Error loading dashboards:", error);
-          showErrorNotification(
-            raw(asCaughtError(error).message || t("dashboard.dashboards.failedToLoadFolder")),
-          );
+          forbidden.value = asCaughtError(error).response?.status === 403;
+          // The grouped access toast already reports a 403; a second red toast adds nothing.
+          if (!forbidden.value) {
+            showErrorNotification(
+              raw(asCaughtError(error).message || t("dashboard.dashboards.failedToLoadFolder")),
+            );
+          }
         } finally {
           loading.value = false;
           searchAcrossFolders.value = false;
           router.push({
             path: "/dashboards",
             query: {
+              ...route.query,
               org_identifier: store.state.selectedOrganization.identifier,
               folder: activeFolderId.value,
             },
@@ -1137,6 +1153,19 @@ export default defineComponent({
     // Start in the loading state so the table shows the skeleton on first
     // render instead of briefly flashing the empty state before the fetch.
     const loading = ref(true);
+    // Only the dashboards fetch is authoritative on access; the folder list is not.
+    const forbidden = ref(false);
+    // The first real load lands after mount and races TanStack's own auto-reset-on-data-change, which resolves through its own deferred microtask queue — setTimeout(0) runs strictly after that queue drains, so the restored page reliably wins.
+    watch(
+      loading,
+      (isLoading) => {
+        if (isLoading) return;
+        setTimeout(() => {
+          oTableRef.value?.table?.setPageIndex(currentPage.value - 1);
+        }, 0);
+      },
+      { once: true },
+    );
     const getDashboards = async () => {
       const dismiss = toast({
         variant: "loading",
@@ -1696,6 +1725,7 @@ export default defineComponent({
       dashboard,
       columns,
       loading,
+      forbidden,
       showAddDashboardDialog,
       showAddDashboardFromGitHub,
       addDashboard,
@@ -1742,6 +1772,8 @@ export default defineComponent({
       filteredFolders,
       updateActiveFolderId,
       selectedIds,
+      currentPage,
+      onPageChange,
       multipleExportDashboard,
       moveMultipleDashboards,
       openBulkDeleteDialog,

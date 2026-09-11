@@ -167,6 +167,20 @@ impl<T: RangeFunc + ?Sized> RangeFunc for Box<T> {
     }
 }
 
+impl<T: RangeFunc + ?Sized> RangeFunc for std::sync::Arc<T> {
+    fn name(&self) -> &'static str {
+        (**self).name()
+    }
+
+    fn exec(&self, samples: &[Sample], eval_ts: i64, range: &Duration) -> Option<f64> {
+        (**self).exec(samples, eval_ts, range)
+    }
+
+    fn counter_extrapolation(&self) -> Option<ExtrapolationKind> {
+        (**self).counter_extrapolation()
+    }
+}
+
 pub static KEEP_METRIC_NAME_FUNC: Lazy<HashSet<&str>> =
     Lazy::new(|| HashSet::from_iter(["last_over_time"]));
 
@@ -244,6 +258,11 @@ pub trait RangeFunc: Send + Sync {
 /// The fused evaluators' view of the same table: a name that resolves to a range function.
 pub(crate) fn fusable_range_func(name: &str) -> Option<Box<dyn RangeFunc>> {
     name.parse::<Func>().ok()?.range_func()
+}
+
+/// The range function a bare instant selector streams as; it keeps the metric name.
+pub(crate) fn instant_lookback_func() -> std::sync::Arc<dyn RangeFunc> {
+    std::sync::Arc::new(last_over_time::LastOverTimeFunc::new())
 }
 
 pub(crate) fn eval_range<F>(data: Value, func: F, eval_ctx: &EvalContext) -> Result<Value>

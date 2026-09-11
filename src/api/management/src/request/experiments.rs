@@ -24,11 +24,14 @@ use openobserve_api_common::extractors::Headers;
 use openobserve_core::{
     auth::{UserEmail, is_ofga_object_visible},
     llm_evaluations::{
-        datasets, experiment_baseline, experiment_deletion,
-        experiment_dispersion::{self, NormalizationSpans, RowDispersion},
-        experiment_ingest::{self, IngestError},
-        experiment_results::{self, ExperimentResultSlot, ExperimentSlotStatus},
-        experiments::{self, ExperimentError, PinnedExperimentScorer},
+        datasets,
+        experiments::{
+            self, ExperimentError, PinnedExperimentScorer, baseline, deletion,
+            dispersion::{self, NormalizationSpans, RowDispersion},
+            ingest::{self, IngestError},
+            results::{self, ExperimentResultSlot, ExperimentSlotStatus},
+            summary,
+        },
         remote_tasks,
     },
 };
@@ -43,15 +46,17 @@ use crate::{
         experiments::{
             CloneExperimentRequestBody, CreateExperimentRequestBody, CreateExperimentResponseBody,
             ExperimentBaselineResponseBody, ExperimentDetailQuery, ExperimentDetailResponseBody,
-            ExperimentDispersionSummaryBody, ExperimentPreviewQuery, ExperimentPreviewResponseBody,
-            ExperimentResponseBody, ExperimentResultPaginationBody, ExperimentResultRowBody,
-            ExperimentResultRowPageQuery, ExperimentResultRowPageResponseBody,
-            ExperimentResultRowPaginationBody, ExperimentResultRowSortBody,
-            ExperimentResultsResponseBody, ExperimentRowDetailResponseBody,
-            ExperimentRowNavigationBody, ExperimentRowSnapshotBody, ExperimentScoreSummaryBody,
-            ExperimentSlotPageQuery, ExperimentSlotPageResponseBody, ExperimentTaskBody,
-            ListExperimentsResponseBody, RetryExperimentSlotRequestBody,
-            SubmitExperimentRecordsRequestBody, SubmitExperimentRecordsResponseBody,
+            ExperimentDispersionSummaryBody, ExperimentListQuery, ExperimentPreviewQuery,
+            ExperimentPreviewResponseBody, ExperimentResponseBody, ExperimentResultPaginationBody,
+            ExperimentResultRowBody, ExperimentResultRowPageQuery,
+            ExperimentResultRowPageResponseBody, ExperimentResultRowPaginationBody,
+            ExperimentResultRowSortBody, ExperimentResultsResponseBody,
+            ExperimentRowDetailResponseBody, ExperimentRowNavigationBody,
+            ExperimentRowSnapshotBody, ExperimentScoreSummaryBody, ExperimentSlotPageQuery,
+            ExperimentSlotPageResponseBody, ExperimentSummaryResponseBody, ExperimentTaskBody,
+            ExperimentViewResponseBody, ListExperimentsResponseBody,
+            RetryExperimentSlotRequestBody, SubmitExperimentRecordsRequestBody,
+            SubmitExperimentRecordsResponseBody,
         },
     },
 };
@@ -137,7 +142,7 @@ fn validate_comparison_dataset(
 }
 
 fn score_summary_bodies(
-    summaries: Vec<experiment_results::ExperimentScoreSummary>,
+    summaries: Vec<results::ExperimentScoreSummary>,
     scorer_definitions: &[infra::table::scorers::Scorer],
     score_configs: &[infra::table::score_configs::ScoreConfig],
 ) -> Vec<ExperimentScoreSummaryBody> {
@@ -168,6 +173,39 @@ fn score_summary_bodies(
             body
         })
         .collect()
+}
+
+fn experiment_summary_body(
+    summary: summary::ExperimentSummary,
+    score_configs: &[infra::table::score_configs::ScoreConfig],
+) -> ExperimentSummaryResponseBody {
+    let summary::ExperimentSummary {
+        status,
+        execution_progress,
+        scoring_status,
+        scoring_progress,
+        task_outcomes,
+        score_outcomes,
+        score_summaries,
+        aggregate_summary,
+        scorer_definitions,
+    } = summary;
+    let score_summaries = match (score_summaries, scorer_definitions) {
+        (Some(summaries), Some(definitions)) => {
+            Some(score_summary_bodies(summaries, &definitions, score_configs))
+        }
+        _ => None,
+    };
+    ExperimentSummaryResponseBody {
+        status: status.map(Into::into),
+        scoring_status,
+        execution_progress: execution_progress.map(Into::into),
+        scoring_progress: scoring_progress.map(Into::into),
+        task_outcomes: task_outcomes.map(Into::into),
+        score_outcomes: score_outcomes.map(Into::into),
+        score_summaries,
+        aggregate_summary: aggregate_summary.map(Into::into),
+    }
 }
 
 fn experiment_result_row_status(slots: &[ExperimentResultSlot]) -> ExperimentSlotStatus {
@@ -234,9 +272,8 @@ fn experiment_result_rows(
                         .chain(trial.client_scores.iter().cloned())
                 })
                 .collect::<Vec<_>>();
-            let summary =
-                experiment_results::row_result_summary(trials.len(), scorers, &executions, &scores);
-            let aggregate = experiment_results::aggregate_summary(
+            let summary = results::row_result_summary(trials.len(), scorers, &executions, &scores);
+            let aggregate = results::aggregate_summary(
                 &executions,
                 &summary.task_progress,
                 &summary.scoring_progress,
@@ -257,6 +294,8 @@ fn experiment_result_rows(
                 expected_output: first.expected_output.clone(),
                 trial_count: trials.len(),
                 status: experiment_result_row_status(&trials).into(),
+                task_outcomes: summary.task_outcomes.into(),
+                score_outcomes: summary.score_outcomes.into(),
                 output,
                 score_summaries: score_summary_bodies(
                     summary.score_summaries,
@@ -320,8 +359,8 @@ fn paginate_experiment_result_rows(
 async fn derive_scoring_status(
     org_id: &str,
     experiment: &openobserve_core::llm_evaluations::experiments::Experiment,
-    results: &openobserve_core::llm_evaluations::experiment_runner::ExperimentResults,
-) -> Result<openobserve_core::llm_evaluations::experiment_results::ScoringStatus, Response> {
+    results: &openobserve_core::llm_evaluations::experiments::runner::ExperimentResults,
+) -> Result<openobserve_core::llm_evaluations::experiments::results::ScoringStatus, Response> {
     let applicability = experiments::scoring_applicability(org_id, experiment)
         .await
         .map_err(|error| {
@@ -331,13 +370,13 @@ async fn derive_scoring_status(
             );
             experiment_error_response(error)
         })?;
-    let summary = experiment_results::result_summary(
+    let summary = results::result_summary(
         &applicability,
         &experiment.scorers,
         &results.executions,
         &results.scores,
     );
-    Ok(experiment_results::scoring_status(
+    Ok(results::scoring_status(
         &summary.scoring_progress,
         &summary.score_summaries,
     ))
@@ -498,11 +537,15 @@ pub async fn create_experiment(
     context_path = "/api",
     tag = "Experiments",
     operation_id = "ListExperiments",
-    params(("org_id" = String, Path, description = "Organization name")),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ExperimentListQuery,
+    ),
     responses((status = 200, body = inline(ListExperimentsResponseBody))),
 )]
 pub async fn list_experiments(
     Path(org_id): Path<String>,
+    Query(query): Query<ExperimentListQuery>,
     Headers(user): Headers<UserEmail>,
 ) -> Response {
     let permitted_objects = match openobserve_api_common::auth::validator::list_objects_for_user(
@@ -525,26 +568,60 @@ pub async fn list_experiments(
                 .collect()
         })
         .unwrap_or_default();
-    match experiments::list(&org_id).await {
-        Ok(experiments) => MetaHttpResponse::json(ListExperimentsResponseBody {
-            list: experiments
-                .into_iter()
-                .filter(|experiment| {
-                    is_ofga_object_visible(
-                        &org_id,
-                        "experiment",
-                        &experiment.id,
-                        permitted_objects.as_deref(),
-                    )
-                })
-                .map(|experiment| {
-                    let dataset_name = dataset_names.get(&experiment.dataset_id).cloned();
-                    ExperimentResponseBody::from(experiment).with_dataset_name(dataset_name)
-                })
-                .collect(),
-        }),
-        Err(error) => experiment_error_response(error),
-    }
+    let dataset_id = query
+        .dataset_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|id| !id.is_empty());
+    let experiments = match experiments::list(&org_id, dataset_id).await {
+        Ok(experiments) => experiments
+            .into_iter()
+            .filter(|experiment| {
+                is_ofga_object_visible(
+                    &org_id,
+                    "experiment",
+                    &experiment.id,
+                    permitted_objects.as_deref(),
+                )
+            })
+            .collect::<Vec<_>>(),
+        Err(error) => return experiment_error_response(error),
+    };
+    let include_summary = query.include_summary.unwrap_or(false);
+    let mut summaries = if include_summary {
+        summary::load(&experiments).await
+    } else {
+        HashMap::new()
+    };
+    let score_configs = if include_summary {
+        infra::table::score_configs::get_all_by_org(&org_id)
+            .await
+            .unwrap_or_else(|error| {
+                log::warn!("[ExperimentSummary] component=score_configs error={error}");
+                Vec::new()
+            })
+    } else {
+        Vec::new()
+    };
+    MetaHttpResponse::json(ListExperimentsResponseBody {
+        list: experiments
+            .into_iter()
+            .map(|experiment| {
+                let id = experiment.id.clone();
+                let dataset_name = dataset_names.get(&experiment.dataset_id).cloned();
+                ExperimentViewResponseBody {
+                    experiment: ExperimentResponseBody::from(experiment)
+                        .with_dataset_name(dataset_name),
+                    summary: include_summary.then(|| {
+                        experiment_summary_body(
+                            summaries.remove(&id).unwrap_or_default(),
+                            &score_configs,
+                        )
+                    }),
+                }
+            })
+            .collect(),
+    })
 }
 
 #[utoipa::path(
@@ -586,13 +663,13 @@ pub async fn get_experiment(
         return MetaHttpResponse::internal_error("Failed to load Experiment results");
     }
     let result_page = query.result_page.unwrap_or(1);
-    let result_page_size = query
-        .result_page_size
-        .unwrap_or(openobserve_core::llm_evaluations::experiment_runner::DEFAULT_RESULT_PAGE_SIZE);
+    let result_page_size = query.result_page_size.unwrap_or(
+        openobserve_core::llm_evaluations::experiments::runner::DEFAULT_RESULT_PAGE_SIZE,
+    );
     if result_page == 0
         || result_page_size == 0
         || result_page_size
-            > openobserve_core::llm_evaluations::experiment_runner::MAX_RESULT_PAGE_SIZE
+            > openobserve_core::llm_evaluations::experiments::runner::MAX_RESULT_PAGE_SIZE
     {
         return MetaHttpResponse::bad_request("Invalid Experiment result pagination");
     }
@@ -606,115 +683,108 @@ pub async fn get_experiment(
         }
     };
     let spans = NormalizationSpans::from_configs(&score_configs);
-    let scorer_definitions = match experiments::scorer_definitions(&org_id, &experiment).await {
-        Ok(definitions) => definitions,
-        Err(error) => {
-            log::error!(
-                "[Experiment] failed to load Scorer definitions for {experiment_id}: {error}"
-            );
-            return MetaHttpResponse::internal_error("Failed to load Experiment results");
-        }
-    };
-    let results = match openobserve_core::llm_evaluations::experiment_runner::results_page(
-        &experiment,
-        result_page,
-        result_page_size,
-    )
-    .await
-    {
-        Ok(results) => {
-            let executions = results.executions;
-            let scores = results.scores;
-            let summary_executions = results.summary_executions;
-            let summary_scores = results.summary_scores;
-            let scorers = experiment.scorers.clone();
-            let summary = experiment_results::result_summary(
-                &preview.applicability,
-                &scorers,
-                &summary_executions,
-                &summary_scores,
-            );
-            let aggregate_summary = experiment_results::aggregate_summary(
-                &summary_executions,
-                &summary.task_progress,
-                &summary.scoring_progress,
-            );
-            // Measured over the whole Experiment, then narrowed to this page:
-            // a case's trials can straddle a page boundary, and half a case's
-            // trials would understate how much it disagreed with itself.
-            let dispersions = experiment_dispersion::row_dispersions(
-                &results.summary_rows,
-                &summary_scores,
-                &scorers,
-                &spans,
-            );
-            let dispersion_summary = ExperimentDispersionSummaryBody {
-                high_dispersion_row_count: experiment_dispersion::high_dispersion_row_count(
-                    &dispersions,
-                ),
-                threshold: experiment_dispersion::HIGH_DISPERSION_THRESHOLD,
-            };
-            let page_rows = results
-                .slots
-                .iter()
-                .map(|slot| slot.row_id.clone())
-                .collect::<HashSet<_>>();
-            let row_dispersions = dispersions
-                .into_iter()
-                .filter(|row| page_rows.contains(&row.row_id))
-                .map(Into::into)
-                .collect();
-            let slots =
-                experiment_results::result_slots(results.slots, &executions, &scores, &scorers);
-            ExperimentResultsResponseBody {
-                executions: executions
+    let (results, summary_evidence) =
+        match openobserve_core::llm_evaluations::experiments::runner::results_page(
+            &experiment,
+            result_page,
+            result_page_size,
+        )
+        .await
+        {
+            Ok(results) => {
+                let executions = results.executions;
+                let scores = results.scores;
+                let summary_executions = results
+                    .summary_evidence
+                    .executions
+                    .as_deref()
+                    .unwrap_or_default();
+                let summary_scores = results
+                    .summary_evidence
+                    .scores
+                    .as_deref()
+                    .unwrap_or_default();
+                let scorers = experiment.scorers.clone();
+                let summary = results::result_summary(
+                    &preview.applicability,
+                    &scorers,
+                    summary_executions,
+                    summary_scores,
+                );
+                // Measured over the whole Experiment, then narrowed to this page:
+                // a case's trials can straddle a page boundary, and half a case's
+                // trials would understate how much it disagreed with itself.
+                let dispersions = dispersion::row_dispersions(
+                    &results.summary_rows,
+                    summary_scores,
+                    &scorers,
+                    &spans,
+                );
+                let dispersion_summary = ExperimentDispersionSummaryBody {
+                    high_dispersion_row_count: dispersion::high_dispersion_row_count(&dispersions),
+                    threshold: dispersion::HIGH_DISPERSION_THRESHOLD,
+                };
+                let page_rows = results
+                    .slots
+                    .iter()
+                    .map(|slot| slot.row_id.clone())
+                    .collect::<HashSet<_>>();
+                let row_dispersions = dispersions
                     .into_iter()
-                    .filter_map(|record| serde_json::to_value(record).ok())
-                    .collect(),
-                scores: scores
-                    .into_iter()
-                    .filter_map(|record| serde_json::to_value(record).ok())
-                    .collect(),
-                slots: slots.into_iter().map(Into::into).collect(),
-                pagination: ExperimentResultPaginationBody {
-                    page: results.page,
-                    page_size: results.page_size,
-                    total_slots: results.total_slots,
-                    has_more: results.has_more,
-                },
-                task_progress: summary.task_progress.into(),
-                scoring_status: experiment_results::scoring_status(
-                    &summary.scoring_progress,
-                    &summary.score_summaries,
-                ),
-                scoring_progress: summary.scoring_progress.into(),
-                skip_summary: summary.skip_summary.into(),
-                score_summaries: score_summary_bodies(
-                    summary.score_summaries,
-                    &scorer_definitions,
-                    &score_configs,
-                ),
-                client_score_summaries: summary
-                    .client_score_summaries
-                    .into_iter()
+                    .filter(|row| page_rows.contains(&row.row_id))
                     .map(Into::into)
-                    .collect(),
-                aggregate_summary: aggregate_summary.into(),
-                row_dispersions,
-                dispersion_summary,
+                    .collect();
+                let slots = results::result_slots(results.slots, &executions, &scores, &scorers);
+                let body = ExperimentResultsResponseBody {
+                    executions: executions
+                        .into_iter()
+                        .filter_map(|record| serde_json::to_value(record).ok())
+                        .collect(),
+                    scores: scores
+                        .into_iter()
+                        .filter_map(|record| serde_json::to_value(record).ok())
+                        .collect(),
+                    slots: slots.into_iter().map(Into::into).collect(),
+                    pagination: ExperimentResultPaginationBody {
+                        page: results.page,
+                        page_size: results.page_size,
+                        total_slots: results.total_slots,
+                        has_more: results.has_more,
+                    },
+                    skip_summary: summary.skip_summary.into(),
+                    client_score_summaries: summary
+                        .client_score_summaries
+                        .into_iter()
+                        .map(Into::into)
+                        .collect(),
+                    row_dispersions,
+                    dispersion_summary,
+                };
+                (body, results.summary_evidence)
             }
-        }
-        Err(error) => {
-            log::error!("[Experiment] failed to load results for {experiment_id}: {error}");
-            return MetaHttpResponse::internal_error("Failed to load Experiment results");
-        }
-    };
+            Err(error) => {
+                log::error!("[Experiment] failed to load results for {experiment_id}: {error}");
+                return MetaHttpResponse::internal_error("Failed to load Experiment results");
+            }
+        };
     let dataset_name = datasets::get(&org_id, &experiment.dataset_id)
         .await
         .ok()
         .map(|dataset| dataset.name);
+    let mut summaries = summary::load_with_evidence(
+        std::slice::from_ref(&experiment),
+        HashMap::from([(experiment.id.clone(), summary_evidence)]),
+    )
+    .await;
+    let summary = experiment_summary_body(
+        summaries.remove(&experiment.id).unwrap_or_default(),
+        &score_configs,
+    );
     MetaHttpResponse::json(ExperimentDetailResponseBody {
-        experiment: ExperimentResponseBody::from(experiment).with_dataset_name(dataset_name),
+        experiment: ExperimentViewResponseBody {
+            experiment: ExperimentResponseBody::from(experiment).with_dataset_name(dataset_name),
+            summary: Some(summary),
+        },
         preview: preview.into(),
         results,
     })
@@ -734,7 +804,7 @@ pub async fn get_experiment(
     ),
     responses(
         (status = 200, description = "Baseline/candidate comparison", body = ExperimentComparisonResponseBody),
-        (status = 400, description = "Invalid threshold or cross-dataset comparison"),
+        (status = 400, description = "Invalid threshold, outcome dimensions, or cross-dataset comparison"),
         (status = 403, description = "One or both Experiments are not accessible"),
         (status = 404, description = "One or both Experiments were not found"),
     )
@@ -786,7 +856,7 @@ pub async fn compare_experiments(
         Err(error) => return experiment_error_response(error),
     };
     let baseline_results =
-        match openobserve_core::llm_evaluations::experiment_runner::results(&baseline).await {
+        match openobserve_core::llm_evaluations::experiments::runner::results(&baseline).await {
             Ok(results) => results,
             Err(error) => {
                 log::error!("[Experiment] failed to load baseline comparison evidence: {error}");
@@ -794,14 +864,14 @@ pub async fn compare_experiments(
             }
         };
     let candidate_results =
-        match openobserve_core::llm_evaluations::experiment_runner::results(&candidate).await {
+        match openobserve_core::llm_evaluations::experiments::runner::results(&candidate).await {
             Ok(results) => results,
             Err(error) => {
                 log::error!("[Experiment] failed to load candidate comparison evidence: {error}");
                 return MetaHttpResponse::internal_error("Failed to compare Experiments");
             }
         };
-    use openobserve_core::llm_evaluations::experiment_comparison::{
+    use openobserve_core::llm_evaluations::experiments::comparison::{
         CompareExperimentsInput, ComparisonEvidence, ComparisonPolicy, ComparisonScoringState,
         compare_experiments,
     };
@@ -828,11 +898,13 @@ pub async fn compare_experiments(
         }
     };
     let policy = ComparisonPolicy::from_configs(&score_configs);
-    let comparison = compare_experiments(CompareExperimentsInput {
+    let outcome_dimensions = query.selected_dimensions();
+    let comparison = match compare_experiments(CompareExperimentsInput {
         baseline_id: baseline.id,
         candidate_id: candidate.id,
         dataset_id: baseline.dataset_id,
         threshold,
+        outcome_dimensions: outcome_dimensions.as_ref(),
         policy: &policy,
         scoring: ComparisonScoringState {
             baseline: baseline_scoring,
@@ -848,7 +920,14 @@ pub async fn compare_experiments(
             executions: &candidate_results.executions,
             scores: &candidate_results.scores,
         },
-    });
+    }) {
+        Ok(comparison) => comparison,
+        Err(_) => {
+            return MetaHttpResponse::bad_request(
+                "Selected outcome dimensions are unavailable or have no comparison policy",
+            );
+        }
+    };
     let response = ExperimentComparisonResponseBody::from(comparison)
         .with_trial_outputs(&baseline_results.executions, &candidate_results.executions);
     MetaHttpResponse::json(response)
@@ -885,12 +964,12 @@ pub async fn list_experiment_result_rows(
         return response;
     }
     let page = query.page.unwrap_or(1);
-    let page_size = query
-        .page_size
-        .unwrap_or(openobserve_core::llm_evaluations::experiment_runner::DEFAULT_RESULT_PAGE_SIZE);
+    let page_size = query.page_size.unwrap_or(
+        openobserve_core::llm_evaluations::experiments::runner::DEFAULT_RESULT_PAGE_SIZE,
+    );
     if page == 0
         || page_size == 0
-        || page_size > openobserve_core::llm_evaluations::experiment_runner::MAX_RESULT_PAGE_SIZE
+        || page_size > openobserve_core::llm_evaluations::experiments::runner::MAX_RESULT_PAGE_SIZE
     {
         return MetaHttpResponse::bad_request("Invalid Experiment row pagination");
     }
@@ -911,15 +990,16 @@ pub async fn list_experiment_result_rows(
         Ok(slots) => slots,
         Err(error) => return experiment_error_response(error),
     };
-    let evidence = match openobserve_core::llm_evaluations::experiment_runner::results(&experiment)
-        .await
-    {
-        Ok(evidence) => evidence,
-        Err(error) => {
-            log::error!("[Experiment] failed to load row evidence for {experiment_id}: {error}");
-            return MetaHttpResponse::internal_error("Failed to load Experiment rows");
-        }
-    };
+    let evidence =
+        match openobserve_core::llm_evaluations::experiments::runner::results(&experiment).await {
+            Ok(evidence) => evidence,
+            Err(error) => {
+                log::error!(
+                    "[Experiment] failed to load row evidence for {experiment_id}: {error}"
+                );
+                return MetaHttpResponse::internal_error("Failed to load Experiment rows");
+            }
+        };
     let score_configs = match infra::table::score_configs::get_all_by_org(&org_id).await {
         Ok(configs) => configs,
         Err(error) => {
@@ -937,14 +1017,14 @@ pub async fn list_experiment_result_rows(
         }
     };
     let scorers = experiment.scorers.clone();
-    let dispersions = experiment_dispersion::row_dispersions(
+    let dispersions = dispersion::row_dispersions(
         &experiments::row_keys(&slots),
         &evidence.scores,
         &scorers,
         &NormalizationSpans::from_configs(&score_configs),
     );
     let result_slots =
-        experiment_results::result_slots(slots, &evidence.executions, &evidence.scores, &scorers);
+        results::result_slots(slots, &evidence.executions, &evidence.scores, &scorers);
     let rows = experiment_result_rows(
         result_slots,
         &scorers,
@@ -1005,7 +1085,7 @@ pub async fn get_experiment_row(
         );
         return MetaHttpResponse::internal_error("Failed to load Experiment row");
     }
-    let row = match openobserve_core::llm_evaluations::experiment_runner::row_result(
+    let row = match openobserve_core::llm_evaluations::experiments::runner::row_result(
         &experiment,
         &row_id,
     )
@@ -1021,7 +1101,7 @@ pub async fn get_experiment_row(
     let executions = row.executions;
     let scorers = experiment.scorers.clone();
     let row_summary =
-        experiment_results::row_result_summary(row.slots.len(), &scorers, &executions, &row.scores);
+        results::row_result_summary(row.slots.len(), &scorers, &executions, &row.scores);
     let score_summaries = row_summary.score_summaries;
     let client_score_summaries = row_summary.client_score_summaries;
     let score_configs = match infra::table::score_configs::get_all_by_org(&org_id).await {
@@ -1038,7 +1118,7 @@ pub async fn get_experiment_row(
             return MetaHttpResponse::internal_error("Failed to load Experiment row");
         }
     };
-    let dispersion = experiment_dispersion::row_dispersions(
+    let dispersion = dispersion::row_dispersions(
         &experiments::row_keys(&row.slots),
         &row.scores,
         &scorers,
@@ -1070,7 +1150,7 @@ pub async fn get_experiment_row(
         logical_id: first_slot.logical_id.clone(),
         input: first_slot.input.clone(),
         expected_output: first_slot.expected_output.clone(),
-        trials: experiment_results::result_slots(row.slots, &executions, &row.scores, &scorers)
+        trials: results::result_slots(row.slots, &executions, &row.scores, &scorers)
             .into_iter()
             .map(Into::into)
             .collect(),
@@ -1135,7 +1215,7 @@ pub async fn set_experiment_baseline(
     {
         return response;
     }
-    match experiment_baseline::set_baseline(&org_id, &experiment_id, &user.user_id).await {
+    match baseline::set_baseline(&org_id, &experiment_id, &user.user_id).await {
         Ok(change) => MetaHttpResponse::json(ExperimentBaselineResponseBody {
             experiment: ExperimentResponseBody::from(change.experiment),
             previous_baseline_id: change.previous_baseline_id,
@@ -1171,7 +1251,7 @@ pub async fn clear_experiment_baseline(
     {
         return response;
     }
-    match experiment_baseline::clear_baseline(&org_id, &experiment_id, &user.user_id).await {
+    match baseline::clear_baseline(&org_id, &experiment_id, &user.user_id).await {
         Ok(experiment) => MetaHttpResponse::json(ExperimentResponseBody::from(experiment)),
         Err(error) => experiment_error_response(error),
     }
@@ -1205,7 +1285,7 @@ pub async fn delete_experiment(
     {
         return response;
     }
-    match experiment_deletion::delete(&org_id, &experiment_id, &user.user_id).await {
+    match deletion::delete(&org_id, &experiment_id, &user.user_id).await {
         Ok(()) => {
             // The authorization object outlives the row it named, so it is
             // removed here rather than by the cleanup sweep.
@@ -1269,7 +1349,7 @@ pub async fn retry_experiment_slot(
     Headers(user): Headers<UserEmail>,
     axum::Json(body): axum::Json<RetryExperimentSlotRequestBody>,
 ) -> Response {
-    use openobserve_core::llm_evaluations::experiment_runner::ExperimentSlotRetryError;
+    use openobserve_core::llm_evaluations::experiments::runner::ExperimentSlotRetryError;
 
     if let Err(response) =
         require_experiment_visibility(&org_id, &experiment_id, &user.user_id, "PUT").await
@@ -1277,7 +1357,7 @@ pub async fn retry_experiment_slot(
         return response;
     }
 
-    match openobserve_core::llm_evaluations::experiment_runner::retry_error_slot(
+    match openobserve_core::llm_evaluations::experiments::runner::retry_error_slot(
         &org_id,
         &experiment_id,
         &row_id,
@@ -1445,7 +1525,7 @@ pub async fn submit_experiment_records(
     {
         return response;
     }
-    match experiment_ingest::submit_records(&org_id, &experiment_id, body.into()).await {
+    match ingest::submit_records(&org_id, &experiment_id, body.into()).await {
         Ok(result) => MetaHttpResponse::json(SubmitExperimentRecordsResponseBody::from(result)),
         Err(error) => ingest_error_response(error),
     }
@@ -1481,7 +1561,7 @@ pub async fn finalize_experiment(
     {
         return response;
     }
-    match experiment_ingest::finalize(&org_id, &experiment_id).await {
+    match ingest::finalize(&org_id, &experiment_id).await {
         Ok(experiment) => MetaHttpResponse::json(ExperimentResponseBody::from(experiment)),
         Err(error) => ingest_error_response(error),
     }
@@ -1504,7 +1584,7 @@ mod tests {
             expected_output: None,
             status,
             task_status:
-                openobserve_core::llm_evaluations::experiment_results::ExperimentResultTaskStatus::Pending,
+                openobserve_core::llm_evaluations::experiments::results::ExperimentResultTaskStatus::Pending,
             execution: None,
             scores: Vec::new(),
             client_scores: Vec::new(),
@@ -1521,6 +1601,8 @@ mod tests {
             expected_output: None,
             trial_count: 2,
             status: crate::models::experiments::ExperimentSlotStatusBody::Completed,
+            task_outcomes: Default::default(),
+            score_outcomes: Default::default(),
             output: None,
             score_summaries: Vec::new(),
             p50_latency_ms: None,
@@ -1578,7 +1660,7 @@ mod tests {
 
     #[test]
     fn score_summary_uses_the_pinned_score_config_name_before_scores_exist() {
-        let summaries = vec![experiment_results::ExperimentScoreSummary {
+        let summaries = vec![results::ExperimentScoreSummary {
             scorer_id: "scorer-entity".to_string(),
             scorer_version: 2,
             sample_count: 0,

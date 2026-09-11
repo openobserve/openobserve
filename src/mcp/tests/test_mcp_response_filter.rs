@@ -661,7 +661,7 @@ fn test_search_sql_token_reduction() {
 }
 
 #[test]
-fn test_search_sql_hit_cap_at_100() {
+fn test_search_sql_summary_keeps_every_hit() {
     init_test_configs();
     let mut fixture: Value = serde_json::from_str(&search_sql_fixture()).unwrap();
     // Expand hits to 150
@@ -678,9 +678,9 @@ fn test_search_sql_hit_cap_at_100() {
     let summary = filter_response("SearchSQL", &full, &DetailLevel::Summary);
     let parsed: Value = serde_json::from_str(&summary).unwrap();
 
-    assert_eq!(parsed["hits"].as_array().unwrap().len(), 100);
-    assert!(parsed.get("_hits_capped").is_some());
-    assert_eq!(parsed["_hits_capped"]["original"], 150);
+    assert_eq!(parsed["hits"].as_array().unwrap().len(), 150);
+    assert!(parsed.get("_hits_capped").is_none());
+    assert_eq!(parsed["total"], 150);
 }
 
 #[test]

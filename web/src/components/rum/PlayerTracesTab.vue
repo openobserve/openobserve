@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon name="arrow-back" size="sm" />
         </OButton>
         <code class="text-text-secondary min-w-0 flex-1 truncate text-sm">{{
-          shortRoute(selectedTrace.route) || selectedTrace.label
+          traceDisplayName(selectedTrace)
         }}</code>
         <div class="flex flex-shrink-0 items-center gap-1.5">
           <span
@@ -188,8 +188,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
           </template>
           <template #cell-route="{ row }">
-            <span class="block truncate font-mono text-xs" :title="row.route">
-              {{ shortRoute(row.route) }}
+            <span class="block truncate font-mono text-xs" :title="traceDisplayName(row)">
+              {{ traceDisplayName(row) }}
             </span>
           </template>
           <template #cell-duration="{ row }">
@@ -223,6 +223,7 @@ import useHttpStreaming from "@/composables/useStreamingSearch";
 import useCorrelatedTracesStream from "@/composables/rum/useCorrelatedTracesStream";
 import { traceQueryWindow } from "@/utils/rum/traceWindow";
 import type { TraceTimeRange } from "@/ts/interfaces/traces/traceTimeRange.types";
+import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -294,7 +295,7 @@ const traceColumns = computed(() => [
   {
     id: "route",
     header: t("rum.route"),
-    accessorFn: (row: any) => shortRoute(row.route),
+    accessorFn: (row: any) => traceDisplayName(row),
     size: 400,
     minSize: 80,
     maxSize: 800,
@@ -332,6 +333,11 @@ function shortRoute(url: string): string {
   } catch {
     return url;
   }
+}
+
+function traceDisplayName(trace: any): string {
+  const operation = trace.metadata?.httpOperation || trace.metadata?.rootOperation;
+  return operation && operation !== "unknown" ? operation : shortRoute(trace.route) || trace.label;
 }
 
 // Converts nanosecond trace timestamp to millisecond offset from session start,
@@ -407,7 +413,7 @@ async function fetchTraceMetadata(
       ? `trace_id='${safeTraceIds[0]}'`
       : `trace_id IN (${safeTraceIds.map((id) => `'${id}'`).join(",")})`;
 
-  return new Promise<Record<string, any>>((resolve, reject) => {
+  const metadata = await new Promise<Record<string, any>>((resolve, reject) => {
     const traceId = generateTraceContext().traceId;
     activeTraceIds.push(traceId);
     const untrack = () => {
@@ -457,6 +463,37 @@ async function fetchTraceMetadata(
       },
     );
   });
+
+  try {
+    const stream = quoteSqlIdentifierIfNeeded(streamName);
+    const timestamp = quoteSqlIdentifierIfNeeded(store.state.zoConfig.timestamp_column);
+    const operationResponse = await searchService.search(
+      {
+        org_identifier: orgId,
+        query: {
+          query: {
+            sql: `SELECT trace_id, first_value(operation_name ORDER BY ${timestamp} ASC) AS operation_name FROM ${stream} WHERE ${filter} AND span_kind='2' AND http_route IS NOT NULL AND operation_name IS NOT NULL AND operation_name != '' GROUP BY trace_id`,
+            start_time: searchStartTime,
+            end_time: searchEndTime,
+            from: 0,
+            size: traceIds.length,
+          },
+        },
+        page_type: "traces",
+      },
+      "RUM",
+    );
+
+    for (const hit of operationResponse.data?.hits || []) {
+      if (metadata[hit.trace_id] && hit.operation_name) {
+        metadata[hit.trace_id].httpOperation = hit.operation_name;
+      }
+    }
+  } catch (err) {
+    console.warn("HTTP server operation fetch failed:", err);
+  }
+
+  return metadata;
 }
 
 // An in-flight metadata fetch outlives this tab otherwise; cancel it on unmount.
@@ -494,11 +531,7 @@ async function fetchTraces() {
       return;
     }
 
-    // The view-context columns are browser-shaped and are NOT guaranteed on a mobile
-    // `_rumdata` schema. Referencing a column the stream lacks fails the whole query with a
-    // 400, so each optional column is selected only when present (NULL-aliased otherwise)
-    // and the `action_id` filter is applied only when that column exists. `session_id` and
-    // the guarded `trace_id` are the only hard requirements.
+    // Optional browser fields must be schema-guarded because mobile streams omit them.
     const presentCols = new Set((rumStream?.schema ?? []).map((field: any) => field?.name));
     const has = (col: string): boolean => presentCols.has(col);
     const aggOrNull = (fn: string, col: string, alias: string): string =>
@@ -513,11 +546,13 @@ async function fetchTraces() {
       aggOrNull("min", "date", "_date"),
     ];
     const whereParts = [`session_id='${props.sessionId}'`, traceIdSet];
-    if (has("action_id")) whereParts.push("action_id is not null");
+    const having = has("resource_url")
+      ? " HAVING MAX(CASE WHEN resource_url LIKE '%/socket.io/%' AND resource_url LIKE '%transport=polling%' THEN 1 ELSE 0 END) = 0"
+      : "";
 
     const rumQuery = {
       query: {
-        sql: `SELECT ${selectParts.join(", ")} FROM "_rumdata" WHERE ${whereParts.join(" AND ")} GROUP BY ${traceIdExpr} ORDER BY _date ASC`,
+        sql: `SELECT ${selectParts.join(", ")} FROM "_rumdata" WHERE ${whereParts.join(" AND ")} GROUP BY ${traceIdExpr}${having} ORDER BY _date ASC`,
         start_time: searchStartTime,
         end_time: searchEndTime,
         from: 0,

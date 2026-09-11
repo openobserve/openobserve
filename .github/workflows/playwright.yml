@@ -36,7 +36,6 @@ env:
   ZO_FEATURE_QUERY_EXCLUDE_ALL: false
   ZO_USAGE_BATCH_SIZE: 200
   ZO_USAGE_PUBLISH_INTERVAL: 2
-  ZO_USAGE_REPORTING_ENABLED: true
   ZO_MIN_AUTO_REFRESH_INTERVAL: 5
   ZO_STREAMING_ENABLED: true
   ZO_COLS_PER_RECORD_LIMIT: "80000"
@@ -196,11 +195,11 @@ jobs:
 
       - uses: ./.github/actions/github-auth
       - name: Setup Rust Toolchain
-        uses: dtolnay/rust-toolchain@master
+        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master
         with:
           toolchain: nightly-2026-05-20
           targets: x86_64-unknown-linux-gnu
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           cache-on-failure: true
           shared-key: playwright-release-ci
@@ -321,6 +320,30 @@ jobs:
             cat /tmp/pw-select-log.txt
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+
+      # One sticky comment per PR (found by the hidden marker) so the triage result updates
+      # in place on every push instead of spamming a fresh comment. Same idiom as Kinora below.
+      - name: Upsert shard-selection comment on PR
+        if: ${{ github.event_name == 'pull_request' }}
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}   # PAT: comment as a human, not github-actions[bot]
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          MATRIX: ${{ steps.gen.outputs.matrix }}
+          SMOKE_ACTIVE: ${{ steps.gen.outputs.smoke_active }}
+          ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          MARKER="<!-- playwright-shard-triage -->"
+          BODY=$(MARKER="$MARKER" node .github/scripts/pw-triage-comment.js /tmp/pw-select-log.txt)
+          CID=$(gh api "repos/$REPO/issues/$PR_NUMBER/comments" --paginate \
+                  -q ".[] | select(.body | contains(\"$MARKER\")) | .id" | head -1)
+          if [ -n "$CID" ]; then
+            gh api -X PATCH "repos/$REPO/issues/comments/$CID" -f body="$BODY" >/dev/null && echo "Updated triage comment ($CID)."
+          else
+            gh api -X POST "repos/$REPO/issues/$PR_NUMBER/comments" -f body="$BODY" >/dev/null && echo "Posted triage comment."
+          fi
 
   ui_integration_tests:
     timeout-minutes: 45

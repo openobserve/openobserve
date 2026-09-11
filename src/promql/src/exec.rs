@@ -26,8 +26,8 @@ use tokio::sync::{RwLock, Semaphore};
 
 use super::engine::Engine;
 use crate::{
-    DEFAULT_LOOKBACK, TableProvider, micros, micros_since_epoch,
-    promql::selector_visitor::MetricSelectorVisitor,
+    DEFAULT_LOOKBACK, TableProvider, ast::selector_visitor::MetricSelectorVisitor, micros,
+    micros_since_epoch,
 };
 
 #[derive(Clone)]
@@ -65,6 +65,10 @@ impl PromqlContext {
         }
     }
 
+    pub fn lookback(&self) -> Duration {
+        Duration::from_micros(self.lookback_delta as u64)
+    }
+
     #[tracing::instrument(name = "promql:engine:exec", skip_all)]
     pub async fn exec(
         &mut self,
@@ -86,7 +90,7 @@ impl PromqlContext {
 
         // See https://promlabs.com/blog/2020/06/18/the-anatomy-of-a-promql-query/#range-queries
         let eval_ctx = EvalContext::new(self.start, self.end, self.interval, trace_id.to_string());
-        let mut engine = Engine::new_with_context(trace_id, ctx.clone(), eval_ctx.clone());
+        let mut engine = Engine::new(trace_id, ctx.clone(), eval_ctx.clone());
 
         let (value, result_type_exec) = engine.exec(&expr).await?;
 

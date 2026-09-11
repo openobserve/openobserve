@@ -17,7 +17,7 @@
         {{ statusVariant(detail.experiment.status, "eval").label }}
       </OTag>
       <OButton
-        v-if="detail?.experiment.status === 'running'"
+        v-if="detail?.experiment.executionStatus === 'running'"
         size="sm"
         variant="outline"
         :disabled="acting"
@@ -27,7 +27,7 @@
         {{ t("aiObservability.experiments.cancel") }}
       </OButton>
       <OButton
-        v-else-if="detail?.experiment.status === 'failed' || failedSlotCount > 0"
+        v-else-if="detail?.experiment.executionStatus === 'failed' || failedSlotCount > 0"
         size="sm"
         variant="outline"
         :disabled="acting"
@@ -300,6 +300,7 @@ import { computed, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { gt, raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import useSmartBack from "@/composables/useSmartBack";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -365,9 +366,14 @@ const rowDrawerOpen = ref(false);
 const retryingRow = ref(false);
 const selectedRowDetail = ref<ExperimentRowDetail | null>(null);
 
+// Real browser back when there's history to pop — returns to the Experiments
+// list with whatever filter (e.g. a dataset) the user actually arrived
+// through, not just the bare list. The fallback only fires with no history
+// to pop (direct link / reload).
+const { goBack: backToExperiments } = useSmartBack(() => aiExperimentsRoute(orgId.value));
 const backTarget = computed(() => ({
   label: t("aiObservability.nav.experiments"),
-  to: aiExperimentsRoute(orgId.value),
+  onClick: backToExperiments,
 }));
 const isMultiTrial = computed(() => (detail.value?.experiment.trialCount ?? 1) > 1);
 
@@ -375,13 +381,14 @@ const isMultiTrial = computed(() => (detail.value?.experiment.trialCount ?? 1) >
  *  two score columns exactly like the dataset grouping on the list page. */
 const scorerIds = computed(() => (detail.value?.preview.pinnedScorers ?? []).map((s) => s.id));
 
-// Fetched once per org, not re-fetched on every refresh() — Score Configs
-// change far less often than an Experiment's results.
+// Session-cached per org (see `scoreConfigs.listCached`) rather than a plain
+// `list()` — this page mounts fresh every time a different experiment is
+// opened, and Score Configs change far less often than that.
 const scoreConfigs = ref<ScoreConfig[]>([]);
 async function loadScoreConfigs() {
   if (!orgId.value) return;
   try {
-    scoreConfigs.value = await onlineEvalsService.scoreConfigs.list(orgId.value);
+    scoreConfigs.value = await onlineEvalsService.scoreConfigs.listCached(orgId.value);
   } catch {
     // Non-fatal: without configs, boolean cells just render unhighlighted —
     // same as before this feature existed.
@@ -436,7 +443,7 @@ const tableRows = computed(() =>
     const violations: Record<string, boolean> = {};
     for (const id of scorerIds.value) {
       const summary = row.scoreSummaries.find((candidate) => candidate.scorerId === id);
-      scores[`score:${id}`] = experimentScoreSummaryValue(summary?.value ?? null);
+      scores[`score:${id}`] = experimentScoreSummaryValue(summary?.value ?? null, row.trialCount);
       const healthy = scorerHealthyBoolean.value[id];
       const aggregate = summary?.value as Record<string, unknown> | null | undefined;
       if (healthy !== undefined && aggregate?.kind === "boolean") {
@@ -548,6 +555,8 @@ const metricCards = computed<MetricCard[]>(() => {
   const aggregate = results.aggregateSummary;
   const task = results.taskProgress;
   const scoring = results.scoringProgress;
+  const taskOutcomes = results.taskOutcomes;
+  const scoreOutcomes = results.scoreOutcomes;
   const scoreDistribution = (results.scoreSummaries ?? []).reduce(
     (distribution, summary) => ({
       success: distribution.success + summary.sampleCount,
@@ -577,6 +586,15 @@ const metricCards = computed<MetricCard[]>(() => {
     key: "cost",
     label: t("aiObservability.experiments.detail.totalCost"),
     value: aggregate?.totalCost == null ? "—" : `$${aggregate.totalCost.toFixed(4)}`,
+    footer: t(
+      aggregate?.costIncomplete
+        ? "aiObservability.experiments.detail.partialCostBreakdown"
+        : "aiObservability.experiments.detail.costBreakdown",
+      {
+        task: formatCost(aggregate?.taskCost ?? aggregate?.totalCost),
+        scoring: formatCost(aggregate?.scoringCost),
+      },
+    ),
     icon: "payments" as IconName,
     dataTest: "ai-experiment-detail-cost",
   });
@@ -591,27 +609,37 @@ const metricCards = computed<MetricCard[]>(() => {
   if (task) {
     cards.push({
       key: "progress",
-      label: t("aiObservability.experiments.detail.progress"),
+      label: t("aiObservability.experiments.detail.tasks"),
       value: `${task.completed}/${task.total}`,
-      footer: task.skipped
-        ? t("aiObservability.experiments.detail.skippedCount", { count: task.skipped })
-        : undefined,
+      footer: taskOutcomes
+        ? t("aiObservability.experiments.detail.taskDistribution", taskOutcomes)
+        : task.skipped
+          ? t("aiObservability.experiments.detail.skippedCount", { count: task.skipped })
+          : undefined,
       icon: "check-circle" as IconName,
       dataTest: "ai-experiment-detail-progress",
     });
   }
-  if (scoring && (scoring.total > 0 || results.scoreSummaries?.length)) {
+  if (scoring && (scoreOutcomes?.total || scoring.total > 0 || results.scoreSummaries?.length)) {
     cards.push({
       key: "scoring",
-      label: t("aiObservability.experiments.detail.scoring"),
-      value: `${scoring.completed}/${scoring.total}`,
-      footer: t("aiObservability.experiments.detail.scoringDistribution", scoreDistribution),
+      label: t("aiObservability.experiments.detail.scores"),
+      value: scoreOutcomes
+        ? `${scoreOutcomes.completed}/${scoreOutcomes.total}`
+        : `${scoring.completed}/${scoring.total}`,
+      footer: scoreOutcomes
+        ? t("aiObservability.experiments.detail.scoreOutcomeDistribution", scoreOutcomes)
+        : t("aiObservability.experiments.detail.scoringDistribution", scoreDistribution),
       icon: "fact-check" as IconName,
       dataTest: "ai-experiment-detail-scoring",
     });
   }
   return cards;
 });
+
+function formatCost(cost: number | null | undefined): string {
+  return cost == null ? "—" : `$${cost.toFixed(4)}`;
+}
 
 function isMetricCardActionable(card: MetricCard) {
   return card.key === "dispersion" && isMultiTrial.value;

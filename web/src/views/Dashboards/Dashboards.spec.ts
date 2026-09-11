@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { shallowMount } from "@vue/test-utils";
+import { shallowMount, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
 import Dashboards from "./Dashboards.vue";
 import { createStore } from "vuex";
@@ -63,6 +63,7 @@ vi.mock("@/services/settings", () => ({
 }));
 
 import settingsService from "@/services/settings";
+import * as commons from "@/utils/commons";
 import { useFavoriteDashboards } from "@/composables/useFavoriteDashboards";
 
 // Mock DOM methods to prevent errors from missing DOM APIs
@@ -389,6 +390,27 @@ describe("Dashboards.vue", () => {
 
       expect(wrapper.exists()).toBe(true);
       expect(wrapper.vm.activeFolderId).toBe("default");
+    });
+
+    it("should stop the loading skeleton when the folder list is forbidden", async () => {
+      // A 403 folder list used to abort mount before the landing decision ran,
+      // leaving the table on its skeleton forever instead of the empty state.
+      vi.mocked(commons.getFoldersList).mockRejectedValueOnce(
+        Object.assign(new Error("Request failed with status code 403"), {
+          response: { status: 403 },
+        }),
+      );
+
+      wrapper = shallowMount(Dashboards, {
+        global: buildGlobalConfig(store, router, i18n, {}),
+      });
+
+      await nextTick();
+      await nextTick();
+      await nextTick();
+
+      expect(wrapper.vm.activeFolderId).toBe("default");
+      expect(wrapper.vm.loading).toBe(false);
     });
 
     it("should have reactive activeFolderId property", async () => {
@@ -720,6 +742,20 @@ describe("Dashboards.vue", () => {
       await settle();
 
       expect(wrapper.vm.activeFolderId).toBe("__favorites__");
+    });
+
+    it("restores the page from the URL and keeps it there after the landing decision's own URL sync", async () => {
+      await router.push({ path: "/dashboards", query: { folder: "default", page: "3" } });
+      wrapper = shallowMount(Dashboards, {
+        global: buildGlobalConfig(storeWithTwo(), router, i18n),
+      });
+      await settle();
+      await flushPromises();
+      await settle();
+
+      expect(wrapper.vm.currentPage).toBe(3);
+      // The folder-switch watcher rewrites the URL as part of landing — it must not drop `page` while doing so.
+      expect(router.currentRoute.value.query.page).toBe("3");
     });
 
     it("toggleFavorite persists the per-user setting resolved to the active folder", async () => {

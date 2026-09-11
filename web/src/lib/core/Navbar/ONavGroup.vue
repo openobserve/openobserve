@@ -293,10 +293,13 @@ async function positionFlyout() {
   const rect = wrapper.getBoundingClientRect();
   // Small breathing gap between the rail and the flyout so they don't touch.
   const GAP = 4;
-  const left = rect.right + GAP;
+  const isRtl = document.documentElement.dir === "rtl";
+  const horizontalPosition: Record<string, string> = isRtl
+    ? { right: `${document.documentElement.clientWidth - rect.left + GAP}px` }
+    : { left: `${rect.right + GAP}px` };
   flyoutStyle.value = {
     position: "fixed",
-    left: `${left}px`,
+    ...horizontalPosition,
     top: `${rect.top}px`,
     zIndex: "6000",
   };
@@ -309,8 +312,30 @@ async function positionFlyout() {
   };
 }
 
+/**
+ * Send any open dropdown away before the flyout appears.
+ *
+ * Both are page menus, but a dropdown is portaled after this flyout AND sits on
+ * a higher layer, so it paints over the menu the pointer is actually on.
+ * Raising the flyout is the wrong lever: it would have to clear 10001, which is
+ * above the modal layer, and a nav menu floating over a dialog is worse than
+ * the overlap it would fix. One menu at a time is the behaviour anyway.
+ *
+ * Escape is what reka's dismissable layers listen for. It is scoped to the case
+ * where a popper is the topmost layer — with a dialog or drawer open the same
+ * key would close that instead, and the rail is reachable beside a drawer.
+ */
+function dismissOpenDropdowns() {
+  if (!document.querySelector("[data-reka-popper-content-wrapper]")) return;
+  if (document.querySelector('[data-test="o-dialog-overlay"], [data-test="o-drawer-overlay"]')) {
+    return;
+  }
+  document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+}
+
 async function open() {
   if (visibleChildren.value.length === 0) return;
+  dismissOpenDropdowns();
   clearTimers();
   isOpen.value = true;
   openGroupKey.value = props.groupKey;

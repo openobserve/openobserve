@@ -1552,6 +1552,34 @@ describe("OTable", () => {
       });
       expect(wrapper.find('[data-test="custom-loading-banner"]').exists()).toBe(true);
     });
+
+    it("suppresses the default banner for an empty loading-banner slot but keeps the streaming bar", () => {
+      // An empty slot still counts as "provided" — consumers can opt out of the default banner entirely.
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(5),
+          columns: makeColumns(),
+          streaming: true,
+        },
+        slots: {
+          "loading-banner": "",
+        },
+      });
+      expect(wrapper.findAll('[data-test="o2-table-loading-banner"]').length).toBe(0);
+      expect(wrapper.find('[data-test="o2-table-streaming-bar"]').exists()).toBe(true);
+    });
+
+    it("renders the default banner while streaming when no loading-banner slot is supplied", () => {
+      // Pairs with the empty-slot case: together they pin the opt-out as a contract.
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(5),
+          columns: makeColumns(),
+          streaming: true,
+        },
+      });
+      expect(wrapper.find('[data-test="o2-table-loading-banner"]').exists()).toBe(true);
+    });
   });
 
   // ── Scoped Bottom Slot ─────────────────────────────────────
@@ -2107,6 +2135,40 @@ describe("OTable", () => {
       const emitted = wrapper.emitted("column-order-change");
       expect(emitted).toBeTruthy();
       expect(emitted![emitted!.length - 1][0]).toEqual(newOrder);
+    });
+  });
+
+  // currentPage only lands if it's present at mount alongside the real data — data arriving after mount loses the race to TanStack's own deferred autoResetPageIndex, so async callers must remount (e.g. via :key) rather than update data in place.
+  describe("controlled currentPage (client mode)", () => {
+    it("restores the given page when mounted directly with data already present", async () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(20),
+          columns: makeColumns(),
+          pagination: "client",
+          pageSize: 5,
+          currentPage: 3,
+        },
+      });
+      await nextTick();
+      expect((wrapper.vm as any).table.getState().pagination.pageIndex).toBe(2);
+    });
+
+    it("does NOT restore the page if data arrives after mount (documents the race)", async () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: [],
+          columns: makeColumns(),
+          pagination: "client",
+          pageSize: 5,
+          currentPage: 3,
+          loading: true,
+        },
+      });
+      await wrapper.setProps({ data: makeRows(20), loading: false });
+      await nextTick();
+      await nextTick();
+      expect((wrapper.vm as any).table.getState().pagination.pageIndex).toBe(0);
     });
   });
 });

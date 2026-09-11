@@ -32,6 +32,11 @@ export function availableModelsOf(row: Provider) {
   return (valueOf(row, "availableModels", "available_models") || []) as string[];
 }
 
+// A backend predating resolvedEndpoint omits it; falling back keeps a mixed rollout from blanking the column.
+export function resolvedEndpointOf(row: Provider) {
+  return String(valueOf(row, "resolvedEndpoint", "resolved_endpoint") || row.endpoint || "");
+}
+
 export function scorerTypeOf(row: Scorer): ScorerType {
   return (valueOf(row, "scorerType", "scorer_type") || "llm_judge") as ScorerType;
 }

@@ -40,17 +40,9 @@ fn check_auth_inner(
 ) -> Result<Request<()>, Status> {
     let cfg = config::get_config();
     let metadata = req.metadata();
-    if !metadata.contains_key(&cfg.grpc.org_header_key) && !metadata.contains_key("authorization") {
+    let Some(token) = metadata.get("authorization").and_then(|v| v.to_str().ok()) else {
         return Err(Status::unauthenticated("No valid auth token[1]"));
-    }
-
-    let token = req
-        .metadata()
-        .get("authorization")
-        .unwrap()
-        .to_str()
-        .unwrap()
-        .to_string();
+    };
     if token.is_empty() {
         if get_internal_grpc_token().is_empty() {
             log::error!("Internal grpc token is not set");
@@ -66,67 +58,71 @@ fn check_auth_inner(
     #[cfg(not(feature = "enterprise"))]
     let super_cluster_token = get_internal_grpc_token();
     if token.eq(get_internal_grpc_token().as_str()) || token.eq(super_cluster_token.as_str()) {
-        Ok(req)
-    } else {
-        log::debug!("Auth token is not internal grpc token");
-        let org_id = metadata.get(&cfg.grpc.org_header_key);
-        if org_id.is_none() {
-            return Err(Status::invalid_argument(format!(
-                "Please specify organization id with header key '{}' ",
-                cfg.grpc.org_header_key
-            )));
-        }
-
-        let credentials = match Credentials::from_header(token) {
-            Ok(c) => c,
-            Err(err) => {
-                log::error!("Err authenticating {err}");
-                return Err(Status::unauthenticated("No valid auth token[3]"));
-            }
-        };
-
-        let user_id = credentials.user_id;
-        if allow_org_ingestion_token && credentials.password.starts_with(ORG_INGESTION_TOKEN_PREFIX)
-        {
-            let org_id = org_id.unwrap().to_str().unwrap();
-            let cache_key = db::org_ingestion_tokens::cache_key(org_id, &credentials.password);
-            if ORG_INGESTION_TOKENS.contains_key(&cache_key) {
-                let mut req = req;
-                let user_id_metadata = MetadataValue::try_from(&user_id).unwrap();
-                req.metadata_mut().append("user_id", user_id_metadata);
-                return Ok(req);
-            }
-            return Err(Status::unauthenticated("No valid auth token[5]"));
-        }
-
-        let user = if is_root_user(&user_id) {
-            ROOT_USER.get("root").unwrap().to_owned()
-        } else if let Some(user) = get_cached_user_org(org_id.unwrap().to_str().unwrap(), &user_id)
-        {
-            user
-        } else {
-            return Err(Status::unauthenticated("No valid auth token[4]"));
-        };
-
-        if user.token.eq(&credentials.password) {
-            let mut req = req;
-            let user_id_metadata = MetadataValue::try_from(&user_id).unwrap();
-            req.metadata_mut().append("user_id", user_id_metadata);
-            return Ok(req);
-        }
-        let in_pass = get_hash(&credentials.password, &user.salt);
-        if user_id.eq(&user.email)
-            && (credentials.password.eq(&user.password) || in_pass.eq(&user.password))
-        {
-            let mut req = req;
-            let user_id_metadata = MetadataValue::try_from(&user_id).unwrap();
-            req.metadata_mut().append("user_id", user_id_metadata);
-
-            Ok(req)
-        } else {
-            Err(Status::unauthenticated("No valid auth token[5]"))
-        }
+        return Ok(req);
     }
+
+    log::debug!("Auth token is not internal grpc token");
+    let Some(org_id) = metadata.get(&cfg.grpc.org_header_key) else {
+        return Err(Status::invalid_argument(format!(
+            "Please specify organization id with header key '{}' ",
+            cfg.grpc.org_header_key
+        )));
+    };
+    let Ok(org_id) = org_id.to_str() else {
+        return Err(Status::invalid_argument(format!(
+            "Organization id in header key '{}' must be visible ASCII",
+            cfg.grpc.org_header_key
+        )));
+    };
+
+    let credentials = match Credentials::from_header(token.to_string()) {
+        Ok(c) => c,
+        Err(err) => {
+            log::error!("Err authenticating {err}");
+            return Err(Status::unauthenticated("No valid auth token[3]"));
+        }
+    };
+
+    let user_id = credentials.user_id;
+    if allow_org_ingestion_token && credentials.password.starts_with(ORG_INGESTION_TOKEN_PREFIX) {
+        let cache_key = db::org_ingestion_tokens::cache_key(org_id, &credentials.password);
+        if ORG_INGESTION_TOKENS.contains_key(&cache_key) {
+            return attach_user_id(req, &user_id);
+        }
+        return Err(Status::unauthenticated("No valid auth token[5]"));
+    }
+
+    // is_root_user reads ORG_USERS, a separate cache from ROOT_USER; they can disagree transiently
+    let user = if is_root_user(&user_id) {
+        ROOT_USER.get("root").map(|user| user.value().clone())
+    } else {
+        get_cached_user_org(org_id, &user_id)
+    };
+    let Some(user) = user else {
+        return Err(Status::unauthenticated("No valid auth token[4]"));
+    };
+
+    if user.token.eq(&credentials.password) {
+        return attach_user_id(req, &user_id);
+    }
+    let in_pass = get_hash(&credentials.password, &user.salt);
+    if user_id.eq(&user.email)
+        && (credentials.password.eq(&user.password) || in_pass.eq(&user.password))
+    {
+        attach_user_id(req, &user_id)
+    } else {
+        Err(Status::unauthenticated("No valid auth token[5]"))
+    }
+}
+
+fn attach_user_id(mut req: Request<()>, user_id: &str) -> Result<Request<()>, Status> {
+    let Ok(user_id) = MetadataValue::try_from(user_id) else {
+        return Err(Status::invalid_argument(
+            "user id is not a valid metadata value",
+        ));
+    };
+    req.metadata_mut().append("user_id", user_id);
+    Ok(req)
 }
 
 #[cfg(test)]
@@ -137,6 +133,7 @@ mod tests {
         meta::user::{User, UserRole},
     };
     use infra::table::org_users::OrgUserRecord;
+    use tonic::metadata::AsciiMetadataValue;
 
     use super::*;
 
@@ -250,8 +247,47 @@ mod tests {
         let meta: &mut tonic::metadata::MetadataMap = request.metadata_mut();
         meta.insert("authorization", token.clone());
 
-        let res = check_auth(request);
-        assert!(res.is_err())
+        let status = check_auth(request).unwrap_err();
+        assert_eq!(status.code(), tonic::Code::InvalidArgument);
+    }
+
+    #[test]
+    fn test_check_auth_rejects_org_without_authorization() {
+        let mut request = tonic::Request::new(());
+        request
+            .metadata_mut()
+            .insert("organization", "default".parse().unwrap());
+
+        let status = check_auth(request).unwrap_err();
+        assert_eq!(status.code(), tonic::Code::Unauthenticated);
+    }
+
+    #[test]
+    fn test_check_auth_rejects_non_ascii_authorization() {
+        let mut request = tonic::Request::new(());
+        let token = AsciiMetadataValue::try_from(b"basic \xff").unwrap();
+        request.metadata_mut().insert("authorization", token);
+        request
+            .metadata_mut()
+            .insert("organization", "default".parse().unwrap());
+
+        let status = check_auth(request).unwrap_err();
+        assert_eq!(status.code(), tonic::Code::Unauthenticated);
+    }
+
+    #[test]
+    fn test_check_auth_rejects_non_ascii_organization() {
+        cache_instance_id("instance");
+        let mut request = tonic::Request::new(());
+        request.metadata_mut().insert(
+            "authorization",
+            "basic cm9vdEBleGFtcGxlLmNvbTp0b2tlbg==".parse().unwrap(),
+        );
+        let org_id = AsciiMetadataValue::try_from(b"\xff").unwrap();
+        request.metadata_mut().insert("organization", org_id);
+
+        let status = check_auth(request).unwrap_err();
+        assert_eq!(status.code(), tonic::Code::InvalidArgument);
     }
 
     fn org_token_request(org_id: &str, encoded_credentials: &str) -> tonic::Request<()> {
@@ -307,5 +343,18 @@ mod tests {
 
         let status = check_otlp_auth(request).unwrap_err();
         assert_eq!(status.code(), tonic::Code::Unauthenticated);
+    }
+
+    #[test]
+    fn test_otlp_auth_rejects_org_ingestion_token_with_invalid_user_id() {
+        cache_instance_id("instance");
+        let cache_key = db::org_ingestion_tokens::cache_key("auth-invalid-user-id", "o2oi_x");
+        ORG_INGESTION_TOKENS.insert(cache_key.clone(), "collector-token".to_string());
+
+        let request = org_token_request("auth-invalid-user-id", "dXMKZXI6bzJvaV94");
+        let status = check_otlp_auth(request).unwrap_err();
+
+        assert_eq!(status.code(), tonic::Code::InvalidArgument);
+        ORG_INGESTION_TOKENS.remove(&cache_key);
     }
 }

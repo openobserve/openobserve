@@ -114,6 +114,108 @@ describe("ONavGroup", () => {
     expect(flyout().exists()).toBe(true);
   });
 
+  /**
+   * A dropdown is portaled after this flyout and sits on a higher layer, so it
+   * paints over the menu the pointer is on. Escape is what reka's dismissable
+   * layers listen for; the flyout sends it before showing itself.
+   */
+  it("closes an open dropdown before showing the flyout", async () => {
+    const popper = document.createElement("div");
+    popper.setAttribute("data-reka-popper-content-wrapper", "");
+    document.body.appendChild(popper);
+    const keys: string[] = [];
+    const listener = (e: Event) => keys.push((e as KeyboardEvent).key);
+    document.addEventListener("keydown", listener);
+
+    wrapper = mountGroup();
+    await hoverOpen();
+
+    document.removeEventListener("keydown", listener);
+    popper.remove();
+    expect(keys).toContain("Escape");
+    expect(flyout().exists()).toBe(true);
+  });
+
+  // Nothing to dismiss must stay silent: a stray Escape would close whatever
+  // else is listening, and hovering the rail is not a dismissal gesture.
+  it("sends no Escape when no dropdown is open", async () => {
+    const keys: string[] = [];
+    const listener = (e: Event) => keys.push((e as KeyboardEvent).key);
+    document.addEventListener("keydown", listener);
+
+    wrapper = mountGroup();
+    await hoverOpen();
+
+    document.removeEventListener("keydown", listener);
+    expect(keys).not.toContain("Escape");
+  });
+
+  // A dialog or drawer owns Escape while it is open, and the rail stays
+  // reachable beside a drawer — so the flyout must not fire the key there.
+  it("leaves an open dialog alone", async () => {
+    const popper = document.createElement("div");
+    popper.setAttribute("data-reka-popper-content-wrapper", "");
+    const overlay = document.createElement("div");
+    overlay.setAttribute("data-test", "o-dialog-overlay");
+    document.body.append(popper, overlay);
+    const keys: string[] = [];
+    const listener = (e: Event) => keys.push((e as KeyboardEvent).key);
+    document.addEventListener("keydown", listener);
+
+    wrapper = mountGroup();
+    await hoverOpen();
+
+    document.removeEventListener("keydown", listener);
+    popper.remove();
+    overlay.remove();
+    expect(keys).not.toContain("Escape");
+  });
+
+  it("positions the flyout after the rail in LTR", async () => {
+    document.documentElement.dir = "ltr";
+    wrapper = mountGroup();
+    vi.spyOn(wrapper.element, "getBoundingClientRect").mockReturnValue({
+      left: 10,
+      right: 98,
+      top: 40,
+      bottom: 100,
+      width: 88,
+      height: 60,
+      x: 10,
+      y: 40,
+      toJSON: () => ({}),
+    });
+
+    await hoverOpen();
+
+    expect(flyout().attributes("style")).toContain("left: 102px");
+    expect(flyout().attributes("style")).not.toContain("right:");
+  });
+
+  it("positions the flyout before the right-hand rail in RTL", async () => {
+    const viewportWidth = 1024;
+    vi.spyOn(document.documentElement, "clientWidth", "get").mockReturnValue(viewportWidth);
+    document.documentElement.dir = "rtl";
+    wrapper = mountGroup();
+    vi.spyOn(wrapper.element, "getBoundingClientRect").mockReturnValue({
+      left: viewportWidth - 88,
+      right: viewportWidth,
+      top: 40,
+      bottom: 100,
+      width: 88,
+      height: 60,
+      x: viewportWidth - 88,
+      y: 40,
+      toJSON: () => ({}),
+    });
+
+    await hoverOpen();
+
+    expect(flyout().attributes("style")).toContain("right: 92px");
+    expect(flyout().attributes("style")).not.toContain("left:");
+    document.documentElement.dir = "ltr";
+  });
+
   // The Infra tile holds ONE child (Database Monitoring) behind the
   // `databaseMonitoring` runtime gate. Rendering the tile regardless of its
   // children would leave a dead "Infra" entry on every build with the feature

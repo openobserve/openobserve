@@ -179,8 +179,7 @@ import {
   useLocalUserInfo,
   getImageURL,
   invalidateLoginData,
-  getDueDays,
-  trialPeriodAllowedPath,
+  shouldPaywallRoute,
   emptyDataAllowedPaths,
 } from "../utils/zincutils";
 
@@ -378,6 +377,14 @@ export default defineComponent({
       );
     });
 
+    // The AI Observability menu entry itself ships on true OSS builds too —
+    // Monitor (LLM Insights + Sessions) needs no backend flag, unlike the rest
+    // of the module. AIObservabilityShell (Index.vue) shows only the Monitor
+    // group there; Evaluate/Experiment/Annotate/Agent Graph/Agent Behavior stay
+    // behind `isOnlineEvalsEnabled` as before.
+    const isOssBuild = !(config.isEnterprise == "true" || config.isCloud == "true");
+    const isAiObservabilityMenuVisible = computed(() => isOnlineEvalsEnabled.value || isOssBuild);
+
     // Backend `/config` flag `synthetics_enabled` — `ZO_SYNTHETICS_ENABLED`, and
     // no longer an enterprise build check: synthetics ships in OSS, and only the
     // private-agent path behind it is enterprise. Reactive so the menu picks it
@@ -491,6 +498,10 @@ export default defineComponent({
       {
         label: raw("English"),
         code: "en-us",
+      },
+      {
+        label: raw("العربية"),
+        code: "ar",
       },
       {
         label: raw("Türkçe"),
@@ -697,7 +708,7 @@ export default defineComponent({
         (link: any) => link.name === "aiObservability",
       );
 
-      if (isOnlineEvalsEnabled.value) {
+      if (isAiObservabilityMenuVisible.value) {
         if (existingIndex !== -1) return;
         const tracesIndex = linksList.value.findIndex((link: any) => link.name === "traces");
         const insertAt = tracesIndex === -1 ? linksList.value.length : tracesIndex + 1;
@@ -714,7 +725,7 @@ export default defineComponent({
 
     // If `/config` resolves after this component mounted (or if the flag
     // ever flips at runtime), keep the menu in sync.
-    watch(isOnlineEvalsEnabled, () => updateAIObservabilityMenu(), { immediate: false });
+    watch(isAiObservabilityMenuVisible, () => updateAIObservabilityMenu(), { immediate: false });
 
     const updateSyntheticMenu = () => {
       const existingIndex = linksList.value.findIndex((l: any) => l.name === "synthetics");
@@ -1109,21 +1120,17 @@ export default defineComponent({
         await useHomeDashboard(t).load(store.state?.selectedOrganization?.identifier);
 
         if (
-          orgSettings?.data?.data?.free_trial_expiry != null &&
-          orgSettings?.data?.data?.free_trial_expiry != ""
+          shouldPaywallRoute(
+            orgSettings?.data?.data?.free_trial_expiry,
+            router.currentRoute.value.name,
+          )
         ) {
-          const trialDueDays = getDueDays(orgSettings?.data?.data?.free_trial_expiry);
-          if (
-            trialDueDays <= 0 &&
-            trialPeriodAllowedPath.indexOf(router.currentRoute.value.name) == -1
-          ) {
-            router.push({
-              name: "plans",
-              query: {
-                org_identifier: selectedOrg.value.identifier,
-              },
-            });
-          }
+          router.push({
+            name: "plans",
+            query: {
+              org_identifier: selectedOrg.value.identifier,
+            },
+          });
         }
       } catch (error: any) {
         // Handle permission errors gracefully (403 = Forbidden)
@@ -1248,6 +1255,8 @@ export default defineComponent({
     };
 
     const toggleAIChat = () => {
+      // ai_enabled arrives with the async /config response, so it can't gate registration.
+      if (!store.state.zoConfig.ai_enabled) return;
       // On the home page, switch to the AI tab instead of opening the side panel
       if (router.currentRoute.value.name === "home") {
         window.dispatchEvent(new CustomEvent("o2:home-switch-tab", { detail: "ai" }));
@@ -1360,7 +1369,10 @@ export default defineComponent({
     };
 
     // ── Global shortcuts: AI Chat ─────────────────────────────────────────
-    useShortcuts([{ id: "aiChatToggle", handler: () => toggleAIChat() }]);
+    // O2 AI is enterprise-only: on OSS the Ctrl+B binding must not exist at all.
+    if (config.isEnterprise == "true") {
+      useShortcuts([{ id: "aiChatToggle", handler: () => toggleAIChat() }]);
+    }
 
     return {
       isDark,

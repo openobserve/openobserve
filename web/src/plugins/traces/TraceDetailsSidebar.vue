@@ -209,6 +209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :source-stream="spanSourceStream"
               compact
               data-test="trace-details-sidebar-annotate-span-btn"
+              @annotated-target="onScoreAnnotated"
             />
 
             <OButton
@@ -300,6 +301,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }}{{ Number(llmMetrics.cost.total).toFixed(5) }}</span
             >
           </OTag>
+
+          <!-- Real evaluator scores for this exact span; nothing renders until one
+               resolves. Scoring itself (Score Configs, Eval Jobs, Annotate) is
+               enterprise/cloud-only, so `_llm_scores` never exists on OSS —
+               without this gate the query would run on every LLM span for a
+               stream that can never be written to there. -->
+          <template
+            v-if="isLLMSpan && (config.isEnterprise === 'true' || config.isCloud === 'true')"
+          >
+            <OSeparator vertical class="mx-1.5 h-3.5" />
+            <span class="text-3xs text-text-secondary me-1 shrink-0 font-medium">{{
+              t("traces.traceDetailsSidebar.scores")
+            }}</span>
+            <TraceScoreChips
+              ref="scoreChipsRef"
+              scope="span"
+              :target-id="String(span.span_id ?? '')"
+              :start-time-us="spanStartTimeUs"
+            >
+              <template v-if="showAnnotateButtons" #empty>
+                <OTag
+                  type="metricChip"
+                  class="text-3xs bg-surface-base border-border-default h-5 shrink-0 border border-solid px-1.5"
+                  data-test="trace-details-sidebar-scores-empty"
+                >
+                  <span class="text-3xs text-text-secondary font-medium">{{
+                    t("traces.traceDetailsSidebar.notScoredYet")
+                  }}</span>
+                </OTag>
+              </template>
+            </TraceScoreChips>
+          </template>
         </div>
 
         <div class="flex items-center">
@@ -1065,6 +1098,9 @@ export default defineComponent({
     TraceAnnotateMenu: defineAsyncComponent(
       () => import("@/enterprise/components/AIObservability/TraceAnnotateMenu.vue"),
     ),
+    TraceScoreChips: defineAsyncComponent(
+      () => import("@/enterprise/components/onlineEvals/TraceScoreChips.vue"),
+    ),
     EqualIcon,
     NotEqualIcon,
     AttributeValueCell,
@@ -1095,6 +1131,11 @@ export default defineComponent({
     // Check if this is an LLM span to set default tab
     const isLLMSpan = computed(() => isLLMTrace(props.span));
     const canPreviewSpan = computed(() => hasTracePreview(props.span));
+    // Score chips don't poll, so a fresh annotation must tell the chip row to re-check.
+    const scoreChipsRef = ref<{ refresh: () => void } | null>(null);
+    function onScoreAnnotated() {
+      scoreChipsRef.value?.refresh();
+    }
     const previewInput = computed(
       () => props.span?.gen_ai_input_messages ?? props.span?.attributes_prompt ?? "",
     );
@@ -2313,6 +2354,8 @@ export default defineComponent({
       // LLM
       isLLMSpan,
       canPreviewSpan,
+      scoreChipsRef,
+      onScoreAnnotated,
       previewInput,
       previewOutput,
       previewOperationName,

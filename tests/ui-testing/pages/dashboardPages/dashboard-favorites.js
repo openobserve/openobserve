@@ -19,8 +19,12 @@ export default class DashboardFavorites {
       `[data-test="dashboard-folder-tab-${FAVORITES_FOLDER_ID}"]`
     );
 
-    // Dashboard list surface.
+    // Dashboard list surface. OTable mirrors its `loading` prop onto the inner
+    // root as data-test-loading, which is the only settled-list signal exposed.
     this.dashboardTable = page.locator('[data-test="dashboard-table"]');
+    this.tableSettled = page.locator(
+      '[data-test="o2-table"][data-test-loading="false"]'
+    );
     this.searchInput = page.locator('[data-test="dashboard-search-field"]');
     this.refreshBtn = page.locator('[data-test="dashboard-list-refresh"]');
 
@@ -96,15 +100,48 @@ export default class DashboardFavorites {
 
   // ── Navigation ─────────────────────────────────────────────────────────
 
+  // Dashboards.vue picks its landing folder in onMounted only AFTER awaiting the
+  // folders and favorites fetches, and that decision overwrites activeFolderId —
+  // so a rail click landing between the rail rendering and that decision is
+  // silently discarded and no route is ever pushed. Retry once instead of
+  // failing: the landing commits at most once, so the clobber cannot recur.
+  // The wait is not swallowed — if the switch never happens, every later
+  // assertion would be made against the wrong folder, and failing here names
+  // the real cause instead of surfacing as a confusing missing row.
   async openFavoritesFolder() {
-    await this.favoritesFolderTab.waitFor({ state: "visible", timeout: 15000 });
-    await this.favoritesFolderTab.click();
-    // The rail pushes ?folder=__favorites__ once the view switches.
-    await this.page
-      .waitForURL(new RegExp(`folder=${FAVORITES_FOLDER_ID}`), {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      await this.favoritesFolderTab.waitFor({
+        state: "visible",
         timeout: 15000,
-      })
-      .catch(() => {});
+      });
+      await this.favoritesFolderTab.click();
+      try {
+        await this.page.waitForURL(
+          (url) =>
+            new URL(url).searchParams.get("folder") === FAVORITES_FOLDER_ID,
+          { timeout: 15000 }
+        );
+        return;
+      } catch (error) {
+        if (attempt === 1) throw error;
+      }
+    }
+  }
+
+  // Folder navigation is cache-first: `loading` never flips for an
+  // already-cached folder, so the table can still be showing the Favorites rows
+  // with data-test-loading="false" and a settled-list wait would pass against
+  // them. The route is pushed only once the switch commits, so leaving
+  // ?folder=__favorites__ is the honest gate when returning to a real folder.
+  async waitForFavoritesViewExited() {
+    await this.page.waitForURL(
+      (url) => new URL(url).searchParams.get("folder") !== FAVORITES_FOLDER_ID,
+      { timeout: 15000 }
+    );
+  }
+
+  async waitForListSettled() {
+    await this.tableSettled.waitFor({ state: "visible", timeout: 15000 });
   }
 
   // Narrow the paginated list to a single row. The list is 20-per-page with no
@@ -129,6 +166,15 @@ export default class DashboardFavorites {
       timeout: 15000,
     });
     await this.searchScopeAllFolders.click();
+    // The activeFolderId watcher resets searchAcrossFolders to false when a
+    // folder view settles, silently undoing a click that landed just before it
+    // — the query would then filter the current folder instead. OToggleGroupItem
+    // exposes the committed scope as data-state, so assert it actually stuck.
+    await expect(this.searchScopeAllFolders).toHaveAttribute(
+      "data-state",
+      "on",
+      { timeout: 15000 }
+    );
     await this.searchInput.waitFor({ state: "visible", timeout: 15000 });
     await this.searchInput.fill(query);
   }
@@ -206,9 +252,9 @@ export default class DashboardFavorites {
     }).toPass({ timeout: 15000 });
   }
 
-  // Favorited rows render the filled `favorite` icon and carry the rose
-  // `text-favorite` class; unfavorited ones use the `favorite-border` outline.
-  // Asserting on the class keeps this independent of icon-name internals.
+  // Favorited rows render the filled `star` icon and carry the `text-favorite`
+  // class; unfavorited ones use the `star-outline` icon. Asserting on the class
+  // keeps this independent of icon-name internals.
   async verifyIsFavorite(dashboardName) {
     await expect(this.getFavoriteToggle(dashboardName)).toHaveClass(
       /text-favorite/,
@@ -234,7 +280,9 @@ export default class DashboardFavorites {
     if ((await toggle.count()) === 0) return;
     const classAttr = (await toggle.getAttribute("class")) ?? "";
     if (/text-favorite/.test(classAttr)) {
-      await toggle.click();
+      // Fire-and-forget POST — without waiting, the context closes at test end
+      // and the un-favorite is lost, leaving exactly the ghost this prevents.
+      await this.waitForFavoritesPersisted(() => toggle.click());
     }
   }
 
@@ -246,7 +294,10 @@ export default class DashboardFavorites {
     });
   }
 
+  // toHaveCount(0) is trivially true while the list is still loading, so a
+  // ghost row would pass as absent. Gate on the rendered list first.
   async verifyDashboardNotPresent(dashboardName) {
+    await this.waitForListSettled();
     await expect(this.getNameCell(dashboardName)).toHaveCount(0, {
       timeout: 15000,
     });
@@ -257,7 +308,20 @@ export default class DashboardFavorites {
   async deleteDashboardFromRow(dashboardName) {
     await this.getRowDeleteBtn(dashboardName).click();
     await this.deleteConfirmBtn.waitFor({ state: "visible", timeout: 15000 });
-    await this.deleteConfirmBtn.click();
+    // Negative lookahead keeps this off the /dashboards/bulk endpoint.
+    const [response] = await Promise.all([
+      this.page.waitForResponse(
+        (r) =>
+          r.request().method() === "DELETE" &&
+          /\/dashboards\/(?!bulk)[^/?]+/.test(r.url()),
+        { timeout: 30000 }
+      ),
+      this.deleteConfirmBtn.click(),
+    ]);
+    expect(
+      response.ok(),
+      `delete responded ${response.status()} for ${response.url()}`
+    ).toBe(true);
     // Wait for the dialog to actually close before the caller asserts on
     // the resulting list state, instead of racing the close animation.
     await this.page
@@ -279,7 +343,20 @@ export default class DashboardFavorites {
       state: "visible",
       timeout: 15000,
     });
-    await this.bulkDeleteConfirmBtn.click();
+    // The regression this guards was a 404 from sending `__favorites__` as
+    // ?folder=; the response status is the direct signal, the toast its shadow.
+    const [response] = await Promise.all([
+      this.page.waitForResponse(
+        (r) =>
+          r.request().method() === "DELETE" && /\/dashboards\/bulk/.test(r.url()),
+        { timeout: 30000 }
+      ),
+      this.bulkDeleteConfirmBtn.click(),
+    ]);
+    expect(
+      response.ok(),
+      `bulk delete responded ${response.status()} for ${response.url()}`
+    ).toBe(true);
   }
 
   // Regression guard: bulk delete used to send `__favorites__` as the ?folder=

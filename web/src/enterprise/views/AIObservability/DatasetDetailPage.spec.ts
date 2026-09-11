@@ -28,9 +28,11 @@ const mockUpdateItem = vi.fn();
 const mockAddItem = vi.fn();
 const mockImportItems = vi.fn();
 const mockRemoveItem = vi.fn();
+const mockListExperiments = vi.fn();
 const mockToast = vi.fn();
 const mockConfirm = vi.fn();
 const mockRouterPush = vi.fn();
+const mockRouterBack = vi.fn();
 
 vi.mock("@/services/llm-datasets.service", () => ({
   default: {
@@ -46,7 +48,7 @@ vi.mock("@/services/llm-datasets.service", () => ({
 }));
 
 vi.mock("@/services/llm-experiments.service", () => ({
-  default: { list: vi.fn().mockResolvedValue([]), get: vi.fn() },
+  default: { list: (...args: any[]) => mockListExperiments(...args), get: vi.fn() },
 }));
 
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
@@ -63,7 +65,7 @@ vi.mock("vuex", () => ({
 
 vi.mock("vue-router", () => ({
   useRoute: vi.fn(() => ({ params: { id: "dataset-1" }, query: {} })),
-  useRouter: vi.fn(() => ({ push: mockRouterPush, replace: vi.fn() })),
+  useRouter: vi.fn(() => ({ push: mockRouterPush, replace: vi.fn(), back: mockRouterBack })),
 }));
 
 vi.mock("vue-i18n", () => ({ useI18n: () => ({ t: (key: string) => key }) }));
@@ -71,7 +73,11 @@ vi.mock("vue-i18n", () => ({ useI18n: () => ({ t: (key: string) => key }) }));
 vi.mock("@/lib/core/PageLayout/OPageLayout.vue", () => ({
   default: {
     name: "OPageLayout",
-    template: `<div class="o-page-layout"><slot name="actions" /><slot /></div>`,
+    props: ["back"],
+    template: `<div class="o-page-layout">
+      <button v-if="back" data-test="app-page-header-back" @click="back.onClick?.()" />
+      <slot name="actions" /><slot />
+    </div>`,
   },
 }));
 
@@ -152,10 +158,35 @@ beforeEach(() => {
     .mockReset()
     .mockResolvedValue({ filename: "goldens.csv", importedCount: 2, skippedCount: 1 });
   mockRemoveItem.mockReset().mockResolvedValue(undefined);
+  mockListExperiments.mockReset().mockResolvedValue([]);
   mockToast.mockReset();
   mockConfirm.mockReset().mockResolvedValue(true);
 });
 
+describe("DatasetDetailPage navigation", () => {
+  it("uses real browser back when there's history to pop, instead of the bare Datasets list", async () => {
+    window.history.pushState({ back: "/previous" }, "", "/previous-fake-url");
+    const wrapper = await mountPage();
+    mockRouterPush.mockClear();
+
+    await wrapper.get('[data-test="app-page-header-back"]').trigger("click");
+
+    expect(mockRouterBack).toHaveBeenCalledTimes(1);
+    expect(mockRouterPush).not.toHaveBeenCalled();
+    window.history.replaceState(null, "");
+  });
+});
+
+describe("DatasetDetailPage experiments", () => {
+  it("requests summarized experiments for this dataset", async () => {
+    await mountPage();
+
+    expect(mockListExperiments).toHaveBeenCalledWith("test-org", {
+      includeSummary: true,
+      datasetId: "dataset-1",
+    });
+  });
+});
 describe("DatasetDetailPage item writes", () => {
   // The update endpoint replaces the row, so an edit that omits metadata wipes
   // the item's subset-filter dimensions.

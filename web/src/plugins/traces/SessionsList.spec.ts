@@ -56,6 +56,16 @@ vi.mock("@/composables/useStreams", () => ({
   })),
 }));
 
+// This file's default subject is Agent mode — enterprise-only — independent
+// of whatever a developer's local .env happens to set. OSS-forced-stream
+// behavior gets its own explicit tests further down, overriding this mock.
+vi.mock("@/aws-exports", () => ({
+  default: {
+    isEnterprise: "true",
+    isCloud: "false",
+  },
+}));
+
 vi.mock("@/services/gen-ai-agent-mapping.service", () => ({
   default: {
     listAgents: (...args: any[]) => mockListAgents(...args),
@@ -179,9 +189,11 @@ vi.mock("./llmInsightsDashboard.utils", () => ({
 
 // ---------------------------------------------------------------------------
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import SessionsList from "./SessionsList.vue";
+import AgentScopeCascade from "@/enterprise/components/AIObservability/AgentScopeCascade.vue";
+import config from "@/aws-exports";
 
 const defaultProps = {
   streamName: "test-stream",
@@ -241,6 +253,17 @@ beforeEach(() => {
   });
 });
 
+afterEach(() => {
+  mountedWrappers.splice(0).forEach((wrapper) => wrapper.unmount());
+});
+
+// `agents`/`hasLoadedOnce`/etc. are module-scoped mock singletons (mirroring
+// the real useSessions), shared across every mount in this file. A wrapper
+// left mounted keeps its own reactive watchers alive against those shared
+// refs, so it can react to a LATER test's state changes — unmounting after
+// each test (below) is what makes that safe.
+const mountedWrappers: ReturnType<typeof mount>[] = [];
+
 async function mountComponent(props = defaultProps) {
   const wrapper = mount(SessionsList, {
     props,
@@ -248,6 +271,7 @@ async function mountComponent(props = defaultProps) {
       stubs: {},
     },
   });
+  mountedWrappers.push(wrapper);
   await flushPromises();
   return wrapper;
 }
@@ -508,6 +532,82 @@ describe("SessionsList — agent filter", () => {
   });
 });
 
+describe("SessionsList — agent selection survives a back-navigation remount", () => {
+  const agentA = {
+    name: "agent-a",
+    id: "agent-a-id",
+    source_stream: "stream-a",
+    source_stream_type: "traces",
+    env: "prod",
+    version: "v1",
+  };
+  const agentB = {
+    name: "agent-b",
+    id: "agent-b-id",
+    source_stream: "stream-b",
+    source_stream_type: "traces",
+    env: "prod",
+    version: "v1",
+  };
+  // Same NAME as agentB, different env — proves restore uses the exact
+  // (env, name, version) triple rather than picking the first name match.
+  const agentBStaging = {
+    name: "agent-b",
+    id: "agent-b-staging-id",
+    source_stream: "stream-b-staging",
+    source_stream_type: "traces",
+    env: "staging",
+    version: "v1",
+  };
+
+  it("restores the previously-picked agent instead of defaulting to the first one", async () => {
+    // Simulates returning from a session detail: the list was already loaded
+    // (module-scoped state survives the unmount/remount), and the user had
+    // picked "agent-b" last time — persisted to localStorage since the `Back`
+    // navigation doesn't always round-trip it via the URL.
+    localStorage.setItem("sessionsList_agentFilter", "agent-b");
+    localStorage.setItem("sessionsList_envFilter", "prod");
+    localStorage.setItem("sessionsList_versionFilter", "v1");
+    mockAgents.value = [agentA, agentB];
+    mockAgentsLoaded.value = true;
+    mockHasLoadedOnce.value = true;
+    mockLoadedOrg.value = "test-org";
+    mockError.value = null;
+
+    const wrapper = await mountComponent({ streamName: "", startTime: 1000, endTime: 2000 });
+    // Mirrors SessionsPage's mount-replay call after the DateTime fires its
+    // programmatic window replay on remount (force=false, unlike a real date
+    // change or explicit refresh).
+    await wrapper.vm.refresh(1000, 2000, false);
+    await flushPromises();
+
+    expect(wrapper.findComponent(AgentScopeCascade).props("selectedAgentName")).toBe("agent-b");
+    // Restoring the selection must not defeat the point of the cache guard.
+    expect(mockFetchPage).not.toHaveBeenCalled();
+  });
+
+  it("restores the exact env, not just a same-named agent under a different one", async () => {
+    localStorage.setItem("sessionsList_agentFilter", "agent-b");
+    localStorage.setItem("sessionsList_envFilter", "staging");
+    localStorage.setItem("sessionsList_versionFilter", "v1");
+    // "agent-b" exists under BOTH prod and staging — agentB (prod) comes
+    // first in the list, so a name-only restore would wrongly land on it.
+    mockAgents.value = [agentA, agentB, agentBStaging];
+    mockAgentsLoaded.value = true;
+    mockHasLoadedOnce.value = true;
+    mockLoadedOrg.value = "test-org";
+    mockError.value = null;
+
+    const wrapper = await mountComponent({ streamName: "", startTime: 1000, endTime: 2000 });
+    await wrapper.vm.refresh(1000, 2000, false);
+    await flushPromises();
+
+    const cascadeProps = wrapper.findComponent(AgentScopeCascade).props();
+    expect(cascadeProps.selectedAgentName).toBe("agent-b");
+    expect(cascadeProps.selectedEnv).toBe("staging");
+  });
+});
+
 describe("SessionsList — row click", () => {
   it("emits sessionSelected with the row data when a row is clicked", async () => {
     const session = makeSession({ sessionId: "sess-click" });
@@ -523,5 +623,46 @@ describe("SessionsList — row click", () => {
     const emitted = wrapper.emitted("sessionSelected");
     expect(emitted).toBeTruthy();
     expect(emitted![0][0]).toMatchObject({ sessionId: "sess-click" });
+  });
+});
+
+describe("SessionsList — OSS builds (neither isEnterprise nor isCloud is 'true')", () => {
+  afterEach(() => {
+    // Every other describe block in this file assumes enterprise mode (see
+    // the module-level @/aws-exports mock) — restore it so later tests aren't
+    // affected by mutating the shared mock object here.
+    config.isEnterprise = "true";
+    config.isCloud = "false";
+  });
+
+  it("hides the Stream/Agent toggle — Agent mode needs the enterprise-only agent-mapping API", async () => {
+    config.isEnterprise = "false";
+    const wrapper = await mountComponent();
+    expect(wrapper.find("[data-test='sessions-list-filter-mode']").exists()).toBe(false);
+  });
+
+  it("forces Stream mode even when the URL asks for Agent mode", async () => {
+    config.isEnterprise = "false";
+    mockRouteQuery = { type: "agent" };
+    const wrapper = await mountComponent();
+    await flushPromises();
+    // With no toggle, the stream selector is always visible.
+    expect(wrapper.find("[data-test='sessions-list-stream-selector']").exists()).toBe(true);
+    expect(wrapper.findComponent(AgentScopeCascade).exists()).toBe(false);
+  });
+
+  it("still shows the toggle on a cloud build (isCloud true) even with isEnterprise false — cloud registers the same enterprise route/backend", async () => {
+    config.isEnterprise = "false";
+    config.isCloud = "true";
+    const wrapper = await mountComponent();
+    expect(wrapper.find("[data-test='sessions-list-filter-mode']").exists()).toBe(true);
+  });
+
+  it("defaults to Agent mode on a cloud build, same as enterprise", async () => {
+    config.isEnterprise = "false";
+    config.isCloud = "true";
+    const wrapper = await mountComponent();
+    await flushPromises();
+    expect(wrapper.findComponent(AgentScopeCascade).exists()).toBe(true);
   });
 });
