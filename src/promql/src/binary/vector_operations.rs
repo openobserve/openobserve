@@ -43,7 +43,7 @@ pub static DROP_METRIC_BIN_OP: Lazy<HashSet<u8>> = Lazy::new(|| {
 /// Implement the operation between a matrix and a float.
 ///
 /// https://prometheus.io/docs/prometheus/latest/querying/operators/#arithmetic-binary-operators
-pub async fn vector_scalar_bin_op(
+pub fn vector_scalar_bin_op(
     expr: &BinaryExpr,
     left: Vec<RangeValue>,
     right: f64,
@@ -74,9 +74,7 @@ pub async fn vector_scalar_bin_op(
                     {
                         Some(value) => {
                             let final_value =
-                                if is_comparison_operator && swapped_lhs_rhs && return_bool {
-                                    value
-                                } else if is_comparison_operator && swapped_lhs_rhs {
+                                if is_comparison_operator && swapped_lhs_rhs && !return_bool {
                                     sample.value
                                 } else {
                                     value

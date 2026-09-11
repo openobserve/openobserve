@@ -32,10 +32,11 @@ use super::{
     },
 };
 use crate::{
-    functions,
-    fused::{self, streaming::group_label_columns},
-    micros,
-    series_stream::merge::{MergeSeriesStream, StreamingSelector, series_label_columns},
+    functions, micros,
+    series_stream::plan::{
+        StreamingSelector, execute_partitioned, group_label_columns, series_label_columns,
+    },
+    streaming_eval,
 };
 
 /// What scanning a selector takes: the normalized selector, its offset and label set, the
@@ -58,7 +59,7 @@ impl Engine {
         range: Duration,
         modifier: &Option<LabelModifier>,
         func: Arc<dyn functions::RangeFunc>,
-        op: fused::FusedAggOp,
+        op: streaming_eval::FusedAggOp,
     ) -> Result<Option<Value>> {
         if matches!(modifier, Some(LabelModifier::Exclude(_))) {
             return Ok(None);
@@ -151,14 +152,14 @@ impl Engine {
         scan: &SelectorScan,
         modifier: &Option<LabelModifier>,
         func: Arc<dyn functions::RangeFunc>,
-        op: fused::FusedAggOp,
+        op: streaming_eval::FusedAggOp,
         range: Duration,
     ) -> Result<Option<Value>> {
         self.stream_scan_guarded(scan, |ctx, schema| async move {
             let Some(label_cols) = group_label_columns(modifier, schema, func.name()) else {
                 return Ok(None);
             };
-            let Some(sources) = MergeSeriesStream::execute_partitioned(
+            let Some(sources) = execute_partitioned(
                 ctx,
                 schema,
                 &scan.streaming_selector(),
@@ -170,8 +171,8 @@ impl Engine {
             else {
                 return Ok(None);
             };
-            let eval = Arc::new(fused::RangeExpr::new(func, range, &self.eval_ctx));
-            fused::aggregate(sources, op, eval)
+            let eval = Arc::new(streaming_eval::RangeExpr::new(func, range, &self.eval_ctx));
+            streaming_eval::aggregate(sources, op, eval)
                 .await
                 .map(|(value, _)| Some(value))
         })
@@ -190,8 +191,8 @@ impl Engine {
             } else {
                 series_label_columns(schema, &scan.label_selector, func.name())
             };
-            let eval = Arc::new(fused::RangeExpr::new(func, range, &self.eval_ctx));
-            match MergeSeriesStream::execute_partitioned(
+            let eval = Arc::new(streaming_eval::RangeExpr::new(func, range, &self.eval_ctx));
+            match execute_partitioned(
                 ctx,
                 schema,
                 &scan.streaming_selector(),
@@ -202,7 +203,7 @@ impl Engine {
             .await?
             {
                 None => Ok(None),
-                Some(sources) => fused::eval_range(sources, eval).await.map(Some),
+                Some(sources) => streaming_eval::eval_range(sources, eval).await.map(Some),
             }
         })
         .await

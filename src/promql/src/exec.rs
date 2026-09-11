@@ -90,7 +90,7 @@ impl PromqlContext {
 
         // See https://promlabs.com/blog/2020/06/18/the-anatomy-of-a-promql-query/#range-queries
         let eval_ctx = EvalContext::new(self.start, self.end, self.interval, trace_id.to_string());
-        let mut engine = Engine::new_with_context(trace_id, ctx.clone(), eval_ctx.clone());
+        let mut engine = Engine::new(trace_id, ctx.clone(), eval_ctx.clone());
 
         let (value, result_type_exec) = engine.exec(&expr).await?;
 
