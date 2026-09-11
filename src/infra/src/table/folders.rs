@@ -44,6 +44,7 @@ pub(crate) fn folder_type_into_i16(folder_type: FolderType) -> i16 {
         FolderType::Alerts => 1,
         FolderType::Reports => 2,
         FolderType::Synthetics => 3,
+        FolderType::Workflows => 4,
     }
 }
 

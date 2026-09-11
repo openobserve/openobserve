@@ -2608,6 +2608,13 @@
     "edit": "Edytuj",
     "view": "Podgląd",
     "delete": "Usuń",
+    "moveToFolder": "Przenieś do folderu",
+    "tabAll": "Wszystkie",
+    "searchThisFolder": "Ten folder",
+    "searchAllFolders": "Wszystkie foldery",
+    "searchThisFolderTooltip": "Szukaj tylko w tym folderze",
+    "searchAllFoldersTooltip": "Szukaj we wszystkich folderach",
+    "folder": "Folder",
     "deleteTitle": "Usuń przepływ pracy",
     "deleteMessage": "Czy na pewno chcesz usunąć ten przepływ pracy?",
     "deleteSuccess": "Przepływ pracy został usunięty pomyślnie",
@@ -2642,12 +2649,14 @@
     "triggerKind": {
       "alertFired": {
         "label": "Alert wyzwolony",
+        "tab": "Alerty",
         "node": "Wyzwalacz alertu",
         "desc": "Uruchom, gdy alert się wyzwoli",
         "intro": "Gdy powiązany alert się wyzwoli, każdy kolejny krok otrzyma ten ładunek."
       },
       "incidentEvent": {
         "label": "Zdarzenie incydentu",
+        "tab": "Incydenty",
         "node": "Wyzwalacz incydentu",
         "desc": "Uruchom na zdarzeniu cyklu życia incydentu",
         "intro": "Gdy wystąpi zdarzenie incydentu, każdy kolejny krok otrzyma ten ładunek."

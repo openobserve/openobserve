@@ -1423,6 +1423,10 @@ pub fn service_routes() -> Router {
                     get(workflows::list_workflows).post(workflows::save_workflow),
                 )
                 .route(
+                    "/v2/{org_id}/workflows/move",
+                    patch(workflows::move_workflows),
+                )
+                .route(
                     "/{org_id}/workflows/{id}",
                     delete(workflows::delete_workflows).put(workflows::update_workflows),
                 )

@@ -2608,6 +2608,13 @@
     "edit": "编辑",
     "view": "查看",
     "delete": "删除",
+    "moveToFolder": "Move to folder",
+    "tabAll": "All",
+    "searchThisFolder": "This folder",
+    "searchAllFolders": "所有文件夹",
+    "searchThisFolderTooltip": "仅搜索此文件夹",
+    "searchAllFoldersTooltip": "搜索所有文件夹",
+    "folder": "文件夹",
     "deleteTitle": "删除工作流",
     "deleteMessage": "确定要删除此工作流吗？",
     "deleteSuccess": "工作流删除成功",
@@ -2642,12 +2649,14 @@
     "triggerKind": {
       "alertFired": {
         "label": "告警触发",
+        "tab": "告警",
         "node": "告警触发器",
         "desc": "当告警触发时运行",
         "intro": "当关联的告警触发时，每个下游步骤都会收到此载荷。"
       },
       "incidentEvent": {
         "label": "故障事件",
+        "tab": "事件",
         "node": "故障触发器",
         "desc": "在故障生命周期事件发生时运行",
         "intro": "当故障事件发生时，每个下游步骤都会收到此载荷。"

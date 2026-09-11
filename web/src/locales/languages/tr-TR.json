@@ -2608,6 +2608,13 @@
     "edit": "Düzenle",
     "view": "Görüntüle",
     "delete": "Sil",
+    "moveToFolder": "Move to folder",
+    "tabAll": "All",
+    "searchThisFolder": "This folder",
+    "searchAllFolders": "All folders",
+    "searchThisFolderTooltip": "Search only this folder",
+    "searchAllFoldersTooltip": "Search across all folders",
+    "folder": "Folder",
     "deleteTitle": "İş Akışını Sil",
     "deleteMessage": "Bu iş akışını silmek istediğinizden emin misiniz?",
     "deleteSuccess": "İş akışı başarıyla silindi",
@@ -2642,12 +2649,14 @@
     "triggerKind": {
       "alertFired": {
         "label": "Uyarı tetiklendi",
+        "tab": "Alerts",
         "node": "Uyarı tetikleyicisi",
         "desc": "Bir uyarı tetiklendiğinde çalıştır",
         "intro": "Bağlı bir uyarı tetiklendiğinde, aşağı akıştaki her adım bu veri yükünü alır."
       },
       "incidentEvent": {
         "label": "Olay etkinliği",
+        "tab": "Incidents",
         "node": "Olay tetikleyicisi",
         "desc": "Bir olay yaşam döngüsü etkinliğinde çalıştır",
         "intro": "Bir olay etkinliği oluştuğunda, aşağı akıştaki her adım bu veri yükünü alır."

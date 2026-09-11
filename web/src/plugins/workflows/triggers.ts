@@ -62,6 +62,9 @@ export interface WorkflowTriggerDef {
   icon: IconName;
   /** i18n key — picker label + the list's Trigger column. */
   labelKey: I18nKey;
+  /** i18n key — short form for the list's type tabs ("Alerts", not "Alert Fired").
+   *  Falls back to `labelKey` when a trigger does not define one. */
+  tabLabelKey?: I18nKey;
   /** i18n key — canvas card + config-drawer title (e.g. "Alert Trigger"). */
   nodeTitleKey: I18nKey;
   /** i18n key — picker sub-label. */
@@ -135,6 +138,7 @@ export const WORKFLOW_TRIGGERS: WorkflowTriggerDef[] = [
     enabled: true,
     icon: "notifications-active",
     labelKey: "workflow.triggerKind.alertFired.label",
+    tabLabelKey: "workflow.triggerKind.alertFired.tab",
     nodeTitleKey: "workflow.triggerKind.alertFired.node",
     descKey: "workflow.triggerKind.alertFired.desc",
     introKey: "workflow.triggerKind.alertFired.intro",
@@ -149,6 +153,7 @@ export const WORKFLOW_TRIGGERS: WorkflowTriggerDef[] = [
     enabled: true,
     icon: "warning",
     labelKey: "workflow.triggerKind.incidentEvent.label",
+    tabLabelKey: "workflow.triggerKind.incidentEvent.tab",
     nodeTitleKey: "workflow.triggerKind.incidentEvent.node",
     descKey: "workflow.triggerKind.incidentEvent.desc",
     introKey: "workflow.triggerKind.incidentEvent.intro",

@@ -2608,6 +2608,13 @@
     "edit": "تعديل",
     "view": "منظر",
     "delete": "حذف",
+    "moveToFolder": "Move to folder",
+    "tabAll": "All",
+    "searchThisFolder": "This folder",
+    "searchAllFolders": "All folders",
+    "searchThisFolderTooltip": "Search only this folder",
+    "searchAllFoldersTooltip": "Search across all folders",
+    "folder": "Folder",
     "deleteTitle": "حذف سير العمل",
     "deleteMessage": "هل أنت متأكد أنك تريد حذف سير العمل هذا؟",
     "deleteSuccess": "تم حذف سير العمل بنجاح",
@@ -2642,12 +2649,14 @@
     "triggerKind": {
       "alertFired": {
         "label": "تم إطلاق الإنذار",
+        "tab": "Alerts",
         "node": "تفعيل التنبيه",
         "desc": "اهرب عندما يطلق تنبيه",
         "intro": "عندما يطلق تنبيه مرتبط، تستقبل كل خطوة لاحقة هذه الحمولة."
       },
       "incidentEvent": {
         "label": "حدث الحادث",
+        "tab": "Incidents",
         "node": "محفز الحادث",
         "desc": "تشغيل حدث دورة حياة الحادث",
         "intro": "عندما يحدث حدث حادث، تستقبل كل خطوة انتقالية هذه الحمولة."

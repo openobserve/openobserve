@@ -16,6 +16,7 @@
 use std::collections::HashMap;
 
 use config::meta::{
+    folder::DEFAULT_FOLDER,
     pipeline::components::NodeData,
     self_reporting::usage::{RunOutcome, TriggerData, TriggerDataType},
 };
@@ -335,10 +336,29 @@ async fn validate_workflow(workflow: &Workflow, is_draft: bool) -> Result<(), an
     Ok(())
 }
 
-pub async fn save_workflow(workflow: Workflow) -> Result<(), anyhow::Error> {
+/// Saves a workflow into `folder_slug`, defaulting to the org's default folder.
+///
+/// The folder slug is resolved to a primary key here, so callers pass the
+/// user-facing id straight from the request.
+pub async fn save_workflow(
+    mut workflow: Workflow,
+    folder_slug: Option<&str>,
+) -> Result<(), anyhow::Error> {
     validate_workflow(&workflow, false).await?;
+    let slug = folder_slug.unwrap_or(DEFAULT_FOLDER);
+    workflow.folder_id = db::workflows::resolve_folder_pk(&workflow.org_id, slug).await?;
+
     db::workflows::save_workflow_record(workflow.clone()).await?;
-    set_ownership(&workflow.org_id, "workflows", Authz::new(&workflow.id)).await;
+    set_ownership(
+        &workflow.org_id,
+        "workflows",
+        Authz {
+            obj_id: workflow.id.clone(),
+            parent_type: "workflow_folder".to_string(),
+            parent: slug.to_string(),
+        },
+    )
+    .await;
     db::workflows::notify_workflow_upsert(&workflow).await?;
     Ok(())
 }
@@ -365,10 +385,38 @@ pub async fn update_draft(workflow: Workflow) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-pub async fn promote_draft(org_id: &str, workflow: Workflow) -> Result<(), anyhow::Error> {
+/// Publishes a draft as a workflow in `folder_slug`, defaulting to the org's
+/// default folder.
+///
+/// Drafts carry no folder of their own, so one must be resolved here: promoting
+/// with the draft's empty `folder_id` would orphan the workflow in every folder
+/// listing, and violate the folder foreign key on Postgres.
+pub async fn promote_draft(
+    org_id: &str,
+    mut workflow: Workflow,
+    folder_slug: Option<&str>,
+) -> Result<(), anyhow::Error> {
     validate_workflow(&workflow, false).await?;
+    let slug = folder_slug
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .unwrap_or(DEFAULT_FOLDER);
+    workflow.folder_id = db::workflows::resolve_folder_pk(org_id, slug).await?;
+
     let id = workflow.id.clone();
     db::workflows::promote_draft(org_id, workflow.clone()).await?;
+    // The draft's tuple has no folder parent; re-assert ownership so the
+    // published workflow inherits the folder's grants.
+    set_ownership(
+        org_id,
+        "workflows",
+        Authz {
+            obj_id: id.clone(),
+            parent_type: "workflow_folder".to_string(),
+            parent: slug.to_string(),
+        },
+    )
+    .await;
     db::workflows::notify_workflow_upsert(&workflow).await?;
     db::workflows::notify_draft_delete(&id).await?;
     Ok(())
@@ -392,13 +440,78 @@ pub async fn enable_disable_workflow(
 pub async fn list_workflows(
     org_id: &str,
     permitted: Option<Vec<String>>,
+    folder_slug: Option<&str>,
+    name_substring: Option<&str>,
 ) -> Result<Vec<Workflow>, anyhow::Error> {
-    let ret = workflows::list_by_org(org_id)
+    let ret = db::workflows::list_workflows(org_id, folder_slug, name_substring)
         .await?
         .into_iter()
         .filter(|pipeline| is_permitted(&pipeline.id, org_id, permitted.as_ref()))
         .collect();
     Ok(ret)
+}
+
+/// Moves workflows into another folder, re-pointing their authorization parent.
+pub async fn move_workflows(
+    org_id: &str,
+    workflow_ids: &[String],
+    dst_folder_slug: &str,
+) -> Result<(), anyhow::Error> {
+    // The row stores the folder's primary key but tuples name folders by slug,
+    // so resolve the source slug before the move overwrites it.
+    let mut previous = Vec::with_capacity(workflow_ids.len());
+    let mut missing = Vec::new();
+    for id in workflow_ids {
+        match db::workflows::get_workflow(org_id, id).await? {
+            Some(w) => {
+                let src_slug = infra::table::folders::get_name_by_pk(&w.folder_id)
+                    .await
+                    .ok()
+                    .flatten();
+                previous.push((w.id.clone(), src_slug));
+            }
+            // Without this the update simply matches no rows and the caller is
+            // told the move succeeded.
+            None => missing.push(id.clone()),
+        }
+    }
+    if !missing.is_empty() {
+        return Err(anyhow::anyhow!(
+            "workflows not found: {}",
+            missing.join(", ")
+        ));
+    }
+
+    db::workflows::move_workflows(org_id, workflow_ids, dst_folder_slug).await?;
+
+    // Ownership follows the row. Removing the tuple requires naming the OLD
+    // parent: without it the stale parent survives and the source folder's
+    // grants keep reaching a workflow that has left it.
+    for (id, src_slug) in previous {
+        if let Some(src) = src_slug {
+            remove_ownership(
+                org_id,
+                "workflows",
+                Authz {
+                    obj_id: id.clone(),
+                    parent_type: "workflow_folder".to_string(),
+                    parent: src,
+                },
+            )
+            .await;
+        }
+        set_ownership(
+            org_id,
+            "workflows",
+            Authz {
+                obj_id: id,
+                parent_type: "workflow_folder".to_string(),
+                parent: dst_folder_slug.to_string(),
+            },
+        )
+        .await;
+    }
+    Ok(())
 }
 
 pub async fn list_drafts(
@@ -433,8 +546,11 @@ pub async fn get_workflow_associations(
 fn is_permitted(workflow_id: &str, org_id: &str, permitted: Option<&Vec<String>>) -> bool {
     match permitted {
         Some(permitted) => {
-            permitted.contains(&format!("workflow:{}", workflow_id))
-                || permitted.contains(&format!("workflow:_all_{org_id}"))
+            // The OFGA type is "workflows"; the list this is filtered against is
+            // fetched under that key, so a singular prefix here matches nothing
+            // and hides every workflow from non-root users.
+            permitted.contains(&format!("workflows:{}", workflow_id))
+                || permitted.contains(&format!("workflows:_all_{org_id}"))
         }
         None => true,
     }

@@ -50,6 +50,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <BetaBadge />
         </span>
       </template>
+      <template #sidebar>
+        <FolderList type="workflows" @update:activeFolderId="onFolderChange" />
+      </template>
       <template #actions>
         <!-- v1: only the Alert Fired trigger exists, so New Workflow goes
              straight to the editor (which pre-places the Alert Trigger). -->
@@ -63,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </template>
 
-      <div class="min-h-0 flex-1 overflow-hidden">
+      <div class="h-full min-h-0 overflow-hidden">
         <div class="card-container h-full">
           <OTable
             ref="oTableRef"
@@ -89,6 +92,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <template #toolbar>
               <div class="flex w-full items-center gap-2">
+                <OToggleGroup
+                  :model-value="activeTab"
+                  data-test="workflow-list-tabs"
+                  @update:model-value="(v) => (activeTab = (v as string) || 'all')"
+                >
+                  <OToggleGroupItem
+                    v-for="tab in workflowTabs"
+                    :key="tab.value"
+                    :value="tab.value"
+                    size="sm"
+                    :data-test="`workflow-list-tab-${tab.value}`"
+                  >
+                    {{ tab.label }}
+                  </OToggleGroupItem>
+                </OToggleGroup>
                 <div class="min-w-0 flex-1">
                   <OInput
                     data-test="workflow-list-search-input"
@@ -98,6 +116,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <template #icon-left>
                       <OIcon name="search" size="sm" />
+                    </template>
+                    <template #icon-right>
+                      <OToggleGroup
+                        :model-value="searchAcrossFolders ? 'all' : 'this'"
+                        type="single"
+                        class="me-1 self-center"
+                        @update:model-value="(v) => onFolderScopeChange(v as string)"
+                      >
+                        <OToggleGroupItem
+                          value="this"
+                          size="xs"
+                          icon-left="folder-outline"
+                          data-test="workflow-list-search-scope-current"
+                          :title="t('workflow.searchThisFolderTooltip')"
+                          >{{ t("workflow.searchThisFolder") }}</OToggleGroupItem
+                        >
+                        <OToggleGroupItem
+                          value="all"
+                          size="xs"
+                          icon-left="search"
+                          data-test="workflow-list-search-across-folders-toggle"
+                          :title="t('workflow.searchAllFoldersTooltip')"
+                          >{{ t("workflow.searchAllFolders") }}</OToggleGroupItem
+                        >
+                      </OToggleGroup>
                     </template>
                   </OInput>
                 </div>
@@ -180,6 +223,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <OTooltip side="bottom" :content="t('workflow.edit')" />
                 </OButton>
+                <OButton
+                  :data-test="`workflow-list-${row.name}-move`"
+                  variant="ghost"
+                  size="icon-sm"
+                  icon-left="drive-file-move"
+                  :title="t('workflow.moveToFolder')"
+                  @click.stop="openMoveDialog(row)"
+                >
+                  <OTooltip side="bottom" :content="t('workflow.moveToFolder')" />
+                </OButton>
                 <ODropdown align="end">
                   <template #trigger>
                     <OButton
@@ -234,6 +287,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <component :is="Component" @saved="onEditorSaved" />
   </router-view>
 
+  <MoveAcrossFolders
+    v-model:open="showMoveDialog"
+    :activeFolderId="activeFolderId"
+    :moduleId="workflowIdsToMove"
+    type="workflows"
+    @updated="onMoveUpdated"
+    data-test="workflow-move-to-another-folder-dialog"
+  />
+
   <ConfirmDialog
     :title="confirmDialogMeta.title"
     :message="confirmDialogMeta.message"
@@ -244,12 +306,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, defineAsyncComponent, onMounted, watch } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import FolderList from "@/components/common/sidebar/FolderList.vue";
+import { getFoldersListByType } from "@/utils/commons";
+const MoveAcrossFolders = defineAsyncComponent(
+  () => import("@/components/common/sidebar/MoveAcrossFolders.vue"),
+);
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import BetaBadge from "@/components/common/BetaBadge.vue";
@@ -267,9 +336,48 @@ import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 import workflowService from "@/services/workflows";
 import { hydrateWorkflow, triggerDef } from "@/plugins/workflows/useWorkflowCanvas";
+import { DEFAULT_TRIGGER_KIND, enabledTriggers } from "@/plugins/workflows/triggers";
 
 const { t } = useI18nTyped();
 const router = useRouter();
+const route = useRoute();
+
+// The folder lives in the URL so a folder view is linkable and survives a reload.
+const activeFolderId = computed(() => (route.query.folder as string) || "default");
+
+// Tabs come from the trigger registry, so enabling another trigger kind adds its
+// tab without touching this file.
+const activeTab = ref("all");
+const workflowTabs = computed(() => [
+  { value: "all", label: t("workflow.tabAll") },
+  ...enabledTriggers().map((tr) => ({ value: tr.kind, label: t(tr.tabLabelKey ?? tr.labelKey) })),
+]);
+
+const searchAcrossFolders = ref(false);
+
+const showMoveDialog = ref(false);
+const workflowIdsToMove = ref<string[]>([]);
+
+const openMoveDialog = (row: any) => {
+  workflowIdsToMove.value = [row.id];
+  showMoveDialog.value = true;
+};
+
+const onMoveUpdated = () => {
+  showMoveDialog.value = false;
+  workflowIdsToMove.value = [];
+  getWorkflows();
+};
+
+const onFolderChange = (folderId: string) => {
+  if (folderId === activeFolderId.value) return;
+  router.push({
+    query: { ...route.query, org_identifier: orgId.value, folder: folderId },
+  });
+  // Pass the folder explicitly: router.push resolves asynchronously, so
+  // reading it back off the route here would still yield the previous folder.
+  getWorkflows(folderId);
+};
 const store = useStore();
 
 const currentRouteName = computed(() => router.currentRoute.value.name);
@@ -278,6 +386,30 @@ const orgId = computed(() => store.state.selectedOrganization.identifier as stri
 const loading = ref(true);
 const forbidden = ref(false);
 const filterQuery = ref("");
+
+// Cross-folder is a search mode, not a browse mode: with an empty box the list
+// stays in the selected folder, matching the Alerts and Dashboards lists. That
+// also avoids pulling the org's entire set just because the toggle is on.
+const crossFolderActive = computed(
+  () => searchAcrossFolders.value && filterQuery.value.trim() !== "",
+);
+
+const onFolderScopeChange = (v: string) => {
+  const across = v === "all";
+  if (across === searchAcrossFolders.value) return;
+  searchAcrossFolders.value = across;
+  getWorkflows();
+};
+
+// The cross-folder term is matched by the backend, so re-fetch as it changes
+// rather than on every keystroke.
+let searchDebounce: ReturnType<typeof setTimeout> | undefined;
+watch(filterQuery, () => {
+  if (!searchAcrossFolders.value) return;
+  clearTimeout(searchDebounce);
+  searchDebounce = setTimeout(() => getWorkflows(), 300);
+});
+
 const workflows = ref<any[]>([]);
 const oTableRef: any = ref(null);
 // Plain ref, not URL/store-backed: WorkflowsList stays mounted across create/edit/runs child-route navigation, so this alone survives the round trip.
@@ -295,10 +427,14 @@ const restorePageIndex = () => {
 
 const filteredWorkflows = computed(() => {
   const q = filterQuery.value.trim().toLowerCase();
-  if (!q) return workflows.value;
-  return workflows.value.filter(
-    (w) => w.name?.toLowerCase().includes(q) || w.description?.toLowerCase().includes(q),
-  );
+  const tab = activeTab.value;
+  return workflows.value.filter((w) => {
+    if (tab !== "all" && triggerKind(w) !== tab) return false;
+    // In cross-folder mode the backend already applied the name filter; applying
+    // it again here would drop rows that matched on name but not description.
+    if (!q || crossFolderActive.value) return true;
+    return w.name?.toLowerCase().includes(q) || w.description?.toLowerCase().includes(q);
+  });
 });
 
 const resultTotal = computed(() => filteredWorkflows.value.length);
@@ -309,6 +445,12 @@ const resultTotal = computed(() => filteredWorkflows.value.length);
 // (NodeData::WorkflowTrigger, serde tag = "node_type", snake_case).
 // v1 has one kind (alert-fired); once B1 adds WorkflowTriggerParams.kind we can
 // map data.kind -> a per-kind label here.
+// The kind drives the type tabs; the label is only for display.
+const triggerKind = (wf: any): string => {
+  const triggerNode = (wf.nodes || []).find((n: any) => n.data?.node_type === "workflow_trigger");
+  return triggerNode?.data?.trigger_kind || triggerNode?.meta?.trigger_kind || DEFAULT_TRIGGER_KIND;
+};
+
 const triggerLabel = (wf: any): string => {
   const triggerNode = (wf.nodes || []).find((n: any) => n.data?.node_type === "workflow_trigger");
   if (!triggerNode) return "—";
@@ -380,16 +522,38 @@ const columns = computed(() => [
     header: t("workflow.actions"),
     sortable: false,
     isAction: true,
-    meta: { align: "center", cellClass: "actions-column", actionCount: 4 },
+    meta: { align: "center", cellClass: "actions-column", actionCount: 5 },
   },
 ]);
-const otableColumns = computed(() => columns.value);
+const otableColumns = computed(() => {
+  // The rail already names the folder when scoped to one, so the column only
+  // earns its width when rows can come from several.
+  if (!crossFolderActive.value) return columns.value;
+  const cols = [...columns.value];
+  cols.splice(2, 0, {
+    id: "folder_name",
+    header: t("workflow.folder"),
+    accessorKey: "folder_name",
+    sortable: true,
+    resizable: true,
+    hideable: true,
+    size: COL.folder,
+    meta: { align: "left" },
+  });
+  return cols;
+});
 
-const getWorkflows = async () => {
+const getWorkflows = async (folderId?: string) => {
   loading.value = true;
   forbidden.value = false;
   try {
-    const response = await workflowService.listWorkflows(orgId.value);
+    const across = crossFolderActive.value;
+    const response = await workflowService.listWorkflows(
+      orgId.value,
+      folderId ?? activeFolderId.value,
+      across,
+      across ? filterQuery.value.trim() : undefined,
+    );
     // list handler returns a bare array of Workflow.
     const list = Array.isArray(response.data) ? response.data : (response.data?.list ?? []);
     workflows.value = list.map((wf: any, index: number) => ({
@@ -527,6 +691,10 @@ const onEditorSaved = async () => {
 };
 
 onMounted(async () => {
+  // FolderList reads the store, so the folders must be there before it renders.
+  await getFoldersListByType(store, "workflows").catch((err: unknown) =>
+    console.error("failed to load workflow folders", err),
+  );
   await getWorkflows();
   restorePageIndex();
 });

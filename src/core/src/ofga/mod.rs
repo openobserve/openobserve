@@ -57,6 +57,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     let mut need_pipeline_migration = false;
     let mut need_cipher_keys_migration = false;
     let mut need_alert_folders_migration = false;
+    let mut need_workflow_folders_migration = false;
     let mut need_ratelimit_migration = false;
     let mut need_service_accounts_migration = false;
     let mut need_ai_chat_permissions_migration = false;
@@ -264,6 +265,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 let v0_0_38 = version_compare::Version::from("0.0.38").unwrap();
                 let v0_0_39 = version_compare::Version::from("0.0.39").unwrap();
                 let v0_0_42 = version_compare::Version::from("0.0.42").unwrap();
+                let v0_0_46 = version_compare::Version::from("0.0.46").unwrap();
 
                 if meta_version > v0_0_5 && existing_model_version < v0_0_6 {
                     need_pipeline_migration = true;
@@ -356,6 +358,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 if existing_model_version < v0_0_42 {
                     log::info!("[OFGA:Local] LLM workbench permissions migration needed");
                     need_llm_workbench_migration = true;
+                }
+                if existing_model_version < v0_0_46 {
+                    log::info!("[OFGA:Local] workflow folders permissions migration needed");
+                    need_workflow_folders_migration = true;
                 }
             }
 
@@ -511,6 +517,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
                     if need_workflows_migration {
                         get_ownership_all_org_tuple(org_name, "workflows", &mut tuples);
                     }
+                    if need_workflow_folders_migration {
+                        get_ownership_all_org_tuple(org_name, "workflow_folder", &mut tuples);
+                    }
                     if need_annotation_queues_datasets_migration {
                         get_ownership_all_org_tuple(org_name, "annotation_queues", &mut tuples);
                         get_ownership_all_org_tuple(org_name, "datasets", &mut tuples);
@@ -524,6 +533,18 @@ pub async fn init() -> Result<(), anyhow::Error> {
                         Err(e) => {
                             log::error!(
                                 "[OFGA:Local] Error migrating alert folders to openfga: {e}"
+                            );
+                        }
+                    }
+                }
+                if need_workflow_folders_migration {
+                    match migrations::migrate_workflow_folders().await {
+                        Ok(_) => {
+                            log::info!("[OFGA:Local] Workflow folders migrated to openfga");
+                        }
+                        Err(e) => {
+                            log::error!(
+                                "[OFGA:Local] Error migrating workflow folders to openfga: {e}"
                             );
                         }
                     }

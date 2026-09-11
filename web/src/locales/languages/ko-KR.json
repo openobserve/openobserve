@@ -2608,6 +2608,13 @@
     "edit": "편집",
     "view": "보기",
     "delete": "삭제",
+    "moveToFolder": "폴더로 이동",
+    "tabAll": "전체",
+    "searchThisFolder": "이 폴더",
+    "searchAllFolders": "모든 폴더",
+    "searchThisFolderTooltip": "이 폴더만 검색",
+    "searchAllFoldersTooltip": "모든 폴더에서 검색",
+    "folder": "폴더",
     "deleteTitle": "워크플로 삭제",
     "deleteMessage": "이 워크플로우를 삭제하시겠습니까?",
     "deleteSuccess": "워크플로우가 삭제되었습니다",
@@ -2642,12 +2649,14 @@
     "triggerKind": {
       "alertFired": {
         "label": "알림 발생",
+        "tab": "알림",
         "node": "알림 트리거",
         "desc": "알림이 발생하면 실행",
         "intro": "연결된 알림이 발생하면 모든 다운스트림 단계가 이 페이로드를 받습니다."
       },
       "incidentEvent": {
         "label": "인시던트 이벤트",
+        "tab": "인시던트",
         "node": "인시던트 트리거",
         "desc": "인시던트 수명 주기 이벤트에서 실행",
         "intro": "인시던트 이벤트가 발생하면 모든 다운스트림 단계가 이 페이로드를 받습니다."

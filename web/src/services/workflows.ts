@@ -16,10 +16,23 @@
 import http from "./http";
 
 const workflows = {
-  // List all workflows for the org .
-  listWorkflows: (org_identifier: string) => {
-    const url = `/api/${org_identifier}/workflows`;
-    return http().get(url);
+  // List the org's workflows in one folder. Omitting `folder` lets the backend
+  // fall back to the default folder, which is what pre-folders clients sent.
+  // `allFolders` lists across every folder the caller may see and takes
+  // precedence over `folder`. `nameSubstring` is matched in the database, so a
+  // cross-folder search does not require loading every workflow first.
+  listWorkflows: (
+    org_identifier: string,
+    folder?: string,
+    allFolders = false,
+    nameSubstring?: string,
+  ) => {
+    const params = new URLSearchParams();
+    if (allFolders) params.set("all_folders", "true");
+    else if (folder) params.set("folder", folder);
+    if (nameSubstring) params.set("name_substring", nameSubstring);
+    const qs = params.toString();
+    return http().get(`/api/${org_identifier}/workflows${qs ? `?${qs}` : ""}`);
   },
 
   // Save a new workflow. `draft=true` saves to the drafts table WITHOUT the
