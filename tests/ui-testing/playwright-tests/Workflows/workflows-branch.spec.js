@@ -186,4 +186,24 @@ test.describe('Workflows branch node', { tag: ['@workflows', '@enterprise', '@al
     testLogger.info('publish rejection after deleting a wired path', { msg });
     expect(msg.toLowerCase()).toContain('branch');
   });
+  // BR-11 — path labels are persisted config, not view state: they must survive a draft
+  // checkpoint and come back in the same order, since order is evaluation order.
+  test('BR-11: path labels survive a draft save and reopen', { tag: ['@workflowsBranch'] }, async () => {
+    const name = `wf_auto_br_${uniq()}`;
+    await pm.workflowsPage.goToAdd();
+    await pm.workflowsPage.setName(name);
+    await pm.workflowsPage.addBranchFromPalette();
+
+    const [h0] = await pm.workflowsPage.branchCaseHandles();
+    await pm.workflowsPage.setBranchCase(h0, { label: 'ALPHA' });
+    await pm.workflowsPage.addBranchCase();
+    const [, h1] = await pm.workflowsPage.branchCaseHandles();
+    await pm.workflowsPage.setBranchCase(h1, { label: 'BETA' });
+    await pm.workflowsPage.saveNodeDrawer();
+    await pm.workflowsPage.saveAsDraft();
+
+    await pm.workflowsPage.openEdit(name);
+    await pm.workflowsPage.openBranchDrawer();
+    expect(await pm.workflowsPage.branchCaseLabels()).toEqual(['ALPHA', 'BETA']);
+  });
 });
