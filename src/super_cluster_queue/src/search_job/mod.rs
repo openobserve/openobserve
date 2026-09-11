@@ -19,7 +19,7 @@ pub mod search_jobs;
 
 use config::utils::json;
 use db::{
-    sourcemaps::SOURCEMAP_PREFIX,
+    sourcemaps::{SOURCEMAP_PREFIX, delete_stored_files},
     workflows::{AssociationDeleteEvent, WORKFLOWS_PREFIX},
 };
 use infra::{
@@ -91,7 +91,13 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
             )
             .await
             {
-                Ok(_) => {}
+                Ok(deleted) => {
+                    if let Err(e) = delete_stored_files(&deleted).await {
+                        log::error!(
+                            "error deleting sourcemap files from storage for {org_id} : {e}"
+                        );
+                    }
+                }
                 Err(e) => {
                     log::error!(
                         "error while deleting sourceamp for {}/{}/{}/{} : {e}",
