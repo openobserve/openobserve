@@ -342,6 +342,33 @@ describe("useRumSpanBuilder", () => {
   });
 
   // =========================================================================
+  // fetchRumEventsForTrace — view_id escaping
+  // =========================================================================
+
+  describe("fetchRumEventsForTrace — view_id escaping", () => {
+    it("escapes an embedded single quote in view_id for both view-event queries", async () => {
+      const tracedResource = makeTracedResource({ view_id: "view'1" });
+      vi.mocked(searchService.search)
+        .mockResolvedValueOnce(makeSearchResponse([tracedResource]))
+        .mockResolvedValueOnce(makeSearchResponse([]))
+        .mockResolvedValueOnce(makeSearchResponse([]))
+        .mockResolvedValueOnce(makeSearchResponse([]));
+
+      const { fetchRumEventsForTrace } = buildComposable(["_rumdata"]);
+      await fetchRumEventsForTrace("trace-abc", 1_000_000, 2_000_000);
+
+      // Call order: tracedResources(0), viewEvents(1), actionEvents(2), allViewEvents(3)
+      const viewEventsSql: string = vi.mocked(searchService.search).mock.calls[1][0].query.query
+        .sql as string;
+      const allViewEventsSql: string = vi.mocked(searchService.search).mock.calls[3][0].query
+        .query.sql as string;
+
+      expect(viewEventsSql).toContain("view_id IN ('view''1')");
+      expect(allViewEventsSql).toContain("view_id IN ('view''1')");
+    });
+  });
+
+  // =========================================================================
   // fetchRumEventsForTrace — padded/legacy trace-id variants
   // =========================================================================
 
