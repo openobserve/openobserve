@@ -22,7 +22,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { createStore } from "vuex";
 import { createRouter, createMemoryHistory } from "vue-router";
-import { defineComponent } from "vue";
+import { computed, defineComponent, ref } from "vue";
 import HostDetailDrawer from "./HostDetailDrawer.vue";
 import searchService from "@/services/search";
 import { b64DecodeUnicode } from "@/utils/zincutils";
@@ -56,6 +56,25 @@ vi.mock("@/utils/semanticGroupsCache", () => ({
   clearSemanticGroupsCacheForOrg: vi.fn(),
   getCachedSemanticGroups: vi.fn(() => null),
 }));
+
+/**
+ * A PASSTHROUGH by default, so every case below still drives the real engine.
+ * `curatedOverride` exists only to reach a shape resolveManifest cannot produce
+ * (presentGroupIds is pushed ONLY when a panel is visible, resolve.ts:563), which
+ * is exactly why the drawer's zero-panel guard needs a test of its own.
+ */
+const curatedOverride = vi.hoisted(() => ({ current: null as null | ((real: any) => any) }));
+
+vi.mock("./curated/useCuratedPage", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./curated/useCuratedPage")>();
+  return {
+    ...actual,
+    useCuratedPage: (...args: Parameters<typeof actual.useCuratedPage>) => {
+      const real = actual.useCuratedPage(...args);
+      return curatedOverride.current ? curatedOverride.current(real) : real;
+    },
+  };
+});
 
 const searchMock = vi.mocked(searchService.search);
 
@@ -203,6 +222,7 @@ describe("HostDetailDrawer", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    curatedOverride.current = null;
     lastDashboardData = null;
     for (const k of Object.keys(dateTimeCapture)) delete dateTimeCapture[k];
     searchMock.mockResolvedValue({ data: { hits: [{ _timestamp: 1, log: "x" }] } } as any);
@@ -403,6 +423,71 @@ describe("HostDetailDrawer", () => {
       await wrapper.find('[data-test="host-drawer-tab-traces"]').trigger("click");
       await flushPromises();
       expect(wrapper.find('[data-test="host-drawer-traces-link"]').exists()).toBe(true);
+    });
+
+    // The drawer handled `unknown` only, so `dormant` and `undetected` both fell
+    // through to RenderDashboardCharts with tabs:[] — and its generic empty state
+    // told the user to "Add a panel" on a read-only curated surface.
+    it("`dormant` names the outage instead of handing the renderer an empty dashboard", async () => {
+      primeStreams(HOST_STREAMS, NOW_US - 25 * 60 * 60 * 1_000_000);
+      wrapper = await mountDrawer();
+      expect(wrapper.find('[data-test="host-drawer-metrics-dormant"]').exists()).toBe(true);
+      expect(wrapper.text()).toContain("stopped reporting");
+      expect(lastDashboardData).toBeNull();
+    });
+
+    it("`undetected` explains the missing receiver instead of offering a panel editor", async () => {
+      primeStreams([]);
+      wrapper = await mountDrawer();
+      expect(wrapper.find('[data-test="host-drawer-metrics-undetected"]').exists()).toBe(true);
+      expect(lastDashboardData).toBeNull();
+    });
+
+    // The `|| !hasPanels` catch-all, which no FACE reaches: resolveManifest only
+    // marks a group present when a panel is visible (resolve.ts:563), so a ready
+    // face always has one today. The guard defends the RENDERER contract instead —
+    // buildDashboard drops panel-less tabs (resolve.ts:756), so if that ever emits
+    // an empty tab set under a ready face, "Add a panel" must still not appear.
+    describe("ready face whose dashboard has no panels", () => {
+      const readyWithTabs = (tabs: unknown[]) => {
+        curatedOverride.current = (real: any) => ({
+          ...real,
+          face: computed(() => "ready" as const),
+          dashboard: ref({ version: 8, tabs }),
+        });
+      };
+
+      it("renders the curated copy, not the panel editor, when tabs is empty", async () => {
+        readyWithTabs([]);
+        wrapper = await mountDrawer();
+        expect(wrapper.find('[data-test="host-drawer-metrics-undetected"]').exists()).toBe(true);
+        expect(wrapper.text()).not.toContain("Add a panel");
+        // The renderer must never be handed it — that is what printed the copy.
+        expect(lastDashboardData).toBeNull();
+      });
+
+      it("also covers a tab that exists but carries zero panels", async () => {
+        readyWithTabs([{ tabId: "host", name: "host", panels: [] }]);
+        wrapper = await mountDrawer();
+        expect(wrapper.find('[data-test="host-drawer-metrics-undetected"]').exists()).toBe(true);
+        expect(lastDashboardData).toBeNull();
+      });
+    });
+
+    // A curated read-only surface must NEVER print the generic dashboard copy.
+    it("never renders the generic 'Add a panel' empty state in any non-ready face", async () => {
+      for (const prime of [
+        () => primeStreams(HOST_STREAMS, NOW_US - 25 * 60 * 60 * 1_000_000),
+        () => primeStreams([]),
+      ]) {
+        prime();
+        wrapper = await mountDrawer();
+        // tabs:[] is what made RenderDashboardCharts print it — never hand it one.
+        expect((lastDashboardData?.tabs ?? []).length === 0 && lastDashboardData !== null).toBe(
+          false,
+        );
+        wrapper.unmount();
+      }
     });
   });
 
