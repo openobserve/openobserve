@@ -1,0 +1,18 @@
+{
+  "feature_slug": "shortcut-cheatsheet-edition-gating",
+  "feature_title": "Keyboard Shortcut Cheatsheet Edition Gating",
+  "area": "GeneralTests",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "shortcutCheatsheet.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/GeneralTests/shortcutCheatsheet.spec.js",
+  "playwright_group": "GeneralTests",
+  "source_files": [
+    "web/src/lib/vue-shortcut-manager/ShortcutCheatsheet.vue",
+    "web/src/lib/vue-shortcut-manager/shortcutRegistry.ts"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": ""
+}

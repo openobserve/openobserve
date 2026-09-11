@@ -1,0 +1,3 @@
+web/src/lib/vue-shortcut-manager/ShortcutCheatsheet.vue
+web/src/lib/vue-shortcut-manager/__tests__/shortcutRegistry.spec.ts
+web/src/lib/vue-shortcut-manager/shortcutRegistry.ts

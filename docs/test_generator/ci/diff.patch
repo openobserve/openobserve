@@ -1,0 +1,467 @@
+===== COMPLETE LIST OF CHANGED FILES (3 files) =====
+# AUTHORITATIVE: this list is never truncated. The diff BODY below may be trimmed for
+# very large PRs, so decide WHICH files/areas changed (e.g. web/src frontend) from THIS list.
+web/src/lib/vue-shortcut-manager/ShortcutCheatsheet.vue
+web/src/lib/vue-shortcut-manager/__tests__/shortcutRegistry.spec.ts
+web/src/lib/vue-shortcut-manager/shortcutRegistry.ts
+===== END CHANGED FILES =====
+
+diff --git a/web/src/lib/vue-shortcut-manager/ShortcutCheatsheet.vue b/web/src/lib/vue-shortcut-manager/ShortcutCheatsheet.vue
+index 00f7aba9dfe..4321b08e3e0 100644
+--- a/web/src/lib/vue-shortcut-manager/ShortcutCheatsheet.vue
++++ b/web/src/lib/vue-shortcut-manager/ShortcutCheatsheet.vue
+@@ -220,6 +220,7 @@
+ 
+ <script setup lang="ts">
+ import { computed, ref, watch, onUnmounted } from "vue";
++import { useStore } from "vuex";
+ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+@@ -227,8 +228,9 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
+ import OButton from "@/lib/core/Button/OButton.vue";
+ import { useShortcut } from "./composables";
+ import { SHORTCUT_REGISTRY, SHORTCUT_MODULES } from "./shortcutRegistry";
+-import type { ShortcutEntry } from "./shortcutRegistry";
++import type { ShortcutEntry, ShortcutCapabilities } from "./shortcutRegistry";
+ import { isMacOS } from "@/utils/keyboardShortcuts";
++import config from "@/aws-exports";
+ 
+ const props = withDefaults(
+   defineProps<{
+@@ -246,6 +248,20 @@ const emit = defineEmits<{
+ }>();
+ 
+ const { t } = useI18nTyped();
++const store = useStore();
++
++// Edition + `/config` flags that decide which feature pages the build can reach.
++const capabilities = computed<ShortcutCapabilities>(() => ({
++  isEnterprise: config.isEnterprise === "true",
++  isCloud: config.isCloud === "true",
++  isMetaOrg:
++    !!store.state.zoConfig?.meta_org &&
++    store.state.selectedOrganization?.identifier === store.state.zoConfig.meta_org,
++  onlineEvalsEnabled: Boolean(store.state.zoConfig?.online_evals_enabled),
++  incidentsEnabled: Boolean(store.state.zoConfig?.incidents_enabled),
++  modelPricingEnabled: Boolean(store.state.zoConfig?.model_pricing_enabled),
++  rbacEnabled: Boolean(store.state.zoConfig?.rbac_enabled),
++}));
+ 
+ const open = computed({
+   get: () => props.open,
+@@ -290,11 +306,12 @@ function entryDisplay(e: ShortcutEntry): string {
+ }
+ 
+ const allModules = computed<DisplayModule[]>(() => {
++  const caps = capabilities.value;
+   return SHORTCUT_MODULES.map((m) => ({
+     title: m.title ? raw(m.title) : t(m.titleKey),
+     sections: m.pages.flatMap((pageKey) => {
+       const group = groupByPage.get(pageKey);
+-      if (!group) return [];
++      if (!group || (group.visible && !group.visible(caps))) return [];
+       return [
+         {
+           title: t(group.pageKey, PAGE_TITLE_PARAMS[group.pageKey] ?? {}),
+@@ -306,7 +323,8 @@ const allModules = computed<DisplayModule[]>(() => {
+         },
+       ];
+     }),
+-  }));
++    // A module whose every page is gated off (e.g. Settings on OSS) drops its chip entirely.
++  })).filter((m) => m.sections.length > 0);
+ });
+ 
+ const filteredModules = computed<DisplayModule[]>(() => {
+diff --git a/web/src/lib/vue-shortcut-manager/__tests__/shortcutRegistry.spec.ts b/web/src/lib/vue-shortcut-manager/__tests__/shortcutRegistry.spec.ts
+new file mode 100644
+index 00000000000..1ef4ec8f0ca
+--- /dev/null
++++ b/web/src/lib/vue-shortcut-manager/__tests__/shortcutRegistry.spec.ts
+@@ -0,0 +1,179 @@
++import { describe, it, expect } from "vitest";
++import {
++  SHORTCUT_MODULES,
++  SHORTCUT_REGISTRY,
++  type ShortcutCapabilities,
++} from "../shortcutRegistry";
++
++const OSS: ShortcutCapabilities = {
++  isEnterprise: false,
++  isCloud: false,
++  isMetaOrg: false,
++  onlineEvalsEnabled: false,
++  incidentsEnabled: false,
++  modelPricingEnabled: false,
++  rbacEnabled: false,
++};
++const ENTERPRISE: ShortcutCapabilities = {
++  isEnterprise: true,
++  isCloud: false,
++  isMetaOrg: true,
++  onlineEvalsEnabled: true,
++  incidentsEnabled: true,
++  modelPricingEnabled: true,
++  rbacEnabled: true,
++};
++const CLOUD: ShortcutCapabilities = {
++  isEnterprise: false,
++  isCloud: true,
++  isMetaOrg: true,
++  onlineEvalsEnabled: true,
++  incidentsEnabled: true,
++  modelPricingEnabled: true,
++  rbacEnabled: true,
++};
++
++/** Mirrors ShortcutCheatsheet: a page shows unless its gate rejects the caps. */
++function visiblePages(caps: ShortcutCapabilities): Set<string> {
++  const pages = new Set<string>();
++  for (const g of SHORTCUT_REGISTRY) {
++    if (!g.visible || g.visible(caps)) pages.add(g.pageKey);
++  }
++  return pages;
++}
++
++/** A module shows only while at least one of its pages is visible. */
++function visibleModuleTitles(caps: ShortcutCapabilities): string[] {
++  const pages = visiblePages(caps);
++  return SHORTCUT_MODULES.filter((m) => m.pages.some((p) => pages.has(p))).map(
++    (m) => m.title ?? m.titleKey,
++  );
++}
++
++const GATED_IN_OSS = [
++  "shortcuts.pages.searchSchedulers",
++  "shortcuts.pages.alertSources",
++  "shortcuts.pages.alertIncidents",
++  "shortcuts.pages.pipelineDestinations",
++  "shortcuts.pages.iamRoles",
++  "shortcuts.pages.iamGroups",
++  "shortcuts.pages.iamInvitations",
++  "shortcuts.pages.regexPatterns",
++  "shortcuts.pages.cipherKeys",
++  "shortcuts.pages.nodes",
++  "shortcuts.pages.modelPricing",
++  "shortcuts.pages.llmProviders",
++  "shortcuts.pages.aiToolsets",
++  "shortcuts.pages.orgManagement",
++  "shortcuts.pages.actions",
++  "shortcuts.pages.evalTemplates",
++  "shortcuts.pages.scorers",
++  "shortcuts.pages.evalJobs",
++  "shortcuts.pages.scoreConfigs",
++  "shortcuts.pages.runningQueries",
++];
++
++const OSS_PAGES = [
++  "shortcuts.pages.global",
++  "shortcuts.pages.logs",
++  "shortcuts.pages.searchHistory",
++  "shortcuts.pages.alerts",
++  "shortcuts.pages.alertDestinations",
++  "shortcuts.pages.alertTemplates",
++  "shortcuts.pages.streams",
++  "shortcuts.pages.pipelines",
++  "shortcuts.pages.functions",
++  "shortcuts.pages.reports",
++  "shortcuts.pages.iamUsers",
++  "shortcuts.pages.iamServiceAccounts",
++  "shortcuts.pages.ingestionTokens",
++  "shortcuts.pages.rumErrors",
++];
++
++describe("shortcut cheatsheet OSS gating", () => {
++  it("hides every enterprise/cloud-only page on an OSS build", () => {
++    const pages = visiblePages(OSS);
++    for (const p of GATED_IN_OSS) expect(pages.has(p), `${p} leaked into OSS`).toBe(false);
++  });
++
++  it("keeps the core OSS pages visible on an OSS build", () => {
++    const pages = visiblePages(OSS);
++    for (const p of OSS_PAGES) expect(pages.has(p), `${p} missing from OSS`).toBe(true);
++  });
++
++  it("drops the fully-gated module chips on an OSS build", () => {
++    const titles = visibleModuleTitles(OSS);
++    expect(titles).not.toContain("shortcuts.modules.settings");
++    expect(titles).not.toContain("shortcuts.modules.onlineEvals");
++    expect(titles).not.toContain("shortcuts.modules.runningQueries");
++    expect(titles).not.toContain("shortcuts.modules.actions");
++  });
++
++  it("shows enterprise-only pages on enterprise and hides the cloud-only ones", () => {
++    const pages = visiblePages(ENTERPRISE);
++    for (const p of [
++      "shortcuts.pages.regexPatterns",
++      "shortcuts.pages.cipherKeys",
++      "shortcuts.pages.nodes",
++      "shortcuts.pages.searchSchedulers",
++      "shortcuts.pages.aiToolsets",
++      "shortcuts.pages.pipelineDestinations",
++      "shortcuts.pages.runningQueries",
++    ]) {
++      expect(pages.has(p), `${p} should show on enterprise`).toBe(true);
++    }
++    // Cloud-only pages stay hidden on a pure enterprise build.
++    expect(pages.has("shortcuts.pages.iamInvitations")).toBe(false);
++    expect(pages.has("shortcuts.pages.orgManagement")).toBe(false);
++  });
++
++  it("shows cloud-only pages on cloud and hides the enterprise-only ones", () => {
++    const pages = visiblePages(CLOUD);
++    expect(pages.has("shortcuts.pages.iamInvitations")).toBe(true);
++    expect(pages.has("shortcuts.pages.orgManagement")).toBe(true);
++    // Enterprise-only pages (incl. _meta-org cluster pages) stay hidden on cloud.
++    for (const p of [
++      "shortcuts.pages.regexPatterns",
++      "shortcuts.pages.cipherKeys",
++      "shortcuts.pages.nodes",
++      "shortcuts.pages.searchSchedulers",
++      "shortcuts.pages.aiToolsets",
++      "shortcuts.pages.pipelineDestinations",
++      "shortcuts.pages.runningQueries",
++    ]) {
++      expect(pages.has(p), `${p} should be hidden on cloud`).toBe(false);
++    }
++  });
++
++  it("keeps flag-gated pages hidden on enterprise/cloud when their /config flag is off", () => {
++    const entNoFlags: ShortcutCapabilities = {
++      ...ENTERPRISE,
++      onlineEvalsEnabled: false,
++      incidentsEnabled: false,
++      modelPricingEnabled: false,
++    };
++    const pages = visiblePages(entNoFlags);
++    expect(pages.has("shortcuts.pages.scorers")).toBe(false);
++    expect(pages.has("shortcuts.pages.alertIncidents")).toBe(false);
++    // Alert Sources rides the same incidents gate — the nav only reaches it via Incidents.
++    expect(pages.has("shortcuts.pages.alertSources")).toBe(false);
++    // llmProviders follows online_evals_enabled; modelPricing follows model_pricing_enabled.
++    expect(pages.has("shortcuts.pages.llmProviders")).toBe(false);
++    expect(pages.has("shortcuts.pages.modelPricing")).toBe(false);
++  });
++
++  it("gates IAM Roles/Groups behind rbac_enabled on enterprise/cloud", () => {
++    const entNoRbac: ShortcutCapabilities = { ...ENTERPRISE, rbacEnabled: false };
++    const pages = visiblePages(entNoRbac);
++    expect(pages.has("shortcuts.pages.iamRoles")).toBe(false);
++    expect(pages.has("shortcuts.pages.iamGroups")).toBe(false);
++  });
++
++  it("gates cluster-scoped pages to the _meta org", () => {
++    const entNonMeta = visiblePages({ ...ENTERPRISE, isMetaOrg: false });
++    expect(entNonMeta.has("shortcuts.pages.nodes")).toBe(false);
++    expect(entNonMeta.has("shortcuts.pages.runningQueries")).toBe(false);
++    const cloudNonMeta = visiblePages({ ...CLOUD, isMetaOrg: false });
++    expect(cloudNonMeta.has("shortcuts.pages.orgManagement")).toBe(false);
++  });
++});
+diff --git a/web/src/lib/vue-shortcut-manager/shortcutRegistry.ts b/web/src/lib/vue-shortcut-manager/shortcutRegistry.ts
+index eb2c5ffe3fa..8a80cb618f5 100644
+--- a/web/src/lib/vue-shortcut-manager/shortcutRegistry.ts
++++ b/web/src/lib/vue-shortcut-manager/shortcutRegistry.ts
+@@ -49,9 +49,22 @@ export interface ShortcutGroup {
+   pageKey: I18nKey;
+   /** Manager scope shared by this group's registerable shortcuts (omit = global). */
+   scope?: string;
++  /** Hide this page in the cheatsheet unless the edition/config exposes the feature. */
++  visible?: (caps: ShortcutCapabilities) => boolean;
+   shortcuts: ShortcutEntry[];
+ }
+ 
++/** Runtime edition + org scope + `/config` flags that gate feature-specific pages. */
++export interface ShortcutCapabilities {
++  isEnterprise: boolean;
++  isCloud: boolean;
++  isMetaOrg: boolean;
++  onlineEvalsEnabled: boolean;
++  incidentsEnabled: boolean;
++  modelPricingEnabled: boolean;
++  rbacEnabled: boolean;
++}
++
+ export interface ShortcutModule {
+   /** i18n key under shortcuts.modules.* */
+   titleKey: I18nKey;
+@@ -65,6 +78,18 @@ export interface ShortcutModule {
+   pages: I18nKey[];
+ }
+ 
++// Gates mirror each feature's own route guard, so the cheatsheet never lists a page OSS cannot reach.
++const enterprise = (c: ShortcutCapabilities) => c.isEnterprise;
++const cloud = (c: ShortcutCapabilities) => c.isCloud;
++const enterpriseOrCloud = (c: ShortcutCapabilities) => c.isEnterprise || c.isCloud;
++const incidents = (c: ShortcutCapabilities) => enterpriseOrCloud(c) && c.incidentsEnabled;
++const onlineEvals = (c: ShortcutCapabilities) => enterpriseOrCloud(c) && c.onlineEvalsEnabled;
++const modelPricing = (c: ShortcutCapabilities) => enterpriseOrCloud(c) && c.modelPricingEnabled;
++const rbac = (c: ShortcutCapabilities) => enterpriseOrCloud(c) && c.rbacEnabled;
++// Cluster-scoped admin surfaces only render inside the _meta org.
++const metaAdmin = (c: ShortcutCapabilities) => c.isEnterprise && c.isMetaOrg;
++const cloudMetaAdmin = (c: ShortcutCapabilities) => c.isCloud && c.isMetaOrg;
++
+ /**
+  * Groups the flat SHORTCUT_REGISTRY into modules for the cheatsheet. Each module
+  * is one chip + one block in the listing; its `pages` render as sub-sections.
+@@ -455,6 +480,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
+   {
+     pageKey: "shortcuts.pages.alertSources",
+     scope: "alert-sources",
++    visible: incidents,
+     shortcuts: [
+       { id: "alertSourcesAdd", key: "n", descriptionKey: "shortcuts.actions.alertSourcesAdd" },
+       {
+@@ -595,6 +621,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
+   {
+     pageKey: "shortcuts.pages.iamRoles",
+     scope: "iam-roles",
++    visible: rbac,
+     shortcuts: [
+       { id: "iamRolesAdd", key: "n", descriptionKey: "shortcuts.actions.iamRolesAdd" },
+       { id: "iamRolesRefresh", key: "r", descriptionKey: "shortcuts.actions.iamRolesRefresh" },
+@@ -612,6 +639,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
+   {
+     pageKey: "shortcuts.pages.iamGroups",
+     scope: "iam-groups",
++    visible: rbac,
+     shortcuts: [
+       { id: "iamGroupsAdd", key: "n", descriptionKey: "shortcuts.actions.iamGroupsAdd" },
+       { id: "iamGroupsRefresh", key: "r", descriptionKey: "shortcuts.actions.iamGroupsRefresh" },
+@@ -708,6 +736,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
+   {
+     pageKey: "shortcuts.pages.runningQueries",
+     scope: "running-queries",
++    visible: metaAdmin,
+     shortcuts: [
+       {
+         id: "runningQueriesRefresh",
+@@ -726,6 +755,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
+   {
+     pageKey: "shortcuts.pages.alertIncidents",
+     scope: "alert-incidents",
++    visible: incidents,
+     shortcuts: [
+       {
+         id: "alertIncidentsRefresh",
+@@ -739,6 +769,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
+   {
+     pageKey: "shortcuts.pages.pipelineDestinations",
+     scope: "pipeline-destinations",
++    visible: enterprise,
+     shortcuts: [
+       {
+         id: "pipelineDestinationsRefresh",
+@@ -765,6 +796,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
+   {
+     pageKey: "shortcuts.pages.iamInvitations",
+     scope: "iam-invitations",
++    visible: cloud,
+     shortcuts: [
+       {
+         id: "iamInvitationsRefresh",
+@@ -791,6 +823,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
+   {
+     pageKey: "shortcuts.pages.regexPatterns",
+     scope: "regex-patterns",
++    visible: enterprise,
+     shortcuts: [
+       {
+         id: "regexPatternsRefresh",
+@@ -804,6 +837,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
+   {
+     pageKey: "shortcuts.pages.cipherKeys",
+     scope: "cipher-keys",
++    visible: enterprise,
+     shortcuts: [
+       { id: "cipherKeysRefresh", key: "r", descriptionKey: "shortcuts.actions.cipherKeysRefresh" },
+     ],
+@@ -813,6 +847,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
+   {
+     pageKey: "shortcuts.pages.nodes",
+     scope: "nodes",
++    visible: metaAdmin,
+     shortcuts: [{ id: "nodesRefresh", key: "r", descriptionKey: "shortcuts.actions.nodesRefresh" }],
+   },
+ 
+@@ -820,6 +855,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
+   {
+     pageKey: "shortcuts.pages.modelPricing",
+     scope: "model-pricing",
++    visible: modelPricing,
+     shortcuts: [
+       {
+         id: "modelPricingRefresh",
+@@ -833,6 +869,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
+   {
+     pageKey: "shortcuts.pages.searchSchedulers",
+     scope: "search-schedulers",
++    visible: enterprise,
+     shortcuts: [
+       {
+         id: "searchSchedulersRefresh",
+@@ -868,6 +905,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
+   {
+     pageKey: "shortcuts.pages.evalTemplates",
+     scope: "eval-templates",
++    visible: onlineEvals,
+     shortcuts: [
+       {
+         id: "evalTemplatesRefresh",
+@@ -881,6 +919,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
+   {
+     pageKey: "shortcuts.pages.scorers",
+     scope: "scorers",
++    visible: onlineEvals,
+     shortcuts: [
+       { id: "scorersRefresh", key: "r", descriptionKey: "shortcuts.actions.scorersRefresh" },
+     ],
+@@ -890,6 +929,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
+   {
+     pageKey: "shortcuts.pages.evalJobs",
+     scope: "eval-jobs",
++    visible: onlineEvals,
+     shortcuts: [
+       { id: "evalJobsRefresh", key: "r", descriptionKey: "shortcuts.actions.evalJobsRefresh" },
+     ],
+@@ -899,6 +939,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
+   {
+     pageKey: "shortcuts.pages.scoreConfigs",
+     scope: "score-configs",
++    visible: onlineEvals,
+     shortcuts: [
+       {
+         id: "scoreConfigsRefresh",
+@@ -912,6 +953,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
+   {
+     pageKey: "shortcuts.pages.actions",
+     scope: "actions",
++    visible: enterpriseOrCloud,
+     shortcuts: [
+       { id: "actionsRefresh", key: "r", descriptionKey: "shortcuts.actions.actionsRefresh" },
+     ],
+@@ -921,6 +963,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
+   {
+     pageKey: "shortcuts.pages.llmProviders",
+     scope: "llm-providers",
++    visible: onlineEvals,
+     shortcuts: [
+       {
+         id: "llmProvidersRefresh",
+@@ -934,6 +977,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
+   {
+     pageKey: "shortcuts.pages.aiToolsets",
+     scope: "ai-toolsets",
++    visible: enterprise,
+     shortcuts: [
+       { id: "aiToolsetsRefresh", key: "r", descriptionKey: "shortcuts.actions.aiToolsetsRefresh" },
+     ],
+@@ -943,6 +987,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
+   {
+     pageKey: "shortcuts.pages.orgManagement",
+     scope: "organization-management",
++    visible: cloudMetaAdmin,
+     shortcuts: [
+       {
+         id: "orgManagementRefresh",

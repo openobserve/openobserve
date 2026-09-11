@@ -1,0 +1,26 @@
+{
+  "feature_slug": "shortcut-cheatsheet-edition-gating",
+  "feature_title": "Keyboard Shortcut Cheatsheet Edition Gating",
+  "area": "GeneralTests",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "shortcutCheatsheet.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/GeneralTests/shortcutCheatsheet.spec.js",
+  "playwright_group": "GeneralTests",
+  "source_files": [
+    "web/src/lib/vue-shortcut-manager/ShortcutCheatsheet.vue",
+    "web/src/lib/vue-shortcut-manager/shortcutRegistry.ts"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "All three changed files live under web/src/lib/vue-shortcut-manager/ — the open-source frontend. No path touches enterprise/, o2_enterprise/, or any enterprise-owned module. Enterprise keywords (cipherKeys, rbac, onlineEvals, nodes) appear only as gating metadata the OSS cheatsheet reads to hide enterprise pages on OSS builds; they do not move the change into an enterprise path.",
+    "skip": "Not skipped. There is no tests-added label or skip comment, and the change alters a user-facing UI (the keyboard shortcut cheatsheet dialog) rather than docs/CI/comment content.",
+    "e2e": "E2E is warranted. ShortcutCheatsheet.vue is a user-visible dialog, and the change filters which pages and module chips it lists based on edition (config.isEnterprise / isCloud) and /config flags (rbac_enabled, online_evals_enabled, incidents_enabled, model_pricing_enabled). The user-visible behavior that needs verifying is that an OSS build no longer lists enterprise/cloud-only pages while the enterprise build still does.",
+    "area": "The change lives in web/src/lib/vue-shortcut-manager/ — a global UI library, not a Logs/Metrics/Dashboards feature. GeneralTests is the closest fit for cross-cutting UI behavior and is where sibling global specs (sanity, enrichment, theme-management, cipherKeys) live.",
+    "group": "GeneralTests — the existing matrix shard (testfolder 'GeneralTests', actual_folder 'GeneralTests') whose run_files already host cross-cutting UI specs, so the new spec belongs there.",
+    "existing_tests": "No E2E specs in the diff. The only test added is web/src/lib/vue-shortcut-manager/__tests__/shortcutRegistry.spec.ts, a Vitest unit test, not a Playwright E2E spec, so it does not count as existing E2E coverage."
+  }
+}

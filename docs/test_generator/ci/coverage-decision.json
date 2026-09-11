@@ -1,0 +1,10 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/GeneralTests/shortcutCheatsheet.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Logs/logstable.spec.js",
+    "tests/ui-testing/playwright-tests/GeneralTests/status-pages-enterprise-gating.spec.js"
+  ],
+  "needs_registration": true,
+  "rationale": "No existing spec exercises the ShortcutCheatsheet dialog. The only grep hit (Logs/logstable.spec.js) matches the word 'shortcut' for Logs keyboard shortcuts, not the cheatsheet modal. The closest sibling gating spec (status-pages-enterprise-gating.spec.js) gates a different component (Status Pages) via the backend build_type, not the frontend config flags the cheatsheet reads. This is a distinct cross-cutting UI feature in GeneralTests and warrants its own spec at the run-context spec_path. It must be added to GeneralTests.run_files in ci_matrix.json."
+}

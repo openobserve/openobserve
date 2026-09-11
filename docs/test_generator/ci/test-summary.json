@@ -1,0 +1,7 @@
+[
+  { "title": "OSS - cheatsheet opens via help menu and drops gated module chips", "action": "new", "verifies": "the cheatsheet opens from the Help menu and applies edition gating: 12 core module chips render while the 4 fully-gated chips are absent" },
+  { "title": "OSS - enterprise/cloud-only pages are hidden within surviving modules", "action": "new", "verifies": "enterprise/cloud/flag-gated page rows never render while a core page row (logsRunQuery) stays visible" },
+  { "title": "toggles via shift+?, close button, and Escape", "action": "new", "verifies": "shift+? toggles the dialog both ways and the close button and Escape also close it" },
+  { "title": "filters rows via search and shows the no-results empty state", "action": "new", "verifies": "live search narrows rows, non-matching chips drop, and a nonsense query shows the no-results state and removes the chip container" },
+  { "title": "clicking a chip scrolls to and highlights its module", "action": "new", "verifies": "clicking a module chip scrolls to that module and briefly applies the highlight class" }
+]
