@@ -1,5 +1,5 @@
 /**
- * Workflows v1 — Branch node (BR-01..BR-08)
+ * Workflows v1 — Branch node (BR-02, BR-04..BR-09, BR-11)
  *
  * Enterprise-only. The Branch is the N-way generalisation of Condition: each path is an
  * optional label plus a ConditionBuilder, evaluated TOP-DOWN with FIRST MATCH WINS, and a
@@ -34,7 +34,8 @@ test.describe('Workflows branch node', { tag: ['@workflows', '@enterprise', '@al
   });
 
   // BR-06 — Add Path mints a new arm, and the else row stays pinned last however many
-  // paths exist. The order badges are 1..N for the cases and N+1 for else.
+  // paths exist. The ordinal badges are the user-visible statement of evaluation order,
+  // so they must read 1..N over the case rows.
   test('BR-06: Add Path appends an arm and Everything Else stays last', { tag: ['@workflowsBranch'] }, async () => {
     await pm.workflowsPage.goToAdd();
     await pm.workflowsPage.setName(`wf_auto_br_${uniq()}`);
@@ -44,6 +45,7 @@ test.describe('Workflows branch node', { tag: ['@workflows', '@enterprise', '@al
     await pm.workflowsPage.addBranchCase();
     await pm.workflowsPage.addBranchCase();
     expect(await pm.workflowsPage.branchCaseCount()).toBe(3);
+    expect(await pm.workflowsPage.branchOrderValues()).toEqual(['1', '2', '3']);
 
     await pm.workflowsPage.expectElseArmLast();
   });
@@ -83,6 +85,8 @@ test.describe('Workflows branch node', { tag: ['@workflows', '@enterprise', '@al
     expect(await pm.workflowsPage.branchCaseLabels()).toEqual(['SECOND', 'FIRST']);
     // Handles travel WITH their row — reordering must never re-point an existing edge.
     expect(await pm.workflowsPage.branchCaseHandles()).toEqual([second, first]);
+    // The ordinals renumber to match the new evaluation order.
+    expect(await pm.workflowsPage.branchOrderValues()).toEqual(['1', '2']);
   });
 
   // BR-09 — handles are minted off a high-water mark and kept for the node's life. Deleting

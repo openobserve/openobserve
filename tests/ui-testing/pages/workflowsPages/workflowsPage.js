@@ -476,6 +476,16 @@ class WorkflowsPage {
     return this.page.locator(this.branchCaseRows).count();
   }
 
+  /**
+   * The ordinal badge on each case row, in rendered order. These are the user-visible
+   * statement of evaluation order, so they must renumber when rows move or are removed.
+   */
+  async branchOrderValues() {
+    return this.page
+      .locator(this.branchOrderBadges)
+      .evaluateAll((els) => els.map((e) => (e.textContent || '').trim()));
+  }
+
   /** Handles in RENDERED order — which is evaluation order, since first match wins. */
   async branchCaseHandles() {
     return this.page.locator(this.branchCaseRows).evaluateAll((els) =>
