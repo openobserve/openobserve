@@ -2057,7 +2057,8 @@
       "startFrom": {
         "label": "Inizia da",
         "custom": "Personalizzato (ruolo vuoto)",
-        "readonly": "Sola lettura (visualizza l'accesso a tutte le risorse)"
+        "readonly": "Sola lettura (visualizza l'accesso a tutte le risorse)",
+        "dbm": "Visualizzatore del monitoraggio dei database (sola lettura sul modulo Monitoraggio database e sugli stream di metriche interrogati dalla relativa scheda Metriche)"
       },
       "name": {
         "required": "Il nome del ruolo è obbligatorio.",
@@ -2093,7 +2094,9 @@
       "loadFailed": "Impossibile caricare i dettagli del ruolo. Reindirizzamento all'elenco dei ruoli.",
       "noUpdatesDetected": "Nessun aggiornamento rilevato.",
       "updateSuccess": "Ruolo aggiornato con successo!",
-      "updateError": "Errore durante l'aggiornamento del ruolo!"
+      "updateError": "Errore durante l'aggiornamento del ruolo!",
+      "dbmPresetSeeded": "Accesso in lettura preselezionato su {matched} di {total} stream di metriche del monitoraggio dei database, più il modulo Monitoraggio database. Rivedi prima di salvare.",
+      "dbmPresetNoMatch": "Nessuno dei {total} stream di metriche del monitoraggio dei database esiste ancora in questa organizzazione, quindi non è stato preselezionato nulla su di essi; l'autorizzazione al modulo Monitoraggio database è stata comunque preparata."
     },
     "rolesPage": {
       "subtitle": "I ruoli raggruppano le autorizzazioni: assegnali a utenti, account di servizio o gruppi per concedere l'accesso.",
@@ -16298,6 +16301,7 @@
       },
       "databaseCount": "1 database | {count} database",
       "openQueries": "Vedi le sue query",
+      "viewMetrics": "Visualizza metriche",
       "alertMe": "Avvisami",
       "columnHints": {
         "qps": "Chiamate al secondo — le chiamate di questa finestra divise per la sua durata, così una vista di 15 minuti e una di 4 ore restano confrontabili.",
@@ -16558,10 +16562,10 @@
         "missingDescription": "Questa pagina descrive una query e l'indirizzo non ne nomina una. Se hai appena cambiato organizzazione, la query che stavi leggendo appartiene a quella che hai lasciato.",
         "action": "Sfoglia le query di questa organizzazione"
       },
-      "backToQueries": "Torna alle query principali",
-      "backToActivity": "Torna all'attività",
-      "backToSamples": "Torna alle chiamate più lente",
-      "backToDeadlocks": "Torna ai deadlock",
+      "backToQueries": "Query principali",
+      "backToActivity": "attività",
+      "backToSamples": "chiamate più lente",
+      "backToDeadlocks": "deadlock",
       "latencyTitle": "Velocità nel tempo",
       "volumeTitle": "Chiamate ed errori nel tempo",
       "endpointsTitle": "Da dove viene chiamata",
@@ -16726,6 +16730,8 @@
     "page": {
       "tabs": {
         "overview": "Panoramica",
+        "metrics": "Metriche",
+        "metricsHint": "Carico del database per evento di attesa e ogni metrica raccolta dai tuoi receiver del database.",
         "queries": "Query principali",
         "samples": "Chiamate più lente",
         "samplesHintClient": "Chiamate concluse osservate dai tuoi servizi strumentati in questa finestra — i chiamanti senza tracciamento non sono contati, quindi questo è un minimo, non il totale. La tabella mostra le più lente.",
@@ -16742,6 +16748,129 @@
         "deadlocksLocked": "I deadlock sono una funzionalità Enterprise. Esegui l'upgrade per vedere quali query sono entrate in deadlock tra loro e perché. Le altre schede database funzionano su ogni piano.",
         "blockedLocked": "Le query bloccate sono una funzionalità Enterprise. Esegui l'upgrade per vedere quali sessioni sono in attesa di un lock e cosa lo detiene. Le altre schede database funzionano su ogni piano.",
         "tableHealthLocked": "La salute delle tabelle è una funzionalità Enterprise. Esegui l'upgrade per monitorare dimensioni, bloat e stato del vacuum delle tabelle. Le altre schede database funzionano su ogni piano."
+      }
+    },
+    "metrics": {
+      "title": "Metriche",
+      "subtitle": "Carico del database e ogni metrica raccolta dai tuoi receiver del database, rappresentati in grafici su questa finestra",
+      "load": {
+        "title": "Carico del database",
+        "hint": "Sessioni medie attivamente al lavoro per intervallo, impilate per la dimensione scelta. Le connessioni inattive sono escluse; una sessione in attesa di nulla è su CPU. Trascina su un picco per applicare lo zoom di tutti i grafici su di esso.",
+        "timeAxis": "Tempo",
+        "sessionsAxis": "Sessioni attive medie",
+        "waitEventAxis": "Evento di attesa",
+        "viewActivity": "Visualizza in Attività",
+        "breakdowns": {
+          "waitEvent": "Per evento di attesa",
+          "query": "Per query",
+          "database": "Per database",
+          "user": "Per utente"
+        }
+      },
+      "limitLegend": "limite di connessioni",
+      "explore": "Apri in Esplora metriche",
+      "railLabel": "Sezioni delle metriche",
+      "noAccess": "Non hai l'autorizzazione per leggere {stream}. Chiedi a un amministratore l'accesso in lettura a questo stream.",
+      "byDims": {
+        "query": "per query",
+        "database": "per database",
+        "service": "per servizio",
+        "operation": "per operazione",
+        "mode": "per modalità",
+        "lockType": "per tipo di lock",
+        "table": "per tabella",
+        "index": "per indice",
+        "client": "per client",
+        "state": "per stato",
+        "direction": "per direzione",
+        "device": "per dispositivo",
+        "host": "per host"
+      },
+      "catalog": {
+        "activity": {
+          "title": "Attività",
+          "desc": "Throughput, transazioni e ricambio delle righe"
+        },
+        "locks": {
+          "title": "Lock",
+          "desc": "Pressione dei lock e chi li mantiene"
+        },
+        "replication": {
+          "title": "Replica",
+          "desc": "Pressione WAL e ritardo delle repliche"
+        },
+        "indexes": {
+          "title": "Indici",
+          "desc": "Utilizzo e dimensione degli indici per tabella"
+        },
+        "blocks": {
+          "title": "Blocchi",
+          "desc": "I/O sui shared buffer attribuito alle query, dai contatori del database stesso"
+        },
+        "vacuum": {
+          "title": "Vacuum",
+          "desc": "Righe vive e morte per tabella"
+        },
+        "host": {
+          "managedNote": "Questo database viene eseguito su un endpoint gestito dal cloud (come Amazon RDS), quindi il suo provider non espone un host che i tuoi collector possano monitorare. Rimuovi il filtro del database per visualizzare le metriche host per gli host che i tuoi collector segnalano.",
+          "title": "Host",
+          "desc": "CPU, memoria e I/O dell'host del database",
+          "loopbackHint": "istanza contattata tramite localhost — visualizzazione di tutti gli host",
+          "matchHint": "le metriche host vengono associate in base al nome host"
+        }
+      },
+      "catalogPanels": {
+        "calls": "Chiamate query",
+        "avgDuration": "Durata media",
+        "commits": "Commit",
+        "rollbacks": "Rollback",
+        "rowsModified": "Righe modificate",
+        "locks": "Lock",
+        "walLag": "Ritardo WAL",
+        "indexScans": "Scansioni indice",
+        "indexSize": "Dimensione indice",
+        "blksHit": "Blocchi condivisi in cache",
+        "blksRead": "Blocchi condivisi letti",
+        "blksDirtied": "Blocchi condivisi sporcati",
+        "rowsByState": "Righe per stato",
+        "cpuUtilization": "Utilizzo CPU",
+        "memoryUsage": "Memoria",
+        "diskIo": "I/O disco",
+        "networkIo": "I/O rete"
+      },
+      "searchPlaceholder": "Filtra metriche…",
+      "triageOrder": "ordinati per rilevanza di triage",
+      "sections": {
+        "featured": "Metriche chiave di integrità",
+        "postgresql": "Metriche PostgreSQL",
+        "mysql": "Metriche MySQL e MariaDB"
+      },
+      "roleTitle": "{role} · {engine}",
+      "roles": {
+        "cacheHitRatio": "Tasso di hit della cache",
+        "connections": "Connessioni",
+        "connectionLimit": "Limite di connessioni",
+        "replicationLag": "Ritardo di replica",
+        "cacheHit": "Hit cache",
+        "cacheRead": "Letture disco cache",
+        "deadlocks": "Deadlock"
+      },
+      "notCollecting": {
+        "title": "Non arrivano metriche di database",
+        "description": "Il grafico di carico sopra legge i campioni di attività, ma in questa organizzazione non esiste ancora alcuno stream di metriche proveniente da un ricevitore di database. Le ricette del collector nelle schede di configurazione del database li forniscono.",
+        "checklistTitle": "Cosa verificare",
+        "checks": {
+          "receivers": {
+            "no": "Nessun ricevitore di database sta inviando metriche",
+            "noDetail": "Le schede di configurazione PostgreSQL e MySQL in Origini dei dati configurano il ricevitore di metriche del collector insieme ai feed di monitoraggio."
+          },
+          "enabled": {
+            "ok": "Il monitoraggio del database è abilitato",
+            "okDetail": "quindi le metriche verranno visualizzate qui non appena un ricevitore le invierà",
+            "no": "Il monitoraggio del database è disabilitato",
+            "noDetail": "ZO_DB_MONITORING_ENABLED è disattivato per questa distribuzione, quindi le schede del database non stanno raccogliendo."
+          }
+        }
       }
     },
     "samples": {

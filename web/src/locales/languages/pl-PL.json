@@ -2057,7 +2057,8 @@
       "startFrom": {
         "label": "Zacznij od",
         "custom": "Niestandardowa (pusta rola)",
-        "readonly": "Tylko do odczytu (dostęp do wszystkich zasobów)"
+        "readonly": "Tylko do odczytu (dostęp do wszystkich zasobów)",
+        "dbm": "Przeglądający Monitorowanie baz danych (tylko odczyt w module Monitorowanie baz danych oraz w strumieniach metryk odpytywanych przez jego kartę Metryki)"
       },
       "name": {
         "required": "Nazwa roli jest wymagana.",
@@ -2093,7 +2094,9 @@
       "loadFailed": "Nie udało się załadować szczegółów roli. Przekierowanie do listy ról.",
       "noUpdatesDetected": "Nie wykryto aktualizacji.",
       "updateSuccess": "Rola zaktualizowana pomyślnie!",
-      "updateError": "Błąd podczas aktualizacji roli!"
+      "updateError": "Błąd podczas aktualizacji roli!",
+      "dbmPresetSeeded": "Wstępnie wybrany dostęp do odczytu w {matched} z {total} strumieni metryk Monitorowania baz danych oraz do modułu Monitorowanie baz danych. Sprawdź przed zapisaniem.",
+      "dbmPresetNoMatch": "Żaden z {total} strumieni metryk Monitorowania baz danych nie istnieje jeszcze w tej organizacji, więc nic w nich nie zostało wstępnie wybrane; uprawnienie do modułu Monitorowanie baz danych zostało jednak przygotowane."
     },
     "rolesPage": {
       "subtitle": "Role łączą uprawnienia — przypisz je do użytkowników, kont serwisowych lub grup, aby przyznać dostęp.",
@@ -16298,6 +16301,7 @@
       },
       "databaseCount": "1 baza danych | {count} baz danych",
       "openQueries": "Zobacz jej zapytania",
+      "viewMetrics": "Wyświetl metryki",
       "alertMe": "Powiadom mnie",
       "columnHints": {
         "qps": "Wywołania na sekundę — wywołania w tym oknie podzielone przez jego długość, dzięki czemu widok 15-minutowy i 4-godzinny pozostają porównywalne.",
@@ -16558,10 +16562,10 @@
         "missingDescription": "Ta strona opisuje jedno zapytanie, a adres nie wskazuje żadnego. Jeśli właśnie przełączyłeś organizację, czytane zapytanie należy do tej, którą opuściłeś.",
         "action": "Przeglądaj zapytania tej organizacji"
       },
-      "backToQueries": "Wróć do najczęstszych zapytań",
-      "backToActivity": "Wróć do aktywności",
-      "backToSamples": "Wróć do najwolniejszych wywołań",
-      "backToDeadlocks": "Wróć do zakleszczeń",
+      "backToQueries": "najczęstsze zapytania",
+      "backToActivity": "aktywność",
+      "backToSamples": "najwolniejsze wywołania",
+      "backToDeadlocks": "zakleszczenia",
       "latencyTitle": "Szybkość w czasie",
       "volumeTitle": "Wywołania i błędy w czasie",
       "endpointsTitle": "Skąd jest wywoływane",
@@ -16726,6 +16730,8 @@
     "page": {
       "tabs": {
         "overview": "Przegląd",
+        "metrics": "Metryki",
+        "metricsHint": "Obciążenie bazy danych według zdarzeń oczekiwania oraz wszystkie metryki zbierane przez odbiorniki bazy danych.",
         "queries": "Najczęstsze zapytania",
         "samples": "Najwolniejsze wywołania",
         "samplesHintClient": "Zakończone wywołania zaobserwowane przez Twoje instrumentowane usługi w tym oknie — wywołujący bez śledzenia nie są liczeni, więc to minimum, a nie suma. Tabela pokazuje najwolniejsze z nich.",
@@ -16742,6 +16748,129 @@
         "deadlocksLocked": "Zakleszczenia to funkcja Enterprise. Dokonaj upgrade'u, aby zobaczyć, które zapytania zablokowały się wzajemnie i dlaczego. Pozostałe zakładki bazy danych działają w każdym planie.",
         "blockedLocked": "Zablokowane zapytania to funkcja Enterprise. Dokonaj upgrade'u, aby zobaczyć, które sesje oczekują na blokadę i co ją trzyma. Pozostałe zakładki bazy danych działają w każdym planie.",
         "tableHealthLocked": "Zdrowie tabel to funkcja Enterprise. Dokonaj upgrade'u, aby śledzić rozmiar tabeli, stan bloat i vacuum. Pozostałe zakładki bazy danych działają w każdym planie."
+      }
+    },
+    "metrics": {
+      "title": "Metryki",
+      "subtitle": "Obciążenie bazy danych i wszystkie metryki zbierane przez odbiorniki bazy danych, przedstawione na wykresach w tym oknie",
+      "load": {
+        "title": "Obciążenie bazy danych",
+        "hint": "Średnia liczba sesji aktywnie pracujących w danym interwale, grupowana narastająco według wybranego wymiaru. Bezczynne połączenia są wykluczone; sesja, która na nic nie czeka, pracuje na CPU. Przeciągnij po szczycie, aby przybliżyć do niego wszystkie wykresy.",
+        "timeAxis": "Czas",
+        "sessionsAxis": "Śr. aktywnych sesji",
+        "waitEventAxis": "Zdarzenie oczekiwania",
+        "viewActivity": "Pokaż w Aktywności",
+        "breakdowns": {
+          "waitEvent": "Według zdarzenia oczekiwania",
+          "query": "Według zapytania",
+          "database": "Według bazy danych",
+          "user": "Według użytkownika"
+        }
+      },
+      "limitLegend": "limit połączeń",
+      "explore": "Otwórz w Eksploratorze metryk",
+      "railLabel": "Sekcje metryk",
+      "noAccess": "Nie masz uprawnień do odczytu {stream}. Poproś administratora o dostęp do odczytu tego strumienia.",
+      "byDims": {
+        "query": "według zapytania",
+        "database": "według bazy danych",
+        "service": "według usługi",
+        "operation": "według operacji",
+        "mode": "według trybu",
+        "lockType": "według typu blokady",
+        "table": "według tabeli",
+        "index": "według indeksu",
+        "client": "według klienta",
+        "state": "według stanu",
+        "direction": "według kierunku",
+        "device": "według urządzenia",
+        "host": "według hosta"
+      },
+      "catalog": {
+        "activity": {
+          "title": "Aktywność",
+          "desc": "Przepustowość, transakcje i rotacja wierszy"
+        },
+        "locks": {
+          "title": "Blokady",
+          "desc": "Presja blokad i to, co je utrzymuje"
+        },
+        "replication": {
+          "title": "Replikacja",
+          "desc": "Presja WAL i opóźnienie repliki"
+        },
+        "indexes": {
+          "title": "Indeksy",
+          "desc": "Użycie i rozmiar indeksów na tabelę"
+        },
+        "blocks": {
+          "title": "Bloki",
+          "desc": "Operacje I/O na buforze współdzielonym przypisane do zapytań, na podstawie własnych liczników bazy danych"
+        },
+        "vacuum": {
+          "title": "Vacuum",
+          "desc": "Wiersze żywe i martwe na tabelę"
+        },
+        "host": {
+          "managedNote": "Ta baza danych działa na zarządzanym w chmurze punkcie końcowym (takim jak Amazon RDS), więc jej dostawca nie udostępnia hosta do monitorowania przez Twoje kolektory. Wyczyść filtr bazy danych, aby zobaczyć metryki hostów raportowanych przez Twoje kolektory.",
+          "title": "Host",
+          "desc": "CPU, pamięć i I/O hosta bazy danych",
+          "loopbackHint": "instancja połączona przez localhost — pokazywane są wszystkie hosty",
+          "matchHint": "metryki hostów są dopasowywane po nazwie hosta"
+        }
+      },
+      "catalogPanels": {
+        "calls": "Wywołania zapytań",
+        "avgDuration": "Średni czas trwania",
+        "commits": "Zatwierdzenia",
+        "rollbacks": "Wycofania",
+        "rowsModified": "Zmodyfikowane wiersze",
+        "locks": "Blokady",
+        "walLag": "Opóźnienie WAL",
+        "indexScans": "Skanowania indeksu",
+        "indexSize": "Rozmiar indeksu",
+        "blksHit": "Trafienia bloków współdzielonych",
+        "blksRead": "Odczytane bloki współdzielone",
+        "blksDirtied": "Zabrudzone bloki współdzielone",
+        "rowsByState": "Wiersze według stanu",
+        "cpuUtilization": "Wykorzystanie CPU",
+        "memoryUsage": "Pamięć",
+        "diskIo": "I/O dysku",
+        "networkIo": "I/O sieci"
+      },
+      "searchPlaceholder": "Filtruj metryki…",
+      "triageOrder": "posortowane według istotności dla triage",
+      "sections": {
+        "featured": "Kluczowe metryki kondycji",
+        "postgresql": "Metryki PostgreSQL",
+        "mysql": "Metryki MySQL i MariaDB"
+      },
+      "roleTitle": "{role} · {engine}",
+      "roles": {
+        "cacheHitRatio": "Współczynnik trafień cache",
+        "connections": "Połączenia",
+        "connectionLimit": "Limit połączeń",
+        "replicationLag": "Opóźnienie replikacji",
+        "cacheHit": "Trafienia cache",
+        "cacheRead": "Odczyty z dysku cache",
+        "deadlocks": "Zakleszczenia"
+      },
+      "notCollecting": {
+        "title": "Nie napływają żadne metryki baz danych",
+        "description": "Powyższy wykres obciążenia odczytuje próbki aktywności, ale w tej organizacji nie ma jeszcze strumieni metryk pochodzących z odbiornika bazy danych. Dostarczają je przepisy kolektora na kartach konfiguracji bazy danych.",
+        "checklistTitle": "Co sprawdzić",
+        "checks": {
+          "receivers": {
+            "no": "Żaden odbiornik bazy danych nie wysyła metryk",
+            "noDetail": "Karty konfiguracji PostgreSQL i MySQL w sekcji Źródła danych konfigurują odbiornik metryk kolektora wraz z feedami monitorującymi."
+          },
+          "enabled": {
+            "ok": "Monitorowanie baz danych jest włączone",
+            "okDetail": "więc metryki pojawią się tutaj na wykresie, gdy tylko odbiornik je dostarczy",
+            "no": "Monitorowanie baz danych jest wyłączone",
+            "noDetail": "ZO_DB_MONITORING_ENABLED jest wyłączone dla tego wdrożenia, więc zakładki baz danych nie zbierają danych."
+          }
+        }
       }
     },
     "samples": {
