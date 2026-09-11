@@ -13,6 +13,7 @@ name: Playwright E2E Crosscheck
 #   - Touches them (the e2e label gates the whole job, like every paid workflow):
 #       · open sister ENT PR (same-named branch) → DEFER to that PR's checks (link it, don't build here)
 #       · sister ENT branch only (no PR)          → build the enterprise binary against that branch
+#       · PR base is a release line (not main) with a same-named ENT branch → build against THAT branch
 #       · no ENT counterpart                      → build against ENT main
 #     then POLL and mirror pass/fail.
 #
@@ -109,6 +110,7 @@ jobs:
           PR: ${{ github.event.pull_request.number }}
           HEAD_REF: ${{ github.event.pull_request.head.ref }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
           ENT_REF: ${{ vars.ENT_GATE_REF || 'main' }}
         run: |
           set -euo pipefail
@@ -130,7 +132,7 @@ jobs:
 
           # Sister ENT resolution. An OPEN same-named ENT PR is the live counterpart — let ITS checks
           # own enterprise validation; we DEFER (don't build here), just link. Only a branch (no PR) →
-          # build against that branch. Neither → build against main.
+          # build against that branch. Neither → the PR's base-line ENT branch if it exists, else main.
           SISTER_PR=$(gh pr list --repo "$REPO" --head "$HEAD_REF" --state open --json number -q '.[0].number' 2>/dev/null || echo "")
           if [ -n "$SISTER_PR" ] && [ "$SISTER_PR" != "null" ]; then
           sticky "### ⏭️ Playwright E2E Crosscheck — handled by the sister ENT PR
@@ -141,14 +143,22 @@ jobs:
             exit 0
           fi
 
+          # No sister branch/PR → build against the PR's base line, not blindly main. A PR onto a
+          # release branch (e.g. branch-v1.0.0) must build against the ENT branch of the same name;
+          # ENT main would fail to compile the release-line OSS code. Fall back to main only when
+          # the base is main or has no ENT counterpart.
           if gh api "repos/$REPO/branches/$HEAD_REF" >/dev/null 2>&1; then
             ENT_CODE_REF="$HEAD_REF"
             SISTER_NOTE="Built against the matching ENT branch \`$HEAD_REF\` (no ENT PR yet)."
             echo "::notice::ENT branch '$HEAD_REF' exists (no PR) — building against it."
+          elif [ "$BASE_REF" != "main" ] && [ "$BASE_REF" != "master" ] && gh api "repos/$REPO/branches/$BASE_REF" >/dev/null 2>&1; then
+            ENT_CODE_REF="$BASE_REF"
+            SISTER_NOTE="No same-named ENT branch — built against the PR's base line \`$BASE_REF\` on ENT."
+            echo "::notice::No ENT branch '$HEAD_REF'; PR targets '$BASE_REF' which exists on ENT — building against it."
           else
             ENT_CODE_REF=main
             SISTER_NOTE="No ENT counterpart — built against ENT \`main\`."
-            echo "::notice::No ENT counterpart for '$HEAD_REF' — building against main."
+            echo "::notice::No ENT counterpart for '$HEAD_REF' (base '$BASE_REF') — building against main."
           fi
 
           # Stamp the time BEFORE dispatch so correlation can reject stale prior runs for this PR.
