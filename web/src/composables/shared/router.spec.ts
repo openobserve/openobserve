@@ -1662,14 +1662,13 @@ describe("useRoutes (router.ts)", () => {
   });
 
   // =========================================================================
-  // 18b. homeChildRoutes — Infrastructure routes (Hosts / Kubernetes / AWS)
+  // 18b. homeChildRoutes — Infrastructure routes (Hosts / Kubernetes)
   // =========================================================================
   // Always registered, no feature gate — detection changes page state, never route existence (4.7/§6).
   describe("homeChildRoutes — infra workload routes", () => {
     it.each([
       ["infraHosts", "infra/hosts"],
       ["infraKubernetes", "infra/kubernetes"],
-      ["infraAws", "infra/aws"],
     ])("registers %s at path %s", (name, path) => {
       const { homeChildRoutes } = useRoutes();
       const route = findRoute(homeChildRoutes, name as string);
@@ -1677,33 +1676,46 @@ describe("useRoutes (router.ts)", () => {
       expect(route.path).toBe(path);
     });
 
-    it.each(["infraHosts", "infraKubernetes", "infraAws"])(
-      "%s beforeEnter calls routeGuard",
-      async (name) => {
-        const { routeGuard } = await import("@/utils/zincutils");
-        vi.mocked(routeGuard as any).mockClear();
-        const { homeChildRoutes } = useRoutes();
-        const route = findRoute(homeChildRoutes, name);
-        const mockTo = {};
-        const mockFrom = {};
-        const mockNext = vi.fn();
-        route.beforeEnter(mockTo, mockFrom, mockNext);
-        expect(routeGuard).toHaveBeenCalledWith(mockTo, mockFrom, mockNext);
-      },
-    );
+    it.each(["infraHosts", "infraKubernetes"])("%s beforeEnter calls routeGuard", async (name) => {
+      const { routeGuard } = await import("@/utils/zincutils");
+      vi.mocked(routeGuard as any).mockClear();
+      const { homeChildRoutes } = useRoutes();
+      const route = findRoute(homeChildRoutes, name);
+      const mockTo = {};
+      const mockFrom = {};
+      const mockNext = vi.fn();
+      route.beforeEnter(mockTo, mockFrom, mockNext);
+      expect(routeGuard).toHaveBeenCalledWith(mockTo, mockFrom, mockNext);
+    });
 
-    it("passes the workload prop to the kubernetes and aws pages", () => {
+    it("passes the workload prop to the kubernetes page", () => {
       const { homeChildRoutes } = useRoutes();
       expect(findRoute(homeChildRoutes, "infraKubernetes").props).toEqual({
         workload: "kubernetes",
       });
-      expect(findRoute(homeChildRoutes, "infraAws").props).toEqual({ workload: "aws" });
+    });
+
+    // A menu entry whose workload has no registered pack can only render a dead
+    // end, so the route must not come back while `curatedPacks` lacks an AWS pack.
+    it("registers NO aws route, by name or by path", () => {
+      const { homeChildRoutes } = useRoutes();
+      expect(homeChildRoutes.find((r: any) => r.name === "infraAws")).toBeUndefined();
+      expect(homeChildRoutes.find((r: any) => r.path === "infra/aws")).toBeUndefined();
+    });
+
+    it("keeps exactly the infra workload routes that have a curated pack", () => {
+      const { homeChildRoutes } = useRoutes();
+      const infraWorkloads = homeChildRoutes
+        .filter((r: any) => typeof r.path === "string" && /^infra\/(?!databases)/.test(r.path))
+        .map((r: any) => r.path)
+        .sort();
+      expect(infraWorkloads).toEqual(["infra/hosts", "infra/kubernetes"]);
     });
 
     // The curated-page migration (design §8.1) swaps only the `component` on these
     // two rows. Which chunk they load is an implementation detail and deliberately
     // NOT asserted; what must survive is the deep-link contract below.
-    it.each(["infraKubernetes", "infraAws"])(
+    it.each(["infraKubernetes"])(
       "%s keeps its titleKey and a lazily-imported component across the component swap",
       (name) => {
         const { homeChildRoutes } = useRoutes();
@@ -1713,7 +1725,7 @@ describe("useRoutes (router.ts)", () => {
       },
     );
 
-    it.each(["infraKubernetes", "infraAws"])(
+    it.each(["infraKubernetes"])(
       "%s resolves to the curated view, NOT WorkloadStubPage (§8.1 step 2)",
       (name) => {
         // The chunk NAME stays unasserted; which MODULE the loader targets is what

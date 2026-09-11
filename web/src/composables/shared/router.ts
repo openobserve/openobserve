@@ -506,14 +506,6 @@ const useRoutes = () => {
       beforeEnter: routeGuard,
     },
     {
-      path: "infra/aws",
-      name: "infraAws",
-      component: () => import("@/views/Infrastructure/curated/CuratedPageView.vue"),
-      props: { workload: "aws" },
-      meta: { titleKey: "menu.awsInfra" },
-      beforeEnter: routeGuard,
-    },
-    {
       path: "traces/trace-details",
       name: "traceDetails",
       component: TraceDetails,

@@ -207,7 +207,6 @@ describe("CuratedPageView", () => {
       routes: [
         { path: "/", component: { template: "<div />" } },
         { path: "/infra/kubernetes", name: "infraKubernetes", component: { template: "<div />" } },
-        { path: "/infra/aws", name: "infraAws", component: { template: "<div />" } },
         { path: "/ingestion/aws", name: "AWSConfig", component: { template: "<div />" } },
         { path: "/dashboards", name: "dashboards", component: { template: "<div />" } },
       ],
@@ -334,10 +333,10 @@ describe("CuratedPageView", () => {
     });
 
     it("a workload with NO registered pack renders the unavailable face, never another pack's page", async () => {
-      // The AWS pack is deferred. Falling back to `curatedPacks.kubernetes` put
-      // the Kubernetes manifest — its title, its panels, its queries — behind
-      // /infra/aws, which is the most confident kind of wrong a page can be.
-      wrapper = await mountView({ workload: "aws" });
+      // Falling back to `curatedPacks.kubernetes` would put the Kubernetes
+      // manifest — its title, panels and queries — behind an unrelated
+      // workload's route, the most confident kind of wrong a page can be.
+      wrapper = await mountView({ workload: "packless" });
       expect(wrapper.find('[data-test="curated-pack-unavailable"]').exists()).toBe(true);
 
       const text = wrapper.text();
@@ -350,7 +349,7 @@ describe("CuratedPageView", () => {
 
     it("a packless workload fetches NOTHING — it cannot resolve, so it must not ask", async () => {
       refreshSpy.mockClear();
-      wrapper = await mountView({ workload: "aws" });
+      wrapper = await mountView({ workload: "packless" });
       await flushPromises();
       expect(refreshSpy).not.toHaveBeenCalled();
     });
