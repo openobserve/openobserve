@@ -2495,6 +2495,33 @@ pub static EVAL_SCHEDULER_WATERMARK_LAG_SECONDS: Lazy<IntGaugeVec> = Lazy::new(|
     .expect("Metric created")
 });
 
+pub static HEC_AUTH_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "hec_auth_total",
+            "Splunk HEC collector authentication attempts by outcome (success, unknown, disabled, malformed)".to_owned()
+                + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["result", "organization"],
+    )
+    .expect("Metric created")
+});
+
+pub static HEC_REQUESTS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "hec_requests_total",
+            "Splunk HEC collector requests by response status".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["status", "organization"],
+    )
+    .expect("Metric created")
+});
+
 fn register_metrics(registry: &Registry) {
     // http latency
     registry
@@ -2510,6 +2537,14 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(GRPC_RESPONSE_TIME.clone()))
+        .expect("Metric registered");
+
+    // splunk hec collector
+    registry
+        .register(Box::new(HEC_AUTH_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(HEC_REQUESTS_TOTAL.clone()))
         .expect("Metric registered");
 
     // ingester stats
@@ -3342,6 +3377,12 @@ mod tests {
         let _ = HTTP_RESPONSE_TIME.clone();
         let _ = GRPC_INCOMING_REQUESTS.clone();
         let _ = GRPC_RESPONSE_TIME.clone();
+    }
+
+    #[test]
+    fn test_statics_hec() {
+        let _ = HEC_AUTH_TOTAL.clone();
+        let _ = HEC_REQUESTS_TOTAL.clone();
     }
 
     #[test]

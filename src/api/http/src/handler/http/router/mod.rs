@@ -1766,6 +1766,39 @@ pub fn other_service_routes() -> Router {
         .nest("/rum", rum_routes)
 }
 
+/// Splunk-compatible HEC collector routes, served at the server root.
+///
+/// These must NOT be nested under `base_uri`: Splunk forwarders are configured
+/// with a bare host and always POST to `/services/collector`.
+pub fn splunk_collector_routes() -> Router {
+    use logs::hec_collector;
+
+    // `route_layer` and not `layer`: auth must run only on a matched route and
+    // matched method, so a wrong method is 405 and an unknown path is 404
+    // rather than both leaking as 401.
+    let event_handler = || {
+        post(hec_collector::collector_event)
+            .route_layer(middleware::from_fn(hec_collector::splunk_auth_middleware))
+            .fallback(hec_collector::collector_method_not_allowed)
+    };
+
+    Router::new()
+        .route("/services/collector", event_handler())
+        .route("/services/collector/event", event_handler())
+        .route(
+            "/services/collector/health",
+            get(hec_collector::collector_health)
+                .fallback(hec_collector::collector_method_not_allowed),
+        )
+        // Root-level routers inherit nothing from `service_routes`, so the
+        // decompression pair has to be re-applied here.
+        .layer(RequestDecompressionLayer::new())
+        .layer(middleware::from_fn(
+            decompression::preprocess_encoding_middleware,
+        ))
+        .layer(DefaultBodyLimit::max(hec_collector::HEC_MAX_BODY_BYTES))
+}
+
 /// Create the full application router
 pub fn create_app_router(ui_routes: fn(&str) -> Router) -> Router {
     let cfg = get_config();
@@ -1841,6 +1874,11 @@ pub fn create_app_router(ui_routes: fn(&str) -> Router) -> Router {
         outer
     };
 
+    // Registered here, AFTER the base_uri nest, because `basic_routes()` is
+    // merged into `app` and `app` is what gets nested — mounting alongside it
+    // would produce `{base_uri}/services/collector`, which no forwarder calls.
+    outer = outer.merge(splunk_collector_routes());
+
     // Must be the LAST `.layer()` call in this function: `Router::layer` only
     // wraps routes that exist at call time, so this has to come after the
     // "/" redirect, "/web" mount, and base_uri trailing-slash redirect above
@@ -1898,6 +1936,165 @@ mod tests {
             response.status().is_client_error() || response.status().is_server_error(),
             "expected 4xx/5xx, got {}",
             response.status()
+        );
+    }
+
+    #[tokio::test]
+    async fn collector_health_needs_no_auth_and_returns_code_17() {
+        let app = splunk_collector_routes();
+        let req = Request::builder()
+            .uri("/services/collector/health")
+            .body(Body::empty())
+            .unwrap();
+        let response = app.oneshot(req).await.unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let json: Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["code"], 17);
+        assert_eq!(json["text"], "HEC is healthy");
+    }
+
+    #[tokio::test]
+    async fn collector_without_authorization_is_401_code_2() {
+        let app = splunk_collector_routes();
+        let req = Request::builder()
+            .method(Method::POST)
+            .uri("/services/collector")
+            .body(Body::from(r#"{"event":"x"}"#))
+            .unwrap();
+        let response = app.oneshot(req).await.unwrap();
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let json: Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["code"], 2);
+    }
+
+    #[tokio::test]
+    async fn collector_with_non_splunk_scheme_is_401_code_3() {
+        let app = splunk_collector_routes();
+        let req = Request::builder()
+            .method(Method::POST)
+            .uri("/services/collector")
+            .header("Authorization", "Bearer something")
+            .body(Body::from(r#"{"event":"x"}"#))
+            .unwrap();
+        let response = app.oneshot(req).await.unwrap();
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let json: Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["code"], 3);
+    }
+
+    #[tokio::test]
+    async fn collector_with_unknown_guid_is_403_code_4() {
+        let app = splunk_collector_routes();
+        let req = Request::builder()
+            .method(Method::POST)
+            .uri("/services/collector")
+            .header(
+                "Authorization",
+                "Splunk 7b3d9f2c-4a11-4e55-9c8b-2f6a01c34d90",
+            )
+            .body(Body::from(r#"{"event":"x"}"#))
+            .unwrap();
+        let response = app.oneshot(req).await.unwrap();
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let json: Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["code"], 4);
+    }
+
+    #[tokio::test]
+    async fn collector_non_guid_token_is_indistinguishable_from_unknown_guid() {
+        // §12.6: both must be exactly 403/code 4, or the endpoint becomes a
+        // GUID-format oracle.
+        let mut bodies = Vec::new();
+        for token in ["not-a-guid-at-all", "7b3d9f2c-4a11-4e55-9c8b-2f6a01c34d90"] {
+            let app = splunk_collector_routes();
+            let req = Request::builder()
+                .method(Method::POST)
+                .uri("/services/collector")
+                .header("Authorization", format!("Splunk {token}"))
+                .body(Body::from(r#"{"event":"x"}"#))
+                .unwrap();
+            let response = app.oneshot(req).await.unwrap();
+            assert_eq!(response.status(), StatusCode::FORBIDDEN);
+            bodies.push(
+                axum::body::to_bytes(response.into_body(), usize::MAX)
+                    .await
+                    .unwrap(),
+            );
+        }
+        assert_eq!(bodies[0], bodies[1]);
+    }
+
+    #[tokio::test]
+    async fn collector_rejects_other_methods_with_405() {
+        for (method, uri) in [
+            (Method::GET, "/services/collector"),
+            (Method::PUT, "/services/collector/event"),
+            (Method::POST, "/services/collector/health"),
+        ] {
+            let app = splunk_collector_routes();
+            let req = Request::builder()
+                .method(method.clone())
+                .uri(uri)
+                .body(Body::empty())
+                .unwrap();
+            let response = app.oneshot(req).await.unwrap();
+            assert_eq!(
+                response.status(),
+                StatusCode::METHOD_NOT_ALLOWED,
+                "{method} {uri}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn collector_raw_and_ack_are_404() {
+        for uri in ["/services/collector/raw", "/services/collector/ack"] {
+            let app = splunk_collector_routes();
+            let req = Request::builder()
+                .method(Method::POST)
+                .uri(uri)
+                .body(Body::empty())
+                .unwrap();
+            let response = app.oneshot(req).await.unwrap();
+            assert_eq!(response.status(), StatusCode::NOT_FOUND, "{uri}");
+        }
+    }
+
+    #[tokio::test]
+    async fn collector_stays_at_root_when_a_base_uri_nest_is_applied() {
+        // D4/§8.3: the collector is merged AFTER the base_uri nest, so it must
+        // answer at /services/collector and NOT at {base_uri}/services/collector.
+        let nested = Router::new().nest("/o2", Router::new().route("/ping", get(|| async { "" })));
+        let app = nested.merge(splunk_collector_routes());
+
+        let req = Request::builder()
+            .uri("/services/collector/health")
+            .body(Body::empty())
+            .unwrap();
+        assert_eq!(
+            app.clone().oneshot(req).await.unwrap().status(),
+            StatusCode::OK
+        );
+
+        let req = Request::builder()
+            .uri("/o2/services/collector/health")
+            .body(Body::empty())
+            .unwrap();
+        assert_eq!(
+            app.oneshot(req).await.unwrap().status(),
+            StatusCode::NOT_FOUND
         );
     }
 

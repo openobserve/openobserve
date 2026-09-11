@@ -119,13 +119,22 @@ const organizations = {
   },
   create_org_ingestion_token: (
     orgIdentifier: string,
-    data: { name: string; description?: string },
+    data: { name: string; description?: string; splunk_token?: boolean },
   ) => {
     return http().post(`/api/${orgIdentifier}/ingestion-tokens`, data);
   },
   enable_disable_org_ingestion_token: (orgIdentifier: string, name: string, enabled: boolean) => {
     return http().patch(`/api/${orgIdentifier}/ingestion-tokens/${encodeURIComponent(name)}`, {
       enabled,
+    });
+  },
+  set_org_ingestion_splunk_token: (
+    orgIdentifier: string,
+    name: string,
+    action: "generate" | "revoke",
+  ) => {
+    return http().patch(`/api/${orgIdentifier}/ingestion-tokens/${encodeURIComponent(name)}`, {
+      splunk_token: action,
     });
   },
 };

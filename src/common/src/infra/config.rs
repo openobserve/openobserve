@@ -95,6 +95,11 @@ pub static USER_ROLES_CACHE: Lazy<RwAHashMap<String, CachedUserRoles>> =
 /// Presence means the token is valid and enabled. Absence means cache miss (check DB).
 pub static ORG_INGESTION_TOKENS: Lazy<RwHashMap<String, String>> = Lazy::new(DashMap::default);
 
+/// Splunk HEC token cache — key = the GUID, value = (org_id, token row id).
+/// Presence means the GUID is valid and its token row is enabled.
+pub static SPLUNK_HEC_TOKENS: Lazy<RwHashMap<String, (String, String)>> =
+    Lazy::new(DashMap::default);
+
 /// Cache of org_id → OrgStatus for O(1) synchronous checks during request handling.
 pub static ORG_STATUS_CACHE: Lazy<Arc<RwHashMap<String, OrgStatus>>> =
     Lazy::new(|| Arc::new(dashmap::DashMap::default()));
