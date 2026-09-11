@@ -94,7 +94,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
 
       <!-- Without this the anchor was silently "now", so a rotation created
-           at 14:32 handed over at 14:32 forever. -->
+           at 14:32 handed over at 14:32 forever. Timezone rides along as a
+           disabled third field rather than a hint — there is one zone per
+           schedule, set on the team, so it is shown here, not chosen here. -->
       <div class="flex gap-2">
         <ODate
           class="min-w-0 flex-1"
@@ -107,8 +109,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTime
           class="min-w-0 flex-1"
           :model-value="handoverTime"
+          :label="raw('\u00A0')"
           :data-test="`oncall-schedule-handover-${ruleIndex}-time`"
           @update:model-value="setHandoverTime"
+        />
+        <OSelect
+          class="min-w-0 flex-1"
+          :model-value="timezone"
+          disabled
+          :label="t('oncall.timezone')"
+          :options="[{ label: raw(timezone), value: timezone }]"
+          :data-test="`oncall-schedule-handover-${ruleIndex}-timezone`"
         />
       </div>
     </div>
