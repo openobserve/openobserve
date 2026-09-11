@@ -21,7 +21,8 @@
     "run_files": [
       "alerts-regression.spec.js",
       "alerts-stream-switching.spec.js",
-      "alerts-bugs.spec.js"
+      "alerts-bugs.spec.js",
+      "alerts-14306-composite-clone.spec.js"
     ],
     "disabled": []
   },
