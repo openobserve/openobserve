@@ -99,6 +99,16 @@ const stubs = {
     props: ["modelValue"],
     template: `<input :value="modelValue" @input="$emit('update:modelValue', $event.target.value)" />`,
   },
+  ODate: {
+    name: "ODate",
+    props: ["modelValue"],
+    template: `<div :data-test="$attrs['data-test']"><input type="date" :value="modelValue" @input="$emit('update:modelValue', $event.target.value)" /></div>`,
+  },
+  OTime: {
+    name: "OTime",
+    props: ["modelValue"],
+    template: `<div :data-test="$attrs['data-test']"><input type="time" :value="modelValue" @input="$emit('update:modelValue', $event.target.value)" /></div>`,
+  },
   OSelect: {
     name: "OSelect",
     props: ["modelValue", "options", "multiple"],
@@ -206,7 +216,7 @@ describe("OnCallScheduleEditor", () => {
     await flushPromises();
     await openRotation(wrapper);
 
-    const field = wrapper.find('[data-test="oncall-schedule-handover-0"]');
+    const field = wrapper.find('[data-test="oncall-schedule-handover-0-date"] input');
     expect(field.exists()).toBe(true);
 
     const before = wrapper.findAll('[data-test="oncall-schedule-preview-shift"]')[0].text();
@@ -575,10 +585,12 @@ describe("OnCallScheduleEditor — retiring a shift rule", () => {
     });
     await openRotation(wrapper);
 
-    const field = wrapper.findComponent('[data-test="oncall-schedule-retire-at-0"]');
-    expect(field.props("modelValue")).toBe("2026-08-17T10:00");
+    const dateField = wrapper.findComponent('[data-test="oncall-schedule-retire-at-0-date"]');
+    const timeField = wrapper.findComponent('[data-test="oncall-schedule-retire-at-0-time"]');
+    expect(dateField.props("modelValue")).toBe("2026-08-17");
+    expect(timeField.props("modelValue")).toBe("10:00");
 
-    field.vm.$emit("update:modelValue", "2026-08-18T10:00");
+    dateField.vm.$emit("update:modelValue", "2026-08-18");
     await flushPromises();
     await save(wrapper);
 

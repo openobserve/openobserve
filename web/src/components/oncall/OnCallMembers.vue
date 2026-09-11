@@ -168,19 +168,43 @@
           <OUserCell v-if="awayEmail" :value="awayEmail" />
         </span>
         <p class="text-text-muted text-sm">{{ t("oncall.awayHint") }}</p>
-        <OInput
-          v-model="awayFrom"
-          type="datetime-local"
-          :label="t('oncall.awayFrom')"
-          data-test="oncall-members-away-from"
-        />
-        <OInput
-          v-model="awayTo"
-          type="datetime-local"
-          :label="t('oncall.awayTo')"
-          :help-text="t('oncall.awayToHint')"
-          data-test="oncall-members-away-to"
-        />
+        <div class="flex flex-col gap-1">
+          <span class="o-input-label text-sm leading-tight font-semibold">
+            {{ t("oncall.awayFrom") }}
+          </span>
+          <div class="flex gap-2" data-test="oncall-members-away-from">
+            <ODate
+              class="min-w-0 flex-1"
+              v-model="awayFromDate"
+              data-test="oncall-members-away-from-date"
+            />
+            <OTime
+              class="min-w-0 flex-1"
+              v-model="awayFromTime"
+              data-test="oncall-members-away-from-time"
+            />
+          </div>
+        </div>
+        <div class="flex flex-col gap-1">
+          <span class="o-input-label text-sm leading-tight font-semibold">
+            {{ t("oncall.awayTo") }}
+          </span>
+          <div class="flex gap-2" data-test="oncall-members-away-to">
+            <ODate
+              class="min-w-0 flex-1"
+              v-model="awayToDate"
+              data-test="oncall-members-away-to-date"
+            />
+            <OTime
+              class="min-w-0 flex-1"
+              v-model="awayToTime"
+              data-test="oncall-members-away-to-time"
+            />
+          </div>
+          <span class="text-datepicker-label text-xs leading-none">
+            {{ t("oncall.awayToHint") }}
+          </span>
+        </div>
         <OInput
           v-model="awayReason"
           :label="t('oncall.awayReason')"
@@ -197,7 +221,7 @@
             variant="primary"
             size="sm-action"
             :loading="awaySaving"
-            :disabled="!awayFrom || !awayTo"
+            :disabled="!awayFromDate || !awayFromTime || !awayToDate || !awayToTime"
             data-test="oncall-members-away-save"
             @click="saveAbsence"
           >
@@ -215,8 +239,10 @@ import { useStore } from "vuex";
 
 import OButton from "@/lib/core/Button/OButton.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import ODate from "@/lib/forms/Date/ODate.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTime from "@/lib/forms/Time/OTime.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -305,8 +331,10 @@ const absences = ref<Unavailability[]>([]);
 const segments = ref<ResolvedSegment[]>([]);
 const awayOpen = ref(false);
 const awayEmail = ref("");
-const awayFrom = ref("");
-const awayTo = ref("");
+const awayFromDate = ref("");
+const awayFromTime = ref("");
+const awayToDate = ref("");
+const awayToTime = ref("");
 const awayReason = ref("");
 const awaySaving = ref(false);
 
@@ -362,8 +390,10 @@ function awayLabel(absence: Unavailability): I18nText {
 
 function openAway(email: string) {
   awayEmail.value = email;
-  awayFrom.value = "";
-  awayTo.value = "";
+  awayFromDate.value = "";
+  awayFromTime.value = "";
+  awayToDate.value = "";
+  awayToTime.value = "";
   awayReason.value = "";
   awayOpen.value = true;
 }
@@ -375,8 +405,8 @@ async function saveAbsence() {
       org_identifier: orgId.value,
       data: {
         user_email: awayEmail.value,
-        start_at: new Date(awayFrom.value).getTime() * 1000,
-        end_at: new Date(awayTo.value).getTime() * 1000,
+        start_at: new Date(`${awayFromDate.value}T${awayFromTime.value}`).getTime() * 1000,
+        end_at: new Date(`${awayToDate.value}T${awayToTime.value}`).getTime() * 1000,
         ...(awayReason.value.trim() ? { reason: awayReason.value.trim() } : {}),
       },
     });

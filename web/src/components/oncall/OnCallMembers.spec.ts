@@ -92,6 +92,16 @@ const stubs = {
     props: ["modelValue"],
     template: `<input :value="modelValue" @input="$emit('update:modelValue', $event.target.value)" />`,
   },
+  ODate: {
+    name: "ODate",
+    props: ["modelValue"],
+    template: `<div :data-test="$attrs['data-test']"><input type="date" :value="modelValue" @input="$emit('update:modelValue', $event.target.value)" /></div>`,
+  },
+  OTime: {
+    name: "OTime",
+    props: ["modelValue"],
+    template: `<div :data-test="$attrs['data-test']"><input type="time" :value="modelValue" @input="$emit('update:modelValue', $event.target.value)" /></div>`,
+  },
   // `multiple` mode emits an ARRAY, so the stub mirrors that rather than a
   // scalar — a scalar stub would let a broken payload shape pass.
   OSelect: {
@@ -291,8 +301,10 @@ describe("OnCallMembers", () => {
       await flushPromises();
 
       await wrapper.find('[data-test="oncall-members-mark-away-m1"]').trigger("click");
-      await wrapper.find('[data-test="oncall-members-away-from"]').setValue("2026-09-01T09:00");
-      await wrapper.find('[data-test="oncall-members-away-to"]').setValue("2026-09-08T09:00");
+      await wrapper.find('[data-test="oncall-members-away-from-date"] input').setValue("2026-09-01");
+      await wrapper.find('[data-test="oncall-members-away-from-time"] input').setValue("09:00");
+      await wrapper.find('[data-test="oncall-members-away-to-date"] input').setValue("2026-09-08");
+      await wrapper.find('[data-test="oncall-members-away-to-time"] input').setValue("09:00");
       await wrapper.find('[data-test="oncall-members-away-save"]').trigger("click");
       await flushPromises();
 

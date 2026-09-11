@@ -90,7 +90,12 @@ const members = form.useStore((s: any) => (s.values?.members ?? []) as string[])
 const shiftMicros = form.useStore(
   (s: any) => (s.values?.shift_micros ?? MICROS_PER_WEEK) as number,
 );
-const firstHandover = form.useStore((s: any) => (s.values?.first_handover ?? "") as string);
+const firstHandoverDate = form.useStore(
+  (s: any) => (s.values?.first_handover_date ?? "") as string,
+);
+const firstHandoverTime = form.useStore(
+  (s: any) => (s.values?.first_handover_time ?? "") as string,
+);
 const wantSecondary = form.useStore((s: any) => (s.values?.create_secondary ?? true) as boolean);
 
 /// Only worth a second column when there is somebody else to be in it. On a
@@ -101,7 +106,11 @@ const showSecondary = computed(() => wantSecondary.value && members.value.length
 /// The first three shifts the rotation would produce. Three because the point
 /// is to show the order rotating, which two cannot.
 const shifts = computed(() => {
-  const anchor = Date.parse(firstHandover.value);
+  const anchor = Date.parse(
+    firstHandoverDate.value && firstHandoverTime.value
+      ? `${firstHandoverDate.value}T${firstHandoverTime.value}`
+      : "",
+  );
   const shift = shiftMicros.value;
   if (!members.value.length || !Number.isFinite(anchor) || !shift || shift <= 0) return [];
 

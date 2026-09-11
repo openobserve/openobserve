@@ -658,9 +658,9 @@ const isRetired = (rule: ShiftRule) => rule.ends_at !== undefined;
 
 const retiredAt = (rule: ShiftRule) => rule.ends_at ?? nowMicros.value;
 
-/// The picker is a `datetime-local`, which has no timezone of its own — so the
-/// value is rendered in the TEAM's zone and labelled with it, rather than in
-/// whatever zone the reader's laptop is set to.
+/// The date/time pickers carry no timezone of their own — so the value is
+/// rendered in the TEAM's zone and labelled with it, rather than in whatever
+/// zone the reader's laptop is set to.
 function retiredAtLocal(rule: ShiftRule): string {
   return toZonedInputValue(retiredAt(rule), props.timezone);
 }

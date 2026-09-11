@@ -1374,9 +1374,9 @@ export function isOnCallUnavailable(err: unknown): boolean {
   return response.status === 403 && /not supported/i.test(response.data?.message ?? "");
 }
 
-/// ── `datetime-local` in somebody else's timezone ──────────────────────────
+/// ── A date+time picker in somebody else's timezone ─────────────────────────
 ///
-/// A `<input type="datetime-local">` has no zone: it reads and writes bare
+/// The date/time fields carry no zone of their own: they read and write bare
 /// wall time, and the browser's own zone is the only one the platform will
 /// apply. Every on-call instant belongs to the TEAM's zone instead — that is
 /// what "handover at 10:00" means, and the fields say so on their labels.

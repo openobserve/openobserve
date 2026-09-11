@@ -253,20 +253,23 @@
                 <OTooltip side="right" :content="raw(input.description)" />
               </template>
             </OSelect>
-            <OInput
-              v-if="anchorInput"
-              :key="anchorInput.field"
-              type="datetime-local"
-              width="md"
-              :model-value="anchorLocal"
-              :label="raw(anchorInput.label)"
-              :data-test="`oncall-preset-field-${anchorInput.field}`"
-              @update:model-value="setAnchor"
-            >
-              <template #tooltip>
-                <OTooltip side="right" :content="raw(anchorInput.description)" />
-              </template>
-            </OInput>
+            <div v-if="anchorInput" :key="anchorInput.field" class="flex gap-2">
+              <ODate
+                :model-value="anchorDate"
+                :label="raw(anchorInput.label)"
+                :data-test="`oncall-preset-field-${anchorInput.field}-date`"
+                @update:model-value="setAnchorDate"
+              >
+                <template #tooltip>
+                  <OTooltip side="right" :content="raw(anchorInput.description)" />
+                </template>
+              </ODate>
+              <OTime
+                :model-value="anchorTime"
+                :data-test="`oncall-preset-field-${anchorInput.field}-time`"
+                @update:model-value="setAnchorTime"
+              />
+            </div>
           </div>
         </div>
 
@@ -329,10 +332,11 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import ODate from "@/lib/forms/Date/ODate.vue";
 import OInlineEdit from "@/lib/forms/InlineEdit/OInlineEdit.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue, SelectOption } from "@/lib/forms/Select/OSelect.types";
+import OTime from "@/lib/forms/Time/OTime.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import oncallService from "@/services/oncall";
@@ -763,6 +767,18 @@ function setAnchor(value: string | number) {
   const micros = fromZonedInputValue(String(value), zone.value);
   if (micros === null) delete model.value[input.field];
   else model.value[input.field] = micros;
+}
+
+// ODate/OTime split anchorLocal's `YYYY-MM-DDTHH:mm` in two; recombining on
+// either half's change keeps the other half's current value in place.
+const anchorDate = computed(() => anchorLocal.value.slice(0, 10));
+const anchorTime = computed(() => anchorLocal.value.slice(11));
+
+function setAnchorDate(date: string) {
+  setAnchor(`${date}T${anchorTime.value}`);
+}
+function setAnchorTime(time: string) {
+  setAnchor(`${anchorDate.value}T${time}`);
 }
 
 // ── What the picture and the footer say ───────────────────────────────────────

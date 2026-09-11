@@ -27,8 +27,9 @@ export const makeOnCallTeamSchema = (t: (_key: string) => string) =>
     // exists — validates exactly as it did before.
     members: z.array(z.string()).optional(),
     shift_micros: z.number().optional(),
-    /** `datetime-local`, so a browser-local wall time. */
-    first_handover: z.string().optional(),
+    /** Browser-local wall time — combined at submit into `${date}T${time}`. */
+    first_handover_date: z.string().optional(),
+    first_handover_time: z.string().optional(),
     /**
      * Write a second rotation beside the first — same roster, anchor one shift
      * behind, so the two can never resolve to the same person while the roster

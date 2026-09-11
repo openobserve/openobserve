@@ -148,6 +148,18 @@ const stubs = {
     emits: ["update:modelValue"],
     template: `<label>{{ label }}<input :value="modelValue" @input="$emit('update:modelValue', $event.target.value)" /></label>`,
   },
+  ODate: {
+    name: "ODate",
+    props: ["modelValue", "label"],
+    emits: ["update:modelValue"],
+    template: `<label>{{ label }}<input type="date" :value="modelValue" @input="$emit('update:modelValue', $event.target.value)" /></label>`,
+  },
+  OTime: {
+    name: "OTime",
+    props: ["modelValue"],
+    emits: ["update:modelValue"],
+    template: `<input type="time" :value="modelValue" @input="$emit('update:modelValue', $event.target.value)" />`,
+  },
   OInlineEdit: {
     name: "OInlineEdit",
     props: ["modelValue", "error"],

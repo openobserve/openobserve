@@ -95,14 +95,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Without this the anchor was silently "now", so a rotation created
            at 14:32 handed over at 14:32 forever. -->
-      <OInput
-        :model-value="handoverInput(rule)"
-        type="datetime-local"
-        :label="t('oncall.firstHandover')"
-        :help-text="handoverHint"
-        :data-test="`oncall-schedule-handover-${ruleIndex}`"
-        @update:model-value="(v: string | number) => setAnchor(rule, String(v))"
-      />
+      <div class="flex gap-2">
+        <ODate
+          class="min-w-0 flex-1"
+          :model-value="handoverDate"
+          :label="t('oncall.firstHandover')"
+          :help-text="handoverHint"
+          :data-test="`oncall-schedule-handover-${ruleIndex}-date`"
+          @update:model-value="setHandoverDate"
+        />
+        <OTime
+          class="min-w-0 flex-1"
+          :model-value="handoverTime"
+          :data-test="`oncall-schedule-handover-${ruleIndex}-time`"
+          @update:model-value="setHandoverTime"
+        />
+      </div>
     </div>
 
     <!-- Restricting the hours, ranking two rules and retiring one are what a
@@ -214,17 +222,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:model-value="(on: CheckboxModelValue) => setRetired(rule, !!on)"
           />
           <OText variant="meta">{{ t("oncall.rotationRetireHint") }}</OText>
-          <OInput
+          <div
             v-if="isRetired(rule)"
-            type="datetime-local"
-            width="md"
-            class="pt-1"
-            :model-value="retiredAtLocal(rule)"
-            :label="t('oncall.rotationRetiredOn')"
-            :help-text="t('oncall.rotationRetiredOnHint', { zone: raw(timezone) })"
+            class="flex gap-2 pt-1"
             :data-test="`oncall-schedule-retire-at-${ruleIndex}`"
-            @update:model-value="(v: string | number) => setRetiredAt(rule, v)"
-          />
+          >
+            <ODate
+              class="min-w-0 flex-1"
+              :model-value="retiredAtDate"
+              :label="t('oncall.rotationRetiredOn')"
+              :help-text="t('oncall.rotationRetiredOnHint', { zone: raw(timezone) })"
+              :data-test="`oncall-schedule-retire-at-${ruleIndex}-date`"
+              @update:model-value="setRetiredAtDate"
+            />
+            <OTime
+              class="min-w-0 flex-1"
+              :model-value="retiredAtTime"
+              :data-test="`oncall-schedule-retire-at-${ruleIndex}-time`"
+              @update:model-value="setRetiredAtTime"
+            />
+          </div>
         </div>
       </div>
     </OCollapsible>
@@ -249,8 +266,9 @@ import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import type { CheckboxModelValue } from "@/lib/forms/Checkbox/OCheckbox.types";
-import OInput from "@/lib/forms/Input/OInput.vue";
+import ODate from "@/lib/forms/Date/ODate.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTime from "@/lib/forms/Time/OTime.vue";
 import type { SelectOptionInput } from "@/lib/forms/Select/OSelect.types";
 import OText from "@/lib/core/Typography/OText.vue";
 import type { ShiftRule, Unavailability } from "@/ts/interfaces/oncall";
@@ -295,4 +313,26 @@ const { t } = useI18nTyped();
 // aliasing through a computed satisfies vue/no-mutating-props without adding
 // v-model/emit boilerplate for a value that was never meant to round-trip.
 const rule = computed(() => props.rule);
+
+// `handoverInput`/`retiredAtLocal` hand back one `YYYY-MM-DDTHH:mm` string (the
+// team-zone instant, already resolved by the parent). ODate and OTime want it
+// split; recombining on either half's change is what keeps the other half's
+// value in place.
+const handoverDate = computed(() => props.handoverInput(props.rule).slice(0, 10));
+const handoverTime = computed(() => props.handoverInput(props.rule).slice(11));
+const retiredAtDate = computed(() => props.retiredAtLocal(props.rule).slice(0, 10));
+const retiredAtTime = computed(() => props.retiredAtLocal(props.rule).slice(11));
+
+function setHandoverDate(date: string) {
+  props.setAnchor(props.rule, `${date}T${handoverTime.value}`);
+}
+function setHandoverTime(time: string) {
+  props.setAnchor(props.rule, `${handoverDate.value}T${time}`);
+}
+function setRetiredAtDate(date: string) {
+  props.setRetiredAt(props.rule, `${date}T${retiredAtTime.value}`);
+}
+function setRetiredAtTime(time: string) {
+  props.setRetiredAt(props.rule, `${retiredAtDate.value}T${time}`);
+}
 </script>

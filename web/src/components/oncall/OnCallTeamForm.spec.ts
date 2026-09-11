@@ -85,7 +85,8 @@ describe("OnCallTeamForm", () => {
     setValues(wrapper, {
       name: "Payments",
       members: ["ana@o2.ai", "bob@o2.ai"],
-      first_handover: "2026-08-17T10:00",
+      first_handover_date: "2026-08-17",
+      first_handover_time: "10:00",
     });
     await submit(wrapper);
     await flushPromises();
@@ -155,7 +156,8 @@ describe("OnCallTeamForm", () => {
     setValues(wrapper, {
       name: "Payments",
       members: ["ana@o2.ai", "bob@o2.ai"],
-      first_handover: "2026-08-17T10:00",
+      first_handover_date: "2026-08-17",
+      first_handover_time: "10:00",
     });
     await submit(wrapper);
     await flushPromises();
@@ -193,7 +195,8 @@ describe("OnCallTeamForm", () => {
     setValues(wrapper, {
       name: "Payments",
       members: ["ana@o2.ai", "bob@o2.ai"],
-      first_handover: "2026-08-17T10:00",
+      first_handover_date: "2026-08-17",
+      first_handover_time: "10:00",
       create_secondary: false,
     });
     await submit(wrapper);
@@ -235,7 +238,8 @@ describe("OnCallTeamForm", () => {
     setValues(wrapper, {
       name: "Payments",
       members: ["ana@o2.ai"],
-      first_handover: "2026-08-17T10:00",
+      first_handover_date: "2026-08-17",
+      first_handover_time: "10:00",
     });
     await submit(wrapper);
     await flushPromises();
@@ -263,7 +267,8 @@ describe("OnCallTeamForm", () => {
     setValues(wrapper, {
       name: "Payments",
       members: ["ana@o2.ai", "bob@o2.ai"],
-      first_handover: "2026-08-17T10:00",
+      first_handover_date: "2026-08-17",
+      first_handover_time: "10:00",
     });
     await submit(wrapper);
     await flushPromises();
@@ -288,7 +293,8 @@ describe("OnCallTeamForm", () => {
     setValues(wrapper, {
       name: "Payments",
       members: ["ana@o2.ai"],
-      first_handover: "2026-08-17T10:00",
+      first_handover_date: "2026-08-17",
+      first_handover_time: "10:00",
       create_secondary: false,
     });
     await submit(wrapper);
@@ -324,7 +330,8 @@ describe("OnCallTeamForm", () => {
     setValues(wrapper, {
       name: "Payments",
       members: ["ana@o2.ai"],
-      first_handover: "2026-08-17T10:00",
+      first_handover_date: "2026-08-17",
+      first_handover_time: "10:00",
     });
     await submit(wrapper);
     await flushPromises();

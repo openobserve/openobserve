@@ -109,12 +109,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Without an explicit first handover the anchor is "now", so a team
              created at 14:32 hands over at 14:32 for ever. -->
-        <OFormInput
-          name="first_handover"
-          type="datetime-local"
-          :label="t('oncall.firstHandover')"
-          data-test="oncall-team-form-handover"
-        />
+        <div class="flex gap-2" data-test="oncall-team-form-handover">
+          <OFormDate
+            class="min-w-0 flex-1"
+            name="first_handover_date"
+            :label="t('oncall.firstHandover')"
+            data-test="oncall-team-form-handover-date"
+          />
+          <OFormTime
+            class="min-w-0 flex-1"
+            name="first_handover_time"
+            data-test="oncall-team-form-handover-time"
+          />
+        </div>
 
         <!-- The default that replaced the derived secondary. Ticked, because
              a team with one position and no backup is the state almost nobody
@@ -140,9 +147,11 @@ import { useRouter } from "vue-router";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormCheckbox from "@/lib/forms/Checkbox/OFormCheckbox.vue";
+import OFormDate from "@/lib/forms/Date/OFormDate.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
-import OFormCheckbox from "@/lib/forms/Checkbox/OFormCheckbox.vue";
+import OFormTime from "@/lib/forms/Time/OFormTime.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useOnCallPermissions } from "@/composables/useOnCallPermissions";
 import oncallService from "@/services/oncall";
@@ -212,7 +221,7 @@ const previewZone = computed(() => defaultValues.value.timezone);
 
 /// Weekly, next Monday at 10:00, per the shipped defaults in architecture/02
 /// §4 — a new team is pageable without the user deciding anything.
-function nextMondayAt10(): string {
+function nextMondayAt10(): { date: string; time: string } {
   const d = new Date();
   d.setSeconds(0, 0);
   d.setHours(10, 0, 0, 0);
@@ -220,20 +229,27 @@ function nextMondayAt10(): string {
   const daysAhead = (8 - d.getDay()) % 7 || 7;
   d.setDate(d.getDate() + daysAhead);
   const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return {
+    date: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
+    time: `${pad(d.getHours())}:${pad(d.getMinutes())}`,
+  };
 }
 
-const defaultValues = computed<OnCallTeamFormValues>(() => ({
-  name: props.team?.name ?? "",
-  timezone: props.team?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC",
-  description: props.team?.description ?? "",
-  members: [],
-  shift_micros: MICROS_PER_WEEK,
-  first_handover: nextMondayAt10(),
-  // Ticked. A team with one position and no backup is the state almost nobody
-  // wants and nobody notices until a page goes unanswered.
-  create_secondary: true,
-}));
+const defaultValues = computed<OnCallTeamFormValues>(() => {
+  const handover = nextMondayAt10();
+  return {
+    name: props.team?.name ?? "",
+    timezone: props.team?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC",
+    description: props.team?.description ?? "",
+    members: [],
+    shift_micros: MICROS_PER_WEEK,
+    first_handover_date: handover.date,
+    first_handover_time: handover.time,
+    // Ticked. A team with one position and no backup is the state almost
+    // nobody wants and nobody notices until a page goes unanswered.
+    create_secondary: true,
+  };
+});
 
 function addEveryone() {
   formRef.value?.form?.setFieldValue(
@@ -341,7 +357,11 @@ async function staffNewTeam(teamId: string, values: OnCallTeamFormValues) {
     return;
   }
 
-  const anchor = Date.parse(values.first_handover ?? "");
+  const anchor = Date.parse(
+    values.first_handover_date && values.first_handover_time
+      ? `${values.first_handover_date}T${values.first_handover_time}`
+      : "",
+  );
   const shift = values.shift_micros ?? MICROS_PER_WEEK;
   if (!Number.isFinite(anchor) || shift <= 0) return;
 
