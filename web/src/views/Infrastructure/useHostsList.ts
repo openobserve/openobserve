@@ -14,8 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 // Hosts-list data plane (design 4.8): 6 PromQL instant queries + 1 SQL
-// last-seen, joined client-side on host_name. All reads anchor to the time
-// picker — no fixed lookback window anywhere.
+// last-seen, joined client-side on host_name. The picker's END anchors the
+// utilization samples; its full range only bounds last-seen and membership.
 
 import { computed, onScopeDispose, ref, watch } from "vue";
 import { useStore } from "vuex";
@@ -101,12 +101,14 @@ export function useHostsList() {
 
   const refresh = async ({ orgId, start, end }: HostsRefreshArgs) => {
     const gen = ++generation;
+    // Utilization is the latest sample at the window's END, not an aggregate:
+    // /api/v1/query takes no range, and this engine cannot evaluate the
+    // subquery that wrapping `irate`/ratio expressions in max_over_time needs.
     const instant = (query: string) =>
       searchService.metrics_query({
         org_identifier: orgId,
         // metrics_query interpolates the query RAW into the URL — encode here.
         query: encodeURIComponent(query),
-        start_time: start,
         end_time: end,
       });
     const results = await Promise.allSettled([
