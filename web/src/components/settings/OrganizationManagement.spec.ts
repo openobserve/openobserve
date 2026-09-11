@@ -1090,7 +1090,7 @@ describe("OrganizationManagement.vue", () => {
 
     it("should render the status badge for an active org", async () => {
       await mountWithRow(orgRow({ status: "active" }));
-      expect(wrapper.find('[data-test="otable-status-0"]').text()).toBe("active");
+      expect(wrapper.find('[data-test="otable-status-0"]').text()).toBe("Active");
       expect(wrapper.find('[data-test="org-management-resurrect-btn"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="org-management-cleanup-tasks-btn"]').exists()).toBe(false);
     });
@@ -1124,7 +1124,7 @@ describe("OrganizationManagement.vue", () => {
       await mountWithRow(orgRow({ status: "deleting" }));
       expect(wrapper.find('[data-test="org-management-cleanup-tasks-btn"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="org-management-resurrect-btn"]').exists()).toBe(false);
-      expect(wrapper.find('[data-test="otable-status-0"]').text()).toBe("deleting");
+      expect(wrapper.find('[data-test="otable-status-0"]').text()).toBe("Deleting");
     });
 
     it("should open the cleanup dialog targeting the clicked org", async () => {
@@ -1140,11 +1140,14 @@ describe("OrganizationManagement.vue", () => {
       mockResurrect.mockResolvedValue({});
       await mountWithRow(orgRow({ status: "pending_deletion" }));
       mockGetAdminOrg.mockClear();
+      // meta org is read at call time and must differ from the selected org so
+      // the assertion proves resurrect targets zoConfig.meta_org, not the selection.
+      store.state.zoConfig.meta_org = "meta-distinct";
 
       await wrapper.find('[data-test="org-management-resurrect-btn"]').trigger("click");
       await flushPromises();
 
-      expect(mockResurrect).toHaveBeenCalledWith("default", "test-org");
+      expect(mockResurrect).toHaveBeenCalledWith("meta-distinct", "test-org");
       expect(mockToastFn).toHaveBeenCalledWith(
         expect.objectContaining({ variant: "success", message: "Organization resurrected." }),
       );
