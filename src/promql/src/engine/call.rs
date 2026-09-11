@@ -302,14 +302,7 @@ mod tests {
             _matchers: promql_parser::label::Matchers,
             _label_selector: hashbrown::HashSet<String>,
             _filters: &mut [(String, Vec<String>)],
-        ) -> Result<
-            Vec<(
-                datafusion::prelude::SessionContext,
-                Arc<datafusion::arrow::datatypes::Schema>,
-                config::meta::search::ScanStats,
-                bool,
-            )>,
-        > {
+        ) -> Result<Vec<crate::SelectorContext>> {
             self.0.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
             Ok(vec![])
         }

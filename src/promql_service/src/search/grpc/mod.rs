@@ -27,11 +27,11 @@ use config::{
     },
     utils::time::{now_micros, second_micros},
 };
-use datafusion::{arrow::datatypes::Schema, error::DataFusionError, prelude::SessionContext};
+use datafusion::error::DataFusionError;
 use hashbrown::HashSet;
 use infra::errors::Result;
 use promql::{
-    DEFAULT_LOOKBACK, TableProvider,
+    DEFAULT_LOOKBACK, SelectorContext, TableProvider,
     ast::{
         name_visitor,
         selector_window::{SelectorWindow, selector_window},
@@ -46,8 +46,6 @@ use tokio::sync::mpsc;
 
 mod storage;
 mod wal;
-
-type Context = (SessionContext, Arc<Schema>, ScanStats, bool);
 
 /// What a range query's groups are planned from.
 struct GroupPlan {
@@ -72,7 +70,7 @@ impl TableProvider for StorageProvider {
         matchers: Matchers,
         label_selector: HashSet<String>,
         filters: &mut [(String, Vec<String>)],
-    ) -> datafusion::error::Result<Vec<Context>> {
+    ) -> datafusion::error::Result<Vec<SelectorContext>> {
         let mut ctxs = Vec::new();
         // register storage table
         let trace_id = self.trace_id.to_owned() + "-storage-" + stream_name;

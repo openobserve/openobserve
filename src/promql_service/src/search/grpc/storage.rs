@@ -31,6 +31,7 @@ use infra::{
 };
 use itertools::Itertools;
 use metrics_index::MetricsFileLayout;
+use promql::SelectorContext;
 use promql_parser::label::Matchers;
 use search::{
     datafusion::{exec::register_metrics_table, sort_order::FileSortOrder},
@@ -38,8 +39,6 @@ use search::{
 };
 use search_service::match_source;
 use tracing::Instrument;
-
-use crate::search::grpc::Context;
 
 #[tracing::instrument(name = "promql:search:grpc:storage:create_context", skip(trace_id))]
 pub(crate) async fn create_context(
@@ -49,7 +48,7 @@ pub(crate) async fn create_context(
     time_range: (i64, i64),
     matchers: Matchers,
     filters: &mut [(String, Vec<String>)],
-) -> Result<Option<Context>> {
+) -> Result<Option<SelectorContext>> {
     let enter_span = tracing::span::Span::current();
 
     // check if we are allowed to search
@@ -246,7 +245,13 @@ pub(crate) async fn create_context(
         register_metrics_table(&session, schema.clone(), stream_name, files, sort_order).await?;
 
     // keep_filters=false only when the pruner proved its selections exact
-    Ok(Some((ctx, schema, scan_stats, keep_filters)))
+    Ok(Some(SelectorContext {
+        ctx,
+        schema,
+        scan_stats,
+        keep_filters,
+        sorted_wal: None,
+    }))
 }
 
 /// Prefetch the `.midx` sidecars like the Tantivy path prefetches `.ttv` files:

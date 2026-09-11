@@ -18,19 +18,22 @@ use std::sync::Arc;
 use arrow::record_batch::RecordBatch;
 use config::{
     TIMESTAMP_COL_NAME, get_config,
-    meta::{cluster::IntoArcVec, search::ScanStats, stream::StreamType},
+    meta::{cluster::IntoArcVec, promql::HASH_LABEL, search::ScanStats, stream::StreamType},
 };
 use datafusion::{
-    arrow::datatypes::Schema,
+    arrow::datatypes::{DataType, Schema},
     common::TableReference,
     datasource::MemTable,
     error::{DataFusionError, Result},
-    physical_plan::visit_execution_plan,
+    physical_plan::{sorts::sort_preserving_merge::SortPreservingMergeExec, visit_execution_plan},
     prelude::{SessionContext, col, lit},
 };
 use hashbrown::HashSet;
 use infra::cluster::get_cached_online_ingester_nodes;
-use promql::utils::{apply_label_selector, apply_matchers};
+use promql::{
+    SelectorContext, SortedWalRows,
+    utils::{apply_label_selector, apply_matchers},
+};
 use promql_parser::label::Matchers;
 use proto::cluster_rpc::{self, IndexInfo, QueryIdentifier};
 use search::{
@@ -40,13 +43,12 @@ use search::{
             remote_scan_exec::RemoteScanExec,
         },
         exec::DataFusionContextBuilder,
+        sort_order::FileSortOrder,
         table_provider::empty_table::NewEmptyTable,
     },
     utils::ScanStatsVisitor,
 };
 use tracing_opentelemetry::OpenTelemetrySpanExt;
-
-use crate::search::grpc::Context;
 
 #[tracing::instrument(name = "promql:search:grpc:wal:create_context", skip(trace_id))]
 pub(crate) async fn create_context(
@@ -56,7 +58,7 @@ pub(crate) async fn create_context(
     time_range: (i64, i64),
     matchers: Matchers,
     label_selector: HashSet<String>,
-) -> Result<Vec<Context>> {
+) -> Result<Vec<SelectorContext>> {
     let mut resp = vec![];
     // fetch all schema versions, get latest schema
     let schema = Arc::new(
@@ -73,6 +75,7 @@ pub(crate) async fn create_context(
     }
 
     // get wal record batches
+    let sort_order = wal_sort_order(&schema);
     let (stats, batches, schema) = get_wal_batches(
         trace_id,
         org_id,
@@ -81,17 +84,23 @@ pub(crate) async fn create_context(
         time_range,
         matchers,
         label_selector,
+        sort_order,
     )
     .await?;
 
     if batches.is_empty() {
-        return Ok(vec![(
-            SessionContext::new(),
-            Arc::new(Schema::empty()),
-            ScanStats::default(),
-            true,
-        )]);
+        return Ok(vec![SelectorContext {
+            ctx: SessionContext::new(),
+            schema: Arc::new(Schema::empty()),
+            scan_stats: ScanStats::default(),
+            keep_filters: true,
+            sorted_wal: None,
+        }]);
     }
+    // the same batches, sliced per partition by the streaming merge
+    let sorted_wal = sort_order
+        .is_sorted()
+        .then(|| Arc::new(SortedWalRows::new(batches.clone())));
 
     log::info!(
         "[trace_id {trace_id}] promql->wal->search: load wal files: batches {}, scan_size {}",
@@ -107,9 +116,28 @@ pub(crate) async fn create_context(
     let mem_table = Arc::new(MemTable::try_new(schema.clone(), vec![batches])?);
     log::info!("[trace_id {trace_id}] promql->wal->search: register mem table done");
     ctx.register_table(stream_name, mem_table)?;
-    resp.push((ctx, schema, stats, true));
+    resp.push(SelectorContext {
+        ctx,
+        schema,
+        scan_stats: stats,
+        keep_filters: true,
+        sorted_wal,
+    });
 
     Ok(resp)
+}
+
+/// The order the WAL scan asks the ingesters for: `(__hash__, _timestamp)` when the streaming
+/// merge can slice it, so the querier only merges the node streams.
+fn wal_sort_order(schema: &Schema) -> FileSortOrder {
+    let hash_is_u64 = schema
+        .field_with_name(HASH_LABEL)
+        .is_ok_and(|field| field.data_type() == &DataType::UInt64);
+    if get_config().search.feature_metrics_streaming_agg_enabled && hash_is_u64 {
+        FileSortOrder::HashTimestampAsc
+    } else {
+        FileSortOrder::None
+    }
 }
 
 /// Register a placeholder metrics table for a distributed WAL search.
@@ -144,6 +172,7 @@ async fn get_wal_batches(
     time_range: (i64, i64),
     matchers: Matchers,
     label_selector: HashSet<String>,
+    sort_order: FileSortOrder,
 ) -> Result<(ScanStats, Vec<RecordBatch>, Arc<Schema>)> {
     let cfg = get_config();
     let nodes = get_cached_online_ingester_nodes().await;
@@ -178,6 +207,10 @@ async fn get_wal_batches(
         Some(dataframe) => df = dataframe,
         None => return Ok((ScanStats::new(), vec![], Arc::new(Schema::empty()))),
     }
+    // each ingester sorts its own rows in parallel; the querier only merges
+    if sort_order.is_sorted() {
+        df = df.sort(sort_order.logical_sort_exprs())?;
+    }
 
     let plan = df.logical_plan();
     let mut physical_plan = ctx.state().create_physical_plan(plan).await?;
@@ -210,6 +243,15 @@ async fn get_wal_batches(
     };
 
     physical_plan = Arc::new(RemoteScanExec::new(physical_plan, remote_scan_node)?);
+    // the node streams are each sorted; the merge keeps the collected batches in one order
+    if sort_order.is_sorted() {
+        let ordering = sort_order
+            .physical_ordering(physical_plan.schema().as_ref())
+            .ok_or_else(|| {
+                DataFusionError::Internal("the WAL scan dropped its sort columns".to_string())
+            })?;
+        physical_plan = Arc::new(SortPreservingMergeExec::new(ordering, physical_plan));
+    }
 
     // run datafusion
     let ret = datafusion::physical_plan::collect(physical_plan.clone(), ctx.task_ctx()).await;
