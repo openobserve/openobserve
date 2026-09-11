@@ -224,6 +224,7 @@ import useCorrelatedTracesStream from "@/composables/rum/useCorrelatedTracesStre
 import { traceQueryWindow } from "@/utils/rum/traceWindow";
 import type { TraceTimeRange } from "@/ts/interfaces/traces/traceTimeRange.types";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
+import { sqlEquals, sqlIn } from "@/utils/query/sqlFilterBuilder";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -407,11 +408,8 @@ async function fetchTraceMetadata(
   const searchEndTime = window?.endTime ?? (props.endTime || nowMs) * 1000;
 
   // Build filter for multiple trace IDs
-  const safeTraceIds = traceIds.map((id) => id.replace(/'/g, "''"));
   const filter =
-    safeTraceIds.length === 1
-      ? `trace_id='${safeTraceIds[0]}'`
-      : `trace_id IN (${safeTraceIds.map((id) => `'${id}'`).join(",")})`;
+    traceIds.length === 1 ? sqlEquals("trace_id", traceIds[0]) : sqlIn("trace_id", traceIds);
 
   const metadata = await new Promise<Record<string, any>>((resolve, reject) => {
     const traceId = generateTraceContext().traceId;
@@ -545,7 +543,7 @@ async function fetchTraces() {
       aggOrNull("max", "type", "_type"),
       aggOrNull("min", "date", "_date"),
     ];
-    const whereParts = [`session_id='${props.sessionId}'`, traceIdSet];
+    const whereParts = [sqlEquals("session_id", props.sessionId), traceIdSet];
     const having = has("resource_url")
       ? " HAVING MAX(CASE WHEN resource_url LIKE '%/socket.io/%' AND resource_url LIKE '%transport=polling%' THEN 1 ELSE 0 END) = 0"
       : "";

@@ -91,6 +91,7 @@ vi.mock("@/utils/zincutils", async (importOriginal) => {
 import SessionViewer from "./SessionViewer.vue";
 import store from "@/test/unit/helpers/store";
 import ShareButton from "@/components/common/ShareButton.vue";
+import searchService from "@/services/search";
 
 // ---------------------------------------------------------------------------
 // Mount factory — centralises stub config; update in one place when the
@@ -631,5 +632,37 @@ describe("SessionViewer.vue", () => {
       expect(Array.isArray(result)).toBe(true);
       w.unmount();
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Regression: session_id comes straight from the URL route param, so a
+// crafted link with an embedded single quote must not corrupt the generated
+// SQL. Covers the three fetches issued automatically on mount.
+// ---------------------------------------------------------------------------
+describe("SessionViewer.vue — session id with an embedded single quote", () => {
+  it("escapes the id in every query built from the route param", async () => {
+    vi.clearAllMocks();
+    const router = createTestRouter();
+    await router.push({
+      path: "/rum/sessions/session'x",
+      query: {
+        start_time: "1692884313968000",
+        end_time: "1692884769270000",
+      },
+    });
+    const wrapper = mountSessionViewer(router);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const sqlCalls = vi
+      .mocked(searchService.search)
+      .mock.calls.map((call) => (call[0] as any).query.query.sql as string);
+
+    expect(sqlCalls.length).toBeGreaterThan(0);
+    for (const sql of sqlCalls) {
+      expect(sql).toContain("session_id='session''x'");
+    }
+
+    wrapper.unmount();
   });
 });
