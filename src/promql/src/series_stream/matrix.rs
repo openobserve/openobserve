@@ -78,7 +78,7 @@ pub(crate) fn matrix_streams(
         .collect();
     groups.sort_unstable_by_key(|(sig, _)| *sig);
 
-    let total: usize = groups.iter().map(|(_, indices)| indices.len()).sum();
+    let total = matrix.len();
     // small folds stay sequential, keeping them bit-identical to the generic path
     let partitions = if total < 2 * MATRIX_PARTITION_CHUNK {
         1

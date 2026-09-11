@@ -89,31 +89,19 @@ pub fn count_values(
     // Step 1: Compute label hash for each series once based on param
     // This avoids recomputing the hash for every timestamp
     let start1 = std::time::Instant::now();
-    let series_label_hashes: Vec<u64> = matrix
-        .iter()
-        .map(|rv| projected_labels_signature(modifier, &rv.labels))
-        .collect();
-
-    log::info!(
-        "[trace_id: {}] [PromQL Timing] eval_aggregate({func_name}) computed label hashes in {:?}",
-        eval_ctx.trace_id,
-        start1.elapsed()
-    );
-
-    let start2 = std::time::Instant::now();
-
     // Step 2: Group series indices by their label hash
     // Build index: label_hash -> Vec<series_idx>
     let mut groups: HashMap<u64, Vec<usize>> = HashMap::new();
-    for (series_idx, hash) in series_label_hashes.iter().enumerate() {
-        groups.entry(*hash).or_default().push(series_idx);
+    for (series_idx, series) in matrix.iter().enumerate() {
+        let hash = projected_labels_signature(modifier, &series.labels);
+        groups.entry(hash).or_default().push(series_idx);
     }
 
     log::info!(
-        "[trace_id: {}] [PromQL Timing] eval_aggregate({func_name}) built {} groups in {:?}",
+        "[trace_id: {}] [PromQL Timing] eval_aggregate({func_name}) computed label hashes and built {} groups in {:?}",
         eval_ctx.trace_id,
         groups.len(),
-        start2.elapsed()
+        start1.elapsed()
     );
 
     let start3 = std::time::Instant::now();

@@ -31,7 +31,7 @@ pub fn quantile(qtile: f64, data: Value, eval_ctx: &EvalContext) -> Result<Value
     );
 
     // Handle invalid quantile parameter by returning special values
-    if !(0.0..=1.0).contains(&qtile) || qtile.is_nan() {
+    if !(0.0..=1.0).contains(&qtile) {
         let value = quantile_in_place(&mut [], qtile).unwrap();
         return crate::functions::vector(Value::Float(value), eval_ctx);
     }

@@ -18,8 +18,7 @@ use datafusion::error::{DataFusionError, Result};
 
 pub(crate) fn scalar(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
     match data {
-        Value::Float(f) => Ok(Value::Float(f)),
-        Value::Matrix(v) => Ok(Value::Matrix(v)),
+        Value::Float(_) | Value::Matrix(_) => Ok(data),
         Value::None => {
             // Generate samples using timestamps from eval_ctx
             super::vector(Value::Float(f64::NAN), eval_ctx)

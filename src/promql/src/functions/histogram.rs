@@ -88,9 +88,13 @@ pub(crate) fn histogram_quantile(phi: f64, data: Value, eval_ctx: &EvalContext) 
         // can then consume them directly for every timestamp.
         bucket_series.sort_by(|a, b| sort_float(&a.0, &b.0));
         // Get the labels (without bucket label) from the first series
-        let mut base_labels = bucket_series[0].1.labels.clone();
-        base_labels
-            .retain(|l| l.name != HASH_LABEL && l.name != NAME_LABEL && l.name != BUCKET_LABEL);
+        let base_labels = bucket_series[0]
+            .1
+            .labels
+            .iter()
+            .filter(|l| l.name != HASH_LABEL && l.name != NAME_LABEL && l.name != BUCKET_LABEL)
+            .cloned()
+            .collect();
 
         let mut samples = Vec::with_capacity(timestamps.len());
         let mut cursors = vec![0usize; bucket_series.len()];

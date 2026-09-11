@@ -162,30 +162,10 @@ pub trait Accumulate: Send + Sync {
     fn evaluate(self: Box<Self>) -> Vec<Sample>;
 }
 
-pub fn labels_to_include(
-    include_labels: &[String],
-    mut actual_labels: Vec<Arc<Label>>,
-) -> Vec<Arc<Label>> {
-    actual_labels.retain(|label| include_labels.contains(&label.name));
-    actual_labels
-}
-
-pub fn labels_to_exclude(
-    exclude_labels: &[String],
-    mut actual_labels: Vec<Arc<Label>>,
-) -> Vec<Arc<Label>> {
-    actual_labels.retain(|label| !exclude_labels.contains(&label.name) && label.name != NAME_LABEL);
-    actual_labels
-}
-
 /// Projects a series' labels onto the grouping set of the label modifier
 /// (`by(...)` keeps them, `without(...)` drops them, none drops all).
 pub(crate) fn projected_labels(modifier: &Option<LabelModifier>, labels: &Labels) -> Labels {
-    match modifier {
-        Some(LabelModifier::Include(include)) => labels_to_include(&include.labels, labels.clone()),
-        Some(LabelModifier::Exclude(exclude)) => labels_to_exclude(&exclude.labels, labels.clone()),
-        None => Labels::default(),
-    }
+    projected_label_refs(modifier, labels).cloned().collect()
 }
 
 /// Compute the signature of the projected labels without cloning the label
@@ -193,20 +173,29 @@ pub(crate) fn projected_labels(modifier: &Option<LabelModifier>, labels: &Labels
 /// [`projected_labels`], so the grouping key is unchanged.
 fn projected_labels_signature(modifier: &Option<LabelModifier>, labels: &Labels) -> u64 {
     let mut hasher = gxhash::new_hasher();
-    for label in labels {
-        let keep = match modifier {
-            Some(LabelModifier::Include(include)) => include.labels.contains(&label.name),
-            Some(LabelModifier::Exclude(exclude)) => {
-                !exclude.labels.contains(&label.name) && label.name != NAME_LABEL
-            }
-            None => false,
-        };
-        if keep {
-            hasher.write(label.name.as_bytes());
-            hasher.write(label.value.as_bytes());
-        }
+    for label in projected_label_refs(modifier, labels) {
+        hasher.write(label.name.as_bytes());
+        hasher.write(label.value.as_bytes());
     }
     hasher.finish()
+}
+
+fn projected_label_refs<'a>(
+    modifier: &'a Option<LabelModifier>,
+    labels: &'a Labels,
+) -> impl Iterator<Item = &'a Arc<Label>> {
+    let labels = if modifier.is_none() {
+        &labels[..0]
+    } else {
+        labels.as_slice()
+    };
+    labels.iter().filter(move |label| match modifier {
+        Some(LabelModifier::Include(include)) => include.labels.contains(&label.name),
+        Some(LabelModifier::Exclude(exclude)) => {
+            !exclude.labels.contains(&label.name) && label.name != NAME_LABEL
+        }
+        None => false,
+    })
 }
 
 /// Groups series indices by their label signatures based on the label modifier
@@ -369,6 +358,23 @@ mod tests {
             Arc::new(Label::new("job", "prometheus")),
             Arc::new(Label::new("__name__", "http_requests_total")),
         ]
+    }
+
+    fn labels_to_include(
+        include_labels: &[String],
+        mut actual_labels: Vec<Arc<Label>>,
+    ) -> Vec<Arc<Label>> {
+        actual_labels.retain(|label| include_labels.contains(&label.name));
+        actual_labels
+    }
+
+    fn labels_to_exclude(
+        exclude_labels: &[String],
+        mut actual_labels: Vec<Arc<Label>>,
+    ) -> Vec<Arc<Label>> {
+        actual_labels
+            .retain(|label| !exclude_labels.contains(&label.name) && label.name != NAME_LABEL);
+        actual_labels
     }
 
     #[test]
@@ -585,9 +591,19 @@ mod tests {
         ];
 
         for modifier in modifiers {
+            let expected = match &modifier {
+                Some(LabelModifier::Include(include)) => {
+                    labels_to_include(&include.labels, labels.clone())
+                }
+                Some(LabelModifier::Exclude(exclude)) => {
+                    labels_to_exclude(&exclude.labels, labels.clone())
+                }
+                None => vec![],
+            };
+            assert_eq!(projected_labels(&modifier, &labels), expected);
             assert_eq!(
                 projected_labels_signature(&modifier, &labels),
-                projected_labels(&modifier, &labels).signature()
+                expected.signature()
             );
         }
     }
