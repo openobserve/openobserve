@@ -129,6 +129,8 @@ const sessions = {
     page = 0,
     pageSize = 25,
     filter = "",
+    userSearch,
+    messageSearch,
     timeout,
   }: {
     orgId: string;
@@ -138,6 +140,15 @@ const sessions = {
     page?: number;
     pageSize?: number;
     filter?: string;
+    /**
+     * Case-insensitive substring match on the session's user id — a session is
+     * selected when ANY of its spans matches. The backend resolves the column
+     * (`user_id` / legacy `llm_user_id`) and escapes the term; the frontend
+     * never builds SQL for search.
+     */
+    userSearch?: string;
+    /** Same rule on the span's input-messages text ("conversation contains"). */
+    messageSearch?: string;
     timeout?: number;
   }) => {
     const params = new URLSearchParams({
@@ -147,6 +158,8 @@ const sessions = {
       end_time: String(endTime),
     });
     if (filter) params.set("filter", filter);
+    if (userSearch) params.set("user_search", userSearch);
+    if (messageSearch) params.set("message_search", messageSearch);
     if (timeout) params.set("timeout", String(timeout));
     const url = `/api/${orgId}/${encodeURIComponent(
       streamName,
