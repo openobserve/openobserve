@@ -101,7 +101,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @select="startFrom(signal.id)"
               >
                 <span class="flex w-full min-w-0 items-center gap-2">
-                  <code class="text-text-body min-w-0 flex-1 wrap-break-word whitespace-normal text-xs">
+                  <code
+                    class="text-text-body min-w-0 flex-1 text-xs wrap-break-word whitespace-normal"
+                  >
                     {{ raw(routablePathOf(signal)) }}
                   </code>
                   <!-- Two different emergencies share this queue, and which one

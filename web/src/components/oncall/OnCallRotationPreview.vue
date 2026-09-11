@@ -111,10 +111,7 @@ const showSecondary = computed(() => wantSecondary.value && members.value.length
 const shifts = computed(() => {
   const anchorMicros =
     firstHandoverDate.value && firstHandoverTime.value
-      ? fromZonedInputValue(
-          `${firstHandoverDate.value}T${firstHandoverTime.value}`,
-          timezone.value,
-        )
+      ? fromZonedInputValue(`${firstHandoverDate.value}T${firstHandoverTime.value}`, timezone.value)
       : null;
   const shift = shiftMicros.value;
   if (!members.value.length || anchorMicros === null || !shift || shift <= 0) return [];

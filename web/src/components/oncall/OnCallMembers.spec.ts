@@ -301,7 +301,9 @@ describe("OnCallMembers", () => {
       await flushPromises();
 
       await wrapper.find('[data-test="oncall-members-mark-away-m1"]').trigger("click");
-      await wrapper.find('[data-test="oncall-members-away-from-date"] input').setValue("2026-09-01");
+      await wrapper
+        .find('[data-test="oncall-members-away-from-date"] input')
+        .setValue("2026-09-01");
       await wrapper.find('[data-test="oncall-members-away-from-time"] input').setValue("09:00");
       await wrapper.find('[data-test="oncall-members-away-to-date"] input').setValue("2026-09-08");
       await wrapper.find('[data-test="oncall-members-away-to-time"] input').setValue("09:00");
