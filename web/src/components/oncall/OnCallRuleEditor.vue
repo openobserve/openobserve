@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <ODropdown
               v-if="!rule && !pairs.length && startable.length"
               align="end"
-              content-class="min-w-120"
+              content-class="min-w-80 max-w-[min(26rem,var(--reka-dropdown-menu-content-available-width,26rem))]"
             >
               <template #trigger>
                 <OButton
@@ -101,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @select="startFrom(signal.id)"
               >
                 <span class="flex w-full min-w-0 items-center gap-2">
-                  <code class="text-text-body min-w-0 flex-1 truncate text-xs">
+                  <code class="text-text-body min-w-0 flex-1 wrap-break-word whitespace-normal text-xs">
                     {{ raw(routablePathOf(signal)) }}
                   </code>
                   <!-- Two different emergencies share this queue, and which one
