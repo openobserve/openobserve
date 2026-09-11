@@ -48,7 +48,7 @@ pub async fn create_synthetic(
     // Validate the payload (field bounds, type-specific config shape, and
     // membership against this deployment's capabilities). Runs after location
     // normalisation so membership checks see canonical ids.
-    validate_against_capabilities(org_id, &body, true).await?;
+    validate_against_capabilities(org_id, "", &body, true).await?;
 
     // Encrypt credential fields before persisting.
     body = encrypt_synthetic_auth(org_id, body).await?;
@@ -161,7 +161,7 @@ pub async fn update_synthetic(
 
     // Validate before touching anything — same rules as create, except the
     // `start` freshness check (edits round-trip the original start date).
-    validate_against_capabilities(org_id, &body, false).await?;
+    validate_against_capabilities(org_id, id, &body, false).await?;
 
     // Read current folder_id (KSUID PK) before update — needed for OpenFGA relation change.
     let old_folder_pk = synthetics_checks::get(conn, org_id, id)

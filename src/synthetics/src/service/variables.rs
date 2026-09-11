@@ -477,6 +477,16 @@ pub async fn create_variable(
         .map_err(|e| anyhow::anyhow!(e))?;
     let name = normalize_variable_name(&req.name);
 
+    let before = org_variable_state(org_id).await?;
+    let mut after = before.clone();
+    after.shared.push(SharedVariableScope {
+        name: name.clone(),
+        env: env_id.clone(),
+    });
+    if let Some(err) = variable_cap_error(&before, &after) {
+        anyhow::bail!(err);
+    }
+
     let conn = get_orm_client_rw().await;
 
     let dek = synthetics_dek(org_id).await?;
@@ -522,6 +532,21 @@ pub async fn update_variable(
     .map_err(|e| anyhow::anyhow!(e))?;
 
     let name = normalize_variable_name(&req.name);
+
+    if name != record.name {
+        let before = org_variable_state(org_id).await?;
+        let mut after = before.clone();
+        if let Some(row) = after
+            .shared
+            .iter_mut()
+            .find(|v| v.name == record.name && v.env == record.env)
+        {
+            row.name = name.clone();
+        }
+        if let Some(err) = variable_cap_error(&before, &after) {
+            anyhow::bail!(err);
+        }
+    }
 
     if let Some(value) = req.value {
         let dek = synthetics_dek(org_id).await?;
@@ -820,6 +845,18 @@ pub async fn promote_check_variable(
     let env_id = env.map(|e| e.id.clone());
 
     let source = check.variables[position].clone();
+
+    // The source check already resolved this name; every *other* check gains it.
+    let before = org_variable_state(org_id).await?;
+    let mut after = before.clone();
+    after.shared.push(SharedVariableScope {
+        name: normalized.clone(),
+        env: env_id.clone(),
+    });
+    if let Some(err) = variable_cap_error(&before, &after) {
+        anyhow::bail!(err);
+    }
+
     let now = config::utils::time::now_micros();
     let record = SyntheticsVariableRecord {
         id: config::ider::uuid(),
@@ -866,6 +903,20 @@ pub async fn promote_to_global(
         anyhow::bail!(secret_cannot_be_global(&record.name));
     }
 
+    // Unscoping widens the row from one environment to every check in the org.
+    let before = org_variable_state(org_id).await?;
+    let mut after = before.clone();
+    if let Some(row) = after
+        .shared
+        .iter_mut()
+        .find(|v| v.name == record.name && v.env.as_deref() == Some(env.id.as_str()))
+    {
+        row.env = None;
+    }
+    if let Some(err) = variable_cap_error(&before, &after) {
+        anyhow::bail!(err);
+    }
+
     // Other environments may keep rows of the same name: they simply shadow
     // the promoted value, which becomes the fallback everywhere else.
     record.updated_at = config::utils::time::now_micros();
@@ -877,6 +928,11 @@ pub async fn promote_to_global(
 }
 
 /// Splits one unscoped variable into per-environment rows.
+///
+/// No variable-cap gate, and it does not need one: the tiers merge by name, so
+/// a check targeting a split environment swaps the global for the env row at
+/// the same name, and a check targeting none of them loses the name outright.
+/// Neither direction can raise a resolved count.
 ///
 /// A split, not a move: one row becomes N, each with its own value. Values
 /// arrive with the request rather than being filled in afterwards, because the
@@ -996,6 +1052,50 @@ pub async fn org_has_shared_variables(org_id: &str) -> bool {
             log::error!("[synthetics] shared variable lookup failed for {org_id}: {e}");
             false
         }
+    }
+}
+
+/// The org's checks and shared rows, as the write-time cap gate reads them.
+///
+/// A full pass over the org's checks on every variable write. That is the price
+/// of catching the overflow at the call that causes it rather than at every
+/// check's next run.
+///
+/// Read through the RO client while the write that follows uses RW, so on a
+/// replica this measures a slightly stale org and two concurrent writes can both
+/// pass. The gate is an early, attributable error, not a guarantee — the
+/// resolve-time check in `merge_variable_tiers` is what holds the line.
+pub(crate) async fn org_variable_state(org_id: &str) -> anyhow::Result<OrgVariableState> {
+    let conn = get_orm_client_ro().await;
+    let checks = synthetics_checks::list(conn, org_id, &ListSyntheticsParams::default())
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+    let shared = synthetics_variables::list(conn, org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+    Ok(OrgVariableState {
+        checks: checks.iter().map(|c| check_footprint(&c.id, c)).collect(),
+        shared: shared
+            .into_iter()
+            .map(|v| SharedVariableScope {
+                name: v.name,
+                env: v.env,
+            })
+            .collect(),
+    })
+}
+
+/// One check reduced to what the cap needs: what it defines and where it runs.
+///
+/// `id` is taken separately because an update carries it in the URL, not always
+/// in the body — and a footprint that cannot be matched to the stored check is
+/// counted as a second check rather than replacing it.
+pub(crate) fn check_footprint(id: &str, check: &Synthetic) -> CheckVariableFootprint {
+    CheckVariableFootprint {
+        id: id.to_string(),
+        name: check.name.clone(),
+        own_names: check.variables.iter().map(|v| v.name.clone()).collect(),
+        environments: check.environments.clone(),
     }
 }
 
@@ -1183,6 +1283,25 @@ mod tests {
         };
         assert_eq!(stored_kind(&secret), SyntheticsVariableKind::Secret);
         assert_eq!(stored_kind(&var(None)), SyntheticsVariableKind::Plain);
+    }
+
+    /// An update carries the check id in the URL and may leave it out of the body; a footprint
+    /// built from an empty body id would be counted as a second check instead of replacing the
+    /// stored one.
+    #[test]
+    fn a_footprint_takes_its_id_from_the_caller_not_the_body() {
+        let check = Synthetic {
+            id: String::new(),
+            name: "Login".into(),
+            variables: vec![check_var("BASE_URL")],
+            environments: vec!["e-prod".into()],
+            ..Default::default()
+        };
+        let footprint = check_footprint("check-from-the-url", &check);
+        assert_eq!(footprint.id, "check-from-the-url");
+        assert_eq!(footprint.name, "Login");
+        assert_eq!(footprint.own_names, ["BASE_URL"]);
+        assert_eq!(footprint.environments, ["e-prod"]);
     }
 
     #[test]
