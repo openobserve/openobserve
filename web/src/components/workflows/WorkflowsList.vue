@@ -92,6 +92,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <template #toolbar>
               <div class="flex w-full items-center gap-2">
+                <OToggleGroup
+                  :model-value="activeTab"
+                  data-test="workflow-list-tabs"
+                  @update:model-value="(v) => (activeTab = (v as string) || 'all')"
+                >
+                  <OToggleGroupItem
+                    v-for="tab in workflowTabs"
+                    :key="tab.value"
+                    :value="tab.value"
+                    size="sm"
+                    :data-test="`workflow-list-tab-${tab.value}`"
+                  >
+                    {{ tab.label }}
+                  </OToggleGroupItem>
+                </OToggleGroup>
                 <div class="min-w-0 flex-1">
                   <OInput
                     data-test="workflow-list-search-input"
@@ -101,6 +116,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <template #icon-left>
                       <OIcon name="search" size="sm" />
+                    </template>
+                    <template #icon-right>
+                      <OToggleGroup
+                        :model-value="searchAcrossFolders ? 'all' : 'this'"
+                        type="single"
+                        class="me-1 self-center"
+                        @update:model-value="(v) => onFolderScopeChange(v as string)"
+                      >
+                        <OToggleGroupItem
+                          value="this"
+                          size="xs"
+                          icon-left="folder-outline"
+                          data-test="workflow-list-search-scope-current"
+                          :title="t('workflow.searchThisFolderTooltip')"
+                          >{{ t("workflow.searchThisFolder") }}</OToggleGroupItem
+                        >
+                        <OToggleGroupItem
+                          value="all"
+                          size="xs"
+                          icon-left="search"
+                          data-test="workflow-list-search-across-folders-toggle"
+                          :title="t('workflow.searchAllFoldersTooltip')"
+                          >{{ t("workflow.searchAllFolders") }}</OToggleGroupItem
+                        >
+                      </OToggleGroup>
                     </template>
                   </OInput>
                 </div>
@@ -272,6 +312,8 @@ import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import FolderList from "@/components/common/sidebar/FolderList.vue";
 import { getFoldersListByType } from "@/utils/commons";
 const MoveAcrossFolders = defineAsyncComponent(
@@ -294,6 +336,7 @@ import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 import workflowService from "@/services/workflows";
 import { hydrateWorkflow, triggerDef } from "@/plugins/workflows/useWorkflowCanvas";
+import { DEFAULT_TRIGGER_KIND, enabledTriggers } from "@/plugins/workflows/triggers";
 
 const { t } = useI18nTyped();
 const router = useRouter();
@@ -301,6 +344,23 @@ const route = useRoute();
 
 // The folder lives in the URL so a folder view is linkable and survives a reload.
 const activeFolderId = computed(() => (route.query.folder as string) || "default");
+
+// Tabs come from the trigger registry, so enabling another trigger kind adds its
+// tab without touching this file.
+const activeTab = ref("all");
+const workflowTabs = computed(() => [
+  { value: "all", label: t("workflow.tabAll") },
+  ...enabledTriggers().map((tr) => ({ value: tr.key, label: t(tr.labelKey) })),
+]);
+
+const searchAcrossFolders = ref(false);
+
+const onFolderScopeChange = (v: string) => {
+  const across = v === "all";
+  if (across === searchAcrossFolders.value) return;
+  searchAcrossFolders.value = across;
+  getWorkflows();
+};
 
 const showMoveDialog = ref(false);
 const workflowIdsToMove = ref<string[]>([]);
@@ -350,10 +410,12 @@ const restorePageIndex = () => {
 
 const filteredWorkflows = computed(() => {
   const q = filterQuery.value.trim().toLowerCase();
-  if (!q) return workflows.value;
-  return workflows.value.filter(
-    (w) => w.name?.toLowerCase().includes(q) || w.description?.toLowerCase().includes(q),
-  );
+  const tab = activeTab.value;
+  return workflows.value.filter((w) => {
+    if (tab !== "all" && triggerKind(w) !== tab) return false;
+    if (!q) return true;
+    return w.name?.toLowerCase().includes(q) || w.description?.toLowerCase().includes(q);
+  });
 });
 
 const resultTotal = computed(() => filteredWorkflows.value.length);
@@ -364,6 +426,12 @@ const resultTotal = computed(() => filteredWorkflows.value.length);
 // (NodeData::WorkflowTrigger, serde tag = "node_type", snake_case).
 // v1 has one kind (alert-fired); once B1 adds WorkflowTriggerParams.kind we can
 // map data.kind -> a per-kind label here.
+// The kind drives the type tabs; the label is only for display.
+const triggerKind = (wf: any): string => {
+  const triggerNode = (wf.nodes || []).find((n: any) => n.data?.node_type === "workflow_trigger");
+  return triggerNode?.data?.trigger_kind || triggerNode?.meta?.trigger_kind || DEFAULT_TRIGGER_KIND;
+};
+
 const triggerLabel = (wf: any): string => {
   const triggerNode = (wf.nodes || []).find((n: any) => n.data?.node_type === "workflow_trigger");
   if (!triggerNode) return "—";
@@ -438,7 +506,23 @@ const columns = computed(() => [
     meta: { align: "center", cellClass: "actions-column", actionCount: 5 },
   },
 ]);
-const otableColumns = computed(() => columns.value);
+const otableColumns = computed(() => {
+  // The rail already names the folder when scoped to one, so the column only
+  // earns its width when rows can come from several.
+  if (!searchAcrossFolders.value) return columns.value;
+  const cols = [...columns.value];
+  cols.splice(2, 0, {
+    id: "folder_name",
+    header: t("workflow.folder"),
+    accessorKey: "folder_name",
+    sortable: true,
+    resizable: true,
+    hideable: true,
+    size: COL.folder,
+    meta: { align: "left" },
+  });
+  return cols;
+});
 
 const getWorkflows = async (folderId?: string) => {
   loading.value = true;
@@ -447,6 +531,7 @@ const getWorkflows = async (folderId?: string) => {
     const response = await workflowService.listWorkflows(
       orgId.value,
       folderId ?? activeFolderId.value,
+      searchAcrossFolders.value,
     );
     // list handler returns a bare array of Workflow.
     const list = Array.isArray(response.data) ? response.data : (response.data?.list ?? []);

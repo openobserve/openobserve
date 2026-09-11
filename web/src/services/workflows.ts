@@ -18,11 +18,15 @@ import http from "./http";
 const workflows = {
   // List the org's workflows in one folder. Omitting `folder` lets the backend
   // fall back to the default folder, which is what pre-folders clients sent.
-  listWorkflows: (org_identifier: string, folder?: string) => {
-    const url = `/api/${org_identifier}/workflows${
-      folder ? `?folder=${encodeURIComponent(folder)}` : ""
-    }`;
-    return http().get(url);
+  // `allFolders` lists across every folder the caller may see and takes
+  // precedence over `folder`.
+  listWorkflows: (org_identifier: string, folder?: string, allFolders = false) => {
+    const query = allFolders
+      ? "?all_folders=true"
+      : folder
+        ? `?folder=${encodeURIComponent(folder)}`
+        : "";
+    return http().get(`/api/${org_identifier}/workflows${query}`);
   },
 
   // Save a new workflow. `draft=true` saves to the drafts table WITHOUT the

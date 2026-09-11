@@ -119,6 +119,10 @@ pub struct WorkflowListItem {
     #[serde(flatten)]
     workflow: Workflow,
     is_draft: bool,
+    /// Display name of the owning folder. The row stores the primary key, which
+    /// is meaningless to a client, so the name is resolved here.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    folder_name: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -259,6 +263,7 @@ pub async fn save_workflow(
     params(
         ("org_id" = String, Path, description = "Organization id"),
         ("folder" = Option<String>, Query, description = "Folder ID to list within. The default folder is used when absent."),
+        ("all_folders" = Option<bool>, Query, description = "List across every folder the caller may see. Overrides `folder`."),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = inline(Object)),
@@ -292,18 +297,31 @@ pub async fn list_workflows(
     };
     // Get List of allowed objects ends
 
-    let folder = query
-        .get("folder")
-        .map(|s| s.as_str())
-        .unwrap_or(DEFAULT_FOLDER);
+    // `all_folders=true` lists across every folder. It is a separate parameter
+    // rather than a `folder=all` sentinel so `folder` stays empty, which is what
+    // makes the route's authorization fall back to the org-wide folder check.
+    let across_folders = query
+        .get("all_folders")
+        .is_some_and(|v| v.eq_ignore_ascii_case("true"));
+    let folder = if across_folders {
+        None
+    } else {
+        Some(
+            query
+                .get("folder")
+                .map(|s| s.as_str())
+                .unwrap_or(DEFAULT_FOLDER),
+        )
+    };
 
-    let workflows = match workflows::list_workflows(&org_id, permitted.clone(), Some(folder)).await
-    {
+    let workflows = match workflows::list_workflows(&org_id, permitted.clone(), folder).await {
         Ok(workflows) => workflows,
         Err(e) => return MetaHttpResponse::internal_error(e),
     };
 
     let mut ret = Vec::with_capacity(workflows.len());
+    // Resolved once per distinct folder rather than per row.
+    let mut folder_names: HashMap<String, Option<String>> = HashMap::new();
 
     for w in workflows {
         let associations = match workflows::get_workflow_associations(&org_id, &w.id).await {
@@ -317,10 +335,24 @@ pub async fn list_workflows(
             }
         };
 
+        let folder_name = match folder_names.get(&w.folder_id) {
+            Some(name) => name.clone(),
+            None => {
+                let name = infra::table::folders::get_name_and_display_name_by_pk(&w.folder_id)
+                    .await
+                    .ok()
+                    .flatten()
+                    .map(|(_slug, display)| display);
+                folder_names.insert(w.folder_id.clone(), name.clone());
+                name
+            }
+        };
+
         ret.push(WorkflowListItem {
             workflow: w,
             associations,
             is_draft: false,
+            folder_name,
         });
     }
 
@@ -334,6 +366,7 @@ pub async fn list_workflows(
             workflow: draft,
             associations: vec![],
             is_draft: true,
+            folder_name: None,
         });
     }
 
