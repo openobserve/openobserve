@@ -304,6 +304,14 @@ describe("TemplateSuggestionCards", () => {
     expect(importHostMetricsDashboard).not.toHaveBeenCalled();
   });
 
+  it("still imports directly — the card's own framing already asked, so it gets no extra confirm", async () => {
+    wrapper = mountCards();
+    await wrapper.find('[data-test="template-card-hostmetrics"]').trigger("click");
+    await flushPromises();
+    expect(importHostMetricsDashboard).toHaveBeenCalledWith("test-org");
+    expect(wrapper.find('[data-test="host-drawer-import-confirm"]').exists()).toBe(false);
+  });
+
   it("keeps the bundled card standing when the lazy gallery fetch fails", async () => {
     // Pinned contract (useDashboardGallery.spec): loadDashboards never rejects.
     galleryState.loadDashboards.mockImplementation(async () => {

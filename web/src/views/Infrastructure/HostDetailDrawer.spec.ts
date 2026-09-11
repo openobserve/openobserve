@@ -30,12 +30,16 @@ import searchService from "@/services/search";
 import i18n from "@/locales";
 import goldenDashboard from "./curated/packs/__fixtures__/hostDashboard.golden.json";
 
-const { importHostMetricsDashboard, toastMock } = vi.hoisted(() => ({
+const { importHostMetricsDashboard, findHostMetricsDashboard, toastMock } = vi.hoisted(() => ({
   importHostMetricsDashboard: vi.fn(),
+  findHostMetricsDashboard: vi.fn(),
   toastMock: vi.fn(),
 }));
 
-vi.mock("@/composables/useHostMetricsDashboard", () => ({ importHostMetricsDashboard }));
+vi.mock("@/composables/useHostMetricsDashboard", () => ({
+  importHostMetricsDashboard,
+  findHostMetricsDashboard,
+}));
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: toastMock }));
 
 vi.mock("@/services/search", () => ({
@@ -65,6 +69,14 @@ vi.mock("@/utils/semanticGroupsCache", () => ({
  * is exactly why the drawer's zero-panel guard needs a test of its own.
  */
 const curatedOverride = vi.hoisted(() => ({ current: null as null | ((real: any) => any) }));
+
+// The house ODialog teleports via DialogPortal — the sibling suites' stub keeps it findable in-wrapper.
+const ODialogStub = {
+  name: "ODialog",
+  props: ["open", "size", "title", "subTitle", "showClose", "persistent"],
+  emits: ["update:open"],
+  template: `<div :data-open="open" :data-title="title"><slot name="header" /><slot /><slot name="footer" /></div>`,
+};
 
 vi.mock("./curated/useCuratedPage", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./curated/useCuratedPage")>();
@@ -225,6 +237,7 @@ describe("HostDetailDrawer", () => {
           RenderDashboardCharts: renderStub,
           DateTime: dateTimeStub,
           ODrawer: { template: "<div><slot /><slot name='footer' /></div>" },
+          ODialog: ODialogStub,
           teleport: true,
         },
       },
@@ -243,6 +256,11 @@ describe("HostDetailDrawer", () => {
     searchMock.mockResolvedValue({ data: { hits: [] } } as any);
     importHostMetricsDashboard.mockResolvedValue({
       status: "created",
+      dashboardId: "dash-1",
+      folderId: "default",
+    });
+    findHostMetricsDashboard.mockResolvedValue({
+      status: "exists",
       dashboardId: "dash-1",
       folderId: "default",
     });
@@ -641,16 +659,66 @@ describe("HostDetailDrawer", () => {
     expect(captured).toContain(String(RANGE.to));
   });
 
-  describe("footer — Open Host Metrics dashboard", () => {
-    it("imports if absent, then navigates carrying var-host_name plus the drawer range", async () => {
-      wrapper = await mountDrawer();
+  describe("footer — Host Metrics dashboard", () => {
+    const absent = () =>
+      findHostMetricsDashboard.mockResolvedValue({ status: "absent", folderId: "default" });
+
+    const clickFooter = async () => {
       await wrapper.find('[data-test="host-drawer-open-dashboard"]').trigger("click");
       await flushPromises();
-      // A user can reach /infra/hosts without the setup flow (pass-4 finding 7).
-      expect(importHostMetricsDashboard).toHaveBeenCalledWith("test-org");
+    };
+
+    it("navigates to the existing dashboard with NO prompt when it already exists", async () => {
+      findHostMetricsDashboard.mockResolvedValue({
+        status: "exists",
+        dashboardId: "dash-old",
+        folderId: "default",
+      });
+      wrapper = await mountDrawer();
+      await clickFooter();
+      // The common path must stay frictionless — no dialog, and nothing created.
+      expect(wrapper.find('[data-test="host-drawer-import-confirm"]').exists()).toBe(false);
+      expect(importHostMetricsDashboard).not.toHaveBeenCalled();
       expect(router.push).toHaveBeenCalledTimes(1);
       const target: any = vi.mocked(router.push).mock.calls[0][0];
       expect(target.path).toBe("/dashboards/view");
+      expect(target.query.dashboard).toBe("dash-old");
+      expect(target.query.folder).toBe("default");
+      expect(target.query["var-host_name"]).toBe("web-01");
+      expect(Number(target.query.from)).toBe(RANGE.from);
+      expect(Number(target.query.to)).toBe(RANGE.to);
+    });
+
+    it("does NOT create anything on click when the dashboard is absent — it asks first", async () => {
+      absent();
+      wrapper = await mountDrawer();
+      await clickFooter();
+      // A button labelled "open" must never write a dashboard into the org unannounced.
+      expect(importHostMetricsDashboard).not.toHaveBeenCalled();
+      expect(router.push).not.toHaveBeenCalled();
+      expect(wrapper.find('[data-test="host-drawer-import-confirm"]').exists()).toBe(true);
+    });
+
+    it("cancel creates nothing, does not navigate, and closes the prompt", async () => {
+      absent();
+      wrapper = await mountDrawer();
+      await clickFooter();
+      await wrapper.find('[data-test="host-drawer-import-confirm-cancel"]').trigger("click");
+      await flushPromises();
+      expect(importHostMetricsDashboard).not.toHaveBeenCalled();
+      expect(router.push).not.toHaveBeenCalled();
+      expect(wrapper.find('[data-test="host-drawer-import-confirm"]').exists()).toBe(false);
+    });
+
+    it("confirm creates the dashboard and navigates with the host and range preset", async () => {
+      absent();
+      wrapper = await mountDrawer();
+      await clickFooter();
+      await wrapper.find('[data-test="host-drawer-import-confirm-ok"]').trigger("click");
+      await flushPromises();
+      expect(importHostMetricsDashboard).toHaveBeenCalledWith("test-org");
+      expect(router.push).toHaveBeenCalledTimes(1);
+      const target: any = vi.mocked(router.push).mock.calls[0][0];
       expect(target.query.dashboard).toBe("dash-1");
       expect(target.query.folder).toBe("default");
       expect(target.query["var-host_name"]).toBe("web-01");
@@ -658,31 +726,74 @@ describe("HostDetailDrawer", () => {
       expect(Number(target.query.to)).toBe(RANGE.to);
     });
 
-    it("navigates to the existing dashboard on exists", async () => {
-      importHostMetricsDashboard.mockResolvedValue({
-        status: "exists",
-        dashboardId: "dash-old",
-        folderId: "default",
-      });
+    it("names the dashboard and the folder in the prompt, so the write is never a surprise", async () => {
+      absent();
       wrapper = await mountDrawer();
-      await wrapper.find('[data-test="host-drawer-open-dashboard"]').trigger("click");
-      await flushPromises();
-      const target: any = vi.mocked(router.push).mock.calls[0][0];
-      expect(target.query.dashboard).toBe("dash-old");
+      await clickFooter();
+      const body = wrapper.find('[data-test="host-drawer-import-confirm"]').text();
+      expect(body).toContain("Host Metrics");
+      expect(body).toContain(t("infra.hosts.importConfirmMessage"));
     });
 
-    it("shows the cause-naming toast by kind and does NOT navigate on error", async () => {
-      importHostMetricsDashboard.mockResolvedValue({
+    it("a double-click on confirm creates only once", async () => {
+      absent();
+      let release: (v: any) => void = () => {};
+      importHostMetricsDashboard.mockReturnValue(new Promise((r) => (release = r)));
+      wrapper = await mountDrawer();
+      await clickFooter();
+      const ok = wrapper.find('[data-test="host-drawer-import-confirm-ok"]');
+      await ok.trigger("click");
+      await ok.trigger("click");
+      release({ status: "created", dashboardId: "dash-1", folderId: "default" });
+      await flushPromises();
+      expect(importHostMetricsDashboard).toHaveBeenCalledTimes(1);
+      expect(router.push).toHaveBeenCalledTimes(1);
+    });
+
+    it("a double-click on the footer button runs one existence check", async () => {
+      let release: (v: any) => void = () => {};
+      findHostMetricsDashboard.mockReturnValue(new Promise((r) => (release = r)));
+      wrapper = await mountDrawer();
+      const button = wrapper.find('[data-test="host-drawer-open-dashboard"]');
+      await button.trigger("click");
+      await button.trigger("click");
+      release({ status: "exists", dashboardId: "dash-old", folderId: "default" });
+      await flushPromises();
+      expect(findHostMetricsDashboard).toHaveBeenCalledTimes(1);
+      expect(router.push).toHaveBeenCalledTimes(1);
+    });
+
+    it("toasts by kind and does NOT navigate when the existence check fails", async () => {
+      findHostMetricsDashboard.mockResolvedValue({
         status: "error",
         kind: "forbidden",
         message: "403",
       });
       wrapper = await mountDrawer();
-      await wrapper.find('[data-test="host-drawer-open-dashboard"]').trigger("click");
-      await flushPromises();
+      await clickFooter();
       expect(toastMock).toHaveBeenCalledWith(
         expect.objectContaining({
           message: t("ingestion.setupCard.hostDashboardImportForbidden"),
+        }),
+      );
+      expect(router.push).not.toHaveBeenCalled();
+      expect(wrapper.find('[data-test="host-drawer-import-confirm"]').exists()).toBe(false);
+    });
+
+    it("toasts by kind and does NOT navigate when the confirmed create fails", async () => {
+      absent();
+      importHostMetricsDashboard.mockResolvedValue({
+        status: "error",
+        kind: "generic",
+        message: "boom",
+      });
+      wrapper = await mountDrawer();
+      await clickFooter();
+      await wrapper.find('[data-test="host-drawer-import-confirm-ok"]').trigger("click");
+      await flushPromises();
+      expect(toastMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: t("ingestion.setupCard.hostDashboardImportFailed"),
         }),
       );
       expect(router.push).not.toHaveBeenCalled();
