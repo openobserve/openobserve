@@ -160,19 +160,17 @@ const loadedOrg = ref<string | null>(null);
 // unmount/remount cycle and stays in sync with the restored rows.
 const currentPage = ref(1);
 const rowsPerPage = ref(20);
-// Active list search (the User / Message boxes on the scope row). Module-
-// scoped like the pagination so a back-navigation from a session detail
-// restores the filtered page together with the terms that produced it.
-// Deliberately NOT persisted to localStorage: the scope is remembered across
-// visits, a search is a one-time action. These are the APPLIED terms (what the
-// current rows were fetched with) — the boxes' draft text lives in the
-// component. Both may be set at once; the backend ANDs them.
+// Active list search (the search box on the scope row) — this ref IS the
+// box's v-model directly (live, debounced), no separate draft. Module-scoped
+// like the pagination so a back-navigation from a session detail restores the
+// filtered page together with the term that produced it. Deliberately NOT
+// persisted to localStorage: the scope is remembered across visits, a search
+// is a one-time action. The backend matches it against the user id OR the
+// conversation text (whichever the stream has), so one term searches both.
 export interface SessionSearch {
-  user?: string;
-  message?: string;
+  keyword?: string;
 }
-const searchUser = ref("");
-const searchMessage = ref("");
+const searchKeyword = ref("");
 /** Hard cap on a search term; longer input is truncated, never rejected. */
 export const SESSION_SEARCH_MAX_LEN = 256;
 /** Trims and caps a raw search term. Empty result = no search. */
@@ -244,8 +242,7 @@ export function useSessions() {
 
     try {
       const orgId = store.state.selectedOrganization?.identifier || "default";
-      const userTerm = normalizeSearchTerm(search?.user ?? "");
-      const messageTerm = normalizeSearchTerm(search?.message ?? "");
+      const keywordTerm = normalizeSearchTerm(search?.keyword ?? "");
       const res = await sessionsService.list({
         orgId,
         streamName,
@@ -254,8 +251,7 @@ export function useSessions() {
         page,
         pageSize,
         filter,
-        userSearch: userTerm || undefined,
-        messageSearch: messageTerm || undefined,
+        keyword: keywordTerm || undefined,
       });
       // Stale: a newer fetch has started since — its result (or error) owns
       // the list now, so leave every piece of state to it.
@@ -596,8 +592,7 @@ export function useSessions() {
     loadedOrg,
     currentPage,
     rowsPerPage,
-    searchUser,
-    searchMessage,
+    searchKeyword,
     agents,
     agentsLoaded,
     fetchPage,

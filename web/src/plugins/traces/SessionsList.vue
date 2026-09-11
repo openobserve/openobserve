@@ -64,75 +64,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @filter-mode-change="onFilterModeChange"
       @stream-change="onStreamChange"
     >
-      <!-- List search — a User box and a Message box, right-aligned on the
-           scope row. Both terms apply together (the backend ANDs them). Each
-           runs on Enter / clear / Escape, never per keystroke: every run is
-           two distributed queries over the whole window. While a box's text
-           differs from what was applied, an ↵ keycap (the logs page's
-           run-query affordance) sits in the box: it tells the user the search
-           has not run yet, and clicking it runs it. The applied terms live in
-           useSessions' singleton next to the page/size so back-navigation
-           restores the filtered page. -->
+      <!-- List search — one box, matched against the user id OR the
+           conversation text server-side (whichever the stream has). Live,
+           debounced (300ms — same as the Streams list's search), same
+           pattern as LogStream.vue: no Enter/run-query affordance, a settled
+           value just re-fetches. The applied term lives in useSessions'
+           singleton next to the page/size so back-navigation restores the
+           filtered page. -->
       <template #trailing>
-        <div class="ms-auto flex shrink-0 items-center gap-2">
-          <label :for="USER_INPUT_ID" class="sr-only">
-            {{ t("traces.sessionsList.search.placeholderUser") }}
+        <div class="flex min-w-0 flex-1 items-center gap-2">
+          <label :for="SEARCH_INPUT_ID" class="sr-only">
+            {{ t("traces.sessionsList.search.placeholder") }}
           </label>
           <OSearchInput
-            :id="USER_INPUT_ID"
-            v-model="userDraft"
-            :placeholder="t('traces.sessionsList.search.placeholderUser')"
-            :title="t('traces.sessionsList.search.userTitle')"
+            :id="SEARCH_INPUT_ID"
+            v-model="searchKeyword"
+            :placeholder="t('traces.sessionsList.search.placeholder')"
+            :title="t('traces.sessionsList.search.title')"
             size="sm"
             clearable
-            class="w-56"
-            data-test="sessions-list-search-user"
-            @keydown="onSearchKeydown($event, 'user')"
-            @clear="onSearchClear('user')"
-          >
-            <template v-if="userDraft !== searchUser" #icon-right>
-              <button
-                type="button"
-                tabindex="-1"
-                class="flex items-center"
-                data-test="sessions-list-search-user-enter"
-                :aria-label="t('traces.sessionsList.search.pressEnter')"
-                @click="applySearch"
-              >
-                <OShortcut keys="enter" />
-                <OTooltip :content="t('traces.sessionsList.search.pressEnter')" />
-              </button>
-            </template>
-          </OSearchInput>
-          <label :for="MESSAGE_INPUT_ID" class="sr-only">
-            {{ t("traces.sessionsList.search.placeholderMessage") }}
-          </label>
-          <OSearchInput
-            :id="MESSAGE_INPUT_ID"
-            v-model="messageDraft"
-            :placeholder="t('traces.sessionsList.search.placeholderMessage')"
-            :title="t('traces.sessionsList.search.messageTitle')"
-            size="sm"
-            clearable
-            class="w-60"
-            data-test="sessions-list-search-message"
-            @keydown="onSearchKeydown($event, 'message')"
-            @clear="onSearchClear('message')"
-          >
-            <template v-if="messageDraft !== searchMessage" #icon-right>
-              <button
-                type="button"
-                tabindex="-1"
-                class="flex items-center"
-                data-test="sessions-list-search-message-enter"
-                :aria-label="t('traces.sessionsList.search.pressEnter')"
-                @click="applySearch"
-              >
-                <OShortcut keys="enter" />
-                <OTooltip :content="t('traces.sessionsList.search.pressEnter')" />
-              </button>
-            </template>
-          </OSearchInput>
+            :debounce="300"
+            class="w-full"
+            data-test="sessions-list-search"
+          />
         </div>
       </template>
     </AiScopeBar>
@@ -312,7 +266,6 @@ import {
   type SessionSearch,
 } from "./composables/useSessions";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
-import OShortcut from "@/lib/core/Shortcut/OShortcut.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
@@ -355,8 +308,7 @@ const {
   loadedOrg,
   currentPage,
   rowsPerPage,
-  searchUser,
-  searchMessage,
+  searchKeyword,
   agents,
   agentsLoaded,
   fetchPage,
@@ -368,42 +320,32 @@ const urlStream = typeof route.query.stream === "string" ? route.query.stream : 
 const urlAgentName = typeof route.query.agent === "string" ? route.query.agent : "";
 const urlEnv = typeof route.query.env === "string" ? route.query.env : "";
 const urlVersion = typeof route.query.version === "string" ? route.query.version : "";
-// Search deep-link: `?user=<term>` and/or `?message=<term>`. Read once at
-// setup, like the scope.
-const urlUserSearch = normalizeSearchTerm(
-  typeof route.query.user === "string" ? route.query.user : "",
-);
-const urlMessageSearch = normalizeSearchTerm(
-  typeof route.query.message === "string" ? route.query.message : "",
+// Search deep-link: `?keyword=<term>`. Read once at setup, like the scope.
+const urlKeyword = normalizeSearchTerm(
+  typeof route.query.keyword === "string" ? route.query.keyword : "",
 );
 
 // ── List search ─────────────────────────────────────────────────────────────
-// `searchUser` / `searchMessage` (the APPLIED terms) are module-scoped in
-// useSessions so back-navigation restores the filtered page with its terms.
-// The drafts are what's typed in the boxes; they only become applied on Enter
-// (or are dropped on clear / Escape) — never per keystroke.
-const USER_INPUT_ID = "sessions-list-search-user";
-const MESSAGE_INPUT_ID = "sessions-list-search-message";
-// Terms in the URL override whatever the singleton holds: a pasted link must
-// reproduce its filtered view. When they differ from what the cached rows were
-// fetched with, the cache guard in `loadSessions` is bypassed once so the mount
-// fetch runs with the URL's terms instead of restoring the stale page.
+// `searchKeyword` is module-scoped in useSessions so back-navigation restores
+// the filtered page with its term, and it's the search box's own v-model —
+// there's no separate draft/applied split. The input's own `:debounce="300"`
+// (same as the Streams list's search) settles typing into one value; the
+// watch below re-fetches whenever it changes, live, same as LogStream.vue.
+// Matched server-side against the user id OR the conversation text,
+// whichever the stream has.
+const SEARCH_INPUT_ID = "sessions-list-search";
+// A term in the URL overrides whatever the singleton holds: a pasted link
+// must reproduce its filtered view. When it differs from what the cached rows
+// were fetched with, the cache guard in `loadSessions` is bypassed once so the
+// mount fetch runs with the URL's term instead of restoring the stale page.
 let searchChangedByUrl = false;
-if (
-  (urlUserSearch || urlMessageSearch) &&
-  (urlUserSearch !== searchUser.value || urlMessageSearch !== searchMessage.value)
-) {
-  searchUser.value = urlUserSearch;
-  searchMessage.value = urlMessageSearch;
+if (urlKeyword && urlKeyword !== searchKeyword.value) {
+  searchKeyword.value = urlKeyword;
   searchChangedByUrl = true;
 }
-const userDraft = ref(searchUser.value);
-const messageDraft = ref(searchMessage.value);
-const searchActive = computed(() => searchUser.value.length > 0 || searchMessage.value.length > 0);
+const searchActive = computed(() => searchKeyword.value.length > 0);
 const activeSearch = computed<SessionSearch | undefined>(() =>
-  searchActive.value
-    ? { user: searchUser.value || undefined, message: searchMessage.value || undefined }
-    : undefined,
+  searchActive.value ? { keyword: searchKeyword.value || undefined } : undefined,
 );
 
 const activeStream = ref<string>(
@@ -710,12 +652,10 @@ function syncFilterUrl() {
     if (activeStream.value) query.stream = activeStream.value;
     else delete query.stream;
   }
-  // Only the applied terms — so the filtered view has a link and survives a
+  // Only the applied term — so the filtered view has a link and survives a
   // reload, and a cleared box leaves no stale param behind.
-  if (searchUser.value) query.user = searchUser.value;
-  else delete query.user;
-  if (searchMessage.value) query.message = searchMessage.value;
-  else delete query.message;
+  if (searchKeyword.value) query.keyword = searchKeyword.value;
+  else delete query.keyword;
   router.replace({ query }).catch(() => {});
 }
 
@@ -749,10 +689,7 @@ async function loadSessions(startTime?: number, endTime?: number, force = false)
   // An org switch invalidates the list (see the guard above); the search
   // belonged to the previous org's data, so it goes with it.
   if (loadedOrg.value && loadedOrg.value !== orgId && searchActive.value) {
-    searchUser.value = "";
-    searchMessage.value = "";
-    userDraft.value = "";
-    messageDraft.value = "";
+    searchKeyword.value = "";
   }
 
   localStorage.setItem(MODE_LS_KEY, filterMode.value);
@@ -812,52 +749,19 @@ async function loadSessions(startTime?: number, endTime?: number, force = false)
 }
 
 // ── Search handlers ─────────────────────────────────────────────────────────
-type SearchBox = "user" | "message";
-
-// Applies BOTH drafts (trimmed, capped) as the active search and re-fetches
-// from page 1 — Enter in either box submits the pair, so a user can type in
-// both and press Enter once. Enter on unchanged terms is still a deliberate
-// re-run, same as Refresh. `fetchPage` drops the response of any run this
-// one supersedes.
-function applySearch() {
-  userDraft.value = normalizeSearchTerm(userDraft.value);
-  messageDraft.value = normalizeSearchTerm(messageDraft.value);
-  searchUser.value = userDraft.value;
-  searchMessage.value = messageDraft.value;
+// Live search, same pattern as LogStream.vue: the box's own `:debounce="300"`
+// settles typing into one value on `searchKeyword` (its v-model); this watch
+// is the ONLY re-fetch trigger — typing, the built-in clear (x) button, and
+// clearSearch() below all just change the ref and let this fire. No Enter /
+// Escape handling needed. `fetchPage` drops the response of any run a later
+// change supersedes.
+watch(searchKeyword, () => {
   currentPage.value = 1;
   loadSessions(undefined, undefined, true);
-}
+});
 
 function clearSearch() {
-  userDraft.value = "";
-  messageDraft.value = "";
-  applySearch();
-}
-
-function onSearchKeydown(e: KeyboardEvent, box: SearchBox) {
-  const draft = box === "user" ? userDraft : messageDraft;
-  const applied = box === "user" ? searchUser : searchMessage;
-  if (e.key === "Enter") {
-    e.preventDefault();
-    applySearch();
-  } else if (e.key === "Escape") {
-    // Nothing typed and nothing applied in THIS box — let the key bubble (a
-    // dialog may own it). Otherwise Escape drops this box's term and re-runs
-    // with whatever the other box still holds.
-    if (!draft.value && !applied.value) return;
-    e.preventDefault();
-    e.stopPropagation();
-    draft.value = "";
-    applySearch();
-  }
-}
-
-// The (x) control already emptied that box's draft; only re-fetch when its
-// term was actually applied — clearing an unsubmitted draft has nothing to
-// reload.
-function onSearchClear(box: SearchBox) {
-  const applied = box === "user" ? searchUser : searchMessage;
-  if (applied.value) applySearch();
+  searchKeyword.value = "";
 }
 
 // Filter / pagination changes are deliberate user actions — force a re-fetch
