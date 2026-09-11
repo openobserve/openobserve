@@ -860,7 +860,7 @@
       "createNew": "Tạo đích mới",
       "select": "Đích",
       "loadError": "Có lỗi khi lấy danh sách đích.",
-      "unsupportedType": "Loại không được hỗ trợ — Quy trình làm việc chỉ hỗ trợ đích tùy chỉnh"
+      "unsupportedType": "Loại không được hỗ trợ — quy trình làm việc chỉ hỗ trợ đích tùy chỉnh"
     },
     "function": {
       "createNew": "Tạo hàm mới",
@@ -869,7 +869,7 @@
       "loadError": "Tải hàm thất bại",
       "saved": "Đã lưu hàm thành công",
       "updated": "Đã cập nhật hàm thành công",
-      "saveError": "Không thể lưu hàm",
+      "saveError": "Lưu hàm thất bại",
       "flatten": "Sau khi làm phẳng",
       "guidelinesTitle": "Hướng dẫn thực thi hàm:",
       "rbf": "RBF (Chạy trước khi làm phẳng):",
@@ -2057,7 +2057,8 @@
       "startFrom": {
         "label": "Bắt đầu từ",
         "custom": "Tùy chỉnh (vai trò trống)",
-        "readonly": "Chỉ đọc (quyền xem tất cả tài nguyên)"
+        "readonly": "Chỉ đọc (quyền xem tất cả tài nguyên)",
+        "dbm": "Người xem Giám sát cơ sở dữ liệu (chỉ đọc trên module Giám sát CSDL và các Stream chỉ số mà tab Chỉ số của nó truy vấn)"
       },
       "name": {
         "required": "Tên vai trò là bắt buộc.",
@@ -2093,7 +2094,9 @@
       "loadFailed": "Không thể tải chi tiết vai trò. Đang chuyển hướng đến danh sách vai trò.",
       "noUpdatesDetected": "Không phát hiện cập nhật.",
       "updateSuccess": "Cập nhật vai trò thành công!",
-      "updateError": "Lỗi khi cập nhật vai trò!"
+      "updateError": "Lỗi khi cập nhật vai trò!",
+      "dbmPresetSeeded": "Quyền đọc được chọn trước trên {matched} trong {total} Stream chỉ số Giám sát CSDL, cùng với module Giám sát CSDL. Hãy xem lại trước khi lưu.",
+      "dbmPresetNoMatch": "Chưa có Stream chỉ số Giám sát CSDL nào trong số {total} tồn tại trong tổ chức này, nên không có Stream nào được chọn trước; quyền cấp cho module Giám sát CSDL vẫn được chuẩn bị sẵn."
     },
     "rolesPage": {
       "subtitle": "Vai trò gói quyền — gán chúng cho Người dùng, Tài khoản dịch vụ hoặc Nhóm để cấp quyền truy cập.",
@@ -2554,7 +2557,7 @@
     "header": "Quy trình làm việc",
     "subtitle": "Tự động hóa Hành động bằng Trình kích hoạt, Logic và Đích",
     "create": "Quy trình làm việc mới",
-    "createSuccess": "Đã tạo quy trình làm việc thành công",
+    "createSuccess": "Tạo quy trình làm việc thành công",
     "name": "Tên Workflow",
     "nameRequired": "Tên là bắt buộc",
     "search": "Tìm kiếm quy trình làm việc",
@@ -2604,16 +2607,16 @@
     "view": "Xem",
     "delete": "Xóa",
     "deleteTitle": "Xóa quy trình",
-    "deleteMessage": "Bạn có chắc chắn muốn xóa quy trình này?",
-    "deleteSuccess": "Đã xóa quy trình thành công",
-    "deleteError": "Lỗi khi xóa quy trình",
-    "updateSuccess": "Đã cập nhật quy trình thành công",
-    "saveError": "Lỗi khi lưu quy trình",
-    "resumeSuccess": "{name} đã được tiếp tục thành công",
-    "pauseSuccess": "{name} đã được tạm dừng thành công",
-    "toggleError": "Lỗi khi cập nhật trạng thái quy trình",
-    "triggerRequired": "Cần có một bộ kích hoạt",
-    "addStepRequired": "Thêm ít nhất một bước sau bộ kích hoạt",
+    "deleteMessage": "Bạn có chắc chắn muốn xóa quy trình làm việc này không?",
+    "deleteSuccess": "Đã xóa quy trình làm việc thành công",
+    "deleteError": "Lỗi khi xóa quy trình làm việc",
+    "updateSuccess": "Đã cập nhật quy trình làm việc thành công",
+    "saveError": "Lỗi khi lưu quy trình làm việc",
+    "resumeSuccess": "{name} đã tiếp tục thành công",
+    "pauseSuccess": "{name} đã tạm dừng thành công",
+    "toggleError": "Lỗi khi cập nhật trạng thái quy trình làm việc",
+    "triggerRequired": "Cần có một trigger",
+    "addStepRequired": "Thêm ít nhất một bước sau trigger",
     "connectAllNodes": "Kết nối tất cả các nút trước khi lưu",
     "branchPathsRequired": "Kết nối từng đường dẫn của nhánh với một bước | 1 bước Nhánh có các kết nối không khớp với các đường dẫn của nó. Hãy mở nó, xác định các đường dẫn rồi kết nối lại. | {count} bước Nhánh có các kết nối không khớp với các đường dẫn của chúng.",
     "finishStepsBeforePublish": "{count} bước cần được thiết lập trước khi xuất bản — được đánh dấu trên canvas. | {count} bước cần được thiết lập trước khi xuất bản — được đánh dấu trên canvas.",
@@ -2622,13 +2625,13 @@
     "saveDraft": "Lưu thành bản nháp",
     "publish": "Xuất bản",
     "draftSaveSuccess": "Đã lưu bản nháp thành công",
-    "publishSuccess": "Đã xuất bản quy trình thành công",
-    "publishError": "Lỗi khi xuất bản quy trình",
-    "comingSoon": "Điều này sẽ có ở một bước sau",
+    "publishSuccess": "Đã xuất bản quy trình làm việc thành công",
+    "publishError": "Lỗi khi xuất bản quy trình làm việc",
+    "comingSoon": "Tính năng này sẽ có trong bước sau",
     "triggerType": {
       "pick": "Chọn trình kích hoạt",
       "dialogTitle": "Tạo quy trình mới",
-      "dialogIntro": "Chọn cách quy trình này được kích hoạt. Sắp có thêm nhiều loại trình kích hoạt.",
+      "dialogIntro": "Chọn cách quy trình làm việc này được kích hoạt. Các loại trigger khác sẽ sớm ra mắt.",
       "cta": "Tạo quy trình",
       "soonCta": "Khả dụng trong bản phát hành tương lai",
       "comingSoon": "Sắp ra mắt",
@@ -2661,7 +2664,7 @@
       "alertStartTime": "Dấu thời gian sớm nhất trong các bản ghi khớp.",
       "alertEndTime": "Dấu thời gian muộn nhất trong các bản ghi khớp."
     },
-    "loadError": "Không thể tải Workflow",
+    "loadError": "Không thể tải quy trình làm việc",
     "deleteNode": "Xóa Node",
     "deleteNodeTitle": "Xóa Bước",
     "deleteNodeConfirm": "Bạn có chắc chắn muốn xóa bước này không? Bạn có thể hoàn tác thao tác này.",
@@ -2737,7 +2740,7 @@
       "folderLabel": "Thư mục",
       "alertsLabel": "Cảnh báo",
       "alertsPlaceholder": "Chọn cảnh báo",
-      "noneSelected": "Chưa có cảnh báo nào được chọn.",
+      "noneSelected": "Chưa chọn cảnh báo nào.",
       "selectedCount": "{count} đã chọn",
       "clear": "Xóa tất cả",
       "empty": "Không tìm thấy cảnh báo nào trong tổ chức này.",
@@ -2746,8 +2749,8 @@
       "link": "Liên kết đã chọn",
       "linkN": "Liên kết {count} đã chọn",
       "skip": "Bỏ qua bây giờ",
-      "linkSuccess": "Đã liên kết với {count} cảnh báo",
-      "linkPartial": "Liên kết đến {count} cảnh báo, {failed} không thành công | Liên kết đến {count} cảnh báo, {failed} không thành công",
+      "linkSuccess": "Đã liên kết với {count} cảnh báo | Đã liên kết với {count} cảnh báo",
+      "linkPartial": "Đã liên kết với {count} cảnh báo, {failed} thất bại | Đã liên kết với {count} cảnh báo, {failed} thất bại",
       "linkError": "Không thể liên kết cảnh báo."
     },
     "chooseTrigger": "Chọn một trình kích hoạt",
@@ -2764,11 +2767,11 @@
       "branch": "Nhánh",
       "function": "Hàm",
       "sendToDestination": "Đích",
-      "configComingSoon": "Cấu hình {node} sẽ có ở bước sau",
+      "configComingSoon": "Cấu hình {node} sẽ có trong bước sau",
       "sectionTransform": "Biến đổi",
       "sectionDestination": "Đích",
       "stepSearchPlaceholder": "Tìm kiếm bước...",
-      "stepNoMatch": "Không có bước nào phù hợp với tìm kiếm của bạn.",
+      "stepNoMatch": "Không có bước nào khớp với tìm kiếm của bạn.",
       "conditionDesc": "Chỉ tiếp tục khi một quy tắc khớp",
       "branchDesc": "Định tuyến từng bản ghi theo đường dẫn khớp đầu tiên",
       "branchCaseLabel": "Tên đường dẫn (không bắt buộc)",
@@ -2779,13 +2782,13 @@
       "branchMoveDown": "Di chuyển đường dẫn xuống",
       "branchPathNumber": "Đường dẫn {index}",
       "branchElseTitle": "Mọi trường hợp khác",
-      "branchElseHint": "Các bản ghi không khớp với đường dẫn nào ở trên sẽ được chuyển ra tại đây.",
+      "branchElseHint": "Các bản ghi không khớp với đường dẫn nào ở trên sẽ thoát ra từ đây.",
       "branchNoteTitle": "Hướng dẫn về nhánh",
-      "branchNoteFirstMatch": "Các nhánh được kiểm tra từ trên xuống dưới và nhánh nào khớp ĐẦU TIÊN sẽ thắng, vì vậy mỗi bản ghi sẽ thoát theo đúng một nhánh.",
-      "branchNoteUnwired": "Một nhánh không có gì kết nối sẽ chỉ đơn giản loại bỏ các bản ghi của nó.",
+      "branchNoteFirstMatch": "Các đường dẫn được kiểm tra từ trên xuống dưới và kết quả khớp ĐẦU TIÊN sẽ thắng, vì vậy mỗi bản ghi chỉ đi ra theo đúng một đường dẫn.",
+      "branchNoteUnwired": "Một đường dẫn không được kết nối với gì sẽ chỉ đơn giản bỏ các bản ghi của nó.",
       "functionDesc": "Định hình lại tải trọng bằng một hàm",
       "destinationDesc": "Gửi đến một đích",
-      "triggerBody": "Chạy khi một cảnh báo liên quan kích hoạt",
+      "triggerBody": "Chạy khi cảnh báo liên kết được kích hoạt",
       "triggerDataExampleNote": "Chỉ là ví dụ — các cột thực tế đến từ truy vấn của cảnh báo của bạn.",
       "incidentEventTypeLabel": "Loại sự kiện",
       "incidentEventType": {
@@ -2809,18 +2812,18 @@
       "incidentNoExtraFields": "Sự kiện này không thêm trường nào ngoài các trường chung.",
       "conditionNoteTitle": "Hướng dẫn điều kiện",
       "functionFlattenTitle": "Trước và sau khi làm phẳng",
-      "conditionNoteCustom": "Để thêm cột tùy chỉnh, nhập tên của nó và nhấn Enter.",
-      "functionBody": "Định dạng lại payload bằng hàm",
+      "conditionNoteCustom": "Để thêm một cột tùy chỉnh, hãy nhập tên cột và nhấn Enter.",
+      "functionBody": "Định hình lại payload bằng một Hàm",
       "functionBodySet": "Áp dụng {name}",
       "functionSelect": "Chọn hàm",
       "functionCreateNew": "Tạo hàm mới",
       "functionRequired": "Hàm là bắt buộc",
-      "functionLoadError": "Không thể tải danh sách hàm",
-      "destinationBody": "Gửi đến một đích",
+      "functionLoadError": "Không thể tải các hàm",
+      "destinationBody": "Gửi đến một Đích",
       "destinationBodySet": "Gửi đến {name}",
       "destinationSelect": "Đích",
       "destinationCreateNew": "Tạo đích mới",
-      "destinationRequired": "Vui lòng chọn một đích",
+      "destinationRequired": "Vui lòng chọn một Đích",
       "destinationLoadError": "Không thể tải các đích",
       "namePlaceholder": "Tên bước này (Tùy chọn)",
       "commentLabel": "Nhận xét (Tùy chọn)",
@@ -2859,7 +2862,7 @@
       "expandSteps": "Mở rộng các bước",
       "inputTag": "Đầu vào",
       "openStep": "Mở {name}",
-      "runToView": "Chạy thử để xem dữ liệu này.",
+      "runToView": "Chạy kiểm thử để xem dữ liệu này.",
       "noBranchItems": "Không có mục nào trên nhánh này.",
       "forwardedCount": "{out} trong {total} bản ghi được chuyển tiếp | {out} trong {total} bản ghi được chuyển tiếp",
       "noMatchForwarded": "Không khớp — 0 trong {total} bản ghi được chuyển tiếp | Không khớp — 0 trong {total} bản ghi được chuyển tiếp",
@@ -2869,7 +2872,7 @@
       "runLabel": "Chạy",
       "switchRun": "Chuyển lần chạy",
       "notInRun": "Bước này không nằm trong lần chạy này.",
-      "noRunData": "Lần chạy này không lưu dữ liệu bước.",
+      "noRunData": "Lần chạy này không lưu dữ liệu của bước.",
       "runTest": "Chạy thử",
       "noItems": "Không có mục nào",
       "itemsCount": "{count} mục | {count} mục",
@@ -2881,7 +2884,7 @@
       "editStep": "Chỉnh sửa bước",
       "readOnlyRun": "Bạn đang xem một lần chạy trước đó, vì vậy cấu hình của bước này không thể thay đổi tại đây.",
       "readOnlyRunEdit": "Chỉnh sửa trong quy trình làm việc",
-      "testInputHint": "Đầu vào thử nghiệm — Chỉnh sửa, sau đó chạy bước.",
+      "testInputHint": "Đầu vào thử nghiệm — chỉnh sửa, rồi chạy bước.",
       "noRunsList": "Chưa có lần chạy nào.",
       "resetInput": "Đặt lại về mẫu",
       "eventPager": "{n} / {total}",
@@ -2906,7 +2909,7 @@
       "expand": "Mở rộng",
       "close": "Xóa & Đóng Kết Quả",
       "nodesTitle": "Các bước",
-      "empty": "Chạy một bài kiểm tra để xem kết quả các bước tại đây.",
+      "empty": "Chạy thử để xem kết quả của bước tại đây.",
       "openNode": "Mở Node",
       "viewConfig": "Xem cấu hình",
       "hideConfig": "Ẩn cấu hình",
@@ -2916,7 +2919,7 @@
       "branchPathsLabel": "Nhánh",
       "branchNoRule": "Chưa thiết lập quy tắc",
       "destinationUnsupported": "Loại không được hỗ trợ",
-      "destinationMissing": "Đích này không còn tồn tại hoặc không thể đọc được.",
+      "destinationMissing": "Destination này không còn tồn tại hoặc không thể đọc.",
       "headersLabel": "Header",
       "templateLabel": "Mẫu",
       "outputFormatLabel": "Định dạng đầu ra",
@@ -3673,29 +3676,31 @@
       "crossLinkBody": "{brand} cung cấp điểm cuối {product} (MCP) để các ứng dụng AI như {client1}, {client2} và {client3} có thể truy vấn và thao tác trên tổ chức này. Cấu hình và thông tin xác thực nằm trong IAM.",
       "crossLinkCta": "Mở thiết lập MCP",
       "tagline": "Kết nối {client1}, {client2}, {client3} và các ứng dụng AI khác với tổ chức này qua {product} (MCP).",
-      "endpointLabel": "Điểm cuối MCP",
-      "authLabel": "1. Xác thực",
-      "clientLabel": "2. Chọn ứng dụng khách của bạn",
-      "configLabel": "3. Thêm cấu hình",
+      "connectLabel": "Endpoint và xác thực",
+      "connectHint": "Trỏ MCP client của bạn tới URL này, rồi chọn cách đăng nhập.",
+      "configLabel": "Thêm cấu hình",
+      "configHint": "Chọn client của bạn, sau đó chép cấu hình vào đúng vị trí.",
       "auth": {
         "oauth": "OAuth — đăng nhập (khuyên dùng)",
         "token": "Mã thông báo truy cập",
+        "oauthTitle": "Đăng nhập bằng trình duyệt của bạn",
         "oauthNote": "Không cần quản lý thông tin xác thực: ứng dụng khách MCP của bạn mở trình duyệt để đăng nhập và quyền truy cập được giới hạn bởi các quyền hiện có của bạn. Sử dụng nó bất cứ khi nào ứng dụng khách của bạn hỗ trợ OAuth."
       },
       "credential": {
-        "quickStartTitle": "Bắt đầu nhanh — tài khoản của bạn",
-        "quickStartBody": "Các đoạn mã sử dụng thông tin xác thực của riêng bạn, mang đầy đủ quyền của bạn. Đối với môi trường sản xuất, hãy tạo thông tin xác thực chỉ đọc chuyên dụng thay thế.",
-        "generate": "Tạo thông tin xác thực chỉ đọc",
-        "created": "Đã tạo thông tin xác thực chỉ đọc",
+        "quickStartTitle": "Chưa có token",
+        "quickStartBody": "Các đoạn mã bên dưới chứa một header giữ chỗ. Hãy tạo token chuyên dụng cho MCP client này, hoặc dán token tài khoản dịch vụ hiện có vào vị trí đó.",
+        "generate": "Tạo token chuyên dụng",
+        "created": "Đã tạo token chuyên dụng",
         "shownOnce": "Cho {email}. Sao chép ngay — mã thông báo chỉ được hiển thị một lần và các đoạn mã bên dưới hiện sử dụng nó.",
         "download": "Tải xuống",
         "manage": "Quản lý / thu hồi",
-        "readonlyWarn": "Tài khoản đã được tạo nhưng không thể áp dụng vai trò chỉ đọc tự động — hãy xem xét quyền của nó trong Tài khoản dịch vụ.",
+        "readonlyWarn": "Tài khoản đã được tạo nhưng không thể thêm vào vai trò {role} — tài khoản không có quyền nào cho đến khi bạn gán một vai trò trong IAM.",
+        "readonlyNote": "Giới hạn chỉ đọc thông qua vai trò {role} — hãy xem lại hoặc mở rộng trong IAM › Vai trò.",
+        "rbacNote": "RBAC đang tắt trong môi trường triển khai này, vì vậy token này không thể giới hạn chỉ đọc — nó có quyền truy cập giống như mọi thông tin xác thực khác của tổ chức này.",
         "error": "Không thể tạo thông tin xác thực. Hãy thử lại hoặc tạo tài khoản dịch vụ thủ công trong IAM."
       },
       "securityTitle": "Sử dụng thông tin xác thực chuyên dụng với đặc quyền tối thiểu",
-      "securityBody": "Mã thông báo mặc định là thông tin xác thực tài khoản của bạn. Đối với môi trường sản xuất, hãy tạo thông tin xác thực chỉ đọc ở trên (hoặc tạo tài khoản dịch vụ có phạm vi) và không bao giờ commit mã thông báo vào kiểm soát nguồn.",
-      "docsCta": "Đọc tài liệu MCP đầy đủ",
+      "securityBody": "Hãy cấp cho MCP client một tài khoản dịch vụ chỉ đọc, giới hạn phạm vi thay vì dùng thông tin xác thực tài khoản cá nhân của bạn, và không bao giờ commit token của nó vào kho mã nguồn.",
       "clients": {
         "claudeCode": "Claude Code",
         "cursor": "Cursor",
@@ -3722,7 +3727,10 @@
         "hermes": "Thêm vào ~/.hermes/config.yaml (YAML), sau đó chạy /reload-mcp.",
         "codex": "Thêm vào ~/.codex/config.toml (TOML), sau đó khởi động lại Codex."
       },
-      "installOneClick": "Thêm vào {client}"
+      "installOneClick": "Thêm vào {client}",
+      "skillsLabel": "Thêm kỹ năng {brand} (không bắt buộc)",
+      "skillsHint": "Dạy Trợ lý AI của bạn cách truy vấn, cảnh báo và tạo bảng điều khiển trong {brand}, để tận dụng tốt hơn các công cụ MCP. Chạy nó trong dự án của bạn, sau đó chọn các agent để cài đặt.",
+      "skillsRepo": "Xem các kỹ năng trên {host}"
     },
     "manageTokensBtnLabel": "Quản lý mã thông báo",
     "orgLevelExplanation": "Đây là các mã thông báo ingestion cấp tổ chức. Chúng không gắn với người dùng cụ thể và sẽ tiếp tục hoạt động ngay cả khi người dùng đã tạo chúng rời khỏi tổ chức. Mã thông báo chỉ có thể được sử dụng trên các điểm cuối ingestion.",
@@ -16293,6 +16301,7 @@
       },
       "databaseCount": "1 cơ sở dữ liệu | {count} cơ sở dữ liệu",
       "openQueries": "Xem truy vấn của nó",
+      "viewMetrics": "Xem chỉ số",
       "alertMe": "Cảnh báo tôi",
       "columnHints": {
         "qps": "Lời gọi mỗi giây — số lời gọi trong cửa sổ này chia cho độ dài của nó, để chế độ xem 15 phút và chế độ xem 4 giờ vẫn so sánh được.",
@@ -16553,10 +16562,10 @@
         "missingDescription": "Trang này mô tả một truy vấn, nhưng địa chỉ không chỉ ra truy vấn nào. Nếu bạn vừa chuyển tổ chức, truy vấn bạn đang đọc thuộc về tổ chức bạn đã rời khỏi.",
         "action": "Duyệt các truy vấn của tổ chức này"
       },
-      "backToQueries": "Quay lại các truy vấn hàng đầu",
-      "backToActivity": "Quay lại hoạt động",
-      "backToSamples": "Quay lại các lệnh gọi chậm nhất",
-      "backToDeadlocks": "Quay lại các deadlock",
+      "backToQueries": "truy vấn hàng đầu",
+      "backToActivity": "hoạt động",
+      "backToSamples": "các lệnh gọi chậm nhất",
+      "backToDeadlocks": "deadlock",
       "latencyTitle": "Tốc độ theo thời gian",
       "volumeTitle": "Lệnh gọi và lỗi theo thời gian",
       "endpointsTitle": "Nơi nó được gọi",
@@ -16721,6 +16730,8 @@
     "page": {
       "tabs": {
         "overview": "Tổng quan",
+        "metrics": "Chỉ số",
+        "metricsHint": "Tải cơ sở dữ liệu theo sự kiện chờ, và mọi chỉ số mà các receiver cơ sở dữ liệu của bạn thu thập.",
         "queries": "Truy vấn hàng đầu",
         "samples": "Cuộc gọi chậm nhất",
         "samplesHintClient": "Các cuộc gọi hoàn tất mà các dịch vụ được đo lường của bạn quan sát được trong khoảng thời gian này — các bên gọi không được truy vết không được tính, vì vậy đây là mức tối thiểu, không phải tổng số. Bảng hiển thị những cuộc gọi chậm nhất trong số đó.",
@@ -16737,6 +16748,129 @@
         "deadlocksLocked": "Deadlock là tính năng Enterprise. Nâng cấp để xem truy vấn nào đã khóa lẫn nhau và tại sao. Các tab cơ sở dữ liệu khác hoạt động trên mọi gói.",
         "blockedLocked": "Truy vấn bị chặn là tính năng Enterprise. Nâng cấp để xem phiên nào đang chờ khóa và điều gì đang giữ khóa. Các tab cơ sở dữ liệu khác hoạt động trên mọi gói.",
         "tableHealthLocked": "Sức khỏe bảng là tính năng Enterprise. Nâng cấp để theo dõi kích thước bảng, độ phình và trạng thái dọn dẹp. Các tab cơ sở dữ liệu khác hoạt động trên mọi gói."
+      }
+    },
+    "metrics": {
+      "title": "Chỉ số",
+      "subtitle": "Tải cơ sở dữ liệu và mọi chỉ số mà các receiver cơ sở dữ liệu của bạn thu thập, được vẽ biểu đồ trong cửa sổ này",
+      "load": {
+        "title": "Tải cơ sở dữ liệu",
+        "hint": "Số phiên trung bình đang hoạt động trong mỗi khoảng thời gian, xếp chồng theo chiều được chọn. Các kết nối không hoạt động bị loại trừ; một phiên không chờ gì cả nghĩa là đang chạy trên CPU. Kéo ngang qua một đỉnh để phóng to mọi biểu đồ theo đó.",
+        "timeAxis": "Thời gian",
+        "sessionsAxis": "Số phiên hoạt động trung bình",
+        "waitEventAxis": "Sự kiện chờ",
+        "viewActivity": "Xem trong Hoạt động",
+        "breakdowns": {
+          "waitEvent": "Theo sự kiện chờ",
+          "query": "Theo truy vấn",
+          "database": "Theo cơ sở dữ liệu",
+          "user": "Theo người dùng"
+        }
+      },
+      "limitLegend": "giới hạn kết nối",
+      "explore": "Mở trong Metrics Explorer",
+      "railLabel": "Các mục chỉ số",
+      "noAccess": "Bạn không có quyền đọc {stream}. Hãy yêu cầu quản trị viên cấp quyền đọc Stream này.",
+      "byDims": {
+        "query": "theo truy vấn",
+        "database": "theo cơ sở dữ liệu",
+        "service": "theo dịch vụ",
+        "operation": "theo thao tác",
+        "mode": "theo chế độ",
+        "lockType": "theo loại khóa",
+        "table": "theo bảng",
+        "index": "theo chỉ mục",
+        "client": "theo client",
+        "state": "theo trạng thái",
+        "direction": "theo hướng",
+        "device": "theo thiết bị",
+        "host": "theo host"
+      },
+      "catalog": {
+        "activity": {
+          "title": "Hoạt động",
+          "desc": "Thông lượng, giao dịch và mức biến động hàng"
+        },
+        "locks": {
+          "title": "Khóa",
+          "desc": "Áp lực khóa và đối tượng đang giữ khóa"
+        },
+        "replication": {
+          "title": "Sao chép",
+          "desc": "Áp lực WAL và độ trễ bản sao"
+        },
+        "indexes": {
+          "title": "Chỉ mục",
+          "desc": "Mức sử dụng và kích thước chỉ mục theo từng bảng"
+        },
+        "blocks": {
+          "title": "Khối",
+          "desc": "I/O bộ đệm chia sẻ được quy cho các truy vấn, từ các bộ đếm của chính cơ sở dữ liệu"
+        },
+        "vacuum": {
+          "title": "Vacuum",
+          "desc": "Số hàng còn sống và hàng đã chết trên mỗi bảng"
+        },
+        "host": {
+          "managedNote": "Cơ sở dữ liệu này chạy trên một endpoint do dịch vụ đám mây quản lý (chẳng hạn Amazon RDS), nên nhà cung cấp không cung cấp host để các collector của bạn giám sát. Hãy xoá bộ lọc cơ sở dữ liệu để xem chỉ số host của những host mà collector của bạn thực sự báo cáo.",
+          "title": "Host",
+          "desc": "CPU, bộ nhớ và I/O của host cơ sở dữ liệu",
+          "loopbackHint": "instance được kết nối qua localhost — đang hiển thị tất cả host",
+          "matchHint": "chỉ số host được khớp theo hostname"
+        }
+      },
+      "catalogPanels": {
+        "calls": "Số lần gọi truy vấn",
+        "avgDuration": "Thời lượng trung bình",
+        "commits": "Số lần commit",
+        "rollbacks": "Số lần rollback",
+        "rowsModified": "Số hàng đã thay đổi",
+        "locks": "Khóa",
+        "walLag": "Độ trễ WAL",
+        "indexScans": "Quét chỉ mục",
+        "indexSize": "Kích thước chỉ mục",
+        "blksHit": "Shared block trúng cache",
+        "blksRead": "Shared block đọc",
+        "blksDirtied": "Shared block bị ghi bẩn",
+        "rowsByState": "Hàng theo trạng thái",
+        "cpuUtilization": "Mức sử dụng CPU",
+        "memoryUsage": "Bộ nhớ",
+        "diskIo": "I/O đĩa",
+        "networkIo": "I/O mạng"
+      },
+      "searchPlaceholder": "Lọc chỉ số…",
+      "triageOrder": "sắp xếp theo mức độ liên quan khi xử lý sự cố",
+      "sections": {
+        "featured": "Chỉ số sức khỏe chính",
+        "postgresql": "Chỉ số PostgreSQL",
+        "mysql": "Chỉ số MySQL và MariaDB"
+      },
+      "roleTitle": "{role} · {engine}",
+      "roles": {
+        "cacheHitRatio": "Tỷ lệ trúng cache",
+        "connections": "Kết nối",
+        "connectionLimit": "Giới hạn kết nối",
+        "replicationLag": "Độ trễ sao chép",
+        "cacheHit": "Lần trúng cache",
+        "cacheRead": "Lần đọc cache từ đĩa",
+        "deadlocks": "Deadlock"
+      },
+      "notCollecting": {
+        "title": "Không có chỉ số cơ sở dữ liệu nào được gửi đến",
+        "description": "Biểu đồ tải ở trên đọc các mẫu hoạt động, nhưng tổ chức này chưa có stream chỉ số nào từ một database receiver. Các công thức collector trên thẻ thiết lập cơ sở dữ liệu sẽ gửi chúng.",
+        "checklistTitle": "Cần kiểm tra gì",
+        "checks": {
+          "receivers": {
+            "no": "Không có database receiver nào đang gửi chỉ số",
+            "noDetail": "Các thẻ thiết lập PostgreSQL và MySQL trong Nguồn dữ liệu cấu hình metric receiver của collector cùng với các luồng giám sát."
+          },
+          "enabled": {
+            "ok": "Giám sát cơ sở dữ liệu đã được bật",
+            "okDetail": "nên các chỉ số sẽ được vẽ ở đây ngay khi receiver gửi chúng đến",
+            "no": "Giám sát cơ sở dữ liệu đã bị tắt",
+            "noDetail": "ZO_DB_MONITORING_ENABLED đang tắt cho triển khai này, nên các tab cơ sở dữ liệu không thu thập dữ liệu."
+          }
+        }
       }
     },
     "samples": {

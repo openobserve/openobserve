@@ -18,82 +18,68 @@ use std::collections::BTreeSet;
 use config::meta::promql::value::{EvalContext, Labels, RangeValue, Sample, Value};
 use datafusion::error::{DataFusionError, Result};
 
-/// Helper function to generate a matrix with value 1.0 for all timestamps in the eval context
-fn generate_absent_matrix(eval_ctx: &EvalContext) -> Value {
-    let mut samples = Vec::new();
-    let mut ts = eval_ctx.start;
-    while ts <= eval_ctx.end {
-        samples.push(Sample::new(ts, 1.0));
-        ts += eval_ctx.step;
+/// https://prometheus.io/docs/prometheus/latest/querying/functions/#absent
+/// Returns 1 for each timestamp where the input vector has no data
+pub(crate) fn absent(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
+    let matrix = match data {
+        Value::Matrix(matrix) => matrix,
+        Value::None => vec![],
+        _ => {
+            return Err(DataFusionError::Plan(format!(
+                "Invalid input for absent, expected matrix but got: {:?}",
+                data.get_type()
+            )));
+        }
+    };
+    // Collect all timestamps that have data across all series
+    let present: BTreeSet<_> = matrix
+        .iter()
+        .flat_map(|series| series.samples.iter().map(|sample| sample.timestamp))
+        .collect();
+    // Generate samples for timestamps that DON'T have data
+    let samples: Vec<_> = eval_ctx
+        .timestamps()
+        .into_iter()
+        .filter(|timestamp| !present.contains(timestamp))
+        .map(|timestamp| Sample::new(timestamp, 1.0))
+        .collect();
+    // If all timestamps have data, return None (empty result)
+    if samples.is_empty() {
+        return Ok(Value::None);
     }
-
-    let range_value = RangeValue {
+    // Return 1.0 for timestamps where data is absent
+    Ok(Value::Matrix(vec![RangeValue {
         labels: Labels::default(),
         samples,
         exemplars: None,
         time_window: None,
-    };
-
-    Value::Matrix(vec![range_value])
-}
-
-/// https://prometheus.io/docs/prometheus/latest/querying/functions/#absent
-/// Returns 1 for each timestamp where the input vector has no data
-pub(crate) fn absent(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
-    match data {
-        Value::Matrix(matrix) => {
-            // If the matrix is completely empty, return 1 for all timestamps
-            if matrix.is_empty() {
-                return Ok(generate_absent_matrix(eval_ctx));
-            }
-
-            // Collect all timestamps that have data across all series
-            let mut timestamps_with_data = BTreeSet::new();
-            for range_value in &matrix {
-                for sample in &range_value.samples {
-                    timestamps_with_data.insert(sample.timestamp);
-                }
-            }
-
-            // Generate samples for timestamps that DON'T have data
-            let mut absent_samples = Vec::new();
-            let mut ts = eval_ctx.start;
-            while ts <= eval_ctx.end {
-                if !timestamps_with_data.contains(&ts) {
-                    absent_samples.push(Sample::new(ts, 1.0));
-                }
-                ts += eval_ctx.step;
-            }
-
-            // If all timestamps have data, return None (empty result)
-            if absent_samples.is_empty() {
-                return Ok(Value::None);
-            }
-
-            // Return 1.0 for timestamps where data is absent
-            let range_value = RangeValue {
-                labels: Labels::default(),
-                samples: absent_samples,
-                exemplars: None,
-                time_window: None,
-            };
-
-            Ok(Value::Matrix(vec![range_value]))
-        }
-        Value::None => {
-            // No data at all, return 1 for all timestamps
-            Ok(generate_absent_matrix(eval_ctx))
-        }
-        _ => Err(DataFusionError::Plan(format!(
-            "Invalid input for absent, expected matrix but got: {:?}",
-            data.get_type()
-        ))),
-    }
+    }]))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_absent_instant_with_zero_step() {
+        let ctx = EvalContext::new(1_000_000, 1_000_000, 0, "test".into());
+        for input in [Value::None, Value::Matrix(vec![])] {
+            let Value::Matrix(matrix) = absent(input, &ctx).unwrap() else {
+                panic!("expected one absent sample");
+            };
+            assert_eq!(matrix.len(), 1);
+            assert_eq!(matrix[0].samples.len(), 1);
+            assert_eq!(matrix[0].samples[0].timestamp, ctx.start);
+            assert_eq!(matrix[0].samples[0].value, 1.0);
+        }
+        let input = Value::Matrix(vec![RangeValue {
+            labels: Labels::default(),
+            samples: vec![Sample::new(ctx.start, 7.0)],
+            exemplars: None,
+            time_window: None,
+        }]);
+        assert!(matches!(absent(input, &ctx).unwrap(), Value::None));
+    }
 
     fn create_eval_ctx() -> EvalContext {
         EvalContext::new(

@@ -860,15 +860,15 @@
       "createNew": "新しい宛先を作成",
       "select": "宛先",
       "loadError": "宛先の取得中にエラーが発生しました。",
-      "unsupportedType": "サポートされていないタイプ — ワークフローはカスタム宛先のみをサポートします"
+      "unsupportedType": "サポートされていないタイプ — ワークフローはカスタム送信先のみをサポートしています"
     },
     "function": {
       "createNew": "新しい関数を作成",
       "createNewNoteWorkflow": "注：関数が作成され、その後、以前のフォームにリダイレクトされて、新しく作成された関数をワークフローに関連付けます。",
       "select": "関数を選択",
       "loadError": "関数の読み込みに失敗しました",
-      "saved": "関数が正常に保存されました",
-      "updated": "関数が正常に更新されました",
+      "saved": "関数を保存しました",
+      "updated": "関数を更新しました",
       "saveError": "関数の保存に失敗しました",
       "flatten": "フラット化後",
       "guidelinesTitle": "関数実行ガイドライン：",
@@ -2057,7 +2057,8 @@
       "startFrom": {
         "label": "から開始",
         "custom": "カスタム (空のロール)",
-        "readonly": "読み取り専用 (すべてのリソースへのアクセスを表示)"
+        "readonly": "読み取り専用 (すべてのリソースへのアクセスを表示)",
+        "dbm": "データベースモニタリングビューアー（DB モニタリングモジュールと、そのメトリクスタブがクエリするメトリクスストリームに対する読み取り専用）"
       },
       "name": {
         "required": "ロール名が必要です。",
@@ -2093,7 +2094,9 @@
       "loadFailed": "ロールの詳細の読み込みに失敗しました。ロール一覧にリダイレクトします。",
       "noUpdatesDetected": "更新は検出されませんでした。",
       "updateSuccess": "ロールの更新に成功しました。",
-      "updateError": "ロールの更新中にエラーが発生しました。"
+      "updateError": "ロールの更新中にエラーが発生しました。",
+      "dbmPresetSeeded": "{total} 個の DB モニタリングメトリクスストリームのうち {matched} 個に対する読み取りアクセスが事前選択されています。さらに DB モニタリングモジュールも含まれます。保存する前に確認してください。",
+      "dbmPresetNoMatch": "{total} 個の DB モニタリングメトリクスストリームはまだこの組織に存在しないため、それらに対して事前選択は行われませんでした。DB モニタリングモジュールの付与は引き続きステージングされました。"
     },
     "rolesPage": {
       "subtitle": "ロールには権限がバンドルされています。ユーザー、サービスアカウント、またはグループに割り当ててアクセスを許可します。",
@@ -2554,7 +2557,7 @@
     "header": "ワークフロー",
     "subtitle": "トリガー、ロジック、宛先でアクションを自動化",
     "create": "新しいワークフロー",
-    "createSuccess": "ワークフローが正常に作成されました",
+    "createSuccess": "ワークフローを作成しました",
     "name": "ワークフロー名",
     "nameRequired": "名前は必須です",
     "search": "ワークフローを検索",
@@ -2605,14 +2608,14 @@
     "delete": "削除",
     "deleteTitle": "ワークフローを削除",
     "deleteMessage": "このワークフローを削除してもよろしいですか？",
-    "deleteSuccess": "ワークフローが正常に削除されました",
-    "deleteError": "ワークフロー削除中にエラーが発生しました",
-    "updateSuccess": "ワークフローが正常に更新されました",
-    "saveError": "ワークフロー保存中にエラーが発生しました",
-    "resumeSuccess": "{name}が正常に再開されました",
-    "pauseSuccess": "{name}が正常に一時停止されました",
-    "toggleError": "ワークフローステータスの更新中にエラーが発生しました",
-    "triggerRequired": "トリガーが必要です",
+    "deleteSuccess": "ワークフローを削除しました",
+    "deleteError": "ワークフローの削除中にエラーが発生しました",
+    "updateSuccess": "ワークフローを更新しました",
+    "saveError": "ワークフローの保存中にエラーが発生しました",
+    "resumeSuccess": "{name} を再開しました",
+    "pauseSuccess": "{name} を一時停止しました",
+    "toggleError": "ワークフロー状態の更新中にエラーが発生しました",
+    "triggerRequired": "トリガーは必須です",
     "addStepRequired": "トリガーの後に少なくとも1つのステップを追加してください",
     "connectAllNodes": "保存する前にすべてのノードを接続してください",
     "branchPathsRequired": "各分岐パスをステップに接続してください | 1つの分岐ステップで、接続がパスと一致していません。開いてパスを定義し、再接続してください。 | {count} 個の分岐ステップで、接続がパスと一致していません。",
@@ -2621,14 +2624,14 @@
     "draft": "下書き",
     "saveDraft": "下書きとして保存",
     "publish": "公開",
-    "draftSaveSuccess": "下書きが正常に保存されました",
-    "publishSuccess": "ワークフローが正常に公開されました",
+    "draftSaveSuccess": "下書きを保存しました",
+    "publishSuccess": "ワークフローを公開しました",
     "publishError": "ワークフローの公開中にエラーが発生しました",
-    "comingSoon": "これは後のステップで提供されます",
+    "comingSoon": "これは今後のステップで提供予定です",
     "triggerType": {
       "pick": "トリガーを選択",
       "dialogTitle": "新しいワークフローを作成",
-      "dialogIntro": "このワークフローのトリガー方法を選択してください。さらに多くのトリガータイプが近日公開予定です。",
+      "dialogIntro": "このワークフローのトリガー方法を選択してください。その他のトリガータイプは近日提供予定です。",
       "cta": "ワークフローを作成",
       "soonCta": "将来のリリースで利用可能",
       "comingSoon": "近日公開",
@@ -2737,18 +2740,18 @@
       "folderLabel": "フォルダ",
       "alertsLabel": "アラート",
       "alertsPlaceholder": "アラートを選択",
-      "noneSelected": "まだアラートが選択されていません。",
+      "noneSelected": "アラートがまだ選択されていません。",
       "selectedCount": "{count} 件選択済み",
       "clear": "すべてクリア",
-      "empty": "この組織にアラートが見つかりません。",
-      "noAlertsInFolder": "このフォルダにアラートはありません。",
-      "loadError": "アラートを読み込めませんでした。",
+      "empty": "この組織にはアラートがありません。",
+      "noAlertsInFolder": "このフォルダーにアラートはありません。",
+      "loadError": "アラートを読み込めません。",
       "link": "選択したものをリンク",
       "linkN": "選択した {count} 件をリンク",
       "skip": "今はスキップ",
-      "linkSuccess": "リンク先: {count} 件のアラート",
-      "linkPartial": "リンクされたアラート: {count} 件、失敗: {failed} 件 | リンクされたアラート: {count} 件、失敗: {failed} 件",
-      "linkError": "アラートをリンクできませんでした。"
+      "linkSuccess": "{count} 件のアラートにリンクしました | {count} 件のアラートにリンクしました",
+      "linkPartial": "{count} 件のアラートにリンクしました、{failed} 件失敗 | {count} 件のアラートにリンクしました、{failed} 件失敗",
+      "linkError": "アラートをリンクできません。"
     },
     "chooseTrigger": "トリガーを選択",
     "start": {
@@ -2764,7 +2767,7 @@
       "branch": "分岐",
       "function": "関数",
       "sendToDestination": "宛先",
-      "configComingSoon": "{node} の設定は後続のステップで行います",
+      "configComingSoon": "{node} の設定は今後のステップで提供予定です",
       "sectionTransform": "変換",
       "sectionDestination": "宛先",
       "stepSearchPlaceholder": "ステップを検索...",
@@ -2779,13 +2782,13 @@
       "branchMoveDown": "パスを下へ移動",
       "branchPathNumber": "パス {index}",
       "branchElseTitle": "その他すべて",
-      "branchElseHint": "上記のどのパスにも一致しないレコードはここから出力されます。",
+      "branchElseHint": "上のどのパスにも一致しないレコードはここから出ます。",
       "branchNoteTitle": "分岐ガイドライン",
-      "branchNoteFirstMatch": "パスは上から下へチェックされ、最初に一致したパスが優先されます。そのため、各レコードは必ず1つのパスだけを通って出力されます。",
-      "branchNoteUnwired": "接続先のないパスでは、レコードは単に破棄されます。",
+      "branchNoteFirstMatch": "パスは上から下へチェックされ、最初に一致したものが優先されるため、各レコードは必ず1つのパスから出ます。",
+      "branchNoteUnwired": "何も接続されていないパスは、そのレコードをそのまま破棄します。",
       "functionDesc": "関数でペイロードを再整形",
       "destinationDesc": "宛先に送信",
-      "triggerBody": "関連付けられたアラートが発生したときに実行",
+      "triggerBody": "関連するアラートが発火したときに実行されます",
       "triggerDataExampleNote": "これは例です。実際の列はアラートのクエリから取得されます。",
       "incidentEventTypeLabel": "イベントタイプ",
       "incidentEventType": {
@@ -2809,19 +2812,19 @@
       "incidentNoExtraFields": "このイベントは共通フィールド以外のフィールドを追加しません。",
       "conditionNoteTitle": "条件のガイドライン",
       "functionFlattenTitle": "フラット化前と後",
-      "conditionNoteCustom": "カスタム列を追加するには、名前を入力してEnterキーを押します。",
-      "functionBody": "関数でペイロードを再形成する",
+      "conditionNoteCustom": "カスタム列を追加するには、名前を入力して Enter キーを押します。",
+      "functionBody": "関数でペイロードを整形する",
       "functionBodySet": "{name} を適用",
       "functionSelect": "関数を選択",
       "functionCreateNew": "新しい関数を作成",
-      "functionRequired": "関数が必要です",
+      "functionRequired": "関数は必須です",
       "functionLoadError": "関数を読み込めません",
-      "destinationBody": "宛先に送信",
+      "destinationBody": "送信先に送信する",
       "destinationBodySet": "{name} に送信",
       "destinationSelect": "宛先",
       "destinationCreateNew": "新しい宛先を作成",
-      "destinationRequired": "宛先を選択してください",
-      "destinationLoadError": "宛先を読み込めません",
+      "destinationRequired": "送信先を選択してください",
+      "destinationLoadError": "送信先を読み込めません",
       "namePlaceholder": "ステップ名 (任意)",
       "commentLabel": "コメント (任意)",
       "commentPlaceholder": "このステップに関するメモを追加...",
@@ -2859,17 +2862,17 @@
       "expandSteps": "ステップを展開",
       "inputTag": "入力",
       "openStep": "{name} を開く",
-      "runToView": "このデータを表示するにはテストを実行してください。",
-      "noBranchItems": "このブランチにはアイテムがありません。",
+      "runToView": "テストを実行してこのデータを表示します。",
+      "noBranchItems": "このブランチに項目はありません。",
       "forwardedCount": "{out} / {total} 件のレコードが転送されました | {out} / {total} 件のレコードが転送されました",
       "noMatchForwarded": "一致なし — 0 / {total} 件のレコードが転送されました | 一致なし — 0 / {total} 件のレコードが転送されました",
       "branchDropped": "{count} 件のレコードがどのパスにも一致しなかったため破棄されました | {count} 件のレコードがどのパスにも一致しなかったため破棄されました",
-      "noUpstream": "上流のステップがありません。",
+      "noUpstream": "上流のステップはありません。",
       "noRunYet": "まだ実行されていません。",
       "runLabel": "実行",
       "switchRun": "実行を切り替え",
-      "notInRun": "このステップはこの実行に含まれていません。",
-      "noRunData": "この実行ではステップデータが保存されませんでした。",
+      "notInRun": "このステップは今回の実行に含まれていません。",
+      "noRunData": "この実行ではステップデータが保存されていません。",
       "runTest": "テストを実行",
       "noItems": "アイテムがありません",
       "itemsCount": "{count} アイテム | {count} アイテム",
@@ -2906,7 +2909,7 @@
       "expand": "展開する",
       "close": "結果をクリアして閉じる",
       "nodesTitle": "ステップ",
-      "empty": "テストを実行すると、ここにステップ結果が表示されます。",
+      "empty": "テストを実行すると、ここにステップの結果が表示されます。",
       "openNode": "ノードを開く",
       "viewConfig": "設定を表示",
       "hideConfig": "設定を非表示",
@@ -3673,29 +3676,31 @@
       "crossLinkBody": "{brand} は {product}（MCP）エンドポイントを公開しており、{client1}、{client2}、{client3} などの AI クライアントがこの組織に対してクエリを実行し操作できます。セットアップと認証情報は IAM にあります。",
       "crossLinkCta": "MCPセットアップを開く",
       "tagline": "{product}（MCP）を介して {client1}、{client2}、{client3} およびその他の AI クライアントをこの組織に接続します。",
-      "endpointLabel": "MCPエンドポイント",
-      "authLabel": "1. 認証",
-      "clientLabel": "2. クライアントを選択",
-      "configLabel": "3. 設定を追加",
+      "connectLabel": "エンドポイントと認証",
+      "connectHint": "MCPクライアントにこのURLを指定し、サインイン方法を選択してください。",
+      "configLabel": "設定を追加",
+      "configHint": "クライアントを選択し、設定を指定の場所にコピーしてください。",
       "auth": {
         "oauth": "OAuth — サインイン（推奨）",
         "token": "アクセストークン",
+        "oauthTitle": "ブラウザでサインイン",
         "oauthNote": "管理する資格情報はありません。MCPクライアントがブラウザを開いてサインインし、アクセスは既存の権限に基づいてスコープされます。クライアントがOAuthをサポートしている場合はこれを使用してください。"
       },
       "credential": {
-        "quickStartTitle": "クイックスタート — あなたのアカウント",
-        "quickStartBody": "スニペットはあなた自身の資格情報を使用し、完全な権限を持ちます。本番環境では、代わりに専用の読み取り専用資格情報を生成してください。",
-        "generate": "読み取り専用資格情報を生成",
-        "created": "読み取り専用資格情報を作成しました",
+        "quickStartTitle": "トークンがまだありません",
+        "quickStartBody": "以下のスニペットにはプレースホルダーのヘッダーが含まれています。このMCPクライアント専用のトークンを生成するか、既存のサービスアカウントトークンをそこに貼り付けてください。",
+        "generate": "専用トークンを生成",
+        "created": "専用トークンを作成しました",
         "shownOnce": "{email}用です。今すぐコピーしてください。トークンは一度だけ表示され、以下のスニペットで使用されます。",
         "download": "ダウンロード",
         "manage": "管理/取り消し",
-        "readonlyWarn": "アカウントは作成されましたが、読み取り専用ロールを自動的に適用できませんでした。サービスアカウントで権限を確認してください。",
+        "readonlyWarn": "アカウントは作成されましたが、{role} ロールに追加できませんでした。IAMでロールを割り当てるまで権限はありません。",
+        "readonlyNote": "{role} ロールを通じて読み取り専用にスコープされています。IAM › ロール で確認または拡張してください。",
+        "rbacNote": "この環境ではRBACが無効になっているため、このトークンを読み取り専用にスコープできません。この組織の他の認証情報と同じアクセス権を持ちます。",
         "error": "資格情報を作成できませんでした。もう一度試すか、IAMで手動でサービスアカウントを作成してください。"
       },
       "securityTitle": "専用の最小権限資格情報を使用する",
-      "securityBody": "トークンはデフォルトで自分のアカウント資格情報になります。本番環境では、上記で読み取り専用資格情報を生成するか（またはスコープされたサービスアカウントを作成し）、トークンをソース管理にコミットしないでください。",
-      "docsCta": "MCPの完全なドキュメントを読む",
+      "securityBody": "MCPクライアントには、自分のアカウントの認証情報ではなく、スコープされた読み取り専用のサービスアカウントを付与し、そのトークンをソース管理にコミットしないでください。",
       "clients": {
         "claudeCode": "Claude Code",
         "cursor": "Cursor",
@@ -3722,7 +3727,10 @@
         "hermes": "~/.hermes/config.yaml (YAML) に追加し、次に /reload-mcp を実行してください。",
         "codex": "~/.codex/config.toml (TOML) に追加し、次に Codex を再起動してください。"
       },
-      "installOneClick": "{client} に追加"
+      "installOneClick": "{client} に追加",
+      "skillsLabel": "{brand} スキルを追加（任意）",
+      "skillsHint": "{brand} でのクエリ、アラート、ダッシュボードの作成方法を AI アシスタントに教えることで、MCP ツールをより活用できるようになります。プロジェクトで実行し、インストール先のエージェントを選択してください。",
+      "skillsRepo": "{host} でスキルを表示"
     },
     "manageTokensBtnLabel": "トークンの管理",
     "orgLevelExplanation": "これらは組織レベルの取り込みトークンです。これらは個々のユーザーに関連付けられることはなく、作成したユーザーが組織を離れても引き続き機能します。トークンは取り込みエンドポイントでのみ使用できます。",
@@ -16293,6 +16301,7 @@
       },
       "databaseCount": "1 データベース | {count} データベース",
       "openQueries": "クエリを表示",
+      "viewMetrics": "メトリクスを表示",
       "alertMe": "アラートを受け取る",
       "columnHints": {
         "qps": "1秒あたりの呼び出し — このウィンドウの呼び出し数をその長さで割ったもので、15分ビューと4時間ビューを比較しやすくします。",
@@ -16553,10 +16562,10 @@
         "missingDescription": "このページは1つのクエリについて説明していますが、アドレスにクエリが指定されていません。組織を切り替えたばかりの場合、読んでいたクエリは以前の組織のものです。",
         "action": "この組織のクエリを参照"
       },
-      "backToQueries": "トップクエリに戻る",
-      "backToActivity": "アクティビティに戻る",
-      "backToSamples": "最も遅いコールに戻る",
-      "backToDeadlocks": "デッドロックに戻る",
+      "backToQueries": "トップクエリ",
+      "backToActivity": "アクティビティ",
+      "backToSamples": "最も遅い呼び出し",
+      "backToDeadlocks": "デッドロック",
       "latencyTitle": "時間ごとの速度",
       "volumeTitle": "コール数と失敗数の推移",
       "endpointsTitle": "呼び出し元",
@@ -16721,6 +16730,8 @@
     "page": {
       "tabs": {
         "overview": "概要",
+        "metrics": "メトリクス",
+        "metricsHint": "待機イベント別のデータベース負荷と、データベースレシーバーが収集するすべてのメトリクスを表示します。",
         "queries": "トップクエリ",
         "samples": "最も遅い呼び出し",
         "samplesHintClient": "このウィンドウで計装されたサービスが観測した完了した呼び出し — トレースなしの呼び出し元はカウントされないため、これは下限であり、合計ではありません。テーブルにはその中で最も遅いものが表示されます。",
@@ -16737,6 +16748,129 @@
         "deadlocksLocked": "デッドロックはEnterprise機能です。アップグレードすると、どのクエリが互いにデッドロックしたか、その理由を確認できます。他のデータベースタブはすべてのプランで利用できます。",
         "blockedLocked": "ブロックされたクエリはEnterprise機能です。アップグレードすると、どのセッションがロックを待っているか、何がロックを保持しているかを確認できます。他のデータベースタブはすべてのプランで利用できます。",
         "tableHealthLocked": "テーブルの健全性はEnterprise機能です。アップグレードすると、テーブルのサイズ、ブロート、バキューム状態を追跡できます。他のデータベースタブはすべてのプランで利用できます。"
+      }
+    },
+    "metrics": {
+      "title": "メトリクス",
+      "subtitle": "このウィンドウでグラフ化した、データベース負荷とデータベースレシーバーが収集するすべてのメトリクス",
+      "load": {
+        "title": "データベース負荷",
+        "hint": "インターバルごとの、アクティブに処理中のセッションの平均を、選択したディメンションで積み上げ表示します。アイドル接続は除外されます。何も待機していないセッションは CPU 上で実行されています。スパイクを横切るようにドラッグすると、すべてのチャートをその範囲にズームできます。",
+        "timeAxis": "時間",
+        "sessionsAxis": "平均アクティブセッション数",
+        "waitEventAxis": "待機イベント",
+        "viewActivity": "アクティビティで表示",
+        "breakdowns": {
+          "waitEvent": "待機イベント別",
+          "query": "クエリ別",
+          "database": "データベース別",
+          "user": "ユーザー別"
+        }
+      },
+      "limitLegend": "接続制限",
+      "explore": "メトリクスエクスプローラーで開く",
+      "railLabel": "メトリクスセクション",
+      "noAccess": "{stream} を読み取る権限がありません。このストリームへの読み取りアクセスについて管理者に問い合わせてください。",
+      "byDims": {
+        "query": "クエリ別",
+        "database": "データベース別",
+        "service": "サービス別",
+        "operation": "オペレーション別",
+        "mode": "モード別",
+        "lockType": "ロックタイプ別",
+        "table": "テーブル別",
+        "index": "インデックス別",
+        "client": "クライアント別",
+        "state": "状態別",
+        "direction": "方向別",
+        "device": "デバイス別",
+        "host": "ホスト別"
+      },
+      "catalog": {
+        "activity": {
+          "title": "アクティビティ",
+          "desc": "スループット、トランザクション、行の変更量"
+        },
+        "locks": {
+          "title": "ロック",
+          "desc": "ロック競合とその保持元"
+        },
+        "replication": {
+          "title": "レプリケーション",
+          "desc": "WAL 負荷とレプリカ遅延"
+        },
+        "indexes": {
+          "title": "インデックス",
+          "desc": "テーブルごとのインデックス使用状況とサイズ"
+        },
+        "blocks": {
+          "title": "ブロック",
+          "desc": "データベース自身のカウンターから得られる、クエリに紐づく共有バッファ I/O"
+        },
+        "vacuum": {
+          "title": "バキューム",
+          "desc": "テーブルごとのライブ行とデッド行"
+        },
+        "host": {
+          "managedNote": "このデータベースはクラウド管理のエンドポイント（Amazon RDS など）で動作しているため、プロバイダーはコレクターが監視するホストを公開していません。データベースフィルタをクリアすると、コレクターが報告するホストのホストメトリクスを表示できます。",
+          "title": "ホスト",
+          "desc": "データベースホストの CPU、メモリ、I/O",
+          "loopbackHint": "インスタンスは localhost 経由で接続 — すべてのホストを表示中",
+          "matchHint": "ホストメトリクスはホスト名で照合されます"
+        }
+      },
+      "catalogPanels": {
+        "calls": "クエリ呼び出し",
+        "avgDuration": "平均所要時間",
+        "commits": "コミット",
+        "rollbacks": "ロールバック",
+        "rowsModified": "変更された行",
+        "locks": "ロック",
+        "walLag": "WAL ラグ",
+        "indexScans": "インデックススキャン",
+        "indexSize": "インデックスサイズ",
+        "blksHit": "共有ブロックヒット",
+        "blksRead": "共有ブロック読み取り",
+        "blksDirtied": "共有ブロックダーティ",
+        "rowsByState": "状態別の行",
+        "cpuUtilization": "CPU 使用率",
+        "memoryUsage": "メモリ",
+        "diskIo": "ディスク I/O",
+        "networkIo": "ネットワーク I/O"
+      },
+      "searchPlaceholder": "メトリクスを絞り込む…",
+      "triageOrder": "トリアージの関連度順",
+      "sections": {
+        "featured": "主要なヘルスメトリクス",
+        "postgresql": "PostgreSQL メトリクス",
+        "mysql": "MySQL と MariaDB のメトリクス"
+      },
+      "roleTitle": "{role} · {engine}",
+      "roles": {
+        "cacheHitRatio": "キャッシュヒット率",
+        "connections": "接続数",
+        "connectionLimit": "接続上限",
+        "replicationLag": "レプリケーションラグ",
+        "cacheHit": "キャッシュヒット",
+        "cacheRead": "キャッシュディスク読み取り",
+        "deadlocks": "デッドロック"
+      },
+      "notCollecting": {
+        "title": "データベースメトリクスが届いていません",
+        "description": "上の負荷チャートはアクティビティサンプルを読み取っていますが、この組織にはデータベースレシーバーからのメトリクスストリームがまだ存在しません。データベースのセットアップカードにあるコレクターレシピがそれらを送信します。",
+        "checklistTitle": "確認すべき項目",
+        "checks": {
+          "receivers": {
+            "no": "メトリクスを送信しているデータベースレシーバーがありません",
+            "noDetail": "データソース配下の PostgreSQL と MySQL のセットアップカードでは、監視フィードとともにコレクターのメトリクスレシーバーを設定します。"
+          },
+          "enabled": {
+            "ok": "データベース監視が有効です",
+            "okDetail": "レシーバーがメトリクスを送信し次第、ここにグラフ表示されます",
+            "no": "データベース監視が無効です",
+            "noDetail": "このデプロイでは ZO_DB_MONITORING_ENABLED がオフのため、データベースタブは収集を行っていません。"
+          }
+        }
       }
     },
     "samples": {

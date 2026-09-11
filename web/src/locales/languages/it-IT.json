@@ -860,7 +860,7 @@
       "createNew": "Crea nuova destinazione",
       "select": "Destinazione",
       "loadError": "Errore durante il recupero delle destinazioni.",
-      "unsupportedType": "Tipo non supportato — Workflow supporta solo destinazioni personalizzate"
+      "unsupportedType": "Tipo non supportato — i workflow supportano solo destinazioni personalizzate"
     },
     "function": {
       "createNew": "Crea nuova funzione",
@@ -869,7 +869,7 @@
       "loadError": "Caricamento funzioni fallito",
       "saved": "Funzione salvata con successo",
       "updated": "Funzione aggiornata con successo",
-      "saveError": "Salvataggio della funzione non riuscito",
+      "saveError": "Impossibile salvare la funzione",
       "flatten": "Dopo l'appiattimento",
       "guidelinesTitle": "Linee guida per l'esecuzione della funzione:",
       "rbf": "RBF (Esecuzione prima dell'appiattimento):",
@@ -2057,7 +2057,8 @@
       "startFrom": {
         "label": "Inizia da",
         "custom": "Personalizzato (ruolo vuoto)",
-        "readonly": "Sola lettura (visualizza l'accesso a tutte le risorse)"
+        "readonly": "Sola lettura (visualizza l'accesso a tutte le risorse)",
+        "dbm": "Visualizzatore del monitoraggio dei database (sola lettura sul modulo Monitoraggio database e sugli stream di metriche interrogati dalla relativa scheda Metriche)"
       },
       "name": {
         "required": "Il nome del ruolo è obbligatorio.",
@@ -2093,7 +2094,9 @@
       "loadFailed": "Impossibile caricare i dettagli del ruolo. Reindirizzamento all'elenco dei ruoli.",
       "noUpdatesDetected": "Nessun aggiornamento rilevato.",
       "updateSuccess": "Ruolo aggiornato con successo!",
-      "updateError": "Errore durante l'aggiornamento del ruolo!"
+      "updateError": "Errore durante l'aggiornamento del ruolo!",
+      "dbmPresetSeeded": "Accesso in lettura preselezionato su {matched} di {total} stream di metriche del monitoraggio dei database, più il modulo Monitoraggio database. Rivedi prima di salvare.",
+      "dbmPresetNoMatch": "Nessuno dei {total} stream di metriche del monitoraggio dei database esiste ancora in questa organizzazione, quindi non è stato preselezionato nulla su di essi; l'autorizzazione al modulo Monitoraggio database è stata comunque preparata."
     },
     "rolesPage": {
       "subtitle": "I ruoli raggruppano le autorizzazioni: assegnali a utenti, account di servizio o gruppi per concedere l'accesso.",
@@ -2604,31 +2607,31 @@
     "view": "Visualizza",
     "delete": "Elimina",
     "deleteTitle": "Elimina flusso di lavoro",
-    "deleteMessage": "Sei sicuro di voler eliminare questo flusso di lavoro?",
-    "deleteSuccess": "Flusso di lavoro eliminato con successo",
-    "deleteError": "Errore durante l'eliminazione del flusso di lavoro",
-    "updateSuccess": "Flusso di lavoro aggiornato con successo",
-    "saveError": "Errore durante il salvataggio del flusso di lavoro",
+    "deleteMessage": "Sei sicuro di voler eliminare questo workflow?",
+    "deleteSuccess": "Workflow eliminato con successo",
+    "deleteError": "Errore durante l'eliminazione del workflow",
+    "updateSuccess": "Workflow aggiornato con successo",
+    "saveError": "Errore durante il salvataggio del workflow",
     "resumeSuccess": "{name} ripreso con successo",
     "pauseSuccess": "{name} messo in pausa con successo",
-    "toggleError": "Errore durante l'aggiornamento dello stato del flusso di lavoro",
-    "triggerRequired": "È richiesto un trigger",
-    "addStepRequired": "Aggiungi almeno un passo dopo il trigger",
-    "connectAllNodes": "Collega tutti i nodi prima di salvare",
+    "toggleError": "Errore durante l'aggiornamento dello stato del workflow",
+    "triggerRequired": "È necessario un trigger",
+    "addStepRequired": "Aggiungi almeno un passaggio dopo il trigger",
+    "connectAllNodes": "Connetti tutti i nodi prima di salvare",
     "branchPathsRequired": "Collega ogni percorso di Branch a uno step. | 1 step di Branch ha connessioni che non corrispondono ai suoi percorsi. Aprilo, definisci i percorsi, poi ricollegali. | {count} step di Branch hanno connessioni che non corrispondono ai loro percorsi.",
     "finishStepsBeforePublish": "{count} passaggio richiede configurazione prima della pubblicazione — evidenziato sulla tela. | {count} passaggi richiedono configurazione prima della pubblicazione — evidenziati sulla tela.",
     "noChangesToPublish": "Nessuna modifica da pubblicare — questo workflow corrisponde già alla versione pubblicata.",
     "draft": "Bozza",
     "saveDraft": "Salva come bozza",
     "publish": "Pubblica",
-    "draftSaveSuccess": "Bozza salvata correttamente",
-    "publishSuccess": "Workflow pubblicato correttamente",
+    "draftSaveSuccess": "Bozza salvata con successo",
+    "publishSuccess": "Workflow pubblicato con successo",
     "publishError": "Errore durante la pubblicazione del workflow",
-    "comingSoon": "Questa opzione è prevista in un passaggio successivo",
+    "comingSoon": "Questa funzionalità arriverà in un passaggio successivo",
     "triggerType": {
       "pick": "Scegli un trigger",
       "dialogTitle": "Crea un nuovo workflow",
-      "dialogIntro": "Scegli come viene attivato questo workflow. Altri tipi di trigger sono in arrivo.",
+      "dialogIntro": "Scegli come viene attivato questo workflow. Altri tipi di trigger arriveranno presto.",
       "cta": "Crea workflow",
       "soonCta": "Disponibile in una futura versione",
       "comingSoon": "Prossimamente",
@@ -2661,7 +2664,7 @@
       "alertStartTime": "Timestamp più antico tra i record corrispondenti.",
       "alertEndTime": "Timestamp più recente tra i record corrispondenti."
     },
-    "loadError": "Impossibile caricare il flusso di lavoro",
+    "loadError": "Impossibile caricare il workflow",
     "deleteNode": "Elimina nodo",
     "deleteNodeTitle": "Elimina passaggio",
     "deleteNodeConfirm": "Sei sicuro di voler eliminare questo step? Puoi annullare l'operazione.",
@@ -2737,7 +2740,7 @@
       "folderLabel": "Cartella",
       "alertsLabel": "Avvisi",
       "alertsPlaceholder": "Seleziona Avvisi",
-      "noneSelected": "Nessun avviso selezionato ancora.",
+      "noneSelected": "Nessun avviso selezionato.",
       "selectedCount": "{count} Selezionati",
       "clear": "Cancella tutto",
       "empty": "Nessun avviso trovato in questa organizzazione.",
@@ -2746,8 +2749,8 @@
       "link": "Collega selezionati",
       "linkN": "Collega {count} selezionati",
       "skip": "Salta per ora",
-      "linkSuccess": "Collegato a {count} avviso(i)",
-      "linkPartial": "Collegato a {count} avviso, {failed} in errore | Collegato a {count} avvisi, {failed} in errore",
+      "linkSuccess": "Collegato a {count} avviso | Collegato a {count} avvisi",
+      "linkPartial": "Collegato a {count} avviso, {failed} non riusciti | Collegato a {count} avvisi, {failed} non riusciti",
       "linkError": "Impossibile collegare gli avvisi."
     },
     "chooseTrigger": "Scegli un trigger",
@@ -2768,7 +2771,7 @@
       "sectionTransform": "Trasforma",
       "sectionDestination": "Destinazione",
       "stepSearchPlaceholder": "Cerca passaggi...",
-      "stepNoMatch": "Nessun passaggio corrisponde alla tua ricerca.",
+      "stepNoMatch": "Nessun passaggio corrisponde alla ricerca.",
       "conditionDesc": "Prosegui solo quando una regola è soddisfatta.",
       "branchDesc": "Instrada ogni record sul primo percorso corrispondente.",
       "branchCaseLabel": "Nome percorso (facoltativo)",
@@ -2779,13 +2782,13 @@
       "branchMoveDown": "Sposta il percorso giù",
       "branchPathNumber": "Percorso {index}",
       "branchElseTitle": "Tutto il resto",
-      "branchElseHint": "I record che non corrispondono a nessuno dei percorsi sopra indicati escono qui.",
+      "branchElseHint": "I record che non corrispondono a nessun percorso precedente escono da qui.",
       "branchNoteTitle": "Linee guida per Branch",
-      "branchNoteFirstMatch": "I percorsi vengono controllati dall'alto verso il basso e vince la PRIMA corrispondenza, quindi ogni record esce esattamente da un percorso.",
-      "branchNoteUnwired": "Un percorso senza nulla collegato semplicemente scarta i suoi record.",
+      "branchNoteFirstMatch": "I percorsi vengono controllati dall'alto verso il basso e vince la PRIMA corrispondenza, quindi ogni record esce attraverso un solo percorso.",
+      "branchNoteUnwired": "Un percorso senza nulla collegato scarta semplicemente i suoi record.",
       "functionDesc": "Rimodella il payload con una funzione",
       "destinationDesc": "Invia a una destinazione",
-      "triggerBody": "Viene eseguito quando un avviso associato viene attivato",
+      "triggerBody": "Viene eseguito quando un avviso associato si attiva",
       "triggerDataExampleNote": "Solo esempio — le colonne effettive provengono dalla query del tuo avviso.",
       "incidentEventTypeLabel": "Tipo di evento",
       "incidentEventType": {
@@ -2860,16 +2863,16 @@
       "inputTag": "Ingresso",
       "openStep": "Apri {name}",
       "runToView": "Esegui un test per visualizzare questi dati.",
-      "noBranchItems": "Nessun elemento in questo ramo.",
+      "noBranchItems": "Nessun elemento su questo ramo.",
       "forwardedCount": "{out} di {total} record inoltrato | {out} di {total} record inoltrati",
       "noMatchForwarded": "Nessuna corrispondenza — 0 di {total} record inoltrato | Nessuna corrispondenza — 0 di {total} record inoltrati",
       "branchDropped": "{count} record non ha trovato alcun percorso — scartato | {count} record non hanno trovato alcun percorso — scartati",
       "noUpstream": "Nessun passaggio a monte.",
-      "noRunYet": "Nessuna esecuzione ancora.",
+      "noRunYet": "Nessuna esecuzione.",
       "runLabel": "Esegui",
       "switchRun": "Cambia esecuzione",
       "notInRun": "Questo passaggio non è incluso in questa esecuzione.",
-      "noRunData": "Questa esecuzione non ha memorizzato i dati dei passaggi.",
+      "noRunData": "Questa esecuzione non ha memorizzato i dati dello step.",
       "runTest": "Esegui test",
       "noItems": "Nessun elemento",
       "itemsCount": "{count} elemento | {count} elementi",
@@ -2881,7 +2884,7 @@
       "editStep": "Modifica passaggio",
       "readOnlyRun": "Stai visualizzando un'esecuzione passata, quindi la configurazione di questo passaggio non può essere modificata qui.",
       "readOnlyRunEdit": "Modifica nel Workflow",
-      "testInputHint": "Ingresso di test — modifica, quindi esegui il passaggio.",
+      "testInputHint": "Input di test — modifica, poi esegui lo step.",
       "noRunsList": "Nessuna esecuzione ancora.",
       "resetInput": "Ripristina al campione",
       "eventPager": "{n} di {total}",
@@ -2906,7 +2909,7 @@
       "expand": "Espandi",
       "close": "Cancella e chiudi i risultati",
       "nodesTitle": "Passaggi",
-      "empty": "Esegui un test per vedere i risultati dei passaggi qui.",
+      "empty": "Esegui un test per vedere qui i risultati dello step.",
       "openNode": "Apri nodo",
       "viewConfig": "Visualizza configurazione",
       "hideConfig": "Nascondi configurazione",
@@ -2916,7 +2919,7 @@
       "branchPathsLabel": "Percorsi",
       "branchNoRule": "Nessuna regola impostata",
       "destinationUnsupported": "Tipo non supportato",
-      "destinationMissing": "Questa destinazione non esiste più o non può essere letta.",
+      "destinationMissing": "Questa Destinazione non esiste più o non può essere letta.",
       "headersLabel": "Intestazioni",
       "templateLabel": "Template",
       "outputFormatLabel": "Formato di output",
@@ -3673,29 +3676,31 @@
       "crossLinkBody": "{brand} espone un endpoint {product} (MCP) così che client AI come {client1}, {client2} e {client3} possano interrogare e agire su questa organizzazione. Configurazione e credenziali si trovano in IAM.",
       "crossLinkCta": "Apri configurazione MCP",
       "tagline": "Connetti {client1}, {client2}, {client3} e altri client AI a questa organizzazione tramite {product} (MCP).",
-      "endpointLabel": "Endpoint MCP",
-      "authLabel": "1. Autenticazione",
-      "clientLabel": "2. Scegli il tuo client",
-      "configLabel": "3. Aggiungi la configurazione",
+      "connectLabel": "Endpoint e autenticazione",
+      "connectHint": "Indirizza il tuo client MCP a questo URL, quindi scegli come deve autenticarsi.",
+      "configLabel": "Aggiungi la configurazione",
+      "configHint": "Scegli il client, quindi copia la configurazione nella posizione appropriata.",
       "auth": {
         "oauth": "OAuth — accedi (consigliato)",
         "token": "Token di accesso",
+        "oauthTitle": "Accedi con il tuo browser",
         "oauthNote": "Nessuna credenziale da gestire: il tuo client MCP apre un browser per l'accesso e l'accesso è limitato dai tuoi permessi esistenti. Usalo quando il tuo client supporta OAuth."
       },
       "credential": {
-        "quickStartTitle": "Guida rapida — il tuo account",
-        "quickStartBody": "Gli snippet usano le tue credenziali personali, che hanno i tuoi permessi completi. Per la produzione, genera invece una credenziale di sola lettura dedicata.",
-        "generate": "Genera credenziale di sola lettura",
-        "created": "Credenziale di sola lettura creata",
+        "quickStartTitle": "Ancora nessun token",
+        "quickStartBody": "I frammenti seguenti contengono un'intestazione segnaposto. Genera un token dedicato per questo client MCP oppure incolla al suo posto un token di un account di servizio esistente.",
+        "generate": "Genera token dedicato",
+        "created": "Token dedicato creato",
         "shownOnce": "Per {email}. Copiala ora — il token viene mostrato solo una volta e gli snippet seguenti ora lo utilizzano.",
         "download": "Scarica",
         "manage": "Gestisci / revoca",
-        "readonlyWarn": "L'account è stato creato ma il ruolo di sola lettura non può essere applicato automaticamente — rivedi i suoi permessi in Service Accounts.",
+        "readonlyWarn": "L'account è stato creato ma non è stato possibile aggiungerlo al ruolo {role} — non dispone di autorizzazioni finché non se ne assegna una in IAM.",
+        "readonlyNote": "Limitato alla sola lettura tramite il ruolo {role} — rivedilo o estendilo in IAM › Ruoli.",
+        "rbacNote": "Il controllo degli accessi basato sui ruoli (RBAC) è disattivato in questa distribuzione, quindi questo token non può essere limitato alla sola lettura — ha lo stesso accesso di qualsiasi altra credenziale per questa organizzazione.",
         "error": "Impossibile creare la credenziale. Riprova o crea manualmente un account di servizio in IAM."
       },
       "securityTitle": "Usa una credenziale dedicata con privilegi minimi",
-      "securityBody": "Il token predefinito utilizza le credenziali del tuo account. Per la produzione, genera una credenziale di sola lettura sopra (o crea un account di servizio con ambito) e non inserire mai i token nel controllo versione.",
-      "docsCta": "Leggi la documentazione completa su MCP",
+      "securityBody": "Assegna al client MCP un account di servizio con ambito limitato e di sola lettura anziché le credenziali del tuo account personale e non inserire mai il suo token nel controllo del codice sorgente.",
       "clients": {
         "claudeCode": "Claude Code",
         "cursor": "Cursor",
@@ -3722,7 +3727,10 @@
         "hermes": "Aggiungi a ~/.hermes/config.yaml (YAML), poi esegui /reload-mcp.",
         "codex": "Aggiungi a ~/.codex/config.toml (TOML), quindi riavvia Codex."
       },
-      "installOneClick": "Aggiungi a {client}"
+      "installOneClick": "Aggiungi a {client}",
+      "skillsLabel": "Aggiungi la skill {brand} (opzionale)",
+      "skillsHint": "Insegna al tuo Assistente AI come eseguire query, creare avvisi e dashboard in {brand}, così può sfruttare al meglio gli strumenti MCP. Eseguilo nel tuo progetto, poi scegli gli agenti su cui installarlo.",
+      "skillsRepo": "Visualizza le skill su {host}"
     },
     "manageTokensBtnLabel": "Gestisci i token",
     "orgLevelExplanation": "Si tratta di token di ingestione a livello di organizzazione. Non sono legati ai singoli utenti e continueranno a funzionare anche se l'utente che li ha creati lascia l'organizzazione. I token possono essere utilizzati solo sugli endpoint di ingestione.",
@@ -16293,6 +16301,7 @@
       },
       "databaseCount": "1 database | {count} database",
       "openQueries": "Vedi le sue query",
+      "viewMetrics": "Visualizza metriche",
       "alertMe": "Avvisami",
       "columnHints": {
         "qps": "Chiamate al secondo — le chiamate di questa finestra divise per la sua durata, così una vista di 15 minuti e una di 4 ore restano confrontabili.",
@@ -16553,10 +16562,10 @@
         "missingDescription": "Questa pagina descrive una query e l'indirizzo non ne nomina una. Se hai appena cambiato organizzazione, la query che stavi leggendo appartiene a quella che hai lasciato.",
         "action": "Sfoglia le query di questa organizzazione"
       },
-      "backToQueries": "Torna alle query principali",
-      "backToActivity": "Torna all'attività",
-      "backToSamples": "Torna alle chiamate più lente",
-      "backToDeadlocks": "Torna ai deadlock",
+      "backToQueries": "Query principali",
+      "backToActivity": "attività",
+      "backToSamples": "chiamate più lente",
+      "backToDeadlocks": "deadlock",
       "latencyTitle": "Velocità nel tempo",
       "volumeTitle": "Chiamate ed errori nel tempo",
       "endpointsTitle": "Da dove viene chiamata",
@@ -16721,6 +16730,8 @@
     "page": {
       "tabs": {
         "overview": "Panoramica",
+        "metrics": "Metriche",
+        "metricsHint": "Carico del database per evento di attesa e ogni metrica raccolta dai tuoi receiver del database.",
         "queries": "Query principali",
         "samples": "Chiamate più lente",
         "samplesHintClient": "Chiamate concluse osservate dai tuoi servizi strumentati in questa finestra — i chiamanti senza tracciamento non sono contati, quindi questo è un minimo, non il totale. La tabella mostra le più lente.",
@@ -16737,6 +16748,129 @@
         "deadlocksLocked": "I deadlock sono una funzionalità Enterprise. Esegui l'upgrade per vedere quali query sono entrate in deadlock tra loro e perché. Le altre schede database funzionano su ogni piano.",
         "blockedLocked": "Le query bloccate sono una funzionalità Enterprise. Esegui l'upgrade per vedere quali sessioni sono in attesa di un lock e cosa lo detiene. Le altre schede database funzionano su ogni piano.",
         "tableHealthLocked": "La salute delle tabelle è una funzionalità Enterprise. Esegui l'upgrade per monitorare dimensioni, bloat e stato del vacuum delle tabelle. Le altre schede database funzionano su ogni piano."
+      }
+    },
+    "metrics": {
+      "title": "Metriche",
+      "subtitle": "Carico del database e ogni metrica raccolta dai tuoi receiver del database, rappresentati in grafici su questa finestra",
+      "load": {
+        "title": "Carico del database",
+        "hint": "Sessioni medie attivamente al lavoro per intervallo, impilate per la dimensione scelta. Le connessioni inattive sono escluse; una sessione in attesa di nulla è su CPU. Trascina su un picco per applicare lo zoom di tutti i grafici su di esso.",
+        "timeAxis": "Tempo",
+        "sessionsAxis": "Sessioni attive medie",
+        "waitEventAxis": "Evento di attesa",
+        "viewActivity": "Visualizza in Attività",
+        "breakdowns": {
+          "waitEvent": "Per evento di attesa",
+          "query": "Per query",
+          "database": "Per database",
+          "user": "Per utente"
+        }
+      },
+      "limitLegend": "limite di connessioni",
+      "explore": "Apri in Esplora metriche",
+      "railLabel": "Sezioni delle metriche",
+      "noAccess": "Non hai l'autorizzazione per leggere {stream}. Chiedi a un amministratore l'accesso in lettura a questo stream.",
+      "byDims": {
+        "query": "per query",
+        "database": "per database",
+        "service": "per servizio",
+        "operation": "per operazione",
+        "mode": "per modalità",
+        "lockType": "per tipo di lock",
+        "table": "per tabella",
+        "index": "per indice",
+        "client": "per client",
+        "state": "per stato",
+        "direction": "per direzione",
+        "device": "per dispositivo",
+        "host": "per host"
+      },
+      "catalog": {
+        "activity": {
+          "title": "Attività",
+          "desc": "Throughput, transazioni e ricambio delle righe"
+        },
+        "locks": {
+          "title": "Lock",
+          "desc": "Pressione dei lock e chi li mantiene"
+        },
+        "replication": {
+          "title": "Replica",
+          "desc": "Pressione WAL e ritardo delle repliche"
+        },
+        "indexes": {
+          "title": "Indici",
+          "desc": "Utilizzo e dimensione degli indici per tabella"
+        },
+        "blocks": {
+          "title": "Blocchi",
+          "desc": "I/O sui shared buffer attribuito alle query, dai contatori del database stesso"
+        },
+        "vacuum": {
+          "title": "Vacuum",
+          "desc": "Righe vive e morte per tabella"
+        },
+        "host": {
+          "managedNote": "Questo database viene eseguito su un endpoint gestito dal cloud (come Amazon RDS), quindi il suo provider non espone un host che i tuoi collector possano monitorare. Rimuovi il filtro del database per visualizzare le metriche host per gli host che i tuoi collector segnalano.",
+          "title": "Host",
+          "desc": "CPU, memoria e I/O dell'host del database",
+          "loopbackHint": "istanza contattata tramite localhost — visualizzazione di tutti gli host",
+          "matchHint": "le metriche host vengono associate in base al nome host"
+        }
+      },
+      "catalogPanels": {
+        "calls": "Chiamate query",
+        "avgDuration": "Durata media",
+        "commits": "Commit",
+        "rollbacks": "Rollback",
+        "rowsModified": "Righe modificate",
+        "locks": "Lock",
+        "walLag": "Ritardo WAL",
+        "indexScans": "Scansioni indice",
+        "indexSize": "Dimensione indice",
+        "blksHit": "Blocchi condivisi in cache",
+        "blksRead": "Blocchi condivisi letti",
+        "blksDirtied": "Blocchi condivisi sporcati",
+        "rowsByState": "Righe per stato",
+        "cpuUtilization": "Utilizzo CPU",
+        "memoryUsage": "Memoria",
+        "diskIo": "I/O disco",
+        "networkIo": "I/O rete"
+      },
+      "searchPlaceholder": "Filtra metriche…",
+      "triageOrder": "ordinati per rilevanza di triage",
+      "sections": {
+        "featured": "Metriche chiave di integrità",
+        "postgresql": "Metriche PostgreSQL",
+        "mysql": "Metriche MySQL e MariaDB"
+      },
+      "roleTitle": "{role} · {engine}",
+      "roles": {
+        "cacheHitRatio": "Tasso di hit della cache",
+        "connections": "Connessioni",
+        "connectionLimit": "Limite di connessioni",
+        "replicationLag": "Ritardo di replica",
+        "cacheHit": "Hit cache",
+        "cacheRead": "Letture disco cache",
+        "deadlocks": "Deadlock"
+      },
+      "notCollecting": {
+        "title": "Non arrivano metriche di database",
+        "description": "Il grafico di carico sopra legge i campioni di attività, ma in questa organizzazione non esiste ancora alcuno stream di metriche proveniente da un ricevitore di database. Le ricette del collector nelle schede di configurazione del database li forniscono.",
+        "checklistTitle": "Cosa verificare",
+        "checks": {
+          "receivers": {
+            "no": "Nessun ricevitore di database sta inviando metriche",
+            "noDetail": "Le schede di configurazione PostgreSQL e MySQL in Origini dei dati configurano il ricevitore di metriche del collector insieme ai feed di monitoraggio."
+          },
+          "enabled": {
+            "ok": "Il monitoraggio del database è abilitato",
+            "okDetail": "quindi le metriche verranno visualizzate qui non appena un ricevitore le invierà",
+            "no": "Il monitoraggio del database è disabilitato",
+            "noDetail": "ZO_DB_MONITORING_ENABLED è disattivato per questa distribuzione, quindi le schede del database non stanno raccogliendo."
+          }
+        }
       }
     },
     "samples": {

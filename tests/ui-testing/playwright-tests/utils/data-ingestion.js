@@ -298,6 +298,41 @@ async function waitForFieldValueSearchable(page, streamName, fieldName, fieldVal
   return false;
 }
 
+/** Polls /streams until the stream is enumerated — distinct from waitForStreamData (which polls _search), because a new stream is queryable before it is listed and every stream PICKER is built from this list, not from search. */
+async function waitForStreamListed(page, streamName, streamType = 'logs', maxWaitMs = 90000, pollIntervalMs = 2000) {
+  const orgId = getOrgIdentifier();
+  const headers = getHeaders();
+  // INGESTION_URL first, then ZO_BASE_URL: on cloud the two hosts differ and only the former feeds the picker's list.
+  const rawBase = process.env.INGESTION_URL || process.env.ZO_BASE_URL || '';
+  const baseUrl = rawBase.endsWith('/') ? rawBase.slice(0, -1) : rawBase;
+
+  const startTime = Date.now();
+  while (Date.now() - startTime < maxWaitMs) {
+    try {
+      const response = await page.request.get(
+        `${baseUrl}/api/${orgId}/streams?type=${encodeURIComponent(streamType)}`,
+        { headers }
+      );
+      if (response.status() === 200) {
+        const data = await response.json().catch(() => null);
+        const list = Array.isArray(data?.list) ? data.list : [];
+        if (list.some((s) => s?.name === streamName)) {
+          testLogger.debug('Stream listed', { streamName, waitedMs: Date.now() - startTime });
+          return true;
+        }
+      } else {
+        testLogger.warn('Stream list poll got non-200', { status: response.status(), streamName });
+      }
+    } catch (e) {
+      testLogger.warn('Stream list poll error', { error: e.message, streamName });
+    }
+    await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+  }
+
+  testLogger.warn('Stream list poll timed out', { streamName, streamType, maxWaitMs });
+  return false;
+}
+
 module.exports = {
   ingestTestData,
   getHeaders,
@@ -306,5 +341,6 @@ module.exports = {
   ingestCustomData,
   enableLogPatternsExtraction,
   waitForStreamData,
-  waitForFieldValueSearchable
+  waitForFieldValueSearchable,
+  waitForStreamListed
 };

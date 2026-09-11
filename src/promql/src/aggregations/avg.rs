@@ -13,92 +13,77 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::promql::value::{EvalContext, Sample, Value};
-use datafusion::error::Result;
+use config::meta::promql::value::Sample;
 use hashbrown::HashMap;
-use promql_parser::parser::LabelModifier;
 
-use crate::{
-    aggregations::{Accumulate, AggFunc},
-    common::kahan_sum_increment,
-};
-
-pub fn avg(param: &Option<LabelModifier>, data: Value, eval_ctx: &EvalContext) -> Result<Value> {
-    let start = std::time::Instant::now();
-    log::info!(
-        "[trace_id: {}] [PromQL Timing] avg() started",
-        eval_ctx.trace_id,
-    );
-
-    let result = super::eval_aggregate(param, data, Avg, eval_ctx);
-    log::info!(
-        "[trace_id: {}] [PromQL Timing] avg() execution took: {:?}",
-        eval_ctx.trace_id,
-        start.elapsed()
-    );
-    result
-}
+use crate::aggregations::{Accumulate, AggFunc, SumState};
 
 pub struct Avg;
 
 impl AggFunc for Avg {
+    type Accumulator = AvgAccumulate;
+
     fn name(&self) -> &'static str {
         "avg"
     }
 
-    fn build(&self) -> Box<dyn super::Accumulate> {
-        Box::new(AvgAccumulate::new())
+    fn build(&self) -> Self::Accumulator {
+        Self::Accumulator::default()
     }
 }
 
-pub struct AvgAccumulate {
-    sum: HashMap<i64, (f64, f64)>,
-    count: HashMap<i64, usize>,
+#[derive(Clone, Default)]
+pub(crate) struct AvgState {
+    sum: SumState,
+    count: usize,
 }
 
-impl AvgAccumulate {
-    fn new() -> Self {
-        AvgAccumulate {
-            sum: HashMap::new(),
-            count: HashMap::new(),
+#[derive(Default)]
+pub struct AvgAccumulate {
+    states: HashMap<i64, AvgState>,
+}
+
+impl AvgState {
+    pub(crate) fn push(&mut self, value: f64) {
+        self.sum.push(value);
+        self.count += 1;
+    }
+
+    pub(crate) fn merge(&mut self, other: Self) {
+        if other.count == 0 {
+            return;
         }
+        // Fold the other partial's sum and compensation in as two
+        // separate compensated increments: a plain `c + other_c` add
+        // rounds residuals away before the main sums get to cancel.
+        self.sum.merge(other.sum);
+        self.count += other.count;
+    }
+
+    pub(crate) fn value(&self) -> Option<f64> {
+        (self.count > 0).then(|| self.sum.value() / self.count as f64)
     }
 }
 
 impl Accumulate for AvgAccumulate {
     fn accumulate(&mut self, sample: &Sample) {
-        let (sum, c) = self.sum.entry(sample.timestamp).or_insert((0.0, 0.0));
-        (*sum, *c) = kahan_sum_increment(sample.value, *sum, *c);
-        let count_entry = self.count.entry(sample.timestamp).or_insert(0);
-        *count_entry += 1;
+        self.states
+            .entry(sample.timestamp)
+            .or_default()
+            .push(sample.value);
     }
 
-    fn merge(&mut self, other: Box<dyn Accumulate>) {
-        let other = other.into_any().downcast::<Self>().expect("same type");
-        for (timestamp, (other_sum, other_c)) in other.sum {
-            let (sum, c) = self.sum.entry(timestamp).or_insert((0.0, 0.0));
-            // Fold the other partial's sum and compensation in as two
-            // separate compensated increments: a plain `c + other_c` add
-            // rounds residuals away before the main sums get to cancel.
-            (*sum, *c) = kahan_sum_increment(other_sum, *sum, *c);
-            (*sum, *c) = kahan_sum_increment(other_c, *sum, *c);
-        }
-        for (timestamp, count) in other.count {
-            *self.count.entry(timestamp).or_insert(0) += count;
+    fn merge(&mut self, other: Self) {
+        for (timestamp, other) in other.states {
+            self.states.entry(timestamp).or_default().merge(other);
         }
     }
 
-    fn into_any(self: Box<Self>) -> Box<dyn std::any::Any> {
-        self
-    }
-
-    fn evaluate(self: Box<Self>) -> Vec<Sample> {
-        self.sum
+    fn evaluate(self) -> Vec<Sample> {
+        self.states
             .into_iter()
-            .filter_map(|(timestamp, (sum, c))| {
-                self.count
-                    .get(&timestamp)
-                    .map(|&count| Sample::new(timestamp, (sum + c) / count as f64))
+            .filter_map(|(timestamp, state)| {
+                state.value().map(|value| Sample::new(timestamp, value))
             })
             .collect()
     }
@@ -108,15 +93,16 @@ impl Accumulate for AvgAccumulate {
 mod tests {
     use std::sync::Arc;
 
-    use config::meta::promql::value::{Label, RangeValue, Sample, Value};
+    use config::meta::promql::value::{EvalContext, Label, RangeValue, Sample, Value};
 
     use super::*;
+    use crate::aggregations::eval_aggregate;
 
     #[test]
     fn test_avg_value_none_input() {
         let timestamp = 1640995200;
         let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
-        let result = avg(&None, Value::None, &eval_ctx).unwrap();
+        let result = eval_aggregate(&None, Value::None, Avg, &eval_ctx).unwrap();
         assert!(matches!(result, Value::None));
     }
 
@@ -124,7 +110,7 @@ mod tests {
     fn test_avg_invalid_input_returns_err() {
         let timestamp = 1640995200;
         let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
-        let result = avg(&None, Value::Float(1.0), &eval_ctx);
+        let result = eval_aggregate(&None, Value::Float(1.0), Avg, &eval_ctx);
         assert!(result.is_err());
     }
 
@@ -132,7 +118,7 @@ mod tests {
     fn test_avg_empty_matrix_returns_none() {
         let timestamp = 1640995200;
         let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
-        let result = avg(&None, Value::Matrix(vec![]), &eval_ctx).unwrap();
+        let result = eval_aggregate(&None, Value::Matrix(vec![]), Avg, &eval_ctx).unwrap();
         assert!(matches!(result, Value::None));
     }
 
@@ -175,7 +161,7 @@ mod tests {
         let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
 
         // Test avg without label grouping - all samples should be averaged together
-        let result = avg(&None, data.clone(), &eval_ctx).unwrap();
+        let result = eval_aggregate(&None, data.clone(), Avg, &eval_ctx).unwrap();
 
         match result {
             Value::Matrix(matrix) => {

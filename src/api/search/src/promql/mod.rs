@@ -195,7 +195,7 @@ async fn query(
                     .into_response();
             }
         };
-        let mut visitor = promql::promql::name_visitor::MetricNameVisitor::default();
+        let mut visitor = promql::ast::name_visitor::MetricNameVisitor::default();
         if let Err(e) = promql_parser::util::walk_expr(&mut visitor, &ast) {
             log::error!("[trace_id: {trace_id}] promql metric name error: {e}");
             return (
@@ -494,7 +494,7 @@ async fn query_range(
                     .into_response();
             }
         };
-        let mut visitor = promql::promql::name_visitor::MetricNameVisitor::default();
+        let mut visitor = promql::ast::name_visitor::MetricNameVisitor::default();
         if let Err(e) = promql_parser::util::walk_expr(&mut visitor, &ast) {
             log::error!("[trace_id: {trace_id}] promql metric name error: {e}");
             return (

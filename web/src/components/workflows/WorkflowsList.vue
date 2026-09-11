@@ -150,7 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-if="!row.is_draft"
                   :data-test="`workflow-list-${row.name}-pause-start-action`"
                   :data-row-action="row.enabled ? 'pause' : 'resume'"
-                  :variant="row.enabled ? 'ghost-destructive' : 'ghost'"
+                  :variant="row.enabled ? 'ghost-destructive' : 'ghost-success'"
                   size="icon-sm"
                   :icon-left="row.enabled ? 'pause' : 'play-arrow'"
                   class="max-md:hidden"

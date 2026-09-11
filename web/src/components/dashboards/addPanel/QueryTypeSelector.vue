@@ -130,6 +130,7 @@ export default defineComponent({
       if (dashboardPanelData.data.type == "custom_chart") {
         // For custom_chart, check the actual query type and customQuery flag
         selectedButtonType.value = "custom";
+        await nextTick();
         ignoreSelectedButtonTypeUpdate.value = false;
         return;
       }

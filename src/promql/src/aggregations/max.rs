@@ -13,83 +13,19 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::promql::value::{EvalContext, Sample, Value};
-use datafusion::error::Result;
-use hashbrown::HashMap;
-use promql_parser::parser::LabelModifier;
-
-use crate::aggregations::{Accumulate, AggFunc};
-
-pub fn max(param: &Option<LabelModifier>, data: Value, eval_ctx: &EvalContext) -> Result<Value> {
-    let start = std::time::Instant::now();
-    log::info!(
-        "[trace_id: {}] [PromQL Timing] max() started",
-        eval_ctx.trace_id,
-    );
-
-    let result = super::eval_aggregate(param, data, Max, eval_ctx);
-    log::info!(
-        "[trace_id: {}] [PromQL Timing] max() execution took: {:?}",
-        eval_ctx.trace_id,
-        start.elapsed()
-    );
-    result
-}
+use crate::aggregations::{AggFunc, extrema::ExtremaAccumulator};
 
 pub struct Max;
 
 impl AggFunc for Max {
+    type Accumulator = ExtremaAccumulator<true>;
+
     fn name(&self) -> &'static str {
         "max"
     }
 
-    fn build(&self) -> Box<dyn super::Accumulate> {
-        Box::new(MaxAccumulate::new())
-    }
-}
-
-pub struct MaxAccumulate {
-    max: HashMap<i64, f64>,
-}
-
-impl MaxAccumulate {
-    fn new() -> Self {
-        MaxAccumulate {
-            max: HashMap::new(),
-        }
-    }
-}
-
-impl Accumulate for MaxAccumulate {
-    fn accumulate(&mut self, sample: &Sample) {
-        let entry = self
-            .max
-            .entry(sample.timestamp)
-            .or_insert(f64::NEG_INFINITY);
-        if sample.value > *entry {
-            *entry = sample.value;
-        }
-    }
-
-    fn merge(&mut self, other: Box<dyn Accumulate>) {
-        let other = other.into_any().downcast::<Self>().expect("same type");
-        for (timestamp, value) in other.max {
-            let entry = self.max.entry(timestamp).or_insert(f64::NEG_INFINITY);
-            if value > *entry {
-                *entry = value;
-            }
-        }
-    }
-
-    fn into_any(self: Box<Self>) -> Box<dyn std::any::Any> {
-        self
-    }
-
-    fn evaluate(self: Box<Self>) -> Vec<Sample> {
-        self.max
-            .into_iter()
-            .map(|(timestamp, value)| Sample::new(timestamp, value))
-            .collect()
+    fn build(&self) -> Self::Accumulator {
+        Self::Accumulator::default()
     }
 }
 
@@ -97,15 +33,16 @@ impl Accumulate for MaxAccumulate {
 mod tests {
     use std::sync::Arc;
 
-    use config::meta::promql::value::{Label, RangeValue, Sample, Value};
+    use config::meta::promql::value::{EvalContext, Label, RangeValue, Sample, Value};
 
     use super::*;
+    use crate::aggregations::eval_aggregate;
 
     #[test]
     fn test_max_value_none_input() {
         let timestamp = 1640995200;
         let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
-        let result = max(&None, Value::None, &eval_ctx).unwrap();
+        let result = eval_aggregate(&None, Value::None, Max, &eval_ctx).unwrap();
         assert!(matches!(result, Value::None));
     }
 
@@ -113,7 +50,7 @@ mod tests {
     fn test_max_invalid_input_returns_err() {
         let timestamp = 1640995200;
         let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
-        let result = max(&None, Value::Float(1.0), &eval_ctx);
+        let result = eval_aggregate(&None, Value::Float(1.0), Max, &eval_ctx);
         assert!(result.is_err());
     }
 
@@ -121,7 +58,7 @@ mod tests {
     fn test_max_empty_matrix_returns_none() {
         let timestamp = 1640995200;
         let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
-        let result = max(&None, Value::Matrix(vec![]), &eval_ctx).unwrap();
+        let result = eval_aggregate(&None, Value::Matrix(vec![]), Max, &eval_ctx).unwrap();
         assert!(matches!(result, Value::None));
     }
 
@@ -164,7 +101,7 @@ mod tests {
         let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
 
         // Test max without label grouping - should return the maximum value
-        let result = max(&None, data.clone(), &eval_ctx).unwrap();
+        let result = eval_aggregate(&None, data.clone(), Max, &eval_ctx).unwrap();
 
         match result {
             Value::Matrix(matrix) => {

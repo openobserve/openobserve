@@ -860,7 +860,7 @@
       "createNew": "Créer une nouvelle destination",
       "select": "Destination",
       "loadError": "Erreur lors de la récupération des destinations.",
-      "unsupportedType": "Type non pris en charge — Les Workflows ne prennent en charge que les destinations personnalisées"
+      "unsupportedType": "Type non pris en charge — les workflows prennent en charge uniquement les destinations personnalisées"
     },
     "function": {
       "createNew": "Créer une nouvelle fonction",
@@ -2057,7 +2057,8 @@
       "startFrom": {
         "label": "Commencez à partir de",
         "custom": "Personnalisé (rôle vide)",
-        "readonly": "Lecture seule (affichage de l'accès à toutes les ressources)"
+        "readonly": "Lecture seule (affichage de l'accès à toutes les ressources)",
+        "dbm": "Lecteur de la surveillance des bases de données (lecture seule sur le module Surveillance des bases de données et les flux de métriques interrogés par son onglet Métriques)"
       },
       "name": {
         "required": "Le nom du rôle est obligatoire.",
@@ -2093,7 +2094,9 @@
       "loadFailed": "Échec du chargement des détails du rôle. Redirection vers la liste des rôles.",
       "noUpdatesDetected": "Aucune mise à jour détectée.",
       "updateSuccess": "Rôle mis à jour avec succès !",
-      "updateError": "Erreur lors de la mise à jour du rôle !"
+      "updateError": "Erreur lors de la mise à jour du rôle !",
+      "dbmPresetSeeded": "Accès en lecture présélectionné sur {matched} des {total} flux de métriques de la surveillance des bases de données, plus le module Surveillance des bases de données. Vérifiez avant d'enregistrer.",
+      "dbmPresetNoMatch": "Aucun des {total} flux de métriques de la surveillance des bases de données n'existe encore dans cette organisation, donc rien n'a été présélectionné ; l'octroi du module Surveillance des bases de données a tout de même été préparé."
     },
     "rolesPage": {
       "subtitle": "Les rôles regroupent des autorisations : attribuez-les à des utilisateurs, à des comptes de service ou à des groupes pour accorder l'accès.",
@@ -2604,7 +2607,7 @@
     "view": "Voir",
     "delete": "Supprimer",
     "deleteTitle": "Supprimer le workflow",
-    "deleteMessage": "Êtes-vous sûr de vouloir supprimer ce workflow ?",
+    "deleteMessage": "Voulez-vous vraiment supprimer ce workflow ?",
     "deleteSuccess": "Workflow supprimé avec succès",
     "deleteError": "Erreur lors de la suppression du workflow",
     "updateSuccess": "Workflow mis à jour avec succès",
@@ -2624,7 +2627,7 @@
     "draftSaveSuccess": "Brouillon enregistré avec succès",
     "publishSuccess": "Workflow publié avec succès",
     "publishError": "Erreur lors de la publication du workflow",
-    "comingSoon": "Ceci arrivera dans une étape ultérieure",
+    "comingSoon": "Disponible dans une prochaine étape",
     "triggerType": {
       "pick": "Choisissez un déclencheur",
       "dialogTitle": "Créer un nouveau workflow",
@@ -2746,8 +2749,8 @@
       "link": "Lier les sélectionnées",
       "linkN": "Lier {count} sélectionné(s)",
       "skip": "Ignorer pour l'instant",
-      "linkSuccess": "Lié à {count} alerte(s)",
-      "linkPartial": "Lié à {count} alerte, {failed} échouée | Lié à {count} alertes, {failed} échouées",
+      "linkSuccess": "Lié à {count} alerte | Lié à {count} alertes",
+      "linkPartial": "Lié à {count} alerte, {failed} en échec | Lié à {count} alertes, {failed} en échec",
       "linkError": "Impossible de lier les alertes."
     },
     "chooseTrigger": "Choisir un déclencheur",
@@ -2764,7 +2767,7 @@
       "branch": "Branche",
       "function": "Fonction",
       "sendToDestination": "Destination",
-      "configComingSoon": "La configuration de {node} sera disponible dans une étape ultérieure",
+      "configComingSoon": "La configuration de {node} arrive dans une prochaine étape",
       "sectionTransform": "Transformer",
       "sectionDestination": "Destination",
       "stepSearchPlaceholder": "Rechercher des étapes...",
@@ -2779,10 +2782,10 @@
       "branchMoveDown": "Déplacer le chemin vers le bas",
       "branchPathNumber": "Chemin {index}",
       "branchElseTitle": "Tout le reste",
-      "branchElseHint": "Les enregistrements qui ne correspondent à aucun chemin ci-dessus partent d'ici.",
+      "branchElseHint": "Les enregistrements ne correspondant à aucun chemin ci-dessus sortent ici.",
       "branchNoteTitle": "Instructions pour les branches",
-      "branchNoteFirstMatch": "Les chemins sont vérifiés de haut en bas et la PREMIÈRE correspondance gagne, donc chaque enregistrement sort par exactement un chemin.",
-      "branchNoteUnwired": "Un chemin auquel rien n'est connecté se contente de supprimer ses enregistrements.",
+      "branchNoteFirstMatch": "Les chemins sont vérifiés de haut en bas et la PREMIÈRE correspondance l'emporte, ainsi chaque enregistrement sort par exactement un chemin.",
+      "branchNoteUnwired": "Un chemin auquel rien n'est connecté abandonne simplement ses enregistrements.",
       "functionDesc": "Reformez la charge utile avec une fonction",
       "destinationDesc": "Envoyer vers une destination",
       "triggerBody": "S'exécute lorsqu'une alerte associée se déclenche",
@@ -2809,12 +2812,12 @@
       "incidentNoExtraFields": "Cet événement n'ajoute aucun champ au-delà des champs courants.",
       "conditionNoteTitle": "Directives de condition",
       "functionFlattenTitle": "Avant vs Après aplatissement",
-      "conditionNoteCustom": "Pour ajouter une colonne personnalisée, tapez son nom et appuyez sur Entrée.",
-      "functionBody": "Reformez la charge utile avec une fonction",
+      "conditionNoteCustom": "Pour ajouter une colonne personnalisée, saisissez son nom et appuyez sur Entrée.",
+      "functionBody": "Transformez la charge utile avec une fonction",
       "functionBodySet": "Applique {name}",
       "functionSelect": "Sélectionner une fonction",
       "functionCreateNew": "Créer une nouvelle fonction",
-      "functionRequired": "Une fonction est requise",
+      "functionRequired": "La fonction est requise",
       "functionLoadError": "Impossible de charger les fonctions",
       "destinationBody": "Envoyer vers une destination",
       "destinationBodySet": "Envoie vers {name}",
@@ -2859,7 +2862,7 @@
       "expandSteps": "Développer les étapes",
       "inputTag": "Entrée",
       "openStep": "Ouvrir {name}",
-      "runToView": "Exécutez un test pour afficher ces données.",
+      "runToView": "Lancez un test pour afficher ces données.",
       "noBranchItems": "Aucun élément sur cette branche.",
       "forwardedCount": "{out} sur {total} enregistrement transféré | {out} sur {total} enregistrements transférés",
       "noMatchForwarded": "Aucune correspondance — 0 sur {total} enregistrement transféré | Aucune correspondance — 0 sur {total} enregistrements transférés",
@@ -2869,7 +2872,7 @@
       "runLabel": "Exécuter",
       "switchRun": "Changer d'exécution",
       "notInRun": "Cette étape n'est pas incluse dans cette exécution.",
-      "noRunData": "Cette exécution n'a pas stocké de données d'étape.",
+      "noRunData": "Cette exécution n'a pas stocké les données des étapes.",
       "runTest": "Exécuter le test",
       "noItems": "Aucun élément",
       "itemsCount": "{count} élément | {count} éléments",
@@ -2881,8 +2884,8 @@
       "editStep": "Modifier l'étape",
       "readOnlyRun": "Vous consultez une exécution passée, la configuration de cette étape ne peut donc pas être modifiée ici.",
       "readOnlyRunEdit": "Modifier dans le workflow",
-      "testInputHint": "Entrée de test — Modifiez, puis exécutez l'étape.",
-      "noRunsList": "Aucune exécution pour l'instant.",
+      "testInputHint": "Entrée de test — modifiez, puis exécutez l'étape.",
+      "noRunsList": "Aucune exécution pour le moment.",
       "resetInput": "Réinitialiser à l'échantillon",
       "eventPager": "{n} sur {total}",
       "nextEvent": "Événement suivant",
@@ -2906,7 +2909,7 @@
       "expand": "Développer",
       "close": "Effacer et fermer les résultats",
       "nodesTitle": "Étapes",
-      "empty": "Exécutez un test pour voir les résultats des étapes ici.",
+      "empty": "Lancez un test pour voir les résultats des étapes ici.",
       "openNode": "Ouvrir le nœud",
       "viewConfig": "Afficher la configuration",
       "hideConfig": "Masquer la configuration",
@@ -2916,7 +2919,7 @@
       "branchPathsLabel": "Chemins",
       "branchNoRule": "Aucune règle définie",
       "destinationUnsupported": "Type non pris en charge",
-      "destinationMissing": "Cette destination n'existe plus ou ne peut pas être lue.",
+      "destinationMissing": "Cette destination n'existe plus ou est illisible.",
       "headersLabel": "En-têtes",
       "templateLabel": "Modèle",
       "outputFormatLabel": "Format de sortie",
@@ -3673,29 +3676,31 @@
       "crossLinkBody": "{brand} expose un point de terminaison {product} (MCP) afin que les clients IA comme {client1}, {client2} et {client3} puissent interroger et agir sur cette organisation. La configuration et les identifiants se trouvent dans IAM.",
       "crossLinkCta": "Ouvrir la configuration MCP",
       "tagline": "Connectez {client1}, {client2}, {client3} et d'autres clients IA à cette organisation via le {product} (MCP).",
-      "endpointLabel": "Point de terminaison MCP",
-      "authLabel": "1. Authentification",
-      "clientLabel": "2. Choisissez votre client",
-      "configLabel": "3. Ajoutez la configuration",
+      "connectLabel": "Point de terminaison et authentification",
+      "connectHint": "Indiquez cette URL à votre client MCP, puis choisissez comment il se connecte.",
+      "configLabel": "Ajouter la configuration",
+      "configHint": "Choisissez votre client, puis copiez la configuration fournie.",
       "auth": {
         "oauth": "OAuth — connexion (recommandé)",
         "token": "Jeton d'accès",
+        "oauthTitle": "Connectez-vous avec votre navigateur",
         "oauthNote": "Aucun identifiant à gérer : votre client MCP ouvre un navigateur pour vous connecter, et l'accès est limité par vos autorisations existantes. Utilisez-le lorsque votre client prend en charge OAuth."
       },
       "credential": {
-        "quickStartTitle": "Démarrage rapide — votre compte",
-        "quickStartBody": "Les extraits utilisent vos propres identifiants, qui portent toutes vos autorisations. Pour la production, générez plutôt un identifiant en lecture seule dédié.",
-        "generate": "Générer un identifiant en lecture seule",
-        "created": "Identifiant en lecture seule créé",
+        "quickStartTitle": "Aucun jeton pour l'instant",
+        "quickStartBody": "Les extraits ci-dessous portent un en-tête factice. Générez un jeton dédié pour ce client MCP, ou collez un jeton de compte de service existant à sa place.",
+        "generate": "Générer un jeton dédié",
+        "created": "Jeton dédié créé",
         "shownOnce": "Pour {email}. Copiez-le maintenant — le jeton n'est affiché qu'une seule fois et les extraits ci-dessous l'utilisent désormais.",
         "download": "Télécharger",
         "manage": "Gérer / révoquer",
-        "readonlyWarn": "Le compte a été créé mais le rôle en lecture seule n'a pas pu être appliqué automatiquement — vérifiez ses autorisations dans Comptes de service.",
+        "readonlyWarn": "Le compte a été créé, mais il n'a pas pu être ajouté au rôle {role} — il n'a aucune autorisation jusqu'à ce que vous en attribuiez une dans IAM.",
+        "readonlyNote": "Lecture seule limitée via le rôle {role} — vérifiez-le ou étendez-le dans IAM › Rôles.",
+        "rbacNote": "Le RBAC est désactivé dans ce déploiement, ce jeton ne peut donc pas être limité en lecture seule — il dispose du même accès que n'importe quel autre identifiant pour cette organisation.",
         "error": "Impossible de créer l'identifiant. Réessayez, ou créez un compte de service manuellement dans IAM."
       },
       "securityTitle": "Utilisez un identifiant dédié avec le moins de privilèges possible",
-      "securityBody": "Le jeton utilise par défaut les identifiants de votre propre compte. Pour la production, générez un identifiant en lecture seule ci-dessus (ou créez un compte de service restreint) et ne validez jamais les jetons dans le contrôle de source.",
-      "docsCta": "Lisez la documentation complète de MCP",
+      "securityBody": "Donnez au client MCP un compte de service limité en lecture seule plutôt que les informations d'identification de votre propre compte, et ne validez jamais son jeton dans le contrôle de code source.",
       "clients": {
         "claudeCode": "Claude Code",
         "cursor": "Cursor",
@@ -3722,7 +3727,10 @@
         "hermes": "Ajouter à ~/.hermes/config.yaml (YAML), puis exécuter /reload-mcp.",
         "codex": "Ajouter à ~/.codex/config.toml (TOML), puis redémarrer Codex."
       },
-      "installOneClick": "Ajouter à {client}"
+      "installOneClick": "Ajouter à {client}",
+      "skillsLabel": "Ajouter la compétence {brand} (facultatif)",
+      "skillsHint": "Apprend à votre assistante IA à interroger, à alerter et à créer des tableaux de bord dans {brand}, afin qu'elle tire le meilleur parti des outils MCP. Exécutez-la dans votre projet, puis choisissez les agents dans lesquels l'installer.",
+      "skillsRepo": "Voir les compétences sur {host}"
     },
     "manageTokensBtnLabel": "Gérer les jetons",
     "orgLevelExplanation": "Il s'agit de jetons d'ingestion au niveau de l'organisation. Ils ne sont pas liés à des utilisateurs individuels et continueront de fonctionner même si l'utilisateur qui les a créés quitte l'organisation. Les jetons ne peuvent être utilisés que sur les points finaux d'ingestion.",
@@ -16293,6 +16301,7 @@
       },
       "databaseCount": "1 base de données | {count} bases de données",
       "openQueries": "Voir ses requêtes",
+      "viewMetrics": "Voir les métriques",
       "alertMe": "M'alerter",
       "columnHints": {
         "qps": "Appels par seconde — les appels de cette fenêtre divisés par sa durée, de sorte qu'une vue de 15 minutes et une vue de 4 heures restent comparables.",
@@ -16553,10 +16562,10 @@
         "missingDescription": "Cette page décrit une requête, et l'adresse n'en nomme aucune. Si vous venez de changer d'organisation, la requête que vous lisiez appartient à celle que vous avez quittée.",
         "action": "Parcourir les requêtes de cette organisation"
       },
-      "backToQueries": "Retour aux requêtes principales",
-      "backToActivity": "Retour à l'activité",
-      "backToSamples": "Retour aux appels les plus lents",
-      "backToDeadlocks": "Retour aux interblocages",
+      "backToQueries": "Requêtes principales",
+      "backToActivity": "activité",
+      "backToSamples": "appels les plus lents",
+      "backToDeadlocks": "interblocages",
       "latencyTitle": "Vitesse au fil du temps",
       "volumeTitle": "Appels et échecs au fil du temps",
       "endpointsTitle": "D'où elle est appelée",
@@ -16721,6 +16730,8 @@
     "page": {
       "tabs": {
         "overview": "Aperçu",
+        "metrics": "Métriques",
+        "metricsHint": "Charge de la base de données par événement d'attente, et chaque métrique collectée par vos récepteurs de base de données.",
         "queries": "Requêtes principales",
         "samples": "Appels les plus lents",
         "samplesHintClient": "Appels terminés que vos services instrumentés ont observés dans cette fenêtre — les appelants sans traçage ne sont pas comptés, donc il s'agit d'un minimum, pas du total. Le tableau montre les plus lents d'entre eux.",
@@ -16737,6 +16748,129 @@
         "deadlocksLocked": "Les interblocages sont une fonctionnalité Enterprise. Mettez à niveau pour voir quelles requêtes ont été mutuellement bloquées et pourquoi. Les autres onglets de base de données fonctionnent sur tous les plans.",
         "blockedLocked": "Les requêtes bloquées sont une fonctionnalité Enterprise. Mettez à niveau pour voir quelles sessions attendent un verrou et ce qui le retient. Les autres onglets de base de données fonctionnent sur tous les plans.",
         "tableHealthLocked": "La santé des tables est une fonctionnalité Enterprise. Mettez à niveau pour suivre la taille, la fragmentation et l'état du vacuum des tables. Les autres onglets de base de données fonctionnent sur tous les plans."
+      }
+    },
+    "metrics": {
+      "title": "Métriques",
+      "subtitle": "Charge de la base de données et chaque métrique collectée par vos récepteurs de base de données, tracées sur cette fenêtre",
+      "load": {
+        "title": "Charge de la base de données",
+        "hint": "Nombre moyen de sessions actives par intervalle, empilées selon la dimension choisie. Les connexions inactives sont exclues ; une session qui n'attend rien s'exécute sur le CPU. Faites glisser sur un pic pour zoomer tous les graphiques dessus.",
+        "timeAxis": "Temps",
+        "sessionsAxis": "Sessions actives moy.",
+        "waitEventAxis": "Événement d'attente",
+        "viewActivity": "Voir dans Activité",
+        "breakdowns": {
+          "waitEvent": "Par événement d'attente",
+          "query": "Par requête",
+          "database": "Par base de données",
+          "user": "Par utilisateur"
+        }
+      },
+      "limitLegend": "limite de connexions",
+      "explore": "Ouvrir dans l'explorateur de métriques",
+      "railLabel": "Sections de métriques",
+      "noAccess": "Vous n'avez pas la permission de lire {stream}. Demandez à un administrateur l'accès en lecture à ce flux.",
+      "byDims": {
+        "query": "par requête",
+        "database": "par base de données",
+        "service": "par service",
+        "operation": "par opération",
+        "mode": "par mode",
+        "lockType": "par type de verrou",
+        "table": "par table",
+        "index": "par index",
+        "client": "par client",
+        "state": "par état",
+        "direction": "par direction",
+        "device": "par périphérique",
+        "host": "par hôte"
+      },
+      "catalog": {
+        "activity": {
+          "title": "Activité",
+          "desc": "Débit, transactions et renouvellement des lignes"
+        },
+        "locks": {
+          "title": "Verrous",
+          "desc": "Pression de verrouillage et ce qui la détient"
+        },
+        "replication": {
+          "title": "Réplication",
+          "desc": "Pression du WAL et retard des réplicas"
+        },
+        "indexes": {
+          "title": "Index",
+          "desc": "Utilisation et taille des index par table"
+        },
+        "blocks": {
+          "title": "Blocs",
+          "desc": "E/S du tampon partagé attribuées aux requêtes, à partir des compteurs propres à la base de données"
+        },
+        "vacuum": {
+          "title": "Vacuum",
+          "desc": "Lignes actives et mortes par table"
+        },
+        "host": {
+          "managedNote": "Cette base de données s'exécute sur un point de terminaison géré dans le cloud (comme Amazon RDS), son fournisseur n'expose donc pas d'hôte que vos collecteurs puissent surveiller. Effacez le filtre de base de données pour voir les métriques d'hôte des hôtes que vos collecteurs remontent réellement.",
+          "title": "Hôte",
+          "desc": "CPU, mémoire et E/S de l'hôte de la base de données",
+          "loopbackHint": "instance contactée via localhost — affichage de tous les hôtes",
+          "matchHint": "les métriques d'hôte sont mises en correspondance par nom d'hôte"
+        }
+      },
+      "catalogPanels": {
+        "calls": "Appels de requêtes",
+        "avgDuration": "Durée moyenne",
+        "commits": "Commits",
+        "rollbacks": "Rollbacks",
+        "rowsModified": "Lignes modifiées",
+        "locks": "Verrous",
+        "walLag": "Retard WAL",
+        "indexScans": "Scans d'index",
+        "indexSize": "Taille des index",
+        "blksHit": "Blocs partagés trouvés",
+        "blksRead": "Blocs partagés lus",
+        "blksDirtied": "Blocs partagés modifiés",
+        "rowsByState": "Lignes par état",
+        "cpuUtilization": "Utilisation du CPU",
+        "memoryUsage": "Mémoire",
+        "diskIo": "E/S disque",
+        "networkIo": "E/S réseau"
+      },
+      "searchPlaceholder": "Filtrer les métriques…",
+      "triageOrder": "triées par pertinence de triage",
+      "sections": {
+        "featured": "Métriques de santé clés",
+        "postgresql": "Métriques PostgreSQL",
+        "mysql": "Métriques MySQL et MariaDB"
+      },
+      "roleTitle": "{role} · {engine}",
+      "roles": {
+        "cacheHitRatio": "Taux de succès du cache",
+        "connections": "Connexions",
+        "connectionLimit": "Limite de connexions",
+        "replicationLag": "Retard de réplication",
+        "cacheHit": "Succès du cache",
+        "cacheRead": "Lectures disque du cache",
+        "deadlocks": "Interblocages"
+      },
+      "notCollecting": {
+        "title": "Aucune métrique de base de données n'arrive",
+        "description": "Le graphique de charge ci-dessus lit les échantillons d'activité, mais aucun flux de métriques provenant d'un récepteur de base de données n'existe encore dans cette organisation. Les recettes de collecteur des fiches de configuration de base de données les fournissent.",
+        "checklistTitle": "Points à vérifier",
+        "checks": {
+          "receivers": {
+            "no": "Aucun récepteur de base de données n'envoie de métriques",
+            "noDetail": "Les fiches de configuration PostgreSQL et MySQL sous Sources de données configurent le récepteur de métriques du collecteur en parallèle des flux de supervision."
+          },
+          "enabled": {
+            "ok": "La surveillance des bases de données est activée",
+            "okDetail": "les métriques seront donc tracées ici dès qu'un récepteur les enverra",
+            "no": "La surveillance des bases de données est désactivée",
+            "noDetail": "ZO_DB_MONITORING_ENABLED est désactivé pour ce déploiement, les onglets de base de données ne collectent donc pas."
+          }
+        }
       }
     },
     "samples": {

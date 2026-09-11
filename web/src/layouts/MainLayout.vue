@@ -445,6 +445,14 @@ export default defineComponent({
       );
     });
 
+    // The AI Observability menu entry itself ships on true OSS builds too —
+    // Monitor (LLM Insights + Sessions) needs no backend flag, unlike the rest
+    // of the module. AIObservabilityShell (Index.vue) shows only the Monitor
+    // group there; Evaluate/Experiment/Annotate/Agent Graph/Agent Behavior stay
+    // behind `isOnlineEvalsEnabled` as before.
+    const isOssBuild = !(config.isEnterprise == "true" || config.isCloud == "true");
+    const isAiObservabilityMenuVisible = computed(() => isOnlineEvalsEnabled.value || isOssBuild);
+
     // Backend `/config` flag `synthetics_enabled` — `ZO_SYNTHETICS_ENABLED`, and
     // no longer an enterprise build check: synthetics ships in OSS, and only the
     // private-agent path behind it is enterprise. Reactive so the menu picks it
@@ -768,7 +776,7 @@ export default defineComponent({
         (link: any) => link.name === "aiObservability",
       );
 
-      if (isOnlineEvalsEnabled.value) {
+      if (isAiObservabilityMenuVisible.value) {
         if (existingIndex !== -1) return;
         const tracesIndex = linksList.value.findIndex((link: any) => link.name === "traces");
         const insertAt = tracesIndex === -1 ? linksList.value.length : tracesIndex + 1;
@@ -785,7 +793,7 @@ export default defineComponent({
 
     // If `/config` resolves after this component mounted (or if the flag
     // ever flips at runtime), keep the menu in sync.
-    watch(isOnlineEvalsEnabled, () => updateAIObservabilityMenu(), { immediate: false });
+    watch(isAiObservabilityMenuVisible, () => updateAIObservabilityMenu(), { immediate: false });
 
     const updateSyntheticMenu = () => {
       const existingIndex = linksList.value.findIndex((l: any) => l.name === "synthetics");

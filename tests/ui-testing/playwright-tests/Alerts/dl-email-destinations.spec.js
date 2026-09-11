@@ -1,3 +1,5 @@
+const fs = require('fs');
+const path = require('path');
 const { test, expect } = require('../utils/enhanced-baseFixtures.js');
 const PageManager = require('../../pages/page-manager.js');
 const testLogger = require('../utils/test-logger.js');
@@ -74,12 +76,41 @@ async function fillEmailForm(pm, destName, recipients) {
  * these tests were previously parked in, and a red suite would tell nobody anything.
  */
 let smtpReady = null;
-async function smtpAvailable() {
-  if (smtpReady !== null) return smtpReady;
+// The probe DELIVERS a message and only a real send proves the transport (the membership gate runs first, so a non-member recipient never observes SMTP being off, and /config exposes nothing) — so it is claimed through a file in Playwright's outputDir, wiped every run, making it one probe per RUN rather than one per worker dropping uncounted mail in the shared inbox.
+const PROBE_FILE = path.join(__dirname, '../../test-results', '.smtp-probe.json');
+async function probeSmtp() {
   const res = await api.testDestination({ type: 'email', recipients: [ORG_USER] });
   const err = ((res.body && res.body.error) || '').toLowerCase();
   // "must be part of this org" still proves SMTP is on — it failed the LATER gate.
-  smtpReady = res.status === 200 && !err.includes('smtp');
+  return res.status === 200 && !err.includes('smtp');
+}
+async function smtpAvailable() {
+  if (smtpReady !== null) return smtpReady;
+  fs.mkdirSync(path.dirname(PROBE_FILE), { recursive: true });
+  let claimed = false;
+  try {
+    // 'wx' fails if the file exists, so exactly one worker wins the claim.
+    fs.closeSync(fs.openSync(PROBE_FILE, 'wx'));
+    claimed = true;
+  } catch (_) { /* another worker is probing (or already did) */ }
+
+  if (claimed) {
+    const ready = await probeSmtp();
+    fs.writeFileSync(PROBE_FILE, JSON.stringify({ ready }));
+    smtpReady = ready;
+    return smtpReady;
+  }
+
+  const deadline = Date.now() + 60000;
+  while (Date.now() < deadline) {
+    try {
+      const raw = fs.readFileSync(PROBE_FILE, 'utf8');
+      if (raw) return (smtpReady = JSON.parse(raw).ready);
+    } catch (_) { /* winner has not written its answer yet */ }
+    await new Promise((r) => setTimeout(r, 250));
+  }
+  // The winner never answered — probe here rather than skipping the suite on a lock timeout.
+  smtpReady = await probeSmtp();
   return smtpReady;
 }
 
@@ -298,17 +329,6 @@ test.describe('Email destinations and distribution lists', () => {
     expect(await api.storedRecipients(destName), 'no partial save may survive').toBeNull();
   });
 
-  test('UI-05 · Test sends without persisting the destination', {
-    tag: ['@dlEmailDestinations', '@email', '@P1', '@all'],
-  }, async () => {
-    const destName = `auto_dest_dl_never_${RUN}`;
-    await fillEmailForm(pm, destName, ORG_USER);
-    await pm.alertDestinationsPage.clickTest();
-    await pm.alertDestinationsPage.clickCancel();
-
-    expect(await api.storedRecipients(destName), 'Test must not persist the destination').toBeNull();
-  });
-
   test('D-08 · the custom email path offers only organisation users', {
     tag: ['@dlEmailDestinations', '@email', '@P1', '@all'],
   }, async () => {
@@ -485,8 +505,20 @@ test.describe('Email destinations and distribution lists', () => {
   // These share ONE inbox, so they clear and count against common state. Nested
   // serial keeps them in a single worker and in order; the Tier A cases above
   // never touch the sink and stay parallel.
+  // Every test that SENDS mail belongs here too, even one that never reads the sink: a send from a parallel worker lands in the same inbox and is counted by whichever delivery case is mid-assertion (ML-04's "Expected: 1, Received: 2").
   test.describe('delivery', () => {
     test.describe.configure({ mode: 'serial' });
+
+  test('UI-05 · Test sends without persisting the destination', {
+    tag: ['@dlEmailDestinations', '@email', '@delivery', '@P1', '@all'],
+  }, async () => {
+    const destName = `auto_dest_dl_never_${RUN}`;
+    await fillEmailForm(pm, destName, ORG_USER);
+    await pm.alertDestinationsPage.clickTest();
+    await pm.alertDestinationsPage.clickCancel();
+
+    expect(await api.storedRecipients(destName), 'Test must not persist the destination').toBeNull();
+  });
 
   test('D-04 · envelope headers carry the configured From and only the alias in To', {
     tag: ['@dlEmailDestinations', '@email', '@delivery', '@P1', '@all'],
@@ -521,7 +553,9 @@ test.describe('Email destinations and distribution lists', () => {
     await pm.alertDestinationsPage.clickTest();
     await sink.waitForCount(1);
 
-    expect(await sink.count(), 'one message, not one per recipient').toBe(1);
+    // The regression guarded here is one message PER RECIPIENT, whose extra copy lands milliseconds later, so a count read the instant the first message arrives cannot tell it from a second still in flight — settle first.
+    const settled = await sink.countAfterSettle();
+    expect(settled, 'one message, not one per recipient').toBe(1);
   });
 
   // ══ TIER C — requires a real distribution list ═══════════════════════════

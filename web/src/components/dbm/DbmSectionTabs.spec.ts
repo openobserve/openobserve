@@ -237,7 +237,7 @@ describe("DbmSectionTabs", () => {
      * It is also the only tab whose signal is Postgres-only, so it must not
      * sit where a MySQL reader meets an unexplained empty tab first.
      */
-    it("orders the tabs Overview → Top queries → Slowest calls → Activity → Deadlocks → Blocked queries → Table health", () => {
+    it("orders the tabs Overview → Metrics → Top queries → Slowest calls → Activity → Deadlocks → Blocked queries → Table health", () => {
       // Slowest calls sits beside Top queries: the two are the aggregate and
       // the per-execution view of the same client-observed data.
       const wrapper = mountAt("dbmQueries");
@@ -254,6 +254,7 @@ describe("DbmSectionTabs", () => {
         .filter((name) => !name?.startsWith("dbm-section-tab-lock-"));
       expect(labels).toEqual([
         "dbm-section-tab-overview",
+        "dbm-section-tab-metrics",
         "dbm-section-tab-queries",
         "dbm-section-tab-samples",
         "dbm-section-tab-activity",
@@ -457,8 +458,8 @@ describe("DbmSectionTabs", () => {
       mockConfig.isEnterprise = "false";
       const wrapper = mountAt("dbmDatabases");
 
-      // All seven still RENDER — disabled, not hidden.
-      expect(tabsOf(wrapper)).toHaveLength(7);
+      // All eight still RENDER — disabled, not hidden.
+      expect(tabsOf(wrapper)).toHaveLength(8);
       expect(disabledKeys(wrapper)).toEqual([
         "dbm-section-tab-deadlocks",
         "dbm-section-tab-blocked",
@@ -469,7 +470,7 @@ describe("DbmSectionTabs", () => {
     it("leaves every tab enabled on an enterprise build", () => {
       mockConfig.isEnterprise = "true";
       const wrapper = mountAt("dbmDatabases");
-      expect(tabsOf(wrapper)).toHaveLength(7);
+      expect(tabsOf(wrapper)).toHaveLength(8);
       expect(disabledKeys(wrapper)).toHaveLength(0);
     });
 

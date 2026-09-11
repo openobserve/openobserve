@@ -695,17 +695,25 @@ const appendPointsFor = (node: any) => {
   // Half a gap past the last arm: dead centre collided with the middle arm's mid-edge
   // `+`, so that one arrow appeared to carry two buttons.
   const newPathOff = (mid + 0.5) * ARM_GAP;
+  // The real source handle sits where FlowNodeCard's own spread puts it
+  // (`FlowNodeCard.vue` handleOffset), not at the node's centre — matching that here
+  // is what keeps each arm's connector its own line instead of every arm converging
+  // on one point below the node before splitting to the buttons.
+  const nodeW = findNode(node.id)?.dimensions?.width ?? 240;
+  const handleDx = (index: number) => nodeW * ((index + 1) / (handles.length + 1) - 0.5);
   return open.map((handle: string) => {
-    const off =
-      handle === NEW_BRANCH_PATH_HANDLE ? newPathOff : (handles.indexOf(handle) - mid) * ARM_GAP;
+    const idx = handles.indexOf(handle);
+    const off = handle === NEW_BRANCH_PATH_HANDLE ? newPathOff : (idx - mid) * ARM_GAP;
+    const handleTop = handle === NEW_BRANCH_PATH_HANDLE ? 0 : handleDx(idx);
+    const cx = handleTop - off;
     return {
       id: node.id,
       handle,
       ...base,
       left: base.left + off * base.zoom,
       hoverOnly: true,
-      cx: -off,
-      svgW: 2 * Math.max(Math.abs(off), 1),
+      cx,
+      svgW: 2 * Math.max(Math.abs(off), Math.abs(cx), 1),
     };
   });
 };

@@ -1,4 +1,5 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
+import { nextTick, reactive } from "vue";
 import { mount, flushPromises } from "@vue/test-utils";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -64,6 +65,38 @@ async function mountTable(props: Record<string, any> = {}) {
   await flushPromises();
   return wrapper;
 }
+
+// No PermissionsTable stub: a regression in programmatic expansion is invisible unless the nested level renders for real.
+async function mountRealNestedTable(props: Record<string, any> = {}) {
+  const wrapper = mount(PermissionsTable, {
+    global: { plugins: [i18n, store] },
+    props: {
+      rows: [],
+      level: 0,
+      visibleResourceCount: 0,
+      parent: {
+        name: "main",
+        resourceName: "main",
+        expand: false,
+        is_loading: false,
+        has_entities: false,
+      },
+      selectedPermissionsHash: new Set(),
+      filter: {},
+      customFilteredPermissions: {},
+      ...props,
+    },
+    attachTo: document.body,
+  });
+  await flushPromises();
+  await nextTick();
+  return wrapper;
+}
+
+const makeParentRow = (name: string, children: string[], expand: boolean) => ({
+  ...makeRow(name, true, true, expand),
+  entities: children.map((child) => makeRow(child, true, false, false)),
+});
 
 afterEach(() => {
   vi.clearAllMocks();
@@ -294,5 +327,96 @@ describe("PermissionsTable - table section", () => {
     };
     const wrapper = await mountTable({ parent });
     expect(wrapper.find('[data-test="iam-stream-permissions-table-section"]').exists()).toBe(true);
+  });
+});
+
+// Programmatic expansion (row.expand) must reach the rendered table
+describe("PermissionsTable - programmatic expansion", () => {
+  const nestedSection = (wrapper: any, name: string) =>
+    wrapper.find(`[data-test="iam-${name}-permissions-table-section"]`);
+
+  // OTableBodyRow keys the expand button by the row's INDEX, not by row-key.
+  const clickExpandToggle = async (wrapper: any, index = 0) => {
+    await wrapper.find(`[data-test="o2-table-expand-${index}"]`).trigger("click");
+    await nextTick();
+    await flushPromises();
+  };
+
+  it("renders the nested rows of a row that arrives already expanded", async () => {
+    const rows = [makeParentRow("stream", ["metrics", "logs"], true)];
+
+    const wrapper = await mountRealNestedTable({ rows, visibleResourceCount: 1 });
+
+    expect(nestedSection(wrapper, "stream").exists()).toBe(true);
+    expect(wrapper.text()).toContain("metrics");
+    expect(wrapper.text()).toContain("logs");
+  });
+
+  it("does NOT render the nested rows of a collapsed row", async () => {
+    const rows = [makeParentRow("stream", ["metrics"], false)];
+
+    const wrapper = await mountRealNestedTable({ rows, visibleResourceCount: 1 });
+
+    expect(nestedSection(wrapper, "stream").exists()).toBe(false);
+  });
+
+  it("renders the nested rows when a row becomes expanded after mount", async () => {
+    const rows = reactive([makeParentRow("stream", ["metrics"], false)]);
+    const wrapper = await mountRealNestedTable({ rows, visibleResourceCount: 1 });
+    expect(nestedSection(wrapper, "stream").exists()).toBe(false);
+
+    rows[0].expand = true;
+    await nextTick();
+    await flushPromises();
+
+    expect(nestedSection(wrapper, "stream").exists()).toBe(true);
+  });
+
+  it("lets the user collapse a programmatically expanded row and keeps it collapsed", async () => {
+    const rows = [makeParentRow("stream", ["metrics"], true)];
+    const wrapper = await mountRealNestedTable({ rows, visibleResourceCount: 1 });
+    expect(nestedSection(wrapper, "stream").exists()).toBe(true);
+
+    await clickExpandToggle(wrapper);
+
+    expect(nestedSection(wrapper, "stream").exists()).toBe(false);
+
+    // A re-render must not resurrect the expansion the user just dismissed.
+    await wrapper.setProps({ visibleResourceCount: 2 });
+    await nextTick();
+    await flushPromises();
+
+    expect(nestedSection(wrapper, "stream").exists()).toBe(false);
+  });
+
+  it("lets the user re-expand a row they collapsed", async () => {
+    const rows = [makeParentRow("stream", ["metrics"], true)];
+    const wrapper = await mountRealNestedTable({ rows, visibleResourceCount: 1 });
+
+    await clickExpandToggle(wrapper);
+    expect(nestedSection(wrapper, "stream").exists()).toBe(false);
+
+    await clickExpandToggle(wrapper);
+
+    expect(nestedSection(wrapper, "stream").exists()).toBe(true);
+  });
+
+  it("still emits expand:row when the user expands a collapsed row manually", async () => {
+    const rows = [makeParentRow("stream", ["metrics"], false)];
+    const wrapper = await mountRealNestedTable({ rows, visibleResourceCount: 1 });
+
+    await clickExpandToggle(wrapper);
+
+    const emitted = wrapper.emitted("expand:row");
+    expect(emitted).toBeTruthy();
+    expect((emitted![0][0] as any).name).toBe("stream");
+  });
+
+  it("does not emit expand:row for a row that was already expanded programmatically", async () => {
+    const rows = [makeParentRow("stream", ["metrics"], true)];
+
+    const wrapper = await mountRealNestedTable({ rows, visibleResourceCount: 1 });
+
+    expect(wrapper.emitted("expand:row")).toBeFalsy();
   });
 });
