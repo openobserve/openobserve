@@ -21,7 +21,7 @@ import { computed, ref, type ComputedRef } from "vue";
 import useStreams from "@/composables/useStreams";
 import { gt } from "@/types/i18n";
 
-export type WorkloadId = "hosts" | "kubernetes" | "aws";
+export type WorkloadId = "hosts" | "kubernetes";
 export type WorkloadState = "unknown" | "undetected" | "detected";
 
 // Exact characteristic streams — ≥2 present means a host agent is reporting.
@@ -32,8 +32,6 @@ const HOST_SIGNATURE_STREAMS = [
   "system_network_io",
 ];
 
-const isAwsName = (name: string) => name.startsWith("aws_") || name.includes("cloudwatch");
-
 /**
  * The L0 signature applied to already-loaded stream NAMES. Exported so a caller
  * that has just read the lists itself (the curated engine) derives the same
@@ -43,7 +41,7 @@ export function workloadStateFromNames(
   workload: WorkloadId,
   names: { metrics: string[] | null; logs: string[] | null },
 ): WorkloadState {
-  const { metrics, logs } = names;
+  const { metrics } = names;
   const fromMetrics = (matched: boolean): WorkloadState =>
     metrics == null ? "unknown" : matched ? "detected" : "undetected";
   if (workload === "hosts") {
@@ -51,12 +49,7 @@ export function workloadStateFromNames(
       metrics != null && HOST_SIGNATURE_STREAMS.filter((n) => metrics.includes(n)).length >= 2,
     );
   }
-  if (workload === "kubernetes") {
-    return fromMetrics(metrics != null && metrics.filter((n) => n.startsWith("k8s_")).length >= 2);
-  }
-  const awsDetected =
-    (metrics != null && metrics.some(isAwsName)) || (logs != null && logs.some(isAwsName));
-  return awsDetected ? "detected" : metrics != null && logs != null ? "undetected" : "unknown";
+  return fromMetrics(metrics != null && metrics.filter((n) => n.startsWith("k8s_")).length >= 2);
 }
 
 export function useWorkloadDetection(): {
@@ -87,7 +80,6 @@ export function useWorkloadDetection(): {
     return {
       hosts: workloadStateFromNames("hosts", names),
       kubernetes: workloadStateFromNames("kubernetes", names),
-      aws: workloadStateFromNames("aws", names),
     };
   });
 

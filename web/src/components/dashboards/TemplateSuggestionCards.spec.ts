@@ -55,7 +55,6 @@ vi.mock("@/composables/useDashboardGallery", () => ({
 const workloadStates = ref<Record<string, string>>({
   hosts: "undetected",
   kubernetes: "undetected",
-  aws: "undetected",
 });
 
 const galleryState = {
@@ -138,7 +137,7 @@ describe("TemplateSuggestionCards", () => {
   beforeEach(() => {
     vi.stubGlobal("fetch", mockFetch);
     vi.clearAllMocks();
-    workloadStates.value = { hosts: "undetected", kubernetes: "undetected", aws: "undetected" };
+    workloadStates.value = { hosts: "undetected", kubernetes: "undetected" };
     galleryState.dashboards.value = [];
     galleryState.error.value = "";
     galleryState.loadDashboards.mockResolvedValue(undefined);

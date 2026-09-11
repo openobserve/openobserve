@@ -446,11 +446,10 @@ describe("groupNavLinks", () => {
       "infraHosts",
       "dbmDatabases",
       "infraKubernetes",
-      "infraAws",
     ]);
   });
 
-  it("declares the three workload children ungated, with their titleKey/icon/route", () => {
+  it("declares the two workload children ungated, with their titleKey/icon/route", () => {
     // Ungated = always present under Infra; detection changes page state, never existence.
     const infra = NAV_GROUPS.find((g) => g.key === "infra");
     const byName = (name: string) => infra?.children.find((c) => c.name === name);
@@ -464,14 +463,17 @@ describe("groupNavLinks", () => {
       icon: "hub",
       name: "infraKubernetes",
     });
-    expect(byName("infraAws")).toMatchObject({
-      titleKey: "menu.awsInfra",
-      icon: "cloud",
-      name: "infraAws",
-    });
-    for (const name of ["infraHosts", "infraKubernetes", "infraAws"]) {
+    for (const name of ["infraHosts", "infraKubernetes"]) {
       expect(byName(name)?.gate, name).toBeUndefined();
     }
+  });
+
+  // An entry whose workload has no registered curated pack renders a dead end,
+  // so Infra must not regrow an AWS child while no AWS pack exists.
+  it("declares NO aws child under Infra", () => {
+    const infra = NAV_GROUPS.find((g) => g.key === "infra");
+    expect(infra?.children.find((c) => c.name === "infraAws")).toBeUndefined();
+    expect(infra?.children.map((c) => c.titleKey)).not.toContain("menu.awsInfra");
   });
 
   it("anchors Infra directly after Reliability", () => {
@@ -528,7 +530,7 @@ describe("groupNavLinks", () => {
     const infra = NAV_GROUPS.find((g) => g.key === "infra");
     expect(infra?.standalone).toBe(true);
     expect(infra?.absorbs).toEqual([]);
-    expect(infra?.children).toHaveLength(4);
+    expect(infra?.children).toHaveLength(3);
     expect(infraGroup(groupNavLinks([link("home"), link("traces")]))).toBeTruthy();
   });
 

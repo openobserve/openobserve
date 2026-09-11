@@ -49,7 +49,7 @@ const route = useRoute();
 const router = useRouter();
 const { t } = useI18nTyped();
 
-// No fallback: an AWS route rendering the Kubernetes manifest is a lie, not a degradation.
+// No fallback: a packless route rendering another workload's manifest is a lie, not a degradation.
 const pack = curatedPacks[props.workload];
 const hasPack = computed(() => pack != null);
 const manifest = computed(() => pack ?? curatedPacks.kubernetes!);
@@ -139,7 +139,6 @@ const showPartialTelemetry = computed(
   () => face.value === "undetected" && l0State.value === "detected",
 );
 const partialTelemetryKey = computed(() => {
-  if (props.workload === "aws") return "infra.curated.partialTelemetryAws" as const;
   if (props.workload === "hosts") return "infra.curated.partialTelemetryHosts" as const;
   return "infra.curated.partialTelemetryKubernetes" as const;
 });

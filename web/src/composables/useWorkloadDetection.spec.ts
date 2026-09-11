@@ -76,7 +76,6 @@ describe("useWorkloadDetection", () => {
       await flushPromises();
       expect(states.value.hosts).toBe("unknown");
       expect(states.value.kubernetes).toBe("unknown");
-      expect(states.value.aws).toBe("unknown");
     });
   });
 
@@ -98,29 +97,25 @@ describe("useWorkloadDetection", () => {
     });
   });
 
-  describe("aws signature (≥1 aws_/cloudwatch stream, metrics or logs)", () => {
-    it("detects an aws_-prefixed metrics stream", async () => {
-      mockStreamLists({ metrics: ["aws_ec2_cpu"] });
+  // Detection exists to pick a curated page's face, so a workload with no pack
+  // has nothing to detect for — no consumer ever read the aws state.
+  describe("detected workloads", () => {
+    it("reports exactly hosts and kubernetes, with no aws key", async () => {
+      mockStreamLists({ metrics: ["aws_ec2_cpu"], logs: ["vpc_cloudwatch_flow"] });
       const { states, refresh } = useWorkloadDetection();
       await refresh();
       await flushPromises();
-      expect(states.value.aws).toBe("detected");
+      expect(Object.keys(states.value).sort()).toEqual(["hosts", "kubernetes"]);
+      expect((states.value as Record<string, unknown>).aws).toBeUndefined();
     });
 
-    it("detects a cloudwatch-bearing logs stream", async () => {
-      mockStreamLists({ logs: ["vpc_cloudwatch_flow"] });
+    it("does not treat aws_/cloudwatch streams as a detected workload", async () => {
+      mockStreamLists({ metrics: ["aws_ec2_cpu"], logs: ["vpc_cloudwatch_flow"] });
       const { states, refresh } = useWorkloadDetection();
       await refresh();
       await flushPromises();
-      expect(states.value.aws).toBe("detected");
-    });
-
-    it("stays undetected without either", async () => {
-      mockStreamLists({ metrics: ["nginx_requests"], logs: ["default"] });
-      const { states, refresh } = useWorkloadDetection();
-      await refresh();
-      await flushPromises();
-      expect(states.value.aws).toBe("undetected");
+      expect(states.value.hosts).toBe("undetected");
+      expect(states.value.kubernetes).toBe("undetected");
     });
   });
 

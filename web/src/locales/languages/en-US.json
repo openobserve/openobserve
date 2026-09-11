@@ -1248,7 +1248,6 @@
     "databases": "Databases",
     "hosts": "Hosts",
     "kubernetes": "Kubernetes",
-    "awsInfra": "AWS",
     "topQueries": "Top Queries"
   },
   "rum": {
@@ -16326,7 +16325,6 @@
       "packUnavailable": "This page isn't available yet.",
       "packUnavailableHint": "Curated content for this workload hasn't shipped. Build a dashboard to chart it in the meantime.",
       "partialTelemetryKubernetes": "We found Kubernetes streams, but not the metrics this page needs (kubeletstats or cluster receiver). Check your collector's receivers.",
-      "partialTelemetryAws": "We found AWS streams, but not the events this page needs. Check that your Firehose delivery stream is running.",
       "partialTelemetryHosts": "We found host streams, but not the metrics this page needs. Check your collector's hostmetrics receiver.",
       "hiddenSummary": "{capabilities}",
       "hiddenSummaryMore": "{first}, and {count} more",

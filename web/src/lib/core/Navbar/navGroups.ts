@@ -267,7 +267,6 @@ export const NAV_GROUPS: NavGroupDef[] = [
         ],
       },
       { titleKey: "menu.kubernetes", icon: "hub", name: "infraKubernetes" },
-      { titleKey: "menu.awsInfra", icon: "cloud", name: "infraAws" },
     ],
   },
   {

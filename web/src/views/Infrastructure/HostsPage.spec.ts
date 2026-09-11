@@ -71,7 +71,6 @@ const hostsListState = {
 const workloadStates = ref<Record<string, string>>({
   hosts: "detected",
   kubernetes: "undetected",
-  aws: "undetected",
 });
 const detectionRefresh = vi.fn();
 
@@ -204,7 +203,7 @@ describe("HostsPage", () => {
     vi.clearAllMocks();
     // clearAllMocks keeps implementations, so a per-test re-emit would leak.
     dateTimeRefreshSpy.mockReset();
-    workloadStates.value = { hosts: "detected", kubernetes: "undetected", aws: "undetected" };
+    workloadStates.value = { hosts: "detected", kubernetes: "undetected" };
     hostsListState.rows.value = [];
     hostsListState.filteredRows.value = [];
     hostsListState.pagedRows.value = [];
