@@ -13,21 +13,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Fused evaluation of `agg(range_func(...))`: range-function values fold
-//! straight into dense per-group accumulators, skipping the generic
-//! evaluator's intermediate per-series materialization.
+//! Consumers of a `SeriesStream`: the fused aggregate folds each series into per-group
+//! accumulators as it arrives, `eval_range` keeps every series' range-function output whole.
 
 mod accumulator;
 mod aggregate;
 mod eval_range;
-pub(crate) mod matrix;
-mod op;
 mod range_expr;
-pub(crate) mod stream;
 
+pub(crate) use accumulator::FusedAggOp;
+pub(crate) use aggregate::aggregate;
 use datafusion::error::{DataFusionError, Result};
 pub(crate) use eval_range::eval_range;
-pub(crate) use op::FusedAggOp;
 pub(crate) use range_expr::RangeExpr;
 use tokio::task::JoinSet;
 
@@ -55,16 +52,16 @@ where
 }
 
 #[cfg(test)]
-mod test_support {
+pub(crate) mod tests {
     use config::meta::promql::value::{EvalContext, Value};
     use promql_parser::parser::LabelModifier;
 
-    pub(super) type CanonicalSeries = (Vec<(String, String)>, Vec<(i64, u64)>);
+    pub(crate) type CanonicalSeries = (Vec<(String, String)>, Vec<(i64, u64)>);
 
-    pub(super) const SECOND: i64 = 1_000_000;
-    pub(super) const BASE: i64 = 1_000 * SECOND;
+    pub(crate) const SECOND: i64 = 1_000_000;
+    pub(crate) const BASE: i64 = 1_000 * SECOND;
 
-    pub(super) fn eval_ctx() -> EvalContext {
+    pub(crate) fn eval_ctx() -> EvalContext {
         EvalContext::new(
             BASE + 60 * SECOND,
             BASE + 180 * SECOND,
@@ -73,7 +70,7 @@ mod test_support {
         )
     }
 
-    pub(super) fn canonical_matrix(value: Value) -> Vec<CanonicalSeries> {
+    pub(crate) fn canonical_matrix(value: Value) -> Vec<CanonicalSeries> {
         let matrix = match value {
             Value::Matrix(matrix) => matrix,
             Value::None => return vec![],
@@ -100,13 +97,13 @@ mod test_support {
         canonical
     }
 
-    pub(super) fn by(labels: &[&str]) -> Option<LabelModifier> {
+    pub(crate) fn by(labels: &[&str]) -> Option<LabelModifier> {
         Some(LabelModifier::Include(promql_parser::label::Labels {
             labels: labels.iter().map(|label| label.to_string()).collect(),
         }))
     }
 
-    pub(super) fn without(labels: &[&str]) -> Option<LabelModifier> {
+    pub(crate) fn without(labels: &[&str]) -> Option<LabelModifier> {
         Some(LabelModifier::Exclude(promql_parser::label::Labels {
             labels: labels.iter().map(|label| label.to_string()).collect(),
         }))
@@ -114,7 +111,7 @@ mod test_support {
 
     /// Labels and timestamps must match exactly; values may drift in the last bits (fold order
     /// differs).
-    pub(super) fn assert_matrix_close(
+    pub(crate) fn assert_matrix_close(
         expected: Vec<CanonicalSeries>,
         actual: Vec<CanonicalSeries>,
         context: &str,

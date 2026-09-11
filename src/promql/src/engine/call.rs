@@ -20,7 +20,6 @@ use std::{str::FromStr, sync::Arc};
 
 use config::meta::promql::value::*;
 use datafusion::error::{DataFusionError, Result};
-use hashbrown::HashSet;
 use promql_parser::parser::{Expr as PromExpr, Function, FunctionArgs, MatrixSelector};
 
 use super::Engine;
@@ -47,57 +46,18 @@ impl Engine {
             return Ok(value);
         }
 
-        // There are a few functions which need no arguments for e.g. time()
-        let functions_without_args: HashSet<&str> = HashSet::from_iter(vec![
-            "day_of_month",
-            "day_of_week",
-            "day_of_year",
-            "days_in_month",
-            "hour",
-            "minute",
-            "month",
-            "time",
-            "year",
-        ]);
-        let input = match functions_without_args.contains(func.name) {
-            true => match args.len() {
-                0 => {
-                    // Found no arg to pass to, lets use a `matrix(time())` as the arg.
-                    // https://prometheus.io/docs/prometheus/latest/querying/functions/#functions
-                    let timestamps = self.eval_ctx.timestamps();
-                    let samples: Vec<Sample> = timestamps
-                        .iter()
-                        .map(|&ts| Sample::new(ts, ts as f64))
-                        .collect();
-                    let default_now_matrix = vec![RangeValue {
-                        labels: Labels::default(),
-                        samples,
-                        exemplars: None,
-                        time_window: None,
-                    }];
-                    Value::Matrix(default_now_matrix)
-                }
-                1 => self.call_expr_first_arg(args).await?,
-
-                _ => {
-                    return Err(DataFusionError::NotImplemented(
-                        "Invalid args passed to the function".into(),
-                    ));
-                }
-            },
-            false => {
-                let last_arg = args
-                    .last()
-                    .expect("BUG: promql-parser should have validated function arguments");
-                self.exec_expr(&last_arg).await?
-            }
-        };
+        if func_name == Func::Time {
+            self.ensure_args_len(args, 0, "Invalid args passed to the function")?;
+            // TODO: check this implementation
+            return Ok(Value::Float((self.eval_ctx.start / 1_000_000) as f64));
+        }
 
         let start = std::time::Instant::now();
         let result = if let Some(range_func) = func_name.range_func() {
+            let input = self.call_expr_arg(args, 0).await?;
             functions::eval_range(input, range_func, &self.eval_ctx)?
         } else {
-            self.call_builtin(func, func_name, input, args).await?
+            self.call_builtin(func_name, args).await?
         };
         log::info!(
             "[trace_id: {}] [PromQL Timing] call_expr({}) execution took: {:?}",
@@ -108,200 +68,71 @@ impl Engine {
         Ok(result)
     }
 
-    async fn call_expr_first_arg(&mut self, args: &FunctionArgs) -> Result<Value> {
-        self.exec_expr(args.args.first().expect("Missing arg 0"))
-            .await
-    }
-
-    async fn call_expr_second_arg(&mut self, args: &FunctionArgs) -> Result<Value> {
-        self.exec_expr(args.args.get(1).expect("Missing arg 1"))
-            .await
-    }
-
-    async fn call_expr_third_arg(&mut self, args: &FunctionArgs) -> Result<Value> {
-        self.exec_expr(args.args.get(2).expect("Missing arg 2"))
-            .await
-    }
-
-    async fn call_expr_fourth_arg(&mut self, args: &FunctionArgs) -> Result<Value> {
-        self.exec_expr(args.args.get(3).expect("Missing arg 3"))
-            .await
-    }
-
-    async fn call_expr_fifth_arg(&mut self, args: &FunctionArgs) -> Result<Value> {
-        self.exec_expr(args.args.get(4).expect("Missing arg 4"))
-            .await
-    }
-
-    fn ensure_two_args(&self, args: &FunctionArgs, err: &str) -> Result<()> {
-        if args.len() != 2 {
-            return Err(DataFusionError::NotImplemented(err.into()));
-        }
-        Ok(())
-    }
-
-    fn ensure_three_args(&self, args: &FunctionArgs, err: &str) -> Result<()> {
-        if args.len() != 3 {
-            return Err(DataFusionError::NotImplemented(err.into()));
-        }
-        Ok(())
-    }
-
-    fn ensure_ge_three_args(&self, args: &FunctionArgs, err: &str) -> Result<()> {
-        if args.len() < 3 {
-            return Err(DataFusionError::NotImplemented(err.into()));
-        }
-        Ok(())
-    }
-
-    fn ensure_five_args(&self, args: &FunctionArgs, err: &str) -> Result<()> {
-        if args.len() != 5 {
-            return Err(DataFusionError::NotImplemented(err.into()));
-        }
-        Ok(())
-    }
-
-    fn parse_f64_else_err<T: Into<String>>(&self, value: &Value, err: T) -> Result<f64> {
-        match value {
-            Value::Float(f) => Ok(*f),
-            _ => Err(DataFusionError::NotImplemented(err.into())),
-        }
-    }
-
-    async fn call_builtin(
-        &mut self,
-        func: &Function,
-        func_name: Func,
-        input: Value,
-        args: &FunctionArgs,
-    ) -> Result<Value> {
+    async fn call_builtin(&mut self, func_name: Func, args: &FunctionArgs) -> Result<Value> {
         Ok(match func_name {
-            Func::Abs => functions::abs(input)?,
-            Func::Absent => functions::absent(input, &self.eval_ctx)?,
-            Func::AbsentOverTime => functions::absent_over_time(input, &self.eval_ctx)?,
-            Func::Ceil => functions::ceil(input)?,
             Func::Clamp => {
-                let err =
-                    "Invalid args, expected \"clamp(v instant-vector, min scalar, max scalar)\"";
-                self.ensure_three_args(args, err)?;
+                let err = "Invalid args, expected clamp(v instant-vector, min scalar, max scalar)";
+                self.ensure_args_len(args, 3, err)?;
+                let input = self.call_expr_arg(args, 0).await?;
+                let min = self.call_expr_arg(args, 1).await?;
+                let min_f = self.parse_f64_else_err(&min, err)?;
+                let max = self.call_expr_arg(args, 2).await?;
+                let max_f = self.parse_f64_else_err(&max, err)?;
 
-                let input = self.call_expr_first_arg(args).await?;
-                let min = self.call_expr_second_arg(args).await?;
-                let max = self.call_expr_third_arg(args).await?;
-
-                let (min_f, max_f) = match (min, max) {
-                    (Value::Float(min), Value::Float(max)) => {
-                        if min > max {
-                            return Ok(Value::Matrix(vec![]));
-                        }
-                        (min, max)
-                    }
-                    _ => {
-                        return Err(DataFusionError::NotImplemented(err.into()));
-                    }
-                };
+                if min_f > max_f {
+                    return Ok(Value::Matrix(vec![]));
+                }
                 functions::clamp(input, min_f, max_f)?
             }
             Func::ClampMax => {
-                let err = "Invalid args, expected \"clamp(v instant-vector, max scalar)\"";
-                self.ensure_two_args(args, err)?;
+                let err = "Invalid args, expected clamp(v instant-vector, max scalar)";
+                self.ensure_args_len(args, 2, err)?;
+                let input = self.call_expr_arg(args, 0).await?;
+                let max = self.call_expr_arg(args, 1).await?;
+                let max_f = self.parse_f64_else_err(&max, err)?;
 
-                let input = self.call_expr_first_arg(args).await?;
-                let max = self.call_expr_second_arg(args).await?;
-                let max_f = match max {
-                    Value::Float(max) => max,
-                    _ => {
-                        return Err(DataFusionError::NotImplemented(err.into()));
-                    }
-                };
                 functions::clamp(input, f64::MIN, max_f)?
             }
             Func::ClampMin => {
-                let err = "Invalid args, expected \"clamp(v instant-vector, min scalar)\"";
-                self.ensure_two_args(args, err)?;
+                let err = "Invalid args, expected clamp(v instant-vector, min scalar)";
+                self.ensure_args_len(args, 2, err)?;
+                let input = self.call_expr_arg(args, 0).await?;
+                let min = self.call_expr_arg(args, 1).await?;
+                let min_f = self.parse_f64_else_err(&min, err)?;
 
-                let input = self.call_expr_first_arg(args).await?;
-                let min = self.call_expr_second_arg(args).await?;
-                let min_f = match min {
-                    Value::Float(min) => min,
-                    _ => {
-                        return Err(DataFusionError::NotImplemented(err.into()));
-                    }
-                };
                 functions::clamp(input, min_f, f64::MAX)?
             }
-            Func::DayOfMonth => functions::day_of_month(input)?,
-            Func::DayOfWeek => functions::day_of_week(input)?,
-            Func::DayOfYear => functions::day_of_year(input)?,
-            Func::DaysInMonth => functions::days_in_month(input)?,
-            Func::Exp => functions::exp(input)?,
-            Func::Floor => functions::floor(input)?,
-            Func::HistogramCount => {
-                return Err(DataFusionError::NotImplemented(format!(
-                    "Unsupported Function: {func_name:?}"
-                )));
-            }
-            Func::HistogramFraction => {
-                return Err(DataFusionError::NotImplemented(format!(
-                    "Unsupported Function: {func_name:?}"
-                )));
-            }
             Func::HistogramQuantile => {
-                let args = &args.args;
-                if args.len() != 2 {
-                    return Err(DataFusionError::Plan(format!(
-                        "{}: expected 2 arguments, got {}",
-                        func.name,
-                        args.len()
-                    )));
-                }
-                let phi = {
-                    match *args[0] {
-                        PromExpr::NumberLiteral(ref num) => num.val,
-                        _ => {
-                            return Err(DataFusionError::Plan(format!(
-                                "{}: the first argument must be a number",
-                                func.name
-                            )));
-                        }
-                    }
-                };
+                let err = "Invalid args, expected histogram_quantile(phi scalar, b instant-vector)";
+                self.ensure_args_len(args, 2, err)?;
+                let phi = self.call_expr_arg(args, 0).await?;
+                let phi_f = self.parse_f64_else_err(&phi, err)?;
+                let input = self.call_expr_arg(args, 1).await?;
 
-                // Use range version if we have an eval context
-                functions::histogram_quantile(phi, input, &self.eval_ctx)?
-            }
-            Func::HistogramSum => {
-                return Err(DataFusionError::NotImplemented(format!(
-                    "Unsupported Function: {func_name:?}"
-                )));
+                functions::histogram_quantile(phi_f, input, &self.eval_ctx)?
             }
             Func::HoltWinters => {
                 let err =
-                    "Invalid args, expected \"holt_winters(v range-vector, sf scalar, tf scalar)\"";
-                self.ensure_three_args(args, err)?;
-
-                let input = self.call_expr_first_arg(args).await?;
-                let sf = self.call_expr_second_arg(args).await?;
-                let tf = self.call_expr_third_arg(args).await?;
-
+                    "Invalid args, expected holt_winters(v range-vector, sf scalar, tf scalar)";
+                self.ensure_args_len(args, 3, err)?;
+                let input = self.call_expr_arg(args, 0).await?;
+                let sf = self.call_expr_arg(args, 1).await?;
                 let scaling_factor = self.parse_f64_else_err(&sf, err)?;
+                let tf = self.call_expr_arg(args, 2).await?;
                 let trend_factor = self.parse_f64_else_err(&tf, err)?;
 
                 functions::holt_winters(input, scaling_factor, trend_factor, &self.eval_ctx)?
             }
-            Func::Hour => functions::hour(input)?,
             Func::LabelJoin => {
-                let err = "Invalid args, expected \"label_join(v instant-vector, dst string, sep string, src_1 string, src_2 string, ...)\"";
+                let err = "Invalid args, expected label_join(v instant-vector, dst string, sep string, src_1 string, src_2 string, ...)";
                 self.ensure_ge_three_args(args, err)?;
-
-                let input = self.call_expr_first_arg(args).await?;
-                let dst_label = self.call_expr_second_arg(args).await?.get_string().ok_or(
+                let input = self.call_expr_arg(args, 0).await?;
+                let dst_label = self.call_expr_arg(args, 1).await?.get_string().ok_or(
                     DataFusionError::NotImplemented("Invalid destination label found".into()),
                 )?;
-                let separator = self.call_expr_third_arg(args).await?.get_string().ok_or(
+                let separator = self.call_expr_arg(args, 2).await?.get_string().ok_or(
                     DataFusionError::NotImplemented("Invalid separator label found".into()),
                 )?;
-
                 let mut source_labels = vec![];
                 for each_src in args.args[3..].iter() {
                     if let Value::String(label) = self.exec_expr(each_src).await.unwrap() {
@@ -316,86 +147,166 @@ impl Engine {
                 functions::label_join(input, &dst_label, &separator, source_labels)?
             }
             Func::LabelReplace => {
-                let err = "Invalid args, expected \"label_replace(v instant-vector, dst_label string, replacement string, src_label string, regex string)\"";
-
-                self.ensure_five_args(args, err)?;
-                let input = self.call_expr_first_arg(args).await?;
-
-                let dst_label = self.call_expr_second_arg(args).await?.get_string().ok_or(
+                let err = "Invalid args, expected label_replace(v instant-vector, dst_label string, replacement string, src_label string, regex string)";
+                self.ensure_args_len(args, 5, err)?;
+                let input = self.call_expr_arg(args, 0).await?;
+                let dst_label = self.call_expr_arg(args, 1).await?.get_string().ok_or(
                     DataFusionError::NotImplemented("Invalid destination label found".into()),
                 )?;
-                let replacement = self.call_expr_third_arg(args).await?.get_string().ok_or(
+                let replacement = self.call_expr_arg(args, 2).await?.get_string().ok_or(
                     DataFusionError::NotImplemented("Invalid replacement string found".into()),
                 )?;
-
-                let src_label = self.call_expr_fourth_arg(args).await?.get_string().ok_or(
+                let src_label = self.call_expr_arg(args, 3).await?.get_string().ok_or(
                     DataFusionError::NotImplemented("Invalid source label string found".into()),
                 )?;
-
-                let regex = self.call_expr_fifth_arg(args).await?.get_string().ok_or(
+                let regex = self.call_expr_arg(args, 4).await?.get_string().ok_or(
                     DataFusionError::NotImplemented("Invalid regex string found".into()),
                 )?;
 
                 functions::label_replace(input, &dst_label, &replacement, &src_label, &regex)?
             }
+            Func::PredictLinear => {
+                let err = "Invalid args, expected predict_linear(v range-vector, t scalar)";
+                self.ensure_args_len(args, 2, err)?;
+                let input = self.call_expr_arg(args, 0).await?;
+                let prediction_steps = self.call_expr_arg(args, 1).await?;
+                let prediction_steps_f = self.parse_f64_else_err(&prediction_steps, err)?;
+
+                functions::predict_linear(input, prediction_steps_f, &self.eval_ctx)?
+            }
+            Func::QuantileOverTime => {
+                let err = "Invalid args, expected quantile_over_time(scalar, range-vector)";
+                self.ensure_args_len(args, 2, err)?;
+                let phi_quantile = self.call_expr_arg(args, 0).await?;
+                let phi_quantile_f = self.parse_f64_else_err(&phi_quantile, err)?;
+                let input = self.call_expr_arg(args, 1).await?;
+
+                functions::quantile_over_time(phi_quantile_f, input, &self.eval_ctx)?
+            }
+            Func::Round => {
+                let err = "Invalid args, expected round(v instant-vector, to_nearest=1 scalar)";
+                let input = self.call_expr_arg(args, 0).await?;
+                let to_nearest = match args.len() {
+                    1 => 1.0,
+                    2 => {
+                        let to_nearest = self.call_expr_arg(args, 1).await?;
+                        self.parse_f64_else_err(&to_nearest, err)?
+                    }
+                    _ => return Err(DataFusionError::NotImplemented(err.into())),
+                };
+
+                functions::round(input, to_nearest)?
+            }
+            Func::HistogramCount
+            | Func::HistogramFraction
+            | Func::HistogramSum
+            | Func::Sort
+            | Func::SortDesc => {
+                return Err(DataFusionError::NotImplemented(format!(
+                    "Unsupported Function: {func_name:?}"
+                )));
+            }
+            _ => self.call_single_arg_builtin(func_name, args).await?,
+        })
+    }
+
+    async fn call_single_arg_builtin(
+        &mut self,
+        func_name: Func,
+        args: &FunctionArgs,
+    ) -> Result<Value> {
+        let input = if matches!(
+            func_name,
+            Func::DayOfMonth
+                | Func::DayOfWeek
+                | Func::DayOfYear
+                | Func::DaysInMonth
+                | Func::Hour
+                | Func::Minute
+                | Func::Month
+                | Func::Year
+        ) {
+            match args.len() {
+                0 => Value::Matrix(vec![RangeValue {
+                    labels: Labels::default(),
+                    samples: self
+                        .eval_ctx
+                        .timestamps()
+                        .into_iter()
+                        .map(|ts| Sample::new(ts, ts as f64))
+                        .collect(),
+                    exemplars: None,
+                    time_window: None,
+                }]),
+                1 => self.call_expr_arg(args, 0).await?,
+                _ => {
+                    return Err(DataFusionError::NotImplemented(
+                        "Invalid args passed to the function".into(),
+                    ));
+                }
+            }
+        } else {
+            self.call_expr_arg(args, 0).await?
+        };
+
+        Ok(match func_name {
+            Func::Abs => functions::abs(input)?,
+            Func::Absent => functions::absent(input, &self.eval_ctx)?,
+            Func::AbsentOverTime => functions::absent_over_time(input, &self.eval_ctx)?,
+            Func::Ceil => functions::ceil(input)?,
+            Func::DayOfMonth => functions::day_of_month(input)?,
+            Func::DayOfWeek => functions::day_of_week(input)?,
+            Func::DayOfYear => functions::day_of_year(input)?,
+            Func::DaysInMonth => functions::days_in_month(input)?,
+            Func::Exp => functions::exp(input)?,
+            Func::Floor => functions::floor(input)?,
+            Func::Hour => functions::hour(input)?,
             Func::Ln => functions::ln(input)?,
             Func::Log10 => functions::log10(input)?,
             Func::Log2 => functions::log2(input)?,
             Func::Minute => functions::minute(input)?,
             Func::Month => functions::month(input)?,
-            Func::PredictLinear => {
-                let err = "Invalid args, expected \"predict_linear(v range-vector, t scalar)\"";
-
-                self.ensure_two_args(args, err)?;
-                let input = self.call_expr_first_arg(args).await?;
-
-                let prediction_steps = self.call_expr_second_arg(args).await?.get_float().ok_or(
-                    DataFusionError::NotImplemented(
-                        "Invalid prediction_steps, f64 expected".into(),
-                    ),
-                )?;
-                functions::predict_linear(input, prediction_steps, &self.eval_ctx)?
-            }
-            Func::QuantileOverTime => {
-                let err = "Invalid args, expected \"quantile_over_time(scalar, range-vector)\"";
-
-                self.ensure_two_args(args, err)?;
-                let phi_quantile = match self.call_expr_first_arg(args).await {
-                    Ok(Value::Float(v)) => v,
-                    _ => {
-                        return Err(DataFusionError::Plan(
-                            "[quantile] param must be a NumberLiteral".into(),
-                        ));
-                    }
-                };
-                let input = self.call_expr_second_arg(args).await?;
-                functions::quantile_over_time(phi_quantile, input, &self.eval_ctx)?
-            }
-            Func::Round => functions::round(input)?,
             Func::Scalar => functions::scalar(input, &self.eval_ctx)?,
             Func::Sgn => functions::sgn(input)?,
-            Func::Sort => {
-                return Err(DataFusionError::NotImplemented(format!(
-                    "Unsupported Function: {func_name:?}"
-                )));
-            }
-            Func::SortDesc => {
-                return Err(DataFusionError::NotImplemented(format!(
-                    "Unsupported Function: {func_name:?}"
-                )));
-            }
             Func::Sqrt => functions::sqrt(input)?,
-            // TODO: check this implementation
-            Func::Time => Value::Float((self.eval_ctx.start / 1_000_000) as f64),
             Func::Timestamp => functions::timestamp(input)?,
             Func::Vector => functions::vector(input, &self.eval_ctx)?,
             Func::Year => functions::year(input)?,
             _ => {
                 return Err(DataFusionError::Internal(format!(
-                    "{func_name:?} is a range function and must be evaluated through eval_range"
+                    "{func_name:?} must be evaluated before builtin dispatch"
                 )));
             }
         })
+    }
+
+    async fn call_expr_arg(&mut self, args: &FunctionArgs, index: usize) -> Result<Value> {
+        let arg = args
+            .args
+            .get(index)
+            .ok_or_else(|| DataFusionError::NotImplemented(format!("Missing argument {index}")))?;
+        self.exec_expr(arg).await
+    }
+
+    fn ensure_args_len(&self, args: &FunctionArgs, count: usize, err: &str) -> Result<()> {
+        if args.len() != count {
+            return Err(DataFusionError::NotImplemented(err.into()));
+        }
+        Ok(())
+    }
+
+    fn ensure_ge_three_args(&self, args: &FunctionArgs, err: &str) -> Result<()> {
+        if args.len() < 3 {
+            return Err(DataFusionError::NotImplemented(err.into()));
+        }
+        Ok(())
+    }
+
+    fn parse_f64_else_err<T: Into<String>>(&self, value: &Value, err: T) -> Result<f64> {
+        match value {
+            Value::Float(f) => Ok(*f),
+            _ => Err(DataFusionError::NotImplemented(err.into())),
+        }
     }
 }
 
@@ -407,6 +318,118 @@ mod tests {
 
     use super::*;
     use crate::{engine::tests::*, exec::PromqlContext};
+
+    struct CountingProvider(Arc<std::sync::atomic::AtomicUsize>);
+
+    #[async_trait::async_trait]
+    impl crate::TableProvider for CountingProvider {
+        async fn create_context(
+            &self,
+            _org_id: &str,
+            _stream_name: &str,
+            _time_range: (i64, i64),
+            _matchers: promql_parser::label::Matchers,
+            _label_selector: hashbrown::HashSet<String>,
+            _filters: &mut [(String, Vec<String>)],
+        ) -> Result<
+            Vec<(
+                datafusion::prelude::SessionContext,
+                Arc<datafusion::arrow::datatypes::Schema>,
+                config::meta::search::ScanStats,
+                bool,
+            )>,
+        > {
+            self.0.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            Ok(vec![])
+        }
+    }
+
+    #[tokio::test]
+    async fn test_quantile_over_time_reads_range_argument_once() {
+        let calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let mut engine = Engine::new(
+            "test",
+            Arc::new(PromqlContext::new(
+                create_test_query_ctx("test", "test_org", 30),
+                CountingProvider(calls.clone()),
+                vec![],
+            )),
+            create_test_eval_ctx(),
+        );
+        let expr = promql_parser::parser::parse("quantile_over_time(0.95, m[5m])").unwrap();
+        let value = engine.exec_expr(&expr).await.unwrap();
+        assert!(matches!(value, Value::None));
+        assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 1);
+    }
+
+    #[tokio::test]
+    async fn test_clamp_reads_scalar_argument_once() {
+        let calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let mut engine = Engine::new(
+            "test",
+            Arc::new(PromqlContext::new(
+                create_test_query_ctx("test", "test_org", 30),
+                CountingProvider(calls.clone()),
+                vec![],
+            )),
+            EvalContext::new(1_000_000, 1_000_000, 1_000_000, "test".into()),
+        );
+        let expr =
+            promql_parser::parser::parse("clamp_min(vector(5), scalar(m) > bool 0)").unwrap();
+        let Value::Matrix(series) = engine.exec_expr(&expr).await.unwrap() else {
+            panic!("expected clamped matrix");
+        };
+        assert_eq!(series.len(), 1);
+        assert_eq!(series[0].samples[0].value, 5.0);
+        assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 1);
+    }
+
+    #[tokio::test]
+    async fn test_call_dispatch_preserves_values() {
+        let eval_ctx = EvalContext::new(1_000_000, 1_000_000, 1_000_000, "test".into());
+        for (query, expected) in [
+            ("time()", 1.0),
+            ("day_of_month()", 12.0),
+            ("day_of_month(vector(1000000))", 12.0),
+            ("clamp(vector(5), 1, 3)", 3.0),
+            ("clamp_min(vector(5), 7)", 7.0),
+            ("clamp_max(vector(5), 3)", 3.0),
+            ("round(vector(2.5))", 3.0),
+            ("round(vector(-2.5))", -2.0),
+            ("round(vector(2.6), 0.5)", 2.5),
+            ("round(vector(12.5), 5)", 15.0),
+            ("3 < vector(5)", 5.0),
+            ("3 < bool vector(5)", 1.0),
+            ("7 < bool vector(5)", 0.0),
+            ("quantile_over_time(0.5, vector(5)[1m:1s])", 5.0),
+            ("predict_linear(vector(5)[1m:1s], 10)", 5.0),
+            (r#"label_join(vector(5), "dst", ",", "src")"#, 5.0),
+            (
+                r#"label_replace(vector(5), "dst", "$1", "src", "(.*)")"#,
+                5.0,
+            ),
+        ] {
+            let mut engine = Engine::new(
+                "test",
+                Arc::new(PromqlContext::new(
+                    create_test_query_ctx("test", "test_org", 30),
+                    SimpleMockProvider,
+                    vec![],
+                )),
+                eval_ctx.clone(),
+            );
+            let expr = promql_parser::parser::parse(query).unwrap();
+            match engine.exec_expr(&expr).await.unwrap() {
+                Value::Float(value) => assert_eq!(value, expected, "{query}"),
+                Value::Matrix(series) => {
+                    assert_eq!(series.len(), 1, "{query}");
+                    assert_eq!(series[0].samples.len(), 1, "{query}");
+                    assert_eq!(series[0].samples[0].value, expected, "{query}");
+                }
+                value => panic!("unexpected result for {query}: {value:?}"),
+            }
+        }
+    }
 
     #[test]
     fn test_ensure_two_args() {
@@ -428,7 +451,7 @@ mod tests {
                 Box::new(PromExpr::NumberLiteral(NumberLiteral { val: 2.0 })),
             ],
         };
-        let result = engine.ensure_two_args(&args, "test error");
+        let result = engine.ensure_args_len(&args, 2, "test error");
         assert!(result.is_ok());
 
         let args = FunctionArgs {
@@ -436,7 +459,7 @@ mod tests {
                 val: 1.0,
             }))],
         };
-        let result = engine.ensure_two_args(&args, "test error");
+        let result = engine.ensure_args_len(&args, 2, "test error");
         assert!(result.is_err());
     }
 
@@ -461,7 +484,7 @@ mod tests {
                 Box::new(PromExpr::NumberLiteral(NumberLiteral { val: 3.0 })),
             ],
         };
-        let result = engine.ensure_three_args(&args, "test error");
+        let result = engine.ensure_args_len(&args, 3, "test error");
         assert!(result.is_ok());
 
         let args = FunctionArgs {
@@ -469,7 +492,7 @@ mod tests {
                 val: 1.0,
             }))],
         };
-        let result = engine.ensure_three_args(&args, "test error");
+        let result = engine.ensure_args_len(&args, 3, "test error");
         assert!(result.is_err());
     }
 
@@ -530,7 +553,7 @@ mod tests {
                 Box::new(PromExpr::NumberLiteral(NumberLiteral { val: 5.0 })),
             ],
         };
-        let result = engine.ensure_five_args(&args, "test error");
+        let result = engine.ensure_args_len(&args, 5, "test error");
         assert!(result.is_ok());
 
         let args = FunctionArgs {
@@ -538,7 +561,7 @@ mod tests {
                 val: 1.0,
             }))],
         };
-        let result = engine.ensure_five_args(&args, "test error");
+        let result = engine.ensure_args_len(&args, 5, "test error");
         assert!(result.is_err());
     }
 
@@ -585,7 +608,7 @@ mod tests {
                 val: 42.0,
             }))],
         };
-        let result = engine.call_expr_first_arg(&args).await;
+        let result = engine.call_expr_arg(&args, 0).await;
         assert!(result.is_ok());
 
         if let Ok(Value::Float(val)) = result {
@@ -615,7 +638,7 @@ mod tests {
                 Box::new(PromExpr::NumberLiteral(NumberLiteral { val: 42.0 })),
             ],
         };
-        let result = engine.call_expr_second_arg(&args).await;
+        let result = engine.call_expr_arg(&args, 1).await;
         assert!(result.is_ok());
 
         if let Ok(Value::Float(val)) = result {
@@ -646,7 +669,7 @@ mod tests {
                 Box::new(PromExpr::NumberLiteral(NumberLiteral { val: 42.0 })),
             ],
         };
-        let result = engine.call_expr_third_arg(&args).await;
+        let result = engine.call_expr_arg(&args, 2).await;
         assert!(result.is_ok());
 
         if let Ok(Value::Float(val)) = result {
@@ -678,7 +701,7 @@ mod tests {
                 Box::new(PromExpr::NumberLiteral(NumberLiteral { val: 42.0 })),
             ],
         };
-        let result = engine.call_expr_fourth_arg(&args).await;
+        let result = engine.call_expr_arg(&args, 3).await;
         assert!(result.is_ok());
 
         if let Ok(Value::Float(val)) = result {
@@ -711,7 +734,7 @@ mod tests {
                 Box::new(PromExpr::NumberLiteral(NumberLiteral { val: 42.0 })),
             ],
         };
-        let result = engine.call_expr_fifth_arg(&args).await;
+        let result = engine.call_expr_arg(&args, 4).await;
         assert!(result.is_ok());
 
         if let Ok(Value::Float(val)) = result {

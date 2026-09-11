@@ -29,7 +29,7 @@ use promql_parser::parser::{
     UnaryExpr, value::ValueType,
 };
 
-use crate::{binaries, exec::PromqlContext, promql::label_usage::labels_dropped_at_root};
+use crate::{ast::label_usage::labels_dropped_at_root, binary, exec::PromqlContext};
 
 pub struct Engine {
     trace_id: String,
@@ -63,16 +63,6 @@ impl Engine {
             result_type: None,
             trace_id: trace_id.to_string(),
         }
-    }
-
-    /// Create a new engine with evaluation context for range queries
-    /// This is now an alias for `new()` since eval_ctx is always required
-    pub fn new_with_context(
-        trace_id: &str,
-        ctx: Arc<PromqlContext>,
-        eval_ctx: EvalContext,
-    ) -> Self {
-        Self::new(trace_id, ctx, eval_ctx)
     }
 
     pub async fn exec(&mut self, prom_expr: &PromExpr) -> Result<(Value, Option<String>)> {
@@ -138,30 +128,25 @@ impl Engine {
                 let rhs = scalar_operand(rhs, &expr.rhs, &self.eval_ctx);
                 match (lhs, rhs) {
                     (Value::Float(left), Value::Float(right)) => {
-                        let value = binaries::scalar_binary_operations(
-                            token,
-                            left,
-                            right,
-                            return_bool,
-                            op,
-                        )?;
+                        let value =
+                            binary::scalar_binary_operations(token, left, right, return_bool, op)?;
                         Value::Float(value)
                     }
                     (Value::Matrix(left), Value::Matrix(right)) => {
-                        binaries::vector_bin_op(expr, left, right)?
+                        binary::vector_bin_op(expr, left, right)?
                     }
                     (Value::Matrix(left), Value::Float(right)) => {
-                        binaries::vector_scalar_bin_op(expr, left, right, false).await?
+                        binary::vector_scalar_bin_op(expr, left, right, false)?
                     }
                     (Value::Float(left), Value::Matrix(right)) => {
-                        binaries::vector_scalar_bin_op(expr, right, left, true).await?
+                        binary::vector_scalar_bin_op(expr, right, left, true)?
                     }
                     // a set operator keeps the other side when one side has no series at all
                     (Value::None, Value::Matrix(right)) if expr.op.is_set_operator() => {
-                        binaries::vector_bin_op(expr, vec![], right)?
+                        binary::vector_bin_op(expr, vec![], right)?
                     }
                     (Value::Matrix(left), Value::None) if expr.op.is_set_operator() => {
-                        binaries::vector_bin_op(expr, left, vec![])?
+                        binary::vector_bin_op(expr, left, vec![])?
                     }
                     (Value::None, Value::None) => Value::None,
                     _ => {
