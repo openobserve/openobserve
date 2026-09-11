@@ -663,7 +663,6 @@ export default defineComponent({
         },
         {
           id: "region",
-          hideBelowMd: true,
           header: t("nodes.region"),
           accessorKey: "region",
           resizable: true,
@@ -684,7 +683,6 @@ export default defineComponent({
         },
         {
           id: "role",
-          hideBelowMd: true,
           header: t("nodes.nodetype"),
           // Sorts by the joined role list so same-role nodes group together.
           accessorFn: (row: any) => (row.role || []).join(", "),
@@ -696,7 +694,6 @@ export default defineComponent({
         },
         {
           id: "version",
-          hideBelowMd: true,
           header: t("nodes.version"),
           accessorKey: "version",
           sortable: true,
@@ -707,7 +704,6 @@ export default defineComponent({
         },
         {
           id: "cpu",
-          hideBelowMd: true,
           header: t("nodes.cpu"),
           accessorKey: "cpu_usage",
           sortable: true,
@@ -718,7 +714,6 @@ export default defineComponent({
         },
         {
           id: "memory",
-          hideBelowMd: true,
           header: t("nodes.memory"),
           accessorKey: "percentage_memory_usage",
           sortable: true,
@@ -729,7 +724,6 @@ export default defineComponent({
         },
         {
           id: "tcp",
-          hideBelowMd: true,
           header: t("nodes.tcp"),
           accessorKey: "tcp_conns",
           resizable: true,

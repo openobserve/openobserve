@@ -250,7 +250,6 @@ export default defineComponent({
       },
       {
         id: "identifier",
-        hideBelowMd: true,
         header: t("organization.identifier"),
         accessorKey: "identifier",
         sortable: true,
@@ -261,7 +260,6 @@ export default defineComponent({
       },
       {
         id: "type",
-        hideBelowMd: true,
         header: t("organization.type"),
         accessorKey: "type",
         sortable: true,
@@ -275,7 +273,6 @@ export default defineComponent({
     if (config.isCloud == "true") {
       columns.push({
         id: "plan",
-        hideBelowMd: true,
         header: t("organization.subscription_plan"),
         accessorKey: "plan",
         sortable: true,

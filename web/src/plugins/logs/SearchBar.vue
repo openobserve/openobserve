@@ -648,11 +648,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               data-test="search-download-submenu-trigger"
               :aria-disabled="isDownloadDisabled || undefined"
-              @mouseenter="!isDownloadDisabled && (showDownloadSubmenu = true)"
-              @mouseleave="showDownloadSubmenu = false"
-              @click.stop="
-                isMobile && !isDownloadDisabled && (showDownloadSubmenu = !showDownloadSubmenu)
-              "
+              @mouseenter="!isMobile && !isDownloadDisabled && (showDownloadSubmenu = true)"
+              @mouseleave="!isMobile && (showDownloadSubmenu = false)"
+              @click="onDownloadRowClick"
               class="hover:bg-interactive-hover-bg search-download-item relative flex cursor-pointer items-center gap-2 px-3 py-1.5 [line-height:1.2] text-[var(--text-sm)] select-none before:absolute before:top-0 before:right-full before:h-full before:w-2.5 before:content-[''] max-md:flex-wrap"
               :class="{
                 'text-text-muted cursor-not-allowed! hover:bg-transparent!': isDownloadDisabled,
@@ -4385,9 +4383,14 @@ export default defineComponent({
     const downloadCustomFileType = ref("csv");
     // Hover-triggered submenu state for "Download results → CSV/JSON" in the more-options dropdown.
     // Resets automatically when the parent ODropdown closes (via @update:open handler).
-    // Touch has no hover, so < md a tap toggles it instead (inline, not flyout).
     const showDownloadSubmenu = ref(false);
     const { isMobile } = useBreakpoint();
+    // A tap also fires mouseenter, so < md only the click toggles; taps on the submenu's own buttons are ignored.
+    const onDownloadRowClick = (e: MouseEvent) => {
+      if (!isMobile.value || isDownloadDisabled.value) return;
+      if ((e.target as HTMLElement | null)?.closest(".search-download-submenu")) return;
+      showDownloadSubmenu.value = !showDownloadSubmenu.value;
+    };
     const isDownloadDisabled = computed(
       () =>
         !searchObj.data.stream.selectedStream?.length || !searchObj.data.queryResults?.hits?.length,
@@ -5037,6 +5040,7 @@ export default defineComponent({
       confirmDialogVisible,
       confirmCallback,
       showDownloadSubmenu,
+      onDownloadRowClick,
       isMobile,
       isDownloadDisabled,
       refreshTimes: searchObj.config.refreshTimes,

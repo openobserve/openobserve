@@ -32,12 +32,16 @@ import {
   DropdownMenuContent,
 } from "reka-ui";
 import { computed, inject, onBeforeUnmount, provide, ref, watch, type Ref } from "vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import {
   O_DROPDOWN_NESTED_KEY,
   type DropdownNestedRegistry,
   setActiveOverlay,
   clearActiveOverlay,
 } from "./ODropdown.context";
+
+// < lg popups keep an 8px margin from the viewport edge; desktop positioning is unchanged.
+const { lgUp } = useBreakpoint();
 
 const props = withDefaults(defineProps<DropdownProps>(), {
   modal: false,
@@ -292,14 +296,12 @@ onBeforeUnmount(() => {
         :align="align"
         :side-offset="sideOffset"
         :hide-when-detached="true"
-        :collision-padding="8"
+        :collision-padding="lgUp ? 0 : 8"
         @pointer-down-outside="handlePointerDownOutside"
         @focus-outside="handleFocusOutside"
         :style="{ zIndex: contentZIndex }"
         :class="[
-          // Layout — max-w keeps wide menus on-screen on small viewports.
-          // Stacking is the inline z-index above, not a class.
-          'max-w-[calc(100vw-1rem)] min-w-40 p-1',
+          'min-w-40 p-1 max-lg:max-w-[calc(100vw-1rem)]',
           // < lg a menu taller than the space below its trigger ran off-screen unreachable.
           'max-lg:max-h-[var(--reka-popper-available-height,75vh)] max-lg:overflow-y-auto',
           // Surface

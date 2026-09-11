@@ -54,37 +54,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <header
     class="app-page-header px-page-edge border-border-default shrink-0 border-b"
     :data-drawer-anchor="ownsSidebarTrigger ? 'page-layout-sidebar' : undefined"
-    :class="[
-      tabsBelow
-        ? 'flex flex-col'
-        : // min-h (not h): when the actions don't fit beside the title they
-          // wrap under it instead of overlapping or crushing it to zero width.
-          'flex min-h-15 flex-wrap items-center justify-between gap-x-4 gap-y-1 py-1.5',
-    ]"
+    :class="[tabsBelow ? 'flex flex-col' : ROW_CLASS]"
   >
     <!-- Row 1. In two-row mode this is its own flex row; otherwise it collapses
          (display:contents) so the title block + actions stay direct children of
          the header — preserving the original single-row inline-tabs layout. -->
-    <div
-      :class="
-        tabsBelow
-          ? 'flex min-h-15 flex-wrap items-center justify-between gap-x-4 gap-y-1 py-1.5'
-          : 'contents'
-      "
-    >
-      <!-- The min-w floor decides the mobile header's shape: flex-1 makes this
-           block basis-0, so the floor alone is what forces the actions to wrap
-           once they can't leave it this much room. 10rem when a back tile eats
-           into the block, 6rem otherwise — so a short list-page title still
-           shares its row with a full toolbar. -->
-      <!-- Wrap only when inline tabs need their own row; otherwise nowrap so
-           the title truncates BESIDE the back tile instead of under it. -->
-      <!-- md:min-w-60: flex-1 makes the block basis-0, so without a desktop
-           floor a wide toolbar never wraps — it overlaps the title instead. -->
-      <!-- md–lg the floor drops to 10rem: a rail-hosted page leaves ~28rem for the
-           header, and the full floor pushed a lone primary button under the title. -->
+    <div :class="tabsBelow ? ROW_CLASS : 'contents'">
+      <!-- < lg the min-w floor is what forces the actions to wrap (flex-1 is basis-0); self-stretch keeps h-full children spanning the wrapped row. -->
       <div
-        class="flex h-full min-w-0 flex-1 items-center gap-3.25 md:max-lg:min-w-40 lg:min-w-60"
+        class="flex h-full min-w-0 flex-1 items-center gap-3.25 max-lg:h-auto max-lg:self-stretch md:max-lg:min-w-40"
         :class="[
           hasBack ? 'max-md:min-w-40' : 'max-md:min-w-24',
           hasTabs && !tabsBelow ? 'max-md:flex-wrap' : 'max-md:flex-nowrap',
@@ -134,13 +112,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              An interactive title (titleOverflow="visible") holds a real name
              that can be long, so it may instead consume the free space in the
              row and only ellipsise once genuinely out of room. -->
-        <!-- max-md:shrink: a long subtitle must not push the block past the
-             viewport on phones — it truncates instead (desktop keeps shrink-0
-             so inline tabs can't squeeze a short title). -->
-        <!-- Without inline tabs there is nothing to defend shrink-0 against, and
-             keeping it lets a long title overlap a wide actions row — so the
-             block stays shrinkable (with a floor so a stub always survives)
-             and truncates instead. -->
         <div
           class="flex min-w-0 flex-col justify-center"
           :class="
@@ -148,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ? ''
               : hasTabs && !tabsBelow
                 ? 'shrink-0 max-md:shrink'
-                : 'shrink md:min-w-32'
+                : 'shrink-0 max-lg:shrink md:max-lg:min-w-32'
           "
         >
           <h1
@@ -307,6 +278,10 @@ const props = withDefaults(
     overflowFirst: false,
   },
 );
+
+// Desktop keeps a fixed h-15 row so h-full slot content (inline tabs, dividers) spans it; < lg the row may wrap.
+const ROW_CLASS =
+  "flex h-15 items-center justify-between gap-4 max-lg:h-auto max-lg:min-h-15 max-lg:flex-wrap max-lg:gap-y-1 max-lg:py-1.5";
 
 const router = useRouter();
 const slots = useSlots();

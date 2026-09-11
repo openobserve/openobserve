@@ -95,6 +95,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @hide="setTimeForVariables"
             data-test="dashboard-global-date-time-picker"
           />
+          <!-- Desktop keeps main's order (before Refresh); < md it moves behind More. -->
+          <AutoRefreshInterval
+            v-if="!isMobile"
+            v-model="refreshInterval"
+            trigger
+            :min-refresh-interval="store.state?.zoConfig?.min_auto_refresh_interval || 5"
+            @trigger="refreshData"
+            class="dashboard-icons hideOnPrintMode h-7.5 [transition:all_0.2s_ease]"
+            size="sm"
+          />
           <OButton
             v-if="config.isEnterprise == 'true' && arePanelsLoading"
             v-show="store.state.printMode !== true"
@@ -128,9 +138,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </template>
 
-        <!-- Secondary toolbar actions: inline on desktop, behind "More" < md. -->
         <template #actions-overflow>
           <AutoRefreshInterval
+            v-if="isMobile"
             v-model="refreshInterval"
             trigger
             :min-refresh-interval="store.state?.zoConfig?.min_auto_refresh_interval || 5"
@@ -354,6 +364,7 @@ import { useAiDashboardEvents } from "@/composables/useAiDashboardEvents";
 import type { AiDashboardEvent } from "@/composables/useAiDashboardEvents";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
+import useBreakpoint from "@/composables/useBreakpoint";
 
 const DashboardJsonEditor = defineAsyncComponent(() => {
   return import("./DashboardJsonEditor.vue");
@@ -387,6 +398,7 @@ export default defineComponent({
   },
   setup() {
     const { t } = useI18nTyped();
+    const { isMobile } = useBreakpoint();
     const route = useRoute();
     const router = useRouter();
     const store = useStore();
@@ -1770,6 +1782,7 @@ export default defineComponent({
     ]);
 
     return {
+      isMobile,
       currentDashboardData,
       dashboardRemountKey,
       toggleFullscreen,

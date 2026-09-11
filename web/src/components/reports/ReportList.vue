@@ -505,7 +505,6 @@ const columns = computed<OTableColumnDef[]>(() => {
     },
     {
       id: "owner",
-      hideBelowMd: true,
       header: t("alerts.owner"),
       accessorKey: "owner",
       sortable: true,
@@ -515,7 +514,6 @@ const columns = computed<OTableColumnDef[]>(() => {
     },
     {
       id: "description",
-      hideBelowMd: true,
       header: t("alerts.description"),
       accessorKey: "description",
       sortable: false,
@@ -526,7 +524,6 @@ const columns = computed<OTableColumnDef[]>(() => {
     },
     {
       id: "last_triggered_at",
-      hideBelowMd: true,
       header: t("alerts.lastTriggered"),
       accessorKey: "last_triggered_at",
       sortable: true,
@@ -547,7 +544,6 @@ const columns = computed<OTableColumnDef[]>(() => {
   if (searchAcrossFolders.value && searchQuery.value !== "") {
     base.splice(2, 0, {
       id: "folder_name",
-      hideBelowMd: true,
       header: t("reports.folder"),
       accessorKey: "folder_name",
       cell: " ",

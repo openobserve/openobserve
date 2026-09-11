@@ -856,7 +856,6 @@ const getColumnsForActiveTab = (tab: any) => {
   };
   const stateColumn = {
     id: "state",
-    hideBelowMd: true,
     header: t("pipeline_list.state"),
     // Sorts by the state word so errored / paused / active group together.
     accessorFn: (row: any) => pipelineState(row),
@@ -869,7 +868,6 @@ const getColumnsForActiveTab = (tab: any) => {
   };
   const streamNameColumn = {
     id: "stream_name",
-    hideBelowMd: true,
     header: t("alerts.stream_name"),
     accessorKey: "stream_name",
     sortable: true,
@@ -880,7 +878,6 @@ const getColumnsForActiveTab = (tab: any) => {
   };
   const streamTypeColumn = {
     id: "stream_type",
-    hideBelowMd: true,
     header: t("alerts.streamType"),
     accessorKey: "stream_type",
     sortable: true,
@@ -891,7 +888,6 @@ const getColumnsForActiveTab = (tab: any) => {
   };
   const frequencyColumn = {
     id: "frequency",
-    hideBelowMd: true,
     header: t("pipeline_list.frequency"),
     accessorKey: "frequency",
     sortable: true,
@@ -902,7 +898,6 @@ const getColumnsForActiveTab = (tab: any) => {
   };
   const periodColumn = {
     id: "period",
-    hideBelowMd: true,
     header: t("pipeline_list.period"),
     accessorKey: "period",
     sortable: true,
@@ -913,7 +908,6 @@ const getColumnsForActiveTab = (tab: any) => {
   };
   const cronColumn = {
     id: "cron",
-    hideBelowMd: true,
     header: t("pipeline_list.cron"),
     accessorKey: "cron",
     sortable: false,
@@ -924,7 +918,6 @@ const getColumnsForActiveTab = (tab: any) => {
   };
   const typeColumn = {
     id: "type",
-    hideBelowMd: true,
     header: t("pipeline_list.type"),
     accessorKey: "type",
     sortable: true,
@@ -935,7 +928,6 @@ const getColumnsForActiveTab = (tab: any) => {
   };
   const scheduledStreamTypeColumn = {
     id: "stream_type",
-    hideBelowMd: true,
     header: t("pipeline_list.stream_type"),
     accessorKey: "stream_type",
     sortable: true,

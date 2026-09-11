@@ -971,26 +971,10 @@ export default defineComponent({
       markApplied();
     };
 
-    /**
-     * What the trigger button renders.
-     *
-     * With `autoApply` the pending selection IS the applied one, so show it live.
-     * Without it, show the live selection while the panel is open (so switching
-     * Relative/Absolute updates the label immediately, like the logs picker), and
-     * fall back to the range in force once closed — so closing without Apply snaps
-     * back to what's actually applied; see `appliedDisplayValue`.
-     * The `||` fallback covers the first paint, before the mount-time apply.
-     */
     const { isMobile } = useBreakpoint();
 
-    // < md: shorten an absolute-range label so it fits the toolbar. Years and
-    // seconds are dropped, and a same-day range keeps one date:
-    // "2026/08/11 11:43:57 - 2026/08/11 11:58:57" → "08/11 11:43 - 11:58".
-    // The full-precision range stays visible inside the picker. Applied at
-    // render (not in getDisplayValue) so already-applied labels compact too
-    // when the viewport shrinks.
+    // < md the trigger label is shortened to fit the toolbar; the picker itself keeps full precision.
     const compactRangeLabel = (label: string) => {
-      // Relative ranges use the standard shorthand: "Past 15 Minutes" → "Past 15m".
       const REL_UNIT: Record<string, string> = {
         second: "s",
         minute: "m",
@@ -1001,14 +985,27 @@ export default defineComponent({
       };
       const rel = label.match(/^Past (\d+) ([A-Za-z]+?)s?$/);
       if (rel) return `Past ${rel[1]}${REL_UNIT[rel[2].toLowerCase()] ?? ` ${rel[2]}`}`;
-      let out = label
-        .replace(/\b\d{4}\/(\d{2}\/\d{2})\b/g, "$1")
-        .replace(/\b(\d{2}:\d{2}):\d{2}\b/g, "$1");
-      const m = out.match(/^(\d{2}\/\d{2}) (\S+) - (\d{2}\/\d{2}) (\S+)$/);
-      if (m && m[1] === m[3]) out = `${m[1]} ${m[2]} - ${m[4]}`;
-      return out;
+      const abs = label.match(
+        /^(\d{4})\/(\d{2}\/\d{2}) (\d{2}:\d{2})(?::\d{2})? - (\d{4})\/(\d{2}\/\d{2}) (\d{2}:\d{2})(?::\d{2})?$/,
+      );
+      // The year is only dropped when both ends share it, or a cross-year range would read as same-day.
+      if (!abs || abs[1] !== abs[4]) return label.replace(/\b(\d{2}:\d{2}):\d{2}\b/g, "$1");
+      const [, , fromDay, fromTime, , toDay, toTime] = abs;
+      return fromDay === toDay
+        ? `${fromDay} ${fromTime} - ${toTime}`
+        : `${fromDay} ${fromTime} - ${toDay} ${toTime}`;
     };
 
+    /**
+     * What the trigger button renders.
+     *
+     * With `autoApply` the pending selection IS the applied one, so show it live.
+     * Without it, show the live selection while the panel is open (so switching
+     * Relative/Absolute updates the label immediately, like the logs picker), and
+     * fall back to the range in force once closed — so closing without Apply snaps
+     * back to what's actually applied; see `appliedDisplayValue`.
+     * The `||` fallback covers the first paint, before the mount-time apply.
+     */
     const triggerLabel = computed(() => {
       const label =
         props.autoApply || menuOpen.value

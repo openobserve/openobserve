@@ -562,7 +562,6 @@ export default defineComponent({
       },
       {
         id: "doc_time_max",
-        hideBelowMd: true,
         accessorKey: "doc_time_max",
         header: t("logStream.lastIngested"),
         // NOT sortable: this table is `sorting="server"`, and the streams endpoint's
@@ -582,7 +581,6 @@ export default defineComponent({
       },
       {
         id: "doc_num",
-        hideBelowMd: true,
         accessorFn: (row: any) => formatCount(row.doc_num),
         header: t("logStream.docNum"),
         sortable: true,
@@ -593,7 +591,6 @@ export default defineComponent({
       },
       {
         id: "storage_size",
-        hideBelowMd: true,
         accessorFn: (row: any) => formatBytes(row.storage_size),
         header: t("logStream.storageSize"),
         sortable: true,
@@ -604,7 +601,6 @@ export default defineComponent({
       },
       {
         id: "compressed_size",
-        hideBelowMd: true,
         accessorFn: (row: any) => formatBytes(row.compressed_size),
         header: t("logStream.compressedSize"),
         sortable: true,
@@ -619,7 +615,6 @@ export default defineComponent({
       },
       {
         id: "compression",
-        hideBelowMd: true,
         accessorFn: (row: any) => compressionRatio(row.storage_size, row.compressed_size),
         header: t("logStream.compression"),
         // NOT sortable — same reason as doc_time_max: the endpoint has no
@@ -634,7 +629,6 @@ export default defineComponent({
       },
       {
         id: "index_size",
-        hideBelowMd: true,
         accessorFn: (row: any) => formatBytes(row.index_size),
         header: t("logStream.indexSize"),
         sortable: true,

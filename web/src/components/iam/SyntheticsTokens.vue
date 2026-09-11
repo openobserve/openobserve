@@ -381,7 +381,6 @@ export default defineComponent({
       },
       {
         id: "status",
-        hideBelowMd: true,
         header: t("synthetics.table.status"),
         accessorKey: "enabled",
         sortable: true,
@@ -391,7 +390,6 @@ export default defineComponent({
       },
       {
         id: "agents",
-        hideBelowMd: true,
         header: t("synthetics.tokens.agentsColumn"),
         accessorKey: "agents",
         sortable: true,
@@ -401,7 +399,6 @@ export default defineComponent({
       },
       {
         id: "created_by",
-        hideBelowMd: true,
         header: t("synthetics.tokens.createdBy"),
         accessorKey: "created_by",
         sortable: true,

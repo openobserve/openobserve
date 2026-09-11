@@ -390,7 +390,6 @@ const columns: OTableColumnDef[] = [
   },
   {
     id: "used_by",
-    hideBelowMd: true,
     header: t("alert_dependencies.usedByColumn"),
     cell: " ",
     sortable: false,

@@ -755,7 +755,6 @@ const columns: OTableColumnDef[] = [
   },
   {
     id: "match_pattern",
-    hideBelowMd: true,
     header: t("modelPricing.colMatchPattern"),
     accessorKey: "match_pattern",
     resizable: true,
@@ -765,7 +764,6 @@ const columns: OTableColumnDef[] = [
   },
   {
     id: "pricing",
-    hideBelowMd: true,
     header: t("modelPricing.colPricing"),
     accessorKey: "pricing",
     resizable: true,

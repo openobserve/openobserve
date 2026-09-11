@@ -643,24 +643,29 @@ export default defineComponent({
       zeroSizeReinitObserver.observe(chartRef.value);
     };
 
-    // The window resize listener misses container-only width changes (a rail
-    // collapsing, the mobile pane stack) — observe the element itself.
+    // The window resize listener misses container-only size changes (a rail collapsing, the mobile pane stack).
     let containerResizeObserver: ResizeObserver | null = null;
+    let containerResizeRaf = 0;
     let lastObservedSize = { w: 0, h: 0 };
+    const resizeToContainer = () => {
+      containerResizeRaf = 0;
+      if (!chartRef.value) return;
+      const w = chartRef.value.clientWidth;
+      const h = chartRef.value.clientHeight;
+      if (w > 0 && h > 0 && (w !== lastObservedSize.w || h !== lastObservedSize.h)) {
+        lastObservedSize = { w, h };
+        chart?.resize();
+      }
+    };
     const observeContainerResize = () => {
       if (!chartRef.value || containerResizeObserver) return;
       lastObservedSize = {
         w: chartRef.value.clientWidth,
         h: chartRef.value.clientHeight,
       };
+      // Coalesced to one resize per frame: drawer and splitter animations notify every frame.
       containerResizeObserver = new ResizeObserver(() => {
-        if (!chartRef.value) return;
-        const w = chartRef.value.clientWidth;
-        const h = chartRef.value.clientHeight;
-        if (w > 0 && h > 0 && (w !== lastObservedSize.w || h !== lastObservedSize.h)) {
-          lastObservedSize = { w, h };
-          chart?.resize();
-        }
+        if (!containerResizeRaf) containerResizeRaf = requestAnimationFrame(resizeToContainer);
       });
       containerResizeObserver.observe(chartRef.value);
     };
@@ -707,6 +712,8 @@ export default defineComponent({
 
       containerResizeObserver?.disconnect();
       containerResizeObserver = null;
+      cancelAnimationFrame(containerResizeRaf);
+      containerResizeRaf = 0;
 
       // Cancel throttled functions
       throttledSetHoveredSeriesName.cancel();

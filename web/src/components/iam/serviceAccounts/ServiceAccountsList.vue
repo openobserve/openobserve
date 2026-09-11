@@ -734,7 +734,6 @@ export default defineComponent({
       },
       {
         id: "first_name",
-        hideBelowMd: true,
         header: t("user.description"),
         accessorKey: "first_name",
         sortable: true,
@@ -746,7 +745,6 @@ export default defineComponent({
       },
       {
         id: "token",
-        hideBelowMd: true,
         header: t("serviceAccounts.list.col.token"),
         accessorKey: "token",
         sortable: false,
@@ -757,7 +755,6 @@ export default defineComponent({
       },
       {
         id: "created_at",
-        hideBelowMd: true,
         header: t("serviceAccounts.list.col.created"),
         accessorKey: "created_at",
         sortable: true,

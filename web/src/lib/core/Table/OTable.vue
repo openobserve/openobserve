@@ -95,11 +95,16 @@ const props = withDefaults(defineProps<OTableProps<TData>>(), {
 const emit = defineEmits<OTableEmits<TData>>();
 const slots = defineSlots<OTableSlots<TData>>();
 
-// < md every table behaves as horizontalScroll: columns keep their natural
-// width and the extra ones are reached by scrolling WITHIN the table, instead
-// of being crushed until only the name column survives.
+// < md every column stays reachable by scrolling within the table instead of being crushed to the name column.
 const { isMobile: isMobileViewport, lgUp } = useBreakpoint();
 const horizontalScrollOn = computed(() => !!props.horizontalScroll || isMobileViewport.value);
+
+const showColumnToggle = computed(
+  () =>
+    !!props.persistColumns &&
+    !!props.tableId &&
+    props.columns.some((c) => c.hideable && !c.isAction),
+);
 
 // A row only gets the pointer cursor when it's actually interactive — i.e. the
 // parent listens for @row-click / @row-dblclick, or row-click toggles expansion.
@@ -1167,15 +1172,13 @@ defineExpose({
         data-test="o2-table-toolbar"
       >
         <slot name="toolbar" />
-        <!-- Grouped so that when the mobile toolbar wraps, the controls land
-             right-aligned on their row instead of ragged bottom-left. -->
-        <div class="flex shrink-0 items-center gap-2 max-md:ms-auto">
+        <!-- Rendered only with content: an empty flex item still costs the toolbar a gap. -->
+        <div
+          v-if="showColumnToggle || slots['toolbar-trailing']"
+          class="flex shrink-0 items-center gap-2 max-md:ms-auto"
+        >
           <OTableColumnToggle
-            v-if="
-              props.persistColumns &&
-              props.tableId &&
-              props.columns.some((c) => c.hideable && !c.isAction)
-            "
+            v-if="showColumnToggle"
             :columns="props.columns"
             :column-visibility="internalColumnVisibility"
             :has-resized-columns="props.enableColumnResize && hasResizedColumns"
