@@ -137,6 +137,29 @@ async function findAlertId(page, name) {
   return (await listAlerts(page)).find((a) => a.name === name)?.alert_id;
 }
 
+/** Folder-aware list of alerts (the default listAlerts hardcodes folder=default). */
+async function listAlertsInFolder(page, folderId) {
+  const folder = folderId || 'default';
+  return (await (await api(page, 'get', `${urls().v2}/alerts?folder=${folder}&page_size=100`)).json()).list || [];
+}
+
+/** Find an alert by name within a specific folder (cross-folder clone lookup). */
+async function findAlertIdInFolder(page, name, folderId) {
+  return (await listAlertsInFolder(page, folderId)).find((a) => a.name === name)?.alert_id;
+}
+
+/** Best-effort delete of one alert in an arbitrary folder (default when omitted). */
+async function deleteAlertInFolder(page, id, folderId) {
+  if (!id) return;
+  await api(page, 'delete', `${urls().v2}/alerts/${id}?folder=${folderId || 'default'}`).catch(() => {});
+}
+
+/** Best-effort delete of an alerts folder (must already be empty). */
+async function deleteAlertFolder(page, folderId) {
+  if (!folderId) return;
+  await api(page, 'delete', `${urls().v2}/folders/alerts/${folderId}`).catch(() => {});
+}
+
 /** Best-effort delete of the given alert_ids (used in afterEach). */
 async function deleteAlerts(page, ids) {
   const { v2 } = urls();
@@ -249,6 +272,7 @@ module.exports = {
   simpleAlert, multiAlert, groupedSimpleAlert, realtimeAlert, cronAlert,
   compositeAlert, validateComposite, getCompositeReferences,
   createAlert, listAlerts, findAlertId, getAlert, deleteAlerts, seedAlertFixtures,
+  listAlertsInFolder, findAlertIdInFolder, deleteAlertInFolder, deleteAlertFolder,
   createAlertFolder, ingest, getAlertGroups, getAlertTransitions,
   waitForAlertOutcome, waitForAlertLevel, isFiringOutcome,
 };
