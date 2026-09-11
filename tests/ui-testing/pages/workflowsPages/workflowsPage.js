@@ -66,6 +66,8 @@ class WorkflowsPage {
     this.paletteCondition = '[data-test="workflow-palette-condition-default-btn"]';
     this.paletteFunction = '[data-test="workflow-palette-function-default-btn"]';
     this.paletteDestination = '[data-test="workflow-palette-destination-output-btn"]';
+    // Branch is ioType "default" (a logic node), so its palette card keys as branch-default.
+    this.paletteBranch = '[data-test="workflow-palette-branch-default-btn"]';
     // Trigger node (delete only visible on node hover). The hover-`+` add-out
     // button no longer exists — clicking the node's SOURCE HANDLE opens the step
     // picker instead.
@@ -124,6 +126,13 @@ class WorkflowsPage {
     this.nodeTestPassedFor = (t) =>
       `[data-test="workflow-node-${t}-test-ok"], [data-test="workflow-node-${t}-test-rehearsal"]`;
     this.nodeTestErrorFor = (t) => `[data-test="workflow-node-${t}-test-error"]`;
+    // Branch-arm append connectors (WorkflowCanvas appendPointsFor) — the hover-revealed
+    // `+` points, each carrying an SVG path whose `d` starts at the arm's own source handle.
+    this.appendAdd = '[data-test="workflow-flow-append-add"]';
+    this.appendAddPath = '[data-test="workflow-flow-append-add"] svg path';
+    // Node hover actions (WorkflowNode): the disable/enable toggle and the Disabled badge.
+    this.nodeDisableToggle = '[data-test="workflows-node-disable-toggle"]';
+    this.nodeDisabledBadgeFor = (t) => `[data-test="workflow-node-${t}-disabled-badge"]`;
     this.listRowPrefixFor = (n) => `[data-test^="workflow-list-${n}-"]`;
     this.listRowActionFor = (n, a) => `[data-test="workflow-list-${n}-${a}"]`;
     // NDV output pane — on a successful destination send this holds the sink's
@@ -345,10 +354,15 @@ class WorkflowsPage {
     await rail.waitFor({ state: 'visible' });
   }
 
-  async addNodeFromPalette(type /* 'condition' | 'function' | 'destination' */) {
+  async addNodeFromPalette(type /* 'condition' | 'function' | 'destination' | 'branch' */) {
     await this.closeOpenDrawer();
     await this.ensureNodePaletteOpen();
-    const paletteSel = { condition: this.paletteCondition, function: this.paletteFunction, destination: this.paletteDestination }[type];
+    const paletteSel = {
+      condition: this.paletteCondition,
+      function: this.paletteFunction,
+      destination: this.paletteDestination,
+      branch: this.paletteBranch,
+    }[type];
     await this.page.locator(paletteSel).click({ timeout: DRAWER_TIMEOUT_MS });
     // "Insert-immediately" — the palette adds the node in Set-up-later mode and
     // does NOT auto-open the config panel. Click the freshly-added node to open
@@ -800,6 +814,74 @@ class WorkflowsPage {
   // ---------- enable / disable ----------
   async toggleEnable(name) {
     await this.page.locator(this.listRowActionFor(name, 'pause-start-action')).first().click({ timeout: DRAWER_TIMEOUT_MS });
+  }
+
+  // ---------- list pause/resume control variant ----------
+  // The pause/resume row action is a single OButton whose `:variant` flips between
+  // ghost-destructive (enabled -> pause) and ghost-success (paused -> resume). Both the
+  // `data-row-action` state and the variant class land on the same <button> root.
+  async listActionRowState(name) {
+    const btn = this.page.locator(this.listRowActionFor(name, 'pause-start-action')).first();
+    await btn.waitFor({ state: 'visible', timeout: LIST_TIMEOUT_MS });
+    return (await btn.getAttribute('data-row-action')) || '';
+  }
+
+  async listActionClasses(name) {
+    const btn = this.page.locator(this.listRowActionFor(name, 'pause-start-action')).first();
+    await btn.waitFor({ state: 'visible', timeout: LIST_TIMEOUT_MS });
+    return ((await btn.getAttribute('class')) || '').split(/\s+/);
+  }
+
+  // ---------- branch-arm connector geometry ----------
+  /**
+   * Hover the Branch node to reveal its per-arm append `+` connectors, then read each
+   * connector's SVG path start-x. Each path's `d` is `M <cx> 0 ...`; the fix under test puts
+   * `cx` at the arm's OWN handle offset (small, per-arm), not the old shared convergence
+   * point (|cx| == ARM_GAP/2 == 44). Returns the parsed start-x values in DOM order.
+   */
+  async branchAppendConnectorPaths() {
+    await this.page.locator(this.nodeFor('branch')).hover({ timeout: DRAWER_TIMEOUT_MS });
+    const paths = this.page.locator(this.appendAddPath);
+    await paths.first().waitFor({ state: 'visible', timeout: DRAWER_TIMEOUT_MS });
+    return paths.evaluateAll((els) =>
+      els.map((el) => {
+        const d = el.getAttribute('d') || '';
+        const m = /^M\s*(-?[\d.]+)\s+0\b/.exec(d);
+        return m ? parseFloat(m[1]) : null;
+      })
+    );
+  }
+
+  // ---------- node status badges ----------
+  /**
+   * Hover the node (revealing its hover actions) and click the disable/enable toggle, which
+   * flips the step's muted state. Scoped to the node so multiple nodes can't collide.
+   */
+  async disableNode(nodeType) {
+    const node = this.page.locator(this.nodeFor(nodeType));
+    await node.hover({ timeout: DRAWER_TIMEOUT_MS });
+    const toggle = node.locator(this.nodeDisableToggle);
+    await toggle.waitFor({ state: 'visible', timeout: DRAWER_TIMEOUT_MS });
+    await toggle.click({ timeout: DRAWER_TIMEOUT_MS });
+  }
+
+  async expectNodeDisabledBadge(nodeType) {
+    await expect(this.page.locator(this.nodeDisabledBadgeFor(nodeType))).toBeVisible({
+      timeout: DRAWER_TIMEOUT_MS,
+    });
+  }
+
+  /**
+   * The Disabled badge lives inside the status-glyph strip that must now wrap (flex-wrap) and
+   * cap its width (max-w-*) so several badges stay inside the card. Read the badge's direct
+   * parent (that strip) and assert the two structural classes are present.
+   */
+  async expectStatusStripWraps(nodeType) {
+    const badge = this.page.locator(this.nodeDisabledBadgeFor(nodeType));
+    await badge.waitFor({ state: 'visible', timeout: DRAWER_TIMEOUT_MS });
+    const classes = await badge.evaluate((el) => (el.parentElement ? el.parentElement.className : ''));
+    expect(classes).toContain('flex-wrap');
+    expect(classes).toContain('max-w-');
   }
 }
 
