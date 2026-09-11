@@ -23,7 +23,7 @@ use datafusion::error::{DataFusionError, Result};
 use promql_parser::parser::{Expr as PromExpr, Function, FunctionArgs, MatrixSelector};
 
 use super::Engine;
-use crate::functions::{self, Func};
+use crate::functions::{self, Func, RangeFunc, SingleArgFunc};
 
 impl Engine {
     pub(super) async fn call_expr(
@@ -35,30 +35,36 @@ impl Engine {
             DataFusionError::NotImplemented(format!("Unsupported function: {}", func.name))
         })?;
 
-        // a range function over a plain matrix selector streams its series one at a time
-        if let Some(range_func) = func_name.range_func()
-            && let [arg] = args.args.as_slice()
-            && let PromExpr::MatrixSelector(MatrixSelector { vs, range }) = arg.as_ref()
-            && let Some(value) = self
-                .try_streaming_range_func(vs, *range, Arc::from(range_func))
-                .await?
-        {
-            return Ok(value);
-        }
-
+        // TODO: check this implementation
         if func_name == Func::Time {
             self.ensure_args_len(args, 0, "Invalid args passed to the function")?;
-            // TODO: check this implementation
             return Ok(Value::Float((self.eval_ctx.start / 1_000_000) as f64));
         }
 
         let start = std::time::Instant::now();
         let result = if let Some(range_func) = func_name.range_func() {
-            let input = self.call_expr_arg(args, 0).await?;
-            functions::eval_range(input, range_func, &self.eval_ctx)?
+            // a range function over a plain matrix selector streams its series one at a time
+            if let [arg] = args.args.as_slice()
+                && let PromExpr::MatrixSelector(MatrixSelector { vs, range }) = arg.as_ref()
+            {
+                let range_func: Arc<dyn RangeFunc> = Arc::from(range_func);
+                if let Some(value) = self
+                    .try_streaming_range_func(vs, *range, Arc::clone(&range_func))
+                    .await?
+                {
+                    value
+                } else {
+                    let input = self.call_expr_arg(args, 0).await?;
+                    functions::eval_range(input, range_func, &self.eval_ctx)?
+                }
+            } else {
+                let input = self.call_expr_arg(args, 0).await?;
+                functions::eval_range(input, range_func, &self.eval_ctx)?
+            }
         } else {
             self.call_builtin(func_name, args).await?
         };
+
         log::info!(
             "[trace_id: {}] [PromQL Timing] call_expr({}) execution took: {:?}",
             self.trace_id,
@@ -69,70 +75,67 @@ impl Engine {
     }
 
     async fn call_builtin(&mut self, func_name: Func, args: &FunctionArgs) -> Result<Value> {
-        Ok(match func_name {
+        match func_name {
             Func::Clamp => {
                 let err = "Invalid args, expected clamp(v instant-vector, min scalar, max scalar)";
                 self.ensure_args_len(args, 3, err)?;
                 let input = self.call_expr_arg(args, 0).await?;
-                let min = self.call_expr_arg(args, 1).await?;
-                let min_f = self.parse_f64_else_err(&min, err)?;
-                let max = self.call_expr_arg(args, 2).await?;
-                let max_f = self.parse_f64_else_err(&max, err)?;
+                let min_f = self.call_scalar_arg(args, 1, err).await?;
+                let max_f = self.call_scalar_arg(args, 2, err).await?;
 
                 if min_f > max_f {
                     return Ok(Value::Matrix(vec![]));
                 }
-                functions::clamp(input, min_f, max_f)?
+                functions::clamp(input, min_f, max_f)
             }
-            Func::ClampMax => {
-                let err = "Invalid args, expected clamp(v instant-vector, max scalar)";
+            Func::ClampMax | Func::ClampMin => {
+                let is_max = func_name == Func::ClampMax;
+                let err = if is_max {
+                    "Invalid args, expected clamp(v instant-vector, max scalar)"
+                } else {
+                    "Invalid args, expected clamp(v instant-vector, min scalar)"
+                };
                 self.ensure_args_len(args, 2, err)?;
                 let input = self.call_expr_arg(args, 0).await?;
-                let max = self.call_expr_arg(args, 1).await?;
-                let max_f = self.parse_f64_else_err(&max, err)?;
+                let bound = self.call_scalar_arg(args, 1, err).await?;
+                let (min, max) = if is_max {
+                    (f64::MIN, bound)
+                } else {
+                    (bound, f64::MAX)
+                };
 
-                functions::clamp(input, f64::MIN, max_f)?
-            }
-            Func::ClampMin => {
-                let err = "Invalid args, expected clamp(v instant-vector, min scalar)";
-                self.ensure_args_len(args, 2, err)?;
-                let input = self.call_expr_arg(args, 0).await?;
-                let min = self.call_expr_arg(args, 1).await?;
-                let min_f = self.parse_f64_else_err(&min, err)?;
-
-                functions::clamp(input, min_f, f64::MAX)?
+                functions::clamp(input, min, max)
             }
             Func::HistogramQuantile => {
                 let err = "Invalid args, expected histogram_quantile(phi scalar, b instant-vector)";
                 self.ensure_args_len(args, 2, err)?;
-                let phi = self.call_expr_arg(args, 0).await?;
-                let phi_f = self.parse_f64_else_err(&phi, err)?;
+                let phi_f = self.call_scalar_arg(args, 0, err).await?;
                 let input = self.call_expr_arg(args, 1).await?;
 
-                functions::histogram_quantile(phi_f, input, &self.eval_ctx)?
+                functions::histogram_quantile(phi_f, input, &self.eval_ctx)
             }
             Func::HoltWinters => {
                 let err =
                     "Invalid args, expected holt_winters(v range-vector, sf scalar, tf scalar)";
                 self.ensure_args_len(args, 3, err)?;
                 let input = self.call_expr_arg(args, 0).await?;
-                let sf = self.call_expr_arg(args, 1).await?;
-                let scaling_factor = self.parse_f64_else_err(&sf, err)?;
-                let tf = self.call_expr_arg(args, 2).await?;
-                let trend_factor = self.parse_f64_else_err(&tf, err)?;
+                let scaling_factor = self.call_scalar_arg(args, 1, err).await?;
+                let trend_factor = self.call_scalar_arg(args, 2, err).await?;
 
-                functions::holt_winters(input, scaling_factor, trend_factor, &self.eval_ctx)?
+                functions::holt_winters(input, scaling_factor, trend_factor, &self.eval_ctx)
             }
             Func::LabelJoin => {
                 let err = "Invalid args, expected label_join(v instant-vector, dst string, sep string, src_1 string, src_2 string, ...)";
-                self.ensure_ge_three_args(args, err)?;
+                if args.len() < 3 {
+                    return Err(DataFusionError::NotImplemented(err.into()));
+                }
                 let input = self.call_expr_arg(args, 0).await?;
-                let dst_label = self.call_expr_arg(args, 1).await?.get_string().ok_or(
-                    DataFusionError::NotImplemented("Invalid destination label found".into()),
-                )?;
-                let separator = self.call_expr_arg(args, 2).await?.get_string().ok_or(
-                    DataFusionError::NotImplemented("Invalid separator label found".into()),
-                )?;
+                let dst_label = self
+                    .call_string_arg(args, 1, "Invalid destination label found")
+                    .await?;
+                let separator = self
+                    .call_string_arg(args, 2, "Invalid separator label found")
+                    .await?;
                 let mut source_labels = vec![];
                 for each_src in args.args[3..].iter() {
                     if let Value::String(label) = self.exec_expr(each_src).await.unwrap() {
@@ -144,70 +147,63 @@ impl Engine {
                         "source labels can not be empty or invalid".into(),
                     ));
                 }
-                functions::label_join(input, &dst_label, &separator, source_labels)?
+                functions::label_join(input, &dst_label, &separator, source_labels)
             }
             Func::LabelReplace => {
                 let err = "Invalid args, expected label_replace(v instant-vector, dst_label string, replacement string, src_label string, regex string)";
                 self.ensure_args_len(args, 5, err)?;
                 let input = self.call_expr_arg(args, 0).await?;
-                let dst_label = self.call_expr_arg(args, 1).await?.get_string().ok_or(
-                    DataFusionError::NotImplemented("Invalid destination label found".into()),
-                )?;
-                let replacement = self.call_expr_arg(args, 2).await?.get_string().ok_or(
-                    DataFusionError::NotImplemented("Invalid replacement string found".into()),
-                )?;
-                let src_label = self.call_expr_arg(args, 3).await?.get_string().ok_or(
-                    DataFusionError::NotImplemented("Invalid source label string found".into()),
-                )?;
-                let regex = self.call_expr_arg(args, 4).await?.get_string().ok_or(
-                    DataFusionError::NotImplemented("Invalid regex string found".into()),
-                )?;
+                let dst_label = self
+                    .call_string_arg(args, 1, "Invalid destination label found")
+                    .await?;
+                let replacement = self
+                    .call_string_arg(args, 2, "Invalid replacement string found")
+                    .await?;
+                let src_label = self
+                    .call_string_arg(args, 3, "Invalid source label string found")
+                    .await?;
+                let regex = self
+                    .call_string_arg(args, 4, "Invalid regex string found")
+                    .await?;
 
-                functions::label_replace(input, &dst_label, &replacement, &src_label, &regex)?
+                functions::label_replace(input, &dst_label, &replacement, &src_label, &regex)
             }
             Func::PredictLinear => {
                 let err = "Invalid args, expected predict_linear(v range-vector, t scalar)";
                 self.ensure_args_len(args, 2, err)?;
                 let input = self.call_expr_arg(args, 0).await?;
-                let prediction_steps = self.call_expr_arg(args, 1).await?;
-                let prediction_steps_f = self.parse_f64_else_err(&prediction_steps, err)?;
+                let prediction_steps_f = self.call_scalar_arg(args, 1, err).await?;
 
-                functions::predict_linear(input, prediction_steps_f, &self.eval_ctx)?
+                functions::predict_linear(input, prediction_steps_f, &self.eval_ctx)
             }
             Func::QuantileOverTime => {
                 let err = "Invalid args, expected quantile_over_time(scalar, range-vector)";
                 self.ensure_args_len(args, 2, err)?;
-                let phi_quantile = self.call_expr_arg(args, 0).await?;
-                let phi_quantile_f = self.parse_f64_else_err(&phi_quantile, err)?;
+                let phi_quantile_f = self.call_scalar_arg(args, 0, err).await?;
                 let input = self.call_expr_arg(args, 1).await?;
 
-                functions::quantile_over_time(phi_quantile_f, input, &self.eval_ctx)?
+                functions::quantile_over_time(phi_quantile_f, input, &self.eval_ctx)
             }
             Func::Round => {
                 let err = "Invalid args, expected round(v instant-vector, to_nearest=1 scalar)";
                 let input = self.call_expr_arg(args, 0).await?;
                 let to_nearest = match args.len() {
                     1 => 1.0,
-                    2 => {
-                        let to_nearest = self.call_expr_arg(args, 1).await?;
-                        self.parse_f64_else_err(&to_nearest, err)?
-                    }
+                    2 => self.call_scalar_arg(args, 1, err).await?,
                     _ => return Err(DataFusionError::NotImplemented(err.into())),
                 };
 
-                functions::round(input, to_nearest)?
+                functions::round(input, to_nearest)
             }
             Func::HistogramCount
             | Func::HistogramFraction
             | Func::HistogramSum
             | Func::Sort
-            | Func::SortDesc => {
-                return Err(DataFusionError::NotImplemented(format!(
-                    "Unsupported Function: {func_name:?}"
-                )));
-            }
-            _ => self.call_single_arg_builtin(func_name, args).await?,
-        })
+            | Func::SortDesc => Err(DataFusionError::NotImplemented(format!(
+                "Unsupported Function: {func_name:?}"
+            ))),
+            _ => self.call_single_arg_builtin(func_name, args).await,
+        }
     }
 
     async fn call_single_arg_builtin(
@@ -215,69 +211,34 @@ impl Engine {
         func_name: Func,
         args: &FunctionArgs,
     ) -> Result<Value> {
-        let input = if matches!(
-            func_name,
-            Func::DayOfMonth
-                | Func::DayOfWeek
-                | Func::DayOfYear
-                | Func::DaysInMonth
-                | Func::Hour
-                | Func::Minute
-                | Func::Month
-                | Func::Year
-        ) {
-            match args.len() {
-                0 => Value::Matrix(vec![RangeValue {
-                    labels: Labels::default(),
-                    samples: self
-                        .eval_ctx
-                        .timestamps()
-                        .into_iter()
-                        .map(|ts| Sample::new(ts, ts as f64))
-                        .collect(),
-                    exemplars: None,
-                    time_window: None,
-                }]),
-                1 => self.call_expr_arg(args, 0).await?,
-                _ => {
-                    return Err(DataFusionError::NotImplemented(
-                        "Invalid args passed to the function".into(),
-                    ));
-                }
+        let single_arg_func = func_name.single_arg_func();
+        let input = match (&single_arg_func, args.len()) {
+            (Some(SingleArgFunc::Date(_)), 0) => Value::Matrix(vec![RangeValue {
+                labels: Labels::default(),
+                samples: self
+                    .eval_ctx
+                    .timestamps()
+                    .into_iter()
+                    .map(|ts| Sample::new(ts, ts as f64))
+                    .collect(),
+                exemplars: None,
+                time_window: None,
+            }]),
+            (Some(SingleArgFunc::Date(_)), 2..) => {
+                return Err(DataFusionError::NotImplemented(
+                    "Invalid args passed to the function".into(),
+                ));
             }
-        } else {
-            self.call_expr_arg(args, 0).await?
+            _ => self.call_expr_arg(args, 0).await?,
         };
 
-        Ok(match func_name {
-            Func::Abs => functions::abs(input)?,
-            Func::Absent => functions::absent(input, &self.eval_ctx)?,
-            Func::AbsentOverTime => functions::absent_over_time(input, &self.eval_ctx)?,
-            Func::Ceil => functions::ceil(input)?,
-            Func::DayOfMonth => functions::day_of_month(input)?,
-            Func::DayOfWeek => functions::day_of_week(input)?,
-            Func::DayOfYear => functions::day_of_year(input)?,
-            Func::DaysInMonth => functions::days_in_month(input)?,
-            Func::Exp => functions::exp(input)?,
-            Func::Floor => functions::floor(input)?,
-            Func::Hour => functions::hour(input)?,
-            Func::Ln => functions::ln(input)?,
-            Func::Log10 => functions::log10(input)?,
-            Func::Log2 => functions::log2(input)?,
-            Func::Minute => functions::minute(input)?,
-            Func::Month => functions::month(input)?,
-            Func::Scalar => functions::scalar(input, &self.eval_ctx)?,
-            Func::Sgn => functions::sgn(input)?,
-            Func::Sqrt => functions::sqrt(input)?,
-            Func::Timestamp => functions::timestamp(input)?,
-            Func::Vector => functions::vector(input, &self.eval_ctx)?,
-            Func::Year => functions::year(input)?,
-            _ => {
-                return Err(DataFusionError::Internal(format!(
+        single_arg_func
+            .ok_or_else(|| {
+                DataFusionError::Internal(format!(
                     "{func_name:?} must be evaluated before builtin dispatch"
-                )));
-            }
-        })
+                ))
+            })?
+            .eval(input, &self.eval_ctx)
     }
 
     async fn call_expr_arg(&mut self, args: &FunctionArgs, index: usize) -> Result<Value> {
@@ -295,18 +256,28 @@ impl Engine {
         Ok(())
     }
 
-    fn ensure_ge_three_args(&self, args: &FunctionArgs, err: &str) -> Result<()> {
-        if args.len() < 3 {
-            return Err(DataFusionError::NotImplemented(err.into()));
-        }
-        Ok(())
-    }
-
-    fn parse_f64_else_err<T: Into<String>>(&self, value: &Value, err: T) -> Result<f64> {
-        match value {
-            Value::Float(f) => Ok(*f),
+    async fn call_scalar_arg(
+        &mut self,
+        args: &FunctionArgs,
+        index: usize,
+        err: &str,
+    ) -> Result<f64> {
+        match self.call_expr_arg(args, index).await? {
+            Value::Float(value) => Ok(value),
             _ => Err(DataFusionError::NotImplemented(err.into())),
         }
+    }
+
+    async fn call_string_arg(
+        &mut self,
+        args: &FunctionArgs,
+        index: usize,
+        err: &str,
+    ) -> Result<String> {
+        self.call_expr_arg(args, index)
+            .await?
+            .get_string()
+            .ok_or_else(|| DataFusionError::NotImplemented(err.into()))
     }
 }
 
@@ -431,110 +402,120 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_ensure_two_args() {
-        let trace_id = "test_trace";
-        let org_id = "test_org";
-        let engine = Engine::new(
-            trace_id,
+    #[tokio::test]
+    async fn test_single_arg_dispatch_preserves_argument_handling() {
+        let calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let mut engine = Engine::new(
+            "test",
             Arc::new(PromqlContext::new(
-                create_test_query_ctx(trace_id, org_id, 30),
-                SimpleMockProvider,
+                create_test_query_ctx("test", "test_org", 30),
+                CountingProvider(calls.clone()),
                 vec![],
             )),
             create_test_eval_ctx(),
         );
-
         let args = FunctionArgs {
-            args: vec![
-                Box::new(PromExpr::NumberLiteral(NumberLiteral { val: 1.0 })),
-                Box::new(PromExpr::NumberLiteral(NumberLiteral { val: 2.0 })),
-            ],
+            args: ["vector(-5)", "m"]
+                .into_iter()
+                .map(|expr| Box::new(promql_parser::parser::parse(expr).unwrap()))
+                .collect(),
         };
-        let result = engine.ensure_args_len(&args, 2, "test error");
-        assert!(result.is_ok());
-
-        let args = FunctionArgs {
-            args: vec![Box::new(PromExpr::NumberLiteral(NumberLiteral {
-                val: 1.0,
-            }))],
+        let Value::Matrix(series) = engine.call_builtin(Func::Abs, &args).await.unwrap() else {
+            panic!("expected absolute values");
         };
-        let result = engine.ensure_args_len(&args, 2, "test error");
-        assert!(result.is_err());
+        assert_eq!(series[0].samples[0].value, 5.0);
+        for func in [
+            Func::DayOfMonth,
+            Func::DayOfWeek,
+            Func::DayOfYear,
+            Func::DaysInMonth,
+            Func::Hour,
+            Func::Minute,
+            Func::Month,
+            Func::Year,
+        ] {
+            assert!(matches!(
+                engine.call_builtin(func, &args).await,
+                Err(DataFusionError::NotImplemented(message))
+                    if message == "Invalid args passed to the function"
+            ));
+        }
+        assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 0);
+        assert!(matches!(
+            engine.call_builtin(Func::Abs, &FunctionArgs { args: vec![] }).await,
+            Err(DataFusionError::NotImplemented(message)) if message == "Missing argument 0"
+        ));
     }
 
     #[test]
-    fn test_ensure_three_args() {
-        let trace_id = "test_trace";
-        let org_id = "test_org";
+    fn test_ensure_args_len() {
         let engine = Engine::new(
-            trace_id,
+            "test",
             Arc::new(PromqlContext::new(
-                create_test_query_ctx(trace_id, org_id, 30),
+                create_test_query_ctx("test", "test_org", 30),
                 SimpleMockProvider,
                 vec![],
             )),
             create_test_eval_ctx(),
         );
-
-        let args = FunctionArgs {
-            args: vec![
-                Box::new(PromExpr::NumberLiteral(NumberLiteral { val: 1.0 })),
-                Box::new(PromExpr::NumberLiteral(NumberLiteral { val: 2.0 })),
-                Box::new(PromExpr::NumberLiteral(NumberLiteral { val: 3.0 })),
-            ],
-        };
-        let result = engine.ensure_args_len(&args, 3, "test error");
-        assert!(result.is_ok());
-
-        let args = FunctionArgs {
-            args: vec![Box::new(PromExpr::NumberLiteral(NumberLiteral {
-                val: 1.0,
-            }))],
-        };
-        let result = engine.ensure_args_len(&args, 3, "test error");
-        assert!(result.is_err());
+        for expected in [0, 2, 3, 5] {
+            for actual in 0..=6 {
+                let args = FunctionArgs {
+                    args: (0..actual)
+                        .map(|_| Box::new(PromExpr::NumberLiteral(NumberLiteral { val: 1.0 })))
+                        .collect(),
+                };
+                let result = engine.ensure_args_len(&args, expected, "test error");
+                if actual == expected {
+                    assert!(result.is_ok());
+                } else {
+                    assert!(
+                        matches!(result, Err(DataFusionError::NotImplemented(message)) if message == "test error")
+                    );
+                }
+            }
+        }
     }
 
-    #[test]
-    fn test_ensure_ge_three_args() {
-        let trace_id = "test_trace";
-        let org_id = "test_org";
-        let engine = Engine::new(
-            trace_id,
+    #[tokio::test]
+    async fn test_label_join_missing_arguments() {
+        let mut engine = Engine::new(
+            "test",
             Arc::new(PromqlContext::new(
-                create_test_query_ctx(trace_id, org_id, 30),
+                create_test_query_ctx("test", "test_org", 30),
                 SimpleMockProvider,
                 vec![],
             )),
             create_test_eval_ctx(),
         );
-
-        let args = FunctionArgs {
-            args: vec![
-                Box::new(PromExpr::NumberLiteral(NumberLiteral { val: 1.0 })),
-                Box::new(PromExpr::NumberLiteral(NumberLiteral { val: 2.0 })),
-                Box::new(PromExpr::NumberLiteral(NumberLiteral { val: 3.0 })),
-            ],
-        };
-        let result = engine.ensure_ge_three_args(&args, "test error");
-        assert!(result.is_ok());
-
-        let args = FunctionArgs {
-            args: vec![
-                Box::new(PromExpr::NumberLiteral(NumberLiteral { val: 1.0 })),
-                Box::new(PromExpr::NumberLiteral(NumberLiteral { val: 2.0 })),
-            ],
-        };
-        let result = engine.ensure_ge_three_args(&args, "test error");
-        assert!(result.is_err());
+        for (expressions, expected) in [
+            (
+                vec!["vector(5)", r#""dst""#],
+                "Invalid args, expected label_join(v instant-vector, dst string, sep string, src_1 string, src_2 string, ...)",
+            ),
+            (
+                vec!["vector(5)", r#""dst""#, r#"",""#],
+                "source labels can not be empty or invalid",
+            ),
+        ] {
+            let args = FunctionArgs {
+                args: expressions
+                    .into_iter()
+                    .map(|expr| Box::new(promql_parser::parser::parse(expr).unwrap()))
+                    .collect(),
+            };
+            let result = engine.call_builtin(Func::LabelJoin, &args).await;
+            assert!(
+                matches!(result, Err(DataFusionError::NotImplemented(message)) if message == expected)
+            );
+        }
     }
 
-    #[test]
-    fn test_ensure_five_args() {
+    #[tokio::test]
+    async fn test_typed_arguments() {
         let trace_id = "test_trace";
         let org_id = "test_org";
-        let engine = Engine::new(
+        let mut engine = Engine::new(
             trace_id,
             Arc::new(PromqlContext::new(
                 create_test_query_ctx(trace_id, org_id, 30),
@@ -546,47 +527,58 @@ mod tests {
 
         let args = FunctionArgs {
             args: vec![
-                Box::new(PromExpr::NumberLiteral(NumberLiteral { val: 1.0 })),
-                Box::new(PromExpr::NumberLiteral(NumberLiteral { val: 2.0 })),
-                Box::new(PromExpr::NumberLiteral(NumberLiteral { val: 3.0 })),
-                Box::new(PromExpr::NumberLiteral(NumberLiteral { val: 4.0 })),
-                Box::new(PromExpr::NumberLiteral(NumberLiteral { val: 5.0 })),
+                Box::new(promql_parser::parser::parse("42").unwrap()),
+                Box::new(promql_parser::parser::parse(r#""text""#).unwrap()),
             ],
         };
-        let result = engine.ensure_args_len(&args, 5, "test error");
-        assert!(result.is_ok());
-
-        let args = FunctionArgs {
-            args: vec![Box::new(PromExpr::NumberLiteral(NumberLiteral {
-                val: 1.0,
-            }))],
-        };
-        let result = engine.ensure_args_len(&args, 5, "test error");
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_parse_f64_else_err() {
-        let trace_id = "test_trace";
-        let org_id = "test_org";
-        let engine = Engine::new(
-            trace_id,
-            Arc::new(PromqlContext::new(
-                create_test_query_ctx(trace_id, org_id, 30),
-                SimpleMockProvider,
-                vec![],
-            )),
-            create_test_eval_ctx(),
+        assert_eq!(
+            engine
+                .call_scalar_arg(&args, 0, "scalar error")
+                .await
+                .unwrap(),
+            42.0
         );
-
-        let value = Value::Float(42.0);
-        let result = engine.parse_f64_else_err(&value, "test error");
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), 42.0);
-
-        let value = Value::String("not a float".to_string());
-        let result = engine.parse_f64_else_err(&value, "test error");
-        assert!(result.is_err());
+        assert_eq!(
+            engine
+                .call_string_arg(&args, 1, "string error")
+                .await
+                .unwrap(),
+            "text"
+        );
+        for (result, expected) in [
+            (
+                engine
+                    .call_scalar_arg(&args, 1, "scalar error")
+                    .await
+                    .map(|_| ()),
+                "scalar error",
+            ),
+            (
+                engine
+                    .call_string_arg(&args, 0, "string error")
+                    .await
+                    .map(|_| ()),
+                "string error",
+            ),
+            (
+                engine
+                    .call_scalar_arg(&args, 2, "scalar error")
+                    .await
+                    .map(|_| ()),
+                "Missing argument 2",
+            ),
+            (
+                engine
+                    .call_string_arg(&args, 2, "string error")
+                    .await
+                    .map(|_| ()),
+                "Missing argument 2",
+            ),
+        ] {
+            assert!(
+                matches!(result, Err(DataFusionError::NotImplemented(message)) if message == expected)
+            );
+        }
     }
 
     #[tokio::test]

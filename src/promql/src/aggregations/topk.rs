@@ -24,64 +24,6 @@ use hashbrown::HashMap;
 use promql_parser::parser::LabelModifier;
 use rayon::prelude::*;
 
-/// Aggregates Matrix input for range queries
-/// For each timestamp, selects the top K series by value
-pub fn topk(
-    k: usize,
-    modifier: &Option<LabelModifier>,
-    data: Value,
-    eval_ctx: &EvalContext,
-) -> Result<Value> {
-    let start = std::time::Instant::now();
-    let matrix = match data {
-        Value::Matrix(m) => m,
-        Value::None => return Ok(Value::None),
-        _ => {
-            return Err(DataFusionError::Plan(
-                "[topk] function only accept matrix values".to_string(),
-            ));
-        }
-    };
-
-    if matrix.is_empty() || k == 0 {
-        return Ok(Value::None);
-    }
-
-    log::info!(
-        "[trace_id: {}] [PromQL Timing] topk(k={k}) started with {} series and {} timestamps",
-        eval_ctx.trace_id,
-        matrix.len(),
-        eval_ctx.timestamps().len()
-    );
-
-    let eval_timestamps = eval_ctx.timestamps();
-
-    // Group series by label modifier
-    let grouped_series = super::group_series_by_labels(&matrix, modifier);
-
-    // Process each group
-    let result: Vec<RangeValue> = grouped_series
-        .par_iter()
-        .flat_map(|(_, series_indices)| {
-            // For each timestamp, select top k series from this group
-            select_topk_series(&matrix, series_indices, k, &eval_timestamps, false)
-        })
-        .collect();
-
-    log::info!(
-        "[trace_id: {}] [PromQL Timing] topk(k={k}) completed in {:?}, produced {} series",
-        eval_ctx.trace_id,
-        start.elapsed(),
-        result.len()
-    );
-
-    if result.is_empty() {
-        Ok(Value::None)
-    } else {
-        Ok(Value::Matrix(result))
-    }
-}
-
 /// A series' value at one evaluation slot; the heap keeps the k best and its top is the worst
 /// of them, so a better arrival pops it. Ties go to the lower label signature, which is stable
 /// across runs where the load order of the series is not.
@@ -110,6 +52,75 @@ impl Ord for Ranked {
             sort_float(&other.value, &self.value)
         };
         by_value.then_with(|| self.signature.cmp(&other.signature))
+    }
+}
+
+/// Aggregates Matrix input for range queries
+/// For each timestamp, selects the top K series by value
+pub fn topk(
+    k: usize,
+    modifier: &Option<LabelModifier>,
+    data: Value,
+    eval_ctx: &EvalContext,
+) -> Result<Value> {
+    eval_topk(k, modifier, data, eval_ctx, false)
+}
+
+pub(super) fn eval_topk(
+    k: usize,
+    modifier: &Option<LabelModifier>,
+    data: Value,
+    eval_ctx: &EvalContext,
+    is_bottom: bool,
+) -> Result<Value> {
+    let name = if is_bottom { "bottomk" } else { "topk" };
+    let start = std::time::Instant::now();
+    let matrix = match data {
+        Value::Matrix(m) => m,
+        Value::None => return Ok(Value::None),
+        _ => {
+            return Err(DataFusionError::Plan(format!(
+                "[{name}] function only accept matrix values"
+            )));
+        }
+    };
+
+    if matrix.is_empty() || k == 0 {
+        return Ok(Value::None);
+    }
+
+    let eval_timestamps = eval_ctx.timestamps();
+
+    log::info!(
+        "[trace_id: {}] [PromQL Timing] {name}(k={k}) started with {} series and {} timestamps",
+        eval_ctx.trace_id,
+        matrix.len(),
+        eval_timestamps.len()
+    );
+
+    // Group series by label modifier
+    let grouped_series = super::group_series_by_labels(&matrix, modifier);
+
+    // Process each group
+    let result: Vec<RangeValue> = grouped_series
+        .par_iter()
+        .flat_map(|(_, series_indices)| {
+            // For each timestamp, select top k series from this group
+            select_topk_series(&matrix, series_indices, k, &eval_timestamps, is_bottom)
+        })
+        .collect();
+
+    log::info!(
+        "[trace_id: {}] [PromQL Timing] {name}(k={k}) completed in {:?}, produced {} series",
+        eval_ctx.trace_id,
+        start.elapsed(),
+        result.len()
+    );
+
+    if result.is_empty() {
+        Ok(Value::None)
+    } else {
+        Ok(Value::Matrix(result))
     }
 }
 

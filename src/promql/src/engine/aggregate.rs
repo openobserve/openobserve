@@ -89,57 +89,34 @@ impl Engine {
             token::T_GROUP => eval_aggregate(modifier, input, Group, &eval_ctx),
             token::T_STDDEV => eval_aggregate(modifier, input, Stddev, &eval_ctx),
             token::T_STDVAR => eval_aggregate(modifier, input, Stdvar, &eval_ctx),
-            token::T_TOPK => {
-                let param_expr = param.as_ref().unwrap();
-                let k_value = self.exec_expr(param_expr).await?;
-                let k = match k_value {
-                    Value::Float(f) => f as usize,
-                    _ => {
-                        return Err(DataFusionError::Plan(
-                            "[topk] param must be a number".to_string(),
-                        ));
-                    }
+            token::T_TOPK | token::T_BOTTOMK | token::T_QUANTILE => {
+                let name = match op.id() {
+                    token::T_TOPK => "topk",
+                    token::T_BOTTOMK => "bottomk",
+                    _ => "quantile",
                 };
-                aggregations::topk(k, modifier, input, &eval_ctx)
-            }
-            token::T_BOTTOMK => {
                 let param_expr = param.as_ref().unwrap();
-                let k_value = self.exec_expr(param_expr).await?;
-                let k = match k_value {
-                    Value::Float(f) => f as usize,
-                    _ => {
-                        return Err(DataFusionError::Plan(
-                            "[bottomk] param must be a number".to_string(),
-                        ));
-                    }
+                let Value::Float(value) = self.exec_expr(param_expr).await? else {
+                    return Err(DataFusionError::Plan(format!(
+                        "[{name}] param must be a number"
+                    )));
                 };
-                aggregations::bottomk(k, modifier, input, &eval_ctx)
+                match op.id() {
+                    token::T_TOPK => aggregations::topk(value as usize, modifier, input, &eval_ctx),
+                    token::T_BOTTOMK => {
+                        aggregations::bottomk(value as usize, modifier, input, &eval_ctx)
+                    }
+                    _ => aggregations::quantile(value, input, &eval_ctx),
+                }
             }
             token::T_COUNT_VALUES => {
                 let param_expr = param.as_ref().unwrap();
-                let label_name = self.exec_expr(param_expr).await?;
-                let label_name_str = match label_name {
-                    Value::String(s) => s,
-                    _ => {
-                        return Err(DataFusionError::Plan(
-                            "[count_values] param must be a string".to_string(),
-                        ));
-                    }
+                let Value::String(label_name) = self.exec_expr(param_expr).await? else {
+                    return Err(DataFusionError::Plan(
+                        "[count_values] param must be a string".to_string(),
+                    ));
                 };
-                aggregations::count_values(&label_name_str, modifier, input, &eval_ctx)
-            }
-            token::T_QUANTILE => {
-                let param_expr = param.as_ref().unwrap();
-                let qtile_value = self.exec_expr(param_expr).await?;
-                let qtile = match qtile_value {
-                    Value::Float(f) => f,
-                    _ => {
-                        return Err(DataFusionError::Plan(
-                            "[quantile] param must be a number".to_string(),
-                        ));
-                    }
-                };
-                aggregations::quantile(qtile, input, &eval_ctx)
+                aggregations::count_values(&label_name, modifier, input, &eval_ctx)
             }
             _ => Err(DataFusionError::NotImplemented(format!(
                 "Unsupported Aggregate: {op:?}"
@@ -217,6 +194,38 @@ mod tests {
     use promql_parser::parser::{AggregateExpr, parse};
 
     use super::*;
+
+    #[tokio::test]
+    async fn test_numeric_aggregation_dispatch() {
+        use crate::{engine::tests::*, exec::PromqlContext};
+
+        let mut engine = Engine::new(
+            "test",
+            Arc::new(PromqlContext::new(
+                create_test_query_ctx("test", "test_org", 30),
+                SimpleMockProvider,
+                vec![],
+            )),
+            create_test_eval_ctx(),
+        );
+        for (name, param) in [("topk", "1"), ("bottomk", "1"), ("quantile", "0.5")] {
+            let mut expr = parse(&format!("{name}({param}, vector(5))")).unwrap();
+            let Value::Matrix(series) = engine.exec_expr(&expr).await.unwrap() else {
+                panic!("expected matrix for {name}");
+            };
+            assert_eq!(series.len(), 1);
+            assert_eq!(series[0].samples[0].value, 5.0);
+
+            let PromExpr::Aggregate(aggregate) = &mut expr else {
+                unreachable!();
+            };
+            aggregate.param = Some(Box::new(parse(r#""invalid""#).unwrap()));
+            let result = engine.exec_expr(&expr).await;
+            assert!(
+                matches!(result, Err(DataFusionError::Plan(message)) if message == format!("[{name}] param must be a number"))
+            );
+        }
+    }
 
     fn shape(query: &str) -> Option<(String, bool, Option<Option<Duration>>)> {
         let PromExpr::Aggregate(AggregateExpr { op, expr, .. }) = parse(query).unwrap() else {

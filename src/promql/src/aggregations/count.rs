@@ -21,25 +21,20 @@ use crate::aggregations::{Accumulate, AggFunc};
 pub struct Count;
 
 impl AggFunc for Count {
+    type Accumulator = CountAccumulate;
+
     fn name(&self) -> &'static str {
         "count"
     }
 
-    fn build(&self) -> Box<dyn super::Accumulate> {
-        Box::new(CountAccumulate::new())
+    fn build(&self) -> Self::Accumulator {
+        Self::Accumulator::default()
     }
 }
 
+#[derive(Default)]
 pub struct CountAccumulate {
     count: HashMap<i64, usize>,
-}
-
-impl CountAccumulate {
-    fn new() -> Self {
-        CountAccumulate {
-            count: HashMap::new(),
-        }
-    }
 }
 
 impl Accumulate for CountAccumulate {
@@ -48,18 +43,13 @@ impl Accumulate for CountAccumulate {
         *entry += 1;
     }
 
-    fn merge(&mut self, other: Box<dyn Accumulate>) {
-        let other = other.into_any().downcast::<Self>().expect("same type");
+    fn merge(&mut self, other: Self) {
         for (timestamp, count) in other.count {
             *self.count.entry(timestamp).or_insert(0) += count;
         }
     }
 
-    fn into_any(self: Box<Self>) -> Box<dyn std::any::Any> {
-        self
-    }
-
-    fn evaluate(self: Box<Self>) -> Vec<Sample> {
+    fn evaluate(self) -> Vec<Sample> {
         self.count
             .into_iter()
             .map(|(timestamp, count)| Sample::new(timestamp, count as f64))

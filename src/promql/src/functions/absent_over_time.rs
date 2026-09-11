@@ -22,16 +22,10 @@ use crate::functions::RangeFunc;
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#absent_over_time
 pub(crate) fn absent_over_time(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
-    super::eval_range(data, AbsentOverTimeFunc::new(), eval_ctx)
+    super::eval_range(data, AbsentOverTimeFunc, eval_ctx)
 }
 
 pub struct AbsentOverTimeFunc;
-
-impl AbsentOverTimeFunc {
-    pub fn new() -> Self {
-        AbsentOverTimeFunc {}
-    }
-}
 
 impl RangeFunc for AbsentOverTimeFunc {
     fn name(&self) -> &'static str {
@@ -39,10 +33,7 @@ impl RangeFunc for AbsentOverTimeFunc {
     }
 
     fn exec(&self, samples: &[Sample], _eval_ts: i64, _range: &Duration) -> Option<f64> {
-        if samples.is_empty() {
-            return Some(1.0);
-        }
-        None
+        samples.is_empty().then_some(1.0)
     }
 }
 
@@ -70,14 +61,14 @@ mod tests {
 
     #[test]
     fn test_absent_over_time_exec_samples_present_returns_none() {
-        let func = AbsentOverTimeFunc::new();
+        let func = AbsentOverTimeFunc;
         let samples = vec![Sample::new(1000, 5.0)];
         assert!(func.exec(&samples, 0, &Duration::ZERO).is_none());
     }
 
     #[test]
     fn test_absent_over_time_exec_empty_returns_one() {
-        let func = AbsentOverTimeFunc::new();
+        let func = AbsentOverTimeFunc;
         assert_eq!(func.exec(&[], 0, &Duration::ZERO), Some(1.0));
     }
 

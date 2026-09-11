@@ -19,25 +19,18 @@ use promql_parser::{parser::Expr, util::ExprVisitor};
 
 use crate::utils::metric_name;
 
+#[derive(Default)]
 pub struct MetricNameVisitor {
     pub(crate) name: HashSet<String>,
 }
 
 impl MetricNameVisitor {
     pub fn new() -> Self {
-        Self {
-            name: HashSet::new(),
-        }
+        Self::default()
     }
 
     pub fn into_names(self) -> HashSet<String> {
         self.name
-    }
-}
-
-impl Default for MetricNameVisitor {
-    fn default() -> Self {
-        Self::new()
     }
 }
 

@@ -92,10 +92,12 @@ pub fn labels_dropped_at_root(expr: &PromExpr) -> bool {
 
 fn subtree_labels_unused(expr: &PromExpr) -> bool {
     match expr {
-        PromExpr::VectorSelector(_) | PromExpr::MatrixSelector(_) => true,
-        PromExpr::NumberLiteral(_) => true,
-        PromExpr::Paren(ParenExpr { expr }) => subtree_labels_unused(expr),
-        PromExpr::Unary(UnaryExpr { expr }) => subtree_labels_unused(expr),
+        PromExpr::VectorSelector(_) | PromExpr::MatrixSelector(_) | PromExpr::NumberLiteral(_) => {
+            true
+        }
+        PromExpr::Paren(ParenExpr { expr }) | PromExpr::Unary(UnaryExpr { expr }) => {
+            subtree_labels_unused(expr)
+        }
         PromExpr::Subquery(subquery) => subtree_labels_unused(&subquery.expr),
         PromExpr::Call(Call { func, args }) => {
             LABEL_AGNOSTIC_FUNCS.contains(&func.name)

@@ -30,6 +30,8 @@ mod avg;
 mod bottomk;
 mod count;
 mod count_values;
+mod dispersion;
+mod extrema;
 mod group;
 mod max;
 mod min;
@@ -39,7 +41,7 @@ mod stdvar;
 mod sum;
 mod topk;
 
-pub(crate) use avg::Avg;
+pub(crate) use avg::{Avg, AvgState};
 pub(crate) use bottomk::bottomk;
 pub(crate) use count::Count;
 pub(crate) use count_values::count_values;
@@ -49,7 +51,7 @@ pub(crate) use min::Min;
 pub(crate) use quantile::quantile;
 pub(crate) use stddev::Stddev;
 pub(crate) use stdvar::Stdvar;
-pub(crate) use sum::Sum;
+pub(crate) use sum::{Sum, SumState};
 pub(crate) use topk::topk;
 
 /// Series per parallel partial-aggregation chunk when a single group is large.
@@ -67,16 +69,20 @@ const AGG_PARALLEL_CHUNK: usize = 32768;
 /// struct SumAgg;
 ///
 /// impl AggFunc for SumAgg {
+///     type Accumulator = SumAccumulator;
+///
 ///     fn name(&self) -> &'static str {
 ///         "sum"
 ///     }
 ///
-///     fn build(&self) -> Box<dyn Accumulate> {
-///         Box::new(SumAccumulator::new())
+///     fn build(&self) -> Self::Accumulator {
+///         SumAccumulator::new()
 ///     }
 /// }
 /// ```
 pub trait AggFunc: Sync {
+    type Accumulator: Accumulate;
+
     /// Returns the name of the aggregation function (e.g., "sum", "avg", "max").
     fn name(&self) -> &'static str;
 
@@ -85,7 +91,7 @@ pub trait AggFunc: Sync {
     /// Each call to `build()` should return a fresh accumulator that can independently
     /// collect and aggregate samples. This allows for parallel processing of multiple
     /// label groups.
-    fn build(&self) -> Box<dyn Accumulate>;
+    fn build(&self) -> Self::Accumulator;
 
     /// Whether a huge group may be split into parallel chunks whose partial
     /// accumulators are combined with [`Accumulate::merge`]. Value-buffering
@@ -117,7 +123,7 @@ pub trait AggFunc: Sync {
 /// }
 /// let results = acc.evaluate();
 /// ```
-pub trait Accumulate: Send + Sync {
+pub trait Accumulate: Send + Sync + Sized {
     /// Adds a sample to this accumulator.
     ///
     /// This method is called for each sample that should be included in the aggregation.
@@ -140,51 +146,25 @@ pub trait Accumulate: Send + Sync {
     /// +Inf), so no chunking-independent result exists; NaN at least signals
     /// the Inf - Inf cancellation.
     ///
-    /// # Panics
-    ///
-    /// Panics if `other` is a different accumulator type.
-    fn merge(&mut self, other: Box<dyn Accumulate>);
-
-    /// Upcast used by [`Self::merge`] implementations to downcast `other` to
-    /// their own concrete type.
-    fn into_any(self: Box<Self>) -> Box<dyn std::any::Any>;
+    /// Both accumulators must have the same concrete type.
+    fn merge(&mut self, other: Self);
 
     /// Computes and returns the final aggregated results.
     ///
-    /// This method consumes the accumulator (takes ownership via `Box<Self>`) and produces
+    /// This method consumes the accumulator (takes ownership via `self`) and produces
     /// the final aggregated samples. The returned vector typically contains one sample per
     /// unique timestamp that was accumulated.
     ///
     /// # Returns
     ///
     /// A vector of samples representing the aggregated results
-    fn evaluate(self: Box<Self>) -> Vec<Sample>;
-}
-
-pub fn labels_to_include(
-    include_labels: &[String],
-    mut actual_labels: Vec<Arc<Label>>,
-) -> Vec<Arc<Label>> {
-    actual_labels.retain(|label| include_labels.contains(&label.name));
-    actual_labels
-}
-
-pub fn labels_to_exclude(
-    exclude_labels: &[String],
-    mut actual_labels: Vec<Arc<Label>>,
-) -> Vec<Arc<Label>> {
-    actual_labels.retain(|label| !exclude_labels.contains(&label.name) && label.name != NAME_LABEL);
-    actual_labels
+    fn evaluate(self) -> Vec<Sample>;
 }
 
 /// Projects a series' labels onto the grouping set of the label modifier
 /// (`by(...)` keeps them, `without(...)` drops them, none drops all).
 pub(crate) fn projected_labels(modifier: &Option<LabelModifier>, labels: &Labels) -> Labels {
-    match modifier {
-        Some(LabelModifier::Include(include)) => labels_to_include(&include.labels, labels.clone()),
-        Some(LabelModifier::Exclude(exclude)) => labels_to_exclude(&exclude.labels, labels.clone()),
-        None => Labels::default(),
-    }
+    projected_label_refs(modifier, labels).cloned().collect()
 }
 
 /// Compute the signature of the projected labels without cloning the label
@@ -192,20 +172,29 @@ pub(crate) fn projected_labels(modifier: &Option<LabelModifier>, labels: &Labels
 /// [`projected_labels`], so the grouping key is unchanged.
 fn projected_labels_signature(modifier: &Option<LabelModifier>, labels: &Labels) -> u64 {
     let mut hasher = gxhash::new_hasher();
-    for label in labels {
-        let keep = match modifier {
-            Some(LabelModifier::Include(include)) => include.labels.contains(&label.name),
-            Some(LabelModifier::Exclude(exclude)) => {
-                !exclude.labels.contains(&label.name) && label.name != NAME_LABEL
-            }
-            None => false,
-        };
-        if keep {
-            hasher.write(label.name.as_bytes());
-            hasher.write(label.value.as_bytes());
-        }
+    for label in projected_label_refs(modifier, labels) {
+        hasher.write(label.name.as_bytes());
+        hasher.write(label.value.as_bytes());
     }
     hasher.finish()
+}
+
+fn projected_label_refs<'a>(
+    modifier: &'a Option<LabelModifier>,
+    labels: &'a Labels,
+) -> impl Iterator<Item = &'a Arc<Label>> {
+    let labels = if modifier.is_none() {
+        &labels[..0]
+    } else {
+        labels.as_slice()
+    };
+    labels.iter().filter(move |label| match modifier {
+        Some(LabelModifier::Include(include)) => include.labels.contains(&label.name),
+        Some(LabelModifier::Exclude(exclude)) => {
+            !exclude.labels.contains(&label.name) && label.name != NAME_LABEL
+        }
+        None => false,
+    })
 }
 
 /// Groups series indices by their label signatures based on the label modifier
@@ -370,6 +359,23 @@ mod tests {
         ]
     }
 
+    fn labels_to_include(
+        include_labels: &[String],
+        mut actual_labels: Vec<Arc<Label>>,
+    ) -> Vec<Arc<Label>> {
+        actual_labels.retain(|label| include_labels.contains(&label.name));
+        actual_labels
+    }
+
+    fn labels_to_exclude(
+        exclude_labels: &[String],
+        mut actual_labels: Vec<Arc<Label>>,
+    ) -> Vec<Arc<Label>> {
+        actual_labels
+            .retain(|label| !exclude_labels.contains(&label.name) && label.name != NAME_LABEL);
+        actual_labels
+    }
+
     #[test]
     fn test_labels_to_include() {
         let actual_labels = create_test_labels();
@@ -384,22 +390,47 @@ mod tests {
     }
 
     #[test]
+    fn test_extrema_merge_preserves_nan_and_signed_zero_behavior() {
+        fn check(func: impl AggFunc, initial: f64) {
+            for (values, expected) in [
+                (vec![f64::NAN], initial),
+                (vec![f64::NAN, 7.0, f64::NAN], 7.0),
+                (vec![-0.0, 0.0], -0.0),
+                (vec![0.0, -0.0], 0.0),
+            ] {
+                let mut sequential = func.build();
+                let mut merged = func.build();
+                for value in values {
+                    let sample = Sample::new(1, value);
+                    sequential.accumulate(&sample);
+                    let mut partial = func.build();
+                    partial.accumulate(&sample);
+                    merged.merge(partial);
+                }
+                for samples in [sequential.evaluate(), merged.evaluate()] {
+                    assert_eq!(samples.len(), 1);
+                    assert_eq!(samples[0].timestamp, 1);
+                    assert_eq!(
+                        samples[0].value.to_bits(),
+                        expected.to_bits(),
+                        "{}",
+                        func.name()
+                    );
+                }
+            }
+        }
+        check(Min, f64::INFINITY);
+        check(Max, f64::NEG_INFINITY);
+    }
+
+    #[test]
     fn test_accumulate_merge_matches_sequential() {
         use super::{avg::Avg, count::Count, group::Group, max::Max, min::Min, sum::Sum};
 
-        // Integer values keep float addition exact regardless of order.
-        let part_a = [(1000, 3.0), (2000, 5.0), (1000, 7.0)];
-        let part_b = [(2000, 11.0), (3000, 2.0), (1000, 4.0)];
-
-        let funcs: Vec<Box<dyn AggFunc>> = vec![
-            Box::new(Sum),
-            Box::new(Count),
-            Box::new(Min),
-            Box::new(Max),
-            Box::new(Avg),
-            Box::new(Group),
-        ];
-        for func in funcs {
+        fn check(func: impl AggFunc) {
+            // Integer values keep float addition exact regardless of order.
+            let part_a = [(1000, 3.0), (2000, 5.0), (1000, 7.0)];
+            let part_b = [(2000, 11.0), (3000, 2.0), (1000, 4.0)];
             let mut sequential = func.build();
             let mut acc_a = func.build();
             let mut acc_b = func.build();
@@ -423,6 +454,12 @@ mod tests {
                 assert_eq!(e.value, m.value, "{}", func.name());
             }
         }
+        check(Sum);
+        check(Count);
+        check(Min);
+        check(Max);
+        check(Avg);
+        check(Group);
     }
 
     /// Runs `eval_aggregate` over a single group large enough to take the
@@ -548,9 +585,19 @@ mod tests {
         ];
 
         for modifier in modifiers {
+            let expected = match &modifier {
+                Some(LabelModifier::Include(include)) => {
+                    labels_to_include(&include.labels, labels.clone())
+                }
+                Some(LabelModifier::Exclude(exclude)) => {
+                    labels_to_exclude(&exclude.labels, labels.clone())
+                }
+                None => vec![],
+            };
+            assert_eq!(projected_labels(&modifier, &labels), expected);
             assert_eq!(
                 projected_labels_signature(&modifier, &labels),
-                projected_labels(&modifier, &labels).signature()
+                expected.signature()
             );
         }
     }
