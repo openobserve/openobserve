@@ -36,18 +36,15 @@ where
 {
     let start_time = std::time::Instant::now();
     let func_name = eval.func.name();
-    let trace_id = eval.eval_ctx.trace_id.clone();
+    let trace_id = &eval.eval_ctx.trace_id;
     log::info!(
         "[trace_id: {trace_id}] [PromQL Timing] streaming {func_name}() started with {} partitions",
         sources.len(),
     );
-    let parts = sources
-        .into_iter()
-        .map(|source| {
-            let eval = eval.clone();
-            async move { eval_range_partition(source.await?, eval).await }
-        })
-        .collect();
+    let parts = sources.into_iter().map(|source| {
+        let eval = eval.clone();
+        async move { eval_range_partition(source.await?, eval).await }
+    });
     let parts = collect_partitioned(parts).await?;
     let series_count: usize = parts.iter().map(|(_, series)| series).sum();
     let series: Vec<RangeValue> = parts.into_iter().flat_map(|(series, _)| series).collect();

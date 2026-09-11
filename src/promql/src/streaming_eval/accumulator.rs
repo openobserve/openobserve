@@ -292,20 +292,8 @@ impl FusedAccumulator {
                 .filter(|(_, (_, present))| *present)
                 .map(|(slot, (value, _))| Sample::new(timestamps[slot], value))
                 .collect(),
-            Self::Stddev { values } => values
-                .into_iter()
-                .enumerate()
-                .filter_map(|(slot, values)| {
-                    dispersion_sample(&values, timestamps[slot], std_deviation)
-                })
-                .collect(),
-            Self::Stdvar { values } => values
-                .into_iter()
-                .enumerate()
-                .filter_map(|(slot, values)| {
-                    dispersion_sample(&values, timestamps[slot], std_variance)
-                })
-                .collect(),
+            Self::Stddev { values } => dispersion_samples(values, timestamps, std_deviation),
+            Self::Stdvar { values } => dispersion_samples(values, timestamps, std_variance),
             Self::Sum { sums, present } => sums
                 .into_iter()
                 .zip(present)
@@ -317,12 +305,19 @@ impl FusedAccumulator {
     }
 }
 
-fn dispersion_sample(
-    values: &[f64],
-    timestamp: i64,
+fn dispersion_samples(
+    values: Vec<Vec<f64>>,
+    timestamps: &[i64],
     dispersion: fn(&[f64]) -> Option<f64>,
-) -> Option<Sample> {
-    dispersion(values).map(|value| Sample::new(timestamp, value))
+) -> Vec<Sample> {
+    values
+        .into_iter()
+        .enumerate()
+        .filter_map(|(slot, values)| {
+            let timestamp = timestamps[slot];
+            dispersion(&values).map(|value| Sample::new(timestamp, value))
+        })
+        .collect()
 }
 
 #[cfg(test)]

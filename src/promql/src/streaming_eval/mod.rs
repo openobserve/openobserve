@@ -30,14 +30,18 @@ use tokio::task::JoinSet;
 
 /// Collects every partition in order; the first failure fails the whole, and dropping the set
 /// aborts the rest.
-pub(super) async fn collect_partitioned<T, Fut>(parts: Vec<Fut>) -> Result<Vec<T>>
+pub(super) async fn collect_partitioned<T, Fut>(
+    parts: impl IntoIterator<Item = Fut>,
+) -> Result<Vec<T>>
 where
     T: Send + 'static,
     Fut: Future<Output = Result<T>> + Send + 'static,
 {
-    let mut results: Vec<Option<T>> = parts.iter().map(|_| None).collect();
+    let parts = parts.into_iter();
+    let mut results: Vec<Option<T>> = Vec::with_capacity(parts.size_hint().0);
     let mut tasks = JoinSet::new();
-    for (index, part) in parts.into_iter().enumerate() {
+    for (index, part) in parts.enumerate() {
+        results.push(None);
         tasks.spawn(async move { (index, part.await) });
     }
     // sources finish in any order; the merge needs them in source order
@@ -53,8 +57,12 @@ where
 
 #[cfg(test)]
 pub(crate) mod tests {
+    use std::{future::ready, sync::Arc};
+
     use config::meta::promql::value::{EvalContext, Value};
     use promql_parser::parser::LabelModifier;
+
+    use super::*;
 
     pub(crate) type CanonicalSeries = (Vec<(String, String)>, Vec<(i64, u64)>);
 
@@ -140,5 +148,34 @@ pub(crate) mod tests {
                 );
             }
         }
+    }
+
+    #[tokio::test]
+    async fn test_collect_partitioned_preserves_source_order() {
+        let release_first = Arc::new(tokio::sync::Notify::new());
+        let parts = (0..3).map(|index| {
+            let release_first = release_first.clone();
+            async move {
+                if index == 0 {
+                    release_first.notified().await;
+                } else if index == 1 {
+                    release_first.notify_one();
+                }
+                Ok(index)
+            }
+        });
+        assert_eq!(collect_partitioned(parts).await.unwrap(), vec![0, 1, 2]);
+    }
+
+    #[tokio::test]
+    async fn test_collect_partitioned_empty_and_error() {
+        let empty = std::iter::empty::<std::future::Ready<Result<usize>>>();
+        assert!(collect_partitioned(empty).await.unwrap().is_empty());
+        let parts = std::iter::once(ready(Err::<usize, _>(DataFusionError::Execution(
+            "partition error".into(),
+        ))));
+        assert!(
+            matches!(collect_partitioned(parts).await, Err(DataFusionError::Execution(message)) if message == "partition error")
+        );
     }
 }

@@ -50,23 +50,20 @@ where
 {
     let start_time = std::time::Instant::now();
     let func_name = eval.func.name();
-    let trace_id = eval.eval_ctx.trace_id.clone();
+    let trace_id = &eval.eval_ctx.trace_id;
     log::info!(
         "[trace_id: {trace_id}] [PromQL Timing] fused {}({func_name}) started with {} partitions",
         op.name(),
         sources.len(),
     );
-    let folds = sources
-        .into_iter()
-        .map(|source| {
-            let eval = eval.clone();
-            async move { aggregate_partial(source.await?, op, eval).await }
-        })
-        .collect();
+    let folds = sources.into_iter().map(|source| {
+        let eval = eval.clone();
+        async move { aggregate_partial(source.await?, op, eval).await }
+    });
     let folds = collect_partitioned(folds).await?;
     let series_count = folds.iter().map(|(_, series)| series).sum();
     let value = aggregate_final(
-        folds.into_iter().map(|(groups, _)| groups).collect(),
+        folds.into_iter().map(|(groups, _)| groups),
         &eval.timestamps,
     );
     log::info!(
@@ -109,7 +106,7 @@ async fn aggregate_partial<S: SeriesStream>(
 
 /// The final aggregate: partial groups merged in partition order, groups without output dropped
 /// like the generic path.
-fn aggregate_final(folds: Vec<GroupAccs>, timestamps: &[i64]) -> Value {
+fn aggregate_final(folds: impl IntoIterator<Item = GroupAccs>, timestamps: &[i64]) -> Value {
     let mut folds = folds.into_iter();
     let Some(mut merged) = folds.next() else {
         return Value::None;

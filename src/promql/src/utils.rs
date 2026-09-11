@@ -131,26 +131,18 @@ pub fn apply_label_selector(
         let schema_fields = schema
             .fields()
             .iter()
-            .map(|f| f.name())
+            .map(|f| f.name().as_str())
             .collect::<HashSet<_>>();
-        let mut def_labels = vec![
-            HASH_LABEL.to_string(),
-            VALUE_LABEL.to_string(),
-            BUCKET_LABEL.to_string(),
-            TIMESTAMP_COL_NAME.to_string(),
-        ];
-        def_labels.retain(|label| !label_selector.contains(label));
+        let def_labels = [HASH_LABEL, VALUE_LABEL, BUCKET_LABEL, TIMESTAMP_COL_NAME]
+            .into_iter()
+            .filter(|label| !label_selector.contains(*label));
         // include only found columns and required _timestamp, hash, value, le cols
         let selected_cols: Vec<_> = label_selector
             .iter()
-            .chain(def_labels.iter())
-            .filter_map(|label| {
-                if schema_fields.contains(label) {
-                    Some(col(label))
-                } else {
-                    None
-                }
-            })
+            .map(String::as_str)
+            .chain(def_labels)
+            .filter(|label| schema_fields.contains(label))
+            .map(col)
             .collect();
         df = match df.select(selected_cols) {
             Ok(df) => df,

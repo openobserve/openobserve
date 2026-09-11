@@ -32,10 +32,8 @@ pub fn remove_filter_all(vs: &mut VectorSelector) {
 
 fn match_placeholder(matcher: &Matcher, placeholder: &str) -> bool {
     match &matcher.op {
-        MatchOp::Equal => matcher.value == placeholder,
-        MatchOp::NotEqual => matcher.value == placeholder,
-        MatchOp::Re(pattern) => pattern.to_string() == placeholder,
-        MatchOp::NotRe(pattern) => pattern.to_string() == placeholder,
+        MatchOp::Equal | MatchOp::NotEqual => matcher.value == placeholder,
+        MatchOp::Re(pattern) | MatchOp::NotRe(pattern) => pattern.as_str() == placeholder,
     }
 }
 

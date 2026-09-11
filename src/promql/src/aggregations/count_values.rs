@@ -16,14 +16,12 @@
 use std::sync::Arc;
 
 use ahash::{HashMap, HashMapExt};
-use config::meta::promql::value::{
-    EvalContext, Label, Labels, LabelsExt, RangeValue, Sample, Value,
-};
+use config::meta::promql::value::{EvalContext, Label, LabelsExt, RangeValue, Sample, Value};
 use datafusion::error::{DataFusionError, Result};
 use promql_parser::parser::LabelModifier;
 use rayon::prelude::*;
 
-use crate::aggregations::projected_labels;
+use crate::aggregations::{projected_labels, projected_labels_signature};
 
 /// Aggregates Matrix input for range queries
 /// count_values creates a new label with the metric value as the label value
@@ -91,13 +89,9 @@ pub fn count_values(
     // Step 1: Compute label hash for each series once based on param
     // This avoids recomputing the hash for every timestamp
     let start1 = std::time::Instant::now();
-    let series_label_hashes: Vec<(u64, Labels)> = matrix
+    let series_label_hashes: Vec<u64> = matrix
         .iter()
-        .map(|rv| {
-            let grouped_labels = projected_labels(modifier, &rv.labels);
-            let hash = grouped_labels.signature();
-            (hash, grouped_labels)
-        })
+        .map(|rv| projected_labels_signature(modifier, &rv.labels))
         .collect();
 
     log::info!(
@@ -111,7 +105,7 @@ pub fn count_values(
     // Step 2: Group series indices by their label hash
     // Build index: label_hash -> Vec<series_idx>
     let mut groups: HashMap<u64, Vec<usize>> = HashMap::new();
-    for (series_idx, (hash, _)) in series_label_hashes.iter().enumerate() {
+    for (series_idx, hash) in series_label_hashes.iter().enumerate() {
         groups.entry(*hash).or_default().push(series_idx);
     }
 
@@ -131,7 +125,7 @@ pub fn count_values(
         .par_iter()
         .map(|(_, series_indices)| {
             // Get the base labels for this group (from the first series in the group)
-            let base_labels = series_label_hashes[series_indices[0]].1.clone();
+            let base_labels = projected_labels(modifier, &matrix[series_indices[0]].labels);
 
             // For each timestamp, track unique sample values and their counts
             // Structure: HashMap<timestamp, HashMap<value_string, count>>

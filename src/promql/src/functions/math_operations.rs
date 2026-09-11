@@ -15,86 +15,54 @@
 
 use config::meta::promql::value::Value;
 use datafusion::error::Result;
-use strum::EnumIter;
-
-#[derive(Debug, EnumIter)]
-pub enum MathOperationsType {
-    Abs,
-    Ceil,
-    Exp,
-    Floor,
-    Ln,
-    Log10,
-    Log2,
-    Round { to_nearest: f64 },
-    Sgn,
-    Sqrt,
-}
-
-impl MathOperationsType {
-    /// Apply a given simple match function to a float type
-    pub fn apply(&self, input: f64) -> f64 {
-        match self {
-            Self::Abs => input.abs(),
-            Self::Ceil => input.ceil(),
-            Self::Exp => input.exp(),
-            Self::Floor => input.floor(),
-            Self::Ln => input.ln(),
-            Self::Log2 => input.log2(),
-            Self::Log10 => input.log10(),
-            Self::Sgn => input.signum(),
-            Self::Sqrt => input.sqrt(),
-            // Prometheus semantics: ties round up, and the inverse keeps e.g. 0.1 steps exact
-            Self::Round { to_nearest } => {
-                let inverse = 1.0 / to_nearest;
-                (input * inverse + 0.5).floor() / inverse
-            }
-        }
-    }
-}
 
 pub(crate) fn abs(data: Value) -> Result<Value> {
-    exec(data, &MathOperationsType::Abs)
+    exec(data, f64::abs)
 }
 
 pub(crate) fn ceil(data: Value) -> Result<Value> {
-    exec(data, &MathOperationsType::Ceil)
+    exec(data, f64::ceil)
 }
 
 pub(crate) fn floor(data: Value) -> Result<Value> {
-    exec(data, &MathOperationsType::Floor)
+    exec(data, f64::floor)
 }
 
 pub(crate) fn exp(data: Value) -> Result<Value> {
-    exec(data, &MathOperationsType::Exp)
+    exec(data, f64::exp)
 }
 
 pub(crate) fn ln(data: Value) -> Result<Value> {
-    exec(data, &MathOperationsType::Ln)
+    exec(data, f64::ln)
 }
 
 pub(crate) fn log2(data: Value) -> Result<Value> {
-    exec(data, &MathOperationsType::Log2)
+    exec(data, f64::log2)
 }
 
 pub(crate) fn log10(data: Value) -> Result<Value> {
-    exec(data, &MathOperationsType::Log10)
+    exec(data, f64::log10)
 }
 
 pub(crate) fn sqrt(data: Value) -> Result<Value> {
-    exec(data, &MathOperationsType::Sqrt)
+    exec(data, f64::sqrt)
 }
 
 pub(crate) fn round(data: Value, to_nearest: f64) -> Result<Value> {
-    exec(data, &MathOperationsType::Round { to_nearest })
+    exec(data, |input| {
+        // Prometheus semantics: ties round up, and the inverse keeps e.g. 0.1 steps exact
+        let inverse = 1.0 / to_nearest;
+        (input * inverse + 0.5).floor() / inverse
+    })
 }
 
 pub(crate) fn sgn(data: Value) -> Result<Value> {
-    exec(data, &MathOperationsType::Sgn)
+    exec(data, f64::signum)
 }
 
-fn exec(data: Value, op: &MathOperationsType) -> Result<Value> {
-    super::map_samples(data, "math operation", |sample| op.apply(sample.value))
+/// Apply a given simple match function to a float type
+fn exec(data: Value, op: impl Fn(f64) -> f64 + Sync) -> Result<Value> {
+    super::map_samples(data, "math operation", |sample| op(sample.value))
 }
 
 #[cfg(test)]
@@ -122,63 +90,67 @@ mod tests {
         Value::Matrix(range_values)
     }
 
+    fn apply(op: impl FnOnce(Value) -> Result<Value>, input: f64) -> f64 {
+        let Value::Matrix(matrix) = op(create_matrix(1000, vec![input])).unwrap() else {
+            panic!("expected matrix");
+        };
+        matrix[0].samples[0].value
+    }
+
     #[test]
-    fn test_math_operations_type_apply() {
-        assert_eq!(MathOperationsType::Abs.apply(-5.0), 5.0);
-        assert_eq!(MathOperationsType::Abs.apply(5.0), 5.0);
-        assert_eq!(MathOperationsType::Abs.apply(0.0), 0.0);
+    fn test_math_operations_values() {
+        assert_eq!(apply(abs, -5.0), 5.0);
+        assert_eq!(apply(abs, 5.0), 5.0);
+        assert_eq!(apply(abs, 0.0), 0.0);
 
-        assert_eq!(MathOperationsType::Ceil.apply(3.2), 4.0);
-        assert_eq!(MathOperationsType::Ceil.apply(3.0), 3.0);
-        assert_eq!(MathOperationsType::Ceil.apply(-3.2), -3.0);
+        assert_eq!(apply(ceil, 3.2), 4.0);
+        assert_eq!(apply(ceil, 3.0), 3.0);
+        assert_eq!(apply(ceil, -3.2), -3.0);
 
-        assert_eq!(MathOperationsType::Floor.apply(3.2), 3.0);
-        assert_eq!(MathOperationsType::Floor.apply(3.0), 3.0);
-        assert_eq!(MathOperationsType::Floor.apply(-3.2), -4.0);
+        assert_eq!(apply(floor, 3.2), 3.0);
+        assert_eq!(apply(floor, 3.0), 3.0);
+        assert_eq!(apply(floor, -3.2), -4.0);
 
-        assert_eq!(MathOperationsType::Exp.apply(0.0), 1.0);
-        assert_eq!(MathOperationsType::Exp.apply(1.0), std::f64::consts::E);
-        assert_eq!(
-            MathOperationsType::Exp.apply(-1.0),
-            1.0 / std::f64::consts::E
-        );
+        assert_eq!(apply(exp, 0.0), 1.0);
+        assert_eq!(apply(exp, 1.0), std::f64::consts::E);
+        assert_eq!(apply(exp, -1.0), 1.0 / std::f64::consts::E);
 
-        assert_eq!(MathOperationsType::Ln.apply(1.0), 0.0);
-        assert_eq!(MathOperationsType::Ln.apply(std::f64::consts::E), 1.0);
+        assert_eq!(apply(ln, 1.0), 0.0);
+        assert_eq!(apply(ln, std::f64::consts::E), 1.0);
 
-        assert_eq!(MathOperationsType::Log2.apply(1.0), 0.0);
-        assert_eq!(MathOperationsType::Log2.apply(2.0), 1.0);
-        assert_eq!(MathOperationsType::Log2.apply(4.0), 2.0);
+        assert_eq!(apply(log2, 1.0), 0.0);
+        assert_eq!(apply(log2, 2.0), 1.0);
+        assert_eq!(apply(log2, 4.0), 2.0);
 
-        assert_eq!(MathOperationsType::Log10.apply(1.0), 0.0);
-        assert_eq!(MathOperationsType::Log10.apply(10.0), 1.0);
-        assert_eq!(MathOperationsType::Log10.apply(100.0), 2.0);
+        assert_eq!(apply(log10, 1.0), 0.0);
+        assert_eq!(apply(log10, 10.0), 1.0);
+        assert_eq!(apply(log10, 100.0), 2.0);
 
-        assert_eq!(MathOperationsType::Sqrt.apply(0.0), 0.0);
-        assert_eq!(MathOperationsType::Sqrt.apply(1.0), 1.0);
-        assert_eq!(MathOperationsType::Sqrt.apply(4.0), 2.0);
+        assert_eq!(apply(sqrt, 0.0), 0.0);
+        assert_eq!(apply(sqrt, 1.0), 1.0);
+        assert_eq!(apply(sqrt, 4.0), 2.0);
 
-        let round = MathOperationsType::Round { to_nearest: 1.0 };
-        assert_eq!(round.apply(3.2), 3.0);
-        assert_eq!(round.apply(3.5), 4.0);
-        assert_eq!(round.apply(3.7), 4.0);
-        assert_eq!(round.apply(-3.2), -3.0);
-        assert_eq!(round.apply(-3.5), -3.0);
-        let round = MathOperationsType::Round { to_nearest: 0.5 };
-        assert_eq!(round.apply(3.2), 3.0);
-        assert_eq!(round.apply(3.25), 3.5);
-        assert_eq!(round.apply(3.7), 3.5);
-        assert_eq!(round.apply(-3.2), -3.0);
-        let round = MathOperationsType::Round { to_nearest: 0.1 };
-        assert_eq!(round.apply(2.345), 2.3);
-        assert_eq!(round.apply(0.3), 0.3);
-        let round = MathOperationsType::Round { to_nearest: 5.0 };
-        assert_eq!(round.apply(12.5), 15.0);
-        assert_eq!(round.apply(12.4), 10.0);
+        let round = |input| apply(|data| super::round(data, 1.0), input);
+        assert_eq!(round(3.2), 3.0);
+        assert_eq!(round(3.5), 4.0);
+        assert_eq!(round(3.7), 4.0);
+        assert_eq!(round(-3.2), -3.0);
+        assert_eq!(round(-3.5), -3.0);
+        let round = |input| apply(|data| super::round(data, 0.5), input);
+        assert_eq!(round(3.2), 3.0);
+        assert_eq!(round(3.25), 3.5);
+        assert_eq!(round(3.7), 3.5);
+        assert_eq!(round(-3.2), -3.0);
+        let round = |input| apply(|data| super::round(data, 0.1), input);
+        assert_eq!(round(2.345), 2.3);
+        assert_eq!(round(0.3), 0.3);
+        let round = |input| apply(|data| super::round(data, 5.0), input);
+        assert_eq!(round(12.5), 15.0);
+        assert_eq!(round(12.4), 10.0);
 
-        assert_eq!(MathOperationsType::Sgn.apply(5.0), 1.0);
-        assert_eq!(MathOperationsType::Sgn.apply(0.0), 1.0);
-        assert_eq!(MathOperationsType::Sgn.apply(-5.0), -1.0);
+        assert_eq!(apply(sgn, 5.0), 1.0);
+        assert_eq!(apply(sgn, 0.0), 1.0);
+        assert_eq!(apply(sgn, -5.0), -1.0);
     }
 
     #[test]

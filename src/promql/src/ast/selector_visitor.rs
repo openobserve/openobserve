@@ -15,20 +15,9 @@
 
 use promql_parser::{parser::Expr, util::ExprVisitor};
 
+#[derive(Default)]
 pub struct MetricSelectorVisitor {
     pub(crate) exprs: Vec<Expr>,
-}
-
-impl MetricSelectorVisitor {
-    pub fn new() -> Self {
-        Self { exprs: vec![] }
-    }
-}
-
-impl Default for MetricSelectorVisitor {
-    fn default() -> Self {
-        Self::new()
-    }
 }
 
 impl ExprVisitor for MetricSelectorVisitor {
@@ -36,10 +25,7 @@ impl ExprVisitor for MetricSelectorVisitor {
 
     fn pre_visit(&mut self, expr: &Expr) -> Result<bool, Self::Error> {
         match expr {
-            Expr::VectorSelector(_) => {
-                self.exprs.push(expr.clone());
-            }
-            Expr::MatrixSelector(_) => {
+            Expr::VectorSelector(_) | Expr::MatrixSelector(_) => {
                 self.exprs.push(expr.clone());
             }
             _ => {}
@@ -104,7 +90,7 @@ mod tests {
 
     #[test]
     fn test_selector_visitor_empty() {
-        let visitor = MetricSelectorVisitor::new();
+        let visitor = MetricSelectorVisitor::default();
         assert!(visitor.exprs.is_empty());
     }
 
@@ -113,7 +99,7 @@ mod tests {
         // Scalar arithmetic has no VectorSelector or MatrixSelector
         let promql = "1 + 2";
         let ast = parser::parse(promql).unwrap();
-        let mut visitor = MetricSelectorVisitor::new();
+        let mut visitor = MetricSelectorVisitor::default();
         promql_parser::util::walk_expr(&mut visitor, &ast).unwrap();
         assert!(visitor.exprs.is_empty());
     }

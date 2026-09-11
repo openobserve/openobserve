@@ -222,28 +222,21 @@ pub(super) async fn load_samples_from_datafusion(
         let hash_field_type = hash_field_type.clone();
         let task: TokioResult = tokio::task::spawn(async move {
             let mut metrics: HashMap<u64, RangeValue> = HashMap::new();
-            loop {
-                match stream.try_next().await {
-                    Ok(Some(batch)) => {
-                        let time_values = batch[TIMESTAMP_COL_NAME].as_primitive::<Int64Type>();
-                        let value_values = batch[VALUE_LABEL].as_primitive::<Float64Type>();
+            while let Some(batch) = stream.try_next().await.inspect_err(|e| {
+                log::error!("load samples from datafusion execute stream Error: {e}");
+            })? {
+                let time_values = batch[TIMESTAMP_COL_NAME].as_primitive::<Int64Type>();
+                let value_values = batch[VALUE_LABEL].as_primitive::<Float64Type>();
 
-                        let hashes = batch_hash_values(&batch, &hash_field_type);
-                        append_batch_samples(
-                            &mut metrics,
-                            &hashes,
-                            time_values.values(),
-                            value_values.values(),
-                            fragment_hint,
-                            query_duration,
-                        );
-                    }
-                    Ok(None) => break,
-                    Err(e) => {
-                        log::error!("load samples from datafusion execute stream Error: {e}");
-                        return Err(e);
-                    }
-                }
+                let hashes = batch_hash_values(&batch, &hash_field_type);
+                append_batch_samples(
+                    &mut metrics,
+                    &hashes,
+                    time_values.values(),
+                    value_values.values(),
+                    fragment_hint,
+                    query_duration,
+                );
             }
             let mut unique_timestamps = HashSet::new();
             if collect_timestamps {
@@ -375,33 +368,26 @@ async fn load_exemplars_from_datafusion(
         let hash_field_type = hash_field_type.clone();
         let task: TokioResult = tokio::task::spawn(async move {
             let mut metrics: HashMap<u64, RangeValue> = HashMap::new();
-            loop {
-                match stream.try_next().await {
-                    Ok(Some(batch)) => {
-                        let exemplars_values = batch[EXEMPLARS_LABEL].as_string::<i32>();
-                        let hashes = batch_hash_values(&batch, &hash_field_type);
-                        for (i, &hash) in hashes.iter().enumerate() {
-                            let exemplar = exemplars_values.value(i);
-                            if let Ok(exemplars) = json::from_str::<Vec<json::Value>>(exemplar) {
-                                let entry = metrics.entry(hash).or_insert_with(|| RangeValue {
-                                    labels: vec![],
-                                    samples: vec![],
-                                    exemplars: Some(vec![]),
-                                    time_window: None,
-                                });
-                                let entry = entry.exemplars.as_mut().unwrap();
-                                for exemplar in exemplars {
-                                    if let Some(exemplar) = exemplar.as_object() {
-                                        entry.push(Arc::new(Exemplar::from(exemplar)));
-                                    }
-                                }
+            while let Some(batch) = stream.try_next().await.inspect_err(|e| {
+                log::error!("load exemplars from datafusion execute stream Error: {e}");
+            })? {
+                let exemplars_values = batch[EXEMPLARS_LABEL].as_string::<i32>();
+                let hashes = batch_hash_values(&batch, &hash_field_type);
+                for (i, &hash) in hashes.iter().enumerate() {
+                    let exemplar = exemplars_values.value(i);
+                    if let Ok(exemplars) = json::from_str::<Vec<json::Value>>(exemplar) {
+                        let entry = metrics.entry(hash).or_insert_with(|| RangeValue {
+                            labels: vec![],
+                            samples: vec![],
+                            exemplars: Some(vec![]),
+                            time_window: None,
+                        });
+                        let entry = entry.exemplars.as_mut().unwrap();
+                        for exemplar in exemplars {
+                            if let Some(exemplar) = exemplar.as_object() {
+                                entry.push(Arc::new(Exemplar::from(exemplar)));
                             }
                         }
-                    }
-                    Ok(None) => break,
-                    Err(e) => {
-                        log::error!("load exemplars from datafusion execute stream Error: {e}");
-                        return Err(e);
                     }
                 }
             }
