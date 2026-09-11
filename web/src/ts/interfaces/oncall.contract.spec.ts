@@ -172,11 +172,13 @@ const _c6: Complete<EscalationTargetKind, typeof ESCALATION_TARGET_KINDS> = true
 const ROTATION_MODES = ["on_call", "all"] as const satisfies readonly RotationMode[];
 const _c11: Complete<RotationMode, typeof ROTATION_MODES> = true;
 
-const FINAL_ACTIONS = [
+// Only used for its type via `typeof` below — `EscalationPolicy` has no
+// `final_action` field yet, so there's no MIRROR_MAP entry to hold a runtime reference.
+const _FINAL_ACTIONS = [
   "stop",
   "notify_default_team",
 ] as const satisfies readonly PolicyFinalAction[];
-const _c7: Complete<PolicyFinalAction, typeof FINAL_ACTIONS> = true;
+const _c7: Complete<PolicyFinalAction, typeof _FINAL_ACTIONS> = true;
 
 const L0_MODES = ["parallel", "gate", "only"] as const satisfies readonly L0Mode[];
 const _c8: Complete<L0Mode, typeof L0_MODES> = true;
@@ -206,7 +208,7 @@ const _c10: Complete<PresetInputKind, typeof PRESET_INPUT_KINDS> = true;
 const _causes: Complete<ResolutionCause, typeof RESOLUTION_CAUSES> = true;
 void [_c1, _c2, _c3, _c4, _c5, _c6, _c7, _c8, _c9, _c10, _c11, _causes];
 
-// `FinalAction` names no map below: `EscalationPolicy` carries no `final_action` field yet, so it is not a Rust enum a MIRRORED or SKIPPED entry could point at without failing the stale-entry check — `FINAL_ACTIONS`/`_c7` above still pin `PolicyFinalAction` against drift on its own.
+// `FinalAction` names no map below: `EscalationPolicy` carries no `final_action` field yet, so it is not a Rust enum a MIRRORED or SKIPPED entry could point at without failing the stale-entry check — `_FINAL_ACTIONS`/`_c7` above still pin `PolicyFinalAction` against drift on its own.
 /** Rust enum name → the TS mirror it must equal. */
 const MIRRORED: Record<string, readonly string[]> = {
   ResponseEventKind: RESPONSE_EVENT_KINDS,
