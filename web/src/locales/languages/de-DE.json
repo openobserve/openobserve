@@ -2057,7 +2057,8 @@
       "startFrom": {
         "label": "Beginne von",
         "custom": "Benutzerdefiniert (leere Rolle)",
-        "readonly": "Schreibgeschützt (Zugriff auf alle Ressourcen anzeigen)"
+        "readonly": "Schreibgeschützt (Zugriff auf alle Ressourcen anzeigen)",
+        "dbm": "Datenbanküberwachung-Viewer (schreibgeschützt für das Modul Datenbanküberwachung und die Metrik-Streams, die der Tab Metriken abfragt)"
       },
       "name": {
         "required": "Der Rollenname ist erforderlich.",
@@ -2093,7 +2094,9 @@
       "loadFailed": "Fehler beim Laden der Rollendetails. Weiterleitung zur Rollenliste.",
       "noUpdatesDetected": "Keine Aktualisierungen erkannt.",
       "updateSuccess": "Rolle erfolgreich aktualisiert!",
-      "updateError": "Fehler beim Aktualisieren der Rolle!"
+      "updateError": "Fehler beim Aktualisieren der Rolle!",
+      "dbmPresetSeeded": "Vorausgewählter Lesezugriff auf {matched} von {total} Metrik-Streams der Datenbanküberwachung, plus das Modul Datenbanküberwachung. Vor dem Speichern prüfen.",
+      "dbmPresetNoMatch": "Keiner der {total} Metrik-Streams der Datenbanküberwachung existiert bisher in dieser Organisation, daher wurde für sie nichts vorausgewählt; die Berechtigung für das Modul Datenbanküberwachung wurde dennoch vorbereitet."
     },
     "rolesPage": {
       "subtitle": "Rollen bündeln Berechtigungen — weisen Sie sie Benutzern, Dienstkonten oder Gruppen zu, um Zugriff zu gewähren.",
@@ -16298,6 +16301,7 @@
       },
       "databaseCount": "1 Datenbank | {count} Datenbanken",
       "openQueries": "Abfragen ansehen",
+      "viewMetrics": "Metriken anzeigen",
       "alertMe": "Benachrichtige mich",
       "columnHints": {
         "qps": "Aufrufe pro Sekunde — die Aufrufe dieses Zeitfensters geteilt durch dessen Länge, damit eine 15-Minuten-Ansicht und eine 4-Stunden-Ansicht vergleichbar bleiben.",
@@ -16558,10 +16562,10 @@
         "missingDescription": "Diese Seite beschreibt eine Abfrage, und die Adresse nennt keine. Wenn Sie gerade die Organisation gewechselt haben, gehört die Abfrage, die Sie gelesen haben, zu der, die Sie verlassen haben.",
         "action": "Abfragen dieser Organisation durchsuchen"
       },
-      "backToQueries": "Zurück zu den Top-Abfragen",
-      "backToActivity": "Zurück zur Aktivität",
-      "backToSamples": "Zurück zu den langsamsten Aufrufen",
-      "backToDeadlocks": "Zurück zu Deadlocks",
+      "backToQueries": "Top-Abfragen",
+      "backToActivity": "Aktivität",
+      "backToSamples": "langsamste Aufrufe",
+      "backToDeadlocks": "Deadlocks",
       "latencyTitle": "Geschwindigkeit im Zeitverlauf",
       "volumeTitle": "Aufrufe und Fehler im Zeitverlauf",
       "endpointsTitle": "Von wo es aufgerufen wird",
@@ -16726,6 +16730,8 @@
     "page": {
       "tabs": {
         "overview": "Übersicht",
+        "metrics": "Metriken",
+        "metricsHint": "Datenbanklast nach Warteereignis und jede Metrik, die Ihre Datenbank-Receiver erfassen.",
         "queries": "Top-Abfragen",
         "samples": "Langsamste Aufrufe",
         "samplesHintClient": "Abgeschlossene Aufrufe, die Ihre instrumentierten Dienste in diesem Fenster beobachtet haben – Aufrufer ohne Tracing werden nicht gezählt, dies ist also eine Untergrenze, nicht die Gesamtzahl. Die Tabelle zeigt die langsamsten davon.",
@@ -16742,6 +16748,129 @@
         "deadlocksLocked": "Deadlocks ist eine Enterprise-Funktion. Führen Sie ein Upgrade durch, um zu sehen, welche Abfragen sich gegenseitig blockiert haben und warum. Die anderen Datenbank-Registerkarten funktionieren in jedem Plan.",
         "blockedLocked": "Blockierte Abfragen ist eine Enterprise-Funktion. Führen Sie ein Upgrade durch, um zu sehen, welche Sitzungen auf eine Sperre warten und was sie hält. Die anderen Datenbank-Registerkarten funktionieren in jedem Plan.",
         "tableHealthLocked": "Tabellenzustand ist eine Enterprise-Funktion. Führen Sie ein Upgrade durch, um Tabellengröße, Bloat und Vakuumzustand zu verfolgen. Die anderen Datenbank-Registerkarten funktionieren in jedem Plan."
+      }
+    },
+    "metrics": {
+      "title": "Metriken",
+      "subtitle": "Datenbanklast und jede Metrik, die Ihre Datenbank-Receiver erfassen, im Diagramm für dieses Zeitfenster",
+      "load": {
+        "title": "Datenbanklast",
+        "hint": "Durchschnittlich aktiv arbeitende Sitzungen pro Intervall, gestapelt nach der gewählten Dimension. Idle-Verbindungen sind ausgeschlossen; eine Sitzung, die auf nichts wartet, läuft auf der CPU. Ziehen Sie über einen Ausschlag, um alle Diagramme darauf zu zoomen.",
+        "timeAxis": "Zeit",
+        "sessionsAxis": "Ø aktive Sitzungen",
+        "waitEventAxis": "Warteereignis",
+        "viewActivity": "In Aktivität anzeigen",
+        "breakdowns": {
+          "waitEvent": "Nach Warteereignis",
+          "query": "Nach Abfrage",
+          "database": "Nach Datenbank",
+          "user": "Nach Benutzer"
+        }
+      },
+      "limitLegend": "Verbindungslimit",
+      "explore": "Im Metriken-Explorer öffnen",
+      "railLabel": "Metriken-Bereiche",
+      "noAccess": "Sie haben keine Berechtigung, {stream} zu lesen. Bitten Sie einen Administrator um Lesezugriff auf diesen Stream.",
+      "byDims": {
+        "query": "nach Abfrage",
+        "database": "nach Datenbank",
+        "service": "nach Service",
+        "operation": "nach Operation",
+        "mode": "nach Modus",
+        "lockType": "nach Sperrtyp",
+        "table": "nach Tabelle",
+        "index": "nach Index",
+        "client": "nach Client",
+        "state": "nach Status",
+        "direction": "nach Richtung",
+        "device": "nach Gerät",
+        "host": "nach Host"
+      },
+      "catalog": {
+        "activity": {
+          "title": "Aktivität",
+          "desc": "Durchsatz, Transaktionen und Zeilenumschlag"
+        },
+        "locks": {
+          "title": "Sperren",
+          "desc": "Sperrdruck und was ihn hält"
+        },
+        "replication": {
+          "title": "Replikation",
+          "desc": "WAL-Druck und Replikat-Verzögerung"
+        },
+        "indexes": {
+          "title": "Indizes",
+          "desc": "Index-Nutzung und -Größe pro Tabelle"
+        },
+        "blocks": {
+          "title": "Blöcke",
+          "desc": "Shared-Buffer-I/O, das Abfragen zugeordnet wird, aus den eigenen Zählern der Datenbank"
+        },
+        "vacuum": {
+          "title": "Vacuum",
+          "desc": "Lebende und tote Zeilen pro Tabelle"
+        },
+        "host": {
+          "managedNote": "Diese Datenbank läuft auf einem cloud-verwalteten Endpunkt (wie Amazon RDS), daher stellt ihr Anbieter keinen Host für Ihre Collectors zur Überwachung bereit. Entfernen Sie den Datenbankfilter, um Host-Metriken für die Hosts anzuzeigen, die Ihre Collectors tatsächlich melden.",
+          "title": "Host",
+          "desc": "CPU, Arbeitsspeicher und E/A des Datenbank-Hosts",
+          "loopbackHint": "Instanz über localhost verbunden — alle Hosts werden angezeigt",
+          "matchHint": "Host-Metriken werden anhand des Hostnamens abgeglichen"
+        }
+      },
+      "catalogPanels": {
+        "calls": "Abfrageaufrufe",
+        "avgDuration": "Durchschnittliche Dauer",
+        "commits": "Commits",
+        "rollbacks": "Rollbacks",
+        "rowsModified": "Geänderte Zeilen",
+        "locks": "Sperren",
+        "walLag": "WAL-Verzögerung",
+        "indexScans": "Index-Scans",
+        "indexSize": "Indexgröße",
+        "blksHit": "Shared Blocks Treffer",
+        "blksRead": "Shared Blocks gelesen",
+        "blksDirtied": "Shared Blocks geändert",
+        "rowsByState": "Zeilen nach Status",
+        "cpuUtilization": "CPU-Auslastung",
+        "memoryUsage": "Arbeitsspeicher",
+        "diskIo": "Festplatten-E/A",
+        "networkIo": "Netzwerk-E/A"
+      },
+      "searchPlaceholder": "Metriken filtern…",
+      "triageOrder": "nach Triage-Relevanz sortiert",
+      "sections": {
+        "featured": "Wichtige Gesundheitsmetriken",
+        "postgresql": "PostgreSQL-Metriken",
+        "mysql": "MySQL- und MariaDB-Metriken"
+      },
+      "roleTitle": "{role} · {engine}",
+      "roles": {
+        "cacheHitRatio": "Cache-Trefferquote",
+        "connections": "Verbindungen",
+        "connectionLimit": "Verbindungslimit",
+        "replicationLag": "Replikationsverzögerung",
+        "cacheHit": "Cache-Treffer",
+        "cacheRead": "Cache-Festplattenlesevorgänge",
+        "deadlocks": "Deadlocks"
+      },
+      "notCollecting": {
+        "title": "Keine Datenbankmetriken kommen an",
+        "description": "Das Lastdiagramm oben liest die Aktivitätsproben, aber in dieser Organisation existieren noch keine Metrik-Streams von einem Datenbank-Receiver. Die Collector-Rezepte auf den Datenbank-Einrichtungskarten liefern sie mit.",
+        "checklistTitle": "Was zu prüfen ist",
+        "checks": {
+          "receivers": {
+            "no": "Kein Datenbank-Receiver sendet Metriken",
+            "noDetail": "Die PostgreSQL- und MySQL-Einrichtungskarten unter Datenquellen konfigurieren den Metrik-Receiver des Collectors zusammen mit den Überwachungsfeeds."
+          },
+          "enabled": {
+            "ok": "Datenbanküberwachung ist aktiviert",
+            "okDetail": "damit die Metriken hier dargestellt werden, sobald ein Receiver sie liefert",
+            "no": "Datenbanküberwachung ist deaktiviert",
+            "noDetail": "ZO_DB_MONITORING_ENABLED ist für diese Bereitstellung ausgeschaltet, daher erfassen die Datenbank-Tabs nicht."
+          }
+        }
       }
     },
     "samples": {

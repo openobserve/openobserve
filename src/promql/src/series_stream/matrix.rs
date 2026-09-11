@@ -78,7 +78,7 @@ pub(crate) fn matrix_streams(
         .collect();
     groups.sort_unstable_by_key(|(sig, _)| *sig);
 
-    let total: usize = groups.iter().map(|(_, indices)| indices.len()).sum();
+    let total = matrix.len();
     // small folds stay sequential, keeping them bit-identical to the generic path
     let partitions = if total < 2 * MATRIX_PARTITION_CHUNK {
         1
@@ -137,7 +137,7 @@ pub(crate) fn group_sources(
         .expect("range function input must have a time window")
         .range;
     // strip the metric name as the range function would have; visible to `sum by(__name__)`
-    if !KEEP_METRIC_NAME_FUNC.contains(func_name) {
+    if func_name != KEEP_METRIC_NAME_FUNC {
         matrix.par_iter_mut().for_each(|series| {
             series.labels.retain(|label| label.name != NAME_LABEL);
         });

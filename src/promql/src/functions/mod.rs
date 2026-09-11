@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashSet, sync::LazyLock as Lazy, time::Duration};
+use std::time::Duration;
 
 use config::meta::promql::value::{
     CounterSeries, EvalContext, ExtrapolationKind, LabelsExt, RangeValue, Sample, Value,
@@ -30,12 +30,11 @@ mod avg_over_time;
 mod changes;
 mod clamp;
 mod count_over_time;
-mod delta;
 mod deriv;
+mod extrapolated;
 mod histogram;
 mod holt_winters;
 mod idelta;
-mod increase;
 mod irate;
 mod label_join;
 mod label_replace;
@@ -45,7 +44,6 @@ mod max_over_time;
 mod min_over_time;
 mod predict_linear;
 mod quantile_over_time;
-mod rate;
 mod resets;
 mod scalar;
 mod stddev_over_time;
@@ -67,6 +65,8 @@ pub(crate) use quantile_over_time::quantile_over_time;
 pub(crate) use scalar::scalar;
 pub(crate) use time_operations::*;
 pub(crate) use vector::vector;
+
+pub(crate) const KEEP_METRIC_NAME_FUNC: &str = "last_over_time";
 
 /// Reference: https://prometheus.io/docs/prometheus/latest/querying/functions/
 #[derive(Debug, Clone, Copy, PartialEq, EnumString)]
@@ -128,26 +128,69 @@ pub(crate) enum Func {
     Year,
 }
 
+pub(crate) enum SingleArgFunc {
+    Value(fn(Value) -> Result<Value>),
+    Date(fn(Value) -> Result<Value>),
+    Context(fn(Value, &EvalContext) -> Result<Value>),
+}
+
+impl SingleArgFunc {
+    pub(crate) fn eval(self, input: Value, eval_ctx: &EvalContext) -> Result<Value> {
+        match self {
+            Self::Value(eval) | Self::Date(eval) => eval(input),
+            Self::Context(eval) => eval(input, eval_ctx),
+        }
+    }
+}
+
 impl Func {
+    pub(crate) fn single_arg_func(self) -> Option<SingleArgFunc> {
+        Some(match self {
+            Self::Abs => SingleArgFunc::Value(abs),
+            Self::Ceil => SingleArgFunc::Value(ceil),
+            Self::Exp => SingleArgFunc::Value(exp),
+            Self::Floor => SingleArgFunc::Value(floor),
+            Self::Ln => SingleArgFunc::Value(ln),
+            Self::Log10 => SingleArgFunc::Value(log10),
+            Self::Log2 => SingleArgFunc::Value(log2),
+            Self::Sgn => SingleArgFunc::Value(sgn),
+            Self::Sqrt => SingleArgFunc::Value(sqrt),
+            Self::Timestamp => SingleArgFunc::Value(timestamp),
+            Self::Absent => SingleArgFunc::Context(absent),
+            Self::AbsentOverTime => SingleArgFunc::Context(absent_over_time),
+            Self::Scalar => SingleArgFunc::Context(scalar),
+            Self::Vector => SingleArgFunc::Context(vector),
+            Self::DayOfMonth => SingleArgFunc::Date(day_of_month),
+            Self::DayOfWeek => SingleArgFunc::Date(day_of_week),
+            Self::DayOfYear => SingleArgFunc::Date(day_of_year),
+            Self::DaysInMonth => SingleArgFunc::Date(days_in_month),
+            Self::Hour => SingleArgFunc::Date(hour),
+            Self::Minute => SingleArgFunc::Date(minute),
+            Self::Month => SingleArgFunc::Date(month),
+            Self::Year => SingleArgFunc::Date(year),
+            _ => return None,
+        })
+    }
+
     /// The single-argument range function this name evaluates through [`eval_range`], if any.
     pub(crate) fn range_func(self) -> Option<Box<dyn RangeFunc>> {
         Some(match self {
-            Func::AvgOverTime => Box::new(avg_over_time::AvgOverTimeFunc::new()),
-            Func::Changes => Box::new(changes::ChangesFunc::new()),
-            Func::CountOverTime => Box::new(count_over_time::CountOverTimeFunc::new()),
-            Func::Delta => Box::new(delta::DeltaFunc::new()),
-            Func::Deriv => Box::new(deriv::DerivFunc::new()),
-            Func::Idelta => Box::new(idelta::IdeltaFunc::new()),
-            Func::Increase => Box::new(increase::IncreaseFunc::new()),
-            Func::Irate => Box::new(irate::IrateFunc::new()),
-            Func::LastOverTime => Box::new(last_over_time::LastOverTimeFunc::new()),
-            Func::MaxOverTime => Box::new(max_over_time::MaxOverTimeFunc::new()),
-            Func::MinOverTime => Box::new(min_over_time::MinOverTimeFunc::new()),
-            Func::Rate => Box::new(rate::RateFunc::new()),
-            Func::Resets => Box::new(resets::ResetsFunc::new()),
-            Func::StddevOverTime => Box::new(stddev_over_time::StddevOverTimeFunc::new()),
-            Func::StdvarOverTime => Box::new(stdvar_over_time::StdvarOverTimeFunc::new()),
-            Func::SumOverTime => Box::new(sum_over_time::SumOverTimeFunc::new()),
+            Func::AvgOverTime => Box::new(avg_over_time::AvgOverTimeFunc),
+            Func::Changes => Box::new(changes::ChangesFunc),
+            Func::CountOverTime => Box::new(count_over_time::CountOverTimeFunc),
+            Func::Delta => Box::new(ExtrapolationKind::Delta),
+            Func::Deriv => Box::new(deriv::DerivFunc),
+            Func::Idelta => Box::new(idelta::IdeltaFunc),
+            Func::Increase => Box::new(ExtrapolationKind::Increase),
+            Func::Irate => Box::new(irate::IrateFunc),
+            Func::LastOverTime => Box::new(last_over_time::LastOverTimeFunc),
+            Func::MaxOverTime => Box::new(max_over_time::MaxOverTimeFunc),
+            Func::MinOverTime => Box::new(min_over_time::MinOverTimeFunc),
+            Func::Rate => Box::new(ExtrapolationKind::Rate),
+            Func::Resets => Box::new(resets::ResetsFunc),
+            Func::StddevOverTime => Box::new(stddev_over_time::StddevOverTimeFunc),
+            Func::StdvarOverTime => Box::new(stdvar_over_time::StdvarOverTimeFunc),
+            Func::SumOverTime => Box::new(sum_over_time::SumOverTimeFunc),
             _ => return None,
         })
     }
@@ -180,9 +223,6 @@ impl<T: RangeFunc + ?Sized> RangeFunc for std::sync::Arc<T> {
         (**self).counter_extrapolation()
     }
 }
-
-pub static KEEP_METRIC_NAME_FUNC: Lazy<HashSet<&str>> =
-    Lazy::new(|| HashSet::from_iter(["last_over_time"]));
 
 /// Trait for PromQL range vector functions.
 ///
@@ -262,7 +302,7 @@ pub(crate) fn fusable_range_func(name: &str) -> Option<Box<dyn RangeFunc>> {
 
 /// The range function a bare instant selector streams as; it keeps the metric name.
 pub(crate) fn instant_lookback_func() -> std::sync::Arc<dyn RangeFunc> {
-    std::sync::Arc::new(last_over_time::LastOverTimeFunc::new())
+    std::sync::Arc::new(last_over_time::LastOverTimeFunc)
 }
 
 pub(crate) fn eval_range<F>(data: Value, func: F, eval_ctx: &EvalContext) -> Result<Value>
@@ -302,48 +342,20 @@ where
         .into_par_iter()
         .flat_map(|mut metric| {
             let mut labels = std::mem::take(&mut metric.labels);
-            if !KEEP_METRIC_NAME_FUNC.contains(func.name()) {
+            if func.name() != KEEP_METRIC_NAME_FUNC {
                 labels = labels.without_metric_name();
             }
             let time_window = metric.time_window.as_ref().unwrap();
             let range = time_window.range;
-            let range_micros = micros(range);
             let mut result_samples = Vec::with_capacity(timestamps.len());
-            let mut start_index = 0;
-            let mut end_index = 0;
-            let counter = CounterSeries::try_new(
+            evaluate_series_range(
                 &metric.samples,
-                func.counter_extrapolation(),
+                &func,
+                range,
                 eval_ctx,
-                range_micros,
+                &timestamps,
+                |slot, value| result_samples.push(Sample::new(timestamps[slot], value)),
             );
-
-            // For each eval timestamp, compute the function value
-            for &eval_ts in &timestamps {
-                // Find samples in the window [eval_ts - range, eval_ts]
-                let window_start = eval_ts - range_micros;
-                let window_end = eval_ts;
-
-                let window_samples = advance_sample_window(
-                    &metric.samples,
-                    window_start,
-                    window_end,
-                    &mut start_index,
-                    &mut end_index,
-                );
-
-                if window_samples.is_empty() {
-                    continue;
-                }
-
-                let value = match &counter {
-                    Some(counter) => counter.extrapolate(start_index, end_index, eval_ts, range),
-                    None => func.exec(window_samples, eval_ts, &range),
-                };
-                if let Some(value) = value {
-                    result_samples.push(Sample::new(eval_ts, value));
-                }
-            }
 
             if !result_samples.is_empty() {
                 Some(RangeValue {
@@ -364,6 +376,44 @@ where
         results.len()
     );
     Ok(Value::Matrix(results))
+}
+
+pub(crate) fn evaluate_series_range<F: RangeFunc + ?Sized>(
+    samples: &[Sample],
+    func: &F,
+    range: Duration,
+    eval_ctx: &EvalContext,
+    timestamps: &[i64],
+    mut emit: impl FnMut(usize, f64),
+) {
+    let range_micros = micros(range);
+    let mut start_index = 0;
+    let mut end_index = 0;
+    let counter = CounterSeries::try_new(
+        samples,
+        func.counter_extrapolation(),
+        eval_ctx,
+        range_micros,
+    );
+    for (slot, &eval_ts) in timestamps.iter().enumerate() {
+        let window_samples = advance_sample_window(
+            samples,
+            eval_ts - range_micros,
+            eval_ts,
+            &mut start_index,
+            &mut end_index,
+        );
+        if window_samples.is_empty() {
+            continue;
+        }
+        let value = match &counter {
+            Some(counter) => counter.extrapolate(start_index, end_index, eval_ts, range),
+            None => func.exec(window_samples, eval_ts, &range),
+        };
+        if let Some(value) = value {
+            emit(slot, value);
+        }
+    }
 }
 
 /// Advance two indices through sorted samples for monotonically increasing
@@ -389,9 +439,80 @@ pub(crate) fn advance_sample_window<'a>(
     &samples[*start_index..*end_index]
 }
 
+fn map_samples(data: Value, operation: &str, map: impl Fn(&Sample) -> f64 + Sync) -> Result<Value> {
+    match data {
+        Value::Matrix(mut matrix) => {
+            matrix.par_iter_mut().for_each(|series| {
+                series.labels = std::mem::take(&mut series.labels).without_metric_name();
+                for sample in &mut series.samples {
+                    sample.value = map(sample);
+                }
+            });
+            Ok(Value::Matrix(matrix))
+        }
+        Value::None => Ok(Value::None),
+        _ => Err(DataFusionError::Plan(format!(
+            "Invalid input for {operation}, expected matrix but got: {:?}",
+            data.get_type()
+        ))),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_series_range_matches_independent_window_selection() {
+        let samples = [
+            Sample::new(0, 5.0),
+            Sample::new(1_000_000, 8.0),
+            Sample::new(2_000_000, 2.0),
+            Sample::new(5_000_000, 9.0),
+        ];
+        let ctx = EvalContext::new(3_000_000, 8_000_000, 1_000_000, "test".into());
+        let timestamps = ctx.timestamps();
+        let range = Duration::from_secs(2);
+        for name in [
+            "rate",
+            "increase",
+            "delta",
+            "last_over_time",
+            "avg_over_time",
+        ] {
+            let func = fusable_range_func(name).unwrap();
+            let mut actual = Vec::new();
+            evaluate_series_range(&samples, &func, range, &ctx, &timestamps, |slot, value| {
+                actual.push((slot, value))
+            });
+            let expected: Vec<_> = timestamps
+                .iter()
+                .enumerate()
+                .filter_map(|(slot, &ts)| {
+                    let window: Vec<_> = samples
+                        .iter()
+                        .copied()
+                        .filter(|sample| {
+                            sample.timestamp >= ts - micros(range) && sample.timestamp <= ts
+                        })
+                        .collect();
+                    if window.is_empty() {
+                        return None;
+                    }
+                    func.exec(&window, ts, &range).map(|value| (slot, value))
+                })
+                .collect();
+            assert_eq!(actual.len(), expected.len(), "{name}");
+            for ((slot, value), (expected_slot, expected_value)) in actual.into_iter().zip(expected)
+            {
+                assert_eq!(slot, expected_slot, "{name}");
+                assert!(
+                    (value - expected_value).abs() < 1e-12,
+                    "{name}: {value} != {expected_value}"
+                );
+            }
+        }
+    }
 
     #[test]
     fn test_func_enum_parsing_known_functions() {
@@ -414,9 +535,9 @@ mod tests {
 
     #[test]
     fn test_keep_metric_name_func_contains_last_over_time() {
-        assert!(KEEP_METRIC_NAME_FUNC.contains("last_over_time"));
-        assert!(!KEEP_METRIC_NAME_FUNC.contains("rate"));
-        assert!(!KEEP_METRIC_NAME_FUNC.contains("avg_over_time"));
+        assert_eq!(KEEP_METRIC_NAME_FUNC, "last_over_time");
+        assert_ne!(KEEP_METRIC_NAME_FUNC, "rate");
+        assert_ne!(KEEP_METRIC_NAME_FUNC, "avg_over_time");
     }
 
     #[test]

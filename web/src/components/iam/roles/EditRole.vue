@@ -293,6 +293,17 @@ import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import onlineEvalsService from "@/services/online-evals.service";
 import llmQueuesService from "@/services/llm-queues.service";
 import llmDatasetsService from "@/services/llm-datasets.service";
+import {
+  DBM_MODULE_RESOURCE,
+  DBM_VIEWER_STREAM_ROW_PERMS,
+  DBM_VIEWER_STREAMS,
+  DBM_VIEWER_TYPE_NODE_PERMS,
+} from "./dbmViewerPreset";
+
+// db_monitoring is checked as a plain GET (never LIST), and has no child
+// entities for a wildcard relation to reach — unlike the `metrics` type node,
+// AllowGet on it grants nothing beyond the module itself.
+const DBM_MODULE_PERMS = ["AllowList", "AllowGet"] as const;
 
 const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 
@@ -504,12 +515,14 @@ const getRoleDetails = () => {
       if (selectedPermissionsHash.value.size === 0) {
         filter.value.permissions = "all";
 
-        // "Read-only" preset (from the Add Role dialog) seeds AllowList +
-        // AllowGet across all top-level resources so evaluators get a safe,
-        // non-empty starting point. These land as pending "added" permissions
-        // the user can still tweak before saving.
-        if (router.currentRoute.value.query.preset === "readonly") {
+        // The Add Role dialog's preset seeds read permissions so evaluators get a
+        // safe, non-empty starting point. These land as pending "added"
+        // permissions the user can still tweak before saving.
+        const preset = router.currentRoute.value.query.preset;
+        if (preset === "readonly") {
           seedReadonlyPreset();
+        } else if (preset === "dbm") {
+          await seedDbmViewerPreset();
         }
       }
 
@@ -931,6 +944,74 @@ const seedReadonlyPreset = () => {
       handlePermissionChange(resource, perm);
     });
   });
+};
+
+const collectVisibleDbmReadGrants = (row: Entity, perms: readonly (keyof Entity["permission"])[]) =>
+  perms
+    .filter((perm) => {
+      const permDetail = row.permission?.[perm];
+      return !!permDetail && permDetail.show && !permDetail.value;
+    })
+    .map((perm) => ({ row, permission: perm as string, newValue: true }));
+
+// Stream rows are lazily loaded CHILDREN of the `stream` resource, so both the
+// `stream` node and its `metrics` child must be expanded (which fetches the
+// org's streams) before any row exists to tick. `db_monitoring` is a separate,
+// module-level toggle resource with no entities of its own — it is ticked
+// directly off resourceMapper, no expand needed.
+const seedDbmViewerPreset = async () => {
+  const changes: { row: any; permission: string; newValue: boolean }[] = [];
+
+  const dbMonitoringResource = resourceMapper.value[DBM_MODULE_RESOURCE];
+  if (dbMonitoringResource) {
+    changes.push(...collectVisibleDbmReadGrants(dbMonitoringResource, DBM_MODULE_PERMS));
+  }
+
+  const streamResource = resourceMapper.value["stream"];
+  let matched = 0;
+  if (streamResource) {
+    if (!streamResource.expand) await expandPermission(streamResource);
+
+    const metricsEntity = streamResource.entities?.find(
+      (entity: Entity) => entity.name === "metrics",
+    );
+    if (metricsEntity) {
+      if (!metricsEntity.expand) await expandPermission(metricsEntity);
+
+      // `metrics.entities` only ever holds the visible slice, so seeding off it would silently miss streams.
+      const rows = heavyResourceEntities.value["metrics"] ?? [];
+      const curated = new Set(DBM_VIEWER_STREAMS);
+      const matchedRows = rows.filter((row: Entity) => curated.has(row.name));
+      matched = matchedRows.length;
+      changes.push(
+        ...matchedRows.flatMap((row: Entity) =>
+          collectVisibleDbmReadGrants(row, DBM_VIEWER_STREAM_ROW_PERMS),
+        ),
+      );
+
+      // GET /{org}/streams is checked against `metrics:_all_<org>`, never the per-stream objects, and FGA's LIST relation does not accept ALLOW_GET; ALLOW_GET here would instead wildcard every metric stream in the org, so the type node is LIST-only.
+      if (matchedRows.length) {
+        changes.push(...collectVisibleDbmReadGrants(metricsEntity, DBM_VIEWER_TYPE_NODE_PERMS));
+      }
+    }
+  }
+
+  if (changes.length) {
+    handlePermissionBatchChange(changes);
+    // Unlike readonly (which seeds every resource), only a handful of the org's
+    // streams are seeded here — "all" would bury them in a 50-row truncated grid.
+    filter.value.permissions = "selected";
+  }
+
+  reportDbmViewerSeeding(matched, DBM_VIEWER_STREAMS.length);
+};
+
+const reportDbmViewerSeeding = (matched: number, total: number) => {
+  toast(
+    matched
+      ? { variant: "info", message: t("iam.editRole.dbmPresetSeeded", { matched, total }) }
+      : { variant: "warning", message: t("iam.editRole.dbmPresetNoMatch", { total }) },
+  );
 };
 
 const handlePermissionChange = (row: any, permission: string) => {

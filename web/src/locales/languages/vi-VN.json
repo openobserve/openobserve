@@ -2057,7 +2057,8 @@
       "startFrom": {
         "label": "Bắt đầu từ",
         "custom": "Tùy chỉnh (vai trò trống)",
-        "readonly": "Chỉ đọc (quyền xem tất cả tài nguyên)"
+        "readonly": "Chỉ đọc (quyền xem tất cả tài nguyên)",
+        "dbm": "Người xem Giám sát cơ sở dữ liệu (chỉ đọc trên module Giám sát CSDL và các Stream chỉ số mà tab Chỉ số của nó truy vấn)"
       },
       "name": {
         "required": "Tên vai trò là bắt buộc.",
@@ -2093,7 +2094,9 @@
       "loadFailed": "Không thể tải chi tiết vai trò. Đang chuyển hướng đến danh sách vai trò.",
       "noUpdatesDetected": "Không phát hiện cập nhật.",
       "updateSuccess": "Cập nhật vai trò thành công!",
-      "updateError": "Lỗi khi cập nhật vai trò!"
+      "updateError": "Lỗi khi cập nhật vai trò!",
+      "dbmPresetSeeded": "Quyền đọc được chọn trước trên {matched} trong {total} Stream chỉ số Giám sát CSDL, cùng với module Giám sát CSDL. Hãy xem lại trước khi lưu.",
+      "dbmPresetNoMatch": "Chưa có Stream chỉ số Giám sát CSDL nào trong số {total} tồn tại trong tổ chức này, nên không có Stream nào được chọn trước; quyền cấp cho module Giám sát CSDL vẫn được chuẩn bị sẵn."
     },
     "rolesPage": {
       "subtitle": "Vai trò gói quyền — gán chúng cho Người dùng, Tài khoản dịch vụ hoặc Nhóm để cấp quyền truy cập.",
@@ -16298,6 +16301,7 @@
       },
       "databaseCount": "1 cơ sở dữ liệu | {count} cơ sở dữ liệu",
       "openQueries": "Xem truy vấn của nó",
+      "viewMetrics": "Xem chỉ số",
       "alertMe": "Cảnh báo tôi",
       "columnHints": {
         "qps": "Lời gọi mỗi giây — số lời gọi trong cửa sổ này chia cho độ dài của nó, để chế độ xem 15 phút và chế độ xem 4 giờ vẫn so sánh được.",
@@ -16558,10 +16562,10 @@
         "missingDescription": "Trang này mô tả một truy vấn, nhưng địa chỉ không chỉ ra truy vấn nào. Nếu bạn vừa chuyển tổ chức, truy vấn bạn đang đọc thuộc về tổ chức bạn đã rời khỏi.",
         "action": "Duyệt các truy vấn của tổ chức này"
       },
-      "backToQueries": "Quay lại các truy vấn hàng đầu",
-      "backToActivity": "Quay lại hoạt động",
-      "backToSamples": "Quay lại các lệnh gọi chậm nhất",
-      "backToDeadlocks": "Quay lại các deadlock",
+      "backToQueries": "truy vấn hàng đầu",
+      "backToActivity": "hoạt động",
+      "backToSamples": "các lệnh gọi chậm nhất",
+      "backToDeadlocks": "deadlock",
       "latencyTitle": "Tốc độ theo thời gian",
       "volumeTitle": "Lệnh gọi và lỗi theo thời gian",
       "endpointsTitle": "Nơi nó được gọi",
@@ -16726,6 +16730,8 @@
     "page": {
       "tabs": {
         "overview": "Tổng quan",
+        "metrics": "Chỉ số",
+        "metricsHint": "Tải cơ sở dữ liệu theo sự kiện chờ, và mọi chỉ số mà các receiver cơ sở dữ liệu của bạn thu thập.",
         "queries": "Truy vấn hàng đầu",
         "samples": "Cuộc gọi chậm nhất",
         "samplesHintClient": "Các cuộc gọi hoàn tất mà các dịch vụ được đo lường của bạn quan sát được trong khoảng thời gian này — các bên gọi không được truy vết không được tính, vì vậy đây là mức tối thiểu, không phải tổng số. Bảng hiển thị những cuộc gọi chậm nhất trong số đó.",
@@ -16742,6 +16748,129 @@
         "deadlocksLocked": "Deadlock là tính năng Enterprise. Nâng cấp để xem truy vấn nào đã khóa lẫn nhau và tại sao. Các tab cơ sở dữ liệu khác hoạt động trên mọi gói.",
         "blockedLocked": "Truy vấn bị chặn là tính năng Enterprise. Nâng cấp để xem phiên nào đang chờ khóa và điều gì đang giữ khóa. Các tab cơ sở dữ liệu khác hoạt động trên mọi gói.",
         "tableHealthLocked": "Sức khỏe bảng là tính năng Enterprise. Nâng cấp để theo dõi kích thước bảng, độ phình và trạng thái dọn dẹp. Các tab cơ sở dữ liệu khác hoạt động trên mọi gói."
+      }
+    },
+    "metrics": {
+      "title": "Chỉ số",
+      "subtitle": "Tải cơ sở dữ liệu và mọi chỉ số mà các receiver cơ sở dữ liệu của bạn thu thập, được vẽ biểu đồ trong cửa sổ này",
+      "load": {
+        "title": "Tải cơ sở dữ liệu",
+        "hint": "Số phiên trung bình đang hoạt động trong mỗi khoảng thời gian, xếp chồng theo chiều được chọn. Các kết nối không hoạt động bị loại trừ; một phiên không chờ gì cả nghĩa là đang chạy trên CPU. Kéo ngang qua một đỉnh để phóng to mọi biểu đồ theo đó.",
+        "timeAxis": "Thời gian",
+        "sessionsAxis": "Số phiên hoạt động trung bình",
+        "waitEventAxis": "Sự kiện chờ",
+        "viewActivity": "Xem trong Hoạt động",
+        "breakdowns": {
+          "waitEvent": "Theo sự kiện chờ",
+          "query": "Theo truy vấn",
+          "database": "Theo cơ sở dữ liệu",
+          "user": "Theo người dùng"
+        }
+      },
+      "limitLegend": "giới hạn kết nối",
+      "explore": "Mở trong Metrics Explorer",
+      "railLabel": "Các mục chỉ số",
+      "noAccess": "Bạn không có quyền đọc {stream}. Hãy yêu cầu quản trị viên cấp quyền đọc Stream này.",
+      "byDims": {
+        "query": "theo truy vấn",
+        "database": "theo cơ sở dữ liệu",
+        "service": "theo dịch vụ",
+        "operation": "theo thao tác",
+        "mode": "theo chế độ",
+        "lockType": "theo loại khóa",
+        "table": "theo bảng",
+        "index": "theo chỉ mục",
+        "client": "theo client",
+        "state": "theo trạng thái",
+        "direction": "theo hướng",
+        "device": "theo thiết bị",
+        "host": "theo host"
+      },
+      "catalog": {
+        "activity": {
+          "title": "Hoạt động",
+          "desc": "Thông lượng, giao dịch và mức biến động hàng"
+        },
+        "locks": {
+          "title": "Khóa",
+          "desc": "Áp lực khóa và đối tượng đang giữ khóa"
+        },
+        "replication": {
+          "title": "Sao chép",
+          "desc": "Áp lực WAL và độ trễ bản sao"
+        },
+        "indexes": {
+          "title": "Chỉ mục",
+          "desc": "Mức sử dụng và kích thước chỉ mục theo từng bảng"
+        },
+        "blocks": {
+          "title": "Khối",
+          "desc": "I/O bộ đệm chia sẻ được quy cho các truy vấn, từ các bộ đếm của chính cơ sở dữ liệu"
+        },
+        "vacuum": {
+          "title": "Vacuum",
+          "desc": "Số hàng còn sống và hàng đã chết trên mỗi bảng"
+        },
+        "host": {
+          "managedNote": "Cơ sở dữ liệu này chạy trên một endpoint do dịch vụ đám mây quản lý (chẳng hạn Amazon RDS), nên nhà cung cấp không cung cấp host để các collector của bạn giám sát. Hãy xoá bộ lọc cơ sở dữ liệu để xem chỉ số host của những host mà collector của bạn thực sự báo cáo.",
+          "title": "Host",
+          "desc": "CPU, bộ nhớ và I/O của host cơ sở dữ liệu",
+          "loopbackHint": "instance được kết nối qua localhost — đang hiển thị tất cả host",
+          "matchHint": "chỉ số host được khớp theo hostname"
+        }
+      },
+      "catalogPanels": {
+        "calls": "Số lần gọi truy vấn",
+        "avgDuration": "Thời lượng trung bình",
+        "commits": "Số lần commit",
+        "rollbacks": "Số lần rollback",
+        "rowsModified": "Số hàng đã thay đổi",
+        "locks": "Khóa",
+        "walLag": "Độ trễ WAL",
+        "indexScans": "Quét chỉ mục",
+        "indexSize": "Kích thước chỉ mục",
+        "blksHit": "Shared block trúng cache",
+        "blksRead": "Shared block đọc",
+        "blksDirtied": "Shared block bị ghi bẩn",
+        "rowsByState": "Hàng theo trạng thái",
+        "cpuUtilization": "Mức sử dụng CPU",
+        "memoryUsage": "Bộ nhớ",
+        "diskIo": "I/O đĩa",
+        "networkIo": "I/O mạng"
+      },
+      "searchPlaceholder": "Lọc chỉ số…",
+      "triageOrder": "sắp xếp theo mức độ liên quan khi xử lý sự cố",
+      "sections": {
+        "featured": "Chỉ số sức khỏe chính",
+        "postgresql": "Chỉ số PostgreSQL",
+        "mysql": "Chỉ số MySQL và MariaDB"
+      },
+      "roleTitle": "{role} · {engine}",
+      "roles": {
+        "cacheHitRatio": "Tỷ lệ trúng cache",
+        "connections": "Kết nối",
+        "connectionLimit": "Giới hạn kết nối",
+        "replicationLag": "Độ trễ sao chép",
+        "cacheHit": "Lần trúng cache",
+        "cacheRead": "Lần đọc cache từ đĩa",
+        "deadlocks": "Deadlock"
+      },
+      "notCollecting": {
+        "title": "Không có chỉ số cơ sở dữ liệu nào được gửi đến",
+        "description": "Biểu đồ tải ở trên đọc các mẫu hoạt động, nhưng tổ chức này chưa có stream chỉ số nào từ một database receiver. Các công thức collector trên thẻ thiết lập cơ sở dữ liệu sẽ gửi chúng.",
+        "checklistTitle": "Cần kiểm tra gì",
+        "checks": {
+          "receivers": {
+            "no": "Không có database receiver nào đang gửi chỉ số",
+            "noDetail": "Các thẻ thiết lập PostgreSQL và MySQL trong Nguồn dữ liệu cấu hình metric receiver của collector cùng với các luồng giám sát."
+          },
+          "enabled": {
+            "ok": "Giám sát cơ sở dữ liệu đã được bật",
+            "okDetail": "nên các chỉ số sẽ được vẽ ở đây ngay khi receiver gửi chúng đến",
+            "no": "Giám sát cơ sở dữ liệu đã bị tắt",
+            "noDetail": "ZO_DB_MONITORING_ENABLED đang tắt cho triển khai này, nên các tab cơ sở dữ liệu không thu thập dữ liệu."
+          }
+        }
       }
     },
     "samples": {

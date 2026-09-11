@@ -15,9 +15,9 @@
 
 use std::sync::Arc;
 
-use config::meta::promql::value::{Label, LabelsExt, RangeValue, Value};
+use config::meta::promql::value::{Label, LabelsExt, Value};
 use datafusion::error::{DataFusionError, Result};
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
+use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
 use regex::Regex;
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#label_replace
@@ -29,7 +29,7 @@ pub(crate) fn label_replace(
     regex: &str,
 ) -> Result<Value> {
     match data {
-        Value::Matrix(matrix) => {
+        Value::Matrix(mut matrix) => {
             // Check if the destination label is a valid name
             if !Label::is_valid_label_name(dest_label) {
                 return Err(DataFusionError::NotImplemented(format!(
@@ -40,32 +40,22 @@ pub(crate) fn label_replace(
             let re = Regex::new(regex)
                 .map_err(|_e| DataFusionError::NotImplemented("Invalid regex found".into()))?;
 
-            let out: Vec<RangeValue> = matrix
-                .into_par_iter()
-                .map(|mut range_value| {
-                    let mut labels = std::mem::take(&mut range_value.labels);
-                    let labels = if replacement.is_empty() {
-                        labels.without_label(dest_label)
-                    } else {
-                        let label_value = labels.get_value(source_label);
-                        let output_value = re.replace_all(&label_value, replacement);
-                        if output_value != label_value {
-                            labels.push(Arc::new(Label {
-                                name: dest_label.to_string(),
-                                value: output_value.to_string(),
-                            }));
-                        }
-                        labels
-                    };
-                    RangeValue {
-                        labels,
-                        samples: range_value.samples,
-                        exemplars: range_value.exemplars,
-                        time_window: range_value.time_window,
+            matrix.par_iter_mut().for_each(|range_value| {
+                let labels = &mut range_value.labels;
+                if replacement.is_empty() {
+                    labels.retain(|label| label.name != dest_label);
+                } else {
+                    let label_value = labels.get_value(source_label);
+                    let output_value = re.replace_all(&label_value, replacement);
+                    if output_value != label_value {
+                        labels.push(Arc::new(Label {
+                            name: dest_label.to_string(),
+                            value: output_value.to_string(),
+                        }));
                     }
-                })
-                .collect();
-            Ok(Value::Matrix(out))
+                }
+            });
+            Ok(Value::Matrix(matrix))
         }
         Value::None => Ok(Value::None),
         _ => Err(DataFusionError::Plan(

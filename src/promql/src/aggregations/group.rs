@@ -22,26 +22,21 @@ use crate::aggregations::{Accumulate, AggFunc};
 pub struct Group;
 
 impl AggFunc for Group {
+    type Accumulator = GroupAccumulate;
+
     fn name(&self) -> &'static str {
         "group"
     }
 
-    fn build(&self) -> Box<dyn super::Accumulate> {
-        Box::new(GroupAccumulate::new())
+    fn build(&self) -> Self::Accumulator {
+        Self::Accumulator::default()
     }
 }
 
+#[derive(Default)]
 pub struct GroupAccumulate {
     // Track which timestamps have been seen (group returns 1 if any series exists)
     timestamps: HashSet<i64>,
-}
-
-impl GroupAccumulate {
-    fn new() -> Self {
-        GroupAccumulate {
-            timestamps: HashSet::new(),
-        }
-    }
 }
 
 impl Accumulate for GroupAccumulate {
@@ -49,16 +44,11 @@ impl Accumulate for GroupAccumulate {
         self.timestamps.insert(sample.timestamp);
     }
 
-    fn merge(&mut self, other: Box<dyn Accumulate>) {
-        let other = other.into_any().downcast::<Self>().expect("same type");
+    fn merge(&mut self, other: Self) {
         self.timestamps.extend(other.timestamps);
     }
 
-    fn into_any(self: Box<Self>) -> Box<dyn std::any::Any> {
-        self
-    }
-
-    fn evaluate(self: Box<Self>) -> Vec<Sample> {
+    fn evaluate(self) -> Vec<Sample> {
         self.timestamps
             .into_iter()
             .map(|timestamp| Sample::new(timestamp, 1.0))

@@ -16,14 +16,12 @@
 use std::sync::Arc;
 
 use ahash::{HashMap, HashMapExt};
-use config::meta::promql::value::{
-    EvalContext, Label, Labels, LabelsExt, RangeValue, Sample, Value,
-};
+use config::meta::promql::value::{EvalContext, Label, LabelsExt, RangeValue, Sample, Value};
 use datafusion::error::{DataFusionError, Result};
 use promql_parser::parser::LabelModifier;
 use rayon::prelude::*;
 
-use crate::aggregations::{labels_to_exclude, labels_to_include};
+use crate::aggregations::{projected_labels, projected_labels_signature};
 
 /// Aggregates Matrix input for range queries
 /// count_values creates a new label with the metric value as the label value
@@ -91,43 +89,19 @@ pub fn count_values(
     // Step 1: Compute label hash for each series once based on param
     // This avoids recomputing the hash for every timestamp
     let start1 = std::time::Instant::now();
-    let series_label_hashes: Vec<(u64, Labels)> = matrix
-        .iter()
-        .map(|rv| {
-            let grouped_labels = match modifier {
-                Some(LabelModifier::Include(labels)) => {
-                    labels_to_include(&labels.labels, rv.labels.clone())
-                }
-                Some(LabelModifier::Exclude(labels)) => {
-                    labels_to_exclude(&labels.labels, rv.labels.clone())
-                }
-                None => Labels::default(),
-            };
-            let hash = grouped_labels.signature();
-            (hash, grouped_labels)
-        })
-        .collect();
-
-    log::info!(
-        "[trace_id: {}] [PromQL Timing] eval_aggregate({func_name}) computed label hashes in {:?}",
-        eval_ctx.trace_id,
-        start1.elapsed()
-    );
-
-    let start2 = std::time::Instant::now();
-
     // Step 2: Group series indices by their label hash
     // Build index: label_hash -> Vec<series_idx>
     let mut groups: HashMap<u64, Vec<usize>> = HashMap::new();
-    for (series_idx, (hash, _)) in series_label_hashes.iter().enumerate() {
-        groups.entry(*hash).or_default().push(series_idx);
+    for (series_idx, series) in matrix.iter().enumerate() {
+        let hash = projected_labels_signature(modifier, &series.labels);
+        groups.entry(hash).or_default().push(series_idx);
     }
 
     log::info!(
-        "[trace_id: {}] [PromQL Timing] eval_aggregate({func_name}) built {} groups in {:?}",
+        "[trace_id: {}] [PromQL Timing] eval_aggregate({func_name}) computed label hashes and built {} groups in {:?}",
         eval_ctx.trace_id,
         groups.len(),
-        start2.elapsed()
+        start1.elapsed()
     );
 
     let start3 = std::time::Instant::now();
@@ -135,11 +109,11 @@ pub fn count_values(
     // Step 3: Process each group in parallel
     // For each group, count unique sample values at each timestamp
     // Result structure: HashMap<value_string, HashMap<timestamp, count>>
-    let results: Vec<Vec<(Labels, Vec<Sample>)>> = groups
+    let results: Vec<RangeValue> = groups
         .par_iter()
         .map(|(_, series_indices)| {
             // Get the base labels for this group (from the first series in the group)
-            let base_labels = series_label_hashes[series_indices[0]].1.clone();
+            let base_labels = projected_labels(modifier, &matrix[series_indices[0]].labels);
 
             // For each timestamp, track unique sample values and their counts
             // Structure: HashMap<timestamp, HashMap<value_string, count>>
@@ -164,25 +138,25 @@ pub fn count_values(
 
             // Convert the nested HashMap to a flat structure: Vec<(value_string, Vec<Sample>)>
             // First, collect all unique values seen across all timestamps
-            let mut unique_values: hashbrown::HashSet<String> = hashbrown::HashSet::new();
+            let mut unique_values: hashbrown::HashSet<&String> = hashbrown::HashSet::new();
             for value_map in timestamp_value_counts.values() {
                 for value_str in value_map.keys() {
-                    unique_values.insert(value_str.clone());
+                    unique_values.insert(value_str);
                 }
             }
 
             // For each unique value, create a series with the count at each timestamp
-            let mut value_series: Vec<(Labels, Vec<Sample>)> = Vec::new();
+            let mut value_series: Vec<RangeValue> = Vec::new();
             for value_str in unique_values {
                 // Create labels with the new label_name
                 let mut labels = base_labels.clone();
-                labels.push(Arc::new(Label::new(label_name, &value_str)));
+                labels.push(Arc::new(Label::new(label_name, value_str.as_str())));
                 labels.sort();
 
                 // Create samples for this value across all timestamps
                 let mut samples: Vec<Sample> = Vec::new();
                 for (&timestamp, value_map) in &timestamp_value_counts {
-                    if let Some(&count) = value_map.get(&value_str) {
+                    if let Some(&count) = value_map.get(value_str) {
                         samples.push(Sample::new(timestamp, count as f64));
                     }
                 }
@@ -191,16 +165,20 @@ pub fn count_values(
                 samples.sort_by_key(|s| s.timestamp);
 
                 if !samples.is_empty() {
-                    value_series.push((labels, samples));
+                    value_series.push(RangeValue {
+                        labels,
+                        samples,
+                        exemplars: None,
+                        time_window: None,
+                    });
                 }
             }
 
             value_series
         })
+        // Flatten the nested Vec
+        .flatten()
         .collect();
-
-    // Flatten the nested Vec
-    let results: Vec<(Labels, Vec<Sample>)> = results.into_iter().flatten().collect();
 
     log::info!(
         "[trace_id: {}] [PromQL Timing] eval_aggregate({func_name}) parallel aggregation took: {:?}",
@@ -212,23 +190,13 @@ pub fn count_values(
         return Ok(Value::None);
     }
 
-    let result_matrix: Vec<RangeValue> = results
-        .into_iter()
-        .map(|(labels, samples)| RangeValue {
-            labels,
-            samples,
-            exemplars: None,
-            time_window: None,
-        })
-        .collect();
-
     log::info!(
         "[trace_id: {}] [PromQL Timing] eval_aggregate({func_name}) completed in {:?}, produced {} series",
         eval_ctx.trace_id,
         start.elapsed(),
-        result_matrix.len()
+        results.len()
     );
-    Ok(Value::Matrix(result_matrix))
+    Ok(Value::Matrix(results))
 }
 
 #[cfg(test)]

@@ -2057,7 +2057,8 @@
       "startFrom": {
         "label": "에서 시작",
         "custom": "사용자 지정 (빈 역할)",
-        "readonly": "읽기 전용 (모든 리소스에 대한 보기 액세스)"
+        "readonly": "읽기 전용 (모든 리소스에 대한 보기 액세스)",
+        "dbm": "데이터베이스 모니터링 뷰어(DB 모니터링 모듈 및 해당 메트릭 탭이 쿼리하는 메트릭 스트림에 대한 읽기 전용)"
       },
       "name": {
         "required": "역할 이름은 필수입니다.",
@@ -2093,7 +2094,9 @@
       "loadFailed": "역할 세부 정보를 로드하는 데 실패했습니다. 역할 목록으로 리디렉션합니다.",
       "noUpdatesDetected": "업데이트가 감지되지 않았습니다.",
       "updateSuccess": "역할이 성공적으로 업데이트되었습니다!",
-      "updateError": "역할 업데이트 중 오류가 발생했습니다!"
+      "updateError": "역할 업데이트 중 오류가 발생했습니다!",
+      "dbmPresetSeeded": "{total}개 DB 모니터링 메트릭 스트림 중 {matched}개에 읽기 액세스가 사전 선택되었으며, DB 모니터링 모듈도 포함됩니다. 저장하기 전에 검토하세요.",
+      "dbmPresetNoMatch": "이 조직에 아직 {total}개의 DB 모니터링 메트릭 스트림이 없으므로 해당 스트림에는 아무것도 사전 선택되지 않았습니다. DB 모니터링 모듈 권한 부여는 여전히 스테이징되었습니다."
     },
     "rolesPage": {
       "subtitle": "역할 번들 권한 — 사용자, 서비스 계정 또는 그룹에 할당하여 액세스 권한을 부여합니다.",
@@ -16298,6 +16301,7 @@
       },
       "databaseCount": "데이터베이스 1개 | 데이터베이스 {count}개",
       "openQueries": "쿼리 보기",
+      "viewMetrics": "메트릭 보기",
       "alertMe": "알림 받기",
       "columnHints": {
         "qps": "초당 호출 — 이 창의 호출 수를 기간으로 나눈 값으로, 15분 보기와 4시간 보기가 비교 가능하게 유지됩니다.",
@@ -16558,10 +16562,10 @@
         "missingDescription": "이 페이지는 하나의 쿼리를 설명하지만 주소가 쿼리를 지정하지 않습니다. 방금 조직을 전환했다면, 읽고 있던 쿼리는 이전 조직에 속합니다.",
         "action": "이 조직의 쿼리 찾아보기"
       },
-      "backToQueries": "상위 쿼리로 돌아가기",
-      "backToActivity": "활동으로 돌아가기",
-      "backToSamples": "가장 느린 호출로 돌아가기",
-      "backToDeadlocks": "교착 상태로 돌아가기",
+      "backToQueries": "상위 쿼리",
+      "backToActivity": "활동",
+      "backToSamples": "가장 느린 호출",
+      "backToDeadlocks": "교착 상태",
       "latencyTitle": "시간에 따른 속도",
       "volumeTitle": "시간에 따른 호출 및 실패",
       "endpointsTitle": "호출된 위치",
@@ -16726,6 +16730,8 @@
     "page": {
       "tabs": {
         "overview": "개요",
+        "metrics": "메트릭",
+        "metricsHint": "대기 이벤트별 데이터베이스 부하 및 데이터베이스 리시버가 수집하는 모든 메트릭.",
         "queries": "상위 쿼리",
         "samples": "가장 느린 호출",
         "samplesHintClient": "이 기간 동안 계측된 서비스가 관찰한 완료된 호출입니다. 추적되지 않은 호출자는 집계되지 않으므로 이는 전체가 아닌 하한선입니다. 표에는 그중 가장 느린 호출이 표시됩니다.",
@@ -16742,6 +16748,129 @@
         "deadlocksLocked": "교착 상태는 엔터프라이즈 기능입니다. 어떤 쿼리가 서로 교착 상태에 빠졌는지, 그리고 그 이유를 보려면 업그레이드하세요. 다른 데이터베이스 탭은 모든 요금제에서 사용할 수 있습니다.",
         "blockedLocked": "차단된 쿼리는 엔터프라이즈 기능입니다. 어떤 세션이 잠금을 기다리고 있고 무엇이 잠금을 보유하고 있는지 보려면 업그레이드하세요. 다른 데이터베이스 탭은 모든 요금제에서 사용할 수 있습니다.",
         "tableHealthLocked": "테이블 상태는 엔터프라이즈 기능입니다. 테이블 크기, 블로트 및 진공 상태를 추적하려면 업그레이드하세요. 다른 데이터베이스 탭은 모든 요금제에서 사용할 수 있습니다."
+      }
+    },
+    "metrics": {
+      "title": "메트릭",
+      "subtitle": "이 기간에 걸쳐 차트로 표시된 데이터베이스 부하 및 데이터베이스 리시버가 수집하는 모든 메트릭",
+      "load": {
+        "title": "데이터베이스 부하",
+        "hint": "간격당 활발하게 작업 중인 평균 세션 수를 선택한 차원별로 누적한 것입니다. 유휴 연결은 제외되며, 아무것도 기다리지 않는 세션은 CPU에 있습니다. 스파이크를 가로질러 드래그하면 모든 차트가 해당 부분으로 확대됩니다.",
+        "timeAxis": "시간",
+        "sessionsAxis": "평균 활성 세션",
+        "waitEventAxis": "대기 이벤트",
+        "viewActivity": "활동에서 보기",
+        "breakdowns": {
+          "waitEvent": "대기 이벤트별",
+          "query": "쿼리별",
+          "database": "데이터베이스별",
+          "user": "사용자별"
+        }
+      },
+      "limitLegend": "연결 제한",
+      "explore": "메트릭 탐색기에서 열기",
+      "railLabel": "메트릭 섹션",
+      "noAccess": "{stream}을(를) 읽을 권한이 없습니다. 관리자에게 이 스트림에 대한 읽기 액세스 권한을 요청하세요.",
+      "byDims": {
+        "query": "쿼리별",
+        "database": "데이터베이스별",
+        "service": "서비스별",
+        "operation": "작업별",
+        "mode": "모드별",
+        "lockType": "잠금 유형별",
+        "table": "테이블별",
+        "index": "인덱스별",
+        "client": "클라이언트별",
+        "state": "상태별",
+        "direction": "방향별",
+        "device": "장치별",
+        "host": "호스트별"
+      },
+      "catalog": {
+        "activity": {
+          "title": "활동",
+          "desc": "처리량, 트랜잭션 및 행 변동"
+        },
+        "locks": {
+          "title": "잠금",
+          "desc": "잠금 압력 및 잠금 보유자"
+        },
+        "replication": {
+          "title": "복제",
+          "desc": "WAL 압력 및 복제본 지연"
+        },
+        "indexes": {
+          "title": "인덱스",
+          "desc": "테이블당 인덱스 사용량 및 크기"
+        },
+        "blocks": {
+          "title": "블록",
+          "desc": "데이터베이스 자체 카운터에서 쿼리에 귀속된 공유 버퍼 I/O"
+        },
+        "vacuum": {
+          "title": "Vacuum",
+          "desc": "테이블별 라이브 및 데드 행"
+        },
+        "host": {
+          "managedNote": "이 데이터베이스는 Amazon RDS와 같은 클라우드 관리형 엔드포인트에서 실행되므로, 공급자가 수집기가 모니터링할 호스트를 노출하지 않습니다. 수집기가 보고하는 호스트의 호스트 메트릭을 보려면 데이터베이스 필터를 지우세요.",
+          "title": "호스트",
+          "desc": "데이터베이스 호스트의 CPU, 메모리 및 I/O",
+          "loopbackHint": "인스턴스가 localhost를 통해 연결됨 — 모든 호스트 표시",
+          "matchHint": "호스트 메트릭은 호스트 이름으로 매칭됩니다"
+        }
+      },
+      "catalogPanels": {
+        "calls": "쿼리 호출",
+        "avgDuration": "평균 소요 시간",
+        "commits": "커밋",
+        "rollbacks": "롤백",
+        "rowsModified": "수정된 행",
+        "locks": "잠금",
+        "walLag": "WAL 지연",
+        "indexScans": "인덱스 스캔",
+        "indexSize": "인덱스 크기",
+        "blksHit": "공유 블록 적중",
+        "blksRead": "공유 블록 읽기",
+        "blksDirtied": "공유 블록 더티 처리",
+        "rowsByState": "상태별 행",
+        "cpuUtilization": "CPU 사용률",
+        "memoryUsage": "메모리",
+        "diskIo": "디스크 I/O",
+        "networkIo": "네트워크 I/O"
+      },
+      "searchPlaceholder": "메트릭 필터링…",
+      "triageOrder": "트리아지 관련성 순으로 정렬됨",
+      "sections": {
+        "featured": "주요 상태 메트릭",
+        "postgresql": "PostgreSQL 메트릭",
+        "mysql": "MySQL 및 MariaDB 메트릭"
+      },
+      "roleTitle": "{role} · {engine}",
+      "roles": {
+        "cacheHitRatio": "캐시 적중률",
+        "connections": "연결",
+        "connectionLimit": "연결 제한",
+        "replicationLag": "복제 지연",
+        "cacheHit": "캐시 적중",
+        "cacheRead": "캐시 디스크 읽기",
+        "deadlocks": "교착 상태"
+      },
+      "notCollecting": {
+        "title": "데이터베이스 메트릭이 수신되지 않음",
+        "description": "위의 로드 차트는 활동 샘플을 읽지만, 이 조직에는 아직 데이터베이스 수신기의 메트릭 스트림이 없습니다. 데이터베이스 설정 카드의 수집기 레시피가 이를 제공합니다.",
+        "checklistTitle": "확인할 사항",
+        "checks": {
+          "receivers": {
+            "no": "메트릭을 보내는 데이터베이스 수신기가 없습니다",
+            "noDetail": "데이터 소스 아래의 PostgreSQL 및 MySQL 설정 카드에서 모니터링 피드와 함께 수집기의 메트릭 수신기를 구성합니다."
+          },
+          "enabled": {
+            "ok": "데이터베이스 모니터링이 활성화됨",
+            "okDetail": "따라서 수신기가 메트릭을 전송하는 즉시 여기에 차트로 표시됩니다",
+            "no": "데이터베이스 모니터링이 비활성화됨",
+            "noDetail": "이 배포에서는 ZO_DB_MONITORING_ENABLED가 꺼져 있으므로 데이터베이스 탭이 수집하지 않습니다."
+          }
+        }
       }
     },
     "samples": {

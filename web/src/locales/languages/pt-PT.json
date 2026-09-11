@@ -2057,7 +2057,8 @@
       "startFrom": {
         "label": "Comece a partir de",
         "custom": "Personalizado (função vazia)",
-        "readonly": "Somente leitura (veja o acesso a todos os recursos)"
+        "readonly": "Somente leitura (veja o acesso a todos os recursos)",
+        "dbm": "Visualizador de Monitoramento de bancos de dados (somente leitura no módulo Monitoramento de bancos de dados e nos streams de métricas consultados pela aba Métricas)"
       },
       "name": {
         "required": "O nome da função é obrigatório.",
@@ -2093,7 +2094,9 @@
       "loadFailed": "Falha ao carregar detalhes da função. Redirecionando para a lista de funções.",
       "noUpdatesDetected": "Nenhuma atualização detectada.",
       "updateSuccess": "Função atualizada com sucesso!",
-      "updateError": "Erro ao atualizar função!"
+      "updateError": "Erro ao atualizar função!",
+      "dbmPresetSeeded": "Acesso de leitura pré-selecionado em {matched} de {total} streams de métricas do Monitoramento de bancos de dados, além do módulo Monitoramento de bancos de dados. Revise antes de salvar.",
+      "dbmPresetNoMatch": "Nenhum dos {total} streams de métricas do Monitoramento de bancos de dados existe nesta organização ainda, então nada foi pré-selecionado neles; a concessão do módulo Monitoramento de bancos de dados ainda foi preparada."
     },
     "rolesPage": {
       "subtitle": "As funções agrupam permissões — atribua-as a usuários, contas de serviço ou grupos para conceder acesso.",
@@ -16298,6 +16301,7 @@
       },
       "databaseCount": "1 banco de dados | {count} bancos de dados",
       "openQueries": "Ver suas consultas",
+      "viewMetrics": "Ver métricas",
       "alertMe": "Alertar-me",
       "columnHints": {
         "qps": "Chamadas por segundo — as chamadas desta janela divididas pela sua duração, para que uma visão de 15 minutos e uma de 4 horas permaneçam comparáveis.",
@@ -16558,10 +16562,10 @@
         "missingDescription": "Esta página descreve uma consulta, e o endereço não nomeia uma. Se você acabou de mudar de organização, a consulta que você estava lendo pertence à que você saiu.",
         "action": "Navegar pelas consultas desta organização"
       },
-      "backToQueries": "Voltar para as principais consultas",
-      "backToActivity": "Voltar para atividade",
-      "backToSamples": "Voltar para chamadas mais lentas",
-      "backToDeadlocks": "Voltar para deadlocks",
+      "backToQueries": "principais consultas",
+      "backToActivity": "atividade",
+      "backToSamples": "chamadas mais lentas",
+      "backToDeadlocks": "deadlocks",
       "latencyTitle": "Velocidade ao longo do tempo",
       "volumeTitle": "Chamadas e falhas ao longo do tempo",
       "endpointsTitle": "De onde ela é chamada",
@@ -16726,6 +16730,8 @@
     "page": {
       "tabs": {
         "overview": "Visão geral",
+        "metrics": "Métricas",
+        "metricsHint": "Carga do banco de dados por evento de espera e todas as métricas que seus receptores de banco de dados coletam.",
         "queries": "Principais consultas",
         "samples": "Chamadas mais lentas",
         "samplesHintClient": "Chamadas concluídas que seus serviços instrumentados observaram nesta janela — chamadores sem rastreamento não são contados, então este é um mínimo, não o total. A tabela mostra as mais lentas delas.",
@@ -16742,6 +16748,129 @@
         "deadlocksLocked": "Deadlocks é um recurso Enterprise. Faça upgrade para ver quais consultas entraram em deadlock entre si e por quê. As outras abas de banco de dados funcionam em todos os planos.",
         "blockedLocked": "Consultas bloqueadas é um recurso Enterprise. Faça upgrade para ver quais sessões estão esperando por um lock e o que o está segurando. As outras abas de banco de dados funcionam em todos os planos.",
         "tableHealthLocked": "Saúde da tabela é um recurso Enterprise. Faça upgrade para acompanhar o tamanho da tabela, o estado de bloat e vacuum. As outras abas de banco de dados funcionam em todos os planos."
+      }
+    },
+    "metrics": {
+      "title": "Métricas",
+      "subtitle": "Carga do banco de dados e todas as métricas que seus receptores de banco de dados coletam, plotadas nesta janela",
+      "load": {
+        "title": "Carga do banco de dados",
+        "hint": "Média de sessões trabalhando ativamente por intervalo, empilhadas pela dimensão escolhida. Conexões ociosas são excluídas; uma sessão que não espera por nada está na CPU. Arraste sobre um pico para ampliar todos os gráficos até ele.",
+        "timeAxis": "Tempo",
+        "sessionsAxis": "Média de sessões ativas",
+        "waitEventAxis": "Evento de espera",
+        "viewActivity": "Ver em Atividade",
+        "breakdowns": {
+          "waitEvent": "Por evento de espera",
+          "query": "Por consulta",
+          "database": "Por banco de dados",
+          "user": "Por usuário"
+        }
+      },
+      "limitLegend": "limite de conexões",
+      "explore": "Abrir no Explorador de métricas",
+      "railLabel": "Seções de métricas",
+      "noAccess": "Você não tem permissão para ler {stream}. Peça a um administrador acesso de leitura a este stream.",
+      "byDims": {
+        "query": "por consulta",
+        "database": "por banco de dados",
+        "service": "por serviço",
+        "operation": "por operação",
+        "mode": "por modo",
+        "lockType": "por tipo de bloqueio",
+        "table": "por tabela",
+        "index": "por índice",
+        "client": "por cliente",
+        "state": "por estado",
+        "direction": "por direção",
+        "device": "por dispositivo",
+        "host": "por host"
+      },
+      "catalog": {
+        "activity": {
+          "title": "Atividade",
+          "desc": "Taxa de transferência, transações e rotatividade de linhas"
+        },
+        "locks": {
+          "title": "Bloqueios",
+          "desc": "Pressão de bloqueios e o que os mantém"
+        },
+        "replication": {
+          "title": "Replicação",
+          "desc": "Pressão de WAL e atraso de réplica"
+        },
+        "indexes": {
+          "title": "Índices",
+          "desc": "Uso e tamanho de índices por tabela"
+        },
+        "blocks": {
+          "title": "Blocos",
+          "desc": "E/S de buffer compartilhado atribuída a consultas, a partir dos próprios contadores do banco de dados"
+        },
+        "vacuum": {
+          "title": "Vacuum",
+          "desc": "Linhas vivas e mortas por tabela"
+        },
+        "host": {
+          "managedNote": "Este banco de dados é executado em um endpoint gerenciado na nuvem (como o Amazon RDS), portanto seu provedor não expõe um host para seus coletores monitorarem. Limpe o filtro de banco de dados para ver as métricas de host dos hosts que seus coletores relatam.",
+          "title": "Host",
+          "desc": "CPU, memória e E/S do host do banco de dados",
+          "loopbackHint": "instância acessada via localhost — exibindo todos os hosts",
+          "matchHint": "as métricas de host são correspondidas pelo nome do host"
+        }
+      },
+      "catalogPanels": {
+        "calls": "Chamadas de consulta",
+        "avgDuration": "Duração média",
+        "commits": "Commits",
+        "rollbacks": "Rollbacks",
+        "rowsModified": "Linhas modificadas",
+        "locks": "Bloqueios",
+        "walLag": "Atraso do WAL",
+        "indexScans": "Varreduras de índice",
+        "indexSize": "Tamanho do índice",
+        "blksHit": "Acertos de blocos compartilhados",
+        "blksRead": "Leituras de blocos compartilhados",
+        "blksDirtied": "Blocos compartilhados sujos",
+        "rowsByState": "Linhas por estado",
+        "cpuUtilization": "Utilização de CPU",
+        "memoryUsage": "Memória",
+        "diskIo": "E/S de disco",
+        "networkIo": "E/S de rede"
+      },
+      "searchPlaceholder": "Filtrar métricas…",
+      "triageOrder": "ordenado por relevância de triagem",
+      "sections": {
+        "featured": "Métricas principais de integridade",
+        "postgresql": "Métricas do PostgreSQL",
+        "mysql": "Métricas do MySQL e MariaDB"
+      },
+      "roleTitle": "{role} · {engine}",
+      "roles": {
+        "cacheHitRatio": "Taxa de acertos de cache",
+        "connections": "Conexões",
+        "connectionLimit": "Limite de conexões",
+        "replicationLag": "Atraso de replicação",
+        "cacheHit": "Acertos de cache",
+        "cacheRead": "Leituras de disco do cache",
+        "deadlocks": "Deadlocks"
+      },
+      "notCollecting": {
+        "title": "Nenhuma métrica de banco de dados está chegando",
+        "description": "O gráfico de carga acima lê as amostras de atividade, mas ainda não existem streams de métricas de um receptor de banco de dados nesta organização. As receitas de coletor nos cartões de configuração de banco de dados as fornecem.",
+        "checklistTitle": "O que verificar",
+        "checks": {
+          "receivers": {
+            "no": "Nenhum receptor de banco de dados está enviando métricas",
+            "noDetail": "Os cartões de configuração do PostgreSQL e do MySQL em Fontes de dados configuram o receptor de métricas do coletor junto com os feeds de monitoramento."
+          },
+          "enabled": {
+            "ok": "O monitoramento de banco de dados está habilitado",
+            "okDetail": "portanto as métricas serão exibidas aqui assim que um receptor as enviar",
+            "no": "O monitoramento de banco de dados está desabilitado",
+            "noDetail": "ZO_DB_MONITORING_ENABLED está desativado para esta implantação, portanto as abas de banco de dados não estão coletando."
+          }
+        }
       }
     },
     "samples": {

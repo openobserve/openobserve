@@ -2057,7 +2057,8 @@
       "startFrom": {
         "label": "从",
         "custom": "自定义（空角色）",
-        "readonly": "只读（查看对所有资源的访问权限）"
+        "readonly": "只读（查看对所有资源的访问权限）",
+        "dbm": "数据库监控查看者（对数据库监控模块及其“指标”标签页所查询的指标数据流具有只读权限）"
       },
       "name": {
         "required": "角色名称为必填项。",
@@ -2093,7 +2094,9 @@
       "loadFailed": "加载角色详情失败。正在重定向到角色列表。",
       "noUpdatesDetected": "未检测到更新。",
       "updateSuccess": "角色更新成功！",
-      "updateError": "更新角色时出错！"
+      "updateError": "更新角色时出错！",
+      "dbmPresetSeeded": "已预选对 {total} 个数据库监控指标数据流中 {matched} 个的读取权限，并预选数据库监控模块。请在保存前检查。",
+      "dbmPresetNoMatch": "此组织中尚不存在这 {total} 个数据库监控指标数据流，因此未对它们预选任何内容；但数据库监控模块的授权仍已暂存。"
     },
     "rolesPage": {
       "subtitle": "角色捆绑权限 — 将其分配给用户、服务帐号或群组以授予访问权限。",
@@ -16298,6 +16301,7 @@
       },
       "databaseCount": "1 个数据库 | {count} 个数据库",
       "openQueries": "查看其查询",
+      "viewMetrics": "查看指标",
       "alertMe": "提醒我",
       "columnHints": {
         "qps": "每秒调用次数——此窗口内的调用数除以其时长，因此 15 分钟视图和 4 小时视图具有可比性。",
@@ -16558,10 +16562,10 @@
         "missingDescription": "此页面描述一个查询，但地址未指定具体查询。如果您刚刚切换了组织，您正在阅读的查询属于您离开的那个组织。",
         "action": "浏览此组织的查询"
       },
-      "backToQueries": "返回热门查询",
-      "backToActivity": "返回活动",
-      "backToSamples": "返回最慢调用",
-      "backToDeadlocks": "返回死锁",
+      "backToQueries": "热门查询",
+      "backToActivity": "活动",
+      "backToSamples": "最慢调用",
+      "backToDeadlocks": "死锁",
       "latencyTitle": "速度随时间变化",
       "volumeTitle": "调用和失败随时间变化",
       "endpointsTitle": "调用来源",
@@ -16726,6 +16730,8 @@
     "page": {
       "tabs": {
         "overview": "概述",
+        "metrics": "指标",
+        "metricsHint": "按等待事件划分的数据库负载，以及数据库接收器收集的所有指标。",
         "queries": "Top 查询",
         "samples": "最慢的调用",
         "samplesHintClient": "您的已埋点服务在此时间窗口内观测到的已完成调用 — 未追踪的调用方不计入，因此这是下限而非总数。表格显示了其中最慢的调用。",
@@ -16742,6 +16748,129 @@
         "deadlocksLocked": "死锁是企业版功能。升级以查看哪些查询相互死锁以及原因。其他数据库选项卡在任何计划中都可用。",
         "blockedLocked": "被阻塞的查询是企业版功能。升级以查看哪些会话正在等待锁以及是什么持有锁。其他数据库选项卡在任何计划中都可用。",
         "tableHealthLocked": "表健康状况是企业版功能。升级以跟踪表大小、膨胀和清理状态。其他数据库选项卡在任何计划中都可用。"
+      }
+    },
+    "metrics": {
+      "title": "指标",
+      "subtitle": "数据库负载以及数据库接收器收集的所有指标，均在此时间窗口内以图表展示",
+      "load": {
+        "title": "数据库负载",
+        "hint": "每个间隔内活跃工作的平均会话数，按所选维度堆叠。空闲连接不计入；未等待任何资源的会话即在 CPU 上运行。在峰值上拖动即可将所有图表缩放到该峰值。",
+        "timeAxis": "时间",
+        "sessionsAxis": "平均活跃会话数",
+        "waitEventAxis": "等待事件",
+        "viewActivity": "在活动中查看",
+        "breakdowns": {
+          "waitEvent": "按等待事件",
+          "query": "按查询",
+          "database": "按数据库",
+          "user": "按用户"
+        }
+      },
+      "limitLegend": "连接限制",
+      "explore": "在指标浏览器中打开",
+      "railLabel": "指标分区",
+      "noAccess": "你没有权限读取 {stream}。请联系管理员获取此数据流的读取权限。",
+      "byDims": {
+        "query": "按查询",
+        "database": "按数据库",
+        "service": "按服务",
+        "operation": "按操作",
+        "mode": "按模式",
+        "lockType": "按锁类型",
+        "table": "按表",
+        "index": "按索引",
+        "client": "按客户端",
+        "state": "按状态",
+        "direction": "按方向",
+        "device": "按设备",
+        "host": "按主机"
+      },
+      "catalog": {
+        "activity": {
+          "title": "活动",
+          "desc": "吞吐量、事务和行变动"
+        },
+        "locks": {
+          "title": "锁",
+          "desc": "锁压力及其持有者"
+        },
+        "replication": {
+          "title": "复制",
+          "desc": "WAL 压力与副本延迟"
+        },
+        "indexes": {
+          "title": "索引",
+          "desc": "每个表的索引使用情况和大小"
+        },
+        "blocks": {
+          "title": "数据块",
+          "desc": "来自数据库自身计数器的、归因于查询的共享缓冲区 I/O"
+        },
+        "vacuum": {
+          "title": "Vacuum",
+          "desc": "每个表的活行与死行"
+        },
+        "host": {
+          "managedNote": "此数据库运行在云托管端点（例如 Amazon RDS）上，因此其提供商不会暴露供采集器监控的主机。清除数据库过滤器即可查看采集器实际上报的主机的主机指标。",
+          "title": "主机",
+          "desc": "数据库主机的 CPU、内存和 I/O",
+          "loopbackHint": "实例通过 localhost 连接 — 显示所有主机",
+          "matchHint": "主机指标按主机名匹配"
+        }
+      },
+      "catalogPanels": {
+        "calls": "查询调用",
+        "avgDuration": "平均耗时",
+        "commits": "提交",
+        "rollbacks": "回滚",
+        "rowsModified": "修改的行数",
+        "locks": "锁",
+        "walLag": "WAL 延迟",
+        "indexScans": "索引扫描",
+        "indexSize": "索引大小",
+        "blksHit": "共享块命中",
+        "blksRead": "共享块读取",
+        "blksDirtied": "共享块脏化",
+        "rowsByState": "按状态的行数",
+        "cpuUtilization": "CPU 使用率",
+        "memoryUsage": "内存",
+        "diskIo": "磁盘 I/O",
+        "networkIo": "网络 I/O"
+      },
+      "searchPlaceholder": "筛选指标…",
+      "triageOrder": "按分诊相关度排序",
+      "sections": {
+        "featured": "关键健康指标",
+        "postgresql": "PostgreSQL 指标",
+        "mysql": "MySQL 和 MariaDB 指标"
+      },
+      "roleTitle": "{role} · {engine}",
+      "roles": {
+        "cacheHitRatio": "缓存命中率",
+        "connections": "连接数",
+        "connectionLimit": "连接数上限",
+        "replicationLag": "复制延迟",
+        "cacheHit": "缓存命中",
+        "cacheRead": "缓存磁盘读取",
+        "deadlocks": "死锁"
+      },
+      "notCollecting": {
+        "title": "没有数据库指标到达",
+        "description": "上方的负载图表读取的是活动样本，但此组织中尚不存在来自数据库接收器的指标数据流。数据库设置卡片上的采集器配方会负责发送这些指标。",
+        "checklistTitle": "需要检查的内容",
+        "checks": {
+          "receivers": {
+            "no": "没有数据库接收器在发送指标",
+            "noDetail": "数据源下的 PostgreSQL 和 MySQL 设置卡片会在配置监控数据源的同时配置采集器的指标接收器。"
+          },
+          "enabled": {
+            "ok": "数据库监控已启用",
+            "okDetail": "因此一旦有接收器发送指标，这些指标就会在此处绘制成图",
+            "no": "数据库监控已禁用",
+            "noDetail": "此部署的 ZO_DB_MONITORING_ENABLED 处于关闭状态，因此数据库标签页不会采集数据。"
+          }
+        }
       }
     },
     "samples": {

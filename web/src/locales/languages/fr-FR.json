@@ -2057,7 +2057,8 @@
       "startFrom": {
         "label": "Commencez à partir de",
         "custom": "Personnalisé (rôle vide)",
-        "readonly": "Lecture seule (affichage de l'accès à toutes les ressources)"
+        "readonly": "Lecture seule (affichage de l'accès à toutes les ressources)",
+        "dbm": "Lecteur de la surveillance des bases de données (lecture seule sur le module Surveillance des bases de données et les flux de métriques interrogés par son onglet Métriques)"
       },
       "name": {
         "required": "Le nom du rôle est obligatoire.",
@@ -2093,7 +2094,9 @@
       "loadFailed": "Échec du chargement des détails du rôle. Redirection vers la liste des rôles.",
       "noUpdatesDetected": "Aucune mise à jour détectée.",
       "updateSuccess": "Rôle mis à jour avec succès !",
-      "updateError": "Erreur lors de la mise à jour du rôle !"
+      "updateError": "Erreur lors de la mise à jour du rôle !",
+      "dbmPresetSeeded": "Accès en lecture présélectionné sur {matched} des {total} flux de métriques de la surveillance des bases de données, plus le module Surveillance des bases de données. Vérifiez avant d'enregistrer.",
+      "dbmPresetNoMatch": "Aucun des {total} flux de métriques de la surveillance des bases de données n'existe encore dans cette organisation, donc rien n'a été présélectionné ; l'octroi du module Surveillance des bases de données a tout de même été préparé."
     },
     "rolesPage": {
       "subtitle": "Les rôles regroupent des autorisations : attribuez-les à des utilisateurs, à des comptes de service ou à des groupes pour accorder l'accès.",
@@ -16298,6 +16301,7 @@
       },
       "databaseCount": "1 base de données | {count} bases de données",
       "openQueries": "Voir ses requêtes",
+      "viewMetrics": "Voir les métriques",
       "alertMe": "M'alerter",
       "columnHints": {
         "qps": "Appels par seconde — les appels de cette fenêtre divisés par sa durée, de sorte qu'une vue de 15 minutes et une vue de 4 heures restent comparables.",
@@ -16558,10 +16562,10 @@
         "missingDescription": "Cette page décrit une requête, et l'adresse n'en nomme aucune. Si vous venez de changer d'organisation, la requête que vous lisiez appartient à celle que vous avez quittée.",
         "action": "Parcourir les requêtes de cette organisation"
       },
-      "backToQueries": "Retour aux requêtes principales",
-      "backToActivity": "Retour à l'activité",
-      "backToSamples": "Retour aux appels les plus lents",
-      "backToDeadlocks": "Retour aux interblocages",
+      "backToQueries": "Requêtes principales",
+      "backToActivity": "activité",
+      "backToSamples": "appels les plus lents",
+      "backToDeadlocks": "interblocages",
       "latencyTitle": "Vitesse au fil du temps",
       "volumeTitle": "Appels et échecs au fil du temps",
       "endpointsTitle": "D'où elle est appelée",
@@ -16726,6 +16730,8 @@
     "page": {
       "tabs": {
         "overview": "Aperçu",
+        "metrics": "Métriques",
+        "metricsHint": "Charge de la base de données par événement d'attente, et chaque métrique collectée par vos récepteurs de base de données.",
         "queries": "Requêtes principales",
         "samples": "Appels les plus lents",
         "samplesHintClient": "Appels terminés que vos services instrumentés ont observés dans cette fenêtre — les appelants sans traçage ne sont pas comptés, donc il s'agit d'un minimum, pas du total. Le tableau montre les plus lents d'entre eux.",
@@ -16742,6 +16748,129 @@
         "deadlocksLocked": "Les interblocages sont une fonctionnalité Enterprise. Mettez à niveau pour voir quelles requêtes ont été mutuellement bloquées et pourquoi. Les autres onglets de base de données fonctionnent sur tous les plans.",
         "blockedLocked": "Les requêtes bloquées sont une fonctionnalité Enterprise. Mettez à niveau pour voir quelles sessions attendent un verrou et ce qui le retient. Les autres onglets de base de données fonctionnent sur tous les plans.",
         "tableHealthLocked": "La santé des tables est une fonctionnalité Enterprise. Mettez à niveau pour suivre la taille, la fragmentation et l'état du vacuum des tables. Les autres onglets de base de données fonctionnent sur tous les plans."
+      }
+    },
+    "metrics": {
+      "title": "Métriques",
+      "subtitle": "Charge de la base de données et chaque métrique collectée par vos récepteurs de base de données, tracées sur cette fenêtre",
+      "load": {
+        "title": "Charge de la base de données",
+        "hint": "Nombre moyen de sessions actives par intervalle, empilées selon la dimension choisie. Les connexions inactives sont exclues ; une session qui n'attend rien s'exécute sur le CPU. Faites glisser sur un pic pour zoomer tous les graphiques dessus.",
+        "timeAxis": "Temps",
+        "sessionsAxis": "Sessions actives moy.",
+        "waitEventAxis": "Événement d'attente",
+        "viewActivity": "Voir dans Activité",
+        "breakdowns": {
+          "waitEvent": "Par événement d'attente",
+          "query": "Par requête",
+          "database": "Par base de données",
+          "user": "Par utilisateur"
+        }
+      },
+      "limitLegend": "limite de connexions",
+      "explore": "Ouvrir dans l'explorateur de métriques",
+      "railLabel": "Sections de métriques",
+      "noAccess": "Vous n'avez pas la permission de lire {stream}. Demandez à un administrateur l'accès en lecture à ce flux.",
+      "byDims": {
+        "query": "par requête",
+        "database": "par base de données",
+        "service": "par service",
+        "operation": "par opération",
+        "mode": "par mode",
+        "lockType": "par type de verrou",
+        "table": "par table",
+        "index": "par index",
+        "client": "par client",
+        "state": "par état",
+        "direction": "par direction",
+        "device": "par périphérique",
+        "host": "par hôte"
+      },
+      "catalog": {
+        "activity": {
+          "title": "Activité",
+          "desc": "Débit, transactions et renouvellement des lignes"
+        },
+        "locks": {
+          "title": "Verrous",
+          "desc": "Pression de verrouillage et ce qui la détient"
+        },
+        "replication": {
+          "title": "Réplication",
+          "desc": "Pression du WAL et retard des réplicas"
+        },
+        "indexes": {
+          "title": "Index",
+          "desc": "Utilisation et taille des index par table"
+        },
+        "blocks": {
+          "title": "Blocs",
+          "desc": "E/S du tampon partagé attribuées aux requêtes, à partir des compteurs propres à la base de données"
+        },
+        "vacuum": {
+          "title": "Vacuum",
+          "desc": "Lignes actives et mortes par table"
+        },
+        "host": {
+          "managedNote": "Cette base de données s'exécute sur un point de terminaison géré dans le cloud (comme Amazon RDS), son fournisseur n'expose donc pas d'hôte que vos collecteurs puissent surveiller. Effacez le filtre de base de données pour voir les métriques d'hôte des hôtes que vos collecteurs remontent réellement.",
+          "title": "Hôte",
+          "desc": "CPU, mémoire et E/S de l'hôte de la base de données",
+          "loopbackHint": "instance contactée via localhost — affichage de tous les hôtes",
+          "matchHint": "les métriques d'hôte sont mises en correspondance par nom d'hôte"
+        }
+      },
+      "catalogPanels": {
+        "calls": "Appels de requêtes",
+        "avgDuration": "Durée moyenne",
+        "commits": "Commits",
+        "rollbacks": "Rollbacks",
+        "rowsModified": "Lignes modifiées",
+        "locks": "Verrous",
+        "walLag": "Retard WAL",
+        "indexScans": "Scans d'index",
+        "indexSize": "Taille des index",
+        "blksHit": "Blocs partagés trouvés",
+        "blksRead": "Blocs partagés lus",
+        "blksDirtied": "Blocs partagés modifiés",
+        "rowsByState": "Lignes par état",
+        "cpuUtilization": "Utilisation du CPU",
+        "memoryUsage": "Mémoire",
+        "diskIo": "E/S disque",
+        "networkIo": "E/S réseau"
+      },
+      "searchPlaceholder": "Filtrer les métriques…",
+      "triageOrder": "triées par pertinence de triage",
+      "sections": {
+        "featured": "Métriques de santé clés",
+        "postgresql": "Métriques PostgreSQL",
+        "mysql": "Métriques MySQL et MariaDB"
+      },
+      "roleTitle": "{role} · {engine}",
+      "roles": {
+        "cacheHitRatio": "Taux de succès du cache",
+        "connections": "Connexions",
+        "connectionLimit": "Limite de connexions",
+        "replicationLag": "Retard de réplication",
+        "cacheHit": "Succès du cache",
+        "cacheRead": "Lectures disque du cache",
+        "deadlocks": "Interblocages"
+      },
+      "notCollecting": {
+        "title": "Aucune métrique de base de données n'arrive",
+        "description": "Le graphique de charge ci-dessus lit les échantillons d'activité, mais aucun flux de métriques provenant d'un récepteur de base de données n'existe encore dans cette organisation. Les recettes de collecteur des fiches de configuration de base de données les fournissent.",
+        "checklistTitle": "Points à vérifier",
+        "checks": {
+          "receivers": {
+            "no": "Aucun récepteur de base de données n'envoie de métriques",
+            "noDetail": "Les fiches de configuration PostgreSQL et MySQL sous Sources de données configurent le récepteur de métriques du collecteur en parallèle des flux de supervision."
+          },
+          "enabled": {
+            "ok": "La surveillance des bases de données est activée",
+            "okDetail": "les métriques seront donc tracées ici dès qu'un récepteur les enverra",
+            "no": "La surveillance des bases de données est désactivée",
+            "noDetail": "ZO_DB_MONITORING_ENABLED est désactivé pour ce déploiement, les onglets de base de données ne collectent donc pas."
+          }
+        }
       }
     },
     "samples": {

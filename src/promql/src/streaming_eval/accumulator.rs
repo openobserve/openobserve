@@ -16,7 +16,10 @@
 use config::meta::promql::value::Sample;
 use promql_parser::parser::token::{self, TokenId};
 
-use crate::common::{kahan_sum_increment, std_deviation2, std_variance2};
+use crate::{
+    aggregations::{AvgState, SumState},
+    common::{std_deviation, std_variance},
+};
 
 /// Aggregations the fused path can fold through dense per-timestamp state.
 #[derive(Clone, Copy, Debug)]
@@ -66,8 +69,7 @@ impl FusedAggOp {
 /// exactly, so the same accumulation order yields bit-for-bit identical results.
 pub(super) enum FusedAccumulator {
     Avg {
-        sums: Vec<(f64, f64)>,
-        counts: Vec<u64>,
+        states: Vec<AvgState>,
     },
     Count {
         counts: Vec<u64>,
@@ -90,7 +92,7 @@ pub(super) enum FusedAccumulator {
         values: Vec<Vec<f64>>,
     },
     Sum {
-        sums: Vec<(f64, f64)>,
+        sums: Vec<SumState>,
         present: Vec<bool>,
     },
 }
@@ -99,8 +101,7 @@ impl FusedAccumulator {
     pub(super) fn new(op: FusedAggOp, slots: usize) -> Self {
         match op {
             FusedAggOp::Avg => Self::Avg {
-                sums: vec![(0.0, 0.0); slots],
-                counts: vec![0; slots],
+                states: vec![AvgState::default(); slots],
             },
             FusedAggOp::Count => Self::Count {
                 counts: vec![0; slots],
@@ -123,7 +124,7 @@ impl FusedAccumulator {
                 values: vec![Vec::new(); slots],
             },
             FusedAggOp::Sum => Self::Sum {
-                sums: vec![(0.0, 0.0); slots],
+                sums: vec![SumState::default(); slots],
                 present: vec![false; slots],
             },
         }
@@ -131,11 +132,7 @@ impl FusedAccumulator {
 
     pub(super) fn push(&mut self, slot: usize, value: f64) {
         match self {
-            Self::Avg { sums, counts } => {
-                let (sum, c) = &mut sums[slot];
-                (*sum, *c) = kahan_sum_increment(value, *sum, *c);
-                counts[slot] += 1;
-            }
+            Self::Avg { states } => states[slot].push(value),
             Self::Count { counts } => counts[slot] += 1,
             Self::Group { present } => present[slot] = true,
             Self::Max { maxes, present } => {
@@ -152,8 +149,7 @@ impl FusedAccumulator {
             }
             Self::Stddev { values } | Self::Stdvar { values } => values[slot].push(value),
             Self::Sum { sums, present } => {
-                let (sum, c) = &mut sums[slot];
-                (*sum, *c) = kahan_sum_increment(value, *sum, *c);
+                sums[slot].push(value);
                 present[slot] = true;
             }
         }
@@ -164,23 +160,9 @@ impl FusedAccumulator {
     /// deterministic for a fixed chunk size.
     pub(super) fn merge(&mut self, other: Self) {
         match (self, other) {
-            (
-                Self::Avg { sums, counts },
-                Self::Avg {
-                    sums: other_sums,
-                    counts: other_counts,
-                },
-            ) => {
-                for (slot, other_count) in other_counts.into_iter().enumerate() {
-                    if other_count == 0 {
-                        continue;
-                    }
-                    let (other_sum, other_c) = other_sums[slot];
-                    let (sum, c) = &mut sums[slot];
-                    // Separate compensated increments; `c + other_c` would round residuals away.
-                    (*sum, *c) = kahan_sum_increment(other_sum, *sum, *c);
-                    (*sum, *c) = kahan_sum_increment(other_c, *sum, *c);
-                    counts[slot] += other_count;
+            (Self::Avg { states }, Self::Avg { states: other }) => {
+                for (state, other) in states.iter_mut().zip(other) {
+                    state.merge(other);
                 }
             }
             (
@@ -261,10 +243,7 @@ impl FusedAccumulator {
                     if !other_present {
                         continue;
                     }
-                    let (other_sum, other_c) = other_sums[slot];
-                    let (sum, c) = &mut sums[slot];
-                    (*sum, *c) = kahan_sum_increment(other_sum, *sum, *c);
-                    (*sum, *c) = kahan_sum_increment(other_c, *sum, *c);
+                    sums[slot].merge(other_sums[slot]);
                     present[slot] = true;
                 }
             }
@@ -274,13 +253,13 @@ impl FusedAccumulator {
 
     pub(super) fn into_samples(self, timestamps: &[i64]) -> Vec<Sample> {
         match self {
-            Self::Avg { sums, counts } => sums
+            Self::Avg { states } => states
                 .into_iter()
-                .zip(counts)
                 .enumerate()
-                .filter(|(_, (_, count))| *count > 0)
-                .map(|(slot, ((sum, c), count))| {
-                    Sample::new(timestamps[slot], (sum + c) / count as f64)
+                .filter_map(|(slot, state)| {
+                    state
+                        .value()
+                        .map(|value| Sample::new(timestamps[slot], value))
                 })
                 .collect(),
             Self::Count { counts } => counts
@@ -295,62 +274,88 @@ impl FusedAccumulator {
                 .filter(|(_, present)| *present)
                 .map(|(slot, _)| Sample::new(timestamps[slot], 1.0))
                 .collect(),
-            Self::Max { maxes, present } => maxes
+            Self::Max {
+                maxes: values,
+                present,
+            }
+            | Self::Min {
+                mins: values,
+                present,
+            } => values
                 .into_iter()
                 .zip(present)
                 .enumerate()
                 .filter(|(_, (_, present))| *present)
-                .map(|(slot, (max, _))| Sample::new(timestamps[slot], max))
+                .map(|(slot, (value, _))| Sample::new(timestamps[slot], value))
                 .collect(),
-            Self::Min { mins, present } => mins
-                .into_iter()
-                .zip(present)
-                .enumerate()
-                .filter(|(_, (_, present))| *present)
-                .map(|(slot, (min, _))| Sample::new(timestamps[slot], min))
-                .collect(),
-            Self::Stddev { values } => values
-                .into_iter()
-                .enumerate()
-                .filter_map(|(slot, values)| {
-                    dispersion_sample(&values, timestamps[slot], std_deviation2)
-                })
-                .collect(),
-            Self::Stdvar { values } => values
-                .into_iter()
-                .enumerate()
-                .filter_map(|(slot, values)| {
-                    dispersion_sample(&values, timestamps[slot], std_variance2)
-                })
-                .collect(),
+            Self::Stddev { values } => dispersion_samples(values, timestamps, std_deviation),
+            Self::Stdvar { values } => dispersion_samples(values, timestamps, std_variance),
             Self::Sum { sums, present } => sums
                 .into_iter()
                 .zip(present)
                 .enumerate()
                 .filter(|(_, (_, present))| *present)
-                .map(|(slot, ((sum, c), _))| Sample::new(timestamps[slot], sum + c))
+                .map(|(slot, (sum, _))| Sample::new(timestamps[slot], sum.value()))
                 .collect(),
         }
     }
 }
 
-fn dispersion_sample(
-    values: &[f64],
-    timestamp: i64,
-    dispersion: fn(&[f64], f64, i64) -> Option<f64>,
-) -> Option<Sample> {
-    if values.is_empty() {
-        return None;
-    }
-    let sum: f64 = values.iter().sum();
-    let count = values.len() as i64;
-    let mean = sum / count as f64;
-    dispersion(values, mean, count).map(|value| Sample::new(timestamp, value))
+fn dispersion_samples(
+    values: Vec<Vec<f64>>,
+    timestamps: &[i64],
+    dispersion: fn(&[f64]) -> Option<f64>,
+) -> Vec<Sample> {
+    values
+        .into_iter()
+        .enumerate()
+        .filter_map(|(slot, values)| {
+            let timestamp = timestamps[slot];
+            dispersion(&values).map(|value| Sample::new(timestamp, value))
+        })
+        .collect()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_statistics_with_partial_merges() {
+        for (values, avg, variance) in [
+            (vec![1.0, 2.0, 3.0], 2.0, 2.0 / 3.0),
+            (vec![1e308, 1e308], f64::INFINITY, f64::INFINITY),
+            (vec![f64::INFINITY, f64::INFINITY], f64::INFINITY, f64::NAN),
+            (vec![f64::INFINITY, f64::NEG_INFINITY], f64::NAN, f64::NAN),
+            (vec![f64::NAN, 1.0], f64::NAN, f64::NAN),
+        ] {
+            for (op, expected) in [
+                (FusedAggOp::Avg, avg),
+                (FusedAggOp::Stdvar, variance),
+                (FusedAggOp::Stddev, variance.sqrt()),
+            ] {
+                for merge in [false, true] {
+                    let mut accumulator = FusedAccumulator::new(op, 2);
+                    for &value in &values {
+                        if merge {
+                            let mut partial = FusedAccumulator::new(op, 2);
+                            partial.push(0, value);
+                            accumulator.merge(partial);
+                        } else {
+                            accumulator.push(0, value);
+                        }
+                    }
+                    let samples = accumulator.into_samples(&[1, 2]);
+                    assert_eq!(samples.len(), 1);
+                    assert!(
+                        samples[0].value == expected
+                            || (samples[0].value.is_nan() && expected.is_nan()),
+                        "{op:?}, {values:?}, merge={merge}"
+                    );
+                }
+            }
+        }
+    }
 
     #[test]
     fn test_fused_agg_op_token_coverage() {

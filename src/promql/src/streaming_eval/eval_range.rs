@@ -21,7 +21,7 @@ use std::sync::Arc;
 use config::meta::promql::value::{RangeValue, Sample, TimeWindow};
 use datafusion::error::Result;
 
-use super::{collect_partitioned, range_expr::RangeExpr};
+use super::{evaluate_partitions, range_expr::RangeExpr};
 use crate::series_stream::SeriesStream;
 
 /// Evaluates the range function over every partition's series and returns them whole, in
@@ -36,21 +36,13 @@ where
 {
     let start_time = std::time::Instant::now();
     let func_name = eval.func.name();
-    let trace_id = eval.eval_ctx.trace_id.clone();
+    let trace_id = &eval.eval_ctx.trace_id;
     log::info!(
         "[trace_id: {trace_id}] [PromQL Timing] streaming {func_name}() started with {} partitions",
         sources.len(),
     );
-    let parts = sources
-        .into_iter()
-        .map(|source| {
-            let eval = eval.clone();
-            async move { eval_range_partition(source.await?, eval).await }
-        })
-        .collect();
-    let parts = collect_partitioned(parts).await?;
-    let series_count: usize = parts.iter().map(|(_, series)| series).sum();
-    let series: Vec<RangeValue> = parts.into_iter().flat_map(|(series, _)| series).collect();
+    let (parts, series_count) = evaluate_partitions(sources, &eval, eval_range_partition).await?;
+    let series: Vec<RangeValue> = parts.flatten().collect();
     log::info!(
         "[trace_id: {trace_id}] [PromQL Timing] streaming {func_name}() execution took: {:?}, evaluated {} of {series_count} series",
         start_time.elapsed(),

@@ -237,6 +237,24 @@ export class MetricsExplorerPage {
         return this.getMetricsDataParam();
     }
 
+    /** The decoded blob once the URL stops changing, or null if none was written. NOT expect.poll: that waits for an expectation to BECOME true and cannot assert one HOLDS, so poll(hasMetricsDataParam).toBe(false) just raced the debounced write. */
+    async settleMetricsBlob(stableMs = 2000, timeout = 15000) {
+        const deadline = Date.now() + timeout;
+        let last = this.getMetricsDataParam();
+        let stableSince = Date.now();
+        while (Date.now() < deadline) {
+            await this.page.waitForTimeout(250);
+            const now = this.getMetricsDataParam();
+            if (now !== last) {
+                last = now;
+                stableSince = Date.now();
+            } else if (Date.now() - stableSince >= stableMs) {
+                break;
+            }
+        }
+        return this.decodeMetricsBlob();
+    }
+
     /** The mirror case — leaving Visualize must strip a stale blob. */
     async waitForMetricsDataCleared(timeout = 20000) {
         await expect

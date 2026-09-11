@@ -2057,7 +2057,8 @@
       "startFrom": {
         "label": "Şuradan başlayın",
         "custom": "Özel (boş rol)",
-        "readonly": "Salt okunur (tüm kaynaklara erişimi görüntüleyin)"
+        "readonly": "Salt okunur (tüm kaynaklara erişimi görüntüleyin)",
+        "dbm": "Veritabanı İzleme görüntüleyicisi (Veritabanı İzleme modülünde ve Metrikler sekmesinin sorguladığı metrik akışlarında salt okunur)"
       },
       "name": {
         "required": "Rol adı gereklidir.",
@@ -2093,7 +2094,9 @@
       "loadFailed": "Rol ayrıntıları yüklenemedi. Roller listesine yönlendiriliyor.",
       "noUpdatesDetected": "Güncelleme tespit edilmedi.",
       "updateSuccess": "Rol başarıyla güncellendi!",
-      "updateError": "Rol güncellenirken hata oluştu!"
+      "updateError": "Rol güncellenirken hata oluştu!",
+      "dbmPresetSeeded": "{total} Veritabanı İzleme metrik akışının {matched} tanesi için önceden seçilmiş okuma erişimi ve ayrıca Veritabanı İzleme modülü. Kaydetmeden önce gözden geçirin.",
+      "dbmPresetNoMatch": "{total} Veritabanı İzleme metrik akışının hiçbiri bu organizasyonda henüz mevcut değil, bu nedenle üzerlerinde hiçbir şey önceden seçilmedi; Veritabanı İzleme modülü yetkisi yine de hazırlandı."
     },
     "rolesPage": {
       "subtitle": "Rol paketi izinleri — erişim vermek için bunları Kullanıcılara, Hizmet Hesaplarına veya Gruplara atayın.",
@@ -16298,6 +16301,7 @@
       },
       "databaseCount": "1 veritabanı | {count} veritabanı",
       "openQueries": "Sorgularını gör",
+      "viewMetrics": "Metrikleri görüntüle",
       "alertMe": "Beni uyar",
       "columnHints": {
         "qps": "Saniye başına çağrı — bu penceredeki çağrıların pencere uzunluğuna bölünmesiyle hesaplanır, böylece 15 dakikalık bir görünüm ile 4 saatlik bir görünüm karşılaştırılabilir kalır.",
@@ -16558,10 +16562,10 @@
         "missingDescription": "Bu sayfa tek bir sorguyu açıklar ve adres bir sorgu belirtmiyor. Az önce organizasyon değiştirdiyseniz, okuduğunuz sorgu ayrıldığınız organizasyona aittir.",
         "action": "Bu organizasyonun sorgularına göz atın"
       },
-      "backToQueries": "En sık çalıştırılan sorgulara geri dön",
-      "backToActivity": "Etkinliğe geri dön",
-      "backToSamples": "En yavaş çağrılara geri dön",
-      "backToDeadlocks": "Kilitlenmelere geri dön",
+      "backToQueries": "En Çok Kullanılan Sorgular",
+      "backToActivity": "etkinlik",
+      "backToSamples": "en yavaş çağrılar",
+      "backToDeadlocks": "kilitlenmeler",
       "latencyTitle": "Zaman içinde hız",
       "volumeTitle": "Zaman içinde çağrılar ve hatalar",
       "endpointsTitle": "Nereden çağrılıyor",
@@ -16726,6 +16730,8 @@
     "page": {
       "tabs": {
         "overview": "Genel Bakış",
+        "metrics": "Metrikler",
+        "metricsHint": "Bekleme olayına göre veritabanı yükü ve veritabanı alıcılarınızın topladığı her metrik.",
         "queries": "En İyi Sorgular",
         "samples": "En Yavaş Çağrılar",
         "samplesHintClient": "Bu pencerede enstrümante edilmiş hizmetlerinizin gözlemlediği tamamlanmış çağrılar — izleme olmayan çağıranlar sayılmaz, bu yüzden bu bir alt sınırdır, toplam değil. Tablo bunların en yavaşlarını gösterir.",
@@ -16742,6 +16748,129 @@
         "deadlocksLocked": "Kilitlenmeler bir Enterprise özelliğidir. Hangi sorguların birbirine kilitlendiğini ve nedenini görmek için yükseltin. Diğer veritabanı sekmeleri her planda çalışır.",
         "blockedLocked": "Engellenen sorgular bir Enterprise özelliğidir. Hangi oturumların bir kilidi beklediğini ve neyin onu tuttuğunu görmek için yükseltin. Diğer veritabanı sekmeleri her planda çalışır.",
         "tableHealthLocked": "Tablo sağlığı bir Enterprise özelliğidir. Tablo boyutu, şişkinlik ve vacuum durumunu izlemek için yükseltin. Diğer veritabanı sekmeleri her planda çalışır."
+      }
+    },
+    "metrics": {
+      "title": "Metrikler",
+      "subtitle": "Veritabanı yükü ve veritabanı alıcılarınızın topladığı her metrik, bu pencerede grafiklenir",
+      "load": {
+        "title": "Veritabanı yükü",
+        "hint": "Aralık başına etkin çalışan oturumların ortalaması, seçilen boyuta göre yığılmış. Boşta bekleyen bağlantılar hariç tutulur; hiçbir şeyi beklemeyen oturum CPU'dadır. Her grafiği o sıçramaya yakınlaştırmak için sıçramanın üzerinde sürükleyin.",
+        "timeAxis": "Zaman",
+        "sessionsAxis": "Ortalama etkin oturum",
+        "waitEventAxis": "Bekleme olayı",
+        "viewActivity": "Etkinlik'te görüntüle",
+        "breakdowns": {
+          "waitEvent": "Bekleme olayına göre",
+          "query": "Sorguya göre",
+          "database": "Veritabanına göre",
+          "user": "Kullanıcıya göre"
+        }
+      },
+      "limitLegend": "bağlantı sınırı",
+      "explore": "Metrics Explorer'da aç",
+      "railLabel": "Metrik bölümleri",
+      "noAccess": "{stream} akışını okuma izniniz yok. Bu akışa okuma erişimi için bir yöneticiye başvurun.",
+      "byDims": {
+        "query": "sorguya göre",
+        "database": "veritabanına göre",
+        "service": "hizmete göre",
+        "operation": "işleme göre",
+        "mode": "moda göre",
+        "lockType": "kilit türüne göre",
+        "table": "tabloya göre",
+        "index": "indekse göre",
+        "client": "istemciye göre",
+        "state": "duruma göre",
+        "direction": "yöne göre",
+        "device": "aygıta göre",
+        "host": "ana makineye göre"
+      },
+      "catalog": {
+        "activity": {
+          "title": "Etkinlik",
+          "desc": "Verim, işlemler ve satır değişim hızı"
+        },
+        "locks": {
+          "title": "Kilitler",
+          "desc": "Kilit baskısı ve kilitleri neyin tuttuğu"
+        },
+        "replication": {
+          "title": "Çoğaltma",
+          "desc": "WAL baskısı ve replika gecikmesi"
+        },
+        "indexes": {
+          "title": "İndeksler",
+          "desc": "Tablo başına indeks kullanımı ve boyutu"
+        },
+        "blocks": {
+          "title": "Bloklar",
+          "desc": "Sorgulara atfedilen paylaşımlı tampon G/Ç'si, veritabanının kendi sayaçlarından"
+        },
+        "vacuum": {
+          "title": "Vacuum",
+          "desc": "Tablo başına canlı ve ölü satırlar"
+        },
+        "host": {
+          "managedNote": "Bu veritabanı bulut tarafından yönetilen bir uç noktada (örneğin Amazon RDS) çalışır, bu nedenle sağlayıcısı toplayıcılarınızın izlemesi için bir ana makine sunmaz. Toplayıcılarınızın bildirdiği ana makinelerin ana makine metriklerini görmek için veritabanı filtresini temizleyin.",
+          "title": "Ana makine",
+          "desc": "Veritabanı ana makinesinin CPU, bellek ve G/Ç değerleri",
+          "loopbackHint": "örnek localhost üzerinden bağlandı — tüm ana makineler gösteriliyor",
+          "matchHint": "ana makine metrikleri ana makine adına göre eşleştirilir"
+        }
+      },
+      "catalogPanels": {
+        "calls": "Sorgu çağrıları",
+        "avgDuration": "Ortalama süre",
+        "commits": "Commit'ler",
+        "rollbacks": "Rollback'ler",
+        "rowsModified": "Değiştirilen satırlar",
+        "locks": "Kilitler",
+        "walLag": "WAL gecikmesi",
+        "indexScans": "Dizin taramaları",
+        "indexSize": "Dizin boyutu",
+        "blksHit": "Paylaşılan blok isabetleri",
+        "blksRead": "Okunan paylaşılan bloklar",
+        "blksDirtied": "Kirletilen paylaşılan bloklar",
+        "rowsByState": "Duruma göre satırlar",
+        "cpuUtilization": "CPU kullanımı",
+        "memoryUsage": "Bellek",
+        "diskIo": "Disk G/Ç",
+        "networkIo": "Ağ G/Ç"
+      },
+      "searchPlaceholder": "Metrikleri filtrele…",
+      "triageOrder": "triyaj önemine göre sıralanmış",
+      "sections": {
+        "featured": "Temel sağlık metrikleri",
+        "postgresql": "PostgreSQL metrikleri",
+        "mysql": "MySQL ve MariaDB metrikleri"
+      },
+      "roleTitle": "{role} · {engine}",
+      "roles": {
+        "cacheHitRatio": "Önbellek isabet oranı",
+        "connections": "Bağlantılar",
+        "connectionLimit": "Bağlantı sınırı",
+        "replicationLag": "Çoğaltma gecikmesi",
+        "cacheHit": "Önbellek isabetleri",
+        "cacheRead": "Önbellek disk okumaları",
+        "deadlocks": "Kilitlenmeler"
+      },
+      "notCollecting": {
+        "title": "Hiçbir veritabanı metriği gelmiyor",
+        "description": "Yukarıdaki yük grafiği etkinlik örneklerini okur, ancak bu organizasyonda henüz bir veritabanı alıcısından gelen metrik akışı yok. Bunları veritabanı kurulum kartlarındaki toplayıcı tarifleri gönderir.",
+        "checklistTitle": "Neler kontrol edilmeli",
+        "checks": {
+          "receivers": {
+            "no": "Hiçbir veritabanı alıcısı metrik göndermiyor",
+            "noDetail": "Veri kaynakları altındaki PostgreSQL ve MySQL kurulum kartları, toplayıcının metrik alıcısını izleme akışlarının yanı sıra yapılandırır."
+          },
+          "enabled": {
+            "ok": "Veritabanı izleme etkin",
+            "okDetail": "böylece bir alıcı bunları gönderir göndermez metrikler burada grafiklendirilecek",
+            "no": "Veritabanı izleme devre dışı",
+            "noDetail": "Bu dağıtımda ZO_DB_MONITORING_ENABLED kapalı, bu nedenle veritabanı sekmeleri veri toplamıyor."
+          }
+        }
       }
     },
     "samples": {

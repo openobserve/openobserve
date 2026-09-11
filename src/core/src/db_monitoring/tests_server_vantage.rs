@@ -8116,10 +8116,15 @@ fn idx_seed_set_is_exactly_the_or_predicate_columns() {
     let mut settings = StreamSettings::default();
     assert!(server_vantage::needs_kind_index_field(&mut settings));
 
-    let mut expected: Vec<&str> = std::iter::once(server_vantage::O2_DBM_KIND)
-        .chain(server_vantage::DEADLOCK_MARKERS.iter().map(|(c, _)| *c))
-        .chain(server_vantage::BLOCKING_MARKERS.iter().map(|(c, _)| *c))
-        .collect();
+    let mut expected: Vec<&str> = [
+        server_vantage::O2_DBM_KIND,
+        server_vantage::O2_DBM_ENGINE,
+        server_vantage::O2_DBM_INSTANCE,
+    ]
+    .into_iter()
+    .chain(server_vantage::DEADLOCK_MARKERS.iter().map(|(c, _)| *c))
+    .chain(server_vantage::BLOCKING_MARKERS.iter().map(|(c, _)| *c))
+    .collect();
     expected.sort_unstable();
     expected.dedup();
 
@@ -8127,9 +8132,10 @@ fn idx_seed_set_is_exactly_the_or_predicate_columns() {
     got.sort_unstable();
     assert_eq!(
         got, expected,
-        "the seeded set must be exactly the canonical kind column plus the marker columns of the \
-         read-path ORs — no fewer (the OR is rejected wholesale) and no more (every extra \
-         indexed column is ingest cost and index bytes with no query behind it)"
+        "the seeded set must be exactly the canonical kind column, the engine/instance scope \
+         columns every scoped read filters on, plus the marker columns of the read-path ORs — \
+         no fewer (the OR is rejected wholesale) and no more (every extra indexed column is \
+         ingest cost and index bytes with no query behind it)"
     );
     // `o2_recipe` is shared by the MSSQL deadlock marker and all four blocking
     // markers, so the union must collapse it to one entry.
@@ -8341,6 +8347,10 @@ fn idx_seed_stands_down_entirely_when_every_field_is_blocked() {
         .iter()
         .chain(server_vantage::BLOCKING_MARKERS.iter())
         .map(|(c, _)| c.to_string())
+        .chain([
+            server_vantage::O2_DBM_ENGINE.to_string(),
+            server_vantage::O2_DBM_INSTANCE.to_string(),
+        ])
         .collect();
     fts.sort_unstable();
     fts.dedup();
