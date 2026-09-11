@@ -50,7 +50,7 @@ beforeEach(() => {
   const s = useSessions();
   s.sessions.value = [];
   s.total.value = 0;
-  s.totalIsExact.value = true;
+  s.hasMore.value = false;
   s.loading.value = false;
   s.error.value = null;
   s.hasLoadedOnce.value = false;
@@ -181,16 +181,16 @@ describe("useSessions — fetchPage: field mapping", () => {
     expect(total.value).toBe(42);
   });
 
-  it("marks a lower-bound total as inexact while another page exists", async () => {
+  it("tracks whether another page exists", async () => {
     mockSessionsList.mockResolvedValue({
-      data: { hits: [], total: 21, has_more: true, total_is_exact: false },
+      data: { hits: [], total: 21, has_more: true },
     });
 
-    const { total, totalIsExact, fetchPage } = useSessions();
+    const { total, hasMore, fetchPage } = useSessions();
     await fetchPage("stream", 1000, 2000, 0, 20);
 
     expect(total.value).toBe(21);
-    expect(totalIsExact.value).toBe(false);
+    expect(hasMore.value).toBe(true);
   });
 
   it("sets hasLoadedOnce=true after successful fetch", async () => {
@@ -282,7 +282,7 @@ describe("useSessions — fetchPage: search", () => {
     mockSessionsList
       .mockImplementationOnce(() => first)
       .mockResolvedValueOnce({
-        data: { hits: [{ session_id: "second" }], total: 1, total_is_exact: true },
+        data: { hits: [{ session_id: "second" }], total: 1, has_more: false },
       });
 
     const { sessions, loading, fetchPage } = useSessions();
@@ -292,7 +292,7 @@ describe("useSessions — fetchPage: search", () => {
     expect(sessions.value.map((r) => r.sessionId)).toEqual(["second"]);
     expect(loading.value).toBe(false);
 
-    resolveFirst({ data: { hits: [{ session_id: "first" }], total: 1, total_is_exact: true } });
+    resolveFirst({ data: { hits: [{ session_id: "first" }], total: 1, has_more: false } });
     await p1;
     expect(sessions.value.map((r) => r.sessionId)).toEqual(["second"]);
   });
@@ -302,7 +302,7 @@ describe("useSessions — fetchPage: search", () => {
     const first = new Promise((_, r) => (rejectFirst = r));
     mockSessionsList
       .mockImplementationOnce(() => first)
-      .mockResolvedValueOnce({ data: { hits: [], total: 0, total_is_exact: true } });
+      .mockResolvedValueOnce({ data: { hits: [], total: 0, has_more: false } });
 
     const { error, fetchPage } = useSessions();
     const p1 = fetchPage("stream", 1000, 2000, 0, 25);

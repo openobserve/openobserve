@@ -11,7 +11,7 @@ import { ref } from "vue";
 // Reactive state that tests can mutate to drive component rendering
 const mockSessions = ref<any[]>([]);
 const mockTotal = ref(0);
-const mockTotalIsExact = ref(true);
+const mockHasMore = ref(false);
 const mockLoading = ref(false);
 const mockError = ref<string | null>(null);
 const mockHasLoadedOnce = ref(false);
@@ -45,7 +45,7 @@ vi.mock("./composables/useSessions", () => ({
   useSessions: vi.fn(() => ({
     sessions: mockSessions,
     total: mockTotal,
-    totalIsExact: mockTotalIsExact,
+    hasMore: mockHasMore,
     loading: mockLoading,
     error: mockError,
     hasLoadedOnce: mockHasLoadedOnce,
@@ -243,7 +243,7 @@ beforeEach(() => {
   localStorage.clear();
   mockSessions.value = [];
   mockTotal.value = 0;
-  mockTotalIsExact.value = true;
+  mockHasMore.value = false;
   mockLoading.value = false;
   mockError.value = null;
   mockHasLoadedOnce.value = false;
@@ -424,11 +424,11 @@ describe("SessionsList — sessions table", () => {
     expect(footer.text()).toContain("42");
   });
 
-  it("passes lower-bound count metadata to server pagination", async () => {
+  it("derives lower-bound count metadata from has-more", async () => {
     mockHasLoadedOnce.value = true;
     mockSessions.value = [makeSession()];
     mockTotal.value = 21;
-    mockTotalIsExact.value = false;
+    mockHasMore.value = true;
 
     const wrapper = await mountComponent();
     const table = wrapper.findComponent({ name: "OTable" });
