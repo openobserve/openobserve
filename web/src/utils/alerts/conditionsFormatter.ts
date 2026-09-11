@@ -176,7 +176,9 @@ function getFormattedCondition(
     case "notcontains":
       // SQL mode: convert to NOT LIKE operator
       // Display mode: keep as "not_contains"
-      condition = sqlMode ? sqlLike(column, value, "contains", true) : `${column} ${operator} ${value}`;
+      condition = sqlMode
+        ? sqlLike(column, value, "contains", true)
+        : `${column} ${operator} ${value}`;
       break;
     default:
       // Fallback for any other operators
