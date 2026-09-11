@@ -2478,6 +2478,152 @@ describe("TraceDetails", () => {
     });
   });
 
+  // Regression: a bare Number() on absent query params produced NaN, which
+  // passes the `!= null` guard in search.ts and reaches the API as "NaN".
+  describe("Bug fix: missing from/to in URL query params", () => {
+    // Records the details URL the component actually requested, so we can
+    // assert on what reached the wire rather than only on internal state.
+    let requestedUrl: string;
+
+    // Helper that builds a full mount with a custom route query so we can
+    // control which time-window params (if any) arrive via the URL.
+    function mountWithTimeQuery(range: { from?: string; to?: string }) {
+      vi.spyOn(router, "currentRoute", "get").mockReturnValue({
+        value: {
+          query: {
+            trace_id: "test-trace-id",
+            stream: "test-stream",
+            org_identifier: "default",
+            ...(range.from !== undefined ? { from: range.from } : {}),
+            ...(range.to !== undefined ? { to: range.to } : {}),
+          },
+          name: "traceDetails",
+        },
+      } as any);
+
+      return mount(TraceDetails, {
+        attachTo: "#app",
+        props: { traceId: "test-trace-id" },
+        global: {
+          plugins: [i18n, router],
+          provide: { store },
+          stubs: {
+            ODrawer: ODrawerStub,
+            CodeQueryEditor: {
+              name: "CodeQueryEditor",
+              props: ["query", "language"],
+              emits: ["update:query"],
+              template: '<div data-test="trace-details-filters-code-editor" />',
+            },
+            "chart-renderer": {
+              template: '<div data-test="chart-renderer">Chart</div>',
+              props: ["data", "id"],
+              emits: ["updated:chart"],
+            },
+            "trace-tree": {
+              template: '<div data-test="trace-tree">Trace Tree</div>',
+              props: [
+                "collapseMapping",
+                "spans",
+                "baseTracePosition",
+                "spanDimensions",
+                "spanMap",
+                "leftWidth",
+                "searchQuery",
+                "spanList",
+              ],
+              emits: ["toggle-collapse", "select-span", "update-current-index", "search-result"],
+            },
+            "trace-header": {
+              template: '<div data-test="trace-header">Trace Header</div>',
+              props: ["baseTracePosition", "splitterWidth"],
+              emits: ["resize-start"],
+            },
+            "trace-details-sidebar": {
+              template: '<div data-test="trace-details-sidebar">Sidebar</div>',
+              props: [
+                "span",
+                "baseTracePosition",
+                "searchQuery",
+                "streamName",
+                "serviceStreamsEnabled",
+                "parentMode",
+                "activeTab",
+                "selectedLogStreams",
+                "showLogStreamSelector",
+              ],
+              emits: [
+                "view-logs",
+                "close",
+                "open-trace",
+                "add-filter",
+                "apply-filter-immediately",
+                "update:activeTab",
+              ],
+            },
+          },
+        },
+      });
+    }
+
+    beforeEach(() => {
+      requestedUrl = "";
+      globalThis.server.use(
+        http.get(
+          `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/:stream/traces/:traceId/details`,
+          ({ request }) => {
+            requestedUrl = request.url;
+            return HttpResponse.json(tracesMockData.tracesDetails.traceSpans);
+          },
+        ),
+      );
+    });
+
+    it("resolves a finite window when from/to are absent", async () => {
+      const localWrapper = mountWithTimeQuery({});
+      await flushPromises();
+
+      expect(localWrapper.vm.effectiveTimeRange).toEqual({ from: 0, to: 0 });
+      localWrapper.unmount();
+    });
+
+    // The API rejects the literal string "NaN", so this is the assertion that
+    // actually fails before the fix.
+    it("never sends NaN bounds to the details API", async () => {
+      const localWrapper = mountWithTimeQuery({});
+      await flushPromises();
+
+      expect(requestedUrl).not.toContain("NaN");
+      expect(requestedUrl).toContain("start_time=0");
+      expect(requestedUrl).toContain("end_time=0");
+      localWrapper.unmount();
+    });
+
+    // Half a window is its own API error, so one usable bound must not survive
+    // on its own.
+    it("collapses both bounds when only one is present", async () => {
+      const localWrapper = mountWithTimeQuery({ from: "1752490492843" });
+      await flushPromises();
+
+      expect(localWrapper.vm.effectiveTimeRange).toEqual({ from: 0, to: 0 });
+      localWrapper.unmount();
+    });
+
+    it("still honours the URL window when from/to are present", async () => {
+      const localWrapper = mountWithTimeQuery({
+        from: "1752490492843",
+        to: "1752490493164",
+      });
+      await flushPromises();
+
+      expect(localWrapper.vm.effectiveTimeRange).toEqual({
+        from: 1752490492843,
+        to: 1752490493164,
+      });
+      localWrapper.unmount();
+    });
+  });
+
   describe("Priority 3: Search Navigation", () => {
     let mockTraceTreeRef: any;
 

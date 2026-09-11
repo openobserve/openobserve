@@ -923,7 +923,7 @@ import TraceTimelineIcon from "@/components/icons/TraceTimelineIcon.vue";
 import ServiceMapIcon from "@/components/icons/ServiceMapIcon.vue";
 import { convertTimelineData, convertTraceServiceMapData } from "@/utils/traces/convertTraceData";
 import { getAllSpanColors } from "@/utils/traces/traceColors";
-import { resolveSessionId } from "./traceDetails.utils";
+import { resolveSessionId, resolveUrlTimeRange } from "./traceDetails.utils";
 import { buildFilterTerm, applyFilterTerm } from "@/utils/traces/filterUtils";
 import { buildPatternConsolidatedTree } from "@/utils/traces/patternDetection";
 import { useTracePatternTree } from "@/composables/useTracePatternTree";
@@ -1491,10 +1491,10 @@ export default defineComponent({
         };
       }
       // Standalone mode - get from URL
-      return {
-        from: Number(router.currentRoute.value.query.from),
-        to: Number(router.currentRoute.value.query.to),
-      };
+      return resolveUrlTimeRange(
+        router.currentRoute.value.query.from,
+        router.currentRoute.value.query.to,
+      );
     });
 
     const effectiveOrgIdentifier = computed(() => {
