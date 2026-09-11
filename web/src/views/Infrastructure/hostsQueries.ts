@@ -28,8 +28,9 @@ export const HOSTS_LIVENESS_QUERY =
   "count by (host_name, os_type) (last_over_time(system_cpu_load_average_15m[10m]))";
 
 // SQL because timestamp(last_over_time(...)) re-stamps at eval time in this engine.
+// min(_timestamp) rides along free: the same scan and GROUP BY already run for last_seen.
 export const HOSTS_LAST_SEEN_SQL =
-  'SELECT host_name, max(_timestamp) AS last_seen FROM "system_cpu_load_average_15m" GROUP BY host_name';
+  'SELECT host_name, max(_timestamp) AS last_seen, min(_timestamp) AS first_seen FROM "system_cpu_load_average_15m" GROUP BY host_name';
 
 export const HOSTS_CPU_QUERY =
   '100 * (1 - avg by (host_name)(irate(system_cpu_time{state="idle"}[5m])))';

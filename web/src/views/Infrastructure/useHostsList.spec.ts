@@ -47,7 +47,7 @@ const vector = (rows: Array<{ metric: Record<string, string>; value: number }>) 
     },
   }) as any;
 
-const sqlHits = (rows: Array<{ host_name: string; last_seen: number }>) =>
+const sqlHits = (rows: Array<{ host_name: string; last_seen: number; first_seen?: number }>) =>
   ({ data: { hits: rows } }) as any;
 
 type FleetResponses = Partial<{
@@ -231,6 +231,32 @@ describe("useHostsList — join & window anchoring", () => {
     // Both, off one row — the formatted string is not replaced by the raw value.
     expect(db01.lastSeen).toMatch(/^TZ:.*:America\/Los_Angeles$/);
     expect(rowByName(h.list, "web-01").lastSeenUs).toBe(1_700_000_890_000_000);
+  });
+
+  it("carries the raw µs first-seen in firstSeenUs, off the same aggregate row", async () => {
+    primeFleet({
+      lastSeen: sqlHits([
+        {
+          host_name: "web-01",
+          last_seen: 1_700_000_890_000_000,
+          first_seen: 1_700_000_600_000_000,
+        },
+      ]),
+    });
+    const h = withHostsList();
+    wrapper = h.wrapper;
+    await h.list.refresh(refreshArgs);
+    await flushPromises();
+    expect(rowByName(h.list, "web-01").firstSeenUs).toBe(1_700_000_600_000_000);
+  });
+
+  it("a hit with no first_seen column leaves firstSeenUs null rather than 0", async () => {
+    // A 0 here would format as the Unix epoch and claim the host started in 1970.
+    const h = withHostsList();
+    wrapper = h.wrapper;
+    await h.list.refresh(refreshArgs);
+    await flushPromises();
+    expect(rowByName(h.list, "web-01").firstSeenUs).toBeNull();
   });
 
   it("a host with no last-seen hit blanks BOTH lastSeen and lastSeenUs", async () => {
