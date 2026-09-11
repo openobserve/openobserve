@@ -21,12 +21,40 @@ mod aggregate;
 mod eval_range;
 mod range_expr;
 
+use std::sync::Arc;
+
 pub(crate) use accumulator::FusedAggOp;
 pub(crate) use aggregate::aggregate;
 use datafusion::error::{DataFusionError, Result};
 pub(crate) use eval_range::eval_range;
 pub(crate) use range_expr::RangeExpr;
 use tokio::task::JoinSet;
+
+use crate::series_stream::SeriesStream;
+
+/// Opens and evaluates sources inside their tasks, preserving partition order for the final fold.
+async fn evaluate_partitions<SourceFuture, Stream, Output, EvalFuture>(
+    sources: Vec<SourceFuture>,
+    eval: &Arc<RangeExpr>,
+    evaluate: impl Fn(Stream, Arc<RangeExpr>) -> EvalFuture + Copy + Send + 'static,
+) -> Result<(impl ExactSizeIterator<Item = Output>, usize)>
+where
+    SourceFuture: Future<Output = Result<Stream>> + Send + 'static,
+    Stream: SeriesStream + 'static,
+    Output: Send + 'static,
+    EvalFuture: Future<Output = Result<(Output, usize)>> + Send + 'static,
+{
+    let parts = sources.into_iter().map(|source| {
+        let eval = Arc::clone(eval);
+        async move {
+            let source = source.await?;
+            evaluate(source, eval).await
+        }
+    });
+    let parts = collect_partitioned(parts).await?;
+    let series_count = parts.iter().map(|(_, series)| series).sum();
+    Ok((parts.into_iter().map(|(part, _)| part), series_count))
+}
 
 /// Collects every partition in order; the first failure fails the whole, and dropping the set
 /// aborts the rest.
@@ -148,6 +176,75 @@ pub(crate) mod tests {
                 );
             }
         }
+    }
+
+    #[tokio::test]
+    async fn test_evaluate_partitions_order_counts_and_source_errors() {
+        use config::meta::promql::value::{RangeValue, Sample};
+
+        use crate::series_stream::matrix::{
+            MaterializedSource, MatrixSeriesStream, matrix_streams,
+        };
+
+        let eval = Arc::new(RangeExpr::new(
+            crate::functions::instant_lookback_func(),
+            std::time::Duration::from_secs(60),
+            &eval_ctx(),
+        ));
+        let notify = Arc::new(tokio::sync::Notify::new());
+        let sources = (0..3)
+            .map(|index| {
+                let notify = Arc::clone(&notify);
+                async move {
+                    if index == 0 {
+                        notify.notified().await;
+                    } else if index == 1 {
+                        notify.notify_one();
+                    }
+                    let series = RangeValue::new(vec![], [Sample::new(0, index as f64)]);
+                    Ok(matrix_streams(vec![series; index + 1], &None, 1)
+                        .pop()
+                        .unwrap())
+                }
+            })
+            .collect();
+        let (parts, count) = evaluate_partitions(sources, &eval, |mut stream, _| async move {
+            let mut value = 0;
+            let mut count = 0;
+            while stream.advance().await?.is_some() {
+                value = stream.consume().await?[0].value as usize;
+                count += 1;
+            }
+            Ok((value, count))
+        })
+        .await
+        .unwrap();
+        assert_eq!(parts.len(), 3);
+        assert_eq!(parts.collect::<Vec<_>>(), vec![0, 1, 2]);
+        assert_eq!(count, 6);
+
+        let empty: Vec<MaterializedSource> = vec![];
+        let (parts, count) = evaluate_partitions(empty, &eval, |_, _| ready(Ok(((), 1))))
+            .await
+            .unwrap();
+        assert_eq!(parts.len(), 0);
+        assert_eq!(parts.count(), 0);
+        assert_eq!(count, 0);
+
+        let sources = vec![ready(Err::<MatrixSeriesStream, _>(
+            DataFusionError::Execution("open failed".into()),
+        ))];
+        let result = evaluate_partitions(
+            sources,
+            &eval,
+            |_, _| -> std::future::Ready<Result<((), usize)>> {
+                panic!("failed source must not be evaluated");
+            },
+        )
+        .await;
+        assert!(
+            matches!(result, Err(DataFusionError::Execution(message)) if message == "open failed")
+        );
     }
 
     #[tokio::test]

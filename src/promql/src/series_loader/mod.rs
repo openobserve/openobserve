@@ -216,44 +216,28 @@ pub(super) async fn load_samples_from_datafusion(
     query_duration: i64,
 ) -> Result<(PartitionedMetrics, HashSet<i64>)> {
     let df = df.select_columns(&[TIMESTAMP_COL_NAME, HASH_LABEL, VALUE_LABEL])?;
-    let (_, streams) = partition_streams(trace_id, df).await?;
-    let mut tasks = Vec::with_capacity(streams.len());
-    for mut stream in streams {
-        let hash_field_type = hash_field_type.clone();
-        let task: TokioResult = tokio::task::spawn(async move {
-            let mut metrics: HashMap<u64, RangeValue> = HashMap::new();
-            while let Some(batch) = stream.try_next().await.inspect_err(|e| {
-                log::error!("load samples from datafusion execute stream Error: {e}");
-            })? {
-                let time_values = batch[TIMESTAMP_COL_NAME].as_primitive::<Int64Type>();
-                let value_values = batch[VALUE_LABEL].as_primitive::<Float64Type>();
-
-                let hashes = batch_hash_values(&batch, &hash_field_type);
-                append_batch_samples(
-                    &mut metrics,
-                    &hashes,
-                    time_values.values(),
-                    value_values.values(),
-                    fragment_hint,
-                    query_duration,
-                );
-            }
-            let mut unique_timestamps = HashSet::new();
-            if collect_timestamps {
-                for metric in metrics.values() {
-                    if let Some(max_timestamp) =
-                        metric.samples.iter().map(|sample| sample.timestamp).max()
-                    {
-                        unique_timestamps.insert(max_timestamp);
-                    }
-                }
-            }
-            Ok((metrics, unique_timestamps))
-        });
-        tasks.push(task);
-    }
-
-    collect_partitions(tasks).await
+    load_metric_partitions(
+        trace_id,
+        hash_field_type,
+        df,
+        collect_timestamps,
+        "samples",
+        move |metrics, batch, hash_field_type| {
+            let time_values = batch[TIMESTAMP_COL_NAME].as_primitive::<Int64Type>();
+            let value_values = batch[VALUE_LABEL].as_primitive::<Float64Type>();
+            let hashes = batch_hash_values(batch, hash_field_type);
+            append_batch_samples(
+                metrics,
+                &hashes,
+                time_values.values(),
+                value_values.values(),
+                fragment_hint,
+                query_duration,
+            );
+        },
+        |metric| metric.samples.iter().map(|sample| sample.timestamp).max(),
+    )
+    .await
 }
 
 fn append_batch_samples(
@@ -362,42 +346,78 @@ async fn load_exemplars_from_datafusion(
     let df = df
         .filter(col(EXEMPLARS_LABEL).is_not_null())?
         .select_columns(&[HASH_LABEL, EXEMPLARS_LABEL])?;
+    load_metric_partitions(
+        trace_id,
+        hash_field_type,
+        df,
+        collect_timestamps,
+        "exemplars",
+        append_batch_exemplars,
+        |metric| {
+            metric
+                .exemplars
+                .as_ref()
+                .and_then(|exemplars| exemplars.iter().map(|exemplar| exemplar.timestamp).max())
+        },
+    )
+    .await
+}
+
+fn append_batch_exemplars(
+    metrics: &mut HashMap<u64, RangeValue>,
+    batch: &RecordBatch,
+    hash_field_type: &DataType,
+) {
+    let exemplars_values = batch[EXEMPLARS_LABEL].as_string::<i32>();
+    let hashes = batch_hash_values(batch, hash_field_type);
+    for (i, &hash) in hashes.iter().enumerate() {
+        let exemplar = exemplars_values.value(i);
+        if let Ok(exemplars) = json::from_str::<Vec<json::Value>>(exemplar) {
+            let entry = metrics.entry(hash).or_insert_with(|| RangeValue {
+                labels: vec![],
+                samples: vec![],
+                exemplars: Some(vec![]),
+                time_window: None,
+            });
+            let entry = entry.exemplars.as_mut().unwrap();
+            for exemplar in exemplars {
+                if let Some(exemplar) = exemplar.as_object() {
+                    entry.push(Arc::new(Exemplar::from(exemplar)));
+                }
+            }
+        }
+    }
+}
+
+async fn load_metric_partitions<A, T>(
+    trace_id: &str,
+    hash_field_type: &DataType,
+    df: DataFrame,
+    collect_timestamps: bool,
+    data_name: &'static str,
+    append_batch: A,
+    max_timestamp: T,
+) -> Result<(PartitionedMetrics, HashSet<i64>)>
+where
+    A: Fn(&mut HashMap<u64, RangeValue>, &RecordBatch, &DataType) + Copy + Send + 'static,
+    T: Fn(&RangeValue) -> Option<i64> + Copy + Send + 'static,
+{
     let (_, streams) = partition_streams(trace_id, df).await?;
     let mut tasks = Vec::with_capacity(streams.len());
     for mut stream in streams {
         let hash_field_type = hash_field_type.clone();
         let task: TokioResult = tokio::task::spawn(async move {
-            let mut metrics: HashMap<u64, RangeValue> = HashMap::new();
+            let mut metrics = HashMap::new();
             while let Some(batch) = stream.try_next().await.inspect_err(|e| {
-                log::error!("load exemplars from datafusion execute stream Error: {e}");
+                log::error!("load {data_name} from datafusion execute stream Error: {e}");
             })? {
-                let exemplars_values = batch[EXEMPLARS_LABEL].as_string::<i32>();
-                let hashes = batch_hash_values(&batch, &hash_field_type);
-                for (i, &hash) in hashes.iter().enumerate() {
-                    let exemplar = exemplars_values.value(i);
-                    if let Ok(exemplars) = json::from_str::<Vec<json::Value>>(exemplar) {
-                        let entry = metrics.entry(hash).or_insert_with(|| RangeValue {
-                            labels: vec![],
-                            samples: vec![],
-                            exemplars: Some(vec![]),
-                            time_window: None,
-                        });
-                        let entry = entry.exemplars.as_mut().unwrap();
-                        for exemplar in exemplars {
-                            if let Some(exemplar) = exemplar.as_object() {
-                                entry.push(Arc::new(Exemplar::from(exemplar)));
-                            }
-                        }
-                    }
-                }
+                append_batch(&mut metrics, &batch, &hash_field_type);
             }
             let mut unique_timestamps = HashSet::new();
             if collect_timestamps {
                 for metric in metrics.values() {
-                    if let Some(max_timestamp) = metric.exemplars.as_ref().and_then(|exemplars| {
-                        exemplars.iter().map(|exemplar| exemplar.timestamp).max()
-                    }) {
-                        unique_timestamps.insert(max_timestamp);
+                    if let Some(timestamp) = max_timestamp(metric) {
+                        unique_timestamps.insert(timestamp);
                     }
                 }
             }
@@ -405,7 +425,6 @@ async fn load_exemplars_from_datafusion(
         });
         tasks.push(task);
     }
-
     collect_partitions(tasks).await
 }
 
@@ -609,5 +628,70 @@ mod tests {
         assert_eq!(timestamps, HashSet::from([150, 200]));
         assert_eq!(metrics[&11].exemplars.as_ref().unwrap().len(), 2);
         assert_eq!(metrics[&22].exemplars.as_ref().unwrap().len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_load_exemplars_string_hashes_preserves_empty_and_invalid_rows() {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new(HASH_LABEL, DataType::Utf8, false),
+            Field::new(EXEMPLARS_LABEL, DataType::Utf8, true),
+        ]));
+        let batch = RecordBatch::try_new(
+            schema,
+            vec![
+                Arc::new(StringArray::from(vec![
+                    "valid",
+                    "valid",
+                    "invalid",
+                    "empty",
+                    "nonobject",
+                    "null",
+                ])),
+                Arc::new(StringArray::from(vec![
+                    Some(r#"[{"_timestamp":200,"value":2.0}]"#),
+                    Some(r#"[{"_timestamp":100,"value":1.0}]"#),
+                    Some("invalid json"),
+                    Some("[]"),
+                    Some("[null, 1]"),
+                    None,
+                ])),
+            ],
+        )
+        .unwrap();
+        let ctx = SessionContext::new_with_config(SessionConfig::new().with_target_partitions(4));
+        let df = ctx.read_batch(batch).unwrap();
+        let hash = |value: &str| gxhash::new().sum64(value);
+        for collect_timestamps in [false, true] {
+            let (partitions, timestamps) = load_exemplars_from_datafusion(
+                "test",
+                &DataType::Utf8,
+                df.clone(),
+                collect_timestamps,
+            )
+            .await
+            .unwrap();
+            assert_eq!(partitions.len(), 4);
+            let metrics = merge_partitioned_metrics(partitions);
+            assert_eq!(metrics.len(), 3);
+            let exemplars = metrics[&hash("valid")].exemplars.as_ref().unwrap();
+            assert_eq!(
+                exemplars
+                    .iter()
+                    .map(|value| value.timestamp)
+                    .collect::<Vec<_>>(),
+                vec![200, 100]
+            );
+            for name in ["empty", "nonobject"] {
+                assert!(metrics[&hash(name)].exemplars.as_ref().unwrap().is_empty());
+            }
+            assert_eq!(
+                timestamps,
+                if collect_timestamps {
+                    HashSet::from([200])
+                } else {
+                    HashSet::new()
+                }
+            );
+        }
     }
 }

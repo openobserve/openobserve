@@ -25,7 +25,7 @@ use hashbrown::{HashMap, hash_map::Entry};
 
 use super::{
     accumulator::{FusedAccumulator, FusedAggOp},
-    collect_partitioned,
+    evaluate_partitions,
     range_expr::RangeExpr,
 };
 use crate::series_stream::SeriesStream;
@@ -56,16 +56,11 @@ where
         op.name(),
         sources.len(),
     );
-    let folds = sources.into_iter().map(|source| {
-        let eval = eval.clone();
-        async move { aggregate_partial(source.await?, op, eval).await }
-    });
-    let folds = collect_partitioned(folds).await?;
-    let series_count = folds.iter().map(|(_, series)| series).sum();
-    let value = aggregate_final(
-        folds.into_iter().map(|(groups, _)| groups),
-        &eval.timestamps,
-    );
+    let (folds, series_count) = evaluate_partitions(sources, &eval, move |source, eval| {
+        aggregate_partial(source, op, eval)
+    })
+    .await?;
+    let value = aggregate_final(folds, &eval.timestamps);
     log::info!(
         "[trace_id: {trace_id}] [PromQL Timing] fused {}({func_name}) execution took: {:?}, folded {series_count} series into {} series",
         op.name(),
@@ -157,7 +152,10 @@ mod tests {
     use datafusion::error::DataFusionError;
     use promql_parser::parser::LabelModifier;
 
-    use super::{super::tests::*, *};
+    use super::{
+        super::{collect_partitioned, tests::*},
+        *,
+    };
     use crate::{
         aggregations,
         functions::{self, RangeFunc},
