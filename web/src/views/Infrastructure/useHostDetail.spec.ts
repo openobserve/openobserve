@@ -19,6 +19,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { buildLogsPreviewSql, resolveHostLogsTarget, useHostLogsTarget } from "./useHostDetail";
 import useStreams from "@/composables/useStreams";
+import { __resetSchemaReadsForTest } from "./curated/useCuratedPage";
 import { loadSemanticGroups } from "@/utils/semanticGroupsCache";
 
 vi.mock("@/composables/useStreams", () => ({
@@ -98,6 +99,83 @@ describe("resolveHostLogsTarget — evidence, not a guess", () => {
     });
     expect(target.stream).toBeNull();
   });
+
+  // Rank order is not relevance: `_o2_dbm_server` carries a host-shaped column and
+  // ranked first, so a real org's drawer offered a database-monitoring rollup as
+  // "this host's logs". The backend calls the `_o2_` family internal by PREFIX
+  // (config/src/meta/self_reporting/usage.rs:99 is_internal_rollup_stream).
+  describe("internal rollup streams are not a host's logs", () => {
+    it("never picks an _o2_ stream even when it ranks the best alias", () => {
+      const target = resolveHostLogsTarget({
+        streams: [
+          entry("_o2_dbm_server", ["_timestamp", "host"]),
+          entry("applogs", ["_timestamp", "host_name", "log"]),
+        ],
+        hostFieldAliases: HOST_ALIASES,
+      });
+      expect(target.stream).toBe("applogs");
+      expect(target.field).toBe("host_name");
+    });
+
+    it("excludes the whole _o2_ family, not just the DBM stream", () => {
+      for (const name of ["_o2_db_stats", "_o2_service_graph", "_o2_dbm_server"]) {
+        const target = resolveHostLogsTarget({
+          streams: [entry(name, ["_timestamp", "host"])],
+          hostFieldAliases: HOST_ALIASES,
+        });
+        expect(target.stream).toBeNull();
+      }
+    });
+
+    it("excludes the pre-prefix-era _agent_signals alongside the _o2_ family", () => {
+      const target = resolveHostLogsTarget({
+        streams: [entry("_agent_signals", ["_timestamp", "host"])],
+        hostFieldAliases: HOST_ALIASES,
+      });
+      expect(target.stream).toBeNull();
+    });
+
+    // Honest reason: the org HAS log streams, they are just all ours. "no host
+    // field" would blame the user's schema for our own filter.
+    it("reports an all-internal org as no-log-streams, not as a missing field", () => {
+      const target = resolveHostLogsTarget({
+        streams: [entry("_o2_dbm_server", ["_timestamp", "host"])],
+        hostFieldAliases: HOST_ALIASES,
+      });
+      expect(target.reason).toBe("no-log-streams");
+    });
+
+    it("leaves an ordinary stream that merely starts with o2 alone", () => {
+      const target = resolveHostLogsTarget({
+        streams: [entry("o2_stuff", ["_timestamp", "host"])],
+        hostFieldAliases: HOST_ALIASES,
+      });
+      expect(target.stream).toBe("o2_stuff");
+    });
+  });
+
+  // A stream with a host column but no rows in the window is not this host's logs.
+  // Stats come free on the LIST read, so this costs no extra request.
+  describe("a stream that never reported is not a candidate", () => {
+    it("prefers a stream with rows over a better-ranked empty one", () => {
+      const target = resolveHostLogsTarget({
+        streams: [
+          { ...entry("empty", ["_timestamp", "host"]), stats: { doc_num: 0 } },
+          { ...entry("applogs", ["_timestamp", "host_name"]), stats: { doc_num: 4200 } },
+        ],
+        hostFieldAliases: HOST_ALIASES,
+      });
+      expect(target.stream).toBe("applogs");
+    });
+
+    it("still resolves when no candidate carries stats at all", () => {
+      const target = resolveHostLogsTarget({
+        streams: [entry("applogs", ["_timestamp", "host_name"])],
+        hostFieldAliases: HOST_ALIASES,
+      });
+      expect(target.stream).toBe("applogs");
+    });
+  });
 });
 
 describe("useHostLogsTarget — resolves against the org's own streams and dictionary", () => {
@@ -109,6 +187,8 @@ describe("useHostLogsTarget — resolves against the org's own streams and dicti
     getStreamsMock.mockReset();
     getStreamMock.mockReset();
     vi.mocked(loadSemanticGroups).mockReset();
+    // Schema reads are cached MODULE-side, so one case's reads would answer the next one's.
+    __resetSchemaReadsForTest();
   });
 
   it("reads the org's host aliases rather than assuming a field spelling", async () => {
@@ -147,6 +227,39 @@ describe("useHostLogsTarget — resolves against the org's own streams and dicti
 
     const resolved = await useHostLogsTarget().resolve("org-1");
     expect(resolved.stream).toBe("syslog");
+  });
+
+  // On a COLD store getStreams() forces schema=false (useStreams.ts:66), so every
+  // getStream(..., true) is a real StreamService.schema request, not a cache hit.
+  describe("schema reads are bounded, not one per stream in the org", () => {
+    const bigOrg = (count: number) =>
+      Array.from({ length: count }, (_, i) => ({ name: `stream_${i}` }));
+
+    beforeEach(() => {
+      vi.mocked(loadSemanticGroups).mockResolvedValue([
+        { id: "host", display: "Host", fields: ["host_name"] },
+      ] as any);
+    });
+
+    it("does not read a schema for every stream in a 200-stream org", async () => {
+      getStreamsMock.mockResolvedValue({ list: bigOrg(200) });
+      getStreamMock.mockResolvedValue({ name: "x", schema: [{ name: "host_name" }] });
+
+      await useHostLogsTarget().resolve("org-1");
+      expect(getStreamMock.mock.calls.length).toBeLessThanOrEqual(25);
+    });
+
+    it("never reads a schema for an internal rollup stream", async () => {
+      getStreamsMock.mockResolvedValue({
+        list: [{ name: "_o2_dbm_server" }, { name: "_o2_db_stats" }, { name: "applogs" }],
+      });
+      getStreamMock.mockResolvedValue({ name: "applogs", schema: [{ name: "host_name" }] });
+
+      await useHostLogsTarget().resolve("org-1");
+      const read = getStreamMock.mock.calls.map((call: any[]) => call[0]);
+      expect(read).not.toContain("_o2_dbm_server");
+      expect(read).not.toContain("_o2_db_stats");
+    });
   });
 });
 
