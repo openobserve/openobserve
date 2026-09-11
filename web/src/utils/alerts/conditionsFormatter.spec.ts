@@ -454,5 +454,60 @@ describe("conditionsFormatter", () => {
 
       expect(result).toBe("WHERE age > 18 AND age < 65 OR city = 'NYC'");
     });
+
+    // Regression: a value containing a literal ' must double it before being
+    // wrapped in the outer quotes, in both display and SQL mode, and whether
+    // or not formatValues routes through the type-aware formatValue() path.
+    it("escapes an embedded single quote in display mode (formatValues=false)", () => {
+      const group = {
+        filterType: "condition",
+        column: "city",
+        operator: "=",
+        value: "O'Hare",
+      };
+
+      expect(buildConditionsString(group, { sqlMode: false, formatValues: false })).toBe(
+        "city = 'O''Hare'",
+      );
+    });
+
+    it("escapes an embedded single quote in SQL mode (formatValues=true)", () => {
+      const group = {
+        filterType: "condition",
+        column: "city",
+        operator: "=",
+        value: "O'Hare",
+      };
+
+      expect(
+        buildConditionsString(group, { sqlMode: true, formatValues: true, streamFieldsMap }),
+      ).toBe("city = 'O''Hare'");
+    });
+
+    it("escapes an embedded single quote in a LIKE (contains) pattern", () => {
+      const group = {
+        filterType: "condition",
+        column: "name",
+        operator: "contains",
+        value: "O'Hare",
+      };
+
+      expect(
+        buildConditionsString(group, { sqlMode: true, formatValues: true, streamFieldsMap }),
+      ).toBe("name LIKE '%O''Hare%'");
+    });
+
+    it("escapes an embedded single quote in a NOT LIKE (not_contains) pattern", () => {
+      const group = {
+        filterType: "condition",
+        column: "name",
+        operator: "not_contains",
+        value: "O'Hare",
+      };
+
+      expect(
+        buildConditionsString(group, { sqlMode: true, formatValues: true, streamFieldsMap }),
+      ).toBe("name NOT LIKE '%O''Hare%'");
+    });
   });
 });
