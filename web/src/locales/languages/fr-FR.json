@@ -2425,7 +2425,9 @@
     "subscription_plan": "Plan d'abonnement",
     "pendingDeletion": "Suppression en attente",
     "daysLeft": "{n} jours restants",
-    "resurrect": "Restaurer l'organisation"
+    "resurrect": "Restaurer l'organisation",
+    "statusActive": "Actif",
+    "statusDeleting": "Suppression en cours"
   },
   "template": {
     "search": "Modèle de recherche"

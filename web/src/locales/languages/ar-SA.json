@@ -2425,7 +2425,9 @@
     "subscription_plan": "خطة الاشتراك",
     "pendingDeletion": "قيد الحذف",
     "daysLeft": "{n} أيام متبقية",
-    "resurrect": "منظمة الإحياء"
+    "resurrect": "منظمة الإحياء",
+    "statusActive": "نشط",
+    "statusDeleting": "جارٍ الحذف"
   },
   "template": {
     "search": "قالب البحث"

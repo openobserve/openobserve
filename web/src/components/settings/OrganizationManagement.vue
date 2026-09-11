@@ -94,6 +94,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #cell-protocol_steps_total="{ row }">
             {{ formatCredits(row.protocol_steps_limit) }}
           </template>
+          <template #cell-status="{ row }">
+            <OBadge
+              :variant="
+                row.status === 'pending_deletion' || row.status === 'deleting'
+                  ? 'warning'
+                  : 'success-soft'
+              "
+              size="sm"
+            >
+              {{ statusLabel(row) }}
+            </OBadge>
+          </template>
           <template #cell-actions="{ row }">
             <div class="flex items-center justify-center gap-1">
               <OButton
@@ -172,6 +184,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <OTooltip :content="t('settings.organizationManagementPage.storageEnabled')" />
               </OButton>
+              <OButton
+                v-if="row.status === 'deleting'"
+                variant="ghost"
+                size="icon-xs-circle"
+                icon-left="history"
+                class="max-md:hidden"
+                data-test="org-management-cleanup-tasks-btn"
+                @click.stop="viewCleanupTasks(row)"
+              >
+                <OTooltip :content="t('iam.listOrganizations.viewDeletionProgress')" />
+              </OButton>
+              <OButton
+                v-if="row.status === 'pending_deletion'"
+                variant="ghost"
+                size="icon-xs-circle"
+                icon-left="undo"
+                class="max-md:hidden"
+                data-test="org-management-resurrect-btn"
+                @click.stop="resurrectOrganization(row)"
+              >
+                <OTooltip :content="t('organization.resurrect')" />
+              </OButton>
               <ODropdown side="bottom" align="end">
                 <template #trigger>
                   <OButton
@@ -235,6 +269,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @select="toggleOrgStorage(row)"
                 >
                   <span>{{ t("settings.organizationManagementPage.enableStorage") }}</span>
+                </ODropdownItem>
+                <ODropdownItem
+                  v-if="row.status === 'deleting'"
+                  icon-left="history"
+                  class="md:hidden"
+                  data-test="org-management-cleanup-tasks-btn-menu"
+                  @select="viewCleanupTasks(row)"
+                >
+                  <span>{{ t("iam.listOrganizations.viewDeletionProgress") }}</span>
+                </ODropdownItem>
+                <ODropdownItem
+                  v-if="row.status === 'pending_deletion'"
+                  icon-left="undo"
+                  class="md:hidden"
+                  data-test="org-management-resurrect-btn-menu"
+                  @select="resurrectOrganization(row)"
+                >
+                  <span>{{ t("organization.resurrect") }}</span>
                 </ODropdownItem>
               </ODropdown>
             </div>
@@ -429,12 +481,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </OForm>
     </ODialog>
+
+    <OrgCleanupTasksDialog
+      :open="showCleanupDialog"
+      :org-id="cleanupTargetOrg.id"
+      :org-name="cleanupTargetOrg.name"
+      @update:open="showCleanupDialog = $event"
+    />
   </div>
 </template>
 <script lang="ts">
 import { ref, onMounted, watch, defineComponent, computed } from "vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OrgCleanupTasksDialog from "@/components/iam/organizations/OrgCleanupTasksDialog.vue";
 import { timestampToTimezoneDate, getImageURL } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -480,6 +541,8 @@ export default defineComponent({
   components: {
     OPageLayout,
     OEmptyState,
+    OBadge,
+    OrgCleanupTasksDialog,
     OButton,
     ODialog,
     ODropdown,
@@ -506,6 +569,8 @@ export default defineComponent({
     const tabledata = ref<any>([]);
     const resultTotal = ref(0);
     const filterQuery = ref("");
+    const showCleanupDialog = ref(false);
+    const cleanupTargetOrg = ref({ id: "", name: "" });
 
     // Usage allowance state — one dialog for every quota pool, the active tab
     // naming the pool. Tab names are the backend TrialQuotaPool keys.
@@ -629,6 +694,16 @@ export default defineComponent({
         meta: { align: "left" },
       },
       {
+        id: "status",
+        header: t("iam.listOrganizations.status"),
+        accessorKey: "status",
+        sortable: true,
+        resizable: true,
+        hideable: true,
+        size: COL.status,
+        meta: { align: "left" },
+      },
+      {
         id: "billing_provider",
         header: t("settings.organizationManagementPage.provider"),
         accessorKey: "billing_provider",
@@ -733,8 +808,8 @@ export default defineComponent({
         header: t("settings.actions"),
         isAction: true,
         pinned: "right",
-        size: 240,
-        meta: { align: "center", actionCount: 4 },
+        size: 300,
+        meta: { align: "center", actionCount: 5 },
       },
     ];
 
@@ -795,6 +870,9 @@ export default defineComponent({
               contract_end_date: responseData[i].contract_end_date || 0,
               contract_end_date_display: formatMicrosToDate(responseData[i].contract_end_date),
               org_storage_enabled: responseData[i].org_storage_enabled || false,
+              status: responseData[i].status ?? "active",
+              deleted_at: responseData[i].deleted_at ?? null,
+              grace_period_days: responseData[i].grace_period_days ?? null,
             });
           }
 
@@ -817,6 +895,41 @@ export default defineComponent({
             });
           }
         });
+    };
+
+    const viewCleanupTasks = (row: any) => {
+      cleanupTargetOrg.value = { id: row.identifier, name: row.name };
+      showCleanupDialog.value = true;
+    };
+
+    const statusLabel = (row: any): string => {
+      if (row.status === "pending_deletion") return pendingLabel(row);
+      if (row.status === "deleting") return t("organization.statusDeleting");
+      if (row.status === "active") return t("organization.statusActive");
+      return row.status;
+    };
+
+    const pendingLabel = (row: any): string => {
+      if (!row.deleted_at || !row.grace_period_days) return t("organization.pendingDeletion");
+      // deleted_at is micros → ms
+      const deletedAtMs = row.deleted_at / 1000;
+      const windowMs = row.grace_period_days * 86400 * 1000;
+      const msLeft = deletedAtMs + windowMs - Date.now();
+      const daysLeft = Math.max(0, Math.ceil(msLeft / 86400000));
+      return `${t("organization.pendingDeletion")} — ${t("organization.daysLeft", { n: daysLeft })}`;
+    };
+
+    const resurrectOrganization = async (row: any) => {
+      try {
+        await OrganizationServices.resurrect_org(store.state.zoConfig.meta_org, row.identifier);
+        toast({ variant: "success", message: t("iam.listOrganizations.organizationResurrected") });
+        getData();
+      } catch (e: any) {
+        toast({
+          variant: "error",
+          message: e?.response?.data?.message || t("iam.listOrganizations.failedToResurrect"),
+        });
+      }
     };
 
     const toggleExtendTrialDialog = (row: any) => {
@@ -1182,6 +1295,12 @@ export default defineComponent({
       filterQuery,
       filterData,
       visibleRows,
+      showCleanupDialog,
+      cleanupTargetOrg,
+      viewCleanupTasks,
+      pendingLabel,
+      statusLabel,
+      resurrectOrganization,
       store,
       // Form wiring (Options-API: schemas/defaults MUST be returned so :schema
       // resolves and validation runs).
