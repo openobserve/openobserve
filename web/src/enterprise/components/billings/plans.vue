@@ -150,7 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-if="loading" class="text-center text-xl font-medium font-semibold">
         <OSpinner size="md" class="mx-auto mt-3 block text-center" />
       </div>
-      <div v-else class="mt-3 grid grid-cols-2 gap-3">
+      <div v-else class="mt-3 grid grid-cols-2 gap-3 max-lg:grid-cols-1">
         <ProPlan
           :planType="planType"
           :billingProvider="billingProvider"

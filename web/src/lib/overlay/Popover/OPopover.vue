@@ -41,12 +41,15 @@ if (typeof document !== "undefined" && !(globalThis as any)[_oPopKey]) {
 <script setup lang="ts">
 import { PopoverRoot, PopoverTrigger, PopoverPortal, PopoverContent } from "reka-ui";
 import { inject, onBeforeUnmount, provide, ref, watch, type Ref } from "vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import {
   O_DROPDOWN_NESTED_KEY,
   type DropdownNestedRegistry,
   setActiveOverlay,
   clearActiveOverlay,
 } from "@/lib/overlay/Dropdown/ODropdown.context";
+
+const { lgUp } = useBreakpoint();
 
 const props = withDefaults(
   defineProps<{
@@ -223,12 +226,14 @@ onBeforeUnmount(() => {
         :align="align"
         :side-offset="sideOffset"
         :hide-when-detached="hideWhenDetached"
+        :collision-padding="lgUp ? 0 : 8"
         :aria-label="ariaLabel"
         :style="{ zIndex }"
         @pointer-down-outside="handlePointerDownOutside"
         @focus-outside="handleFocusOutside"
         :class="[
-          'outline-none',
+          'outline-none max-lg:max-w-[calc(100vw-1rem)]',
+          'max-lg:max-h-[var(--reka-popper-available-height,75vh)] max-lg:overflow-y-auto',
           // Surface
           'bg-dropdown-bg border-dropdown-border rounded-default border shadow-md',
           // Open/close reveal animation (matches ODropdown)

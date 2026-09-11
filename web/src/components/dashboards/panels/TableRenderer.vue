@@ -711,6 +711,13 @@ export default defineComponent({
   opacity: 0.4;
 }
 
+/* Touch has no th:hover — keep the sort affordance faintly visible. */
+@media (max-width: 47.99rem) {
+  .table-wrapper :deep(.pivot-sort-icon) {
+    opacity: 0.4;
+  }
+}
+
 .table-wrapper :deep(.pivot-sort-active) {
   opacity: 1 !important;
 }

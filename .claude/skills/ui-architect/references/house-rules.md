@@ -1,6 +1,6 @@
 # House rules — full treatment (what · why · how)
 
-> Extracted from the ui-architect contract. The always-loaded summary is in ../SKILL.md § The six house rules — read this for the full rationale and code.
+> Extracted from the ui-architect contract. The always-loaded summary is in ../SKILL.md § The seven house rules — read this for the full rationale and code of rules 1–6; rule 7 (responsive) lives in [responsive.md](responsive.md).
 
 ## The house rules
 

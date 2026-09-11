@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <span
       v-if="hasRun && mode !== 'button'"
-      class="text-text-secondary text-xs whitespace-nowrap tabular-nums select-none"
+      class="text-text-secondary text-xs whitespace-nowrap tabular-nums select-none max-md:hidden"
       :data-test="`${dataTest}-age`"
     >
       {{ relative }}

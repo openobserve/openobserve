@@ -22,6 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :data-test="`dashboard-panel-container`"
     :data-test-panel-id="props.data.id"
     :data-test-panel-title="props.data.title"
+    :data-panel-type="props.data.type"
   >
     <div
       :class="{
@@ -408,6 +409,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import useBreakpoint from "@/composables/useBreakpoint";
 import {
   defineComponent,
   ref,
@@ -588,8 +590,10 @@ export default defineComponent({
     // layout while hidden so the title's truncation point never moves when the
     // pointer enters or leaves; `invisible` (visibility:hidden) also takes them
     // out of the tab order and the a11y tree, so nothing hidden is reachable.
+    // Touch has no hover, so < md the controls are simply always shown.
+    const { isMobile } = useBreakpoint();
     const hoverRevealClass = computed(() =>
-      isCurrentlyHoveredPanel.value ? "" : "invisible pointer-events-none",
+      isCurrentlyHoveredPanel.value || isMobile.value ? "" : "invisible pointer-events-none",
     );
 
     //for edit panel

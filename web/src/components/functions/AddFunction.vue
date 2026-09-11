@@ -55,8 +55,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="splitterModel"
           :limits="hideTestPanel ? [100, 100] : [30, 100]"
           class="w-full overflow-hidden"
-          :horizontal="false"
-          :separator-class="hideTestPanel ? 'hidden' : 'w-[0.0625rem] bg-card-glass-border'"
+          :horizontal="isMobile"
+          :separator-class="
+            hideTestPanel
+              ? 'hidden'
+              : isMobile
+                ? 'h-[0.0625rem] bg-card-glass-border'
+                : 'w-[0.0625rem] bg-card-glass-border'
+          "
         >
           <template v-slot:before>
             <!-- Workflows (hideTestPanel): drop the horizontal padding so the editor
@@ -220,6 +226,7 @@ import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useVrlPlaceholder, useJsPlaceholder } from "@/composables/useVrlPlaceholder";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import { makeAddFunctionSchema, type AddFunctionForm } from "./AddFunction.schema";
@@ -300,6 +307,7 @@ export default defineComponent({
   setup(props, { emit, expose }) {
     const store: any = useStore();
     const router = useRouter();
+    const { isMobile } = useBreakpoint();
     const { track } = useReo();
 
     // let beingUpdated: boolean = false;
@@ -665,6 +673,7 @@ export default defineComponent({
       handleFunctionError,
       vrlFunctionError,
       splitterModel,
+      isMobile,
       closeAddFunction,
       confirmDialogMeta,
       transformTypeOptions,

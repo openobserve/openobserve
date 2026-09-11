@@ -48,6 +48,7 @@ import {
   watch,
   watchEffect,
 } from "vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import {
   O_DROPDOWN_NESTED_KEY,
   setActiveOverlay,
@@ -89,6 +90,8 @@ type NormalizedOption = {
 const DEFAULT_OPTION_LABEL = "label";
 const DEFAULT_OPTION_VALUE = "value";
 const DEFAULT_OPTION_DISABLED = "disabled";
+
+const { lgUp } = useBreakpoint();
 
 const props = withDefaults(defineProps<SelectProps>(), {
   size: "md",
@@ -1828,10 +1831,12 @@ const fieldWidthClass = computed(() => {
           position="popper"
           :side-offset="4"
           :hide-when-detached="true"
+          :collision-padding="lgUp ? 0 : 8"
           :data-test="parentDataTest ? `${parentDataTest}-popover` : undefined"
           :class="[
-            'z-10001 min-w-(--reka-select-trigger-width)',
+            'z-10001 min-w-(--reka-select-trigger-width) max-lg:max-w-[calc(100vw-1rem)]',
             'overflow-hidden',
+            'max-lg:max-h-[var(--reka-popper-available-height,75vh)] max-lg:overflow-y-auto',
             'rounded-default border shadow-md',
             'bg-select-content-bg border-select-content-border',
             // Clip-path reveal: unveiled at full size from its trigger edge (no
