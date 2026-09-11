@@ -13,38 +13,49 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Loads and attaches labels for series returned by the sample scan.
+//! Attaches labels to the series the sample scan returned: cache hits first, then one label scan
+//! for the remaining series.
 
 use std::sync::Arc;
 
 use config::{
+    TIMESTAMP_COL_NAME,
     meta::promql::{
         HASH_LABEL,
-        value::{Label, Labels, RangeValue},
+        value::{Labels, QueryContext, RangeValue},
     },
     utils::hash::{Sum64, gxhash},
 };
 use datafusion::{
     arrow::{
-        array::{Array, StringArray, StringViewArray, UInt64Array},
+        array::{StringArray, UInt64Array},
         datatypes::DataType,
     },
     error::{DataFusionError, Result},
     physical_plan::{
         Partitioning, execute_stream_partitioned, expressions::Column, repartition::RepartitionExec,
     },
-    prelude::DataFrame,
+    prelude::{DataFrame, col, lit},
 };
 use futures::TryStreamExt;
 use hashbrown::{HashMap, HashSet};
 
-use super::{PartitionedMetrics, with_hash_label};
+use super::{
+    PartitionedMetrics, label_cache,
+    label_interner::{LabelColumn, LabelInterner},
+    with_hash_label,
+};
+
+const MAX_HASH_INLIST_FILTER: usize = 8192;
+const TIMESTAMP_IN_LIST_MAX_VALUES: usize = 1024;
 
 type TokioLabelsResult = tokio::task::JoinHandle<Result<HashMap<u64, RangeValue>>>;
 
-const LABEL_INTERNER_OBSERVATION_WINDOW: usize = 4096;
-const LABEL_INTERNER_MIN_HIT_PERCENT: usize = 10;
-const LABEL_INTERNER_MAX_VALUES: usize = 16_384;
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum TimestampFilterStrategy {
+    InList,
+    Between { min: i64, max: i64 },
+}
 
 /// Receives source labels as they are extracted. Implementations can observe
 /// or persist them without coupling the loader to a particular cache.
@@ -52,103 +63,116 @@ pub(super) trait LoadedLabelsObserver: Send + Sync {
     fn observe(&self, hash: u64, labels: &Labels);
 }
 
-/// Query-local cache for immutable labels from one DataFusion column.
+/// Attach labels to every loaded series. Cache hits are attached first, then
+/// the loader scans and extracts labels only for the remaining series.
+pub(super) async fn load_series_labels(
+    query_ctx: &QueryContext,
+    table_name: &str,
+    df_group: DataFrame,
+    hash_field_type: &DataType,
+    label_col_names: &[String],
+    timestamp_set: &HashSet<i64>,
+    mut metrics: PartitionedMetrics,
+) -> Result<PartitionedMetrics> {
+    let start = std::time::Instant::now();
+
+    let misses = label_cache::attach_cached_labels(
+        &query_ctx.org_id,
+        table_name,
+        label_col_names,
+        query_ctx.query_data,
+        &mut metrics,
+    );
+    let (cache_hits, cache_misses) = (misses.hits(), misses.count());
+
+    if !misses.is_empty() {
+        let series_df = missing_label_scan(
+            &query_ctx.trace_id,
+            df_group,
+            hash_field_type,
+            label_col_names,
+            timestamp_set,
+            &misses,
+        )?;
+        let observer = misses.write_observer(&query_ctx.trace_id, label_col_names.len());
+        metrics = load_labels(
+            &query_ctx.trace_id,
+            hash_field_type,
+            series_df,
+            query_ctx.query_data,
+            observer,
+            misses.into_selected_hashes(),
+            metrics,
+        )
+        .await?;
+    }
+
+    log::info!(
+        "[trace_id: {}] load and process all labels took: {:?}, label cache hits: {cache_hits}, misses: {cache_misses}",
+        query_ctx.trace_id,
+        start.elapsed(),
+    );
+    Ok(metrics)
+}
+
+/// Choose the cheaper timestamp predicate using a bounded empirical model.
+fn timestamp_filter_strategy(timestamp_set: &HashSet<i64>) -> TimestampFilterStrategy {
+    if timestamp_set.len() <= TIMESTAMP_IN_LIST_MAX_VALUES {
+        return TimestampFilterStrategy::InList;
+    }
+
+    let (min, max) = timestamp_set
+        .iter()
+        .fold((i64::MAX, i64::MIN), |(min, max), &timestamp| {
+            (min.min(timestamp), max.max(timestamp))
+        });
+
+    TimestampFilterStrategy::Between { min, max }
+}
+
+/// Build the scan that recovers the missing series' labels: label columns
+/// only, narrowed by a hash in-list when the misses are few, and by the
+/// series max timestamps the sample scan already collected (every series has
+/// a label row at its own max sample/exemplar timestamp).
 ///
-/// Label values are looked up by borrowed `&str`, so cache hits only clone the
-/// `Arc`. A low-reuse column disables and releases its cache after an observation
-/// window instead of retaining one map entry per series.
-pub(crate) struct LabelInterner {
-    name: String,
-    values: Option<HashMap<String, Arc<Label>>>,
-    window_lookups: usize,
-    window_hits: usize,
-}
+/// The timestamp set covers all series rather than just the misses: series
+/// share scrape timestamps, so a miss-only set is virtually identical, and
+/// deriving it would cost a full pass over the loaded samples.
+fn missing_label_scan(
+    trace_id: &str,
+    df_group: DataFrame,
+    hash_field_type: &DataType,
+    label_col_names: &[String],
+    timestamp_set: &HashSet<i64>,
+    misses: &label_cache::CacheMisses,
+) -> Result<DataFrame> {
+    let mut df = df_group;
+    if hash_field_type == &DataType::UInt64 && misses.count() <= MAX_HASH_INLIST_FILTER {
+        let hashes = misses.hashes().map(lit).collect();
+        df = df.filter(col(HASH_LABEL).in_list(hashes, false))?;
+    }
 
-impl LabelInterner {
-    pub(crate) fn new(name: String) -> Self {
-        Self {
-            name,
-            values: Some(HashMap::new()),
-            window_lookups: 0,
-            window_hits: 0,
+    let filter_strategy = timestamp_filter_strategy(timestamp_set);
+    let timestamp_filter = match filter_strategy {
+        TimestampFilterStrategy::InList => {
+            let mut timestamps = timestamp_set.iter().copied().collect::<Vec<_>>();
+            timestamps.sort_unstable();
+            col(TIMESTAMP_COL_NAME).in_list(timestamps.into_iter().map(lit).collect(), false)
         }
-    }
-
-    pub(crate) fn intern(&mut self, value: &str) -> Arc<Label> {
-        let Some(values) = self.values.as_mut() else {
-            return Arc::new(Label {
-                name: self.name.clone(),
-                value: value.to_string(),
-            });
-        };
-
-        self.window_lookups += 1;
-        let label = if let Some(label) = values.get(value) {
-            self.window_hits += 1;
-            Arc::clone(label)
-        } else {
-            let label = Arc::new(Label {
-                name: self.name.clone(),
-                value: value.to_string(),
-            });
-            if values.len() < LABEL_INTERNER_MAX_VALUES {
-                values.insert(value.to_string(), Arc::clone(&label));
-            }
-            label
-        };
-
-        if self.window_lookups == LABEL_INTERNER_OBSERVATION_WINDOW {
-            let keep_cache =
-                self.window_hits * 100 >= self.window_lookups * LABEL_INTERNER_MIN_HIT_PERCENT;
-            self.window_lookups = 0;
-            self.window_hits = 0;
-            if !keep_cache {
-                self.values = None;
-            }
+        TimestampFilterStrategy::Between { min, max } => {
+            col(TIMESTAMP_COL_NAME).between(lit(min), lit(max))
         }
+    };
+    log::info!(
+        "[trace_id: {trace_id}] load labels with {filter_strategy:?} timestamp filter for {} values",
+        timestamp_set.len(),
+    );
 
-        label
-    }
-
-    #[cfg(test)]
-    fn is_enabled(&self) -> bool {
-        self.values.is_some()
-    }
-}
-
-pub(crate) enum LabelColumn<'a> {
-    Utf8(&'a StringArray),
-    Utf8View(&'a StringViewArray),
-}
-
-impl<'a> LabelColumn<'a> {
-    pub(crate) fn try_from_array(column: &'a dyn Array) -> Option<Self> {
-        match column.data_type() {
-            DataType::Utf8 => column
-                .as_any()
-                .downcast_ref::<StringArray>()
-                .map(Self::Utf8),
-            DataType::Utf8View => column
-                .as_any()
-                .downcast_ref::<StringViewArray>()
-                .map(Self::Utf8View),
-            _ => None,
-        }
-    }
-
-    pub(crate) fn is_null(&self, row: usize) -> bool {
-        match self {
-            Self::Utf8(values) => values.is_null(row),
-            Self::Utf8View(values) => values.is_null(row),
-        }
-    }
-
-    pub(crate) fn value(&self, row: usize) -> &str {
-        match self {
-            Self::Utf8(values) => values.value(row),
-            Self::Utf8View(values) => values.value(row),
-        }
-    }
+    let label_cols = label_col_names
+        .iter()
+        .map(|name| col(name.as_str()))
+        .collect::<Vec<_>>();
+    df.filter(timestamp_filter)?.select(label_cols)
 }
 
 /// Repartition labels by series hash and process each partition in its own
@@ -157,7 +181,7 @@ impl<'a> LabelColumn<'a> {
 ///
 /// When `selected_hashes` is given, only those series are attached. The
 /// observer receives source labels before a synthetic hash label is added.
-pub(super) async fn load_labels(
+async fn load_labels(
     trace_id: &str,
     hash_field_type: &DataType,
     df: DataFrame,
@@ -304,7 +328,7 @@ pub(super) async fn load_labels(
 
 #[cfg(test)]
 mod tests {
-    use config::TIMESTAMP_COL_NAME;
+    use config::meta::promql::value::Label;
     use datafusion::{
         arrow::{
             array::{Float64Array, Int64Array, StringArray, StringViewArray, UInt64Array},
@@ -316,7 +340,39 @@ mod tests {
     use parking_lot::Mutex;
 
     use super::*;
-    use crate::load_series::load_samples_from_datafusion;
+    use crate::series_loader::load_samples_from_datafusion;
+
+    fn timestamps(count: usize, gap_micros: i64) -> HashSet<i64> {
+        (0..count)
+            .map(|timestamp| timestamp as i64 * gap_micros)
+            .collect()
+    }
+
+    #[test]
+    fn test_timestamp_filter_strategy_uses_in_list_up_to_limit() {
+        assert_eq!(
+            timestamp_filter_strategy(&HashSet::new()),
+            TimestampFilterStrategy::InList
+        );
+        assert_eq!(
+            timestamp_filter_strategy(&timestamps(TIMESTAMP_IN_LIST_MAX_VALUES, 1)),
+            TimestampFilterStrategy::InList
+        );
+    }
+
+    #[test]
+    fn test_timestamp_filter_strategy_caps_in_list_size() {
+        let count = TIMESTAMP_IN_LIST_MAX_VALUES + 1;
+        let sparse_gap = 10;
+        let sparse = timestamps(count, sparse_gap);
+        assert_eq!(
+            timestamp_filter_strategy(&sparse),
+            TimestampFilterStrategy::Between {
+                min: 0,
+                max: (count - 1) as i64 * sparse_gap,
+            }
+        );
+    }
 
     #[tokio::test]
     async fn test_load_labels_interns_across_batches_and_preserves_first_row() {
@@ -414,42 +470,6 @@ mod tests {
         assert_eq!(metrics[&11].labels[0].name, "instance");
         assert_eq!(metrics[&11].labels[0].value, "api");
         assert!(metrics[&22].labels.is_empty());
-    }
-
-    #[test]
-    fn test_label_interner_disables_low_reuse_columns() {
-        let mut unique_interner = LabelInterner::new("instance".to_string());
-        for value in 0..LABEL_INTERNER_OBSERVATION_WINDOW {
-            unique_interner.intern(&format!("unique-{value}"));
-        }
-        assert!(!unique_interner.is_enabled());
-        let first = unique_interner.intern("tail-repeat");
-        let second = unique_interner.intern("tail-repeat");
-        assert!(!Arc::ptr_eq(&first, &second));
-
-        let mut repeated_interner = LabelInterner::new("instance".to_string());
-        let first = repeated_interner.intern("shared");
-        for _ in 1..LABEL_INTERNER_OBSERVATION_WINDOW {
-            repeated_interner.intern("shared");
-        }
-        assert!(repeated_interner.is_enabled());
-        let last = repeated_interner.intern("shared");
-        assert!(Arc::ptr_eq(&first, &last));
-
-        // Do not disable a column just because the first window starts with a
-        // few thousand distinct values. The bounded cache still pays off when
-        // those values repeat over the rest of a large query.
-        let mut moderately_reused_interner = LabelInterner::new("instance".to_string());
-        for value in 0..3000 {
-            moderately_reused_interner.intern(&format!("value-{value}"));
-        }
-        let cached = moderately_reused_interner.intern("value-0");
-        for _ in 3001..LABEL_INTERNER_OBSERVATION_WINDOW {
-            moderately_reused_interner.intern("value-0");
-        }
-        assert!(moderately_reused_interner.is_enabled());
-        let reused = moderately_reused_interner.intern("value-0");
-        assert!(Arc::ptr_eq(&cached, &reused));
     }
 
     #[tokio::test]

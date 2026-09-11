@@ -26,7 +26,7 @@ use hashlink::lru_cache::LruCache;
 use parking_lot::Mutex;
 use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
 
-use super::{PartitionedMetrics, load_labels::LoadedLabelsObserver, with_hash_label};
+use super::{PartitionedMetrics, labels::LoadedLabelsObserver, with_hash_label};
 
 // Shards scale with the query thread count (~4x, rounded to a power of two)
 // so lock contention stays low on large queriers; clamped to a sane range.
