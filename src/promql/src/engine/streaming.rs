@@ -29,6 +29,7 @@ use super::{
     selector::{SelectorContexts, named_selector, plain_selector},
 };
 use crate::{
+    aggregations::AggOp,
     functions, micros,
     series_stream::plan::{
         StreamingSelector, execute_partitioned, group_label_columns, series_label_columns,
@@ -56,7 +57,7 @@ impl Engine {
         range: Duration,
         modifier: &Option<LabelModifier>,
         func: Arc<dyn functions::RangeFunc>,
-        op: streaming_eval::FusedAggOp,
+        op: AggOp,
     ) -> Result<Option<Value>> {
         if matches!(modifier, Some(LabelModifier::Exclude(_))) {
             return Ok(None);
@@ -149,7 +150,7 @@ impl Engine {
         scan: &SelectorScan,
         modifier: &Option<LabelModifier>,
         func: Arc<dyn functions::RangeFunc>,
-        op: streaming_eval::FusedAggOp,
+        op: AggOp,
         range: Duration,
     ) -> Result<Option<Value>> {
         self.stream_scan_guarded(scan, |ctx, schema| async move {

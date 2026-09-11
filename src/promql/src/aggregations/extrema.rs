@@ -13,46 +13,66 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::promql::value::Sample;
-use hashbrown::HashMap;
+use config::meta::promql::value::{Labels, RangeValue, Sample};
 
-use super::Accumulate;
+use super::{Accumulate, SeriesKey, group_series};
 
-#[derive(Default)]
 pub struct ExtremaAccumulator<const IS_MAX: bool> {
-    values: HashMap<i64, f64>,
+    values: Vec<f64>,
+    present: Vec<bool>,
 }
 
-impl<const IS_MAX: bool> Accumulate for ExtremaAccumulator<IS_MAX> {
-    fn accumulate(&mut self, sample: &Sample) {
+impl<const IS_MAX: bool> ExtremaAccumulator<IS_MAX> {
+    pub(super) fn new(slots: usize) -> Self {
         let initial = if IS_MAX {
             f64::NEG_INFINITY
         } else {
             f64::INFINITY
         };
-        let entry = self.values.entry(sample.timestamp).or_insert(initial);
+        Self {
+            values: vec![initial; slots],
+            present: vec![false; slots],
+        }
+    }
+
+    fn observe(&mut self, slot: usize, value: f64) {
         // Strict comparisons preserve the first signed zero and ignore NaN values.
         let replace = if IS_MAX {
-            sample.value > *entry
+            value > self.values[slot]
         } else {
-            sample.value < *entry
+            value < self.values[slot]
         };
         if replace {
-            *entry = sample.value;
+            self.values[slot] = value;
         }
+        self.present[slot] = true;
+    }
+}
+
+impl<const IS_MAX: bool> Accumulate for ExtremaAccumulator<IS_MAX> {
+    fn push(&mut self, slot: usize, value: f64, _series: &SeriesKey<'_>) {
+        self.observe(slot, value);
     }
 
     fn merge(&mut self, other: Self) {
-        for (timestamp, value) in other.values {
-            self.accumulate(&Sample::new(timestamp, value));
+        for (slot, other_present) in other.present.into_iter().enumerate() {
+            if !other_present {
+                continue;
+            }
+            self.observe(slot, other.values[slot]);
         }
     }
 
-    fn evaluate(self) -> Vec<Sample> {
-        self.values
+    fn evaluate(self, group_labels: Labels, timestamps: &[i64]) -> Vec<RangeValue> {
+        let samples = self
+            .values
             .into_iter()
-            .map(|(timestamp, value)| Sample::new(timestamp, value))
-            .collect()
+            .zip(self.present)
+            .enumerate()
+            .filter(|(_, (_, present))| *present)
+            .map(|(slot, (value, _))| Sample::new(timestamps[slot], value))
+            .collect();
+        group_series(group_labels, samples)
     }
 }
 
