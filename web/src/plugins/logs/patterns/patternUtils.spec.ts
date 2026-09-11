@@ -76,38 +76,34 @@ describe("extractConstantsFromPattern", () => {
   });
 });
 
+// The backend's PostgreSqlDialect parser does not support backslash string-literal
+// escapes, so doubling an embedded single quote is the only escaping this needs —
+// backslash, double quotes, and control characters are all literal once quoted.
 describe("escapeForMatchAll", () => {
-  it("escapes backslashes first", () => {
-    expect(escapeForMatchAll("a\\b")).toBe("a\\\\b");
+  it("doubles an embedded single quote", () => {
+    expect(escapeForMatchAll("it's")).toBe("it''s");
   });
 
-  it("escapes single quotes", () => {
-    expect(escapeForMatchAll("it's")).toBe("it\\'s");
+  it("leaves a backslash untouched", () => {
+    expect(escapeForMatchAll("a\\b")).toBe("a\\b");
   });
 
-  it("escapes double quotes", () => {
-    expect(escapeForMatchAll('say "hello"')).toBe('say \\"hello\\"');
+  it("leaves double quotes untouched", () => {
+    expect(escapeForMatchAll('say "hello"')).toBe('say "hello"');
   });
 
-  it("escapes newlines", () => {
-    expect(escapeForMatchAll("line1\nline2")).toBe("line1\\nline2");
-  });
-
-  it("escapes carriage returns", () => {
-    expect(escapeForMatchAll("line1\rline2")).toBe("line1\\rline2");
-  });
-
-  it("escapes tabs", () => {
-    expect(escapeForMatchAll("col1\tcol2")).toBe("col1\\tcol2");
+  it("leaves newlines, carriage returns, and tabs untouched", () => {
+    expect(escapeForMatchAll("line1\nline2")).toBe("line1\nline2");
+    expect(escapeForMatchAll("line1\rline2")).toBe("line1\rline2");
+    expect(escapeForMatchAll("col1\tcol2")).toBe("col1\tcol2");
   });
 
   it("does not modify plain strings", () => {
     expect(escapeForMatchAll("hello world")).toBe("hello world");
   });
 
-  it("handles backslash before quote correctly (order matters)", () => {
-    // Input: \'  → after backslash escape: \\'  → after quote escape: \\\\'
-    expect(escapeForMatchAll("\\'")).toBe("\\\\\\'");
+  it("doubles a backslash immediately before a quote without introducing extra backslashes", () => {
+    expect(escapeForMatchAll("\\'")).toBe("\\''");
   });
 });
 
@@ -129,7 +125,7 @@ describe("buildPatternSqlQuery", () => {
 
   it("escapes special chars in constants", () => {
     const sql = buildPatternSqlQuery("Error: it's a problem here <*> done", "my_stream");
-    expect(sql).toContain("match_all('Error: it\\'s a problem here')");
+    expect(sql).toContain("match_all('Error: it''s a problem here')");
   });
 });
 
@@ -360,7 +356,7 @@ describe("buildPatternSetSqlQuery", () => {
       streamName: "k8s_logs",
       includes: ["cannot open user's configuration file <*>"],
     });
-    expect(sql).toContain("\\'");
+    expect(sql).toContain("user''s");
   });
 
   it("agrees with buildPatternSqlQuery for the single-include case", () => {

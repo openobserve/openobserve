@@ -555,6 +555,25 @@ describe("useTraces", () => {
       );
     });
 
+    // Regression: an ingested span/trace id containing a literal ' must not
+    // break out of the quoted SQL literal.
+    it("escapes an embedded single quote in the span and trace ids", () => {
+      const { searchObj, buildQueryDetails, resetSearchObj } = useTraces();
+      resetSearchObj();
+      searchObj.data.traceDetails.selectedLogStreams = ["my-logs"] as any;
+      searchObj.data.traceDetails.selectedTrace = {
+        trace_id: "trace'xyz",
+        trace_start_time: 0,
+        trace_end_time: 0,
+      };
+
+      const details = buildQueryDetails({ spanId: "s'1", start_time: 1000, end_time: 2000 }, true);
+
+      expect(String(details.query).replace(/^b64std:/, "")).toBe(
+        "span_id='s''1' AND trace_id='trace''xyz'",
+      );
+    });
+
     // Regression: the field names were previously interpolated as
     // String(settings.span_id_field_name) with no fallback, so an org missing
     // the setting produced a column literally named "undefined".

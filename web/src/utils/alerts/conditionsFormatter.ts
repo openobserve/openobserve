@@ -25,6 +25,7 @@
  */
 
 import type { StreamFieldsMap } from "./alertQueryBuilder";
+import { sqlLiteral, sqlLike } from "@/utils/query/sqlFilterBuilder";
 
 export interface FormatOptions {
   // Whether to generate SQL format (uppercase AND/OR, SQL operators) or display format (lowercase)
@@ -102,7 +103,7 @@ function formatValue(
 ): string {
   // If no formatting requested, return as-is with quotes
   if (!streamFieldsMap) {
-    return value !== undefined && value !== null && value !== "" ? `'${value}'` : "''";
+    return sqlLiteral(value);
   }
 
   // Check if column is Int64 or operator is contains/not_contains - don't add quotes
@@ -113,7 +114,7 @@ function formatValue(
     operator === "Contains" ||
     operator === "NotContains";
 
-  return shouldNotQuote ? value : `'${value}'`;
+  return shouldNotQuote ? value : sqlLiteral(value);
 }
 
 /**
@@ -169,13 +170,15 @@ function getFormattedCondition(
     case "contains":
       // SQL mode: convert to LIKE operator
       // Display mode: keep as "contains"
-      condition = sqlMode ? `${column} LIKE '%${value}%'` : `${column} ${operator} ${value}`;
+      condition = sqlMode ? sqlLike(column, value) : `${column} ${operator} ${value}`;
       break;
     case "not_contains":
     case "notcontains":
       // SQL mode: convert to NOT LIKE operator
       // Display mode: keep as "not_contains"
-      condition = sqlMode ? `${column} NOT LIKE '%${value}%'` : `${column} ${operator} ${value}`;
+      condition = sqlMode
+        ? sqlLike(column, value, "contains", true)
+        : `${column} ${operator} ${value}`;
       break;
     default:
       // Fallback for any other operators
@@ -240,9 +243,7 @@ export function buildConditionsString(group: any, options: FormatOptions = {}): 
           // Step 1: Format the value (add quotes if needed, based on type)
           const formattedValue = formatValues
             ? formatValue(item.column, item.operator, item.value, streamFieldsMap)
-            : item.value !== undefined && item.value !== null && item.value !== ""
-              ? `'${item.value}'`
-              : "''";
+            : sqlLiteral(item.value);
 
           // Step 2: Build the condition string (column operator value)
           conditionStr = getFormattedCondition(
@@ -283,9 +284,7 @@ export function buildConditionsString(group: any, options: FormatOptions = {}): 
     ) {
       const formattedValue = formatValues
         ? formatValue(node.column, node.operator, node.value, streamFieldsMap)
-        : node.value !== undefined && node.value !== null && node.value !== ""
-          ? `'${node.value}'`
-          : "''";
+        : sqlLiteral(node.value);
 
       return getFormattedCondition(
         node.column,

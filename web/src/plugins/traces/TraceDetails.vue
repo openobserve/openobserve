@@ -947,6 +947,7 @@ import { useRouter } from "vue-router";
 import searchService from "@/services/search";
 import config from "@/aws-exports";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
+import { escapeSingleQuotes } from "@/utils/queryUtils";
 import useNotifications from "@/composables/useNotifications";
 import { parseUsageDetails, parseCostDetails, hasTracePreview, isLLMTrace } from "@/utils/llmUtils";
 import { formatTimestamp, useTraceProcessing } from "@/composables/traces/useTraceProcessing";
@@ -2774,7 +2775,7 @@ export default defineComponent({
       const refresh = 0;
 
       const query = b64EncodeUnicode(
-        `${quoteSqlIdentifierIfNeeded(String(store.state.organizationData?.organizationSettings?.trace_id_field_name))}='${spanList.value[0]["trace_id"]}'`,
+        `${quoteSqlIdentifierIfNeeded(String(store.state.organizationData?.organizationSettings?.trace_id_field_name))}='${escapeSingleQuotes(String(spanList.value[0]["trace_id"]))}'`,
       );
 
       router.push({

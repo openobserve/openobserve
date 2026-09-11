@@ -1003,6 +1003,7 @@ import useSqlSuggestions from "@/composables/useSuggestions";
 import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
 import { type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
 import { maxParenDepth, SQL_PARSE_MAX_DEPTH } from "@/utils/query/sqlComplexity";
+import { escapeSingleQuotes } from "@/utils/queryUtils";
 import { createPipelinesContextProvider } from "@/composables/contextProviders/pipelinesContextProvider";
 import { contextRegistry } from "@/composables/contextProviders";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -2130,8 +2131,8 @@ const buildExpression = (fieldName: string, v: string, action: string) =>
       ? `${fieldName} IS NULL`
       : `${fieldName} IS NOT NULL`
     : action === "include"
-      ? `${fieldName}='${v}'`
-      : `${fieldName}!='${v}'`;
+      ? `${fieldName}='${escapeSingleQuotes(v)}'`
+      : `${fieldName}!='${escapeSingleQuotes(v)}'`;
 
 const handleAddSearchTerm = (fieldName: string, value: string, action: string) => {
   handleSidebarEvent("add-field", buildExpression(fieldName, value, action));
