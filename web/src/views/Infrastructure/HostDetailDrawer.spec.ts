@@ -198,6 +198,9 @@ const stripModuloKeys = (doc: any) => {
       // declare one — without this key in the set the two rules are mutually
       // unsatisfiable. §8.2 records the widening.
       delete panel.config?.drilldown;
+      // The frozen builder predates these; they are pinned in resolve.spec.ts.
+      delete panel.config?.show_symbol;
+      delete panel.config?.connect_nulls;
     }
   }
   return copy;

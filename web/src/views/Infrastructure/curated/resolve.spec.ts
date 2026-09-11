@@ -1890,6 +1890,9 @@ describe("§8.2 golden parity — hosts pack vs the frozen buildHostDashboard ou
         delete panel.title;
         delete panel.config?.curated_badge;
         delete panel.config?.drilldown;
+        // The frozen builder predates these; they are pinned by the sparse-series specs below.
+        delete panel.config?.show_symbol;
+        delete panel.config?.connect_nulls;
       }
     }
     return copy;
@@ -2725,5 +2728,26 @@ describe("schemasPending — the tier-2 gap must never read as absence", () => {
     const nodeCpu = panelById(resolution, "k8s_nd_cpu");
     expect(nodeCpu.hidden).toBe(true);
     expect(nodeCpu.pending).toBeUndefined();
+  });
+});
+
+describe("sparse series must render as something, not nothing", () => {
+  const chartPanels = () =>
+    (build(resolve({})).tabs ?? [])
+      .flatMap((tab: any) => tab.panels ?? [])
+      .filter((panel: any) => ["line", "area-stacked", "scatter"].includes(panel.type));
+
+  it("shows a symbol on every time-series panel, so a lone point is visible", () => {
+    const panels = chartPanels();
+    expect(panels.length).toBeGreaterThan(0);
+    for (const panel of panels) {
+      expect(panel.config.show_symbol, `${panel.id} would draw an invisible point`).toBe(true);
+    }
+  });
+
+  it("leaves connect_nulls off, so a collector that stopped reporting shows a gap", () => {
+    for (const panel of chartPanels()) {
+      expect(panel.config.connect_nulls, `${panel.id} would imply data it never had`).toBe(false);
+    }
   });
 });
