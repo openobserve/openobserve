@@ -413,8 +413,9 @@ pub async fn list_workflows(
     org_id: &str,
     permitted: Option<Vec<String>>,
     folder_slug: Option<&str>,
+    name_substring: Option<&str>,
 ) -> Result<Vec<Workflow>, anyhow::Error> {
-    let ret = db::workflows::list_workflows(org_id, folder_slug)
+    let ret = db::workflows::list_workflows(org_id, folder_slug, name_substring)
         .await?
         .into_iter()
         .filter(|pipeline| is_permitted(&pipeline.id, org_id, permitted.as_ref()))

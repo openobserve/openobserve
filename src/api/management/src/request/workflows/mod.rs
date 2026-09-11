@@ -264,6 +264,7 @@ pub async fn save_workflow(
         ("org_id" = String, Path, description = "Organization id"),
         ("folder" = Option<String>, Query, description = "Folder ID to list within. The default folder is used when absent."),
         ("all_folders" = Option<bool>, Query, description = "List across every folder the caller may see. Overrides `folder`."),
+        ("name_substring" = Option<String>, Query, description = "Case-insensitive substring the workflow name must contain."),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = inline(Object)),
@@ -314,10 +315,15 @@ pub async fn list_workflows(
         )
     };
 
-    let workflows = match workflows::list_workflows(&org_id, permitted.clone(), folder).await {
-        Ok(workflows) => workflows,
-        Err(e) => return MetaHttpResponse::internal_error(e),
-    };
+    // Matched in the database rather than in the browser, so a cross-folder
+    // search does not depend on every workflow having been fetched first.
+    let name_substring = query.get("name_substring").map(|s| s.as_str());
+
+    let workflows =
+        match workflows::list_workflows(&org_id, permitted.clone(), folder, name_substring).await {
+            Ok(workflows) => workflows,
+            Err(e) => return MetaHttpResponse::internal_error(e),
+        };
 
     let mut ret = Vec::with_capacity(workflows.len());
     // Resolved once per distinct folder rather than per row.

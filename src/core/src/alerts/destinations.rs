@@ -390,7 +390,7 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), DestinationError> {
     // Folder-blind on purpose: a destination is in use if ANY workflow in the
     // org references it, wherever it lives.
     #[cfg(feature = "enterprise")]
-    if let Ok(workflows) = crate::workflows::list_workflows(org_id, None, None).await {
+    if let Ok(workflows) = crate::workflows::list_workflows(org_id, None, None, None).await {
         for w in workflows {
             for node in w.nodes {
                 if let config::meta::pipeline::components::NodeData::Destination(dest) = node.data

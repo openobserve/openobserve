@@ -306,7 +306,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, computed, defineAsyncComponent, onMounted } from "vue";
+import { ref, computed, defineAsyncComponent, onMounted, watch } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -355,13 +355,6 @@ const workflowTabs = computed(() => [
 
 const searchAcrossFolders = ref(false);
 
-const onFolderScopeChange = (v: string) => {
-  const across = v === "all";
-  if (across === searchAcrossFolders.value) return;
-  searchAcrossFolders.value = across;
-  getWorkflows();
-};
-
 const showMoveDialog = ref(false);
 const workflowIdsToMove = ref<string[]>([]);
 
@@ -393,6 +386,30 @@ const orgId = computed(() => store.state.selectedOrganization.identifier as stri
 const loading = ref(true);
 const forbidden = ref(false);
 const filterQuery = ref("");
+
+// Cross-folder is a search mode, not a browse mode: with an empty box the list
+// stays in the selected folder, matching the Alerts and Dashboards lists. That
+// also avoids pulling the org's entire set just because the toggle is on.
+const crossFolderActive = computed(
+  () => searchAcrossFolders.value && filterQuery.value.trim() !== "",
+);
+
+const onFolderScopeChange = (v: string) => {
+  const across = v === "all";
+  if (across === searchAcrossFolders.value) return;
+  searchAcrossFolders.value = across;
+  getWorkflows();
+};
+
+// The cross-folder term is matched by the backend, so re-fetch as it changes
+// rather than on every keystroke.
+let searchDebounce: ReturnType<typeof setTimeout> | undefined;
+watch(filterQuery, () => {
+  if (!searchAcrossFolders.value) return;
+  clearTimeout(searchDebounce);
+  searchDebounce = setTimeout(() => getWorkflows(), 300);
+});
+
 const workflows = ref<any[]>([]);
 const oTableRef: any = ref(null);
 // Plain ref, not URL/store-backed: WorkflowsList stays mounted across create/edit/runs child-route navigation, so this alone survives the round trip.
@@ -413,7 +430,9 @@ const filteredWorkflows = computed(() => {
   const tab = activeTab.value;
   return workflows.value.filter((w) => {
     if (tab !== "all" && triggerKind(w) !== tab) return false;
-    if (!q) return true;
+    // In cross-folder mode the backend already applied the name filter; applying
+    // it again here would drop rows that matched on name but not description.
+    if (!q || crossFolderActive.value) return true;
     return w.name?.toLowerCase().includes(q) || w.description?.toLowerCase().includes(q);
   });
 });
@@ -509,7 +528,7 @@ const columns = computed(() => [
 const otableColumns = computed(() => {
   // The rail already names the folder when scoped to one, so the column only
   // earns its width when rows can come from several.
-  if (!searchAcrossFolders.value) return columns.value;
+  if (!crossFolderActive.value) return columns.value;
   const cols = [...columns.value];
   cols.splice(2, 0, {
     id: "folder_name",
@@ -528,10 +547,12 @@ const getWorkflows = async (folderId?: string) => {
   loading.value = true;
   forbidden.value = false;
   try {
+    const across = crossFolderActive.value;
     const response = await workflowService.listWorkflows(
       orgId.value,
       folderId ?? activeFolderId.value,
-      searchAcrossFolders.value,
+      across,
+      across ? filterQuery.value.trim() : undefined,
     );
     // list handler returns a bare array of Workflow.
     const list = Array.isArray(response.data) ? response.data : (response.data?.list ?? []);

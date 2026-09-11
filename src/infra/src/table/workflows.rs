@@ -16,6 +16,7 @@
 use config::meta::pipeline::components::{Edge, Node};
 use sea_orm::{
     ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, Set, TransactionTrait, prelude::Expr,
+    sea_query::Func,
 };
 use serde::{Deserialize, Serialize};
 
@@ -204,17 +205,28 @@ pub async fn list_by_org(org_id: &str) -> Result<Vec<Workflow>, anyhow::Error> {
     Ok(ret)
 }
 
-/// Lists an org's workflows, optionally restricted to one folder.
+/// Lists an org's workflows, optionally restricted to one folder and/or to names
+/// containing `name_substring` (case-insensitive, matching how the other list
+/// endpoints search).
 ///
 /// `folder_pk` is the folder's primary key, not the slug from the URL.
 pub async fn list_by_org_folder(
     org_id: &str,
     folder_pk: Option<&str>,
+    name_substring: Option<&str>,
 ) -> Result<Vec<Workflow>, anyhow::Error> {
     let client = get_orm_client_ro().await;
     let mut query = workflows::Entity::find().filter(workflows::Column::OrgId.eq(org_id));
     if let Some(pk) = folder_pk {
         query = query.filter(workflows::Column::FolderId.eq(pk));
+    }
+    // Lowercase both sides rather than using `contains`: LIKE is case-sensitive
+    // on Postgres, and this must match however the user typed it — same
+    // treatment the alerts list gives its name filter.
+    if let Some(substring) = name_substring.map(str::trim).filter(|s| !s.is_empty()) {
+        let pattern = format!("%{}%", substring.to_lowercase());
+        query =
+            query.filter(Expr::expr(Func::lower(Expr::col(workflows::Column::Name))).like(pattern));
     }
     let entities = query.all(client).await?;
     let mut ret = Vec::with_capacity(entities.len());
