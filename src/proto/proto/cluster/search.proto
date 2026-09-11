@@ -115,17 +115,6 @@ message SamplingConfig {
     optional int32 num_time_strata = 4;
 }
 
-message SearchEventContext {
-    optional string alert_key = 1;
-    optional string derived_stream_key = 2;
-    optional string report_key = 3;
-    optional string dashboard_id = 4;
-    optional string dashboard_name = 5;
-    optional string dashboard_folder_id = 6;
-    optional string dashboard_folder_name = 7;
-    optional string alert_name = 8;
-}
-
 message QueryStatus {
     string                trace_id = 1;
     int64               created_at = 2;

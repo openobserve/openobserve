@@ -24,7 +24,7 @@ use utoipa::ToSchema;
 
 use crate::{
     config::get_config,
-    meta::{search, sql::OrderBy, stream::StreamType},
+    meta::{search, slo::Slo, sql::OrderBy, stream::StreamType},
     utils::{base64, json},
 };
 
@@ -1169,6 +1169,13 @@ impl SearchEventContext {
     pub fn with_report(report_key: Option<String>) -> Self {
         Self {
             report_key,
+            ..Default::default()
+        }
+    }
+
+    pub fn with_slo(slo: &Slo) -> Self {
+        Self {
+            derived_stream_key: Some(format!("slo/{}/{}/{}", slo.org, slo.name, slo.id)),
             ..Default::default()
         }
     }

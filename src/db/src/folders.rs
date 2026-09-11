@@ -450,8 +450,6 @@ async fn permitted_folders(
             folder_list = Some(folder_list_with_roles);
         }
     }
-    log::info!("folder_list: {folder_list:?}");
-
     Ok(folder_list)
 }
 
