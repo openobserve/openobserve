@@ -160,6 +160,31 @@ const loadedOrg = ref<string | null>(null);
 // unmount/remount cycle and stays in sync with the restored rows.
 const currentPage = ref(1);
 const rowsPerPage = ref(20);
+// Active list search (the User / Message boxes on the scope row). Module-
+// scoped like the pagination so a back-navigation from a session detail
+// restores the filtered page together with the terms that produced it.
+// Deliberately NOT persisted to localStorage: the scope is remembered across
+// visits, a search is a one-time action. These are the APPLIED terms (what the
+// current rows were fetched with) — the boxes' draft text lives in the
+// component. Both may be set at once; the backend ANDs them.
+export interface SessionSearch {
+  user?: string;
+  message?: string;
+}
+const searchUser = ref("");
+const searchMessage = ref("");
+/** Hard cap on a search term; longer input is truncated, never rejected. */
+export const SESSION_SEARCH_MAX_LEN = 256;
+/** Trims and caps a raw search term. Empty result = no search. */
+export function normalizeSearchTerm(raw: string): string {
+  return String(raw ?? "")
+    .trim()
+    .slice(0, SESSION_SEARCH_MAX_LEN);
+}
+// Monotonic id of the most recent `fetchPage` call. A response from an older
+// call (Enter pressed again while a search was still in flight) is dropped, so
+// a slow first run can never overwrite the newer result. Last request wins.
+let fetchSeq = 0;
 // Agent-filter list is loaded lazily by `loadSessions` (agent mode only), so it
 // lives here too — otherwise a back-navigation, which skips that load, would
 // reset `agentsLoaded` to false and strand the agent picker on its skeleton.
@@ -210,13 +235,17 @@ export function useSessions() {
     page: number,
     pageSize: number,
     filter = "",
+    search?: SessionSearch,
   ): Promise<void> {
     if (!streamName || !startTime || !endTime) return;
+    const seq = ++fetchSeq;
     loading.value = true;
     error.value = null;
 
     try {
       const orgId = store.state.selectedOrganization?.identifier || "default";
+      const userTerm = normalizeSearchTerm(search?.user ?? "");
+      const messageTerm = normalizeSearchTerm(search?.message ?? "");
       const res = await sessionsService.list({
         orgId,
         streamName,
@@ -225,7 +254,12 @@ export function useSessions() {
         page,
         pageSize,
         filter,
+        userSearch: userTerm || undefined,
+        messageSearch: messageTerm || undefined,
       });
+      // Stale: a newer fetch has started since — its result (or error) owns
+      // the list now, so leave every piece of state to it.
+      if (seq !== fetchSeq) return;
       const body = res.data;
       sessions.value = (body.hits || []).map((h) => {
         const errorCount = Number(h.error_count) || 0;
@@ -261,6 +295,7 @@ export function useSessions() {
       lastRunAt.value = Date.now();
       loadedOrg.value = orgId;
     } catch (e: any) {
+      if (seq !== fetchSeq) return;
       // axios error shape — surface the server's message if present.
       const serverMsg =
         e?.response?.data?.message ||
@@ -270,7 +305,9 @@ export function useSessions() {
       error.value = serverMsg;
       console.error("Sessions fetch error:", e?.response?.data ?? e);
     } finally {
-      loading.value = false;
+      // Only the latest call releases the skeleton — an older one settling
+      // first must not blank it while the newer request is still running.
+      if (seq === fetchSeq) loading.value = false;
     }
   }
 
@@ -559,6 +596,8 @@ export function useSessions() {
     loadedOrg,
     currentPage,
     rowsPerPage,
+    searchUser,
+    searchMessage,
     agents,
     agentsLoaded,
     fetchPage,

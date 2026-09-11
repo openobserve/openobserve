@@ -72,6 +72,8 @@ struct LatestSessionsResponse {
         ("org_id" = String, Path, description = "Organization name"),
         ("stream_name" = String, Path, description = "Stream name"),
         ("filter" = Option<String>, Query, description = "filter, eg: a=b AND c=d"),
+        ("user_search" = Option<String>, Query, description = "Case-insensitive substring match on the session's user id. A session is returned when the user id on any of its spans contains the term. Literal text: no wildcards or operators. Trimmed and capped at 256 characters; combined with `filter` and `message_search` using AND."),
+        ("message_search" = Option<String>, Query, description = "Case-insensitive substring match on the conversation text (the input messages of any span in the session). Literal text, trimmed and capped at 256 characters; combined with `filter` and `user_search` using AND. Returns 400 when the stream has no input-messages column."),
         ("from" = i64, Query, description = "from"),
         ("size" = i64, Query, description = "size"),
         ("start_time" = i64, Query, description = "start time"),
@@ -105,7 +107,7 @@ struct LatestSessionsResponse {
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-mcp" = json!({"description": "List recent LLM sessions from a trace stream: session_id, trace count, token usage, cost, error count.", "category": "traces"}))
+        ("x-o2-mcp" = json!({"description": "List recent LLM sessions from a trace stream: session_id, trace count, token usage, cost, error count. Optional user_search (substring of the user id) and message_search (substring of the conversation text) narrow the list.", "category": "traces"}))
     )
 )]
 pub async fn get_latest_sessions(
@@ -148,6 +150,7 @@ pub async fn get_latest_sessions(
         Some(v) => v.to_string(),
         None => "".to_string(),
     };
+    let search = LatestSessionSearch::from_query(&query);
 
     let from = query
         .get("from")
@@ -219,6 +222,22 @@ pub async fn get_latest_sessions(
                         total_is_exact: true,
                     });
                 }
+                // A user search on a stream that never recorded a user id can
+                // match nothing — same empty page as the schema checks above,
+                // rather than a query that fails on an unknown column.
+                if search.user.is_some() && s.field_with_name(v.columns.user_id).is_err() {
+                    return MetaHttpResponse::json(LatestSessionsResponse {
+                        took: 0,
+                        total: 0,
+                        from,
+                        size,
+                        hits: vec![],
+                        trace_id,
+                        function_error: String::new(),
+                        has_more: false,
+                        total_is_exact: true,
+                    });
+                }
                 Some(v)
             }
             Err(e) => return MetaHttpResponse::bad_request(e.to_string()),
@@ -241,7 +260,16 @@ pub async fn get_latest_sessions(
             });
         }
     };
-    let query_sql = build_latest_session_page_sql(&stream_name, &filter, &validated);
+    // A message term the stream cannot honour must be an error, never a
+    // silently unfiltered list. A stream with no cached schema skips this
+    // check: the fallback layout knows nothing about its columns, and the
+    // page query below reports the real problem (an unknown stream) itself.
+    if schema.is_some()
+        && let Err(e) = search.validate(&validated)
+    {
+        return MetaHttpResponse::bad_request(e);
+    }
+    let query_sql = build_latest_session_page_sql(&stream_name, &filter, &search, &validated);
     let user_id_opt = Some(user_id.to_string());
 
     let mut req = config::meta::search::Request {
@@ -1243,17 +1271,124 @@ fn normalize_latest_session_filter(
         .unwrap_or_else(|| trimmed.to_string())
 }
 
+/// Hard cap on a list search term (`user_search` / `message_search`), in
+/// characters. Longer input is truncated, never rejected; the UI applies the
+/// same cap before sending.
+const SESSION_SEARCH_MAX_LEN: usize = 256;
+
+/// Trims a raw search term and caps it at [`SESSION_SEARCH_MAX_LEN`]
+/// characters. An empty result means "no search" and yields `None`.
+fn normalize_session_search_term(raw: Option<&String>) -> Option<String> {
+    let trimmed = raw?.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    Some(trimmed.chars().take(SESSION_SEARCH_MAX_LEN).collect())
+}
+
+/// Case-insensitive substring predicate on one span column.
+///
+/// `str_match_ignore_case` takes the term as literal text — unlike `LIKE` it
+/// has no wildcards, so `%` and `_` need no escaping — and a backslash is not
+/// an escape in the SQL dialect either. The only character that must be
+/// escaped is the single quote closing the literal.
+fn session_search_predicate(column: &str, term: &str) -> String {
+    format!(
+        "str_match_ignore_case({column}, '{}')",
+        term.replace('\'', "''")
+    )
+}
+
+/// The list search from the `user_search` / `message_search` query params,
+/// already normalised. Both terms are ANDed with each other and with `filter`
+/// inside the phase-1 session membership `HAVING`, so a session is selected
+/// when **any** of its spans matches every predicate.
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub(super) struct LatestSessionSearch {
+    /// Substring of the user id column (`user_id` / legacy `llm_user_id`).
+    pub(super) user: Option<String>,
+    /// Substring of the input messages column (`gen_ai_input_messages` /
+    /// legacy `llm_input`): "some prompt in this conversation contains X".
+    pub(super) message: Option<String>,
+}
+
+impl LatestSessionSearch {
+    fn from_query(query: &HashMap<String, String>) -> Self {
+        Self {
+            user: normalize_session_search_term(query.get("user_search")),
+            message: normalize_session_search_term(query.get("message_search")),
+        }
+    }
+
+    fn is_empty(&self) -> bool {
+        self.user.is_none() && self.message.is_none()
+    }
+
+    /// A message search needs the input messages column; a stream without it
+    /// must get a clear error rather than an unfiltered list.
+    fn validate(&self, validated: &super::schema_compat::ValidatedLlmSchema) -> Result<(), String> {
+        if self.message.is_some() && !validated.has_input_messages {
+            return Err(format!(
+                "message search is not available for this stream: it has no '{}' column",
+                input_messages_column(validated)
+            ));
+        }
+        Ok(())
+    }
+
+    /// The search predicates, one per present term, in a fixed order.
+    fn predicates(&self, validated: &super::schema_compat::ValidatedLlmSchema) -> Vec<String> {
+        let mut predicates = Vec::with_capacity(2);
+        if let Some(user) = &self.user {
+            predicates.push(session_search_predicate(validated.columns.user_id, user));
+        }
+        if let Some(message) = &self.message {
+            predicates.push(session_search_predicate(
+                input_messages_column(validated),
+                message,
+            ));
+        }
+        predicates
+    }
+}
+
+/// Stored column holding the prompt text for the stream's schema generation.
+fn input_messages_column(validated: &super::schema_compat::ValidatedLlmSchema) -> &'static str {
+    if validated.has_gen_ai {
+        "gen_ai_input_messages"
+    } else {
+        "llm_input"
+    }
+}
+
 fn build_latest_session_page_sql(
     stream_name: &str,
     filter: &str,
+    search: &LatestSessionSearch,
     validated: &super::schema_compat::ValidatedLlmSchema,
 ) -> String {
     let session_id_col = validated.columns.session_id;
     let filter = normalize_latest_session_filter(filter, stream_name, session_id_col);
-    let membership_filter = if filter.is_empty() {
+    // The agent-scope filter alone keeps its historical shape (the frontend
+    // relies on the exact SQL for nothing, but the query cache key does). A
+    // search ANDs onto it, so the caller's predicate is parenthesised in case
+    // it contains an OR.
+    let mut predicates = Vec::with_capacity(3);
+    if !filter.is_empty() {
+        if search.is_empty() {
+            predicates.push(filter);
+        } else {
+            predicates.push(format!("({filter})"));
+        }
+    }
+    predicates.extend(search.predicates(validated));
+    let membership_filter = if predicates.is_empty() {
         String::new()
     } else {
-        format!(" HAVING max(CASE WHEN {filter} THEN 1 ELSE 0 END) = 1")
+        format!(
+            " HAVING max(CASE WHEN {} THEN 1 ELSE 0 END) = 1",
+            predicates.join(" AND ")
+        )
     };
     format!(
         "SELECT {session_id_col} as session_id, \
@@ -1278,24 +1413,23 @@ fn build_latest_sessions_sql(
         .collect::<Vec<_>>()
         .join(",");
 
-    let (input_tokens_col, output_tokens_col, total_tokens_col, cost_col, input_messages_col) =
-        if validated.has_gen_ai {
-            (
-                "gen_ai_usage_input_tokens",
-                "gen_ai_usage_output_tokens",
-                "gen_ai_usage_total_tokens",
-                "gen_ai_usage_cost",
-                "gen_ai_input_messages",
-            )
-        } else {
-            (
-                "llm_usage_tokens_input",
-                "llm_usage_tokens_output",
-                "llm_usage_tokens_total",
-                "llm_usage_cost_total",
-                "llm_input",
-            )
-        };
+    let input_messages_col = input_messages_column(validated);
+    let (input_tokens_col, output_tokens_col, total_tokens_col, cost_col) = if validated.has_gen_ai
+    {
+        (
+            "gen_ai_usage_input_tokens",
+            "gen_ai_usage_output_tokens",
+            "gen_ai_usage_total_tokens",
+            "gen_ai_usage_cost",
+        )
+    } else {
+        (
+            "llm_usage_tokens_input",
+            "llm_usage_tokens_output",
+            "llm_usage_tokens_total",
+            "llm_usage_cost_total",
+        )
+    };
 
     let total_tokens_expr = optional_sum_expr(
         validated.has_total_tokens,
@@ -1692,7 +1826,12 @@ mod tests {
         validated.has_total_tokens = true;
         validated.has_cache_read_input_tokens = true;
         let filter = "gen_ai_conversation_id IN (SELECT gen_ai_conversation_id FROM \"bench_traces\" WHERE gen_ai_conversation_id IS NOT NULL AND gen_ai_conversation_id != '' AND gen_ai_agent_id = 'agent-123' GROUP BY gen_ai_conversation_id)";
-        let page_sql = build_latest_session_page_sql("bench_traces", filter, &validated);
+        let page_sql = build_latest_session_page_sql(
+            "bench_traces",
+            filter,
+            &LatestSessionSearch::default(),
+            &validated,
+        );
         let sql = build_latest_sessions_sql(
             "bench_traces",
             &["session-1".to_string(), "session'2".to_string()],
@@ -1720,7 +1859,12 @@ mod tests {
     #[test]
     fn latest_session_page_sql_without_filter_has_no_membership_having() {
         let validated = super::super::schema_compat::ValidatedLlmSchema::fallback(true);
-        let sql = build_latest_session_page_sql("bench_traces", "", &validated);
+        let sql = build_latest_session_page_sql(
+            "bench_traces",
+            "",
+            &LatestSessionSearch::default(),
+            &validated,
+        );
 
         assert!(
             sql.contains(
@@ -1735,9 +1879,217 @@ mod tests {
     fn latest_session_page_sql_keeps_unrelated_subqueries_unchanged() {
         let validated = super::super::schema_compat::ValidatedLlmSchema::fallback(true);
         let filter = "gen_ai_conversation_id IN (SELECT other_id FROM other_stream WHERE active = true GROUP BY other_id)";
-        let sql = build_latest_session_page_sql("bench_traces", filter, &validated);
+        let sql = build_latest_session_page_sql(
+            "bench_traces",
+            filter,
+            &LatestSessionSearch::default(),
+            &validated,
+        );
 
         assert!(sql.contains(filter));
+    }
+
+    // ── List search (user_search / message_search) ──────────────────────────
+
+    fn search(user: Option<&str>, message: Option<&str>) -> LatestSessionSearch {
+        LatestSessionSearch {
+            user: user.map(str::to_string),
+            message: message.map(str::to_string),
+        }
+    }
+
+    fn gen_ai_with_messages() -> super::super::schema_compat::ValidatedLlmSchema {
+        let mut validated = super::super::schema_compat::ValidatedLlmSchema::fallback(true);
+        validated.has_input_messages = true;
+        validated
+    }
+
+    #[test]
+    fn page_sql_user_search_is_a_membership_having_on_the_user_id_column() {
+        let sql = build_latest_session_page_sql(
+            "bench_traces",
+            "",
+            &search(Some("luis"), None),
+            &gen_ai_with_messages(),
+        );
+
+        assert!(sql.contains(
+            "HAVING max(CASE WHEN str_match_ignore_case(user_id, 'luis') THEN 1 ELSE 0 END) = 1"
+        ));
+        assert!(!sql.contains("gen_ai_input_messages"));
+        assert!(sql.contains("ORDER BY session_last_activity DESC, session_id DESC"));
+    }
+
+    #[test]
+    fn page_sql_message_search_reads_the_input_messages_column() {
+        let sql = build_latest_session_page_sql(
+            "bench_traces",
+            "",
+            &search(None, Some("refund")),
+            &gen_ai_with_messages(),
+        );
+
+        assert!(sql.contains(
+            "HAVING max(CASE WHEN str_match_ignore_case(gen_ai_input_messages, 'refund') THEN 1 ELSE 0 END) = 1"
+        ));
+        assert!(!sql.contains("user_id"));
+    }
+
+    #[test]
+    fn page_sql_ands_both_search_terms() {
+        let sql = build_latest_session_page_sql(
+            "bench_traces",
+            "",
+            &search(Some("luis"), Some("refund")),
+            &gen_ai_with_messages(),
+        );
+
+        assert!(sql.contains(
+            "HAVING max(CASE WHEN str_match_ignore_case(user_id, 'luis') AND \
+             str_match_ignore_case(gen_ai_input_messages, 'refund') THEN 1 ELSE 0 END) = 1"
+        ));
+    }
+
+    #[test]
+    fn page_sql_ands_the_search_onto_a_parenthesised_agent_filter() {
+        let filter = "gen_ai_agent_id = 'agent-1' OR gen_ai_agent_id = 'agent-2'";
+        let sql = build_latest_session_page_sql(
+            "bench_traces",
+            filter,
+            &search(Some("luis"), Some("refund")),
+            &gen_ai_with_messages(),
+        );
+
+        assert!(sql.contains(
+            "HAVING max(CASE WHEN (gen_ai_agent_id = 'agent-1' OR gen_ai_agent_id = 'agent-2') AND \
+             str_match_ignore_case(user_id, 'luis') AND \
+             str_match_ignore_case(gen_ai_input_messages, 'refund') THEN 1 ELSE 0 END) = 1"
+        ));
+        assert_eq!(sql.matches("HAVING").count(), 1);
+    }
+
+    #[test]
+    fn page_sql_search_unwraps_the_legacy_membership_subquery_filter_too() {
+        let filter = "gen_ai_conversation_id IN (SELECT gen_ai_conversation_id FROM \"bench_traces\" WHERE gen_ai_conversation_id IS NOT NULL AND gen_ai_conversation_id != '' AND gen_ai_agent_id = 'agent-123' GROUP BY gen_ai_conversation_id)";
+        let sql = build_latest_session_page_sql(
+            "bench_traces",
+            filter,
+            &search(Some("luis"), None),
+            &gen_ai_with_messages(),
+        );
+
+        assert!(!sql.contains("IN (SELECT"));
+        assert!(
+            sql.contains(
+                "gen_ai_agent_id = 'agent-123') AND str_match_ignore_case(user_id, 'luis')"
+            )
+        );
+    }
+
+    #[test]
+    fn page_sql_search_uses_the_legacy_columns_on_a_legacy_stream() {
+        let mut validated = super::super::schema_compat::ValidatedLlmSchema::fallback(false);
+        validated.has_input_messages = true;
+        let sql = build_latest_session_page_sql(
+            "legacy_traces",
+            "",
+            &search(Some("luis"), Some("refund")),
+            &validated,
+        );
+
+        assert!(sql.contains("str_match_ignore_case(llm_user_id, 'luis')"));
+        assert!(sql.contains("str_match_ignore_case(llm_input, 'refund')"));
+        assert!(sql.contains("GROUP BY llm_session_id"));
+    }
+
+    #[test]
+    fn search_predicate_escapes_only_the_single_quote() {
+        // A quote must not close the literal; nothing else is special for
+        // str_match_ignore_case (no LIKE wildcards, no backslash escapes).
+        assert_eq!(
+            session_search_predicate("user_id", "o'brien"),
+            "str_match_ignore_case(user_id, 'o''brien')"
+        );
+        assert_eq!(
+            session_search_predicate("user_id", "a'; DROP TABLE x; --"),
+            "str_match_ignore_case(user_id, 'a''; DROP TABLE x; --')"
+        );
+        assert_eq!(
+            session_search_predicate("gen_ai_input_messages", "100% off_the\\path"),
+            "str_match_ignore_case(gen_ai_input_messages, '100% off_the\\path')"
+        );
+    }
+
+    #[test]
+    fn search_validation_rejects_a_message_term_without_the_messages_column() {
+        let validated = super::super::schema_compat::ValidatedLlmSchema::fallback(true);
+        assert!(!validated.has_input_messages);
+
+        let err = search(None, Some("refund"))
+            .validate(&validated)
+            .unwrap_err();
+        assert!(err.contains("message search is not available for this stream"));
+        assert!(err.contains("gen_ai_input_messages"));
+
+        let legacy = super::super::schema_compat::ValidatedLlmSchema::fallback(false);
+        let err = search(None, Some("refund")).validate(&legacy).unwrap_err();
+        assert!(err.contains("llm_input"));
+
+        // A user-only search never needs the messages column.
+        assert!(search(Some("luis"), None).validate(&validated).is_ok());
+        assert!(LatestSessionSearch::default().validate(&validated).is_ok());
+    }
+
+    #[test]
+    fn search_terms_are_trimmed_capped_and_empty_means_absent() {
+        let mut query: HashMap<String, String> = HashMap::new();
+        assert_eq!(
+            LatestSessionSearch::from_query(&query),
+            LatestSessionSearch::default()
+        );
+
+        query.insert("user_search".into(), "  luis ".into());
+        query.insert("message_search".into(), "   ".into());
+        let parsed = LatestSessionSearch::from_query(&query);
+        assert_eq!(parsed, search(Some("luis"), None));
+
+        query.insert("message_search".into(), "x".repeat(300));
+        let parsed = LatestSessionSearch::from_query(&query);
+        assert_eq!(parsed.message.as_deref().map(str::len), Some(256));
+
+        // The cap counts characters, not bytes, so a multi-byte term is never
+        // cut inside a code point.
+        query.insert("user_search".into(), "é".repeat(300));
+        let parsed = LatestSessionSearch::from_query(&query);
+        assert_eq!(parsed.user.as_deref().map(|s| s.chars().count()), Some(256));
+    }
+
+    #[test]
+    fn page_sql_with_search_still_plans_as_a_simple_session_level_aggregate() {
+        // Phase 1 is a distributed streaming aggregate whose per-session state
+        // is one integer. The search predicates must keep that shape: a plain
+        // GROUP BY with no subquery, join, CTE or window — the same test the
+        // partition planner applies (`is_simple_aggregate_query`).
+        let filter = "gen_ai_agent_id = 'agent-1'";
+        for search in [
+            search(Some("luis"), None),
+            search(None, Some("refund")),
+            search(Some("o'brien"), Some("100% refund")),
+        ] {
+            let sql = build_latest_session_page_sql(
+                "bench_traces",
+                filter,
+                &search,
+                &gen_ai_with_messages(),
+            );
+            assert_eq!(
+                config::utils::sql::is_simple_aggregate_query(&sql),
+                Ok(true),
+                "{sql}"
+            );
+            assert!(sql.contains("GROUP BY gen_ai_conversation_id HAVING max(CASE WHEN"));
+            assert!(!sql.contains("IN (SELECT"));
+        }
     }
 
     #[test]

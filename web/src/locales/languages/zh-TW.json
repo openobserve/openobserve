@@ -9473,7 +9473,17 @@
       "agent": "代理",
       "noAgentsTitle": "此範圍內無代理",
       "noAgentsDescription": "在所選時間範圍內未偵測到 GenAI 代理。請嘗試更廣的範圍或切回串流檢視。",
-      "viewByStream": "依串流檢視"
+      "viewByStream": "依串流檢視",
+      "search": {
+        "placeholderUser": "依使用者搜尋",
+        "placeholderMessage": "搜尋訊息文字",
+        "userTitle": "比對使用者 ID 包含該文字的工作階段",
+        "messageTitle": "在對話訊息中搜尋文字",
+        "noResultsTitle": "沒有符合搜尋的工作階段",
+        "noResultsDescription": "請嘗試其他關鍵字、其他欄位或更大的時間範圍。",
+        "clear": "清除搜尋",
+        "pressEnter": "按 Enter 鍵搜尋"
+      }
     },
     "sessionDetail": {
       "currencySymbol": "$",

@@ -21,6 +21,9 @@ const mockLastRunAt = ref<number | null>(null);
 const mockLoadedOrg = ref<string | null>(null);
 const mockCurrentPage = ref(1);
 const mockRowsPerPage = ref(20);
+// Applied search terms — module-scoped in the real composable, like the pagination.
+const mockSearchUser = ref("");
+const mockSearchMessage = ref("");
 const mockAgents = ref<any[]>([]);
 const mockAgentsLoaded = ref(false);
 const mockFetchPage = vi.fn();
@@ -30,7 +33,15 @@ const mockRouterPush = vi.fn();
 const mockRouterReplace = vi.fn(() => Promise.resolve());
 let mockRouteQuery: Record<string, any> = {};
 
+// The real module pulls in the streaming-search stack (vuex store et al), so
+// the term helper the component imports is mirrored here instead of pulled
+// from `importOriginal`.
 vi.mock("./composables/useSessions", () => ({
+  SESSION_SEARCH_MAX_LEN: 256,
+  normalizeSearchTerm: (raw: string) =>
+    String(raw ?? "")
+      .trim()
+      .slice(0, 256),
   useSessions: vi.fn(() => ({
     sessions: mockSessions,
     total: mockTotal,
@@ -42,6 +53,8 @@ vi.mock("./composables/useSessions", () => ({
     loadedOrg: mockLoadedOrg,
     currentPage: mockCurrentPage,
     rowsPerPage: mockRowsPerPage,
+    searchUser: mockSearchUser,
+    searchMessage: mockSearchMessage,
     agents: mockAgents,
     agentsLoaded: mockAgentsLoaded,
     fetchPage: mockFetchPage,
@@ -238,6 +251,8 @@ beforeEach(() => {
   mockLoadedOrg.value = null;
   mockCurrentPage.value = 1;
   mockRowsPerPage.value = 20;
+  mockSearchUser.value = "";
+  mockSearchMessage.value = "";
   mockAgents.value = [];
   mockAgentsLoaded.value = false;
   mockRouteQuery = {};
@@ -371,7 +386,7 @@ describe("SessionsList — sessions table", () => {
     const wrapper = await mountComponent();
     await refreshComponent(wrapper);
 
-    expect(mockFetchPage).toHaveBeenCalledWith("test-stream", 1000, 2000, 0, 20, "");
+    expect(mockFetchPage).toHaveBeenCalledWith("test-stream", 1000, 2000, 0, 20, "", undefined);
   });
 
   it("should not load agents while refreshing when in stream mode", async () => {
@@ -487,6 +502,7 @@ describe("SessionsList — agent filter", () => {
       0,
       20,
       `gen_ai_agent_id = 'agent-1'`,
+      undefined,
     );
   });
 
@@ -664,5 +680,221 @@ describe("SessionsList — OSS builds (neither isEnterprise nor isCloud is 'true
     const wrapper = await mountComponent();
     await flushPromises();
     expect(wrapper.findComponent(AgentScopeCascade).exists()).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// List search
+// ---------------------------------------------------------------------------
+
+describe("SessionsList — search", () => {
+  const USER = "[data-test='sessions-list-search-user-field']";
+  const MESSAGE = "[data-test='sessions-list-search-message-field']";
+  const value = (wrapper: any, sel: string) =>
+    (wrapper.find(sel).element as HTMLInputElement).value;
+  const NO_SEARCH = ["test-stream", 1000, 2000, 0, 20, "", undefined] as const;
+
+  async function mountInStreamMode() {
+    mockRouteQuery = { type: "stream", ...mockRouteQuery };
+    const wrapper = await mountComponent();
+    await refreshComponent(wrapper);
+    mockFetchPage.mockClear();
+    mockRouterReplace.mockClear();
+    return wrapper;
+  }
+
+  it("renders a User box and a Message box on the scope row", async () => {
+    const wrapper = await mountInStreamMode();
+    expect(wrapper.find(USER).attributes("placeholder")).toBe("Search by user");
+    expect(wrapper.find(MESSAGE).attributes("placeholder")).toBe("Search message text");
+  });
+
+  it("typing alone does not fetch; Enter fetches page 1 with the user term", async () => {
+    mockCurrentPage.value = 3;
+    const wrapper = await mountInStreamMode();
+    await wrapper.find(USER).setValue("  luis ");
+    await flushPromises();
+    expect(mockFetchPage).not.toHaveBeenCalled();
+
+    await wrapper.find(USER).trigger("keydown", { key: "Enter" });
+    await flushPromises();
+    expect(mockFetchPage).toHaveBeenCalledTimes(1);
+    expect(mockFetchPage).toHaveBeenCalledWith("test-stream", 1000, 2000, 0, 20, "", {
+      user: "luis",
+      message: undefined,
+    });
+    expect(mockCurrentPage.value).toBe(1);
+    expect(mockSearchUser.value).toBe("luis");
+  });
+
+  it("Enter in either box submits both terms together", async () => {
+    const wrapper = await mountInStreamMode();
+    await wrapper.find(USER).setValue("luis");
+    await wrapper.find(MESSAGE).setValue("refund");
+    await wrapper.find(MESSAGE).trigger("keydown", { key: "Enter" });
+    await flushPromises();
+    expect(mockFetchPage).toHaveBeenCalledWith("test-stream", 1000, 2000, 0, 20, "", {
+      user: "luis",
+      message: "refund",
+    });
+  });
+
+  it("caps an applied term at 256 characters", async () => {
+    const wrapper = await mountInStreamMode();
+    await wrapper.find(MESSAGE).setValue("x".repeat(300));
+    await wrapper.find(MESSAGE).trigger("keydown", { key: "Enter" });
+    await flushPromises();
+    expect(mockSearchMessage.value).toHaveLength(256);
+  });
+
+  it("Enter on empty boxes does not apply a search", async () => {
+    const wrapper = await mountInStreamMode();
+    await wrapper.find(USER).trigger("keydown", { key: "Enter" });
+    await flushPromises();
+    expect(mockFetchPage).toHaveBeenCalledWith(...NO_SEARCH);
+    expect(mockSearchUser.value).toBe("");
+  });
+
+  it("a box's clear control drops only that term and re-fetches with the other", async () => {
+    mockSearchUser.value = "luis";
+    mockSearchMessage.value = "refund";
+    const wrapper = await mountInStreamMode();
+    expect(value(wrapper, USER)).toBe("luis");
+    expect(value(wrapper, MESSAGE)).toBe("refund");
+
+    await wrapper.find("[data-test='sessions-list-search-user-clear']").trigger("click");
+    await flushPromises();
+    expect(mockSearchUser.value).toBe("");
+    expect(mockSearchMessage.value).toBe("refund");
+    expect(mockFetchPage).toHaveBeenCalledWith("test-stream", 1000, 2000, 0, 20, "", {
+      user: undefined,
+      message: "refund",
+    });
+  });
+
+  it("Escape in a box clears that term and loads the list without it", async () => {
+    mockSearchUser.value = "luis";
+    const wrapper = await mountInStreamMode();
+    await wrapper.find(USER).trigger("keydown", { key: "Escape" });
+    await flushPromises();
+    expect(value(wrapper, USER)).toBe("");
+    expect(mockSearchUser.value).toBe("");
+    expect(mockFetchPage).toHaveBeenCalledWith(...NO_SEARCH);
+  });
+
+  it("writes the applied terms to the URL and removes them when cleared", async () => {
+    const wrapper = await mountInStreamMode();
+    await wrapper.find(USER).setValue("luis");
+    await wrapper.find(MESSAGE).setValue("refund");
+    await wrapper.find(USER).trigger("keydown", { key: "Enter" });
+    await flushPromises();
+    expect(mockRouterReplace).toHaveBeenLastCalledWith({
+      query: expect.objectContaining({ type: "stream", user: "luis", message: "refund" }),
+    });
+
+    await wrapper.find(MESSAGE).trigger("keydown", { key: "Escape" });
+    await flushPromises();
+    const query = mockRouterReplace.mock.lastCall?.[0].query;
+    expect(query).toMatchObject({ user: "luis" });
+    expect(query).not.toHaveProperty("message");
+  });
+
+  it("applies terms from the URL before the first fetch", async () => {
+    mockRouteQuery = { type: "stream", user: "luis", message: "refund" };
+    const wrapper = await mountComponent();
+    await refreshComponent(wrapper);
+    expect(value(wrapper, USER)).toBe("luis");
+    expect(value(wrapper, MESSAGE)).toBe("refund");
+    expect(mockFetchPage).toHaveBeenCalledWith("test-stream", 1000, 2000, 0, 20, "", {
+      user: "luis",
+      message: "refund",
+    });
+  });
+
+  it("a URL term that differs from the cached list bypasses the mount cache", async () => {
+    // Cached rows were fetched without a search; the pasted link carries one.
+    mockHasLoadedOnce.value = true;
+    mockLoadedOrg.value = "test-org";
+    mockRouteQuery = { type: "stream", user: "luis" };
+    const wrapper = await mountComponent();
+    // Non-forced mount replay — normally served from the cache.
+    await wrapper.vm.refresh(1000, 2000, false);
+    await flushPromises();
+    expect(mockFetchPage).toHaveBeenCalledWith("test-stream", 1000, 2000, 0, 20, "", {
+      user: "luis",
+      message: undefined,
+    });
+  });
+
+  it("back navigation restores the filtered rows and the terms from the singleton", async () => {
+    mockHasLoadedOnce.value = true;
+    mockLoadedOrg.value = "test-org";
+    mockSearchUser.value = "luis";
+    mockSessions.value = [makeSession({ sessionId: "sess-luis", userId: "luis@example.com" })];
+    mockTotal.value = 1;
+    mockRouteQuery = { type: "stream", user: "luis" };
+
+    const wrapper = await mountComponent();
+    await wrapper.vm.refresh(1000, 2000, false);
+    await flushPromises();
+
+    expect(mockFetchPage).not.toHaveBeenCalled();
+    expect(wrapper.find("[data-session-id='sess-luis']").exists()).toBe(true);
+    expect(value(wrapper, USER)).toBe("luis");
+  });
+
+  it("shows the filtered empty state, not the first-run screen, and its Clear action re-fetches", async () => {
+    mockHasLoadedOnce.value = true;
+    mockSearchUser.value = "nobody";
+    mockSearchMessage.value = "nothing";
+    const wrapper = await mountInStreamMode();
+
+    expect(wrapper.find("[data-test='sessions-empty-search']").exists()).toBe(true);
+    expect(wrapper.find("[data-test='sessions-empty']").exists()).toBe(false);
+    expect(wrapper.text()).toContain("No sessions match your search");
+
+    await wrapper.find("[data-test='sessions-empty-search'] button").trigger("click");
+    await flushPromises();
+    expect(mockSearchUser.value).toBe("");
+    expect(mockSearchMessage.value).toBe("");
+    expect(value(wrapper, USER)).toBe("");
+    expect(value(wrapper, MESSAGE)).toBe("");
+    expect(mockFetchPage).toHaveBeenCalledWith(...NO_SEARCH);
+  });
+
+  it("shows an Enter hint only while a box's text differs from the applied term", async () => {
+    const HINT = "[data-test='sessions-list-search-user-enter']";
+    const wrapper = await mountInStreamMode();
+    expect(wrapper.find(HINT).exists()).toBe(false);
+
+    await wrapper.find(USER).setValue("luis");
+    expect(wrapper.find(HINT).exists()).toBe(true);
+    expect(wrapper.find(HINT).text()).toContain("↵");
+
+    await wrapper.find(USER).trigger("keydown", { key: "Enter" });
+    await flushPromises();
+    expect(wrapper.find(HINT).exists()).toBe(false);
+  });
+
+  it("clicking the Enter hint runs the search", async () => {
+    const wrapper = await mountInStreamMode();
+    await wrapper.find(MESSAGE).setValue("refund");
+    await wrapper.find("[data-test='sessions-list-search-message-enter']").trigger("click");
+    await flushPromises();
+    expect(mockFetchPage).toHaveBeenCalledWith("test-stream", 1000, 2000, 0, 20, "", {
+      user: undefined,
+      message: "refund",
+    });
+  });
+
+  it("keeps the terms across an explicit refresh", async () => {
+    mockSearchUser.value = "luis";
+    const wrapper = await mountInStreamMode();
+    await refreshComponent(wrapper);
+    expect(mockSearchUser.value).toBe("luis");
+    expect(mockFetchPage).toHaveBeenCalledWith("test-stream", 1000, 2000, 0, 20, "", {
+      user: "luis",
+      message: undefined,
+    });
   });
 });

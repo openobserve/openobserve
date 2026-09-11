@@ -9478,7 +9478,17 @@
       "agent": "智能体",
       "noAgentsTitle": "此范围内无智能体",
       "noAgentsDescription": "在选定的时间窗口内未检测到 GenAI 智能体。尝试更宽的范围或切换回流视图。",
-      "viewByStream": "按流查看"
+      "viewByStream": "按流查看",
+      "search": {
+        "placeholderUser": "按用户搜索",
+        "placeholderMessage": "搜索消息文本",
+        "userTitle": "匹配用户 ID 包含该文本的会话",
+        "messageTitle": "在对话消息中搜索文本",
+        "noResultsTitle": "没有与搜索匹配的会话",
+        "noResultsDescription": "请尝试其他关键词、其他字段或更大的时间范围。",
+        "clear": "清除搜索",
+        "pressEnter": "按 Enter 键搜索"
+      }
     },
     "sessionDetail": {
       "currencySymbol": "$",

@@ -9478,7 +9478,17 @@
       "agent": "エージェント",
       "noAgentsTitle": "この範囲内にエージェントはありません",
       "noAgentsDescription": "選択した時間枠ではGenAIエージェントは検出されませんでした。範囲を広げるか、ストリームビューに切り替えてください。",
-      "viewByStream": "ストリームで表示"
+      "viewByStream": "ストリームで表示",
+      "search": {
+        "placeholderUser": "ユーザーで検索",
+        "placeholderMessage": "メッセージ本文を検索",
+        "userTitle": "ユーザーIDにテキストを含むセッションに一致",
+        "messageTitle": "会話メッセージ内のテキストを検索",
+        "noResultsTitle": "検索に一致するセッションはありません",
+        "noResultsDescription": "別の語句、別のフィールド、またはより広い時間範囲をお試しください。",
+        "clear": "検索をクリア",
+        "pressEnter": "Enter キーを押して検索"
+      }
     },
     "sessionDetail": {
       "currencySymbol": "$",
