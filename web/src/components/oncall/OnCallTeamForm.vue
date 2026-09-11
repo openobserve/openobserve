@@ -43,7 +43,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         required
         data-test="oncall-team-form-name"
       />
+      <!-- In create mode this same field sits inline with First Handover
+           instead — a team's zone and its first handover are decided
+           together, so asking for the zone twice on one screen would be the
+           genuinely redundant thing. Edit mode has no handover row, so it
+           stays here. -->
       <OFormSelect
+        v-if="isEdit"
         name="timezone"
         :label="t('oncall.timezone')"
         :options="timezoneOptions"
@@ -108,7 +114,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
 
         <!-- Without an explicit first handover the anchor is "now", so a team
-             created at 14:32 hands over at 14:32 for ever. -->
+             created at 14:32 hands over at 14:32 for ever. The zone travels
+             with it on the same row — a date and time mean nothing on their
+             own, and this is the one place in create mode that asks for the
+             zone at all. -->
         <div class="flex gap-2" data-test="oncall-team-form-handover">
           <OFormDate
             class="min-w-0 flex-1"
@@ -116,10 +125,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('oncall.firstHandover')"
             data-test="oncall-team-form-handover-date"
           />
+          <!-- Blank label, not none: it reserves the same header row the date and timezone fields have, so all three boxes align. -->
           <OFormTime
             class="min-w-0 flex-1"
             name="first_handover_time"
+            :label="raw('\u00A0')"
             data-test="oncall-team-form-handover-time"
+          />
+          <OFormSelect
+            class="min-w-0 flex-1"
+            name="timezone"
+            :label="t('oncall.timezone')"
+            :options="timezoneOptions"
+            required
+            data-test="oncall-team-form-timezone"
           />
         </div>
 
@@ -133,7 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="oncall-team-form-secondary"
         />
 
-        <OnCallRotationPreview :timezone="previewZone" />
+        <OnCallRotationPreview />
       </template>
     </OForm>
   </ODrawer>
@@ -164,7 +183,7 @@ import {
   SECONDARY_ROTATION_NAME,
 } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { resolvableTimezones, SHIFT_PRESETS } from "@/utils/oncall";
+import { fromZonedInputValue, resolvableTimezones, SHIFT_PRESETS } from "@/utils/oncall";
 import OnCallRotationPreview from "./OnCallRotationPreview.vue";
 
 import { makeOnCallTeamSchema, type OnCallTeamFormValues } from "./OnCallTeamForm.schema";
@@ -213,11 +232,6 @@ const userOptions = computed(() =>
     return { label: raw(name ? `${name} (${user.email})` : user.email), value: user.email };
   }),
 );
-
-/// The zone the preview reads its instants in. The form's own timezone field
-/// is the answer once the user has touched it, which is why it is not read
-/// from the team.
-const previewZone = computed(() => defaultValues.value.timezone);
 
 /// Weekly, next Monday at 10:00, per the shipped defaults in architecture/02
 /// §4 — a new team is pageable without the user deciding anything.
@@ -357,13 +371,15 @@ async function staffNewTeam(teamId: string, values: OnCallTeamFormValues) {
     return;
   }
 
-  const anchor = Date.parse(
+  const anchor =
     values.first_handover_date && values.first_handover_time
-      ? `${values.first_handover_date}T${values.first_handover_time}`
-      : "",
-  );
+      ? fromZonedInputValue(
+          `${values.first_handover_date}T${values.first_handover_time}`,
+          values.timezone,
+        )
+      : null;
   const shift = values.shift_micros ?? MICROS_PER_WEEK;
-  if (!Number.isFinite(anchor) || shift <= 0) return;
+  if (anchor === null || shift <= 0) return;
 
   try {
     await oncallService.setSchedule({
@@ -375,7 +391,7 @@ async function staffNewTeam(teamId: string, values: OnCallTeamFormValues) {
           teamId,
           emails,
           shift,
-          anchor * 1000,
+          anchor,
           values.create_secondary !== false,
         ),
       },

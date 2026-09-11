@@ -78,14 +78,17 @@ import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 import { MICROS_PER_WEEK } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { formatInZone, memberAt } from "@/utils/oncall";
-
-const props = defineProps<{ timezone: string }>();
+import { formatInZone, fromZonedInputValue, memberAt } from "@/utils/oncall";
 
 const { t } = useI18nTyped();
 
 const form: any = inject(FORM_CONTEXT_KEY, null);
 
+// Read live off the form, same as every other value below — a `timezone`
+// prop snapshotted the value at mount and went stale the moment the user
+// touched the Timezone select, so the preview kept showing shifts in
+// whatever zone the form opened in.
+const timezone = form.useStore((s: any) => (s.values?.timezone ?? "UTC") as string);
 const members = form.useStore((s: any) => (s.values?.members ?? []) as string[]);
 const shiftMicros = form.useStore(
   (s: any) => (s.values?.shift_micros ?? MICROS_PER_WEEK) as number,
@@ -106,15 +109,16 @@ const showSecondary = computed(() => wantSecondary.value && members.value.length
 /// The first three shifts the rotation would produce. Three because the point
 /// is to show the order rotating, which two cannot.
 const shifts = computed(() => {
-  const anchor = Date.parse(
+  const anchorMicros =
     firstHandoverDate.value && firstHandoverTime.value
-      ? `${firstHandoverDate.value}T${firstHandoverTime.value}`
-      : "",
-  );
+      ? fromZonedInputValue(
+          `${firstHandoverDate.value}T${firstHandoverTime.value}`,
+          timezone.value,
+        )
+      : null;
   const shift = shiftMicros.value;
-  if (!members.value.length || !Number.isFinite(anchor) || !shift || shift <= 0) return [];
+  if (!members.value.length || anchorMicros === null || !shift || shift <= 0) return [];
 
-  const anchorMicros = anchor * 1000;
   const rule = (anchorFor: number) => ({
     name: "",
     members: members.value,
@@ -133,7 +137,7 @@ const shifts = computed(() => {
       startMicros,
       member: memberAt(primary, startMicros) ?? "",
       secondary: showSecondary.value ? (memberAt(secondary, startMicros) ?? "") : "",
-      when: formatInZone(startMicros, props.timezone, {
+      when: formatInZone(startMicros, timezone.value, {
         dateStyle: "medium",
         timeStyle: "short",
       }),

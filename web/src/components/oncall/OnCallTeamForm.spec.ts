@@ -113,6 +113,28 @@ describe("OnCallTeamForm", () => {
     expect(primary.name).toBe("Primary");
   });
 
+  /// The date/time fields hold a WALL clock, meaningless without a zone. It
+  /// must resolve in the team's chosen timezone, not whatever zone the
+  /// browser running the form happens to be in.
+  it("resolves the first handover in the team's chosen timezone, not the browser's", async () => {
+    const wrapper = render();
+    await flushPromises();
+
+    setValues(wrapper, {
+      name: "Payments",
+      timezone: "America/New_York",
+      members: ["ana@o2.ai"],
+      first_handover_date: "2026-08-17",
+      first_handover_time: "10:00",
+    });
+    await submit(wrapper);
+    await flushPromises();
+
+    const { rotations } = (oncall.setSchedule.mock.calls[0][0] as any).data;
+    // 10:00 America/New_York on 2026-08-17 (EDT, UTC-4) is 14:00 UTC.
+    expect(rotations[0].shift_rules[0].anchor_micros).toBe(Date.UTC(2026, 7, 17, 14, 0) * 1000);
+  });
+
   /// Adding members auto-staffs the team, and this PUT is a full replace: the
   /// hand-built rotation used to delete the second one the server had written,
   /// so a team created here had one position where the same team created by
