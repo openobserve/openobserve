@@ -29,9 +29,7 @@ use {
     },
     chrono::Utc,
     common::infra::config::USERS,
-    o2_enterprise::enterprise::password_policy::enforcement::{
-        PolicyDecision, RESET_REQUIRED_CODE, decide,
-    },
+    o2_enterprise::enterprise::password_policy::enforcement::{PolicyDecision, decide},
 };
 
 /// The header `auth_middleware` writes the authenticated email into. Reading it here rather than
@@ -74,14 +72,14 @@ async fn check_request(user_email: &str, uri: &Uri, method: &Method) -> Option<R
     let policy = db::password_policy::get_effective_policy().await;
     match decide(&user, uri, method, &policy, Utc::now()) {
         PolicyDecision::Allow => None,
-        PolicyDecision::Block { reason } => Some(blocked_response(&reason)),
+        PolicyDecision::Block { code, reason } => Some(blocked_response(code, &reason)),
     }
 }
 
 #[cfg(feature = "enterprise")]
-fn blocked_response(reason: &str) -> Response {
+fn blocked_response(code: &str, reason: &str) -> Response {
     let body = serde_json::json!({
-        "code": RESET_REQUIRED_CODE,
+        "code": code,
         "reason": reason,
         "message": "Your password must be updated before you can continue.",
     });
