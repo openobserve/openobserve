@@ -65,16 +65,6 @@ impl Engine {
         }
     }
 
-    /// Create a new engine with evaluation context for range queries
-    /// This is now an alias for `new()` since eval_ctx is always required
-    pub fn new_with_context(
-        trace_id: &str,
-        ctx: Arc<PromqlContext>,
-        eval_ctx: EvalContext,
-    ) -> Self {
-        Self::new(trace_id, ctx, eval_ctx)
-    }
-
     pub async fn exec(&mut self, prom_expr: &PromExpr) -> Result<(Value, Option<String>)> {
         self.extract_columns_from_prom_expr(prom_expr)?;
         if self.disable_label_selector {
@@ -146,10 +136,10 @@ impl Engine {
                         binary::vector_bin_op(expr, left, right)?
                     }
                     (Value::Matrix(left), Value::Float(right)) => {
-                        binary::vector_scalar_bin_op(expr, left, right, false).await?
+                        binary::vector_scalar_bin_op(expr, left, right, false)?
                     }
                     (Value::Float(left), Value::Matrix(right)) => {
-                        binary::vector_scalar_bin_op(expr, right, left, true).await?
+                        binary::vector_scalar_bin_op(expr, right, left, true)?
                     }
                     // a set operator keeps the other side when one side has no series at all
                     (Value::None, Value::Matrix(right)) if expr.op.is_set_operator() => {

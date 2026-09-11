@@ -8823,10 +8823,9 @@
       "auth": {
         "oauth": "c324eda2422e19d1",
         "oauthNote": "cb0d79fc4e1cc49a",
+        "oauthTitle": "a8d518d7bb385987",
         "token": "9a911b08feb9d292"
       },
-      "authLabel": "5c32ae8f773796c1",
-      "clientLabel": "3cf80d5b25a738d1",
       "clients": {
         "antigravity": "4da276f5f11d050f",
         "chatgpt": "50a4122943273ad2",
@@ -8840,16 +8839,21 @@
         "vscode": "af437cf8caed3e51",
         "windsurf": "da30d04dca8e2ba1"
       },
-      "configLabel": "bd7f547a796d2933",
+      "configHint": "cbbc94b94fef7deb",
+      "configLabel": "7915e69862be7ae7",
+      "connectHint": "9c7417f6b259a0af",
+      "connectLabel": "7d0b8450b967c40b",
       "credential": {
-        "created": "8a7ad20f369ea242",
+        "created": "f5e23e0f00fce190",
         "download": "d6eafe8235910042",
         "error": "7ddcced3576b445e",
-        "generate": "2f02f30a99ef3d96",
+        "generate": "c6e4cddd2773af0c",
         "manage": "de572f939d581a46",
-        "quickStartBody": "5a8294722e40104e",
-        "quickStartTitle": "6e1a5e1b5bb46b22",
-        "readonlyWarn": "7ac2c2c841fd9524",
+        "quickStartBody": "d2b9167a2c9e62bc",
+        "quickStartTitle": "b6000f54c6e6adc1",
+        "rbacNote": "65df0740cae0c52c",
+        "readonlyNote": "5e453e04030d8c82",
+        "readonlyWarn": "606034424490ad90",
         "shownOnce": "58bc45155d18d789"
       },
       "crossLinkBody": "f36ef3efc51aff3c",
@@ -8868,13 +8872,14 @@
         "vscode": "d0e0e3f94f8bdfbb",
         "windsurf": "a1ef3a47b0214359"
       },
-      "docsCta": "673e1c9b4e77fed2",
-      "endpointLabel": "b10c324c9054c45a",
       "installOneClick": "22cd4bc02c1d4c1c",
       "name": "9b5daabca4647fd7",
-      "securityBody": "0d17925aade50015",
+      "securityBody": "de00835eaf7e01f2",
       "securityTitle": "925dcec8f1041a1d",
       "shortName": "960e444e99771619",
+      "skillsHint": "e60d1e31c0597783",
+      "skillsLabel": "71cb3d49b256843d",
+      "skillsRepo": "887cfdf2ea742b4a",
       "tagline": "32cc3ebe273db3de"
     },
     "messageQueuesLabel": "9cd00858543a587f",
