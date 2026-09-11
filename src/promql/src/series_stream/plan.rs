@@ -112,7 +112,7 @@ async fn build_partition_inputs(
     trace_id: &str,
 ) -> Result<Option<Vec<Vec<SendableRecordBatchStream>>>> {
     let mut partition_inputs = Vec::with_capacity(partitions);
-    for (partition, (lo, hi)) in hash_partitions(partitions).into_iter().enumerate() {
+    for (partition, (lo, hi)) in hash_partitions(partitions).enumerate() {
         let partition_df = df
             .clone()
             .filter(
@@ -144,16 +144,14 @@ async fn build_partition_inputs(
 }
 
 /// Uniform partition of the u64 hash space into `count` inclusive ranges.
-fn hash_partitions(count: usize) -> Vec<(u64, u64)> {
+fn hash_partitions(count: usize) -> impl Iterator<Item = (u64, u64)> {
     let count = count.max(1) as u128;
     let span = (u64::MAX as u128) + 1;
-    (0..count)
-        .map(|partition| {
-            let lo = (span * partition / count) as u64;
-            let hi = (span * (partition + 1) / count - 1) as u64;
-            (lo, hi)
-        })
-        .collect()
+    (0..count).map(move |partition| {
+        let lo = (span * partition / count) as u64;
+        let hi = (span * (partition + 1) / count - 1) as u64;
+        (lo, hi)
+    })
 }
 
 /// The merge node's own child partitions, so the row-level merge itself is never executed.
@@ -335,7 +333,7 @@ mod tests {
     #[test]
     fn test_hash_shards_cover_the_full_space_contiguously() {
         for count in [1, 3, 7, 16] {
-            let partitions = hash_partitions(count);
+            let partitions: Vec<_> = hash_partitions(count).collect();
             assert_eq!(partitions.len(), count);
             assert_eq!(partitions[0].0, 0);
             assert_eq!(partitions[count - 1].1, u64::MAX);

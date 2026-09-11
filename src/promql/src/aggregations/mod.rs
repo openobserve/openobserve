@@ -31,6 +31,7 @@ mod bottomk;
 mod count;
 mod count_values;
 mod dispersion;
+mod extrema;
 mod group;
 mod max;
 mod min;
@@ -50,7 +51,7 @@ pub(crate) use min::Min;
 pub(crate) use quantile::quantile;
 pub(crate) use stddev::Stddev;
 pub(crate) use stdvar::Stdvar;
-pub(crate) use sum::Sum;
+pub(crate) use sum::{Sum, SumState};
 pub(crate) use topk::topk;
 
 /// Series per parallel partial-aggregation chunk when a single group is large.

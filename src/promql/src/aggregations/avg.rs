@@ -16,10 +16,7 @@
 use config::meta::promql::value::Sample;
 use hashbrown::HashMap;
 
-use crate::{
-    aggregations::{Accumulate, AggFunc},
-    common::kahan_sum_increment,
-};
+use crate::aggregations::{Accumulate, AggFunc, SumState};
 
 pub struct Avg;
 
@@ -35,8 +32,7 @@ impl AggFunc for Avg {
 
 #[derive(Clone, Default)]
 pub(crate) struct AvgState {
-    sum: f64,
-    compensation: f64,
+    sum: SumState,
     count: usize,
 }
 
@@ -47,7 +43,7 @@ pub struct AvgAccumulate {
 
 impl AvgState {
     pub(crate) fn push(&mut self, value: f64) {
-        (self.sum, self.compensation) = kahan_sum_increment(value, self.sum, self.compensation);
+        self.sum.push(value);
         self.count += 1;
     }
 
@@ -58,14 +54,12 @@ impl AvgState {
         // Fold the other partial's sum and compensation in as two
         // separate compensated increments: a plain `c + other_c` add
         // rounds residuals away before the main sums get to cancel.
-        (self.sum, self.compensation) = kahan_sum_increment(other.sum, self.sum, self.compensation);
-        (self.sum, self.compensation) =
-            kahan_sum_increment(other.compensation, self.sum, self.compensation);
+        self.sum.merge(other.sum);
         self.count += other.count;
     }
 
     pub(crate) fn value(&self) -> Option<f64> {
-        (self.count > 0).then(|| (self.sum + self.compensation) / self.count as f64)
+        (self.count > 0).then(|| self.sum.value() / self.count as f64)
     }
 }
 

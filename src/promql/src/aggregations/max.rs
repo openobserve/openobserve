@@ -13,10 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::promql::value::Sample;
-use hashbrown::HashMap;
-
-use crate::aggregations::{Accumulate, AggFunc};
+use crate::aggregations::{AggFunc, extrema::ExtremaAccumulator};
 
 pub struct Max;
 
@@ -26,42 +23,7 @@ impl AggFunc for Max {
     }
 
     fn build(&self) -> Box<dyn super::Accumulate> {
-        Box::<MaxAccumulate>::default()
-    }
-}
-
-#[derive(Default)]
-pub struct MaxAccumulate {
-    max: HashMap<i64, f64>,
-}
-
-impl Accumulate for MaxAccumulate {
-    fn accumulate(&mut self, sample: &Sample) {
-        let entry = self
-            .max
-            .entry(sample.timestamp)
-            .or_insert(f64::NEG_INFINITY);
-        if sample.value > *entry {
-            *entry = sample.value;
-        }
-    }
-
-    fn merge(&mut self, other: Box<dyn Accumulate>) {
-        let other = other.into_any().downcast::<Self>().expect("same type");
-        for (timestamp, value) in other.max {
-            self.accumulate(&Sample::new(timestamp, value));
-        }
-    }
-
-    fn into_any(self: Box<Self>) -> Box<dyn std::any::Any> {
-        self
-    }
-
-    fn evaluate(self: Box<Self>) -> Vec<Sample> {
-        self.max
-            .into_iter()
-            .map(|(timestamp, value)| Sample::new(timestamp, value))
-            .collect()
+        Box::<ExtremaAccumulator<true>>::default()
     }
 }
 

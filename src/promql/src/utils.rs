@@ -76,9 +76,10 @@ pub fn matcher_predicates(schema: &Schema, matchers: &Matchers) -> Vec<Expr> {
         let Some(field) = matcher_residual_field(schema, mat) else {
             continue;
         };
-        let field_type = field.data_type().clone();
+        let field_type = field.data_type();
+        let column = col(mat.name.as_str());
         let literal = |value: String| -> Expr {
-            match &field_type {
+            match field_type {
                 // Explicitly type equality matcher literals to the label column;
                 // an untyped literal would become Utf8View == Utf8 at execution.
                 DataType::Utf8View => lit(ScalarValue::Utf8View(Some(value))),
@@ -87,17 +88,17 @@ pub fn matcher_predicates(schema: &Schema, matchers: &Matchers) -> Vec<Expr> {
             }
         };
         let predicate = match &mat.op {
-            MatchOp::Equal => col(mat.name.clone()).eq(literal(mat.value.clone())),
-            MatchOp::NotEqual => col(mat.name.clone()).not_eq(literal(mat.value.clone())),
+            MatchOp::Equal => column.eq(literal(mat.value.clone())),
+            MatchOp::NotEqual => column.not_eq(literal(mat.value.clone())),
             MatchOp::Re(regex) | MatchOp::NotRe(regex) => {
                 let regex = format!("^{}$", regex.as_str());
                 // DataFusion 54 can lower a regex on Utf8View to a mixed-type
                 // equality/LIKE expression. Cast only regex matchers until that
                 // optimizer bug is fixed; equality matchers stay zero-copy views.
-                let value = if field_type == DataType::Utf8View {
-                    cast(col(mat.name.clone()), DataType::Utf8)
+                let value = if field_type == &DataType::Utf8View {
+                    cast(column, DataType::Utf8)
                 } else {
-                    col(mat.name.clone())
+                    column
                 };
                 let predicate = regexp_like().call(vec![value, lit(regex)]);
                 if matches!(mat.op, MatchOp::NotRe(_)) {

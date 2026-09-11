@@ -17,8 +17,8 @@ use config::meta::promql::value::Sample;
 use promql_parser::parser::token::{self, TokenId};
 
 use crate::{
-    aggregations::AvgState,
-    common::{kahan_sum_increment, std_deviation, std_variance},
+    aggregations::{AvgState, SumState},
+    common::{std_deviation, std_variance},
 };
 
 /// Aggregations the fused path can fold through dense per-timestamp state.
@@ -92,7 +92,7 @@ pub(super) enum FusedAccumulator {
         values: Vec<Vec<f64>>,
     },
     Sum {
-        sums: Vec<(f64, f64)>,
+        sums: Vec<SumState>,
         present: Vec<bool>,
     },
 }
@@ -124,7 +124,7 @@ impl FusedAccumulator {
                 values: vec![Vec::new(); slots],
             },
             FusedAggOp::Sum => Self::Sum {
-                sums: vec![(0.0, 0.0); slots],
+                sums: vec![SumState::default(); slots],
                 present: vec![false; slots],
             },
         }
@@ -149,8 +149,7 @@ impl FusedAccumulator {
             }
             Self::Stddev { values } | Self::Stdvar { values } => values[slot].push(value),
             Self::Sum { sums, present } => {
-                let (sum, c) = &mut sums[slot];
-                (*sum, *c) = kahan_sum_increment(value, *sum, *c);
+                sums[slot].push(value);
                 present[slot] = true;
             }
         }
@@ -244,10 +243,7 @@ impl FusedAccumulator {
                     if !other_present {
                         continue;
                     }
-                    let (other_sum, other_c) = other_sums[slot];
-                    let (sum, c) = &mut sums[slot];
-                    (*sum, *c) = kahan_sum_increment(other_sum, *sum, *c);
-                    (*sum, *c) = kahan_sum_increment(other_c, *sum, *c);
+                    sums[slot].merge(other_sums[slot]);
                     present[slot] = true;
                 }
             }
@@ -299,7 +295,7 @@ impl FusedAccumulator {
                 .zip(present)
                 .enumerate()
                 .filter(|(_, (_, present))| *present)
-                .map(|(slot, ((sum, c), _))| Sample::new(timestamps[slot], sum + c))
+                .map(|(slot, (sum, _))| Sample::new(timestamps[slot], sum.value()))
                 .collect(),
         }
     }
