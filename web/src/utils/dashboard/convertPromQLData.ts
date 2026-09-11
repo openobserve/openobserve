@@ -188,10 +188,10 @@ export const convertPromQLData = async (
   // Add warning if total number of series exceeds limit
   // Check if series limiting info is available from data loader (PromQL streaming)
   if (metadata?.seriesLimiting) {
-    const { totalMetricsReceived, metricsStored } = metadata.seriesLimiting;
-    // Only show warning if we actually hit the limit (metricsStored >= maxSeries)
-    // AND we had to drop some metrics (totalMetricsReceived > metricsStored)
-    if (totalMetricsReceived > metricsStored && metricsStored >= maxSeries) {
+    const { uniqueSeriesSeen, metricsStored } = metadata.seriesLimiting;
+    // Streaming re-delivers the same series in every chunk, so only distinct-series
+    // count proves a drop; comparing arrivals warned whenever a panel had 2+ chunks.
+    if ((uniqueSeriesSeen ?? metricsStored) > metricsStored) {
       extras.limitNumberOfSeriesWarningMessage = gt("dashboard.utils.seriesLimitWarning");
     }
   } else if (totalSeries > (store.state?.zoConfig?.max_dashboard_series ?? 100)) {

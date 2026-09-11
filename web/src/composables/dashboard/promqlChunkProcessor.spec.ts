@@ -412,3 +412,42 @@ describe("the series cap vs. partitions that arrive oldest-first", () => {
     expect(result.result.length).toBeLessThanOrEqual(10);
   });
 });
+
+// A dropped series is invisible data loss, so the stats the panel warns from must
+// distinguish "series were dropped" from "the same series arrived in many chunks".
+describe("PromQL Chunk Processor — dropped-series reporting", () => {
+  const chunkOf = (names: string[]) => ({
+    result_type: "matrix",
+    result: names.map((instance) => ({
+      metric: { __name__: "m", instance },
+      values: [[1640000000, "1"]] as [number, string][],
+    })),
+  });
+
+  const streamUnique = (uniqueCount: number, chunks: number, maxSeries: number) => {
+    const processor = createPromQLChunkProcessor({ maxSeries, enableLogging: false });
+    const names = Array.from({ length: uniqueCount }, (_, i) => `h_${i}`);
+    let result: any = null;
+    for (let c = 0; c < chunks; c++) result = processor.processChunk(result, chunkOf(names));
+    return { stats: processor.getStats(), rendered: result.result.length };
+  };
+
+  it("reports uniqueSeriesSeen, not the per-chunk arrival sum", () => {
+    const { stats } = streamUnique(150, 6, 100);
+    expect(stats.totalMetricsReceived).toBe(900);
+    expect(stats.uniqueSeriesSeen).toBe(150);
+  });
+
+  it("reports no drop when the cap is exactly met across many chunks", () => {
+    const { stats, rendered } = streamUnique(100, 6, 100);
+    expect(rendered).toBe(100);
+    expect(stats.uniqueSeriesSeen).toBe(100);
+    expect(stats.uniqueSeriesSeen - stats.metricsStored).toBe(0);
+  });
+
+  it("reports the exact number of series it dropped whole", () => {
+    const { stats, rendered } = streamUnique(150, 6, 100);
+    expect(rendered).toBe(100);
+    expect(stats.uniqueSeriesSeen - stats.metricsStored).toBe(50);
+  });
+});
