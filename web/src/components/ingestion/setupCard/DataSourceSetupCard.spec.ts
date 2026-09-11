@@ -208,6 +208,14 @@ describe("DataSourceSetupCard — host metrics auto-import wiring", () => {
     );
   });
 
+  it("keeps the silent detect-time import — the setup flow's own framing is the user's consent", async () => {
+    wrapper = mountCard("linux");
+    renderer().vm.$emit("detected", 4);
+    await flushPromises();
+    expect(importHostMetricsDashboard).toHaveBeenCalledWith("test-org");
+    expect(wrapper.find('[data-test="host-drawer-import-confirm"]').exists()).toBe(false);
+  });
+
   it("imports first, then navigates, when the step button is clicked before any import", async () => {
     wrapper = mountCard("linux");
     renderer().vm.$emit("step-action", "view-host-dashboard");

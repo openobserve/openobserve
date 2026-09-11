@@ -16288,7 +16288,11 @@
       "columnLoad": "Load 15m (current)",
       "columnLastSeen": "Last seen",
       "memoryAbsolute": "{used} / {total}",
-      "openDashboard": "Open Host Metrics dashboard",
+      "openDashboard": "Host Metrics dashboard",
+      "importConfirmTitle": "Add the Host Metrics dashboard?",
+      "importConfirmMessage": "You don't have this dashboard yet. Adding it creates a dashboard named 'Host Metrics' in your Default folder, then opens it for this host.",
+      "importConfirmOk": "Add and open",
+      "importConfirmCancel": "Cancel",
       "windowsLivenessNote": "Windows hosts appear in this list only when the agent reports the load metric (system_cpu_load_average_15m) — if your Windows agents are running but missing here, enable the load scraper in the collector config or update the agent.",
       "panel": {
         "cpuBusy": "CPU busy",

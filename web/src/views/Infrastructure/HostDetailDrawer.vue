@@ -23,9 +23,13 @@ import { computed, onMounted, provide, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { importHostMetricsDashboard } from "@/composables/useHostMetricsDashboard";
+import {
+  findHostMetricsDashboard,
+  importHostMetricsDashboard,
+} from "@/composables/useHostMetricsDashboard";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -219,39 +223,75 @@ watch(
   },
 );
 
-// ── Footer — create-if-absent, then deep-link with the host + range preset ──
+// ── Footer — check first, ask before creating, then deep-link with host + range ──
 const openingDashboard = ref(false);
+const importing = ref(false);
+const confirmingImport = ref(false);
+
+const toastImportError = (kind: "forbidden" | "generic") => {
+  toast({
+    variant: "error",
+    message: t(
+      kind === "forbidden"
+        ? "ingestion.setupCard.hostDashboardImportForbidden"
+        : "ingestion.setupCard.hostDashboardImportFailed",
+    ),
+  });
+};
+
+const goToDashboard = (dashboardId: string, folderId: string) => {
+  router.push({
+    path: "/dashboards/view",
+    query: {
+      org_identifier: org.value,
+      dashboard: dashboardId,
+      folder: folderId,
+      "var-host_name": props.hostName,
+      from: String(drawerRange.value.from),
+      to: String(drawerRange.value.to),
+    },
+  });
+};
 
 const openHostDashboard = async () => {
+  if (openingDashboard.value) return;
   openingDashboard.value = true;
   try {
     // The user can reach this drawer without ever running the setup flow.
-    const result = await importHostMetricsDashboard(org.value);
+    const result = await findHostMetricsDashboard(org.value);
     if (result.status === "error") {
-      toast({
-        variant: "error",
-        message: t(
-          result.kind === "forbidden"
-            ? "ingestion.setupCard.hostDashboardImportForbidden"
-            : "ingestion.setupCard.hostDashboardImportFailed",
-        ),
-      });
+      toastImportError(result.kind);
       return;
     }
-    router.push({
-      path: "/dashboards/view",
-      query: {
-        org_identifier: org.value,
-        dashboard: result.dashboardId,
-        folder: result.folderId,
-        "var-host_name": props.hostName,
-        from: String(drawerRange.value.from),
-        to: String(drawerRange.value.to),
-      },
-    });
+    // Creating a dashboard in the user's org is never done off an "open" click alone.
+    if (result.status === "absent") {
+      confirmingImport.value = true;
+      return;
+    }
+    goToDashboard(result.dashboardId, result.folderId);
   } finally {
     openingDashboard.value = false;
   }
+};
+
+const confirmImport = async () => {
+  if (importing.value) return;
+  importing.value = true;
+  try {
+    const result = await importHostMetricsDashboard(org.value);
+    if (result.status === "error") {
+      toastImportError(result.kind);
+      return;
+    }
+    goToDashboard(result.dashboardId, result.folderId);
+  } finally {
+    importing.value = false;
+    confirmingImport.value = false;
+  }
+};
+
+const cancelImport = () => {
+  confirmingImport.value = false;
 };
 
 const statusVariant = computed(() =>
@@ -418,5 +458,38 @@ const statusLabel = computed(() =>
         </OButton>
       </div>
     </template>
+
+    <ODialog
+      v-if="confirmingImport"
+      :open="true"
+      persistent
+      size="sm"
+      :title="t('infra.hosts.importConfirmTitle')"
+      data-test="host-drawer-import-confirm"
+      @update:open="(open: boolean) => !open && cancelImport()"
+    >
+      <OText>{{ t("infra.hosts.importConfirmMessage") }}</OText>
+      <template #footer>
+        <div class="flex w-full justify-end gap-2">
+          <OButton
+            variant="outline"
+            size="sm-action"
+            data-test="host-drawer-import-confirm-cancel"
+            @click="cancelImport"
+          >
+            {{ t("infra.hosts.importConfirmCancel") }}
+          </OButton>
+          <OButton
+            variant="primary"
+            size="sm-action"
+            :loading="importing"
+            data-test="host-drawer-import-confirm-ok"
+            @click="confirmImport"
+          >
+            {{ t("infra.hosts.importConfirmOk") }}
+          </OButton>
+        </div>
+      </template>
+    </ODialog>
   </ODrawer>
 </template>

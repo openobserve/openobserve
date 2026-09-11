@@ -16,7 +16,10 @@
 // Shared create-if-absent import of the bundled Host Metrics dashboard (design 4.2/§6).
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { importHostMetricsDashboard } from "@/composables/useHostMetricsDashboard";
+import {
+  findHostMetricsDashboard,
+  importHostMetricsDashboard,
+} from "@/composables/useHostMetricsDashboard";
 import dashboardsService from "@/services/dashboards";
 import dashboardJson from "@/assets/dashboards/host_metrics.dashboard.json";
 
@@ -111,5 +114,80 @@ describe("importHostMetricsDashboard", () => {
     const [r1, r2] = await Promise.all([first, second]);
     expect(createMock).toHaveBeenCalledTimes(1);
     expect(r1).toEqual(r2);
+  });
+});
+
+describe("findHostMetricsDashboard", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    listMock.mockResolvedValue(listResponse([]));
+    createMock.mockResolvedValue(createResponse("dash-new"));
+  });
+
+  it("reports absent WITHOUT creating anything — this is what lets a caller ask first", async () => {
+    const result = await findHostMetricsDashboard("org-a");
+    expect(result).toEqual({ status: "absent", folderId: "default" });
+    expect(createMock).not.toHaveBeenCalled();
+    expect(deleteMock).not.toHaveBeenCalled();
+  });
+
+  it("reports exists with the id when the dashboard is found", async () => {
+    listMock.mockResolvedValue(listResponse([{ dashboard_id: "dash-old", title: "Host Metrics" }]));
+    const result = await findHostMetricsDashboard("org-a");
+    expect(result).toEqual({ status: "exists", dashboardId: "dash-old", folderId: "default" });
+    expect(createMock).not.toHaveBeenCalled();
+  });
+
+  it("runs through the same server-side title filter as the import", async () => {
+    await findHostMetricsDashboard("org-a");
+    expect(listMock).toHaveBeenCalledWith(
+      0,
+      50,
+      "name",
+      false,
+      "",
+      "org-a",
+      "default",
+      "Host Metrics",
+    );
+  });
+
+  it("treats a substring title match as absent, so the confirm names a real gap", async () => {
+    listMock.mockResolvedValue(
+      listResponse([{ dashboard_id: "near-miss", title: "Host Metrics Extended" }]),
+    );
+    expect((await findHostMetricsDashboard("org-a")).status).toBe("absent");
+  });
+
+  it("maps HTTP 403 to kind 'forbidden'", async () => {
+    listMock.mockRejectedValue({ response: { status: 403 } });
+    const result = await findHostMetricsDashboard("org-a");
+    expect(result).toMatchObject({ status: "error", kind: "forbidden" });
+  });
+
+  it("maps network/other failures to kind 'generic'", async () => {
+    listMock.mockRejectedValue(new Error("network down"));
+    const result = await findHostMetricsDashboard("org-a");
+    expect(result).toMatchObject({ status: "error", kind: "generic" });
+  });
+
+  it("dedupes concurrent lookups through its own in-flight guard", async () => {
+    let release: (v: any) => void = () => {};
+    listMock.mockReturnValue(new Promise((r) => (release = r)) as any);
+    const first = findHostMetricsDashboard("org-a");
+    const second = findHostMetricsDashboard("org-a");
+    release(listResponse([]));
+    const [r1, r2] = await Promise.all([first, second]);
+    expect(listMock).toHaveBeenCalledTimes(1);
+    expect(r1).toEqual(r2);
+  });
+
+  it("does not share its in-flight entry with the import guard", async () => {
+    // A lookup settling must not hand its no-op result to a create the user confirmed.
+    listMock.mockResolvedValue(listResponse([]));
+    const found = await findHostMetricsDashboard("org-a");
+    expect(found.status).toBe("absent");
+    const imported = await importHostMetricsDashboard("org-a");
+    expect(imported).toEqual({ status: "created", dashboardId: "dash-new", folderId: "default" });
   });
 });
