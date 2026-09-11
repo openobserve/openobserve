@@ -30,12 +30,11 @@ mod avg_over_time;
 mod changes;
 mod clamp;
 mod count_over_time;
-mod delta;
 mod deriv;
+mod extrapolated;
 mod histogram;
 mod holt_winters;
 mod idelta;
-mod increase;
 mod irate;
 mod label_join;
 mod label_replace;
@@ -45,7 +44,6 @@ mod max_over_time;
 mod min_over_time;
 mod predict_linear;
 mod quantile_over_time;
-mod rate;
 mod resets;
 mod scalar;
 mod stddev_over_time;
@@ -137,15 +135,15 @@ impl Func {
             Func::AvgOverTime => Box::new(avg_over_time::AvgOverTimeFunc),
             Func::Changes => Box::new(changes::ChangesFunc),
             Func::CountOverTime => Box::new(count_over_time::CountOverTimeFunc),
-            Func::Delta => Box::new(delta::DeltaFunc),
+            Func::Delta => Box::new(ExtrapolationKind::Delta),
             Func::Deriv => Box::new(deriv::DerivFunc),
             Func::Idelta => Box::new(idelta::IdeltaFunc),
-            Func::Increase => Box::new(increase::IncreaseFunc),
+            Func::Increase => Box::new(ExtrapolationKind::Increase),
             Func::Irate => Box::new(irate::IrateFunc),
             Func::LastOverTime => Box::new(last_over_time::LastOverTimeFunc),
             Func::MaxOverTime => Box::new(max_over_time::MaxOverTimeFunc),
             Func::MinOverTime => Box::new(min_over_time::MinOverTimeFunc),
-            Func::Rate => Box::new(rate::RateFunc),
+            Func::Rate => Box::new(ExtrapolationKind::Rate),
             Func::Resets => Box::new(resets::ResetsFunc),
             Func::StddevOverTime => Box::new(stddev_over_time::StddevOverTimeFunc),
             Func::StdvarOverTime => Box::new(stdvar_over_time::StdvarOverTimeFunc),
