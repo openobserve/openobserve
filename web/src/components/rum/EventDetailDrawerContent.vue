@@ -462,6 +462,7 @@ import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import EventDetailsSection from "./common/EventDetailsSection.vue";
 import { useEventFormatters } from "@/composables/useEventFormatters";
 import { formatDuration } from "@/utils/zincutils";
+import { sqlEquals, sqlLike } from "@/utils/query/sqlFilterBuilder";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -559,7 +560,7 @@ const fetchRelatedResources = async () => {
   try {
     const req = {
       query: {
-        sql: `select * from "_rumdata" where (action_id like '%${props.rawEvent.action_id}%' or action_id='${props.rawEvent.action_id}') order by ${store.state.zoConfig.timestamp_column} desc`,
+        sql: `select * from "_rumdata" where (${sqlLike("action_id", props.rawEvent.action_id)} or ${sqlEquals("action_id", props.rawEvent.action_id)}) order by ${store.state.zoConfig.timestamp_column} desc`,
         start_time: props.rawEvent.date * 1000, // 5 mins/360 seconds before action
         end_time: props.rawEvent.date * 1000 + 360000000, // 5 mins/360 seconds after action
         from: 0,

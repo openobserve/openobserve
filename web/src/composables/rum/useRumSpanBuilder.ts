@@ -27,6 +27,7 @@ import {
   traceIdLookupVariants,
 } from "@/utils/rum/fields";
 import { SPAN_KIND_CLIENT, SPAN_KIND_UNSPECIFIED } from "@/utils/traces/constants";
+import { sqlIn } from "@/utils/query/sqlFilterBuilder";
 
 const ACTION_PROXIMITY_MS = 10_000; // ±10s — actions beyond this are collapsed
 
@@ -65,7 +66,7 @@ export default function useRumSpanBuilder(
           org_identifier: orgId,
           query: {
             query: {
-              sql: `SELECT * FROM "_rumdata" WHERE view_id IN ('${viewIds.join("','")}') AND type = 'view' ORDER BY ${store.state.zoConfig.timestamp_column} ASC`,
+              sql: `SELECT * FROM "_rumdata" WHERE ${sqlIn("view_id", viewIds)} AND type = 'view' ORDER BY ${store.state.zoConfig.timestamp_column} ASC`,
               // +/- 60s around trace window to capture RUM events that may have
               // been ingested slightly before or after the backend trace spans
               start_time: startTime - RUM_TIME_BUFFER_US,
@@ -135,7 +136,7 @@ export default function useRumSpanBuilder(
           org_identifier: orgId,
           query: {
             query: {
-              sql: `SELECT * FROM "_rumdata" WHERE view_id IN ('${viewIds.join("','")}') AND (type = 'error' OR type = 'resource' OR type = 'long_task' OR type = 'action') ORDER BY ${store.state.zoConfig.timestamp_column} ASC`,
+              sql: `SELECT * FROM "_rumdata" WHERE ${sqlIn("view_id", viewIds)} AND (type = 'error' OR type = 'resource' OR type = 'long_task' OR type = 'action') ORDER BY ${store.state.zoConfig.timestamp_column} ASC`,
               // +/- 60s around trace window to capture RUM leaf events (resource,
               // error, long_task) that may have been ingested slightly before or
               // after the backend trace spans
