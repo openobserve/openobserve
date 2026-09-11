@@ -1126,6 +1126,7 @@ pub async fn get_workflow_history(
     params(
         ("org_id" = String, Path, description = "Organization id"),
         ("id" = String, Path, description = "Workflow id"),
+        ("folder" = Option<String>, Query, description = "Folder to publish into. The default folder is used when absent."),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = inline(Object)),
@@ -1156,7 +1157,11 @@ pub async fn promote_draft(
         Ok(Some(v)) => v,
     };
 
-    if let Err(e) = workflows::promote_draft(&org_id, draft).await {
+    // Drafts store no folder, so the destination comes from the request; absent,
+    // the workflow is published into the default folder.
+    let folder = query.get("folder").map(|s| s.as_str());
+
+    if let Err(e) = workflows::promote_draft(&org_id, draft, folder).await {
         return MetaHttpResponse::bad_request(format!(
             "error in promoting draft to workflow : {e}"
         ));

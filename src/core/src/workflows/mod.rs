@@ -385,10 +385,38 @@ pub async fn update_draft(workflow: Workflow) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-pub async fn promote_draft(org_id: &str, workflow: Workflow) -> Result<(), anyhow::Error> {
+/// Publishes a draft as a workflow in `folder_slug`, defaulting to the org's
+/// default folder.
+///
+/// Drafts carry no folder of their own, so one must be resolved here: promoting
+/// with the draft's empty `folder_id` would orphan the workflow in every folder
+/// listing, and violate the folder foreign key on Postgres.
+pub async fn promote_draft(
+    org_id: &str,
+    mut workflow: Workflow,
+    folder_slug: Option<&str>,
+) -> Result<(), anyhow::Error> {
     validate_workflow(&workflow, false).await?;
+    let slug = folder_slug
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .unwrap_or(DEFAULT_FOLDER);
+    workflow.folder_id = db::workflows::resolve_folder_pk(org_id, slug).await?;
+
     let id = workflow.id.clone();
     db::workflows::promote_draft(org_id, workflow.clone()).await?;
+    // The draft's tuple has no folder parent; re-assert ownership so the
+    // published workflow inherits the folder's grants.
+    set_ownership(
+        org_id,
+        "workflows",
+        Authz {
+            obj_id: id.clone(),
+            parent_type: "workflow_folder".to_string(),
+            parent: slug.to_string(),
+        },
+    )
+    .await;
     db::workflows::notify_workflow_upsert(&workflow).await?;
     db::workflows::notify_draft_delete(&id).await?;
     Ok(())
