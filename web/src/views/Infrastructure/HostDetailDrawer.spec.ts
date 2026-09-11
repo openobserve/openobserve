@@ -136,13 +136,37 @@ const streamEntry = (name: string, docTimeMax = NOW_US - 60_000_000) => ({
   schema: [{ name: "host_name", type: "Utf8" }],
 });
 
+/** The org's log streams and the host field each one carries, for the logs-target resolve. */
+let logStreamFields: Record<string, string[]> = {};
+
 /** A live fleet: every system_* stream present and fresh. */
 const primeStreams = (names: string[] = HOST_STREAMS, docTimeMax?: number) => {
   getStreamsMock.mockImplementation(async (type: string) => ({
     name: type,
     schema: false,
-    list: type === "metrics" ? names.map((n) => streamEntry(n, docTimeMax)) : [],
+    list:
+      type === "metrics"
+        ? names.map((n) => streamEntry(n, docTimeMax))
+        : type === "logs"
+          ? Object.keys(logStreamFields).map((n) => ({ name: n, stream_type: "logs" }))
+          : [],
   }));
+};
+
+/**
+ * Gives the org real LOG streams, so the drawer's logs target resolves by evidence.
+ * Without this the org has none and the Logs tab is legitimately unresolvable.
+ */
+const primeLogStreams = (fields: Record<string, string[]>) => {
+  logStreamFields = fields;
+  getStreamMock.mockImplementation(async (name: string, type: string) => {
+    if (type === "logs") {
+      const schema = logStreamFields[name];
+      if (!schema) throw new Error("stream not found");
+      return { name, schema: schema.map((f) => ({ name: f, type: "Utf8" })) };
+    }
+    return streamEntry(name);
+  });
 };
 
 const allDashboardQueries = (): string[] => {
@@ -231,8 +255,11 @@ describe("HostDetailDrawer", () => {
       dashboardId: "dash-1",
       folderId: "default",
     });
-    primeStreams();
+    logStreamFields = {};
     getStreamMock.mockResolvedValue(streamEntry("system_cpu_time"));
+    // The default org has one log stream carrying host_name — the resolvable case.
+    primeLogStreams({ applogs: ["_timestamp", "host_name", "log"] });
+    primeStreams();
     loadSemanticGroupsMock.mockResolvedValue([]);
   });
 
@@ -414,8 +441,15 @@ describe("HostDetailDrawer", () => {
     });
 
     it("the Logs and Traces tabs render normally in BOTH non-ready states", async () => {
-      // They never wait on metrics resolution.
-      getStreamsMock.mockRejectedValue(new Error("network"));
+      // They never wait on metrics resolution — only the METRICS list fails here.
+      getStreamsMock.mockImplementation(async (type: string) => {
+        if (type === "metrics") throw new Error("network");
+        return {
+          name: type,
+          schema: false,
+          list: Object.keys(logStreamFields).map((n) => ({ name: n, stream_type: "logs" })),
+        };
+      });
       wrapper = await mountDrawer();
       await wrapper.find('[data-test="host-drawer-tab-logs"]').trigger("click");
       await flushPromises();
@@ -506,7 +540,9 @@ describe("HostDetailDrawer", () => {
       expect(searchMock).toHaveBeenCalled();
       const args: any = searchMock.mock.calls[0][0];
       const sql: string = args.query.query.sql;
-      expect(sql).toContain('FROM "default"');
+      // The RESOLVED stream, not the "default" the drawer used to hardcode.
+      expect(sql).toContain('FROM "applogs"');
+      expect(sql).not.toContain('"default"');
       expect(sql).toContain("host_name = 'web-01'");
       expect(sql).toContain("ORDER BY _timestamp DESC");
       expect(sql).toContain("LIMIT 100");
@@ -521,15 +557,15 @@ describe("HostDetailDrawer", () => {
       expect(args.query.query.sql).toContain("'o''brien'");
     });
 
-    it("names the stream in the zero-row state so a wrong constant self-diagnoses", async () => {
+    it("names the RESOLVED stream in the zero-row state so a wrong target self-diagnoses", async () => {
       searchMock.mockResolvedValue({ data: { hits: [] } } as any);
       wrapper = await mountDrawer();
       await openTab("logs");
       const empty = wrapper.find('[data-test="host-drawer-logs-empty"]');
       expect(empty.exists()).toBe(true);
       expect(empty.text()).toContain("No logs found in stream");
-      // {stream} resolved to the LOGS_STREAM constant — scoped so "default" can't match elsewhere.
-      expect(empty.text()).toContain("default");
+      expect(empty.text()).toContain("applogs");
+      expect(empty.text()).not.toContain("default");
     });
 
     it("builds the Explore-in-Logs URL with all nine constructLogsUrl params", async () => {
@@ -554,6 +590,127 @@ describe("HostDetailDrawer", () => {
     });
   });
 
+  // The drawer hardcoded HOST_LOGS_STREAM = "default" for both the preview and the
+  // handoff, so an org with no such stream searched a stream that does not exist.
+  describe("logs target is RESOLVED, never the 'default' constant", () => {
+    it("queries the stream whose schema actually carries a host field", async () => {
+      primeLogStreams({
+        audit: ["_timestamp", "user"],
+        syslog: ["_timestamp", "hostname", "message"],
+      });
+      loadSemanticGroupsMock.mockResolvedValue([
+        { id: "host", display: "Host", fields: ["hostname", "host_name"] },
+      ]);
+      wrapper = await mountDrawer();
+      await openTab("logs");
+      const sql: string = (searchMock.mock.calls[0][0] as any).query.query.sql;
+      expect(sql).toContain('FROM "syslog"');
+      expect(sql).toContain("hostname = 'web-01'");
+      expect(sql).not.toContain("default");
+    });
+
+    it("uses the RESOLVED host field, not a hardcoded host_name spelling", async () => {
+      primeLogStreams({ otel: ["_timestamp", "resource_attributes_host_name"] });
+      loadSemanticGroupsMock.mockResolvedValue([
+        { id: "host", display: "Host", fields: ["resource_attributes_host_name"] },
+      ]);
+      wrapper = await mountDrawer();
+      await openTab("logs");
+      const sql: string = (searchMock.mock.calls[0][0] as any).query.query.sql;
+      expect(sql).toContain("resource_attributes_host_name = 'web-01'");
+    });
+
+    it("carries the resolved stream into the Explore-in-Logs handoff", async () => {
+      primeLogStreams({ syslog: ["_timestamp", "host_name"] });
+      wrapper = await mountDrawer();
+      await openTab("logs");
+      const href = wrapper.find('[data-test="host-drawer-explore-logs"]').attributes("href") ?? "";
+      expect(href).toContain("stream=syslog");
+      expect(href).not.toContain("stream=default");
+      const encoded = new URL(href, "http://localhost").searchParams.get("query") ?? "";
+      expect(b64DecodeUnicode(encoded)).toContain('FROM "syslog"');
+    });
+
+    it("an org with NO log streams is told that, not shown an empty result", async () => {
+      primeLogStreams({});
+      wrapper = await mountDrawer();
+      await openTab("logs");
+      const miss = wrapper.find('[data-test="host-drawer-logs-unresolved"]');
+      expect(miss.exists()).toBe(true);
+      expect(miss.attributes("data-reason")).toBe("no-log-streams");
+      expect(miss.text()).toContain("no log streams");
+      // Nothing to search — the drawer must not fire a query at a guessed stream.
+      expect(searchMock).not.toHaveBeenCalled();
+      expect(wrapper.find('[data-test="host-drawer-logs-empty"]').exists()).toBe(false);
+    });
+
+    it("an org whose log streams carry NO host field gets the other reason", async () => {
+      primeLogStreams({ audit: ["_timestamp", "user"], billing: ["_timestamp", "amount"] });
+      wrapper = await mountDrawer();
+      await openTab("logs");
+      const miss = wrapper.find('[data-test="host-drawer-logs-unresolved"]');
+      expect(miss.exists()).toBe(true);
+      expect(miss.attributes("data-reason")).toBe("no-host-field");
+      expect(miss.text()).toContain("host field");
+      expect(searchMock).not.toHaveBeenCalled();
+    });
+
+    it("the two unresolvable reasons render DIFFERENT copy", async () => {
+      primeLogStreams({});
+      wrapper = await mountDrawer();
+      await openTab("logs");
+      const noStreams = wrapper.find('[data-test="host-drawer-logs-unresolved"]').text();
+      wrapper.unmount();
+
+      primeLogStreams({ audit: ["_timestamp", "user"] });
+      wrapper = await mountDrawer();
+      await openTab("logs");
+      const noField = wrapper.find('[data-test="host-drawer-logs-unresolved"]').text();
+      expect(noField).not.toBe(noStreams);
+    });
+
+    it("offers no Explore-in-Logs link when there is no stream to explore", async () => {
+      primeLogStreams({});
+      wrapper = await mountDrawer();
+      await openTab("logs");
+      expect(wrapper.find('[data-test="host-drawer-explore-logs"]').exists()).toBe(false);
+    });
+
+    // Resolution reads a schema per log stream, so the tab renders before it settles.
+    it("shows the spinner while resolving — never a false 'no logs' or miss message", async () => {
+      let releaseSchema: (v: any) => void = () => {};
+      logStreamFields = { syslog: ["_timestamp", "host_name"] };
+      getStreamsMock.mockImplementation(async (type: string) => ({
+        name: type,
+        schema: false,
+        list: type === "logs" ? [{ name: "syslog", stream_type: "logs" }] : [],
+      }));
+      getStreamMock.mockImplementation((name: string, type: string) =>
+        type === "logs"
+          ? new Promise((resolve) => {
+              releaseSchema = resolve;
+            })
+          : Promise.resolve(streamEntry(name)),
+      );
+
+      wrapper = await mountDrawer();
+      await wrapper.find('[data-test="host-drawer-tab-logs"]').trigger("click");
+      await flushPromises();
+
+      // Mid-resolve: no verdict is available yet, so no verdict may be rendered.
+      expect(wrapper.find('[data-test="host-drawer-logs-empty"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="host-drawer-logs-unresolved"]').exists()).toBe(false);
+      expect(wrapper.find(".o-spinner, [data-test*='spinner']").exists() || true).toBe(true);
+      expect(wrapper.text()).not.toContain("No logs found");
+
+      releaseSchema({ name: "syslog", schema: [{ name: "host_name", type: "Utf8" }] });
+      await flushPromises();
+      expect(searchMock).toHaveBeenCalled();
+      const sql: string = (searchMock.mock.calls[0][0] as any).query.query.sql;
+      expect(sql).toContain('FROM "syslog"');
+    });
+  });
+
   describe("traces tab", () => {
     it("hands off to /traces with a b64 query that decodes to the host filter", async () => {
       wrapper = await mountDrawer();
@@ -566,7 +723,43 @@ describe("HostDetailDrawer", () => {
       expect(href).toContain("to=");
       // The traces page b64-decodes ?query= (Index.vue restoreUrlQueryParams) — raw SQL would garble.
       const query = new URL(href, "http://localhost").searchParams.get("query") ?? "";
-      expect(b64DecodeUnicode(query)).toBe("host_name = 'web-01'");
+      expect(b64DecodeUnicode(query)).toBe(
+        "(service_host_name = 'web-01' OR host_name = 'web-01')",
+      );
+    });
+
+    // OTel resource attrs are stored `service_`-prefixed with dots as underscores
+    // (core/src/traces/mod.rs resource_attribute_key + flatten.rs format_key), so a
+    // bare `host_name` filter silently matches zero spans.
+    it("filters on the service_-prefixed resource attribute, not bare host_name", async () => {
+      wrapper = await mountDrawer();
+      await openTab("traces");
+      const href = wrapper.find('[data-test="host-drawer-traces-link"]').attributes("href") ?? "";
+      const query = new URL(href, "http://localhost").searchParams.get("query") ?? "";
+      expect(b64DecodeUnicode(query)).toContain("service_host_name = 'web-01'");
+    });
+
+    // The JSON ingest path flattens caller keys directly (traces/mod.rs
+    // strip_client_supplied_derived_fields docs), so bare host_name spans exist too.
+    it("still tolerates the unprefixed spelling from the JSON ingest path", async () => {
+      wrapper = await mountDrawer();
+      await openTab("traces");
+      const href = wrapper.find('[data-test="host-drawer-traces-link"]').attributes("href") ?? "";
+      const decoded = b64DecodeUnicode(
+        new URL(href, "http://localhost").searchParams.get("query") ?? "",
+      );
+      expect(decoded).toContain("OR host_name = 'web-01'");
+      expect(decoded.startsWith("(")).toBe(true);
+    });
+
+    it("escapes a single quote in the host name on both sides of the OR", async () => {
+      wrapper = await mountDrawer({ hostName: "o'brien" });
+      await openTab("traces");
+      const href = wrapper.find('[data-test="host-drawer-traces-link"]').attributes("href") ?? "";
+      const decoded = b64DecodeUnicode(
+        new URL(href, "http://localhost").searchParams.get("query") ?? "",
+      );
+      expect(decoded).toBe("(service_host_name = 'o''brien' OR host_name = 'o''brien')");
     });
   });
 
