@@ -16907,6 +16907,7 @@
     "edit": "464c4ffd019e1e96",
     "editMode": "e7945ee25eb63c57",
     "finishStepsBeforePublish": "a5fc67e0214af8f6",
+    "folder": "74ccd43303847f26",
     "header": "e2073645cb0dbbdd",
     "history": {
       "button": "848f54e89660cea4",
@@ -16958,6 +16959,7 @@
       "title": "089c03463a1425d3"
     },
     "loadError": "0369fba2135ee9dc",
+    "moveToFolder": "91d631e150a39784",
     "name": "43d40c5c912ac933",
     "namePlaceholder": "942ce282b041e034",
     "nameRequired": "604fd1b2e29c688a",
@@ -17135,12 +17137,17 @@
     "saveDraft": "6c462142d3681836",
     "saveError": "dcd1c0b44e7e420d",
     "search": "a5b9f624c06b9981",
+    "searchAllFolders": "226fd0e51f770b0b",
+    "searchAllFoldersTooltip": "0d0ce170f89122a2",
+    "searchThisFolder": "ab7db04c96526507",
+    "searchThisFolderTooltip": "adb0c3857eea4b10",
     "start": {
       "actionHint": "3ebd524d3730efcc",
       "chooseAction": "f3009e224e14fc87",
       "triggerHint": "b7cc692397818e23"
     },
     "subtitle": "42349f7319e8d8fe",
+    "tabAll": "a52ace420f2175d0",
     "test": {
       "button": "532eaabd9574880d",
       "dirtySelf": "548f87ca62ee4357",
@@ -17209,13 +17216,15 @@
         "desc": "bc5a598b7e8469b4",
         "intro": "a4827ff008e634fb",
         "label": "58ac3a0377867548",
-        "node": "3a187f50000132fe"
+        "node": "3a187f50000132fe",
+        "tab": "f62e9267d196c761"
       },
       "incidentEvent": {
         "desc": "7aff51af193679b7",
         "intro": "2a34d4a2a6466302",
         "label": "c1f3512f947eb9f7",
-        "node": "24e205fc0fb0d4e0"
+        "node": "24e205fc0fb0d4e0",
+        "tab": "bfe868931580fb3b"
       }
     },
     "triggerMeta": {

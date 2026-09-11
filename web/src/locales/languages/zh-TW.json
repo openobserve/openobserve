@@ -2603,6 +2603,13 @@
     "edit": "編輯",
     "view": "檢視",
     "delete": "刪除",
+    "moveToFolder": "移至資料夾",
+    "tabAll": "全部",
+    "searchThisFolder": "此資料夾",
+    "searchAllFolders": "所有資料夾",
+    "searchThisFolderTooltip": "僅搜尋此資料夾",
+    "searchAllFoldersTooltip": "搜尋所有資料夾",
+    "folder": "資料夾",
     "deleteTitle": "刪除工作流程",
     "deleteMessage": "確定要刪除此工作流程嗎？",
     "deleteSuccess": "工作流程刪除成功",
@@ -2637,12 +2644,14 @@
     "triggerKind": {
       "alertFired": {
         "label": "警示已觸發",
+        "tab": "警示",
         "node": "警示觸發器",
         "desc": "當警示觸發時執行",
         "intro": "當連結的警示觸發時，每個下游步驟都會收到此負載。"
       },
       "incidentEvent": {
         "label": "事故事件",
+        "tab": "事件",
         "node": "事故觸發器",
         "desc": "在事故生命週期事件發生時執行",
         "intro": "當事故事件發生時，每個下游步驟都會收到此負載。"

@@ -2603,6 +2603,13 @@
     "edit": "Modifica",
     "view": "Visualizza",
     "delete": "Elimina",
+    "moveToFolder": "Sposta nella cartella",
+    "tabAll": "Tutti",
+    "searchThisFolder": "Questa cartella",
+    "searchAllFolders": "Tutte le cartelle",
+    "searchThisFolderTooltip": "Cerca solo in questa cartella",
+    "searchAllFoldersTooltip": "Cerca in tutte le cartelle",
+    "folder": "Cartella",
     "deleteTitle": "Elimina flusso di lavoro",
     "deleteMessage": "Sei sicuro di voler eliminare questo workflow?",
     "deleteSuccess": "Workflow eliminato con successo",
@@ -2637,12 +2644,14 @@
     "triggerKind": {
       "alertFired": {
         "label": "Avviso scattato",
+        "tab": "Avvisi",
         "node": "Trigger di avviso",
         "desc": "Esegui quando un avviso scatta",
         "intro": "Quando un avviso collegato scatta, ogni step a valle riceve questo payload."
       },
       "incidentEvent": {
         "label": "Evento di incidente",
+        "tab": "Incidenti",
         "node": "Trigger di incidente",
         "desc": "Esegui su un evento del ciclo di vita di un incidente",
         "intro": "Quando si verifica un evento di incidente, ogni step a valle riceve questo payload."

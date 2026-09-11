@@ -2603,6 +2603,13 @@
     "edit": "Bearbeiten",
     "view": "Anzeigen",
     "delete": "Löschen",
+    "moveToFolder": "In Ordner verschieben",
+    "tabAll": "Alle",
+    "searchThisFolder": "Dieser Ordner",
+    "searchAllFolders": "Alle Ordner",
+    "searchThisFolderTooltip": "Nur in diesem Ordner suchen",
+    "searchAllFoldersTooltip": "In allen Ordnern suchen",
+    "folder": "Ordner",
     "deleteTitle": "Workflow löschen",
     "deleteMessage": "Möchten Sie diesen Workflow wirklich löschen?",
     "deleteSuccess": "Workflow erfolgreich gelöscht",
@@ -2637,12 +2644,14 @@
     "triggerKind": {
       "alertFired": {
         "label": "Alert ausgelöst",
+        "tab": "Warnmeldungen",
         "node": "Alert-Trigger",
         "desc": "Ausführen, wenn ein Alert ausgelöst wird",
         "intro": "Wenn ein verknüpfter Alert ausgelöst wird, erhält jeder nachgelagerte Schritt diese Payload."
       },
       "incidentEvent": {
         "label": "Incident-Ereignis",
+        "tab": "Vorfälle",
         "node": "Incident-Trigger",
         "desc": "Ausführen bei einem Incident-Lifecycle-Ereignis",
         "intro": "Wenn ein Incident-Ereignis auftritt, erhält jeder nachgelagerte Schritt diese Payload."

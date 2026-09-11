@@ -2603,6 +2603,13 @@
     "edit": "Modifier",
     "view": "Voir",
     "delete": "Supprimer",
+    "moveToFolder": "Déplacer vers le dossier",
+    "tabAll": "Tous",
+    "searchThisFolder": "Ce dossier",
+    "searchAllFolders": "Tous les dossiers",
+    "searchThisFolderTooltip": "Rechercher uniquement dans ce dossier",
+    "searchAllFoldersTooltip": "Rechercher dans tous les dossiers",
+    "folder": "Dossier",
     "deleteTitle": "Supprimer le workflow",
     "deleteMessage": "Voulez-vous vraiment supprimer ce workflow ?",
     "deleteSuccess": "Workflow supprimé avec succès",
@@ -2637,12 +2644,14 @@
     "triggerKind": {
       "alertFired": {
         "label": "Alerte déclenchée",
+        "tab": "Alertes",
         "node": "Déclencheur d'alerte",
         "desc": "Exécuter lorsqu'une alerte se déclenche",
         "intro": "Lorsqu'une alerte liée se déclenche, chaque étape en aval reçoit cette charge utile."
       },
       "incidentEvent": {
         "label": "Événement d'incident",
+        "tab": "Incidents",
         "node": "Déclencheur d'incident",
         "desc": "Exécuter lors d'un événement du cycle de vie d'un incident",
         "intro": "Lorsqu'un événement d'incident se produit, chaque étape en aval reçoit cette charge utile."

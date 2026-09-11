@@ -2603,6 +2603,13 @@
     "edit": "Editar",
     "view": "Ver",
     "delete": "Eliminar",
+    "moveToFolder": "Mover a carpeta",
+    "tabAll": "Todos",
+    "searchThisFolder": "Esta carpeta",
+    "searchAllFolders": "Todas las carpetas",
+    "searchThisFolderTooltip": "Buscar solo en esta carpeta",
+    "searchAllFoldersTooltip": "Buscar en todas las carpetas",
+    "folder": "Carpeta",
     "deleteTitle": "Eliminar flujo de trabajo",
     "deleteMessage": "¿Está seguro de que desea eliminar este flujo de trabajo?",
     "deleteSuccess": "Flujo de trabajo eliminado correctamente",
@@ -2637,12 +2644,14 @@
     "triggerKind": {
       "alertFired": {
         "label": "Alerta disparada",
+        "tab": "Alertas",
         "node": "Disparador de alerta",
         "desc": "Ejecutar cuando se dispare una alerta",
         "intro": "Cuando una alerta vinculada se dispara, cada paso posterior recibe esta carga útil."
       },
       "incidentEvent": {
         "label": "Evento de incidente",
+        "tab": "Incidentes",
         "node": "Disparador de incidentes",
         "desc": "Ejecutar en un evento del ciclo de vida de incidentes",
         "intro": "Cuando ocurre un evento de incidente, cada paso posterior recibe esta carga útil."

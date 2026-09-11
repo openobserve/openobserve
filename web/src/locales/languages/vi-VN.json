@@ -2603,6 +2603,13 @@
     "edit": "Sửa",
     "view": "Xem",
     "delete": "Xóa",
+    "moveToFolder": "Di chuyển vào thư mục",
+    "tabAll": "Tất cả",
+    "searchThisFolder": "Thư mục này",
+    "searchAllFolders": "Tất cả thư mục",
+    "searchThisFolderTooltip": "Chỉ tìm kiếm trong thư mục này",
+    "searchAllFoldersTooltip": "Tìm kiếm trên tất cả thư mục",
+    "folder": "Thư mục",
     "deleteTitle": "Xóa quy trình",
     "deleteMessage": "Bạn có chắc chắn muốn xóa quy trình làm việc này không?",
     "deleteSuccess": "Đã xóa quy trình làm việc thành công",
@@ -2637,12 +2644,14 @@
     "triggerKind": {
       "alertFired": {
         "label": "Cảnh báo đã kích hoạt",
+        "tab": "Cảnh báo",
         "node": "Kích hoạt cảnh báo",
         "desc": "Chạy khi một cảnh báo được kích hoạt",
         "intro": "Khi một cảnh báo được liên kết kích hoạt, mọi bước hạ nguồn đều nhận được payload này."
       },
       "incidentEvent": {
         "label": "Sự kiện sự cố",
+        "tab": "Sự cố",
         "node": "Kích hoạt sự cố",
         "desc": "Chạy theo sự kiện trong vòng đời sự cố",
         "intro": "Khi một sự kiện sự cố xảy ra, mọi bước hạ nguồn đều nhận được payload này."
