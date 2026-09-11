@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         name="kind"
         :label="t('synthetics.variables.kind')"
         :options="kindOptions"
-        :disabled="!environment"
+        :disabled="isEdit || !environment"
         :hint="!environment ? t('synthetics.variables.secretNeedsEnvironment') : undefined"
         data-test="synthetics-variable-kind-select"
       />
@@ -152,8 +152,7 @@ export default defineComponent({
     const replacing = ref(false);
     const kindValue = ref<"plain" | "secret">("plain");
 
-    // A secret must carry an environment, so on the global tab the control is
-    // disabled with the reason rather than failing validation after the fact.
+    // A secret must carry an environment, so the global tab offers no such option.
     const kindOptions = computed(() =>
       props.environment
         ? [

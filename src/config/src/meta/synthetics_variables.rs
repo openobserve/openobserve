@@ -57,8 +57,11 @@ pub struct SyntheticsVariableRequest {
     pub name: String,
     #[serde(default)]
     pub value: Option<String>,
+    /// Optional so an update that never mentions `kind` is not read as an
+    /// attempt to change it — the field defaults to `Plain`, and a client
+    /// editing a secret's description sends no kind at all.
     #[serde(default)]
-    pub kind: SyntheticsVariableKind,
+    pub kind: Option<SyntheticsVariableKind>,
     #[serde(default)]
     pub description: String,
     #[serde(default)]
@@ -352,18 +355,35 @@ pub fn validate_environment_name(name: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// Validates a create/update body, given whether a value is already stored.
+/// Validates a create/update body against what is already stored.
 ///
 /// `has_stored_value` is what makes an update legal without a value: a secret's
 /// value cannot be round-tripped, so an omitted one means "leave it alone" —
-/// but only when there is something to leave alone.
+/// but only when there is something to leave alone. `stored_kind` is `None` on
+/// a create and the stored kind on an update, which is what makes kind
+/// immutable: both kinds hold the same encrypted value, so `kind` is the entire
+/// difference between a write-only secret and one any reader with GET can
+/// fetch, and an update that rewrote it would turn write access into read
+/// access permanently.
 pub fn validate_variable_request(
     req: &SyntheticsVariableRequest,
     env: Option<&str>,
     has_stored_value: bool,
+    stored_kind: Option<SyntheticsVariableKind>,
 ) -> Result<(), String> {
     validate_variable_name(&normalize_variable_name(&req.name))?;
-    if req.kind == SyntheticsVariableKind::Secret && env.is_none() {
+    if let (Some(requested), Some(stored)) = (req.kind, stored_kind)
+        && requested != stored
+    {
+        let stored = match stored {
+            SyntheticsVariableKind::Secret => "a secret",
+            SyntheticsVariableKind::Plain => "plain",
+        };
+        return Err(format!(
+            "kind: a variable's kind is fixed when it is created; this one is stored as {stored}"
+        ));
+    }
+    if req.kind.unwrap_or_default() == SyntheticsVariableKind::Secret && env.is_none() {
         return Err(
             "kind: a secret must belong to an environment — that is what gives it an access \
              boundary"
@@ -451,11 +471,11 @@ mod tests {
         let req = SyntheticsVariableRequest {
             name: "TOKEN".into(),
             value: Some("s3cret".into()),
-            kind: SyntheticsVariableKind::Secret,
+            kind: Some(SyntheticsVariableKind::Secret),
             ..Default::default()
         };
-        assert!(validate_variable_request(&req, None, false).is_err());
-        assert!(validate_variable_request(&req, Some("env-id"), false).is_ok());
+        assert!(validate_variable_request(&req, None, false, None).is_err());
+        assert!(validate_variable_request(&req, Some("env-id"), false, None).is_ok());
     }
 
     #[test]
@@ -463,11 +483,126 @@ mod tests {
         let req = SyntheticsVariableRequest {
             name: "TOKEN".into(),
             value: None,
-            kind: SyntheticsVariableKind::Secret,
+            kind: Some(SyntheticsVariableKind::Secret),
             ..Default::default()
         };
-        assert!(validate_variable_request(&req, Some("env-id"), true).is_ok());
-        assert!(validate_variable_request(&req, Some("env-id"), false).is_err());
+        let stored = Some(SyntheticsVariableKind::Secret);
+        assert!(validate_variable_request(&req, Some("env-id"), true, stored).is_ok());
+        assert!(validate_variable_request(&req, Some("env-id"), false, stored).is_err());
+    }
+
+    /// Both kinds store the same encrypted value, so `kind` is the entire difference between a
+    /// write-only secret and one anyone with GET reads.
+    #[test]
+    fn a_stored_secret_cannot_be_demoted_to_a_plain_variable() {
+        let req = SyntheticsVariableRequest {
+            name: "API_KEY".into(),
+            value: None,
+            kind: Some(SyntheticsVariableKind::Plain),
+            ..Default::default()
+        };
+        let err = validate_variable_request(
+            &req,
+            Some("env-id"),
+            true,
+            Some(SyntheticsVariableKind::Secret),
+        )
+        .expect_err("demoting a secret must be rejected");
+        assert!(err.starts_with("kind:"), "{err}");
+    }
+
+    /// `kind` defaults to Plain, so reading an omitted field as a demotion would 400 every
+    /// client that edits a secret's description.
+    #[test]
+    fn an_update_that_never_mentions_kind_leaves_a_secret_alone() {
+        let req = SyntheticsVariableRequest {
+            name: "API_KEY".into(),
+            value: None,
+            kind: None,
+            ..Default::default()
+        };
+        assert!(
+            validate_variable_request(
+                &req,
+                Some("env-id"),
+                true,
+                Some(SyntheticsVariableKind::Secret)
+            )
+            .is_ok()
+        );
+    }
+
+    #[test]
+    fn editing_a_plain_variables_metadata_still_works() {
+        let req = SyntheticsVariableRequest {
+            name: "BASE_URL".into(),
+            value: None,
+            kind: Some(SyntheticsVariableKind::Plain),
+            description: "the storefront".into(),
+            ..Default::default()
+        };
+        assert!(
+            validate_variable_request(&req, None, true, Some(SyntheticsVariableKind::Plain))
+                .is_ok()
+        );
+    }
+
+    /// Immutable in both directions: the value was readable while it was plain, so calling it a
+    /// secret afterwards claims a guarantee that never held.
+    #[test]
+    fn a_stored_plain_variable_cannot_be_turned_into_a_secret() {
+        let req = SyntheticsVariableRequest {
+            name: "BASE_URL".into(),
+            value: None,
+            kind: Some(SyntheticsVariableKind::Secret),
+            ..Default::default()
+        };
+        assert!(
+            validate_variable_request(
+                &req,
+                Some("env-id"),
+                true,
+                Some(SyntheticsVariableKind::Plain)
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn an_update_that_keeps_the_stored_kind_is_accepted() {
+        let req = SyntheticsVariableRequest {
+            name: "API_KEY".into(),
+            value: None,
+            kind: Some(SyntheticsVariableKind::Secret),
+            ..Default::default()
+        };
+        assert!(
+            validate_variable_request(
+                &req,
+                Some("env-id"),
+                true,
+                Some(SyntheticsVariableKind::Secret)
+            )
+            .is_ok()
+        );
+    }
+
+    /// No stored kind means there is nothing to change, so the only rule that applies is the
+    /// one that ties a secret to an environment.
+    #[test]
+    fn a_create_may_pick_either_kind() {
+        for kind in [
+            SyntheticsVariableKind::Plain,
+            SyntheticsVariableKind::Secret,
+        ] {
+            let req = SyntheticsVariableRequest {
+                name: "TOKEN".into(),
+                value: Some("v".into()),
+                kind: Some(kind),
+                ..Default::default()
+            };
+            assert!(validate_variable_request(&req, Some("env-id"), false, None).is_ok());
+        }
     }
 
     #[test]

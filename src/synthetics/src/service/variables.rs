@@ -473,8 +473,10 @@ pub async fn create_variable(
     created_by: &str,
 ) -> anyhow::Result<SyntheticsVariableView> {
     let env_id = env.map(|e| e.id.clone());
-    validate_variable_request(&req, env_id.as_deref(), false).map_err(|e| anyhow::anyhow!(e))?;
+    validate_variable_request(&req, env_id.as_deref(), false, None)
+        .map_err(|e| anyhow::anyhow!(e))?;
     let name = normalize_variable_name(&req.name);
+
     let conn = get_orm_client_rw().await;
 
     let dek = synthetics_dek(org_id).await?;
@@ -485,7 +487,7 @@ pub async fn create_variable(
         env: env_id,
         name,
         value: store_value(&dek, req.value.as_deref().unwrap_or_default())?,
-        kind: kind_str(req.kind).to_string(),
+        kind: kind_str(req.kind.unwrap_or_default()).to_string(),
         description: req.description,
         example: req.example,
         tags: req.tags,
@@ -511,8 +513,13 @@ pub async fn update_variable(
     let Some(mut record) = scoped_variable(conn, org_id, env, id).await? else {
         return Ok(None);
     };
-    validate_variable_request(&req, record.env.as_deref(), !record.value.is_empty())
-        .map_err(|e| anyhow::anyhow!(e))?;
+    validate_variable_request(
+        &req,
+        record.env.as_deref(),
+        !record.value.is_empty(),
+        Some(stored_kind(&record)),
+    )
+    .map_err(|e| anyhow::anyhow!(e))?;
 
     let name = normalize_variable_name(&req.name);
 
@@ -521,7 +528,6 @@ pub async fn update_variable(
         record.value = store_value(&dek, &value)?;
     }
     record.name = name;
-    record.kind = kind_str(req.kind).to_string();
     record.description = req.description;
     record.example = req.example;
     record.tags = req.tags;
@@ -857,10 +863,7 @@ pub async fn promote_to_global(
         .ok_or_else(|| anyhow::anyhow!("variable not found in environment '{}'", env.name))?;
 
     if record.is_secret() {
-        anyhow::bail!(
-            "Secrets must belong to an environment. Change '{}' to a plain variable first.",
-            record.name
-        );
+        anyhow::bail!(secret_cannot_be_global(&record.name));
     }
 
     // Other environments may keep rows of the same name: they simply shadow
@@ -996,6 +999,17 @@ pub async fn org_has_shared_variables(org_id: &str) -> bool {
     }
 }
 
+/// Why a secret cannot join the unscoped tier.
+///
+/// Deliberately offers no way to demote: kind is fixed once created, so telling
+/// the user to "make it plain first" would be advice nobody can follow.
+fn secret_cannot_be_global(name: &str) -> String {
+    format!(
+        "'{name}' is a secret, and a secret's environment is its access boundary — it cannot be \
+         made global. Create a plain variable instead."
+    )
+}
+
 /// `var.env IS NULL OR var.env = <the environment being run>` — §4 of the design.
 ///
 /// An environment filters; it never overrides. A variable with no environment
@@ -1035,6 +1049,15 @@ fn split_targets_without_own_row(
                 .any(|v| v.name == name && v.env.as_deref() == Some(env.id.as_str()))
         })
         .collect()
+}
+
+/// The stored kind, which is what makes `kind` immutable across an update.
+fn stored_kind(record: &SyntheticsVariableRecord) -> SyntheticsVariableKind {
+    if record.is_secret() {
+        SyntheticsVariableKind::Secret
+    } else {
+        SyntheticsVariableKind::Plain
+    }
 }
 
 fn kind_str(kind: SyntheticsVariableKind) -> &'static str {
@@ -1148,6 +1171,29 @@ mod tests {
         let usage = HashMap::from([("base_url".to_string(), vec!["Checkout".to_string()])]);
 
         assert_eq!(with_usage(views, &usage)[0].used_by_checks, 0);
+    }
+
+    /// The single link between the stored row and the immutability rule. Inverted, the whole
+    /// demotion attack works again and every pure validator test still passes.
+    #[test]
+    fn a_stored_secret_reads_back_as_a_secret() {
+        let secret = SyntheticsVariableRecord {
+            kind: synthetics_variables::KIND_SECRET.into(),
+            ..var(Some("e-prod"))
+        };
+        assert_eq!(stored_kind(&secret), SyntheticsVariableKind::Secret);
+        assert_eq!(stored_kind(&var(None)), SyntheticsVariableKind::Plain);
+    }
+
+    #[test]
+    fn the_promote_refusal_does_not_advise_a_demotion_nobody_can_perform() {
+        // Kind is immutable, so the old "make it plain first" pointed at a door now locked.
+        let msg = secret_cannot_be_global("API_KEY");
+        assert!(msg.contains("API_KEY"), "{msg}");
+        // Assert what it must say: a blacklist of one phrase is trivially slipped.
+        assert!(msg.contains("access boundary"), "{msg}");
+        assert!(msg.contains("Create a plain variable instead"), "{msg}");
+        assert!(!msg.to_lowercase().contains("first"), "{msg}");
     }
 
     #[test]

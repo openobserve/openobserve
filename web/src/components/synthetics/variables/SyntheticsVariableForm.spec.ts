@@ -37,6 +37,7 @@ vi.mock("@/services/synthetics", () => ({
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn() }));
 
 import SyntheticsVariableForm from "./SyntheticsVariableForm.vue";
+import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 
 function mountForm(props: Record<string, unknown> = {}) {
   return shallowMount(SyntheticsVariableForm, {
@@ -44,6 +45,11 @@ function mountForm(props: Record<string, unknown> = {}) {
     global: {
       plugins: [i18n],
       provide: { store: { state: { selectedOrganization: { identifier: "default" } } } },
+      // The fields live inside two nested slots, which shallowMount drops.
+      stubs: {
+        ODrawer: { template: "<div><slot /></div>" },
+        OForm: { template: "<form><slot /></form>" },
+      },
     },
   }) as VueWrapper;
 }
@@ -109,5 +115,36 @@ describe("SyntheticsVariableForm — cross-tier shadow confirms", () => {
     const message = String(confirmMock.mock.calls[0][0].message);
     expect(message).toContain("staging, ap1");
     expect(createGlobalVar).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("SyntheticsVariableForm — kind is fixed at creation", () => {
+  let wrapper: VueWrapper;
+
+  afterEach(() => {
+    wrapper?.unmount();
+  });
+
+  it("disables the Kind select when editing an existing variable", () => {
+    // Both kinds hold the same ciphertext, so kind alone hides the value.
+    wrapper = mountForm({
+      environment: "staging",
+      isEdit: true,
+      data: { id: "v1", name: "API_KEY", kind: "secret", has_value: true },
+    });
+
+    expect(wrapper.findComponent(OFormSelect).props("disabled")).toBe(true);
+  });
+
+  it("leaves the Kind select enabled when creating inside an environment", () => {
+    wrapper = mountForm({ environment: "staging" });
+
+    expect(wrapper.findComponent(OFormSelect).props("disabled")).toBe(false);
+  });
+
+  it("keeps the Kind select disabled on the global tab, where a secret cannot exist", () => {
+    wrapper = mountForm({ environment: null });
+
+    expect(wrapper.findComponent(OFormSelect).props("disabled")).toBe(true);
   });
 });
