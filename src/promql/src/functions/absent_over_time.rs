@@ -33,10 +33,7 @@ impl RangeFunc for AbsentOverTimeFunc {
     }
 
     fn exec(&self, samples: &[Sample], _eval_ts: i64, _range: &Duration) -> Option<f64> {
-        if samples.is_empty() {
-            return Some(1.0);
-        }
-        None
+        samples.is_empty().then_some(1.0)
     }
 }
 

@@ -266,23 +266,14 @@ async fn load_labels(
                     labeled_hashes.insert(hash);
                 };
 
+                let hash_column = batch.column_by_name(HASH_LABEL).unwrap().as_any();
                 if hash_field_type == DataType::UInt64 {
-                    let hash_values = batch
-                        .column_by_name(HASH_LABEL)
-                        .unwrap()
-                        .as_any()
-                        .downcast_ref::<UInt64Array>()
-                        .unwrap();
+                    let hash_values = hash_column.downcast_ref::<UInt64Array>().unwrap();
                     for i in 0..batch.num_rows() {
                         attach_row_labels(hash_values.value(i), i);
                     }
                 } else {
-                    let hash_values = batch
-                        .column_by_name(HASH_LABEL)
-                        .unwrap()
-                        .as_any()
-                        .downcast_ref::<StringArray>()
-                        .unwrap();
+                    let hash_values = hash_column.downcast_ref::<StringArray>().unwrap();
                     for i in 0..batch.num_rows() {
                         attach_row_labels(gxhash::new().sum64(hash_values.value(i)), i);
                     }

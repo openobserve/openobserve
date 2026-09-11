@@ -111,16 +111,12 @@ impl Engine {
             }
             token::T_COUNT_VALUES => {
                 let param_expr = param.as_ref().unwrap();
-                let label_name = self.exec_expr(param_expr).await?;
-                let label_name_str = match label_name {
-                    Value::String(s) => s,
-                    _ => {
-                        return Err(DataFusionError::Plan(
-                            "[count_values] param must be a string".to_string(),
-                        ));
-                    }
+                let Value::String(label_name) = self.exec_expr(param_expr).await? else {
+                    return Err(DataFusionError::Plan(
+                        "[count_values] param must be a string".to_string(),
+                    ));
                 };
-                aggregations::count_values(&label_name_str, modifier, input, &eval_ctx)
+                aggregations::count_values(&label_name, modifier, input, &eval_ctx)
             }
             _ => Err(DataFusionError::NotImplemented(format!(
                 "Unsupported Aggregate: {op:?}"

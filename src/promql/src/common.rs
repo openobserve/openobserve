@@ -48,7 +48,7 @@ pub fn quantile(data: &[f64], quantile: f64) -> Option<f64> {
 }
 
 pub(crate) fn quantile_in_place(data: &mut [f64], quantile: f64) -> Option<f64> {
-    if quantile < 0 as f64 || quantile > 1_f64 || quantile.is_nan() {
+    if !(0.0..=1.0).contains(&quantile) {
         let value = match quantile.signum() as i32 {
             1 => f64::INFINITY,
             -1 => f64::NEG_INFINITY,
