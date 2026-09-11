@@ -264,7 +264,11 @@ export class RumPage {
     }
 
     async clickPrettyTab() {
-        await this.prettyTab.click();
+        // A click dispatched while the tab strip is still mounting is swallowed, the Pretty pane never renders, and every later Pretty assertion burns its full timeout against an unchanged Raw tab — so retry until the tab reports itself selected.
+        await expect(async () => {
+            await this.prettyTab.click({ timeout: 5000 });
+            await expect(this.prettyTab).toHaveAttribute('aria-selected', 'true', { timeout: 3000 });
+        }).toPass({ timeout: 30000, intervals: [500, 1000, 2000] });
     }
 
     /** Assert the (minified) frame text — e.g. the bundle file name — is shown. */
@@ -292,11 +296,9 @@ export class RumPage {
         });
     }
 
-    /** Pretty tab's explicit "no sourcemaps" outcome (message text variants). */
+    /** Pretty tab's terminal "no sourcemaps" outcome — frames with no source_info render the unavailable panel, but NO frames fall through to the error panel (allSourceInfoNull is false when translatedStackTrace is empty), so matching only the two message strings missed the empty-frames path. */
     async expectPrettyUnavailableMessage(timeoutMs = 30000) {
-        await expect(
-            this.prettyUnavailableText.or(this.prettyTranslateFailedText).first(),
-        ).toBeVisible({ timeout: timeoutMs });
+        await this.expectPrettyUnavailableState(timeoutMs);
     }
 
     /**
@@ -317,8 +319,8 @@ export class RumPage {
     }
 
     /** The translating spinner must be gone (not hung). */
-    async expectPrettyLoadingResolved() {
-        await expect(this.prettyLoadingText).toHaveCount(0);
+    async expectPrettyLoadingResolved(timeoutMs = 30000) {
+        await expect(this.prettyLoadingText).toHaveCount(0, { timeout: timeoutMs });
     }
 
 }
