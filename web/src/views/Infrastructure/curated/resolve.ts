@@ -36,6 +36,9 @@ export const STALE_GRACE_US = 10 * 60 * 1_000_000;
 
 const GRID_COLUMNS = 192;
 
+/** Panel types whose series are drawn as a connected line, so an isolated point needs a symbol. */
+const TIME_SERIES_TYPES = new Set(["line", "area-stacked", "scatter"]);
+
 /** Labels the cardinality rule accepts as enumerable without a topk bound (§4.1). */
 export const ENUMERABLE_LABELS = new Set([
   "phase",
@@ -1086,6 +1089,15 @@ function buildPanel(
   // very labels an inventory table exists to name — same reason the metrics
   // handoff sets it at utils/metrics/metricsHandoff.ts:180-183.
   if (panel.def.type === "table") config.promql_table_mode = "all";
+
+  if (TIME_SERIES_TYPES.has(panel.def.type)) {
+    // The series is null-padded to the whole window, so a point whose neighbours are
+    // null draws no line segment; without a symbol an ephemeral host renders blank.
+    config.show_symbol = true;
+    // Left OFF deliberately: bridging the padding would assert the collector kept
+    // reporting across a gap where it did not.
+    config.connect_nulls = false;
+  }
 
   if (stale) {
     config.curated_badge = {
