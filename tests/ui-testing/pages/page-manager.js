@@ -126,6 +126,9 @@ const FunctionsFormValidationPage = require("./functionsPages/functionsFormValid
 // ===== ANOMALY DETECTION PAGE OBJECTS =====
 const { AnomalyDetectionPage } = require("./anomalyPages/anomalyDetectionPage.js");
 
+// ===== ONLINE EVALS PAGE OBJECTS =====
+import { LlmProvidersPage } from "./onlineEvalsPages/llmProvidersPage.js";
+
 class PageManager {
   /**
    * @param {import('@playwright/test').Page} page - Playwright page instance
@@ -263,6 +266,9 @@ class PageManager {
     // ===== ANOMALY DETECTION PAGE OBJECTS =====
     this.anomalyDetectionPage = new AnomalyDetectionPage(page, this.commonActions);
     this.aiToolsetsFormValidation = new AiToolsetsFormValidationPage(page);
+
+    // ===== ONLINE EVALS PAGE OBJECTS =====
+    this.llmProvidersPage = new LlmProvidersPage(page);
 
     // ===== RUM PAGE OBJECTS =====
     this.rumFormValidation = new RumFormValidationPage(page);
