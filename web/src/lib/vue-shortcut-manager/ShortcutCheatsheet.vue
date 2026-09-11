@@ -256,6 +256,7 @@ const capabilities = computed<ShortcutCapabilities>(() => ({
   isCloud: config.isCloud === "true",
   onlineEvalsEnabled: Boolean(store.state.zoConfig?.online_evals_enabled),
   incidentsEnabled: Boolean(store.state.zoConfig?.incidents_enabled),
+  modelPricingEnabled: Boolean(store.state.zoConfig?.model_pricing_enabled),
 }));
 
 const open = computed({

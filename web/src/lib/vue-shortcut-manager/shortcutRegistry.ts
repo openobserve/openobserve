@@ -60,6 +60,7 @@ export interface ShortcutCapabilities {
   isCloud: boolean;
   onlineEvalsEnabled: boolean;
   incidentsEnabled: boolean;
+  modelPricingEnabled: boolean;
 }
 
 export interface ShortcutModule {
@@ -81,6 +82,7 @@ const cloud = (c: ShortcutCapabilities) => c.isCloud;
 const enterpriseOrCloud = (c: ShortcutCapabilities) => c.isEnterprise || c.isCloud;
 const incidents = (c: ShortcutCapabilities) => enterpriseOrCloud(c) && c.incidentsEnabled;
 const onlineEvals = (c: ShortcutCapabilities) => enterpriseOrCloud(c) && c.onlineEvalsEnabled;
+const modelPricing = (c: ShortcutCapabilities) => enterpriseOrCloud(c) && c.modelPricingEnabled;
 
 /**
  * Groups the flat SHORTCUT_REGISTRY into modules for the cheatsheet. Each module
@@ -847,7 +849,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.modelPricing",
     scope: "model-pricing",
-    visible: enterpriseOrCloud,
+    visible: modelPricing,
     shortcuts: [
       {
         id: "modelPricingRefresh",
@@ -955,7 +957,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.llmProviders",
     scope: "llm-providers",
-    visible: enterpriseOrCloud,
+    visible: onlineEvals,
     shortcuts: [
       {
         id: "llmProvidersRefresh",
