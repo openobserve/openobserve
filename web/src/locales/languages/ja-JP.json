@@ -2464,7 +2464,9 @@
     "subscription_plan": "サブスクリプションプラン",
     "pendingDeletion": "削除保留中",
     "daysLeft": "残り{n}日",
-    "resurrect": "組織を復活"
+    "resurrect": "組織を復活",
+    "statusActive": "有効",
+    "statusDeleting": "削除中"
   },
   "template": {
     "search": "テンプレートを検索"

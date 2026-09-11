@@ -2464,7 +2464,9 @@
     "subscription_plan": "Piano di abbonamento",
     "pendingDeletion": "Eliminazione in sospeso",
     "daysLeft": "{n} giorni rimasti",
-    "resurrect": "Resuscita organizzazione"
+    "resurrect": "Resuscita organizzazione",
+    "statusActive": "Attivo",
+    "statusDeleting": "In eliminazione"
   },
   "template": {
     "search": "Cerca template"

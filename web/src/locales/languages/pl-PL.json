@@ -2464,7 +2464,9 @@
     "subscription_plan": "Plan subskrypcji",
     "pendingDeletion": "Oczekuje na usunięcie",
     "daysLeft": "{n} dni pozostało",
-    "resurrect": "Przywróć organizację"
+    "resurrect": "Przywróć organizację",
+    "statusActive": "Aktywna",
+    "statusDeleting": "Usuwanie"
   },
   "template": {
     "search": "Szukaj szablonu"

@@ -58,6 +58,7 @@ use crate::{
 };
 
 mod otlp_json_compat;
+pub mod query;
 
 /// Transport-neutral failure from profile ingestion. HTTP and gRPC map this
 /// separately so a gate/circuit-breaker reject is not acknowledged as success.
@@ -206,7 +207,7 @@ const HOT_RESOURCE_ATTRS: &[(&str, &str)] = &[
     ("process.pid", "process_pid"),
     ("process.executable.name", "process_executable_name"),
 ];
-/// Well-known Resource attributes stored under `tags` with stable snake_case keys.
+/// Well-known Resource attributes flattened to stable snake_case columns.
 const TAG_RESOURCE_ATTR_ALIASES: &[(&str, &str)] = &[
     ("service.namespace", "service_namespace"),
     ("service.instance.id", "service_instance_id"),
@@ -214,7 +215,7 @@ const TAG_RESOURCE_ATTR_ALIASES: &[(&str, &str)] = &[
     ("k8s.pod.name", "k8s_pod_name"),
     ("k8s.container.name", "k8s_container_name"),
 ];
-/// Sample attributes promoted to fixed columns; remaining attrs go to `sample_tags`.
+/// Sample attributes promoted to fixed columns; remaining attrs flatten to columns.
 const HOT_SAMPLE_ATTRS: &[(&str, &str)] = &[
     ("thread.id", "thread_id"),
     ("thread_id", "thread_id"),
@@ -674,7 +675,6 @@ fn build_sample_records(
     }
 
     if let Some(resource) = &resource_profile.resource {
-        let mut tags = json::Map::new();
         for attr in &resource.attributes {
             let Some(key) = resolve_key_value_key(attr, dictionary) else {
                 continue;
@@ -689,18 +689,14 @@ fn build_sample_records(
             if let Some((_, field_name)) = HOT_RESOURCE_ATTRS.iter().find(|(src, _)| *src == key) {
                 base.insert((*field_name).to_string(), json::Value::String(string_value));
             } else {
-                tags.insert(
-                    resource_attr_tag_key(&key),
-                    json::Value::String(string_value),
-                );
+                let field_name = resource_attr_tag_key(&key);
+                // Skip reserved keys and columns already set (e.g. profile_type, otel_scope_name).
+                if query::is_reserved_profile_column(&field_name) || base.contains_key(&field_name)
+                {
+                    continue;
+                }
+                base.insert(field_name, json::Value::String(string_value));
             }
-        }
-        if !tags.is_empty() {
-            // Store as JSON string: O2 schema inference rejects nested objects.
-            base.insert(
-                "tags".to_string(),
-                json::Value::String(json::to_string(&json::Value::Object(tags)).unwrap()),
-            );
         }
     }
 
@@ -782,13 +778,11 @@ fn build_sample_records(
                     json::Value::String(cpu_logical_number.clone()),
                 );
             }
-            if !sample_tags.is_empty() {
-                record.insert(
-                    "sample_tags".to_string(),
-                    json::Value::String(
-                        json::to_string(&json::Value::Object(sample_tags.clone())).unwrap(),
-                    ),
-                );
+            for (key, value) in &sample_tags {
+                if record.contains_key(key) || query::is_reserved_profile_column(key) {
+                    continue;
+                }
+                record.insert(key.clone(), value.clone());
             }
 
             let event_id = format!(
@@ -881,6 +875,8 @@ fn resolve_stack(stack_index: i32, dictionary: Option<&ProfilesDictionary>) -> (
     for &location_index in &stack.location_indices {
         frames.extend(format_location_frames(location_index, dictionary));
     }
+    // Keep the executing leaf; mark rootward ancestors dropped by the depth cap.
+    query::limit_leaf_to_root_depth(&mut frames);
     let frame_count = frames.len() as i64;
     (frames.join(";"), frame_count)
 }
@@ -1086,7 +1082,11 @@ fn resolve_sample_attrs(
                 _ => {}
             }
         } else {
-            sample_tags.insert(key.replace('.', "_"), json::Value::String(string_value));
+            let field_name = key.replace('.', "_");
+            if query::is_reserved_profile_column(&field_name) {
+                continue;
+            }
+            sample_tags.insert(field_name, json::Value::String(string_value));
         }
     }
     (thread_id, thread_name, cpu_logical_number, sample_tags)
@@ -1891,26 +1891,19 @@ mod tests {
             row.get("process_executable_name").and_then(|v| v.as_str()),
             Some("order-api.bin")
         );
-        assert!(row.get("service_namespace").is_none());
-        assert!(row.get("k8s_pod_name").is_none());
-        let tags_raw = row
-            .get("tags")
-            .and_then(|v| v.as_str())
-            .expect("tags string");
-        let tags: json::Map<String, json::Value> =
-            serde_json::from_str(tags_raw).expect("tags json");
         assert_eq!(
-            tags.get("service_namespace").and_then(|v| v.as_str()),
+            row.get("service_namespace").and_then(|v| v.as_str()),
             Some("payments")
         );
         assert_eq!(
-            tags.get("k8s_pod_name").and_then(|v| v.as_str()),
+            row.get("k8s_pod_name").and_then(|v| v.as_str()),
             Some("order-api-7f9c")
         );
         assert_eq!(
-            tags.get("cloud_region").and_then(|v| v.as_str()),
+            row.get("cloud_region").and_then(|v| v.as_str()),
             Some("us-west-2")
         );
+        assert!(row.get("tags").is_none());
         assert_eq!(
             row.get("trace_id").and_then(|v| v.as_str()),
             Some("11111111111111111111111111111111")
@@ -1928,18 +1921,12 @@ mod tests {
             row.get("cpu_logical_number").and_then(|v| v.as_str()),
             Some("2")
         );
-        let sample_tags_raw = row
-            .get("sample_tags")
-            .and_then(|v| v.as_str())
-            .expect("sample_tags string");
-        let sample_tags: json::Map<String, json::Value> =
-            serde_json::from_str(sample_tags_raw).expect("sample_tags json");
         assert_eq!(
-            sample_tags
-                .get("process_context_label_request_id")
+            row.get("process_context_label_request_id")
                 .and_then(|v| v.as_str()),
             Some("req-42")
         );
+        assert!(row.get("sample_tags").is_none());
         assert!(row.get("profile_blob").is_none());
     }
 
@@ -1950,7 +1937,134 @@ mod tests {
     }
 
     #[test]
-    fn sample_record_with_tags_passes_schema_inference() {
+    fn resource_attrs_do_not_overwrite_structural_columns() {
+        let dictionary = ProfilesDictionary {
+            string_table: vec![
+                "".to_string(),
+                "cpu".to_string(),
+                "nanoseconds".to_string(),
+                "main".to_string(),
+            ],
+            function_table: vec![
+                Function::default(),
+                Function {
+                    name_strindex: 3,
+                    ..Default::default()
+                },
+            ],
+            location_table: vec![
+                Location::default(),
+                Location {
+                    lines: vec![opentelemetry_proto::tonic::profiles::v1development::Line {
+                        function_index: 1,
+                        ..Default::default()
+                    }],
+                    ..Default::default()
+                },
+            ],
+            stack_table: vec![
+                Stack::default(),
+                Stack {
+                    location_indices: vec![1],
+                },
+            ],
+            ..Default::default()
+        };
+        let profile = Profile {
+            sample_type: Some(ValueType {
+                type_strindex: 1,
+                unit_strindex: 2,
+            }),
+            time_unix_nano: 1_700_000_000_000_000_000,
+            samples: vec![Sample {
+                stack_index: 1,
+                values: vec![1],
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        let resource = ResourceProfiles {
+            resource: Some(opentelemetry_proto::tonic::resource::v1::Resource {
+                attributes: vec![
+                    opentelemetry_proto::tonic::common::v1::KeyValue {
+                        key: "service.name".to_string(),
+                        value: Some(AnyValue {
+                            value: Some(any_value::Value::StringValue("order-api".to_string())),
+                        }),
+                        ..Default::default()
+                    },
+                    opentelemetry_proto::tonic::common::v1::KeyValue {
+                        key: "profile.type".to_string(),
+                        value: Some(AnyValue {
+                            value: Some(any_value::Value::StringValue(
+                                "spoofed-profile-type".to_string(),
+                            )),
+                        }),
+                        ..Default::default()
+                    },
+                    opentelemetry_proto::tonic::common::v1::KeyValue {
+                        key: "otel.scope.name".to_string(),
+                        value: Some(AnyValue {
+                            value: Some(any_value::Value::StringValue("spoofed-scope".to_string())),
+                        }),
+                        ..Default::default()
+                    },
+                    opentelemetry_proto::tonic::common::v1::KeyValue {
+                        key: "k8s.pod.name".to_string(),
+                        value: Some(AnyValue {
+                            value: Some(any_value::Value::StringValue("pod-safe".to_string())),
+                        }),
+                        ..Default::default()
+                    },
+                ],
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let scope = ScopeProfiles {
+            scope: Some(
+                opentelemetry_proto::tonic::common::v1::InstrumentationScope {
+                    name: "real.scope".to_string(),
+                    version: "1.0.0".to_string(),
+                    ..Default::default()
+                },
+            ),
+            ..Default::default()
+        };
+
+        let (records, rejected) = build_sample_records(
+            "default",
+            "default",
+            &resource,
+            &scope,
+            &profile,
+            Some(&dictionary),
+            i64::MIN,
+            i64::MAX,
+        );
+        assert_eq!(rejected, 0);
+        assert_eq!(records.len(), 1);
+        let row = &records[0];
+        assert_eq!(
+            row.get("profile_type").and_then(|v| v.as_str()),
+            Some("cpu")
+        );
+        assert_eq!(
+            row.get("otel_scope_name").and_then(|v| v.as_str()),
+            Some("real.scope")
+        );
+        assert_eq!(
+            row.get("service_name").and_then(|v| v.as_str()),
+            Some("order-api")
+        );
+        assert_eq!(
+            row.get("k8s_pod_name").and_then(|v| v.as_str()),
+            Some("pod-safe")
+        );
+    }
+
+    #[test]
+    fn sample_record_with_flattened_tags_passes_schema_inference() {
         let dictionary = ProfilesDictionary {
             string_table: vec![
                 "".to_string(),
@@ -2031,15 +2145,19 @@ mod tests {
         );
         assert_eq!(rejected, 0);
         assert_eq!(records.len(), 1);
-        assert!(records[0].get("tags").and_then(|v| v.as_str()).is_some());
+        assert!(records[0].get("tags").is_none());
+        assert_eq!(
+            records[0].get("k8s_pod_name").and_then(|v| v.as_str()),
+            Some("pod-1")
+        );
 
         let schema = config::utils::schema::infer_json_schema_from_map(
             "default",
             StreamType::Profiles,
             records.iter(),
         )
-        .expect("record with tags string must be schema-inferable");
-        assert!(schema.field_with_name("tags").is_ok());
+        .expect("record with flattened tags must be schema-inferable");
+        assert!(schema.field_with_name("k8s_pod_name").is_ok());
         assert!(schema.field_with_name("service_name").is_ok());
         assert!(schema.field_with_name("stack").is_ok());
         assert!(schema.field_with_name("value").is_ok());

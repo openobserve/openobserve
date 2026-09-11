@@ -6,6 +6,17 @@
 
 import { raw, type TranslateFn } from "@/types/i18n";
 
+// Escape user-controlled strings before embedding in HTML (XSS prevention) —
+// mirrors alertSummaryGenerator.ts's esc(), so both generators emit HTML that
+// is already safe rather than leaving escaping to whoever calls v-html.
+const esc = (s: string) =>
+  String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+
 export function generateAnomalySummary(
   config: any,
   destinations: any[],
@@ -18,7 +29,8 @@ export function generateAnomalySummary(
 
   // The markup stays here rather than in en-US.json: translators get whole
   // sentences with {placeholders} and never have to preserve a tag.
-  const chip = (value: string | number) => `<span class="summary-clickable">${value}</span>`;
+  const chip = (value: string | number) =>
+    `<span class="summary-clickable">${esc(String(value))}</span>`;
 
   // Step 1+: Stream & query info
   if (wizardStep >= 1) {
@@ -130,14 +142,14 @@ export function generateAnomalySummary(
 function generatePlainEnglish(config: any, wizardStep: number, t: TranslateFn): string {
   if (!config.stream_name) return "";
 
-  const stream = config.stream_name;
-  const fn = config.detection_function || "count";
-  const schedule = `${config.schedule_interval_value}${config.schedule_interval_unit}`;
+  const stream = esc(config.stream_name);
+  const fn = esc(config.detection_function || "count");
+  const schedule = esc(`${config.schedule_interval_value}${config.schedule_interval_unit}`);
   const trainingDays = config.training_window_days || 14;
 
   if (wizardStep < 2) {
     return t("alerts.anomaly.summaryConfiguring", {
-      streamType: config.stream_type || "logs",
+      streamType: esc(config.stream_type || "logs"),
       stream,
     });
   }

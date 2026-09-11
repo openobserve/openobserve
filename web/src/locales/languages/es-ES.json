@@ -2464,7 +2464,9 @@
     "subscription_plan": "Plan de suscripción",
     "pendingDeletion": "Eliminación pendiente",
     "daysLeft": "{n} días restantes",
-    "resurrect": "Restaurar organización"
+    "resurrect": "Restaurar organización",
+    "statusActive": "Activo",
+    "statusDeleting": "Eliminando"
   },
   "template": {
     "search": "Buscar plantilla"
