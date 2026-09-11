@@ -18,12 +18,14 @@ use super::{AggFunc, dispersion::DispersionAccumulator};
 pub struct Stddev;
 
 impl AggFunc for Stddev {
+    type Accumulator = DispersionAccumulator;
+
     fn name(&self) -> &'static str {
         "stddev"
     }
 
-    fn build(&self) -> Box<dyn super::Accumulate> {
-        Box::new(DispersionAccumulator::new(true))
+    fn build(&self) -> Self::Accumulator {
+        DispersionAccumulator::new(true)
     }
 
     // Buffered values would be copied again at every parallel reduction level.

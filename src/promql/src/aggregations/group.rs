@@ -22,12 +22,14 @@ use crate::aggregations::{Accumulate, AggFunc};
 pub struct Group;
 
 impl AggFunc for Group {
+    type Accumulator = GroupAccumulate;
+
     fn name(&self) -> &'static str {
         "group"
     }
 
-    fn build(&self) -> Box<dyn super::Accumulate> {
-        Box::<GroupAccumulate>::default()
+    fn build(&self) -> Self::Accumulator {
+        Self::Accumulator::default()
     }
 }
 
@@ -42,16 +44,11 @@ impl Accumulate for GroupAccumulate {
         self.timestamps.insert(sample.timestamp);
     }
 
-    fn merge(&mut self, other: Box<dyn Accumulate>) {
-        let other = other.into_any().downcast::<Self>().expect("same type");
+    fn merge(&mut self, other: Self) {
         self.timestamps.extend(other.timestamps);
     }
 
-    fn into_any(self: Box<Self>) -> Box<dyn std::any::Any> {
-        self
-    }
-
-    fn evaluate(self: Box<Self>) -> Vec<Sample> {
+    fn evaluate(self) -> Vec<Sample> {
         self.timestamps
             .into_iter()
             .map(|timestamp| Sample::new(timestamp, 1.0))

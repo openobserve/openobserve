@@ -19,7 +19,7 @@ use hashbrown::HashMap;
 use super::Accumulate;
 
 #[derive(Default)]
-pub(super) struct ExtremaAccumulator<const IS_MAX: bool> {
+pub struct ExtremaAccumulator<const IS_MAX: bool> {
     values: HashMap<i64, f64>,
 }
 
@@ -42,18 +42,13 @@ impl<const IS_MAX: bool> Accumulate for ExtremaAccumulator<IS_MAX> {
         }
     }
 
-    fn merge(&mut self, other: Box<dyn Accumulate>) {
-        let other = other.into_any().downcast::<Self>().expect("same type");
+    fn merge(&mut self, other: Self) {
         for (timestamp, value) in other.values {
             self.accumulate(&Sample::new(timestamp, value));
         }
     }
 
-    fn into_any(self: Box<Self>) -> Box<dyn std::any::Any> {
-        self
-    }
-
-    fn evaluate(self: Box<Self>) -> Vec<Sample> {
+    fn evaluate(self) -> Vec<Sample> {
         self.values
             .into_iter()
             .map(|(timestamp, value)| Sample::new(timestamp, value))
@@ -66,9 +61,10 @@ mod tests {
     use super::*;
 
     #[test]
-    #[should_panic(expected = "same type")]
-    fn test_min_cannot_merge_max() {
-        let mut min = ExtremaAccumulator::<false>::default();
-        min.merge(Box::new(ExtremaAccumulator::<true>::default()));
+    fn test_min_and_max_have_distinct_accumulator_types() {
+        assert_ne!(
+            std::any::TypeId::of::<ExtremaAccumulator<false>>(),
+            std::any::TypeId::of::<ExtremaAccumulator<true>>(),
+        );
     }
 }

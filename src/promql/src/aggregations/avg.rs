@@ -21,12 +21,14 @@ use crate::aggregations::{Accumulate, AggFunc, SumState};
 pub struct Avg;
 
 impl AggFunc for Avg {
+    type Accumulator = AvgAccumulate;
+
     fn name(&self) -> &'static str {
         "avg"
     }
 
-    fn build(&self) -> Box<dyn super::Accumulate> {
-        Box::<AvgAccumulate>::default()
+    fn build(&self) -> Self::Accumulator {
+        Self::Accumulator::default()
     }
 }
 
@@ -71,18 +73,13 @@ impl Accumulate for AvgAccumulate {
             .push(sample.value);
     }
 
-    fn merge(&mut self, other: Box<dyn Accumulate>) {
-        let other = other.into_any().downcast::<Self>().expect("same type");
+    fn merge(&mut self, other: Self) {
         for (timestamp, other) in other.states {
             self.states.entry(timestamp).or_default().merge(other);
         }
     }
 
-    fn into_any(self: Box<Self>) -> Box<dyn std::any::Any> {
-        self
-    }
-
-    fn evaluate(self: Box<Self>) -> Vec<Sample> {
+    fn evaluate(self) -> Vec<Sample> {
         self.states
             .into_iter()
             .filter_map(|(timestamp, state)| {

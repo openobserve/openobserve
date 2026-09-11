@@ -19,7 +19,7 @@ use hashbrown::HashMap;
 use super::Accumulate;
 use crate::common::std_variance;
 
-pub(super) struct DispersionAccumulator {
+pub struct DispersionAccumulator {
     values: HashMap<i64, Vec<f64>>,
     stddev: bool,
 }
@@ -41,19 +41,14 @@ impl Accumulate for DispersionAccumulator {
             .push(sample.value);
     }
 
-    fn merge(&mut self, other: Box<dyn Accumulate>) {
-        let other = other.into_any().downcast::<Self>().expect("same type");
+    fn merge(&mut self, other: Self) {
         assert_eq!(self.stddev, other.stddev, "same aggregation");
         for (timestamp, values) in other.values {
             self.values.entry(timestamp).or_default().extend(values);
         }
     }
 
-    fn into_any(self: Box<Self>) -> Box<dyn std::any::Any> {
-        self
-    }
-
-    fn evaluate(self: Box<Self>) -> Vec<Sample> {
+    fn evaluate(self) -> Vec<Sample> {
         self.values
             .into_iter()
             .filter_map(|(timestamp, values)| {
@@ -91,8 +86,8 @@ mod tests {
                 left.accumulate(&Sample::new(timestamp, a));
                 right.accumulate(&Sample::new(timestamp, b));
             }
-            left.merge(Box::new(right));
-            let mut samples = Box::new(left).evaluate();
+            left.merge(right);
+            let mut samples = left.evaluate();
             samples.sort_by_key(|sample| sample.timestamp);
             assert_eq!(
                 samples
@@ -106,11 +101,7 @@ mod tests {
             assert!(samples[2].value.is_nan());
             assert!(samples[3].value.is_nan());
             assert_eq!(samples[4].value, f64::INFINITY);
-            assert!(
-                Box::new(DispersionAccumulator::new(stddev))
-                    .evaluate()
-                    .is_empty()
-            );
+            assert!(DispersionAccumulator::new(stddev).evaluate().is_empty());
         }
     }
 }

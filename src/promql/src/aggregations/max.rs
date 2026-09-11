@@ -18,12 +18,14 @@ use crate::aggregations::{AggFunc, extrema::ExtremaAccumulator};
 pub struct Max;
 
 impl AggFunc for Max {
+    type Accumulator = ExtremaAccumulator<true>;
+
     fn name(&self) -> &'static str {
         "max"
     }
 
-    fn build(&self) -> Box<dyn super::Accumulate> {
-        Box::<ExtremaAccumulator<true>>::default()
+    fn build(&self) -> Self::Accumulator {
+        Self::Accumulator::default()
     }
 }
 

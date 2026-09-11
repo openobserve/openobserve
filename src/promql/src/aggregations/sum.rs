@@ -48,12 +48,14 @@ impl SumState {
 }
 
 impl AggFunc for Sum {
+    type Accumulator = SumAccumulate;
+
     fn name(&self) -> &'static str {
         "sum"
     }
 
-    fn build(&self) -> Box<dyn super::Accumulate> {
-        Box::<SumAccumulate>::default()
+    fn build(&self) -> Self::Accumulator {
+        Self::Accumulator::default()
     }
 }
 
@@ -70,18 +72,13 @@ impl Accumulate for SumAccumulate {
             .push(sample.value);
     }
 
-    fn merge(&mut self, other: Box<dyn Accumulate>) {
-        let other = other.into_any().downcast::<Self>().expect("same type");
+    fn merge(&mut self, other: Self) {
         for (timestamp, other) in other.sum {
             self.sum.entry(timestamp).or_default().merge(other);
         }
     }
 
-    fn into_any(self: Box<Self>) -> Box<dyn std::any::Any> {
-        self
-    }
-
-    fn evaluate(self: Box<Self>) -> Vec<Sample> {
+    fn evaluate(self) -> Vec<Sample> {
         self.sum
             .into_iter()
             .map(|(timestamp, sum)| Sample::new(timestamp, sum.value()))

@@ -18,12 +18,14 @@ use crate::aggregations::{AggFunc, extrema::ExtremaAccumulator};
 pub struct Min;
 
 impl AggFunc for Min {
+    type Accumulator = ExtremaAccumulator<false>;
+
     fn name(&self) -> &'static str {
         "min"
     }
 
-    fn build(&self) -> Box<dyn super::Accumulate> {
-        Box::<ExtremaAccumulator<false>>::default()
+    fn build(&self) -> Self::Accumulator {
+        Self::Accumulator::default()
     }
 }
 

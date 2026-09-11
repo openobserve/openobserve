@@ -69,16 +69,20 @@ const AGG_PARALLEL_CHUNK: usize = 32768;
 /// struct SumAgg;
 ///
 /// impl AggFunc for SumAgg {
+///     type Accumulator = SumAccumulator;
+///
 ///     fn name(&self) -> &'static str {
 ///         "sum"
 ///     }
 ///
-///     fn build(&self) -> Box<dyn Accumulate> {
-///         Box::new(SumAccumulator::new())
+///     fn build(&self) -> Self::Accumulator {
+///         SumAccumulator::new()
 ///     }
 /// }
 /// ```
 pub trait AggFunc: Sync {
+    type Accumulator: Accumulate;
+
     /// Returns the name of the aggregation function (e.g., "sum", "avg", "max").
     fn name(&self) -> &'static str;
 
@@ -87,7 +91,7 @@ pub trait AggFunc: Sync {
     /// Each call to `build()` should return a fresh accumulator that can independently
     /// collect and aggregate samples. This allows for parallel processing of multiple
     /// label groups.
-    fn build(&self) -> Box<dyn Accumulate>;
+    fn build(&self) -> Self::Accumulator;
 
     /// Whether a huge group may be split into parallel chunks whose partial
     /// accumulators are combined with [`Accumulate::merge`]. Value-buffering
@@ -119,7 +123,7 @@ pub trait AggFunc: Sync {
 /// }
 /// let results = acc.evaluate();
 /// ```
-pub trait Accumulate: Send + Sync {
+pub trait Accumulate: Send + Sync + Sized {
     /// Adds a sample to this accumulator.
     ///
     /// This method is called for each sample that should be included in the aggregation.
@@ -142,25 +146,19 @@ pub trait Accumulate: Send + Sync {
     /// +Inf), so no chunking-independent result exists; NaN at least signals
     /// the Inf - Inf cancellation.
     ///
-    /// # Panics
-    ///
-    /// Panics if `other` is a different accumulator type.
-    fn merge(&mut self, other: Box<dyn Accumulate>);
-
-    /// Upcast used by [`Self::merge`] implementations to downcast `other` to
-    /// their own concrete type.
-    fn into_any(self: Box<Self>) -> Box<dyn std::any::Any>;
+    /// Both accumulators must have the same concrete type.
+    fn merge(&mut self, other: Self);
 
     /// Computes and returns the final aggregated results.
     ///
-    /// This method consumes the accumulator (takes ownership via `Box<Self>`) and produces
+    /// This method consumes the accumulator (takes ownership via `self`) and produces
     /// the final aggregated samples. The returned vector typically contains one sample per
     /// unique timestamp that was accumulated.
     ///
     /// # Returns
     ///
     /// A vector of samples representing the aggregated results
-    fn evaluate(self: Box<Self>) -> Vec<Sample>;
+    fn evaluate(self) -> Vec<Sample>;
 }
 
 /// Projects a series' labels onto the grouping set of the label modifier
@@ -393,11 +391,7 @@ mod tests {
 
     #[test]
     fn test_extrema_merge_preserves_nan_and_signed_zero_behavior() {
-        let funcs: [(Box<dyn AggFunc>, f64); 2] = [
-            (Box::new(Min), f64::INFINITY),
-            (Box::new(Max), f64::NEG_INFINITY),
-        ];
-        for (func, initial) in funcs {
+        fn check(func: impl AggFunc, initial: f64) {
             for (values, expected) in [
                 (vec![f64::NAN], initial),
                 (vec![f64::NAN, 7.0, f64::NAN], 7.0),
@@ -425,25 +419,18 @@ mod tests {
                 }
             }
         }
+        check(Min, f64::INFINITY);
+        check(Max, f64::NEG_INFINITY);
     }
 
     #[test]
     fn test_accumulate_merge_matches_sequential() {
         use super::{avg::Avg, count::Count, group::Group, max::Max, min::Min, sum::Sum};
 
-        // Integer values keep float addition exact regardless of order.
-        let part_a = [(1000, 3.0), (2000, 5.0), (1000, 7.0)];
-        let part_b = [(2000, 11.0), (3000, 2.0), (1000, 4.0)];
-
-        let funcs: Vec<Box<dyn AggFunc>> = vec![
-            Box::new(Sum),
-            Box::new(Count),
-            Box::new(Min),
-            Box::new(Max),
-            Box::new(Avg),
-            Box::new(Group),
-        ];
-        for func in funcs {
+        fn check(func: impl AggFunc) {
+            // Integer values keep float addition exact regardless of order.
+            let part_a = [(1000, 3.0), (2000, 5.0), (1000, 7.0)];
+            let part_b = [(2000, 11.0), (3000, 2.0), (1000, 4.0)];
             let mut sequential = func.build();
             let mut acc_a = func.build();
             let mut acc_b = func.build();
@@ -467,6 +454,12 @@ mod tests {
                 assert_eq!(e.value, m.value, "{}", func.name());
             }
         }
+        check(Sum);
+        check(Count);
+        check(Min);
+        check(Max);
+        check(Avg);
+        check(Group);
     }
 
     /// Runs `eval_aggregate` over a single group large enough to take the
