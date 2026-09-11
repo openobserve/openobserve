@@ -50,6 +50,7 @@
 </template>
 
 <script lang="ts">
+import DOMPurify from "dompurify";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import {
   computed,
@@ -124,7 +125,7 @@ export default defineComponent({
         const parsed = JSON.parse(content);
         const formatted = JSON.stringify(parsed, null, 2);
         // Apply syntax highlighting
-        return formatted.replace(
+        const highlighted = formatted.replace(
           /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+-]?\d+)?)/g,
           (match) => {
             let cls = "json-number";
@@ -142,6 +143,12 @@ export default defineComponent({
             return `<span class="${cls}">${match}</span>`;
           },
         );
+        // matched tokens are substrings of the referenced content (log/dashboard data), so
+        // sanitize before v-html renders it
+        return DOMPurify.sanitize(highlighted, {
+          ALLOWED_TAGS: ["span"],
+          ALLOWED_ATTR: ["class"],
+        });
       } catch {
         // Not JSON, return plain text with line breaks preserved
         return content.replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br>");
