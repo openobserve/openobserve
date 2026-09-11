@@ -26,12 +26,17 @@
 //! because it is schema knowledge, and schema knowledge that drifts from its
 //! entity definitions fails at runtime rather than at compile time.
 //!
-//! Everything here is last-write-wins over a whole row rather than field-level
-//! edits. A snapshot is idempotent under replay and under reordering-by-retry
-//! in a way that "apply this delta" is not, and the queue promises neither
-//! exactly-once nor ordering. Two regions writing the same record concurrently
-//! resolve to whichever message lands second — acceptable, because only one
-//! cluster runs the alert-manager job.
+//! Everything here is a whole-row snapshot rather than field-level edits. A
+//! snapshot is idempotent under replay in a way that "apply this delta" is not,
+//! and the queue promises neither exactly-once nor ordering.
+//!
+//! Configuration snapshots are last-write-wins, which is safe because a stale
+//! one self-corrects on the next edit. A **response** is not: it carries who
+//! answered the page, so it is applied only when its `updated_at` is at least
+//! the replica's. A handler that errors leaves its message unacked and moves
+//! on, so the queue redelivers it behind the messages that overtook it — and a
+//! stale snapshot applied blind clears `acked_by` and hands the record back to
+//! the sweep that re-arms ladders.
 //!
 //! Every snapshot update goes through `reset_all()`, and that is load-bearing.
 //! `Model::into_active_model()` marks every column `Unchanged`, and SeaORM
@@ -369,12 +374,20 @@ pub async fn put_routing_config(
     super::oncall_routing_config::put(config).await
 }
 
-/// Applies a response record under the id the source region gave it.
+/// Applies a response record under the id the source region gave it, unless the
+/// replica already holds a newer one.
 ///
 /// The id is the contract with the scheduler: a replicated escalation trigger's
 /// `module_key` is this string, and the trigger sync path refuses to push a
 /// timer for a record it cannot find. Renumbering would drop every replicated
 /// page.
+///
+/// The revision check is what stops the queue's own redelivery rule from
+/// un-answering a page. A handler that errors leaves its message unacked and
+/// moves on, so NATS redelivers it behind the messages that overtook it — and a
+/// blind apply of that older snapshot clears `acked_by`, restores `Triggered`,
+/// and hands the record straight back to `reconcile_abandoned`, which re-arms
+/// the ladder and wakes somebody for a page a human already took.
 pub async fn put_response(response: &Response) -> Result<(), errors::Error> {
     put_response_in(get_orm_client_rw().await, response).await
 }
@@ -426,13 +439,22 @@ async fn put_response_in<C: ConnectionTrait>(
         // replication.
         runbook_url: None,
         exhausted_at: response.exhausted_at,
+        updated_at: response.updated_at,
     };
     match oncall_responses::Entity::find_by_id(&response.id)
         .one(conn)
         .await?
     {
+        // Filtered rather than checked against the row just read: the comparison
+        // and the write have to be one statement, or a newer snapshot landing
+        // between them is overwritten by this one.
         Some(_) => {
-            model.into_active_model().reset_all().update(conn).await?;
+            oncall_responses::Entity::update_many()
+                .set(model.into_active_model().reset_all())
+                .filter(oncall_responses::Column::Id.eq(&response.id))
+                .filter(oncall_responses::Column::UpdatedAt.lte(response.updated_at))
+                .exec(conn)
+                .await?;
         }
         None => {
             model.into_active_model().insert(conn).await?;
@@ -597,6 +619,7 @@ mod tests {
             acked_at: None,
             closed_at: None,
             incident_id: None,
+            updated_at: 10,
         }
     }
 
@@ -744,6 +767,36 @@ mod tests {
         assert_eq!(row.ladder_run, Some(3));
     }
 
+    /// A snapshot older than the replica's row must not be applied. The queue
+    /// redelivers an unacked message behind the ones that overtook it, so
+    /// replaying the pre-ack snapshot would clear `acked_by`, restore
+    /// `Triggered`, and let the sweep re-arm a ladder a human already answered.
+    #[tokio::test]
+    async fn test_an_older_snapshot_does_not_un_answer_a_page() {
+        let db = db().await;
+        let opened = a_response();
+        put_response_in(&db, &opened).await.unwrap();
+        let acked = Response {
+            state: ResponseState::Acknowledged,
+            acked_by: Some("ana@o2.ai".to_string()),
+            acked_at: Some(99),
+            updated_at: opened.updated_at + 1,
+            ..a_response()
+        };
+        put_response_in(&db, &acked).await.unwrap();
+
+        put_response_in(&db, &opened).await.unwrap();
+
+        let row = oncall_responses::Entity::find_by_id("resp_1")
+            .one(&db)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(row.state, ResponseState::Acknowledged.to_i32());
+        assert_eq!(row.acked_by.as_deref(), Some("ana@o2.ai"));
+        assert_eq!(row.acked_at, Some(99));
+    }
+
     /// The retry of a failed send is the same page at a later `at`, so it must
     /// rewrite the ledger row rather than insert beside it — the unique delivery
     /// key would reject that insert, and a message that can only error is
@@ -764,6 +817,23 @@ mod tests {
             .unwrap();
         assert_eq!(rows.len(), 1, "one page to one person on one channel");
         assert_eq!(rows[0].delivered, Some(true), "the later outcome is true");
+        assert_eq!(rows[0].at, 200);
+
+        // The failed attempt, redelivered behind its own retry.
+        put_event_in(&db, "resp_1", &a_delivery(100, false))
+            .await
+            .unwrap();
+        let rows = oncall_response_events::Entity::find()
+            .all(&db)
+            .await
+            .unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(
+            rows[0].delivered,
+            Some(true),
+            "a replayed failure must not un-deliver a page that landed, or \
+             `is_delivery_of` lets the next tick send it again"
+        );
         assert_eq!(rows[0].at, 200);
     }
 

@@ -4898,6 +4898,7 @@ mod tests {
             acked_at: Some(4_000),
             closed_at: None,
             incident_id: None,
+            updated_at: 4_000,
         };
         assert_eq!(base.acked_at.unwrap() - base.opened_at, 3_000);
 

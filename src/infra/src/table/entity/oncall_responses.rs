@@ -29,6 +29,10 @@ pub struct Model {
     pub runbook_url: Option<String>,
     /// When the ladder ran out with nobody answering. `None` while it climbs.
     pub exhausted_at: Option<i64>,
+    /// Revision of the last write, and what a replicated snapshot is accepted
+    /// or refused on: the queue redelivers an unacked message behind newer
+    /// ones, so an older snapshot applied blind would un-acknowledge a page.
+    pub updated_at: i64,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

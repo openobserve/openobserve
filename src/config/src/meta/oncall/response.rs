@@ -554,6 +554,12 @@ pub struct Response {
     /// owned by an incident, so this stays `None` for most firings.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub incident_id: Option<String>,
+    /// Revision of the write this record came from, and what a replica accepts
+    /// or refuses a snapshot on. The queue redelivers an unacked message behind
+    /// newer ones, so a blind apply lets an older snapshot un-acknowledge a
+    /// page that a human already answered.
+    #[serde(default)]
+    pub updated_at: i64,
 }
 
 impl Response {
@@ -1299,6 +1305,7 @@ mod tests {
             closed_at,
             incident_id: None,
             exhausted_at: None,
+            updated_at: 1_000,
         }
     }
 
