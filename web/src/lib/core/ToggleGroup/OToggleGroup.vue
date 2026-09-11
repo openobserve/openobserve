@@ -7,7 +7,11 @@ import type {
 } from "./OToggleGroup.types";
 import { ToggleGroupAnimatedKey, TOGGLE_GROUP_CONTEXT_KEY } from "./OToggleGroup.types";
 import { ToggleGroupRoot, type AcceptableValue } from "reka-ui";
-import { computed, provide, ref, watch, nextTick, onMounted, onBeforeUnmount } from "vue";
+import { computed, provide, ref, watch, nextTick, onMounted, onBeforeUnmount, useAttrs } from "vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OToggleGroupMenuScope from "./OToggleGroupMenuScope.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 
 const props = withDefaults(defineProps<ToggleGroupProps>(), {
   type: "single",
@@ -16,6 +20,7 @@ const props = withDefaults(defineProps<ToggleGroupProps>(), {
   variant: "default",
   labelPosition: "left",
   reorderable: false,
+  mobileDropdown: false,
 });
 
 const emit = defineEmits<ToggleGroupEmits>();
@@ -27,6 +32,21 @@ const slots = defineSlots<ToggleGroupSlots>();
 const rekaModelValue = computed(() => props.modelValue as AcceptableValue | AcceptableValue[]);
 
 const hasLabel = computed(() => Boolean(slots.label) || props.label !== undefined);
+
+const { isMobile } = useBreakpoint();
+const attrs = useAttrs();
+const asDropdown = computed(
+  () =>
+    props.mobileDropdown &&
+    isMobile.value &&
+    props.type === "single" &&
+    props.orientation !== "vertical",
+);
+const dropdownTestId = computed(() =>
+  attrs["data-test"] ? `${attrs["data-test"]}-dropdown-btn` : "o-toggle-group-dropdown-btn",
+);
+const isActiveValue = (value: AcceptableValue | boolean) => props.modelValue === value;
+const selectValue = (value: AcceptableValue | boolean) => emit("update:modelValue", value);
 
 // Sliding-selection indicator ------------------------------------------------
 // On by default for every single-select group (one active item to track). A
@@ -122,9 +142,17 @@ watch(
   },
 );
 
-onMounted(async () => {
-  if (!animate.value) return;
+const detachIndicator = () => {
+  resizeObserver?.disconnect();
+  resizeObserver = null;
+  mutationObserver?.disconnect();
+  mutationObserver = null;
+};
+
+const attachIndicator = async () => {
+  if (!animate.value || asDropdown.value) return;
   await nextTick();
+  detachIndicator();
   measure(false);
   // … but only snap when item sizes/visibility change (responsive icon-only mode,
   // items shown/hidden, the group being revealed) — these are not user selections.
@@ -144,13 +172,13 @@ onMounted(async () => {
     mutationObserver = new MutationObserver(measureSettled);
     mutationObserver.observe(track, { childList: true });
   }
-});
+};
+
+onMounted(attachIndicator);
+watch(asDropdown, (dropdown) => (dropdown ? detachIndicator() : attachIndicator()));
 
 onBeforeUnmount(() => {
-  resizeObserver?.disconnect();
-  resizeObserver = null;
-  mutationObserver?.disconnect();
-  mutationObserver = null;
+  detachIndicator();
   cancelAnimationFrame(settleRaf);
 });
 
@@ -273,7 +301,27 @@ provide(TOGGLE_GROUP_CONTEXT_KEY, context);
   <!-- With label: wrap in a flex container so the label and toggle bar sit
        together. Without label: render the ToggleGroupRoot directly to keep
        the existing inline-flex/sizing contract. -->
-  <div v-if="hasLabel" :class="wrapperClasses">
+  <ODropdown v-if="asDropdown" side="bottom" align="start">
+    <template #trigger>
+      <OButton
+        variant="outline"
+        size="sm-toolbar"
+        icon-right="arrow-drop-down"
+        class="shrink-0"
+        :disabled="disabled"
+        :data-test="dropdownTestId"
+      >
+        <OToggleGroupMenuScope mode="trigger" :is-active="isActiveValue" :select="selectValue">
+          <slot />
+        </OToggleGroupMenuScope>
+      </OButton>
+    </template>
+    <OToggleGroupMenuScope mode="menu" :is-active="isActiveValue" :select="selectValue">
+      <slot />
+    </OToggleGroupMenuScope>
+  </ODropdown>
+
+  <div v-else-if="hasLabel" :class="wrapperClasses">
     <span
       :class="[
         'o-input-label text-compact leading-tight select-none',
@@ -328,6 +376,8 @@ provide(TOGGLE_GROUP_CONTEXT_KEY, context);
       orientation === 'vertical' ? 'flex-col' : 'flex-row',
       'bg-toggle-track-bg rounded-default p-0.5',
       'border-toggle-border border',
+      // Wrapped toggle chips read as two unrelated controls, so the strip scrolls within its track.
+      orientation !== 'vertical' && 'max-md:max-w-full max-md:overflow-x-auto',
     ]"
     v-bind="dragListeners"
     @update:model-value="

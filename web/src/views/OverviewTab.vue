@@ -108,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >{{ inc.alert_count }} {{ t("overview.alertsSuffix") }}</span
             >
           </div>
-          <span class="invisible shrink-0 whitespace-nowrap group-hover:visible">
+          <span class="invisible shrink-0 whitespace-nowrap group-hover:visible max-md:visible">
             <OButton variant="ghost-primary" size="sm" @click="goToIncident(inc)">
               {{ t("overview.investigate") }}
             </OButton>
@@ -337,7 +337,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="text-text-secondary text-xs font-normal">{{ item.description }}</span>
             </div>
           </div>
-          <span class="invisible shrink-0 whitespace-nowrap group-hover:visible">
+          <span class="invisible shrink-0 whitespace-nowrap group-hover:visible max-md:visible">
             <OButton variant="ghost-primary" size="sm" @click="goToAlert(item)">
               {{ t("overview.investigate") }}
             </OButton>

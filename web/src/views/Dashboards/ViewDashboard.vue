@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="selectedDate"
             v-show="store.state.printMode === false"
             ref="dateTimePicker"
-            class="dashboard-icons h-7.5 [transition:all_0.2s_ease]"
+            class="dashboard-icons h-7.5 [transition:all_0.2s_ease] max-md:[&_.date-time-label]:hidden"
             size="sm"
             v-model="selectedDate"
             :initialTimezone="initialTimezone"
@@ -96,6 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dashboard-global-date-time-picker"
           />
           <AutoRefreshInterval
+            v-if="!isMobile"
             v-model="refreshInterval"
             trigger
             :min-refresh-interval="store.state?.zoConfig?.min_auto_refresh_interval || 5"
@@ -134,7 +135,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               shortcut-id="dashboardRefresh"
             />
           </OButton>
+        </template>
 
+        <template #actions-overflow>
+          <AutoRefreshInterval
+            v-if="isMobile"
+            v-model="refreshInterval"
+            trigger
+            :min-refresh-interval="store.state?.zoConfig?.min_auto_refresh_interval || 5"
+            @trigger="refreshData"
+            class="dashboard-icons hideOnPrintMode h-7.5 [transition:all_0.2s_ease]"
+            size="sm"
+          />
           <ExportDashboard
             v-if="!isFullscreen"
             v-show="store.state.printMode !== true"
@@ -351,6 +363,7 @@ import { useAiDashboardEvents } from "@/composables/useAiDashboardEvents";
 import type { AiDashboardEvent } from "@/composables/useAiDashboardEvents";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
+import useBreakpoint from "@/composables/useBreakpoint";
 
 const DashboardJsonEditor = defineAsyncComponent(() => {
   return import("./DashboardJsonEditor.vue");
@@ -384,6 +397,7 @@ export default defineComponent({
   },
   setup() {
     const { t } = useI18nTyped();
+    const { isMobile } = useBreakpoint();
     const route = useRoute();
     const router = useRouter();
     const store = useStore();
@@ -1769,6 +1783,7 @@ export default defineComponent({
     ]);
 
     return {
+      isMobile,
       currentDashboardData,
       dashboardRemountKey,
       toggleFullscreen,

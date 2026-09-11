@@ -212,13 +212,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Body: left rail (entity-type filter) + table — mirrors the Dashboards
          folder-rail + table layout (panel bg + vertical separator, 230px). -->
-    <div class="flex min-h-0 flex-1">
+    <div class="flex min-h-0 flex-1 max-md:flex-col">
       <!-- Left rail: the entity-type filter. Panel background + right border
            match FolderList.vue so the rail reads like the app's other left
            rails. The stream selector lives in the top toolbar alongside the
            search. -->
       <div
-        class="w-rail bg-surface-panel border-border-default flex h-full shrink-0 flex-col gap-2 border-e px-1.5 py-2"
+        class="w-rail bg-surface-panel border-border-default flex h-full shrink-0 flex-col gap-2 border-e px-1.5 py-2 max-md:h-auto max-md:w-full max-md:flex-row max-md:flex-wrap max-md:border-e-0 max-md:border-b"
       >
         <!-- Entity-type filter: All / Services / Datastores / Queues /
              External / RPC. A vertical nav rail — same OTabs pattern as the
@@ -227,7 +227,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              unhealthy badge right. -->
         <div v-if="!isLoading && services.length > 0" class="catalog-type-filter overflow-y-auto">
           <OTabs
-            orientation="vertical"
+            :orientation="isMobile ? 'horizontal' : 'vertical'"
             dense
             :model-value="typeFilter"
             data-test="services-catalog-type-filter"
@@ -287,7 +287,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            header, rows, in-frame toolbar and footer (count + "Showing X–Y of N"
            + records-per-page + pager) all match. OTable owns pagination, so we
            feed it the full sorted list and it paginates internally. -->
-      <div v-else class="h-full min-w-0 flex-1">
+      <div v-else class="h-full min-w-0 flex-1 max-md:h-auto max-md:min-h-0">
         <div class="bg-card-glass-bg h-full">
           <OTable
             ref="oTableRef"
@@ -437,6 +437,7 @@ import useExternalColumnToggle from "@/composables/useExternalColumnToggle";
 import TraceServiceCell from "./components/TraceServiceCell.vue";
 import ServiceCatalogBarCell from "./components/ServiceCatalogBarCell.vue";
 import ServiceGraphNodeSidePanel from "./ServiceGraphNodeSidePanel.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import useTraces from "@/composables/useTraces";
 import useStreams from "@/composables/useStreams";
 import useHttpStreaming from "@/composables/useStreamingSearch";
@@ -460,6 +461,7 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import ServicesCatalogNoDataState from "./ServicesCatalogNoDataState.vue";
 
 const { t } = useI18nTyped();
+const { isMobile } = useBreakpoint();
 const { columnVisibility, setColumnVisibility } = useExternalColumnToggle("services-catalog");
 const catalogContainerRef = ref<HTMLElement | null>(null);
 const { searchObj } = useTraces();

@@ -136,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-else-if="isDetailView"
             id="o2-page-actions"
-            class="flex items-center gap-2"
+            class="flex items-center gap-2 max-md:max-w-full max-md:flex-wrap max-md:justify-end max-md:gap-y-1"
             data-test="pipeline-detail-actions"
           />
         </template>

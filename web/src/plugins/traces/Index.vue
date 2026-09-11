@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }"
         :before-class="
           activeTab === 'service-graph' || activeTab === 'services-catalog'
-            ? 'z-auto overflow-visible max-h-[3.125rem]!'
+            ? 'z-auto overflow-visible max-h-[3.125rem]! max-md:h-auto! max-md:max-h-none!'
             : 'z-auto overflow-visible'
         "
         @update:model-value="onSplitterUpdate"
@@ -108,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Note: Splitter max-height to be dynamically calculated with JS -->
               <OSplitter
                 v-model="searchObj.config.splitterModel"
-                :limits="searchObj.config.splitterLimit"
+                :limits="isMobile ? [0, 0] : searchObj.config.splitterLimit"
                 separatorClass="w-px"
                 @update:model-value="onSplitterUpdate"
                 class="h-full w-full"
@@ -116,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template #before>
                   <div class="border-border-default bg-surface-panel h-full border-e">
                     <IndexList
-                      v-show="searchObj.meta.showFields"
+                      v-show="searchObj.meta.showFields && !isMobile"
                       ref="indexListRef"
                       :field-list="searchObj.data.stream.selectedStreamFields"
                       :active-include-field-values="activeIncludeFilterValues"
@@ -263,6 +263,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @error-only-toggled="onErrorOnlyToggled"
                         @ask-ai="onAskAiTracing"
                         @send-to-ai-chat="sendToAiChat"
+                        @open-mobile-fields="mobileFieldsOpen = true"
                       />
                     </div>
                   </div>
@@ -273,6 +274,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </OSplitter>
     </div>
+
+    <ODrawer
+      v-if="isMobile"
+      v-model:open="mobileFieldsOpen"
+      side="left"
+      size="sm"
+      bleed
+      seamless
+      anchor="#tracesThirdLevel"
+      data-test="traces-mobile-fields-drawer"
+    >
+      <div class="flex h-full flex-col overflow-hidden pt-2.5">
+        <IndexList
+          :field-list="searchObj.data.stream.selectedStreamFields"
+          :active-include-field-values="activeIncludeFilterValues"
+          :active-exclude-field-values="activeExcludeFilterValues"
+          data-test="traces-search-index-list-mobile"
+          class="h-full"
+          :key="searchObj.data.stream.streamLists"
+          @update:changeStream="onChangeStream"
+          @update:selectedFields="updateFieldVisibility"
+        />
+      </div>
+    </ODrawer>
 
     <ODialog
       v-model:open="streamChangeDialog.show"
@@ -341,6 +366,8 @@ import { resolveTraceSearchMode, type TraceSearchMode } from "@/ts/interfaces/tr
 import { isLLMTrace } from "@/utils/llmUtils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -408,6 +435,34 @@ const serviceGraphRef = ref<any>(null);
 const servicesCatalogRef = ref<any>(null);
 const splitterModel = ref(90);
 const fieldValues = ref({});
+
+const { isMobile, isTablet } = useBreakpoint();
+const mobileFieldsOpen = ref(false);
+watch(
+  isMobile,
+  (mobile, wasMobile) => {
+    if (mobile) {
+      searchObj.config.splitterModel = 0;
+      splitterModel.value = 150;
+    } else if (wasMobile) {
+      if (searchObj.config.splitterModel === 0 && searchObj.meta.showFields) {
+        searchObj.config.splitterModel = searchObj.config.lastSplitterPosition || 20;
+      }
+      splitterModel.value = 90;
+    }
+  },
+  { immediate: true },
+);
+// md–lg: the desktop 20% pane is ~140px, too narrow for the stream picker.
+watch(
+  isTablet,
+  (tablet) => {
+    if (tablet && searchObj.config.splitterModel > 0 && searchObj.config.splitterModel < 30) {
+      searchObj.config.splitterModel = 30;
+    }
+  },
+  { immediate: true },
+);
 const { showErrorNotification } = useNotifications();
 const disableMoreErrorDetails = ref(false);
 const toggleErrorDetails = () => {
@@ -1551,6 +1606,16 @@ const onJumpToPanelStreamData = (fromUs: number, toUs: number) => {
 };
 
 const onSelectTracesStream = () => {
+  // < md the stream selector lives in the fields drawer, so it must open before the trigger can focus.
+  if (isMobile.value) {
+    mobileFieldsOpen.value = true;
+    setTimeout(() => {
+      document
+        .querySelector<HTMLElement>('[data-test="log-search-index-list-select-stream"] button')
+        ?.click();
+    }, 300);
+    return;
+  }
   const trigger = document.querySelector<HTMLElement>(
     '[data-test="log-search-index-list-select-stream"] button',
   );

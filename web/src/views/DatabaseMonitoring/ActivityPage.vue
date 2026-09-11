@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             search-data-test="dbm-activity-search"
           >
             <DbmScopeFilters
-              class="min-w-0 flex-1"
+              class="min-w-0 flex-1 max-lg:flex-none max-lg:basis-auto"
               :filters="dimensionFilters"
               @clear="clearScope"
             />
@@ -270,7 +270,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="text-text-secondary flex w-full items-center gap-2.5"
             data-test="dbm-activity-status-bar"
           >
-            <span>{{ countLine }}</span>
+            <span class="max-md:hidden">{{ countLine }}</span>
           </div>
         </template>
 

@@ -134,6 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="ghost"
             size="icon-sm"
             icon-left="edit"
+            class="max-md:hidden"
             :data-test="`status-pages-edit-btn-${(row as any).id}`"
             @click.stop="emit('edit', row)"
           >
@@ -152,6 +153,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OTooltip side="bottom" :content="t('statusPages.more')" />
               </OButton>
             </template>
+
+            <ODropdownItem
+              class="md:hidden"
+              :data-test="`status-pages-edit-btn-${(row as any).id}-menu`"
+              @select="emit('edit', row)"
+            >
+              <template #icon-left>
+                <OIcon name="edit" size="sm" />
+              </template>
+              {{ t("common.edit") }}
+            </ODropdownItem>
 
             <ODropdownItem
               :disabled="!advancedEnabled"

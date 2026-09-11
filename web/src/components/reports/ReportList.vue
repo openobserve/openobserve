@@ -35,16 +35,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <!-- Folder rail (fixed width) + table — matches the Alerts layout. -->
-      <div data-test="report-list-splitter" class="report-list-table flex min-h-0 flex-1">
+      <div
+        data-test="report-list-splitter"
+        class="report-list-table flex min-h-0 flex-1 max-md:flex-col"
+      >
         <!-- Left: folder list -->
-        <div class="w-rail h-full shrink-0">
+        <div
+          class="w-rail max-md:border-border-default h-full shrink-0 max-md:h-auto max-md:w-full max-md:border-b"
+        >
           <div class="h-full">
             <FolderList type="reports" @update:activeFolderId="updateActiveFolderId" />
           </div>
         </div>
 
         <!-- Right: report table -->
-        <div class="h-full min-w-0 flex-1">
+        <div class="h-full min-w-0 flex-1 max-md:h-auto max-md:min-h-0">
           <div class="bg-card-glass-bg h-full">
             <OTable
               data-test="report-list-table"
@@ -67,7 +72,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <!-- Toolbar: Scheduled/Cached tabs + search (inline folder scope) + refresh -->
               <template #toolbar>
-                <div class="flex w-full items-center gap-2">
+                <div
+                  class="flex w-full items-center gap-2 max-lg:min-w-0 max-lg:flex-wrap max-lg:gap-y-1.5 max-md:contents"
+                >
                   <div class="app-tabs-container">
                     <AppTabs
                       class="tabs-selection-container"
@@ -81,7 +88,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       "
                     />
                   </div>
-                  <div class="min-w-0 flex-1">
+                  <!-- flex-1 is basis-0, so the min-w floor is what wraps the input before its scope chips spill. -->
+                  <div
+                    class="min-w-0 flex-1 max-md:order-last max-md:basis-full md:max-lg:min-w-80"
+                  >
                     <OInput
                       v-model="dynamicQueryModel"
                       :placeholder="
@@ -108,7 +118,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             icon-left="folder-outline"
                             data-test="report-list-search-scope-current"
                             :title="t('reports.searchThisFolderTitle')"
-                            >{{ t("reports.searchThisFolder") }}</OToggleGroupItem
+                            ><span class="max-md:hidden">{{
+                              t("reports.searchThisFolder")
+                            }}</span></OToggleGroupItem
                           >
                           <OToggleGroupItem
                             value="all"
@@ -116,7 +128,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             icon-left="search"
                             data-test="report-list-search-across-folders-toggle"
                             :title="t('reports.searchAllFoldersTitle')"
-                            >{{ t("reports.searchAllFolders") }}</OToggleGroupItem
+                            ><span class="max-md:hidden">{{
+                              t("reports.searchAllFolders")
+                            }}</span></OToggleGroupItem
                           >
                         </OToggleGroup>
                       </template>
@@ -211,6 +225,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="icon-sm"
                   :icon-left="row.enabled ? 'pause' : 'play-arrow'"
                   :title="row.enabled ? t('alerts.pause') : t('alerts.start')"
+                  class="max-md:hidden"
                   @click="toggleReportState(row)"
                 />
 
@@ -222,6 +237,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="ghost"
                   size="icon-sm"
                   :title="t('alerts.edit')"
+                  class="max-md:hidden"
                   @click="editReport(row)"
                 />
 
@@ -232,6 +248,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="ghost"
                   size="icon-sm"
                   :title="t('reports.moveToFolder')"
+                  class="max-md:hidden"
                   @click="openMoveDialog(row)"
                 />
 
@@ -243,8 +260,57 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="ghost-destructive"
                   size="icon-sm"
                   :title="t('alerts.delete')"
+                  class="max-md:hidden"
                   @click="confirmDeleteReport(row)"
                 />
+
+                <ODropdown side="bottom" align="end">
+                  <template #trigger>
+                    <OButton
+                      icon-left="more-vert"
+                      :title="t('dashboard.moreActions')"
+                      variant="ghost"
+                      size="icon-xs-sq"
+                      class="md:hidden"
+                      data-test="report-list-row-more-actions"
+                      @click.stop
+                    />
+                  </template>
+                  <ODropdownItem
+                    v-if="!reportsStateLoadingMap[row.report_id]"
+                    :icon-left="row.enabled ? 'pause' : 'play-arrow'"
+                    class="md:hidden"
+                    :data-test="`report-list-${row.name}-pause-start-report-menu`"
+                    @select="toggleReportState(row)"
+                  >
+                    <span>{{ row.enabled ? t("alerts.pause") : t("alerts.start") }}</span>
+                  </ODropdownItem>
+                  <ODropdownItem
+                    icon-left="edit"
+                    class="md:hidden"
+                    :data-test="`report-list-${row.name}-edit-report-menu`"
+                    @select="editReport(row)"
+                  >
+                    <span>{{ t("alerts.edit") }}</span>
+                  </ODropdownItem>
+                  <ODropdownItem
+                    icon-left="drive-file-move"
+                    class="md:hidden"
+                    :data-test="`report-list-${row.name}-move-report-menu`"
+                    @select="openMoveDialog(row)"
+                  >
+                    <span>{{ t("reports.moveToFolder") }}</span>
+                  </ODropdownItem>
+                  <ODropdownItem
+                    icon-left="delete"
+                    variant="destructive"
+                    class="md:hidden"
+                    :data-test="`report-list-${row.name}-delete-report-menu`"
+                    @select="confirmDeleteReport(row)"
+                  >
+                    <span>{{ t("alerts.delete") }}</span>
+                  </ODropdownItem>
+                </ODropdown>
               </template>
 
               <!-- Table footer: pagination + bulk actions -->
@@ -252,7 +318,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="flex h-12 w-full items-center justify-between">
                   <!-- Left: count + action buttons grouped together -->
                   <div class="flex items-center gap-2">
-                    <div class="flex items-center text-xs font-normal whitespace-nowrap">
+                    <div
+                      class="flex items-center text-xs font-normal whitespace-nowrap max-md:hidden"
+                    >
                       {{ resultTotal }} {{ t("reports.header") }}
                     </div>
                     <OButton
@@ -343,6 +411,8 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { COL } from "@/lib/core/Table/OTable.types";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";

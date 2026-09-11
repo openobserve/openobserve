@@ -689,6 +689,13 @@ export default defineComponent({
   table-layout: fixed;
 }
 
+/* Touch has no hover — keep the field quick-actions visible. */
+@media (max-width: 47.99rem) {
+  .index-menu :deep(.field_list .field_overlay) {
+    visibility: visible;
+  }
+}
+
 .index-table :deep(table .field-container:hover .field_overlay) {
   visibility: visible;
 }

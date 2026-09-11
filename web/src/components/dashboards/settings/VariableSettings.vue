@@ -171,6 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="editVariableFn(row.name)"
                 :data-test="`dashboard-edit-variable-${row.name}`"
                 icon-left="edit"
+                class="max-md:hidden"
               >
               </OButton>
               <OButton
@@ -179,9 +180,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :title="t('dashboard.delete')"
                 @click.stop="showDeleteDialogFn({ row: { name: row.name } })"
                 data-test="dashboard-delete-variable"
+                class="max-md:hidden"
               >
                 <template #icon-left><OIcon name="delete" size="sm" /></template>
               </OButton>
+              <ODropdown side="bottom" align="end">
+                <template #trigger>
+                  <OButton
+                    icon-left="more-vert"
+                    :title="t('dashboard.moreActions')"
+                    variant="ghost"
+                    size="icon-xs-sq"
+                    class="md:hidden"
+                    data-test="dashboard-variable-row-more-actions"
+                    @click.stop
+                  />
+                </template>
+                <ODropdownItem
+                  icon-left="edit"
+                  class="md:hidden"
+                  :data-test="`dashboard-edit-variable-${row.name}-menu`"
+                  @select="editVariableFn(row.name)"
+                >
+                  <span>{{ t("dashboard.edit") }}</span>
+                </ODropdownItem>
+                <ODropdownItem
+                  icon-left="delete"
+                  variant="destructive"
+                  class="md:hidden"
+                  data-test="dashboard-delete-variable-menu"
+                  @select="showDeleteDialogFn({ row: { name: row.name } })"
+                >
+                  <span>{{ t("dashboard.delete") }}</span>
+                </ODropdownItem>
+              </ODropdown>
             </div>
           </template>
         </OTable>
@@ -238,6 +270,8 @@ import VariablesDependenciesGraph from "./VariablesDependenciesGraph.vue";
 import useNotifications from "@/composables/useNotifications";
 import Sortable from "sortablejs";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -253,6 +287,8 @@ export default defineComponent({
     DashboardHeader,
     VariablesDependenciesGraph,
     OButton,
+    ODropdown,
+    ODropdownItem,
     OIcon,
     ODialog,
     OTag,

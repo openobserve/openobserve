@@ -88,8 +88,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @row-click="openRuns"
           >
             <template #toolbar>
-              <div class="flex w-full items-center gap-2">
-                <div class="min-w-0 flex-1">
+              <div class="flex w-full items-center gap-2 max-lg:min-w-0 max-md:contents">
+                <div class="min-w-0 flex-1 max-md:min-w-40">
                   <OInput
                     data-test="workflow-list-search-input"
                     v-model="filterQuery"
@@ -153,6 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :variant="row.enabled ? 'ghost-destructive' : 'ghost-success'"
                   size="icon-sm"
                   :icon-left="row.enabled ? 'pause' : 'play-arrow'"
+                  class="max-md:hidden"
                   @click.stop="toggleWorkflow(row)"
                 >
                   <OTooltip
@@ -176,6 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="ghost"
                   size="icon-sm"
                   icon-left="edit"
+                  class="max-md:hidden"
                   @click.stop="editWorkflow(row)"
                 >
                   <OTooltip side="bottom" :content="t('workflow.edit')" />
@@ -190,6 +192,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @click.stop
                     />
                   </template>
+                  <ODropdownItem
+                    v-if="!row.is_draft"
+                    :icon-left="row.enabled ? 'pause' : 'play-arrow'"
+                    class="md:hidden"
+                    :data-test="`workflow-list-${row.name}-pause-start-action-menu`"
+                    @select="toggleWorkflow(row)"
+                  >
+                    <span>{{ row.enabled ? t("alerts.pause") : t("alerts.start") }}</span>
+                  </ODropdownItem>
+                  <ODropdownItem
+                    icon-left="edit"
+                    class="md:hidden"
+                    :data-test="`workflow-list-${row.name}-edit-menu`"
+                    @select="editWorkflow(row)"
+                  >
+                    <span>{{ t("workflow.edit") }}</span>
+                  </ODropdownItem>
                   <ODropdownItem
                     :data-test="`workflow-list-${row.name}-delete`"
                     variant="destructive"
@@ -217,7 +236,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                    dropped — a legacy CSS-framework class this repo does not
                    generate, so it never applied. -->
               <div class="flex h-12 w-full items-center justify-between">
-                <div class="o2-table-footer-title flex w-50 items-center">
+                <div class="o2-table-footer-title flex w-50 items-center max-md:hidden">
                   {{ resultTotal }} {{ t("workflow.header") }}
                 </div>
               </div>

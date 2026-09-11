@@ -1816,6 +1816,39 @@ export default defineComponent({
   cursor: move;
 }
 
+/* CSS-only stack: GridStack's oneColumnMode stays off because the change handler would persist it. */
+@media (max-width: 47.99rem) {
+  .displayDiv :deep(.grid-stack) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    height: auto !important;
+  }
+  .displayDiv :deep(.grid-stack > .grid-stack-item) {
+    position: relative !important;
+    inset: auto !important;
+    transform: none !important;
+    width: 100% !important;
+    min-width: 100% !important;
+    height: 20rem !important;
+    min-height: 20rem !important;
+  }
+  .displayDiv :deep(.grid-stack > .grid-stack-item:has([data-panel-type="metric"])),
+  .displayDiv :deep(.grid-stack > .grid-stack-item:has([data-panel-type="gauge"])) {
+    width: calc(50% - 0.25rem) !important;
+    min-width: calc(50% - 0.25rem) !important;
+    height: 8rem !important;
+    min-height: 8rem !important;
+  }
+  .displayDiv :deep(.grid-stack > .grid-stack-item.panel-section-header) {
+    height: 2.5rem !important;
+    min-height: 2.5rem !important;
+  }
+  .displayDiv :deep(.grid-stack > .grid-stack-item > .ui-resizable-handle) {
+    display: none !important;
+  }
+}
+
 .displayDiv :deep(.grid-stack .grid-stack-item.ui-draggable-dragging) {
   opacity: 0.8;
   z-index: 1000;

@@ -22,7 +22,8 @@ vi.stubGlobal("scrollTo", vi.fn());
 vi.stubGlobal(
   "matchMedia",
   vi.fn().mockImplementation((query) => ({
-    matches: false,
+    // Desktop-like default: only min-width queries match, so useBreakpoint reads md/lg as "up".
+    matches: /min-width/.test(String(query)),
     media: query,
     onchange: null,
     addListener: vi.fn(), // Deprecated
