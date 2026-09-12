@@ -15,6 +15,7 @@
 
 import config from "@/aws-exports";
 import { routeGuard } from "@/utils/zincutils";
+import SplunkHec from "@/components/ingestion/logs/SplunkHec.vue";
 import SyslogNg from "@/components/ingestion/logs/SyslogNg.vue";
 import LoongCollector from "@/components/ingestion/logs/LoongCollector.vue";
 import Ingestion from "@/views/Ingestion.vue";
@@ -223,6 +224,14 @@ const useIngestionRoutes = () => {
                   path: "syslogng",
                   name: "syslogNg",
                   component: SyslogNg,
+                  beforeEnter(to: any, from: any, next: any) {
+                    routeGuard(to, from, next);
+                  },
+                },
+                {
+                  path: "splunkhec",
+                  name: "splunkHec",
+                  component: SplunkHec,
                   beforeEnter(to: any, from: any, next: any) {
                     routeGuard(to, from, next);
                   },

@@ -1292,6 +1292,60 @@ mod tests {
         meta::user::UserRequest,
     };
 
+    #[tokio::test]
+    async fn splunk_scheme_is_rejected_on_the_api_tree() {
+        // §12.1: a Splunk collector GUID must never authenticate an /api route.
+        // This holds structurally — `Splunk` matches no branch in
+        // oo_validator_internal and falls through to Unauthorized.
+        let req_data = RequestData {
+            uri: "/api/orgb/_bulk".parse::<Uri>().unwrap(),
+            method: Method::POST,
+            headers: HeaderMap::new(),
+        };
+        let auth_info = AuthExtractor {
+            auth: "Splunk 7b3d9f2c-4a11-4e55-9c8b-2f6a01c34d90".to_string(),
+            method: "POST".to_string(),
+            o2_type: "stream".to_string(),
+            org_id: "orgb".to_string(),
+            bypass_check: true,
+            parent_id: String::new(),
+            use_all_org: false,
+            use_self_context: false,
+            use_self_parent: false,
+        };
+
+        let result = oo_validator(&req_data, &auth_info).await;
+        assert!(matches!(result, Err(AuthError::Unauthorized(_))));
+    }
+
+    #[tokio::test]
+    async fn splunk_guid_as_a_basic_password_is_rejected() {
+        // A GUID is not an `o2oi_` token and is not a user password, so Basic
+        // with it must fail too.
+        let req_data = RequestData {
+            uri: "/api/orgb/_bulk".parse::<Uri>().unwrap(),
+            method: Method::POST,
+            headers: HeaderMap::new(),
+        };
+        let credential = config::utils::base64::encode(
+            "someone@example.com:7b3d9f2c-4a11-4e55-9c8b-2f6a01c34d90",
+        );
+        let auth_info = AuthExtractor {
+            auth: format!("Basic {credential}"),
+            method: "POST".to_string(),
+            o2_type: "stream".to_string(),
+            org_id: "orgb".to_string(),
+            bypass_check: true,
+            parent_id: String::new(),
+            use_all_org: false,
+            use_self_context: false,
+            use_self_parent: false,
+        };
+
+        let result = oo_validator(&req_data, &auth_info).await;
+        assert!(result.is_err());
+    }
+
     #[test]
     fn extract_rum_token_prefers_query_over_header() {
         let mut query = std::collections::HashMap::new();

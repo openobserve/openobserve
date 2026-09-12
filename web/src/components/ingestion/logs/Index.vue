@@ -111,6 +111,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :label="t('ingestion.syslogNg')"
       />
       <ORouteTab
+        name="splunkHec"
+        data-test="ingestion-logs-tab-splunkhec"
+        :to="{
+          name: 'splunkHec',
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        }"
+        icon="cloud-upload"
+        :label="t('ingestion.splunkHecTab')"
+      />
+      <ORouteTab
         name="loongcollector"
         data-test="ingestion-logs-tab-loongcollector"
         :to="{
@@ -171,7 +183,15 @@ export default defineComponent({
       resolveTab("ingestLogs", router.currentRoute.value.name as string, "curl"),
     );
     const currentOrgIdentifier: any = ref(store.state.selectedOrganization.identifier);
-    const ingestRoutes = ["curl", "fluentbit", "fluentd", "vector", "syslogNg", "loongcollector"];
+    const ingestRoutes = [
+      "curl",
+      "fluentbit",
+      "fluentd",
+      "vector",
+      "syslogNg",
+      "splunkHec",
+      "loongcollector",
+    ];
 
     onBeforeMount(() => {
       if (ingestRoutes.includes(router.currentRoute.value.name)) {

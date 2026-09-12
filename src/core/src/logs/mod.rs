@@ -188,6 +188,11 @@ fn set_parsing_error(parse_error: &mut String, field: &Field) {
     ));
 }
 
+/// Write each stream's prepared records, returning whether any stream was
+/// skipped because it started deleting after admission.
+///
+/// A skip loses those records silently, so the flag is the only way a caller
+/// that must not acknowledge lost data can tell it from a clean write.
 #[allow(clippy::too_many_arguments)]
 async fn write_logs_by_stream(
     thread_id: usize,
@@ -199,12 +204,14 @@ async fn write_logs_by_stream(
     json_data_by_stream: HashMap<String, O2IngestJsonData>,
     byte_size_by_stream: HashMap<String, usize>,
     derived_streams: HashSet<String>,
-) -> Result<()> {
+) -> Result<bool> {
+    let mut stream_skipped = false;
     for (stream_name, (json_data, fn_num)) in json_data_by_stream {
         // check if we are allowed to ingest
         if db::compact::retention::is_deleting_stream(org_id, StreamType::Logs, &stream_name, None)
         {
             log::warn!("stream [{stream_name}] is being deleted");
+            stream_skipped = true;
             continue; // skip
         }
 
@@ -295,7 +302,7 @@ async fn write_logs_by_stream(
             .await;
         }
     }
-    Ok(())
+    Ok(stream_skipped)
 }
 
 async fn write_logs(

@@ -26,6 +26,14 @@ use pin_project_lite::pin_project;
 use regex::Regex;
 use tower::{Layer, Service};
 
+/// Request headers whose value is a credential and is never written to the log.
+const REDACTED_REQUEST_HEADERS: [&str; 4] = [
+    "authorization",
+    "proxy-authorization",
+    "cookie",
+    "x-api-key",
+];
+
 /// Returns the HTTP access log format string based on configuration.
 ///
 /// Supported format specifiers:
@@ -269,12 +277,21 @@ where
                         {
                             continue;
                         }
-                        let header_value = this
-                            .request_headers
+                        // %{Name}i is substituted raw, so an operator who puts
+                        // Authorization in the format string would write every
+                        // caller's credential to disk in plaintext.
+                        let header_value = if REDACTED_REQUEST_HEADERS
                             .iter()
-                            .find(|(name, _)| name.eq_ignore_ascii_case(header_name))
-                            .map(|(_, value)| value.as_str())
-                            .unwrap_or("-");
+                            .any(|h| header_name.eq_ignore_ascii_case(h))
+                        {
+                            "[REDACTED]"
+                        } else {
+                            this.request_headers
+                                .iter()
+                                .find(|(name, _)| name.eq_ignore_ascii_case(header_name))
+                                .map(|(_, value)| value.as_str())
+                                .unwrap_or("-")
+                        };
                         log_message =
                             log_message.replace(&format!("%{{{}}}i", header_name), header_value);
                     }

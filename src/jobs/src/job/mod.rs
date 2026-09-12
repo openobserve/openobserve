@@ -412,6 +412,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(db::user::watch());
     tokio::task::spawn(db::org_users::watch());
     tokio::task::spawn(db::org_ingestion_tokens::watch());
+    tokio::task::spawn(db::org_ingestion_tokens::run_splunk_token_reload());
     tokio::task::spawn(db::organization::watch());
     tokio::task::spawn(db::org_status::watch());
     if let Err(e) = db::org_status::load_from_db().await {

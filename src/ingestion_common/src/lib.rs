@@ -93,6 +93,13 @@ pub struct RecordStatus {
     #[serde(default)]
     #[serde(skip_serializing_if = "String::is_empty")]
     pub error: String,
+    /// Records dropped by the ingestion-window policy, counted in `failed` too.
+    ///
+    /// Not serialized: every legacy route's body would otherwise gain a field.
+    /// Lets a caller tell "outside ZO_INGEST_ALLOWED_UPTO / _IN_FUTURE, dropped
+    /// by design" apart from a record that could not be prepared at all.
+    #[serde(skip_serializing, skip_deserializing)]
+    pub policy_dropped: u32,
 }
 
 pub struct BulkStreamData {
@@ -125,6 +132,21 @@ pub struct IngestionResponse {
     pub status: Vec<StreamStatus>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
+    /// True when the records were accepted but the write to storage failed.
+    ///
+    /// Deliberately NOT serialized: `code` is a response BODY field on /_json,
+    /// /_multi, /_bulk, Loki and RUM, so signalling the failure through it would
+    /// silently change those routes' bodies. Callers that must not acknowledge
+    /// lost data read this instead.
+    #[serde(skip_serializing, skip_deserializing)]
+    pub write_failed: bool,
+    /// True when a stream was found to be deleting after admission and skipped.
+    ///
+    /// Not serialized, for the same reason as `write_failed`: those records are
+    /// silently gone, so a caller that must not acknowledge lost data has to be
+    /// able to tell this apart from a clean write.
+    #[serde(skip_serializing, skip_deserializing)]
+    pub stream_skipped: bool,
 }
 
 impl IngestionResponse {
@@ -133,7 +155,21 @@ impl IngestionResponse {
             code,
             status,
             error: None,
+            write_failed: false,
+            stream_skipped: false,
         }
+    }
+
+    /// Mark this response as "accepted, but the storage write failed".
+    pub fn with_write_failed(mut self, write_failed: bool) -> Self {
+        self.write_failed = write_failed;
+        self
+    }
+
+    /// Mark this response as "a stream was skipped mid-write, its records lost".
+    pub fn with_stream_skipped(mut self, stream_skipped: bool) -> Self {
+        self.stream_skipped = stream_skipped;
+        self
     }
 }
 
@@ -487,6 +523,7 @@ mod tests {
             successful: 10,
             failed: 2,
             error: "test error".to_string(),
+            policy_dropped: 0,
         };
 
         assert_eq!(status.successful, 10);
@@ -736,10 +773,69 @@ mod tests {
             code: 200,
             status: vec![],
             error: None,
+            write_failed: false,
+            stream_skipped: false,
         };
         let serialized = serde_json::to_string(&response).unwrap();
         assert!(!serialized.contains("status"));
         assert!(!serialized.contains("error"));
+    }
+
+    #[test]
+    fn write_failure_does_not_change_the_serialized_body() {
+        // /_json, /_multi, /_bulk, Loki, RUM and gRPC all share the function that
+        // sets this flag, and `code` is a BODY field on every one of them. The
+        // signal has to ride a field that never reaches the wire.
+        let ok = IngestionResponse::new(200, vec![StreamStatus::new("s")]);
+        let failed =
+            IngestionResponse::new(200, vec![StreamStatus::new("s")]).with_write_failed(true);
+
+        assert_eq!(
+            serde_json::to_string(&ok).unwrap(),
+            serde_json::to_string(&failed).unwrap()
+        );
+        assert!(
+            !serde_json::to_string(&failed)
+                .unwrap()
+                .contains("write_failed")
+        );
+        assert!(failed.write_failed);
+        assert_eq!(failed.code, 200);
+    }
+
+    #[test]
+    fn a_skipped_stream_does_not_change_the_serialized_body() {
+        // Same constraint as `write_failed`: the six legacy routes serialize this
+        // struct as their response body, so the signal must never reach the wire.
+        let ok = IngestionResponse::new(200, vec![StreamStatus::new("s")]);
+        let skipped =
+            IngestionResponse::new(200, vec![StreamStatus::new("s")]).with_stream_skipped(true);
+
+        assert_eq!(
+            serde_json::to_string(&ok).unwrap(),
+            serde_json::to_string(&skipped).unwrap()
+        );
+        assert!(
+            !serde_json::to_string(&skipped)
+                .unwrap()
+                .contains("stream_skipped")
+        );
+        assert!(skipped.stream_skipped);
+        assert_eq!(skipped.code, 200);
+    }
+
+    #[test]
+    fn policy_dropped_does_not_change_the_serialized_body() {
+        let mut dropped = RecordStatus {
+            successful: 1,
+            failed: 1,
+            error: "too old".to_string(),
+            policy_dropped: 1,
+        };
+        let baseline = serde_json::to_string(&dropped).unwrap();
+        dropped.policy_dropped = 0;
+        assert_eq!(baseline, serde_json::to_string(&dropped).unwrap());
+        assert!(!baseline.contains("policy_dropped"));
     }
 
     #[test]
@@ -748,6 +844,7 @@ mod tests {
             successful: 1,
             failed: 0,
             error: "".to_string(),
+            policy_dropped: 0,
         };
         let serialized = serde_json::to_string(&status).unwrap();
         assert!(!serialized.contains("error"));
@@ -771,6 +868,27 @@ mod tests {
         let custom: HecResponse = HecStatus::Custom("Test error".to_string(), 418).into();
         assert_eq!(custom.text, "Test error");
         assert_eq!(custom.code, 418);
+    }
+
+    /// D3: `/api/{org_id}/_hec` response bodies are a frozen wire contract
+    /// shared with existing clients. The Splunk collector has its own status
+    /// type precisely so these do not change.
+    #[test]
+    fn test_legacy_hec_response_bodies_are_byte_identical() {
+        for (status, expected) in [
+            (HecStatus::Success, r#"{"text":"Success","code":200}"#),
+            (
+                HecStatus::InvalidFormat,
+                r#"{"text":"Invalid data format","code":400}"#,
+            ),
+            (
+                HecStatus::InvalidIndex,
+                r#"{"text":"Incorrect index","code":400}"#,
+            ),
+        ] {
+            let resp: HecResponse = status.into();
+            assert_eq!(json::to_string(&resp).unwrap(), expected);
+        }
     }
 
     /// Verifies that `IngestionRequest::Usage` does NOT trigger usage reporting,

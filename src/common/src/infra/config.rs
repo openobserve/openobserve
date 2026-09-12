@@ -31,7 +31,7 @@ use config::{
 };
 use dashmap::DashMap;
 use hashbrown::HashMap;
-use infra::table::short_urls::ShortUrlRecord;
+use infra::table::{org_ingestion_tokens::SplunkHecTokenEntry, short_urls::ShortUrlRecord};
 #[cfg(test)]
 use transform::QUERY_FUNCTIONS;
 
@@ -94,6 +94,13 @@ pub static USER_ROLES_CACHE: Lazy<RwAHashMap<String, CachedUserRoles>> =
 /// Org ingestion token cache — key format: "org_id/token", value = token name.
 /// Presence means the token is valid and enabled. Absence means cache miss (check DB).
 pub static ORG_INGESTION_TOKENS: Lazy<RwHashMap<String, String>> = Lazy::new(DashMap::default);
+
+/// Splunk HEC token cache — key = the GUID.
+///
+/// Holds EVERY row that carries a GUID, enabled or not, so a miss is
+/// authoritative and an unauthenticated GUID flood cannot reach the database.
+pub static SPLUNK_HEC_TOKENS: Lazy<RwHashMap<String, SplunkHecTokenEntry>> =
+    Lazy::new(DashMap::default);
 
 /// Cache of org_id → OrgStatus for O(1) synchronous checks during request handling.
 pub static ORG_STATUS_CACHE: Lazy<Arc<RwHashMap<String, OrgStatus>>> =

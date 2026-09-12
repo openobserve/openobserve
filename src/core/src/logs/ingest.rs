@@ -82,6 +82,14 @@ struct FinalizeRecordContext<'a> {
     json_data_by_stream: &'a mut LogDataByStream,
 }
 
+/// Why a record could not be prepared for writing.
+pub enum PrepareRecordError {
+    /// Flattening failed; the record is unusable.
+    Flatten(anyhow::Error),
+    /// Timestamp unresolvable or window-rejected; carries the flattened record.
+    Timestamp(json::Value, anyhow::Error),
+}
+
 /// The `_o2_` write-guard predicate (design §5.3): true when a logs ingest
 /// request targeting `stream_name` must be rejected because the stream is an
 /// internal rollup stream and the request is user-initiated. Internal writers
@@ -424,8 +432,7 @@ pub async fn ingest(
                                 match handle_timestamp_for_value(&mut res, min_ts, max_ts) {
                                     Ok(ts) => ts,
                                     Err(e) => {
-                                        stream_status.status.failed += 1;
-                                        stream_status.status.error = e.to_string();
+                                        count_timestamp_rejection(&mut stream_status.status, &e);
                                         metrics::INGEST_ERRORS
                                             .with_label_values(&[
                                                 org_id,
@@ -615,7 +622,7 @@ pub async fn ingest(
         }
     }
 
-    let (metric_rpt_status_code, response_body) = {
+    let (metric_rpt_status_code, response_body, stream_skipped) = {
         let mut status = if usage_type == UsageType::Bulk {
             IngestionStatus::Bulk(BulkResponse {
                 took: 0,
@@ -646,10 +653,10 @@ pub async fn ingest(
             }
         };
         match write_result {
-            Ok(()) => ("200", stream_status),
+            Ok(skipped) => ("200", stream_status, skipped),
             Err(e) => {
                 log::error!("Error while writing logs: {e}");
-                ("500", stream_status)
+                ("500", stream_status, false)
             }
         }
     };
@@ -681,10 +688,48 @@ pub async fn ingest(
             .inc();
     }
 
-    Ok(IngestionResponse::new(
-        http::StatusCode::OK.into(),
-        vec![response_body],
-    ))
+    // A write failure used to be visible only in the metric label while the
+    // caller still saw 200. Signalled on `write_failed` and NOT on `code`, which
+    // is a serialized body field on every legacy route sharing this function.
+    Ok(
+        IngestionResponse::new(http::StatusCode::OK.into(), vec![response_body])
+            .with_write_failed(metric_rpt_status_code == "500")
+            .with_stream_skipped(stream_skipped),
+    )
+}
+
+/// Flatten a record and resolve its timestamp — the only two steps of record
+/// preparation that can reject an event.
+///
+/// Shared with the HEC collector's pre-write validation pass, which must reach
+/// the same verdict as the write does; a second implementation would drift.
+pub fn prepare_record(
+    item: json::Value,
+    flatten_level: u32,
+    min_ts: i64,
+    max_ts: i64,
+) -> std::result::Result<(json::Value, i64), PrepareRecordError> {
+    let mut res =
+        flatten::flatten_with_level(item, flatten_level).map_err(PrepareRecordError::Flatten)?;
+    match handle_timestamp_for_value(&mut res, min_ts, max_ts) {
+        Ok(ts) => Ok((res, ts)),
+        Err(e) => Err(PrepareRecordError::Timestamp(res, e)),
+    }
+}
+
+/// Count one rejected record on a stream's status, separating an ingestion-window
+/// POLICY drop from a record that genuinely could not be prepared.
+///
+/// Both the pipeline and non-pipeline timestamp paths must agree here: the HEC
+/// collector reads `failed > policy_dropped` to decide code 6 vs code 0, so a
+/// window drop counted only as `failed` returns a 400 the client never retries
+/// and makes it discard its in-window events too.
+fn count_timestamp_rejection(status: &mut ingestion_common::RecordStatus, e: &anyhow::Error) {
+    status.failed += 1;
+    if schema::is_window_discard_error(e) {
+        status.policy_dropped += 1;
+    }
+    status.error = e.to_string();
 }
 
 /// Finalize a log record (flatten, resolve timestamp, apply UDS, add
@@ -698,20 +743,17 @@ fn finalize_and_buffer_record(
     original_data: Option<String>,
     ctx: &mut FinalizeRecordContext<'_>,
 ) -> bool {
-    let mut res = match flatten::flatten_with_level(item, ctx.flatten_level) {
-        Ok(r) => r,
-        Err(e) => {
+    let (mut res, timestamp) = match prepare_record(item, ctx.flatten_level, ctx.min_ts, ctx.max_ts)
+    {
+        Ok(v) => v,
+        Err(PrepareRecordError::Flatten(e)) => {
             ctx.stream_status.status.failed += 1;
             ctx.stream_status.status.error = e.to_string();
             log::error!("Record flattening error: {e}");
             return false;
         }
-    };
-    let timestamp = match handle_timestamp_for_value(&mut res, ctx.min_ts, ctx.max_ts) {
-        Ok(ts) => ts,
-        Err(e) => {
-            ctx.stream_status.status.failed += 1;
-            ctx.stream_status.status.error = e.to_string();
+        Err(PrepareRecordError::Timestamp(res, e)) => {
+            count_timestamp_rejection(&mut ctx.stream_status.status, &e);
             metrics::INGEST_ERRORS
                 .with_label_values(&[
                     ctx.org_id,
@@ -1201,6 +1243,36 @@ mod tests {
     use ingestion_common::{IngestUser, SystemJobType};
 
     use super::*;
+
+    #[test]
+    fn a_window_drop_is_counted_as_a_policy_drop_on_both_timestamp_paths() {
+        // §11.1: the pipeline path timestamps the pipeline OUTPUT and used to
+        // count only `failed`, so one out-of-window event in a pipeline-attached
+        // HEC stream answered 400/code 6 and the client dropped its in-window
+        // events with it. Both paths now route through this one helper.
+        let mut status = ingestion_common::RecordStatus::default();
+        count_timestamp_rejection(&mut status, &schema::get_upto_discard_error());
+        assert_eq!(status.failed, 1);
+        assert_eq!(status.policy_dropped, 1);
+
+        count_timestamp_rejection(&mut status, &schema::get_future_discard_error());
+        assert_eq!(status.failed, 2);
+        assert_eq!(status.policy_dropped, 2);
+
+        // The collector's code-0 test: nothing but window drops.
+        assert!(status.failed <= status.policy_dropped);
+    }
+
+    #[test]
+    fn a_malformed_timestamp_is_not_a_policy_drop() {
+        let mut status = ingestion_common::RecordStatus::default();
+        count_timestamp_rejection(&mut status, &anyhow::anyhow!("Can't parse timestamp"));
+        assert_eq!(status.failed, 1);
+        assert_eq!(status.policy_dropped, 0);
+        // Which is what the collector turns into code 6.
+        assert!(status.failed > status.policy_dropped);
+        assert_eq!(status.error, "Can't parse timestamp");
+    }
 
     #[test]
     fn test_internal_rollup_write_guard_blocks_users_in_all_editions() {

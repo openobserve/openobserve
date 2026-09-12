@@ -292,15 +292,24 @@ pub(super) async fn ingest_reporting_data(
         )
         .await
         {
-            Ok(resp) if resp.code == 200 => {
+            // `write_failed` and not `code`: a storage failure returns 200 here,
+            // so treating that as delivered would drop usage records silently.
+            Ok(resp) if resp.code == 200 && !resp.write_failed => {
                 log::debug!(
                     "[SELF-REPORTING] ReportingData successfully ingested to stream {org_id}/{stream_name}"
                 );
                 Ok(())
             }
             error => {
-                let err =
-                    error.map_or_else(|e| e.to_string(), |resp| resp.error.unwrap_or_default());
+                // A write failure carries no `error` text, so name it explicitly
+                // rather than reporting an empty reason.
+                let err = error.map_or_else(
+                    |e| e.to_string(),
+                    |resp| {
+                        resp.error
+                            .unwrap_or_else(|| "write to storage failed".to_string())
+                    },
+                );
                 log::error!(
                     "[SELF-REPORTING] ReportingData errored while ingesting to stream {org_id}/{stream_name}. Error: {err}"
                 );

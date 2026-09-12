@@ -59,6 +59,17 @@ pub use watcher::{
 };
 
 const SCHEMA_CONFORMANCE_FAILED: &str = "schema_conformance_failed";
+/// Shared by both ingestion-window discard messages and the test for them.
+const WINDOW_DISCARD_MARKER: &str = " data can be ingested. Data discarded.";
+
+/// True when this error is an ingestion-window POLICY drop rather than a record
+/// that could not be prepared.
+///
+/// The window drops by design on every route, so a caller must be able to keep
+/// reporting success for the rest of the batch instead of failing all of it.
+pub fn is_window_discard_error(e: &anyhow::Error) -> bool {
+    e.to_string().contains(WINDOW_DISCARD_MARKER)
+}
 
 pub fn get_upto_discard_error() -> anyhow::Error {
     anyhow::anyhow!(
@@ -990,6 +1001,24 @@ mod tests {
     use arrow_schema::DataType;
 
     use super::*;
+
+    /// The predicate that lets a caller keep reporting success for the rest of a
+    /// batch when only the ingestion window rejected some events.
+    #[test]
+    fn window_discards_are_told_apart_from_real_failures() {
+        assert!(is_window_discard_error(&get_upto_discard_error()));
+        assert!(is_window_discard_error(&get_future_discard_error()));
+
+        assert!(!is_window_discard_error(&get_request_columns_limit_error(
+            "s", 9999
+        )));
+        assert!(!is_window_discard_error(&anyhow::anyhow!(
+            "Can't parse timestamp"
+        )));
+        assert!(!is_window_discard_error(&anyhow::anyhow!(
+            "Record flattening error"
+        )));
+    }
 
     #[test]
     fn test_normalize_stream_settings_index_fields_updated_at() {

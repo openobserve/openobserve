@@ -39,8 +39,11 @@ use config::{
 };
 use futures::StreamExt;
 use hashbrown::HashMap;
-use http_body_util::BodyExt;
+use http_body_util::{BodyExt, Limited};
 use infra::cluster;
+
+/// Compressed-body cap on the router hop for the unauthenticated collector path.
+const SPLUNK_COLLECTOR_PROXY_BODY_LIMIT: usize = 10 * 1024 * 1024;
 
 /// Global HTTP client for connection pooling.
 /// Using OnceLock ensures thread-safe lazy initialization.
@@ -155,8 +158,50 @@ async fn resolve_candidates(path: &str, base_uri: &str) -> Result<(String, Vec<N
     }
 
     let nodes = order_nodes(nodes);
-    let full_path = format!("{}{}", base_uri, path);
+    // The collector is mounted at the server root on the ingester, outside the
+    // base_uri nest, so its path must be forwarded unchanged.
+    let full_path = if is_splunk_collector_route(api_path) {
+        api_path.to_string()
+    } else {
+        format!("{}{}", base_uri, path)
+    };
     Ok((full_path, nodes))
+}
+
+/// The Splunk-shaped 413 body, so an oversized batch reads as HEC rather than
+/// as a transport error.
+fn splunk_payload_too_large() -> Response {
+    splunk_status(StatusCode::PAYLOAD_TOO_LARGE, 6, "Request entity too large")
+}
+
+/// The Splunk-shaped "server is busy" body for a failed or unroutable proxy hop.
+///
+/// The upstream error is logged, never returned: it carries the backend node URL
+/// and this route is unauthenticated.
+fn splunk_server_busy(status: StatusCode) -> Response {
+    splunk_status(status, 9, "Server is busy")
+}
+
+fn splunk_status(status: StatusCode, code: u16, text: &str) -> Response {
+    (
+        status,
+        [(header::CONTENT_TYPE, "application/json")],
+        json::to_string(&json::json!({"text": text, "code": code})).unwrap_or_default(),
+    )
+        .into_response()
+}
+
+/// True for the Splunk HEC collector paths, which are never under `base_uri`.
+///
+/// A `..` segment is refused: this is the one route whose forwarded path skips
+/// the `base_uri` prefix, and the proxy's URL parser would collapse the segment
+/// into a backend path outside it.
+pub fn is_splunk_collector_route(path: &str) -> bool {
+    let path = extract_path_without_query(path);
+    if path.split('/').any(|seg| seg == "..") {
+        return false;
+    }
+    path == "/services/collector" || path.starts_with("/services/collector/")
 }
 
 /// Orders the candidate nodes so the preferred node (per dispatch strategy) is
@@ -230,18 +275,35 @@ async fn proxy_request(
     let headers = build_request_headers(req.headers(), is_streaming);
 
     // Read the request body once and keep it buffered so it can be re-sent on
-    // each fail-over attempt. The body is held fully in memory (bounded by the
-    // usual request size limits); buffering is required because a consumed
-    // stream cannot be replayed onto another node.
-    let body = match req.into_body().collect().await {
-        Ok(collected) => collected.to_bytes(),
-        Err(e) => {
-            log::error!("Failed to read request body: {:?}", e);
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "Failed to read request body",
-            )
-                .into_response();
+    // each fail-over attempt. The body is held fully in memory; buffering is
+    // required because a consumed stream cannot be replayed onto another node.
+    //
+    // `collect()` bypasses the extractor-based DefaultBodyLimit, so unauthenticated
+    // root-level routes have to carry their own cap here.
+    let body = if is_splunk_collector_route(query_path) {
+        match Limited::new(req.into_body(), SPLUNK_COLLECTOR_PROXY_BODY_LIMIT)
+            .collect()
+            .await
+        {
+            Ok(collected) => collected.to_bytes(),
+            Err(e) => {
+                log::warn!("Collector request body rejected: {e}");
+                // A HEC client parses the body, so a plain-text 413 here reads
+                // as a protocol error rather than "your batch is too big".
+                return splunk_payload_too_large();
+            }
+        }
+    } else {
+        match req.into_body().collect().await {
+            Ok(collected) => collected.to_bytes(),
+            Err(e) => {
+                log::error!("Failed to read request body: {:?}", e);
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Failed to read request body",
+                )
+                    .into_response();
+            }
         }
     };
 
@@ -300,11 +362,17 @@ fn proxy_error_response(
                 node_addr,
                 start.elapsed().as_millis()
             );
+            if is_splunk_collector_route(path) {
+                return splunk_server_busy(StatusCode::BAD_GATEWAY);
+            }
             (
                 StatusCode::BAD_GATEWAY,
                 format!("Proxy request failed: {e}"),
             )
                 .into_response()
+        }
+        None if is_splunk_collector_route(path) => {
+            splunk_server_busy(StatusCode::SERVICE_UNAVAILABLE)
         }
         None => (StatusCode::SERVICE_UNAVAILABLE, "No online nodes").into_response(),
     }
@@ -759,9 +827,59 @@ pub fn create_router_routes() -> axum::Router {
         .route("/rum/{*path}", any(dispatch))
 }
 
+/// Proxy routes for the Splunk HEC collector, for router nodes only.
+///
+/// Kept out of [`create_router_routes`] because these are mounted outside the
+/// `base_uri` nest while everything there is mounted inside it; merging both
+/// onto one path would give axum two fallbacks for it and panic at startup.
+pub fn create_splunk_collector_proxy_routes() -> axum::Router {
+    use axum::routing::any;
+
+    // Splunk forwarders POST to a bare host, so the collector has to be
+    // reachable on a router node too.
+    axum::Router::new()
+        .route("/services/collector", any(dispatch))
+        .route("/services/collector/{*path}", any(dispatch))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_splunk_collector_route_detection() {
+        assert!(is_splunk_collector_route("/services/collector"));
+        assert!(is_splunk_collector_route("/services/collector/event"));
+        assert!(is_splunk_collector_route("/services/collector/health"));
+        assert!(is_splunk_collector_route("/services/collector?channel=x"));
+        assert!(!is_splunk_collector_route("/services/collectorfoo"));
+        assert!(!is_splunk_collector_route("/api/default/_hec"));
+        assert!(!is_splunk_collector_route("/services"));
+        // `..` would be collapsed by the proxy's URL parser into a backend path
+        // outside base_uri, which this route alone is allowed to skip.
+        assert!(!is_splunk_collector_route(
+            "/services/collector/../../api/x/_bulk"
+        ));
+        assert!(!is_splunk_collector_route("/services/collector/../x?a=b"));
+        // A percent-encoded `..` is not a path segment to the URL parser either,
+        // so it stays a literal path component and needs no special case.
+        assert!(is_splunk_collector_route("/services/collector/..%2f"));
+        assert!(is_splunk_collector_route("/services/collector/event"));
+    }
+
+    #[test]
+    fn test_collector_is_an_ingester_route_not_a_querier_route() {
+        // Wrong here means every forwarder is proxied to a querier.
+        assert!(!is_querier_route("/services/collector"));
+        assert!(!is_querier_route("/services/collector/event"));
+    }
+
+    #[test]
+    fn test_collector_is_registered_as_an_ingester_route() {
+        // INGESTER_ROUTES is not a rate-limit list: its consumers are
+        // is_querier_route and the cloud trial gate.
+        assert!(config::router::INGESTER_ROUTES.contains(&"/services/collector"));
+    }
 
     #[test]
     fn test_is_querier_route() {
@@ -928,5 +1046,29 @@ mod tests {
         assert_eq!(max_attempts(100), 1 + max_retries);
         // capped by the number of available nodes
         assert!(max_attempts(2) <= 2);
+    }
+
+    #[tokio::test]
+    async fn collector_proxy_failures_are_splunk_shaped_and_leak_nothing() {
+        let start = std::time::Instant::now();
+        for path in ["/services/collector", "/services/collector/event"] {
+            let resp = proxy_error_response(path, None, start);
+            assert_eq!(resp.status(), StatusCode::SERVICE_UNAVAILABLE);
+            let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            let json: json::Value = json::from_slice(&body).unwrap();
+            assert_eq!(json["code"], 9, "{path}");
+            assert_eq!(json["text"], "Server is busy", "{path}");
+        }
+    }
+
+    #[tokio::test]
+    async fn non_collector_proxy_failures_keep_their_plain_text_body() {
+        let resp = proxy_error_response("/api/default/_bulk", None, std::time::Instant::now());
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        assert_eq!(&body[..], b"No online nodes");
     }
 }

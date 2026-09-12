@@ -13,16 +13,27 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
+};
 
 use bytes::Bytes;
-use common::infra::config::ORG_INGESTION_TOKENS;
+use common::infra::config::{ORG_INGESTION_TOKENS, SPLUNK_HEC_TOKENS};
 use infra::{
     db::{self, delete_from_db_coordinator, get_coordinator, put_into_db_coordinator},
-    table::org_ingestion_tokens::{self, OrgIngestionTokenListRecord, OrgIngestionTokenRecord},
+    table::org_ingestion_tokens::{
+        self, OrgIngestionTokenListRecord, OrgIngestionTokenRecord, SplunkHecTokenEntry,
+    },
 };
 
 const ORG_INGESTION_TOKENS_KEY_PREFIX: &str = "/org_ingestion_tokens/";
+/// Matches `DEFAULT_TOKEN_CACHE_TTL` in the table layer.
+const SPLUNK_TOKEN_RELOAD_INTERVAL: std::time::Duration = std::time::Duration::from_secs(60);
+
+/// False until the first full load lands, so a cold node answers 503 rather than
+/// turning a valid GUID into an authoritative 403.
+pub static SPLUNK_HEC_TOKENS_LOADED: AtomicBool = AtomicBool::new(false);
 
 #[inline]
 pub fn cache_key(org_id: &str, token: &str) -> String {
@@ -31,6 +42,76 @@ pub fn cache_key(org_id: &str, token: &str) -> String {
 
 fn event_key(org_id: &str, token: &str) -> String {
     format!("{ORG_INGESTION_TOKENS_KEY_PREFIX}{}/{}", org_id, token)
+}
+
+/// Mirror one row into the Splunk lookup map, dropping any stale GUID it had.
+///
+/// The map is authoritative, so an entry left behind by a replaced or revoked
+/// GUID keeps authenticating on every other node until the 60s reload.
+fn sync_splunk_token(record: &OrgIngestionTokenRecord) {
+    let guid = record.splunk_token.clone().flatten();
+    evict_stale_guids(&record.id, guid.as_deref());
+    if let Some(guid) = guid {
+        SPLUNK_HEC_TOKENS.insert(
+            guid,
+            SplunkHecTokenEntry {
+                org_id: record.org_id.clone(),
+                token_id: record.id.clone(),
+                o2oi_token: record.token.clone(),
+                enabled: record.enabled,
+            },
+        );
+    }
+}
+
+/// Drop every entry for `token_id` except the GUID it currently carries.
+fn evict_stale_guids(token_id: &str, keep: Option<&str>) {
+    SPLUNK_HEC_TOKENS
+        .retain(|guid, entry| entry.token_id != token_id || keep.is_some_and(|k| k == guid));
+}
+
+/// Drop the org's cached GUIDs that the store no longer holds.
+///
+/// A delete event names a row that is already gone, so its id cannot be resolved
+/// by name; reconciling the org's GUIDs by value is what evicts it.
+async fn evict_removed_splunk_tokens(org_id: &str) {
+    match org_ingestion_tokens::list_splunk_guids_by_org(org_id).await {
+        Ok(live) => {
+            let live: std::collections::HashSet<String> = live.into_iter().collect();
+            SPLUNK_HEC_TOKENS.retain(|guid, entry| entry.org_id != org_id || live.contains(guid));
+        }
+        // Leaving a revoked GUID usable is the one outcome worth a loud line: the
+        // 60s reload is the only thing that will repair it.
+        Err(e) => log::error!("[SPLUNK_HEC] could not reconcile org {org_id} guids: {e}"),
+    }
+}
+
+/// Drop one org's tokens from both local lookup maps.
+///
+/// Neither map has a TTL and the validator answers from a cache hit before any
+/// DB lookup, so a row deleted without this stays usable on every node forever.
+fn evict_token_caches(org_id: &str, records: &[OrgIngestionTokenListRecord]) {
+    for record in records {
+        ORG_INGESTION_TOKENS.remove(&cache_key(org_id, &record.token));
+        if let Some(guid) = &record.splunk_token {
+            SPLUNK_HEC_TOKENS.remove(guid);
+        }
+    }
+}
+
+/// Re-read a row through the read-WRITE client after committing a change to it.
+///
+/// `get_by_name` reads a replica, so under lag a caller would see the PRE-write
+/// row: the super-cluster emit would replicate the change away, and the auth
+/// cache would hold an `enabled` the operator has already turned off.
+async fn committed_row(org_id: &str, name: &str) -> Result<OrgIngestionTokenRecord, anyhow::Error> {
+    org_ingestion_tokens::get_by_name_rw(org_id, name)
+        .await?
+        .ok_or_else(|| {
+            anyhow::anyhow!(
+                "Token '{name}' in org '{org_id}' vanished before it could be replicated"
+            )
+        })
 }
 
 /// Insert a new org ingestion token and notify the cluster.
@@ -45,7 +126,10 @@ pub async fn add(record: &OrgIngestionTokenRecord) -> Result<(), anyhow::Error> 
 
 /// Rotate a token's value and notify the cluster.
 pub async fn rotate_token(org_id: &str, name: &str) -> Result<String, anyhow::Error> {
-    let existing = org_ingestion_tokens::get_by_name(org_id, name)
+    // Read-WRITE: the value being rotated away is what the old-key delete event
+    // names, and a replica-stale read would announce the eviction at a token no
+    // other node holds, leaving the real one cached until the 60s reload.
+    let existing = org_ingestion_tokens::get_by_name_rw(org_id, name)
         .await?
         .ok_or_else(|| anyhow::anyhow!("Token '{}' not found", name))?;
 
@@ -62,24 +146,30 @@ pub async fn rotate_token(org_id: &str, name: &str) -> Result<String, anyhow::Er
     #[cfg(feature = "enterprise")]
     {
         super_cluster::org_ingestion_token_delete(&old_key).await?;
-        let new_record = OrgIngestionTokenRecord {
-            token: new_token.clone(),
-            ..existing
-        };
-        super_cluster::org_ingestion_token_put(&new_key, &new_record).await?;
+        // Replicate the committed row, not a patched pre-update copy, so a
+        // concurrent write to another column is not replicated away.
+        let committed = committed_row(org_id, name).await?;
+        super_cluster::org_ingestion_token_put(&new_key, &committed).await?;
     }
     Ok(new_token)
 }
 
 /// Enable or disable a named token and notify the cluster.
 pub async fn set_enabled(org_id: &str, name: &str, enabled: bool) -> Result<(), anyhow::Error> {
-    let existing = org_ingestion_tokens::get_by_name(org_id, name)
+    if org_ingestion_tokens::get_by_name_rw(org_id, name)
         .await?
-        .ok_or_else(|| anyhow::anyhow!("Token '{}' not found", name))?;
+        .is_none()
+    {
+        return Err(anyhow::anyhow!("Token '{}' not found", name));
+    }
 
     org_ingestion_tokens::set_enabled(org_id, name, enabled).await?;
 
-    let key = event_key(org_id, &existing.token);
+    // The event key carries the token VALUE, so it has to come from the committed
+    // row: a replica-stale read concurrent with a rotation announces the change at
+    // a value no other node holds, and it never propagates until the 60s reload.
+    let committed = committed_row(org_id, name).await?;
+    let key = event_key(org_id, &committed.token);
     if enabled {
         let _ = put_into_db_coordinator(&key, Bytes::new(), true, None).await;
     } else {
@@ -88,12 +178,74 @@ pub async fn set_enabled(org_id: &str, name: &str, enabled: bool) -> Result<(), 
     // Always replicate the token with its new `enabled` state; the receiving
     // cluster fires the matching coordinator event based on the flag.
     #[cfg(feature = "enterprise")]
+    super_cluster::org_ingestion_token_put(&key, &committed).await?;
+    Ok(())
+}
+
+/// Generate or revoke a token's Splunk HEC GUID and notify the cluster.
+///
+/// Returns the new GUID, or `None` when revoked.
+pub async fn set_splunk_token(
+    org_id: &str,
+    name: &str,
+    generate: bool,
+) -> Result<Option<String>, anyhow::Error> {
+    if org_ingestion_tokens::get_by_name_rw(org_id, name)
+        .await?
+        .is_none()
     {
-        let record = OrgIngestionTokenRecord {
-            enabled,
-            ..existing
-        };
-        super_cluster::org_ingestion_token_put(&key, &record).await?;
+        return Err(anyhow::anyhow!("Token '{}' not found", name));
+    }
+
+    let new_value = generate.then(org_ingestion_tokens::generate_splunk_token);
+    org_ingestion_tokens::set_splunk_token(org_id, name, new_value.clone()).await?;
+
+    // Read through the primary: a replica-stale `enabled` here would authenticate
+    // a token the operator just disabled.
+    let committed = committed_row(org_id, name).await?;
+
+    evict_stale_guids(&committed.id, new_value.as_deref());
+    if let Some(new) = &new_value {
+        SPLUNK_HEC_TOKENS.insert(
+            new.clone(),
+            SplunkHecTokenEntry {
+                org_id: org_id.to_string(),
+                token_id: committed.id.clone(),
+                o2oi_token: committed.token.clone(),
+                enabled: committed.enabled,
+            },
+        );
+    }
+
+    // Keyed off the committed row too: a replica-stale `token` here would address
+    // the event at a rotated-away value, so no other node would update its cache.
+    let key = event_key(org_id, &committed.token);
+    let _ = put_into_db_coordinator(&key, Bytes::new(), true, None).await;
+
+    #[cfg(feature = "enterprise")]
+    super_cluster::org_ingestion_token_put(&key, &committed).await?;
+
+    Ok(new_value)
+}
+
+/// Delete every token for an org and evict the caches cluster-wide.
+///
+/// The table-layer delete alone leaves each node's `ORG_INGESTION_TOKENS` /
+/// `SPLUNK_HEC_TOKENS` entries resident forever (neither map has a TTL, and the
+/// validator answers from a cache hit before any DB lookup), so a hard-deleted
+/// org would keep ingesting on its old tokens.
+pub async fn delete_by_org(org_id: &str) -> Result<(), anyhow::Error> {
+    let existing = org_ingestion_tokens::list_by_org(org_id).await?;
+
+    org_ingestion_tokens::delete_by_org(org_id).await?;
+
+    evict_token_caches(org_id, &existing);
+
+    for record in &existing {
+        let key = event_key(org_id, &record.token);
+        let _ = delete_from_db_coordinator(&key, false, true, None).await;
+        #[cfg(feature = "enterprise")]
+        super_cluster::org_ingestion_token_delete(&key).await?;
     }
     Ok(())
 }
@@ -135,7 +287,39 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         "Org ingestion tokens cached: {}",
         ORG_INGESTION_TOKENS.len()
     );
+    reload_splunk_tokens().await
+}
+
+/// Rebuild the Splunk HEC token map from the database, dropping stale entries.
+///
+/// Loads DISABLED rows too: the map is authoritative, so a disabled token has to
+/// answer code 1 from memory rather than fall through to a database lookup.
+pub async fn reload_splunk_tokens() -> Result<(), anyhow::Error> {
+    let records = org_ingestion_tokens::list_all_splunk().await?;
+    let mut seen = std::collections::HashSet::with_capacity(records.len());
+    for (splunk_token, entry) in records {
+        seen.insert(splunk_token.clone());
+        SPLUNK_HEC_TOKENS.insert(splunk_token, entry);
+    }
+    SPLUNK_HEC_TOKENS.retain(|guid, _| seen.contains(guid));
+    SPLUNK_HEC_TOKENS_LOADED.store(true, Ordering::Release);
     Ok(())
+}
+
+/// Periodic full reload of the Splunk HEC token map.
+///
+/// Coordinator put/delete failures are discarded by every write path here, and
+/// `watch` exits `Ok(())` when its channel closes, so a lost event would
+/// otherwise leave the map wrong forever with nothing to repair it.
+pub async fn run_splunk_token_reload() -> Result<(), anyhow::Error> {
+    let mut interval = tokio::time::interval(SPLUNK_TOKEN_RELOAD_INTERVAL);
+    interval.tick().await;
+    loop {
+        interval.tick().await;
+        if let Err(e) = reload_splunk_tokens().await {
+            log::error!("[SPLUNK_HEC] failed to reload splunk token cache: {e}");
+        }
+    }
 }
 
 /// Watch for cluster-wide cache invalidation events.
@@ -169,16 +353,32 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     if let Ok(Some(record)) =
                         org_ingestion_tokens::find_enabled_token(parts[0], parts[1]).await
                     {
+                        sync_splunk_token(&record);
                         ORG_INGESTION_TOKENS.insert(item_key.to_string(), record.name);
                     } else {
+                        if let Ok(Some(record)) =
+                            org_ingestion_tokens::find_token_any_state(parts[0], parts[1]).await
+                        {
+                            sync_splunk_token(&record);
+                        }
                         ORG_INGESTION_TOKENS.remove(item_key);
                     }
                 }
             }
             db::Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
-                if let Some((org_id, _)) = item_key.split_once('/') {
+                if let Some((org_id, token)) = item_key.split_once('/') {
                     org_ingestion_tokens::invalidate_default_cache(org_id);
+                    match org_ingestion_tokens::find_token_any_state(org_id, token).await {
+                        // Still there: a disable, so keep the entry and mark it.
+                        Ok(Some(record)) => sync_splunk_token(&record),
+                        // Gone (a deletion, or an o2oi_ rotation's old key): the
+                        // GUID is no longer reachable by name, so drop it by value.
+                        Ok(None) => evict_removed_splunk_tokens(org_id).await,
+                        Err(e) => log::error!(
+                            "[SPLUNK_HEC] could not resolve {org_id} token on delete: {e}"
+                        ),
+                    }
                 }
                 ORG_INGESTION_TOKENS.remove(item_key);
             }
@@ -251,5 +451,129 @@ mod tests {
     fn test_event_key_format() {
         let key = event_key("default", "o2oi_abc123");
         assert_eq!(key, "/org_ingestion_tokens/default/o2oi_abc123");
+    }
+
+    fn entry(org_id: &str, token_id: &str, enabled: bool) -> SplunkHecTokenEntry {
+        SplunkHecTokenEntry {
+            org_id: org_id.to_string(),
+            token_id: token_id.to_string(),
+            o2oi_token: format!("o2oi_{token_id}"),
+            enabled,
+        }
+    }
+
+    fn list_record(token: &str, splunk_token: Option<&str>) -> OrgIngestionTokenListRecord {
+        OrgIngestionTokenListRecord {
+            name: token.to_string(),
+            token: token.to_string(),
+            description: String::new(),
+            is_default: false,
+            enabled: true,
+            created_by: String::new(),
+            created_at: 0,
+            splunk_token: splunk_token.map(str::to_string),
+        }
+    }
+
+    /// A cached token outliving its deleted org is how a hard-deleted org keeps
+    /// ingesting: the validator answers from a cache hit before any DB lookup.
+    #[test]
+    fn evict_token_caches_drops_only_the_named_org() {
+        ORG_INGESTION_TOKENS.insert(cache_key("gone", "o2oi_a"), "a".to_string());
+        ORG_INGESTION_TOKENS.insert(cache_key("gone", "o2oi_b"), "b".to_string());
+        ORG_INGESTION_TOKENS.insert(cache_key("kept", "o2oi_c"), "c".to_string());
+        SPLUNK_HEC_TOKENS.insert("guid-a".to_string(), entry("gone", "id-a", true));
+        SPLUNK_HEC_TOKENS.insert("guid-c".to_string(), entry("kept", "id-c", true));
+
+        evict_token_caches(
+            "gone",
+            &[
+                list_record("o2oi_a", Some("guid-a")),
+                list_record("o2oi_b", None),
+            ],
+        );
+
+        assert!(!ORG_INGESTION_TOKENS.contains_key(&cache_key("gone", "o2oi_a")));
+        assert!(!ORG_INGESTION_TOKENS.contains_key(&cache_key("gone", "o2oi_b")));
+        assert!(!SPLUNK_HEC_TOKENS.contains_key("guid-a"));
+        assert!(ORG_INGESTION_TOKENS.contains_key(&cache_key("kept", "o2oi_c")));
+        assert!(SPLUNK_HEC_TOKENS.contains_key("guid-c"));
+
+        ORG_INGESTION_TOKENS.remove(&cache_key("kept", "o2oi_c"));
+        SPLUNK_HEC_TOKENS.remove("guid-c");
+    }
+
+    fn record(
+        id: &str,
+        org_id: &str,
+        guid: Option<&str>,
+        enabled: bool,
+    ) -> OrgIngestionTokenRecord {
+        OrgIngestionTokenRecord {
+            id: id.to_string(),
+            org_id: org_id.to_string(),
+            name: "t".to_string(),
+            token: "o2oi_t".to_string(),
+            description: String::new(),
+            is_default: false,
+            enabled,
+            created_by: String::new(),
+            created_at: 0,
+            updated_at: 0,
+            splunk_token: Some(guid.map(str::to_string)),
+        }
+    }
+
+    /// A replaced GUID that keeps authenticating is the leak the spec's `generate`
+    /// exists to close: it must stop working at once, not in up to 60 seconds.
+    #[test]
+    fn sync_replaces_a_tokens_previous_guid() {
+        SPLUNK_HEC_TOKENS.insert("old-guid".to_string(), entry("o", "tok-1", true));
+
+        sync_splunk_token(&record("tok-1", "o", Some("new-guid"), true));
+
+        assert!(!SPLUNK_HEC_TOKENS.contains_key("old-guid"));
+        assert_eq!(
+            SPLUNK_HEC_TOKENS.get("new-guid").unwrap().value().token_id,
+            "tok-1"
+        );
+        SPLUNK_HEC_TOKENS.remove("new-guid");
+    }
+
+    /// A revoke leaves the row in place with no GUID, so nothing re-inserts it.
+    #[test]
+    fn sync_evicts_when_the_guid_is_revoked() {
+        SPLUNK_HEC_TOKENS.insert("revoked".to_string(), entry("o", "tok-2", true));
+        sync_splunk_token(&record("tok-2", "o", None, true));
+        assert!(!SPLUNK_HEC_TOKENS.contains_key("revoked"));
+    }
+
+    /// A disabled row stays cached so the collector answers code 1 from memory
+    /// rather than falling through to a database lookup.
+    #[test]
+    fn sync_keeps_a_disabled_token_cached_as_disabled() {
+        sync_splunk_token(&record("tok-3", "o", Some("guid-3"), false));
+        let cached = SPLUNK_HEC_TOKENS.get("guid-3").unwrap().value().clone();
+        assert!(!cached.enabled);
+        assert_eq!(cached.token_id, "tok-3");
+        SPLUNK_HEC_TOKENS.remove("guid-3");
+    }
+
+    #[test]
+    fn sync_leaves_other_tokens_guids_alone() {
+        SPLUNK_HEC_TOKENS.insert("other-guid".to_string(), entry("o", "tok-other", true));
+        sync_splunk_token(&record("tok-4", "o", Some("guid-4"), true));
+        assert!(SPLUNK_HEC_TOKENS.contains_key("other-guid"));
+        SPLUNK_HEC_TOKENS.remove("other-guid");
+        SPLUNK_HEC_TOKENS.remove("guid-4");
+    }
+
+    /// A token row with no GUID must not take an unrelated Splunk entry with it.
+    #[test]
+    fn evict_token_caches_leaves_other_guids_alone() {
+        SPLUNK_HEC_TOKENS.insert("guid-other".to_string(), entry("other", "id", true));
+        evict_token_caches("gone", &[list_record("o2oi_x", None)]);
+        assert!(SPLUNK_HEC_TOKENS.contains_key("guid-other"));
+        SPLUNK_HEC_TOKENS.remove("guid-other");
     }
 }

@@ -90,6 +90,7 @@ import KeyboardDoubleArrowLeft from "~icons/material-symbols/keyboard-double-arr
 import KeyboardDoubleArrowRight from "~icons/material-symbols/keyboard-double-arrow-right";
 import Language from "~icons/material-symbols/language";
 import Link from "~icons/material-symbols/link";
+import LinkOff from "~icons/material-symbols/link-off";
 import LocationOn from "~icons/material-symbols/location-on-outline";
 import MoreVert from "~icons/material-symbols/more-vert";
 import MenuIcon from "~icons/material-symbols/menu";
@@ -434,6 +435,7 @@ export const iconRegistry = {
   "keyboard-double-arrow-right": KeyboardDoubleArrowRight,
   language: Language,
   link: Link,
+  "link-off": LinkOff,
   "location-on": LocationOn,
   "more-vert": MoreVert,
   menu: MenuIcon,
