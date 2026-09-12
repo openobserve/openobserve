@@ -7342,7 +7342,7 @@
       "sensitivityHintEveryNDays": "Oznacza {rate}% najbardziej nietypowych przedziałów — mniej więcej jeden na {count} dni przy rozdzielczości {resolution}.",
       "sensitivityHintPerDay": "Oznacza {rate}% najbardziej nietypowych przedziałów — około {count} dziennie przy rozdzielczości {resolution}. | Oznacza {rate}% najbardziej nietypowych przedziałów — około {count} dziennie przy rozdzielczości {resolution}.",
       "sensitivityRange": "Podaj liczbę całkowitą z zakresu od 50 do 99",
-      "sensitivityTooltip": "Jak nietypowy musi być przedział, zanim zostanie oznaczony jako percentyl wyników treningowych modelu. 97 oznacza najbardziej nietypowe 3%. Wyższa wartość oznacza mniej, ale bardziej pewnych alertów.",
+      "sensitivityTooltip": "Jak nietypowy musi być przedział, zanim zostanie oznaczony, jako percentyl wyników treningowych modelu. 97 oznacza najbardziej nietypowe 3%. Każdy oznaczony przedział wysyła alert, więc niższa wartość powoduje oznaczenie większej liczby przedziałów i wysłanie większej liczby alertów.",
       "seriesAnomaly": "Anomalia",
       "seriesDeviation": "Odchylenie",
       "seriesScore": "Wynik",

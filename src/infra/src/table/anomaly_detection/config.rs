@@ -21,8 +21,8 @@
 //! `UPDATE … WHERE anomaly_id = ?` rather than silently updating 0 rows.
 
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, QueryFilter,
-    QueryOrder, Set, TransactionTrait,
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel,
+    JsonValue as Json, QueryFilter, QueryOrder, Set, TransactionTrait,
 };
 
 use crate::{
@@ -249,7 +249,7 @@ fn patch_all_fields(active: &mut anomaly_detection_config::ActiveModel, src: Mod
     active.name = Set(src.name);
     active.description = Set(src.description);
     active.query_mode = Set(src.query_mode);
-    active.filters = Set(src.filters);
+    active.filters = Set(normalize_filters(src.filters));
     active.custom_sql = Set(src.custom_sql);
     active.detection_function = Set(src.detection_function);
     active.histogram_interval = Set(src.histogram_interval);
@@ -273,14 +273,31 @@ fn patch_all_fields(active: &mut anomaly_detection_config::ActiveModel, src: Mod
     active.folder_id = Set(src.folder_id);
     active.owner = Set(src.owner);
     active.status = Set(src.status);
-    active.retries = Set(src.retries);
     active.last_updated = Set(src.last_updated);
     active.updated_at = Set(src.updated_at);
     // created_at is NOT patched — it is set once at insert time and never changed.
+    // retries is NOT patched: a peer's count would push this region into an unearned backoff.
+    // last_failed_at is NOT patched: a replicated anchor can only corrupt the local backoff.
+    // last_alert_fired_at is NOT patched either: each region alerts to its own
+    // destinations, so a peer's fire time must not suppress a local alert.
+}
+
+/// Collapses the `filters` shapes that mean "no filters" to NULL, on every model-based write.
+fn normalize_filters(filters: Option<Json>) -> Option<Json> {
+    match filters {
+        Some(Json::Null) => None,
+        Some(Json::Object(ref map)) if map.is_empty() => None,
+        other => other,
+    }
 }
 
 /// Converts a `Model` into a fully-`Set` `ActiveModel` for inserts.
-fn into_active_model(m: Model) -> anomaly_detection_config::ActiveModel {
+fn into_active_model(mut m: Model) -> anomaly_detection_config::ActiveModel {
+    m.filters = normalize_filters(m.filters);
+    // Held local like patch_all_fields does: a new row inherits no peer's anchor.
+    m.retries = 0;
+    m.last_failed_at = None;
+    m.last_alert_fired_at = None;
     // For inserts the PK must be Set (it is not auto-increment).
     // `into_active_model()` sets every field including PK as Set, which is
     // correct for INSERT — only UPDATE requires the PK to be Unchanged.
@@ -289,9 +306,19 @@ fn into_active_model(m: Model) -> anomaly_detection_config::ActiveModel {
 
 #[cfg(test)]
 mod tests {
-    use sea_orm::IntoActiveModel;
+    use sea_orm::{ActiveModelTrait as _, IntoActiveModel, Iterable as _};
 
     use super::*;
+
+    /// Whether a super-cluster peer's row is allowed to overwrite a column locally.
+    enum Scope {
+        PrimaryKey,
+        Replicated,
+        RegionLocal,
+        Immutable,
+        /// Behaves region-local only because `patch_all_fields` omits it — a gap, not a decision.
+        KnownGap,
+    }
 
     fn make_model(anomaly_id: &str, org_id: &str) -> Model {
         Model {
@@ -330,6 +357,8 @@ mod tests {
             tags: None,
             status: 0,
             retries: 0,
+            last_failed_at: None,
+            last_alert_fired_at: None,
             last_updated: 0,
             created_at: 1_000_000,
             updated_at: 1_000_000,
@@ -367,6 +396,54 @@ mod tests {
         patch_all_fields(&mut active, replacement);
         assert!(!active.enabled.unwrap());
         assert_eq!(active.status.unwrap(), 3);
+    }
+
+    #[test]
+    fn test_normalize_filters_collapses_the_no_filter_shapes() {
+        assert_eq!(normalize_filters(None), None);
+        assert_eq!(normalize_filters(Some(Json::Null)), None);
+        assert_eq!(normalize_filters(Some(serde_json::json!({}))), None);
+    }
+
+    #[test]
+    fn test_normalize_filters_leaves_every_other_value_alone() {
+        let empty_array = serde_json::json!([]);
+        assert_eq!(
+            normalize_filters(Some(empty_array.clone())),
+            Some(empty_array)
+        );
+        let rows = serde_json::json!([{"field": "a", "operator": "=", "value": "b"}]);
+        assert_eq!(normalize_filters(Some(rows.clone())), Some(rows));
+        // Not silently dropped: the read path must still reject it rather than widen the query.
+        let populated_object = serde_json::json!({"a": "b"});
+        assert_eq!(
+            normalize_filters(Some(populated_object.clone())),
+            Some(populated_object)
+        );
+    }
+
+    /// A legacy `{}` must not survive a clone or a super-cluster replication into a new row.
+    #[test]
+    fn test_into_active_model_normalizes_a_legacy_empty_object() {
+        let mut m = make_model("id", "org");
+        m.filters = Some(serde_json::json!({}));
+        let active = into_active_model(m);
+        assert_eq!(
+            active.filters.into_value(),
+            Some(sea_orm::Value::Json(None))
+        );
+    }
+
+    #[test]
+    fn test_patch_all_fields_normalizes_a_legacy_empty_object() {
+        let mut active = make_model("id", "org").into_active_model();
+        let mut src = make_model("id", "org");
+        src.filters = Some(serde_json::json!({}));
+        patch_all_fields(&mut active, src);
+        assert_eq!(
+            active.filters.into_value(),
+            Some(sea_orm::Value::Json(None))
+        );
     }
 
     #[test]
@@ -412,8 +489,31 @@ mod tests {
         assert_eq!(active.detection_function.unwrap(), "zscore");
     }
 
+    /// A peer's ConfigUpdate must not move this region's retry anchor: it never trained.
     #[test]
-    fn test_into_active_model_sets_all_fields() {
+    fn test_patch_all_fields_leaves_last_failed_at_alone() {
+        let mut original = make_model("anom-1", "org");
+        original.last_failed_at = Some(1_700_000_000_000_000);
+        let mut active = original.into_active_model();
+
+        let mut replicated = make_model("anom-1", "org");
+        replicated.last_failed_at = None;
+        patch_all_fields(&mut active, replicated);
+
+        assert_eq!(active.last_failed_at.unwrap(), Some(1_700_000_000_000_000));
+    }
+
+    /// `put()` may insert a ConfigUpdate for an unknown row, so it holds the anchor local.
+    #[test]
+    fn test_into_active_model_drops_a_replicated_last_failed_at() {
+        let mut m = make_model("anom-1", "org");
+        m.last_failed_at = Some(1_700_000_000_000_000);
+        let active = into_active_model(m);
+        assert_eq!(active.last_failed_at.unwrap(), None);
+    }
+
+    #[test]
+    fn test_into_active_model_sets_the_representative_fields() {
         let m = make_model("anom-all", "org-all");
         let active = into_active_model(m);
         assert_eq!(active.anomaly_id.unwrap(), "anom-all");
@@ -421,5 +521,338 @@ mod tests {
         assert_eq!(active.stream_name.unwrap(), "default");
         assert!(active.enabled.unwrap());
         assert_eq!(active.threshold.unwrap(), 95);
+    }
+
+    /// The super-cluster broadcasts whole rows, so this list is the only thing keeping a
+    /// region-local column from being clobbered by a peer. Adding a column breaks this
+    /// destructure and forces the replicated-vs-region-local decision to be made here.
+    #[allow(unused_variables)]
+    fn replication_scope(m: Model) -> Vec<(&'static str, Scope)> {
+        let Model {
+            anomaly_id,
+            org_id,
+            stream_name,
+            stream_type,
+            enabled,
+            name,
+            description,
+            query_mode,
+            filters,
+            custom_sql,
+            detection_function,
+            histogram_interval,
+            schedule_interval,
+            detection_window_seconds,
+            training_window_days,
+            retrain_interval_days,
+            threshold,
+            seasonality,
+            is_trained,
+            training_started_at,
+            training_completed_at,
+            last_error,
+            last_processed_timestamp,
+            current_model_version,
+            rcf_num_trees,
+            rcf_tree_size,
+            rcf_shingle_size,
+            alert_enabled,
+            alert_destinations,
+            folder_id,
+            owner,
+            priority,
+            tags,
+            status,
+            retries,
+            last_failed_at,
+            last_alert_fired_at,
+            last_updated,
+            created_at,
+            updated_at,
+        } = m;
+        vec![
+            ("anomaly_id", Scope::PrimaryKey),
+            ("org_id", Scope::Replicated),
+            ("stream_name", Scope::Replicated),
+            ("stream_type", Scope::Replicated),
+            ("enabled", Scope::Replicated),
+            ("name", Scope::Replicated),
+            ("description", Scope::Replicated),
+            ("query_mode", Scope::Replicated),
+            ("filters", Scope::Replicated),
+            ("custom_sql", Scope::Replicated),
+            ("detection_function", Scope::Replicated),
+            ("histogram_interval", Scope::Replicated),
+            ("schedule_interval", Scope::Replicated),
+            ("detection_window_seconds", Scope::Replicated),
+            ("training_window_days", Scope::Replicated),
+            ("retrain_interval_days", Scope::Replicated),
+            ("threshold", Scope::Replicated),
+            ("seasonality", Scope::Replicated),
+            ("is_trained", Scope::Replicated),
+            ("training_started_at", Scope::Replicated),
+            ("training_completed_at", Scope::Replicated),
+            ("last_error", Scope::Replicated),
+            ("last_processed_timestamp", Scope::Replicated),
+            ("current_model_version", Scope::Replicated),
+            ("rcf_num_trees", Scope::Replicated),
+            ("rcf_tree_size", Scope::Replicated),
+            ("rcf_shingle_size", Scope::Replicated),
+            ("alert_enabled", Scope::Replicated),
+            ("alert_destinations", Scope::Replicated),
+            ("folder_id", Scope::Replicated),
+            ("owner", Scope::Replicated),
+            // User-authored config like `owner`, so these should replicate; patch_all_fields omits
+            // them today and this pins that gap rather than blessing it.
+            ("priority", Scope::KnownGap),
+            ("tags", Scope::KnownGap),
+            ("status", Scope::Replicated),
+            // P0.7: paired with last_failed_at, or regions back off on each other's failures.
+            ("retries", Scope::RegionLocal),
+            ("last_failed_at", Scope::RegionLocal),
+            // P0.3: one region's alert must never silence another region's cooldown.
+            ("last_alert_fired_at", Scope::RegionLocal),
+            ("last_updated", Scope::Replicated),
+            ("created_at", Scope::Immutable),
+            ("updated_at", Scope::Replicated),
+        ]
+    }
+
+    /// Every field carries a distinct value from `make_model`, so "changed" is unambiguous.
+    fn peer_model() -> Model {
+        Model {
+            anomaly_id: "anom-1".to_string(),
+            org_id: "peer-org".to_string(),
+            stream_name: "peer-stream".to_string(),
+            stream_type: "metrics".to_string(),
+            enabled: false,
+            name: "peer-config".to_string(),
+            description: Some("peer".to_string()),
+            query_mode: "filters".to_string(),
+            filters: Some(serde_json::json!([{"field": "peer"}])),
+            custom_sql: Some("select 1".to_string()),
+            detection_function: "zscore".to_string(),
+            histogram_interval: "10m".to_string(),
+            schedule_interval: "30m".to_string(),
+            detection_window_seconds: 7200,
+            training_window_days: 30,
+            retrain_interval_days: 7,
+            threshold: 99,
+            seasonality: "daily".to_string(),
+            is_trained: true,
+            training_started_at: Some(11),
+            training_completed_at: Some(12),
+            last_error: Some("peer boom".to_string()),
+            last_processed_timestamp: Some(13),
+            current_model_version: 9,
+            rcf_num_trees: 100,
+            rcf_tree_size: 512,
+            rcf_shingle_size: 16,
+            alert_enabled: true,
+            alert_destinations: Some(serde_json::json!(["peer-dest"])),
+            folder_id: "peer-folder".to_string(),
+            owner: Some("peer-owner".to_string()),
+            priority: Some(2),
+            tags: Some(serde_json::json!(["peer-tag"])),
+            status: 3,
+            retries: 7,
+            last_failed_at: Some(1_700_000_000_000_001),
+            last_alert_fired_at: Some(1_700_000_000_000_002),
+            last_updated: 21,
+            created_at: 9_999_999,
+            updated_at: 22,
+        }
+    }
+
+    fn active_field(active: &anomaly_detection_config::ActiveModel, field: &str) -> sea_orm::Value {
+        let column = <anomaly_detection_config::Column as std::str::FromStr>::from_str(field)
+            .unwrap_or_else(|_| panic!("unknown column {field}"));
+        active
+            .get(column)
+            .into_value()
+            .unwrap_or_else(|| panic!("field {field} is NotSet"))
+    }
+
+    /// Pins the exact replication scope of every column: a replicated row may overwrite the
+    /// Replicated set and nothing else.
+    #[test]
+    fn test_patch_all_fields_replication_scope_is_exhaustive() {
+        // Region-local fields carry non-default values so "cleared" cannot pass as "preserved".
+        let mut local = make_model("anom-1", "local-org");
+        local.priority = Some(5);
+        local.tags = Some(serde_json::json!(["local-tag"]));
+        local.retries = 2;
+        local.last_failed_at = Some(1_700_000_000_000_900);
+        local.last_alert_fired_at = Some(1_700_000_000_000_800);
+        let peer = peer_model();
+
+        let mut active = local.clone().into_active_model();
+        patch_all_fields(&mut active, peer.clone());
+
+        let local_active = local.into_active_model();
+        let replicated_expected = into_active_model(peer.clone());
+        // Raw, un-normalized: the region-local arm needs the value the peer actually sent.
+        let peer_raw = peer.clone().into_active_model();
+
+        let table = replication_scope(peer);
+        // Closes the `field: _` escape hatch: destructuring alone lets a new column be ignored.
+        // A `#[sea_orm(ignore)]` field escapes this, but it is not a Column and never broadcasts.
+        assert_eq!(
+            table.len(),
+            anomaly_detection_config::Column::iter().count(),
+            "every column needs a replication-scope decision"
+        );
+
+        for (field, scope) in table {
+            let got = active_field(&active, field);
+            match scope {
+                Scope::Replicated => assert_eq!(
+                    got,
+                    active_field(&replicated_expected, field),
+                    "{field} is replicated and must take the peer's value"
+                ),
+                Scope::RegionLocal => {
+                    // Without this the label is free parking: any column relabelled here would
+                    // stop replicating with a green suite.
+                    assert!(
+                        matches!(field, "retries" | "last_failed_at" | "last_alert_fired_at"),
+                        "{field} was relabelled region-local; that is a replication change"
+                    );
+                    assert_eq!(
+                        got,
+                        active_field(&local_active, field),
+                        "{field} is region-local and must keep this region's value"
+                    );
+                    assert_ne!(
+                        got,
+                        active_field(&peer_raw, field),
+                        "{field} matches the peer by accident, so it verifies nothing"
+                    );
+                    // What separates region-local from merely-unpatched: a fresh row starts clean.
+                    assert_eq!(
+                        active_field(&replicated_expected, field),
+                        active_field(&make_model("anom-1", "org").into_active_model(), field),
+                        "{field} is region-local, so an inserted row must not inherit the peer's"
+                    );
+                }
+                Scope::Immutable => {
+                    assert!(
+                        matches!(field, "created_at"),
+                        "{field} was relabelled immutable; that is a replication change"
+                    );
+                    assert_eq!(
+                        got,
+                        active_field(&local_active, field),
+                        "{field} is immutable and must keep this region's value"
+                    );
+                    assert_ne!(
+                        got,
+                        active_field(&peer_raw, field),
+                        "{field} matches the peer by accident, so it verifies nothing"
+                    );
+                    // Unlike region-local state, these still ride along on an insert.
+                    assert_eq!(
+                        active_field(&replicated_expected, field),
+                        active_field(&peer_raw, field),
+                        "{field} is not region-local, so an insert must carry the peer's value"
+                    );
+                }
+                Scope::KnownGap => {
+                    assert!(
+                        matches!(field, "priority" | "tags"),
+                        "{field} was relabelled a known gap; that is a replication change"
+                    );
+                    let peer_value = active_field(&peer_raw, field);
+                    assert_ne!(
+                        active_field(&local_active, field),
+                        peer_value,
+                        "{field} verifies nothing if it matches the peer"
+                    );
+                    assert_eq!(
+                        got,
+                        active_field(&local_active, field),
+                        "{field} stays local today; closing the gap means relabelling it Replicated"
+                    );
+                    // Only patch_all_fields skips it — an insert already carries the peer's value.
+                    assert_eq!(active_field(&replicated_expected, field), peer_value);
+                }
+                Scope::PrimaryKey => {
+                    assert!(
+                        matches!(field, "anomaly_id"),
+                        "{field} was relabelled the primary key; that is a replication change"
+                    );
+                    // No assert_ne here: the PK is the join key, so it necessarily equals the peer.
+                    assert_eq!(
+                        got,
+                        active_field(&local_active, field),
+                        "{field} must keep this region's value"
+                    );
+                }
+            }
+        }
+    }
+
+    /// A peer whose columns are NULL must not clear a region-local value either.
+    #[test]
+    fn test_patch_all_fields_region_local_survives_a_null_peer() {
+        let mut local = make_model("anom-1", "org");
+        local.retries = 5;
+        local.last_failed_at = Some(1_700_000_000_000_000);
+        local.last_alert_fired_at = Some(1_700_000_000_000_100);
+        let mut active = local.into_active_model();
+
+        let mut peer = make_model("anom-1", "org");
+        peer.retries = 0;
+        peer.last_failed_at = None;
+        peer.last_alert_fired_at = None;
+        patch_all_fields(&mut active, peer);
+
+        assert_eq!(active.retries.unwrap(), 5);
+        assert_eq!(active.last_failed_at.unwrap(), Some(1_700_000_000_000_000));
+        assert_eq!(
+            active.last_alert_fired_at.unwrap(),
+            Some(1_700_000_000_000_100)
+        );
+    }
+
+    /// A peer's cooldown anchor must not suppress this region's first alert.
+    #[test]
+    fn test_patch_all_fields_leaves_last_alert_fired_at_alone() {
+        let mut local = make_model("anom-1", "org");
+        local.last_alert_fired_at = None;
+        let mut active = local.into_active_model();
+
+        let mut peer = make_model("anom-1", "org");
+        peer.last_alert_fired_at = Some(1_700_000_000_000_000);
+        patch_all_fields(&mut active, peer);
+
+        assert_eq!(active.last_alert_fired_at.unwrap(), None);
+    }
+
+    /// P0.7: a peer's failure count must not push this region into a backoff it never earned.
+    #[test]
+    fn test_patch_all_fields_leaves_retries_alone() {
+        let mut local = make_model("anom-1", "org");
+        local.retries = 0;
+        let mut active = local.into_active_model();
+
+        let mut peer = make_model("anom-1", "org");
+        peer.retries = 9;
+        patch_all_fields(&mut active, peer);
+
+        assert_eq!(active.retries.unwrap(), 0);
+    }
+
+    /// `put()` inserts unknown rows, so a fresh region starts its own backoff from zero.
+    #[test]
+    fn test_into_active_model_drops_replicated_region_local_state() {
+        let mut m = make_model("anom-1", "org");
+        m.retries = 6;
+        m.last_failed_at = Some(1_700_000_000_000_000);
+        m.last_alert_fired_at = Some(1_700_000_000_000_100);
+        let active = into_active_model(m);
+        assert_eq!(active.retries.unwrap(), 0);
+        assert_eq!(active.last_failed_at.unwrap(), None);
+        assert_eq!(active.last_alert_fired_at.unwrap(), None);
     }
 }

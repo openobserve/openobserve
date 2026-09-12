@@ -174,6 +174,9 @@ mod m20260825_000001_add_alert_pending_period_col;
 mod m20260825_000001_add_steps_configured_to_synthetics_jobs;
 mod m20260825_000001_create_status_page_custom_domains;
 mod m20260827_000001_drop_table_action_scripts;
+mod m20260901_000001_reset_anomaly_detection_retries;
+mod m20260903_000001_add_anomaly_last_failed_at;
+mod m20260906_000001_add_anomaly_last_alert_fired_at;
 
 #[cfg(test)]
 pub(crate) async fn create_scheduled_jobs_for_test(
@@ -431,6 +434,9 @@ impl MigratorTrait for Migrator {
             Box::new(m20260827_000001_drop_table_action_scripts::Migration),
             Box::new(m20260822_000001_create_status_pages_tables::Migration),
             Box::new(m20260825_000001_create_status_page_custom_domains::Migration),
+            Box::new(m20260901_000001_reset_anomaly_detection_retries::Migration),
+            Box::new(m20260903_000001_add_anomaly_last_failed_at::Migration),
+            Box::new(m20260906_000001_add_anomaly_last_alert_fired_at::Migration),
         ]
     }
 }
@@ -464,7 +470,7 @@ mod tests {
             .collect();
         assert_eq!(
             names.last().map(String::as_str),
-            Some("m20260825_000001_create_status_page_custom_domains")
+            Some("m20260906_000001_add_anomaly_last_alert_fired_at")
         );
         assert_eq!(
             names
