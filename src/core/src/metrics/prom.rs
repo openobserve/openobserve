@@ -21,7 +21,7 @@ use std::{
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
 use config::{
-    FxIndexMap, TIMESTAMP_COL_NAME,
+    TIMESTAMP_COL_NAME,
     cluster::LOCAL_NODE,
     get_config,
     meta::{
@@ -33,14 +33,21 @@ use config::{
     },
     metrics,
     utils::{
-        flatten::format_label_name,
-        json,
+        flatten::format_label_name_owned,
+        json::{self, JsonBytesExt, estimate_json_bytes, estimate_json_entry_bytes},
         schema::format_stream_name,
         schema_ext::SchemaExt,
         time::{now_micros, parse_i64_to_timestamp_micros},
     },
 };
-use datafusion::arrow::datatypes::Schema;
+use datafusion::arrow::{
+    array::{
+        Array, ArrayBuilder, ArrayRef, Float64Builder, Int64Builder, StringBuilder, UInt64Builder,
+        make_builder,
+    },
+    datatypes::{DataType, Schema},
+    record_batch::RecordBatch,
+};
 use db;
 use infra::{
     cache::stats,
@@ -62,10 +69,247 @@ use crate::{
         meta::stream::SchemaRecords,
     },
     ingestion::{
-        TriggerAlertData, check_ingestion_allowed, evaluate_trigger, get_thread_id, write_file,
+        TriggerAlertData, check_ingestion_allowed, evaluate_trigger, get_thread_id,
+        schema_records_to_entries, write_entries,
     },
     pipeline::batch_execution::ExecutablePipeline,
 };
+
+/// Metrics partition hourly, so a record's hour is also its partition.
+const MICROS_PER_HOUR: i64 = 3_600_000_000;
+
+const BUILDER_START_ROWS: usize = 16;
+
+/// A record waiting for the write path, with the series hash when this handler computed it.
+type PendingRecord = (json::Map<String, json::Value>, i64, Option<u64>);
+
+type JsonDataByStream = HashMap<String, Vec<PendingRecord>>;
+
+struct RecordSink<'a> {
+    pipelines: &'a HashMap<String, Vec<ExecutablePipeline>>,
+    user_defined_schema: &'a HashMap<String, Option<HashSet<String>>>,
+    pipeline_inputs: &'a mut HashMap<String, Vec<(json::Value, i64)>>,
+    json_data_by_stream: &'a mut JsonDataByStream,
+}
+
+/// HA replica election, run once per request at the first record that will actually be written.
+struct HaGate<'a> {
+    first_line: &'a mut bool,
+    armed: bool,
+    cluster_name: &'a str,
+    replica_label: &'a str,
+    interval: i64,
+}
+
+#[derive(Clone, Copy)]
+enum MetricColumn {
+    Label,
+    Value,
+    Timestamp,
+    Hash,
+}
+
+struct ColumnarStream {
+    schema: Arc<Schema>,
+    schema_key: String,
+    columns: Vec<MetricColumn>,
+    col_index: HashMap<String, usize>,
+    /// Hour partitions are few per request, so a scan beats hashing the timestamp.
+    buckets: Vec<(i64, ColumnarBucket)>,
+    /// Scratch reused across the samples of a request, not state.
+    label_cols: Vec<usize>,
+    present: Vec<bool>,
+}
+
+struct ColumnarBucket {
+    partition_key: String,
+    builders: Vec<Box<dyn ArrayBuilder>>,
+    rows: usize,
+    json_size: usize,
+}
+
+impl HaGate<'_> {
+    /// `false` once this replica has lost leadership; the request must then write nothing.
+    async fn admit(&mut self) -> bool {
+        if !self.armed || !*self.first_line {
+            return true;
+        }
+        *self.first_line = false;
+        run_ha_election(self.cluster_name, self.replica_label, self.interval).await
+    }
+}
+
+impl ColumnarStream {
+    /// `None` unless every field is exactly the type the JSON path would infer for it.
+    fn for_schema(schema: &Arc<Schema>) -> Option<Self> {
+        if schema.fields().is_empty() {
+            return None;
+        }
+        let mut columns = Vec::with_capacity(schema.fields().len());
+        let mut col_index = HashMap::with_capacity(schema.fields().len());
+        let (mut has_value, mut has_timestamp, mut has_hash) = (false, false, false);
+        for (idx, field) in schema.fields().iter().enumerate() {
+            let column = match (field.name().as_str(), field.data_type()) {
+                (VALUE_LABEL, DataType::Float64) => {
+                    has_value = true;
+                    MetricColumn::Value
+                }
+                (TIMESTAMP_COL_NAME, DataType::Int64) => {
+                    has_timestamp = true;
+                    MetricColumn::Timestamp
+                }
+                (HASH_LABEL, DataType::UInt64) => {
+                    has_hash = true;
+                    MetricColumn::Hash
+                }
+                (_, DataType::Utf8) => MetricColumn::Label,
+                _ => return None,
+            };
+            columns.push(column);
+            col_index.insert(field.name().clone(), idx);
+        }
+        if !(has_value && has_timestamp && has_hash) {
+            return None;
+        }
+        let present = vec![false; columns.len()];
+        let schema = Arc::new(schema.as_ref().clone().with_metadata(HashMap::new()));
+        let schema_key = schema.hash_key();
+        Some(Self {
+            schema,
+            schema_key,
+            columns,
+            col_index,
+            buckets: Vec::with_capacity(1),
+            label_cols: Vec::new(),
+            present,
+        })
+    }
+
+    /// `false` when a label owns no column of its own, which sends the series down the JSON path.
+    fn resolve_columns(&mut self, labels: &[(String, String)]) -> bool {
+        self.label_cols.clear();
+        // two label names can format to one column, and a label can be named `value`
+        self.present.fill(false);
+        for (name, _) in labels {
+            let Some(&idx) = self.col_index.get(name) else {
+                return false;
+            };
+            if !matches!(self.columns[idx], MetricColumn::Label) || self.present[idx] {
+                return false;
+            }
+            self.present[idx] = true;
+            self.label_cols.push(idx);
+        }
+        true
+    }
+
+    fn bucket_for(&mut self, timestamp: i64) -> usize {
+        let hour = timestamp.div_euclid(MICROS_PER_HOUR);
+        if let Some(idx) = self.buckets.iter().position(|(h, _)| *h == hour) {
+            return idx;
+        }
+        let partition_key = crate::ingestion::get_write_partition_key(
+            timestamp,
+            &Vec::new(),
+            get_partition_time_level(StreamType::Metrics),
+            &json::Map::new(),
+            Some(&self.schema_key),
+        );
+        let builders = self
+            .schema
+            .fields()
+            .iter()
+            .map(|f| make_builder(f.data_type(), BUILDER_START_ROWS))
+            .collect();
+        self.buckets.push((
+            hour,
+            ColumnarBucket {
+                partition_key,
+                builders,
+                rows: 0,
+                json_size: 0,
+            },
+        ));
+        self.buckets.len() - 1
+    }
+
+    /// `resolve_columns` must have accepted these labels first.
+    fn append(&mut self, labels: &[(String, String)], value: f64, timestamp: i64, hash: u64) {
+        let idx = self.bucket_for(timestamp);
+        let size = estimated_record_bytes(labels, value, timestamp, hash);
+        let Self {
+            buckets,
+            columns,
+            label_cols,
+            present,
+            ..
+        } = self;
+        let bucket = &mut buckets[idx].1;
+        present.fill(false);
+        for (col, (_, label)) in label_cols.iter().zip(labels) {
+            string_builder(&mut bucket.builders[*col]).append_value(label);
+            present[*col] = true;
+        }
+        for (col, column) in columns.iter().enumerate() {
+            match column {
+                MetricColumn::Label => {
+                    if !present[col] {
+                        string_builder(&mut bucket.builders[col]).append_null();
+                    }
+                }
+                MetricColumn::Value => bucket.builders[col]
+                    .as_any_mut()
+                    .downcast_mut::<Float64Builder>()
+                    .unwrap()
+                    .append_value(value),
+                MetricColumn::Timestamp => bucket.builders[col]
+                    .as_any_mut()
+                    .downcast_mut::<Int64Builder>()
+                    .unwrap()
+                    .append_value(timestamp),
+                MetricColumn::Hash => bucket.builders[col]
+                    .as_any_mut()
+                    .downcast_mut::<UInt64Builder>()
+                    .unwrap()
+                    .append_value(hash),
+            }
+        }
+        bucket.rows += 1;
+        bucket.json_size += size;
+    }
+
+    fn into_entries(self, org_id: &str, stream_name: &str) -> Result<Vec<ingester::Entry>> {
+        let mut entries = Vec::with_capacity(self.buckets.len());
+        for (_, mut bucket) in self.buckets {
+            if bucket.rows == 0 {
+                continue;
+            }
+            // `finish` hands over the whole capacity, which the memtable then holds until flush
+            let cols: Vec<ArrayRef> = bucket
+                .builders
+                .iter_mut()
+                .map(|b| {
+                    let mut col = b.finish();
+                    col.shrink_to_fit();
+                    col
+                })
+                .collect();
+            let batch = RecordBatch::try_new(self.schema.clone(), cols)
+                .map_err(|e| Error::IngestionError(e.to_string()))?;
+            entries.push(ingester::Entry {
+                org_id: Arc::from(org_id),
+                stream: Arc::from(stream_name),
+                schema: Some(self.schema.clone()),
+                schema_key: Arc::from(self.schema_key.as_str()),
+                partition_key: Arc::from(bucket.partition_key.as_str()),
+                data: Vec::new(),
+                data_size: bucket.json_size,
+                batch: Some(batch),
+            });
+        }
+        Ok(entries)
+    }
+}
 
 pub async fn remote_write(
     org_id: &str,
@@ -84,7 +328,6 @@ pub async fn remote_write(
     let mut cluster_name = String::new();
     let mut metric_data_map: HashMap<String, HashMap<String, SchemaRecords>> = HashMap::new();
     let mut metric_schema_map: HashMap<String, SchemaCache> = HashMap::new();
-    let mut schema_evolved: HashMap<String, bool> = HashMap::new();
     let mut stream_partitioning_map: HashMap<String, Vec<StreamPartition>> = HashMap::new();
 
     // Start get user defined schema
@@ -175,23 +418,31 @@ pub async fn remote_write(
     let mut first_line = true;
 
     // Detailed performance tracking
-    let mut sample_processing_time = 0u128;
     let mut event_count = 0;
     let mut sample_count = 0;
 
     // Pre-load all configurations for unique metrics to avoid repeated queries
     let preload_start = std::time::Instant::now();
     let mut unique_metrics = HashSet::new();
+    // a request carries far more series than distinct metric names, so each is formatted once
+    let mut formatted_names: HashMap<String, String> = HashMap::new();
     for event in &request.timeseries {
         if let Some(name_label) = event.labels.iter().find(|l| l.name == NAME_LABEL) {
-            let metric_name = format_stream_name(name_label.value.to_string());
+            let metric_name = match formatted_names.get(&name_label.value) {
+                Some(name) => name.clone(),
+                None => {
+                    let name = format_stream_name(name_label.value.clone());
+                    formatted_names.insert(name_label.value.clone(), name.clone());
+                    unique_metrics.insert(name.clone());
+                    name
+                }
+            };
             if !event.histograms.is_empty() {
                 // native histograms degrade into classic streams; preload those too
                 for suffix in CLASSIC_HISTOGRAM_SUFFIXES {
                     unique_metrics.insert(format!("{metric_name}{suffix}"));
                 }
             }
-            unique_metrics.insert(metric_name);
         }
     }
 
@@ -270,37 +521,56 @@ pub async fn remote_write(
     }
     let total_preload_time = preload_start.elapsed().as_micros();
 
+    let mut columnar_streams = plan_columnar_streams(
+        org_id,
+        &unique_metrics,
+        &metric_schema_map,
+        &stream_executable_pipelines,
+        &user_defined_schema_map,
+        &stream_alerts_map,
+        &stream_partitioning_map,
+    );
+
+    let mut sink = RecordSink {
+        pipelines: &stream_executable_pipelines,
+        user_defined_schema: &user_defined_schema_map,
+        pipeline_inputs: &mut stream_pipeline_inputs,
+        json_data_by_stream: &mut json_data_by_stream,
+    };
     for mut event in request.timeseries {
         event_count += 1;
         // get labels
         let mut replica_label = String::new();
 
-        let mut labels: FxIndexMap<String, String> = event
-            .labels
-            .drain(..)
-            .filter(|label| {
-                if label.name == cfg.prom.ha_replica_label {
-                    replica_label = label.value.clone();
-                    false
-                } else if label.name == cfg.prom.ha_cluster_label {
-                    if cluster_name.is_empty() {
-                        cluster_name = format!("{}/{}", org_id, label.value.clone());
-                    }
-                    false
-                } else {
-                    true
+        let mut label_pairs: Vec<(String, String)> = Vec::with_capacity(event.labels.len());
+        for label in event.labels.drain(..) {
+            if label.name == cfg.prom.ha_replica_label {
+                replica_label = label.value;
+                continue;
+            }
+            if label.name == cfg.prom.ha_cluster_label {
+                if cluster_name.is_empty() {
+                    cluster_name = format!("{}/{}", org_id, label.value);
                 }
-            })
-            .map(|label| (format_label_name(&label.name), label.value))
-            .collect();
+                continue;
+            }
+            push_label(
+                &mut label_pairs,
+                format_label_name_owned(label.name),
+                label.value,
+            );
+        }
 
-        let metric_name = match labels.get_mut(NAME_LABEL) {
-            Some(v) => {
-                // store the formatted name back so the `__name__` column always
-                // equals the stream name; otherwise `{__name__="..."}` selectors
-                // can never match the rows (same policy as the OTLP writer)
-                let name = format_stream_name(std::mem::take(v));
-                v.clone_from(&name);
+        let metric_name = match label_pairs.iter_mut().find(|(name, _)| name == NAME_LABEL) {
+            // `__name__` must equal the stream name or `{__name__="..."}` can never match
+            Some((_, v)) => {
+                let name = match formatted_names.get(v.as_str()) {
+                    Some(name) => name.clone(),
+                    None => format_stream_name(std::mem::take(v)),
+                };
+                if v.as_str() != name.as_str() {
+                    v.clone_from(&name);
+                }
                 name
             }
             None => continue,
@@ -329,9 +599,57 @@ pub async fn remote_write(
         // Note: All configurations (pipeline, UDS, schema, partition, alerts) are now pre-loaded
         // before the loop to avoid repeated async queries
 
+        let mut gate = HaGate {
+            first_line: &mut first_line,
+            armed: dedup_enabled && !cluster_name.is_empty(),
+            cluster_name: &cluster_name,
+            replica_label: &replica_label,
+            interval: election_interval,
+        };
+
+        // every sample of a series shares its labels, so the identity is loop-invariant
+        let series_hash = super::signature_of_series_labels(&label_pairs);
+
+        // a label the schema has not seen goes down the JSON path, which evolves the schema
+        if event.histograms.is_empty()
+            && let Some(columnar) = columnar_streams.get_mut(&metric_name)
+            && columnar.resolve_columns(&label_pairs)
+        {
+            sample_count += event.samples.len();
+            // no iterator may live across this await, or the handler loses axum's `Handler` bound
+            let has_writable = event
+                .samples
+                .iter()
+                .any(|s| super::sanitize_metric_value(s.value).is_some());
+            if has_writable && !gate.admit().await {
+                observe_rejected_request(org_id, &start);
+                return Ok(());
+            }
+            for sample in &event.samples {
+                if let Some(value) = super::sanitize_metric_value(sample.value) {
+                    let timestamp = parse_i64_to_timestamp_micros(sample.timestamp);
+                    columnar.append(&label_pairs, value, timestamp, series_hash);
+                }
+            }
+            continue;
+        }
+
+        let mut labels: json::Map<String, json::Value> =
+            json::Map::with_capacity(label_pairs.len() + 3);
+        for (name, value) in label_pairs {
+            labels.insert(name, json::Value::String(value));
+        }
+        // a pipeline rewrites the labels the identity derives from, UDS trimming drops some of them
+        let known_hash = (!stream_executable_pipelines
+            .get(&metric_name)
+            .is_some_and(|v| !v.is_empty())
+            && !matches!(user_defined_schema_map.get(&metric_name), Some(Some(_))))
+        .then_some(series_hash);
+
         // parse samples
-        let sample_start = std::time::Instant::now();
-        for sample in event.samples {
+        let sample_total = event.samples.len();
+        let can_move_labels = event.histograms.is_empty();
+        for (sample_idx, sample) in event.samples.into_iter().enumerate() {
             sample_count += 1;
             // NaN -> no observation -> no record; infinities clamp. Shared with the OTLP
             // writer so the two ingestion paths cannot drift apart on this.
@@ -339,105 +657,48 @@ pub async fn remote_write(
                 continue;
             };
 
-            // HA election runs at the first record that will actually be written, so a
-            // replica sending only unusable data cannot retain leadership
-            if first_line && dedup_enabled && !cluster_name.is_empty() {
-                first_line = false;
-                if !run_ha_election(&cluster_name, &replica_label, election_interval).await {
-                    // do not accept any entries for this request
-                    observe_rejected_request(org_id, &start);
-                    return Ok(());
-                }
+            if !gate.admit().await {
+                // do not accept any entries for this request
+                observe_rejected_request(org_id, &start);
+                return Ok(());
             }
 
-            let metric = Metric {
-                labels: &labels,
-                value: sample_val,
-            };
-
-            let mut value: json::Value = json::to_value(&metric).unwrap();
             let timestamp = parse_i64_to_timestamp_micros(sample.timestamp);
-            value.as_object_mut().unwrap().insert(
-                TIMESTAMP_COL_NAME.to_string(),
-                json::Value::Number(timestamp.into()),
-            );
+            // the last sample owns the label set outright; nothing reads it afterwards
+            let value = if can_move_labels && sample_idx + 1 == sample_total {
+                build_metric_record(std::mem::take(&mut labels), sample_val, timestamp)
+            } else {
+                build_metric_record(labels.clone(), sample_val, timestamp)
+            };
 
             // ready to be buffered for downstream processing
             buffer_metric_record(
                 &metric_name,
-                value,
+                json::Value::Object(value),
                 timestamp,
-                &stream_executable_pipelines,
-                &user_defined_schema_map,
-                &mut stream_pipeline_inputs,
-                &mut json_data_by_stream,
+                known_hash,
+                &mut sink,
             );
         }
 
-        // native histograms degrade into classic `_count`/`_sum`/`le` `_bucket`
-        // records so existing PromQL works on them unchanged
         if !event.histograms.is_empty() {
-            // one stream name + label template per derived stream, shared by every
-            // record of the event instead of cloned per record
-            let mut derived_streams = CLASSIC_HISTOGRAM_SUFFIXES.map(|suffix| {
-                let mut hist_labels = labels.clone();
-                if let Some(name) = hist_labels.get_mut(NAME_LABEL) {
-                    name.push_str(suffix);
-                }
-                (format!("{metric_name}{suffix}"), hist_labels)
-            });
-            for hp in &event.histograms {
-                sample_count += 1;
-                let records = expand_native_histogram(hp, cfg.prom.native_histogram_max_buckets);
-                if records.is_empty() {
-                    // unsupported schema or stale marker: nothing will be written
-                    continue;
-                }
-
-                // same first-writable-record election as the samples loop
-                if first_line && dedup_enabled && !cluster_name.is_empty() {
-                    first_line = false;
-                    if !run_ha_election(&cluster_name, &replica_label, election_interval).await {
-                        observe_rejected_request(org_id, &start);
-                        return Ok(());
-                    }
-                }
-
-                let timestamp = parse_i64_to_timestamp_micros(hp.timestamp);
-                for (suffix, le, value) in records {
-                    let Some(value) = super::sanitize_metric_value(value) else {
-                        continue;
-                    };
-                    let idx = CLASSIC_HISTOGRAM_SUFFIXES
-                        .iter()
-                        .position(|s| *s == suffix)
-                        .unwrap();
-                    let (stream_name, hist_labels) = &mut derived_streams[idx];
-                    if let Some(le) = le {
-                        hist_labels.insert(BUCKET_LABEL.to_string(), le);
-                    }
-                    let metric = Metric {
-                        labels: hist_labels,
-                        value,
-                    };
-                    let mut value: json::Value = json::to_value(&metric).unwrap();
-                    value.as_object_mut().unwrap().insert(
-                        TIMESTAMP_COL_NAME.to_string(),
-                        json::Value::Number(timestamp.into()),
-                    );
-                    buffer_metric_record(
-                        stream_name,
-                        value,
-                        timestamp,
-                        &stream_executable_pipelines,
-                        &user_defined_schema_map,
-                        &mut stream_pipeline_inputs,
-                        &mut json_data_by_stream,
-                    );
+            match buffer_native_histograms(
+                &event.histograms,
+                &labels,
+                &metric_name,
+                cfg.prom.native_histogram_max_buckets,
+                &mut gate,
+                &mut sink,
+            )
+            .await
+            {
+                Some(counted) => sample_count += counted,
+                None => {
+                    observe_rejected_request(org_id, &start);
+                    return Ok(());
                 }
             }
         }
-        sample_processing_time += sample_start.elapsed().as_micros();
     }
 
     // warn if any records were skipped due to streams being deleted
@@ -449,20 +710,18 @@ pub async fn remote_write(
 
     // Detailed performance logging
     if parse_timeseries_ms > 200 {
-        let total_accounted = total_preload_time + sample_processing_time;
         let parse_timeseries_us = parse_timeseries_ms * 1000;
-        let other_time = parse_timeseries_us.saturating_sub(total_accounted);
+        let other_time = parse_timeseries_us.saturating_sub(total_preload_time);
 
         log::info!(
             "[remote_write] org: {org_id}, parse timeseries took: {parse_timeseries_ms} ms, streams: {} (events: {event_count}, samples: {sample_count}) | \
-            preload_total={:.1}ms (pipeline={:.1}ms, uds={:.1}ms, schema={:.1}ms, alerts={:.1}ms), sample_proc={:.1}ms, other={:.1}ms",
+            preload_total={:.1}ms (pipeline={:.1}ms, uds={:.1}ms, schema={:.1}ms, alerts={:.1}ms), other={:.1}ms",
             unique_metrics.len(),
             total_preload_time as f64 / 1000.0,
             preload_pipeline_time as f64 / 1000.0,
             preload_uds_time as f64 / 1000.0,
             preload_schema_time as f64 / 1000.0,
             preload_alerts_time as f64 / 1000.0,
-            sample_processing_time as f64 / 1000.0,
             other_time as f64 / 1000.0,
         );
     }
@@ -531,7 +790,7 @@ pub async fn remote_write(
                             json_data_by_stream
                                 .entry(destination_stream.clone())
                                 .or_default()
-                                .push((local_val, timestamps[idx]));
+                                .push((local_val, timestamps[idx], None));
                         }
                     }
                 }
@@ -552,13 +811,13 @@ pub async fn remote_write(
                 json_data_by_stream
                     .entry(stream_name.clone())
                     .or_default()
-                    .push((local_val, timestamp));
+                    .push((local_val, timestamp, None));
             }
         }
     }
 
     let step_start = std::time::Instant::now();
-    for (stream_name, json_data) in json_data_by_stream {
+    for (stream_name, mut json_data) in json_data_by_stream {
         // get partition keys
         let partition_keys = stream_partitioning_map
             .get(&stream_name)
@@ -593,78 +852,18 @@ pub async fn remote_write(
             .unwrap_or_default();
         let mut trigger_slots: HashMap<String, super::TriggerSlot> = HashMap::new();
 
-        for (mut val_map, timestamp) in json_data {
-            let hash = super::signature_without_labels(&val_map, &[VALUE_LABEL]);
-            val_map.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
-            val_map.insert(
-                TIMESTAMP_COL_NAME.to_string(),
-                json::Value::Number(timestamp.into()),
-            );
-            let value_str = config::utils::json::to_string(&val_map).unwrap();
+        finish_identity_columns(&mut json_data);
+        let has_uds = matches!(user_defined_schema_map.get(&stream_name), Some(Some(_)));
+        let (schema, schema_key) = resolve_batch_schema(
+            org_id,
+            &stream_name,
+            &mut metric_schema_map,
+            &json_data,
+            has_uds,
+        )
+        .await?;
 
-            // check for schema evolution
-            let schema_fields = match metric_schema_map.get(&stream_name) {
-                Some(schema) => schema
-                    .schema()
-                    .fields()
-                    .iter()
-                    .map(|f| f.name())
-                    .collect::<HashSet<_>>(),
-                None => HashSet::default(),
-            };
-            let mut need_schema_check = !schema_evolved.contains_key(&stream_name);
-            for key in val_map.keys() {
-                if !schema_fields.contains(&key) {
-                    need_schema_check = true;
-                    break;
-                }
-            }
-            drop(schema_fields);
-            if need_schema_check {
-                let (schema_evolution, _infer_schema) = check_for_schema(
-                    org_id,
-                    &stream_name,
-                    StreamType::Metrics,
-                    &mut metric_schema_map,
-                    vec![&val_map],
-                    timestamp,
-                    false, // is_derived is false for metrics
-                )
-                .await?;
-                if schema_evolution.is_schema_changed {
-                    schema_evolved.insert(stream_name.clone(), true);
-                }
-            }
-
-            let schema = metric_schema_map
-                .get(&stream_name)
-                .unwrap()
-                .schema()
-                .as_ref()
-                .clone()
-                .with_metadata(HashMap::new());
-            let schema_key = schema.hash_key();
-
-            // get hour key
-            let hour_key = crate::ingestion::get_write_partition_key(
-                timestamp,
-                &partition_keys,
-                partition_time_level,
-                &val_map,
-                Some(&schema_key),
-            );
-            let buf = metric_data_map.entry(stream_name.to_owned()).or_default();
-            let hour_buf = buf.entry(hour_key).or_insert_with(|| SchemaRecords {
-                schema_key,
-                schema: Arc::new(schema),
-                records: vec![],
-                records_size: 0,
-            });
-            hour_buf
-                .records
-                .push(Arc::new(json::Value::Object(val_map.to_owned())));
-            hour_buf.records_size += value_str.len();
-
+        for (val_map, timestamp, _) in json_data {
             // start check for alert trigger
             if let Some(alerts) = cur_stream_alerts {
                 let end_time = now_micros();
@@ -696,6 +895,24 @@ pub async fn remote_write(
                 }
             }
             // end check for alert triggers
+
+            let hour_key = crate::ingestion::get_write_partition_key(
+                timestamp,
+                &partition_keys,
+                partition_time_level,
+                &val_map,
+                Some(&schema_key),
+            );
+            let buf = metric_data_map.entry(stream_name.to_owned()).or_default();
+            let hour_buf = buf.entry(hour_key).or_insert_with(|| SchemaRecords {
+                schema_key: schema_key.clone(),
+                schema: schema.clone(),
+                records: vec![],
+                records_size: 0,
+            });
+            let record = json::Value::Object(val_map);
+            hour_buf.records_size += estimate_json_bytes(&record);
+            hour_buf.records.push(Arc::new(record));
         }
 
         if !triggers.is_empty() {
@@ -717,9 +934,24 @@ pub async fn remote_write(
     let mut report_stats_time = 0u128;
     let mut deletion_check_time = 0u128;
 
-    for (stream_name, stream_data) in metric_data_map {
-        // stream_data could be empty if metric value is nan, check it
-        if stream_data.is_empty() {
+    // both paths can have written to the same stream, so they are merged before the write
+    let mut entries_by_stream: HashMap<String, Vec<ingester::Entry>> =
+        HashMap::with_capacity(metric_data_map.len() + columnar_streams.len());
+    for (stream_name, buf) in metric_data_map {
+        let entries = schema_records_to_entries(org_id, &stream_name, buf);
+        entries_by_stream.insert(stream_name, entries);
+    }
+    for (stream_name, columnar) in columnar_streams {
+        let entries = columnar.into_entries(org_id, &stream_name)?;
+        entries_by_stream
+            .entry(stream_name)
+            .or_default()
+            .extend(entries);
+    }
+
+    for (stream_name, entries) in entries_by_stream {
+        // a stream buffers nothing when every sample of it was NaN
+        if entries.is_empty() {
             continue;
         }
 
@@ -752,7 +984,7 @@ pub async fn remote_write(
         // for performance issue, we will flush all when the app shutdown
         let fsync = false;
         let t = std::time::Instant::now();
-        let mut req_stats = write_file(&writer, org_id, &stream_name, stream_data, fsync).await?;
+        let mut req_stats = write_entries(&writer, &stream_name, entries, fsync).await?;
         write_file_time += t.elapsed().as_micros();
 
         let fns_length: usize = stream_executable_pipelines
@@ -1269,26 +1501,204 @@ pub fn try_into_metric_name(selector: &parser::VectorSelector) -> Option<String>
     }
 }
 
-/// Per-stream buffer of records ready for the write path, keyed by stream name.
-type JsonDataByStream = HashMap<String, Vec<(json::Map<String, json::Value>, i64)>>;
+/// Streams nothing downstream needs as JSON: no pipeline, UDS, alert, partition key or odd type.
+fn plan_columnar_streams(
+    org_id: &str,
+    unique_metrics: &HashSet<String>,
+    metric_schema_map: &HashMap<String, SchemaCache>,
+    stream_executable_pipelines: &HashMap<String, Vec<ExecutablePipeline>>,
+    user_defined_schema_map: &HashMap<String, Option<HashSet<String>>>,
+    stream_alerts_map: &HashMap<String, Vec<alert::Alert>>,
+    stream_partitioning_map: &HashMap<String, Vec<StreamPartition>>,
+) -> HashMap<String, ColumnarStream> {
+    let mut columnar_streams = HashMap::new();
+    for name in unique_metrics {
+        let alert_key = format!("{}/{}/{}", org_id, StreamType::Metrics, name);
+        let plain = !stream_executable_pipelines
+            .get(name)
+            .is_some_and(|v| !v.is_empty())
+            && !matches!(user_defined_schema_map.get(name), Some(Some(_)))
+            && !stream_alerts_map.contains_key(&alert_key)
+            && stream_partitioning_map
+                .get(name)
+                .is_none_or(|keys| keys.iter().all(|key| key.disabled));
+        if plain
+            && let Some(schema) = metric_schema_map.get(name)
+            && let Some(columnar) = ColumnarStream::for_schema(schema.schema())
+        {
+            columnar_streams.insert(name.clone(), columnar);
+        }
+    }
+    columnar_streams
+}
 
-/// Routes one metric record either into its stream's pipeline input buffer or, with UDS
-/// trimming applied, directly into the per-stream write buffer.
+/// Replaces an earlier label of the same formatted name, exactly as the JSON map does.
+fn push_label(label_pairs: &mut Vec<(String, String)>, name: String, value: String) {
+    match label_pairs
+        .iter_mut()
+        .find(|(existing, _)| *existing == name)
+    {
+        Some((_, existing)) => *existing = value,
+        None => label_pairs.push((name, value)),
+    }
+}
+
+/// What `estimate_json_bytes` would count for this record, without building it.
+fn estimated_record_bytes(
+    labels: &[(String, String)],
+    value: f64,
+    timestamp: i64,
+    hash: u64,
+) -> usize {
+    let mut entries = estimate_json_entry_bytes(VALUE_LABEL, value.json_bytes())
+        + estimate_json_entry_bytes(TIMESTAMP_COL_NAME, timestamp.json_bytes())
+        + estimate_json_entry_bytes(HASH_LABEL, hash.json_bytes());
+    for (name, label) in labels {
+        entries += estimate_json_entry_bytes(name, label.json_bytes());
+    }
+    // {?} extra 2, less the ',' the entry rule counts for the last entry
+    2 + entries - 1
+}
+
+fn string_builder(builder: &mut Box<dyn ArrayBuilder>) -> &mut StringBuilder {
+    builder
+        .as_any_mut()
+        .downcast_mut::<StringBuilder>()
+        .unwrap()
+}
+
+/// Fills in `__hash__` and `_timestamp`, so the schema below sees the fields that get written.
+fn finish_identity_columns(json_data: &mut [PendingRecord]) {
+    for (val_map, timestamp, known_hash) in json_data.iter_mut() {
+        // a `__hash__` the handler did not compute is an input field and gets overwritten
+        let hash =
+            known_hash.unwrap_or_else(|| super::signature_without_labels(val_map, &[VALUE_LABEL]));
+        val_map.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
+        val_map.insert(
+            TIMESTAMP_COL_NAME.to_string(),
+            json::Value::Number((*timestamp).into()),
+        );
+    }
+}
+
+/// Whether this record can still change the schema, as `infer_json_schema_from_map` sees it.
+fn record_evolves_schema(
+    record: &json::Map<String, json::Value>,
+    fields: &HashMap<&str, &DataType>,
+) -> bool {
+    record.iter().any(|(key, value)| {
+        let Some(inferred) = inferred_column_type(key, value) else {
+            return false;
+        };
+        fields
+            .get(key.as_str())
+            .is_none_or(|existing| **existing != inferred)
+    })
+}
+
+/// The column type this value infers to, `None` for a null, which contributes no field at all.
+fn inferred_column_type(key: &str, value: &json::Value) -> Option<DataType> {
+    match value {
+        json::Value::Null => None,
+        json::Value::String(_) => Some(DataType::Utf8),
+        json::Value::Bool(_) => Some(DataType::Boolean),
+        json::Value::Number(n) => Some(match key {
+            // `fix_schema` pins these two whatever the record carries
+            TIMESTAMP_COL_NAME => DataType::Int64,
+            HASH_LABEL => DataType::UInt64,
+            _ if n.is_i64() => DataType::Int64,
+            _ if n.is_u64() => DataType::UInt64,
+            _ if n.is_f64() => DataType::Float64,
+            _ => DataType::Utf8,
+        }),
+        // a nested value cannot be inferred at all, so it must reach check_for_schema
+        _ => Some(DataType::Null),
+    }
+}
+
+async fn resolve_batch_schema(
+    org_id: &str,
+    stream_name: &str,
+    metric_schema_map: &mut HashMap<String, SchemaCache>,
+    json_data: &[PendingRecord],
+    has_uds: bool,
+) -> Result<(Arc<Schema>, String)> {
+    let schema_fields: HashMap<&str, &DataType> = match metric_schema_map.get(stream_name) {
+        Some(schema) => schema
+            .schema()
+            .fields()
+            .iter()
+            .map(|f| (f.name().as_str(), f.data_type()))
+            .collect(),
+        None => HashMap::default(),
+    };
+    let evolving: Vec<&json::Map<String, json::Value>> = json_data
+        .iter()
+        .filter(|(val_map, ..)| record_evolves_schema(val_map, &schema_fields))
+        .map(|(val_map, ..)| val_map)
+        .collect();
+    drop(schema_fields);
+    // a user-defined schema is applied by check_for_schema itself, so it cannot be skipped
+    if !evolving.is_empty() || has_uds {
+        let min_ts = json_data.iter().map(|(_, ts, _)| *ts).min().unwrap_or(0);
+        let records = if evolving.is_empty() {
+            json_data.iter().map(|(val_map, ..)| val_map).collect()
+        } else {
+            evolving
+        };
+        check_for_schema(
+            org_id,
+            stream_name,
+            StreamType::Metrics,
+            metric_schema_map,
+            records,
+            min_ts,
+            false, // is_derived is false for metrics
+        )
+        .await?;
+    }
+
+    let schema = metric_schema_map
+        .get(stream_name)
+        .unwrap()
+        .schema()
+        .as_ref()
+        .clone()
+        .with_metadata(HashMap::new());
+    let schema_key = schema.hash_key();
+    Ok((Arc::new(schema), schema_key))
+}
+
+fn build_metric_record(
+    mut record: json::Map<String, json::Value>,
+    value: f64,
+    timestamp: i64,
+) -> json::Map<String, json::Value> {
+    record.insert(
+        VALUE_LABEL.to_string(),
+        json::Number::from_f64(value).map_or(json::Value::Null, json::Value::Number),
+    );
+    record.insert(
+        TIMESTAMP_COL_NAME.to_string(),
+        json::Value::Number(timestamp.into()),
+    );
+    record
+}
+
 fn buffer_metric_record(
     metric_name: &str,
     mut value: json::Value,
     timestamp: i64,
-    stream_executable_pipelines: &HashMap<String, Vec<ExecutablePipeline>>,
-    user_defined_schema_map: &HashMap<String, Option<HashSet<String>>>,
-    stream_pipeline_inputs: &mut HashMap<String, Vec<(json::Value, i64)>>,
-    json_data_by_stream: &mut JsonDataByStream,
+    known_hash: Option<u64>,
+    sink: &mut RecordSink<'_>,
 ) {
-    if stream_executable_pipelines
+    if sink
+        .pipelines
         .get(metric_name)
         .is_some_and(|v| !v.is_empty())
     {
         // buffer to pipeline for batch processing
-        stream_pipeline_inputs
+        sink.pipeline_inputs
             .entry(metric_name.to_owned())
             .or_default()
             .push((value, timestamp));
@@ -1299,16 +1709,70 @@ fn buffer_metric_record(
             _ => unreachable!(),
         };
 
-        if let Some(Some(fields)) = user_defined_schema_map.get(metric_name) {
+        if let Some(Some(fields)) = sink.user_defined_schema.get(metric_name) {
             local_val = crate::ingestion::refactor_map(local_val, fields);
         }
 
         // buffer to downstream processing directly
-        json_data_by_stream
+        sink.json_data_by_stream
             .entry(metric_name.to_owned())
             .or_default()
-            .push((local_val, timestamp));
+            .push((local_val, timestamp, known_hash));
     }
+}
+
+/// `None` means this replica lost the HA election, so the request must write nothing.
+async fn buffer_native_histograms(
+    histograms: &[prometheus_rpc::Histogram],
+    labels: &json::Map<String, json::Value>,
+    metric_name: &str,
+    max_buckets: usize,
+    gate: &mut HaGate<'_>,
+    sink: &mut RecordSink<'_>,
+) -> Option<usize> {
+    // one stream name + label template per derived stream, not one per record
+    let mut derived_streams = CLASSIC_HISTOGRAM_SUFFIXES.map(|suffix| {
+        let mut hist_labels = labels.clone();
+        if let Some(json::Value::String(name)) = hist_labels.get_mut(NAME_LABEL) {
+            name.push_str(suffix);
+        }
+        (format!("{metric_name}{suffix}"), hist_labels)
+    });
+    let mut counted = 0;
+    for hp in histograms {
+        counted += 1;
+        let records = expand_native_histogram(hp, max_buckets);
+        if records.is_empty() {
+            // unsupported schema or stale marker: nothing will be written
+            continue;
+        }
+        if !gate.admit().await {
+            return None;
+        }
+        let timestamp = parse_i64_to_timestamp_micros(hp.timestamp);
+        for (suffix, le, value) in records {
+            let Some(value) = super::sanitize_metric_value(value) else {
+                continue;
+            };
+            let idx = CLASSIC_HISTOGRAM_SUFFIXES
+                .iter()
+                .position(|s| *s == suffix)
+                .unwrap();
+            let (stream_name, hist_labels) = &mut derived_streams[idx];
+            if let Some(le) = le {
+                hist_labels.insert(BUCKET_LABEL.to_string(), json::Value::String(le));
+            }
+            let record = build_metric_record(hist_labels.clone(), value, timestamp);
+            buffer_metric_record(
+                stream_name,
+                json::Value::Object(record),
+                timestamp,
+                None,
+                sink,
+            );
+        }
+    }
+    Some(counted)
 }
 
 /// Looks up the current leader state and runs leader election for this replica.
@@ -1429,6 +1893,7 @@ async fn prom_ha_handler(
 
 #[cfg(test)]
 mod tests {
+    use datafusion::arrow::datatypes::Field;
     use promql_parser::{
         label::{MatchOp, Matcher, Matchers},
         parser::VectorSelector,
@@ -1694,5 +2159,188 @@ mod tests {
     fn test_normalize_series_time_range_explicit_values_untouched() {
         let (start, end) = normalize_series_time_range(1_000, 2_000);
         assert_eq!((start, end), (1_000, 2_000));
+    }
+
+    fn columnar_schema(labels: &[&str]) -> Arc<Schema> {
+        let mut fields: Vec<Field> = labels
+            .iter()
+            .map(|name| Field::new(*name, DataType::Utf8, true))
+            .collect();
+        fields.push(Field::new(VALUE_LABEL, DataType::Float64, true));
+        fields.push(Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false));
+        fields.push(Field::new(HASH_LABEL, DataType::UInt64, true));
+        Arc::new(Schema::new(fields))
+    }
+
+    #[test]
+    fn test_resolve_columns_accepts_a_plain_series() {
+        let schema = columnar_schema(&[NAME_LABEL, "instance"]);
+        let mut columnar = ColumnarStream::for_schema(&schema).unwrap();
+        let labels = vec![
+            (NAME_LABEL.to_string(), "http_requests".to_string()),
+            ("instance".to_string(), "host-1".to_string()),
+        ];
+
+        assert!(columnar.resolve_columns(&labels));
+        columnar.append(&labels, 1.5, 1_700_000_000_000_000, 42);
+        let entries = columnar.into_entries("nexus", "http_requests").unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].batch.as_ref().unwrap().num_rows(), 1);
+    }
+
+    #[test]
+    fn test_resolve_columns_rejects_two_labels_on_one_column() {
+        let schema = columnar_schema(&[NAME_LABEL, "foo_bar"]);
+        let mut columnar = ColumnarStream::for_schema(&schema).unwrap();
+        // `foo.bar` and `foo-bar` both format to `foo_bar`, which the JSON path collapses
+        let labels = vec![
+            (NAME_LABEL.to_string(), "http_requests".to_string()),
+            ("foo_bar".to_string(), "a".to_string()),
+            ("foo_bar".to_string(), "b".to_string()),
+        ];
+
+        assert!(!columnar.resolve_columns(&labels));
+    }
+
+    #[test]
+    fn test_resolve_columns_rejects_a_label_owning_no_column_of_its_own() {
+        let schema = columnar_schema(&[NAME_LABEL]);
+        let mut columnar = ColumnarStream::for_schema(&schema).unwrap();
+
+        for taken in [VALUE_LABEL, TIMESTAMP_COL_NAME, HASH_LABEL] {
+            let labels = vec![
+                (NAME_LABEL.to_string(), "http_requests".to_string()),
+                (taken.to_string(), "x".to_string()),
+            ];
+            assert!(!columnar.resolve_columns(&labels), "{taken}");
+        }
+    }
+
+    #[test]
+    fn test_push_label_collapses_formatted_collisions_like_the_json_map() {
+        let mut label_pairs: Vec<(String, String)> = Vec::new();
+        for (name, value) in [("__name__", "m"), ("foo.bar", "a"), ("foo-bar", "b")] {
+            push_label(
+                &mut label_pairs,
+                format_label_name_owned(name.to_string()),
+                value.to_string(),
+            );
+        }
+
+        assert_eq!(
+            label_pairs,
+            vec![
+                (NAME_LABEL.to_string(), "m".to_string()),
+                ("foo_bar".to_string(), "b".to_string()),
+            ]
+        );
+        let mut labels = json::Map::new();
+        for (name, value) in &label_pairs {
+            labels.insert(name.clone(), json::Value::String(value.clone()));
+        }
+        let record = build_metric_record(labels, 1.5, 1_700_000_000_000_000);
+        assert_eq!(
+            crate::metrics::signature_of_series_labels(&label_pairs),
+            crate::metrics::signature_without_labels(&record, &[VALUE_LABEL])
+        );
+    }
+
+    #[test]
+    fn test_finish_identity_columns_overwrites_a_hash_it_did_not_compute() {
+        let mut labels = json::Map::new();
+        labels.insert(NAME_LABEL.to_string(), json::json!("http_requests"));
+        labels.insert(HASH_LABEL.to_string(), json::json!("sent by the client"));
+        let record = build_metric_record(labels, 1.0, 5);
+        let recomputed = crate::metrics::signature_without_labels(&record, &[VALUE_LABEL]);
+        let mut json_data = vec![(record.clone(), 5_i64, None), (record, 5_i64, Some(7_u64))];
+
+        finish_identity_columns(&mut json_data);
+
+        assert_eq!(
+            json_data[0].0.get(HASH_LABEL),
+            Some(&json::json!(recomputed))
+        );
+        assert_eq!(json_data[1].0.get(HASH_LABEL), Some(&json::json!(7_u64)));
+    }
+
+    #[test]
+    fn test_record_evolves_schema_sees_a_type_change_on_a_known_field() {
+        let (utf8, int64, uint64) = (DataType::Utf8, DataType::Int64, DataType::UInt64);
+        let fields: HashMap<&str, &DataType> = [
+            (NAME_LABEL, &utf8),
+            (VALUE_LABEL, &int64),
+            (TIMESTAMP_COL_NAME, &int64),
+            (HASH_LABEL, &uint64),
+        ]
+        .into_iter()
+        .collect();
+        let mut record = json::Map::new();
+        record.insert(NAME_LABEL.to_string(), json::json!("http_requests"));
+        record.insert(TIMESTAMP_COL_NAME.to_string(), json::json!(5_i64));
+        record.insert(HASH_LABEL.to_string(), json::json!(7_u64));
+        record.insert(VALUE_LABEL.to_string(), json::json!(1_i64));
+
+        assert!(!record_evolves_schema(&record, &fields));
+        record.insert(VALUE_LABEL.to_string(), json::json!(1.5));
+        assert!(record_evolves_schema(&record, &fields));
+    }
+
+    #[test]
+    fn test_record_evolves_schema_on_an_unseen_field_but_not_on_a_null() {
+        let (utf8, float64, int64, uint64) = (
+            DataType::Utf8,
+            DataType::Float64,
+            DataType::Int64,
+            DataType::UInt64,
+        );
+        let fields: HashMap<&str, &DataType> = [
+            (NAME_LABEL, &utf8),
+            (VALUE_LABEL, &float64),
+            (TIMESTAMP_COL_NAME, &int64),
+            (HASH_LABEL, &uint64),
+        ]
+        .into_iter()
+        .collect();
+        let mut record = json::Map::new();
+        record.insert(NAME_LABEL.to_string(), json::json!("http_requests"));
+        record.insert(TIMESTAMP_COL_NAME.to_string(), json::json!(5_i64));
+        record.insert(HASH_LABEL.to_string(), json::json!(7_u64));
+        record.insert(VALUE_LABEL.to_string(), json::json!(1.5));
+
+        assert!(!record_evolves_schema(&record, &fields));
+        record.insert("unset".to_string(), json::Value::Null);
+        assert!(!record_evolves_schema(&record, &fields));
+        record.insert("instance".to_string(), json::json!("host-1"));
+        assert!(record_evolves_schema(&record, &fields));
+    }
+
+    #[test]
+    fn test_columnar_buckets_follow_the_partition_key_across_the_epoch() {
+        let schema = columnar_schema(&[NAME_LABEL]);
+        let mut columnar = ColumnarStream::for_schema(&schema).unwrap();
+        let schema_key = columnar.schema_key.clone();
+        let labels = vec![(NAME_LABEL.to_string(), "http_requests".to_string())];
+        let timestamps = [-3_601_000_000_i64, -1_000_000, 1_000_000];
+        assert!(columnar.resolve_columns(&labels));
+        for ts in timestamps {
+            columnar.append(&labels, 1.0, ts, 42);
+        }
+
+        let entries = columnar.into_entries("nexus", "http_requests").unwrap();
+        let keys: HashSet<String> = entries
+            .iter()
+            .map(|entry| entry.partition_key.to_string())
+            .collect();
+        assert_eq!(keys.len(), timestamps.len());
+        for ts in timestamps {
+            let expected = crate::ingestion::get_write_partition_key(
+                ts,
+                &Vec::new(),
+                get_partition_time_level(StreamType::Metrics),
+                &json::Map::new(),
+                Some(&schema_key),
+            );
+            assert!(keys.contains(&expected), "{ts}");
+        }
     }
 }
