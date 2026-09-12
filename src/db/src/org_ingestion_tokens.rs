@@ -57,6 +57,7 @@ fn sync_splunk_token(record: &OrgIngestionTokenRecord) {
             SplunkHecTokenEntry {
                 org_id: record.org_id.clone(),
                 token_id: record.id.clone(),
+                o2oi_token: record.token.clone(),
                 enabled: record.enabled,
             },
         );
@@ -210,6 +211,7 @@ pub async fn set_splunk_token(
             SplunkHecTokenEntry {
                 org_id: org_id.to_string(),
                 token_id: committed.id.clone(),
+                o2oi_token: committed.token.clone(),
                 enabled: committed.enabled,
             },
         );
@@ -455,6 +457,7 @@ mod tests {
         SplunkHecTokenEntry {
             org_id: org_id.to_string(),
             token_id: token_id.to_string(),
+            o2oi_token: format!("o2oi_{token_id}"),
             enabled,
         }
     }

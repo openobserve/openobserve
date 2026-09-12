@@ -26,7 +26,7 @@ use axum::{
     middleware::Next,
     response::{IntoResponse, Response},
 };
-use common::infra::config::SPLUNK_HEC_TOKENS;
+use common::infra::config::{ORG_INGESTION_TOKENS, SPLUNK_HEC_TOKENS};
 use config::{DEFAULT_STREAM_NAME, meta::stream::StreamType, metrics, utils::str::mask_secret};
 use db::org_ingestion_tokens::SPLUNK_HEC_TOKENS_LOADED;
 use ingestion_common::IngestUser;
@@ -219,8 +219,8 @@ pub async fn splunk_auth_middleware(mut req: Request, next: Next) -> Response {
     };
     let guid = guid.as_str();
 
-    let (org_id, token_id) = match lookup_token(guid) {
-        TokenLookup::Found(org_id, token_id) => (org_id, token_id),
+    let (org_id, token_id, o2oi_token) = match lookup_token(guid) {
+        TokenLookup::Found(org_id, token_id, o2oi_token) => (org_id, token_id, o2oi_token),
         TokenLookup::Disabled(org_id, token_id) => {
             return reject(
                 HecCollectorStatus::TokenDisabled,
@@ -256,6 +256,34 @@ pub async fn splunk_auth_middleware(mut req: Request, next: Next) -> Response {
             );
         }
     };
+
+    // §6 step 2: the GUID converts to its `o2oi_` token, which is what actually
+    // authorizes ingestion, and is validated through the existing org-scoped path.
+    match validate_o2oi_token(&org_id, &o2oi_token).await {
+        O2oiCheck::Valid => {}
+        O2oiCheck::NotFound => {
+            return reject(
+                HecCollectorStatus::TokenDisabled,
+                "disabled",
+                &org_id,
+                guid,
+                &real_ip,
+                &format!("o2oi token behind splunk token {token_id} is not enabled"),
+            );
+        }
+        O2oiCheck::StoreError(e) => {
+            // Retryable: the row may well be valid, so a store outage must not
+            // read as a revoked credential.
+            return reject(
+                HecCollectorStatus::ServerBusy,
+                "store_unavailable",
+                &org_id,
+                guid,
+                &real_ip,
+                &format!("token store unavailable for {token_id}: {e}"),
+            );
+        }
+    }
 
     if db::org_status::is_blocked(&org_id) {
         // `/services/collector` is outside the /api tree, so the blocking
@@ -360,9 +388,16 @@ fn canonical_guid(token: &str) -> Option<String> {
     groups.next().is_none().then(|| token.to_ascii_lowercase())
 }
 
+/// Outcome of re-validating the `o2oi_` token a GUID converts to (design §6).
+enum O2oiCheck {
+    Valid,
+    NotFound,
+    StoreError(String),
+}
+
 /// Outcome of resolving a GUID, kept distinct so each maps to its own Splunk code.
 enum TokenLookup {
-    Found(String, String),
+    Found(String, String, String),
     Disabled(String, String),
     Unknown,
     NotLoaded,
@@ -386,7 +421,11 @@ fn resolve_guid(guid: &str, loaded: bool) -> TokenLookup {
     if let Some(entry) = SPLUNK_HEC_TOKENS.get(guid) {
         let entry = entry.value();
         return if entry.enabled {
-            TokenLookup::Found(entry.org_id.clone(), entry.token_id.clone())
+            TokenLookup::Found(
+                entry.org_id.clone(),
+                entry.token_id.clone(),
+                entry.o2oi_token.clone(),
+            )
         } else {
             // A disabled token says so: code 4 would send an operator hunting for
             // a token they already hold.
@@ -397,6 +436,27 @@ fn resolve_guid(guid: &str, loaded: bool) -> TokenLookup {
         return TokenLookup::NotLoaded;
     }
     TokenLookup::Unknown
+}
+
+/// Validate the `o2oi_` token behind a GUID through the existing org-scoped path.
+///
+/// In-memory first: `ORG_INGESTION_TOKENS` holds only enabled tokens, so a hit
+/// is the whole answer. The store is consulted ONLY on a miss there, which is
+/// what the Basic-auth `o2oi_` path already does — §6.2's "a miss never reaches
+/// the database" is about the GUID map, whose miss is already answered with code
+/// 4 above, so only a holder of a live GUID can get this far.
+async fn validate_o2oi_token(org_id: &str, o2oi_token: &str) -> O2oiCheck {
+    if ORG_INGESTION_TOKENS.contains_key(&format!("{org_id}/{o2oi_token}")) {
+        return O2oiCheck::Valid;
+    }
+    match db::org_ingestion_tokens::find_enabled_token(org_id, o2oi_token).await {
+        Ok(Some(record)) => {
+            ORG_INGESTION_TOKENS.insert(format!("{org_id}/{o2oi_token}"), record.name);
+            O2oiCheck::Valid
+        }
+        Ok(None) => O2oiCheck::NotFound,
+        Err(e) => O2oiCheck::StoreError(e.to_string()),
+    }
 }
 
 /// Map a `Bytes` extractor rejection onto a Splunk status.
@@ -776,6 +836,44 @@ mod tests {
         ));
     }
 
+    #[tokio::test]
+    async fn the_o2oi_token_behind_a_guid_is_validated_from_memory() {
+        // §6 step 2: the GUID converts to its `o2oi_` token, which is what
+        // actually authorizes ingestion. A hit in ORG_INGESTION_TOKENS is the
+        // whole answer — that map holds only ENABLED tokens — so this must not
+        // reach the store, which no unit test has.
+        const O2OI: &str = "o2oi_step2token";
+        ORG_INGESTION_TOKENS.insert(format!("orgstep2/{O2OI}"), "step2".to_string());
+        assert!(matches!(
+            validate_o2oi_token("orgstep2", O2OI).await,
+            O2oiCheck::Valid
+        ));
+        ORG_INGESTION_TOKENS.remove(&format!("orgstep2/{O2OI}"));
+    }
+
+    #[test]
+    fn a_found_guid_carries_the_o2oi_token_it_converts_to() {
+        SPLUNK_HEC_TOKENS.insert(
+            GUID.to_string(),
+            infra::table::org_ingestion_tokens::SplunkHecTokenEntry {
+                org_id: "org-c".to_string(),
+                token_id: "tok-c".to_string(),
+                o2oi_token: "o2oi_cvalue".to_string(),
+                enabled: true,
+            },
+        );
+        match resolve_guid(GUID, true) {
+            TokenLookup::Found(org_id, token_id, o2oi_token) => {
+                assert_eq!(org_id, "org-c");
+                assert_eq!(token_id, "tok-c");
+                // Without this the re-validation stage has nothing to validate.
+                assert_eq!(o2oi_token, "o2oi_cvalue");
+            }
+            _ => panic!("an enabled row must resolve"),
+        }
+        SPLUNK_HEC_TOKENS.remove(GUID);
+    }
+
     #[test]
     fn a_disabled_token_answers_from_memory() {
         SPLUNK_HEC_TOKENS.insert(
@@ -783,6 +881,7 @@ mod tests {
             infra::table::org_ingestion_tokens::SplunkHecTokenEntry {
                 org_id: "org-a".to_string(),
                 token_id: "tok-a".to_string(),
+                o2oi_token: "o2oi_avalue".to_string(),
                 enabled: false,
             },
         );
