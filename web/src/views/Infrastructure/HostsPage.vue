@@ -452,23 +452,27 @@ const osToggleLabel = (slug: string) =>
         <OText variant="meta">{{ t("infra.hosts.lastSeenBanner") }}</OText>
       </div>
 
-      <div class="flex min-h-0 flex-1 gap-4">
-        <!-- Facet rail — fixed order; UNKNOWN appends last only when present. -->
-        <div class="w-rail flex shrink-0 flex-col gap-3 overflow-y-auto px-2">
+      <div class="flex min-h-0 flex-1">
+        <!-- Facet rail — fixed order; UNKNOWN appends last only when present.
+             Panel surface + right border match FolderList.vue so the rail reads
+             like the app's other left rails. -->
+        <div
+          class="w-rail bg-surface-panel border-border-default flex h-full shrink-0 flex-col gap-3 overflow-y-auto border-e px-1.5 py-2"
+        >
           <OSearchInput
             v-model="nameFilter"
             :placeholder="t('infra.hosts.filterPlaceholder')"
             data-test="hosts-name-filter"
           />
           <section class="flex flex-col gap-1">
-            <OText variant="label" class="px-2 font-semibold">{{
+            <OText variant="label" class="px-1 font-semibold">{{
               t("infra.hosts.statusFacet")
             }}</OText>
             <div
               v-for="facet in facets.status"
               :key="facet.value"
               :data-test="`hosts-facet-status-${facet.value}`"
-              class="rounded-default hover:bg-surface-subtle flex items-center justify-between gap-2 px-2 py-1"
+              class="rounded-default hover:bg-surface-subtle flex items-center justify-between gap-2 px-1 py-1"
               :class="statusFilter.includes(facet.value) ? 'bg-surface-subtle' : ''"
             >
               <OCheckbox
@@ -487,12 +491,12 @@ const osToggleLabel = (slug: string) =>
             </div>
           </section>
           <section v-if="facets.os.length" class="flex flex-col gap-1">
-            <OText variant="label" class="px-2 font-semibold">{{ t("infra.hosts.osFacet") }}</OText>
+            <OText variant="label" class="px-1 font-semibold">{{ t("infra.hosts.osFacet") }}</OText>
             <div
               v-for="facet in facets.os"
               :key="facet.value"
               :data-test="`hosts-facet-os-${facet.value}`"
-              class="rounded-default hover:bg-surface-subtle flex items-center justify-between gap-2 px-2 py-1"
+              class="rounded-default hover:bg-surface-subtle flex items-center justify-between gap-2 px-1 py-1"
               :class="osFilter.includes(facet.value) ? 'bg-surface-subtle' : ''"
             >
               <OCheckbox
@@ -512,7 +516,7 @@ const osToggleLabel = (slug: string) =>
               }}</OTag>
             </div>
           </section>
-          <OText variant="meta" class="px-2 pb-2" data-test="hosts-range-note">{{
+          <OText variant="meta" class="px-1 pb-2" data-test="hosts-range-note">{{
             t("infra.hosts.rangeNote")
           }}</OText>
         </div>
