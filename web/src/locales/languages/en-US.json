@@ -4372,7 +4372,31 @@
     "errorWhileRefreshingRumToken": "Error while refreshing RUM Token.",
     "windowsManualInstall": "Windows (Manual Install)",
     "linuxUnixMacosManualInstall": "Linux/Unix/MacOS (Manual Install)",
-    "directIntegration": "Direct Integration"
+    "directIntegration": "Direct Integration",
+    "splunkHec": {
+      "intro": "Send events to {brand} with the {product} protocol. The organization is resolved from the token, so no organization identifier appears anywhere in the request.",
+      "endpointTitle": "Endpoint",
+      "endpointBody": "Send a POST request to {path}. The {alias} path is identical and accepts the same payload.",
+      "endpointNote": "This path is fixed at the root and is not affected by {setting}, because a Splunk forwarder appends it itself and cannot be reconfigured.",
+      "authTitle": "Authentication",
+      "authBody": "Send the header {header}, where the token is a GUID generated in {brand}.",
+      "tokenWhere": "Generate it on the",
+      "tokenPageName": "Ingestion Tokens page",
+      "tokenWhereSuffix": "— create a token or edit an existing one, then generate its Splunk token.",
+      "exampleTitle": "Example request",
+      "payloadTitle": "Event payload",
+      "payloadIndex": "The {field} field selects the stream. Events without it go to the {stream} stream.",
+      "payloadTime": "The {field} field is epoch seconds, and a fractional value is accepted. When it is missing or not positive, the receipt time is used.",
+      "payloadMetadata": "The {fields} fields are stored as columns on the event.",
+      "healthTitle": "Health check",
+      "healthBody": "A GET request needs no authentication and answers {response}.",
+      "edgeTitle": "{product} configuration",
+      "edgeAck": "Disable {setting} on the destination. Indexer acknowledgement is not supported, and a client waiting for one will block.",
+      "edgeToken": "{product} forwards the upstream client's token for any data that reached it over HEC, and uses the destination token only when the data carries none. So either have upstream clients send this organization's Splunk token, or send to {product} with no {header} header. Getting this wrong looks like total silent data loss, because every request answers 403.",
+      "tlsTitle": "Use HTTPS",
+      "tlsBody": "The token is a bearer credential that is replayable over plaintext HTTP, so terminate TLS at {brand} ({setting}, disabled by default) or at a trusted proxy in front of it."
+    },
+    "splunkHecTab": "Splunk HEC"
   },
   "dashboard": {
     "approximately": "Approximately",
