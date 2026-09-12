@@ -100,10 +100,9 @@ fn evict_token_caches(org_id: &str, records: &[OrgIngestionTokenListRecord]) {
 
 /// Re-read a row through the read-WRITE client after committing a change to it.
 ///
-/// `get_by_name` reads a replica, so under lag the emit would carry the PRE-write
-/// row and the remote region would replicate the change away with nothing to
-/// reconcile it.
-#[cfg(feature = "enterprise")]
+/// `get_by_name` reads a replica, so under lag a caller would see the PRE-write
+/// row: the super-cluster emit would replicate the change away, and the auth
+/// cache would hold an `enabled` the operator has already turned off.
 async fn committed_row(org_id: &str, name: &str) -> Result<OrgIngestionTokenRecord, anyhow::Error> {
     org_ingestion_tokens::get_by_name_rw(org_id, name)
         .await?
@@ -183,33 +182,40 @@ pub async fn set_splunk_token(
     name: &str,
     generate: bool,
 ) -> Result<Option<String>, anyhow::Error> {
-    let existing = org_ingestion_tokens::get_by_name(org_id, name)
+    if org_ingestion_tokens::get_by_name_rw(org_id, name)
         .await?
-        .ok_or_else(|| anyhow::anyhow!("Token '{}' not found", name))?;
+        .is_none()
+    {
+        return Err(anyhow::anyhow!("Token '{}' not found", name));
+    }
 
     let new_value = generate.then(org_ingestion_tokens::generate_splunk_token);
     org_ingestion_tokens::set_splunk_token(org_id, name, new_value.clone()).await?;
 
-    evict_stale_guids(&existing.id, new_value.as_deref());
+    // Read through the primary: a replica-stale `enabled` here would authenticate
+    // a token the operator just disabled.
+    let committed = committed_row(org_id, name).await?;
+
+    evict_stale_guids(&committed.id, new_value.as_deref());
     if let Some(new) = &new_value {
         SPLUNK_HEC_TOKENS.insert(
             new.clone(),
             SplunkHecTokenEntry {
                 org_id: org_id.to_string(),
-                token_id: existing.id.clone(),
-                enabled: existing.enabled,
+                token_id: committed.id.clone(),
+                enabled: committed.enabled,
             },
         );
     }
 
-    let key = event_key(org_id, &existing.token);
+    // Keyed off the committed row too: a replica-stale `token` here would address
+    // the event at a rotated-away value, so no other node would update its cache.
+    let key = event_key(org_id, &committed.token);
     let _ = put_into_db_coordinator(&key, Bytes::new(), true, None).await;
 
     #[cfg(feature = "enterprise")]
-    {
-        let committed = committed_row(org_id, name).await?;
-        super_cluster::org_ingestion_token_put(&key, &committed).await?;
-    }
+    super_cluster::org_ingestion_token_put(&key, &committed).await?;
+
     Ok(new_value)
 }
 

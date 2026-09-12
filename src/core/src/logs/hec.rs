@@ -372,7 +372,9 @@ fn parse_hec_time(value: &json::Value) -> std::result::Result<i64, HecParseError
         return Ok(chrono::Utc::now().timestamp_micros());
     }
     let micros = seconds * 1_000_000.0;
-    if micros > i64::MAX as f64 {
+    // `i64::MAX as f64` rounds UP, so `>` lets the top ULP through and the cast
+    // then saturates to a nonsense far-future timestamp.
+    if micros >= i64::MAX as f64 {
         return Err(HecParseError::InvalidFormat(
             "time is out of range".to_string(),
         ));
@@ -464,6 +466,16 @@ mod tests {
     fn test_time_overflow_is_rejected() {
         assert!(matches!(
             parse_hec_time(&json::json!(1e300)),
+            Err(HecParseError::InvalidFormat(_))
+        ));
+    }
+
+    #[test]
+    fn test_time_at_the_i64_boundary_is_rejected_not_saturated() {
+        // `i64::MAX as f64` rounds up, so a `>` guard would let this through and
+        // the saturating cast would silently yield i64::MAX.
+        assert!(matches!(
+            parse_hec_time(&json::json!(9223372036854.775_f64)),
             Err(HecParseError::InvalidFormat(_))
         ));
     }
