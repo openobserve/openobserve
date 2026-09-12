@@ -171,11 +171,22 @@ async fn resolve_candidates(path: &str, base_uri: &str) -> Result<(String, Vec<N
 /// The Splunk-shaped 413 body, so an oversized batch reads as HEC rather than
 /// as a transport error.
 fn splunk_payload_too_large() -> Response {
+    splunk_status(StatusCode::PAYLOAD_TOO_LARGE, 6, "Request entity too large")
+}
+
+/// The Splunk-shaped "server is busy" body for a failed or unroutable proxy hop.
+///
+/// The upstream error is logged, never returned: it carries the backend node URL
+/// and this route is unauthenticated.
+fn splunk_server_busy(status: StatusCode) -> Response {
+    splunk_status(status, 9, "Server is busy")
+}
+
+fn splunk_status(status: StatusCode, code: u16, text: &str) -> Response {
     (
-        StatusCode::PAYLOAD_TOO_LARGE,
+        status,
         [(header::CONTENT_TYPE, "application/json")],
-        json::to_string(&json::json!({"text": "Request entity too large", "code": 6}))
-            .unwrap_or_default(),
+        json::to_string(&json::json!({"text": text, "code": code})).unwrap_or_default(),
     )
         .into_response()
 }
@@ -344,11 +355,17 @@ fn proxy_error_response(
                 node_addr,
                 start.elapsed().as_millis()
             );
+            if is_splunk_collector_route(path) {
+                return splunk_server_busy(StatusCode::BAD_GATEWAY);
+            }
             (
                 StatusCode::BAD_GATEWAY,
                 format!("Proxy request failed: {e}"),
             )
                 .into_response()
+        }
+        None if is_splunk_collector_route(path) => {
+            splunk_server_busy(StatusCode::SERVICE_UNAVAILABLE)
         }
         None => (StatusCode::SERVICE_UNAVAILABLE, "No online nodes").into_response(),
     }
@@ -1012,5 +1029,29 @@ mod tests {
         assert_eq!(max_attempts(100), 1 + max_retries);
         // capped by the number of available nodes
         assert!(max_attempts(2) <= 2);
+    }
+
+    #[tokio::test]
+    async fn collector_proxy_failures_are_splunk_shaped_and_leak_nothing() {
+        let start = std::time::Instant::now();
+        for path in ["/services/collector", "/services/collector/event"] {
+            let resp = proxy_error_response(path, None, start);
+            assert_eq!(resp.status(), StatusCode::SERVICE_UNAVAILABLE);
+            let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            let json: json::Value = json::from_slice(&body).unwrap();
+            assert_eq!(json["code"], 9, "{path}");
+            assert_eq!(json["text"], "Server is busy", "{path}");
+        }
+    }
+
+    #[tokio::test]
+    async fn non_collector_proxy_failures_keep_their_plain_text_body() {
+        let resp = proxy_error_response("/api/default/_bulk", None, std::time::Instant::now());
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        assert_eq!(&body[..], b"No online nodes");
     }
 }
