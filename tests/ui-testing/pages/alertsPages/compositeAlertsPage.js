@@ -50,20 +50,18 @@ export class CompositeAlertsPage {
       save: '[data-test="add-alert-submit-btn"]',
 
       // ---- child selector ---------------------------------------------
-      childSelector: '[data-test="alerts-composite-child-selector"]',
       childAdd: '[data-test="alerts-composite-child-add"]',
       childCap: '[data-test="alerts-composite-child-cap"]',
       childEmpty: '[data-test="alerts-composite-child-empty"]',
       selectedChild: (id) => `[data-test="alerts-composite-selected-child-${id}"]`,
-      childSelectTrigger: (id) => `[data-test="alerts-composite-child-select-${id}-trigger"]`,
-      childSelectOption: (id) => `[data-test="alerts-composite-child-select-${id}-option"]`,
+      // OSelect base: selectOption() derives -trigger/-popover/-search/-option.
+      childSelectBase: (id) => `alerts-composite-child-select-${id}`,
       childType: (id) => `[data-test="alerts-composite-child-type-${id}"]`,
       childLevel: (id) => `[data-test="alerts-composite-child-level-${id}"]`,
       childOpen: (id) => `[data-test="alerts-composite-child-open-${id}"]`,
       childRemove: (id) => `[data-test="alerts-composite-child-remove-${id}"]`,
 
       // ---- expression builder ------------------------------------------
-      expressionBuilder: '[data-test="alerts-composite-expression-builder"]',
       expressionLive: '[data-test="alerts-composite-expression-live"]',
       expressionInput: '[data-test="alerts-composite-expression-input-field"]',
       expressionInsert: (id) => `[data-test="alerts-composite-expression-insert-${id}"]`,
@@ -80,8 +78,7 @@ export class CompositeAlertsPage {
 
       // ---- settings -----------------------------------------------------
       warningCountsAsFiring: '[data-test="alerts-composite-warning-counts-as-firing-btn"]',
-      stalePolicyTrigger: '[data-test="alerts-composite-stale-policy-trigger"]',
-      stalePolicyOption: '[data-test="alerts-composite-stale-policy-option"]',
+      stalePolicyBase: 'alerts-composite-stale-policy',
       stalePolicyHelp: '[data-test="alerts-composite-stale-policy-help"]',
 
       // ---- live preview --------------------------------------------------
@@ -137,9 +134,26 @@ export class CompositeAlertsPage {
     return this.page.locator(this.locators.listTab(tab));
   }
 
+  /**
+   * Switch the list's type filter and wait for the refetch it triggers.
+   *
+   * Waits on the list request rather than a fixed delay: a sleep long enough
+   * for a loaded shared env is dead time on every other run, and still too
+   * short on the slowest one.
+   */
   async openListTab(tab = 'composite') {
+    const refetched = this.page
+      .waitForResponse(
+        (response) =>
+          /\/api\/v2\/[^/]+\/alerts\?/.test(response.url()) && response.status() === 200,
+        { timeout: 30000 },
+      )
+      .catch(() => null);
     await this.listTab(tab).click();
-    await this.page.waitForTimeout(2000);
+    await refetched;
+    // reka-ui ToggleGroupItem reports on/off, not the active/inactive that
+    // OTab uses — asserting 'active' here silently never matches.
+    await expect(this.listTab(tab)).toHaveAttribute('data-state', 'on');
   }
 
   listBadge(id) {
@@ -357,11 +371,7 @@ export class CompositeAlertsPage {
         `replaceChild expects a {id, name} child, received ${JSON.stringify(next)}`,
       );
     }
-    await this.selectOption(
-      `alerts-composite-child-select-${currentId}`,
-      next.id,
-      next.name,
-    );
+    await this.selectOption(this.locators.childSelectBase(currentId), next.id, next.name);
     await expect(this.selectedChild(next.id)).toBeVisible();
   }
 
@@ -402,7 +412,7 @@ export class CompositeAlertsPage {
    * as the complete option universe.
    */
   async optionIdsFor(id) {
-    const base = `alerts-composite-child-select-${id}`;
+    const base = this.locators.childSelectBase(id);
     const popover = this.page.locator(`[data-test="${base}-popover"]`);
     await this.page.locator(`[data-test="${base}-trigger"]`).click();
     await expect(popover).toBeVisible();
@@ -497,7 +507,7 @@ export class CompositeAlertsPage {
 
   /** @param {'use_last_state'|'treat_as_false'|'treat_as_true'} value */
   async selectStalePolicy(value) {
-    await this.selectOption('alerts-composite-stale-policy', value);
+    await this.selectOption(this.locators.stalePolicyBase, value);
     await expect.poll(() => this.stalePolicyValue()).toBe(value);
   }
 
