@@ -432,8 +432,7 @@ pub async fn ingest(
                                 match handle_timestamp_for_value(&mut res, min_ts, max_ts) {
                                     Ok(ts) => ts,
                                     Err(e) => {
-                                        stream_status.status.failed += 1;
-                                        stream_status.status.error = e.to_string();
+                                        count_timestamp_rejection(&mut stream_status.status, &e);
                                         metrics::INGEST_ERRORS
                                             .with_label_values(&[
                                                 org_id,
@@ -718,6 +717,21 @@ pub fn prepare_record(
     }
 }
 
+/// Count one rejected record on a stream's status, separating an ingestion-window
+/// POLICY drop from a record that genuinely could not be prepared.
+///
+/// Both the pipeline and non-pipeline timestamp paths must agree here: the HEC
+/// collector reads `failed > policy_dropped` to decide code 6 vs code 0, so a
+/// window drop counted only as `failed` returns a 400 the client never retries
+/// and makes it discard its in-window events too.
+fn count_timestamp_rejection(status: &mut ingestion_common::RecordStatus, e: &anyhow::Error) {
+    status.failed += 1;
+    if schema::is_window_discard_error(e) {
+        status.policy_dropped += 1;
+    }
+    status.error = e.to_string();
+}
+
 /// Finalize a log record (flatten, resolve timestamp, apply UDS, add
 /// `_original` / `_all_values` if configured) and push it into
 /// `json_data_by_stream`.
@@ -739,13 +753,7 @@ fn finalize_and_buffer_record(
             return false;
         }
         Err(PrepareRecordError::Timestamp(res, e)) => {
-            ctx.stream_status.status.failed += 1;
-            // A window drop is policy, not a malformed record: counted so a
-            // caller can still report success for the rest of the batch.
-            if schema::is_window_discard_error(&e) {
-                ctx.stream_status.status.policy_dropped += 1;
-            }
-            ctx.stream_status.status.error = e.to_string();
+            count_timestamp_rejection(&mut ctx.stream_status.status, &e);
             metrics::INGEST_ERRORS
                 .with_label_values(&[
                     ctx.org_id,
@@ -1235,6 +1243,36 @@ mod tests {
     use ingestion_common::{IngestUser, SystemJobType};
 
     use super::*;
+
+    #[test]
+    fn a_window_drop_is_counted_as_a_policy_drop_on_both_timestamp_paths() {
+        // §11.1: the pipeline path timestamps the pipeline OUTPUT and used to
+        // count only `failed`, so one out-of-window event in a pipeline-attached
+        // HEC stream answered 400/code 6 and the client dropped its in-window
+        // events with it. Both paths now route through this one helper.
+        let mut status = ingestion_common::RecordStatus::default();
+        count_timestamp_rejection(&mut status, &schema::get_upto_discard_error());
+        assert_eq!(status.failed, 1);
+        assert_eq!(status.policy_dropped, 1);
+
+        count_timestamp_rejection(&mut status, &schema::get_future_discard_error());
+        assert_eq!(status.failed, 2);
+        assert_eq!(status.policy_dropped, 2);
+
+        // The collector's code-0 test: nothing but window drops.
+        assert!(status.failed <= status.policy_dropped);
+    }
+
+    #[test]
+    fn a_malformed_timestamp_is_not_a_policy_drop() {
+        let mut status = ingestion_common::RecordStatus::default();
+        count_timestamp_rejection(&mut status, &anyhow::anyhow!("Can't parse timestamp"));
+        assert_eq!(status.failed, 1);
+        assert_eq!(status.policy_dropped, 0);
+        // Which is what the collector turns into code 6.
+        assert!(status.failed > status.policy_dropped);
+        assert_eq!(status.error, "Can't parse timestamp");
+    }
 
     #[test]
     fn test_internal_rollup_write_guard_blocks_users_in_all_editions() {

@@ -125,6 +125,7 @@ pub async fn create_token(
             infra::table::org_ingestion_tokens::SplunkHecTokenEntry {
                 org_id: org_id.to_string(),
                 token_id: record.id.clone(),
+                o2oi_token: token_value.clone(),
                 enabled: true,
             },
         );

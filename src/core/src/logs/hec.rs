@@ -135,6 +135,10 @@ pub async fn ingest(
 /// rejectable is rejected while nothing is persisted. A storage failure after
 /// the first stream has been written still cannot be rolled back — there is no
 /// cross-stream transaction — but it is reported rather than masked as success.
+///
+/// The "nothing is persisted" guarantee does NOT extend to a stream with a
+/// pipeline attached: see [`preflight_records`]'s KNOWN LIMITATION, where two
+/// rejections are unavoidably found inside the write loop.
 pub async fn ingest_parsed(
     thread_id: usize,
     org_id: &str,
@@ -211,9 +215,21 @@ pub async fn preflight_streams(
 /// fail the batch — a 400 is not retried, so the client would discard its
 /// in-window events too.
 ///
-/// Exact only when the stream has no pipeline: with one attached the write path
-/// timestamps the pipeline OUTPUT, which this cannot see, so a transform that
-/// produces a bad timestamp is still caught only at write time.
+/// KNOWN LIMITATION — §10.4's "every event prepared before the first write"
+/// holds only for streams with NO pipeline attached. With one attached the write
+/// path timestamps the pipeline OUTPUT and this pass cannot see it, so two
+/// rejections are still found inside the write loop, after earlier stream groups
+/// have been committed: a transform that produces an unparseable timestamp, and
+/// a pipeline batch execution error.
+///
+/// Executing the pipeline here to close that gap is NOT viable:
+/// `ExecutablePipeline::process_batch` is not side-effect free — a
+/// `RemoteStream` destination node writes the batch to the pipeline WAL
+/// (`pipeline/batch_execution.rs`, `write_wal`), and an evaluation pipeline with
+/// an LLM node is spawned fire-and-forget by the caller — so a dry run would
+/// double-deliver every remote-destination record unless a no-side-effect mode
+/// were threaded through `process_batch` and every node type. Those rejections
+/// are answered from the write outcome instead (code 6 / code 8).
 pub async fn preflight_records(
     org_id: &str,
     streams: &[(String, Vec<json::Value>)],

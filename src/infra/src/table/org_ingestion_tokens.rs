@@ -134,10 +134,15 @@ impl From<Model> for OrgIngestionTokenRecord {
 ///
 /// Carries `enabled` so a disabled token answers code 1 from memory: without it
 /// every disabled-token request would fall through to a database lookup.
+///
+/// `o2oi_token` is the value the GUID converts to (design §6 step 2): the
+/// `o2oi_` token, not the GUID, is the source of truth for whether ingestion is
+/// allowed, so the collector re-validates through the existing org-scoped path.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SplunkHecTokenEntry {
     pub org_id: String,
     pub token_id: String,
+    pub o2oi_token: String,
     pub enabled: bool,
 }
 
@@ -212,20 +217,22 @@ pub async fn list_all_splunk() -> Result<Vec<(String, SplunkHecTokenEntry)>, err
         .column(Column::SplunkToken)
         .column(Column::OrgId)
         .column(Column::Id)
+        .column(Column::Token)
         .column(Column::Enabled)
-        .into_tuple::<(String, String, String, bool)>()
+        .into_tuple::<(String, String, String, String, bool)>()
         .all(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
 
     Ok(records
         .into_iter()
-        .map(|(guid, org_id, token_id, enabled)| {
+        .map(|(guid, org_id, token_id, o2oi_token, enabled)| {
             (
                 guid,
                 SplunkHecTokenEntry {
                     org_id,
                     token_id,
+                    o2oi_token,
                     enabled,
                 },
             )

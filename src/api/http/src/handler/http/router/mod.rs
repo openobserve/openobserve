@@ -2144,11 +2144,16 @@ mod tests {
             infra::table::org_ingestion_tokens::SplunkHecTokenEntry {
                 org_id: "g1org".to_string(),
                 token_id: "g1tok".to_string(),
+                o2oi_token: "o2oi_g1value".to_string(),
                 enabled: true,
             },
         );
         db::org_ingestion_tokens::SPLUNK_HEC_TOKENS_LOADED
             .store(true, std::sync::atomic::Ordering::Release);
+        // §6 step 2 re-validates the `o2oi_` token the GUID converts to; seeded in
+        // memory so the check is answered without a store this test has no DB for.
+        common::infra::config::ORG_INGESTION_TOKENS
+            .insert("g1org/o2oi_g1value".to_string(), "g1".to_string());
 
         let raw = vec![b'x'; logs::hec_collector::HEC_MAX_BODY_BYTES + 1024];
         let compressed = zstd::encode_all(&raw[..], 3).unwrap();
@@ -2180,6 +2185,7 @@ mod tests {
         assert_eq!(v["text"], "Request entity too large");
 
         common::infra::config::SPLUNK_HEC_TOKENS.remove(GUID);
+        common::infra::config::ORG_INGESTION_TOKENS.remove("g1org/o2oi_g1value");
     }
 
     #[tokio::test]
