@@ -221,4 +221,37 @@ describe("PanelErrorButtons", () => {
     const lastRefreshed = wrapper.find('[data-test="panel-last-refreshed-at"]');
     expect(lastRefreshed.exists()).toBe(true);
   });
+
+  /**
+   * viewOnly gates ONLY the last-refreshed chip, so a read-only embedding (the
+   * curated host drawer) still surfaces every warning. Gating a warning on it
+   * would silence exactly the surfaces that cannot open a panel editor to find out.
+   */
+  describe("a viewOnly embedding still surfaces every warning", () => {
+    it("renders the range and partial-data warnings under viewOnly", () => {
+      const wrapper = mountComponent({
+        props: {
+          maxQueryRangeWarning: "range shortened",
+          isPartialData: true,
+          isPanelLoading: false,
+          viewOnly: true,
+        },
+      });
+
+      expect(wrapper.find('[data-test="panel-max-duration-warning"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="panel-partial-data-warning"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="panel-last-refreshed-at"]').exists()).toBe(false);
+    });
+
+    // isPartialData means the LOAD was cut short (cancelled or unmounted mid-flight),
+    // never that the returned rows fail to cover the window — so it stays hidden
+    // while loading and says nothing about a host that started reporting late.
+    it("hides the partial-data warning while the panel is still loading", () => {
+      const wrapper = mountComponent({
+        props: { isPartialData: true, isPanelLoading: true, viewOnly: true },
+      });
+
+      expect(wrapper.find('[data-test="panel-partial-data-warning"]').exists()).toBe(false);
+    });
+  });
 });

@@ -17,20 +17,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div v-if="variablesData.values?.length > 0" class="mt-1 flex flex-wrap gap-y-1">
     <div
       v-for="(item, index) in variablesData.values"
+      v-show="!isVariableOffTab(item)"
       :key="item.name + index"
       :data-test="`dashboard-variable-${item.name}-container`"
     >
-      <div v-if="item.type == 'query_values'" class="max-w-[40rem] min-w-37.5">
+      <div
+        v-if="item.type == 'query_values'"
+        class="max-w-[40rem] min-w-37.5"
+        v-show="!isVariableOmitted(item)"
+      >
         <VariableQueryValueSelector
           class="me-4 mt-1"
           v-show="!item.hideOnDashboard"
           v-model="item.value"
           :variableItem="item"
+          :clearable="isVariableClearable(item)"
           @update:model-value="onVariablesValueUpdated(Number(index))"
           :loadOptions="loadVariableOptions"
           @search="onVariableSearch(Number(index), $event)"
           :data-test="`variable-selector-${item.name}`"
         />
+        <div
+          v-if="isVariableCapped(item)"
+          class="text-text-muted text-xs"
+          :data-test="`variable-values-capped-${item.name}`"
+        >
+          {{
+            t("infra.curated.valuesCapped", {
+              count: item.query_data?.max_record_size ?? 0,
+              parent: item.curatedNarrowBy || item.label || item.name,
+            })
+          }}
+        </div>
       </div>
       <div v-else-if="item.type == 'constant'" class="max-w-[40rem] min-w-37.5">
         <OInput
@@ -399,17 +417,19 @@ export default defineComponent({
         if (valueChanged) {
           // Update oldVariablesData
           oldVariablesData[variableObject.name] = currentValue;
+        }
 
-          // Notify manager if using manager mode - this ensures children get updated even with no data
-          if (useManager && manager) {
-            const variableKey = getVariableKey(
-              variableObject.name,
-              variableObject.scope || "global",
-              variableObject.tabId,
-              variableObject.panelId,
-            );
-            manager.onVariablePartiallyLoaded(variableKey);
-          }
+        // Notified on COMPLETION, not on a changed value: an all-sentinel parent
+        // holds `_o2_all_` across its own fetch, so gating this left its children
+        // never triggered and their pickers permanently empty.
+        if (useManager && manager) {
+          const variableKey = getVariableKey(
+            variableObject.name,
+            variableObject.scope || "global",
+            variableObject.tabId,
+            variableObject.panelId,
+          );
+          manager.onVariablePartiallyLoaded(variableKey);
         }
 
         finalizeVariableLoading(variableObject, true);
@@ -565,20 +585,22 @@ export default defineComponent({
                 // Update oldVariablesData ONLY when value changes
                 // This prevents duplicate child loads when value hasn't actually changed
                 oldVariablesData[variableObject.name] = variableObject.value;
+              }
 
-                // Notify manager if using manager mode
-                if (useManager && manager) {
-                  const variableKey = getVariableKey(
-                    variableObject.name,
-                    variableObject.scope || "global",
-                    variableObject.tabId,
-                    variableObject.panelId,
-                  );
-                  manager.onVariablePartiallyLoaded(variableKey);
-                } else {
-                  // Only use legacy child loading if not using manager
-                  finalizePartialVariableLoading(variableObject, true);
-                }
+              // Same completion-not-change rule as the streaming path above: an
+              // all-sentinel parent never changes value, and its children would
+              // otherwise never be told the options had arrived.
+              if (useManager && manager) {
+                const variableKey = getVariableKey(
+                  variableObject.name,
+                  variableObject.scope || "global",
+                  variableObject.tabId,
+                  variableObject.panelId,
+                );
+                manager.onVariablePartiallyLoaded(variableKey);
+              } else if (hasValueChanged) {
+                // Only use legacy child loading if not using manager
+                finalizePartialVariableLoading(variableObject, true);
               }
             }
           } else {
@@ -914,7 +936,14 @@ export default defineComponent({
         // we MUST clear oldVariablesData immediately, otherwise the old value will be
         // restored when API response arrives
         // HOWEVER: If variable has custom/all default, set it to that value instead
+        // A variable the manager has just scheduled to load is NOT a reset to be
+        // undone: restoring its all-default here also cleared isVariableLoadingPending
+        // and marked it loaded, cancelling that load, so a chained child never
+        // queried and its picker stayed empty forever.
+        const managerScheduledLoad = v.isVariableLoadingPending === true || v.isLoading === true;
+
         const managerHasResetValue =
+          !managerScheduledLoad &&
           (currentValue === null || (Array.isArray(currentValue) && currentValue.length === 0)) &&
           oldValue !== undefined &&
           oldValue !== null &&
@@ -2287,9 +2316,72 @@ export default defineComponent({
       );
     };
 
+    // ACCEPTED, not enforced: the dashboard import path does not strip unknown
+    // config keys, so a hand-edited JSON carrying curated* on a stored dashboard
+    // gets curated behaviour. Import is already a trusted-JSON path (author and
+    // victim are the same person) and filtering it risks dropping legitimate
+    // forward-compatible keys, so the invariant is documented rather than policed.
+    //
+    // No truncation signal exists in the response (`no_count: true`), so an
+    // exactly-at-cap list is the only inference available and it errs to disclosure.
+    const isVariableCapped = (item: any) => {
+      const cap = item?.query_data?.max_record_size ?? 0;
+      // `>=`, not `===`: options accumulate across paged responses (:505 merges the
+      // previous page in) and the selected value is appended when absent, so a
+      // capped list can exceed the cap — where `===` silently dropped the notice.
+      return Boolean(item?.curatedCapNotice && cap && (item?.options?.length ?? 0) >= cap);
+    };
+
+    // The all-sentinel is the absence of a scope choice, so it is not a held value.
+    const holdsSelection = (item: any) => {
+      const value = item?.value;
+      if (Array.isArray(value))
+        return value.some((entry) => entry !== "" && entry != null && entry !== SELECT_ALL_VALUE);
+      return value !== "" && value != null && value !== SELECT_ALL_VALUE;
+    };
+
+    // Schema presence is not resolvability, so a zero-values picker is removed
+    // rather than left enabled and blank — but only once its load has settled.
+    // "Settled" is the codebase's own three-flag test (useVariablesManager.ts:221),
+    // not isLoading alone: a parent change clears a chained child's options WITH
+    // isLoading already false (:643/:650, :695-706), so a one-flag test read that
+    // reload window as "genuinely empty" and flickered the Pod picker out of the
+    // DOM on every Namespace change.
+    const isVariableOmitted = (item: any) =>
+      Boolean(
+        item?.curatedOmitWhenValuesEmpty &&
+        !item?.isLoading &&
+        !item?.isVariableLoadingPending &&
+        item?.isVariablePartialLoaded &&
+        Array.isArray(item?.options) &&
+        item.options.length === 0 &&
+        // loadFromUrl marks a URL-restored picker loaded WITHOUT fetching options
+        // (useVariablesManager :880-885), so on a hard refresh a held value is
+        // indistinguishable from a settled-empty list — and hiding it strands a
+        // filter the user cannot see or undo.
+        !holdsSelection(item),
+      );
+
+    // Curated pickers only: a stored dashboard's variables are authored state, and
+    // clearing one there would silently diverge the view from the saved dashboard.
+    const isVariableClearable = (item: any) => Boolean(item?.curatedOmitWhenValuesEmpty);
+
+    // `curatedTabs` narrows a GLOBAL variable to the tabs that declare it, so an
+    // inapplicable picker is not rendered rather than shown disabled. It gates
+    // RENDERING only: the variable stays in variablesData.values so it still
+    // loads and still feeds panel queries on the tabs that do use it.
+    const isVariableOffTab = (item: any) =>
+      Boolean(
+        Array.isArray(item?.curatedTabs) && props.tabId && !item.curatedTabs.includes(props.tabId),
+      );
+
     return {
       t,
       props,
+      isVariableCapped,
+      isVariableOmitted,
+      isVariableOffTab,
+      isVariableClearable,
       variablesData,
       changeInitialVariableValues,
       onVariablesValueUpdated,

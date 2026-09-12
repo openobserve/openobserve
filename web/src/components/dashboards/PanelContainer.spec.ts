@@ -235,7 +235,17 @@ describe("PanelContainer", () => {
             name: "PanelSchemaRenderer",
             template: '<div data-test="panel-schema-renderer"></div>',
             props: ["panelSchema", "selectedTimeObj", "width", "height"],
-            emits: ["show-legends"],
+            emits: ["show-legends", "series-data-update"],
+            // The real component exposes `noData` as "" | "No Data"
+            // (PanelSchemaRenderer.vue:1448-1480, exposed at :1802). Tests drive
+            // it through setNoData() so the consumer reads the same contract the
+            // real renderer publishes, not a shape invented by the stub.
+            data: () => ({ noData: "" }),
+            methods: {
+              setNoData(this: any, value: string) {
+                this.noData = value;
+              },
+            },
           },
           SinglePanelMove: {
             template: '<div data-test="single-panel-move"></div>',
@@ -1702,6 +1712,298 @@ describe("PanelContainer", () => {
       await wrapper.vm.$nextTick();
 
       expect(wrapper.vm.showLegendsDialog).toBe(false);
+    });
+  });
+  // ── Curated-page stale badge (curated-pages design §6.3) ───────────────────
+  // Additive: stored dashboards never carry config.curated_badge, so every case
+  // below is asserted BOTH ways — the absent half is the regression guard.
+  describe("curated stale badge", () => {
+    // The duration arrives as a KEY + count, never formatted copy: a string baked
+    // in the pure layer would freeze at build time and speak English only.
+    const CURATED_BADGE = {
+      key: "infra.curated.staleBadge",
+      duration: { key: "durationDays", count: 3 },
+      date: "Sep 1, 14:20",
+    };
+    const badgedPanel = (over = {}) => ({
+      ...mockPanelData,
+      config: { curated_badge: CURATED_BADGE, ...over },
+    });
+
+    it("renders the badge tag when config.curated_badge is set, UNDER viewOnly:true", () => {
+      // viewOnly hides the description icon, so the badge cannot ride description.
+      wrapper = createWrapper({ data: badgedPanel(), viewOnly: true });
+      expect(wrapper.find('[data-test="dashboard-panel-curated-badge"]').exists()).toBe(true);
+    });
+
+    it("the label leads with the DURATION — elapsed time is what tells the user to care", () => {
+      wrapper = createWrapper({ data: badgedPanel(), viewOnly: true });
+      const badge = wrapper.find('[data-test="dashboard-panel-curated-badge"]');
+      const text = badge.text();
+      expect(text).toContain("3 days");
+      expect(text).toContain("Sep 1, 14:20");
+      expect(text.indexOf("3 days")).toBeLessThan(text.indexOf("Sep 1, 14:20"));
+    });
+
+    it("the 'as of the last stream-list refresh' caveat is TOOLTIP-only, never in the label", () => {
+      wrapper = createWrapper({ data: badgedPanel(), viewOnly: true });
+      const badge = wrapper.find('[data-test="dashboard-panel-curated-badge"]');
+      expect(badge.text()).not.toContain("last stream-list refresh");
+      // A REAL tooltip, asserted by its content. `data-tooltip-key` was an
+      // attribute nothing in web/src consumed, so the caveat reached no user.
+      const tooltip = wrapper.findComponent({ name: "OTag" }).findComponent({ name: "OTooltip" });
+      expect(tooltip.exists()).toBe(true);
+      expect(tooltip.props("content")).toBe("As of the last stream-list refresh.");
+    });
+
+    it("dims the panel BODY wrapper when badged — a full-contrast number reads as current", () => {
+      // The badge alone loses on a `metric` tile: "Pods Failed: 0" in confident
+      // large type is read as zero. Badge and de-emphasis are ONE change.
+      wrapper = createWrapper({ data: badgedPanel(), viewOnly: true });
+      const body = wrapper.find('[data-test="dashboard-panel-body"]');
+      expect(body.exists()).toBe(true);
+      expect(body.attributes("data-curated-stale")).toBe("true");
+    });
+
+    it("renders NO badge and NO dimming when config.curated_badge is absent", () => {
+      // Stored dashboards never carry the key, so the change must be invisible
+      // outside curated pages — asserted both ways so a blanket dim can't ship.
+      wrapper = createWrapper({ data: mockPanelData, viewOnly: true });
+      expect(wrapper.find('[data-test="dashboard-panel-curated-badge"]').exists()).toBe(false);
+      const body = wrapper.find('[data-test="dashboard-panel-body"]');
+      expect(body.exists()).toBe(true);
+      expect(body.attributes("data-curated-stale")).not.toBe("true");
+    });
+
+    it("localizes the duration KEY through i18n rather than printing a baked string", () => {
+      // The pure layer emits {key,count}; pluralization and localization are the
+      // renderer's job, so a badge carrying a count of 1 must read "1 day".
+      wrapper = createWrapper({
+        data: badgedPanel({
+          curated_badge: { ...CURATED_BADGE, duration: { key: "durationDays", count: 1 } },
+        }),
+        viewOnly: true,
+      });
+      const text = wrapper.find('[data-test="dashboard-panel-curated-badge"]').text();
+      expect(text).toContain("1 day");
+      expect(text).not.toContain("1 days");
+      expect(text).not.toContain("durationDays");
+    });
+
+    it("leaves the description-icon behavior unchanged in both states", () => {
+      wrapper = createWrapper({ data: badgedPanel(), viewOnly: false });
+      expect(wrapper.find('[data-test="dashboard-panel-description-info"]').exists()).toBe(true);
+      wrapper.unmount();
+
+      wrapper = createWrapper({ data: badgedPanel(), viewOnly: true });
+      expect(wrapper.find('[data-test="dashboard-panel-description-info"]').exists()).toBe(false);
+    });
+  });
+
+  // ── Curated tile no-data + subtitle (design §6.3) ──────────────────────────
+
+  describe("curated tile no-data and subtitle", () => {
+    const eligible = (over = {}) => ({
+      ...mockPanelData,
+      config: { curated_no_data_eligible: true, ...over },
+    });
+
+    // THE SEAM. PanelSchemaRenderer owns the no-data verdict — a type-aware,
+    // loading-aware computed exposed as `noData` ("" | "No Data",
+    // PanelSchemaRenderer.vue:1448-1480, :1802) — and emits series-data-update
+    // once its conversion settles. Driving BOTH is what exercises the real
+    // contract; a pin that only hand-fires a payload proves nothing, because
+    // the payload never carried the answer.
+    const settle = async (renderer: any, verdict: string) => {
+      renderer.vm.setNoData(verdict);
+      await renderer.vm.$emit("series-data-update", { chartType: "metric", options: {} });
+      await wrapper.vm.$nextTick();
+    };
+
+    it("an eligible tile whose series result is EMPTY renders tileNoData ON the tile", async () => {
+      // A wrong label value leaves the panel present, fresh and blank, and a blank
+      // tile is read as a zero — the engine's worst possible output.
+      wrapper = createWrapper({ data: eligible(), viewOnly: true });
+      const renderer = wrapper.findComponent({ name: "PanelSchemaRenderer" });
+      await settle(renderer, "No Data");
+      expect(wrapper.find('[data-test="dashboard-panel-curated-no-data"]').exists()).toBe(true);
+    });
+
+    // Ownership is per panel type, because the layer underneath differs:
+    // PanelSchemaRenderer's OEmptyState covers TILES (suppressed there for these
+    // panels via config.curated_empty_means_healthy), while a promql TABLE is
+    // excluded from it and takes its wording from PromQLTableChart's own #empty
+    // slot. Claiming both printed the words twice, once from each layer.
+    it("a healthy-empty TILE reads All clear, not No Data", async () => {
+      wrapper = createWrapper({
+        data: eligible({ curated_empty_means_healthy: true }),
+        viewOnly: true,
+      });
+      const renderer = wrapper.findComponent({ name: "PanelSchemaRenderer" });
+      await settle(renderer, "No Data");
+      const overlay = wrapper.find('[data-test="dashboard-panel-curated-no-data"]');
+      expect(overlay.exists()).toBe(true);
+      expect(overlay.text()).toContain("All clear");
+    });
+
+    // bg-success-50 has no dark-mode variant, so the LEAST urgent state became the loudest on a 14-panel tab.
+    it("All clear carries NO background fill — only the check glyph and success text", async () => {
+      wrapper = createWrapper({
+        data: eligible({ curated_empty_means_healthy: true }),
+        viewOnly: true,
+      });
+      const renderer = wrapper.findComponent({ name: "PanelSchemaRenderer" });
+      await settle(renderer, "No Data");
+      const overlay = wrapper.find('[data-test="dashboard-panel-curated-no-data"]');
+      const classes = overlay.classes();
+      expect(classes.some((name) => name.startsWith("bg-"))).toBe(false);
+      expect(overlay.find('[data-test="dashboard-panel-curated-all-clear-icon"]').exists()).toBe(
+        true,
+      );
+      // --color-text-success does not exist; status-success-text is the only per-theme success TEXT token.
+      expect(classes).toContain("text-status-success-text");
+    });
+
+    it("a healthy-empty TABLE stands the overlay down — its own empty state owns it", async () => {
+      wrapper = createWrapper({
+        data: {
+          ...eligible({ curated_empty_means_healthy: true }),
+          type: "table",
+        },
+        viewOnly: true,
+      });
+      const renderer = wrapper.findComponent({ name: "PanelSchemaRenderer" });
+      await settle(renderer, "No Data");
+      expect(wrapper.find('[data-test="dashboard-panel-curated-no-data"]').exists()).toBe(false);
+    });
+
+    // Ownership follows the panel TYPE, never the healthy-empty flag: that flag is
+    // set on one section only, so keying on it left every table elsewhere printing
+    // its own empty state and the overlay on top of it.
+    it("a plain TABLE stands the overlay down too, flag or no flag", async () => {
+      wrapper = createWrapper({
+        data: { ...eligible({}), type: "table" },
+        viewOnly: true,
+      });
+      const renderer = wrapper.findComponent({ name: "PanelSchemaRenderer" });
+      await settle(renderer, "No Data");
+      expect(wrapper.find('[data-test="dashboard-panel-curated-no-data"]').exists()).toBe(false);
+    });
+
+    it("a tile resolving to a REAL 0 renders no no-data state — the two must look different", async () => {
+      wrapper = createWrapper({ data: eligible(), viewOnly: true });
+      const renderer = wrapper.findComponent({ name: "PanelSchemaRenderer" });
+      await settle(renderer, "");
+      expect(wrapper.find('[data-test="dashboard-panel-curated-no-data"]').exists()).toBe(false);
+    });
+
+    it("claims nothing before a load has settled — pending is not the same as empty", () => {
+      wrapper = createWrapper({ data: eligible(), viewOnly: true });
+      expect(wrapper.find('[data-test="dashboard-panel-curated-no-data"]').exists()).toBe(false);
+    });
+
+    it("a tile that HAD data and later settles empty re-reports no-data", async () => {
+      // The refresh path: watch(loading) true->false re-converts unconditionally
+      // (PanelSchemaRenderer.vue:1299-1301), so an emptied tile does re-emit.
+      wrapper = createWrapper({ data: eligible(), viewOnly: true });
+      const renderer = wrapper.findComponent({ name: "PanelSchemaRenderer" });
+      await settle(renderer, "");
+      expect(wrapper.find('[data-test="dashboard-panel-curated-no-data"]').exists()).toBe(false);
+      await settle(renderer, "No Data");
+      expect(wrapper.find('[data-test="dashboard-panel-curated-no-data"]').exists()).toBe(true);
+    });
+
+    it("a panel WITHOUT curated_no_data_eligible never renders the state", async () => {
+      wrapper = createWrapper({ data: mockPanelData, viewOnly: true });
+      const renderer = wrapper.findComponent({ name: "PanelSchemaRenderer" });
+      await settle(renderer, "No Data");
+      expect(wrapper.find('[data-test="dashboard-panel-curated-no-data"]').exists()).toBe(false);
+    });
+
+    // THE ANTI-DRIFT PIN. Everything above fires at a stub, so it is only
+    // trustworthy while the stub matches reality. This calls the REAL converter
+    // and pins the fact that made the original implementation inert: for a
+    // `metric` panel — the type the curated tiles use — an EMPTY promql result
+    // still produces exactly ONE synthetic rendering series. So counting
+    // `options.series` can never detect an empty metric tile, and any future
+    // "simplification" back to a length check fails here.
+    it("an empty metric result still emits one synthetic series — length cannot detect it", async () => {
+      const { convertPanelData } = await import("@/utils/dashboard/convertPanelData");
+      const panelSchema = {
+        type: "metric",
+        queryType: "promql",
+        queries: [{ query: "count(up)", customQuery: true, fields: { x: [], y: [] } }],
+        config: {},
+      };
+      const convert = (data: any) =>
+        convertPanelData(
+          panelSchema,
+          data,
+          store,
+          { value: { offsetWidth: 100, offsetHeight: 100 } },
+          { value: null },
+          { value: null },
+          { value: null },
+          {},
+          [],
+          false,
+        ) as Promise<any>;
+
+      const now = Math.floor(Date.now() / 1000);
+      const emptyResult = await convert([{ resultType: "matrix", result: [] }]);
+      const populated = await convert([
+        {
+          resultType: "matrix",
+          result: [{ metric: { __name__: "up" }, values: [[now, "5"]] }],
+        },
+      ]);
+
+      // The emitted payload is an object carrying options.series — never an array, never null.
+      expect(Array.isArray(emptyResult)).toBe(false);
+      expect(emptyResult).toHaveProperty("chartType");
+
+      // ...and the empty case is INDISTINGUISHABLE from the populated one by length.
+      expect(emptyResult.options.series.length).toBe(1);
+      expect(populated.options.series.length).toBe(1);
+      expect(emptyResult.options.series.length).toBe(populated.options.series.length);
+    });
+
+    // The inline subtitle was withdrawn: sharing the one-line PanelBar with the
+    // title, it consumed the width and truncated the titles it qualified
+    // ("Pods ru…", "Pods pe…", "Pods f…" — user-reported). The disclosure now
+    // lives once per section; the bar carries the title alone.
+    it("never renders a subtitle in the title bar, even when a key is stamped", () => {
+      wrapper = createWrapper({
+        data: {
+          ...mockPanelData,
+          config: { curated_subtitle_key: "infra.k8s.panel.podsFailedSub" },
+        },
+        viewOnly: true,
+      });
+      expect(wrapper.find('[data-test="dashboard-panel-curated-subtitle"]').exists()).toBe(false);
+    });
+
+    it("gives the title the full bar — nothing between it and the flex spacer", () => {
+      // The truncation was structural, not cosmetic: a sibling in the same
+      // one-line flex row takes width the title then has to ellipsise into.
+      // Pinned on the DOM shape so a future inline sibling reintroduces it red.
+      wrapper = createWrapper({
+        data: {
+          ...mockPanelData,
+          title: "Pods running",
+          config: { curated_subtitle_key: "infra.k8s.panel.podsFailedSub" },
+        },
+        viewOnly: true,
+      });
+      const bar = wrapper.find('[data-test="dashboard-panel-bar"]');
+      const header = bar.find('[data-test="dashboard-panel-header"]');
+      expect(header.exists()).toBe(true);
+      // The title element must not be forced to shrink by a sibling before the
+      // spacer: its immediate next sibling IS the spacer.
+      const children = Array.from(bar.element.children);
+      const headerIndex = children.indexOf(header.element);
+      const next = children[headerIndex + 1] as HTMLElement;
+      expect(next?.className).toContain("flex-1");
     });
   });
 });

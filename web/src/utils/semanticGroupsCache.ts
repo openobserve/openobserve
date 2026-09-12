@@ -31,6 +31,8 @@ interface CacheEntry {
 
 const cache = new Map<string, CacheEntry>();
 const pending = new Map<string, Promise<FieldAlias[]>>();
+/** Held only for the life of one request, so every awaiter sees the same failure. */
+const lastFailure = new Map<string, any>();
 
 /**
  * Whatever groups are held for an org, without fetching and without evicting —
@@ -66,17 +68,28 @@ export async function loadSemanticGroups(
   if (cached) return cached;
 
   const inFlight = pending.get(org);
-  if (inFlight) return await inFlight;
+  if (inFlight) {
+    const groups = await inFlight;
+    // A second caller awaiting the SAME request used to get [] with no failure
+    // signal — indistinguishable from "this org has no groups". It then raised a
+    // false groups-missing warning AND never populated its 403 negative cache,
+    // so the doomed request re-fired forever. The failure travels with the promise.
+    const failure = lastFailure.get(org);
+    if (failure) onError?.(failure);
+    return groups;
+  }
 
   // Deferred so the body cannot run before `pending` holds it: a synchronous
   // throw from the service would otherwise reach `finally` first, delete nothing,
   // and let the `set` below pin an already-settled `[]` for this org forever.
+  lastFailure.delete(org);
   const request = Promise.resolve().then(async (): Promise<FieldAlias[]> => {
     try {
       const response = await serviceStreamsApi.getSemanticGroups(org);
       cache.set(org, { data: response.data, timestamp: Date.now() });
       return response.data;
     } catch (err: any) {
+      lastFailure.set(org, err);
       onError?.(err);
       console.error("Error loading semantic groups:", err);
       return [];
@@ -93,12 +106,14 @@ export async function loadSemanticGroups(
 export function clearSemanticGroupsCacheForOrg(org: string) {
   cache.delete(org);
   pending.delete(org);
+  lastFailure.delete(org);
 }
 
 /** Drop every cached org — org switch, logout, tests. */
 export function clearSemanticGroupsCache() {
   cache.clear();
   pending.clear();
+  lastFailure.clear();
 }
 
 /** Per-org cache ages, for debugging. */

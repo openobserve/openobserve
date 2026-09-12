@@ -281,6 +281,16 @@ function childTo(child: SubnavChild) {
   return { name: child.name, query };
 }
 
+// Anchor-child rule (design 4.7): parentLink holds unless the child resolving to it gates out — then first visible child, so a DBM-off Infra tile can't bounce onto Traces.
+const tileLink = computed(() => {
+  const parent = props.parentItem;
+  if (!parent) return "";
+  const anchor = props.children.find((c) => childPath(c.name) === parent.link);
+  if (!anchor || visibleChildren.value.includes(anchor)) return parent.link;
+  const first = visibleChildren.value[0];
+  return first ? (childPath(first.name) ?? parent.link) : parent.link;
+});
+
 function childDataTest(child: SubnavChild): string {
   return `nav-group-item-${child.name}${child.tab ? `-${child.tab}` : ""}`;
 }
@@ -485,7 +495,7 @@ function onChildMouseenter(event: MouseEvent) {
       submenu
       :title="title"
       :icon="icon"
-      :link="parentItem.link"
+      :link="tileLink"
       :active="isGroupActive"
       :expanded="isOpen"
       @click="onLinkClick"

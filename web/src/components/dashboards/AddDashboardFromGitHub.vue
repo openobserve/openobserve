@@ -180,6 +180,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </ODialog>
 
+    <!-- Replace Confirmation Dialog -->
+    <ODialog
+      data-test="add-dashboard-github-replace-confirm"
+      :open="!!replaceConfirm"
+      persistent
+      size="sm"
+      :title="t('dashboard.addDashboardFromGitHub.replaceTitle')"
+      :primary-button-label="t('dashboard.addDashboardFromGitHub.replaceConfirm')"
+      :secondary-button-label="t('dashboard.addDashboardFromGitHub.replaceSkip')"
+      primary-button-variant="destructive"
+      @update:open="(open: boolean) => !open && resolveReplaceConfirm(false)"
+      @click:primary="resolveReplaceConfirm(true)"
+      @click:secondary="resolveReplaceConfirm(false)"
+    >
+      <OText>{{
+        t("dashboard.addDashboardFromGitHub.replaceMessage", {
+          title: replaceConfirm?.title ?? "",
+        })
+      }}</OText>
+    </ODialog>
+
     <!-- Add Folder Dialog -->
     <ODialog
       v-model:open="showAddFolderDialog"
@@ -206,11 +227,19 @@ import { defineComponent, ref, computed, watch } from "vue";
 import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import dashboardsService from "@/services/dashboards";
+import {
+  useDashboardGallery,
+  getCategoryInfo,
+  parseS3Files,
+  CATEGORY_ORDER,
+  S3_BASE,
+  S3_PREFIX,
+  type GalleryDashboard,
+} from "@/composables/useDashboardGallery";
 import AddFolder from "@/components/dashboards/AddFolder.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
@@ -220,13 +249,7 @@ import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
-interface GitHubDashboard {
-  name: string;
-  displayName: string;
-  description?: I18nText;
-  folderPath: string;
-  jsonFiles: string[];
-}
+type GitHubDashboard = GalleryDashboard;
 
 export default defineComponent({
   name: "AddDashboardFromGitHub",
@@ -248,6 +271,11 @@ export default defineComponent({
       type: Boolean,
       required: true,
     },
+    /** Pre-seeds the gallery search box on open (workload pages, design 4.9). */
+    initialSearch: {
+      type: String,
+      default: "",
+    },
   },
   emits: ["update:modelValue", "added"],
   setup(props, { emit }) {
@@ -259,10 +287,8 @@ export default defineComponent({
       set: (val) => emit("update:modelValue", val),
     });
 
-    const loading = ref(false);
-    const error = ref("");
-    const dashboards = ref<GitHubDashboard[]>([]);
-    const searchQuery = ref("");
+    const { dashboards, loading, error, loadDashboards } = useDashboardGallery();
+    const searchQuery = ref(props.initialSearch ?? "");
     const selectedDashboards = ref<GitHubDashboard[]>([]);
     const showFolderSelection = ref(false);
     const selectedFolderObj = ref<string | null>(null);
@@ -298,19 +324,6 @@ export default defineComponent({
       t(`dashboard.addDashboardFromGitHub.category.${category}`);
 
     // Group filtered dashboards by category for the gallery view
-    const CATEGORY_ORDER = [
-      "aws",
-      "cloudwatch",
-      "googleCloud",
-      "azure",
-      "kubernetes",
-      "database",
-      "networking",
-      "observability",
-      "security",
-      "storage",
-      "dashboard",
-    ];
     const groupedDashboards = computed(() => {
       const groups: Record<string, GitHubDashboard[]> = {};
       for (const d of filteredDashboards.value) {
@@ -338,75 +351,6 @@ export default defineComponent({
         selectedDashboards.value.splice(index, 1);
       } else {
         selectedDashboards.value.push(dashboard);
-      }
-    };
-
-    const S3_BASE = "https://openobserve-datasources-bucket.s3.amazonaws.com";
-    const S3_PREFIX = "dashboards/";
-
-    const parseS3Folders = (xmlText: string): string[] => {
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(xmlText, "application/xml");
-      const prefixes = Array.from(doc.querySelectorAll("CommonPrefixes Prefix"));
-      return prefixes
-        .map((el) => {
-          const full = el.textContent || "";
-          return full.replace(S3_PREFIX, "").replace(/\/$/, "");
-        })
-        .filter(Boolean);
-    };
-
-    const parseS3Files = (xmlText: string, folderPath: string): string[] => {
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(xmlText, "application/xml");
-      const keys = Array.from(doc.querySelectorAll("Contents Key"));
-      const prefix = `${S3_PREFIX}${folderPath}/`;
-      return keys
-        .map((el) => (el.textContent || "").replace(prefix, ""))
-        .filter((name) => name.endsWith(".json") && !name.includes("/"));
-    };
-
-    const loadDashboards = async () => {
-      loading.value = true;
-      error.value = "";
-      try {
-        // Check if we have cached data that's still valid
-        const cache = store.state.githubDashboardGallery;
-        const now = Date.now();
-        const cacheAge = cache.lastFetched ? now - cache.lastFetched : Infinity;
-
-        if (cache.dashboards.length > 0 && cacheAge < cache.cacheExpiry) {
-          dashboards.value = cache.dashboards;
-          loading.value = false;
-          return;
-        }
-
-        // Fetch folder list from S3 using List Objects v2 API (requires s3:ListBucket)
-        const response = await fetch(`${S3_BASE}/?list-type=2&prefix=${S3_PREFIX}&delimiter=/`);
-        if (!response.ok)
-          throw new Error(t("dashboard.addDashboardFromGitHub.fetchDashboardsError"));
-
-        const xmlText = await response.text();
-        const folderNames = parseS3Folders(xmlText).filter((name) => !name.startsWith("."));
-
-        const dashboardList = folderNames
-          .map((name) => ({
-            name,
-            displayName: name.replace(/_/g, " "),
-            folderPath: name,
-            jsonFiles: [],
-          }))
-          .sort((a: any, b: any) => a.displayName.localeCompare(b.displayName));
-
-        store.commit("setGithubDashboardGallery", dashboardList);
-        dashboards.value = dashboardList;
-      } catch (err) {
-        error.value =
-          err instanceof Error
-            ? err.message
-            : t("dashboard.addDashboardFromGitHub.loadGalleryError");
-      } finally {
-        loading.value = false;
       }
     };
 
@@ -504,10 +448,24 @@ export default defineComponent({
       }
     };
 
+    // Closing the drawer must stop the batch — not just unpark the current confirm.
+    let importCancelled = false;
+    // Replace-on-import needs an explicit user confirm (design 4.3); the import loop parks here.
+    const replaceConfirm = ref<{ title: string; resolve: (ok: boolean) => void } | null>(null);
+    const requestReplaceConfirm = (title: string) =>
+      new Promise<boolean>((resolve) => {
+        replaceConfirm.value = { title, resolve };
+      });
+    const resolveReplaceConfirm = (ok: boolean) => {
+      replaceConfirm.value?.resolve(ok);
+      replaceConfirm.value = null;
+    };
+
     const confirmAdd = async () => {
       if (selectedDashboards.value.length === 0 || !selectedFolderObj.value) return;
 
       importing.value = true;
+      importCancelled = false;
       try {
         const orgId = store.state.selectedOrganization.identifier;
         const folderId = selectedFolderObj.value;
@@ -517,7 +475,9 @@ export default defineComponent({
 
         // Import each selected dashboard and all its JSON files
         for (const dashboard of selectedDashboards.value) {
+          if (importCancelled) break;
           for (const jsonFile of dashboard.jsonFiles) {
+            if (importCancelled) break;
             try {
               // Check cache first
               const cacheKey = `${dashboard.folderPath}/${jsonFile}`;
@@ -567,7 +527,10 @@ export default defineComponent({
               );
 
               if (existingDashboard) {
-                // Delete existing dashboard before importing
+                // Declining skips this file only; the rest of the batch proceeds.
+                const replace = await requestReplaceConfirm(dashboardTitle);
+                if (importCancelled) break;
+                if (!replace) continue;
                 const existingDashboardId =
                   existingDashboard?.dashboardId ||
                   existingDashboard?.dashboard_id ||
@@ -597,7 +560,15 @@ export default defineComponent({
           }
         }
 
-        // Show summary notification
+        // A cancelled batch shows no summary — the drawer is already gone.
+        if (importCancelled) return;
+
+        // Show summary notification; a batch that was entirely declined is not a failure
+        if (successCount === 0 && failCount === 0) {
+          show.value = false;
+          showFolderSelection.value = false;
+          return;
+        }
         if (successCount > 0 && failCount === 0) {
           toast({
             variant: "success",
@@ -646,8 +617,13 @@ export default defineComponent({
     // Load dashboards when dialog opens
     watch(show, (newVal) => {
       if (newVal) {
+        searchQuery.value = props.initialSearch ?? "";
         loadDashboards();
       } else {
+        // Close aborts the batch: resolving the parked confirm alone would let later files re-park a dialog over a closed drawer.
+        importCancelled = true;
+        // A confirm left parked by a programmatic close would leak `importing` forever.
+        resolveReplaceConfirm(false);
         // Reset state when closing
         selectedDashboards.value = [];
         searchQuery.value = "";
@@ -678,6 +654,8 @@ export default defineComponent({
       loadDashboards,
       handleNext,
       confirmAdd,
+      replaceConfirm,
+      resolveReplaceConfirm,
       updateFolderList,
       getCategoryInfo,
       groupedDashboards,
@@ -686,80 +664,4 @@ export default defineComponent({
     };
   },
 });
-
-// Classify a dashboard into a category key, its icon, and a token-backed
-// badge variant. Category keys resolve to translated labels via categoryLabel().
-function getCategoryInfo(dashboard: { name: string }): {
-  icon: string;
-  variant: BadgeVariant;
-  category: string;
-} {
-  const n = dashboard.name.toLowerCase();
-  if (
-    n.includes("aws") ||
-    n.includes("amazon") ||
-    n.includes("ec2") ||
-    n.includes("s3") ||
-    n.includes("rds") ||
-    n.includes("elb") ||
-    n.includes("lambda")
-  )
-    return { icon: "cloud", variant: "orange-soft", category: "aws" };
-  if (n.includes("cloudwatch"))
-    return { icon: "cloud", variant: "orange-soft", category: "cloudwatch" };
-  if (n.includes("gcp") || n.includes("google") || n.includes("bigquery") || n.includes("pubsub"))
-    return { icon: "cloud", variant: "blue-soft", category: "googleCloud" };
-  if (n.includes("azure") || n.includes("microsoft"))
-    return { icon: "cloud", variant: "cyan-soft", category: "azure" };
-  if (
-    n.includes("kubernetes") ||
-    n.includes("k8s") ||
-    n.includes("kube") ||
-    n.includes("pod") ||
-    n.includes("helm") ||
-    n.includes("container") ||
-    n.includes("docker")
-  )
-    return { icon: "hub", variant: "indigo-soft", category: "kubernetes" };
-  if (
-    n.includes("postgres") ||
-    n.includes("mysql") ||
-    n.includes("mongo") ||
-    n.includes("redis") ||
-    n.includes("elastic") ||
-    n.includes("cassandra") ||
-    n.includes("database") ||
-    n.includes("db")
-  )
-    return { icon: "database", variant: "purple-soft", category: "database" };
-  if (
-    n.includes("nginx") ||
-    n.includes("apache") ||
-    n.includes("haproxy") ||
-    n.includes("istio") ||
-    n.includes("envoy") ||
-    n.includes("traefik")
-  )
-    return { icon: "dns", variant: "teal-soft", category: "networking" };
-  if (
-    n.includes("security") ||
-    n.includes("audit") ||
-    n.includes("threat") ||
-    n.includes("waf") ||
-    n.includes("firewall")
-  )
-    return { icon: "shield", variant: "error-soft", category: "security" };
-  if (
-    n.includes("monitor") ||
-    n.includes("alert") ||
-    n.includes("metric") ||
-    n.includes("prometheus") ||
-    n.includes("opentelemetry") ||
-    n.includes("otel")
-  )
-    return { icon: "monitor-heart", variant: "success-soft", category: "observability" };
-  if (n.includes("storage") || n.includes("disk") || n.includes("blob"))
-    return { icon: "storage", variant: "amber-soft", category: "storage" };
-  return { icon: "dashboard", variant: "primary-soft", category: "dashboard" };
-}
 </script>

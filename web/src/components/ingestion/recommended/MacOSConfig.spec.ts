@@ -68,7 +68,7 @@ describe("macosCard builder", () => {
     const card = macosCard(SUBS, gt);
     expect(card.provider.name).toBe("macOS");
     expect(card.provider.metaBadges).toEqual(["Logs", "Metrics"]);
-    expect(card.steps.map((s) => s.id)).toEqual(["install", "verify"]);
+    expect(card.steps.map((s) => s.id)).toEqual(["install", "verify", "dashboard"]);
     // Host metrics fan out per metric, so detection is existence-based.
     expect(card.detect).toMatchObject({
       streamType: "metrics",

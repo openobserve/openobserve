@@ -447,6 +447,60 @@ describe("Dashboards.vue", () => {
     });
   });
 
+  // T1.3 (design 4.3/§6): template cards render only on the true "new org" empty state.
+  describe("Empty-state template suggestion cards", () => {
+    const findCards = () => wrapper.findComponent({ name: "TemplateSuggestionCards" });
+
+    it("renders TemplateSuggestionCards for the default folder with no filter", async () => {
+      wrapper = shallowMount(Dashboards, {
+        global: buildGlobalConfig(store, router, i18n),
+      });
+      await nextTick();
+      await nextTick();
+      expect(findCards().exists()).toBe(true);
+    });
+
+    it("does not render them in a non-default folder", async () => {
+      wrapper = shallowMount(Dashboards, {
+        global: buildGlobalConfig(store, router, i18n, { folder: "folder1" }),
+      });
+      await nextTick();
+      await nextTick();
+      expect(findCards().exists()).toBe(false);
+    });
+
+    it("does not render them while a filter query is active", async () => {
+      wrapper = shallowMount(Dashboards, {
+        global: buildGlobalConfig(store, router, i18n),
+      });
+      await nextTick();
+      wrapper.vm.filterQuery = "cpu";
+      await nextTick();
+      // The cards' own frozen spec pins that this prop suppresses rendering.
+      expect(findCards().props("filterQuery")).toBe("cpu");
+    });
+
+    it("does not render them on the favorites view", async () => {
+      wrapper = shallowMount(Dashboards, {
+        global: buildGlobalConfig(store, router, i18n, { folder: "__favorites__" }),
+      });
+      await nextTick();
+      await nextTick();
+      expect(findCards().exists()).toBe(false);
+    });
+
+    it("opens the templates drawer on the cards' open-drawer event", async () => {
+      wrapper = shallowMount(Dashboards, {
+        global: buildGlobalConfig(store, router, i18n),
+      });
+      await nextTick();
+      await nextTick();
+      findCards().vm.$emit("open-drawer");
+      await nextTick();
+      expect(wrapper.vm.showAddDashboardFromGitHub).toBe(true);
+    });
+  });
+
   describe("Computed Properties", () => {
     it("should define table columns correctly", async () => {
       wrapper = shallowMount(Dashboards, {

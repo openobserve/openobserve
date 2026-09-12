@@ -15,7 +15,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { nextTick } from "vue";
+import { nextTick, reactive } from "vue";
 import VariablesValueSelector from "./VariablesValueSelector.vue";
 
 // Mock external dependencies
@@ -89,7 +89,12 @@ vi.mock("@/utils/zincutils", () => ({
   isWebSocketEnabled: vi.fn(() => false),
 }));
 
-vi.mock("@/utils/dashboard/variables/variablesDependencyUtils", () => ({
+// Partial: the real variables manager builds the SCOPED graph from this module,
+// so replacing the whole module leaves it without the chain it is being tested on.
+vi.mock("@/utils/dashboard/variables/variablesDependencyUtils", async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import("@/utils/dashboard/variables/variablesDependencyUtils")
+  >()),
   buildVariablesDependencyGraph: vi.fn((variables: any[]) => {
     const graph: any = {};
     variables.forEach((variable) => {
@@ -1597,6 +1602,253 @@ describe("VariablesValueSelector", () => {
       const emittedEvents = wrapper.emitted("openAddVariable");
       expect(emittedEvents).toBeDefined();
       expect(emittedEvents!.length).toBeGreaterThan(0);
+    });
+  });
+
+  // An all-sentinel parent keeps its `_o2_all_` value across its OWN fetch, so
+  // its value never changes when the options arrive. Gating the manager
+  // notification on a changed VALUE therefore never fires for such a parent, and
+  // onVariablePartiallyLoaded is the only thing that marks a dependent child
+  // pending — so the child never loads and its picker stays permanently empty.
+  // Completion, not change, is what a child waits on.
+  describe("a chained child is notified when its all-sentinel parent finishes loading", () => {
+    const chainedConfig = {
+      list: [
+        {
+          name: "namespace",
+          type: "query_values",
+          label: "Namespace",
+          multiSelect: true,
+          selectAllValueForMultiSelect: "all",
+          loadOptionsWithAllDefault: true,
+          query_data: {
+            field: "k8s_namespace_name",
+            stream: "k8s_pod_memory_usage",
+            stream_type: "metrics",
+            max_record_size: 100,
+            filter: [],
+          },
+        },
+        {
+          name: "pod",
+          type: "query_values",
+          label: "Pod",
+          multiSelect: true,
+          selectAllValueForMultiSelect: "all",
+          loadOptionsWithAllDefault: true,
+          query_data: {
+            field: "k8s_pod_name",
+            stream: "k8s_pod_memory_usage",
+            stream_type: "metrics",
+            max_record_size: 100,
+            filter: [{ name: "k8s_namespace_name", operator: "IN", value: "$namespace" }],
+          },
+        },
+      ],
+    };
+
+    it("notifies the manager on completion even though the parent value never changed", async () => {
+      const { useVariablesManager } = await import("@/composables/dashboard/useVariablesManager");
+      const manager = useVariablesManager(((key: string) => key) as never);
+      await manager.initialize(chainedConfig.list as any, {});
+
+      const parent = manager.variablesData.global.find((v: any) => v.name === "namespace") as any;
+      const child = manager.variablesData.global.find((v: any) => v.name === "pod") as any;
+      // The premise of the whole test: the child is NOT already pending, so the
+      // only way it ever loads is the notification under test.
+      expect(child.isVariableLoadingPending).toBe(false);
+      const valueBefore = JSON.stringify(parent.value);
+
+      wrapper = createWrapper({
+        variablesConfig: chainedConfig,
+        variablesManager: manager,
+        scope: "global",
+      });
+      await nextTick();
+
+      const vm = wrapper.vm as any;
+      const parentVariable = vm.variablesData.values.find((v: any) => v.name === "namespace");
+
+      // The parent's own fetch completes and returns options, but an all-sentinel
+      // parent holds `_o2_all_` throughout — so its VALUE is unchanged. `end` on
+      // the data channel is the completion signal the component acts on.
+      mockStreamingComposable.fetchQueryDataWithHttpStream.mockImplementation(
+        (payload: any, handlers: any) => {
+          handlers.data(payload, {
+            type: "search_response_hits",
+            content: {
+              results: {
+                hits: [
+                  {
+                    field: "k8s_namespace_name",
+                    values: [{ zo_sql_key: "argocd" }, { zo_sql_key: "monitor" }],
+                  },
+                ],
+              },
+            },
+          });
+          handlers.data(payload, { type: "end", content: {} });
+        },
+      );
+
+      await vm.loadVariableOptions(parentVariable);
+      // The child's own fetch is dispatched asynchronously once it is told.
+      await nextTick();
+      await new Promise((r) => setTimeout(r, 0));
+      await nextTick();
+
+      expect(JSON.stringify(parent.value), "parent value must be unchanged").toBe(valueBefore);
+
+      // The observable consequence, and the one the user sees: the child issues
+      // its own values query. Before the fix it was never notified, never became
+      // pending, never fetched, and its picker stayed empty forever.
+      const podCall = mockStreamingComposable.fetchQueryDataWithHttpStream.mock.calls.find(
+        (call: any) => JSON.stringify(call[0]).includes("k8s_pod_name"),
+      );
+      expect(podCall, "child never issued its values query").toBeTruthy();
+      expect(JSON.stringify(podCall[0])).not.toContain("$namespace");
+    });
+  });
+
+  // In manager mode the rendered set comes from the MANAGER's scope arrays, not
+  // from variablesConfig, so a filter on the config prop alone is ignored and
+  // every global variable renders on every tab. The narrowing must gate RENDERING
+  // only: filtering the managed list itself also removed the picker from
+  // variablesData.values, which is what checkAndLoadPendingVariables walks — so
+  // the pod picker was never loaded at all and stayed permanently empty.
+  describe("curatedTabs narrows the rendered set in manager mode", () => {
+    const managerWith = (vars: any[]) => ({
+      variablesData: { global: vars, tabs: {}, panels: {} },
+      getAllVisibleVariables: vi.fn(() => vars),
+      updateVariableValue: vi.fn(),
+      onVariablePartiallyLoaded: vi.fn(),
+    });
+
+    const scopedVars = () => [
+      {
+        name: "cluster",
+        type: "query_values",
+        scope: "global",
+        value: [],
+        curatedTabs: ["overview"],
+      },
+      { name: "pod", type: "query_values", scope: "global", value: [], curatedTabs: ["workloads"] },
+      { name: "always", type: "query_values", scope: "global", value: [] },
+    ];
+
+    const mountOn = async (tabId: string) => {
+      wrapper = createWrapper({
+        variablesManager: managerWith(scopedVars()),
+        scope: "global",
+        tabId,
+      });
+      await nextTick();
+      return wrapper;
+    };
+
+    /** Names whose container is actually shown (v-show sets display:none). */
+    const visibleNames = (w: any) =>
+      w
+        .findAll('[data-test^="dashboard-variable-"][data-test$="-container"]')
+        .filter((el: any) => (el.attributes("style") || "").indexOf("display: none") === -1)
+        .map((el: any) =>
+          el
+            .attributes("data-test")
+            .replace(/^dashboard-variable-/, "")
+            .replace(/-container$/, ""),
+        );
+
+    it("renders only the pickers the ACTIVE tab declares", async () => {
+      expect(visibleNames(await mountOn("overview"))).toEqual(["cluster", "always"]);
+    });
+
+    it("renders a different set on another tab — the tab-switch case", async () => {
+      expect(visibleNames(await mountOn("workloads"))).toEqual(["pod", "always"]);
+    });
+
+    // The bug this guards: an off-tab picker must still LOAD, because a curated
+    // panel on another tab substitutes its value. Narrowing the managed list
+    // instead of the rendering removed it from the loading walk entirely.
+    it("keeps every picker in the loading list regardless of tab", async () => {
+      const w = await mountOn("overview");
+      expect((w.vm as any).variablesData.values.map((v: any) => v.name)).toEqual([
+        "cluster",
+        "pod",
+        "always",
+      ]);
+    });
+  });
+
+  // When a parent finishes, the manager resets each chained child — value to [],
+  // options cleared, isVariableLoadingPending = true — so the child reloads under
+  // the new parent value. syncManagerVariablesToLocal then saw an all-sentinel
+  // child sitting at an "empty" value and helpfully restored `_o2_all_`, marked it
+  // partially loaded and CLEARED the pending flag — cancelling the very load the
+  // manager had just scheduled. The child then never queried and stayed empty.
+  describe("the local sync must not cancel a load the manager just scheduled", () => {
+    it("leaves a manager-reset child pending so it still fetches", async () => {
+      // Starts with a REAL previous value, so the first sync records it in
+      // oldVariablesData. That prior value is the precondition for the sync
+      // classifying the manager's later reset as "restore the all-default".
+      const child: any = {
+        name: "pod",
+        type: "query_values",
+        scope: "global",
+        multiSelect: true,
+        selectAllValueForMultiSelect: "all",
+        loadOptionsWithAllDefault: true,
+        value: ["pod-a"],
+        options: [{ label: "pod-a", value: "pod-a" }],
+        isLoading: false,
+        isVariableLoadingPending: false,
+        isVariablePartialLoaded: true,
+        query_data: {
+          field: "k8s_pod_name",
+          stream: "k8s_pod_memory_usage",
+          stream_type: "metrics",
+          max_record_size: 100,
+          filter: [{ name: "k8s_namespace_name", operator: "IN", value: "$namespace" }],
+        },
+      };
+      // reactive() so the component's deep watcher actually sees the manager
+      // mutate the child, exactly as the real manager does.
+      const state = reactive({ global: [child], tabs: {}, panels: {} });
+      const manager = {
+        variablesData: state,
+        getAllVisibleVariables: vi.fn(() => state.global),
+        updateVariableValue: vi.fn(),
+        onVariablePartiallyLoaded: vi.fn(),
+      };
+
+      wrapper = createWrapper({ variablesManager: manager, scope: "global" });
+      await nextTick();
+      const vm = wrapper.vm as any;
+      mockStreamingComposable.fetchQueryDataWithHttpStream.mockClear();
+
+      // Now the parent finishes and the manager resets the child exactly as
+      // onVariablePartiallyLoaded does: cleared value/options, pending again.
+      const managed: any = state.global[0];
+      managed.value = [];
+      managed.options = [];
+      managed.isVariablePartialLoaded = false;
+      managed.isVariableLoadingPending = true;
+      await nextTick();
+      await nextTick();
+      await new Promise((r) => setTimeout(r, 0));
+      await nextTick();
+
+      const pod = vm.variablesData.values.find((v: any) => v.name === "pod");
+      // Either still queued, or already picked up and loading — both mean the
+      // scheduled load survived. What must NOT happen is being declared loaded
+      // while empty, which silently cancels it.
+      void pod;
+      // The observable consequence, and the only order-independent one: pod
+      // actually goes to the wire. Before the fix the sync declared it loaded
+      // and cleared its pending flag, so it never queried at all.
+      const podCall = mockStreamingComposable.fetchQueryDataWithHttpStream.mock.calls.find(
+        (call: any) => JSON.stringify(call?.[0] ?? {}).includes("k8s_pod_name"),
+      );
+      expect(podCall, "pod never issued its values query").toBeTruthy();
     });
   });
 

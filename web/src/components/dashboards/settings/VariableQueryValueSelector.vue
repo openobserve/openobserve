@@ -15,7 +15,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div>
+  <div class="relative">
+    <!-- A disabled control swallows its own pointer events, so the tooltip
+         trigger has to be an overlay above it rather than the control itself. -->
+    <div
+      v-if="disabled && disabledTooltipKey"
+      class="absolute inset-0 z-10"
+      data-test="variable-disabled-tooltip"
+    >
+      <OTooltip :content="t(disabledTooltipKey, disabledTooltipParams ?? {})" side="bottom" />
+    </div>
     <OSelect
       ref="selectRef"
       :model-value="oSelectModelValue"
@@ -28,6 +37,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :loading="variableItem.isLoading && !isOpen"
       :data-test="`variable-selector-${variableItem.name}-inner`"
       :multiple="variableItem.multiSelect"
+      :disabled="!!disabled"
+      :clearable="clearable"
       @search="onSearch"
       @open="onPopupShow"
       @close="onPopupHide"
@@ -126,12 +137,23 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useI18nTyped } from "@/types/i18n";
 
 export default defineComponent({
   name: "VariableQueryValueSelector",
-  components: { OSeparator, OSelect, OCheckbox, OSpinner },
-  props: ["modelValue", "variableItem", "loadOptions"],
+  components: { OSeparator, OSelect, OCheckbox, OSpinner, OTooltip },
+  props: {
+    modelValue: { type: null, default: undefined },
+    variableItem: { type: Object, default: undefined },
+    loadOptions: { type: Function, default: undefined },
+    // Declared Boolean so a valueless `disabled` attribute coerces to true
+    // rather than passing the falsy "" an array-form prop would hand through.
+    disabled: { type: Boolean, default: false },
+    disabledTooltipKey: { type: String, default: undefined },
+    disabledTooltipParams: { type: Object, default: undefined },
+    clearable: { type: Boolean, default: false },
+  },
   emits: ["update:modelValue", "search"],
   setup(props: any, { emit }) {
     const { t } = useI18nTyped();

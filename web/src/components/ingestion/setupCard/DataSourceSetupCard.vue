@@ -25,15 +25,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <script setup lang="ts">
 import { raw, useI18nTyped } from "@/types/i18n";
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { useStore } from "vuex";
+import { useRouter } from "vue-router";
 import { b64EncodeStandard } from "@/utils/zincutils";
 import useIngestion from "@/composables/useIngestion";
+import { importHostMetricsDashboard } from "@/composables/useHostMetricsDashboard";
+import { toast } from "@/lib/feedback/Toast/useToast";
 import CopyContent from "@/components/CopyContent.vue";
 import IngestionDocLink from "@/components/ingestion/IngestionDocLink.vue";
 import SetupCardRenderer from "./SetupCardRenderer.vue";
 import type { CardSubstitutions } from "./types";
 import { getDataSourceCard } from "./registry";
+import { HOST_AGENT_SLUGS } from "./content/osAgent";
 
 const props = defineProps<{
   /**
@@ -49,6 +53,7 @@ const props = defineProps<{
 }>();
 
 const store = useStore();
+const router = useRouter();
 const { t } = useI18nTyped();
 const { endpoint } = useIngestion();
 
@@ -65,6 +70,66 @@ const subs = computed<CardSubstitutions>(() => {
 });
 
 const content = computed(() => getDataSourceCard(props.slug, subs.value, t));
+
+// Detection is forwarded so an embedding page (Hosts empty state) can react to it.
+const emit = defineEmits<{
+  (e: "detected", count: number): void;
+}>();
+
+// Host Metrics auto-import (design 4.2) — host-agent slugs only, so the AWS EC2 embed comes free.
+const isHostAgentSlug = computed(() => HOST_AGENT_SLUGS.has(props.slug));
+const importedDashboard = ref<{ id: string; folderId: string } | null>(null);
+
+const onDetected = async (count: number) => {
+  emit("detected", count);
+  if (!isHostAgentSlug.value) return;
+  // Captured at detect time — an org switch before the toast click must not retarget.
+  const org = store.state.selectedOrganization?.identifier ?? "";
+  const result = await importHostMetricsDashboard(org);
+  // The user didn't invoke the import, so a failure here stays silent.
+  if (result.status === "error") return;
+  importedDashboard.value = { id: result.dashboardId, folderId: result.folderId };
+  toast({
+    variant: "success",
+    message: t(
+      result.status === "created"
+        ? "ingestion.setupCard.hostDashboardImported"
+        : "ingestion.setupCard.hostDashboardExists",
+    ),
+    timeout: 5000,
+    action: {
+      label: t("ingestion.setupCard.viewHosts"),
+      handler: () => router.push({ path: "/infra/hosts", query: { org_identifier: org } }),
+    },
+  });
+};
+
+const onStepAction = async (actionId: string) => {
+  if (actionId !== "view-host-dashboard" || !isHostAgentSlug.value) return;
+  const org = store.state.selectedOrganization?.identifier ?? "";
+  let target = importedDashboard.value;
+  if (!target) {
+    const result = await importHostMetricsDashboard(org);
+    if (result.status === "error") {
+      // User-invoked path: the failure must be visible and name its cause.
+      toast({
+        variant: "error",
+        message: t(
+          result.kind === "forbidden"
+            ? "ingestion.setupCard.hostDashboardImportForbidden"
+            : "ingestion.setupCard.hostDashboardImportFailed",
+        ),
+      });
+      return;
+    }
+    target = { id: result.dashboardId, folderId: result.folderId };
+    importedDashboard.value = target;
+  }
+  router.push({
+    path: "/dashboards/view",
+    query: { org_identifier: org, dashboard: target.id, folder: target.folderId },
+  });
+};
 </script>
 
 <template>
@@ -76,6 +141,8 @@ const content = computed(() => getDataSourceCard(props.slug, subs.value, t));
       :content="content"
       :subs="subs"
       data-test="data-source-setup-card"
+      @detected="onDetected"
+      @step-action="onStepAction"
     />
     <template v-else>
       <CopyContent v-if="fallbackContent" :content="raw(fallbackContent)" />

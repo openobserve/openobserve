@@ -110,16 +110,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </template>
 
-      <!-- PanelSchemaRenderer excludes `table` panels from its own OEmptyState,
-           so mirror the chart panels' "No Data" treatment here. -->
+      <!-- PanelSchemaRenderer excludes `table` panels from its own OEmptyState, so
+           mirror the chart panels' "No Data" treatment here. Forwarded like #bottom
+           so a parent can reword it — a triage table reports empty as "All clear". -->
       <template #empty>
-        <OEmptyState
-          size="inline"
-          icon="bar-chart"
-          :title="t('panel.noData')"
-          :backdrop="false"
-          data-test="no-data"
-        />
+        <slot name="empty">
+          <OEmptyState
+            size="inline"
+            icon="bar-chart"
+            :title="t('panel.noData')"
+            :backdrop="false"
+            data-test="no-data"
+          />
+        </slot>
       </template>
 
       <!-- Pagination footer: forward parent's #bottom slot or show default pagination controls -->

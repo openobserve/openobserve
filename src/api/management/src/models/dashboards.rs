@@ -346,6 +346,17 @@ mod tests {
     }
 
     #[test]
+    fn test_bundled_host_metrics_dashboard_dispatches_to_v8() {
+        // Pins the create endpoint's version dispatch on the real bundled asset.
+        let json = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../../web/src/assets/dashboards/host_metrics.dashboard.json"
+        ));
+        let body: DashboardRequestBody = serde_json::from_str(json).unwrap();
+        assert!(matches!(body, DashboardRequestBody::V8(_)));
+    }
+
+    #[test]
     fn test_from_request_body_v2_sets_version() {
         let json = serde_json::json!({
             "version": 2,

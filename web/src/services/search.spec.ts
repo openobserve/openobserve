@@ -554,7 +554,6 @@ describe("Search Service", () => {
       const params = {
         org_identifier: "test-org",
         query: "up",
-        start_time: 1609459200,
         end_time: 1609545600,
       };
 
@@ -563,6 +562,20 @@ describe("Search Service", () => {
       expect(mockHttp.get).toHaveBeenCalledWith(
         "/api/test-org/prometheus/api/v1/query?time=1609545600&query=up",
       );
+    });
+
+    it("builds an instant URL carrying no window — the endpoint has no start parameter", async () => {
+      await search.metrics_query({
+        org_identifier: "test-org",
+        query: "up",
+        end_time: 1609545600,
+      });
+
+      const url = mockHttp.get.mock.calls[0][0] as string;
+      expect(url).toContain("/prometheus/api/v1/query?");
+      expect(url).not.toContain("query_range");
+      expect(url).not.toContain("start");
+      expect(url).not.toContain("step");
     });
   });
 

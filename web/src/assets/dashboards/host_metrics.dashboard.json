@@ -1,0 +1,1578 @@
+{
+  "version": 8,
+  "dashboardId": "",
+  "title": "Host Metrics",
+  "description": "CPU, memory, disk and network for hosts running the OpenObserve agent or the OTel hostmetrics receiver. Use the Host filter at the top.",
+  "role": "",
+  "owner": "",
+  "created": "2026-09-03T00:00:00Z",
+  "variables": {
+    "list": [
+      {
+        "type": "query_values",
+        "name": "host_name",
+        "label": "Host",
+        "query_data": {
+          "stream_type": "metrics",
+          "stream": "system_memory_usage",
+          "field": "host_name",
+          "max_record_size": 100,
+          "filter": []
+        },
+        "value": "",
+        "options": [],
+        "multiSelect": true,
+        "selectAllValueForMultiSelect": "all",
+        "scope": "global"
+      },
+      {
+        "type": "query_values",
+        "name": "mountpoint",
+        "label": "Mountpoint",
+        "query_data": {
+          "stream_type": "metrics",
+          "stream": "system_filesystem_usage",
+          "field": "mountpoint",
+          "max_record_size": 100,
+          "filter": [
+            {
+              "name": "host_name",
+              "operator": "IN",
+              "value": "$host_name"
+            }
+          ]
+        },
+        "value": "",
+        "options": [],
+        "multiSelect": true,
+        "selectAllValueForMultiSelect": "all",
+        "scope": "global"
+      },
+      {
+        "type": "query_values",
+        "name": "device",
+        "label": "Disk device",
+        "query_data": {
+          "stream_type": "metrics",
+          "stream": "system_disk_io",
+          "field": "device",
+          "max_record_size": 100,
+          "filter": [
+            {
+              "name": "host_name",
+              "operator": "IN",
+              "value": "$host_name"
+            }
+          ]
+        },
+        "value": "",
+        "options": [],
+        "multiSelect": true,
+        "selectAllValueForMultiSelect": "all",
+        "scope": "global"
+      }
+    ],
+    "showDynamicFilters": true
+  },
+  "defaultDatetimeDuration": {
+    "type": "relative",
+    "relativeTimePeriod": "3h"
+  },
+  "tabs": [
+    {
+      "tabId": "overview",
+      "name": "Overview",
+      "panels": [
+        {
+          "id": "hm_overview_cpu_busy",
+          "type": "metric",
+          "title": "CPU busy",
+          "description": "",
+          "config": {
+            "show_legends": false,
+            "legends_position": "bottom",
+            "unit": "percent",
+            "unit_custom": null,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "100 * (1 - avg(irate(system_cpu_time{state=\"idle\",host_name=~\"$host_name\"}[5m])))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "default",
+                "stream_type": "logs",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 0,
+            "w": 32,
+            "h": 6,
+            "i": 0
+          }
+        },
+        {
+          "id": "hm_overview_load_15m",
+          "type": "metric",
+          "title": "Load 15m",
+          "description": "",
+          "config": {
+            "show_legends": false,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "avg(system_cpu_load_average_15m{host_name=~\"$host_name\"})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "default",
+                "stream_type": "logs",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 32,
+            "y": 0,
+            "w": 32,
+            "h": 6,
+            "i": 1
+          }
+        },
+        {
+          "id": "hm_overview_ram_used",
+          "type": "metric",
+          "title": "RAM used",
+          "description": "",
+          "config": {
+            "show_legends": false,
+            "legends_position": "bottom",
+            "unit": "percent",
+            "unit_custom": null,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "100 * sum(system_memory_usage{state=\"used\",host_name=~\"$host_name\"}) / sum(system_memory_usage{host_name=~\"$host_name\"})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "default",
+                "stream_type": "logs",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 64,
+            "y": 0,
+            "w": 32,
+            "h": 6,
+            "i": 2
+          }
+        },
+        {
+          "id": "hm_overview_disk_used",
+          "type": "metric",
+          "title": "Disk used",
+          "description": "",
+          "config": {
+            "show_legends": false,
+            "legends_position": "bottom",
+            "unit": "percent",
+            "unit_custom": null,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "100 * sum(system_filesystem_usage{state=\"used\",host_name=~\"$host_name\",device!~\"/dev/loop.*|tmpfs|nsfs|squashfs|overlay\"}) / sum(system_filesystem_usage{host_name=~\"$host_name\",device!~\"/dev/loop.*|tmpfs|nsfs|squashfs|overlay\"})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "default",
+                "stream_type": "logs",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 96,
+            "y": 0,
+            "w": 32,
+            "h": 6,
+            "i": 3
+          }
+        },
+        {
+          "id": "hm_overview_hosts_reporting",
+          "type": "metric",
+          "title": "Hosts reporting",
+          "description": "",
+          "config": {
+            "show_legends": false,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "count(count by (host_name) (system_cpu_time{host_name=~\"$host_name\"}))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "default",
+                "stream_type": "logs",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 128,
+            "y": 0,
+            "w": 32,
+            "h": 6,
+            "i": 4
+          }
+        },
+        {
+          "id": "hm_overview_net_throughput",
+          "type": "metric",
+          "title": "Net throughput",
+          "description": "",
+          "config": {
+            "show_legends": false,
+            "legends_position": "bottom",
+            "unit": "bps",
+            "unit_custom": null,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum(irate(system_network_io{host_name=~\"$host_name\"}[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "default",
+                "stream_type": "logs",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 160,
+            "y": 0,
+            "w": 32,
+            "h": 6,
+            "i": 5
+          }
+        },
+        {
+          "id": "hm_overview_cpu_by_host",
+          "type": "line",
+          "title": "CPU busy by host (top 10)",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "percent",
+            "unit_custom": null,
+            "drilldown": [
+              {
+                "name": "View logs for selected hosts",
+                "type": "logs",
+                "targetBlank": true,
+                "findBy": "name",
+                "data": {
+                  "logsMode": "custom",
+                  "logsQuery": "SELECT * FROM \"default\" WHERE host_name IN (${host_name:singlequote})",
+                  "url": "",
+                  "folder": "",
+                  "dashboard": "",
+                  "tab": "",
+                  "passAllVariables": true,
+                  "variables": []
+                }
+              }
+            ]
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "topk(10, 100 * (1 - avg by (host_name)(irate(system_cpu_time{state=\"idle\",host_name=~\"$host_name\"}[5m]))))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "default",
+                "stream_type": "logs",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{host_name}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 6,
+            "w": 96,
+            "h": 16,
+            "i": 6
+          }
+        },
+        {
+          "id": "hm_overview_memory_by_host",
+          "type": "line",
+          "title": "Memory used by host (top 10)",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "bytes",
+            "unit_custom": null,
+            "drilldown": [
+              {
+                "name": "View logs for selected hosts",
+                "type": "logs",
+                "targetBlank": true,
+                "findBy": "name",
+                "data": {
+                  "logsMode": "custom",
+                  "logsQuery": "SELECT * FROM \"default\" WHERE host_name IN (${host_name:singlequote})",
+                  "url": "",
+                  "folder": "",
+                  "dashboard": "",
+                  "tab": "",
+                  "passAllVariables": true,
+                  "variables": []
+                }
+              }
+            ]
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "topk(10, sum by (host_name)(system_memory_usage{state=\"used\",host_name=~\"$host_name\"}))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "default",
+                "stream_type": "logs",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{host_name}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 96,
+            "y": 6,
+            "w": 96,
+            "h": 16,
+            "i": 7
+          }
+        },
+        {
+          "id": "hm_overview_network_by_host",
+          "type": "line",
+          "title": "Network I/O by host (top 10)",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "bps",
+            "unit_custom": null,
+            "drilldown": [
+              {
+                "name": "View logs for selected hosts",
+                "type": "logs",
+                "targetBlank": true,
+                "findBy": "name",
+                "data": {
+                  "logsMode": "custom",
+                  "logsQuery": "SELECT * FROM \"default\" WHERE host_name IN (${host_name:singlequote})",
+                  "url": "",
+                  "folder": "",
+                  "dashboard": "",
+                  "tab": "",
+                  "passAllVariables": true,
+                  "variables": []
+                }
+              }
+            ]
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "topk(10, sum by (host_name, direction)(irate(system_network_io{host_name=~\"$host_name\"}[5m])))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "default",
+                "stream_type": "logs",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{host_name} {direction}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 22,
+            "w": 96,
+            "h": 16,
+            "i": 8
+          }
+        },
+        {
+          "id": "hm_overview_disk_io_by_host",
+          "type": "line",
+          "title": "Disk I/O by host (top 10)",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "bps",
+            "unit_custom": null,
+            "drilldown": [
+              {
+                "name": "View logs for selected hosts",
+                "type": "logs",
+                "targetBlank": true,
+                "findBy": "name",
+                "data": {
+                  "logsMode": "custom",
+                  "logsQuery": "SELECT * FROM \"default\" WHERE host_name IN (${host_name:singlequote})",
+                  "url": "",
+                  "folder": "",
+                  "dashboard": "",
+                  "tab": "",
+                  "passAllVariables": true,
+                  "variables": []
+                }
+              }
+            ]
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "topk(10, sum by (host_name, direction)(irate(system_disk_io{host_name=~\"$host_name\",device=~\"$device\"}[5m])))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "default",
+                "stream_type": "logs",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{host_name} {direction}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 96,
+            "y": 22,
+            "w": 96,
+            "h": 16,
+            "i": 9
+          }
+        }
+      ]
+    },
+    {
+      "tabId": "cpu",
+      "name": "CPU",
+      "panels": [
+        {
+          "id": "hm_cpu_busy_by_host",
+          "type": "line",
+          "title": "CPU busy by host",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "percent",
+            "unit_custom": null,
+            "drilldown": [
+              {
+                "name": "View logs for selected hosts",
+                "type": "logs",
+                "targetBlank": true,
+                "findBy": "name",
+                "data": {
+                  "logsMode": "custom",
+                  "logsQuery": "SELECT * FROM \"default\" WHERE host_name IN (${host_name:singlequote})",
+                  "url": "",
+                  "folder": "",
+                  "dashboard": "",
+                  "tab": "",
+                  "passAllVariables": true,
+                  "variables": []
+                }
+              }
+            ]
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "100 * (1 - avg by (host_name)(irate(system_cpu_time{state=\"idle\",host_name=~\"$host_name\"}[5m])))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "default",
+                "stream_type": "logs",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{host_name}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 0,
+            "w": 96,
+            "h": 16,
+            "i": 10
+          }
+        },
+        {
+          "id": "hm_cpu_by_state",
+          "type": "line",
+          "title": "CPU by state",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "percent-1",
+            "unit_custom": null,
+            "drilldown": [
+              {
+                "name": "View logs for selected hosts",
+                "type": "logs",
+                "targetBlank": true,
+                "findBy": "name",
+                "data": {
+                  "logsMode": "custom",
+                  "logsQuery": "SELECT * FROM \"default\" WHERE host_name IN (${host_name:singlequote})",
+                  "url": "",
+                  "folder": "",
+                  "dashboard": "",
+                  "tab": "",
+                  "passAllVariables": true,
+                  "variables": []
+                }
+              }
+            ]
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "avg by (state)(irate(system_cpu_time{host_name=~\"$host_name\",state!=\"idle\"}[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "default",
+                "stream_type": "logs",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{state}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 96,
+            "y": 0,
+            "w": 96,
+            "h": 16,
+            "i": 11
+          }
+        },
+        {
+          "id": "hm_cpu_load",
+          "type": "line",
+          "title": "Load 1m / 5m / 15m",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "drilldown": [
+              {
+                "name": "View logs for selected hosts",
+                "type": "logs",
+                "targetBlank": true,
+                "findBy": "name",
+                "data": {
+                  "logsMode": "custom",
+                  "logsQuery": "SELECT * FROM \"default\" WHERE host_name IN (${host_name:singlequote})",
+                  "url": "",
+                  "folder": "",
+                  "dashboard": "",
+                  "tab": "",
+                  "passAllVariables": true,
+                  "variables": []
+                }
+              }
+            ]
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "avg by (host_name)(system_cpu_load_average_1m{host_name=~\"$host_name\"})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "default",
+                "stream_type": "logs",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{host_name} 1m"
+              }
+            },
+            {
+              "query": "avg by (host_name)(system_cpu_load_average_5m{host_name=~\"$host_name\"})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "default",
+                "stream_type": "logs",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{host_name} 5m"
+              }
+            },
+            {
+              "query": "avg by (host_name)(system_cpu_load_average_15m{host_name=~\"$host_name\"})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "default",
+                "stream_type": "logs",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{host_name} 15m"
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 16,
+            "w": 96,
+            "h": 16,
+            "i": 12
+          }
+        }
+      ]
+    },
+    {
+      "tabId": "memory",
+      "name": "Memory",
+      "panels": [
+        {
+          "id": "hm_memory_by_state",
+          "type": "area-stacked",
+          "title": "Memory by state",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "bytes",
+            "unit_custom": null,
+            "drilldown": [
+              {
+                "name": "View logs for selected hosts",
+                "type": "logs",
+                "targetBlank": true,
+                "findBy": "name",
+                "data": {
+                  "logsMode": "custom",
+                  "logsQuery": "SELECT * FROM \"default\" WHERE host_name IN (${host_name:singlequote})",
+                  "url": "",
+                  "folder": "",
+                  "dashboard": "",
+                  "tab": "",
+                  "passAllVariables": true,
+                  "variables": []
+                }
+              }
+            ]
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (state)(system_memory_usage{host_name=~\"$host_name\"})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "default",
+                "stream_type": "logs",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{state}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 0,
+            "w": 96,
+            "h": 16,
+            "i": 13
+          }
+        },
+        {
+          "id": "hm_memory_used_pct_by_host",
+          "type": "line",
+          "title": "Memory used % by host",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "percent",
+            "unit_custom": null,
+            "drilldown": [
+              {
+                "name": "View logs for selected hosts",
+                "type": "logs",
+                "targetBlank": true,
+                "findBy": "name",
+                "data": {
+                  "logsMode": "custom",
+                  "logsQuery": "SELECT * FROM \"default\" WHERE host_name IN (${host_name:singlequote})",
+                  "url": "",
+                  "folder": "",
+                  "dashboard": "",
+                  "tab": "",
+                  "passAllVariables": true,
+                  "variables": []
+                }
+              }
+            ]
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "100 * sum by (host_name)(system_memory_usage{state=\"used\",host_name=~\"$host_name\"}) / sum by (host_name)(system_memory_usage{host_name=~\"$host_name\"})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "default",
+                "stream_type": "logs",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{host_name}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 96,
+            "y": 0,
+            "w": 96,
+            "h": 16,
+            "i": 14
+          }
+        },
+        {
+          "id": "hm_memory_free_by_host",
+          "type": "line",
+          "title": "Memory free by host",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "bytes",
+            "unit_custom": null,
+            "drilldown": [
+              {
+                "name": "View logs for selected hosts",
+                "type": "logs",
+                "targetBlank": true,
+                "findBy": "name",
+                "data": {
+                  "logsMode": "custom",
+                  "logsQuery": "SELECT * FROM \"default\" WHERE host_name IN (${host_name:singlequote})",
+                  "url": "",
+                  "folder": "",
+                  "dashboard": "",
+                  "tab": "",
+                  "passAllVariables": true,
+                  "variables": []
+                }
+              }
+            ]
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (host_name)(system_memory_usage{state=\"free\",host_name=~\"$host_name\"})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "default",
+                "stream_type": "logs",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{host_name}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 16,
+            "w": 96,
+            "h": 16,
+            "i": 15
+          }
+        }
+      ]
+    },
+    {
+      "tabId": "disk",
+      "name": "Disk",
+      "panels": [
+        {
+          "id": "hm_disk_fs_used_pct_current",
+          "type": "table",
+          "title": "Filesystem used % (current)",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "percent",
+            "unit_custom": null,
+            "drilldown": [
+              {
+                "name": "View logs for selected hosts",
+                "type": "logs",
+                "targetBlank": true,
+                "findBy": "name",
+                "data": {
+                  "logsMode": "custom",
+                  "logsQuery": "SELECT * FROM \"default\" WHERE host_name IN (${host_name:singlequote})",
+                  "url": "",
+                  "folder": "",
+                  "dashboard": "",
+                  "tab": "",
+                  "passAllVariables": true,
+                  "variables": []
+                }
+              }
+            ]
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "100 * sum by (host_name, mountpoint)(system_filesystem_usage{state=\"used\",host_name=~\"$host_name\",mountpoint=~\"$mountpoint\",device!~\"/dev/loop.*|tmpfs|nsfs|squashfs|overlay\"}) / sum by (host_name, mountpoint)(system_filesystem_usage{host_name=~\"$host_name\",mountpoint=~\"$mountpoint\",device!~\"/dev/loop.*|tmpfs|nsfs|squashfs|overlay\"})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "default",
+                "stream_type": "logs",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{host_name} {mountpoint}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 0,
+            "w": 96,
+            "h": 16,
+            "i": 16
+          }
+        },
+        {
+          "id": "hm_disk_fs_used_pct",
+          "type": "line",
+          "title": "Filesystem used %",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "percent",
+            "unit_custom": null,
+            "drilldown": [
+              {
+                "name": "View logs for selected hosts",
+                "type": "logs",
+                "targetBlank": true,
+                "findBy": "name",
+                "data": {
+                  "logsMode": "custom",
+                  "logsQuery": "SELECT * FROM \"default\" WHERE host_name IN (${host_name:singlequote})",
+                  "url": "",
+                  "folder": "",
+                  "dashboard": "",
+                  "tab": "",
+                  "passAllVariables": true,
+                  "variables": []
+                }
+              }
+            ]
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "100 * sum by (host_name, mountpoint)(system_filesystem_usage{state=\"used\",host_name=~\"$host_name\",mountpoint=~\"$mountpoint\",device!~\"/dev/loop.*|tmpfs|nsfs|squashfs|overlay\"}) / sum by (host_name, mountpoint)(system_filesystem_usage{host_name=~\"$host_name\",mountpoint=~\"$mountpoint\",device!~\"/dev/loop.*|tmpfs|nsfs|squashfs|overlay\"})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "default",
+                "stream_type": "logs",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{host_name} {mountpoint}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 96,
+            "y": 0,
+            "w": 96,
+            "h": 16,
+            "i": 17
+          }
+        },
+        {
+          "id": "hm_disk_fs_free",
+          "type": "line",
+          "title": "Filesystem free",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "bytes",
+            "unit_custom": null,
+            "drilldown": [
+              {
+                "name": "View logs for selected hosts",
+                "type": "logs",
+                "targetBlank": true,
+                "findBy": "name",
+                "data": {
+                  "logsMode": "custom",
+                  "logsQuery": "SELECT * FROM \"default\" WHERE host_name IN (${host_name:singlequote})",
+                  "url": "",
+                  "folder": "",
+                  "dashboard": "",
+                  "tab": "",
+                  "passAllVariables": true,
+                  "variables": []
+                }
+              }
+            ]
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (host_name, mountpoint)(system_filesystem_usage{state=\"free\",host_name=~\"$host_name\",mountpoint=~\"$mountpoint\",device!~\"/dev/loop.*|tmpfs|nsfs|squashfs|overlay\"})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "default",
+                "stream_type": "logs",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{host_name} {mountpoint}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 16,
+            "w": 96,
+            "h": 16,
+            "i": 18
+          }
+        },
+        {
+          "id": "hm_disk_read",
+          "type": "line",
+          "title": "Disk read",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "bps",
+            "unit_custom": null,
+            "drilldown": [
+              {
+                "name": "View logs for selected hosts",
+                "type": "logs",
+                "targetBlank": true,
+                "findBy": "name",
+                "data": {
+                  "logsMode": "custom",
+                  "logsQuery": "SELECT * FROM \"default\" WHERE host_name IN (${host_name:singlequote})",
+                  "url": "",
+                  "folder": "",
+                  "dashboard": "",
+                  "tab": "",
+                  "passAllVariables": true,
+                  "variables": []
+                }
+              }
+            ]
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (host_name, device)(irate(system_disk_io{direction=\"read\",host_name=~\"$host_name\",device=~\"$device\",device!~\"loop.*\"}[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "default",
+                "stream_type": "logs",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{host_name} {device}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 96,
+            "y": 16,
+            "w": 96,
+            "h": 16,
+            "i": 19
+          }
+        },
+        {
+          "id": "hm_disk_write",
+          "type": "line",
+          "title": "Disk write",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "bps",
+            "unit_custom": null,
+            "drilldown": [
+              {
+                "name": "View logs for selected hosts",
+                "type": "logs",
+                "targetBlank": true,
+                "findBy": "name",
+                "data": {
+                  "logsMode": "custom",
+                  "logsQuery": "SELECT * FROM \"default\" WHERE host_name IN (${host_name:singlequote})",
+                  "url": "",
+                  "folder": "",
+                  "dashboard": "",
+                  "tab": "",
+                  "passAllVariables": true,
+                  "variables": []
+                }
+              }
+            ]
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (host_name, device)(irate(system_disk_io{direction=\"write\",host_name=~\"$host_name\",device=~\"$device\",device!~\"loop.*\"}[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "default",
+                "stream_type": "logs",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{host_name} {device}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 32,
+            "w": 96,
+            "h": 16,
+            "i": 20
+          }
+        },
+        {
+          "id": "hm_disk_queue",
+          "type": "line",
+          "title": "Disk queue (weighted io time)",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "drilldown": [
+              {
+                "name": "View logs for selected hosts",
+                "type": "logs",
+                "targetBlank": true,
+                "findBy": "name",
+                "data": {
+                  "logsMode": "custom",
+                  "logsQuery": "SELECT * FROM \"default\" WHERE host_name IN (${host_name:singlequote})",
+                  "url": "",
+                  "folder": "",
+                  "dashboard": "",
+                  "tab": "",
+                  "passAllVariables": true,
+                  "variables": []
+                }
+              }
+            ]
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (host_name, device)(irate(system_disk_weighted_io_time{host_name=~\"$host_name\",device=~\"$device\",device!~\"loop.*\"}[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "default",
+                "stream_type": "logs",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{host_name} {device}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 96,
+            "y": 32,
+            "w": 96,
+            "h": 16,
+            "i": 21
+          }
+        }
+      ]
+    },
+    {
+      "tabId": "network",
+      "name": "Network",
+      "panels": [
+        {
+          "id": "hm_network_received",
+          "type": "line",
+          "title": "Received by host",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "bps",
+            "unit_custom": null,
+            "drilldown": [
+              {
+                "name": "View logs for selected hosts",
+                "type": "logs",
+                "targetBlank": true,
+                "findBy": "name",
+                "data": {
+                  "logsMode": "custom",
+                  "logsQuery": "SELECT * FROM \"default\" WHERE host_name IN (${host_name:singlequote})",
+                  "url": "",
+                  "folder": "",
+                  "dashboard": "",
+                  "tab": "",
+                  "passAllVariables": true,
+                  "variables": []
+                }
+              }
+            ]
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (host_name)(irate(system_network_io{direction=\"receive\",host_name=~\"$host_name\"}[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "default",
+                "stream_type": "logs",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{host_name}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 0,
+            "w": 96,
+            "h": 16,
+            "i": 22
+          }
+        },
+        {
+          "id": "hm_network_transmitted",
+          "type": "line",
+          "title": "Transmitted by host",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "bps",
+            "unit_custom": null,
+            "drilldown": [
+              {
+                "name": "View logs for selected hosts",
+                "type": "logs",
+                "targetBlank": true,
+                "findBy": "name",
+                "data": {
+                  "logsMode": "custom",
+                  "logsQuery": "SELECT * FROM \"default\" WHERE host_name IN (${host_name:singlequote})",
+                  "url": "",
+                  "folder": "",
+                  "dashboard": "",
+                  "tab": "",
+                  "passAllVariables": true,
+                  "variables": []
+                }
+              }
+            ]
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (host_name)(irate(system_network_io{direction=\"transmit\",host_name=~\"$host_name\"}[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "default",
+                "stream_type": "logs",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{host_name}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 96,
+            "y": 0,
+            "w": 96,
+            "h": 16,
+            "i": 23
+          }
+        },
+        {
+          "id": "hm_network_by_direction",
+          "type": "line",
+          "title": "I/O by direction",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "bps",
+            "unit_custom": null,
+            "drilldown": [
+              {
+                "name": "View logs for selected hosts",
+                "type": "logs",
+                "targetBlank": true,
+                "findBy": "name",
+                "data": {
+                  "logsMode": "custom",
+                  "logsQuery": "SELECT * FROM \"default\" WHERE host_name IN (${host_name:singlequote})",
+                  "url": "",
+                  "folder": "",
+                  "dashboard": "",
+                  "tab": "",
+                  "passAllVariables": true,
+                  "variables": []
+                }
+              }
+            ]
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (direction)(irate(system_network_io{host_name=~\"$host_name\"}[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "default",
+                "stream_type": "logs",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{direction}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 16,
+            "w": 96,
+            "h": 16,
+            "i": 24
+          }
+        }
+      ]
+    }
+  ]
+}

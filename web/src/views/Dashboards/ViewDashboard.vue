@@ -1206,7 +1206,9 @@ export default defineComponent({
 
     // Fallback-only: a dashboard opened from the Favorites pseudo-folder carries the folder it lives in, so rebuilding from route.query.folder here (rather than Favorites) is only reached when there's no real history to go back to.
     const goBackToDashboardList = useListBackNavigation({
-      isListPath: (path) => path === "/dashboards" || path.endsWith("/dashboards"),
+      // The Infrastructure pages push into a dashboard the same way the listing does, so back belongs there rather than on a listing the user never saw.
+      isListPath: (path) =>
+        path === "/dashboards" || path.endsWith("/dashboards") || path.startsWith("/infra/"),
       fallback: () => ({
         path: "/dashboards",
         query: {

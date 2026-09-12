@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { convertPromQLData } from "./convertPromQLData";
+import { createPromQLChunkProcessor } from "@/composables/dashboard/promqlChunkProcessor";
 import { getPropsByChartTypeForSeries } from "./promqlChartSeriesProps";
 import { chartColor } from "@/utils/chartTheme";
 import { applyMeasuredYAxisLeftInset } from "./chartDimensionUtils";
@@ -327,7 +328,8 @@ describe("Convert PromQL Data Utils", () => {
       const metadata = {
         seriesLimiting: {
           totalMetricsReceived: 9, // 3 series × 3 chunks
-          metricsStored: 3, // Only 3 unique series
+          uniqueSeriesSeen: 3, // the same 3 series re-delivered, nothing dropped
+          metricsStored: 3,
           maxSeries: 100,
         },
       };
@@ -374,8 +376,9 @@ describe("Convert PromQL Data Utils", () => {
 
       const metadata = {
         seriesLimiting: {
-          totalMetricsReceived: 150, // Received 150 metrics
-          metricsStored: 100, // Only stored 100 (hit the limit)
+          totalMetricsReceived: 150,
+          uniqueSeriesSeen: 150, // 150 distinct series existed
+          metricsStored: 100, // only 100 survived the cap, so 50 were dropped
           maxSeries: 100,
         },
       };
@@ -747,6 +750,42 @@ describe("Convert PromQL Data Utils", () => {
 
       expect(result.options).toBeDefined();
       expect(result.extras.isTimeSeries).toBe(false);
+    });
+
+    it("renders the NUMBER for a vector result, exactly as it does for a matrix", async () => {
+      // An INSTANT promql query returns resultType "vector"; a range query returns
+      // "matrix". The matrix branch builds a custom series carrying `_metricText`
+      // and a renderItem that paints the value — the vector branch returned a bare
+      // {name, value} with no renderer, so a curated instant tile with a perfectly
+      // good scalar (measured: 8) painted an empty box.
+      const panelSchema = {
+        id: "panel1",
+        type: "metric",
+        config: {},
+        queries: [{ config: { promql_legend: "" } }],
+      };
+      const vectorData = [
+        {
+          resultType: "vector",
+          result: [{ metric: {}, value: [1640435200, "8"] }],
+        },
+      ];
+
+      const result = await convertPromQLData(
+        panelSchema,
+        vectorData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockAnnotations,
+      );
+
+      const painted = (result.options?.series ?? []).find((s: any) => s?._metricText);
+      expect(
+        painted,
+        "a vector metric must build the text series the matrix branch builds",
+      ).toBeDefined();
+      expect(String(painted._metricText)).toContain("8");
     });
 
     it("should handle legends position right", async () => {
@@ -3869,7 +3908,12 @@ describe("Convert PromQL Data Utils", () => {
         );
 
         expect(result.extras.isTimeSeries).toBe(false);
-        expect(result.options.backgroundColor).toBe("transparent"); // Default background is transparent
+        // The panel configures background.value.color = "#ff0000", and a vector
+        // (instant) result now honours panel config the same way a matrix (range)
+        // result always has. The previous "transparent" expectation was recording
+        // the bug: the vector branch returned a bare data point and applied no
+        // metric styling at all, which is why an instant tile painted nothing.
+        expect(result.options.backgroundColor).toBe("#ff0000");
         expect(result.options.series).toHaveLength(1);
       });
 
@@ -4623,6 +4667,86 @@ describe("Convert PromQL Data Utils", () => {
       );
 
       expect(result.options.series.map((s: any) => s.name).filter(Boolean)).toEqual(["api", "api"]);
+    });
+  });
+
+  // Dropping a series whole is silent data loss unless the panel says so. These drive the
+  // REAL chunk processor, because hand-written seriesLimiting can assert a shape it never emits.
+  describe("series-limit warning, driven by the real chunk processor", () => {
+    const streamThroughProcessor = (uniqueSeries: number, chunks: number, maxSeries: number) => {
+      const processor = createPromQLChunkProcessor({ maxSeries, enableLogging: false });
+      const names = Array.from({ length: uniqueSeries }, (_, i) => `host_${i}`);
+      let merged: any = null;
+      for (let c = 0; c < chunks; c++) {
+        merged = processor.processChunk(merged, {
+          resultType: "matrix",
+          result: names.map((instance) => ({
+            metric: { __name__: "cpu", instance },
+            values: [[1640435200 + c * 60, "1"]] as [number, string][],
+          })),
+        });
+      }
+      const stats = processor.getStats();
+      return {
+        searchQueryData: [{ resultType: "matrix", result: merged.result }],
+        metadata: {
+          seriesLimiting: {
+            totalMetricsReceived: stats.totalMetricsReceived,
+            uniqueSeriesSeen: stats.uniqueSeriesSeen,
+            metricsStored: stats.metricsStored,
+            maxSeries,
+          },
+        },
+      };
+    };
+
+    const panelSchema = {
+      id: "panel1",
+      type: "line",
+      config: {},
+      queries: [{ config: { promql_legend: "" } }],
+    };
+
+    const convert = async (fixture: ReturnType<typeof streamThroughProcessor>) =>
+      convertPromQLData(
+        panelSchema,
+        fixture.searchQueryData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockAnnotations,
+        fixture.metadata,
+      );
+
+    beforeEach(() => {
+      mockStore.state.zoConfig.max_dashboard_series = 100;
+    });
+
+    it("warns when the cap drops series, so the loss is never silent", async () => {
+      const fixture = streamThroughProcessor(150, 6, 100);
+      expect(fixture.metadata.seriesLimiting.metricsStored).toBe(100);
+
+      const result = await convert(fixture);
+
+      expect(result.extras.limitNumberOfSeriesWarningMessage).toBe(
+        "Limiting the displayed series to ensure optimal performance",
+      );
+    });
+
+    it("does not warn when every series survived, even at exactly the cap", async () => {
+      const fixture = streamThroughProcessor(100, 6, 100);
+      expect(fixture.metadata.seriesLimiting.metricsStored).toBe(100);
+      expect(fixture.metadata.seriesLimiting.totalMetricsReceived).toBe(600);
+
+      const result = await convert(fixture);
+
+      expect(result.extras.limitNumberOfSeriesWarningMessage).toBeUndefined();
+    });
+
+    it("does not warn when one series is re-delivered by every chunk", async () => {
+      const result = await convert(streamThroughProcessor(40, 6, 100));
+
+      expect(result.extras.limitNumberOfSeriesWarningMessage).toBeUndefined();
     });
   });
 });

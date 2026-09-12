@@ -436,16 +436,44 @@ describe("groupNavLinks", () => {
     expect(Object.keys(NAV_SUBNAV)).toEqual(["traces"]);
   });
 
-  it("emits Infra as a link+subnav tile carrying Database Monitoring", () => {
+  it("emits Infra as a link+subnav tile with Hosts declared FIRST", () => {
     const entries = groupNavLinks([link("home"), link("traces")]);
     const infra = infraGroup(entries);
     expect(infra).toBeTruthy();
-    // Clicking the tile lands on Database Monitoring — Infra's only destination.
-    // Under `/infra/`, not the `/traces/` prefix it shipped with: the section
-    // is Infra's, and the URL now agrees with the rail. `/traces/databases`
-    // still resolves via the redirect registered in router.ts.
+    // Declared child order IS the flyout order (pass-4 finding 4): Hosts leads; parentLink stays Databases.
     expect(infra?.item.link).toBe("/infra/databases");
-    expect(infra?.children.map((c) => c.name)).toEqual(["dbmDatabases"]);
+    expect(infra?.children.map((c) => c.name)).toEqual([
+      "infraHosts",
+      "dbmDatabases",
+      "infraKubernetes",
+    ]);
+  });
+
+  it("declares the two workload children ungated, with their titleKey/icon/route", () => {
+    // Ungated = always present under Infra; detection changes page state, never existence.
+    const infra = NAV_GROUPS.find((g) => g.key === "infra");
+    const byName = (name: string) => infra?.children.find((c) => c.name === name);
+    expect(byName("infraHosts")).toMatchObject({
+      titleKey: "menu.hosts",
+      icon: "dns",
+      name: "infraHosts",
+    });
+    expect(byName("infraKubernetes")).toMatchObject({
+      titleKey: "menu.kubernetes",
+      icon: "hub",
+      name: "infraKubernetes",
+    });
+    for (const name of ["infraHosts", "infraKubernetes"]) {
+      expect(byName(name)?.gate, name).toBeUndefined();
+    }
+  });
+
+  // An entry whose workload has no registered curated pack renders a dead end,
+  // so Infra must not regrow an AWS child while no AWS pack exists.
+  it("declares NO aws child under Infra", () => {
+    const infra = NAV_GROUPS.find((g) => g.key === "infra");
+    expect(infra?.children.find((c) => c.name === "infraAws")).toBeUndefined();
+    expect(infra?.children.map((c) => c.titleKey)).not.toContain("menu.awsInfra");
   });
 
   it("anchors Infra directly after Reliability", () => {
@@ -495,14 +523,14 @@ describe("groupNavLinks", () => {
     expect(NAV_SUBNAV.traces.some((c) => c.name === "dbmDatabases")).toBe(false);
   });
 
-  it("emits Infra even though it absorbs nothing and has a single child", () => {
+  it("emits Infra even though it absorbs nothing", () => {
     // The ≥2-children / hasAbsorbed rule that collapses the other groups would
     // silently drop Infra; `standalone` is the explicit opt-out. Without it this
     // tile never renders at all.
     const infra = NAV_GROUPS.find((g) => g.key === "infra");
     expect(infra?.standalone).toBe(true);
     expect(infra?.absorbs).toEqual([]);
-    expect(infra?.children).toHaveLength(1);
+    expect(infra?.children).toHaveLength(3);
     expect(infraGroup(groupNavLinks([link("home"), link("traces")]))).toBeTruthy();
   });
 

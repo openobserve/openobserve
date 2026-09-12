@@ -489,6 +489,22 @@ const useRoutes = () => {
         query: to.query,
       }),
     },
+    // Ungated by design (detection changes page state, not route existence) and placed past the splice(13) hazard.
+    {
+      path: "infra/hosts",
+      name: "infraHosts",
+      component: () => import("@/views/Infrastructure/HostsPage.vue"),
+      meta: { titleKey: "menu.hosts" },
+      beforeEnter: routeGuard,
+    },
+    {
+      path: "infra/kubernetes",
+      name: "infraKubernetes",
+      component: () => import("@/views/Infrastructure/curated/CuratedPageView.vue"),
+      props: { workload: "kubernetes" },
+      meta: { titleKey: "menu.kubernetes" },
+      beforeEnter: routeGuard,
+    },
     {
       path: "traces/trace-details",
       name: "traceDetails",

@@ -302,6 +302,7 @@ export const usePanelPromQLExecutor = (ctx: {
                 // Add series limiting information for warning message
                 seriesLimiting: {
                   totalMetricsReceived: stats.totalMetricsReceived,
+                  uniqueSeriesSeen: stats.uniqueSeriesSeen,
                   metricsStored: stats.metricsStored,
                   maxSeries,
                 },

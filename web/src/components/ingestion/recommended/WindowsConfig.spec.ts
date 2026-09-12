@@ -65,7 +65,7 @@ describe("windowsCard builder", () => {
     const card = windowsCard(SUBS, gt);
     expect(card.provider.name).toBe("Windows");
     expect(card.provider.metaBadges).toEqual(["Logs", "Metrics"]);
-    expect(card.steps.map((s) => s.id)).toEqual(["install", "verify"]);
+    expect(card.steps.map((s) => s.id)).toEqual(["install", "verify", "dashboard"]);
   });
 
   it("uses PowerShell, not bash", () => {

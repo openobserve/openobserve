@@ -1662,6 +1662,97 @@ describe("useRoutes (router.ts)", () => {
   });
 
   // =========================================================================
+  // 18b. homeChildRoutes — Infrastructure routes (Hosts / Kubernetes)
+  // =========================================================================
+  // Always registered, no feature gate — detection changes page state, never route existence (4.7/§6).
+  describe("homeChildRoutes — infra workload routes", () => {
+    it.each([
+      ["infraHosts", "infra/hosts"],
+      ["infraKubernetes", "infra/kubernetes"],
+    ])("registers %s at path %s", (name, path) => {
+      const { homeChildRoutes } = useRoutes();
+      const route = findRoute(homeChildRoutes, name as string);
+      expect(route).toBeDefined();
+      expect(route.path).toBe(path);
+    });
+
+    it.each(["infraHosts", "infraKubernetes"])("%s beforeEnter calls routeGuard", async (name) => {
+      const { routeGuard } = await import("@/utils/zincutils");
+      vi.mocked(routeGuard as any).mockClear();
+      const { homeChildRoutes } = useRoutes();
+      const route = findRoute(homeChildRoutes, name);
+      const mockTo = {};
+      const mockFrom = {};
+      const mockNext = vi.fn();
+      route.beforeEnter(mockTo, mockFrom, mockNext);
+      expect(routeGuard).toHaveBeenCalledWith(mockTo, mockFrom, mockNext);
+    });
+
+    it("passes the workload prop to the kubernetes page", () => {
+      const { homeChildRoutes } = useRoutes();
+      expect(findRoute(homeChildRoutes, "infraKubernetes").props).toEqual({
+        workload: "kubernetes",
+      });
+    });
+
+    // A menu entry whose workload has no registered pack can only render a dead
+    // end, so the route must not come back while `curatedPacks` lacks an AWS pack.
+    it("registers NO aws route, by name or by path", () => {
+      const { homeChildRoutes } = useRoutes();
+      expect(homeChildRoutes.find((r: any) => r.name === "infraAws")).toBeUndefined();
+      expect(homeChildRoutes.find((r: any) => r.path === "infra/aws")).toBeUndefined();
+    });
+
+    it("keeps exactly the infra workload routes that have a curated pack", () => {
+      const { homeChildRoutes } = useRoutes();
+      const infraWorkloads = homeChildRoutes
+        .filter((r: any) => typeof r.path === "string" && /^infra\/(?!databases)/.test(r.path))
+        .map((r: any) => r.path)
+        .sort();
+      expect(infraWorkloads).toEqual(["infra/hosts", "infra/kubernetes"]);
+    });
+
+    // The curated-page migration (design §8.1) swaps only the `component` on these
+    // two rows. Which chunk they load is an implementation detail and deliberately
+    // NOT asserted; what must survive is the deep-link contract below.
+    it.each(["infraKubernetes"])(
+      "%s keeps its titleKey and a lazily-imported component across the component swap",
+      (name) => {
+        const { homeChildRoutes } = useRoutes();
+        const route = findRoute(homeChildRoutes, name);
+        expect(typeof route.component).toBe("function");
+        expect(route.meta?.titleKey).toBeTruthy();
+      },
+    );
+
+    it.each(["infraKubernetes"])(
+      "%s resolves to the curated view, NOT WorkloadStubPage (§8.1 step 2)",
+      (name) => {
+        // The chunk NAME stays unasserted; which MODULE the loader targets is what
+        // changes, and it is the only thing separating the two across the swap.
+        // Asserted off the loader's source rather than by importing either module:
+        // WorkloadStubPage.vue is DELETED by §8.1, so importing it fails the whole
+        // file, and awaiting the real CuratedPageView pulls RenderDashboardCharts →
+        // logs/constants → useLocalWrapContent, which this spec's closed zincutils
+        // mock does not export. The loader source needs neither.
+        const { homeChildRoutes } = useRoutes();
+        const loader = String((findRoute(homeChildRoutes, name) as any).component);
+        expect(loader).not.toMatch(/WorkloadStubPage\.vue/);
+        expect(loader).toMatch(/Infrastructure\/curated\/CuratedPageView\.vue/);
+      },
+    );
+
+    it("keeps the non-cloud reports route at splice index 13 after the insertion", () => {
+      // The infra routes must land past the splice(13) hazard (design 4.7).
+      config.isCloud = "false";
+      const { homeChildRoutes } = useRoutes();
+      expect(homeChildRoutes[13].name).toBe("reports");
+      expect(homeChildRoutes[14].name).toBe("createReport");
+      expect(findRoute(homeChildRoutes, "infraHosts")).toBeDefined();
+    });
+  });
+
+  // =========================================================================
   // 19. homeChildRoutes — reports routes absent when cloud
   // =========================================================================
   describe("homeChildRoutes — reports routes absent when cloud", () => {

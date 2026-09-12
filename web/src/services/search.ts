@@ -269,6 +269,11 @@ const search = {
     // that don't cancel keep the exact single-argument call they had before.
     return signal ? http().get(url, { signal }) : http().get(url);
   },
+  /**
+   * A Prometheus INSTANT query: one sample evaluated at `end_time`. The
+   * endpoint takes no range, so a caller that needs a window must use
+   * `metrics_query_range` instead of expecting this to aggregate one.
+   */
   metrics_query: ({
     org_identifier,
     query,
@@ -276,7 +281,6 @@ const search = {
   }: {
     org_identifier: string;
     query: string;
-    start_time: number;
     end_time: number;
   }) => {
     const url = `/api/${org_identifier}/prometheus/api/v1/query?time=${end_time}&query=${query}`;
