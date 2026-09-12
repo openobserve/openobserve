@@ -1992,15 +1992,13 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn collector_with_unknown_guid_is_403_code_4() {
+    async fn collector_with_non_guid_token_is_403_code_4() {
+        // A non-GUID is rejected on format alone, so this holds with no store.
         let app = splunk_collector_routes();
         let req = Request::builder()
             .method(Method::POST)
             .uri("/services/collector")
-            .header(
-                "Authorization",
-                "Splunk 7b3d9f2c-4a11-4e55-9c8b-2f6a01c34d90",
-            )
+            .header("Authorization", "Splunk not-a-guid-at-all")
             .body(Body::from(r#"{"event":"x"}"#))
             .unwrap();
         let response = app.oneshot(req).await.unwrap();
@@ -2014,10 +2012,11 @@ mod tests {
 
     #[tokio::test]
     async fn collector_non_guid_token_is_indistinguishable_from_unknown_guid() {
-        // §12.6: both must be exactly 403/code 4, or the endpoint becomes a
-        // GUID-format oracle.
+        // §12.6: every non-GUID shape must answer with one identical body, or the
+        // endpoint becomes a GUID-format oracle. An unknown *well-formed* GUID is
+        // covered in hec_collector's own tests, which need no store.
         let mut bodies = Vec::new();
-        for token in ["not-a-guid-at-all", "7b3d9f2c-4a11-4e55-9c8b-2f6a01c34d90"] {
+        for token in ["not-a-guid-at-all", "o2oi_abc", "7b3d9f2c-4a11"] {
             let app = splunk_collector_routes();
             let req = Request::builder()
                 .method(Method::POST)
@@ -2026,14 +2025,14 @@ mod tests {
                 .body(Body::from(r#"{"event":"x"}"#))
                 .unwrap();
             let response = app.oneshot(req).await.unwrap();
-            assert_eq!(response.status(), StatusCode::FORBIDDEN);
+            assert_eq!(response.status(), StatusCode::FORBIDDEN, "{token}");
             bodies.push(
                 axum::body::to_bytes(response.into_body(), usize::MAX)
                     .await
                     .unwrap(),
             );
         }
-        assert_eq!(bodies[0], bodies[1]);
+        assert!(bodies.windows(2).all(|w| w[0] == w[1]));
     }
 
     #[tokio::test]
