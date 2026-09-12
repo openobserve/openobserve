@@ -216,10 +216,6 @@ const drawerOs = computed(
 const drawerLastSeenUs = computed(
   () => list.rows.value.find((r) => r.host_name === drawerHost.value)?.lastSeenUs ?? null,
 );
-// Rides the same aggregate as lastSeenUs — the drawer dates its own late-start banner off it.
-const drawerFirstSeenUs = computed(
-  () => list.rows.value.find((r) => r.host_name === drawerHost.value)?.firstSeenUs ?? null,
-);
 const openDrawer = (host: string) => {
   router.replace({ query: { ...route.query, host } });
 };
@@ -647,7 +643,6 @@ const osToggleLabel = (slug: string) =>
       :status="drawerStatus"
       :os-type="drawerOs"
       :last-seen-us="drawerLastSeenUs"
-      :first-seen-us="drawerFirstSeenUs"
       :range="{ from: range.start, to: range.end }"
       @close="closeDrawer"
     />

@@ -233,7 +233,9 @@ describe("useHostsList — join & window anchoring", () => {
     expect(rowByName(h.list, "web-01").lastSeenUs).toBe(1_700_000_890_000_000);
   });
 
-  it("carries the raw µs first-seen in firstSeenUs, off the same aggregate row", async () => {
+  // A window-bounded min(_timestamp) reports the window floor, not the host's first
+  // sample, so no row may carry a first-seen for anything to date a banner off.
+  it("carries no first-seen, which the window-bounded aggregate cannot know", async () => {
     primeFleet({
       lastSeen: sqlHits([
         {
@@ -247,16 +249,7 @@ describe("useHostsList — join & window anchoring", () => {
     wrapper = h.wrapper;
     await h.list.refresh(refreshArgs);
     await flushPromises();
-    expect(rowByName(h.list, "web-01").firstSeenUs).toBe(1_700_000_600_000_000);
-  });
-
-  it("a hit with no first_seen column leaves firstSeenUs null rather than 0", async () => {
-    // A 0 here would format as the Unix epoch and claim the host started in 1970.
-    const h = withHostsList();
-    wrapper = h.wrapper;
-    await h.list.refresh(refreshArgs);
-    await flushPromises();
-    expect(rowByName(h.list, "web-01").firstSeenUs).toBeNull();
+    expect(rowByName(h.list, "web-01")).not.toHaveProperty("firstSeenUs");
   });
 
   it("a host with no last-seen hit blanks BOTH lastSeen and lastSeenUs", async () => {
