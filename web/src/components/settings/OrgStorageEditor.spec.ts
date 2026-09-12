@@ -118,6 +118,9 @@ describe("OrgStorageEditor", () => {
     expect(wrapper.find('[data-test="storage-settings-provider-card-AwsRoleArn"]').exists()).toBe(
       true,
     );
+    expect(
+      wrapper.find('[data-test="storage-settings-provider-card-GcpServiceAccount"]').exists(),
+    ).toBe(true);
   });
 
   it("renders the AWS credential fields after selecting the provider", async () => {
@@ -279,27 +282,63 @@ describe("OrgStorageEditor", () => {
     });
   });
 
-  describe("GCP provider validation (schema-level — card not in the grid)", () => {
-    // GCP is intentionally not offered as a provider card (providerDefinitions
-    // comments it out), so it can't be exercised through the UI — but the
-    // superRefine branch still exists, so it is covered directly here.
-    const schema = makeOrgStorageEditorSchema((k: string) => k);
+  describe("GCP provider validation (real OForm)", () => {
+    it("renders bucket, project and service account fields — and no server url", async () => {
+      const wrapper = createWrapper("add");
+      await selectProvider(wrapper, "GcpServiceAccount");
 
-    it("requires bucket_name and access_key for GcpCredentials", () => {
-      const res = schema.safeParse({ selectedProvider: "GcpCredentials" });
+      expect(wrapper.find('[data-test="storage-settings-bucket-name-input"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="storage-settings-project-name-input"]').exists()).toBe(true);
+      expect(
+        wrapper.find('[data-test="storage-settings-service-account-name-input"]').exists(),
+      ).toBe(true);
+      // enforce_checks ignores server_url and region for GCP, so neither is offered.
+      expect(wrapper.find('[data-test="storage-settings-server-url-input"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="storage-settings-region-input"]').exists()).toBe(false);
+    });
+
+    it("blocks submit and does NOT call create when GCP required fields are empty", async () => {
+      const wrapper = createWrapper("add");
+      await selectProvider(wrapper, "GcpServiceAccount");
+
+      await getForm(wrapper).handleSubmit();
+      await flushPromises();
+
+      expect(getForm(wrapper).state.isValid).toBe(false);
+      expect(mockCreate).not.toHaveBeenCalled();
+    });
+
+    it("creates the GCP config with the correct payload when valid", async () => {
+      const wrapper = createWrapper("add");
+      await selectProvider(wrapper, "GcpServiceAccount");
+
+      const form = getForm(wrapper);
+      form.setFieldValue("bucket_name", "gcp-bucket");
+      form.setFieldValue("project_name", "my-project");
+      form.setFieldValue("service_account_name", "sa@my-project.iam.gserviceaccount.com");
+      await nextTick();
+
+      await form.handleSubmit();
+      await flushPromises();
+
+      expect(mockCreate).toHaveBeenCalledWith("test-org-123", {
+        provider: "GcpServiceAccount",
+        data: {
+          bucket_name: "gcp-bucket",
+          project_name: "my-project",
+          service_account_name: "sa@my-project.iam.gserviceaccount.com",
+        },
+      });
+    });
+
+    it("flags each missing GCP field individually at the schema level", () => {
+      const schema = makeOrgStorageEditorSchema((k: string) => k);
+      const res = schema.safeParse({ selectedProvider: "GcpServiceAccount" });
       expect(res.success).toBe(false);
       const paths = res.success ? [] : res.error.issues.map((iss: any) => iss.path.join("."));
       expect(paths).toContain("bucket_name");
-      expect(paths).toContain("access_key");
-    });
-
-    it("passes for GcpCredentials when bucket_name and access_key are present", () => {
-      const res = schema.safeParse({
-        selectedProvider: "GcpCredentials",
-        bucket_name: "gcp-bucket",
-        access_key: "gcp-key",
-      });
-      expect(res.success).toBe(true);
+      expect(paths).toContain("project_name");
+      expect(paths).toContain("service_account_name");
     });
   });
 
@@ -341,6 +380,89 @@ describe("OrgStorageEditor", () => {
           region: "eu-west-1",
           access_key: "new-key",
           secret_key: "new-secret",
+        },
+      });
+    });
+
+    it("prefills the AwsRoleArn role arn and external id, and locks bucket + region", async () => {
+      mockGet.mockResolvedValue({
+        data: {
+          provider: "AwsRoleArn",
+          data: {
+            bucket_name: "role-bucket",
+            region: "us-east-1",
+            role_arn: "arn:aws:iam::123456789:role/test-role",
+            external_id: "ext-123",
+          },
+        },
+      });
+
+      const wrapper = createWrapper("edit");
+      await flushPromises();
+      await nextTick();
+
+      const form = getForm(wrapper);
+      // get_redacted_config masks neither, so both prefill rather than forcing a retype.
+      expect(form.state.values.bucket_name).toBe("role-bucket");
+      expect(form.state.values.region).toBe("us-east-1");
+      expect(form.state.values.role_arn).toBe("arn:aws:iam::123456789:role/test-role");
+      expect(form.state.values.external_id).toBe("ext-123");
+
+      // Editing only the external id must not force the ARN to be re-entered.
+      form.setFieldValue("external_id", "ext-456");
+      await nextTick();
+
+      await form.handleSubmit();
+      await flushPromises();
+
+      expect(mockUpdate).toHaveBeenCalledWith("test-org-123", {
+        provider: "AwsRoleArn",
+        data: {
+          bucket_name: "role-bucket",
+          region: "us-east-1",
+          role_arn: "arn:aws:iam::123456789:role/test-role",
+          external_id: "ext-456",
+        },
+      });
+    });
+
+    it("prefills the GCP service account and locks bucket + project", async () => {
+      mockGet.mockResolvedValue({
+        data: {
+          provider: "GcpServiceAccount",
+          data: {
+            bucket_name: "existing-gcp-bucket",
+            project_name: "existing-project",
+            service_account_name: "old-sa@existing-project.iam.gserviceaccount.com",
+          },
+        },
+      });
+
+      const wrapper = createWrapper("edit");
+      await flushPromises();
+      await nextTick();
+
+      const form = getForm(wrapper);
+      // The API does not redact service_account_name, so it prefills like external_id.
+      expect(form.state.values.bucket_name).toBe("existing-gcp-bucket");
+      expect(form.state.values.project_name).toBe("existing-project");
+      expect(form.state.values.service_account_name).toBe(
+        "old-sa@existing-project.iam.gserviceaccount.com",
+      );
+
+      // _merge_gcp_credentials only honours service_account_name on update.
+      form.setFieldValue("service_account_name", "new-sa@existing-project.iam.gserviceaccount.com");
+      await nextTick();
+
+      await form.handleSubmit();
+      await flushPromises();
+
+      expect(mockUpdate).toHaveBeenCalledWith("test-org-123", {
+        provider: "GcpServiceAccount",
+        data: {
+          bucket_name: "existing-gcp-bucket",
+          project_name: "existing-project",
+          service_account_name: "new-sa@existing-project.iam.gserviceaccount.com",
         },
       });
     });

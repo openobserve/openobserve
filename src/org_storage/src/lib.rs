@@ -16,7 +16,7 @@
 #![cfg(feature = "enterprise")]
 
 use infra::table::org_storage_providers::{
-    AwsCredentials, AwsRoleArn, AzureCredentials, GcpCredentials, OrgStorageProvider, ProviderType,
+    AwsCredentials, AwsRoleArn, AzureCredentials, GcpServiceAccount, OrgStorageProvider, ProviderType,
 };
 use object_store::ObjectStore;
 
@@ -24,6 +24,7 @@ use crate::utils::_merge_aws_role_arn;
 mod aws_role_utils;
 mod checks;
 mod db;
+mod gcp_utils;
 mod utils;
 pub mod watch;
 
@@ -31,7 +32,7 @@ pub use checks::{StorageProviderPolicy, enforce_checks};
 pub use db::get_for_org;
 use utils::{
     _merge_aws_credentials, _merge_azure_credentials, _merge_gcp_credentials, get_aws, get_azure,
-    get_gcp, test_provider,
+    test_provider,
 };
 
 pub(crate) async fn get_provider(
@@ -51,9 +52,9 @@ pub(crate) async fn get_provider(
             let store = aws_role_utils::get_aws_from_role(org_id, creds).await?;
             ret = Box::new(store);
         }
-        ProviderType::GcpCredentials => {
-            let creds: GcpCredentials = serde_json::from_str(data)?;
-            let store = get_gcp(creds)?;
+        ProviderType::GcpServiceAccount => {
+            let creds: GcpServiceAccount = serde_json::from_str(data)?;
+            let store = gcp_utils::get_gcp_from_service_account(org_id, creds).await?;
             ret = Box::new(store);
         }
         ProviderType::AzureCredentials => {
@@ -118,10 +119,8 @@ pub async fn get_redacted_config(
             ProviderType::AwsRoleArn => {
                 // nothing to redact here
             }
-            ProviderType::GcpCredentials => {
-                let mut creds: GcpCredentials = serde_json::from_str(&config.data)?;
-                creds.access_key = redact(&creds.access_key);
-                config.data = serde_json::to_string(&creds).unwrap();
+            ProviderType::GcpServiceAccount => {
+                // nothing to redact here
             }
             ProviderType::AzureCredentials => {
                 let mut creds: AzureCredentials = serde_json::from_str(&config.data)?;
@@ -162,7 +161,7 @@ pub fn merge_configs(
 ) -> Result<String, anyhow::Error> {
     match provider_type {
         ProviderType::AwsCredentials => _merge_aws_credentials(existing, new),
-        ProviderType::GcpCredentials => _merge_gcp_credentials(existing, new),
+        ProviderType::GcpServiceAccount => _merge_gcp_credentials(existing, new),
         ProviderType::AzureCredentials => _merge_azure_credentials(existing, new),
         ProviderType::AwsRoleArn => _merge_aws_role_arn(existing, new),
     }
