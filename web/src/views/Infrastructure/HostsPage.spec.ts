@@ -526,6 +526,16 @@ describe("HostsPage", () => {
       ]);
     });
 
+    it("gives the rail the panel surface and edge the app's other left rails use", async () => {
+      wrapper = await mountPage();
+      const rail = wrapper.find('[data-test="hosts-name-filter"]').element
+        .parentElement as HTMLElement;
+      // Matches FolderList.vue, the rail Alerts/Reports/Dashboards/Traces share.
+      for (const cls of ["w-rail", "bg-surface-panel", "border-border-default", "border-e"]) {
+        expect(Array.from(rail.classList)).toContain(cls);
+      }
+    });
+
     it("pads every facet row by the same step so the group reads as one column", async () => {
       wrapper = await mountPage();
       const rows = wrapper.findAll(
@@ -533,7 +543,7 @@ describe("HostsPage", () => {
       );
       expect(rows.length).toBeGreaterThan(0);
       // The heading shares this inline padding, so heading and label sit on one edge.
-      for (const row of rows) expect(row.classes()).toContain("px-2");
+      for (const row of rows) expect(row.classes()).toContain("px-1");
     });
 
     it("renders each count as a chip in its own row, not a loose right-edge number", async () => {
