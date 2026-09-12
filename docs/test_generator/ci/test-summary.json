@@ -1,0 +1,7 @@
+[
+  {
+    "title": "NOD-03: disabling a node badges it and re-enabling clears the badge",
+    "action": "append",
+    "verifies": "the node-card disable toggle paints the Disabled badge and clears it on re-enable while the node stays on the canvas"
+  }
+]

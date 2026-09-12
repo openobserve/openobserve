@@ -1,0 +1,6 @@
+tests/ui-testing/pages/workflowsPages/workflowsPage.js
+tests/ui-testing/playwright-tests/Workflows/workflows-branch.spec.js
+tests/ui-testing/playwright-tests/Workflows/workflows-canvas.spec.js
+tests/ui-testing/playwright-tests/Workflows/workflows-lifecycle.spec.js
+tests/ui-testing/playwright-tests/Workflows/workflows-test-dialog.spec.js
+tests/ui-testing/ci-matrix/ci_matrix.ent.json

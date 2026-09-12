@@ -1,0 +1,21 @@
+{
+  "feature_slug": "workflows",
+  "feature_title": "Workflows E2E Coverage (branch node, canvas actions, draft lifecycle, test drawer)",
+  "area": "Workflows",
+  "edition": "enterprise",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "workflows-branch.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Workflows/workflows-branch.spec.js",
+  "playwright_group": "Workflows",
+  "source_files": [
+    "tests/ui-testing/pages/workflowsPages/workflowsPage.js",
+    "tests/ui-testing/playwright-tests/Workflows/workflows-branch.spec.js",
+    "tests/ui-testing/playwright-tests/Workflows/workflows-canvas.spec.js",
+    "tests/ui-testing/playwright-tests/Workflows/workflows-lifecycle.spec.js",
+    "tests/ui-testing/playwright-tests/Workflows/workflows-test-dialog.spec.js"
+  ],
+  "existing_tests_in_diff": true,
+  "skip": false,
+  "skip_reason": ""
+}

@@ -1,0 +1,17 @@
+{
+  "action": "append",
+  "target_spec": "tests/ui-testing/playwright-tests/Workflows/workflows-canvas.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Workflows/workflows-branch.spec.js",
+    "tests/ui-testing/playwright-tests/Workflows/workflows-canvas.spec.js",
+    "tests/ui-testing/playwright-tests/Workflows/workflows-lifecycle.spec.js",
+    "tests/ui-testing/playwright-tests/Workflows/workflows-test-dialog.spec.js",
+    "tests/ui-testing/playwright-tests/Workflows/workflows-conditions.spec.js",
+    "tests/ui-testing/playwright-tests/Workflows/workflows-crud.spec.js",
+    "tests/ui-testing/playwright-tests/Workflows/workflows-delivery.spec.js",
+    "tests/ui-testing/playwright-tests/Workflows/workflows-incidents.spec.js",
+    "tests/ui-testing/playwright-tests/Workflows/workflows-negative.spec.js"
+  ],
+  "needs_registration": false,
+  "rationale": "The dev-authored diff already adds four specs covering every WIRED headline behavior in the feature doc (BR-02/04/05/06/07/08/09/11, NOD-01/02/04/05/06/07/08, NDV-08, DRF-01/02/05, EDT-02, LST-03/06/07/08, TST-01/04/05a/05b/06), and registers them in ci_matrix.ent.json's Workflows shard. One load-bearing node-card action claimed in workflows-canvas.spec.js's header — the disable toggle (NOD-03) — has no test(): the page object ships toggleNodeDisabled/expectNodeDisabledBadge/expectNoDisabledBadge but no spec calls them. Append one test() to the existing canvas spec (reuse its withCondition setup + @workflowsCanvas tag); no new spec, no matrix registration."
+}

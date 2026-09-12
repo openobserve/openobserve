@@ -114,4 +114,21 @@ test.describe('Workflows canvas & node actions', { tag: ['@workflows', '@enterpr
     await pm.workflowsPage.expectNoIncompleteBadge('condition');
   });
 
+  // NOD-03 — the disable toggle keeps a node on the canvas but out of the run set; the
+  // "Disabled" badge is the author's only signal that a step will not fire. It must paint
+  // on disable and clear again on re-enable, with the node never leaving the canvas.
+  test('NOD-03: disabling a node badges it and re-enabling clears the badge', { tag: ['@workflowsCanvas'] }, async () => {
+    await withCondition();
+    await pm.workflowsPage.saveNodeDrawer();
+    await pm.workflowsPage.expectNoDisabledBadge('condition');
+
+    await pm.workflowsPage.toggleNodeDisabled('condition');
+    await pm.workflowsPage.expectNodeDisabledBadge('condition');
+    expect(await pm.workflowsPage.nodeCount('condition')).toBe(1);
+
+    await pm.workflowsPage.toggleNodeDisabled('condition');
+    await pm.workflowsPage.expectNoDisabledBadge('condition');
+    expect(await pm.workflowsPage.nodeCount('condition')).toBe(1);
+  });
+
 });
