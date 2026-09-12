@@ -41,8 +41,8 @@ use crate::{
     service::get_formatted_stream_name,
 };
 
-/// Cap on events in one request: each is held decoded, cloned during preflight
-/// and flattened twice, so the byte limit alone does not bound peak memory.
+/// Cap on events in one request: each is held decoded and flattened in memory,
+/// so the byte limit alone does not bound peak memory.
 pub const MAX_HEC_EVENTS_PER_REQUEST: usize = 200_000;
 
 /// Why a HEC body could not be turned into records. Maps onto the collector's
@@ -207,9 +207,11 @@ pub async fn preflight_streams(
 /// committed — a partial write the client is told is a single failure, and
 /// duplicates when it retries.
 ///
-/// Deliberately a dry run over the SAME `prepare_record` the write path uses:
-/// the duplicated flatten costs CPU, but a second implementation would drift
-/// from the one that decides what actually gets written.
+/// Runs the SAME `prepare_record` the write path uses, rather than a second
+/// implementation that would drift from the one deciding what gets written. The
+/// flattened record is kept and handed back so the write path's own flatten is a
+/// cheap no-op instead of a second full pass: `flatten_with_level` is idempotent,
+/// and both passes read the same `get_flatten_level` for the stream.
 ///
 /// Window drops stay policy drops. They are the one rejection that must NOT
 /// fail the batch — a 400 is not retried, so the client would discard its
@@ -232,27 +234,36 @@ pub async fn preflight_streams(
 /// are answered from the write outcome instead (code 6 / code 8).
 pub async fn preflight_records(
     org_id: &str,
-    streams: &[(String, Vec<json::Value>)],
-) -> std::result::Result<(), HecParseError> {
+    streams: Vec<(String, Vec<json::Value>)>,
+) -> std::result::Result<Vec<(String, Vec<json::Value>)>, HecParseError> {
     let cfg = get_config();
     let now = config::utils::time::now_micros();
     let min_ts = now - cfg.limit.ingest_allowed_upto_micro;
     let max_ts = now + cfg.limit.ingest_allowed_in_future_micro;
 
+    let mut prepared = Vec::with_capacity(streams.len());
     for (stream, entries) in streams {
-        let flatten_level = get_flatten_level(org_id, stream, StreamType::Logs).await;
+        let flatten_level = get_flatten_level(org_id, &stream, StreamType::Logs).await;
+        let mut kept = Vec::with_capacity(entries.len());
         for entry in entries {
-            match prepare_record(entry.clone(), flatten_level, min_ts, max_ts) {
-                Ok(_) => {}
-                Err(PrepareRecordError::Timestamp(_, e)) if schema::is_window_discard_error(&e) => {
+            match prepare_record(entry, flatten_level, min_ts, max_ts) {
+                Ok((res, _)) => kept.push(res),
+                // A window drop is still written: the write path re-reads the
+                // timestamp and counts it as a policy drop, which is what keeps
+                // the response code 0 rather than an unretryable 400.
+                Err(PrepareRecordError::Timestamp(res, e))
+                    if schema::is_window_discard_error(&e) =>
+                {
+                    kept.push(res)
                 }
                 Err(PrepareRecordError::Flatten(e) | PrepareRecordError::Timestamp(_, e)) => {
                     return Err(HecParseError::InvalidFormat(e.to_string()));
                 }
             }
         }
+        prepared.push((stream, kept));
     }
-    Ok(())
+    Ok(prepared)
 }
 
 /// Parse a HEC body into per-stream record batches.
@@ -505,7 +516,7 @@ mod tests {
             ("group_two".to_string(), vec![bad]),
         ];
         assert!(matches!(
-            preflight_records("preflight_org", &streams).await,
+            preflight_records("preflight_org", streams).await,
             Err(HecParseError::InvalidFormat(_))
         ));
 
@@ -513,7 +524,7 @@ mod tests {
             ("group_one".to_string(), vec![good.clone()]),
             ("group_two".to_string(), vec![good]),
         ];
-        assert!(preflight_records("preflight_org", &all_good).await.is_ok());
+        assert!(preflight_records("preflight_org", all_good).await.is_ok());
     }
 
     #[tokio::test]
@@ -527,7 +538,7 @@ mod tests {
             "windowed".to_string(),
             vec![json::json!({"_timestamp": too_old, "log": "old"})],
         )];
-        assert!(preflight_records("preflight_org", &streams).await.is_ok());
+        assert!(preflight_records("preflight_org", streams).await.is_ok());
 
         let too_new = config::utils::time::now_micros()
             + cfg.limit.ingest_allowed_in_future_micro
@@ -536,7 +547,38 @@ mod tests {
             "windowed".to_string(),
             vec![json::json!({"_timestamp": too_new, "log": "future"})],
         )];
-        assert!(preflight_records("preflight_org", &streams).await.is_ok());
+        assert!(preflight_records("preflight_org", streams).await.is_ok());
+    }
+
+    #[tokio::test]
+    async fn preflight_returns_flattened_records_and_keeps_every_event() {
+        // The write path re-flattens what comes back, so the saving only holds
+        // if these records are ALREADY flat — and a dropped event here would be
+        // silent data loss, not a rejection.
+        let streams = vec![(
+            "kept".to_string(),
+            vec![
+                json::json!({"nested": {"a": {"b": 1}}, "log": "one"}),
+                json::json!({"log": "two"}),
+            ],
+        )];
+        let prepared = preflight_records("preflight_org", streams).await.unwrap();
+
+        assert_eq!(prepared.len(), 1);
+        let (stream, records) = &prepared[0];
+        assert_eq!(stream, "kept");
+        assert_eq!(records.len(), 2, "no event may be dropped by the preflight");
+
+        let first = records[0].as_object().expect("record is an object");
+        assert!(
+            first.values().all(|v| !v.is_object() && !v.is_array()),
+            "record should already be flat: {first:?}"
+        );
+        // Re-flattening what we hand back must be a no-op, or the write path
+        // would store something different from what preflight validated.
+        let reflattened =
+            config::utils::flatten::flatten_with_level(records[0].clone(), 0).unwrap();
+        assert_eq!(&reflattened, &records[0]);
     }
 
     #[tokio::test]
@@ -553,12 +595,12 @@ mod tests {
         let bad = json::json!({"_timestamp": "not-a-timestamp", "log": "x"});
         assert!(prepare_record(bad.clone(), level, min_ts, max_ts).is_err());
         let streams = vec![("s".to_string(), vec![bad])];
-        assert!(preflight_records("preflight_org", &streams).await.is_err());
+        assert!(preflight_records("preflight_org", streams).await.is_err());
 
         let good = json::json!({"log": "fine"});
         assert!(prepare_record(good.clone(), level, min_ts, max_ts).is_ok());
         let streams = vec![("s".to_string(), vec![good])];
-        assert!(preflight_records("preflight_org", &streams).await.is_ok());
+        assert!(preflight_records("preflight_org", streams).await.is_ok());
     }
 
     #[test]
