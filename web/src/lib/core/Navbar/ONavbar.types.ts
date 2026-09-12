@@ -99,6 +99,8 @@ export interface NavGateContext {
   modelPricing: boolean;
   serviceStreams: boolean;
   onlineEvals: boolean;
+  /** `/config` `oncall_enabled` — the module's only navigation gate. */
+  oncallEnabled: boolean;
   /** `zoConfig.database_monitoring_enabled`. OSS feature — no build gate. */
   databaseMonitoring: boolean;
   /** Raw `custom_hide_menus` entries (split on ",") — matches how pages test it. */
@@ -132,6 +134,14 @@ export interface NavbarProps {
   linksList: NavItem[];
   miniMode?: boolean;
   visible?: boolean;
+  /**
+   * Render the rail as a fixed slide-over above page content instead of a
+   * normal flex sibling that reserves its own column width. Used on narrow
+   * viewports, where the rail is hidden by default (`visible=false`) and
+   * revealed on demand via a header hamburger toggle — reserving its ~90px
+   * column permanently there would eat a quarter of a 390px viewport.
+   */
+  overlay?: boolean;
 }
 
 export interface NavbarEmits {

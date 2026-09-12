@@ -4,6 +4,7 @@ import { describe, it, expect } from "vitest";
 import { mount } from "@vue/test-utils";
 import OTag from "./OTag.vue";
 import { BADGE_GROUPS } from "./badgeGroups";
+import { raw } from "@/types/i18n";
 
 const DOT_CLASS = "size-1.75";
 
@@ -107,5 +108,59 @@ describe("OTag size", () => {
     expect(untyped.includes("py-1.5")).toBe(true);
     expect(typed.includes("py-2")).toBe(false);
     expect(untyped.includes("py-2")).toBe(false);
+  });
+});
+
+describe("OTag removable", () => {
+  // V5: the delete affordance used to be a bare <button> nested inside the tag
+  // at the call site — not focus-styled, not sized, an unstyled tab stop.
+  it("renders no remove control by default", () => {
+    const w = mount(OTag, { props: { value: "prod" } });
+    expect(w.find("[data-test='o2-badge-remove']").exists()).toBe(false);
+  });
+
+  it("renders a real button with an accessible name when removable", () => {
+    const w = mount(OTag, { props: { value: "prod", removable: true } });
+    const btn = w.find("[data-test='o2-badge-remove']");
+    expect(btn.exists()).toBe(true);
+    expect(btn.element.tagName).toBe("BUTTON");
+    expect(btn.attributes("type")).toBe("button");
+    expect(btn.attributes("aria-label")).toBeTruthy();
+  });
+
+  it("emits remove, not click", async () => {
+    const w = mount(OTag, { props: { value: "prod", removable: true } });
+    await w.find("[data-test='o2-badge-remove']").trigger("click");
+    expect(w.emitted("remove")).toHaveLength(1);
+    expect(w.emitted("click")).toBeUndefined();
+  });
+
+  it("does not also fire the chip's own click", async () => {
+    const w = mount(OTag, { props: { value: "prod", removable: true, clickable: true } });
+    await w.find("[data-test='o2-badge-remove']").trigger("click");
+    expect(w.emitted("remove")).toHaveLength(1);
+    expect(w.emitted("click")).toBeUndefined();
+  });
+
+  // A button inside a button is invalid markup browsers repair by hoisting the
+  // inner one out of the chip.
+  it("keeps a removable clickable chip a span, not a nested button", () => {
+    const w = mount(OTag, { props: { value: "prod", removable: true, clickable: true } });
+    // The ✕ is the ONLY button; the chip itself stays a span.
+    expect(w.findAll("button")).toHaveLength(1);
+    expect(w.find("button").attributes("data-test")).toBe("o2-badge-remove");
+  });
+
+  it("suppresses remove when disabled", async () => {
+    const w = mount(OTag, { props: { value: "prod", removable: true, disabled: true } });
+    await w.find("[data-test='o2-badge-remove']").trigger("click");
+    expect(w.emitted("remove")).toBeUndefined();
+  });
+
+  it("takes a caller-supplied accessible name", () => {
+    const w = mount(OTag, {
+      props: { value: "prod", removable: true, removeLabel: raw("Remove prod") },
+    });
+    expect(w.find("[data-test='o2-badge-remove']").attributes("aria-label")).toBe("Remove prod");
   });
 });

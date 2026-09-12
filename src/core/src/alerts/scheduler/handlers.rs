@@ -595,7 +595,72 @@ pub async fn handle_triggers(
         db::scheduler::TriggerModule::CompositeAlert => {
             handle_composite_alert_trigger(trace_id, trigger).await
         }
+        db::scheduler::TriggerModule::OncallEscalation => {
+            handle_oncall_escalation_triggers(trigger).await
+        }
     }
+}
+
+/// Dropped rather than re-armed once the ladder ends: a timer outliving it fires at nobody.
+#[cfg(feature = "enterprise")]
+async fn handle_oncall_escalation_triggers(
+    trigger: db::scheduler::Trigger,
+) -> Result<(), anyhow::Error> {
+    use config::utils::time::now_micros;
+    use o2_enterprise::enterprise::oncall;
+
+    let response_id = trigger.module_key.clone();
+    if !oncall::is_enabled() {
+        // Turned off mid-ladder: drop the job rather than hold a timer nobody will service.
+        db::scheduler::delete(
+            &trigger.org,
+            db::scheduler::TriggerModule::OncallEscalation,
+            &response_id,
+        )
+        .await?;
+        return Ok(());
+    }
+
+    // `None` so the engine builds a notifier per team, whose destinations can change per tick.
+    match oncall::escalation::tick(&trigger.org, &response_id, None, now_micros()).await? {
+        Some(next_run_at) => {
+            // Re-read first: `tick` writes the retry budget to this row's `data`.
+            let mut row = db::scheduler::get(
+                &trigger.org,
+                db::scheduler::TriggerModule::OncallEscalation,
+                &response_id,
+            )
+            .await
+            .unwrap_or(trigger);
+            row.next_run_at = next_run_at;
+            row.status = db::scheduler::TriggerStatus::Waiting;
+            row.retries = 0;
+            db::scheduler::update_trigger(row, true, "").await?;
+        }
+        None => {
+            db::scheduler::delete(
+                &trigger.org,
+                db::scheduler::TriggerModule::OncallEscalation,
+                &response_id,
+            )
+            .await?;
+        }
+    }
+    Ok(())
+}
+
+#[cfg(not(feature = "enterprise"))]
+async fn handle_oncall_escalation_triggers(
+    trigger: db::scheduler::Trigger,
+) -> Result<(), anyhow::Error> {
+    // A row can survive a downgrade, so drop it rather than leave it retried forever.
+    db::scheduler::delete(
+        &trigger.org,
+        db::scheduler::TriggerModule::OncallEscalation,
+        &trigger.module_key,
+    )
+    .await?;
+    Ok(())
 }
 
 fn composite_debounce_secs() -> i64 {
@@ -895,6 +960,10 @@ async fn handle_composite_alert_trigger(
     let mut delivery_retry_at = None;
     if evaluated.result {
         scheduled_data.last_satisfied_at = Some(now);
+        // Hoisted: correlation runs in the deliverable branch, but paging needs the answer.
+        #[cfg(feature = "enterprise")]
+        let mut composite_incident_handled = false;
+
         let delivery = if matches!(outcome, RunOutcome::Pending) {
             DeliveryDecision::SuppressedByPending
         } else {
@@ -956,6 +1025,11 @@ async fn handle_composite_alert_trigger(
             #[cfg(not(feature = "enterprise"))]
             let incident_handled = false;
 
+            #[cfg(feature = "enterprise")]
+            {
+                composite_incident_handled = incident_handled;
+            }
+
             let delivery_result = if incident_handled {
                 Ok(crate::alerts::alert::NotificationOutcome::default())
             } else {
@@ -1002,6 +1076,18 @@ async fn handle_composite_alert_trigger(
                     delivery_retry_at = Some(now.saturating_add(10_000_000));
                 }
             }
+        }
+
+        // Outside the deliverable branch: a silenced composite never reaches correlation.
+        #[cfg(feature = "enterprise")]
+        if o2_enterprise::enterprise::oncall::is_enabled() && !composite_incident_handled {
+            let notification_alert = composite_notification_alert(&definition.definition);
+            let rows = [composite_notification_row(
+                &definition.definition.expression,
+                evaluated.result,
+                &evaluated.children,
+            )];
+            page_for_alert_firing(trace_id, &notification_alert, &rows).await;
         }
     }
 
@@ -1479,6 +1565,178 @@ pub(crate) fn merge_ledger(prior: &[String], succeeded: &[String]) -> Vec<String
         }
     }
     out
+}
+
+/// Never propagates: a missing blast radius costs the impacted teams a page, an error the owner.
+#[cfg(feature = "enterprise")]
+pub(crate) async fn impacted_services(
+    org_id: &str,
+    dimensions: &std::collections::HashMap<String, String>,
+) -> Result<Vec<String>, config::meta::oncall::NoBlastRadius> {
+    use config::meta::oncall::NoBlastRadius;
+
+    let Some(failing) = dimensions.get("service") else {
+        return Err(NoBlastRadius::NoServiceDimension);
+    };
+    // Wider than the graph view's window: a read between two aggregation writes sees nothing.
+    let end = now_micros();
+    let window_micros = (o2_enterprise::enterprise::common::config::get_config()
+        .service_graph
+        .processing_interval_secs as i64)
+        .saturating_mul(2 * 1_000_000)
+        .max(crate::traces::service_graph::DEFAULT_QUERY_WINDOW_MINUTES * 60 * 1_000_000);
+    let raw = match crate::traces::service_graph::query_edges_from_stream_internal(
+        org_id,
+        None,
+        Some(end - window_micros),
+        Some(end),
+        None,
+    )
+    .await
+    {
+        Ok(e) if !e.is_empty() => e,
+        _ => return Err(NoBlastRadius::NoGraph),
+    };
+    let (_, edges) = o2_enterprise::enterprise::service_graph::build_topology(
+        raw,
+        std::collections::HashMap::new(),
+    );
+    let mut callers: Vec<String> = edges
+        .iter()
+        .filter(|e| &e.to == failing)
+        .filter_map(|e| e.from.clone())
+        .filter(|from| from != failing)
+        .collect();
+    callers.sort();
+    callers.dedup();
+    if callers.is_empty() {
+        return Err(NoBlastRadius::NothingCallsIt {
+            service: failing.clone(),
+        });
+    }
+    Ok(callers)
+}
+
+/// Shared by the alert and the incident path so the two cannot drift apart.
+#[cfg(feature = "enterprise")]
+pub(crate) async fn page_blast_radius(
+    org_id: &str,
+    origin: &config::meta::oncall::Response,
+    dimensions: &std::collections::HashMap<String, String>,
+) -> Result<(), anyhow::Error> {
+    use o2_enterprise::enterprise::oncall::escalation;
+
+    let now = now_micros();
+    match impacted_services(org_id, dimensions).await {
+        Ok(impacted) => escalation::page_impacted(org_id, origin, &impacted, now)
+            .await
+            .map(|_| ()),
+        Err(why) => escalation::note_no_blast_radius(org_id, &origin.id, &why, now).await,
+    }
+}
+
+/// Shared by the scheduled-alert and composite producers so `creates_incident` cannot drift.
+#[cfg(feature = "enterprise")]
+async fn page_for_alert_firing(
+    trace_id: &str,
+    alert: &config::meta::alerts::alert::Alert,
+    rows: &[config::utils::json::Map<String, config::utils::json::Value>],
+) {
+    let (Some(first_row), Some(alert_id)) = (rows.first(), alert.id.as_ref()) else {
+        // Nothing fired, or the signal has no stable id to key a record on.
+        return;
+    };
+    // Decided in the engine, on the key the record is stored under; the bare alert id is not it.
+    let semantic_groups =
+        crate::db::system_settings::get_semantic_field_groups(&alert.org_id).await;
+    // Row first, then the alert's conditions: an aggregating alert has no identity columns.
+    let dimensions = o2_enterprise::enterprise::oncall::routing::dimensions_for_alert(
+        &semantic_groups,
+        &alert.query_condition,
+        first_row,
+    );
+    // One row per group key, as `dispatch_per_group` reduces: `rows.first()` woke one group.
+    let mut group_dimensions: Vec<std::collections::HashMap<String, String>> =
+        if alert.query_condition.multi_alert_enabled() {
+            let group_by = alert
+                .query_condition
+                .aggregation
+                .as_ref()
+                .and_then(|a| a.group_by.clone())
+                .unwrap_or_default();
+            let mut by_key: Vec<(String, _)> =
+                config::meta::alerts::dispatch::rows_by_group_key(rows, &group_by)
+                    .into_iter()
+                    .collect();
+            // Must stay sorted: `HashMap` order decides `by_team[0]` above the fan-out cap.
+            by_key.sort_by(|a, b| a.0.cmp(&b.0));
+            by_key
+                .iter()
+                .map(|(_, row)| {
+                    o2_enterprise::enterprise::oncall::routing::dimensions_for_alert(
+                        &semantic_groups,
+                        &alert.query_condition,
+                        row,
+                    )
+                })
+                .collect()
+        } else {
+            vec![dimensions.clone()]
+        };
+    // Last resort, matching the incident path so a checkbox about incidents cannot reroute.
+    if group_dimensions.iter().all(|d| d.is_empty())
+        && let Some(service) =
+            crate::alerts::incidents::correlated_service_for_routing(&alert.org_id, first_row).await
+    {
+        for dims in &mut group_dimensions {
+            dims.insert(
+                config::meta::oncall::SERVICE_DIMENSION.to_string(),
+                service.clone(),
+            );
+        }
+        log::debug!(
+            "[SCHEDULER trace_id {trace_id}] {}/{}: no identity fields in the result row; routing \
+             on the correlated service `{service}`",
+            alert.org_id,
+            alert.name,
+        );
+    }
+    // Single-sourced with the incident path: `creates_incident` must not change the severity.
+    let priority = alert
+        .priority
+        .unwrap_or(config::meta::oncall::DEFAULT_PAGING_PRIORITY);
+    match o2_enterprise::enterprise::oncall::escalation::start_for_alert_groups(
+        &alert.org_id,
+        &alert_id.to_string(),
+        &alert.name,
+        priority,
+        alert.oncall_team.as_deref(),
+        &group_dimensions,
+    )
+    .await
+    {
+        // Per record, against its own dimensions: a firing that woke two teams has two origins.
+        Ok(opened) => {
+            for paged in &opened {
+                if let Err(e) =
+                    page_blast_radius(&alert.org_id, &paged.response, &paged.dimensions).await
+                {
+                    log::error!(
+                        "[SCHEDULER trace_id {trace_id}] impacted paging failed for {}/{}: {e}",
+                        alert.org_id,
+                        alert.name
+                    );
+                }
+            }
+        }
+        Err(e) => {
+            log::error!(
+                "[SCHEDULER trace_id {trace_id}] on-call paging failed for {}/{}: {e}",
+                alert.org_id,
+                alert.name
+            );
+        }
+    }
 }
 
 #[allow(clippy::cognitive_complexity, clippy::too_many_lines)]
@@ -2008,6 +2266,24 @@ async fn handle_alert_triggers(
         matched_level,
     );
 
+    // Outside the fired branch: that branch runs only while firing, when recovery must not.
+    #[cfg(feature = "enterprise")]
+    if matched_level.is_none()
+        && o2_enterprise::enterprise::oncall::is_enabled()
+        && let Some(alert_id) = alert.id.as_ref()
+        && let Err(e) = o2_enterprise::enterprise::oncall::escalation::recover_for_alert(
+            &alert.org_id,
+            &alert_id.to_string(),
+        )
+        .await
+    {
+        log::error!(
+            "[SCHEDULER trace_id {scheduler_trace_id}] on-call recovery failed for {}/{}: {e}",
+            alert.org_id,
+            alert.name
+        );
+    }
+
     // T-9 value context: what was observed, against what, with which operator.
     //
     // Aggregation alerts carry their thresholds in `having` / `warning_value`,
@@ -2527,9 +2803,7 @@ async fn handle_alert_triggers(
         //     );
         // }
 
-        // True when incident correlation ran and handled the notification internally
-        // (either sent it for a new incident/alert type, or suppressed it for a repeat).
-        // When false, the direct send_notification() call below fires instead.
+        // True when correlation sent or suppressed the notification itself; false sends below.
         #[cfg(feature = "enterprise")]
         let incident_handled_notification = if alert.creates_incident
             && o2_enterprise::enterprise::common::config::get_config()
@@ -2580,6 +2854,12 @@ async fn handle_alert_triggers(
 
         #[cfg(not(feature = "enterprise"))]
         let incident_handled_notification = false;
+
+        // Asked after correlation, not predicted: a prediction suppresses a page nobody made.
+        #[cfg(feature = "enterprise")]
+        if o2_enterprise::enterprise::oncall::is_enabled() && !incident_handled_notification {
+            page_for_alert_firing(&scheduler_trace_id, &alert, &data).await;
+        }
 
         let vars = get_row_column_map(&data);
         // Multi-time range alerts can have multiple time ranges, hence only
@@ -5639,6 +5919,94 @@ mod tests {
     use config::meta::stream::StreamType;
 
     use super::*;
+
+    // ── On-call: one page per firing ────────────────────────────────────────
+
+    /// The record this evaluation's paging decision is taken against.
+    #[cfg(feature = "enterprise")]
+    fn oncall_record(
+        state: config::meta::oncall::ResponseState,
+        closed_at: Option<i64>,
+    ) -> config::meta::oncall::Response {
+        use config::meta::oncall::{ResponderRole, SubjectRef, SubjectType};
+        config::meta::oncall::Response {
+            id: "resp_1".into(),
+            org_id: "default".into(),
+            subject: SubjectRef::new(SubjectType::Alert, "al_1", 1),
+            team_id: Some("team_1".into()),
+            title: None,
+            cause: None,
+            cause_note: None,
+            snoozed_until: None,
+            ladder_anchor: None,
+            ladder_run: None,
+            priority: 2,
+            responder_role: ResponderRole::Owner,
+            exhausted_at: None,
+            origin_response_id: None,
+            state,
+            opened_at: 0,
+            acked_by: None,
+            acked_at: None,
+            closed_at,
+            incident_id: None,
+            updated_at: 0,
+        }
+    }
+
+    /// While a record is open its ladder escalates, so `silence = 0` must not page every cycle.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_a_still_open_firing_does_not_page_again_on_the_next_cycle() {
+        use config::meta::oncall::{PageDecision, ResponseState, page_decision};
+
+        for state in [
+            ResponseState::Triggered,
+            ResponseState::Triaged,
+            ResponseState::Acknowledged,
+        ] {
+            assert!(
+                !state.is_terminal(),
+                "precondition: {state:?} is an open state"
+            );
+            assert_eq!(
+                page_decision(Some(&oncall_record(state, None)), 1_000, 0),
+                PageDecision::AlreadyOpen,
+                "{state:?} is open, so the next evaluation must not page again"
+            );
+        }
+    }
+
+    /// A resolved firing that fires again later gets its own record, so its cause is history.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_a_resolved_firing_that_fires_again_gets_its_own_record() {
+        use config::meta::oncall::{
+            DEFAULT_FLAP_DAMPENING_SECS, PageDecision, ResponseState, page_decision,
+        };
+
+        let window = DEFAULT_FLAP_DAMPENING_SECS * 1_000_000;
+        assert_eq!(
+            page_decision(None, 1_000, window),
+            PageDecision::Page,
+            "nothing at all means this is the first firing"
+        );
+        let closed = oncall_record(ResponseState::Resolved, Some(1_000));
+        assert_eq!(
+            page_decision(Some(&closed), 1_000 + window + 1, window),
+            PageDecision::Page,
+            "the previous firing closed and stayed closed, so this one is a new one"
+        );
+    }
+
+    /// Both paths must agree, or ticking `creates_incident` changes how loudly an alert pages.
+    #[test]
+    fn test_both_entry_points_default_an_unset_priority_the_same_way() {
+        assert_eq!(
+            config::meta::oncall::DEFAULT_PAGING_PRIORITY,
+            config::meta::alerts::priority::AlertPriority::P2
+        );
+    }
 
     // ── Task 11: per-destination retry ledger (§6.1) ────────────────────────
 

@@ -182,6 +182,9 @@ export const defaultAlertValue: any = () => {
     // serialize unchanged.
     priority: null,
     tags: [],
+    // Empty means "route from the identity dimensions"; the payload layer
+    // drops the key so alerts that never set a team serialize unchanged.
+    oncall_team: "",
   };
 };
 
@@ -2073,6 +2076,16 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
 
   let callAlert: Promise<{ data: any }>;
 
+  // Advisories that ride along with a 200 — an alert that can only ever page
+  // the catch-all team, or one whose groups span teams. Shown beside the
+  // success toast and never in place of it: the save did happen, and an
+  // operator who meant it is entitled to keep it.
+  const showSaveWarnings = (res: { data?: { warnings?: string[] } }) => {
+    for (const message of res?.data?.warnings ?? []) {
+      toast({ variant: "warning", message: raw(message), timeout: 10000 });
+    }
+  };
+
   // Post-schema scheduled/realtime save. Runs ONLY after the composed schema
   // passes (via handleSubmit); preserves the imperative gates + the payload
   // assembly byte-for-byte (Rule ④ payload parity). The payload is built from
@@ -2204,7 +2217,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       // isSubmitting) spans the whole request — otherwise the Save button
       // re-enables in the same tick and repeat clicks fire duplicate saves.
       const request = callAlert
-        .then((_res: { data: any }) => {
+        .then((res: { data: any }) => {
           resetForm(defaultAlertValue());
           emit("update:list", activeFolderId.value);
           addAlertForm.value?.resetValidation();
@@ -2213,6 +2226,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
             variant: "success",
             message: t("alerts.messages.alertUpdated"),
           });
+          showSaveWarnings(res);
         })
         .catch((err: any) => {
           dismiss();
@@ -2241,7 +2255,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
 
       // Same as the update branch: returned below so isSubmitting spans the request.
       const request = callAlert
-        .then((_res: { data: any }) => {
+        .then((res: { data: any }) => {
           resetForm(defaultAlertValue());
           emit("update:list", activeFolderId.value);
           addAlertForm.value?.resetValidation();
@@ -2250,6 +2264,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
             variant: "success",
             message: t("alerts.messages.alertSaved"),
           });
+          showSaveWarnings(res);
         })
         .catch((err: any) => {
           dismiss();

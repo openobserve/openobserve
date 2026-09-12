@@ -56,8 +56,8 @@ use {
     },
     openobserve_api_management::request::{
         ai, annotation_queues, annotations, anomaly_detection, datasets, discovery,
-        domain_management, eval_jobs, experiments, gen_ai, keys, license, playground, providers,
-        remote_tasks, score_configs, scorers, service_streams, workflows,
+        domain_management, eval_jobs, experiments, gen_ai, keys, license, oncall, playground,
+        providers, remote_tasks, score_configs, scorers, service_streams, workflows,
     },
     openobserve_api_pipelines::request::re_pattern,
     openobserve_api_search::search::patterns,
@@ -117,7 +117,7 @@ pub fn cors_layer() -> CorsLayer {
         // Restrict CORS to the configured web_url origin, plus any extra origins in
         // ZO_CORS_ALLOWED_ORIGINS (comma-separated).  mirror_request() + allow_credentials(true)
         // allows any origin to make credentialed requests — effectively disabling same-origin
-        // protection.  Only reflect the Origin header back if it matches one of our allowed origins.
+        // protection.  Only reflect the Origin header back if it matches an allowed origin.
         // We extract only the scheme+host+port from each URL (ignoring any path) because the Origin
         // header per RFC 6454 never carries a path component.  This prevents prefix-match bypasses
         // like https://app.example.com.evil.com when the allowed URL is https://app.example.com.
@@ -402,7 +402,7 @@ fn is_remote_task_secret_write(method: &Method, path: &str) -> bool {
         return false;
     };
     let task_path = &segments[tasks + 1..];
-    (method == Method::POST && (task_path.is_empty() || task_path == &["test"]))
+    (method == Method::POST && (task_path.is_empty() || task_path == ["test"]))
         || task_path
             .iter()
             .any(|segment| matches!(*segment, "auth" | "headers" | "signing"))
@@ -689,6 +689,16 @@ pub fn basic_routes() -> Router {
         get(alerts::chart_render::render_chart),
     );
 
+    // Static `/api/v2`: a param beside the router's `/api/{*path}` panics axum at startup.
+    #[cfg(feature = "enterprise")]
+    if get_o2_config().oncall.enabled {
+        // Unauthenticated HMAC link; GET only renders, so a gateway prefetch cannot ack a page.
+        router = router.route(
+            "/api/v2/{org_id}/oncall/ack",
+            get(oncall::ack_page).post(oncall::acknowledge),
+        );
+    }
+
     // External alert source webhooks — token-authenticated inside the handler itself
     // (never via auth_middleware), so these must stay in basic_routes rather than
     // service_routes. See GHSA-wffq-g8qf-ccmv: do not widen the shared token
@@ -913,7 +923,7 @@ pub fn service_routes() -> Router {
 
         // LLM Model Pricing
         .route("/{org_id}/llm/models", get(model_pricing::list).post(model_pricing::create))
-        // NOTE: named routes MUST be registered before {model_id} to avoid being matched as a model ID
+        // NOTE: named routes MUST be registered before {model_id} or they match as a model ID
         .route("/{org_id}/llm/models/built-in", get(model_pricing::get_built_in))
         .route("/{org_id}/llm/models/refresh-built-in", post(model_pricing::refresh_built_in))
         .route("/{org_id}/llm/models/test", post(model_pricing::test_model_match))
@@ -1154,7 +1164,7 @@ pub fn service_routes() -> Router {
     #[cfg(feature = "enterprise")]
     {
         router = router
-            // Gen-AI agent mapping and registry are enterprise features, independent of Online Evaluations.
+            // Gen-AI agent mapping and registry are enterprise, independent of Online Evaluations.
             .route("/{org_id}/settings/gen_ai/agent_mapping", get(gen_ai::get_agent_mapping).put(gen_ai::save_agent_mapping))
             .route("/{org_id}/settings/gen_ai/agent_registry", delete(gen_ai::clear_agent_registry))
             .route("/{org_id}/gen_ai/agents", get(gen_ai::list_scored_agents));
@@ -1400,7 +1410,7 @@ pub fn service_routes() -> Router {
             // Topology
             .route("/{org_id}/traces/service_graph/topology/current", get(traces::get_current_topology))
             .route("/{org_id}/traces/service_graph/edge/history", get(traces::get_edge_history))
-            // Agent behavior signals (loop / failure / cost) — reads the derived _agent_signals stream
+            // Agent behavior signals (loop / failure / cost) — reads the _agent_signals stream
             .route("/{org_id}/traces/agent_signals", get(traces::get_agent_signals))
             .route("/{org_id}/traces/agent_signals/compare", post(traces::compare_agent_versions))
 
@@ -1573,10 +1583,213 @@ pub fn service_routes() -> Router {
         }
     }
 
+    #[cfg(feature = "enterprise")]
+    if get_o2_config().oncall.enabled {
+        router = router
+            .route(
+                "/{org_id}/oncall/teams",
+                get(oncall::list_teams).post(oncall::create_team),
+            )
+            .route(
+                "/{org_id}/oncall/teams/{team_id}",
+                get(oncall::get_team)
+                    .put(oncall::update_team)
+                    .delete(oncall::delete_team),
+            )
+            .route(
+                "/{org_id}/oncall/teams/{team_id}/members",
+                get(oncall::list_members)
+                    .post(oncall::add_member)
+                    .delete(oncall::remove_member),
+            )
+            .route(
+                "/{org_id}/oncall/teams/{team_id}/schedule",
+                get(oncall::get_schedule).put(oncall::set_schedule),
+            )
+            .route(
+                "/{org_id}/oncall/schedule-presets",
+                get(oncall::list_schedule_presets),
+            )
+            .route(
+                "/{org_id}/oncall/teams/{team_id}/schedule/from-preset",
+                post(oncall::apply_schedule_preset),
+            )
+            .route(
+                "/{org_id}/oncall/teams/{team_id}/on-call",
+                get(oncall::who_is_on_call),
+            )
+            .route(
+                "/{org_id}/oncall/teams/{team_id}/overrides",
+                get(oncall::list_overrides).post(oncall::create_override),
+            )
+            .route(
+                "/{org_id}/oncall/teams/{team_id}/overrides/{override_id}",
+                delete(oncall::delete_override),
+            )
+            // Org-scoped, not hung off a team: somebody on two teams is away from both.
+            .route(
+                "/{org_id}/oncall/unavailability",
+                get(oncall::list_unavailability).post(oncall::create_unavailability),
+            )
+            .route(
+                "/{org_id}/oncall/unavailability/{unavailability_id}",
+                delete(oncall::delete_unavailability),
+            )
+            .route(
+                "/{org_id}/oncall/teams/{team_id}/resolved-schedule",
+                get(oncall::get_resolved_schedule),
+            )
+            .route(
+                "/{org_id}/oncall/teams/{team_id}/policy",
+                get(oncall::get_policy).put(oncall::set_policy),
+            )
+            .route(
+                "/{org_id}/oncall/teams/{team_id}/channel",
+                get(oncall::get_team_channel).put(oncall::set_team_channel),
+            )
+            // Derived on every read, never stored: a saved list argues with the config beside it.
+            .route(
+                "/{org_id}/oncall/teams/{team_id}/reachability",
+                get(oncall::get_team_reachability),
+            )
+            .route(
+                "/{org_id}/oncall/teams/{team_id}/config-risks",
+                get(oncall::list_team_config_risks),
+            )
+            .route(
+                "/{org_id}/oncall/teams/{team_id}/overview",
+                get(oncall::get_team_overview),
+            )
+            .route(
+                "/{org_id}/oncall/teams/{team_id}/load",
+                get(oncall::get_team_load),
+            )
+            // A dry run: must stay free of side effects, `test-page` is what actually delivers.
+            .route(
+                "/{org_id}/oncall/teams/{team_id}/escalation-preview",
+                get(oncall::get_escalation_preview),
+            )
+            .route("/{org_id}/oncall/responses", get(oncall::list_responses))
+            .route(
+                "/{org_id}/oncall/responses/{response_id}",
+                get(oncall::get_response),
+            )
+            .route(
+                "/{org_id}/oncall/responses/{response_id}/resolve",
+                post(oncall::resolve_response),
+            )
+            .route(
+                "/{org_id}/oncall/ownership",
+                get(oncall::list_ownership_rules).post(oncall::create_ownership_rule),
+            )
+            // A sibling of the list: the counts cost a grouped read the routing path must not pay.
+            .route(
+                "/{org_id}/oncall/ownership/stats",
+                get(oncall::list_ownership_rule_stats),
+            )
+            .route(
+                "/{org_id}/oncall/ownership/{rule_id}",
+                put(oncall::update_ownership_rule).delete(oncall::delete_ownership_rule),
+            )
+            .route(
+                "/{org_id}/oncall/responses/{response_id}/notes",
+                post(oncall::add_note),
+            )
+            .route(
+                "/{org_id}/oncall/incidents/{incident_id}/responses",
+                get(oncall::list_responses_for_incident),
+            )
+            .route(
+                "/{org_id}/oncall/responses/{response_id}/escalation",
+                get(oncall::get_escalation_progress),
+            )
+            .route(
+                "/{org_id}/oncall/responses/{response_id}/prior-causes",
+                get(oncall::get_prior_causes),
+            )
+            .route(
+                "/{org_id}/oncall/responses/{response_id}/acknowledge",
+                post(oncall::acknowledge_response),
+            )
+            .route(
+                "/{org_id}/oncall/responses/{response_id}/snooze",
+                post(oncall::snooze_response),
+            )
+            .route(
+                "/{org_id}/oncall/responses/{response_id}/handoff",
+                post(oncall::handoff_response),
+            )
+            .route(
+                "/{org_id}/oncall/responses/{response_id}/history",
+                get(oncall::get_response_history),
+            )
+            .route(
+                "/{org_id}/oncall/responses/{response_id}/deliveries",
+                get(oncall::list_deliveries),
+            )
+            .route(
+                "/{org_id}/oncall/routing/config",
+                get(oncall::get_routing_config).put(oncall::set_routing_config),
+            )
+            .route(
+                "/{org_id}/oncall/routing/preview",
+                post(oncall::preview_routing),
+            )
+            .route(
+                "/{org_id}/oncall/unrouted",
+                get(oncall::list_unrouted_signals),
+            )
+            .route(
+                "/{org_id}/oncall/unrouted/{signal_id}",
+                delete(oncall::dismiss_unrouted_signal),
+            )
+            .route(
+                "/{org_id}/oncall/coverage-gaps",
+                get(oncall::list_coverage_gaps),
+            )
+            .route(
+                "/{org_id}/oncall/responses/{response_id}/promote",
+                post(oncall::promote_to_incident),
+            )
+            // Storage only: no SMS or voice transport exists, so nothing saved here can page.
+            .route(
+                "/{org_id}/oncall/contacts/{user_email}",
+                get(oncall::get_contact)
+                    .put(oncall::set_contact)
+                    .delete(oncall::delete_contact),
+            )
+            .route(
+                "/{org_id}/oncall/my/deliveries",
+                get(oncall::list_my_deliveries),
+            )
+            .route(
+                "/{org_id}/oncall/my/deliveries/read",
+                post(oncall::mark_deliveries_read),
+            )
+            .route("/{org_id}/oncall/my/teams", get(oncall::list_my_teams))
+            .route(
+                "/{org_id}/oncall/analytics/causes",
+                get(oncall::cause_analytics),
+            )
+            .route(
+                "/{org_id}/oncall/responses/{response_id}/confirm-recovery",
+                post(oncall::confirm_recovery),
+            )
+            .route(
+                "/{org_id}/oncall/responses/{response_id}/escalate",
+                post(oncall::escalate_response),
+            )
+            // Goes down the real dispatch path but must leave no response record behind.
+            .route(
+                "/{org_id}/oncall/teams/{team_id}/test-page",
+                post(oncall::send_test_page),
+            );
+    }
+
     #[cfg(feature = "cloud")]
     {
         router = router
-            // Authorized by ROUTE_PERMISSIONS in o2-enterprise; without those rows enterprise auth 403s these for non-root users.
+            // Without ROUTE_PERMISSIONS rows in o2-enterprise, these 403 for non-root users.
             .route(
                 "/{org_id}/alerts/destinations/slack/oauth/start",
                 post(alerts::slack_oauth::start),
@@ -1860,6 +2073,50 @@ mod tests {
     use tower::ServiceExt;
 
     use super::*;
+
+    /// A router node merges `basic_routes()` beside its catch-all proxy
+    /// `/api/{*path}`, and axum **panics at registration** — not at request
+    /// time — when a parameter and a wildcard sit at the same position. So
+    /// `/api/{org_id}/...` in `basic_routes` crash-loops every router pod on
+    /// startup, while every single-node deployment stays perfectly healthy.
+    ///
+    /// That asymmetry is why this shipped: nothing in the test suite or in
+    /// local development builds the router-role tree. This test does.
+    ///
+    /// A **static** second segment does not conflict, which is why every
+    /// token-authenticated route here lives under `/api/v2/`. If you add one,
+    /// it must too.
+    #[test]
+    fn test_basic_routes_cannot_conflict_with_the_router_catch_all() {
+        // Registration is where the panic would happen, so building it is the
+        // whole assertion.
+        let merged = Router::<()>::new()
+            .merge(basic_routes())
+            .route("/api/{*path}", get(|| async { "proxy" }));
+        drop(merged);
+
+        // And the rule that keeps it true, stated where somebody adding a route
+        // will read it: nothing in `basic_routes` may take a path parameter
+        // directly after `/api/`.
+        // Only production code registers routes; the assertions below quote
+        // `/api/{org_id}/...` OpenAPI keys as data, and scanning those too
+        // reported a passing router as broken.
+        let src = include_str!("mod.rs");
+        let (production, _) = src
+            .split_once("\n#[cfg(test)]\nmod tests {")
+            .expect("test module marker moved; this scan would read fixtures as routes");
+        let offenders: Vec<&str> = production
+            .lines()
+            .map(str::trim)
+            .filter(|l| l.starts_with("\"/api/{") && !l.starts_with("\"/api/{*"))
+            .collect();
+        assert!(
+            offenders.is_empty(),
+            "these routes take a parameter straight after /api/ and will panic \
+             every router pod at startup; give them a static segment such as \
+             /api/v2/: {offenders:?}"
+        );
+    }
 
     #[cfg(feature = "enterprise")]
     #[test]

@@ -149,4 +149,11 @@ export interface DialogSlots {
    * When omitted, no footer section is rendered.
    */
   footer?: () => unknown;
+
+  /**
+   * Optional left sub-slot in the built-in footer row.
+   * Rendered before the neutral button, left-aligned.
+   * Ignored when the `#footer` full-override slot is provided.
+   */
+  "footer-left"?: () => unknown;
 }

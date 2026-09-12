@@ -2285,7 +2285,7 @@ mod tests {
     #[cfg(feature = "enterprise")]
     #[test]
     fn test_rank_deadlock_shapes_groups_and_ranks() {
-        let rows = vec![
+        let rows = [
             pg_row(
                 300,
                 11,
@@ -2328,7 +2328,7 @@ mod tests {
     #[cfg(feature = "enterprise")]
     #[test]
     fn test_stitch_mysql_merges_two_sides() {
-        let rows = vec![
+        let rows = [
             my_row(1_000_000, 41, "trxA", "aaa", false),
             my_row(1_000_150, 42, "trxB", "bbb", true),
         ];
@@ -2344,7 +2344,7 @@ mod tests {
     #[cfg(feature = "enterprise")]
     #[test]
     fn test_stitch_leaves_postgres_untouched() {
-        let rows = vec![
+        let rows = [
             pg_row(
                 1_000_000,
                 11,
@@ -2367,7 +2367,7 @@ mod tests {
     #[cfg(feature = "enterprise")]
     #[test]
     fn test_stitch_never_merges_across_engines() {
-        let rows = vec![
+        let rows = [
             pg_row(
                 1_000_000,
                 11,
@@ -2505,7 +2505,7 @@ mod tests {
     #[cfg(feature = "enterprise")]
     #[test]
     fn test_stitch_leaves_far_apart_sides_separate() {
-        let rows = vec![
+        let rows = [
             my_row(1_000_000, 41, "trxA", "aaa", false),
             // 3 s > the 2 s window.
             my_row(4_000_000, 42, "trxB", "bbb", true),
@@ -2533,7 +2533,7 @@ mod tests {
     #[cfg(feature = "enterprise")]
     #[test]
     fn test_stitch_handles_three_way_pileup() {
-        let rows = vec![
+        let rows = [
             my_row(1_000_000, 41, "trxA", "aaa", false),
             my_row(1_000_100, 42, "trxB", "bbb", false),
             my_row(1_000_200, 43, "trxC", "ccc", true),
@@ -2549,7 +2549,7 @@ mod tests {
     #[cfg(feature = "enterprise")]
     #[test]
     fn test_stitch_repeated_transaction_id_starts_new_event() {
-        let rows = vec![
+        let rows = [
             my_row(1_000_000, 41, "trxA", "aaa", false),
             my_row(1_000_100, 42, "trxB", "bbb", true),
             // Same trxA again, still inside the window.
@@ -2566,7 +2566,7 @@ mod tests {
     #[cfg(feature = "enterprise")]
     #[test]
     fn test_stitch_identical_timestamps_tie() {
-        let rows = vec![
+        let rows = [
             my_row(1_000_000, 41, "trxA", "aaa", false),
             my_row(1_000_000, 42, "trxB", "bbb", true),
         ];
@@ -2607,7 +2607,7 @@ mod tests {
     #[cfg(feature = "enterprise")]
     #[test]
     fn test_rank_shapes_counts_stitched_mysql_once() {
-        let rows = vec![
+        let rows = [
             my_row(1_000_000, 41, "trxA", "aaa", false),
             my_row(1_000_100, 42, "trxB", "bbb", true),
             my_row(5_000_000, 43, "trxC", "aaa", false),

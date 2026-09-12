@@ -66,6 +66,12 @@ const props = withDefaults(
     clickable?: boolean;
     /** Mute + disable interaction (OBadge passthrough). */
     disabled?: boolean;
+    /** Render a trailing ✕ that emits `remove` (OBadge passthrough). Use this
+     *  for chips a user can delete — a selected token, an escalation target —
+     *  instead of nesting a bare `<button>` inside the tag. */
+    removable?: boolean;
+    /** Accessible name for the remove button. Defaults to `common.remove`. */
+    removeLabel?: I18nText;
     /** Text shown when a typed value is empty. Default "—". */
     emptyLabel?: I18nText;
   }>(),
@@ -75,7 +81,10 @@ const props = withDefaults(
   { emptyLabel: raw("—"), dot: undefined },
 );
 
-const emit = defineEmits<{ click: [e: MouseEvent | KeyboardEvent] }>();
+const emit = defineEmits<{
+  click: [e: MouseEvent | KeyboardEvent];
+  remove: [e: MouseEvent];
+}>();
 
 const slots = useSlots();
 
@@ -133,8 +142,11 @@ const dot = computed(() => props.dot ?? (props.type ? resolved.value.dot : false
     :hide-zero-count="hideZeroCount"
     :clickable="clickable"
     :disabled="disabled"
+    :removable="removable"
+    :remove-label="removeLabel"
     v-bind="$attrs"
     @click="emit('click', $event)"
+    @remove="emit('remove', $event)"
   >
     <template v-if="slots.icon" #icon><slot name="icon" /></template>
     <slot>{{ label }}</slot>

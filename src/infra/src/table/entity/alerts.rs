@@ -52,6 +52,16 @@ pub struct Model {
     /// and every ingest pass (SA-19), and a JSON key is not portably
     /// indexable. NULL = not an SLO alert.
     pub slo_id: Option<String>,
+    /// The team this alert pages, overriding ownership discovery. An explicit
+    /// column rather than a key in `context_attributes` because "which alerts
+    /// route here" runs on every team delete and a JSON key is not portably
+    /// indexable. NULL = discover the owner from identity dimensions.
+    pub oncall_team: Option<String>,
+    /// Where the fix for this alert is written down. An explicit column beside
+    /// `oncall_team` and for the same reason: it is copied onto every response
+    /// record the alert opens, and a JSON key is not portably indexable.
+    /// NULL = no runbook.
+    pub runbook_url: Option<String>,
     /// Feature 5 (D42): the `SloCondition` payload. Follows the
     /// `query_aggregation` precedent, NOT `trigger_thresholds`, whose scope is
     /// threshold and level configuration only (D1).
@@ -135,6 +145,8 @@ mod tests {
             priority: None,
             tags: None,
             slo_id: None,
+            oncall_team: None,
+            runbook_url: None,
             query_slo_condition: None,
             trigger_frequency_type: 0,
             trigger_frequency_seconds: 300,

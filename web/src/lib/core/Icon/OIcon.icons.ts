@@ -45,6 +45,7 @@ import ChevronRight from "~icons/material-symbols/chevron-right";
 import Close from "~icons/material-symbols/close";
 import Backup from "~icons/material-symbols/backup-outline";
 import Cloud from "~icons/material-symbols/cloud-outline";
+import CloudOff from "~icons/material-symbols/cloud-off-outline";
 import Code from "~icons/material-symbols/code";
 import CompareArrows from "~icons/material-symbols/compare-arrows";
 import ContentCopy from "~icons/material-symbols/content-copy-outline";
@@ -106,6 +107,7 @@ import Replay from "~icons/material-symbols/replay";
 import Replay10 from "~icons/material-symbols/replay-10";
 import Forward10 from "~icons/material-symbols/forward-10";
 import Schedule from "~icons/material-symbols/schedule-outline";
+import Science from "~icons/material-symbols/science-outline";
 import Search from "~icons/material-symbols/search";
 import Send from "~icons/material-symbols/send-outline";
 import Share from "~icons/material-symbols/share-outline";
@@ -310,7 +312,6 @@ import PlayCircleFilled from "~icons/material-symbols/play-circle-outline";
 import Pets from "~icons/material-symbols/pets";
 import MonitorHeart from "~icons/material-symbols/monitor-heart-outline";
 import Dataset from "~icons/material-symbols/dataset-outline";
-import Science from "~icons/material-symbols/science-outline";
 import FolderOpen from "~icons/material-symbols/folder-open-outline";
 import Folder from "~icons/material-symbols/folder";
 import FolderOutline from "~icons/material-symbols/folder-outline";
@@ -389,6 +390,7 @@ export const iconRegistry = {
   "chevron-right": ChevronRight,
   close: Close,
   cloud: Cloud,
+  "cloud-off": CloudOff,
   code: Code,
   "compare-arrows": CompareArrows,
   "content-copy": ContentCopy,
@@ -451,6 +453,7 @@ export const iconRegistry = {
   "replay-10": Replay10,
   "forward-10": Forward10,
   schedule: Schedule,
+  science: Science,
   search: Search,
   send: Send,
   share: Share,
@@ -704,7 +707,6 @@ export const iconRegistry = {
   // Batch 4: Alert Library (2026-08-20)
   // "no signal arriving" — the alert library's not-ingesting-this-stream state.
   "sensors-off": SensorsOff,
-  science: Science,
 } as const satisfies Record<string, Component>;
 
 export type IconName = keyof typeof iconRegistry;
