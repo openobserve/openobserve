@@ -391,6 +391,7 @@ pub async fn search_inner(
         regions: req.regions.clone(),
         clusters: req.clusters.clone(),
         is_super_cluster: req.is_super_cluster,
+        search_event_context: req.search_event_context.clone().map(Into::into),
     });
     let mut ctx = PromqlContext::new(
         query_ctx,

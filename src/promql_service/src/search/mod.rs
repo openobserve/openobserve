@@ -515,6 +515,7 @@ async fn search_in_cluster(
         min_ts: Some(start),
         max_ts: Some(end),
         trace_id: Some(trace_id.to_string()),
+        search_event_context: req.search_event_context.map(Into::into),
         ..Default::default()
     };
 

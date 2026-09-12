@@ -221,6 +221,7 @@ impl QueryConditionExt for QueryCondition {
                     search_type: Some(SearchEventType::Alerts),
                     regions: vec![],
                     clusters: vec![],
+                    search_event_context,
                 };
                 // check super cluster
                 #[cfg(not(feature = "enterprise"))]

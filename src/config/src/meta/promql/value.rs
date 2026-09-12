@@ -30,7 +30,10 @@ use serde::{
 
 use crate::{
     FxIndexMap,
-    meta::{promql::NAME_LABEL, search::SearchEventType},
+    meta::{
+        promql::NAME_LABEL,
+        search::{SearchEventContext, SearchEventType},
+    },
     utils::{json, sort::sort_float},
 };
 
@@ -453,6 +456,7 @@ pub struct QueryContext {
     pub use_cache: bool,
     pub timeout: u64, // seconds, query timeout
     pub search_event_type: Option<SearchEventType>,
+    pub search_event_context: Option<SearchEventContext>,
     pub regions: Vec<String>,
     pub clusters: Vec<String>,
     pub is_super_cluster: bool,

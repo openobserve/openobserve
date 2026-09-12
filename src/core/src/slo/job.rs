@@ -29,7 +29,7 @@
 use config::{
     get_config,
     meta::{
-        search::{Query, Request, RequestEncoding},
+        search::{Query, Request, RequestEncoding, SearchEventContext},
         slo::{
             CountSource, QueryLanguage, SliConfig, Slo,
             alert_uptime::{EvalInterval, UptimeGrid, uptime_slices},
@@ -248,8 +248,9 @@ async fn fetch_rows(
             ))
         }
         SliQueryPlan::PromQl { good, total } => {
-            let good_series = prom_search(&slo.org, &good).await?;
-            let total_series = prom_search(&slo.org, &total).await?;
+            let ctx = SearchEventContext::with_slo(slo);
+            let good_series = prom_search(&slo.org, &good, ctx.clone()).await?;
+            let total_series = prom_search(&slo.org, &total, ctx).await?;
             Ok((
                 promql_rows(
                     good_series,
@@ -261,7 +262,8 @@ async fn fetch_rows(
             ))
         }
         SliQueryPlan::PromQlValue(q) => {
-            let series = prom_search(&slo.org, &q).await?;
+            let ctx = SearchEventContext::with_slo(slo);
+            let series = prom_search(&slo.org, &q, ctx).await?;
             Ok(promql_value_rows(
                 series,
                 group_by,
@@ -526,6 +528,7 @@ pub fn promql_value_rows(
 async fn prom_search(
     org: &str,
     q: &super::query::PromQuery,
+    ctx: SearchEventContext,
 ) -> Result<Vec<PromSeries>, anyhow::Error> {
     let req = promql_service::MetricsQueryRequest {
         query: q.expr.clone(),
@@ -537,6 +540,7 @@ async fn prom_search(
         search_type: Some(config::meta::search::SearchEventType::DerivedStream),
         regions: vec![],
         clusters: vec![],
+        search_event_context: Some(ctx),
     };
     #[cfg(not(feature = "enterprise"))]
     let is_super_cluster = false;
