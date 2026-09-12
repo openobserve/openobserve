@@ -41,7 +41,6 @@ export class CompositeAlertsPage {
       referenceDrawer: '[data-test="alerts-composite-reference-drawer"]',
       referenceConflict: '[data-test="alerts-composite-reference-conflict"]',
       referenceParent: (id) => `[data-test="alerts-composite-reference-parent-${id}"]`,
-      referenceHiddenCount: '[data-test="alerts-composite-reference-hidden-count"]',
       referenceClose: '[data-test="alerts-composite-reference-close"]',
 
       // ---- create / edit form -----------------------------------------
@@ -56,9 +55,6 @@ export class CompositeAlertsPage {
       selectedChild: (id) => `[data-test="alerts-composite-selected-child-${id}"]`,
       // OSelect base: selectOption() derives -trigger/-popover/-search/-option.
       childSelectBase: (id) => `alerts-composite-child-select-${id}`,
-      childType: (id) => `[data-test="alerts-composite-child-type-${id}"]`,
-      childLevel: (id) => `[data-test="alerts-composite-child-level-${id}"]`,
-      childOpen: (id) => `[data-test="alerts-composite-child-open-${id}"]`,
       childRemove: (id) => `[data-test="alerts-composite-child-remove-${id}"]`,
 
       // ---- expression builder ------------------------------------------
@@ -77,7 +73,6 @@ export class CompositeAlertsPage {
       advancedField: '[data-test="alerts-composite-expression-advanced-field"]',
 
       // ---- settings -----------------------------------------------------
-      warningCountsAsFiring: '[data-test="alerts-composite-warning-counts-as-firing-btn"]',
       stalePolicyBase: 'alerts-composite-stale-policy',
       stalePolicyHelp: '[data-test="alerts-composite-stale-policy-help"]',
 
@@ -91,14 +86,12 @@ export class CompositeAlertsPage {
 
       // ---- detail --------------------------------------------------------
       detail: '[data-test="alerts-composite-detail"]',
-      detailResult: '[data-test="alerts-composite-detail-result"]',
       detailExpressionLive: '[data-test="alerts-composite-detail-expression-live"]',
       detailExpression: '[data-test="alerts-composite-detail-expression"]',
       detailConfig: '[data-test="alerts-composite-detail-config"]',
       detailStalePolicy: '[data-test="alerts-composite-detail-stale-policy"]',
       detailChild: (id) => `[data-test="alerts-composite-detail-child-${id}"]`,
       detailChildLink: (id) => `[data-test="alerts-composite-detail-child-link-${id}"]`,
-      detailLevelAt: (id) => `[data-test="alerts-composite-detail-level-at-${id}"]`,
       detailStaleReason: (id) => `[data-test="alerts-composite-detail-stale-reason-${id}"]`,
       missingJob: '[data-test="alerts-composite-detail-missing-job"]',
 
@@ -199,10 +192,6 @@ export class CompositeAlertsPage {
     return this.page.locator(this.locators.referenceParent(id));
   }
 
-  referenceHiddenCount() {
-    return this.page.locator(this.locators.referenceHiddenCount);
-  }
-
   referenceClose() {
     return this.page.locator(this.locators.referenceClose);
   }
@@ -292,18 +281,6 @@ export class CompositeAlertsPage {
 
   selectedChild(id) {
     return this.page.locator(this.locators.selectedChild(id));
-  }
-
-  childType(id) {
-    return this.page.locator(this.locators.childType(id));
-  }
-
-  childLevel(id) {
-    return this.page.locator(this.locators.childLevel(id));
-  }
-
-  childOpen(id) {
-    return this.page.locator(this.locators.childOpen(id));
   }
 
   childRemove(id) {
@@ -497,10 +474,6 @@ export class CompositeAlertsPage {
 
   // ===================== settings =====================
 
-  warningCountsAsFiring() {
-    return this.page.locator(this.locators.warningCountsAsFiring);
-  }
-
   stalePolicyHelp() {
     return this.page.locator(this.locators.stalePolicyHelp);
   }
@@ -554,10 +527,6 @@ export class CompositeAlertsPage {
     return this.page.locator(this.locators.detail);
   }
 
-  detailResult() {
-    return this.page.locator(this.locators.detailResult);
-  }
-
   detailExpression() {
     return this.page.locator(this.locators.detailExpression);
   }
@@ -580,10 +549,6 @@ export class CompositeAlertsPage {
 
   detailChildLink(id) {
     return this.page.locator(this.locators.detailChildLink(id));
-  }
-
-  detailLevelAt(id) {
-    return this.page.locator(this.locators.detailLevelAt(id));
   }
 
   detailStaleReason(id) {
