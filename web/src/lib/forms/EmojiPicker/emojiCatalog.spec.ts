@@ -138,6 +138,7 @@ describe("emojiCatalog", () => {
       DotNetTracing: "dotnet",
       LogstashDatasource: "logstash",
       SyslogNg: "syslog",
+      SplunkHec: "splunk",
       OtelCollector: "opentelemetry",
       OtelConfig: "opentelemetry",
       OpenTelemetry: "opentelemetry",
