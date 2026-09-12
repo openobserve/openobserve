@@ -138,19 +138,53 @@ async function getCompositeReferences(page, alertId) {
  */
 async function createChildAlerts(page, prefix, count) {
   const names = Array.from({ length: count }, (_, i) => uniq(`${prefix}_${i}`));
-  await Promise.all(names.map((name) => createAlert(page, simpleAlert(name))));
+  const responses = await Promise.all(
+    names.map((name) => createAlert(page, simpleAlert(name))),
+  );
+
+  // Fail here, loudly, rather than handing back {id: undefined}. An undefined
+  // id flows into a composite expression as the literal string "{undefined}"
+  // and only surfaces much later as an unexplained locator timeout.
+  const rejected = responses
+    .map((response, i) => ({ name: names[i], status: response.status() }))
+    .filter(({ status }) => status < 200 || status >= 300);
+  if (rejected.length) {
+    throw new Error(
+      `createChildAlerts: ${rejected.length}/${count} creates failed: `
+      + rejected.map((r) => `${r.name} -> ${r.status}`).join(', '),
+    );
+  }
+
   const byName = new Map((await listAlerts(page)).map((a) => [a.name, a.alert_id]));
+  const missing = names.filter((name) => !byName.get(name));
+  if (missing.length) {
+    throw new Error(
+      `createChildAlerts: created but absent from the list read (raise page_size?): ${missing.join(', ')}`,
+    );
+  }
   return names.map((name) => ({ name, id: byName.get(name) }));
 }
 
-/** Create a composite over `childIds` and return {id, name}. */
+/**
+ * Create a composite over `childIds` and return {response, id, name}.
+ *
+ * `response` is handed back unasserted so a caller can examine a deliberate
+ * rejection; `id` is undefined in that case. A 2xx with no resolvable id is
+ * never legitimate, though, so that combination throws.
+ */
 async function createCompositeAlert(page, name, childIds, overrides = {}) {
   const response = await createAlert(page, compositeAlert(name, childIds, overrides));
-  return { response, name, id: await findAlertId(page, name) };
+  const id = await findAlertId(page, name);
+  if (response.ok() && !id) {
+    throw new Error(`createCompositeAlert: "${name}" saved but absent from the list read`);
+  }
+  return { response, name, id };
 }
 
 async function listAlerts(page) {
-  return (await (await api(page, 'get', `${urls().v2}/alerts?folder=default&page_size=100`)).json()).list || [];
+  // 1000, not 100: parallel workers each hold up to 11 child fixtures, and a
+  // name lookup that silently falls off page 1 is what made bad ids possible.
+  return (await (await api(page, 'get', `${urls().v2}/alerts?folder=default&page_size=1000`)).json()).list || [];
 }
 
 async function findAlertId(page, name) {
@@ -161,7 +195,7 @@ async function findAlertId(page, name) {
  * `seedAlertFixtures`, but at most once per worker process.
  *
  * The seed is idempotent, so calling it in every `beforeEach` is harmless in
- * principle — but it is five API calls plus an ingest per test, and against a
+ * principle — but it is three API calls plus an ingest per test, and against a
  * SHARED dev env that multiplies into real contention once specs run in
  * parallel. Playwright gives each worker its own module registry, so a
  * module-level promise collapses it to one seed per worker while keeping full

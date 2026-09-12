@@ -1,8 +1,8 @@
 // Copyright 2026 OpenObserve Inc.
 
 /**
- * Composite alerts — child selector, expression builder, settings
- * (plan areas B, C and E).
+ * Composite alerts — child selector, expression builder, settings and the
+ * edit round-trip (plan areas B, C, E and F).
  *
  * WHY THIS FILE EXISTS
  * --------------------
