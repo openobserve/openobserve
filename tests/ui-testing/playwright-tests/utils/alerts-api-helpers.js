@@ -129,12 +129,91 @@ async function getCompositeReferences(page, alertId) {
   return api(page, 'get', `${urls().v2}/alerts/${encodeURIComponent(alertId)}/composite-references`);
 }
 
+/**
+ * Create `count` plain scheduled alerts in one go and return [{id, name}].
+ *
+ * The ten-child cap and the server-side child-limit cases both need more
+ * children than is tolerable to create one await at a time, so these are
+ * issued concurrently and resolved against a single list read.
+ */
+async function createChildAlerts(page, prefix, count) {
+  const names = Array.from({ length: count }, (_, i) => uniq(`${prefix}_${i}`));
+  const responses = await Promise.all(
+    names.map((name) => createAlert(page, simpleAlert(name))),
+  );
+
+  // Fail here, loudly, rather than handing back {id: undefined}. An undefined
+  // id flows into a composite expression as the literal string "{undefined}"
+  // and only surfaces much later as an unexplained locator timeout.
+  const rejected = responses
+    .map((response, i) => ({ name: names[i], status: response.status() }))
+    .filter(({ status }) => status < 200 || status >= 300);
+  if (rejected.length) {
+    throw new Error(
+      `createChildAlerts: ${rejected.length}/${count} creates failed: `
+      + rejected.map((r) => `${r.name} -> ${r.status}`).join(', '),
+    );
+  }
+
+  const byName = new Map((await listAlerts(page)).map((a) => [a.name, a.alert_id]));
+  const missing = names.filter((name) => !byName.get(name));
+  if (missing.length) {
+    throw new Error(
+      `createChildAlerts: created but absent from the list read (raise page_size?): ${missing.join(', ')}`,
+    );
+  }
+  return names.map((name) => ({ name, id: byName.get(name) }));
+}
+
+/**
+ * Create a composite over `childIds` and return {response, id, name}.
+ *
+ * `response` is handed back unasserted so a caller can examine a deliberate
+ * rejection; `id` is undefined in that case. A 2xx with no resolvable id is
+ * never legitimate, though, so that combination throws.
+ */
+async function createCompositeAlert(page, name, childIds, overrides = {}) {
+  const response = await createAlert(page, compositeAlert(name, childIds, overrides));
+  const id = await findAlertId(page, name);
+  if (response.ok() && !id) {
+    throw new Error(`createCompositeAlert: "${name}" saved but absent from the list read`);
+  }
+  return { response, name, id };
+}
+
 async function listAlerts(page) {
-  return (await (await api(page, 'get', `${urls().v2}/alerts?folder=default&page_size=100`)).json()).list || [];
+  // 1000, not 100: parallel workers each hold up to 11 child fixtures, and a
+  // name lookup that silently falls off page 1 is what made bad ids possible.
+  return (await (await api(page, 'get', `${urls().v2}/alerts?folder=default&page_size=1000`)).json()).list || [];
 }
 
 async function findAlertId(page, name) {
   return (await listAlerts(page)).find((a) => a.name === name)?.alert_id;
+}
+
+/**
+ * `seedAlertFixtures`, but at most once per worker process.
+ *
+ * The seed is idempotent, so calling it in every `beforeEach` is harmless in
+ * principle — but it is three API calls plus an ingest per test, and against a
+ * SHARED dev env that multiplies into real contention once specs run in
+ * parallel. Playwright gives each worker its own module registry, so a
+ * module-level promise collapses it to one seed per worker while keeping full
+ * parallelism.
+ *
+ * Deliberately separate from `seedAlertFixtures`: specs that assert on freshly
+ * ingested rows need the per-test ingest, and silently taking it away from them
+ * would trade this flake for a subtler one.
+ */
+let seedOnce = null;
+function seedAlertFixturesOnce(page) {
+  if (!seedOnce) {
+    seedOnce = seedAlertFixtures(page).catch((error) => {
+      seedOnce = null; // let the next test retry rather than inherit the failure
+      throw error;
+    });
+  }
+  return seedOnce;
 }
 
 /** Best-effort delete of the given alert_ids (used in afterEach). */
@@ -143,6 +222,47 @@ async function deleteAlerts(page, ids) {
   for (const id of ids) {
     if (id) await api(page, 'delete', `${v2}/alerts/${id}?folder=default`).catch(() => {});
   }
+}
+
+/**
+ * Delete composites before their children, whatever order the ids arrive in.
+ *
+ * A child that is still referenced is refused with 409, so cleanup that walks a
+ * flat list leaks fixtures whenever the caller's creation order is not exactly
+ * children-then-parents. Composites can nest, so parents are drained in passes
+ * until nothing more will go.
+ */
+async function deleteAlertsCascade(page, ids) {
+  const alive = new Set(ids.filter(Boolean));
+  for (let pass = 0; pass < 6 && alive.size; pass += 1) {
+    const before = alive.size;
+    let transportFailed = false;
+    const rows = await listAlerts(page).catch(() => {
+      transportFailed = true;
+      return [];
+    });
+    const type = new Map(rows.map((r) => [r.alert_id, r.alert_type]));
+    const composites = [...alive].filter((id) => type.get(id) === 'composite');
+    for (const id of composites.length ? composites : [...alive]) {
+      const response = await api(page, 'delete', `${urls().v2}/alerts/${id}?folder=default`)
+        .catch(() => {
+          transportFailed = true;
+          return null;
+        });
+      // 404 counts as gone; a 409 means a parent is still standing, so leave it
+      // for the next pass once that parent has been removed.
+      if (response && (response.status() < 400 || response.status() === 404)) alive.delete(id);
+    }
+    // Stop only when a pass made no progress for a REASON, not because the
+    // network dropped. Treating a transient failure as "nothing left to do"
+    // abandoned every id on the first hiccup and leaked the whole fixture set
+    // — silently, because callers discard the return value.
+    if (alive.size === before) {
+      if (!transportFailed) break;
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+    }
+  }
+  return [...alive];
 }
 
 /**
@@ -248,7 +368,9 @@ module.exports = {
   uniq, urls, api,
   simpleAlert, multiAlert, groupedSimpleAlert, realtimeAlert, cronAlert,
   compositeAlert, validateComposite, getCompositeReferences,
-  createAlert, listAlerts, findAlertId, getAlert, deleteAlerts, seedAlertFixtures,
+  createChildAlerts, createCompositeAlert, deleteAlertsCascade,
+  createAlert, listAlerts, findAlertId, getAlert, deleteAlerts,
+  seedAlertFixtures, seedAlertFixturesOnce,
   createAlertFolder, ingest, getAlertGroups, getAlertTransitions,
   waitForAlertOutcome, waitForAlertLevel, isFiringOutcome,
 };
