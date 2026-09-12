@@ -27,6 +27,7 @@ use common::meta::{
 // these streams for billing); OSS / self-hosted must not block user streams.
 #[cfg(feature = "cloud")]
 use config::meta::self_reporting::usage::is_reserved_internal_stream;
+use config::meta::self_reporting::ai_chat::is_protected_ai_chat_stream;
 use config::{
     SIZE_IN_MB, TIMESTAMP_COL_NAME, get_config, is_local_disk_storage,
     meta::{
@@ -245,6 +246,14 @@ pub async fn create_stream(
     // Cloud-only: OSS / self-hosted may legitimately use these stream names.
     #[cfg(feature = "cloud")]
     if is_reserved_internal_stream(stream_name) {
+        return Ok(MetaHttpResponse::error_with_header(
+            http::StatusCode::BAD_REQUEST,
+            format!("stream name '{stream_name}' is reserved and cannot be created"),
+        ));
+    }
+    // The AI chat-events stream is created and written only by server-side
+    // chat persistence, in every edition.
+    if is_protected_ai_chat_stream(stream_name) {
         return Ok(MetaHttpResponse::error_with_header(
             http::StatusCode::BAD_REQUEST,
             format!("stream name '{stream_name}' is reserved and cannot be created"),
@@ -763,6 +772,15 @@ where
     // delete is safe and preserves billing/usage accounting. Cloud-only.
     #[cfg(feature = "cloud")]
     if is_reserved_internal_stream(stream_name) {
+        return Ok(MetaHttpResponse::error_with_header(
+            http::StatusCode::BAD_REQUEST,
+            format!("stream '{stream_name}' is reserved and cannot be deleted"),
+        ));
+    }
+    // Chat history is deleted through the Chat API (which tombstones the
+    // session index and lets retention remove the rows), never by dropping
+    // the whole org's stream from the streams UI.
+    if is_protected_ai_chat_stream(stream_name) {
         return Ok(MetaHttpResponse::error_with_header(
             http::StatusCode::BAD_REQUEST,
             format!("stream '{stream_name}' is reserved and cannot be deleted"),

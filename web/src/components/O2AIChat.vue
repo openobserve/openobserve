@@ -1427,7 +1427,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
 import { UNAUTHORIZED_MESSAGE_KEY, isAuthError } from "@/utils/authErrors";
 
-const { fetchAiChat, submitFeedback } = useAiChat();
+const { fetchAiChat, cancelAiChat, submitFeedback } = useAiChat();
 const { emit: emitDashboardEvent } = useAiDashboardEvents();
 
 // Register VRL as a JavaScript alias (type assertion)
@@ -1986,6 +1986,16 @@ export default defineComponent({
      */
     const cancelCurrentRequest = async () => {
       if (currentAbortController.value) {
+        // Ask the server to stop first. With server-side chat persistence the
+        // turn outlives this request, so aborting alone would leave it running
+        // (and billing) with nobody watching.
+        const sessionId = currentSessionId.value;
+        if (sessionId) {
+          cancelAiChat(store.state.selectedOrganization.identifier, sessionId).catch(
+            (e: unknown) => console.debug("AI chat cancel request failed", e),
+          );
+        }
+
         currentAbortController.value.abort();
         currentAbortController.value = null;
 
@@ -2359,6 +2369,14 @@ export default defineComponent({
                 // Try to parse the JSON, handling potential errors
                 try {
                   const data = JSON.parse(jsonStr);
+
+                  // Server-side chat persistence frames: opencode's durable
+                  // events, addressed to OpenObserve, never to the UI. Skipped
+                  // explicitly because unknown types fall through to
+                  // extractStreamText and would be rendered as assistant text.
+                  if (data && (data.type === "sync" || data.type === "sync_state")) {
+                    continue;
+                  }
 
                   // Handle title events - AI-generated chat title from first message
                   if (data && data.type === "title") {
@@ -3002,6 +3020,11 @@ export default defineComponent({
                 if (!jsonStr || !jsonStr.trim()) continue;
 
                 const data = JSON.parse(jsonStr);
+
+                // See the note in the main loop: these belong to persistence.
+                if (data && (data.type === "sync" || data.type === "sync_state")) {
+                  continue;
+                }
 
                 // Handle title events
                 if (data && data.type === "title") {

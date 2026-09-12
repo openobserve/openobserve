@@ -521,6 +521,12 @@ pub async fn list(
     )
     .await;
 
+    // The AI chat-events stream is internal: readable only through the Chat
+    // API, so it is not offered in the streams UI/API either.
+    indices.retain(|s| {
+        !config::meta::self_reporting::ai_chat::is_protected_ai_chat_stream(&s.name)
+    });
+
     // filter by keyword
     if let Some(keyword) = query
         .get("keyword")
