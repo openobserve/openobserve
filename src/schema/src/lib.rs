@@ -594,6 +594,8 @@ pub async fn handle_diff_schema(
     if let Some(updated_schema) = read_cache.get(&cache_key)
         && let (false, _) = get_schema_changes(updated_schema, inferred_schema)
     {
+        // the caller still holds the schema it started from, empty for a just-created stream
+        stream_schema_map.insert(stream_name.to_string(), updated_schema.clone());
         return Ok(None);
     }
     drop(read_cache);
@@ -1199,6 +1201,42 @@ mod tests {
         .await
         .unwrap();
         assert!(!result.is_schema_changed);
+    }
+
+    /// The loser of a create race must adopt the winner's schema, not keep its empty one.
+    #[tokio::test]
+    async fn test_check_for_schema_adopts_schema_another_writer_created() {
+        let org_name = "nexus";
+        let stream_name = "race_created_by_peer";
+        let record: json::Value =
+            json::from_str(r#"{"city": "Athens", "_timestamp": 1234234234234}"#).unwrap();
+
+        let peer_schema = Schema::new(vec![
+            Field::new("city", DataType::Utf8, false),
+            Field::new("_timestamp", DataType::Int64, false),
+        ]);
+        STREAM_SCHEMAS_LATEST.write().await.insert(
+            format!("{org_name}/{}/{stream_name}", StreamType::Logs),
+            SchemaCache::new(peer_schema),
+        );
+
+        let mut map: HashMap<String, SchemaCache> = HashMap::new();
+        map.insert(stream_name.to_string(), SchemaCache::new(Schema::empty()));
+        check_for_schema(
+            org_name,
+            stream_name,
+            StreamType::Logs,
+            &mut map,
+            vec![record.as_object().unwrap()],
+            1234234234234,
+            false,
+        )
+        .await
+        .unwrap();
+
+        let adopted = map.get(stream_name).unwrap().schema();
+        assert_eq!(adopted.fields().len(), 2);
+        assert!(adopted.field_with_name("city").is_ok());
     }
 
     #[tokio::test]

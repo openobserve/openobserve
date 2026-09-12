@@ -189,9 +189,13 @@ pub fn format_key(key: &mut String) {
 }
 
 pub fn format_label_name(label_name: &str) -> String {
-    let mut key = label_name.to_string();
-    format_key(&mut key);
-    key
+    format_label_name_owned(label_name.to_string())
+}
+
+/// `format_label_name` for an owned name, so a name needing no rewrite costs no allocation.
+pub fn format_label_name_owned(mut label_name: String) -> String {
+    format_key(&mut label_name);
+    label_name
 }
 
 fn check_key(key: &str) -> bool {
