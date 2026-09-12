@@ -22,13 +22,15 @@ vi.mock("vue-router", () => ({
 
 import { useListBackNavigation } from "./useListBackNavigation";
 
+// Mirrors ViewDashboard.vue: the listing, plus the Infrastructure pages that push into a dashboard the same way it does.
 const dashboardOptions = () => ({
-  isExcluded: (path: string) => path === "/dashboards/view" || path === "/dashboards/add_panel",
+  isListPath: (path: string) =>
+    path === "/dashboards" || path.endsWith("/dashboards") || path.startsWith("/infra/"),
   fallback: () => ({ path: "/dashboards", query: { folder: "default" } }),
 });
 
 const metricsOptions = () => ({
-  isExcluded: (path: string) => !path.startsWith("/metrics") || path.startsWith("/metrics/editor"),
+  isListPath: (path: string) => path.startsWith("/metrics") && !path.startsWith("/metrics/editor"),
   fallback: () => ({ name: "metrics", query: { org_identifier: "default" } }),
 });
 
@@ -66,12 +68,13 @@ describe("useListBackNavigation", () => {
     });
   });
 
+  // Saving a panel from Logs → Visualize lands on a dashboard the user never navigated to; back belongs on the listing, not back in the log search.
   it.each([
-    ["/login?redirect=%2Fdashboards%2Fview", "a login bounce"],
-    ["/cb", "an OAuth callback"],
+    ["/logs", "the Visualize flow that just created this dashboard"],
     ["/dashboards/view?dashboard=other", "another dashboard bounced through"],
     ["/dashboards/add_panel?dashboard=abc", "the panel editor already left"],
-  ])("falls back rather than returning to %s (%s)", (back) => {
+    ["/login?redirect=%2Fdashboards%2Fview", "a login bounce"],
+  ])("pushes the listing rather than returning to %s (%s)", (back) => {
     historyState.back = back;
 
     useListBackNavigation(dashboardOptions())();
@@ -87,14 +90,6 @@ describe("useListBackNavigation", () => {
 
     expect(mockRouterBack).not.toHaveBeenCalled();
     expect(mockRouterPush).toHaveBeenCalledTimes(1);
-  });
-
-  it("reports whether the button will pop history, so the label can name the destination", () => {
-    historyState.back = "/infra/hosts?host=web-01";
-    expect(useListBackNavigation(dashboardOptions()).popsHistory.value).toBe(true);
-
-    historyState.back = "/dashboards/view?dashboard=other";
-    expect(useListBackNavigation(dashboardOptions()).popsHistory.value).toBe(false);
   });
 
   describe("metrics editor — deliberately explorer-only", () => {
