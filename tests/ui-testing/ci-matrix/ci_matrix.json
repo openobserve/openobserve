@@ -17,7 +17,6 @@
       "alerts-multialert-ui.spec.js",
       "alert-library.spec.js",
       "alerts-add-alert-org-identifier.spec.js",
-      "alerts-composite-api.spec.js",
       "alerts-composite-builder.spec.js",
       "alerts-composite-list.spec.js",
       "alerts-composite-preview.spec.js",

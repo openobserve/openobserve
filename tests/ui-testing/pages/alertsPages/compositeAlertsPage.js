@@ -34,6 +34,7 @@ export class CompositeAlertsPage {
       listChildCount: (id) => `[data-test="alert-list-child-count-${id}"]`,
       listExpression: (id) => `[data-test="alert-list-composite-expression-${id}"]`,
       listReferenceCount: (id) => `[data-test="alert-list-reference-count-${id}"]`,
+      listEnableToggle: (name) => `[data-test="alert-list-${name}-pause-start-alert"]`,
 
       // ---- references drawer ------------------------------------------
       referenceChip: '[data-test="alerts-composite-reference-chip"]',
@@ -155,6 +156,15 @@ export class CompositeAlertsPage {
 
   listReferenceCount(id) {
     return this.page.locator(this.locators.listReferenceCount(id));
+  }
+
+  listEnableToggle(name) {
+    return this.page.locator(this.locators.listEnableToggle(name));
+  }
+
+  /** The whole table row a composite occupies, reached via its badge. */
+  listRow(id) {
+    return this.page.locator(this.locators.listBadge(id)).locator('xpath=ancestor::tr[1]');
   }
 
   // ===================== references drawer =====================
@@ -299,26 +309,84 @@ export class CompositeAlertsPage {
     await this.childAdd().click();
   }
 
-  /** Repoint an occupied slot at `newId`, keeping the slot's position/letter. */
-  async replaceChild(currentId, newId) {
-    await this.page.locator(this.locators.childSelectTrigger(currentId)).click();
-    await this.page
-      .locator(`${this.locators.childSelectOption(currentId)}[data-test-value="${newId}"]`)
-      .click();
-    await expect(this.selectedChild(newId)).toBeVisible();
+  /**
+   * Pick a value from an O2 OSelect by its `data-test-value`.
+   *
+   * Two things make the naive open-then-click flaky, and both bite only at
+   * scale or in sequence:
+   *
+   *   - A searchable OSelect renders a windowed list, so an option can be
+   *     absent from the DOM entirely until the search box narrows to it. The
+   *     child picker hits this as soon as the org holds more than a screenful
+   *     of alerts, which is any parallel run.
+   *   - Reka keeps the popover mounted through its close animation, and while
+   *     it is there it intercepts pointer events. A second selection opened
+   *     before that unmount races it and the click lands on the dying overlay.
+   *
+   * @param {string} base  the consumer `data-test` on the OSelect
+   * @param {string} value the option's `data-test-value`
+   * @param {string} [searchText] typed into the search box when the select has one
+   */
+  async selectOption(base, value, searchText) {
+    const popover = this.page.locator(`[data-test="${base}-popover"]`);
+    const option = this.page.locator(`[data-test="${base}-option"][data-test-value="${value}"]`);
+
+    await this.page.locator(`[data-test="${base}-trigger"]`).click();
+    await expect(popover).toBeVisible();
+
+    if (searchText) {
+      const search = this.page.locator(`[data-test="${base}-search"]`);
+      if (await search.count()) await search.fill(searchText);
+    }
+    await expect(option).toBeVisible();
+    await option.click();
+
+    await expect(popover).toBeHidden();
   }
 
-  /** Add a slot, then point it at `id`. The two-step is the only way to pin a child. */
-  async addChildById(id) {
+  /**
+   * Repoint an occupied slot at `next`, keeping the slot's position/letter.
+   *
+   * `next` is the whole {id, name} child, not an id: the name is what gets
+   * typed into the select's search box. Passing a bare id used to surface as a
+   * 15s locator timeout with no hint of the real cause, so it is rejected here.
+   */
+  async replaceChild(currentId, next) {
+    if (typeof next !== 'object' || !next?.id || !next?.name) {
+      throw new TypeError(
+        `replaceChild expects a {id, name} child, received ${JSON.stringify(next)}`,
+      );
+    }
+    await this.selectOption(
+      `alerts-composite-child-select-${currentId}`,
+      next.id,
+      next.name,
+    );
+    await expect(this.selectedChild(next.id)).toBeVisible();
+  }
+
+  /**
+   * Add a slot, then point it at `child`.
+   *
+   * Two steps because "Add alert" takes the first unselected option rather than
+   * one the caller chooses — so pinning a specific child always means adding,
+   * then replacing whatever landed there.
+   *
+   * @param {{id: string, name: string}} child
+   */
+  async addChildById(child) {
+    if (typeof child !== 'object' || !child?.id || !child?.name) {
+      throw new TypeError(
+        `addChildById expects a {id, name} child, received ${JSON.stringify(child)}`,
+      );
+    }
     const before = await this.selectedChildRows().count();
     await this.addChild();
     await expect(this.selectedChildRows()).toHaveCount(before + 1);
-    if (await this.selectedChild(id).count()) return;
-    const landedOn = await this.selectedChildRows()
-      .nth(before)
-      .getAttribute('data-test');
+    if (await this.selectedChild(child.id).count()) return;
+    const landedOn = await this.selectedChildRows().nth(before).getAttribute('data-test');
     const currentId = landedOn.replace('alerts-composite-selected-child-', '');
-    await this.replaceChild(currentId, id);
+    await this.replaceChild(currentId, child);
   }
 
   async removeChild(id) {
@@ -326,13 +394,23 @@ export class CompositeAlertsPage {
     await expect(this.selectedChild(id)).toHaveCount(0);
   }
 
-  /** The options a slot currently offers, as alert ids. */
+  /**
+   * The options a slot currently offers, as alert ids.
+   *
+   * Only what the select has RENDERED: a searchable OSelect windows its list,
+   * so treat this as "does not offer" evidence for a small fixture set, never
+   * as the complete option universe.
+   */
   async optionIdsFor(id) {
-    await this.page.locator(this.locators.childSelectTrigger(id)).click();
+    const base = `alerts-composite-child-select-${id}`;
+    const popover = this.page.locator(`[data-test="${base}-popover"]`);
+    await this.page.locator(`[data-test="${base}-trigger"]`).click();
+    await expect(popover).toBeVisible();
     const ids = await this.page
-      .locator(this.locators.childSelectOption(id))
+      .locator(`[data-test="${base}-option"]`)
       .evaluateAll((nodes) => nodes.map((n) => n.getAttribute('data-test-value')));
     await this.page.keyboard.press('Escape');
+    await expect(popover).toBeHidden();
     return ids;
   }
 
@@ -419,10 +497,8 @@ export class CompositeAlertsPage {
 
   /** @param {'use_last_state'|'treat_as_false'|'treat_as_true'} value */
   async selectStalePolicy(value) {
-    await this.page.locator(this.locators.stalePolicyTrigger).click();
-    await this.page
-      .locator(`${this.locators.stalePolicyOption}[data-test-value="${value}"]`)
-      .click();
+    await this.selectOption('alerts-composite-stale-policy', value);
+    await expect.poll(() => this.stalePolicyValue()).toBe(value);
   }
 
   async stalePolicyValue() {
@@ -443,6 +519,11 @@ export class CompositeAlertsPage {
 
   previewSteps() {
     return this.page.locator(this.locators.previewSteps);
+  }
+
+  /** One row per operand, then the result row last. */
+  previewStepRows() {
+    return this.previewSteps().locator('li');
   }
 
   previewWarning(code) {

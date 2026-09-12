@@ -56,10 +56,10 @@ test.describe('Composite alerts — builder', {
   }
 
   /** Open the wizard in composite mode with `ids` already in slots A, B, … */
-  async function openBuilderWith(page, ids) {
+  async function openBuilderWith(page, picks) {
     await pm.compositeAlertsPage.openCreate();
     await pm.compositeAlertsPage.chooseCompositeType();
-    for (const id of ids) await pm.compositeAlertsPage.addChildById(id);
+    for (const child of picks) await pm.compositeAlertsPage.addChildById(child);
   }
 
   // ===================== B · child selector =====================
@@ -77,7 +77,7 @@ test.describe('Composite alerts — builder', {
 
   test('B3/B4 · adding children fills lettered slots in order', async ({ page }) => {
     const [a, b] = await children(page, 'b3', 2);
-    await openBuilderWith(page, [a.id, b.id]);
+    await openBuilderWith(page, [a, b]);
 
     await expect(pm.compositeAlertsPage.selectedChild(a.id)).toContainText('A');
     await expect(pm.compositeAlertsPage.selectedChild(b.id)).toContainText('B');
@@ -87,7 +87,7 @@ test.describe('Composite alerts — builder', {
 
   test('B6 · a slot never offers a child that is already selected elsewhere', async ({ page }) => {
     const [a, b, c] = await children(page, 'b6', 3);
-    await openBuilderWith(page, [a.id, b.id]);
+    await openBuilderWith(page, [a, b]);
 
     const options = await pm.compositeAlertsPage.optionIdsFor(a.id);
     expect(options).toContain(a.id); // its own value stays selectable
@@ -97,9 +97,9 @@ test.describe('Composite alerts — builder', {
 
   test('B7 · replacing a child keeps the slot position and its letter', async ({ page }) => {
     const [a, b, c] = await children(page, 'b7', 3);
-    await openBuilderWith(page, [a.id, b.id]);
+    await openBuilderWith(page, [a, b]);
 
-    await pm.compositeAlertsPage.replaceChild(a.id, c.id);
+    await pm.compositeAlertsPage.replaceChild(a.id, c);
 
     await expect(pm.compositeAlertsPage.selectedChild(c.id)).toContainText('A');
     await expect(pm.compositeAlertsPage.selectedChild(b.id)).toContainText('B');
@@ -123,7 +123,7 @@ test.describe('Composite alerts — builder', {
 
   test('B8 · removing a child also removes its operand from the expression', async ({ page }) => {
     const [a, b, c] = await children(page, 'b8', 3);
-    await openBuilderWith(page, [a.id, b.id, c.id]);
+    await openBuilderWith(page, [a, b, c]);
     await pm.compositeAlertsPage.fillExpression('A && B && C');
 
     await pm.compositeAlertsPage.removeChild(b.id);
@@ -137,7 +137,7 @@ test.describe('Composite alerts — builder', {
 
   test('B9 · removing a negated operand drops the NOT with it', async ({ page }) => {
     const [a, b, c] = await children(page, 'b9', 3);
-    await openBuilderWith(page, [a.id, b.id, c.id]);
+    await openBuilderWith(page, [a, b, c]);
     await pm.compositeAlertsPage.fillExpression('A && !B && C');
 
     await pm.compositeAlertsPage.removeChild(b.id);
@@ -152,7 +152,7 @@ test.describe('Composite alerts — builder', {
 
   test('C1 · two children auto-apply the default AND expression', async ({ page }) => {
     const [a, b] = await children(page, 'c1', 2);
-    await openBuilderWith(page, [a.id, b.id]);
+    await openBuilderWith(page, [a, b]);
 
     await expect(pm.compositeAlertsPage.expressionInput()).toHaveValue(/A\s*&&\s*B/);
     await expect(pm.compositeAlertsPage.expressionError()).toHaveCount(0);
@@ -161,7 +161,7 @@ test.describe('Composite alerts — builder', {
 
   test('C3/C4 · palette buttons append operators and operands', async ({ page }) => {
     const [a, b] = await children(page, 'c3', 2);
-    await openBuilderWith(page, [a.id, b.id]);
+    await openBuilderWith(page, [a, b]);
     await pm.compositeAlertsPage.fillExpression('');
 
     await pm.compositeAlertsPage.expressionInsert(a.id).click();
@@ -174,7 +174,7 @@ test.describe('Composite alerts — builder', {
 
   test('C3b · group buttons append parentheses', async ({ page }) => {
     const [a, b, c] = await children(page, 'c3b', 3);
-    await openBuilderWith(page, [a.id, b.id, c.id]);
+    await openBuilderWith(page, [a, b, c]);
     await pm.compositeAlertsPage.fillExpression('A &&');
 
     await pm.compositeAlertsPage.expressionOpenGroup().click();
@@ -189,7 +189,7 @@ test.describe('Composite alerts — builder', {
 
   test('C5 · the lettered form round-trips to the stored id form', async ({ page }) => {
     const [a, b] = await children(page, 'c5', 2);
-    await openBuilderWith(page, [a.id, b.id]);
+    await openBuilderWith(page, [a, b]);
     await pm.compositeAlertsPage.fillExpression('B || A');
 
     await pm.compositeAlertsPage.openAdvanced();
@@ -202,7 +202,7 @@ test.describe('Composite alerts — builder', {
 
   test('C6 · editing the advanced form updates the lettered form', async ({ page }) => {
     const [a, b] = await children(page, 'c6', 2);
-    await openBuilderWith(page, [a.id, b.id]);
+    await openBuilderWith(page, [a, b]);
 
     await pm.compositeAlertsPage.fillAdvancedExpression(`{${a.id}} || {${b.id}}`);
 
@@ -212,7 +212,7 @@ test.describe('Composite alerts — builder', {
 
   test('C7 · unbalanced parentheses invalidate the draft and disable Save', async ({ page }) => {
     const [a, b] = await children(page, 'c7', 2);
-    await openBuilderWith(page, [a.id, b.id]);
+    await openBuilderWith(page, [a, b]);
 
     await pm.compositeAlertsPage.fillExpression('( A && B');
 
@@ -222,7 +222,7 @@ test.describe('Composite alerts — builder', {
 
   test('C8 · an unused child is offered in the tray and places on click', async ({ page }) => {
     const [a, b, c] = await children(page, 'c8', 3);
-    await openBuilderWith(page, [a.id, b.id, c.id]);
+    await openBuilderWith(page, [a, b, c]);
 
     await pm.compositeAlertsPage.fillExpression('A && B');
 
@@ -238,7 +238,7 @@ test.describe('Composite alerts — builder', {
 
   test('C9 · a duplicated operand invalidates the draft', async ({ page }) => {
     const [a, b] = await children(page, 'c9', 2);
-    await openBuilderWith(page, [a.id, b.id]);
+    await openBuilderWith(page, [a, b]);
 
     await pm.compositeAlertsPage.fillExpression('A && A');
 
@@ -249,7 +249,7 @@ test.describe('Composite alerts — builder', {
 
   test('C13 · every operator control carries an accessible name', async ({ page }) => {
     const [a, b] = await children(page, 'c13', 2);
-    await openBuilderWith(page, [a.id, b.id]);
+    await openBuilderWith(page, [a, b]);
 
     for (const control of [
       pm.compositeAlertsPage.expressionAnd(),
@@ -268,7 +268,7 @@ test.describe('Composite alerts — builder', {
 
   test('E2/E3 · stale policy offers three options and explains the active one', async ({ page }) => {
     const [a, b] = await children(page, 'e2', 2);
-    await openBuilderWith(page, [a.id, b.id]);
+    await openBuilderWith(page, [a, b]);
 
     expect(await pm.compositeAlertsPage.stalePolicyValue()).toBe('use_last_state');
     const initialHelp = await pm.compositeAlertsPage.stalePolicyHelp().textContent();
@@ -283,7 +283,7 @@ test.describe('Composite alerts — builder', {
 
   test('E5 · changing a setting re-runs validation against the server', async ({ page }) => {
     const [a, b] = await children(page, 'e5', 2);
-    await openBuilderWith(page, [a.id, b.id]);
+    await openBuilderWith(page, [a, b]);
     await expect(pm.compositeAlertsPage.preview()).toBeVisible();
 
     const validations = [];

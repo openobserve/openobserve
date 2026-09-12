@@ -726,3 +726,174 @@ def test_openapi_exposes_composite_create_validate_preview_and_references(
         "referenced_by_composite_count",
     ):
         assert token in serialized
+
+
+def test_validate_rejects_empty_single_operand_and_malformed_expressions(
+    client: OpenObserveClient, composite_prereqs: dict[str, Any]
+):
+    """The four ways a composite expression can be unusable, each a 400.
+
+    The UI blocks these locally before it ever calls validate, so the server
+    contract is only reachable from here — a regression would surface as a
+    saved composite that can never evaluate.
+    """
+    child_a, child_b, _ = composite_prereqs["child_ids"]
+    cases = {
+        "empty": "",
+        "single_operand": f"{{{child_a}}}",
+        "trailing_operator": f"{{{child_a}}} && ",
+        "unbalanced_group": f"{{{child_a}}} && ({{{child_b}}}",
+    }
+    for label, expression in cases.items():
+        response = client.post(
+            "alerts/composites/validate",
+            prefix="api/v2/",
+            json={
+                "composite_condition": {
+                    "expression": expression,
+                    "warning_counts_as_firing": True,
+                    "stale_child_policy": "use_last_state",
+                },
+                "folder_id": composite_prereqs["folder_id"],
+            },
+        )
+        assert response.status_code == 400, f"{label}: {response.text}"
+        assert response.json()["code"] == "composite_invalid_expression", (
+            f"{label}: {response.text}"
+        )
+
+
+def test_composite_cannot_reference_itself(
+    client: OpenObserveClient, composite_prereqs: dict[str, Any]
+):
+    """A self-edge is the shortest cycle and must be refused like any other.
+
+    Only expressible on update: create has no id to point at yet, so nothing
+    upstream of this test can exercise it.
+    """
+    child_a, child_b, _ = composite_prereqs["child_ids"]
+    name = unique_name("cmp_self_ref")
+    composite = _tracked_create(
+        client,
+        composite_prereqs,
+        _composite_payload(name=name, child_ids=[child_a, child_b]),
+    )
+
+    response = client.put(
+        f"alerts/{composite}?folder={composite_prereqs['folder_id']}",
+        prefix="api/v2/",
+        json=_composite_payload(name=name, child_ids=[composite, child_b]),
+    )
+    assert response.status_code == 409, response.text
+    assert response.json()["code"] == "composite_cycle", response.text
+
+    # The refusal must be total: the stored definition is untouched.
+    response = client.get(
+        f"alerts/{composite}?folder={composite_prereqs['folder_id']}", prefix="api/v2/"
+    )
+    assert response.status_code == 200, response.text
+    expression = response.json()["composite_condition"]["expression"]
+    assert composite not in expression, expression
+
+
+def test_child_cap_is_enforced_on_both_validate_and_create(
+    client: OpenObserveClient, composite_prereqs: dict[str, Any]
+):
+    """Eleven children is refused by validate AND by the write path.
+
+    Enforcing this only on validate would leave the cap bypassable by any
+    client that skips the preview call, which is every client except the UI.
+    """
+    folder_id = composite_prereqs["folder_id"]
+    child_ids = list(composite_prereqs["child_ids"])
+    for index in range(len(child_ids), 11):
+        child_name = unique_name(f"cmp_cap_child_{index}")
+        payload = _alert_payload(
+            name=child_name,
+            folder_id=folder_id,
+            template=composite_prereqs["template"],
+            destination=composite_prereqs["destination"],
+            enabled=False,
+        )
+        response = client.post(f"alerts?folder={folder_id}", prefix="api/v2/", json=payload)
+        assert response.status_code == 200, response.text
+        child_id = _find_by_name(client, child_name)["alert_id"]
+        child_ids.append(child_id)
+        composite_prereqs["child_ids"].append(child_id)
+    assert len(child_ids) == 11
+
+    over_cap = " && ".join(f"{{{child_id}}}" for child_id in child_ids)
+    response = client.post(
+        "alerts/composites/validate",
+        prefix="api/v2/",
+        json={
+            "composite_condition": {
+                "expression": over_cap,
+                "warning_counts_as_firing": True,
+                "stale_child_policy": "use_last_state",
+            },
+            "folder_id": folder_id,
+        },
+    )
+    assert response.status_code == 400, response.text
+
+    response = client.post(
+        f"alerts?folder={folder_id}",
+        prefix="api/v2/",
+        json=_composite_payload(name=unique_name("cmp_over_cap"), child_ids=child_ids),
+    )
+    assert response.status_code >= 400, response.text
+
+    # Exactly ten is the boundary and must still be accepted.
+    at_cap = _tracked_create(
+        client,
+        composite_prereqs,
+        _composite_payload(name=unique_name("cmp_at_cap"), child_ids=child_ids[:10]),
+    )
+    row = next(item for item in _list(client) if item["alert_id"] == at_cap)
+    assert row["child_count"] == 10, row
+
+
+def test_composite_timeline_returns_child_lanes_plus_a_result_lane(
+    client: OpenObserveClient, composite_prereqs: dict[str, Any]
+):
+    """The detail page's timeline reads every lane off this one response.
+
+    The result lane is keyed by the COMPOSITE's own id; the UI uses that to
+    tell the aggregate row apart from the children, so the key matters as much
+    as the values.
+    """
+    child_a, child_b, _ = composite_prereqs["child_ids"]
+    composite = _tracked_create(
+        client,
+        composite_prereqs,
+        _composite_payload(name=unique_name("cmp_timeline"), child_ids=[child_a, child_b]),
+    )
+
+    to_micros = 1_800_000_000_000_000
+    from_micros = to_micros - 14_400_000_000
+    response = client.get(
+        f"alerts/{composite}/composite-timeline?from={from_micros}&to={to_micros}",
+        prefix="api/v2/",
+    )
+    assert response.status_code == 200, response.text
+
+    body = response.json()
+    assert body["from"] < body["to"], body
+    assert sorted(lane["alert_id"] for lane in body["children"]) == sorted([child_a, child_b]), body
+    assert body["result"]["alert_id"] == composite, body
+
+    for lane in body["children"] + [body["result"]]:
+        assert lane["accessible"] is True, lane
+        # Always serialised, empty when nothing has changed in the window.
+        assert isinstance(lane["transitions"], list), lane
+        # `current_level` and `level_since` are omitted, NOT null, until the lane
+        # has been evaluated once; the UI falls back to "nodata" on absence, so
+        # asserting presence here would contradict the real contract.
+        if "current_level" in lane:
+            assert isinstance(lane["current_level"], str) and lane["current_level"], lane
+
+    # Children carry the slot index the UI letters them by (A, B, …); the result
+    # lane deliberately has none, which is how it is told apart from a child.
+    assert sorted(lane["slot"] for lane in body["children"]) == [0, 1], body
+    assert "slot" not in body["result"], body

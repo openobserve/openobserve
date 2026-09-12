@@ -71,9 +71,7 @@ test.describe('Composite alerts — list', {
     await pm.compositeAlertsPage.openList();
     await pm.compositeAlertsPage.openListTab('composite');
 
-    const row = page.locator(`[data-test="alert-list-composite-badge-${parent.id}"]`)
-      .locator('xpath=ancestor::tr[1]');
-    await expect(row).toContainText('--');
+    await expect(pm.compositeAlertsPage.listRow(parent.id)).toContainText('--');
   });
 
   test.fixme('A4 · a composite row shows its trigger expression (o2-enterprise#2620)', async ({ page }) => {
@@ -186,7 +184,7 @@ test.describe('Composite alerts — list', {
     await pm.compositeAlertsPage.openListTab('composite');
     await expect(pm.compositeAlertsPage.listBadge(parent.id)).toBeVisible();
 
-    const toggle = page.locator(`[data-test="alert-list-${parent.name}-pause-start-alert"]`);
+    const toggle = pm.compositeAlertsPage.listEnableToggle(parent.name);
     await expect(toggle).toBeVisible();
     await toggle.click();
 

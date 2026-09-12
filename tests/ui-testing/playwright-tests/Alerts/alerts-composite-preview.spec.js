@@ -64,10 +64,10 @@ test.describe('Composite alerts — live preview', {
     return { id, name };
   }
 
-  async function openBuilderWith(page, ids) {
+  async function openBuilderWith(page, picks) {
     await pm.compositeAlertsPage.openCreate();
     await pm.compositeAlertsPage.chooseCompositeType();
-    for (const id of ids) await pm.compositeAlertsPage.addChildById(id);
+    for (const child of picks) await pm.compositeAlertsPage.addChildById(child);
   }
 
   /** A validate response shaped like the server's, with `children` overridden. */
@@ -84,14 +84,14 @@ test.describe('Composite alerts — live preview', {
 
   test('D1/D5/D6 · a valid draft renders a verdict and a step per operand', async ({ page }) => {
     const [a, b] = await children(page, 'd1', 2);
-    await openBuilderWith(page, [a.id, b.id]);
+    await openBuilderWith(page, [a, b]);
 
     await expect(pm.compositeAlertsPage.preview()).toBeVisible();
     await expect(pm.compositeAlertsPage.previewResult()).toBeVisible();
     await expect(pm.compositeAlertsPage.previewResult()).toHaveAttribute('aria-live', 'polite');
 
     // One step per operand plus the result row.
-    const steps = pm.compositeAlertsPage.previewSteps().locator('li');
+    const steps = pm.compositeAlertsPage.previewStepRows();
     await expect(steps).toHaveCount(3);
     await expect(steps.nth(0)).toContainText(a.name);
     await expect(steps.nth(1)).toContainText(b.name);
@@ -127,7 +127,7 @@ test.describe('Composite alerts — live preview', {
       });
     });
 
-    await openBuilderWith(page, [a.id, b.id]);
+    await openBuilderWith(page, [a, b]);
 
     await expect(pm.compositeAlertsPage.previewWarning('child_never_evaluated')).toBeVisible();
   });
@@ -135,7 +135,7 @@ test.describe('Composite alerts — live preview', {
   test('D3 · a disabled child raises its warning', async ({ page }) => {
     const [a] = await children(page, 'd3', 1);
     const off = await disabledChild(page, 'd3_disabled');
-    await openBuilderWith(page, [a.id, off.id]);
+    await openBuilderWith(page, [a, off]);
 
     await expect(pm.compositeAlertsPage.previewWarning('child_disabled')).toBeVisible();
   });
@@ -162,7 +162,7 @@ test.describe('Composite alerts — live preview', {
       });
     });
 
-    await openBuilderWith(page, [a.id, b.id]);
+    await openBuilderWith(page, [a, b]);
 
     const banner = pm.compositeAlertsPage.previewStale(a.id);
     await expect(banner).toBeVisible();
@@ -181,7 +181,7 @@ test.describe('Composite alerts — live preview', {
       });
     });
 
-    await openBuilderWith(page, [a.id, b.id]);
+    await openBuilderWith(page, [a, b]);
 
     // The component turns a thrown request into a synthetic invalid preview
     // rather than leaving the last good result on screen.
@@ -216,9 +216,9 @@ test.describe('Composite alerts — live preview', {
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
     });
 
-    await openBuilderWith(page, [a.id, b.id]);
+    await openBuilderWith(page, [a, b]);
     // Force a second validation while the first is still in flight.
-    await pm.compositeAlertsPage.addChildById(c.id);
+    await pm.compositeAlertsPage.addChildById(c);
     await pm.compositeAlertsPage.fillExpression('A && B');
 
     await expect.poll(() => seen, { timeout: 30000 }).toBeGreaterThan(1);
