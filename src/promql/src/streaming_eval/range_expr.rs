@@ -20,7 +20,7 @@ use std::{sync::Arc, time::Duration};
 
 use config::meta::promql::value::{EvalContext, Sample};
 
-use crate::functions::{RangeFunc, evaluate_series_range};
+use crate::functions::{RangeFunc, SeriesRange};
 
 /// How one series becomes per-step values: the range function, its window, and the slots.
 pub(crate) struct RangeExpr {
@@ -40,15 +40,17 @@ impl RangeExpr {
         }
     }
 
-    /// Evaluates the function over one series, handing each value to `emit` with its slot.
-    pub(super) fn evaluate(&self, samples: &[Sample], emit: impl FnMut(usize, f64)) {
-        evaluate_series_range(
+    /// The function's `(slot, value)` pairs over one series, in slot order.
+    pub(super) fn values<'a>(
+        &'a self,
+        samples: &'a [Sample],
+    ) -> impl Iterator<Item = (usize, f64)> + 'a {
+        SeriesRange::new(
             samples,
             self.func.as_ref(),
             self.range,
             &self.eval_ctx,
             &self.timestamps,
-            emit,
-        );
+        )
     }
 }

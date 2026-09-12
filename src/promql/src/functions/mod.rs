@@ -295,6 +295,76 @@ pub trait RangeFunc: Send + Sync {
     }
 }
 
+/// One series' values of a range function, `(slot, value)` per evaluation timestamp that has
+/// one, in slot order: the window advances monotonically over the sorted samples, and a counter
+/// function extrapolates from a per-series reset prefix.
+pub(crate) struct SeriesRange<'a, F: ?Sized> {
+    samples: &'a [Sample],
+    func: &'a F,
+    range: Duration,
+    range_micros: i64,
+    timestamps: std::iter::Enumerate<std::slice::Iter<'a, i64>>,
+    start_index: usize,
+    end_index: usize,
+    counter: Option<CounterSeries<'a>>,
+}
+
+impl<'a, F: RangeFunc + ?Sized> SeriesRange<'a, F> {
+    pub(crate) fn new(
+        samples: &'a [Sample],
+        func: &'a F,
+        range: Duration,
+        eval_ctx: &EvalContext,
+        timestamps: &'a [i64],
+    ) -> Self {
+        let range_micros = micros(range);
+        Self {
+            samples,
+            func,
+            range,
+            range_micros,
+            timestamps: timestamps.iter().enumerate(),
+            start_index: 0,
+            end_index: 0,
+            counter: CounterSeries::try_new(
+                samples,
+                func.counter_extrapolation(),
+                eval_ctx,
+                range_micros,
+            ),
+        }
+    }
+}
+
+impl<F: RangeFunc + ?Sized> Iterator for SeriesRange<'_, F> {
+    type Item = (usize, f64);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        for (slot, &eval_ts) in self.timestamps.by_ref() {
+            let window_samples = advance_sample_window(
+                self.samples,
+                eval_ts - self.range_micros,
+                eval_ts,
+                &mut self.start_index,
+                &mut self.end_index,
+            );
+            if window_samples.is_empty() {
+                continue;
+            }
+            let value = match &self.counter {
+                Some(counter) => {
+                    counter.extrapolate(self.start_index, self.end_index, eval_ts, self.range)
+                }
+                None => self.func.exec(window_samples, eval_ts, &self.range),
+            };
+            if let Some(value) = value {
+                return Some((slot, value));
+            }
+        }
+        None
+    }
+}
+
 /// The fused evaluators' view of the same table: a name that resolves to a range function.
 pub(crate) fn fusable_range_func(name: &str) -> Option<Box<dyn RangeFunc>> {
     name.parse::<Func>().ok()?.range_func()
@@ -347,15 +417,10 @@ where
             }
             let time_window = metric.time_window.as_ref().unwrap();
             let range = time_window.range;
-            let mut result_samples = Vec::with_capacity(timestamps.len());
-            evaluate_series_range(
-                &metric.samples,
-                &func,
-                range,
-                eval_ctx,
-                &timestamps,
-                |slot, value| result_samples.push(Sample::new(timestamps[slot], value)),
-            );
+            let result_samples: Vec<Sample> =
+                SeriesRange::new(&metric.samples, &func, range, eval_ctx, &timestamps)
+                    .map(|(slot, value)| Sample::new(timestamps[slot], value))
+                    .collect();
 
             if !result_samples.is_empty() {
                 Some(RangeValue {
@@ -376,44 +441,6 @@ where
         results.len()
     );
     Ok(Value::Matrix(results))
-}
-
-pub(crate) fn evaluate_series_range<F: RangeFunc + ?Sized>(
-    samples: &[Sample],
-    func: &F,
-    range: Duration,
-    eval_ctx: &EvalContext,
-    timestamps: &[i64],
-    mut emit: impl FnMut(usize, f64),
-) {
-    let range_micros = micros(range);
-    let mut start_index = 0;
-    let mut end_index = 0;
-    let counter = CounterSeries::try_new(
-        samples,
-        func.counter_extrapolation(),
-        eval_ctx,
-        range_micros,
-    );
-    for (slot, &eval_ts) in timestamps.iter().enumerate() {
-        let window_samples = advance_sample_window(
-            samples,
-            eval_ts - range_micros,
-            eval_ts,
-            &mut start_index,
-            &mut end_index,
-        );
-        if window_samples.is_empty() {
-            continue;
-        }
-        let value = match &counter {
-            Some(counter) => counter.extrapolate(start_index, end_index, eval_ts, range),
-            None => func.exec(window_samples, eval_ts, &range),
-        };
-        if let Some(value) = value {
-            emit(slot, value);
-        }
-    }
 }
 
 /// Advance two indices through sorted samples for monotonically increasing
@@ -481,10 +508,8 @@ mod tests {
             "avg_over_time",
         ] {
             let func = fusable_range_func(name).unwrap();
-            let mut actual = Vec::new();
-            evaluate_series_range(&samples, &func, range, &ctx, &timestamps, |slot, value| {
-                actual.push((slot, value))
-            });
+            let actual: Vec<_> =
+                SeriesRange::new(&samples, &func, range, &ctx, &timestamps).collect();
             let expected: Vec<_> = timestamps
                 .iter()
                 .enumerate()

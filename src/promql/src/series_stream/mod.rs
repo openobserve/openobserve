@@ -26,13 +26,13 @@ use config::meta::promql::value::{Labels, Sample};
 use datafusion::error::Result;
 
 /// One partition's series delivered whole: `advance` yields the group signature, then
-/// `labels`/`consume` read the current one.
+/// `labels` and `consume` read the current one, in either order.
 pub(crate) trait SeriesStream: Send {
     fn advance(&mut self) -> impl Future<Output = Result<Option<u64>>> + Send;
-    /// The projected labels of the current series; valid only before `consume`.
+    /// The projected labels of the current series.
     fn labels(&mut self) -> Labels;
-    /// Time-ordered samples of the current series.
-    fn consume(&mut self) -> impl Future<Output = Result<&[Sample]>> + Send;
+    /// Replaces `samples` with the time-ordered samples of the current series.
+    fn consume(&mut self, samples: &mut Vec<Sample>) -> impl Future<Output = Result<()>> + Send;
 }
 
 #[cfg(test)]
@@ -56,13 +56,13 @@ mod tests {
         logical_expr::SortExpr,
         prelude::{SessionConfig, SessionContext, col},
     };
-    use hashbrown::HashMap;
+    use hashbrown::{HashMap, HashSet};
     use itertools::Itertools;
     use promql_parser::{label::Matchers, parser::LabelModifier};
 
     use super::{
         hash_sorted::HashSortedSeriesStream,
-        plan::{StreamingSelector, execute_partitioned, group_label_columns},
+        plan::{LabelColumns, StreamingSelector, execute_partitioned},
     };
     use crate::{
         aggregations::AggOp,
@@ -209,7 +209,7 @@ mod tests {
     /// The sorted table's streams, projected to `label_cols`; `None` when it cannot stream.
     pub(super) async fn sorted_table_sources(
         ctx: &SessionContext,
-        label_cols: Vec<String>,
+        label_cols: LabelColumns,
         range: Duration,
     ) -> Option<Vec<impl Future<Output = Result<HashSortedSeriesStream>> + Send + 'static>> {
         let selector = StreamingSelector {
@@ -229,7 +229,8 @@ mod tests {
         .unwrap()
     }
 
-    /// The aggregate over the sorted table's streams; `None` when it cannot stream.
+    /// The aggregate over the sorted table's streams, keyed by the group columns and, for a
+    /// ranking, carrying every label column; `None` when it cannot stream.
     pub(super) async fn run_streaming(
         ctx: &SessionContext,
         modifier: &Option<LabelModifier>,
@@ -238,7 +239,8 @@ mod tests {
         range: Duration,
     ) -> Option<Value> {
         let func: Arc<dyn RangeFunc> = Arc::from(functions::fusable_range_func(func_name).unwrap());
-        let label_cols = group_label_columns(modifier, &arrow_schema(), func_name)?;
+        let label_cols =
+            LabelColumns::for_op(op, modifier, &arrow_schema(), &HashSet::new(), func_name)?;
         let sources = sorted_table_sources(ctx, label_cols, range).await?;
         let eval = Arc::new(RangeExpr::new(func, range, &eval_ctx()));
         Some(aggregate(sources, op, eval).await.unwrap().0)

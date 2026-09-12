@@ -44,6 +44,7 @@ use promql_parser::{label::Matchers, parser::LabelModifier};
 
 use super::hash_sorted::HashSortedSeriesStream;
 use crate::{
+    aggregations::AggOp,
     functions::KEEP_METRIC_NAME_FUNC,
     utils::{apply_matchers, apply_time_window},
 };
@@ -55,13 +56,52 @@ pub(crate) struct StreamingSelector<'a> {
     pub offset: i64,
 }
 
+/// The label columns a stream reads: `group` keys the series it yields, `series` is what its
+/// labels carry. The same set for a scalar aggregation; a ranking keys by the `by()` columns
+/// but carries every label column.
+pub(crate) struct LabelColumns {
+    pub group: Vec<String>,
+    pub series: Vec<String>,
+}
+
+impl LabelColumns {
+    /// Series keyed and labelled by the same columns.
+    pub(crate) fn grouped(cols: Vec<String>) -> Self {
+        Self {
+            group: cols.clone(),
+            series: cols,
+        }
+    }
+
+    /// The columns an aggregation reads: keyed by the `by()` columns, carrying every label
+    /// column when the output keeps the series' own labels; `None` when the modifier cannot be
+    /// keyed by columns.
+    pub(crate) fn for_op(
+        op: AggOp,
+        modifier: &Option<LabelModifier>,
+        schema: &Schema,
+        label_selector: &HashSet<String>,
+        func_name: &str,
+    ) -> Option<Self> {
+        let group = group_label_columns(modifier, schema, func_name)?;
+        Some(if op.needs_series_labels() {
+            Self {
+                group,
+                series: series_label_columns(schema, label_selector, func_name),
+            }
+        } else {
+            Self::grouped(group)
+        })
+    }
+}
+
 /// One hash-sorted stream per partition over the selector's hash-sorted table, projected to the
-/// sample columns plus `label_cols`; `None` when the layout cannot stream in order.
+/// sample columns plus the label columns; `None` when the layout cannot stream in order.
 pub(crate) async fn execute_partitioned(
     ctx: &SessionContext,
     schema: &Schema,
     selector: &StreamingSelector<'_>,
-    label_cols: Vec<String>,
+    label_cols: LabelColumns,
     lookback: i64,
     eval_ctx: &EvalContext,
 ) -> Result<
@@ -86,7 +126,11 @@ pub(crate) async fn execute_partitioned(
     )?;
     let df = apply_matchers(df, selector.matchers)?;
     let mut columns = vec![TIMESTAMP_COL_NAME, HASH_LABEL, VALUE_LABEL];
-    columns.extend(label_cols.iter().map(String::as_str));
+    for name in label_cols.group.iter().chain(&label_cols.series) {
+        if !columns.contains(&name.as_str()) {
+            columns.push(name);
+        }
+    }
     let partitions = ctx.state().config().target_partitions();
     let Some(partition_inputs) =
         build_partition_inputs(&df, &columns, partitions, &eval_ctx.trace_id).await?

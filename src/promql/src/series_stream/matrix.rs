@@ -44,6 +44,8 @@ pub(crate) struct MatrixSeriesStream {
     series: std::vec::IntoIter<(u64, RangeValue)>,
     current: Option<RangeValue>,
     modifier: Option<LabelModifier>,
+    /// Emit every label of a series rather than its group projection.
+    series_labels: bool,
 }
 
 impl SeriesStream for MatrixSeriesStream {
@@ -58,20 +60,26 @@ impl SeriesStream for MatrixSeriesStream {
 
     fn labels(&mut self) -> Labels {
         let series = self.current.as_ref().expect("advance yielded a series");
+        if self.series_labels {
+            return series.labels.clone();
+        }
         projected_labels(&self.modifier, &series.labels)
     }
 
-    async fn consume(&mut self) -> Result<&[Sample]> {
-        let series = self.current.as_ref().expect("advance yielded a series");
-        Ok(&series.samples)
+    async fn consume(&mut self, samples: &mut Vec<Sample>) -> Result<()> {
+        let series = self.current.as_mut().expect("advance yielded a series");
+        *samples = std::mem::take(&mut series.samples);
+        Ok(())
     }
 }
 
 /// Splits a matrix into group-contiguous partitions; boundaries depend only on the series count.
+/// `series_labels` streams every label of a series instead of its group projection.
 pub(crate) fn matrix_streams(
     matrix: Vec<RangeValue>,
     modifier: &Option<LabelModifier>,
     max_partitions: usize,
+    series_labels: bool,
 ) -> Vec<MatrixSeriesStream> {
     let mut groups: Vec<(u64, Vec<usize>)> = group_series_by_labels(&matrix, modifier)
         .into_iter()
@@ -108,16 +116,19 @@ pub(crate) fn matrix_streams(
             series: part.into_iter(),
             current: None,
             modifier: modifier.clone(),
+            series_labels,
         })
         .collect()
 }
 
 /// The matrix as group-ordered sources for the aggregate and the window the load applied to
-/// it; `None` for no input.
+/// it; `None` for no input. `series_labels` streams every label of a series instead of its
+/// group projection.
 pub(crate) fn group_sources(
     data: Value,
     modifier: &Option<LabelModifier>,
     func_name: &str,
+    series_labels: bool,
 ) -> Result<Option<(Vec<MaterializedSource>, Duration)>> {
     let mut matrix = match data {
         Value::Matrix(matrix) if matrix.is_empty() => return Ok(None),
@@ -142,10 +153,15 @@ pub(crate) fn group_sources(
             series.labels.retain(|label| label.name != NAME_LABEL);
         });
     }
-    let sources = matrix_streams(matrix, modifier, config::get_config().limit.cpu_num)
-        .into_iter()
-        .map(|stream| std::future::ready(Ok(stream)))
-        .collect();
+    let sources = matrix_streams(
+        matrix,
+        modifier,
+        config::get_config().limit.cpu_num,
+        series_labels,
+    )
+    .into_iter()
+    .map(|stream| std::future::ready(Ok(stream)))
+    .collect();
     Ok(Some((sources, range)))
 }
 
@@ -155,10 +171,14 @@ mod tests {
 
     #[test]
     fn test_group_sources_none_and_invalid_input() {
-        assert!(group_sources(Value::None, &None, "rate").unwrap().is_none());
-        assert!(group_sources(Value::Float(1.0), &None, "rate").is_err());
         assert!(
-            group_sources(Value::Matrix(vec![]), &None, "rate")
+            group_sources(Value::None, &None, "rate", false)
+                .unwrap()
+                .is_none()
+        );
+        assert!(group_sources(Value::Float(1.0), &None, "rate", false).is_err());
+        assert!(
+            group_sources(Value::Matrix(vec![]), &None, "rate", false)
                 .unwrap()
                 .is_none()
         );
