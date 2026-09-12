@@ -127,6 +127,8 @@ impl From<&HecParseError> for HecCollectorStatus {
     fn from(value: &HecParseError) -> Self {
         match value {
             HecParseError::NoData => Self::NoData,
+            // 413, not 400: the client's remedy is a smaller batch, not a fixed one.
+            HecParseError::TooManyEvents => Self::RequestEntityTooLarge,
             HecParseError::InvalidFormat(_) => Self::InvalidDataFormat,
             HecParseError::EventRequired => Self::EventFieldRequired,
             HecParseError::EventBlank => Self::EventFieldBlank,
