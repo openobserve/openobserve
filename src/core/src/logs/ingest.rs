@@ -682,13 +682,12 @@ pub async fn ingest(
     }
 
     // A write failure used to be visible only in the metric label while the
-    // caller still saw 200; report it so the HTTP handler can surface it.
-    let code = if metric_rpt_status_code == "500" {
-        http::StatusCode::INTERNAL_SERVER_ERROR
-    } else {
-        http::StatusCode::OK
-    };
-    Ok(IngestionResponse::new(code.into(), vec![response_body]))
+    // caller still saw 200. Signalled on `write_failed` and NOT on `code`, which
+    // is a serialized body field on every legacy route sharing this function.
+    Ok(
+        IngestionResponse::new(http::StatusCode::OK.into(), vec![response_body])
+            .with_write_failed(metric_rpt_status_code == "500"),
+    )
 }
 
 /// Finalize a log record (flatten, resolve timestamp, apply UDS, add
@@ -715,6 +714,11 @@ fn finalize_and_buffer_record(
         Ok(ts) => ts,
         Err(e) => {
             ctx.stream_status.status.failed += 1;
+            // A window drop is policy, not a malformed record: counted so a
+            // caller can still report success for the rest of the batch.
+            if schema::is_window_discard_error(&e) {
+                ctx.stream_status.status.policy_dropped += 1;
+            }
             ctx.stream_status.status.error = e.to_string();
             metrics::INGEST_ERRORS
                 .with_label_values(&[

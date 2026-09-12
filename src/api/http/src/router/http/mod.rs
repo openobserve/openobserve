@@ -168,6 +168,18 @@ async fn resolve_candidates(path: &str, base_uri: &str) -> Result<(String, Vec<N
     Ok((full_path, nodes))
 }
 
+/// The Splunk-shaped 413 body, so an oversized batch reads as HEC rather than
+/// as a transport error.
+fn splunk_payload_too_large() -> Response {
+    (
+        StatusCode::PAYLOAD_TOO_LARGE,
+        [(header::CONTENT_TYPE, "application/json")],
+        json::to_string(&json::json!({"text": "Request entity too large", "code": 6}))
+            .unwrap_or_default(),
+    )
+        .into_response()
+}
+
 /// True for the Splunk HEC collector paths, which are never under `base_uri`.
 pub fn is_splunk_collector_route(path: &str) -> bool {
     let path = extract_path_without_query(path);
@@ -258,7 +270,9 @@ async fn proxy_request(
             Ok(collected) => collected.to_bytes(),
             Err(e) => {
                 log::warn!("Collector request body rejected: {e}");
-                return (StatusCode::PAYLOAD_TOO_LARGE, "Request entity too large").into_response();
+                // A HEC client parses the body, so a plain-text 413 here reads
+                // as a protocol error rather than "your batch is too big".
+                return splunk_payload_too_large();
             }
         }
     } else {
@@ -787,8 +801,19 @@ pub fn create_router_routes() -> axum::Router {
         .route("/aws/{*path}", any(dispatch))
         .route("/gcp/{*path}", any(dispatch))
         .route("/rum/{*path}", any(dispatch))
-        // Splunk forwarders POST to a bare host, so the collector has to be
-        // reachable on a router node too.
+}
+
+/// Proxy routes for the Splunk HEC collector, for router nodes only.
+///
+/// Kept out of [`create_router_routes`] because these are mounted outside the
+/// `base_uri` nest while everything there is mounted inside it; merging both
+/// onto one path would give axum two fallbacks for it and panic at startup.
+pub fn create_splunk_collector_proxy_routes() -> axum::Router {
+    use axum::routing::any;
+
+    // Splunk forwarders POST to a bare host, so the collector has to be
+    // reachable on a router node too.
+    axum::Router::new()
         .route("/services/collector", any(dispatch))
         .route("/services/collector/{*path}", any(dispatch))
 }
@@ -816,7 +841,9 @@ mod tests {
     }
 
     #[test]
-    fn test_collector_is_rate_limit_exempt() {
+    fn test_collector_is_registered_as_an_ingester_route() {
+        // INGESTER_ROUTES is not a rate-limit list: its consumers are
+        // is_querier_route and the cloud trial gate.
         assert!(config::router::INGESTER_ROUTES.contains(&"/services/collector"));
     }
 

@@ -20,24 +20,27 @@
 
 use axum::{
     Extension, Json,
-    body::Bytes,
+    body::{Body, Bytes},
     extract::Request,
-    http::{HeaderMap, StatusCode, header},
+    http::{StatusCode, header},
     middleware::Next,
     response::{IntoResponse, Response},
 };
 use common::infra::config::SPLUNK_HEC_TOKENS;
-use config::{DEFAULT_STREAM_NAME, metrics, utils::str::mask_secret};
+use config::{DEFAULT_STREAM_NAME, meta::stream::StreamType, metrics, utils::str::mask_secret};
+use db::org_ingestion_tokens::SPLUNK_HEC_TOKENS_LOADED;
 use ingestion_common::IngestUser;
 use serde::{Deserialize, Serialize};
 
 use crate::service::{
-    ingestion::get_thread_id,
+    ingestion::{check_ingestion_allowed, get_thread_id},
     logs::hec::{HecParseError, parse_body, preflight_streams},
 };
 
 /// Maximum decompressed body the collector will accept.
 pub const HEC_MAX_BODY_BYTES: usize = 100 * 1024 * 1024;
+/// Maximum body on the wire, before any decompression can amplify it.
+pub const HEC_MAX_WIRE_BYTES: usize = 10 * 1024 * 1024;
 
 /// The org and token row resolved by [`splunk_auth_middleware`].
 #[derive(Clone, Debug)]
@@ -161,55 +164,108 @@ pub async fn splunk_auth_middleware(mut req: Request, next: Next) -> Response {
         .map(|ip| ip.0.to_string())
         .unwrap_or_else(|| "-".to_string());
 
-    let auth = match req
-        .headers()
-        .get(header::AUTHORIZATION)
-        .and_then(|v| v.to_str().ok())
-    {
-        Some(v) => v.trim().to_string(),
+    let auth = match req.headers().get(header::AUTHORIZATION) {
+        // A header that is not UTF-8 is present but unreadable: malformed (code
+        // 3), not missing (code 2).
+        Some(v) => match v.to_str() {
+            Ok(v) => v.trim().to_string(),
+            Err(_) => {
+                return reject(
+                    HecCollectorStatus::InvalidAuthorization,
+                    "malformed",
+                    "",
+                    "",
+                    &real_ip,
+                    "Authorization is not valid UTF-8",
+                );
+            }
+        },
         None => {
-            record_auth_failure("malformed", "", "", &real_ip, "missing Authorization");
-            return HecCollectorStatus::TokenRequired.into_response();
+            return reject(
+                HecCollectorStatus::TokenRequired,
+                "malformed",
+                "",
+                "",
+                &real_ip,
+                "missing Authorization",
+            );
         }
     };
 
     let Some(token) = splunk_scheme_token(&auth) else {
-        record_auth_failure("malformed", "", &auth, &real_ip, "not a Splunk credential");
-        return HecCollectorStatus::InvalidAuthorization.into_response();
+        return reject(
+            HecCollectorStatus::InvalidAuthorization,
+            "malformed",
+            "",
+            &auth,
+            &real_ip,
+            "not a Splunk credential",
+        );
     };
 
     // A value that is not a canonical GUID is rejected before any cache or store
     // lookup, so a flood of random tokens cannot reach the database.
     let Some(guid) = canonical_guid(token) else {
-        record_auth_failure("unknown", "", token, &real_ip, "not a canonical guid");
-        return HecCollectorStatus::InvalidToken.into_response();
+        return reject(
+            HecCollectorStatus::InvalidToken,
+            "unknown",
+            "",
+            token,
+            &real_ip,
+            "not a canonical guid",
+        );
     };
     let guid = guid.as_str();
 
-    let (org_id, token_id) = match lookup_token(guid).await {
+    let (org_id, token_id) = match lookup_token(guid) {
         TokenLookup::Found(org_id, token_id) => (org_id, token_id),
-        TokenLookup::Disabled => {
-            record_auth_failure("disabled", "", guid, &real_ip, "splunk token disabled");
-            return HecCollectorStatus::TokenDisabled.into_response();
+        TokenLookup::Disabled(org_id, token_id) => {
+            return reject(
+                HecCollectorStatus::TokenDisabled,
+                "disabled",
+                &org_id,
+                guid,
+                &real_ip,
+                &format!("splunk token {token_id} disabled"),
+            );
         }
         TokenLookup::Unknown => {
             // An unknown GUID and a well-formed non-GUID are indistinguishable to
             // the caller by design; only the log tells them apart.
-            record_auth_failure("unknown", "", guid, &real_ip, "no such splunk token");
-            return HecCollectorStatus::InvalidToken.into_response();
+            return reject(
+                HecCollectorStatus::InvalidToken,
+                "unknown",
+                "",
+                guid,
+                &real_ip,
+                "no such splunk token",
+            );
         }
-        TokenLookup::StoreUnavailable => {
-            // Retryable: a meta-store outage must not look like a bad credential.
-            record_auth_failure("unknown", "", guid, &real_ip, "token store unavailable");
-            return HecCollectorStatus::ServerBusy.into_response();
+        TokenLookup::NotLoaded => {
+            // Retryable: before the first load a miss is not authoritative, so a
+            // valid GUID must not be turned into a 403.
+            return reject(
+                HecCollectorStatus::ServerBusy,
+                "store_unavailable",
+                "",
+                guid,
+                &real_ip,
+                "splunk token cache not loaded yet",
+            );
         }
     };
 
     if db::org_status::is_blocked(&org_id) {
         // `/services/collector` is outside the /api tree, so the blocking
         // middleware never sees it — this is the only gate.
-        record_auth_failure("disabled", &org_id, guid, &real_ip, "org is blocked");
-        return HecCollectorStatus::TokenDisabled.into_response();
+        return reject(
+            HecCollectorStatus::TokenDisabled,
+            "org_blocked",
+            &org_id,
+            guid,
+            &real_ip,
+            &format!("org is blocked, token {token_id}"),
+        );
     }
 
     metrics::HEC_AUTH_TOTAL
@@ -219,17 +275,24 @@ pub async fn splunk_auth_middleware(mut req: Request, next: Next) -> Response {
     next.run(req).await
 }
 
+/// Cap the body on the wire, outside decompression, with the Splunk 413 triple.
+///
+/// `DefaultBodyLimit` sits inside the decompression layer so it bounds the
+/// DECOMPRESSED body; a compressed bomb has to be stopped before that.
+pub async fn wire_body_limit_middleware(req: Request, next: Next) -> Response {
+    let (parts, body) = req.into_parts();
+    let bytes = match axum::body::to_bytes(body, HEC_MAX_WIRE_BYTES).await {
+        Ok(b) => b,
+        Err(_) => return count_and_respond(HecCollectorStatus::RequestEntityTooLarge, ""),
+    };
+    next.run(Request::from_parts(parts, Body::from(bytes)))
+        .await
+}
+
 /// `POST /services/collector` and `/services/collector/event`.
-pub async fn collector_event(
-    Extension(auth): Extension<HecAuth>,
-    headers: HeaderMap,
-    body: Bytes,
-) -> Response {
-    let status = ingest_collector_body(&auth, &headers, body).await;
-    metrics::HEC_REQUESTS_TOTAL
-        .with_label_values(&[status.metric_label(), &auth.org_id])
-        .inc();
-    status.into_response()
+pub async fn collector_event(Extension(auth): Extension<HecAuth>, body: Bytes) -> Response {
+    let status = ingest_collector_body(&auth, body).await;
+    count_and_respond(status, &auth.org_id)
 }
 
 /// `GET /services/collector/health` — unauthenticated liveness probe.
@@ -264,7 +327,12 @@ fn splunk_scheme_token(auth: &str) -> Option<&str> {
         return None;
     }
     let token = rest.trim_matches([' ', '\t']);
-    (!token.is_empty()).then_some(token)
+    // §5 rule 2 splits into exactly scheme and token: a third field is a
+    // malformed credential (code 3), not a token that fails the GUID check.
+    if token.is_empty() || token.contains([' ', '\t']) {
+        return None;
+    }
+    Some(token)
 }
 
 /// Lowercase a canonical 8-4-4-4-12 hyphenated GUID, or reject anything else.
@@ -283,46 +351,59 @@ fn canonical_guid(token: &str) -> Option<String> {
 /// Outcome of resolving a GUID, kept distinct so each maps to its own Splunk code.
 enum TokenLookup {
     Found(String, String),
-    Disabled,
+    Disabled(String, String),
     Unknown,
-    StoreUnavailable,
+    NotLoaded,
 }
 
-/// Resolve a GUID to its org and token row id, cache first.
-async fn lookup_token(guid: &str) -> TokenLookup {
+/// Resolve a GUID to its org and token row id, from memory only.
+///
+/// The map holds EVERY row that carries a GUID, enabled or not, and is repaired
+/// by the 60s reload, so a miss is authoritative. Falling through to the store
+/// here would let unauthenticated traffic generate database load at will —
+/// random GUIDs never repeat, so every request would miss.
+fn lookup_token(guid: &str) -> TokenLookup {
+    resolve_guid(
+        guid,
+        SPLUNK_HEC_TOKENS_LOADED.load(std::sync::atomic::Ordering::Acquire),
+    )
+}
+
+/// The lookup decision, with the load state passed in so it is testable.
+fn resolve_guid(guid: &str, loaded: bool) -> TokenLookup {
     if let Some(entry) = SPLUNK_HEC_TOKENS.get(guid) {
-        let (org_id, token_id) = entry.value().clone();
-        return TokenLookup::Found(org_id, token_id);
+        let entry = entry.value();
+        return if entry.enabled {
+            TokenLookup::Found(entry.org_id.clone(), entry.token_id.clone())
+        } else {
+            // A disabled token says so: code 4 would send an operator hunting for
+            // a token they already hold.
+            TokenLookup::Disabled(entry.org_id.clone(), entry.token_id.clone())
+        };
     }
-    // A cache miss is normal right after a token is minted on another node.
-    match infra::table::org_ingestion_tokens::find_by_splunk_token(guid).await {
-        Ok(Some(record)) if record.enabled => {
-            let entry = (record.org_id.clone(), record.id.clone());
-            SPLUNK_HEC_TOKENS.insert(guid.to_string(), entry.clone());
-            TokenLookup::Found(entry.0, entry.1)
-        }
-        // A disabled token says so: code 4 would send an operator hunting for a
-        // token they already hold.
-        Ok(Some(_)) => TokenLookup::Disabled,
-        Ok(None) => TokenLookup::Unknown,
-        Err(e) => {
-            log::error!("[SPLUNK_HEC] splunk token lookup failed: {e}");
-            TokenLookup::StoreUnavailable
-        }
+    if !loaded {
+        return TokenLookup::NotLoaded;
     }
+    TokenLookup::Unknown
 }
 
 /// Parse, validate and write one collector body.
-async fn ingest_collector_body(
-    auth: &HecAuth,
-    headers: &HeaderMap,
-    body: Bytes,
-) -> HecCollectorStatus {
+///
+/// Content-Type is deliberately not gated: HEC senders use `application/json`,
+/// `text/plain`, `application/x-ndjson` and nothing at all interchangeably, and
+/// the parser is what decides whether a body is usable.
+async fn ingest_collector_body(auth: &HecAuth, body: Bytes) -> HecCollectorStatus {
     if body.len() > HEC_MAX_BODY_BYTES {
         return HecCollectorStatus::RequestEntityTooLarge;
     }
-    if !is_json_content_type(headers) {
-        return HecCollectorStatus::InvalidDataFormat;
+
+    // §9.2: gate the ORG before parsing. `preflight_streams` runs the same check
+    // per stream, but only after the body is parsed and only when the body
+    // yielded at least one group — so a cloud org past its trial, or one over
+    // quota, would otherwise do the parse work first.
+    if let Err(e) = check_ingestion_allowed(&auth.org_id, StreamType::Logs, None).await {
+        log::warn!("[SPLUNK_HEC] rejected for org {}: {e}", auth.org_id);
+        return admission_status(&e);
     }
 
     // Nothing is written until every group has parsed, so a rejected entry
@@ -342,10 +423,7 @@ async fn ingest_collector_body(
             "[SPLUNK_HEC] rejected before write for org {}: {e}",
             auth.org_id
         );
-        return match e {
-            infra::errors::Error::ResourceError(_) => HecCollectorStatus::ServerBusy,
-            _ => HecCollectorStatus::IncorrectIndex,
-        };
+        return admission_status(&e);
     }
 
     let responses = match crate::service::logs::hec::ingest_prepared(
@@ -368,32 +446,79 @@ async fn ingest_collector_body(
         }
     };
 
-    for resp in &responses {
-        if resp.code >= 500 {
+    write_outcome(&responses)
+}
+
+/// The collector status for a completed batch's per-stream outcomes.
+fn write_outcome(responses: &[ingestion_common::IngestionResponse]) -> HecCollectorStatus {
+    for resp in responses {
+        // `code` is 200 even on a storage failure, because it is a serialized
+        // body field the legacy routes depend on; the real signal is this flag.
+        if resp.write_failed {
             return HecCollectorStatus::InternalError;
         }
-        if resp.status.iter().any(|s| s.status.failed > 0) {
+        // §11.1: events outside ZO_INGEST_ALLOWED_UPTO / _IN_FUTURE are dropped
+        // BY POLICY on every route. Failing the batch would make the client
+        // discard its in-window events too, since a 400 is not retried.
+        if resp
+            .status
+            .iter()
+            .any(|s| s.status.failed > s.status.policy_dropped)
+        {
             return HecCollectorStatus::InvalidDataFormat;
         }
     }
     HecCollectorStatus::Success
 }
 
-/// Splunk HEC bodies are JSON; an absent Content-Type is accepted for the many
-/// senders that omit it.
-fn is_json_content_type(headers: &HeaderMap) -> bool {
-    match headers
-        .get(header::CONTENT_TYPE)
-        .and_then(|v| v.to_str().ok())
-    {
-        None => true,
-        Some(v) => {
-            let v = v.to_ascii_lowercase();
-            v.starts_with("application/json")
-                || v.starts_with("text/plain")
-                || v.starts_with("application/x-www-form-urlencoded")
+/// Which Splunk status an admission failure maps to.
+///
+/// §10.2 splits these: quota, circuit breakers and a store outage are retryable
+/// (503/code 9), so a client must not be told its index is wrong and give up.
+fn admission_status(e: &infra::errors::Error) -> HecCollectorStatus {
+    match e {
+        infra::errors::Error::ResourceError(_) => HecCollectorStatus::ServerBusy,
+        // Not an ingester, and a cloud trial that has run out, are both conditions
+        // of the receiving side rather than of the batch.
+        infra::errors::Error::TrialPeriodExpired => HecCollectorStatus::ServerBusy,
+        infra::errors::Error::IngestionError(msg) if is_retryable_admission(msg) => {
+            HecCollectorStatus::ServerBusy
         }
+        _ => HecCollectorStatus::IncorrectIndex,
     }
+}
+
+/// True for the `IngestionError` texts that describe a node or quota condition.
+///
+/// `check_ingestion_allowed` flattens these into one stringly-typed variant, so
+/// the message is the only thing separating "retry later" from "your index is
+/// wrong"; matched on the literals it builds.
+fn is_retryable_admission(msg: &str) -> bool {
+    msg == "not an ingester" || msg.starts_with("Quota exceeded for this organization")
+}
+
+/// Count one collector outcome and render its Splunk body.
+fn count_and_respond(status: HecCollectorStatus, org_id: &str) -> Response {
+    metrics::HEC_REQUESTS_TOTAL
+        .with_label_values(&[status.metric_label(), org_id])
+        .inc();
+    status.into_response()
+}
+
+/// Log, count and render one auth rejection.
+///
+/// Every middleware rejection goes through here so codes 1-4 and 9 appear in
+/// `zo_hec_requests_total` alongside the outcomes the handler counts.
+fn reject(
+    status: HecCollectorStatus,
+    result: &str,
+    org_id: &str,
+    token: &str,
+    real_ip: &str,
+    reason: &str,
+) -> Response {
+    record_auth_failure(result, org_id, token, real_ip, reason);
+    count_and_respond(status, org_id)
 }
 
 /// Log and count one auth rejection, never printing the credential in full.
@@ -411,6 +536,7 @@ fn record_auth_failure(result: &str, org_id: &str, token: &str, real_ip: &str, r
 #[cfg(test)]
 mod tests {
     use config::utils::json;
+    use ingestion_common::IngestionResponse;
 
     use super::*;
 
@@ -512,21 +638,6 @@ mod tests {
     }
 
     #[test]
-    fn test_content_type_gate() {
-        let mut headers = HeaderMap::new();
-        assert!(is_json_content_type(&headers));
-        headers.insert(header::CONTENT_TYPE, "application/json".parse().unwrap());
-        assert!(is_json_content_type(&headers));
-        headers.insert(
-            header::CONTENT_TYPE,
-            "application/json; charset=utf-8".parse().unwrap(),
-        );
-        assert!(is_json_content_type(&headers));
-        headers.insert(header::CONTENT_TYPE, "application/xml".parse().unwrap());
-        assert!(!is_json_content_type(&headers));
-    }
-
-    #[test]
     fn test_health_body_is_splunk_shaped() {
         let resp = HecCollectorResponse {
             text: "HEC is healthy".to_string(),
@@ -595,12 +706,135 @@ mod tests {
     }
 
     #[test]
+    fn a_third_field_is_malformed_not_an_invalid_token() {
+        // Code 3 (malformed credential), not code 4 (bad token value): the
+        // header does not parse as scheme + token at all.
+        assert_eq!(splunk_scheme_token(&format!("Splunk {GUID} extra")), None);
+        assert_eq!(splunk_scheme_token(&format!("Splunk {GUID}\textra")), None);
+    }
+
+    #[test]
     fn uppercase_guid_normalizes_to_lowercase() {
         assert_eq!(
             canonical_guid(&GUID.to_ascii_uppercase()).as_deref(),
             Some(GUID)
         );
         assert_eq!(canonical_guid(GUID).as_deref(), Some(GUID));
+    }
+
+    #[test]
+    fn a_miss_is_authoritative_once_the_cache_is_loaded() {
+        // §6.2: the map holds every GUID row, so a miss means "no such GUID".
+        // Falling through to the store would let unauthenticated traffic drive
+        // database load — random GUIDs never repeat, so every request misses.
+        assert!(matches!(
+            resolve_guid("00000000-0000-4000-8000-000000000000", true),
+            TokenLookup::Unknown
+        ));
+    }
+
+    #[test]
+    fn a_disabled_token_answers_from_memory() {
+        SPLUNK_HEC_TOKENS.insert(
+            GUID.to_string(),
+            infra::table::org_ingestion_tokens::SplunkHecTokenEntry {
+                org_id: "org-a".to_string(),
+                token_id: "tok-a".to_string(),
+                enabled: false,
+            },
+        );
+        match resolve_guid(GUID, true) {
+            TokenLookup::Disabled(org_id, token_id) => {
+                assert_eq!(org_id, "org-a");
+                // §12.6 wants the token id on the log line for this path.
+                assert_eq!(token_id, "tok-a");
+            }
+            _ => panic!("a disabled row must answer code 1 from the cache"),
+        }
+        SPLUNK_HEC_TOKENS.remove(GUID);
+    }
+
+    #[test]
+    fn a_miss_before_the_first_load_is_retryable_not_a_403() {
+        // A cold node must never turn a valid GUID into an authoritative 403.
+        assert!(matches!(
+            resolve_guid("11111111-1111-4111-8111-111111111111", false),
+            TokenLookup::NotLoaded
+        ));
+    }
+
+    fn response(successful: u32, failed: u32, policy_dropped: u32) -> IngestionResponse {
+        let mut status = ingestion_common::StreamStatus::new("s");
+        status.status.successful = successful;
+        status.status.failed = failed;
+        status.status.policy_dropped = policy_dropped;
+        IngestionResponse::new(200, vec![status])
+    }
+
+    #[test]
+    fn events_dropped_by_the_ingestion_window_still_return_code_0() {
+        // §11.1: the window drops by design. Failing the batch would make the
+        // client discard its in-window events too, since a 400 is not retried.
+        assert_eq!(
+            write_outcome(&[response(9, 1, 1)]),
+            HecCollectorStatus::Success
+        );
+    }
+
+    #[test]
+    fn a_genuine_preparation_failure_is_still_code_6() {
+        assert_eq!(
+            write_outcome(&[response(9, 1, 0)]),
+            HecCollectorStatus::InvalidDataFormat
+        );
+        // One window drop and one real failure: the real one still decides.
+        assert_eq!(
+            write_outcome(&[response(8, 2, 1)]),
+            HecCollectorStatus::InvalidDataFormat
+        );
+    }
+
+    #[test]
+    fn a_write_failure_is_code_8_even_though_code_is_200() {
+        // The shared path returns 200 so the legacy routes' bodies do not change;
+        // acknowledging lost data here is exactly the bug §11.1 names.
+        let failed = response(10, 0, 0).with_write_failed(true);
+        assert_eq!(failed.code, 200);
+        assert_eq!(write_outcome(&[failed]), HecCollectorStatus::InternalError);
+    }
+
+    #[test]
+    fn retryable_admission_failures_are_503_not_a_bad_index() {
+        // §10.2: telling a client its index is wrong makes it drop the batch;
+        // these conditions are the receiver's, and a retry will succeed.
+        for e in [
+            infra::errors::Error::ResourceError("memtable full".to_string()),
+            infra::errors::Error::TrialPeriodExpired,
+            infra::errors::Error::IngestionError("not an ingester".to_string()),
+            infra::errors::Error::IngestionError(
+                "Quota exceeded for this organization [acme]".to_string(),
+            ),
+        ] {
+            assert_eq!(
+                admission_status(&e),
+                HecCollectorStatus::ServerBusy,
+                "{e:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_genuine_stream_rejection_stays_code_7() {
+        for e in [
+            infra::errors::Error::IngestionError("Stream name is empty".to_string()),
+            infra::errors::Error::IngestionError("stream [foo] is being deleted".to_string()),
+        ] {
+            assert_eq!(
+                admission_status(&e),
+                HecCollectorStatus::IncorrectIndex,
+                "{e:?}"
+            );
+        }
     }
 
     #[test]
