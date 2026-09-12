@@ -231,7 +231,7 @@ import {
   onMounted,
   defineAsyncComponent,
 } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import {
   addPanel,
   checkIfVariablesAreLoaded,
@@ -1247,7 +1247,8 @@ export default defineComponent({
       validatePanel(errors, isFieldsValidationRequired);
 
       if (errors.length) {
-        showErrorNotification(t("dashboard.addPanel.fixErrors"));
+        // This view's `errorData` is rendered nowhere, so the toast is all the user gets.
+        showErrorNotification(raw(errors.join(", ")));
       }
 
       if (errors.length) {
@@ -1258,6 +1259,7 @@ export default defineComponent({
     };
 
     const savePanelChangesToDashboard = async (dashId: string) => {
+      // Left generic: these errors are never cleared before this guard, so they can be stale.
       if (dashboardPanelData.data.type === "custom_chart" && errorData.errors.length > 0) {
         showErrorNotification(t("dashboard.addPanel.fixErrors"));
         return;
