@@ -26,13 +26,20 @@ use config::{
     utils::{json, schema::format_stream_name},
 };
 use hashbrown::HashMap;
-use infra::errors::{Error, Result};
+use infra::{
+    errors::{Error, Result},
+    schema::get_flatten_level,
+};
 use ingestion_common::{
     HecResponse, HecStatus, IngestUser, IngestionRequest, IngestionResponse, IngestionValueType,
 };
 use serde::{Deserialize, Deserializer};
 
-use crate::{ingestion::check_ingestion_allowed, service::get_formatted_stream_name};
+use crate::{
+    ingestion::check_ingestion_allowed,
+    logs::ingest::{PrepareRecordError, prepare_record},
+    service::get_formatted_stream_name,
+};
 
 /// Why a HEC body could not be turned into records. Maps onto the collector's
 /// status codes; the legacy route flattens all of these into its own codes.
@@ -178,6 +185,50 @@ pub async fn preflight_streams(
             return Err(Error::IngestionError(reason));
         }
         check_ingestion_allowed(org_id, StreamType::Logs, Some(stream)).await?;
+    }
+    Ok(())
+}
+
+/// Prepare every event of every group, so an event that cannot be prepared is
+/// reported with nothing written (§10.4).
+///
+/// Preparation otherwise happens inside the per-stream write loop, so an event
+/// in the second group is only found to be bad after the first group has been
+/// committed — a partial write the client is told is a single failure, and
+/// duplicates when it retries.
+///
+/// Deliberately a dry run over the SAME `prepare_record` the write path uses:
+/// the duplicated flatten costs CPU, but a second implementation would drift
+/// from the one that decides what actually gets written.
+///
+/// Window drops stay policy drops. They are the one rejection that must NOT
+/// fail the batch — a 400 is not retried, so the client would discard its
+/// in-window events too.
+///
+/// Exact only when the stream has no pipeline: with one attached the write path
+/// timestamps the pipeline OUTPUT, which this cannot see, so a transform that
+/// produces a bad timestamp is still caught only at write time.
+pub async fn preflight_records(
+    org_id: &str,
+    streams: &[(String, Vec<json::Value>)],
+) -> std::result::Result<(), HecParseError> {
+    let cfg = get_config();
+    let now = config::utils::time::now_micros();
+    let min_ts = now - cfg.limit.ingest_allowed_upto_micro;
+    let max_ts = now + cfg.limit.ingest_allowed_in_future_micro;
+
+    for (stream, entries) in streams {
+        let flatten_level = get_flatten_level(org_id, stream, StreamType::Logs).await;
+        for entry in entries {
+            match prepare_record(entry.clone(), flatten_level, min_ts, max_ts) {
+                Ok(_) => {}
+                Err(PrepareRecordError::Timestamp(_, e)) if schema::is_window_discard_error(&e) => {
+                }
+                Err(PrepareRecordError::Flatten(e) | PrepareRecordError::Timestamp(_, e)) => {
+                    return Err(HecParseError::InvalidFormat(e.to_string()));
+                }
+            }
+        }
     }
     Ok(())
 }
@@ -411,6 +462,76 @@ mod tests {
 
     fn entry(body: &str) -> HecEntry {
         json::from_str(body).unwrap()
+    }
+
+    #[tokio::test]
+    async fn preflight_rejects_an_unpreparable_event_in_any_group() {
+        // §10.4: preparation happens inside the per-stream write loop, so without
+        // this pass a bad event in the SECOND group is only discovered after the
+        // first group is committed — a partial write the client is told is one
+        // failure, and duplicates on retry.
+        let bad = json::json!({"_timestamp": "not-a-timestamp", "log": "x"});
+        let good = json::json!({"log": "fine"});
+
+        let streams = vec![
+            ("group_one".to_string(), vec![good.clone()]),
+            ("group_two".to_string(), vec![bad]),
+        ];
+        assert!(matches!(
+            preflight_records("preflight_org", &streams).await,
+            Err(HecParseError::InvalidFormat(_))
+        ));
+
+        let all_good = vec![
+            ("group_one".to_string(), vec![good.clone()]),
+            ("group_two".to_string(), vec![good]),
+        ];
+        assert!(preflight_records("preflight_org", &all_good).await.is_ok());
+    }
+
+    #[tokio::test]
+    async fn preflight_keeps_an_ingestion_window_drop_a_policy_drop() {
+        // The one rejection that must NOT fail the batch: a 400 is not retried,
+        // so failing here would make the client discard its in-window events too.
+        let cfg = get_config();
+        let too_old =
+            config::utils::time::now_micros() - cfg.limit.ingest_allowed_upto_micro - 60_000_000;
+        let streams = vec![(
+            "windowed".to_string(),
+            vec![json::json!({"_timestamp": too_old, "log": "old"})],
+        )];
+        assert!(preflight_records("preflight_org", &streams).await.is_ok());
+
+        let too_new = config::utils::time::now_micros()
+            + cfg.limit.ingest_allowed_in_future_micro
+            + 60_000_000;
+        let streams = vec![(
+            "windowed".to_string(),
+            vec![json::json!({"_timestamp": too_new, "log": "future"})],
+        )];
+        assert!(preflight_records("preflight_org", &streams).await.is_ok());
+    }
+
+    #[tokio::test]
+    async fn preflight_uses_the_same_verdict_as_the_write_path() {
+        // The dry run and the write must agree, so both go through the SAME
+        // `prepare_record`; a second implementation would drift from the one
+        // that decides what is actually stored.
+        let cfg = get_config();
+        let now = config::utils::time::now_micros();
+        let min_ts = now - cfg.limit.ingest_allowed_upto_micro;
+        let max_ts = now + cfg.limit.ingest_allowed_in_future_micro;
+        let level = cfg.limit.ingest_flatten_level;
+
+        let bad = json::json!({"_timestamp": "not-a-timestamp", "log": "x"});
+        assert!(prepare_record(bad.clone(), level, min_ts, max_ts).is_err());
+        let streams = vec![("s".to_string(), vec![bad])];
+        assert!(preflight_records("preflight_org", &streams).await.is_err());
+
+        let good = json::json!({"log": "fine"});
+        assert!(prepare_record(good.clone(), level, min_ts, max_ts).is_ok());
+        let streams = vec![("s".to_string(), vec![good])];
+        assert!(preflight_records("preflight_org", &streams).await.is_ok());
     }
 
     #[test]

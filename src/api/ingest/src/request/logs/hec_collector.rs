@@ -21,7 +21,7 @@
 use axum::{
     Extension, Json,
     body::{Body, Bytes},
-    extract::Request,
+    extract::{Request, rejection::BytesRejection},
     http::{StatusCode, header},
     middleware::Next,
     response::{IntoResponse, Response},
@@ -34,7 +34,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::service::{
     ingestion::{check_ingestion_allowed, get_thread_id},
-    logs::hec::{HecParseError, parse_body, preflight_streams},
+    logs::hec::{HecParseError, parse_body, preflight_records, preflight_streams},
 };
 
 /// Maximum decompressed body the collector will accept.
@@ -290,8 +290,18 @@ pub async fn wire_body_limit_middleware(req: Request, next: Next) -> Response {
 }
 
 /// `POST /services/collector` and `/services/collector/event`.
-pub async fn collector_event(Extension(auth): Extension<HecAuth>, body: Bytes) -> Response {
-    let status = ingest_collector_body(&auth, body).await;
+///
+/// The body is taken as a `Result` so that `DefaultBodyLimit` — which rejects
+/// INSIDE the `Bytes` extractor, i.e. before this body ever runs — is answered
+/// with the Splunk 413 triple rather than the extractor's plain-text default.
+pub async fn collector_event(
+    Extension(auth): Extension<HecAuth>,
+    body: Result<Bytes, BytesRejection>,
+) -> Response {
+    let status = match body {
+        Ok(body) => ingest_collector_body(&auth, body).await,
+        Err(e) => body_rejection_status(&e),
+    };
     count_and_respond(status, &auth.org_id)
 }
 
@@ -387,6 +397,20 @@ fn resolve_guid(guid: &str, loaded: bool) -> TokenLookup {
     TokenLookup::Unknown
 }
 
+/// Map a `Bytes` extractor rejection onto a Splunk status.
+///
+/// `DefaultBodyLimit` caps the DECOMPRESSED body and fails inside the extractor,
+/// so this is the only place the 100 MiB limit can be answered with the triple.
+fn body_rejection_status(rejection: &BytesRejection) -> HecCollectorStatus {
+    // Matched on the status the rejection itself declares: the length-limit case
+    // is a nested variant of a macro-generated composite, so the shape is not a
+    // stable thing to pattern-match on across axum versions.
+    match rejection.status() {
+        StatusCode::PAYLOAD_TOO_LARGE => HecCollectorStatus::RequestEntityTooLarge,
+        _ => HecCollectorStatus::InvalidDataFormat,
+    }
+}
+
 /// Parse, validate and write one collector body.
 ///
 /// Content-Type is deliberately not gated: HEC senders use `application/json`,
@@ -426,6 +450,17 @@ async fn ingest_collector_body(auth: &HecAuth, body: Bytes) -> HecCollectorStatu
         return admission_status(&e);
     }
 
+    // §10.4: every EVENT of every group is prepared here too, so an event that
+    // group 2 cannot flatten is reported before group 1 is committed rather
+    // than after — which a retrying client would otherwise duplicate.
+    if let Err(e) = preflight_records(&auth.org_id, &streams).await {
+        log::warn!(
+            "[SPLUNK_HEC] unpreparable event for org {}: {e:?}",
+            auth.org_id
+        );
+        return HecCollectorStatus::from(&e);
+    }
+
     let responses = match crate::service::logs::hec::ingest_prepared(
         get_thread_id(),
         &auth.org_id,
@@ -455,6 +490,12 @@ fn write_outcome(responses: &[ingestion_common::IngestionResponse]) -> HecCollec
         // `code` is 200 even on a storage failure, because it is a serialized
         // body field the legacy routes depend on; the real signal is this flag.
         if resp.write_failed {
+            return HecCollectorStatus::InternalError;
+        }
+        // §11.1: a stream that started deleting after admission is skipped and
+        // its records are gone. Retryable (code 8): a retry meets code 7 at
+        // admission once the deletion is visible there.
+        if resp.stream_skipped {
             return HecCollectorStatus::InternalError;
         }
         // §11.1: events outside ZO_INGEST_ALLOWED_UPTO / _IN_FUTURE are dropped
@@ -777,6 +818,28 @@ mod tests {
         // client discard its in-window events too, since a 400 is not retried.
         assert_eq!(
             write_outcome(&[response(9, 1, 1)]),
+            HecCollectorStatus::Success
+        );
+    }
+
+    #[test]
+    fn a_stream_skipped_mid_write_is_code_8_not_code_0() {
+        // §11.1's "most serious item": the write loop skips a stream that started
+        // deleting after admission, so acknowledging 200 would tell the client
+        // data it never stored was safe.
+        let skipped = response(0, 0, 0).with_stream_skipped(true);
+        assert_eq!(write_outcome(&[skipped]), HecCollectorStatus::InternalError);
+
+        // A skip in ANY group fails the batch, not just the first.
+        let skipped = response(0, 0, 0).with_stream_skipped(true);
+        assert_eq!(
+            write_outcome(&[response(5, 0, 0), skipped]),
+            HecCollectorStatus::InternalError
+        );
+
+        // And a clean batch still succeeds.
+        assert_eq!(
+            write_outcome(&[response(5, 0, 0)]),
             HecCollectorStatus::Success
         );
     }

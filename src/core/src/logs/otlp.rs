@@ -681,7 +681,10 @@ pub async fn handle_request(
     )
     .await
     {
-        Ok(()) => {
+        // A deleting-stream skip is surfaced on IngestionResponse for the HEC
+        // collector; OTLP's protobuf response has no field for it, so it keeps
+        // reporting 200 exactly as before.
+        Ok(_skipped) => {
             let mut out = BytesMut::with_capacity(res.encoded_len());
             res.encode(&mut out).expect("Out of memory");
             ("200", out)

@@ -2133,6 +2133,56 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_body_that_decompresses_over_the_limit_is_413_with_the_splunk_triple() {
+        // The wire-limit test above cannot reach this: a compression bomb is
+        // tiny on the wire and only blows past HEC_MAX_BODY_BYTES inside the
+        // `Bytes` extractor, where `DefaultBodyLimit` rejects with a plain-text
+        // body unless the handler maps the rejection itself.
+        const GUID: &str = "abcdabcd-0000-4000-8000-abcdabcdabcd";
+        common::infra::config::SPLUNK_HEC_TOKENS.insert(
+            GUID.to_string(),
+            infra::table::org_ingestion_tokens::SplunkHecTokenEntry {
+                org_id: "g1org".to_string(),
+                token_id: "g1tok".to_string(),
+                enabled: true,
+            },
+        );
+        db::org_ingestion_tokens::SPLUNK_HEC_TOKENS_LOADED
+            .store(true, std::sync::atomic::Ordering::Release);
+
+        let raw = vec![b'x'; logs::hec_collector::HEC_MAX_BODY_BYTES + 1024];
+        let compressed = zstd::encode_all(&raw[..], 3).unwrap();
+        // Small enough on the wire that wire_body_limit_middleware passes it.
+        assert!(compressed.len() < logs::hec_collector::HEC_MAX_WIRE_BYTES);
+
+        let req = Request::builder()
+            .method(Method::POST)
+            .uri("/services/collector")
+            .header("content-encoding", "zstd")
+            .header("content-type", "application/json")
+            .header("authorization", format!("Splunk {GUID}"))
+            .body(Body::from(compressed))
+            .unwrap();
+
+        let resp = splunk_collector_routes().oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::PAYLOAD_TOO_LARGE);
+        assert_eq!(
+            resp.headers()
+                .get(header::CONTENT_TYPE)
+                .and_then(|v| v.to_str().ok()),
+            Some("application/json")
+        );
+        let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let v: Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(v["code"], 6);
+        assert_eq!(v["text"], "Request entity too large");
+
+        common::infra::config::SPLUNK_HEC_TOKENS.remove(GUID);
+    }
+
+    #[tokio::test]
     async fn a_body_under_the_wire_limit_reaches_the_auth_middleware() {
         let app = splunk_collector_routes();
         let req = Request::builder()
