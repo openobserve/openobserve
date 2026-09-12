@@ -72,8 +72,11 @@ pub struct HecParsed {
 
 /// Ingest a HEC body on the legacy `/api/{org_id}/_hec` route.
 ///
-/// Response shape is frozen: this route's `HecResponse` bodies must stay
-/// byte-identical to what they were before the parser was fixed.
+/// Only the RESPONSE MAPPING is frozen — `HecStatus` -> `HecResponse` is
+/// unchanged. Parsing and stored data are NOT: per D8 the §11.2-§11.6 fixes
+/// apply here too, so a blank `event` now fails, `fields` may no longer
+/// overwrite a key, framing is a JSON stream rather than physical lines, and
+/// `host`/`source`/`sourcetype` are stored as columns.
 pub async fn ingest(
     thread_id: usize,
     org_id: &str,
@@ -179,36 +182,6 @@ pub async fn preflight_streams(
     Ok(())
 }
 
-/// Why `logs::ingest::ingest` would refuse to write this stream, if it would.
-///
-/// Kept verbatim in wording and order with the guards at the top of that
-/// function, so a preflight rejection and a per-stream rejection stay in step.
-fn stream_rejection(stream: &str, user: &IngestUser) -> Option<String> {
-    if stream.is_empty() {
-        return Some("Stream name is empty".to_string());
-    }
-    // `need_usage_report` is always true on a HEC write, so the guard always applies.
-    #[cfg(feature = "cloud")]
-    if is_reserved_internal_stream(stream) {
-        return Some(format!(
-            "stream '{stream}' is reserved and cannot be ingested into"
-        ));
-    }
-    #[cfg(not(feature = "enterprise"))]
-    if is_enterprise_only_usage_stream(stream) {
-        return Some(format!(
-            "stream '{stream}' is reserved for enterprise usage reporting"
-        ));
-    }
-    // `is_derived` is always false on a HEC write, so the exemption never applies.
-    if is_internal_rollup_stream(stream) && matches!(user, IngestUser::User(_)) {
-        return Some(format!(
-            "stream '{stream}' is an internal rollup stream and cannot be ingested into"
-        ));
-    }
-    None
-}
-
 /// Parse a HEC body into per-stream record batches.
 ///
 /// Streams are keyed by their RESOLVED name, so `App` and `app` form one group
@@ -247,6 +220,36 @@ pub async fn parse_body(
     Ok(HecParsed { streams })
 }
 
+/// Why `logs::ingest::ingest` would refuse to write this stream, if it would.
+///
+/// Kept verbatim in wording and order with the guards at the top of that
+/// function, so a preflight rejection and a per-stream rejection stay in step.
+fn stream_rejection(stream: &str, user: &IngestUser) -> Option<String> {
+    if stream.is_empty() {
+        return Some("Stream name is empty".to_string());
+    }
+    // `need_usage_report` is always true on a HEC write, so the guard always applies.
+    #[cfg(feature = "cloud")]
+    if is_reserved_internal_stream(stream) {
+        return Some(format!(
+            "stream '{stream}' is reserved and cannot be ingested into"
+        ));
+    }
+    #[cfg(not(feature = "enterprise"))]
+    if is_enterprise_only_usage_stream(stream) {
+        return Some(format!(
+            "stream '{stream}' is reserved for enterprise usage reporting"
+        ));
+    }
+    // `is_derived` is always false on a HEC write, so the exemption never applies.
+    if is_internal_rollup_stream(stream) && matches!(user, IngestUser::User(_)) {
+        return Some(format!(
+            "stream '{stream}' is an internal rollup stream and cannot be ingested into"
+        ));
+    }
+    None
+}
+
 /// Deserialize a whole body as a stream of JSON values.
 ///
 /// Real senders emit concatenated `{...}{...}`, pretty-printed multi-line JSON
@@ -269,10 +272,6 @@ fn body_is_blank(body: &Bytes) -> bool {
     body.iter().all(|b| b.is_ascii_whitespace())
 }
 
-/// Build one output record from a HEC entry, applying HEC precedence.
-///
-/// Highest precedence first: envelope metadata (`_timestamp`, `host`, `source`,
-/// `sourcetype`) > `event` body keys > `fields`. `fields` may only add keys.
 /// Deserialize a present field into `Some`, so an explicit `null` stays distinct
 /// from an absent key.
 fn deserialize_some<'de, D, T>(deserializer: D) -> std::result::Result<Option<T>, D::Error>
@@ -283,6 +282,10 @@ where
     T::deserialize(deserializer).map(Some)
 }
 
+/// Build one output record from a HEC entry, applying HEC precedence.
+///
+/// Highest precedence first: envelope metadata (`_timestamp`, `host`, `source`,
+/// `sourcetype`) > `event` body keys > `fields`. `fields` may only add keys.
 fn build_record(
     entry: &HecEntry,
     col_limit: usize,
@@ -315,8 +318,13 @@ fn build_record(
     ] {
         if let Some(v) = value
             && !v.is_null()
+            // These add up to three columns per record, so they count against
+            // the cap like any other; inserting unconditionally would let a
+            // record exceed the configured limit by three.
+            && let Some(map) = data.as_object_mut()
+            && (map.contains_key(key) || map.len() < col_limit)
         {
-            data[key] = v.to_owned();
+            map.insert(key.to_string(), v.to_owned());
         }
     }
 
@@ -547,6 +555,83 @@ mod tests {
         )
         .unwrap();
         assert_eq!(data["host"], json::json!("from-envelope"));
+    }
+
+    // ── D8: the legacy /api/{org_id}/_hec route's NEW behaviour ───────────
+    //
+    // Only the HecStatus -> HecResponse mapping is frozen. These four deltas are
+    // deliberate and apply to the legacy route as well as the collector; they are
+    // pinned here so nobody "restores" the old behaviour by accident.
+
+    #[test]
+    fn legacy_blank_event_now_fails_instead_of_succeeding() {
+        // WAS: {"event":""} / {} / null were accepted and written.
+        for body in [r#"{"event":""}"#, r#"{"event":{}}"#, r#"{"event":null}"#] {
+            assert_eq!(
+                build_record(&entry(body), 1000).unwrap_err(),
+                HecParseError::EventBlank,
+                "{body}"
+            );
+        }
+    }
+
+    #[test]
+    fn legacy_fields_precedence_is_now_inverted() {
+        // WAS: `fields` was merged over everything, so it could destroy the event
+        // time and shadow any event key. It may now only ADD keys.
+        let data = build_record(
+            &entry(
+                r#"{"time":1426279439,"event":{"log":"real"},"fields":{"log":"spoofed","_timestamp":1,"extra":9}}"#,
+            ),
+            1000,
+        )
+        .unwrap();
+        assert_eq!(data["log"], json::json!("real"));
+        assert_eq!(data["_timestamp"], json::json!(1426279439000000i64));
+        assert_eq!(data["extra"], json::json!(9));
+    }
+
+    #[test]
+    fn legacy_framing_is_now_a_json_stream_not_physical_lines() {
+        // WAS: BufReader::lines, so concatenated and pretty-printed bodies — what
+        // real HEC clients send — were rejected.
+        let body = Bytes::from("{\"event\":\"a\"}{\"event\":\"b\"}\n{\n \"event\": \"c\"\n}");
+        assert_eq!(deserialize_entries(&body).unwrap().len(), 3);
+    }
+
+    #[test]
+    fn legacy_metadata_now_lands_as_new_columns() {
+        // WAS: serde dropped host/source/sourcetype, so existing _hec streams
+        // gain up to three columns they did not have before.
+        let data = build_record(
+            &entry(r#"{"event":{"a":1},"host":"h","source":"s","sourcetype":"st"}"#),
+            1000,
+        )
+        .unwrap();
+        for key in ["host", "source", "sourcetype"] {
+            assert!(data.get(key).is_some(), "{key}");
+        }
+    }
+
+    #[test]
+    fn metadata_counts_against_the_column_limit() {
+        // Inserting the three unconditionally let a record exceed the configured
+        // cap by three.
+        let data = build_record(
+            &entry(r#"{"event":{"a":1},"host":"h","source":"s","sourcetype":"st"}"#),
+            2,
+        )
+        .unwrap();
+        let map = data.as_object().unwrap();
+        assert_eq!(map.len(), 2);
+        assert!(map.contains_key("a"));
+    }
+
+    #[test]
+    fn metadata_may_overwrite_a_body_key_at_the_limit() {
+        // Replacing an existing key adds no column, so the cap must not block it.
+        let data = build_record(&entry(r#"{"event":{"host":"body"},"host":"env"}"#), 1).unwrap();
+        assert_eq!(data["host"], json::json!("env"));
     }
 
     #[test]

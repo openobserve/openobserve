@@ -130,6 +130,17 @@ impl From<Model> for OrgIngestionTokenRecord {
     }
 }
 
+/// One Splunk GUID's cache entry.
+///
+/// Carries `enabled` so a disabled token answers code 1 from memory: without it
+/// every disabled-token request would fall through to a database lookup.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SplunkHecTokenEntry {
+    pub org_id: String,
+    pub token_id: String,
+    pub enabled: bool,
+}
+
 #[derive(Debug, FromQueryResult)]
 pub struct OrgIngestionTokenListRecord {
     pub name: String,
@@ -165,22 +176,6 @@ pub fn generate_splunk_token() -> String {
     config::ider::random_uuid()
 }
 
-/// Find a token by its Splunk GUID (global — the GUID carries the org).
-///
-/// Disabled rows are returned too, so the caller can answer "token disabled"
-/// rather than "no such token".
-pub async fn find_by_splunk_token(
-    splunk_token: &str,
-) -> Result<Option<OrgIngestionTokenRecord>, errors::Error> {
-    let client = get_orm_client_ro().await;
-    let record = Entity::find()
-        .filter(Column::SplunkToken.eq(splunk_token))
-        .one(client)
-        .await
-        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
-    Ok(record.map(OrgIngestionTokenRecord::from))
-}
-
 /// Set or clear a token's Splunk GUID. Returns the stored value.
 pub async fn set_splunk_token(
     org_id: &str,
@@ -203,17 +198,51 @@ pub async fn set_splunk_token(
     Ok(splunk_token)
 }
 
-/// All enabled tokens that carry a Splunk GUID, as (guid, org_id, token id).
-pub async fn list_all_enabled_splunk() -> Result<Vec<(String, String, String)>, errors::Error> {
+/// Every token that carries a Splunk GUID, enabled or not, as (guid, entry).
+///
+/// Disabled rows are included deliberately: the cache is authoritative, so a
+/// miss must mean "no such GUID" rather than "possibly disabled, go and ask".
+pub async fn list_all_splunk() -> Result<Vec<(String, SplunkHecTokenEntry)>, errors::Error> {
     let client = get_orm_client_ro().await;
     let records = Entity::find()
-        .filter(Column::Enabled.eq(true))
         .filter(Column::SplunkToken.is_not_null())
         .select_only()
         .column(Column::SplunkToken)
         .column(Column::OrgId)
         .column(Column::Id)
-        .into_tuple::<(String, String, String)>()
+        .column(Column::Enabled)
+        .into_tuple::<(String, String, String, bool)>()
+        .all(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+
+    Ok(records
+        .into_iter()
+        .map(|(guid, org_id, token_id, enabled)| {
+            (
+                guid,
+                SplunkHecTokenEntry {
+                    org_id,
+                    token_id,
+                    enabled,
+                },
+            )
+        })
+        .collect())
+}
+
+/// Every GUID currently held by one org's rows.
+///
+/// Used to evict by value when a delete event names a row that is already gone,
+/// so its id can no longer be resolved by name.
+pub async fn list_splunk_guids_by_org(org_id: &str) -> Result<Vec<String>, errors::Error> {
+    let client = get_orm_client_ro().await;
+    let records = Entity::find()
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::SplunkToken.is_not_null())
+        .select_only()
+        .column(Column::SplunkToken)
+        .into_tuple::<String>()
         .all(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
@@ -387,6 +416,26 @@ pub async fn get_by_name(
     name: &str,
 ) -> Result<Option<OrgIngestionTokenRecord>, errors::Error> {
     let client = get_orm_client_ro().await;
+    let record = Entity::find()
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::Name.eq(name))
+        .one(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+
+    Ok(record.map(OrgIngestionTokenRecord::from))
+}
+
+/// Get a single token record through the read-WRITE client.
+///
+/// Read-after-write only: `get_by_name` uses the read replica, so under replica
+/// lag it returns the PRE-write row and a super-cluster emit would replicate the
+/// change away in the remote region, permanently.
+pub async fn get_by_name_rw(
+    org_id: &str,
+    name: &str,
+) -> Result<Option<OrgIngestionTokenRecord>, errors::Error> {
+    let client = get_orm_client_rw().await;
     let record = Entity::find()
         .filter(Column::OrgId.eq(org_id))
         .filter(Column::Name.eq(name))

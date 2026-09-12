@@ -1790,13 +1790,18 @@ pub fn splunk_collector_routes() -> Router {
             get(hec_collector::collector_health)
                 .fallback(hec_collector::collector_method_not_allowed),
         )
+        // Applied innermost so it caps the DECOMPRESSED body: `.layer` wraps
+        // outermost-last, so everything below this runs before it.
+        .layer(DefaultBodyLimit::max(hec_collector::HEC_MAX_BODY_BYTES))
         // Root-level routers inherit nothing from `service_routes`, so the
         // decompression pair has to be re-applied here.
         .layer(RequestDecompressionLayer::new())
         .layer(middleware::from_fn(
             decompression::preprocess_encoding_middleware,
         ))
-        .layer(DefaultBodyLimit::max(hec_collector::HEC_MAX_BODY_BYTES))
+        // Outermost, so the 10 MiB cap is measured on the wire before any
+        // decompression can amplify an unauthenticated body.
+        .layer(middleware::from_fn(hec_collector::wire_body_limit_middleware))
 }
 
 /// Create the full application router
@@ -1877,7 +1882,13 @@ pub fn create_app_router(ui_routes: fn(&str) -> Router) -> Router {
     // Registered here, AFTER the base_uri nest, because `basic_routes()` is
     // merged into `app` and `app` is what gets nested — mounting alongside it
     // would produce `{base_uri}/services/collector`, which no forwarder calls.
-    outer = outer.merge(splunk_collector_routes());
+    // Exactly one of the two shapes may claim the path: merging a proxy route
+    // and a local route onto it gives axum two fallbacks and panics at startup.
+    outer = if config::cluster::LOCAL_NODE.is_router() {
+        outer.merge(crate::router::http::create_splunk_collector_proxy_routes())
+    } else {
+        outer.merge(splunk_collector_routes())
+    };
 
     // Must be the LAST `.layer()` call in this function: `Router::layer` only
     // wraps routes that exist at call time, so this has to come after the
@@ -2094,6 +2105,102 @@ mod tests {
         assert_eq!(
             app.oneshot(req).await.unwrap().status(),
             StatusCode::NOT_FOUND
+        );
+    }
+
+    #[tokio::test]
+    async fn an_oversized_wire_body_is_413_with_the_splunk_triple() {
+        // §8.6/§10.2: on an ingester the only cap used to be the 100 MiB
+        // decompressed one, so a single-node deployment accepted a 100 MiB
+        // unauthenticated body — and answered in plain text when it did refuse.
+        let app = splunk_collector_routes();
+        let body = vec![b'x'; logs::hec_collector::HEC_MAX_WIRE_BYTES + 1];
+        let req = Request::builder()
+            .method(Method::POST)
+            .uri("/services/collector")
+            .header("content-type", "application/json")
+            .body(Body::from(body))
+            .unwrap();
+
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::PAYLOAD_TOO_LARGE);
+        let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let v: Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(v["code"], 6);
+        assert_eq!(v["text"], "Request entity too large");
+    }
+
+    #[tokio::test]
+    async fn a_body_under_the_wire_limit_reaches_the_auth_middleware() {
+        let app = splunk_collector_routes();
+        let req = Request::builder()
+            .method(Method::POST)
+            .uri("/services/collector")
+            .body(Body::from(vec![b'x'; 1024]))
+            .unwrap();
+        // No Authorization, so the auth middleware answers: the body got through.
+        assert_eq!(
+            app.oneshot(req).await.unwrap().status(),
+            StatusCode::UNAUTHORIZED
+        );
+    }
+
+    #[tokio::test]
+    #[should_panic(expected = "fallback")]
+    async fn merging_both_collector_shapes_on_one_path_panics() {
+        // Why the registration is role-split: both shapes carry a fallback, so
+        // claiming the path twice aborts every router node at startup.
+        let _ = Router::new()
+            .merge(crate::router::http::create_splunk_collector_proxy_routes())
+            .merge(splunk_collector_routes());
+    }
+
+    #[tokio::test]
+    async fn router_node_shape_merges_only_the_proxy_collector_routes() {
+        // Merging the proxy route and the local route onto one path gives axum
+        // two fallbacks for it and panics every router node at startup.
+        let app = Router::new()
+            .merge(crate::router::http::create_router_routes())
+            .merge(crate::router::http::create_splunk_collector_proxy_routes());
+
+        // Dispatch reaches no backend in a unit test, so anything other than a
+        // 404 proves the path is claimed by the proxy route.
+        let req = Request::builder()
+            .method(Method::POST)
+            .uri("/services/collector")
+            .body(Body::empty())
+            .unwrap();
+        assert_ne!(
+            app.oneshot(req).await.unwrap().status(),
+            StatusCode::NOT_FOUND
+        );
+    }
+
+    #[tokio::test]
+    async fn non_router_node_shape_serves_the_collector_locally() {
+        let app = Router::new()
+            .nest("/api", Router::new().route("/ping", get(|| async { "" })))
+            .merge(splunk_collector_routes());
+
+        let req = Request::builder()
+            .uri("/services/collector/health")
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.clone().oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        // Served locally, so an unauthenticated POST is the collector's own
+        // 401/code 2 rather than a proxy attempt.
+        let req = Request::builder()
+            .method(Method::POST)
+            .uri("/services/collector")
+            .body(Body::empty())
+            .unwrap();
+        assert_eq!(
+            app.oneshot(req).await.unwrap().status(),
+            StatusCode::UNAUTHORIZED
         );
     }
 

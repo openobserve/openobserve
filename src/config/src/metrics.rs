@@ -2499,7 +2499,7 @@ pub static HEC_AUTH_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
         Opts::new(
             "hec_auth_total",
-            "Splunk HEC collector authentication attempts by outcome (success, unknown, disabled, malformed)".to_owned()
+            "Splunk HEC collector authentication attempts by outcome (success, unknown, disabled, malformed, org_blocked, store_unavailable)".to_owned()
                 + HELP_SUFFIX,
         )
         .namespace(NAMESPACE)

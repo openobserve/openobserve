@@ -120,8 +120,14 @@ pub async fn create_token(
     };
     db::org_ingestion_tokens::add(&record).await?;
     if let Some(guid) = &splunk_token {
-        common::infra::config::SPLUNK_HEC_TOKENS
-            .insert(guid.clone(), (org_id.to_string(), record.id.clone()));
+        common::infra::config::SPLUNK_HEC_TOKENS.insert(
+            guid.clone(),
+            infra::table::org_ingestion_tokens::SplunkHecTokenEntry {
+                org_id: org_id.to_string(),
+                token_id: record.id.clone(),
+                enabled: true,
+            },
+        );
     }
 
     Ok(OrgIngestionToken {
