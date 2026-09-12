@@ -163,7 +163,7 @@ test.describe('Composite alerts — list', {
     await expect(pm.compositeAlertsPage.referenceDrawer()).toBeHidden();
   });
 
-  test.fixme('A6b · opening the conflict drawer moves focus into it', async ({ page }) => {
+  test.fixme('A6b · opening the conflict drawer moves focus into it (o2-enterprise#2622)', async ({ page }) => {
     const { a } = await seedComposite(page, 'a6b');
 
     await pm.compositeAlertsPage.openList();
@@ -172,7 +172,7 @@ test.describe('Composite alerts — list', {
     await expect(pm.compositeAlertsPage.referenceDrawer()).toBeVisible();
 
     // Focus is never moved into the drawer, so a keyboard user is left on the
-    // row they just tried to delete with no indication the drawer appeared.
+    // alert-list search input behind it, with no indication it appeared.
     //
     // Cause is in ODrawer, not here: handleOpenAutoFocus() calls
     // event.preventDefault() unconditionally — suppressing reka-ui's own focus
