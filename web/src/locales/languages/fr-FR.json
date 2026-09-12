@@ -14756,7 +14756,6 @@
       "syntheticsTokensRefresh": "Actualiser la liste des jetons",
       "aiChatToggle": "Activer/désactiver le chat IA",
       "aiChatClose": "Fermer le chat IA",
-      "aiChatExpand": "Développer/réduire le chat IA",
       "logsSaveView": "Enregistrer en tant que vue enregistrée",
       "logsExport": "Exporter les résultats au format CSV",
       "tracesCopyUrl": "Copier l'URL de partage de la trace",

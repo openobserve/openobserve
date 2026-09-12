@@ -14756,7 +14756,6 @@
       "syntheticsTokensRefresh": "토큰 목록 새로고침",
       "aiChatToggle": "AI 채팅 켜기/끄기",
       "aiChatClose": "AI 채팅 닫기",
-      "aiChatExpand": "AI 채팅 펼치기/접기",
       "logsSaveView": "저장된 뷰로 저장",
       "logsExport": "결과를 CSV로 내보내기",
       "tracesCopyUrl": "트레이스 공유 URL 복사",

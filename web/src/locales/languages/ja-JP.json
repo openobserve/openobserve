@@ -14756,7 +14756,6 @@
       "syntheticsTokensRefresh": "トークンリストを更新",
       "aiChatToggle": "AI チャットを切り替える",
       "aiChatClose": "AI チャットを閉じる",
-      "aiChatExpand": "AI チャットを展開/折りたたむ",
       "logsSaveView": "保存済みビューとして保存",
       "logsExport": "結果を CSV としてエクスポート",
       "tracesCopyUrl": "トレース共有URLをコピー",

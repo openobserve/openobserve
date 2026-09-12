@@ -14756,7 +14756,6 @@
       "syntheticsTokensRefresh": "Actualizar lista de tokens",
       "aiChatToggle": "Alternar el chat de IA",
       "aiChatClose": "Cerrar chat de IA",
-      "aiChatExpand": "Expandir/contraer chat de IA",
       "logsSaveView": "Guardar como vista guardada",
       "logsExport": "Exportar los resultados como CSV",
       "tracesCopyUrl": "Copiar URL para compartir la traza",
