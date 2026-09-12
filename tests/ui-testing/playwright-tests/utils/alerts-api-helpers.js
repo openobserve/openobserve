@@ -129,6 +129,31 @@ async function getCompositeReferences(page, alertId) {
   return api(page, 'get', `${urls().v2}/alerts/${encodeURIComponent(alertId)}/composite-references`);
 }
 
+async function getCompositeTimeline(page, alertId, from, to) {
+  const range = `from=${from}&to=${to}`;
+  return api(page, 'get', `${urls().v2}/alerts/${encodeURIComponent(alertId)}/composite-timeline?${range}`);
+}
+
+/**
+ * Create `count` plain scheduled alerts in one go and return [{id, name}].
+ *
+ * The ten-child cap and the server-side child-limit cases both need more
+ * children than is tolerable to create one await at a time, so these are
+ * issued concurrently and resolved against a single list read.
+ */
+async function createChildAlerts(page, prefix, count) {
+  const names = Array.from({ length: count }, (_, i) => uniq(`${prefix}_${i}`));
+  await Promise.all(names.map((name) => createAlert(page, simpleAlert(name))));
+  const byName = new Map((await listAlerts(page)).map((a) => [a.name, a.alert_id]));
+  return names.map((name) => ({ name, id: byName.get(name) }));
+}
+
+/** Create a composite over `childIds` and return {id, name}. */
+async function createCompositeAlert(page, name, childIds, overrides = {}) {
+  const response = await createAlert(page, compositeAlert(name, childIds, overrides));
+  return { response, name, id: await findAlertId(page, name) };
+}
+
 async function listAlerts(page) {
   return (await (await api(page, 'get', `${urls().v2}/alerts?folder=default&page_size=100`)).json()).list || [];
 }
@@ -137,12 +162,63 @@ async function findAlertId(page, name) {
   return (await listAlerts(page)).find((a) => a.name === name)?.alert_id;
 }
 
+/**
+ * `seedAlertFixtures`, but at most once per worker process.
+ *
+ * The seed is idempotent, so calling it in every `beforeEach` is harmless in
+ * principle — but it is five API calls plus an ingest per test, and against a
+ * SHARED dev env that multiplies into real contention once specs run in
+ * parallel. Playwright gives each worker its own module registry, so a
+ * module-level promise collapses it to one seed per worker while keeping full
+ * parallelism.
+ *
+ * Deliberately separate from `seedAlertFixtures`: specs that assert on freshly
+ * ingested rows need the per-test ingest, and silently taking it away from them
+ * would trade this flake for a subtler one.
+ */
+let seedOnce = null;
+function seedAlertFixturesOnce(page) {
+  if (!seedOnce) {
+    seedOnce = seedAlertFixtures(page).catch((error) => {
+      seedOnce = null; // let the next test retry rather than inherit the failure
+      throw error;
+    });
+  }
+  return seedOnce;
+}
+
 /** Best-effort delete of the given alert_ids (used in afterEach). */
 async function deleteAlerts(page, ids) {
   const { v2 } = urls();
   for (const id of ids) {
     if (id) await api(page, 'delete', `${v2}/alerts/${id}?folder=default`).catch(() => {});
   }
+}
+
+/**
+ * Delete composites before their children, whatever order the ids arrive in.
+ *
+ * A child that is still referenced is refused with 409, so cleanup that walks a
+ * flat list leaks fixtures whenever the caller's creation order is not exactly
+ * children-then-parents. Composites can nest, so parents are drained in passes
+ * until nothing more will go.
+ */
+async function deleteAlertsCascade(page, ids) {
+  const alive = new Set(ids.filter(Boolean));
+  for (let pass = 0; pass < 5 && alive.size; pass += 1) {
+    const before = alive.size;
+    const rows = await listAlerts(page).catch(() => []);
+    const type = new Map(rows.map((r) => [r.alert_id, r.alert_type]));
+    const composites = [...alive].filter((id) => type.get(id) === 'composite');
+    for (const id of composites.length ? composites : [...alive]) {
+      const response = await api(page, 'delete', `${urls().v2}/alerts/${id}?folder=default`)
+        .catch(() => null);
+      if (response && response.status() < 400) alive.delete(id);
+      else if (response && response.status() === 404) alive.delete(id);
+    }
+    if (alive.size === before) break;
+  }
+  return [...alive];
 }
 
 /**
@@ -247,8 +323,10 @@ module.exports = {
   BASE, STREAM, SINK, TMPL, DEST,
   uniq, urls, api,
   simpleAlert, multiAlert, groupedSimpleAlert, realtimeAlert, cronAlert,
-  compositeAlert, validateComposite, getCompositeReferences,
-  createAlert, listAlerts, findAlertId, getAlert, deleteAlerts, seedAlertFixtures,
+  compositeAlert, validateComposite, getCompositeReferences, getCompositeTimeline,
+  createChildAlerts, createCompositeAlert, deleteAlertsCascade,
+  createAlert, listAlerts, findAlertId, getAlert, deleteAlerts,
+  seedAlertFixtures, seedAlertFixturesOnce,
   createAlertFolder, ingest, getAlertGroups, getAlertTransitions,
   waitForAlertOutcome, waitForAlertLevel, isFiringOutcome,
 };
