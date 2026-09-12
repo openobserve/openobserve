@@ -114,6 +114,8 @@ pub struct ScheduledTriggerData {
     #[serde(default)]
     pub tolerance: i64,
     #[serde(default)]
+    pub schedule_tolerance: i64,
+    #[serde(default)]
     pub last_satisfied_at: Option<i64>,
     /// Last run's outcome as the `RunOutcome` wire string. Written only by
     /// anomaly detection, which has no `alert_states` rollup row to read.
@@ -194,6 +196,7 @@ impl ScheduledTriggerData {
     pub fn reset(&mut self) {
         self.period_end_time = None;
         self.tolerance = 0;
+        self.schedule_tolerance = 0;
         // Every `reset()` call site is a cycle-terminating path (max retries
         // reached, or the run abandoned). Clearing the ledger here is what
         // guarantees it cannot outlive its notification cycle and suppress
@@ -286,6 +289,7 @@ mod tests {
         let mut data = ScheduledTriggerData {
             period_end_time: Some(1000),
             tolerance: 42,
+            schedule_tolerance: 7,
             last_satisfied_at: Some(999),
             last_outcome: None,
             last_outcome_at: None,
@@ -298,6 +302,7 @@ mod tests {
         data.reset();
         assert!(data.period_end_time.is_none());
         assert_eq!(data.tolerance, 0);
+        assert_eq!(data.schedule_tolerance, 0);
         // reset must NOT clear last_satisfied_at
         assert_eq!(data.last_satisfied_at, Some(999));
     }
@@ -353,6 +358,7 @@ mod tests {
         let data = ScheduledTriggerData {
             period_end_time: Some(1_234_567),
             tolerance: 10,
+            schedule_tolerance: 0,
             last_satisfied_at: Some(9_999_999),
             last_outcome: None,
             last_outcome_at: None,
@@ -550,6 +556,7 @@ mod tests {
         let data = ScheduledTriggerData {
             period_end_time: Some(500),
             tolerance: 5,
+            schedule_tolerance: 0,
             last_satisfied_at: None,
             last_outcome: None,
             last_outcome_at: None,
