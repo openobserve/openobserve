@@ -203,7 +203,9 @@ pub async fn set_splunk_token(
 /// Disabled rows are included deliberately: the cache is authoritative, so a
 /// miss must mean "no such GUID" rather than "possibly disabled, go and ask".
 pub async fn list_all_splunk() -> Result<Vec<(String, SplunkHecTokenEntry)>, errors::Error> {
-    let client = get_orm_client_ro().await;
+    // Read-WRITE: this reload is the backstop that repairs a missed eviction, so
+    // reading a replica would leave a revoked GUID live until the lag clears.
+    let client = get_orm_client_rw().await;
     let records = Entity::find()
         .filter(Column::SplunkToken.is_not_null())
         .select_only()
@@ -236,7 +238,9 @@ pub async fn list_all_splunk() -> Result<Vec<(String, SplunkHecTokenEntry)>, err
 /// Used to evict by value when a delete event names a row that is already gone,
 /// so its id can no longer be resolved by name.
 pub async fn list_splunk_guids_by_org(org_id: &str) -> Result<Vec<String>, errors::Error> {
-    let client = get_orm_client_ro().await;
+    // Read-WRITE: a stale replica still lists a revoked GUID, and this read is
+    // what decides whether to evict it.
+    let client = get_orm_client_rw().await;
     let records = Entity::find()
         .filter(Column::OrgId.eq(org_id))
         .filter(Column::SplunkToken.is_not_null())
@@ -375,7 +379,9 @@ pub async fn find_token_any_state(
     org_id: &str,
     token: &str,
 ) -> Result<Option<OrgIngestionTokenRecord>, errors::Error> {
-    let client = get_orm_client_ro().await;
+    // Read-WRITE: a stale replica returns the pre-revoke row, and the watcher
+    // would re-insert the GUID it was woken up to evict.
+    let client = get_orm_client_rw().await;
     let record = Entity::find()
         .filter(Column::OrgId.eq(org_id))
         .filter(Column::Token.eq(token))

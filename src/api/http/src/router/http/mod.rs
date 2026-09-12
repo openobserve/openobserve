@@ -192,8 +192,15 @@ fn splunk_status(status: StatusCode, code: u16, text: &str) -> Response {
 }
 
 /// True for the Splunk HEC collector paths, which are never under `base_uri`.
+///
+/// A `..` segment is refused: this is the one route whose forwarded path skips
+/// the `base_uri` prefix, and the proxy's URL parser would collapse the segment
+/// into a backend path outside it.
 pub fn is_splunk_collector_route(path: &str) -> bool {
     let path = extract_path_without_query(path);
+    if path.split('/').any(|seg| seg == "..") {
+        return false;
+    }
     path == "/services/collector" || path.starts_with("/services/collector/")
 }
 
@@ -848,6 +855,16 @@ mod tests {
         assert!(!is_splunk_collector_route("/services/collectorfoo"));
         assert!(!is_splunk_collector_route("/api/default/_hec"));
         assert!(!is_splunk_collector_route("/services"));
+        // `..` would be collapsed by the proxy's URL parser into a backend path
+        // outside base_uri, which this route alone is allowed to skip.
+        assert!(!is_splunk_collector_route(
+            "/services/collector/../../api/x/_bulk"
+        ));
+        assert!(!is_splunk_collector_route("/services/collector/../x?a=b"));
+        // A percent-encoded `..` is not a path segment to the URL parser either,
+        // so it stays a literal path component and needs no special case.
+        assert!(is_splunk_collector_route("/services/collector/..%2f"));
+        assert!(is_splunk_collector_route("/services/collector/event"));
     }
 
     #[test]

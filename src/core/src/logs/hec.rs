@@ -41,12 +41,18 @@ use crate::{
     service::get_formatted_stream_name,
 };
 
+/// Cap on events in one request: each is held decoded, cloned during preflight
+/// and flattened twice, so the byte limit alone does not bound peak memory.
+pub const MAX_HEC_EVENTS_PER_REQUEST: usize = 200_000;
+
 /// Why a HEC body could not be turned into records. Maps onto the collector's
 /// status codes; the legacy route flattens all of these into its own codes.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum HecParseError {
     /// Body held no events at all.
     NoData,
+    /// More events in one request than [`MAX_HEC_EVENTS_PER_REQUEST`].
+    TooManyEvents,
     /// Malformed JSON, an unusable `time`, or an `event` that is not an object or string.
     InvalidFormat(String),
     /// `event` key missing from an entry.
@@ -58,7 +64,7 @@ pub enum HecParseError {
 }
 
 /// One HEC entry as it arrives on the wire.
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize, Clone, Debug)]
 struct HecEntry {
     index: Option<String>,
     time: Option<json::Value>,
@@ -313,6 +319,11 @@ fn deserialize_entries(body: &Bytes) -> std::result::Result<Vec<HecEntry>, HecPa
             Ok(v) => entries.push(v),
             Err(e) if e.is_eof() && entries.is_empty() && body_is_blank(body) => break,
             Err(e) => return Err(HecParseError::InvalidFormat(e.to_string())),
+        }
+        // A 100 MiB body of tiny events holds far more of them than any real
+        // sender batches, and each is cloned and flattened again during preflight.
+        if entries.len() > MAX_HEC_EVENTS_PER_REQUEST {
+            return Err(HecParseError::TooManyEvents);
         }
     }
     Ok(entries)
@@ -793,6 +804,22 @@ mod tests {
                 .unwrap()
                 .is_empty()
         );
+    }
+
+    #[test]
+    fn test_event_count_is_capped() {
+        // A body well under the byte limit still holds enough tiny events to
+        // exhaust an ingester once each is cloned and flattened.
+        let one = r#"{"event":{"m":1},"index":"x"}"#;
+        let body = Bytes::from(one.repeat(MAX_HEC_EVENTS_PER_REQUEST + 2));
+        assert_eq!(
+            deserialize_entries(&body).unwrap_err(),
+            HecParseError::TooManyEvents
+        );
+        assert!(matches!(
+            deserialize_entries(&Bytes::from(one.repeat(16))),
+            Ok(v) if v.len() == 16
+        ));
     }
 
     #[test]
