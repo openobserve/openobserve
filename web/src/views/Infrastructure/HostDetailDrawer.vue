@@ -333,7 +333,7 @@ const statusLabel = computed(() =>
   <ODrawer
     :open="true"
     side="right"
-    size="xl"
+    size="xxl"
     :title="raw(hostName)"
     data-test="host-detail-drawer"
     @update:open="(open: boolean) => !open && emit('close')"
