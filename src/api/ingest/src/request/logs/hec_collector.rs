@@ -173,20 +173,36 @@ pub async fn splunk_auth_middleware(mut req: Request, next: Next) -> Response {
         }
     };
 
-    let Some(guid) = auth
-        .strip_prefix("Splunk ")
-        .map(str::trim)
-        .filter(|v| !v.is_empty())
-    else {
+    let Some(token) = splunk_scheme_token(&auth) else {
         record_auth_failure("malformed", "", &auth, &real_ip, "not a Splunk credential");
         return HecCollectorStatus::InvalidAuthorization.into_response();
     };
 
-    let Some((org_id, token_id)) = lookup_token(guid).await else {
-        // An unknown GUID and a well-formed non-GUID are indistinguishable to the
-        // caller by design; only the log tells them apart.
-        record_auth_failure("unknown", "", guid, &real_ip, "no such splunk token");
+    // A value that is not a canonical GUID is rejected before any cache or store
+    // lookup, so a flood of random tokens cannot reach the database.
+    let Some(guid) = canonical_guid(token) else {
+        record_auth_failure("unknown", "", token, &real_ip, "not a canonical guid");
         return HecCollectorStatus::InvalidToken.into_response();
+    };
+    let guid = guid.as_str();
+
+    let (org_id, token_id) = match lookup_token(guid).await {
+        TokenLookup::Found(org_id, token_id) => (org_id, token_id),
+        TokenLookup::Disabled => {
+            record_auth_failure("disabled", "", guid, &real_ip, "splunk token disabled");
+            return HecCollectorStatus::TokenDisabled.into_response();
+        }
+        TokenLookup::Unknown => {
+            // An unknown GUID and a well-formed non-GUID are indistinguishable to
+            // the caller by design; only the log tells them apart.
+            record_auth_failure("unknown", "", guid, &real_ip, "no such splunk token");
+            return HecCollectorStatus::InvalidToken.into_response();
+        }
+        TokenLookup::StoreUnavailable => {
+            // Retryable: a meta-store outage must not look like a bad credential.
+            record_auth_failure("unknown", "", guid, &real_ip, "token store unavailable");
+            return HecCollectorStatus::ServerBusy.into_response();
+        }
     };
 
     if db::org_status::is_blocked(&org_id) {
@@ -240,22 +256,58 @@ pub async fn collector_method_not_allowed() -> Response {
         .into_response()
 }
 
+/// Split an `Authorization` value on its first ASCII whitespace run and return the
+/// token when the scheme is `Splunk`, compared case-insensitively.
+fn splunk_scheme_token(auth: &str) -> Option<&str> {
+    let (scheme, rest) = auth.split_once([' ', '\t'])?;
+    if !scheme.eq_ignore_ascii_case("Splunk") {
+        return None;
+    }
+    let token = rest.trim_matches([' ', '\t']);
+    (!token.is_empty()).then_some(token)
+}
+
+/// Lowercase a canonical 8-4-4-4-12 hyphenated GUID, or reject anything else.
+fn canonical_guid(token: &str) -> Option<String> {
+    const GROUPS: [usize; 5] = [8, 4, 4, 4, 12];
+    let mut groups = token.split('-');
+    for len in GROUPS {
+        let g = groups.next()?;
+        if g.len() != len || !g.bytes().all(|b| b.is_ascii_hexdigit()) {
+            return None;
+        }
+    }
+    groups.next().is_none().then(|| token.to_ascii_lowercase())
+}
+
+/// Outcome of resolving a GUID, kept distinct so each maps to its own Splunk code.
+enum TokenLookup {
+    Found(String, String),
+    Disabled,
+    Unknown,
+    StoreUnavailable,
+}
+
 /// Resolve a GUID to its org and token row id, cache first.
-async fn lookup_token(guid: &str) -> Option<(String, String)> {
+async fn lookup_token(guid: &str) -> TokenLookup {
     if let Some(entry) = SPLUNK_HEC_TOKENS.get(guid) {
-        return Some(entry.value().clone());
+        let (org_id, token_id) = entry.value().clone();
+        return TokenLookup::Found(org_id, token_id);
     }
     // A cache miss is normal right after a token is minted on another node.
-    match infra::table::org_ingestion_tokens::find_enabled_by_splunk_token(guid).await {
+    match infra::table::org_ingestion_tokens::find_by_splunk_token(guid).await {
         Ok(Some(record)) if record.enabled => {
             let entry = (record.org_id.clone(), record.id.clone());
             SPLUNK_HEC_TOKENS.insert(guid.to_string(), entry.clone());
-            Some(entry)
+            TokenLookup::Found(entry.0, entry.1)
         }
-        Ok(_) => None,
+        // A disabled token says so: code 4 would send an operator hunting for a
+        // token they already hold.
+        Ok(Some(_)) => TokenLookup::Disabled,
+        Ok(None) => TokenLookup::Unknown,
         Err(e) => {
             log::error!("[SPLUNK_HEC] splunk token lookup failed: {e}");
-            None
+            TokenLookup::StoreUnavailable
         }
     }
 }
@@ -507,5 +559,62 @@ mod tests {
         let count = labels.len();
         labels.dedup();
         assert_eq!(labels.len(), count);
+    }
+
+    const GUID: &str = "ebbd9fe6-f83e-487d-801f-de5152013c3c";
+
+    #[test]
+    fn scheme_is_case_insensitive() {
+        for auth in [
+            format!("Splunk {GUID}"),
+            format!("splunk {GUID}"),
+            format!("SPLUNK {GUID}"),
+        ] {
+            assert_eq!(splunk_scheme_token(&auth), Some(GUID), "{auth}");
+        }
+    }
+
+    #[test]
+    fn scheme_splits_on_a_whitespace_run() {
+        for auth in [
+            format!("Splunk\t{GUID}"),
+            format!("Splunk  {GUID}"),
+            format!("Splunk \t {GUID}"),
+        ] {
+            assert_eq!(splunk_scheme_token(&auth), Some(GUID), "{auth:?}");
+        }
+    }
+
+    #[test]
+    fn other_schemes_and_empty_tokens_are_rejected() {
+        assert_eq!(splunk_scheme_token(&format!("Bearer {GUID}")), None);
+        assert_eq!(splunk_scheme_token(&format!("Basic {GUID}")), None);
+        assert_eq!(splunk_scheme_token("Splunk"), None);
+        assert_eq!(splunk_scheme_token("Splunk   "), None);
+        assert_eq!(splunk_scheme_token(GUID), None);
+    }
+
+    #[test]
+    fn uppercase_guid_normalizes_to_lowercase() {
+        assert_eq!(
+            canonical_guid(&GUID.to_ascii_uppercase()).as_deref(),
+            Some(GUID)
+        );
+        assert_eq!(canonical_guid(GUID).as_deref(), Some(GUID));
+    }
+
+    #[test]
+    fn non_canonical_values_are_rejected_before_lookup() {
+        for bad in [
+            "o2oi_5f8J6dUdH0oPjVgJSwV15z4dFwsxQqOh",
+            "not-a-guid-at-all",
+            "ebbd9fe6f83e487d801fde5152013c3c",
+            "ebbd9fe6-f83e-487d-801f-de5152013c3",
+            "ebbd9fe6-f83e-487d-801f-de5152013c3c-extra",
+            "ebbd9fe6-f83e-487d-801f-gggggggggggg",
+            "",
+        ] {
+            assert!(canonical_guid(bad).is_none(), "{bad}");
+        }
     }
 }

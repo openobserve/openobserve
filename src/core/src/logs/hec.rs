@@ -30,7 +30,7 @@ use infra::errors::{Error, Result};
 use ingestion_common::{
     HecResponse, HecStatus, IngestUser, IngestionRequest, IngestionResponse, IngestionValueType,
 };
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer};
 
 use crate::{ingestion::check_ingestion_allowed, service::get_formatted_stream_name};
 
@@ -59,7 +59,10 @@ struct HecEntry {
     source: Option<json::Value>,
     sourcetype: Option<json::Value>,
     fields: Option<json::Value>,
-    event: Option<json::Value>,
+    // Double Option: a single one would fold an explicit `"event": null` (blank,
+    // code 13) into an absent key (required, code 12), which Splunk separates.
+    #[serde(default, deserialize_with = "deserialize_some")]
+    event: Option<Option<json::Value>>,
 }
 
 /// Events parsed out of one HEC body, already grouped by resolved stream name.
@@ -270,11 +273,25 @@ fn body_is_blank(body: &Bytes) -> bool {
 ///
 /// Highest precedence first: envelope metadata (`_timestamp`, `host`, `source`,
 /// `sourcetype`) > `event` body keys > `fields`. `fields` may only add keys.
+/// Deserialize a present field into `Some`, so an explicit `null` stays distinct
+/// from an absent key.
+fn deserialize_some<'de, D, T>(deserializer: D) -> std::result::Result<Option<T>, D::Error>
+where
+    D: Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    T::deserialize(deserializer).map(Some)
+}
+
 fn build_record(
     entry: &HecEntry,
     col_limit: usize,
 ) -> std::result::Result<json::Value, HecParseError> {
-    let event = entry.event.as_ref().ok_or(HecParseError::EventRequired)?;
+    let event = match entry.event.as_ref() {
+        None => return Err(HecParseError::EventRequired),
+        Some(None) => return Err(HecParseError::EventBlank),
+        Some(Some(v)) => v,
+    };
     let mut data = match event {
         json::Value::String(s) if s.is_empty() => return Err(HecParseError::EventBlank),
         json::Value::String(s) => json::json!({ "log": s.to_owned() }),
@@ -460,6 +477,14 @@ mod tests {
         );
         assert_eq!(
             build_record(&entry(r#"{"event":{}}"#), 1000).unwrap_err(),
+            HecParseError::EventBlank
+        );
+    }
+
+    #[test]
+    fn test_explicit_null_event_is_blank_not_missing() {
+        assert_eq!(
+            build_record(&entry(r#"{"event":null,"index":"app"}"#), 1000).unwrap_err(),
             HecParseError::EventBlank
         );
     }

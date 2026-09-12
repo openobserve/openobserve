@@ -165,8 +165,11 @@ pub fn generate_splunk_token() -> String {
     config::ider::random_uuid()
 }
 
-/// Find an enabled token by its Splunk GUID (global — the GUID carries the org).
-pub async fn find_enabled_by_splunk_token(
+/// Find a token by its Splunk GUID (global — the GUID carries the org).
+///
+/// Disabled rows are returned too, so the caller can answer "token disabled"
+/// rather than "no such token".
+pub async fn find_by_splunk_token(
     splunk_token: &str,
 ) -> Result<Option<OrgIngestionTokenRecord>, errors::Error> {
     let client = get_orm_client_ro().await;
