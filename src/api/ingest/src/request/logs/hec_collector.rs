@@ -515,13 +515,16 @@ async fn ingest_collector_body(auth: &HecAuth, body: Bytes) -> HecCollectorStatu
     // §10.4: every EVENT of every group is prepared here too, so an event that
     // group 2 cannot flatten is reported before group 1 is committed rather
     // than after — which a retrying client would otherwise duplicate.
-    if let Err(e) = preflight_records(&auth.org_id, &streams).await {
-        log::warn!(
-            "[SPLUNK_HEC] unpreparable event for org {}: {e:?}",
-            auth.org_id
-        );
-        return HecCollectorStatus::from(&e);
-    }
+    let streams = match preflight_records(&auth.org_id, streams).await {
+        Ok(prepared) => prepared,
+        Err(e) => {
+            log::warn!(
+                "[SPLUNK_HEC] unpreparable event for org {}: {e:?}",
+                auth.org_id
+            );
+            return HecCollectorStatus::from(&e);
+        }
+    };
 
     let responses = match crate::service::logs::hec::ingest_prepared(
         get_thread_id(),
