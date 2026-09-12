@@ -200,18 +200,33 @@ async function deleteAlerts(page, ids) {
  */
 async function deleteAlertsCascade(page, ids) {
   const alive = new Set(ids.filter(Boolean));
-  for (let pass = 0; pass < 5 && alive.size; pass += 1) {
+  for (let pass = 0; pass < 6 && alive.size; pass += 1) {
     const before = alive.size;
-    const rows = await listAlerts(page).catch(() => []);
+    let transportFailed = false;
+    const rows = await listAlerts(page).catch(() => {
+      transportFailed = true;
+      return [];
+    });
     const type = new Map(rows.map((r) => [r.alert_id, r.alert_type]));
     const composites = [...alive].filter((id) => type.get(id) === 'composite');
     for (const id of composites.length ? composites : [...alive]) {
       const response = await api(page, 'delete', `${urls().v2}/alerts/${id}?folder=default`)
-        .catch(() => null);
-      if (response && response.status() < 400) alive.delete(id);
-      else if (response && response.status() === 404) alive.delete(id);
+        .catch(() => {
+          transportFailed = true;
+          return null;
+        });
+      // 404 counts as gone; a 409 means a parent is still standing, so leave it
+      // for the next pass once that parent has been removed.
+      if (response && (response.status() < 400 || response.status() === 404)) alive.delete(id);
     }
-    if (alive.size === before) break;
+    // Stop only when a pass made no progress for a REASON, not because the
+    // network dropped. Treating a transient failure as "nothing left to do"
+    // abandoned every id on the first hiccup and leaked the whole fixture set
+    // — silently, because callers discard the return value.
+    if (alive.size === before) {
+      if (!transportFailed) break;
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+    }
   }
   return [...alive];
 }

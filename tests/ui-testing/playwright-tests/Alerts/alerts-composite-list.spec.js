@@ -38,8 +38,14 @@ test.describe('Composite alerts — list', {
     await navigateToBase(page);
   });
 
-  test.afterEach(async ({ page }) => {
-    await deleteAlertsCascade(page, created);
+  test.afterEach(async ({ page }, testInfo) => {
+    // Surfaced, not asserted: a leak is an env/cleanup problem, not a defect in
+    // the behaviour under test, so it must not turn a green test red — but it
+    // must not be invisible either, which is what discarding this return was.
+    const leaked = await deleteAlertsCascade(page, created);
+    if (leaked.length) {
+      testLogger.error('fixture cleanup leaked alerts', { leaked, test: testInfo.title });
+    }
   });
 
   /** Two children plus a composite over them. */
