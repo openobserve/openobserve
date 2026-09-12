@@ -804,61 +804,31 @@
     "id": "http-route",
     "display": "HTTP Route",
     "group": "HTTP",
-    "fields": [
-      "http_route",
-      "attributes_http_route",
-      "route",
-      "endpoint",
-      "path_template"
-    ]
+    "fields": ["http_route", "attributes_http_route", "route", "endpoint", "path_template"]
   },
   {
     "id": "db-system",
     "display": "Database System",
     "group": "Database",
-    "fields": [
-      "db_system",
-      "attributes_db_system",
-      "database_type",
-      "db_type",
-      "dbms"
-    ]
+    "fields": ["db_system", "attributes_db_system", "database_type", "db_type", "dbms"]
   },
   {
     "id": "db-name",
     "display": "Database Name",
     "group": "Database",
-    "fields": [
-      "db_name",
-      "attributes_db_name",
-      "database",
-      "database_name",
-      "schema",
-      "db"
-    ]
+    "fields": ["db_name", "attributes_db_name", "database", "database_name", "schema", "db"]
   },
   {
     "id": "db-operation",
     "display": "Database Operation",
     "group": "Database",
-    "fields": [
-      "db_operation",
-      "attributes_db_operation",
-      "operation",
-      "query_type",
-      "db_op"
-    ]
+    "fields": ["db_operation", "attributes_db_operation", "operation", "query_type", "db_op"]
   },
   {
     "id": "db-user",
     "display": "Database User",
     "group": "Database",
-    "fields": [
-      "db_user",
-      "attributes_db_user",
-      "database_user",
-      "db_username"
-    ]
+    "fields": ["db_user", "attributes_db_user", "database_user", "db_username"]
   },
   {
     "id": "process-name",
@@ -1088,12 +1058,6 @@
     "id": "url-scheme",
     "display": "URL Scheme",
     "group": "HTTP",
-    "fields": [
-      "url_scheme",
-      "http_scheme",
-      "url_path",
-      "http_url",
-      "url_full"
-    ]
+    "fields": ["url_scheme", "http_scheme", "url_path", "http_url", "url_full"]
   }
 ]
