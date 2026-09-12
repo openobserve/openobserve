@@ -138,9 +138,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { raw, useI18nTyped } from "@/types/i18n";
-import { computed, defineComponent, ref } from "vue";
+import { computed, defineComponent } from "vue";
 import { useStore } from "vuex";
-import { getEndPoint, getImageURL, getIngestionURL } from "../../../utils/zincutils";
+import { getImageURL } from "../../../utils/zincutils";
 import CopyContent from "@/components/CopyContent.vue";
 import IngestionContent from "@/components/ingestion/IngestionContent.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
@@ -160,18 +160,11 @@ export default defineComponent({
   setup() {
     const { t } = useI18nTyped();
     const store = useStore();
-    const endpoint: any = ref({
-      url: "",
-      host: "",
-      port: "",
-      protocol: "",
-      tls: "",
-    });
+    // The origin, not getIngestionURL(): that carries the ZO_BASE_URI path, and
+    // the collector is mounted at the server root outside that nest.
+    const collectorBase = window.location.origin;
 
-    const ingestionURL = getIngestionURL();
-    endpoint.value = getEndPoint(ingestionURL);
-
-    const endpointUrl = `${endpoint.value.url}/services/collector`;
+    const endpointUrl = `${collectorBase}/services/collector`;
 
     // Built here because the template compiler reads a literal `<token>` in an interpolation as markup.
     const authHeader = raw("Authorization: Splunk " + "<token>");
@@ -189,7 +182,7 @@ export default defineComponent({
   "sourcetype": "app:json"
 }`;
 
-    const healthContent = `curl -k ${endpoint.value.url}/services/collector/health`;
+    const healthContent = `curl -k ${collectorBase}/services/collector/health`;
 
     // The tokens page is org-scoped, unlike the collector endpoint itself.
     const ingestionTokensRoute = computed(() => ({
@@ -201,7 +194,6 @@ export default defineComponent({
       t,
       raw,
       store,
-      endpoint,
       endpointUrl,
       authHeader,
       curlContent,

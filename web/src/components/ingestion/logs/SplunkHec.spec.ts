@@ -27,15 +27,7 @@ vi.mock("@/components/CopyContent.vue", () => ({
 }));
 
 vi.mock("../../../utils/zincutils", () => ({
-  getEndPoint: vi.fn().mockReturnValue({
-    url: "http://localhost:5080",
-    host: "localhost",
-    port: "5080",
-    protocol: "http",
-    tls: false,
-  }),
   getImageURL: vi.fn().mockReturnValue("http://example.com/image.png"),
-  getIngestionURL: vi.fn().mockReturnValue("http://localhost:5080"),
 }));
 
 const mockStore = createStore({
@@ -94,17 +86,24 @@ describe("SplunkHec", () => {
   });
 
   describe("Endpoint resolution", () => {
-    it("should resolve the endpoint from the ingestion URL", () => {
+    it("should build the collector URL from the page origin", () => {
       wrapper = createWrapper();
-      expect(wrapper.vm.endpoint.url).toBe("http://localhost:5080");
+      expect(wrapper.vm.endpointUrl).toBe(`${window.location.origin}/services/collector`);
     });
 
     it("should build the collector URL at the root, with no organization segment", () => {
       wrapper = createWrapper();
-      expect(wrapper.vm.endpointUrl).toBe("http://localhost:5080/services/collector");
       // The org is resolved from the token, so it must not appear in the path.
       expect(wrapper.vm.endpointUrl).not.toContain("test_org_123");
       expect(wrapper.vm.endpointUrl).not.toContain("/api/");
+    });
+
+    it("should not carry a ZO_BASE_URI path, which the root-mounted collector has no prefix for", () => {
+      wrapper = createWrapper();
+      // getIngestionURL() keeps the base_uri prefix; the collector sits outside it.
+      expect(wrapper.vm.endpointUrl).not.toContain("/web/");
+      expect(wrapper.vm.endpointUrl).toMatch(/^https?:\/\/[^/]+\/services\/collector$/);
+      expect(wrapper.vm.healthContent).toMatch(/https?:\/\/[^/]+\/services\/collector\/health$/);
     });
   });
 
@@ -112,7 +111,7 @@ describe("SplunkHec", () => {
     it("should build a curl example carrying the Splunk auth scheme", () => {
       wrapper = createWrapper();
       expect(wrapper.vm.curlContent).toContain("curl");
-      expect(wrapper.vm.curlContent).toContain("http://localhost:5080/services/collector");
+      expect(wrapper.vm.curlContent).toContain(`${window.location.origin}/services/collector`);
       expect(wrapper.vm.curlContent).toContain("Authorization: Splunk [SPLUNK_HEC_TOKEN]");
     });
 
