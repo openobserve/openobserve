@@ -109,11 +109,24 @@ const renderChartsStub = defineComponent({
 
 // Captures all picker attrs so the init-from-page-range pin needn't hardcode the prop name.
 const dateTimeCapture: Record<string, any> = {};
+
+// What the picker would return NOW — a relative window recomputes per call
+// (DateTime.vue:855), which is the whole reason the drawer must not cache one.
+const pickerWindow = { startTime: 0, endTime: 0 };
+
 const dateTimeStub = defineComponent({
   name: "DateTime",
   inheritAttrs: false,
   created() {
     Object.assign(dateTimeCapture, (this as any).$attrs);
+  },
+  methods: {
+    getConsumableDateTime() {
+      return { ...pickerWindow };
+    },
+    refresh() {
+      (this as any).$emit("on:date-change", { ...pickerWindow, userChangedValue: false });
+    },
   },
   template: "<div data-test='drawer-datetime-stub' />",
 });
@@ -255,6 +268,8 @@ describe("HostDetailDrawer", () => {
     __resetSchemaReadsForTest();
     curatedOverride.current = null;
     lastDashboardData = null;
+    pickerWindow.startTime = RANGE.from;
+    pickerWindow.endTime = RANGE.to;
     for (const k of Object.keys(dateTimeCapture)) delete dateTimeCapture[k];
     searchMock.mockResolvedValue({ data: { hits: [] } } as any);
     importHostMetricsDashboard.mockResolvedValue({
@@ -451,48 +466,15 @@ describe("HostDetailDrawer", () => {
       expect(text).not.toContain("{capability}");
     });
 
-    it("a host whose data starts well into the window names when it started", async () => {
-      // 90% of the window is empty axis before the first point — the chart reads as
-      // a product failure until the banner says the host is simply younger than it.
-      const started = RANGE.to - Math.floor((RANGE.to - RANGE.from) * 0.1);
-      wrapper = await mountDrawer({ firstSeenUs: started });
-      const banner = wrapper.find('[data-test="curated-late-start-banner"]');
-      expect(banner.exists()).toBe(true);
-      const text = banner.text();
-      expect(text).toContain("started reporting");
-      expect(text).toMatch(/started reporting \d+ (minute|hour|day)s? ago/);
-      expect(text).not.toContain("{duration}");
-      expect(text).not.toContain("{date}");
-    });
-
-    it("no late-start banner when the host's data covers the window", async () => {
-      wrapper = await mountDrawer({ firstSeenUs: RANGE.from });
+    /**
+     * A "this host started reporting…" banner cannot be told from the hosts list:
+     * min(_timestamp) is bounded by the LIST's window, so it reports that window's
+     * floor rather than the host's first sample, and disagrees with these panels.
+     */
+    it("claims nothing about when the host started reporting", async () => {
+      wrapper = await mountDrawer();
       expect(wrapper.find('[data-test="curated-late-start-banner"]').exists()).toBe(false);
-    });
-
-    it("no late-start banner for a trivial gap under the 10% threshold", async () => {
-      // A host that starts 2% into the window has a full-looking chart; warning is noise.
-      const started = RANGE.from + Math.floor((RANGE.to - RANGE.from) * 0.02);
-      wrapper = await mountDrawer({ firstSeenUs: started });
-      expect(wrapper.find('[data-test="curated-late-start-banner"]').exists()).toBe(false);
-    });
-
-    it("no late-start banner without a firstSeenUs — silence beats a guess", async () => {
-      wrapper = await mountDrawer({ firstSeenUs: null });
-      expect(wrapper.find('[data-test="curated-late-start-banner"]').exists()).toBe(false);
-    });
-
-    it("a host that started late AND stopped reporting shows ONLY the stale banner", async () => {
-      // Both are true, but "it stopped" is the actionable one; stacking two warning
-      // bars over the same panels reads as noise and dilutes both.
-      const started = RANGE.to - Math.floor((RANGE.to - RANGE.from) * 0.1);
-      wrapper = await mountDrawer({
-        status: "INACTIVE",
-        lastSeenUs: STALE_LAST_SEEN,
-        firstSeenUs: started,
-      });
-      expect(wrapper.find('[data-test="curated-stale-banner"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="curated-late-start-banner"]').exists()).toBe(false);
+      expect(wrapper.text()).not.toContain("started reporting");
     });
 
     it("the per-host lastSeenUs BEATS a fleet-fresh stream max (§5.3 pin override)", async () => {
@@ -857,6 +839,64 @@ describe("HostDetailDrawer", () => {
       wrapper = await mountDrawer();
       expect(lastCurrentTimeObj.__global.start_time.getTime()).toBe(RANGE.from);
       expect(lastCurrentTimeObj.__global.end_time.getTime()).toBe(RANGE.to);
+    });
+
+    // ViewDashboard holds a template ref and calls getConsumableDateTime() at every
+    // point of use rather than caching a range, because a RELATIVE window recomputes
+    // per call (DateTime.vue:855). A cached range silently freezes the window.
+    it("a picker change queries the NEW window, not the one captured at open", async () => {
+      wrapper = await mountDrawer();
+      const picker = wrapper.findComponent({ name: "DateTime" });
+
+      const moved = { startTime: RANGE.from + DAY_US, endTime: RANGE.to + DAY_US };
+      pickerWindow.startTime = moved.startTime;
+      pickerWindow.endTime = moved.endTime;
+      picker.vm.$emit("on:date-change", { ...moved, userChangedValue: true });
+      await flushPromises();
+
+      expect(lastCurrentTimeObj.__global.start_time.getTime()).toBe(moved.startTime);
+      expect(lastCurrentTimeObj.__global.end_time.getTime()).toBe(moved.endTime);
+    });
+
+    // A relative window's edges move with the wall clock, so re-reading the picker
+    // must beat any value the drawer stored when the row was opened.
+    it("re-reads the picker rather than replaying the range prop", async () => {
+      wrapper = await mountDrawer();
+
+      const slid = { startTime: RANGE.from + 5 * DAY_US, endTime: RANGE.to + 5 * DAY_US };
+      pickerWindow.startTime = slid.startTime;
+      pickerWindow.endTime = slid.endTime;
+      wrapper.findComponent({ name: "DateTime" }).vm.$emit("on:date-change", {
+        startTime: RANGE.from,
+        endTime: RANGE.to,
+        userChangedValue: true,
+      });
+      await flushPromises();
+
+      expect(lastCurrentTimeObj.__global.start_time.getTime()).toBe(slid.startTime);
+      expect(lastCurrentTimeObj.__global.end_time.getTime()).toBe(slid.endTime);
+    });
+
+    // DateTime replays on mount with userChangedValue:false; the parent's own
+    // onMounted covers the first load, so honouring the replay double-fetches.
+    it("the mount replay does not double-fetch", async () => {
+      const refreshSpy = vi.fn();
+      curatedOverride.current = (real: any) => ({
+        ...real,
+        refresh: (args: any) => {
+          refreshSpy(args);
+          return real.refresh(args);
+        },
+      });
+      wrapper = await mountDrawer();
+      const afterMount = refreshSpy.mock.calls.length;
+
+      wrapper
+        .findComponent({ name: "DateTime" })
+        .vm.$emit("on:date-change", { ...pickerWindow, userChangedValue: false });
+      await flushPromises();
+
+      expect(refreshSpy.mock.calls.length).toBe(afterMount);
     });
   });
 });

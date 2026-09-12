@@ -55,11 +55,6 @@ const props = defineProps<{
    * behind a live fleet would otherwise render un-badged (§5.3, §7.3).
    */
   lastSeenUs?: number | null;
-  /**
-   * This host's OWN first sample, µs — rides the list's existing last-seen aggregate.
-   * Stream stats only carry a fleet-wide doc_time_min, which cannot date an ephemeral pod.
-   */
-  firstSeenUs?: number | null;
 }>();
 
 const emit = defineEmits<{
@@ -72,8 +67,26 @@ const { t } = useI18nTyped();
 
 const org = computed(() => store.state.selectedOrganization?.identifier ?? "");
 
-// Seeded from the page picker — the drawer opens on the window the row was computed over.
+/**
+ * ViewDashboard never caches a range: it holds this ref and calls
+ * getConsumableDateTime() at every point of use, because a RELATIVE window
+ * recomputes against the wall clock per call (DateTime.vue:855).
+ */
+const dateTimePicker = ref<{
+  getConsumableDateTime?: () => { startTime: number; endTime: number };
+} | null>(null);
+
+// Seeded from the page picker so the first paint has a window before the picker mounts.
 const drawerRange = ref({ ...props.range });
+
+/** Picker first, falling back to the seed only before the picker has mounted. */
+const readRange = () => {
+  const picked = dateTimePicker.value?.getConsumableDateTime?.();
+  if (picked && picked.startTime > 0 && picked.endTime > picked.startTime) {
+    drawerRange.value = { from: picked.startTime, to: picked.endTime };
+  }
+  return drawerRange.value;
+};
 
 // GETTERS, not snapshots: this instance is reused across ?host= switches and lastSeenUs lands after mount (§7.3).
 const curated = useCuratedPage(hostsPage, {
@@ -81,13 +94,10 @@ const curated = useCuratedPage(hostsPage, {
   lastSeenUs: () => props.lastSeenUs ?? undefined,
 });
 
-const resolveMetrics = (force = false) =>
-  curated.refresh({
-    orgId: org.value,
-    start: drawerRange.value.from,
-    end: drawerRange.value.to,
-    force,
-  });
+const resolveMetrics = (force = false) => {
+  const range = readRange();
+  return curated.refresh({ orgId: org.value, start: range.from, end: range.to, force });
+};
 
 /**
  * A row the list reports ACTIVE is live by an independent liveness query, so
@@ -197,29 +207,6 @@ const staleBanners = computed(() =>
   }),
 );
 
-/** Below this share of the window the empty lead-in is too small to misread as a failure. */
-const LATE_START_MIN_SHARE = 0.1;
-
-/**
- * The mirror of staleBanner: the leading empty axis is the host's age, not a
- * collection gap. Yields to a stale banner — "it stopped" is the actionable half.
- */
-const lateStartBanner = computed(() => {
-  const firstSeen = props.firstSeenUs;
-  if (firstSeen == null || firstSeen <= 0) return null;
-  if (staleBanners.value.length > 0) return null;
-  const span = drawerRange.value.to - drawerRange.value.from;
-  if (span <= 0) return null;
-  const gap = firstSeen - drawerRange.value.from;
-  if (gap / span < LATE_START_MIN_SHARE) return null;
-  // Same clock as the stale banner, so one drawer never shows two different ages.
-  const parts = durationParts(firstSeen, Math.max(drawerRange.value.to, Date.now() * 1000));
-  return {
-    duration: t(`infra.curated.${parts.key}` as never, { count: parts.count }),
-    date: timestampToTimezoneDate(Math.floor(firstSeen / 1000), store.state.timezone ?? "UTC"),
-  };
-});
-
 // MICROSECOND epoch, undivided — usePanelDataLoader reads these back as µs.
 const currentTimeObj = computed(() => ({
   __global: {
@@ -229,9 +216,10 @@ const currentTimeObj = computed(() => ({
 }));
 
 const onDateChange = (date: { startTime: number; endTime: number; userChangedValue?: boolean }) => {
+  // The payload is a snapshot; the picker is the source of truth, so seed from it first.
+  drawerRange.value = { from: date.startTime, to: date.endTime };
   // DateTime replays on mount with userChangedValue:false — "do not fetch" (DateTime.vue contract).
   if (date.userChangedValue === false) return;
-  drawerRange.value = { from: date.startTime, to: date.endTime };
   void resolveMetrics(false);
 };
 
@@ -269,6 +257,8 @@ const toastImportError = (kind: "forbidden" | "generic") => {
 };
 
 const goToDashboard = (dashboardId: string, folderId: string) => {
+  // Hand the dashboard the window the panels are actually showing, not the seed.
+  const range = readRange();
   router.push({
     path: "/dashboards/view",
     query: {
@@ -276,8 +266,8 @@ const goToDashboard = (dashboardId: string, folderId: string) => {
       dashboard: dashboardId,
       folder: folderId,
       "var-host_name": props.hostName,
-      from: String(drawerRange.value.from),
-      to: String(drawerRange.value.to),
+      from: String(range.from),
+      to: String(range.to),
     },
   });
 };
@@ -357,6 +347,7 @@ const statusLabel = computed(() =>
           }}</OTag>
         </div>
         <DateTime
+          ref="dateTimePicker"
           auto-apply
           menu-align="end"
           default-type="absolute"
@@ -454,18 +445,6 @@ const statusLabel = computed(() =>
                 }}</OText
               >
             </div>
-            <OBanner
-              v-if="lateStartBanner"
-              variant="warning"
-              dense
-              data-test="curated-late-start-banner"
-              :content="
-                t('infra.curated.lateStartBanner', {
-                  duration: lateStartBanner.duration,
-                  date: lateStartBanner.date,
-                })
-              "
-            />
             <OBanner
               v-for="stale in staleBanners"
               :key="stale.id"

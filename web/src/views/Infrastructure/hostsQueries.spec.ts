@@ -49,9 +49,14 @@ describe("hostsQueries — liveness & last-seen ride the 1-series-per-host load 
     expect(HOSTS_LAST_SEEN_SQL).toContain("GROUP BY host_name");
   });
 
-  it("first-seen rides the SAME aggregate as last-seen, so the banner costs no extra request", () => {
-    expect(HOSTS_LAST_SEEN_SQL).toContain("min(_timestamp)");
-    expect(HOSTS_LAST_SEEN_SQL).toContain("first_seen");
+  /**
+   * A min(_timestamp) here is bounded by the caller's window, so it yields that
+   * window's floor rather than the host's first sample — a first-seen claim this
+   * query cannot make, and one that contradicted the drawer's own panels.
+   */
+  it("claims no first-seen, which this window-bounded scan cannot know", () => {
+    expect(HOSTS_LAST_SEEN_SQL).not.toContain("min(_timestamp)");
+    expect(HOSTS_LAST_SEEN_SQL).not.toContain("first_seen");
     // One statement, one GROUP BY: a second SELECT here would be a second round trip.
     expect(HOSTS_LAST_SEEN_SQL.match(/SELECT/gi)).toHaveLength(1);
   });

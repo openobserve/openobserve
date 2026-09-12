@@ -16338,7 +16338,6 @@
       "setUp": "Set up",
       "staleBanner": "{capability} stopped {duration} ago (last seen {date}). Values below are from before then.",
       "staleNoDataBanner": "{capability} has no data yet - the stream exists but has never reported. Panels below stay empty until it does.",
-      "lateStartBanner": "This host started reporting {duration} ago ({date}). Panels below are empty before that because the host was not yet sending data.",
       "dormantHeadline": "{workload} has stopped reporting",
       "dormantBody": "Every data source for this page exists but stopped sending data. The collector is installed — it is no longer running, or it lost access. Restart it and refresh.",
       "staleBadge": "no data for {duration} (last seen {date})",
