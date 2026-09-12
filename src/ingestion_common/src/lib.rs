@@ -140,6 +140,13 @@ pub struct IngestionResponse {
     /// lost data read this instead.
     #[serde(skip_serializing, skip_deserializing)]
     pub write_failed: bool,
+    /// True when a stream was found to be deleting after admission and skipped.
+    ///
+    /// Not serialized, for the same reason as `write_failed`: those records are
+    /// silently gone, so a caller that must not acknowledge lost data has to be
+    /// able to tell this apart from a clean write.
+    #[serde(skip_serializing, skip_deserializing)]
+    pub stream_skipped: bool,
 }
 
 impl IngestionResponse {
@@ -149,12 +156,19 @@ impl IngestionResponse {
             status,
             error: None,
             write_failed: false,
+            stream_skipped: false,
         }
     }
 
     /// Mark this response as "accepted, but the storage write failed".
     pub fn with_write_failed(mut self, write_failed: bool) -> Self {
         self.write_failed = write_failed;
+        self
+    }
+
+    /// Mark this response as "a stream was skipped mid-write, its records lost".
+    pub fn with_stream_skipped(mut self, stream_skipped: bool) -> Self {
+        self.stream_skipped = stream_skipped;
         self
     }
 }
@@ -760,6 +774,7 @@ mod tests {
             status: vec![],
             error: None,
             write_failed: false,
+            stream_skipped: false,
         };
         let serialized = serde_json::to_string(&response).unwrap();
         assert!(!serialized.contains("status"));
@@ -786,6 +801,27 @@ mod tests {
         );
         assert!(failed.write_failed);
         assert_eq!(failed.code, 200);
+    }
+
+    #[test]
+    fn a_skipped_stream_does_not_change_the_serialized_body() {
+        // Same constraint as `write_failed`: the six legacy routes serialize this
+        // struct as their response body, so the signal must never reach the wire.
+        let ok = IngestionResponse::new(200, vec![StreamStatus::new("s")]);
+        let skipped =
+            IngestionResponse::new(200, vec![StreamStatus::new("s")]).with_stream_skipped(true);
+
+        assert_eq!(
+            serde_json::to_string(&ok).unwrap(),
+            serde_json::to_string(&skipped).unwrap()
+        );
+        assert!(
+            !serde_json::to_string(&skipped)
+                .unwrap()
+                .contains("stream_skipped")
+        );
+        assert!(skipped.stream_skipped);
+        assert_eq!(skipped.code, 200);
     }
 
     #[test]

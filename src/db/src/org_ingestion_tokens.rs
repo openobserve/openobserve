@@ -125,7 +125,10 @@ pub async fn add(record: &OrgIngestionTokenRecord) -> Result<(), anyhow::Error> 
 
 /// Rotate a token's value and notify the cluster.
 pub async fn rotate_token(org_id: &str, name: &str) -> Result<String, anyhow::Error> {
-    let existing = org_ingestion_tokens::get_by_name(org_id, name)
+    // Read-WRITE: the value being rotated away is what the old-key delete event
+    // names, and a replica-stale read would announce the eviction at a token no
+    // other node holds, leaving the real one cached until the 60s reload.
+    let existing = org_ingestion_tokens::get_by_name_rw(org_id, name)
         .await?
         .ok_or_else(|| anyhow::anyhow!("Token '{}' not found", name))?;
 
@@ -152,13 +155,20 @@ pub async fn rotate_token(org_id: &str, name: &str) -> Result<String, anyhow::Er
 
 /// Enable or disable a named token and notify the cluster.
 pub async fn set_enabled(org_id: &str, name: &str, enabled: bool) -> Result<(), anyhow::Error> {
-    let existing = org_ingestion_tokens::get_by_name(org_id, name)
+    if org_ingestion_tokens::get_by_name_rw(org_id, name)
         .await?
-        .ok_or_else(|| anyhow::anyhow!("Token '{}' not found", name))?;
+        .is_none()
+    {
+        return Err(anyhow::anyhow!("Token '{}' not found", name));
+    }
 
     org_ingestion_tokens::set_enabled(org_id, name, enabled).await?;
 
-    let key = event_key(org_id, &existing.token);
+    // The event key carries the token VALUE, so it has to come from the committed
+    // row: a replica-stale read concurrent with a rotation announces the change at
+    // a value no other node holds, and it never propagates until the 60s reload.
+    let committed = committed_row(org_id, name).await?;
+    let key = event_key(org_id, &committed.token);
     if enabled {
         let _ = put_into_db_coordinator(&key, Bytes::new(), true, None).await;
     } else {
@@ -167,10 +177,7 @@ pub async fn set_enabled(org_id: &str, name: &str, enabled: bool) -> Result<(), 
     // Always replicate the token with its new `enabled` state; the receiving
     // cluster fires the matching coordinator event based on the flag.
     #[cfg(feature = "enterprise")]
-    {
-        let committed = committed_row(org_id, name).await?;
-        super_cluster::org_ingestion_token_put(&key, &committed).await?;
-    }
+    super_cluster::org_ingestion_token_put(&key, &committed).await?;
     Ok(())
 }
 

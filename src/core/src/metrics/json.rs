@@ -101,6 +101,7 @@ pub async fn ingest(
                 status: vec![],
                 error: Some(e.to_string()),
                 write_failed: false,
+                stream_skipped: false,
             });
         } else {
             log::error!("Metrics ingestion error: {e}");
@@ -109,6 +110,7 @@ pub async fn ingest(
                 status: vec![],
                 error: Some(e.to_string()),
                 write_failed: false,
+                stream_skipped: false,
             });
         }
     }
