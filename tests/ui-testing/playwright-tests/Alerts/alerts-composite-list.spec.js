@@ -177,8 +177,10 @@ test.describe('Composite alerts — list', {
     await expect(pm.compositeAlertsPage.listBadge(parent.id)).toHaveCount(0);
   });
 
-  test('A12 · a composite can be disabled and re-enabled from its row', async ({ page }) => {
+  test('A12 · a composite can be enabled and disabled again from its row', async ({ page }) => {
     const { parent } = await seedComposite(page, 'a12');
+    const enabled = async () =>
+      (await listAlerts(page)).find((row) => row.alert_id === parent.id)?.enabled;
 
     await pm.compositeAlertsPage.openList();
     await pm.compositeAlertsPage.openListTab('composite');
@@ -186,10 +188,15 @@ test.describe('Composite alerts — list', {
 
     const toggle = pm.compositeAlertsPage.listEnableToggle(parent.name);
     await expect(toggle).toBeVisible();
-    await toggle.click();
+    expect(await enabled(), 'fixtures are created paused').toBe(false);
 
-    await expect
-      .poll(async () => (await listAlerts(page)).find((r) => r.alert_id === parent.id)?.enabled)
-      .toBe(true);
+    await toggle.click();
+    await expect.poll(enabled).toBe(true);
+
+    // The return trip is the half that actually matters: enabling a composite
+    // creates a scheduler job, and disabling has to tear it down again rather
+    // than leaving an orphan behind.
+    await toggle.click();
+    await expect.poll(enabled).toBe(false);
   });
 });

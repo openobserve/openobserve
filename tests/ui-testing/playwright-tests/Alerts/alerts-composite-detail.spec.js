@@ -18,8 +18,8 @@
  * Structure (children, links, config read-back) is driven live. Only states a
  * fixture cannot reach on demand — stale reasons, evaluation errors, a missing
  * scheduler job, an unreadable child — are injected by rewriting the detail
- * response. The contracts behind them are asserted live in
- * alerts-composite-api.spec.js.
+ * response. The contracts behind them are asserted live in the pytest suite at
+ * tests/api-testing/tests/alerts/test_composite_alerts.py.
  */
 
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');

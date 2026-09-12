@@ -12,7 +12,8 @@
  *
  * MOCKING POLICY
  * --------------
- * The validate CONTRACT is asserted live in alerts-composite-api.spec.js. This
+ * The validate CONTRACT is asserted live in the pytest suite at
+ * tests/api-testing/tests/alerts/test_composite_alerts.py. This
  * file asserts the RENDER, and mocks only the states that cannot be HELD long
  * enough to drive a form: staleness needs a freshness deadline to pass, a
  * validation outage needs a server that is down, and "never evaluated" survives
@@ -105,7 +106,8 @@ test.describe('Composite alerts — live preview', {
     // scheduler reaches it — on this env that is a few seconds, well inside the
     // time it takes to drive the form. Asserting it live races the scheduler and
     // loses. The contract that the server emits this code lives in
-    // alerts-composite-api.spec.js (J4b).
+    // tests/api-testing/tests/alerts/test_composite_alerts.py
+    // (test_validate_returns_canonical_expression_and_all_child_diagnostics).
     await page.route(VALIDATE_ROUTE, async (route) => {
       const expression = `{${a.id}} && {${b.id}}`;
       await route.fulfill({
@@ -190,12 +192,14 @@ test.describe('Composite alerts — live preview', {
   });
 
   test('D8 · a slow validation never overwrites a newer one', async ({ page }) => {
-    const [a, b, c] = await children(page, 'd8', 3);
-    let seen = 0;
+    const [a, b] = await children(page, 'd8', 2);
+    const STALE_CODE = 'stale_response_should_be_ignored';
+    let received = 0;
+    let staleFulfilled = false;
 
     await page.route(VALIDATE_ROUTE, async (route) => {
-      seen += 1;
-      const mine = seen;
+      received += 1;
+      const mine = received;
       const body = validationBody(`{${a.id}} && {${b.id}}`, [
         {
           alert_id: a.id, accessible: true, name: a.name, alert_type: 'scheduled',
@@ -210,19 +214,34 @@ test.describe('Composite alerts — live preview', {
         // component applied responses in arrival order it would clobber the
         // newer, valid result and wrongly disable Save.
         valid: mine !== 1,
-        errors: mine === 1 ? [{ code: 'stale_response_should_be_ignored' }] : [],
+        errors: mine === 1 ? [{ code: STALE_CODE }] : [],
       });
       if (mine === 1) await new Promise((resolve) => setTimeout(resolve, 6000));
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+      if (mine === 1) staleFulfilled = true;
     });
 
     await openBuilderWith(page, [a, b]);
-    // Force a second validation while the first is still in flight.
-    await pm.compositeAlertsPage.addChildById(c);
-    await pm.compositeAlertsPage.fillExpression('A && B');
+    await expect.poll(() => received).toBe(1);
 
-    await expect.poll(() => seen, { timeout: 30000 }).toBeGreaterThan(1);
-    await expect(pm.compositeAlertsPage.previewError('stale_response_should_be_ignored'))
-      .toHaveCount(0);
+    // Force a SECOND validation while the first is still in flight, via a
+    // setting rather than the child list or the expression: those two can only
+    // be changed into a state the local validator rejects, and a locally
+    // invalid draft short-circuits before the request is ever sent — leaving
+    // nothing for the newer response to win.
+    await pm.compositeAlertsPage.selectStalePolicy('treat_as_false');
+    await expect.poll(() => received).toBeGreaterThan(1);
+
+    // Wait for the stale reply to actually LAND, not merely to have been
+    // received: the handler counts a request before it sleeps, so polling on
+    // arrivals would assert against a preview the stale payload had never
+    // reached, and the test would pass even against a component that applies
+    // responses in arrival order.
+    await expect.poll(() => staleFulfilled, { timeout: 30000 }).toBe(true);
+
+    await expect(pm.compositeAlertsPage.previewError(STALE_CODE)).toHaveCount(0);
+    // The newer, valid result is what survived — so Save is still reachable.
+    await expect(pm.compositeAlertsPage.previewResult()).toBeVisible();
+    await expect(pm.compositeAlertsPage.save()).toBeEnabled();
   });
 });

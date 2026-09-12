@@ -129,11 +129,6 @@ async function getCompositeReferences(page, alertId) {
   return api(page, 'get', `${urls().v2}/alerts/${encodeURIComponent(alertId)}/composite-references`);
 }
 
-async function getCompositeTimeline(page, alertId, from, to) {
-  const range = `from=${from}&to=${to}`;
-  return api(page, 'get', `${urls().v2}/alerts/${encodeURIComponent(alertId)}/composite-timeline?${range}`);
-}
-
 /**
  * Create `count` plain scheduled alerts in one go and return [{id, name}].
  *
@@ -323,7 +318,7 @@ module.exports = {
   BASE, STREAM, SINK, TMPL, DEST,
   uniq, urls, api,
   simpleAlert, multiAlert, groupedSimpleAlert, realtimeAlert, cronAlert,
-  compositeAlert, validateComposite, getCompositeReferences, getCompositeTimeline,
+  compositeAlert, validateComposite, getCompositeReferences,
   createChildAlerts, createCompositeAlert, deleteAlertsCascade,
   createAlert, listAlerts, findAlertId, getAlert, deleteAlerts,
   seedAlertFixtures, seedAlertFixturesOnce,
