@@ -227,9 +227,9 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
             let component = command.get_one::<String>("component").unwrap();
             match component.as_str() {
                 "root" => {
-                    if let Err(msg) = config::utils::password::validate_password_strength(
-                        &cfg.auth.root_user_password,
-                    ) {
+                    if let Err(msg) =
+                        db::password_policy::validate_password(&cfg.auth.root_user_password).await
+                    {
                         return Err(anyhow::anyhow!(
                             "ZO_ROOT_USER_PASSWORD does not meet policy: {msg}"
                         ));
@@ -254,6 +254,7 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                             } else {
                                 Some(cfg.auth.root_user_token.clone())
                             },
+                            remove_lockout: false,
                         },
                     )
                     .await?;

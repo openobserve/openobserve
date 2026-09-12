@@ -8,9 +8,13 @@ import enLocale from "@/locales/languages/en-US.json";
 import SettingsIndex from "./index.vue";
 
 // Mock composables and config with factory functions
+// Settable rather than a fixed `false`: meta-org-only sections cannot be covered otherwise.
+// Defaults to false, so every case written before this stays unchanged.
+const { isMetaOrgRef } = vi.hoisted(() => ({ isMetaOrgRef: { value: false } }));
+
 vi.mock("@/composables/useIsMetaOrg", () => ({
   default: () => ({
-    isMetaOrg: { value: false },
+    isMetaOrg: isMetaOrgRef,
   }),
 }));
 
@@ -432,6 +436,48 @@ describe("SettingsIndex.vue", () => {
       mockRouter.currentRoute.value.name = "alertDestinations";
       wrapper = createWrapper();
       expect(wrapper.vm.isConstrainedSection).toBe(false);
+    });
+  });
+
+  describe("password policy section", () => {
+    const findEntry = (w: any) =>
+      w.vm.sectionGroups
+        .flatMap((group: any) => group.items)
+        .find((item: any) => item.key === "password_policy");
+
+    afterEach(() => {
+      isMetaOrgRef.value = false;
+    });
+
+    it("is offered in the meta org", () => {
+      isMetaOrgRef.value = true;
+      wrapper = createWrapper();
+
+      expect(findEntry(wrapper)?.visible).toBe(true);
+    });
+
+    it("is hidden outside the meta org", () => {
+      isMetaOrgRef.value = false;
+      wrapper = createWrapper();
+
+      expect(findEntry(wrapper)?.visible).toBe(false);
+    });
+
+    it("does NOT depend on the enterprise build flag", () => {
+      // The API lives in the OSS route block — native email/password auth is not an
+      // enterprise feature, so gating this on isEnterprise would hide a working page.
+      isMetaOrgRef.value = true;
+      wrapper = createWrapper();
+
+      expect(wrapper.vm.config.isEnterprise).toBe("false");
+      expect(findEntry(wrapper)?.visible).toBe(true);
+    });
+
+    it("renders in the centered reading column, like the other form sections", () => {
+      mockRouter.currentRoute.value.name = "passwordPolicy";
+      wrapper = createWrapper();
+
+      expect(wrapper.vm.isConstrainedSection).toBe(true);
     });
   });
 

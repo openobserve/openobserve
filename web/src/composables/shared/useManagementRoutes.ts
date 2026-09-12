@@ -66,6 +66,22 @@ const useManagementRoutes = () => {
     },
   ];
 
+  // Native email/password auth is an OSS feature and both policy routes are registered in the
+  // OSS route block, so this page exists in every build. The meta-org restriction is enforced by
+  // the settings shell and by the API, not by leaving the route out.
+  routes[0].children.push({
+    path: "password_policy",
+    name: "passwordPolicy",
+    component: () => import("@/components/settings/PasswordPolicy.vue"),
+    meta: {
+      keepAlive: true,
+      titleKey: "routeTitles.passwordPolicy",
+    },
+    beforeEnter(to: any, from: any, next: any) {
+      routeGuard(to, from, next);
+    },
+  });
+
   // Public synthetics locations are the registry the Lambda venue dispatches
   // against, and synthetics ships in OSS — so this registers in every build. The
   // page itself lists public rows only; private locations stay enterprise.

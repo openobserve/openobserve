@@ -27,24 +27,31 @@ use common::meta::user::UserList;
 use config::{
     Config, get_config,
     meta::user::UserRole,
-    utils::{base64, json, password::validate_password_strength},
+    utils::{base64, json},
 };
-use openobserve_api_common::extractors::Headers;
+use openobserve_api_common::{auth::validator::AuthError, extractors::Headers};
 use openobserve_core::{
     auth::{UserEmail, generate_presigned_url, is_valid_email},
     users,
 };
 use serde::Serialize;
 #[cfg(feature = "enterprise")]
+use utoipa::ToSchema;
+#[cfg(feature = "enterprise")]
 use {
     audit::audit,
     config::utils::time::now_micros,
     o2_dex::config::get_config as get_dex_config,
     o2_enterprise::enterprise::common::auditor::{AuditMessage, Protocol, ResponseMeta},
+    o2_enterprise::enterprise::password_policy::lockout::{self, LockoutState},
     o2_openfga::config::get_config as get_openfga_config,
     openobserve_core::auth::check_permissions,
 };
 
+#[cfg(feature = "enterprise")]
+use crate::common::meta::user::UserResponse;
+#[cfg(feature = "enterprise")]
+use crate::request::password_policy::password_rotation;
 use crate::{
     common::meta::{
         self,
@@ -58,6 +65,19 @@ use crate::{
 };
 
 pub mod service_accounts;
+
+/// One organization member, as the list endpoint reports them, plus their lockout state.
+///
+/// The counters are an administrator's view and must not be handed to the user they describe:
+/// someone who can read the escalation level and the remaining seconds can derive the thresholds
+/// behind them and pace attempts to stay underneath.
+#[cfg(feature = "enterprise")]
+#[derive(Serialize, ToSchema)]
+pub struct UserDetailsResponse {
+    #[serde(flatten)]
+    pub user: UserResponse,
+    pub lockout: LockoutState,
+}
 
 /// ListUsers
 #[utoipa::path(
@@ -134,6 +154,80 @@ pub async fn list(
     }
 }
 
+/// GetUser
+#[cfg(feature = "enterprise")]
+#[utoipa::path(
+    get,
+    path = "/{org_id}/users/{email_id}",
+    context_path = "/api",
+    tag = "Users",
+    operation_id = "UserGet",
+    summary = "Get a single organization user",
+    description = "Returns one member of the organization — the same record the list endpoint \
+                   reports — together with their failed-login lockout state: whether they are \
+                   currently locked out of password authentication, how long is left on the lock, \
+                   and the failure counters behind it. Requires Root or Admin on the named \
+                   organization, and the user must belong to it. A user who has never failed a \
+                   login is reported as unlocked with zeroed counters rather than as missing.",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("email_id" = String, Path, description = "User's email id"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = UserDetailsResponse),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = ()),
+        (status = 404, description = "Not Found", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Users", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Get a user's details and lockout state", "category": "users"}))
+    )
+)]
+pub async fn get(
+    Path((org_id, email_id)): Path<(String, String)>,
+    Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    let email_id = email_id.trim().to_lowercase();
+    if let Err(e) = validate_user_admin(&org_id, &user_email.user_id).await {
+        return MetaHttpResponse::forbidden(e);
+    }
+
+    let Some(user) = users::get_user_details(&org_id, &email_id).await else {
+        return MetaHttpResponse::not_found("User not found");
+    };
+
+    match lockout::lockout_state(&email_id).await {
+        Ok(lockout) => MetaHttpResponse::json(UserDetailsResponse { user, lockout }),
+        Err(e) => {
+            log::error!("{e}");
+            MetaHttpResponse::internal_error("Failed to read the lockout state")
+        }
+    }
+}
+
+/// Who may read another member's record, and the counters that come with it.
+///
+/// The same rule `update_user` applies before it will reset a password or clear a lockout: root
+/// administers the instance, everyone else must administer the organization named in the path.
+/// Whether the *target* belongs to that organization is not decided here — the record lookup is
+/// org-scoped, so a user outside it is simply not found.
+#[cfg(feature = "enterprise")]
+async fn validate_user_admin(org_id: &str, initiator_id: &str) -> Result<(), String> {
+    if db::user::is_root_user(initiator_id) {
+        return Ok(());
+    }
+
+    match users::get_user(Some(org_id), initiator_id).await {
+        Some(user) if matches!(user.role, UserRole::Root | UserRole::Admin) => Ok(()),
+        _ => Err(format!(
+            "Reading a user's details requires Root or Admin on {org_id}"
+        )),
+    }
+}
+
 /// Rejects an `org_id` path segment that is empty or whitespace-only.
 ///
 /// The `/{org_id}/users` route parameter can arrive as `""` (via a
@@ -184,18 +278,19 @@ pub async fn save(
     user.email = user.email.trim().to_lowercase();
 
     let bad_req_msg = if let Some(msg) = validate_org_id(&org_id) {
-        Some(msg)
-    } else if let Err(msg) = validate_password_strength(&user.password) {
+        Some(msg.to_string())
+    } else if let Err(msg) = db::password_policy::validate_password(&user.password).await {
         Some(msg)
     } else if user.role.base_role == UserRole::Root {
-        Some("Not allowed")
+        Some("Not allowed".to_string())
     } else if user.role.base_role == UserRole::SreAgent {
-        Some("SRE Agent role cannot be assigned via API")
+        Some("SRE Agent role cannot be assigned via API".to_string())
     } else if !is_valid_email(user.email.as_str()) {
-        Some("Invalid Email address")
+        Some("Invalid Email address".to_string())
     } else {
         None
     };
+
     if let Some(msg) = bad_req_msg {
         return Response::builder()
             .status(StatusCode::BAD_REQUEST)
@@ -231,7 +326,9 @@ pub async fn save(
     description = "Updates user account information including role assignments, password changes, or other profile details. \
                    Users can modify their own account settings, while administrators have broader permissions to update \
                    any user account. Password changes require the new password to be at least 8 characters long for \
-                   security compliance.",
+                   security compliance. Setting remove_lockout releases an active failed-login lockout and resets the \
+                   counters; it answers to the same gate as an administrative password reset, so Root or Admin on the \
+                   organization, and never the locked-out user themselves.",
     security(
         ("Authorization"= [])
     ),
@@ -271,7 +368,7 @@ pub async fn update(
     }
     if user.change_password
         && let Some(new_pw) = user.new_password.as_deref()
-        && let Err(msg) = validate_password_strength(new_pw)
+        && let Err(msg) = db::password_policy::validate_password(new_pw).await
     {
         return Response::builder()
             .status(StatusCode::BAD_REQUEST)
@@ -641,6 +738,11 @@ pub async fn authentication(
                 return unauthorized_error(resp);
             }
         }
+        Err(AuthError::Locked { retry_after_secs }) => {
+            #[cfg(feature = "enterprise")]
+            audit_locked_error(audit_message).await;
+            return locked_error(resp, retry_after_secs);
+        }
         Err(_e) => {
             #[cfg(feature = "enterprise")]
             audit_unauthorized_error(audit_message).await;
@@ -649,6 +751,11 @@ pub async fn authentication(
     };
     if resp.status {
         let cfg = get_config();
+
+        #[cfg(feature = "enterprise")]
+        {
+            resp.password_rotation_warning = password_rotation::warning_days(&auth.name).await;
+        }
 
         let access_token = format!(
             "Basic {}",
@@ -663,7 +770,8 @@ pub async fn authentication(
         let tokens = base64::encode(&tokens);
         let mut auth_cookie = Cookie::new("auth_tokens", tokens);
         auth_cookie.set_expires(
-            time::OffsetDateTime::now_utc() + time::Duration::seconds(cfg.auth.cookie_max_age),
+            time::OffsetDateTime::now_utc()
+                + time::Duration::seconds(db::password_policy::cookie_max_age_secs().await),
         );
         auth_cookie.set_http_only(true);
         auth_cookie.set_secure(cfg.auth.cookie_secure_only);
@@ -1038,12 +1146,38 @@ fn unauthorized_error(mut resp: SignInResponse) -> Response {
         .unwrap()
 }
 
+/// The lockout refusal, which unlike [`unauthorized_error`] has something to tell the caller: how
+/// long to wait. 429 with `Retry-After` matches what the API path returns for the same state.
+fn locked_error(mut resp: SignInResponse, retry_after_secs: i64) -> Response {
+    resp.status = false;
+    resp.message = openobserve_api_common::auth::validator::lockout_message(retry_after_secs);
+    resp.lockout_retry_after_secs = Some(retry_after_secs);
+    Response::builder()
+        .status(StatusCode::TOO_MANY_REQUESTS)
+        .header(header::CONTENT_TYPE, "application/json")
+        .header(header::RETRY_AFTER, retry_after_secs)
+        .body(Body::from(serde_json::to_string(&resp).unwrap()))
+        .unwrap()
+}
+
 #[cfg(feature = "enterprise")]
-async fn audit_unauthorized_error(mut audit_message: AuditMessage) {
+async fn audit_unauthorized_error(audit_message: AuditMessage) {
+    audit_login_failure(audit_message, 401).await;
+}
+
+/// A lockout is audited under its own status code: an audit trail that reported every refused login
+/// as a 401 would hide the difference between a wrong password and an account under attack.
+#[cfg(feature = "enterprise")]
+async fn audit_locked_error(audit_message: AuditMessage) {
+    audit_login_failure(audit_message, 429).await;
+}
+
+#[cfg(feature = "enterprise")]
+async fn audit_login_failure(mut audit_message: AuditMessage, http_response_code: u16) {
     use chrono::Utc;
 
     audit_message._timestamp = Utc::now().timestamp_micros();
-    audit_message.response_meta.http_response_code = 401;
+    audit_message.response_meta.http_response_code = http_response_code;
     // Even if the user_email of audit_message is not set, still the event should be audited
     audit(audit_message).await;
 }
@@ -1243,5 +1377,83 @@ mod tests {
         assert!(validate_org_id("default").is_none());
         assert!(validate_org_id("my-org").is_none());
         assert!(validate_org_id(" default ").is_none());
+    }
+
+    /// Seeds the caches a running node fills from the coordinator watcher. Nothing watches under
+    /// test, and every allow path below is answered from these two alone — a miss would reach for
+    /// the database.
+    #[cfg(feature = "enterprise")]
+    fn join(org_id: &str, email: &str, role: UserRole) {
+        common::infra::config::USERS.insert(
+            email.to_string(),
+            infra::table::users::UserRecord {
+                email: email.to_string(),
+                first_name: "F".to_string(),
+                last_name: "L".to_string(),
+                password: "hash".to_string(),
+                salt: "salt".to_string(),
+                is_root: role == UserRole::Root,
+                password_ext: None,
+                user_type: config::meta::user::UserType::Internal,
+                created_at: 0,
+                updated_at: 0,
+                must_reset_password: false,
+                password_reset_reason: None,
+                flagged_at: None,
+                password_updated_at: None,
+            },
+        );
+        common::infra::config::ORG_USERS.insert(
+            format!("{org_id}/{email}"),
+            infra::table::org_users::OrgUserRecord {
+                role,
+                token: "token".to_string(),
+                rum_token: None,
+                org_id: org_id.to_string(),
+                email: email.to_string(),
+                created_at: 0,
+                allow_static_token: true,
+            },
+        );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn an_org_admin_reads_its_own_org() {
+        let org = "user-get-acme";
+        let admin = "admin@user-get-acme.test";
+        join(org, admin, UserRole::Admin);
+
+        assert!(validate_user_admin(org, admin).await.is_ok());
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn a_non_admin_is_refused_its_own_org() {
+        let org = "user-get-viewer";
+        let viewer = "viewer@user-get-viewer.test";
+        join(org, viewer, UserRole::Viewer);
+
+        assert!(validate_user_admin(org, viewer).await.is_err());
+    }
+
+    /// The org boundary is the whole point: administering one tenant must not reach into another.
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn administering_one_org_does_not_reach_another() {
+        let (mine, theirs) = ("user-get-mine", "user-get-theirs");
+        let admin = "admin@user-get-mine.test";
+        join(mine, admin, UserRole::Admin);
+
+        assert!(validate_user_admin(theirs, admin).await.is_err());
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn root_reads_any_org() {
+        let root = "root@user-get-root.test";
+        join(config::DEFAULT_ORG, root, UserRole::Root);
+
+        assert!(validate_user_admin("user-get-any", root).await.is_ok());
     }
 }

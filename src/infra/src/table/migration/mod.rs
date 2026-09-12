@@ -169,7 +169,10 @@ mod m20260818_000002_create_llm_remote_tasks;
 mod m20260820_000001_add_icon_to_folders;
 mod m20260820_000003_create_llm_secrets;
 mod m20260822_000001_create_status_pages_tables;
+mod m20260824_000001_add_password_policy_columns_to_users;
 mod m20260824_000001_create_llm_playground_snapshots;
+mod m20260824_000002_create_user_password_history_table;
+mod m20260824_000003_create_user_auth_state_table;
 mod m20260825_000001_add_alert_pending_period_col;
 mod m20260825_000001_add_steps_configured_to_synthetics_jobs;
 mod m20260825_000001_create_status_page_custom_domains;
@@ -425,12 +428,15 @@ impl MigratorTrait for Migrator {
             Box::new(m20260818_000002_create_llm_remote_tasks::Migration),
             Box::new(m20260820_000001_add_icon_to_folders::Migration),
             Box::new(m20260820_000003_create_llm_secrets::Migration),
+            Box::new(m20260822_000001_create_status_pages_tables::Migration),
+            Box::new(m20260824_000001_add_password_policy_columns_to_users::Migration),
+            Box::new(m20260824_000002_create_user_password_history_table::Migration),
+            Box::new(m20260824_000003_create_user_auth_state_table::Migration),
             Box::new(m20260824_000001_create_llm_playground_snapshots::Migration),
             Box::new(m20260825_000001_add_steps_configured_to_synthetics_jobs::Migration),
             Box::new(m20260825_000001_add_alert_pending_period_col::Migration),
-            Box::new(m20260827_000001_drop_table_action_scripts::Migration),
-            Box::new(m20260822_000001_create_status_pages_tables::Migration),
             Box::new(m20260825_000001_create_status_page_custom_domains::Migration),
+            Box::new(m20260827_000001_drop_table_action_scripts::Migration),
         ]
     }
 }
@@ -457,21 +463,22 @@ mod tests {
     }
 
     #[test]
-    fn composite_alert_migration_is_registered_after_existing_migrations() {
+    fn auth_policy_migrations_are_registered_after_existing_migrations() {
         let names: Vec<String> = Migrator::migrations()
             .into_iter()
             .map(|migration| migration.name().to_string())
             .collect();
+        for name in [
+            "m20260812_000001_create_composite_alerts",
+            "m20260824_000001_add_password_policy_columns_to_users",
+            "m20260824_000002_create_user_password_history_table",
+            "m20260824_000003_create_user_auth_state_table",
+        ] {
+            assert_eq!(names.iter().filter(|n| n.as_str() == name).count(), 1);
+        }
         assert_eq!(
             names.last().map(String::as_str),
-            Some("m20260825_000001_create_status_page_custom_domains")
-        );
-        assert_eq!(
-            names
-                .iter()
-                .filter(|name| name.as_str() == "m20260812_000001_create_composite_alerts")
-                .count(),
-            1
+            Some("m20260827_000001_drop_table_action_scripts")
         );
     }
 }

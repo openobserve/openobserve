@@ -89,6 +89,7 @@ export default defineComponent({
       queryManagement: "queryManagement",
       query_management: "queryManagement",
       domainManagement: "domain_management",
+      passwordPolicy: "password_policy",
       pipelineDestinations: "pipeline_destinations",
       alertTemplates: "templates",
       modelPricing: "model_pricing",
@@ -124,6 +125,7 @@ export default defineComponent({
       "organization",
       "license",
       "domain_management",
+      "password_policy",
     ]);
     const isConstrainedSection = computed(() => CONSTRAINED_SECTIONS.has(activeSection.value));
 
@@ -168,6 +170,12 @@ export default defineComponent({
         (store.state.zoConfig.meta_org && !isMetaOrg.value) ||
         store.state.zoConfig?.synthetics_enabled === false;
       if (name === "syntheticsLocations" && syntheticsBlocked) {
+        toGeneral();
+        return;
+      }
+      // Password policy is instance-wide, so the API only accepts the meta org. Not
+      // enterprise-gated — native auth ships in OSS.
+      if (name === "passwordPolicy" && store.state.zoConfig.meta_org && !isMetaOrg.value) {
         toGeneral();
       }
     };
@@ -250,6 +258,18 @@ export default defineComponent({
           to: { name: "domainManagement", query: { org_identifier: org } },
           visible: isEnt && meta,
           dataTest: "domain-management-tab",
+          group: "Access & Security",
+        },
+        {
+          key: "password_policy",
+          label: t("settings.passwordPolicy"),
+          description: t("settings.passwordPolicyDesc"),
+          icon: "lock",
+          to: { name: "passwordPolicy", query: { org_identifier: org } },
+          // Meta-org only, but NOT enterprise-gated like its neighbours here: native
+          // email/password auth is an OSS feature and the API is in the OSS route block.
+          visible: meta,
+          dataTest: "password-policy-tab",
           group: "Access & Security",
         },
         // Notification Destinations and Templates are alerting configuration and

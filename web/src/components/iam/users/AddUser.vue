@@ -71,6 +71,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </template>
           </OFormInput>
+          <PasswordRequirementList
+            :requirements="passwordRequirements"
+            :password="formPassword || ''"
+            data-test="user-password-requirements"
+          />
         </div>
 
         <OFormInput
@@ -176,6 +181,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </template>
           </OFormInput>
+          <PasswordRequirementList
+            v-if="changePassword"
+            :requirements="passwordRequirements"
+            :password="formNewPassword || ''"
+            data-test="user-new-password-requirements"
+          />
         </div>
         <OFormInput
           v-if="!beingUpdated && userRole != 'member' && organization == 'other'"
@@ -232,6 +243,8 @@ import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { makeAddUserSchema, type AddUserForm } from "./AddUser.schema";
+import { usePasswordComplexity } from "@/composables/usePasswordComplexity";
+import PasswordRequirementList from "@/components/common/PasswordRequirementList.vue";
 const defaultValue: any = () => {
   return {
     org_member_id: "",
@@ -249,7 +262,16 @@ const defaultValue: any = () => {
 
 export default defineComponent({
   name: "ComponentAddUpdateUser",
-  components: { ODialog, ODrawer, OIcon, OForm, OFormInput, OFormSelect, OFormSwitch },
+  components: {
+    ODialog,
+    ODrawer,
+    OIcon,
+    OForm,
+    OFormInput,
+    OFormSelect,
+    OFormSwitch,
+    PasswordRequirementList,
+  },
   props: {
     open: {
       type: Boolean,
@@ -464,6 +486,15 @@ export default defineComponent({
     // via <OForm :form="form"> — ONE source of truth. The schema takes a context
     // GETTER so a single stable instance follows mode flips (e.g. the 422
     // add-existing → create-new switch) with no remount.
+    // The instance policy, not a hardcoded rule: the server validates every password against
+    // whatever an admin configured, so a fixed mirror here would reject passwords it accepts and
+    // accept passwords it rejects.
+    const {
+      complexity: passwordComplexity,
+      requirements: passwordRequirements,
+      load: loadPasswordComplexity,
+    } = usePasswordComplexity();
+
     const addUserSchema = makeAddUserSchema(
       () => ({
         existingUser: existingUser.value,
@@ -472,6 +503,7 @@ export default defineComponent({
         loggedInUserEmail: loggedInUserEmail.value,
         modelEmail: props.modelValue?.email ?? "",
         organization: organization.value,
+        complexity: passwordComplexity.value,
       }),
       t,
     );
@@ -488,6 +520,9 @@ export default defineComponent({
     const formEmail = form.useStore((s: any) => s.values.email);
     const formRole = form.useStore((s: any) => s.values.role);
     const formCustomRole = form.useStore((s: any) => s.values.custom_role);
+    // Read live so the requirement rows tick while typing, the same way the reset dialog does.
+    const formPassword = form.useStore((s: any) => s.values.password);
+    const formNewPassword = form.useStore((s: any) => s.values.new_password);
 
     watch(
       () => props.customRoles,
@@ -500,7 +535,10 @@ export default defineComponent({
       organization.value = store.state.selectedOrganization.identifier;
     });
 
-    onBeforeMount(() => setOrganizationOptions());
+    onBeforeMount(() => {
+      setOrganizationOptions();
+      loadPasswordComplexity();
+    });
 
     watch(
       () => store.state.organizations,
@@ -604,6 +642,9 @@ export default defineComponent({
       formEmail,
       formRole,
       formCustomRole,
+      formPassword,
+      formNewPassword,
+      passwordRequirements,
       isPwd,
       isNewPwd,
       isOldPwd,

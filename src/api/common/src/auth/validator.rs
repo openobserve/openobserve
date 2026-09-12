@@ -16,7 +16,7 @@
 use axum::{
     body::Body,
     extract::Request,
-    http::{HeaderMap, Method, StatusCode, Uri},
+    http::{HeaderMap, Method, StatusCode, Uri, header},
     response::{IntoResponse, Response},
 };
 use config::{
@@ -27,6 +27,8 @@ use config::{
 use db::{self, user::is_root_user};
 #[cfg(feature = "enterprise")]
 use o2_dex::config::get_config as get_dex_config;
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::password_policy::lockout::{self, LoginAttemptOutcome};
 #[cfg(feature = "enterprise")]
 pub use openobserve_core::auth::get_user_email_from_auth_str;
 pub use openobserve_core::authz::{check_permissions, list_objects_for_user};
@@ -67,6 +69,12 @@ pub enum AuthError {
     Unauthorized(String),
     Forbidden(String),
     NotFound(String),
+    /// Refused by the failed-login lockout rather than by the credential itself. Only the seconds
+    /// left are disclosed: the thresholds behind them stay admin-only, since a brute-forcer who
+    /// learns them knows exactly how to pace attempts underneath.
+    Locked {
+        retry_after_secs: i64,
+    },
 }
 
 impl std::fmt::Display for AuthError {
@@ -75,6 +83,9 @@ impl std::fmt::Display for AuthError {
             AuthError::Unauthorized(msg) => write!(f, "Unauthorized: {}", msg),
             AuthError::Forbidden(msg) => write!(f, "Forbidden: {}", msg),
             AuthError::NotFound(msg) => write!(f, "NotFound: {}", msg),
+            AuthError::Locked { retry_after_secs } => {
+                write!(f, "Locked: {}", lockout_message(*retry_after_secs))
+            }
         }
     }
 }
@@ -109,8 +120,23 @@ impl IntoResponse for AuthError {
             }
             AuthError::Forbidden(msg) => (StatusCode::FORBIDDEN, msg).into_response(),
             AuthError::NotFound(msg) => (StatusCode::NOT_FOUND, msg).into_response(),
+            // 429 rather than 423: `Retry-After` is canonical on it, and clients and proxies
+            // already know to back off rather than retry immediately.
+            AuthError::Locked { retry_after_secs } => Response::builder()
+                .status(StatusCode::TOO_MANY_REQUESTS)
+                .header(header::RETRY_AFTER, retry_after_secs)
+                .body(Body::from(lockout_message(retry_after_secs)))
+                .unwrap(),
         }
     }
+}
+
+/// The plain-English rejection for a locked account.
+///
+/// Carries the seconds rather than a rendered duration: the console composes its own localized
+/// sentence from `lockout_retry_after_secs`, and this is what everything else sees.
+pub fn lockout_message(retry_after_secs: i64) -> String {
+    format!("Too many failed login attempts, please try again in {retry_after_secs} seconds")
 }
 
 /// Result of auth validation - contains user info and modified request
@@ -118,6 +144,30 @@ pub struct AuthValidationResult {
     pub user_email: String,
     pub user_role: Option<UserRole>,
     pub is_internal_user: bool,
+}
+
+/// What a password comparison decided, once the lockout policy has had its say.
+///
+/// `Locked` is distinct from `Mismatch` because the two owe the caller different answers: one is
+/// "that is not your password", the other is "stop asking for now".
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PasswordCheck {
+    Matched,
+    Mismatch,
+    #[cfg(feature = "enterprise")]
+    Locked {
+        retry_after_secs: i64,
+    },
+}
+
+impl PasswordCheck {
+    fn from_comparison(matched: bool) -> Self {
+        if matched {
+            PasswordCheck::Matched
+        } else {
+            PasswordCheck::Mismatch
+        }
+    }
 }
 
 /// Helper function to build a successful token validation response
@@ -243,6 +293,89 @@ async fn blocked_external(user: &config::meta::user::User) -> bool {
             domain_management::evaluate_cached(&user.email).await,
             AccessDecision::Deny
         )
+}
+
+/// Reads whose answer is instance-wide, so membership in the org named by the path is irrelevant.
+///
+/// `license` carries no org at all. `password_complexity` carries one but ignores it: the policy is
+/// the same for every organization, and the caller who most needs it is a user blocked for a forced
+/// password reset — who has to be told what password will satisfy the policy regardless of which
+/// org the console happens to be pointed at. Neither response contains org-scoped data, so nothing
+/// cross-tenant leaks by admitting a non-member.
+fn is_org_agnostic_read(path: &str) -> bool {
+    if path == "license" {
+        return true;
+    }
+    let segments: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
+    matches!(
+        segments.as_slice(),
+        [_org, "password_complexity"] | ["api", _org, "password_complexity"]
+    )
+}
+
+/// Compare a password under the lockout policy, recording the attempt.
+///
+/// `compare` is whatever "this credential matches" means at the call site, and it runs only once
+/// the lockout check has passed: an attacker is then rejected without the Argon2 work they were
+/// trying to buy, and a locked account rejects in the same time whatever the candidate.
+///
+/// Root is exempt unless `apply_to_root` says otherwise: it is the one account with no recovery
+/// path from inside the product, and anyone who knows its address can deny it access without ever
+/// guessing the password. External users are out of scope because their credentials are verified
+/// elsewhere, whatever the policy says.
+///
+/// A lockout is reported as itself rather than as a mismatch, so the caller can tell the user how
+/// long to wait. Only the remaining seconds are disclosed — never the thresholds behind them.
+async fn enforce_lockout_and_compare_password<F>(
+    user_email: &str,
+    is_internal: bool,
+    compare: F,
+) -> PasswordCheck
+where
+    F: FnOnce() -> bool,
+{
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (user_email, is_internal);
+        PasswordCheck::from_comparison(compare())
+    }
+    #[cfg(feature = "enterprise")]
+    {
+        let policy = db::password_policy::get_effective_policy().await;
+        let lockout = policy.lockout;
+        let root_exempt = is_root_user(user_email) && !policy.apply_to_root;
+        if !lockout.is_enabled() || !is_internal || root_exempt {
+            return PasswordCheck::from_comparison(compare());
+        }
+
+        match lockout::check_lockout(user_email, &lockout).await {
+            LoginAttemptOutcome::Locked { retry_after_secs } => {
+                log::warn!(
+                    "Rejected a login for locked-out account {user_email}, {retry_after_secs}s remaining"
+                );
+                PasswordCheck::Locked { retry_after_secs }
+            }
+            outcome => {
+                if !compare() {
+                    // The failure that trips the lock reports it immediately, rather than leaving
+                    // the user to discover it on an attempt they have no reason to expect to fail.
+                    return match lockout::record_failed_attempt(user_email, &lockout).await {
+                        LoginAttemptOutcome::Locked { retry_after_secs } => {
+                            PasswordCheck::Locked { retry_after_secs }
+                        }
+                        _ => PasswordCheck::Mismatch,
+                    };
+                }
+                // Only a user with failures needs the write; the steady state stays read-only.
+                if outcome == LoginAttemptOutcome::AllowedWithFailures
+                    && let Err(e) = lockout::record_successful_login(user_email).await
+                {
+                    log::error!("{e}");
+                }
+                PasswordCheck::Matched
+            }
+        }
+    }
 }
 
 pub async fn validate_credentials(
@@ -440,7 +573,7 @@ pub async fn validate_credentials(
         // rest of api calls will get blocked anyways, but without this,
         // native users get stuck in logout loop if they go to any page calling license
         // api call
-        if path == "license"
+        if is_org_agnostic_read(path)
             && let Ok(v) = db::user::get_user_record(user_id).await
         {
             // we set the record manually with minimal permission,
@@ -584,13 +717,23 @@ pub async fn validate_credentials(
             });
         }
     }
-    let in_pass = get_hash(user_password, &user.salt);
-    if !user.password.eq(&in_pass)
-        && !user
-            .password_ext
-            .unwrap_or("".to_string())
-            .eq(&user_password)
-    {
+    let password_check: PasswordCheck =
+        enforce_lockout_and_compare_password(&user.email, !user.is_external, || {
+            user.password.eq(&get_hash(user_password, &user.salt))
+                || user
+                    .password_ext
+                    .as_deref()
+                    .unwrap_or_default()
+                    .eq(user_password)
+        })
+        .await;
+    // A lockout is the one refusal that carries an answer, so it is the one that does not collapse
+    // into the shared invalid-credentials response.
+    #[cfg(feature = "enterprise")]
+    if let PasswordCheck::Locked { retry_after_secs } = password_check {
+        return Err(AuthError::Locked { retry_after_secs });
+    }
+    if password_check != PasswordCheck::Matched {
         return Ok(TokenValidationResponse {
             is_valid: false,
             user_email: "".to_string(),
@@ -837,17 +980,32 @@ async fn validate_user_from_db(
     // let db_user = db::user::get_db_user(user_id).await;
     match db_user {
         Ok(mut user) => {
-            let in_pass = get_hash(user_password, &user.salt);
-            if req_time.is_none() && user.password.eq(&in_pass) {
+            // Only this branch is a raw password guess; the password_ext branches below are not.
+            let password_check = if req_time.is_none() {
+                enforce_lockout_and_compare_password(&user.email, !user.is_external, || {
+                    user.password.eq(&get_hash(user_password, &user.salt))
+                })
+                .await
+            } else {
+                PasswordCheck::Mismatch
+            };
+            #[cfg(feature = "enterprise")]
+            if let PasswordCheck::Locked { retry_after_secs } = password_check {
+                return Err(AuthError::Locked { retry_after_secs });
+            }
+            if password_check == PasswordCheck::Matched {
                 if user.password_ext.is_none() {
                     let password_ext = get_hash(user_password, password_ext_salt);
                     user.password_ext = Some(password_ext);
+                    // Backfilling the derived hash is not a password change: bumping the rotation
+                    // clock here would restart it on every login and expiry would never arrive.
                     let _ = db::user::update(
                         &user.email,
                         &user.first_name,
                         &user.last_name,
                         &user.password,
                         user.password_ext.clone(),
+                        false,
                     )
                     .await;
                 }
@@ -1284,6 +1442,8 @@ mod tests {
         db::{get_orm_client_ro, get_orm_client_rw},
         table as infra_table,
     };
+    #[cfg(feature = "enterprise")]
+    use o2_enterprise::enterprise::password_policy::meta::{LockoutPolicy, PasswordPolicy};
     use openobserve_core::{organization, users};
 
     use super::*;
@@ -1786,6 +1946,183 @@ mod tests {
                 .is_valid
         );
         assert!(validate_user(init_user, pwd).await.unwrap().is_valid);
+
+        #[cfg(feature = "enterprise")]
+        exercise_lockout(org_id, init_user, pwd).await;
+    }
+
+    /// Root survives any number of wrong passwords, and a locked-out user is refused even once they
+    /// present the right one.
+    ///
+    /// Folded into `test_validate` rather than standing alone: it needs that fixture's root user
+    /// and caches, and a second test clearing the same tables would race with it.
+    #[cfg(feature = "enterprise")]
+    async fn exercise_lockout(org_id: &str, root_user: &str, root_pwd: &str) {
+        let locked_user = "lockme@example.com";
+        let pwd = "Complexpass#123";
+        let _ = infra_table::system_settings::create_table().await;
+        // The fixture truncates the user tables but not this one, which outlives the process.
+        let _ = infra::table::user_auth_state::delete(locked_user).await;
+        let _ = infra::table::user_auth_state::delete(root_user).await;
+
+        // `is_root_user` reads the org-user cache, which nothing populates under test.
+        ORG_USERS.insert(
+            format!("{DEFAULT_ORG}/{root_user}"),
+            infra::table::org_users::OrgUserRecord {
+                role: config::meta::user::UserRole::Root,
+                token: "root_token".to_string(),
+                rum_token: None,
+                org_id: DEFAULT_ORG.to_string(),
+                email: root_user.to_string(),
+                created_at: 0,
+                allow_static_token: true,
+            },
+        );
+        assert!(is_root_user(root_user), "fixture must have a root user");
+        let _ = users::post_user(
+            org_id,
+            UserRequest {
+                email: locked_user.to_string(),
+                password: pwd.to_string(),
+                role: common::meta::user::UserOrgRole {
+                    base_role: config::meta::user::UserRole::Admin,
+                    custom_role: None,
+                },
+                first_name: "locked".to_owned(),
+                last_name: "".to_owned(),
+                is_external: false,
+                token: None,
+            },
+            root_user,
+        )
+        .await;
+
+        db::password_policy::set_policy(&PasswordPolicy {
+            lockout: LockoutPolicy {
+                threshold: 2,
+                ..Default::default()
+            },
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+
+        for _ in 0..3 {
+            assert_eq!(
+                refuse(root_user, "Wrongpass#123").await,
+                None,
+                "root's failures never carry a retry-after, because they never lock"
+            );
+        }
+        assert!(
+            infra::table::user_auth_state::get(root_user)
+                .await
+                .unwrap()
+                .is_none(),
+            "root must never acquire lockout state"
+        );
+        assert!(
+            validate_credentials(root_user, root_pwd, "default/_bulk", &Method::POST, false)
+                .await
+                .unwrap()
+                .is_valid,
+            "root is never locked out"
+        );
+
+        // Without this the final assertion would also hold for a user who was never created.
+        assert!(
+            validate_credentials(locked_user, pwd, "default/_bulk", &Method::POST, false)
+                .await
+                .unwrap()
+                .is_valid,
+            "the fixture's user must authenticate before being locked out"
+        );
+        assert_eq!(
+            refuse(locked_user, "Wrongpass#123").await,
+            None,
+            "a wrong password below the threshold is a plain mismatch"
+        );
+        let tripped = refuse(locked_user, "Wrongpass#123")
+            .await
+            .expect("the failure that trips the lock reports it, rather than the next attempt");
+        assert!((1..=60).contains(&tripped), "{tripped}s is out of range");
+
+        let refused = refuse(locked_user, pwd)
+            .await
+            .expect("a locked account is refused even with the right password");
+        assert!((1..=60).contains(&refused), "{refused}s is out of range");
+
+        exercise_root_lockout(root_user, root_pwd).await;
+
+        db::password_policy::set_policy(&PasswordPolicy::default())
+            .await
+            .unwrap();
+    }
+
+    /// The same instance with `apply_to_root` on: root loses the exemption it holds above.
+    ///
+    /// Nothing clears the lockout early — a password change does not touch it — so a locked root
+    /// waits out `locked_until` unless an admin clears the row.
+    #[cfg(feature = "enterprise")]
+    async fn exercise_root_lockout(root_user: &str, root_pwd: &str) {
+        db::password_policy::set_policy(&PasswordPolicy {
+            lockout: LockoutPolicy {
+                threshold: 2,
+                ..Default::default()
+            },
+            apply_to_root: true,
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+
+        assert_eq!(refuse(root_user, "Wrongpass#123").await, None);
+        let tripped = refuse(root_user, "Wrongpass#123")
+            .await
+            .expect("root locks like anyone else once the policy applies to it");
+        assert!((1..=60).contains(&tripped), "{tripped}s is out of range");
+        assert!(
+            refuse(root_user, root_pwd).await.is_some(),
+            "a locked root is refused even with the right password"
+        );
+        assert!(
+            infra::table::user_auth_state::get(root_user)
+                .await
+                .unwrap()
+                .is_some_and(|state| state.lockout_level == 1),
+            "root now carries the lockout state it is exempt from by default"
+        );
+
+        let _ = infra::table::user_auth_state::delete(root_user).await;
+    }
+
+    /// The seconds a refused login is told to wait, or `None` when it was refused as a plain
+    /// mismatch. Panics if the credentials are accepted.
+    #[cfg(feature = "enterprise")]
+    async fn refuse(user: &str, password: &str) -> Option<i64> {
+        match validate_credentials(user, password, "default/_bulk", &Method::POST, false).await {
+            Ok(response) => {
+                assert!(!response.is_valid, "{user} was expected to be refused");
+                None
+            }
+            Err(AuthError::Locked { retry_after_secs }) => Some(retry_after_secs),
+            Err(e) => panic!("{user} was refused with an unexpected error: {e}"),
+        }
+    }
+
+    #[test]
+    fn a_lockout_answers_429_with_a_retry_after_header() {
+        let response = AuthError::Locked {
+            retry_after_secs: 42,
+        }
+        .into_response();
+
+        assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
+        assert_eq!(
+            response.headers().get(header::RETRY_AFTER).unwrap(),
+            "42",
+            "clients and proxies back off on the header, not on the sentence"
+        );
     }
 
     #[test]
@@ -1930,5 +2267,28 @@ mod tests {
             "default"
         };
         assert_eq!(org_id_normal, "default");
+    }
+
+    #[test]
+    fn org_agnostic_reads_cover_license_and_password_complexity() {
+        assert!(is_org_agnostic_read("license"));
+        // The path reaching here is relative and nest-stripped, but accept both shapes.
+        assert!(is_org_agnostic_read("acme/password_complexity"));
+        assert!(is_org_agnostic_read("api/acme/password_complexity"));
+        assert!(is_org_agnostic_read("_meta/password_complexity"));
+        // An org literally named "api" still resolves as an org.
+        assert!(is_org_agnostic_read("api/password_complexity"));
+    }
+
+    #[test]
+    fn org_agnostic_reads_do_not_widen_anything_else() {
+        // Authoring the policy keeps its org-membership requirement.
+        assert!(!is_org_agnostic_read("acme/settings/password_policy"));
+        assert!(!is_org_agnostic_read("_meta/settings/password_policy"));
+        // Neither do neighbouring or deeper paths.
+        assert!(!is_org_agnostic_read("acme/password_complexity/detail"));
+        assert!(!is_org_agnostic_read("acme/streams"));
+        assert!(!is_org_agnostic_read("password_complexity"));
+        assert!(!is_org_agnostic_read("license/keys"));
     }
 }

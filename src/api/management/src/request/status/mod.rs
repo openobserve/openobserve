@@ -1267,7 +1267,8 @@ pub async fn redirect(Query(query): Query<std::collections::HashMap<String, Stri
 
             let mut auth_cookie = Cookie::new("auth_tokens", tokens);
             auth_cookie.set_expires(
-                time::OffsetDateTime::now_utc() + time::Duration::seconds(cfg.auth.cookie_max_age),
+                time::OffsetDateTime::now_utc()
+                    + time::Duration::seconds(db::password_policy::cookie_max_age_secs().await),
             );
             auth_cookie.set_http_only(true);
             auth_cookie.set_secure(cfg.auth.cookie_secure_only);
@@ -1425,7 +1426,9 @@ pub async fn refresh_token_with_dex(
                     let mut auth_cookie = Cookie::new("auth_tokens", cleared);
                     auth_cookie.set_expires(
                         time::OffsetDateTime::now_utc()
-                            + time::Duration::seconds(conf.auth.cookie_max_age),
+                            + time::Duration::seconds(
+                                db::password_policy::cookie_max_age_secs().await,
+                            ),
                     );
                     auth_cookie.set_http_only(true);
                     auth_cookie.set_secure(conf.auth.cookie_secure_only);
@@ -1466,7 +1469,8 @@ pub async fn refresh_token_with_dex(
 
             let mut auth_cookie = Cookie::new("auth_tokens", tokens);
             auth_cookie.set_expires(
-                time::OffsetDateTime::now_utc() + time::Duration::seconds(conf.auth.cookie_max_age),
+                time::OffsetDateTime::now_utc()
+                    + time::Duration::seconds(db::password_policy::cookie_max_age_secs().await),
             );
             auth_cookie.set_http_only(true);
             auth_cookie.set_secure(conf.auth.cookie_secure_only);
@@ -1490,7 +1494,8 @@ pub async fn refresh_token_with_dex(
 
             let mut auth_cookie = Cookie::new("auth_tokens", tokens);
             auth_cookie.set_expires(
-                time::OffsetDateTime::now_utc() + time::Duration::seconds(conf.auth.cookie_max_age),
+                time::OffsetDateTime::now_utc()
+                    + time::Duration::seconds(db::password_policy::cookie_max_age_secs().await),
             );
             auth_cookie.set_http_only(true);
             auth_cookie.set_secure(conf.auth.cookie_secure_only);
@@ -1511,15 +1516,18 @@ pub async fn refresh_token_with_dex(
     }
 }
 
+/// `max_age_secs` is passed in rather than read here: the policy read is async and this is not, and
+/// logout builds two cookies from the one answer.
 fn prepare_empty_cookie<'a, T: Serialize + ?Sized>(
     cookie_name: &'a str,
     token_struct: &T,
     conf: &Arc<Config>,
+    max_age_secs: i64,
 ) -> Cookie<'a> {
     let tokens = json::to_string(token_struct).unwrap();
     let tokens = base64::encode(&tokens);
     let mut auth_cookie = Cookie::new(cookie_name, tokens);
-    auth_cookie.set_max_age(time::Duration::seconds(conf.auth.cookie_max_age));
+    auth_cookie.set_max_age(time::Duration::seconds(max_age_secs));
     auth_cookie.set_http_only(true);
     auth_cookie.set_secure(conf.auth.cookie_secure_only);
     auth_cookie.set_path("/");
@@ -1562,8 +1570,11 @@ pub async fn logout(
             .await;
         }
     };
-    let auth_cookie = prepare_empty_cookie("auth_tokens", &AuthTokens::default(), &conf);
-    let auth_ext_cookie = prepare_empty_cookie("auth_ext", &AuthTokensExt::default(), &conf);
+    let max_age_secs = db::password_policy::cookie_max_age_secs().await;
+    let auth_cookie =
+        prepare_empty_cookie("auth_tokens", &AuthTokens::default(), &conf, max_age_secs);
+    let auth_ext_cookie =
+        prepare_empty_cookie("auth_ext", &AuthTokensExt::default(), &conf, max_age_secs);
 
     #[cfg(feature = "enterprise")]
     if let Some(user_email) = user_email {
@@ -1945,7 +1956,12 @@ mod tests {
         };
 
         let config = Arc::new(Config::default());
-        let cookie = prepare_empty_cookie("test_cookie", &test_token, &config);
+        let cookie = prepare_empty_cookie(
+            "test_cookie",
+            &test_token,
+            &config,
+            config.auth.cookie_max_age,
+        );
         let cookie_str = cookie.to_string();
 
         assert!(cookie_str.starts_with("test_cookie="));
@@ -1964,7 +1980,12 @@ mod tests {
 
         let empty_token = EmptyToken {};
         let config = Arc::new(Config::default());
-        let cookie = prepare_empty_cookie("auth_cookie", &empty_token, &config);
+        let cookie = prepare_empty_cookie(
+            "auth_cookie",
+            &empty_token,
+            &config,
+            config.auth.cookie_max_age,
+        );
         let cookie_str = cookie.to_string();
 
         assert!(cookie_str.contains("HttpOnly"));
@@ -1986,8 +2007,10 @@ mod tests {
         let test_data = TestData { id: 42 };
         let config = Arc::new(Config::default());
 
-        let cookie1 = prepare_empty_cookie("cookie1", &test_data, &config);
-        let cookie2 = prepare_empty_cookie("cookie2", &test_data, &config);
+        let cookie1 =
+            prepare_empty_cookie("cookie1", &test_data, &config, config.auth.cookie_max_age);
+        let cookie2 =
+            prepare_empty_cookie("cookie2", &test_data, &config, config.auth.cookie_max_age);
         let cookie1_str = cookie1.to_string();
         let cookie2_str = cookie2.to_string();
 
@@ -2101,7 +2124,12 @@ mod tests {
         };
 
         let config = Arc::new(Config::default());
-        let cookie = prepare_empty_cookie("complex_cookie", &complex_data, &config);
+        let cookie = prepare_empty_cookie(
+            "complex_cookie",
+            &complex_data,
+            &config,
+            config.auth.cookie_max_age,
+        );
 
         assert_eq!(cookie.name(), "complex_cookie");
         assert!(!cookie.value().is_empty());
@@ -2185,7 +2213,12 @@ mod tests {
 
         let empty_data = EmptyStruct;
         let config = Arc::new(Config::default());
-        let cookie = prepare_empty_cookie("empty_cookie", &empty_data, &config);
+        let cookie = prepare_empty_cookie(
+            "empty_cookie",
+            &empty_data,
+            &config,
+            config.auth.cookie_max_age,
+        );
 
         assert_eq!(cookie.name(), "empty_cookie");
         assert!(!cookie.value().is_empty()); // Even empty struct gets base64 encoded
@@ -2213,7 +2246,12 @@ mod tests {
             value: "test".to_string(),
         };
         let config = Arc::new(Config::default());
-        let cookie = prepare_empty_cookie("valid_cookie", &valid_data, &config);
+        let cookie = prepare_empty_cookie(
+            "valid_cookie",
+            &valid_data,
+            &config,
+            config.auth.cookie_max_age,
+        );
 
         // Should not panic and should produce valid cookie
         assert_eq!(cookie.name(), "valid_cookie");
