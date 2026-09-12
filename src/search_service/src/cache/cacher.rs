@@ -1164,6 +1164,7 @@ mod tests {
                 schemas
             },
             limit: 100,
+            sql_limit: None,
             offset: 0,
             time_range: (0, 0),
             group_by: vec![],
