@@ -1,0 +1,7 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/OnCall/oncall-teams.spec.js",
+  "existing_tests_considered": [],
+  "needs_registration": true,
+  "rationale": "No Playwright E2E spec or page object exists for OnCall (confirmed: tests/ui-testing/playwright-tests/ has no OnCall folder; tests/ui-testing/pages/ has no oncallPages folder). The only tests touched by the diff are Vitest unit specs (web/src/**/*.spec.ts) and Rust unit tests, none of which are E2E. The dominant feature for this run is Teams (per run-context spec_filename oncall-teams.spec.js). A brand-new 'OnCall' area folder + spec + ci_matrix group must be created, so needs_registration is true. Secondary OnCall areas (Responses/Pages, Mine, Policies, Routing, escalation editor, schedule editor, ownership rules, covers/overrides) are out of scope for this single spec and are flagged in the test plan as follow-on coverage."
+}

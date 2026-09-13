@@ -1,0 +1,8 @@
+[
+  { "title": "should create a team and show it on the teams list", "action": "new", "verifies": "a uniquely-named team is created via the drawer and its row appears on the Teams list" },
+  { "title": "should open a team and render its five tabs", "action": "new", "verifies": "clicking a team opens the detail view with the title and all five tabs (overview/schedule/members/policy/ownership) rendered" },
+  { "title": "should add a member to a team", "action": "new", "verifies": "picking an org user in the Members tab persists the member and shows their email in the roster" },
+  { "title": "should edit a team name and description", "action": "new", "verifies": "renaming a team via the edit drawer updates the detail title" },
+  { "title": "should delete a team after confirmation", "action": "new", "verifies": "deleting a team with the confirm dialog removes its row from the list" },
+  { "title": "should filter the teams list by search", "action": "new", "verifies": "the search box filters the list so only matching teams remain" }
+]

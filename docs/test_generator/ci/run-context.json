@@ -1,0 +1,23 @@
+{
+  "feature_slug": "oncall",
+  "feature_title": "OnCall Management",
+  "area": "OnCall",
+  "edition": "both",
+  "needs_e2e": true,
+  "needs_api": true,
+  "spec_filename": "oncall-teams.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/OnCall/oncall-teams.spec.js",
+  "playwright_group": "OnCall",
+  "source_files": [
+    "web/src/views/OnCall/OnCallTeams.vue",
+    "web/src/views/OnCall/OnCallMine.vue",
+    "web/src/views/OnCall/OnCallRouting.vue",
+    "web/src/views/OnCall/OnCallResponses.vue",
+    "web/src/views/OnCall/OnCallPolicies.vue",
+    "web/src/services/oncall.ts",
+    "web/src/router/index.ts"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": ""
+}

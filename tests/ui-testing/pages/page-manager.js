@@ -122,6 +122,12 @@ const FunctionsFormValidationPage = require("./functionsPages/functionsFormValid
 // ===== ANOMALY DETECTION PAGE OBJECTS =====
 const { AnomalyDetectionPage } = require("./anomalyPages/anomalyDetectionPage.js");
 
+// ===== ONCALL PAGE OBJECTS =====
+import { OnCallTeamsPage } from "./oncallPages/oncallTeamsPage.js";
+import { OnCallTeamFormPage } from "./oncallPages/oncallTeamFormPage.js";
+import { OnCallTeamDetailPage } from "./oncallPages/oncallTeamDetailPage.js";
+import { OnCallMembersPage } from "./oncallPages/oncallMembersPage.js";
+
 class PageManager {
   /**
    * @param {import('@playwright/test').Page} page - Playwright page instance
@@ -262,6 +268,12 @@ class PageManager {
     this.rumPerformancePage = new RumPerformancePage(page);
     this.rumIngestionPage = new RumIngestionPage(page);
     this.rumSourcemapsPage = new RumSourcemapsPage(page);
+
+    // ===== ONCALL PAGE OBJECTS =====
+    this.onCallTeamsPage = new OnCallTeamsPage(page);
+    this.onCallTeamFormPage = new OnCallTeamFormPage(page);
+    this.onCallTeamDetailPage = new OnCallTeamDetailPage(page);
+    this.onCallMembersPage = new OnCallMembersPage(page);
   }
 }
 

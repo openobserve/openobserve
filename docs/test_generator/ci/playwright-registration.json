@@ -1,0 +1,6 @@
+{
+  "group": "OnCall",
+  "spec_filename": "oncall-teams.spec.js",
+  "create_group": true,
+  "browser": "chrome"
+}

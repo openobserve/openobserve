@@ -1,0 +1,31 @@
+{
+  "feature_slug": "oncall",
+  "feature_title": "OnCall Management",
+  "area": "OnCall",
+  "edition": "both",
+  "needs_e2e": true,
+  "needs_api": true,
+  "spec_filename": "oncall-teams.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/OnCall/oncall-teams.spec.js",
+  "playwright_group": "OnCall",
+  "source_files": [
+    "web/src/views/OnCall/OnCallTeams.vue",
+    "web/src/views/OnCall/OnCallMine.vue",
+    "web/src/views/OnCall/OnCallRouting.vue",
+    "web/src/views/OnCall/OnCallResponses.vue",
+    "web/src/views/OnCall/OnCallPolicies.vue",
+    "web/src/services/oncall.ts",
+    "web/src/router/index.ts"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "The changed file list spans both repositories: OSS paths (src/api/..., src/config/..., src/core/..., src/infra/..., web/src/...) and enterprise paths (o2_enterprise/src/enterprise/oncall/*, o2_enterprise/src/enterprise/alerts/*, o2_openfga/*). The OnCall engine logic (escalation, routing, reachability, notify, replicate) lives under o2_enterprise/src/enterprise/oncall/ while the UI and OSS backend handlers sit in web/src and src/. No bare enterprise keywords are needed to decide this — the enterprise-owned file paths are the authoritative signal, so edition is 'both'.",
+    "skip": "Not skipping. The trigger comment and feature hint are both empty, so there is no explicit opt-out (no 'tests-added' label, no skip comment). The diff is not docs/CI-only: it adds a large user-facing OnCall product area (web/src/views/OnCall/*.vue, web/src/components/oncall/*.vue) plus backend endpoints, so it is clearly user-exercisable behavior.",
+    "e2e": "E2E is warranted. The change adds multiple new user-facing UI flows in web/src/views/OnCall/ (OnCallTeams, OnCallMine, OnCallRouting, OnCallResponses, OnCallPolicies, team/response detail views) and ~50 new oncall components, introducing new navigation, forms, schedules, rotations, and routing configuration. These are new interactive states a user can exercise and must be verified.",
+    "area": "The bulk of the UI changes live under web/src/views/OnCall/ and web/src/components/oncall/, with dedicated services (web/src/services/oncall.ts) and composables (web/src/composables/useOnCall*). No existing playwright-tests area covers OnCall, so a new 'OnCall' area folder is the correct home.",
+    "group": "There is no OnCall shard in tests/ui-testing/ci-matrix/ci_matrix_cloud.json; the closest existing groups are 'Alerts' and 'GeneralTests', but OnCall is a distinct product area with its own views. A new 'OnCall' testfolder/group is proposed and the Engineer must create it (actual_folder 'OnCall').",
+    "existing_tests": "No Playwright E2E specs in the diff. The only test files changed are Vitest unit tests under web/src/**/*.spec.ts (e.g. web/src/components/oncall/*.spec.ts, web/src/views/OnCall/*.spec.ts) and Rust unit tests, none of which are E2E coverage. So no E2E specs exist in the diff to extend."
+  }
+}
