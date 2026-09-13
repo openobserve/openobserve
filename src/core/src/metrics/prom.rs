@@ -34,7 +34,10 @@ use config::{
     metrics,
     utils::{
         flatten::format_label_name_owned,
-        json::{self, JsonBytesExt, estimate_json_bytes, estimate_json_entry_bytes},
+        json::{
+            self, JsonBytesExt, estimate_json_bytes, estimate_json_entry_bytes,
+            is_size_excluded_column,
+        },
         schema::format_stream_name,
         schema_ext::SchemaExt,
         time::{now_micros, parse_i64_to_timestamp_micros},
@@ -58,7 +61,7 @@ use ingestion_common::IngestUser;
 use promql_parser::{label::MatchOp, parser};
 use prost::Message;
 use proto::prometheus_rpc;
-use schema::{check_for_schema, stream_schema_exists};
+use schema::{check_for_schema, check_request_columns_limit, stream_schema_exists};
 use search_service;
 
 use super::native_histogram::{CLASSIC_HISTOGRAM_SUFFIXES, expand_native_histogram};
@@ -79,6 +82,12 @@ use crate::{
 const MICROS_PER_HOUR: i64 = 3_600_000_000;
 
 const BUILDER_START_ROWS: usize = 16;
+
+/// Past this many labels the scan in `push_label` costs more than hashing every name.
+const LABEL_INDEX_THRESHOLD: usize = 64;
+
+/// `value`, `_timestamp` and `__hash__`, the columns a record carries beyond its labels.
+const IDENTITY_COLUMNS: usize = 3;
 
 /// A record waiting for the write path, with the series hash when this handler computed it.
 type PendingRecord = (json::Map<String, json::Value>, i64, Option<u64>);
@@ -114,8 +123,10 @@ struct ColumnarStream {
     schema_key: String,
     columns: Vec<MetricColumn>,
     col_index: HashMap<String, usize>,
-    /// Hour partitions are few per request, so a scan beats hashing the timestamp.
-    buckets: Vec<(i64, ColumnarBucket)>,
+    /// A backfill can span any number of hours, and foldhash keeps an i64 lookup cheap.
+    buckets: hashbrown::HashMap<i64, ColumnarBucket>,
+    /// The widest record this stream's schema can hold, which bounds a series' label count.
+    max_labels: usize,
     /// Scratch reused across the samples of a request, not state.
     label_cols: Vec<usize>,
     present: Vec<bool>,
@@ -136,6 +147,27 @@ impl HaGate<'_> {
         }
         *self.first_line = false;
         run_ha_election(self.cluster_name, self.replica_label, self.interval).await
+    }
+}
+
+impl ColumnarBucket {
+    fn for_hour(schema: &Arc<Schema>, schema_key: &str, timestamp: i64) -> Self {
+        Self {
+            partition_key: crate::ingestion::get_write_partition_key(
+                timestamp,
+                &Vec::new(),
+                get_partition_time_level(StreamType::Metrics),
+                &json::Map::new(),
+                Some(schema_key),
+            ),
+            builders: schema
+                .fields()
+                .iter()
+                .map(|f| make_builder(f.data_type(), BUILDER_START_ROWS))
+                .collect(),
+            rows: 0,
+            json_size: 0,
+        }
     }
 }
 
@@ -179,72 +211,60 @@ impl ColumnarStream {
             schema_key,
             columns,
             col_index,
-            buckets: Vec::with_capacity(1),
+            buckets: hashbrown::HashMap::with_capacity(1),
+            // a record adds `value`, `_timestamp` and `__hash__` to the series' labels
+            max_labels: get_config()
+                .limit
+                .req_cols_per_record_limit
+                .saturating_sub(IDENTITY_COLUMNS),
             label_cols: Vec::new(),
             present,
         })
     }
 
-    /// `false` when a label owns no column of its own, which sends the series down the JSON path.
-    fn resolve_columns(&mut self, labels: &[(String, String)]) -> bool {
+    /// `None` sends the series down the JSON path; `Some` is its share of the record's json size.
+    fn resolve_columns(&mut self, labels: &[(String, String)]) -> Option<usize> {
+        // over the column limit the JSON path has to reject it, so it cannot be taken here
+        if labels.len() > self.max_labels {
+            return None;
+        }
         self.label_cols.clear();
         // two label names can format to one column, and a label can be named `value`
         self.present.fill(false);
         for (name, _) in labels {
-            let Some(&idx) = self.col_index.get(name) else {
-                return false;
-            };
+            let &idx = self.col_index.get(name)?;
             if !matches!(self.columns[idx], MetricColumn::Label) || self.present[idx] {
-                return false;
+                return None;
             }
             self.present[idx] = true;
             self.label_cols.push(idx);
         }
-        true
+        Some(estimated_label_bytes(labels))
     }
 
-    fn bucket_for(&mut self, timestamp: i64) -> usize {
+    /// `resolve_columns` must have accepted these labels first, and returned `label_bytes`.
+    fn append(
+        &mut self,
+        labels: &[(String, String)],
+        label_bytes: usize,
+        value: f64,
+        timestamp: i64,
+        hash: u64,
+    ) {
         let hour = timestamp.div_euclid(MICROS_PER_HOUR);
-        if let Some(idx) = self.buckets.iter().position(|(h, _)| *h == hour) {
-            return idx;
-        }
-        let partition_key = crate::ingestion::get_write_partition_key(
-            timestamp,
-            &Vec::new(),
-            get_partition_time_level(StreamType::Metrics),
-            &json::Map::new(),
-            Some(&self.schema_key),
-        );
-        let builders = self
-            .schema
-            .fields()
-            .iter()
-            .map(|f| make_builder(f.data_type(), BUILDER_START_ROWS))
-            .collect();
-        self.buckets.push((
-            hour,
-            ColumnarBucket {
-                partition_key,
-                builders,
-                rows: 0,
-                json_size: 0,
-            },
-        ));
-        self.buckets.len() - 1
-    }
-
-    /// `resolve_columns` must have accepted these labels first.
-    fn append(&mut self, labels: &[(String, String)], value: f64, timestamp: i64, hash: u64) {
-        let idx = self.bucket_for(timestamp);
-        let size = estimated_record_bytes(labels, value, timestamp, hash);
+        let size = estimated_record_bytes(label_bytes, value, timestamp, hash);
         let Self {
+            schema,
+            schema_key,
             buckets,
             columns,
             label_cols,
             present,
             ..
         } = self;
-        let bucket = &mut buckets[idx].1;
+        let bucket = buckets
+            .entry(hour)
+            .or_insert_with(|| ColumnarBucket::for_hour(schema, schema_key, timestamp));
         present.fill(false);
         for (col, (_, label)) in label_cols.iter().zip(labels) {
             string_builder(&mut bucket.builders[*col]).append_value(label);
@@ -280,7 +300,7 @@ impl ColumnarStream {
 
     fn into_entries(self, org_id: &str, stream_name: &str) -> Result<Vec<ingester::Entry>> {
         let mut entries = Vec::with_capacity(self.buckets.len());
-        for (_, mut bucket) in self.buckets {
+        for mut bucket in self.buckets.into_values() {
             if bucket.rows == 0 {
                 continue;
             }
@@ -543,6 +563,8 @@ pub async fn remote_write(
         let mut replica_label = String::new();
 
         let mut label_pairs: Vec<(String, String)> = Vec::with_capacity(event.labels.len());
+        // allocated only for a series wide enough that `push_label`'s scan would go quadratic
+        let mut label_index: HashMap<String, usize> = HashMap::new();
         for label in event.labels.drain(..) {
             if label.name == cfg.prom.ha_replica_label {
                 replica_label = label.value;
@@ -556,6 +578,7 @@ pub async fn remote_write(
             }
             push_label(
                 &mut label_pairs,
+                &mut label_index,
                 format_label_name_owned(label.name),
                 label.value,
             );
@@ -613,7 +636,7 @@ pub async fn remote_write(
         // a label the schema has not seen goes down the JSON path, which evolves the schema
         if event.histograms.is_empty()
             && let Some(columnar) = columnar_streams.get_mut(&metric_name)
-            && columnar.resolve_columns(&label_pairs)
+            && let Some(label_bytes) = columnar.resolve_columns(&label_pairs)
         {
             sample_count += event.samples.len();
             // no iterator may live across this await, or the handler loses axum's `Handler` bound
@@ -628,7 +651,7 @@ pub async fn remote_write(
             for sample in &event.samples {
                 if let Some(value) = super::sanitize_metric_value(sample.value) {
                     let timestamp = parse_i64_to_timestamp_micros(sample.timestamp);
-                    columnar.append(&label_pairs, value, timestamp, series_hash);
+                    columnar.append(&label_pairs, label_bytes, value, timestamp, series_hash);
                 }
             }
             continue;
@@ -1532,30 +1555,77 @@ fn plan_columnar_streams(
     columnar_streams
 }
 
+/// `check_for_schema` applies the column limit to the batch's merged schema, not to one record.
+fn check_columns_per_record(
+    org_id: &str,
+    stream_name: &str,
+    json_data: &[PendingRecord],
+) -> Result<()> {
+    let limit = get_config().limit.req_cols_per_record_limit;
+    for (val_map, ..) in json_data {
+        // a column count never exceeds the entry count, so the cheap bound settles most records
+        if val_map.len() <= limit {
+            continue;
+        }
+        let columns = val_map
+            .iter()
+            .filter(|(key, value)| inferred_column_type(key, value).is_some())
+            .count();
+        check_request_columns_limit(org_id, StreamType::Metrics, stream_name, columns)?;
+    }
+    Ok(())
+}
+
 /// Replaces an earlier label of the same formatted name, exactly as the JSON map does.
-fn push_label(label_pairs: &mut Vec<(String, String)>, name: String, value: String) {
-    match label_pairs
-        .iter_mut()
-        .find(|(existing, _)| *existing == name)
-    {
-        Some((_, existing)) => *existing = value,
-        None => label_pairs.push((name, value)),
+fn push_label(
+    label_pairs: &mut Vec<(String, String)>,
+    index: &mut HashMap<String, usize>,
+    name: String,
+    value: String,
+) {
+    if label_pairs.len() < LABEL_INDEX_THRESHOLD {
+        match label_pairs
+            .iter_mut()
+            .find(|(existing, _)| *existing == name)
+        {
+            Some((_, existing)) => *existing = value,
+            None => label_pairs.push((name, value)),
+        }
+        return;
+    }
+    // a seeded index holds every label, so empty past the threshold means not seeded yet
+    if index.is_empty() {
+        index.extend(
+            label_pairs
+                .iter()
+                .enumerate()
+                .map(|(idx, (existing, _))| (existing.clone(), idx)),
+        );
+    }
+    match index.get(&name) {
+        Some(&idx) => label_pairs[idx].1 = value,
+        None => {
+            index.insert(name.clone(), label_pairs.len());
+            label_pairs.push((name, value));
+        }
     }
 }
 
+/// The label half of what `estimate_json_bytes` counts, shared by every sample of a series.
+fn estimated_label_bytes(labels: &[(String, String)]) -> usize {
+    labels
+        .iter()
+        .filter(|(name, _)| !is_size_excluded_column(name))
+        .map(|(name, label)| estimate_json_entry_bytes(name, label.json_bytes()))
+        .sum()
+}
+
 /// What `estimate_json_bytes` would count for this record, without building it.
-fn estimated_record_bytes(
-    labels: &[(String, String)],
-    value: f64,
-    timestamp: i64,
-    hash: u64,
-) -> usize {
-    let mut entries = estimate_json_entry_bytes(VALUE_LABEL, value.json_bytes())
+fn estimated_record_bytes(label_bytes: usize, value: f64, timestamp: i64, hash: u64) -> usize {
+    let entries = label_bytes
+        + estimate_json_entry_bytes(VALUE_LABEL, value.json_bytes())
         + estimate_json_entry_bytes(TIMESTAMP_COL_NAME, timestamp.json_bytes())
         + estimate_json_entry_bytes(HASH_LABEL, hash.json_bytes());
-    for (name, label) in labels {
-        entries += estimate_json_entry_bytes(name, label.json_bytes());
-    }
     // {?} extra 2, less the ',' the entry rule counts for the last entry
     2 + entries - 1
 }
@@ -1623,6 +1693,7 @@ async fn resolve_batch_schema(
     json_data: &[PendingRecord],
     has_uds: bool,
 ) -> Result<(Arc<Schema>, String)> {
+    check_columns_per_record(org_id, stream_name, json_data)?;
     let schema_fields: HashMap<&str, &DataType> = match metric_schema_map.get(stream_name) {
         Some(schema) => schema
             .schema()
@@ -2181,8 +2252,8 @@ mod tests {
             ("instance".to_string(), "host-1".to_string()),
         ];
 
-        assert!(columnar.resolve_columns(&labels));
-        columnar.append(&labels, 1.5, 1_700_000_000_000_000, 42);
+        let label_bytes = columnar.resolve_columns(&labels).unwrap();
+        columnar.append(&labels, label_bytes, 1.5, 1_700_000_000_000_000, 42);
         let entries = columnar.into_entries("nexus", "http_requests").unwrap();
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0].batch.as_ref().unwrap().num_rows(), 1);
@@ -2199,7 +2270,7 @@ mod tests {
             ("foo_bar".to_string(), "b".to_string()),
         ];
 
-        assert!(!columnar.resolve_columns(&labels));
+        assert!(columnar.resolve_columns(&labels).is_none());
     }
 
     #[test]
@@ -2212,16 +2283,18 @@ mod tests {
                 (NAME_LABEL.to_string(), "http_requests".to_string()),
                 (taken.to_string(), "x".to_string()),
             ];
-            assert!(!columnar.resolve_columns(&labels), "{taken}");
+            assert!(columnar.resolve_columns(&labels).is_none(), "{taken}");
         }
     }
 
     #[test]
     fn test_push_label_collapses_formatted_collisions_like_the_json_map() {
         let mut label_pairs: Vec<(String, String)> = Vec::new();
+        let mut label_index = HashMap::new();
         for (name, value) in [("__name__", "m"), ("foo.bar", "a"), ("foo-bar", "b")] {
             push_label(
                 &mut label_pairs,
+                &mut label_index,
                 format_label_name_owned(name.to_string()),
                 value.to_string(),
             );
@@ -2242,6 +2315,116 @@ mod tests {
         assert_eq!(
             crate::metrics::signature_of_series_labels(&label_pairs),
             crate::metrics::signature_without_labels(&record, &[VALUE_LABEL])
+        );
+    }
+
+    #[test]
+    fn test_estimated_record_bytes_matches_the_json_path_on_the_same_record() {
+        let (value, timestamp, hash) = (1.5_f64, 1_700_000_000_000_000_i64, 42_u64);
+        let labels = vec![
+            (NAME_LABEL.to_string(), "http_requests".to_string()),
+            ("instance".to_string(), "a\"b\\c".to_string()),
+            // estimate_json_bytes leaves these out, so the columnar estimate has to leave them out
+            (config::ORIGINAL_DATA_COL_NAME.to_string(), "x".repeat(4096)),
+            (config::ALL_VALUES_COL_NAME.to_string(), "y".repeat(512)),
+        ];
+
+        let mut map = json::Map::new();
+        for (name, label) in &labels {
+            map.insert(name.clone(), json::Value::String(label.clone()));
+        }
+        let mut record = build_metric_record(map, value, timestamp);
+        record.insert(HASH_LABEL.to_string(), json::json!(hash));
+
+        assert_eq!(
+            estimated_record_bytes(estimated_label_bytes(&labels), value, timestamp, hash),
+            estimate_json_bytes(&json::Value::Object(record))
+        );
+    }
+
+    #[test]
+    fn test_push_label_collapses_collisions_past_the_index_threshold() {
+        let mut label_pairs: Vec<(String, String)> = Vec::new();
+        let mut label_index = HashMap::new();
+        let width = LABEL_INDEX_THRESHOLD + 8;
+        for i in 0..width {
+            push_label(
+                &mut label_pairs,
+                &mut label_index,
+                format!("label_{i}"),
+                format!("v{i}"),
+            );
+        }
+        let seeded_before = format!("label_{}", LABEL_INDEX_THRESHOLD - 4);
+        let seeded_after = format!("label_{}", LABEL_INDEX_THRESHOLD + 4);
+        for name in [&seeded_before, &seeded_after] {
+            push_label(
+                &mut label_pairs,
+                &mut label_index,
+                name.clone(),
+                "last".to_string(),
+            );
+        }
+
+        // a repeat on either side of the threshold overwrites in place, as the scan alone would
+        assert_eq!(label_pairs.len(), width);
+        assert_eq!(
+            label_pairs[LABEL_INDEX_THRESHOLD - 4],
+            (seeded_before, "last".to_string())
+        );
+        assert_eq!(
+            label_pairs[LABEL_INDEX_THRESHOLD + 4],
+            (seeded_after, "last".to_string())
+        );
+    }
+
+    #[test]
+    fn test_columns_per_record_rejects_only_a_record_over_the_limit() {
+        let limit = get_config().limit.req_cols_per_record_limit;
+        let record = |columns: usize| {
+            let mut map = json::Map::new();
+            for i in 0..columns {
+                map.insert(format!("label_{i}"), json::json!("v"));
+            }
+            (map, 1_i64, None)
+        };
+
+        let narrow = vec![record(limit), record(limit)];
+        assert!(check_columns_per_record("org", "m", &narrow).is_ok());
+
+        let wide = vec![record(limit + 1)];
+        assert!(check_columns_per_record("org", "m", &wide).is_err());
+
+        // a null claims no column, so it cannot push a record over the limit
+        let mut padded = record(limit);
+        padded.0.insert("spare".to_string(), json::Value::Null);
+        assert!(check_columns_per_record("org", "m", &[padded]).is_ok());
+    }
+
+    #[test]
+    fn test_columnar_path_declines_a_series_wider_than_the_column_limit() {
+        let limit = get_config().limit.req_cols_per_record_limit;
+        let names: Vec<String> = (0..limit).map(|i| format!("label_{i}")).collect();
+        let schema = columnar_schema(&names.iter().map(String::as_str).collect::<Vec<_>>());
+        let mut columnar = ColumnarStream::for_schema(&schema).unwrap();
+        let series = |count: usize| -> Vec<(String, String)> {
+            names[..count]
+                .iter()
+                .map(|name| (name.clone(), "v".to_string()))
+                .collect()
+        };
+
+        // the widest record the limit allows still carries the three identity columns
+        assert!(
+            columnar
+                .resolve_columns(&series(limit - IDENTITY_COLUMNS))
+                .is_some()
+        );
+        // one label more and the JSON path would reject the record, so the fast path declines it
+        assert!(
+            columnar
+                .resolve_columns(&series(limit - IDENTITY_COLUMNS + 1))
+                .is_none()
         );
     }
 
@@ -2321,9 +2504,9 @@ mod tests {
         let schema_key = columnar.schema_key.clone();
         let labels = vec![(NAME_LABEL.to_string(), "http_requests".to_string())];
         let timestamps = [-3_601_000_000_i64, -1_000_000, 1_000_000];
-        assert!(columnar.resolve_columns(&labels));
+        let label_bytes = columnar.resolve_columns(&labels).unwrap();
         for ts in timestamps {
-            columnar.append(&labels, 1.0, ts, 42);
+            columnar.append(&labels, label_bytes, 1.0, ts, 42);
         }
 
         let entries = columnar.into_entries("nexus", "http_requests").unwrap();

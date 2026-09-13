@@ -18,6 +18,42 @@ pub use serde_json::{
     Error, Map, Number, Value, from_slice, from_str, from_value, json, to_string, to_value, to_vec,
 };
 
+/// Bytes this value occupies in a JSON document, counted as `estimate_json_bytes` counts it.
+pub trait JsonBytesExt {
+    fn json_bytes(&self) -> usize;
+}
+
+impl JsonBytesExt for i64 {
+    fn json_bytes(&self) -> usize {
+        itoa::Buffer::new().format(*self).len()
+    }
+}
+
+impl JsonBytesExt for u64 {
+    fn json_bytes(&self) -> usize {
+        itoa::Buffer::new().format(*self).len()
+    }
+}
+
+impl JsonBytesExt for f64 {
+    fn json_bytes(&self) -> usize {
+        // serde_json has no non-finite float; it renders one as null
+        if !self.is_finite() {
+            return 4;
+        }
+        let mut buffer = ryu::Buffer::new();
+        let rendered = buffer.format(*self);
+        // serde_json writes a positive exponent with an explicit '+', ryu does not
+        rendered.len() + usize::from(rendered.contains('e') && !rendered.contains("e-"))
+    }
+}
+
+impl JsonBytesExt for str {
+    fn json_bytes(&self) -> usize {
+        json_string_bytes(self)
+    }
+}
+
 pub fn get_float_value(val: &Value) -> f64 {
     match val {
         Value::String(v) => v.parse::<f64>().unwrap_or(0.0),
@@ -90,53 +126,9 @@ pub fn pickup_string_value(val: Value) -> String {
     }
 }
 
-/// Bytes this value occupies in a JSON document, counted as `estimate_json_bytes` counts it.
-pub trait JsonBytesExt {
-    fn json_bytes(&self) -> usize;
-}
-
-impl JsonBytesExt for i64 {
-    fn json_bytes(&self) -> usize {
-        itoa::Buffer::new().format(*self).len()
-    }
-}
-
-impl JsonBytesExt for u64 {
-    fn json_bytes(&self) -> usize {
-        itoa::Buffer::new().format(*self).len()
-    }
-}
-
-impl JsonBytesExt for f64 {
-    fn json_bytes(&self) -> usize {
-        // serde_json has no non-finite float; it renders one as null
-        if !self.is_finite() {
-            return 4;
-        }
-        let mut buffer = ryu::Buffer::new();
-        let rendered = buffer.format(*self);
-        // serde_json writes a positive exponent with an explicit '+', ryu does not
-        rendered.len() + usize::from(rendered.contains('e') && !rendered.contains("e-"))
-    }
-}
-
-impl JsonBytesExt for str {
-    fn json_bytes(&self) -> usize {
-        json_string_bytes(self)
-    }
-}
-
-fn json_string_bytes(s: &str) -> usize {
-    let (quote_count, slash_count) =
-        s.bytes()
-            .fold((0usize, 0usize), |(quote_count, slash_count), b| {
-                (
-                    quote_count + usize::from(b == b'"'),
-                    slash_count + usize::from(b == b'\\'),
-                )
-            });
-    // "?"=>2
-    s.len() + 2 + quote_count + slash_count
+/// Columns `estimate_json_bytes` leaves out of the size it reports.
+pub fn is_size_excluded_column(key: &str) -> bool {
+    key == crate::ORIGINAL_DATA_COL_NAME || key == crate::ALL_VALUES_COL_NAME
 }
 
 /// Bytes `estimate_json_bytes` counts for one `"key":value,` entry of an object.
@@ -152,7 +144,7 @@ pub fn estimate_json_bytes(val: &Value) -> usize {
             // {?} extra 2
             size += 2;
             for (k, v) in map {
-                if k == crate::ORIGINAL_DATA_COL_NAME || k == crate::ALL_VALUES_COL_NAME {
+                if is_size_excluded_column(k) {
                     continue;
                 }
                 size += estimate_json_entry_bytes(k, estimate_json_bytes(v));
@@ -228,8 +220,22 @@ pub fn get_value_from_path(value: &Value, path: &str) -> Option<Value> {
     }
 }
 
+fn json_string_bytes(s: &str) -> usize {
+    let (quote_count, slash_count) =
+        s.bytes()
+            .fold((0usize, 0usize), |(quote_count, slash_count), b| {
+                (
+                    quote_count + usize::from(b == b'"'),
+                    slash_count + usize::from(b == b'\\'),
+                )
+            });
+    // "?"=>2
+    s.len() + 2 + quote_count + slash_count
+}
+
 #[cfg(test)]
 mod tests {
+    use super::*;
 
     #[test]
     fn test_json_bytes_agrees_with_estimate_json_bytes() {
@@ -271,8 +277,6 @@ mod tests {
             assert_eq!(s.json_bytes(), estimate_json_bytes(&json!(s)), "str {s:?}");
         }
     }
-    use super::*;
-
     #[test]
     fn test_get_path_simple() {
         // simple extraction with .

@@ -81,6 +81,30 @@ pub fn get_request_columns_limit_error(stream_name: &str, num_fields: usize) -> 
     )
 }
 
+/// The `ZO_COLS_PER_RECORD_LIMIT` rule, with the ingest-error counter the rejection is counted by.
+pub fn check_request_columns_limit(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    num_fields: usize,
+) -> Result<(), anyhow::Error> {
+    if num_fields <= get_config().limit.req_cols_per_record_limit {
+        return Ok(());
+    }
+    metrics::INGEST_ERRORS
+        .with_label_values(&[
+            org_id,
+            stream_type.as_str(),
+            stream_name,
+            SCHEMA_CONFORMANCE_FAILED,
+        ])
+        .inc();
+    Err(get_request_columns_limit_error(
+        &format!("{org_id}/{stream_type}/{stream_name}"),
+        num_fields,
+    ))
+}
+
 #[derive(Debug)]
 pub enum StreamSettingsError {
     StreamDeleting(String),
@@ -419,7 +443,6 @@ pub async fn check_for_schema(
         let schema = infra::schema::get_cache(org_id, stream_name, stream_type).await?;
         stream_schema_map.insert(stream_name.to_string(), schema);
     }
-    let cfg = get_config();
     let schema = stream_schema_map.get(stream_name).unwrap();
 
     // get infer schema
@@ -437,20 +460,12 @@ pub async fn check_for_schema(
         ));
     }
 
-    if inferred_schema.fields.len() > cfg.limit.req_cols_per_record_limit {
-        metrics::INGEST_ERRORS
-            .with_label_values(&[
-                org_id,
-                stream_type.as_str(),
-                stream_name,
-                SCHEMA_CONFORMANCE_FAILED,
-            ])
-            .inc();
-        return Err(get_request_columns_limit_error(
-            &format!("{org_id}/{stream_type}/{stream_name}"),
-            inferred_schema.fields.len(),
-        ));
-    }
+    check_request_columns_limit(
+        org_id,
+        stream_type,
+        stream_name,
+        inferred_schema.fields.len(),
+    )?;
 
     let mut need_insert_new_latest = false;
     let is_new = schema.schema().fields().is_empty();
