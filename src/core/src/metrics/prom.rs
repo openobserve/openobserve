@@ -40,7 +40,7 @@ use config::{
         },
         schema::format_stream_name,
         schema_ext::SchemaExt,
-        time::{now_micros, parse_i64_to_timestamp_micros},
+        time::{HOUR_MICRO_SECS, now_micros, parse_i64_to_timestamp_micros},
     },
 };
 use datafusion::arrow::{
@@ -77,9 +77,6 @@ use crate::{
     },
     pipeline::batch_execution::ExecutablePipeline,
 };
-
-/// Metrics partition hourly, so a record's hour is also its partition.
-const MICROS_PER_HOUR: i64 = 3_600_000_000;
 
 const BUILDER_START_ROWS: usize = 16;
 
@@ -251,7 +248,8 @@ impl ColumnarStream {
         timestamp: i64,
         hash: u64,
     ) {
-        let hour = timestamp.div_euclid(MICROS_PER_HOUR);
+        // metrics partition hourly, so a record's hour is also its partition
+        let hour = timestamp.div_euclid(HOUR_MICRO_SECS);
         let size = estimated_record_bytes(label_bytes, value, timestamp, hash);
         let Self {
             schema,
