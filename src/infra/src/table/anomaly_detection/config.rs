@@ -258,6 +258,7 @@ fn patch_all_fields(active: &mut anomaly_detection_config::ActiveModel, src: Mod
     active.training_window_days = Set(src.training_window_days);
     active.retrain_interval_days = Set(src.retrain_interval_days);
     active.threshold = Set(src.threshold);
+    active.alert_budget_per_day = Set(src.alert_budget_per_day);
     active.seasonality = Set(src.seasonality);
     active.is_trained = Set(src.is_trained);
     active.training_started_at = Set(src.training_started_at);
@@ -280,6 +281,8 @@ fn patch_all_fields(active: &mut anomaly_detection_config::ActiveModel, src: Mod
     // last_failed_at is NOT patched: a replicated anchor can only corrupt the local backoff.
     // last_alert_fired_at is NOT patched either: each region alerts to its own
     // destinations, so a peer's fire time must not suppress a local alert.
+    // last_recovery_notified_at is NOT patched, for the same reason one step later: a peer's
+    // pending mark would recover an alert this region's destinations never received.
 }
 
 /// Collapses the `filters` shapes that mean "no filters" to NULL, on every model-based write.
@@ -298,6 +301,7 @@ fn into_active_model(mut m: Model) -> anomaly_detection_config::ActiveModel {
     m.retries = 0;
     m.last_failed_at = None;
     m.last_alert_fired_at = None;
+    m.last_recovery_notified_at = None;
     // For inserts the PK must be Set (it is not auto-increment).
     // `into_active_model()` sets every field including PK as Set, which is
     // correct for INSERT — only UPDATE requires the PK to be Unchanged.
@@ -339,6 +343,7 @@ mod tests {
             training_window_days: 7,
             retrain_interval_days: 1,
             threshold: 95,
+            alert_budget_per_day: None,
             seasonality: "none".to_string(),
             is_trained: false,
             training_started_at: None,
@@ -359,6 +364,7 @@ mod tests {
             retries: 0,
             last_failed_at: None,
             last_alert_fired_at: None,
+            last_recovery_notified_at: None,
             last_updated: 0,
             created_at: 1_000_000,
             updated_at: 1_000_000,
@@ -489,6 +495,26 @@ mod tests {
         assert_eq!(active.detection_function.unwrap(), "zscore");
     }
 
+    /// The budget is user-authored sensitivity config, so a peer's value must replicate —
+    /// in both directions, including back to NULL (budget cleared = percentile mode).
+    #[test]
+    fn test_patch_all_fields_replicates_the_alert_budget() {
+        let original = make_model("anom-1", "org");
+        let mut active = original.into_active_model();
+        let mut replacement = make_model("anom-1", "org");
+        replacement.alert_budget_per_day = Some(1.0 / 7.0);
+        patch_all_fields(&mut active, replacement);
+        assert_eq!(
+            active.alert_budget_per_day.clone().unwrap(),
+            Some(1.0 / 7.0)
+        );
+
+        let mut cleared = make_model("anom-1", "org");
+        cleared.alert_budget_per_day = None;
+        patch_all_fields(&mut active, cleared);
+        assert_eq!(active.alert_budget_per_day.unwrap(), None);
+    }
+
     /// A peer's ConfigUpdate must not move this region's retry anchor: it never trained.
     #[test]
     fn test_patch_all_fields_leaves_last_failed_at_alone() {
@@ -546,6 +572,7 @@ mod tests {
             training_window_days,
             retrain_interval_days,
             threshold,
+            alert_budget_per_day,
             seasonality,
             is_trained,
             training_started_at,
@@ -566,6 +593,7 @@ mod tests {
             retries,
             last_failed_at,
             last_alert_fired_at,
+            last_recovery_notified_at,
             last_updated,
             created_at,
             updated_at,
@@ -588,6 +616,8 @@ mod tests {
             ("training_window_days", Scope::Replicated),
             ("retrain_interval_days", Scope::Replicated),
             ("threshold", Scope::Replicated),
+            // User-authored sensitivity config like `threshold`; peers must read the same budget.
+            ("alert_budget_per_day", Scope::Replicated),
             ("seasonality", Scope::Replicated),
             ("is_trained", Scope::Replicated),
             ("training_started_at", Scope::Replicated),
@@ -612,6 +642,9 @@ mod tests {
             ("last_failed_at", Scope::RegionLocal),
             // P0.3: one region's alert must never silence another region's cooldown.
             ("last_alert_fired_at", Scope::RegionLocal),
+            // Pending state for an alert this region delivered; a peer's mark would recover
+            // an alert local destinations never received, or cancel one they did.
+            ("last_recovery_notified_at", Scope::RegionLocal),
             ("last_updated", Scope::Replicated),
             ("created_at", Scope::Immutable),
             ("updated_at", Scope::Replicated),
@@ -638,6 +671,7 @@ mod tests {
             training_window_days: 30,
             retrain_interval_days: 7,
             threshold: 99,
+            alert_budget_per_day: Some(2.0),
             seasonality: "daily".to_string(),
             is_trained: true,
             training_started_at: Some(11),
@@ -658,6 +692,7 @@ mod tests {
             retries: 7,
             last_failed_at: Some(1_700_000_000_000_001),
             last_alert_fired_at: Some(1_700_000_000_000_002),
+            last_recovery_notified_at: Some(1_700_000_000_000_003),
             last_updated: 21,
             created_at: 9_999_999,
             updated_at: 22,
@@ -684,6 +719,7 @@ mod tests {
         local.retries = 2;
         local.last_failed_at = Some(1_700_000_000_000_900);
         local.last_alert_fired_at = Some(1_700_000_000_000_800);
+        local.last_recovery_notified_at = Some(1_700_000_000_000_700);
         let peer = peer_model();
 
         let mut active = local.clone().into_active_model();
@@ -715,7 +751,13 @@ mod tests {
                     // Without this the label is free parking: any column relabelled here would
                     // stop replicating with a green suite.
                     assert!(
-                        matches!(field, "retries" | "last_failed_at" | "last_alert_fired_at"),
+                        matches!(
+                            field,
+                            "retries"
+                                | "last_failed_at"
+                                | "last_alert_fired_at"
+                                | "last_recovery_notified_at"
+                        ),
                         "{field} was relabelled region-local; that is a replication change"
                     );
                     assert_eq!(
@@ -799,12 +841,14 @@ mod tests {
         local.retries = 5;
         local.last_failed_at = Some(1_700_000_000_000_000);
         local.last_alert_fired_at = Some(1_700_000_000_000_100);
+        local.last_recovery_notified_at = Some(1_700_000_000_000_200);
         let mut active = local.into_active_model();
 
         let mut peer = make_model("anom-1", "org");
         peer.retries = 0;
         peer.last_failed_at = None;
         peer.last_alert_fired_at = None;
+        peer.last_recovery_notified_at = None;
         patch_all_fields(&mut active, peer);
 
         assert_eq!(active.retries.unwrap(), 5);
@@ -812,6 +856,10 @@ mod tests {
         assert_eq!(
             active.last_alert_fired_at.unwrap(),
             Some(1_700_000_000_000_100)
+        );
+        assert_eq!(
+            active.last_recovery_notified_at.unwrap(),
+            Some(1_700_000_000_000_200)
         );
     }
 
@@ -850,9 +898,35 @@ mod tests {
         m.retries = 6;
         m.last_failed_at = Some(1_700_000_000_000_000);
         m.last_alert_fired_at = Some(1_700_000_000_000_100);
+        m.last_recovery_notified_at = Some(1_700_000_000_000_200);
         let active = into_active_model(m);
         assert_eq!(active.retries.unwrap(), 0);
         assert_eq!(active.last_failed_at.unwrap(), None);
         assert_eq!(active.last_alert_fired_at.unwrap(), None);
+        assert_eq!(active.last_recovery_notified_at.unwrap(), None);
+    }
+
+    /// Both directions: a peer can neither arm a recovery this region never delivered nor
+    /// clear one it still owes.
+    #[test]
+    fn test_patch_all_fields_leaves_last_recovery_notified_at_alone() {
+        let mut local = make_model("anom-1", "org");
+        local.last_recovery_notified_at = None;
+        let mut active = local.into_active_model();
+        let mut peer = make_model("anom-1", "org");
+        peer.last_recovery_notified_at = Some(1_700_000_000_000_000);
+        patch_all_fields(&mut active, peer);
+        assert_eq!(active.last_recovery_notified_at.unwrap(), None);
+
+        let mut local = make_model("anom-1", "org");
+        local.last_recovery_notified_at = Some(1_700_000_000_000_500);
+        let mut active = local.into_active_model();
+        let mut peer = make_model("anom-1", "org");
+        peer.last_recovery_notified_at = None;
+        patch_all_fields(&mut active, peer);
+        assert_eq!(
+            active.last_recovery_notified_at.unwrap(),
+            Some(1_700_000_000_000_500)
+        );
     }
 }

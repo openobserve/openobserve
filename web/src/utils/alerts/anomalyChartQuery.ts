@@ -32,6 +32,25 @@ export const ANOMALY_FLAGGED_ALIAS = "anomaly_value";
 export const ANOMALY_SCORE_ALIAS = "score_value";
 export const ANOMALY_THRESHOLD_ALIAS = "threshold_value";
 export const ANOMALY_DEVIATION_ALIAS = "deviation_value";
+export const ANOMALY_DROP_ALIAS = "drop_value";
+export const ANOMALY_EXPECTED_ALIAS = "expected_value";
+
+/** Which of the optional per-kind record fields exist in the `_anomalies`
+ *  stream's schema. Referencing a column the stream has never seen fails the
+ *  whole query ("No field named …"), so each one is opt-in; and a column that
+ *  is absent also PROVES no record of that kind exists, so omitting its
+ *  predicate is exact, not approximate. */
+export interface AnomalyKindColumns {
+  isAbsence: boolean;
+  isPartialDrop: boolean;
+  expectedValue: boolean;
+}
+
+export const NO_KIND_COLUMNS: AnomalyKindColumns = {
+  isAbsence: false,
+  isPartialDrop: false,
+  expectedValue: false,
+};
 
 /** `histogram()`'s interval grammar, as the config stores it ("5m", "1h"). */
 const INTERVAL_PATTERN = /^\d+[smhd]$/;
@@ -73,13 +92,20 @@ function buildQuery(
  *  lands exactly on blue. Maxing `actual_value` over the flagged rows alone
  *  reads a different row whenever a bucket holds several — one flagged, one
  *  not — and plots the overlay BELOW the metric it is supposed to mark. */
-export function buildAnomalyMetricQuery(anomalyId?: string, interval?: string): string | null {
+export function buildAnomalyMetricQuery(
+  anomalyId?: string,
+  interval?: string,
+  kinds: AnomalyKindColumns = NO_KIND_COLUMNS,
+): string | null {
+  // Older records carry no expected_value; max() over NULLs gaps the line there.
+  const expected = kinds.expectedValue ? `, max(expected_value) AS ${ANOMALY_EXPECTED_ALIAS}` : "";
   return buildQuery(
     anomalyId,
     interval,
     `max(actual_value) AS ${ANOMALY_VALUE_ALIAS}, ` +
       `CASE WHEN max(CASE WHEN is_anomaly THEN 1 ELSE 0 END) = 1 ` +
-      `THEN max(actual_value) END AS ${ANOMALY_FLAGGED_ALIAS}`,
+      `THEN max(actual_value) END AS ${ANOMALY_FLAGGED_ALIAS}` +
+      expected,
   );
 }
 
@@ -94,7 +120,30 @@ export function buildAnomalyScoreQuery(anomalyId?: string, interval?: string): s
 }
 
 /** Bars, not a line: the writer stores zero for every non-anomalous bucket, so
- *  a line through the flat baseline would imply a trend that is not there. */
-export function buildAnomalyDeviationQuery(anomalyId?: string, interval?: string): string | null {
-  return buildQuery(anomalyId, interval, `max(deviation_percent) AS ${ANOMALY_DEVIATION_ALIAS}`);
+ *  a line through the flat baseline would imply a trend that is not there.
+ *
+ *  `deviation_percent` means a different thing per record kind — score-space %
+ *  over the bar for scored points, value-space % below the slot median for
+ *  partial drops, and a constant 100.0 sentinel for absence — so one
+ *  max() across kinds compares numbers from different spaces. Split: scored
+ *  rows keep the deviation series, drops get their own, absence (a sentinel,
+ *  not a measurement) is excluded. `IS NOT TRUE` keeps legacy rows, which
+ *  predate both flags and are all score-space, in the scored series. */
+export function buildAnomalyDeviationQuery(
+  anomalyId?: string,
+  interval?: string,
+  kinds: AnomalyKindColumns = NO_KIND_COLUMNS,
+): string | null {
+  const scoredOnly = [
+    ...(kinds.isAbsence ? ["is_absence IS NOT TRUE"] : []),
+    ...(kinds.isPartialDrop ? ["is_partial_drop IS NOT TRUE"] : []),
+  ];
+  const scored = scoredOnly.length
+    ? `max(CASE WHEN ${scoredOnly.join(" AND ")} THEN deviation_percent END) ` +
+      `AS ${ANOMALY_DEVIATION_ALIAS}`
+    : `max(deviation_percent) AS ${ANOMALY_DEVIATION_ALIAS}`;
+  const drop = kinds.isPartialDrop
+    ? `, max(CASE WHEN is_partial_drop IS TRUE THEN deviation_percent END) AS ${ANOMALY_DROP_ALIAS}`
+    : "";
+  return buildQuery(anomalyId, interval, scored + drop);
 }

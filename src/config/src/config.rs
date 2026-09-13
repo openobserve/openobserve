@@ -63,7 +63,8 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 77: create status_pages tables and status_page_custom_domains.
 // 78: alert pending period cols
 // 79: anomaly_detection_config retries reset, last_failed_at, last_alert_fired_at
-pub const DB_SCHEMA_VERSION: u64 = 79;
+// 80: anomaly_detection_config alert_budget_per_day, last_recovery_notified_at
+pub const DB_SCHEMA_VERSION: u64 = 80;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables

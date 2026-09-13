@@ -45,6 +45,47 @@ const ERROR_VOCABULARY: [&str; 6] = ["error", "errors", "fatal", "critical", "5x
 /// but it has legitimate standalone uses and no measured failure behind it.
 const SERVER_ERROR_BAND: std::ops::Range<i64> = 500..600;
 
+/// Value column names tried when a config declares none. Kept so configs created before
+/// `value_column` existed keep resolving exactly as they did.
+#[cfg(feature = "enterprise")]
+const LEGACY_VALUE_COLUMNS: [&str; 5] = ["value", "count", "_count", "metric", "result"];
+
+/// Lowercased operators the enterprise query builder can express, mirroring its
+/// `build_single_filter` arms and the UI's `ANOMALY_FILTER_OPERATORS`. All three must move
+/// together: an operator accepted here but unknown there yields an unfiltered query.
+const SUPPORTED_FILTER_OPERATORS: [&str; 30] = [
+    "=",
+    "equals",
+    "eq",
+    "!=",
+    "<>",
+    "not_equals",
+    "neq",
+    ">=",
+    "<=",
+    ">",
+    "<",
+    "contains",
+    "not contains",
+    "not_contains",
+    "starts with",
+    "starts_with",
+    "ends with",
+    "ends_with",
+    "is null",
+    "is_null",
+    "is not null",
+    "is_not_null",
+    "in",
+    "not in",
+    "not_in",
+    "str_match",
+    "str_match_ignore_case",
+    "match_all",
+    "re_match",
+    "re_not_match",
+];
+
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct CreateAnomalyConfigRequest {
     pub name: String,
@@ -62,6 +103,9 @@ pub struct CreateAnomalyConfigRequest {
     pub training_window_days: Option<i32>,
     pub retrain_interval_days: Option<i32>,
     pub percentile: Option<f64>,
+    /// Delivered-alert budget per day; mutually exclusive with `percentile` in one request.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub alert_budget_per_day: Option<f64>,
     pub rcf_num_trees: Option<i32>,
     pub rcf_tree_size: Option<i32>,
     pub rcf_shingle_size: Option<i32>,
@@ -113,6 +157,15 @@ pub struct UpdateAnomalyConfigRequest {
     pub detection_window_seconds: Option<i64>,
     pub training_window_days: Option<i32>,
     pub percentile: Option<f64>,
+    /// Double-option like `priority`: `None` leaves the stored budget, `Some(None)` clears it
+    /// (back to percentile mode), `Some(Some(b))` sets it. A plain Option could never clear.
+    #[serde(
+        default,
+        deserialize_with = "double_option",
+        skip_serializing_if = "Option::is_none"
+    )]
+    #[schema(value_type = Option<f64>)]
+    pub alert_budget_per_day: Option<Option<f64>>,
     pub retrain_interval_days: Option<i32>,
     pub alert_enabled: Option<bool>,
     pub alert_destinations: Option<Vec<String>>,
@@ -427,6 +480,7 @@ pub async fn create_config(
         retrain_interval_days: req.retrain_interval_days.unwrap_or(7),
         // Whole-number percentiles suffice; the model clamps to 50–99.9 regardless.
         threshold: req.percentile.unwrap_or(97.0).clamp(50.0, 99.9) as i32,
+        alert_budget_per_day: req.alert_budget_per_day,
         is_trained: false,
         training_started_at: None,
         training_completed_at: None,
@@ -443,8 +497,7 @@ pub async fn create_config(
                 .anomaly_detection
                 .rcf_tree_size as i32,
         ),
-        // shingle_size default comes from O2_ANOMALY_RCF_SHINGLE_SIZE env var (default=4).
-        // 4 consecutive time-buckets gives the RCF model enough temporal context.
+        // Buckets of context per score, so the span is this times histogram_interval.
         rcf_shingle_size: req.rcf_shingle_size.unwrap_or(
             o2_enterprise::enterprise::common::config::get_config()
                 .anomaly_detection
@@ -470,6 +523,7 @@ pub async fn create_config(
         retries: 0,
         last_failed_at: None,
         last_alert_fired_at: None,
+        last_recovery_notified_at: None,
         last_updated: now_us,
         // Seasonality is auto-determined at training time from training_window_days;
         // initialise to "none" as a placeholder until the first training run.
@@ -598,6 +652,12 @@ pub async fn update_config(
 
     validated_intervals(&req, &existing).map_err(validation_error)?;
     validated_denominator(&req, &existing).map_err(validation_error)?;
+    validated_budget_update(
+        req.percentile,
+        req.alert_budget_per_day,
+        existing.alert_budget_per_day,
+    )
+    .map_err(validation_error)?;
 
     let mut active_model = existing.into_active_model();
 
@@ -673,6 +733,8 @@ pub async fn update_config(
         active_model.detection_function = Set(combined);
     }
     if let Some(histogram_interval) = req.histogram_interval {
+        // An unparseable interval fails every bucket-adjacency check, so detection scores nothing.
+        parse_interval(&histogram_interval)?;
         retryable_change |= previous.histogram_interval != histogram_interval;
         active_model.histogram_interval = Set(histogram_interval);
     }
@@ -691,6 +753,9 @@ pub async fn update_config(
         if clamped != previous_threshold {
             new_threshold = Some(clamped);
         }
+    }
+    if let Some(budget) = req.alert_budget_per_day {
+        active_model.alert_budget_per_day = Set(budget);
     }
     if let Some(training_window_days) = req.training_window_days {
         let clamped = training_window_days.max(1);
@@ -1007,6 +1072,7 @@ pub async fn clone_config(
         training_window_days: src.training_window_days,
         retrain_interval_days: src.retrain_interval_days,
         threshold: src.threshold,
+        alert_budget_per_day: src.alert_budget_per_day,
         seasonality: src.seasonality.clone(),
         is_trained: false,
         training_started_at: None,
@@ -1030,6 +1096,7 @@ pub async fn clone_config(
         retries: 0,
         last_failed_at: None,
         last_alert_fired_at: None,
+        last_recovery_notified_at: None,
         last_updated: now_us,
         created_at: now_us,
         updated_at: now_us,
@@ -1294,24 +1361,6 @@ pub async fn detect_anomalies(org_id: &str, anomaly_id: &str) -> Result<serde_js
                 .and_then(|v| serde_json::from_value::<Vec<String>>(v.clone()).ok())
                 .unwrap_or_default();
             if !destinations.is_empty() {
-                let anomaly_pts: Vec<_> = result
-                    .scored_points
-                    .iter()
-                    .filter(|p| p.is_anomaly)
-                    .collect();
-                let max_dev = anomaly_pts
-                    .iter()
-                    .map(|p| p.deviation_percent)
-                    .fold(0.0f64, f64::max);
-                let worst_val = anomaly_pts
-                    .iter()
-                    .max_by(|a, b| {
-                        a.deviation_percent
-                            .partial_cmp(&b.deviation_percent)
-                            .unwrap_or(std::cmp::Ordering::Equal)
-                    })
-                    .map(|p| p.actual_value)
-                    .unwrap_or(0.0);
                 let window_start = result
                     .scored_points
                     .iter()
@@ -1324,22 +1373,20 @@ pub async fn detect_anomalies(org_id: &str, anomaly_id: &str) -> Result<serde_js
                     .map(|p| p.timestamp)
                     .max()
                     .unwrap_or(end_time_us);
+                // The scheduler's builder, so the two dispatchers cannot disagree on kind.
+                let ctx = o2_enterprise::enterprise::anomaly_detection::types::build_alert_context(
+                    &result.scored_points,
+                    org_id,
+                    &config.name,
+                    anomaly_id,
+                    result.anomaly_count,
+                    &config.stream_name,
+                    window_start,
+                    window_end,
+                );
 
                 for dest_id in destinations {
-                    if let Err(e) = send_anomaly_alert(
-                        org_id.to_string(),
-                        dest_id.clone(),
-                        config.name.clone(),
-                        anomaly_id.to_string(),
-                        result.anomaly_count,
-                        config.stream_name.clone(),
-                        max_dev,
-                        worst_val,
-                        window_start,
-                        window_end,
-                    )
-                    .await
-                    {
+                    if let Err(e) = send_anomaly_alert(dest_id.clone(), ctx.clone()).await {
                         log::warn!(
                             "[anomaly_detection {}] failed to send alert to '{}': {}",
                             anomaly_id,
@@ -1495,6 +1542,8 @@ fn validate_config_request(req: &CreateAnomalyConfigRequest) -> Result<()> {
         anyhow::bail!("custom_sql required when query_mode is 'custom_sql'");
     }
 
+    validated_budget_create(req.percentile, req.alert_budget_per_day)?;
+
     // Delegated so create and update cannot drift to two differently-worded rules.
     validate_interval_pair(&req.schedule_interval, &req.histogram_interval)?;
 
@@ -1509,6 +1558,51 @@ fn validate_config_request(req: &CreateAnomalyConfigRequest) -> Result<()> {
         req.filters.as_ref(),
         req.custom_sql.as_deref(),
     )
+}
+
+/// A budget the meter arithmetic cannot enforce (0, negative, NaN, inf) must never be stored.
+fn validate_budget_value(budget: f64) -> Result<()> {
+    if !budget.is_finite() || budget <= 0.0 {
+        anyhow::bail!("alert_budget_per_day must be a finite value greater than 0");
+    }
+    Ok(())
+}
+
+/// Create-time rule: one sensitivity primitive per request, never both.
+fn validated_budget_create(percentile: Option<f64>, budget: Option<f64>) -> Result<()> {
+    if percentile.is_some() && budget.is_some() {
+        anyhow::bail!("supply either percentile or alert_budget_per_day, not both");
+    }
+    if let Some(b) = budget {
+        validate_budget_value(b)?;
+    }
+    Ok(())
+}
+
+/// Update-time rule: while a budget is in force the stored percentile is derived state, so a
+/// user-supplied percentile is rejected unless the same request clears the budget.
+fn validated_budget_update(
+    percentile: Option<f64>,
+    budget: Option<Option<f64>>,
+    existing_budget: Option<f64>,
+) -> Result<()> {
+    if let Some(Some(b)) = budget {
+        validate_budget_value(b)?;
+        if percentile.is_some() {
+            anyhow::bail!("supply either percentile or alert_budget_per_day, not both");
+        }
+    }
+    let budget_after = match budget {
+        None => existing_budget,
+        Some(b) => b,
+    };
+    if percentile.is_some() && budget_after.is_some() {
+        anyhow::bail!(
+            "percentile is derived while alert_budget_per_day is set; clear the budget \
+             (alert_budget_per_day: null) to set a percentile"
+        );
+    }
+    Ok(())
 }
 
 /// Marks a rejected request with the prefix the API layer matches to answer 400, not 500.
@@ -1921,7 +2015,10 @@ fn normalize_request_filters(
         return Ok(None);
     };
     match value {
-        serde_json::Value::Array(_) => Ok(Some(value)),
+        serde_json::Value::Array(ref entries) => {
+            validate_filter_operators(entries)?;
+            Ok(Some(value))
+        }
         serde_json::Value::Null => Ok(Some(serde_json::json!([]))),
         serde_json::Value::Object(ref map) if map.is_empty() => Ok(Some(serde_json::json!([]))),
         // The value itself is never echoed back: it is caller-controlled JSON.
@@ -1930,6 +2027,20 @@ fn normalize_request_filters(
             json_type(&other)
         ),
     }
+}
+
+/// Rejects an operator the enterprise query builder cannot express. Accepting one would
+/// persist a filter that silently drops out of the query, scoring the unfiltered stream.
+fn validate_filter_operators(entries: &[serde_json::Value]) -> Result<()> {
+    for entry in entries {
+        let Some(operator) = entry.get("operator").and_then(|v| v.as_str()) else {
+            continue;
+        };
+        if !SUPPORTED_FILTER_OPERATORS.contains(&operator.trim().to_lowercase().as_str()) {
+            anyhow::bail!("unsupported filter operator: {operator}");
+        }
+    }
+    Ok(())
 }
 
 /// Names a JSON value's type for an error message, without disclosing the value.
@@ -2016,6 +2127,7 @@ pub fn config_to_training_config(
         training_window_days: config.training_window_days as usize,
         retrain_interval_days: config.retrain_interval_days,
         threshold: config.threshold,
+        alert_budget_per_day: config.alert_budget_per_day,
         seasonality: serde_json::from_str(&format!("\"{}\"", config.seasonality))
             .unwrap_or_default(),
         is_trained: config.is_trained,
@@ -2100,9 +2212,48 @@ pub async fn execute_anomaly_query(
         search_result.total
     );
 
-    let data_points = parse_search_results_to_timeseries(&search_result, anomaly_id)?;
+    // Resolved here rather than threaded through the enterprise query-executor boundary,
+    // whose registered Fn signature is fixed and shared by every anomaly query path.
+    let value_column = resolve_value_column(org_id, anomaly_id).await;
+
+    let data_points =
+        parse_search_results_to_timeseries(&search_result, anomaly_id, value_column.as_deref())?;
 
     Ok(data_points)
+}
+
+/// The config-declared value column, or `None` to keep the legacy name fallback.
+///
+/// A lookup failure must not abort a run that the legacy names would have served, so this
+/// degrades to `None` rather than propagating.
+#[cfg(feature = "enterprise")]
+async fn resolve_value_column(org_id: &str, anomaly_id: &str) -> Option<String> {
+    let db = get_orm_client_rw().await;
+    let model = anomaly_config_table::get_by_id(db, org_id, anomaly_id)
+        .await
+        .inspect_err(|e| {
+            log::warn!(
+                "[anomaly_detection {anomaly_id}] could not load config for value column: {e}"
+            )
+        })
+        .ok()??;
+
+    declared_value_column(&model.query_mode, &model.detection_function)
+}
+
+/// The value column a config declares, or `None` when it declares none.
+///
+/// Only custom_sql mode has one: filter mode's builder emits `AS value` itself, and there
+/// `detection_function`'s field names the input column to aggregate, not the output column.
+#[cfg(feature = "enterprise")]
+fn declared_value_column(query_mode: &str, detection_function: &str) -> Option<String> {
+    use o2_enterprise::enterprise::anomaly_detection::detector::split_detection_function;
+
+    if !query_mode.eq_ignore_ascii_case("custom_sql") {
+        return None;
+    }
+    let (_, field) = split_detection_function(detection_function);
+    field.filter(|f| !f.trim().is_empty())
 }
 
 /// Parse search results into time-series data points.
@@ -2111,10 +2262,14 @@ pub async fn execute_anomaly_query(
 /// `hour` and `dow` are included by filter-based queries via `date_part()`; they are
 /// absent for custom SQL queries, in which case `QueryDataPoint` carries `None` and
 /// `build_feature_vector` falls back to Rust-side extraction from the timestamp.
+///
+/// `value_column` is the config-declared column carrying the metric; `None` keeps the
+/// legacy name fallback.
 #[cfg(feature = "enterprise")]
 fn parse_search_results_to_timeseries(
     results: &config::meta::search::Response,
     anomaly_id: &str,
+    value_column: Option<&str>,
 ) -> Result<Vec<o2_enterprise::enterprise::anomaly_detection::types::QueryDataPoint>> {
     use o2_enterprise::enterprise::anomaly_detection::types::QueryDataPoint;
 
@@ -2153,7 +2308,7 @@ fn parse_search_results_to_timeseries(
                 continue;
             }
         };
-        let value = match extract_value_from_hit(hit) {
+        let value = match extract_value_from_hit(hit, value_column) {
             Ok(v) => v,
             Err(e) => {
                 log::warn!(
@@ -2192,6 +2347,21 @@ fn parse_search_results_to_timeseries(
             data_points.len(),
             results.hits.len(),
             skipped
+        );
+    }
+
+    // Total extraction loss on a non-empty result set is a misconfigured value column, not
+    // an absence of data. Returning Ok(empty) here is what made that present as "no data".
+    if data_points.is_empty() && !results.hits.is_empty() {
+        anyhow::bail!(
+            "[anomaly_detection {anomaly_id}] query returned {} rows but none had a usable \
+             value column ({}); columns present: [{}]",
+            results.hits.len(),
+            match value_column {
+                Some(c) => format!("configured: '{c}'"),
+                None => format!("expected one of: {}", LEGACY_VALUE_COLUMNS.join(", ")),
+            },
+            columns_present(&results.hits).join(", "),
         );
     }
 
@@ -2241,22 +2411,41 @@ fn extract_timestamp_from_hit(hit: &serde_json::Value) -> Result<i64> {
     anyhow::bail!("No timestamp field found in search result")
 }
 
-/// Extract value from a search hit
+/// Extract value from a search hit.
+///
+/// A declared `value_column` is authoritative and never falls back to the legacy names:
+/// silently scoring a different column than the config names is the data-loss bug this
+/// parameter exists to end, so a declared column absent from the row is an error.
 #[cfg(feature = "enterprise")]
-fn extract_value_from_hit(hit: &serde_json::Value) -> Result<f64> {
-    // Try different value field names
-    for field_name in &["value", "count", "_count", "metric", "result"] {
-        if let Some(value) = hit.get(field_name) {
-            if let Some(val_num) = value.as_f64() {
-                return Ok(val_num);
-            }
-            if let Some(val_int) = value.as_i64() {
-                return Ok(val_int as f64);
-            }
+fn extract_value_from_hit(hit: &serde_json::Value, value_column: Option<&str>) -> Result<f64> {
+    if let Some(column) = value_column.map(str::trim).filter(|c| !c.is_empty()) {
+        return hit.get(column).and_then(json_value_as_f64).ok_or_else(|| {
+            anyhow::anyhow!("declared value column '{column}' is missing or non-numeric")
+        });
+    }
+
+    for field_name in LEGACY_VALUE_COLUMNS {
+        if let Some(val) = hit.get(field_name).and_then(json_value_as_f64) {
+            return Ok(val);
         }
     }
 
     anyhow::bail!("No value field found in search result")
+}
+
+/// Numeric coercion shared by the declared-column and legacy-fallback paths.
+#[cfg(feature = "enterprise")]
+fn json_value_as_f64(value: &serde_json::Value) -> Option<f64> {
+    value.as_f64().or_else(|| value.as_i64().map(|v| v as f64))
+}
+
+/// Column names the result set actually carried, for the misconfiguration diagnostic.
+#[cfg(feature = "enterprise")]
+fn columns_present(hits: &[serde_json::Value]) -> Vec<String> {
+    hits.first()
+        .and_then(|h| h.as_object())
+        .map(|obj| obj.keys().cloned().collect())
+        .unwrap_or_default()
 }
 
 /// Write anomaly events to the _anomalies stream.
@@ -2330,29 +2519,150 @@ pub async fn write_anomalies_to_stream(
     Ok(())
 }
 
-/// Send an anomaly alert to the configured destination.
+/// Format a microsecond timestamp for alert text.
+#[cfg(feature = "enterprise")]
+fn fmt_alert_us(us: i64) -> String {
+    chrono::DateTime::from_timestamp_micros(us)
+        .map(|dt| dt.format("%Y-%m-%d %H:%M UTC").to_string())
+        .unwrap_or_else(|| "unknown".to_string())
+}
+
+/// Deep link to the config's detail page (`alerts/anomaly/edit/:anomaly_id`), where the
+/// operator sees the score timeline and threshold behind this alert.
+#[cfg(feature = "enterprise")]
+fn anomaly_detail_link(org_id: &str, anomaly_id: &str) -> String {
+    let cfg = config::get_config();
+    format!(
+        "{}{}/web/alerts/anomaly/edit/{}?org_identifier={}",
+        cfg.common.web_url.trim_end_matches('/'),
+        cfg.common.base_uri,
+        anomaly_id,
+        org_id
+    )
+}
+
+/// One honestly-labeled message per alert kind: a score-space deviation, a value-space
+/// drop, an absence, and a recovery are different claims and must not share a phrasing.
+#[cfg(feature = "enterprise")]
+fn anomaly_alert_message(
+    ctx: &o2_enterprise::enterprise::anomaly_detection::types::AnomalyAlertContext,
+    link: &str,
+) -> String {
+    use o2_enterprise::enterprise::anomaly_detection::types::AnomalyAlertKind;
+    let window = format!(
+        "{}\u{2013}{}",
+        fmt_alert_us(ctx.window_start_us),
+        fmt_alert_us(ctx.window_end_us)
+    );
+    let body = match ctx.kind {
+        AnomalyAlertKind::Absence => format!(
+            "no data received in window {window}, although the stream's learned schedule \
+             expected data"
+        ),
+        AnomalyAlertKind::PartialDrop => {
+            let worst = ctx.worst_actual_value.unwrap_or(0.0);
+            match (ctx.max_deviation_percent, ctx.worst_expected) {
+                (Some(dev), Some(expected)) => format!(
+                    "data volume dropped in window {window} | worst value: {worst:.2}, \
+                     {dev:.1}% below its hour-of-week median ~{expected:.2}"
+                ),
+                _ => format!("data volume dropped in window {window} | worst value: {worst:.2}"),
+            }
+        }
+        AnomalyAlertKind::Recovery => {
+            format!("a full detection run found no anomalies in window {window}")
+        }
+        AnomalyAlertKind::Value => value_anomaly_body(ctx, &window),
+    };
+    let verb = if ctx.kind == AnomalyAlertKind::Recovery {
+        "Anomaly recovered"
+    } else {
+        "Anomaly detected"
+    };
+    format!(
+        "{verb} in stream '{}' (anomaly name: '{}'): {body} | details: {link}",
+        ctx.stream_name, ctx.config_name
+    )
+}
+
+/// The numeric section for a scored value anomaly, degrading field by field so a cold
+/// start (no expectation) or a legacy model (no stored threshold) still reads sensibly.
+#[cfg(feature = "enterprise")]
+fn value_anomaly_body(
+    ctx: &o2_enterprise::enterprise::anomaly_detection::types::AnomalyAlertContext,
+    window: &str,
+) -> String {
+    let mut body = format!("{} anomalies in window {window}", ctx.anomaly_count);
+    if let Some(worst) = ctx.worst_actual_value {
+        body.push_str(&format!(" | worst value: {worst:.2}"));
+        if let Some(expected) = ctx.worst_expected {
+            body.push_str(&format!(" (expected ~{expected:.2} for this hour)"));
+        }
+    }
+    if let (Some(score), Some(threshold)) = (ctx.score, ctx.threshold) {
+        body.push_str(&format!(" | score {score:.2} vs threshold {threshold:.2}"));
+    }
+    // Labeled as score-space: this number is NOT "the metric was N% above normal".
+    if let Some(dev) = ctx.max_deviation_percent {
+        body.push_str(&format!(" (score {dev:.1}% over its bar)"));
+    }
+    body
+}
+
+/// The webhook JSON body. Numeric fields are null where the kind has no honest value
+/// for them, and `deviation_basis` names which space `max_deviation_percent` lives in.
+#[cfg(feature = "enterprise")]
+fn anomaly_alert_payload(
+    ctx: &o2_enterprise::enterprise::anomaly_detection::types::AnomalyAlertContext,
+    message: &str,
+    link: &str,
+) -> serde_json::Value {
+    use o2_enterprise::enterprise::anomaly_detection::types::AnomalyAlertKind;
+    let alert_type = match ctx.kind {
+        AnomalyAlertKind::Recovery => "anomaly_detection_recovery",
+        _ => "anomaly_detection",
+    };
+    let deviation_kind = match ctx.kind {
+        AnomalyAlertKind::Value => Some("score_over_threshold"),
+        AnomalyAlertKind::PartialDrop => Some("value_below_expected"),
+        _ => None,
+    };
+    serde_json::json!({
+        "text": message,
+        "alert_type": alert_type,
+        "kind": ctx.kind,
+        "anomaly_id": ctx.anomaly_id,
+        "config_name": ctx.config_name,
+        "org_id": ctx.org_id,
+        "stream_name": ctx.stream_name,
+        "anomaly_count": ctx.anomaly_count,
+        "max_deviation_percent": ctx.max_deviation_percent,
+        "deviation_kind": deviation_kind,
+        "worst_actual_value": ctx.worst_actual_value,
+        "expected_value": ctx.worst_expected,
+        "score": ctx.score,
+        "threshold": ctx.threshold,
+        "window_start": fmt_alert_us(ctx.window_start_us),
+        "window_end": fmt_alert_us(ctx.window_end_us),
+        "link": link,
+        "message": message,
+        "timestamp": chrono::Utc::now().to_rfc3339(),
+    })
+}
+
+/// Send an anomaly alert (or recovery message) to the configured destination.
 ///
 /// Called by the enterprise scheduler when anomalies are detected and alert_enabled=true.
 /// Looks up the destination by name and POSTs a JSON payload to its webhook URL.
+/// Non-HTTP destinations (email, SNS) are skipped with a warning — a known, parked gap
+/// that recovery messages inherit.
 #[cfg(feature = "enterprise")]
-#[allow(clippy::too_many_arguments)]
 pub async fn send_anomaly_alert(
-    org_id: String,
     destination_id: String,
-    config_name: String,
-    anomaly_id: String,
-    anomaly_count: i32,
-    stream_name: String,
-    // Max deviation above threshold as a percentage (0.0 if no anomalies).
-    max_deviation_percent: f64,
-    // Actual metric value of the worst-scoring anomalous bucket.
-    worst_actual_value: f64,
-    // Detection window start (Unix microseconds).
-    window_start_us: i64,
-    // Detection window end (Unix microseconds).
-    window_end_us: i64,
+    ctx: o2_enterprise::enterprise::anomaly_detection::types::AnomalyAlertContext,
 ) -> anyhow::Result<()> {
-    let dest = match destinations::get(&org_id, &destination_id).await {
+    let anomaly_id = ctx.anomaly_id.clone();
+    let dest = match destinations::get(&ctx.org_id, &destination_id).await {
         Ok(d) => d,
         Err(e) => {
             log::warn!(
@@ -2380,43 +2690,10 @@ pub async fn send_anomaly_alert(
         }
     };
 
-    // Format the detection window as human-readable UTC strings.
-    let fmt_us = |us: i64| -> String {
-        chrono::DateTime::from_timestamp_micros(us)
-            .map(|dt| dt.format("%Y-%m-%d %H:%M UTC").to_string())
-            .unwrap_or_else(|| "unknown".to_string())
-    };
-    let window_start_str = fmt_us(window_start_us);
-    let window_end_str = fmt_us(window_end_us);
-
-    let message = format!(
-        "Anomaly detected in stream '{}' (anomaly name: '{}'): {} anomalies in window {}\u{2013}{} \
-         | worst value: {:.2} | max deviation: {:.1}%",
-        stream_name,
-        config_name,
-        anomaly_count,
-        window_start_str,
-        window_end_str,
-        worst_actual_value,
-        max_deviation_percent,
-    );
-    // Use Slack-compatible format (text field) so the same payload works for
-    // Slack incoming webhooks. Other webhook receivers can still use the fields.
-    let payload = serde_json::json!({
-        "text": message,
-        "alert_type": "anomaly_detection",
-        "anomaly_id": anomaly_id,
-        "config_name": config_name,
-        "org_id": org_id,
-        "stream_name": stream_name,
-        "anomaly_count": anomaly_count,
-        "max_deviation_percent": max_deviation_percent,
-        "worst_actual_value": worst_actual_value,
-        "window_start": window_start_str,
-        "window_end": window_end_str,
-        "message": message,
-        "timestamp": chrono::Utc::now().to_rfc3339(),
-    });
+    let link = anomaly_detail_link(&ctx.org_id, &ctx.anomaly_id);
+    let message = anomaly_alert_message(&ctx, &link);
+    // Slack-compatible shape: `text` renders in Slack, other receivers read the fields.
+    let payload = anomaly_alert_payload(&ctx, &message, &link);
 
     // SSRF protection: validate the URL (incl. DNS) before sending and build the
     // client through `build_safe_client` so redirects + connect-time resolution
@@ -2617,6 +2894,7 @@ mod tests {
             training_window_days: Some(7),
             retrain_interval_days: Some(7),
             percentile: Some(97.0),
+            alert_budget_per_day: None,
             rcf_num_trees: None,
             rcf_tree_size: None,
             rcf_shingle_size: None,
@@ -2672,6 +2950,54 @@ mod tests {
                 Some(value)
             );
         }
+    }
+
+    /// Every operator the UI can persist must survive validation, or a saved config would
+    /// carry a filter the query builder drops — scoring the unfiltered stream.
+    #[test]
+    fn test_normalize_request_filters_accepts_every_ui_operator() {
+        for op in [
+            "=",
+            "<>",
+            ">=",
+            "<=",
+            ">",
+            "<",
+            "IN",
+            "NOT IN",
+            "str_match",
+            "str_match_ignore_case",
+            "match_all",
+            "re_match",
+            "re_not_match",
+            "Contains",
+            "Starts With",
+            "Ends With",
+            "Not Contains",
+            "Is Null",
+            "Is Not Null",
+        ] {
+            let filters = serde_json::json!([{"field": "host", "operator": op, "value": "api"}]);
+            assert!(
+                normalize_request_filters(Some(filters)).is_ok(),
+                "UI operator `{op}` must be accepted at save time"
+            );
+        }
+    }
+
+    /// An operator the query builder cannot express is refused at save time rather than
+    /// persisted to fail silently later.
+    #[test]
+    fn test_normalize_request_filters_rejects_an_unbuildable_operator() {
+        let filters =
+            serde_json::json!([{"field": "host", "operator": "sounds_like", "value": "api"}]);
+        let err = normalize_request_filters(Some(filters))
+            .unwrap_err()
+            .to_string();
+        assert!(
+            err.contains("unsupported filter operator"),
+            "unexpected error: {err}"
+        );
     }
 
     /// Refused rather than dropped, and the caller-controlled value is never echoed back.
@@ -2824,49 +3150,184 @@ mod tests {
     #[test]
     fn test_extract_value_from_hit_value_field_f64() {
         let hit = serde_json::json!({"value": 3.25});
-        assert!((extract_value_from_hit(&hit).unwrap() - 3.25).abs() < f64::EPSILON);
+        assert!((extract_value_from_hit(&hit, None).unwrap() - 3.25).abs() < f64::EPSILON);
     }
 
     #[cfg(feature = "enterprise")]
     #[test]
     fn test_extract_value_from_hit_count_field_integer() {
         let hit = serde_json::json!({"count": 42});
-        assert!((extract_value_from_hit(&hit).unwrap() - 42.0).abs() < f64::EPSILON);
+        assert!((extract_value_from_hit(&hit, None).unwrap() - 42.0).abs() < f64::EPSILON);
     }
 
     #[cfg(feature = "enterprise")]
     #[test]
     fn test_extract_value_from_hit_underscore_count_field() {
         let hit = serde_json::json!({"_count": 7});
-        assert!((extract_value_from_hit(&hit).unwrap() - 7.0).abs() < f64::EPSILON);
+        assert!((extract_value_from_hit(&hit, None).unwrap() - 7.0).abs() < f64::EPSILON);
     }
 
     #[cfg(feature = "enterprise")]
     #[test]
     fn test_extract_value_from_hit_metric_field() {
         let hit = serde_json::json!({"metric": 100.5});
-        assert!((extract_value_from_hit(&hit).unwrap() - 100.5).abs() < f64::EPSILON);
+        assert!((extract_value_from_hit(&hit, None).unwrap() - 100.5).abs() < f64::EPSILON);
     }
 
     #[cfg(feature = "enterprise")]
     #[test]
     fn test_extract_value_from_hit_result_field() {
         let hit = serde_json::json!({"result": 0.0});
-        assert!((extract_value_from_hit(&hit).unwrap() - 0.0).abs() < f64::EPSILON);
+        assert!((extract_value_from_hit(&hit, None).unwrap() - 0.0).abs() < f64::EPSILON);
     }
 
     #[cfg(feature = "enterprise")]
     #[test]
     fn test_extract_value_from_hit_no_value_field_returns_error() {
         let hit = serde_json::json!({"other_field": 99.0});
-        assert!(extract_value_from_hit(&hit).is_err());
+        assert!(extract_value_from_hit(&hit, None).is_err());
     }
 
     #[cfg(feature = "enterprise")]
     #[test]
     fn test_extract_value_from_hit_non_numeric_value_field_returns_error() {
         let hit = serde_json::json!({"value": "not_a_number"});
-        assert!(extract_value_from_hit(&hit).is_err());
+        assert!(extract_value_from_hit(&hit, None).is_err());
+    }
+
+    // ── (a) config-declared value column ────────────────────────────────────
+
+    /// The data-loss bug: custom SQL naming its output column anything outside the
+    /// hardcoded list produced rows that all failed extraction and were dropped.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_declared_value_column_outside_the_hardcoded_list_is_extracted() {
+        let hit = serde_json::json!({"p95_value": 12.5});
+        assert!(
+            (extract_value_from_hit(&hit, Some("p95_value")).unwrap() - 12.5).abs() < f64::EPSILON
+        );
+    }
+
+    /// Backward compatibility: a config that declares nothing keeps the legacy fallback.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_no_declared_column_still_falls_back_to_the_legacy_names() {
+        let hit = serde_json::json!({"count": 42});
+        assert!((extract_value_from_hit(&hit, None).unwrap() - 42.0).abs() < f64::EPSILON);
+    }
+
+    /// A declared column must win over a legacy name present in the same row, or a
+    /// query selecting both its own metric and a raw `count` would score the wrong one.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_declared_column_wins_over_a_legacy_name_in_the_same_hit() {
+        let hit = serde_json::json!({"count": 1.0, "latency_ms": 250.0});
+        assert!(
+            (extract_value_from_hit(&hit, Some("latency_ms")).unwrap() - 250.0).abs()
+                < f64::EPSILON
+        );
+    }
+
+    /// A declared column that the result set does not contain must not silently fall
+    /// through to a legacy name: that would score a different series than configured.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_a_declared_column_missing_from_the_hit_is_an_error_not_a_fallback() {
+        let hit = serde_json::json!({"count": 42});
+        assert!(extract_value_from_hit(&hit, Some("p95_value")).is_err());
+    }
+
+    /// custom_sql mode carries the declaration in `detection_function`'s field slot, which
+    /// that mode's query builder never reads — no new column, no migration.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_custom_sql_mode_declares_its_value_column() {
+        assert_eq!(
+            declared_value_column("custom_sql", "max(p95_value)"),
+            Some("p95_value".to_string())
+        );
+    }
+
+    /// Filter mode's builder emits `AS value` itself, so its field names the aggregated
+    /// input column — reading it as an output column would score the wrong thing.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_filter_mode_declares_nothing() {
+        assert_eq!(
+            declared_value_column("filters", "avg(cpu_millicores)"),
+            None
+        );
+    }
+
+    /// Backward compatibility: a pre-existing custom_sql config declares nothing.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_a_custom_sql_config_without_a_field_declares_nothing() {
+        assert_eq!(declared_value_column("custom_sql", "count(*)"), None);
+        assert_eq!(declared_value_column("custom_sql", "count"), None);
+    }
+
+    // ── (b) loud failure on a fully-unextractable result set ────────────────
+
+    /// The bug presented as "no data" rather than "bad config". A non-empty result set
+    /// that yields zero usable points must fail loudly and name the columns it did find.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_a_result_set_with_no_usable_value_column_is_a_named_error() {
+        let resp = config::meta::search::Response {
+            hits: vec![
+                serde_json::json!({"time_bucket": "2026-02-20T13:15:00", "p95_value": 1.0,
+                                   "request_count": 9}),
+                serde_json::json!({"time_bucket": "2026-02-20T13:20:00", "p95_value": 2.0,
+                                   "request_count": 8}),
+            ],
+            ..Default::default()
+        };
+        let err = parse_search_results_to_timeseries(&resp, "a1", None).unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains('2'), "hit count not reported: {msg}");
+        assert!(
+            msg.contains("p95_value"),
+            "present columns not named: {msg}"
+        );
+        assert!(
+            msg.contains("request_count"),
+            "present columns not named: {msg}"
+        );
+    }
+
+    /// The same result set becomes usable once the config declares its column — the
+    /// error above is a configuration diagnosis, not a dead end.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_declaring_the_column_makes_that_same_result_set_parse() {
+        let resp = config::meta::search::Response {
+            hits: vec![
+                serde_json::json!({"time_bucket": "2026-02-20T13:15:00", "p95_value": 1.0}),
+                serde_json::json!({"time_bucket": "2026-02-20T13:20:00", "p95_value": 2.0}),
+            ],
+            ..Default::default()
+        };
+        let points = parse_search_results_to_timeseries(&resp, "a1", Some("p95_value")).unwrap();
+        assert_eq!(points.len(), 2);
+        assert!((points[0].value - 1.0).abs() < f64::EPSILON);
+        assert!((points[1].value - 2.0).abs() < f64::EPSILON);
+    }
+
+    /// A partially-usable result set must still parse: the loud failure is for total
+    /// loss only, so one malformed bucket cannot abort an otherwise healthy run.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_a_partially_extractable_result_set_still_parses() {
+        let resp = config::meta::search::Response {
+            hits: vec![
+                serde_json::json!({"time_bucket": "2026-02-20T13:15:00", "value": 1.0}),
+                serde_json::json!({"time_bucket": "2026-02-20T13:20:00", "nothing_usable": 2.0}),
+            ],
+            ..Default::default()
+        };
+        let points = parse_search_results_to_timeseries(&resp, "a1", None).unwrap();
+        assert_eq!(points.len(), 1);
     }
 
     /// A truncated hit set fed to the trainer reads as a sparse series and can revoke a model.
@@ -2875,7 +3336,7 @@ mod tests {
     fn test_a_partial_search_result_is_an_error_not_evidence() {
         let mut resp = config::meta::search::Response::default();
         resp.is_partial = true;
-        let err = parse_search_results_to_timeseries(&resp, "a1").unwrap_err();
+        let err = parse_search_results_to_timeseries(&resp, "a1", None).unwrap_err();
         assert!(err.to_string().contains("partial"), "{err}");
     }
 
@@ -2885,7 +3346,7 @@ mod tests {
     fn test_a_complete_search_result_still_parses() {
         let resp = config::meta::search::Response::default();
         assert!(
-            parse_search_results_to_timeseries(&resp, "a1")
+            parse_search_results_to_timeseries(&resp, "a1", None)
                 .unwrap()
                 .is_empty()
         );
@@ -3086,6 +3547,7 @@ mod tests {
                 training_window_days: 7,
                 retrain_interval_days: 7,
                 threshold: 97,
+                alert_budget_per_day: None,
                 seasonality: "none".to_string(),
                 is_trained: false,
                 training_started_at: None,
@@ -3106,6 +3568,7 @@ mod tests {
                 retries: 0,
                 last_failed_at: None,
                 last_alert_fired_at: None,
+                last_recovery_notified_at: None,
                 last_updated: 0,
                 created_at: 1000,
                 updated_at: 1000,
@@ -3437,6 +3900,7 @@ mod tests {
                 training_window_days: 7,
                 retrain_interval_days: 7,
                 threshold: 97,
+                alert_budget_per_day: None,
                 seasonality: "none".to_string(),
                 is_trained: false,
                 training_started_at: None,
@@ -3457,6 +3921,7 @@ mod tests {
                 retries: 0,
                 last_failed_at: None,
                 last_alert_fired_at: None,
+                last_recovery_notified_at: None,
                 last_updated: 0,
                 created_at: 1000,
                 updated_at: 1000,
@@ -4295,6 +4760,206 @@ mod tests {
                 validated_denominator(&filter_alone, &counting).is_err(),
                 "a lone filter change must be judged against the stored function"
             );
+        }
+    }
+
+    // ── Alert message rendering: one honest label per deviation space ──────
+
+    mod alert_rendering {
+        use o2_enterprise::enterprise::anomaly_detection::types::{
+            AnomalyAlertContext, AnomalyAlertKind,
+        };
+
+        use super::super::{anomaly_alert_message, anomaly_alert_payload};
+
+        const LINK: &str = "https://o2.example/web/alerts/anomaly/edit/id1?org_identifier=org";
+
+        fn ctx(kind: AnomalyAlertKind) -> AnomalyAlertContext {
+            AnomalyAlertContext {
+                org_id: "org".to_string(),
+                config_name: "login-errors".to_string(),
+                anomaly_id: "id1".to_string(),
+                anomaly_count: 3,
+                stream_name: "app_logs".to_string(),
+                kind,
+                max_deviation_percent: None,
+                worst_actual_value: None,
+                worst_expected: None,
+                score: None,
+                threshold: None,
+                // 2024-01-01T00:00:00Z .. +1h, so the window text is deterministic.
+                window_start_us: 1_704_067_200_000_000,
+                window_end_us: 1_704_070_800_000_000,
+            }
+        }
+
+        #[test]
+        fn a_value_alert_shows_actual_expected_and_a_labeled_score_deviation() {
+            let mut c = ctx(AnomalyAlertKind::Value);
+            c.worst_actual_value = Some(612.0);
+            c.worst_expected = Some(180.0);
+            c.score = Some(3.2);
+            c.threshold = Some(2.1);
+            c.max_deviation_percent = Some(52.4);
+            let msg = anomaly_alert_message(&c, LINK);
+            assert!(
+                msg.contains("worst value: 612.00 (expected ~180.00 for this hour)"),
+                "{msg}"
+            );
+            assert!(msg.contains("score 3.20 vs threshold 2.10"), "{msg}");
+            assert!(
+                msg.contains("(score 52.4% over its bar)"),
+                "score-space must be labeled as score-space, not bare deviation: {msg}"
+            );
+            assert!(msg.contains("2024-01-01 00:00 UTC"), "{msg}");
+            assert!(msg.ends_with(&format!("details: {LINK}")), "{msg}");
+        }
+
+        #[test]
+        fn a_cold_start_value_alert_omits_the_expected_clause() {
+            let mut c = ctx(AnomalyAlertKind::Value);
+            c.worst_actual_value = Some(612.0);
+            c.max_deviation_percent = Some(52.4);
+            let msg = anomaly_alert_message(&c, LINK);
+            assert!(msg.contains("worst value: 612.00"), "{msg}");
+            assert!(
+                !msg.contains("expected"),
+                "no baseline means no expected claim: {msg}"
+            );
+        }
+
+        #[test]
+        fn a_drop_alert_speaks_value_space_against_its_median() {
+            let mut c = ctx(AnomalyAlertKind::PartialDrop);
+            c.worst_actual_value = Some(43.0);
+            c.worst_expected = Some(180.0);
+            c.max_deviation_percent = Some(76.1);
+            let msg = anomaly_alert_message(&c, LINK);
+            assert!(
+                msg.contains("worst value: 43.00, 76.1% below its hour-of-week median ~180.00"),
+                "{msg}"
+            );
+            assert!(
+                !msg.contains("score"),
+                "the drop sentinel is not a model verdict: {msg}"
+            );
+        }
+
+        #[test]
+        fn an_absence_alert_has_no_numeric_framing() {
+            let msg = anomaly_alert_message(&ctx(AnomalyAlertKind::Absence), LINK);
+            assert!(msg.contains("no data received"), "{msg}");
+            assert!(
+                !msg.contains('%'),
+                "absence has no honest percentage: {msg}"
+            );
+            assert!(msg.contains("details:"), "{msg}");
+        }
+
+        #[test]
+        fn a_recovery_message_reads_as_recovery_not_as_an_alert() {
+            let mut c = ctx(AnomalyAlertKind::Recovery);
+            c.anomaly_count = 0;
+            let msg = anomaly_alert_message(&c, LINK);
+            assert!(msg.starts_with("Anomaly recovered"), "{msg}");
+            assert!(msg.contains("no anomalies"), "{msg}");
+            assert!(msg.contains("details:"), "{msg}");
+        }
+
+        #[test]
+        fn the_payload_names_the_deviation_space_and_the_recovery_class() {
+            let mut value = ctx(AnomalyAlertKind::Value);
+            value.max_deviation_percent = Some(52.4);
+            let p = anomaly_alert_payload(&value, "m", LINK);
+            assert_eq!(p["alert_type"], "anomaly_detection");
+            assert_eq!(p["deviation_kind"], "score_over_threshold");
+            assert_eq!(p["link"], LINK);
+
+            let absent = ctx(AnomalyAlertKind::Absence);
+            let p = anomaly_alert_payload(&absent, "m", LINK);
+            assert!(
+                p["max_deviation_percent"].is_null(),
+                "the absence sentinel 100.0 must not survive into the wire payload"
+            );
+            assert!(p["deviation_kind"].is_null());
+
+            let p = anomaly_alert_payload(&ctx(AnomalyAlertKind::Recovery), "m", LINK);
+            assert_eq!(p["alert_type"], "anomaly_detection_recovery");
+            assert_eq!(p["kind"], "recovery");
+        }
+    }
+
+    // ── Phase B: the alert budget as the sensitivity primitive ──────────────
+    mod budget_rules {
+        use super::super::*;
+
+        #[test]
+        fn create_rejects_both_sensitivity_primitives_at_once() {
+            let err = validated_budget_create(Some(97.0), Some(1.0)).unwrap_err();
+            assert!(err.to_string().contains("not both"), "{err}");
+            assert!(validated_budget_create(Some(97.0), None).is_ok());
+            assert!(validated_budget_create(None, Some(1.0)).is_ok());
+            assert!(validated_budget_create(None, None).is_ok());
+        }
+
+        #[test]
+        fn unusable_budget_values_are_rejected_not_clamped() {
+            for bad in [0.0, -1.0, f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+                let err = validated_budget_create(None, Some(bad)).unwrap_err();
+                assert!(
+                    err.to_string().contains("finite value greater than 0"),
+                    "{bad}: {err}"
+                );
+                assert!(validated_budget_update(None, Some(Some(bad)), None).is_err());
+            }
+            assert!(validated_budget_create(None, Some(1.0 / 7.0)).is_ok());
+        }
+
+        /// While a budget is stored, `threshold` is derived state (B.3): a percentile
+        /// edit must be refused, not silently overwritten by the controller later.
+        #[test]
+        fn update_refuses_a_percentile_while_a_budget_is_in_force() {
+            let err = validated_budget_update(Some(95.0), None, Some(1.0)).unwrap_err();
+            assert!(err.to_string().contains("derived"), "{err}");
+            // Same request setting both is the create-time rule.
+            let err = validated_budget_update(Some(95.0), Some(Some(1.0)), None).unwrap_err();
+            assert!(err.to_string().contains("not both"), "{err}");
+        }
+
+        /// The atomic switch back: clearing the budget and supplying a percentile in ONE
+        /// request must be allowed, or percentile mode is unreachable without two calls.
+        #[test]
+        fn update_allows_clear_budget_and_set_percentile_together() {
+            assert!(validated_budget_update(Some(95.0), Some(None), Some(1.0)).is_ok());
+            // And plain edits in each mode stay legal.
+            assert!(validated_budget_update(Some(95.0), None, None).is_ok());
+            assert!(validated_budget_update(None, Some(Some(2.0)), Some(1.0)).is_ok());
+            assert!(validated_budget_update(None, None, Some(1.0)).is_ok());
+        }
+
+        /// The double-option contract: absent leaves, null clears, a value sets.
+        #[test]
+        fn update_budget_field_keeps_absent_and_null_apart() {
+            let absent: UpdateAnomalyConfigRequest = serde_json::from_str("{}").unwrap();
+            assert_eq!(absent.alert_budget_per_day, None);
+            let null: UpdateAnomalyConfigRequest =
+                serde_json::from_str(r#"{"alert_budget_per_day":null}"#).unwrap();
+            assert_eq!(null.alert_budget_per_day, Some(None));
+            let set: UpdateAnomalyConfigRequest =
+                serde_json::from_str(r#"{"alert_budget_per_day":0.25}"#).unwrap();
+            assert_eq!(set.alert_budget_per_day, Some(Some(0.25)));
+        }
+
+        /// Pre-budget clients omit the field entirely; both request shapes must accept that.
+        #[test]
+        fn create_budget_field_defaults_to_absent() {
+            let req: CreateAnomalyConfigRequest = serde_json::from_str(
+                r#"{"name":"a","stream_name":"s","stream_type":"logs","query_mode":"filters",
+                    "detection_function":"count","histogram_interval":"5m",
+                    "schedule_interval":"15m","detection_window_seconds":3600}"#,
+            )
+            .unwrap();
+            assert_eq!(req.alert_budget_per_day, None);
         }
     }
 }

@@ -983,30 +983,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
         );
 
         o2_enterprise::enterprise::anomaly_detection::query_executor::register_alert_sender(
-            |org_id,
-             dest_id,
-             cfg_name,
-             cfg_id,
-             anomaly_count,
-             stream_name,
-             max_deviation_percent,
-             worst_actual_value,
-             window_start_us,
-             window_end_us| {
+            |dest_id, context| {
                 Box::pin(async move {
-                    openobserve_core::anomaly_detection::send_anomaly_alert(
-                        org_id,
-                        dest_id,
-                        cfg_name,
-                        cfg_id,
-                        anomaly_count,
-                        stream_name,
-                        max_deviation_percent,
-                        worst_actual_value,
-                        window_start_us,
-                        window_end_us,
-                    )
-                    .await
+                    openobserve_core::anomaly_detection::send_anomaly_alert(dest_id, context).await
                 })
             },
         );
@@ -1072,6 +1051,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         && !o2_enterprise::enterprise::common::config::get_config()
             .anomaly_detection
             .disabled
+        && anomaly_holds_job_cluster_claim().await
     {
         // Ensure every enabled anomaly config has a live detection trigger after restart.
         // Handles: trigger row missing, or stuck in Processing from a previous crash.
@@ -1327,6 +1307,59 @@ pub async fn init() -> Result<(), anyhow::Error> {
     log::info!("Job initialization complete");
 
     Ok(())
+}
+
+/// Whether this cluster may train and detect anomalies.
+///
+/// Anomaly training was gated only by `is_scheduler()`, so in a super cluster every
+/// scheduler-role region trained the same replicated config and wrote its own
+/// region-local model, score sidecar and `hybrid_bar.zst`. Those artifacts never
+/// replicate, so the regions then judged the same series against different bars — the
+/// single-owner invariant `anomaly_detection::threshold` documents but nothing enforced.
+///
+/// Follows the election, never holds one: registering here would defeat the arbitration
+/// `scheduler::run` performs, since `init` runs before it and would always read back its
+/// own name. Fails CLOSED, unlike the alert-group reaper's fail-open sweep — a read
+/// failure that opens the gate is the duplicate training this exists to prevent, and an
+/// unclaimed key means the election below has simply not resolved yet.
+#[cfg(feature = "enterprise")]
+async fn anomaly_holds_job_cluster_claim() -> bool {
+    use o2_enterprise::enterprise::super_cluster::kv;
+
+    if !get_o2_config().super_cluster.enabled {
+        return true;
+    }
+
+    let claim = match kv::scheduler::get_job_cluster().await {
+        Ok(name) => name,
+        Err(e) => {
+            log::error!("[ANOMALY] could not read the job cluster, not starting: {e}");
+            return false;
+        }
+    };
+    let local = config::get_cluster_name();
+    if claim.is_empty() {
+        log::info!("[ANOMALY] no cluster holds the job-cluster claim yet — not starting");
+        return false;
+    }
+    if claim == local {
+        return true;
+    }
+
+    let live = match kv::cluster::list_by_role_group(None).await {
+        Ok(clusters) => clusters.into_iter().map(|c| c.name).collect::<Vec<_>>(),
+        Err(e) => {
+            log::error!("[ANOMALY] could not list clusters, not starting: {e}");
+            return false;
+        }
+    };
+    // A departed claimant leaves a TTL-less key behind; deferring to it forever would
+    // mean no region ever trains again.
+    let held_elsewhere = kv::scheduler::claim_is_held_elsewhere(&claim, &local, &live);
+    if held_elsewhere {
+        log::info!("[ANOMALY] job cluster is {claim} — anomaly detection not starting here");
+    }
+    !held_elsewhere
 }
 
 /// Additional jobs that init processes should be deferred until the gRPC service

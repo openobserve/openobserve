@@ -204,6 +204,9 @@ export const defaultAnomalyConfig = () => ({
   training_window_days: 14,
   retrain_interval_days: 7,
   threshold: 97,
+  // Budget mode (course-correction Phase B): set only when the backend stored
+  // a budget; undefined/null = percentile mode, exactly today's behaviour.
+  alert_budget_per_day: undefined as number | undefined,
   alert_enabled: true,
   alert_destination_ids: [] as string[],
   folder_id: "default",
@@ -1918,7 +1921,12 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
           detection_window_seconds: anomalyDetectionWindowSeconds.value,
           training_window_days: c.training_window_days,
           retrain_interval_days: c.retrain_interval_days,
-          threshold: c.threshold,
+          // Budget and percentile are mutually exclusive on the wire — the API
+          // rejects both together, and in budget mode `threshold` is
+          // controller-derived state the UI must not write back.
+          ...(Number.isFinite(Number(c.alert_budget_per_day)) && Number(c.alert_budget_per_day) > 0
+            ? { alert_budget_per_day: Number(c.alert_budget_per_day) }
+            : { threshold: c.threshold }),
           alert_enabled: c.alert_enabled,
         },
       };

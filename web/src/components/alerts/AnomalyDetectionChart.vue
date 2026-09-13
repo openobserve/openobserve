@@ -100,8 +100,11 @@ import PanelBar from "@/components/common/PanelBar.vue";
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
 import { chartColor } from "@/utils/chartTheme";
 import { getDefaultDashboardPanelData } from "@/utils/alerts/aggregationPreviewQuery";
+import streamService from "@/services/stream";
 import {
   ANOMALY_DEVIATION_ALIAS,
+  ANOMALY_DROP_ALIAS,
+  ANOMALY_EXPECTED_ALIAS,
   ANOMALY_FLAGGED_ALIAS,
   ANOMALY_SCORE_ALIAS,
   ANOMALY_STREAM,
@@ -111,6 +114,8 @@ import {
   buildAnomalyDeviationQuery,
   buildAnomalyMetricQuery,
   buildAnomalyScoreQuery,
+  NO_KIND_COLUMNS,
+  type AnomalyKindColumns,
 } from "@/utils/alerts/anomalyChartQuery";
 
 const props = defineProps<{ alert: any; anomalyId: string }>();
@@ -123,6 +128,8 @@ const store = useStore();
 const METRIC_TOKEN = "--color-chart-series-1";
 const ANOMALY_TOKEN = "--color-status-error-text";
 const THRESHOLD_TOKEN = "--color-status-warning-text";
+const EXPECTED_TOKEN = "--color-chart-series-2";
+const DROP_TOKEN = "--color-status-warning-text";
 
 const RANGE_MS: Record<string, number> = {
   "1h": 60 * 60 * 1000,
@@ -148,6 +155,32 @@ const rangeOptions = computed(() => [
 ]);
 
 const interval = computed(() => props.alert?.histogram_interval);
+
+// deviation_percent means a different thing per record kind, and the kind
+// flags are only serialized when true — so a stream that never saw a kind has
+// no column for it, and referencing it would fail the query. The schema says
+// which split the stream can express; without it (fetch failure included)
+// the single-series legacy query still renders.
+const kindColumns = ref<AnomalyKindColumns>({ ...NO_KIND_COLUMNS });
+
+async function loadKindColumns() {
+  try {
+    const res = await streamService.schema(
+      store.state.selectedOrganization.identifier,
+      ANOMALY_STREAM,
+      "logs",
+    );
+    const fields: Array<{ name?: string }> = res.data?.schema || res.data?.fields || [];
+    const names = new Set(fields.map((f) => f?.name));
+    kindColumns.value = {
+      isAbsence: names.has("is_absence"),
+      isPartialDrop: names.has("is_partial_drop"),
+      expectedValue: names.has("expected_value"),
+    };
+  } catch {
+    kindColumns.value = { ...NO_KIND_COLUMNS };
+  }
+}
 
 /** Colouring is `colorBySeries`, not the default: these series carry MEANING,
  *  and hashing the series name into the palette would assign it by accident. */
@@ -203,7 +236,7 @@ const buildPanel = (
 const metricPanel = computed(() =>
   buildPanel(
     "line",
-    buildAnomalyMetricQuery(props.anomalyId, interval.value),
+    buildAnomalyMetricQuery(props.anomalyId, interval.value, kindColumns.value),
     [
       { alias: ANOMALY_VALUE_ALIAS, label: t("alerts.anomaly.seriesValue"), color: METRIC_TOKEN },
       {
@@ -211,6 +244,15 @@ const metricPanel = computed(() =>
         label: t("alerts.anomaly.seriesAnomaly"),
         color: ANOMALY_TOKEN,
       },
+      ...(kindColumns.value.expectedValue
+        ? [
+            {
+              alias: ANOMALY_EXPECTED_ALIAS,
+              label: t("alerts.anomaly.seriesExpected"),
+              color: EXPECTED_TOKEN as `--${string}`,
+            },
+          ]
+        : []),
     ],
     "numbers",
     {
@@ -244,13 +286,24 @@ const scorePanel = computed(() =>
 const deviationPanel = computed(() =>
   buildPanel(
     "bar",
-    buildAnomalyDeviationQuery(props.anomalyId, interval.value),
+    buildAnomalyDeviationQuery(props.anomalyId, interval.value, kindColumns.value),
     [
       {
         alias: ANOMALY_DEVIATION_ALIAS,
-        label: t("alerts.anomaly.seriesDeviation"),
+        label: t("alerts.anomaly.seriesScoreDeviation"),
         color: ANOMALY_TOKEN,
       },
+      // Value-space %, not score-space % — its own labelled series, never
+      // folded into the scored one.
+      ...(kindColumns.value.isPartialDrop
+        ? [
+            {
+              alias: ANOMALY_DROP_ALIAS,
+              label: t("alerts.anomaly.seriesDropDeviation"),
+              color: DROP_TOKEN as `--${string}`,
+            },
+          ]
+        : []),
     ],
     "percent",
   ),
@@ -296,5 +349,8 @@ const onRangeChange = (value: unknown) => {
 };
 
 watch(() => props.anomalyId, setTimeRange);
-onMounted(setTimeRange);
+onMounted(() => {
+  setTimeRange();
+  loadKindColumns();
+});
 </script>

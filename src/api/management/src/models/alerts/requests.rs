@@ -150,6 +150,9 @@ pub struct AnomalyAlertFields {
         deserialize_with = "config::meta::slo::lenient_f64::deserialize_opt"
     )]
     pub percentile: Option<f64>,
+    /// Delivered-alert budget per day; mutually exclusive with `percentile`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub alert_budget_per_day: Option<f64>,
     pub rcf_num_trees: Option<i32>,
     pub rcf_tree_size: Option<i32>,
     pub rcf_shingle_size: Option<i32>,
@@ -343,6 +346,9 @@ pub struct UpdateAnomalyAlertFields {
         deserialize_with = "config::meta::slo::lenient_f64::deserialize_opt"
     )]
     pub percentile: Option<f64>,
+    /// Set-only through this endpoint: clearing a budget goes through the direct anomaly API.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub alert_budget_per_day: Option<f64>,
     pub alert_enabled: Option<bool>,
     pub enabled: Option<bool>,
     /// Moves the config to this folder. Naming a folder you cannot write to
