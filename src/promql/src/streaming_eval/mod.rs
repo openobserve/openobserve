@@ -16,14 +16,12 @@
 //! Consumers of a `SeriesStream`: the fused aggregate folds each series into per-group
 //! accumulators as it arrives, `eval_range` keeps every series' range-function output whole.
 
-mod accumulator;
 mod aggregate;
 mod eval_range;
 mod range_expr;
 
 use std::sync::Arc;
 
-pub(crate) use accumulator::FusedAggOp;
 pub(crate) use aggregate::aggregate;
 use datafusion::error::{DataFusionError, Result};
 pub(crate) use eval_range::eval_range;

@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           table-id="iam-organizations-list"
         >
           <template #toolbar>
-            <div class="flex w-full items-center gap-2">
+            <div class="flex w-full items-center gap-2 max-lg:min-w-0 max-md:contents">
               <OSearchInput
                 v-model="filterQuery"
                 :placeholder="t('organization.search')"
@@ -112,6 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="organization-name-edit"
                 variant="ghost"
                 size="icon-sm"
+                class="max-md:hidden"
                 :title="t('iam.listOrganizations.edit')"
                 @click="renameOrganization(row)"
               >
@@ -122,11 +123,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="organization-delete"
                 variant="ghost"
                 size="icon-sm"
+                class="max-md:hidden"
                 :title="t('iam.listOrganizations.deleteOrganization')"
                 @click="deleteOrganization(row)"
               >
                 <OIcon name="delete" size="sm" />
               </OButton>
+              <ODropdown side="bottom" align="end">
+                <template #trigger>
+                  <OButton
+                    icon-left="more-vert"
+                    :title="t('dashboard.moreActions')"
+                    variant="ghost"
+                    size="icon-xs-sq"
+                    class="md:hidden"
+                    data-test="organization-row-more-actions"
+                    @click.stop
+                  />
+                </template>
+                <ODropdownItem
+                  icon-left="edit"
+                  class="md:hidden"
+                  data-test="organization-name-edit-menu"
+                  @select="renameOrganization(row)"
+                >
+                  <span>{{ t("iam.listOrganizations.edit") }}</span>
+                </ODropdownItem>
+                <ODropdownItem
+                  v-if="canDeleteOrg(row)"
+                  icon-left="delete"
+                  variant="destructive"
+                  class="md:hidden"
+                  data-test="organization-delete-menu"
+                  @select="deleteOrganization(row)"
+                >
+                  <span>{{ t("iam.listOrganizations.deleteOrganization") }}</span>
+                </ODropdownItem>
+              </ODropdown>
             </div>
           </template>
         </OTable>
@@ -154,6 +187,8 @@ import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import AddUpdateOrganization from "@/components/iam/organizations/AddUpdateOrganization.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OCodeCell from "@/lib/core/Table/cells/OCodeCell.vue";
@@ -177,6 +212,8 @@ export default defineComponent({
     AddUpdateOrganization,
     OEmptyState,
     OButton,
+    ODropdown,
+    ODropdownItem,
     OTooltip,
     OTag,
     OPageLayout,

@@ -25,8 +25,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   of the row without owning its contents.
 -->
 <template>
-  <div class="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
-    <div class="w-64 shrink-0">
+  <div
+    class="flex min-w-0 flex-1 items-center gap-2 overflow-hidden max-lg:flex-wrap max-lg:overflow-visible"
+  >
+    <div class="w-64 shrink-0 max-lg:order-last max-lg:w-full max-lg:basis-full">
       <OSearchInput
         :model-value="search"
         :placeholder="placeholder"

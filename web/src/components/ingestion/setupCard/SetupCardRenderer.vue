@@ -1116,6 +1116,16 @@ function fireConfetti() {
 .step-inputs :deep(label) {
   margin-bottom: 0.125rem;
 }
+@media (max-width: 47.9375rem) {
+  .step-inputs > *,
+  .step-inputs :deep(.w-field-width-md) {
+    max-width: 100%;
+  }
+  .variant-tabs {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+}
 
 /* ---- steps (lib OStepper in expanded mode) — only the per-step body content
    is styled here; the rail (indicator/connector/title) comes from OStepper. ---- */

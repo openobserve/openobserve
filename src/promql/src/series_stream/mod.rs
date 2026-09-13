@@ -65,10 +65,11 @@ mod tests {
         plan::{StreamingSelector, execute_partitioned, group_label_columns},
     };
     use crate::{
+        aggregations::AggOp,
         functions::{self, RangeFunc},
         micros,
         streaming_eval::{
-            FusedAggOp, RangeExpr, aggregate,
+            RangeExpr, aggregate,
             tests::{BASE, SECOND, eval_ctx},
         },
     };
@@ -233,7 +234,7 @@ mod tests {
         ctx: &SessionContext,
         modifier: &Option<LabelModifier>,
         func_name: &str,
-        op: FusedAggOp,
+        op: AggOp,
         range: Duration,
     ) -> Option<Value> {
         let func: Arc<dyn RangeFunc> = Arc::from(functions::fusable_range_func(func_name).unwrap());

@@ -34,7 +34,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     :class="[
+      // Safe centering keeps the top reachable once the stack overflows its pane and scrolls.
       'o2-empty-state relative flex flex-col items-center justify-center overflow-hidden',
+      'max-lg:justify-center-safe max-lg:overflow-x-hidden max-lg:overflow-y-auto',
       '[--empty-dot:var(--color-grey-300)] dark:[--empty-dot:var(--color-grey-800)]',
       sizeClass.root,
       { 'o2-empty-state--hero': size === 'hero' },
@@ -49,8 +51,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :style="dotGridStyle"
     />
 
+    <!-- max-w-full: the stack otherwise sizes to its widest child (the no-wrap action-card row). -->
     <div
-      :class="['relative flex w-full min-w-0 flex-col items-center text-center', sizeClass.stack]"
+      :class="[
+        'relative flex w-full max-w-full min-w-0 flex-col items-center text-center',
+        sizeClass.stack,
+      ]"
     >
       <!-- illustration (hero/block) — preset/illustration prop or slot -->
       <div v-if="hasIllustration" class="shrink-0">
@@ -97,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :class="[
           props.columns
             ? 'flex flex-wrap justify-center'
-            : 'flex flex-nowrap items-stretch justify-center',
+            : 'flex items-stretch justify-center max-lg:flex-wrap lg:flex-nowrap',
           sizeClass.actions,
         ]"
       >

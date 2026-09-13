@@ -87,6 +87,9 @@ Rule of thumb: **Tooltip = hint, Dropdown = action menu, Popover = anything free
 - `seamless` (boolean — default `false`; hides the backdrop so the page stays interactive)
 - `lazy` (boolean — default `true`; body slot mounts on open and is destroyed on close — set `false` to preserve child state across open/close)
 - `portalTarget` (string selector | HTMLElement | null — scope the drawer to a container with `position:absolute`; the target needs `position:relative; overflow:hidden`)
+- `anchor` (string selector | HTMLElement — the drawer and its backdrop start at this element's edge instead of the viewport top, so a mobile side panel opens from its trigger's row; re-measured on open and resize)
+- `anchorEdge` (`"top"|"bottom"` — default `"top"`; use `"bottom"` when the trigger lives in the header itself)
+- Below md a `width` is clamped to at least 88% so a "40%" drawer is still usable on a phone. See [responsive § Side panels](responsive.md#side-panels-open-from-their-own-row).
 - Shared with ODialog: `open`, `persistent`, `title`, `subTitle`, `showClose`, `formId`, all `…ButtonLabel`/`…ButtonVariant`/`…ButtonDisabled`/`…ButtonLoading`
 
 **Slots:** `trigger`, `header`, `header-left`, `header-right`, `default`, `footer` (identical to ODialog)

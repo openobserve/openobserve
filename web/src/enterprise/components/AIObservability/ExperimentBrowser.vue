@@ -230,6 +230,7 @@
                     : t('aiObservability.experiments.setBaseline')
                 "
                 :disabled="baselineChangingId === row.id || !canSetBaseline(row)"
+                class="max-md:hidden"
                 :data-test="`ai-experiment-baseline-${row.id}`"
                 @click.stop="toggleBaseline(row)"
               />
@@ -240,11 +241,46 @@
               icon-left="content-copy"
               :disabled="cloningId === row.id"
               :aria-label="t('aiObservability.experiments.clone')"
+              class="max-md:hidden"
               :data-test="`ai-experiment-clone-${row.id}`"
               @click.stop="cloneExperiment(row)"
             >
               <OTooltip side="bottom" :content="t('aiObservability.experiments.clone')" />
             </OButton>
+            <ODropdown side="bottom" align="end">
+              <template #trigger>
+                <OButton
+                  icon-left="more-vert"
+                  variant="ghost"
+                  size="icon-xs-sq"
+                  class="md:hidden"
+                  data-test="ai-experiment-actions-menu-btn"
+                  @click.stop
+                />
+              </template>
+              <ODropdownItem
+                :icon-left="isBaseline(row) ? 'keep' : 'keep-outline'"
+                class="md:hidden"
+                :disabled="baselineChangingId === row.id || !canSetBaseline(row)"
+                :data-test="`ai-experiment-baseline-${row.id}-menu`"
+                @select="toggleBaseline(row)"
+              >
+                <span>{{
+                  isBaseline(row)
+                    ? t("aiObservability.experiments.clearBaseline")
+                    : t("aiObservability.experiments.setBaseline")
+                }}</span>
+              </ODropdownItem>
+              <ODropdownItem
+                icon-left="content-copy"
+                class="md:hidden"
+                :disabled="cloningId === row.id"
+                :data-test="`ai-experiment-clone-${row.id}-menu`"
+                @select="cloneExperiment(row)"
+              >
+                <span>{{ t("aiObservability.experiments.clone") }}</span>
+              </ODropdownItem>
+            </ODropdown>
           </div>
         </template>
       </OTable>
@@ -259,6 +295,8 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OInput from "@/lib/forms/Input/OInput.vue";

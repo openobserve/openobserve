@@ -232,8 +232,9 @@ mod tests {
 
     use super::super::{matrix::group_sources, plan::series_label_columns, tests::*};
     use crate::{
+        aggregations::AggOp,
         functions::{self, RangeFunc},
-        streaming_eval::{FusedAggOp, RangeExpr, aggregate, eval_range, tests::*},
+        streaming_eval::{RangeExpr, aggregate, eval_range, tests::*},
     };
 
     #[tokio::test]
@@ -243,14 +244,14 @@ mod tests {
         let range = Duration::from_secs(60);
 
         let agg_cases = [
-            FusedAggOp::Avg,
-            FusedAggOp::Count,
-            FusedAggOp::Group,
-            FusedAggOp::Max,
-            FusedAggOp::Min,
-            FusedAggOp::Stddev,
-            FusedAggOp::Stdvar,
-            FusedAggOp::Sum,
+            AggOp::Avg,
+            AggOp::Count,
+            AggOp::Group,
+            AggOp::Max,
+            AggOp::Min,
+            AggOp::Stddev,
+            AggOp::Stdvar,
+            AggOp::Sum,
         ];
         let func_cases = ["rate", "increase", "sum_over_time", "last_over_time"];
         let modifiers = [
@@ -279,10 +280,7 @@ mod tests {
                     assert_matrix_close(
                         canonical_matrix(expected),
                         canonical_matrix(actual),
-                        &format!(
-                            "streaming {}({func_name}) (modifier: {modifier:?})",
-                            op.name()
-                        ),
+                        &format!("streaming {op:?}({func_name}) (modifier: {modifier:?})"),
                     );
                 }
             }
