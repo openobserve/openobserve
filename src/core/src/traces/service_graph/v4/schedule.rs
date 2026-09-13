@@ -1,0 +1,878 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+//! Stream discovery, org gate, claim, learning trigger and the per-stream window loop.
+
+use std::sync::{Arc, atomic::Ordering};
+
+use config::{
+    cluster::LOCAL_NODE,
+    meta::stream::{StreamStats, StreamType},
+    utils::time::now_micros,
+};
+use futures::StreamExt;
+use infra::{cluster::get_node_by_uuid, dist_lock};
+use tokio::sync::{Mutex, RwLock};
+
+use super::{
+    LEARN_INTERVAL_SECS, MAX_BACKLOG_MICROS, MAX_WINDOWS_PER_TICK, MICROS, ORG_TABLES,
+    PROCESSED_TIMESTAMP_STREAM, RETAINED, SNAPSHOT_INTERVAL_SECS, STARTED_AT_WRITTEN,
+    STREAM_STATES, Settings, TableRef, V1_STOP_AFTER_MICROS,
+    handoff::{AgentProgress, handoff_boundary, load_progress},
+    resolution::{ResolutionTable, read_snapshot_file, snapshot_path, write_snapshot_file},
+    resolve::{SeriesKey, Staging},
+    sql::{
+        Columns, Q1Row, Q1kRow, Q2Row, Q3Row, QlRow, WindowCounts, build_q1, build_q1k, build_q2,
+        build_q3, build_ql, validate_stream_name,
+    },
+    state::{Batch, StreamState},
+    stream_concurrency, writer,
+};
+use crate::{
+    db::service_graph::{
+        get_agent_signals_handoff, get_agent_signals_progress, get_started_at, get_v1_drained,
+        get_v4_offset, is_v1_stopped, set_agent_signals_handoff_if_absent,
+        set_agent_signals_progress, set_started_at_if_absent, set_v1_stopped_if_absent,
+        set_v4_offset, v4_offset_key,
+    },
+    traces::service_graph::run_graph_search,
+};
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ClaimDecision {
+    Skip,
+    Owned,
+    Claim,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum LearnKind {
+    Q1k,
+    Ql,
+}
+
+struct StreamJob {
+    org: String,
+    stream: String,
+    offset: i64,
+    table: TableRef,
+}
+
+struct WindowRows {
+    q1: Vec<Q1Row>,
+    q2: Vec<Q2Row>,
+    q3: Vec<Q3Row>,
+}
+
+/// The four cases of design §8.3: unclaimed, ours, another live node's, a dead node's.
+pub fn claim_decision(node: &str, local: &str, node_alive: bool) -> ClaimDecision {
+    if node.is_empty() {
+        ClaimDecision::Claim
+    } else if node == local {
+        ClaimDecision::Owned
+    } else if node_alive {
+        ClaimDecision::Skip
+    } else {
+        ClaimDecision::Claim
+    }
+}
+
+pub fn align_down(ts: i64, flush: i64) -> i64 {
+    ts - ts.rem_euclid(flush.max(1))
+}
+
+pub fn initial_offset(offset: i64, horizon: i64, flush: i64, max_backlog: i64) -> (i64, bool) {
+    if offset == 0 {
+        (align_down(horizon, flush), false)
+    } else if horizon - offset > max_backlog {
+        (align_down(horizon, flush), true)
+    } else {
+        (offset, false)
+    }
+}
+
+pub fn window_ends(offset: i64, horizon: i64, flush: i64, max_windows: usize) -> Vec<i64> {
+    let flush = flush.max(1);
+    let mut ends = vec![];
+    let mut end = offset + flush;
+    while end <= horizon && ends.len() < max_windows {
+        ends.push(end);
+        end += flush;
+    }
+    ends
+}
+
+/// Default / missing stats mean "no data yet", never "old data".
+pub fn data_old_enough(stats: &StreamStats, now: i64) -> bool {
+    stats.doc_num > 0 && stats.doc_time_min > 0 && stats.doc_time_min <= now - V1_STOP_AFTER_MICROS
+}
+
+/// A QL pass that was needed but failed keeps its trigger so the range is retried, not skipped.
+pub fn settle_ql_trigger(table: &mut ResolutionTable, need_ql: bool, ql_ok: bool, horizon: i64) {
+    if !need_ql {
+        table.ql_up_to = table.ql_up_to.max(horizon);
+    } else if ql_ok {
+        table.has_unresolved = false;
+    }
+}
+
+pub async fn run_tick(settings: &Settings) {
+    let now = now_micros();
+    let v1_stopped = is_v1_stopped().await;
+    let discovered = discover().await;
+    let orgs: Vec<String> = discovered.iter().map(|(org, _)| org.clone()).collect();
+    if !v1_stopped {
+        maybe_stop_v1(&orgs, now).await;
+    }
+    let handoff = if v1_stopped {
+        agent_signals_handoff(now).await
+    } else {
+        None
+    };
+
+    let mut jobs = vec![];
+    for (org, streams) in discovered {
+        if !org_allowed(&org).await {
+            continue;
+        }
+        let mut claimed = vec![];
+        for stream in &streams {
+            if let Some(offset) = claim_stream(&org, stream).await {
+                claimed.push((stream.clone(), offset));
+            }
+        }
+        if claimed.is_empty() {
+            continue;
+        }
+        let offsets: Vec<i64> = claimed.iter().map(|(_, o)| *o).collect();
+        let table = org_table(&org, &offsets, settings, now).await;
+        let learn_due = now - table.read().await.last_learn_at >= LEARN_INTERVAL_SECS * MICROS;
+        if learn_due {
+            learn_org(&org, &streams, &table, settings, now).await;
+        }
+        snapshot_if_due(&org, &table, now).await;
+        jobs.extend(claimed.into_iter().map(|(stream, offset)| StreamJob {
+            org: org.clone(),
+            stream,
+            offset,
+            table: table.clone(),
+        }));
+    }
+
+    let settings = *settings;
+    futures::stream::iter(jobs)
+        .for_each_concurrent(stream_concurrency(), |job| async move {
+            process_stream(job, &settings, now, handoff).await;
+        })
+        .await;
+}
+
+async fn discover() -> Vec<(String, Vec<String>)> {
+    let orgs = match crate::organization::list_all_orgs(None).await {
+        Ok(orgs) => orgs,
+        Err(e) => {
+            log::error!("[ServiceGraph] org list failed, skipping tick: {e}");
+            return vec![];
+        }
+    };
+    let mut grouped = crate::db::schema::list_all_streams_grouped().await;
+    let mut out = vec![];
+    for org in orgs {
+        let Some(streams) = grouped
+            .get_mut(&org.identifier)
+            .and_then(|types| types.remove(&StreamType::Traces))
+        else {
+            continue;
+        };
+        let valid: Vec<String> = streams
+            .into_iter()
+            .filter(|s| {
+                let ok = validate_stream_name(s);
+                if !ok {
+                    log::warn!(
+                        "[ServiceGraph] {}/{s}: invalid stream name, skipped",
+                        org.identifier
+                    );
+                }
+                ok
+            })
+            .collect();
+        if !valid.is_empty() {
+            out.push((org.identifier, valid));
+        }
+    }
+    out
+}
+
+/// Mirrors the two sources `check_ingestion_allowed` reads; that function is ingester-only.
+async fn org_allowed(org: &str) -> bool {
+    if crate::db::file_list::BLOCKED_ORGS.contains(org) {
+        return false;
+    }
+    #[cfg(feature = "cloud")]
+    match crate::organization::is_org_in_free_trial_period(org).await {
+        Ok(true) => {}
+        Ok(false) => return false,
+        Err(e) => {
+            log::warn!("[ServiceGraph] org {org}: trial check failed, skipped this tick: {e}");
+            return false;
+        }
+    }
+    true
+}
+
+async fn claim_stream(org: &str, stream: &str) -> Option<i64> {
+    let (offset, node) = get_v4_offset(org, stream).await;
+    match claim_decision(&node, &LOCAL_NODE.uuid, node_alive(&node).await) {
+        ClaimDecision::Skip => None,
+        ClaimDecision::Owned => Some(offset),
+        ClaimDecision::Claim => claim_under_lock(org, stream).await,
+    }
+}
+
+async fn node_alive(node: &str) -> bool {
+    !node.is_empty() && node != LOCAL_NODE.uuid && get_node_by_uuid(node).await.is_some()
+}
+
+/// Re-reads the offset inside the lock because another scheduler may have claimed it first.
+async fn claim_under_lock(org: &str, stream: &str) -> Option<i64> {
+    let key = v4_offset_key(org, stream);
+    let locker = match dist_lock::lock(&key, 0).await {
+        Ok(l) => l,
+        Err(e) => {
+            log::warn!("[ServiceGraph] {org}/{stream}: claim lock failed: {e}");
+            return None;
+        }
+    };
+    let (offset, node) = get_v4_offset(org, stream).await;
+    let decision = claim_decision(&node, &LOCAL_NODE.uuid, node_alive(&node).await);
+    let claimed = if decision == ClaimDecision::Skip {
+        None
+    } else {
+        match set_v4_offset(org, stream, offset, &LOCAL_NODE.uuid).await {
+            Ok(()) => Some(offset),
+            Err(e) => {
+                log::warn!("[ServiceGraph] {org}/{stream}: claim write failed: {e}");
+                None
+            }
+        }
+    };
+    if let Err(e) = dist_lock::unlock(&locker).await {
+        log::warn!("[ServiceGraph] {org}/{stream}: claim unlock failed: {e}");
+    }
+    claimed
+}
+
+/// Write-once switch: v4 has run for 7 days and its output stream really holds 7-day-old data.
+async fn maybe_stop_v1(orgs: &[String], now: i64) {
+    if orgs.is_empty() {
+        return;
+    }
+    let Some(started_at) = get_started_at().await else {
+        return;
+    };
+    if now - started_at < V1_STOP_AFTER_MICROS {
+        return;
+    }
+    let old_enough = orgs.iter().any(|org| {
+        let stats = infra::cache::stats::get_stream_stats(
+            org,
+            PROCESSED_TIMESTAMP_STREAM,
+            StreamType::Metrics,
+        );
+        data_old_enough(&stats, now)
+    });
+    if !old_enough {
+        return;
+    }
+    match set_v1_stopped_if_absent().await {
+        Ok(()) => log::info!("[ServiceGraph] v4 has 7 days of data, v1 job stopped"),
+        Err(e) => log::warn!("[ServiceGraph] failed to write v1 stopped flag: {e}"),
+    }
+}
+
+/// Written once after v1 drained; the v1 offset is read only after no run can still be in flight.
+async fn agent_signals_handoff(now: i64) -> Option<i64> {
+    if let Some(boundary) = get_agent_signals_handoff().await {
+        return Some(boundary);
+    }
+    let ack = get_v1_drained().await;
+    let (v1_offset, holder) = crate::db::service_graph::get_offset().await;
+    let alive = !holder.is_empty() && get_node_by_uuid(&holder).await.is_some();
+    let v1_offset_after_drain = || v1_offset;
+    let boundary = handoff_boundary(ack, &holder, alive, v1_offset_after_drain, now)?;
+    if let Err(e) = set_agent_signals_handoff_if_absent(boundary).await {
+        log::warn!("[ServiceGraph] failed to record agent-signals handoff: {e}");
+        return None;
+    }
+    let boundary = get_agent_signals_handoff().await;
+    log::info!("[ServiceGraph] v1 drained, v4 owns agent signals from {boundary:?}");
+    boundary
+}
+
+async fn org_table(org: &str, claimed_offsets: &[i64], settings: &Settings, now: i64) -> TableRef {
+    if let Some(t) = ORG_TABLES.get(org) {
+        return t.clone();
+    }
+    let path = snapshot_path(org);
+    let loaded = tokio::task::spawn_blocking(move || read_snapshot_file(&path, now))
+        .await
+        .ok()
+        .flatten();
+    // learning never reaches further back than the offset backlog jump does
+    let floor = now - MAX_BACKLOG_MICROS;
+    let mut table = loaded.unwrap_or_else(|| {
+        let boundary = ResolutionTable::cold_start_boundary(claimed_offsets, settings.horizon(now));
+        ResolutionTable::new(boundary, boundary)
+    });
+    table.q1k_up_to = table.q1k_up_to.max(floor);
+    table.ql_up_to = table.ql_up_to.max(floor);
+    table.last_snapshot_at = now;
+    let table = Arc::new(RwLock::new(table));
+    ORG_TABLES.insert(org.to_string(), table.clone());
+    table
+}
+
+async fn learn_org(org: &str, streams: &[String], table: &TableRef, settings: &Settings, now: i64) {
+    let (q1k_from, ql_from, need_ql) = {
+        let mut t = table.write().await;
+        t.last_learn_at = now;
+        t.learn_gen += 1;
+        t.prune(now);
+        (t.q1k_up_to, t.ql_up_to, t.has_unresolved)
+    };
+    let horizon = settings.horizon(now);
+    let mut cols_by_stream = vec![];
+    for stream in streams {
+        match infra::schema::get(org, stream, StreamType::Traces).await {
+            Ok(schema) => {
+                let cols = Columns::from_schema(&schema);
+                if cols.has_required() {
+                    cols_by_stream.push((stream.clone(), cols));
+                }
+            }
+            Err(e) => {
+                log::warn!("[ServiceGraph] {org}/{stream}: schema unavailable for learning: {e}")
+            }
+        }
+    }
+    learn_chunks(
+        org,
+        &cols_by_stream,
+        table,
+        q1k_from,
+        horizon,
+        now,
+        LearnKind::Q1k,
+    )
+    .await;
+    let ql_ok = if need_ql {
+        learn_chunks(
+            org,
+            &cols_by_stream,
+            table,
+            ql_from,
+            horizon,
+            now,
+            LearnKind::Ql,
+        )
+        .await
+    } else {
+        false
+    };
+    settle_ql_trigger(&mut *table.write().await, need_ql, ql_ok, horizon);
+}
+
+/// `LEARN_INTERVAL` chunks; a boundary moves only after a fully successful chunk.
+async fn learn_chunks(
+    org: &str,
+    streams: &[(String, Columns)],
+    table: &TableRef,
+    from: i64,
+    horizon: i64,
+    now: i64,
+    kind: LearnKind,
+) -> bool {
+    let step = LEARN_INTERVAL_SECS * MICROS;
+    let mut start = from;
+    while start < horizon {
+        let end = (start + step).min(horizon);
+        let mut hits = vec![];
+        for (stream, cols) in streams {
+            let sql = match kind {
+                LearnKind::Q1k => Some(build_q1k(cols, stream, start, end)),
+                LearnKind::Ql => build_ql(cols, stream, start, end),
+            };
+            let Some(sql) = sql else {
+                continue;
+            };
+            match run_graph_search(org, sql, start, end).await {
+                Ok(rows) => hits.extend(rows),
+                Err(e) => {
+                    log::warn!(
+                        "[ServiceGraph] {org}/{stream}: {kind:?} learning failed at {start}: {e}"
+                    );
+                    return false;
+                }
+            }
+        }
+        let mut t = table.write().await;
+        match kind {
+            LearnKind::Q1k => {
+                let rows: Vec<Q1kRow> = hits.iter().filter_map(Q1kRow::parse).collect();
+                t.learn_q1k(&rows, now);
+                t.q1k_up_to = end;
+            }
+            LearnKind::Ql => {
+                let rows: Vec<QlRow> = hits.iter().filter_map(QlRow::parse).collect();
+                t.learn_ql(&rows, now);
+                t.ql_up_to = end;
+            }
+        }
+        start = end;
+    }
+    true
+}
+
+async fn snapshot_if_due(org: &str, table: &TableRef, now: i64) {
+    let bytes = {
+        let mut t = table.write().await;
+        if now - t.last_snapshot_at < SNAPSHOT_INTERVAL_SECS * MICROS {
+            return;
+        }
+        t.last_snapshot_at = now;
+        match t.to_snapshot_json() {
+            Ok(b) => b,
+            Err(e) => {
+                log::warn!("[ServiceGraph] org {org}: snapshot serialize failed: {e}");
+                return;
+            }
+        }
+    };
+    let path = snapshot_path(org);
+    match tokio::task::spawn_blocking(move || write_snapshot_file(&path, &bytes)).await {
+        Ok(Ok(())) => {}
+        Ok(Err(e)) => log::warn!("[ServiceGraph] org {org}: snapshot write failed: {e}"),
+        Err(e) => log::warn!("[ServiceGraph] org {org}: snapshot task failed: {e}"),
+    }
+}
+
+async fn process_stream(job: StreamJob, settings: &Settings, now: i64, handoff: Option<i64>) {
+    let (org, stream) = (job.org.as_str(), job.stream.as_str());
+    let state_arc = STREAM_STATES
+        .entry((job.org.clone(), job.stream.clone()))
+        .or_insert_with(|| Arc::new(Mutex::new(StreamState::new())))
+        .clone();
+    let mut state = state_arc.lock().await;
+
+    if let Some(batch) = state.pending.take()
+        && !deliver(org, stream, &mut state, batch).await
+    {
+        return;
+    }
+    apply_staging(org, stream, &mut state, &job.table, now).await;
+
+    let horizon = settings.horizon(now);
+    let flush = settings.flush_micros();
+    let (offset, jumped) = initial_offset(job.offset, horizon, flush, MAX_BACKLOG_MICROS);
+    if offset != job.offset {
+        if jumped {
+            log::warn!(
+                "[ServiceGraph] {org}/{stream}: offset {} too far behind, jumping to {offset}",
+                job.offset
+            );
+        }
+        if let Err(e) = set_v4_offset(org, stream, offset, &LOCAL_NODE.uuid).await {
+            log::error!("[ServiceGraph] {org}/{stream}: offset write failed: {e}");
+            return;
+        }
+    }
+    let schema = match infra::schema::get(org, stream, StreamType::Traces).await {
+        Ok(s) => s,
+        Err(e) => {
+            log::warn!("[ServiceGraph] {org}/{stream}: schema unavailable, skipped this tick: {e}");
+            return;
+        }
+    };
+    let cols = Columns::from_schema(&schema);
+    if !cols.has_required() {
+        log::warn!(
+            "[ServiceGraph] {org}/{stream}: schema lacks service_name or span_kind, skipped"
+        );
+        return;
+    }
+    let mut progress = match handoff {
+        Some(_) => {
+            let read = get_agent_signals_progress(org, stream).await;
+            if let Err(e) = &read {
+                log::warn!(
+                    "[AgentSignals] {org}/{stream}: progress read failed, skipped this tick: {e}"
+                );
+            }
+            load_progress(read)
+        }
+        None => None,
+    };
+    for end in window_ends(offset, horizon, flush, MAX_WINDOWS_PER_TICK) {
+        let start = end - flush;
+        if let Err(e) = process_window(&job, &cols, (start, end), now, settings, &mut state).await {
+            log::error!("[ServiceGraph] {org}/{stream}: window [{start}, {end}) stopped: {e}");
+            break;
+        }
+        if let Some(progress) = progress.as_mut() {
+            advance_agent_signals(org, stream, handoff, progress, end).await;
+        }
+    }
+}
+
+/// The pending range is durable before ingestion and retried as is until its end is durable.
+async fn advance_agent_signals(
+    org: &str,
+    stream: &str,
+    handoff: Option<i64>,
+    progress: &mut AgentProgress,
+    end: i64,
+) {
+    loop {
+        let had_pending = progress.pending.is_some();
+        let Some((from, to)) = progress.begin(handoff, end) else {
+            return;
+        };
+        if !had_pending && !persist_progress(org, stream, progress).await {
+            progress.pending = None;
+            return;
+        }
+        if progress.needs_ingest() {
+            if !run_agent_signals(org, stream, from, to).await {
+                return;
+            }
+            progress.mark_delivered();
+        }
+        let mut durable = progress.clone();
+        durable.mark_durable();
+        if !persist_progress(org, stream, &durable).await {
+            return;
+        }
+        *progress = durable;
+        if to >= end {
+            return;
+        }
+    }
+}
+
+async fn persist_progress(org: &str, stream: &str, progress: &AgentProgress) -> bool {
+    match set_agent_signals_progress(org, stream, &progress.encode()).await {
+        Ok(()) => true,
+        Err(e) => {
+            log::warn!("[AgentSignals] {org}/{stream}: progress write failed: {e}");
+            false
+        }
+    }
+}
+
+async fn run_agent_signals(org: &str, stream: &str, start: i64, end: i64) -> bool {
+    #[cfg(feature = "enterprise")]
+    if let Err(e) =
+        crate::traces::agent_signals::process_agent_signals_stream(org, stream, start, end).await
+    {
+        log::error!("[AgentSignals] Failed for stream {org}/{stream} [{start}, {end}): {e}");
+        return false;
+    }
+    #[cfg(not(feature = "enterprise"))]
+    let _ = (org, stream, start, end);
+    true
+}
+
+async fn apply_staging(
+    org: &str,
+    stream: &str,
+    state: &mut StreamState,
+    table: &TableRef,
+    now: i64,
+) {
+    let t = table.read().await;
+    if t.learn_gen == state.staging_gen {
+        return;
+    }
+    state.staging_gen = t.learn_gen;
+    if state.staging.is_empty() {
+        return;
+    }
+    let admissions = state.staging.learning_pass(&t, now);
+    drop(t);
+    for tier in admissions.iter().filter_map(|adm| adm.tier) {
+        config::metrics::O2_SERVICE_GRAPH_RESOLVED_TOTAL
+            .with_label_values(&[org, tier.as_str()])
+            .inc();
+    }
+    let admissions = admissions
+        .into_iter()
+        .map(|adm| (adm.key, adm.windows))
+        .collect();
+    state.admit_staged(org, admissions, now);
+    update_retained(org, stream, state);
+}
+
+async fn process_window(
+    job: &StreamJob,
+    cols: &Columns,
+    (start, end): (i64, i64),
+    now: i64,
+    settings: &Settings,
+    state: &mut StreamState,
+) -> Result<(), anyhow::Error> {
+    let (org, stream, table) = (job.org.as_str(), job.stream.as_str(), &job.table);
+    let rows = fetch_window(org, stream, cols, start, end).await?;
+    set_v4_offset(org, stream, end, &LOCAL_NODE.uuid)
+        .await
+        .map_err(|e| anyhow::anyhow!("offset write failed: {e}"))?;
+
+    let max_windows = Staging::max_windows(settings.flush_secs);
+    let (contributions, staged) = {
+        let t = table.read().await;
+        window_contributions(org, state, &t, &rows, now, end, max_windows)
+    };
+    if staged > 0 {
+        table.write().await.has_unresolved = true;
+    }
+    let report = state.merge_window(org, end, now, rows.q1.len(), contributions);
+    let excess = state.staging.len().saturating_sub(state.budgets.edges);
+    if excess > 0 {
+        let early = state
+            .staging
+            .finalize_oldest(excess)
+            .into_iter()
+            .map(|adm| (adm.key, adm.windows))
+            .collect();
+        state.admit_staged(org, early, now);
+    }
+    if report.dropped_cardinality > 0 || report.evicted_cap > 0 {
+        log::warn!("[ServiceGraph] {org}/{stream}: window {end}: {report:?}");
+    }
+    update_retained(org, stream, state);
+    let batch = state.emit(end);
+    if !deliver(org, stream, state, batch).await {
+        return Err(anyhow::anyhow!("metrics write failed, batch kept pending"));
+    }
+    Ok(())
+}
+
+/// Q1/Q2 failures abort the window (offset untouched); a Q3 failure only loses consumer edges.
+async fn fetch_window(
+    org: &str,
+    stream: &str,
+    cols: &Columns,
+    start: i64,
+    end: i64,
+) -> Result<WindowRows, anyhow::Error> {
+    let q1: Vec<Q1Row> = run_graph_search(org, build_q1(cols, stream, start, end), start, end)
+        .await
+        .map_err(|e| anyhow::anyhow!("Q1 failed: {e}"))?
+        .iter()
+        .filter_map(Q1Row::parse)
+        .collect();
+    let q2: Vec<Q2Row> = run_graph_search(org, build_q2(cols, stream, start, end), start, end)
+        .await
+        .map_err(|e| anyhow::anyhow!("Q2 failed: {e}"))?
+        .iter()
+        .filter_map(Q2Row::parse)
+        .collect();
+    let q3 = match build_q3(cols, stream, start, end) {
+        Some(sql) => match run_graph_search(org, sql, start, end).await {
+            Ok(hits) => hits.iter().filter_map(Q3Row::parse).collect(),
+            Err(e) => {
+                log::error!("[ServiceGraph] {org}/{stream}: Q3 failed for window {end}: {e}");
+                vec![]
+            }
+        },
+        None => vec![],
+    };
+    Ok(WindowRows { q1, q2, q3 })
+}
+
+fn window_contributions(
+    org: &str,
+    state: &mut StreamState,
+    table: &ResolutionTable,
+    rows: &WindowRows,
+    now: i64,
+    end: i64,
+    max_windows: usize,
+) -> (Vec<(SeriesKey, WindowCounts)>, usize) {
+    let WindowRows { q1, q2, q3 } = rows;
+    let mut out = Vec::with_capacity(q1.len() * 2 + q2.len() + q3.len());
+    for r in q1 {
+        out.push((SeriesKey::node(&r.service_name), r.counts));
+        if r.root_requests > 0 {
+            let counts = WindowCounts {
+                requests: r.root_requests,
+                ..Default::default()
+            };
+            out.push((SeriesKey::entry_edge(&r.service_name), counts));
+        }
+    }
+    let (resolved, staged) = state
+        .staging
+        .classify_window(q2, table, now, end, max_windows);
+    for c in resolved {
+        if let Some(tier) = c.tier {
+            config::metrics::O2_SERVICE_GRAPH_RESOLVED_TOTAL
+                .with_label_values(&[org, tier.as_str()])
+                .inc();
+        }
+        out.push((c.key, c.counts));
+    }
+    for r in q3 {
+        out.push((SeriesKey::queue_edge(&r.client, &r.server), r.counts));
+    }
+    (out, staged)
+}
+
+async fn deliver(org: &str, stream: &str, state: &mut StreamState, batch: Batch) -> bool {
+    let records = writer::render(stream, &batch);
+    let chunks = writer::chunk(&records, writer::max_request_bytes());
+    match writer::write_batch(org, chunks).await {
+        writer::WriteOutcome::Delivered => {
+            state.mark_clean(&batch);
+            note_started().await;
+            true
+        }
+        outcome => {
+            log::warn!(
+                "[ServiceGraph] {org}/{stream}: batch for window {} kept pending ({outcome:?})",
+                batch.window_end
+            );
+            state.pending = Some(batch);
+            false
+        }
+    }
+}
+
+async fn note_started() {
+    if STARTED_AT_WRITTEN.load(Ordering::Relaxed) {
+        return;
+    }
+    match set_started_at_if_absent(now_micros()).await {
+        Ok(()) => STARTED_AT_WRITTEN.store(true, Ordering::Relaxed),
+        Err(e) => log::warn!("[ServiceGraph] failed to record v4 started_at: {e}"),
+    }
+}
+
+fn update_retained(org: &str, stream: &str, state: &StreamState) {
+    RETAINED.insert((org.to_string(), stream.to_string()), state.retained());
+    let (edges, nodes) = RETAINED
+        .iter()
+        .filter(|e| e.key().0 == org)
+        .fold((0usize, 0usize), |acc, e| {
+            (acc.0 + e.value().0, acc.1 + e.value().1)
+        });
+    config::metrics::O2_SERVICE_GRAPH_RETAINED_EDGES
+        .with_label_values(&[org])
+        .set(edges as i64);
+    config::metrics::O2_SERVICE_GRAPH_RETAINED_NODES
+        .with_label_values(&[org])
+        .set(nodes as i64);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_claim_decision_four_cases() {
+        assert_eq!(claim_decision("", "me", false), ClaimDecision::Claim);
+        assert_eq!(claim_decision("me", "me", true), ClaimDecision::Owned);
+        assert_eq!(claim_decision("other", "me", true), ClaimDecision::Skip);
+        assert_eq!(claim_decision("other", "me", false), ClaimDecision::Claim);
+    }
+
+    #[test]
+    fn test_window_arithmetic() {
+        let flush = 60 * MICROS;
+        assert_eq!(align_down(125 * MICROS, flush), 120 * MICROS);
+        assert_eq!(align_down(120 * MICROS, flush), 120 * MICROS);
+        let horizon = 1_000 * MICROS;
+        assert_eq!(
+            initial_offset(0, horizon, flush, MAX_BACKLOG_MICROS),
+            (960 * MICROS, false)
+        );
+        assert_eq!(
+            initial_offset(700 * MICROS, horizon, flush, MAX_BACKLOG_MICROS),
+            (700 * MICROS, false)
+        );
+        let far = horizon - MAX_BACKLOG_MICROS - MICROS;
+        assert_eq!(
+            initial_offset(far, horizon, flush, MAX_BACKLOG_MICROS),
+            (960 * MICROS, true)
+        );
+        assert_eq!(
+            window_ends(960 * MICROS, horizon, flush, 120),
+            Vec::<i64>::new()
+        );
+        assert_eq!(
+            window_ends(940 * MICROS, horizon, flush, 120),
+            vec![1_000 * MICROS]
+        );
+        assert_eq!(
+            window_ends(700 * MICROS, horizon, flush, 120),
+            vec![
+                760 * MICROS,
+                820 * MICROS,
+                880 * MICROS,
+                940 * MICROS,
+                1_000 * MICROS
+            ]
+        );
+        assert_eq!(
+            window_ends(700 * MICROS, horizon, flush, 2),
+            vec![760 * MICROS, 820 * MICROS]
+        );
+        assert_eq!(
+            window_ends(0, 10_000 * MICROS, flush, MAX_WINDOWS_PER_TICK).len(),
+            MAX_WINDOWS_PER_TICK
+        );
+    }
+
+    #[test]
+    fn test_ql_trigger_survives_failed_pass() {
+        let mut t = ResolutionTable::new(100, 100);
+        t.has_unresolved = true;
+        settle_ql_trigger(&mut t, true, false, 900);
+        assert!(t.has_unresolved);
+        assert_eq!(t.ql_up_to, 100);
+        let need_ql = t.has_unresolved;
+        settle_ql_trigger(&mut t, need_ql, true, 900);
+        assert!(!t.has_unresolved);
+        settle_ql_trigger(&mut t, false, false, 900);
+        assert_eq!(t.ql_up_to, 900);
+    }
+
+    #[test]
+    fn test_data_age_guard() {
+        let now = 1_700_000_000 * MICROS;
+        assert!(!data_old_enough(&StreamStats::default(), now));
+        let mut stats = StreamStats {
+            doc_num: 10,
+            ..Default::default()
+        };
+        assert!(!data_old_enough(&stats, now));
+        stats.doc_time_min = now - V1_STOP_AFTER_MICROS + MICROS;
+        assert!(!data_old_enough(&stats, now));
+        stats.doc_time_min = now - V1_STOP_AFTER_MICROS;
+        assert!(data_old_enough(&stats, now));
+        stats.doc_num = 0;
+        assert!(!data_old_enough(&stats, now));
+    }
+}

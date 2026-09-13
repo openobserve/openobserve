@@ -20,6 +20,7 @@
 
 #[cfg(feature = "enterprise")]
 use {
+    super::run_graph_search,
     config::{cluster::LOCAL_NODE, meta::stream::StreamType, utils::time::now_micros},
     infra::cluster::get_node_by_uuid,
     o2_enterprise::enterprise::common::config::get_config as get_o2_config,
@@ -36,6 +37,10 @@ struct RecentIngestedTraceStream {
 /// Called by compactor job
 #[cfg(feature = "enterprise")]
 pub async fn process_service_graph() -> Result<(), anyhow::Error> {
+    if crate::db::service_graph::is_v1_stopped().await {
+        ack_v1_drained().await;
+        return Ok(());
+    }
     // get last offset
     let (mut last_updated_at, node) = crate::db::service_graph::get_offset().await;
     // other node is processing
@@ -188,8 +193,23 @@ pub async fn process_service_graph() -> Result<(), anyhow::Error> {
 
     // update last updated at
     crate::db::service_graph::set_offset(next_updated_at, Some(&LOCAL_NODE.uuid.clone())).await?;
+    if crate::db::service_graph::is_v1_stopped().await {
+        ack_v1_drained().await;
+    }
 
     Ok(())
+}
+
+/// Only the v1 holder can still be mid-run, so only it may confirm v1's last window is durable.
+#[cfg(feature = "enterprise")]
+async fn ack_v1_drained() {
+    let (final_offset, node) = crate::db::service_graph::get_offset().await;
+    if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) {
+        return;
+    }
+    if let Err(e) = crate::db::service_graph::set_v1_drained_if_absent(final_offset).await {
+        log::warn!("[ServiceGraph] failed to acknowledge v1 drain: {e}");
+    }
 }
 
 /// Build the
@@ -743,53 +763,6 @@ async fn process_stream(
     // SQL already aggregated everything - just write directly to _o2_service_graph stream
     crate::traces::service_graph::write_sql_aggregated_edges(org_id, stream_name, hits).await?;
     Ok(())
-}
-
-/// Run a pre-aggregated service-graph edge query against a trace stream and return
-/// the raw result hits. Shared by the instrumented self-join query and the
-/// inferred-dependency query.
-#[cfg(feature = "enterprise")]
-pub(crate) async fn run_graph_search(
-    org_id: &str,
-    sql: String,
-    start_time: i64,
-    end_time: i64,
-) -> Result<Vec<serde_json::Value>, anyhow::Error> {
-    let req = config::meta::search::Request {
-        query: config::meta::search::Query {
-            sql,
-            from: 0,
-            size: 100000,
-            start_time,
-            end_time,
-            quick_mode: false,
-            query_type: "".to_string(),
-            track_total_hits: false,
-            uses_zo_fn: false,
-            query_fn: None,
-            skip_wal: false,
-            histogram_interval: 0,
-            streaming_id: None,
-            streaming_output: false,
-            sampling_config: None,
-            sampling_ratio: None,
-            timezone: None,
-        },
-        encoding: config::meta::search::RequestEncoding::Empty,
-        regions: vec![],
-        clusters: vec![],
-        timeout: 300, // 5 minute timeout for large queries
-        search_type: None,
-        search_event_context: None,
-        use_cache: false,
-        clear_cache: false,
-        local_mode: Some(false),
-        agent_options: None,
-    };
-
-    let trace_id = config::ider::generate();
-    let resp = crate::search::search(&trace_id, org_id, StreamType::Traces, None, &req).await?;
-    Ok(resp.hits)
 }
 
 // Stub implementation for non-enterprise builds
