@@ -613,6 +613,15 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
   const emptyMetrics = ref<Set<string>>(new Set());
 
   /**
+   * Metrics whose settled-empty preview has already spent its one bounded
+   * re-query on revisit (see `requestPreview`). Without this, a metric whose
+   * first query raced ingestion and landed empty would fire a real query on
+   * EVERY future revisit forever — the very query storm the settled-cache
+   * guard exists to prevent — instead of getting exactly one extra chance.
+   */
+  const emptyRecheckedCards = ref<Set<string>>(new Set());
+
+  /**
    * Bumped every time the previews map is emptied wholesale — an org switch, a
    * time-range change, any invalidation.
    *
@@ -1307,6 +1316,21 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     // (`cachedTimeRange` below) and let `lastTriggeredAt` say how old it is.
     const differs = window.end_time - window.start_time !== range.end_time - range.start_time;
 
+    // Same bounded recheck as `requestPreview`'s in-memory guard, for the same
+    // reason: this path paints straight from disk and fires no query at all, so
+    // a metric that raced ingestion on its very first (persisted) query would
+    // stay "No Data" across every future page load, not just every revisit.
+    // Reported live: reloading Explore repainted a stale empty answer from here
+    // even after the in-memory guard's recheck had already been added.
+    const cachedEmpty =
+      !cached.value.sparse && !(cached.value.results ?? []).some(hasSamples);
+    if (cachedEmpty && !emptyRecheckedCards.value.has(card.name)) {
+      const next = new Set(emptyRecheckedCards.value);
+      next.add(card.name);
+      emptyRecheckedCards.value = next;
+      return false; // treated as a cache miss — falls through to a real query
+    }
+
     previews.value[card.name] = {
       status: "done",
       results: cached.value.results ?? [],
@@ -1428,15 +1452,31 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     // existing settled preview is always valid for the current query+window.
     // `skipCache` (refresh / time-range change / override) still forces a real
     // re-query, and an `error`/`loading` preview falls through to retry.
+    let forcedRecheck = false;
+
     const settled = previews.value[card.name];
     if (!opts?.skipCache && settled && settled.status !== "loading" && settled.status !== "error") {
-      return;
+      // EXCEPT a settled-EMPTY preview, once: a metric queried moments after its
+      // first write can race ingestion and come back with no samples even
+      // though the write succeeded — the exact "No Data" report this guards
+      // against otherwise wedges forever, since nothing else ever re-asks. A
+      // revisit (scroll-back / mode toggle) is the only signal such a card gets
+      // without an explicit refresh or time-range change, so it gets ONE real
+      // re-query from it. `sparse` is excluded: that path already re-probed
+      // before settling and a stale answer there is not "no data".
+      const settledEmpty = !settled.sparse && !settled.results.some(hasSamples);
+      if (!settledEmpty || emptyRecheckedCards.value.has(card.name)) return;
+      const next = new Set(emptyRecheckedCards.value);
+      next.add(card.name);
+      emptyRecheckedCards.value = next;
+      forcedRecheck = true;
     }
 
     // Paint from the persisted result and fire no query at all — the same deal a
     // dashboard panel gets on revisit. Matters more here than there: a first
     // screenful is ~60 queries against a backend that already times out on the
     // heavy metrics.
+    const hadRecheck = emptyRecheckedCards.value.has(card.name);
     if (
       !opts?.skipCache &&
       !previews.value[card.name] &&
@@ -1444,6 +1484,18 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     ) {
       return;
     }
+    // `restoreFromCache` spends the SAME bounded recheck for its own
+    // settled-empty case (a stale disk answer from before ingestion caught up),
+    // and returns `false` to fall through here instead of short-circuiting.
+    // Caught by a before/after comparison since it cannot reach this closure's
+    // `forcedRecheck` directly.
+    if (!hadRecheck && emptyRecheckedCards.value.has(card.name)) forcedRecheck = true;
+
+    // Threaded into every downstream `runQueries`/probe call in place of `opts`:
+    // the recheck must reach the backend, not just get past the guards above —
+    // `queue.run`'s own `cache: true, refresh: false` default would otherwise
+    // hand back the very cached empty answer this recheck exists to get past.
+    const queryOpts = forcedRecheck ? { ...opts, skipCache: true } : opts;
     // The MISS path of the await above: a restore that painted checks the epoch
     // itself, but a cache miss fell through to the loading write below — and if
     // the map was cleared while IndexedDB was answering, that write resurrects
@@ -1480,8 +1532,8 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
         resolved.queries,
         step,
         card.name,
-        opts?.priority ?? PRIORITY.VISIBLE,
-        !!opts?.skipCache,
+        queryOpts?.priority ?? PRIORITY.VISIBLE,
+        !!queryOpts?.skipCache,
       );
       let nanGuardApplied = false;
 
@@ -1498,8 +1550,8 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
             guarded.resolved.queries,
             step,
             card.name,
-            opts?.priority ?? PRIORITY.VISIBLE,
-            !!opts?.skipCache,
+            queryOpts?.priority ?? PRIORITY.VISIBLE,
+            !!queryOpts?.skipCache,
           );
           if (retried.some((r) => !isAllNaN(r))) {
             results = retried;
@@ -1517,7 +1569,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
         !results.some(hasSamples) &&
         isRateBasedKind(defaults.cardKind) &&
         card.hasData &&
-        (await hasSamplesInWindow(card, step, opts));
+        (await hasSamplesInWindow(card, step, queryOpts));
 
       // The samples are THERE — the probe just said so — the window is merely
       // too narrow to catch two of them, which means the org's configured
@@ -1541,8 +1593,8 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
               widened.resolved.queries,
               step,
               card.name,
-              opts?.priority ?? PRIORITY.VISIBLE,
-              !!opts?.skipCache,
+              queryOpts?.priority ?? PRIORITY.VISIBLE,
+              !!queryOpts?.skipCache,
             );
           } catch (error) {
             // A cancel means the user left this state — abort like any other
@@ -1719,6 +1771,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     previews.value = {};
     previewOrder = [];
     emptyMetrics.value = new Set();
+    emptyRecheckedCards.value = new Set();
   };
 
   /**
@@ -2125,6 +2178,9 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     // window, so its answers still hold; clearing there would un-hide every
     // no-data card on each auto-refresh tick just to re-hide it a moment later.
     emptyMetrics.value = new Set();
+    // A new window deserves its own bounded recheck, not one already spent by
+    // the window just left.
+    emptyRecheckedCards.value = new Set();
 
     // Label VALUES are a property of the window too — `job` has the values it had
     // in the last 15 minutes, which is not what it had over 30 days. Their cache
@@ -2159,6 +2215,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     // meaning what it says.
     previewOrder = [];
     emptyMetrics.value = new Set();
+    emptyRecheckedCards.value = new Set();
     pageSize.value = INITIAL_PAGE_SIZE;
     schemaLoaded.value = false;
     // The in-flight guards, not just the loaded flags.
