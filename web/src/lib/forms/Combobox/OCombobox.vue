@@ -161,9 +161,10 @@ function onSelect(optionValue: string) {
 // ── Sizes ────────────────────────────────────────────────────────────────────
 const heightClass = computed(() => {
   if (props.labelPosition === "inside" && (props.label || slots.label)) {
-    return props.size === "sm" ? "h-10 text-sm pt-4" : "h-10 text-sm pt-4";
+    return "h-10 text-sm pt-4";
   }
-  return props.size === "sm" ? "h-8 text-sm" : "h-8 text-sm";
+  // Aligned with OInput/OSelect/OButton sm: h-[2.125rem].
+  return "h-[2.125rem] text-sm";
 });
 
 // ── Error ────────────────────────────────────────────────────────────────────
