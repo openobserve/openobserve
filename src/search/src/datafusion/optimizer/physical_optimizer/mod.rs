@@ -22,4 +22,5 @@ pub mod index_optimizer;
 pub mod join_reorder;
 pub mod remote_scan;
 pub mod rewrite_match;
+pub mod shared_subplan;
 pub mod utils;

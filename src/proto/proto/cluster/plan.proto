@@ -19,7 +19,12 @@ message PhysicalPlanNode {
     TmpExecNode                 tmp_exec = 4;
     EnrichmentExecNode    enrichment_exec = 5;
     DeduplicationExecNode deduplication_exec = 6;
+    SharedSubplanMarkerNode shared_subplan_marker = 7;
   }
+}
+
+message SharedSubplanMarkerNode {
+  uint64 id = 1;
 }
 
 message Uint64List {

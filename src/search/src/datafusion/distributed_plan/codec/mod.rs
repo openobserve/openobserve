@@ -25,6 +25,7 @@ mod deduplication_exec;
 mod empty_exec;
 mod enrichment_exec;
 mod physical_plan_node;
+mod shared_subplan_marker;
 mod streaming_aggs_exec;
 mod tmp_exec;
 

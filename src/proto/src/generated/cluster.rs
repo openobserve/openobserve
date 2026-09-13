@@ -3265,7 +3265,7 @@ pub mod query_cache_server {
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct PhysicalPlanNode {
-    #[prost(oneof = "physical_plan_node::Plan", tags = "1, 2, 3, 4, 5, 6")]
+    #[prost(oneof = "physical_plan_node::Plan", tags = "1, 2, 3, 4, 5, 6, 7")]
     pub plan: ::core::option::Option<physical_plan_node::Plan>,
 }
 /// Nested message and enum types in `PhysicalPlanNode`.
@@ -3285,7 +3285,14 @@ pub mod physical_plan_node {
         EnrichmentExec(super::EnrichmentExecNode),
         #[prost(message, tag = "6")]
         DeduplicationExec(super::DeduplicationExecNode),
+        #[prost(message, tag = "7")]
+        SharedSubplanMarker(super::SharedSubplanMarkerNode),
     }
+}
+#[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
+pub struct SharedSubplanMarkerNode {
+    #[prost(uint64, tag = "1")]
+    pub id: u64,
 }
 #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct Uint64List {

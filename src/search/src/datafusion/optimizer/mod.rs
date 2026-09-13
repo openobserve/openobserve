@@ -47,17 +47,19 @@ use crate::datafusion::optimizer::logical_optimizer::cipher::{
 };
 use crate::{
     datafusion::optimizer::{
-        analyze::remove_index_fields::RemoveIndexFieldsRule,
+        analyze::{
+            remove_index_fields::RemoveIndexFieldsRule, shared_subplan::MarkSharedSubplanRule,
+        },
         context::{PhysicalOptimizerContext, generate_streaming_agg_rules},
         eliminate_aggregate::EliminateAggregateRule,
         logical_optimizer::{
             add_sort_and_limit::AddSortAndLimitRule, limit_join_right_side::LimitJoinRightSide,
-            rewrite_histogram::RewriteHistogram,
+            rewrite_histogram::RewriteHistogram, shared_subplan::StripDivergedSharedSubplanRule,
         },
         physical_optimizer::{
             aggregate_topk::AggregateTopkRule, distribute_analyze::optimize_distribute_analyze,
             index_optimizer::LeaderIndexOptimizerRule, join_reorder::JoinReorderRule,
-            remote_scan::generate_remote_scan_rules,
+            remote_scan::generate_remote_scan_rules, shared_subplan::SharedSubplanRule,
         },
     },
     sql::Sql,
@@ -72,14 +74,19 @@ pub mod stream_aggregate;
 pub mod utils;
 
 pub fn generate_analyzer_rules(sql: &Sql) -> Vec<Arc<dyn AnalyzerRule + Send + Sync>> {
-    vec![Arc::new(RemoveIndexFieldsRule::new(
-        sql.columns
-            .iter()
-            .any(|(_, columns)| columns.contains(ORIGINAL_DATA_COL_NAME)),
-        sql.columns
-            .iter()
-            .any(|(_, columns)| columns.contains(ALL_VALUES_COL_NAME)),
-    ))]
+    let mut rules: Vec<Arc<dyn AnalyzerRule + Send + Sync>> =
+        vec![Arc::new(RemoveIndexFieldsRule::new(
+            sql.columns
+                .iter()
+                .any(|(_, columns)| columns.contains(ORIGINAL_DATA_COL_NAME)),
+            sql.columns
+                .iter()
+                .any(|(_, columns)| columns.contains(ALL_VALUES_COL_NAME)),
+        ))];
+    if config::get_config().search.feature_shared_cte_enabled {
+        rules.push(Arc::new(MarkSharedSubplanRule::new()));
+    }
+    rules
 }
 
 pub fn generate_optimizer_rules(sql: &Sql) -> Vec<Arc<dyn OptimizerRule + Send + Sync>> {
@@ -163,6 +170,10 @@ pub fn generate_optimizer_rules(sql: &Sql) -> Vec<Arc<dyn OptimizerRule + Send +
             sql.stream_type,
         )));
     }
+    // Must be last so it sees the copies after every pushdown of this pass.
+    if cfg.search.feature_shared_cte_enabled {
+        rules.push(Arc::new(StripDivergedSharedSubplanRule::new()));
+    }
     // ************************************
 
     rules
@@ -212,6 +223,11 @@ pub fn generate_physical_optimizer_rules(
     rules.push(Arc::new(LeaderIndexOptimizerRule::new(index_fields)) as _);
 
     rules.push(Arc::new(LimitPushdown::new()) as _);
+
+    // Must be last: the shared markers are merged only after every copy is fully rewritten.
+    if config::get_config().search.feature_shared_cte_enabled {
+        rules.push(Arc::new(SharedSubplanRule::new()) as _);
+    }
 
     rules
 }
