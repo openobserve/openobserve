@@ -24,6 +24,9 @@ use super::{
     types::*,
 };
 
+/// Answer given to tool calls when the MCP tool registry was never built.
+const MCP_DISABLED_MESSAGE: &str = "MCP is disabled on this node (ZO_MCP_ENABLED=false)";
+
 /// Route an MCP request to the appropriate handler
 pub async fn route_request(
     org_id: &str,
@@ -72,10 +75,16 @@ pub async fn route_request(
         }
     };
 
+    // `ZO_MCP_ENABLED=false` skips building the tool registry at boot, so there
+    // is nothing to list or execute -- answer without touching it.
+    let mcp_enabled = config::get_config().common.mcp_enabled;
+
     // Route to handler
     let result = match method {
         MCPMethod::Initialize => handle_initialize(request.params),
         MCPMethod::Ping => handle_ping(),
+        MCPMethod::ToolsList if !mcp_enabled => Ok(json!({ "tools": [] })),
+        MCPMethod::ToolsCall if !mcp_enabled => Err(anyhow!(MCP_DISABLED_MESSAGE)),
         MCPMethod::ToolsList => handle_tools_list(),
         MCPMethod::ToolsCall => handle_tools_call(org_id, request.params, auth_token).await,
         MCPMethod::ServerDiscover => handle_server_discover(),
