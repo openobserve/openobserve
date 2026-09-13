@@ -372,7 +372,7 @@ futures-util = "0.3.31"
 http-auth-basic = "0.3"
 jemalloc_pprof = { version = "0.8", features = ["symbolize", "flamegraph"] }
 jsonwebtoken = { version = "10.3", features = ["aws_lc_rs"] }
-maxminddb = "0.27"
+maxminddb = { version = "0.27", features = ["mmap"] }
 mime = "0.3.17"
 mime_guess = "2.0"
 multer = "3.1"

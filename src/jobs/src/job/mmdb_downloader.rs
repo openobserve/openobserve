@@ -64,7 +64,7 @@ async fn run_download_files() {
             get_o2_config().common.mmdb_enterprise_file_name
         );
 
-        update_maxmind_table(&fname).await;
+        update_maxmind_table(&fname);
     }
 
     let city_fname = format!("{}{}", cfg.common.mmdb_data_dir, MMDB_CITY_FILE_NAME);
@@ -101,20 +101,18 @@ async fn run_download_files() {
     }
 
     if LazyLock::get(&CLIENT_INITIALIZED).is_none() {
-        update_maxmind_table(&asn_fname).await;
-        update_maxmind_table(&city_fname).await;
-        update_maxmind_client().await;
+        update_maxmind_table(&asn_fname);
+        update_maxmind_client(update_maxmind_table(&city_fname)).await;
         notify_initialized();
     } else {
         if download_asn_files {
             log::info!("New asn file found, updating client");
-            update_maxmind_table(&asn_fname).await;
+            update_maxmind_table(&asn_fname);
         }
 
         if download_city_files {
             log::info!("New city file found, updating client");
-            update_maxmind_table(&city_fname).await;
-            update_maxmind_client().await;
+            update_maxmind_client(update_maxmind_table(&city_fname)).await;
         }
     }
 
@@ -123,56 +121,60 @@ async fn run_download_files() {
     LazyLock::force(&CLIENT_INITIALIZED);
 }
 
-/// Update the maxmind client
-async fn update_maxmind_client() {
-    let cfg = config::get_config();
-    let city_fname = format!("{}{}", cfg.common.mmdb_data_dir, MMDB_CITY_FILE_NAME);
-    #[cfg(feature = "enterprise")]
-    let city_fname = if get_o2_config().common.enable_enterprise_mmdb {
-        format!(
-            "{}{}",
-            cfg.common.mmdb_data_dir,
-            get_o2_config().common.mmdb_enterprise_file_name
-        )
-    } else {
-        city_fname
+/// Update the maxmind client used by the request middleware.
+///
+/// It shares the reader already opened for the enrichment table instead of
+/// mapping the same database a second time.
+async fn update_maxmind_client(city_table: Option<Geoip>) {
+    let Some(city_table) = city_table else {
+        log::warn!("Failed to update maxmind client: no city database registered");
+        return;
     };
-    match MaxmindClient::new_with_path(&city_fname) {
-        Ok(maxminddb_client) => {
-            let mut client = MAXMIND_DB_CLIENT.write().await;
-            *client = Some(maxminddb_client);
-        }
-        Err(e) => log::warn!("Failed to update maxmind client with path: {city_fname}, {e}"),
-    }
+    let mut client = MAXMIND_DB_CLIENT.write().await;
+    *client = Some(MaxmindClient::new_with_shared_reader(city_table.reader()));
 }
 
-/// Update the maxmind table
-async fn update_maxmind_table(fname: &str) {
-    match MaxmindClient::new_with_path(fname) {
-        Ok(_) => {
-            #[cfg(feature = "enterprise")]
-            if get_o2_config().common.enable_enterprise_mmdb {
-                transform::register_global_enrichment_table(
-                    o2_enterprise::enterprise::common::config::GEO_IP_ENTERPRISE_ENRICHMENT_TABLE,
-                    Geoip::new(GeoipConfig::new(
-                        &get_o2_config().common.mmdb_enterprise_file_name,
-                    ))
-                    .unwrap(),
-                );
-            }
+/// Register the enrichment table(s) backed by `fname`.
+///
+/// Returns the table the middleware client should use, when this call
+/// registered one.
+fn update_maxmind_table(fname: &str) -> Option<Geoip> {
+    let mut client_table = None;
 
-            if fname.ends_with(MMDB_CITY_FILE_NAME) {
-                transform::register_global_enrichment_table(
-                    GEO_IP_CITY_ENRICHMENT_TABLE,
-                    Geoip::new(GeoipConfig::new(MMDB_CITY_FILE_NAME)).unwrap(),
-                );
-            } else if fname.ends_with(MMDB_ASN_FILE_NAME) {
-                transform::register_global_enrichment_table(
-                    GEO_IP_ASN_ENRICHMENT_TABLE,
-                    Geoip::new(GeoipConfig::new(MMDB_ASN_FILE_NAME)).unwrap(),
-                );
-            };
+    #[cfg(feature = "enterprise")]
+    if get_o2_config().common.enable_enterprise_mmdb {
+        client_table = register_geoip_table(
+            o2_enterprise::enterprise::common::config::GEO_IP_ENTERPRISE_ENRICHMENT_TABLE,
+            &get_o2_config().common.mmdb_enterprise_file_name,
+        );
+    }
+
+    if fname.ends_with(MMDB_CITY_FILE_NAME) {
+        // The enterprise database takes precedence for the middleware client.
+        client_table = client_table
+            .or_else(|| register_geoip_table(GEO_IP_CITY_ENRICHMENT_TABLE, MMDB_CITY_FILE_NAME));
+    } else if fname.ends_with(MMDB_ASN_FILE_NAME) {
+        register_geoip_table(GEO_IP_ASN_ENRICHMENT_TABLE, MMDB_ASN_FILE_NAME);
+    }
+
+    client_table
+}
+
+/// Open `file_name`, register it as the global enrichment table `table_name`
+/// and return it.
+///
+/// `Geoip::new` performs a dummy lookup, so it is the file's validity check --
+/// no separate throwaway reader is opened for that. The returned clone shares
+/// the registered table's memory map.
+fn register_geoip_table(table_name: &str, file_name: &str) -> Option<Geoip> {
+    match Geoip::new(GeoipConfig::new(file_name)) {
+        Ok(table) => {
+            transform::register_global_enrichment_table(table_name, table.clone());
+            Some(table)
         }
-        Err(e) => log::warn!("Failed to update maxmind table with path: {fname}, {e}"),
+        Err(e) => {
+            log::warn!("Failed to update maxmind table with file: {file_name}, {e}");
+            None
+        }
     }
 }

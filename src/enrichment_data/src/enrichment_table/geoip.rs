@@ -26,7 +26,7 @@ use config::{MMDB_CITY_FILE_NAME, get_config};
 #[cfg(feature = "enterprise")]
 use maxminddb::geoip2::Enterprise;
 use maxminddb::{
-    Reader,
+    Mmap, Reader,
     geoip2::{City, ConnectionType, Isp},
 };
 use serde::{Deserialize, Serialize};
@@ -145,15 +145,22 @@ impl GeoipConfig {
 /// data from a GeoIP database.
 pub struct Geoip {
     config: GeoipConfig,
-    dbreader: Arc<maxminddb::Reader<Vec<u8>>>,
+    dbreader: Arc<maxminddb::Reader<Mmap>>,
     dbkind: DatabaseKind,
     last_modified: SystemTime,
 }
 
 impl Geoip {
     /// Creates a new GeoIP struct from the provided config.
+    ///
+    /// The database is memory-mapped rather than read into a heap buffer, so a
+    /// 64 MB City database costs page cache that the kernel can reclaim instead
+    /// of 64 MB of anonymous RSS.
     pub fn new(config: GeoipConfig) -> Result<Geoip, anyhow::Error> {
-        let dbreader = Arc::new(Reader::open_readfile(config.path.clone())?);
+        // SAFETY: the mmdb files are only ever replaced by an atomic rename (see
+        // `download_utils::download_file`), so the inode a live mapping points at is
+        // never modified in place.
+        let dbreader = Arc::new(unsafe { Reader::open_mmap(config.path.clone())? });
         let dbkind = DatabaseKind::from(dbreader.metadata.database_type.as_str());
 
         // Check if we can read database with dummy Ip.
@@ -177,6 +184,13 @@ impl Geoip {
             }),
             Err(error) => Err(error.into()),
         }
+    }
+
+    /// The shared, memory-mapped database reader, so other holders (such as the
+    /// middleware's `MaxmindClient`) can reuse this mapping instead of opening
+    /// the same file again.
+    pub fn reader(&self) -> Arc<maxminddb::Reader<Mmap>> {
+        self.dbreader.clone()
     }
 
     fn lookup(&self, ip: IpAddr, select: Option<&[String]>) -> Option<ObjectMap> {

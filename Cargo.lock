@@ -6862,6 +6862,7 @@ dependencies = [
  "ipnetwork",
  "log",
  "memchr",
+ "memmap2 0.9.11",
  "serde",
  "thiserror 2.0.19",
 ]
