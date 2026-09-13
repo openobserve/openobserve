@@ -927,3 +927,86 @@ describe("O2AIChat - active tool call VRL context", () => {
     expect(truncated.length).toBeLessThan(longQuery.length);
   });
 });
+
+// Auto-scroll while the agent streams. The scroll event fires a frame after we
+// pin the list to the bottom, by which time more text has arrived — the handler
+// must not read that as "the user scrolled up" and stop following the answer.
+describe("O2AIChat - streaming auto-scroll", () => {
+  const stubScroller = (el, { scrollHeight, clientHeight }) => {
+    let scrollTop = 0;
+    Object.defineProperty(el, "scrollTop", {
+      configurable: true,
+      get: () => scrollTop,
+      set: (v) => {
+        scrollTop = v;
+      },
+    });
+    Object.defineProperty(el, "clientHeight", {
+      configurable: true,
+      value: clientHeight,
+      writable: true,
+    });
+    Object.defineProperty(el, "scrollHeight", {
+      configurable: true,
+      value: scrollHeight,
+      writable: true,
+    });
+    return el;
+  };
+
+  it("stays pinned when the answer grows after a programmatic scroll", async () => {
+    const wrapper = await mountChat({ isOpen: true });
+    const el = stubScroller(wrapper.vm.messagesContainer, {
+      scrollHeight: 2000,
+      clientHeight: 500,
+    });
+
+    await wrapper.vm.scrollToLoadingIndicator();
+    expect(el.scrollTop).toBe(2000);
+
+    // Streamed text lands before the scroll event is delivered.
+    el.scrollHeight = 2600;
+    wrapper.vm.checkIfShouldAutoScroll();
+
+    expect(wrapper.vm.shouldAutoScroll).toBe(true);
+    expect(wrapper.vm.showScrollToBottom).toBe(false);
+  });
+
+  it("disengages when the user scrolls up, and re-engages at the bottom", async () => {
+    const wrapper = await mountChat({ isOpen: true });
+    const el = stubScroller(wrapper.vm.messagesContainer, {
+      scrollHeight: 2000,
+      clientHeight: 500,
+    });
+
+    await wrapper.vm.scrollToLoadingIndicator();
+
+    el.scrollTop = 400; // user drags the scrollbar up
+    wrapper.vm.checkIfShouldAutoScroll();
+    expect(wrapper.vm.shouldAutoScroll).toBe(false);
+    expect(wrapper.vm.showScrollToBottom).toBe(true);
+
+    el.scrollTop = 1500; // back to the bottom
+    wrapper.vm.checkIfShouldAutoScroll();
+    expect(wrapper.vm.shouldAutoScroll).toBe(true);
+    expect(wrapper.vm.showScrollToBottom).toBe(false);
+  });
+
+  it("scrollToBottomSmooth re-engages auto-scroll", async () => {
+    const wrapper = await mountChat({ isOpen: true });
+    const el = stubScroller(wrapper.vm.messagesContainer, {
+      scrollHeight: 2000,
+      clientHeight: 500,
+    });
+    el.scrollTo = vi.fn();
+
+    el.scrollTop = 100;
+    wrapper.vm.checkIfShouldAutoScroll();
+    expect(wrapper.vm.shouldAutoScroll).toBe(false);
+
+    await wrapper.vm.scrollToBottomSmooth();
+    expect(el.scrollTo).toHaveBeenCalledWith({ top: 2000, behavior: "smooth" });
+    expect(wrapper.vm.shouldAutoScroll).toBe(true);
+    expect(wrapper.vm.showScrollToBottom).toBe(false);
+  });
+});
