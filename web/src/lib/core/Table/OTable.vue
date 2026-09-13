@@ -16,14 +16,17 @@ import {
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useTableColumnPersistence } from "./composables/useTableColumnPersistence";
 import OTableColumnToggle from "./sub-components/OTableColumnToggle.vue";
-import { FlexRender } from "@tanstack/vue-table";
+import { FlexRender, type Row } from "@tanstack/vue-table";
 import {
   TABLE_CHECKBOX_COL_SIZE,
   OTableCellActionsKey,
+  ROW_RAIL_TONE_CLASS,
+  ROW_TONE_CLASS,
   type OTableProps,
   type OTableEmits,
   type OTableSlots,
   type OTableColumnDef,
+  type OTableSection,
 } from "./OTable.types";
 
 import { useTableCore } from "./composables/useTableCore";
@@ -94,6 +97,27 @@ const props = withDefaults(defineProps<OTableProps<TData>>(), {
 
 const emit = defineEmits<OTableEmits<TData>>();
 const slots = defineSlots<OTableSlots<TData>>();
+
+/**
+ * `rowRailTone` / `rowTone` / `rowClass` folded into the ONE class function the
+ * body already threads to every render path (plain, virtual, grouped). Both new
+ * props resolve to token-backed utilities, so a call site never injects a colour
+ * or reaches for `!important` to win against a row-state class.
+ */
+const resolvedRowClass = computed(() => {
+  const { rowRailTone, rowTone, rowClass } = props;
+  if (!rowRailTone && !rowTone) return rowClass;
+  return (row: TData): string => {
+    const parts: string[] = [];
+    const rail = rowRailTone?.(row);
+    if (rail) parts.push(ROW_RAIL_TONE_CLASS[rail]);
+    const tone = rowTone?.(row);
+    if (tone) parts.push(ROW_TONE_CLASS[tone]);
+    const base = typeof rowClass === "function" ? rowClass(row) : rowClass;
+    if (base) parts.push(base);
+    return parts.join(" ");
+  };
+});
 
 // < md columns scroll within the table rather than being crushed down to the name column.
 const { isMobile: isMobileViewport, lgUp } = useBreakpoint();
@@ -537,6 +561,53 @@ const columnMgmt = useTableColumnManagement(
 const displayRows = computed(() => {
   return table.getRowModel().rows;
 });
+
+// ── Body sections ───────────────────────────────────────────────
+/**
+ * Off under virtualisation and row reorder: a virtualised body renders a
+ * window of rows with no stable place to hang a heading, and dragging across a
+ * heading would imply a move the caller has no way to apply.
+ */
+const sectionsEnabled = computed(
+  () => !!props.rowSection && !props.virtualScroll && !props.enableRowReorder,
+);
+
+/**
+ * `displayRows` gathered into contiguous runs. Order inside a run is left
+ * alone, so the active column sort still decides which row comes first — this
+ * only decides which rows sit next to each other.
+ */
+const rowSections = computed<OTableSection<TData>[]>(() => {
+  const key = props.rowSection;
+  if (!sectionsEnabled.value || !key) return [];
+  const buckets = new Map<string, Row<TData>[]>();
+  for (const row of displayRows.value) {
+    const k = key(row.original);
+    if (k === null || k === undefined) continue;
+    const bucket = buckets.get(k);
+    if (bucket) bucket.push(row);
+    else buckets.set(k, [row]);
+  }
+  const named = props.sectionOrder ?? [];
+  const ranked = [...buckets.keys()].sort((a, b) => {
+    // An unlisted key ranks after every listed one, and ties break on
+    // first-seen order so an unnamed section still appears.
+    const ia = named.indexOf(a);
+    const ib = named.indexOf(b);
+    return (ia === -1 ? named.length : ia) - (ib === -1 ? named.length : ib);
+  });
+  return ranked.map((k) => ({ key: k, rows: buckets.get(k) ?? [] }));
+});
+
+/**
+ * What the body renders. Sectioned rows are the concatenation of the runs, so a
+ * row `rowSection` returned null for is dropped from the body as well as from
+ * every heading — otherwise it would render under whichever section happened to
+ * precede it.
+ */
+const bodyRows = computed<Row<TData>[]>(() =>
+  sectionsEnabled.value ? rowSections.value.flatMap((section) => section.rows) : displayRows.value,
+);
 
 // ── Pivot: row-field cell merge (fake rowspan) ──────────────────
 // Consecutive rows sharing the same leading row-field values collapse into one
@@ -1052,6 +1123,10 @@ useTableRowShortcuts(scrollContainerRef);
 // with a "Loading…" banner over them (that pattern lets consumers'
 // progressive data mutations leak through visually). Consumers that want
 // refetch-without-replacing-content should use the `streaming` prop.
+// Sectioned tables render `bodyRows`, not `displayRows` — a `rowSection` that
+// filters every loaded row to null (every row belongs to a hidden section)
+// left the body blank with neither a row nor the empty state, since the page
+// itself was not empty.
 // A denied fetch and a genuinely empty list are both zero rows; only the caller
 // knows which, so `forbidden` decides and takes precedence over the empty state.
 const showForbidden = computed(
@@ -1063,7 +1138,7 @@ const showEmpty = computed(
     !props.streaming &&
     !props.error &&
     !showForbidden.value &&
-    displayRows.value.length === 0,
+    (sectionsEnabled.value ? bodyRows.value.length === 0 : displayRows.value.length === 0),
 );
 const showError = computed(() => !heldLoading.value && !!props.error);
 const showLoadingOverlay = computed(() => heldLoading.value);
@@ -1381,7 +1456,8 @@ defineExpose({
           <!-- ── Body ─────────────────────────────────────────── -->
           <OTableBody
             v-else-if="!showEmpty && !showError"
-            :rows="displayRows"
+            :rows="bodyRows"
+            :sections="sectionsEnabled ? rowSections : undefined"
             :table="table"
             :clickable="isRowClickable"
             :selection-enabled="selection.isEnabled.value"
@@ -1399,7 +1475,7 @@ defineExpose({
             :dense="props.dense"
             :bordered="props.bordered"
             :striped="props.striped"
-            :row-class="props.rowClass as any"
+            :row-class="resolvedRowClass as any"
             :row-style-fn="props.getRowStyle"
             :get-status-bar-color="props.getRowStatusColor"
             :enable-cell-copy="props.enableCellCopy"
@@ -1456,6 +1532,11 @@ defineExpose({
             <!-- Expansion slot -->
             <template v-if="slots.expansion" #expansion="expSlotProps">
               <slot name="expansion" :row="expSlotProps.row" />
+            </template>
+
+            <!-- Section heading row -->
+            <template v-if="slots['group-header']" #group-header="ghProps">
+              <slot name="group-header" :section-key="ghProps.sectionKey" :rows="ghProps.rows" />
             </template>
 
             <!-- Tree-mode warning row slot -->

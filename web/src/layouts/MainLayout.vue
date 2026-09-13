@@ -85,7 +85,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="max-md:hidden"
         :links-list="navLinks"
         :mini-mode="miniMode"
-        :visible="leftDrawerOpen"
         @menu-hover="handleMenuHover"
       />
 
@@ -375,10 +374,10 @@ export default defineComponent({
     const router: any = useRouter();
     const { t } = useI18nTyped();
     const miniMode = ref(false);
+    const { isMobile } = useBreakpoint();
     const zoBackendUrl = store.state.API_ENDPOINT;
     const isLoading = ref(false);
 
-    const { isMobile } = useBreakpoint();
     const mobileNavOpen = ref(false);
     watch(
       () => router.currentRoute.value.fullPath,
@@ -821,6 +820,10 @@ export default defineComponent({
       immediate: false,
     });
 
+    // On-call's Pages/Teams/Routing entries live entirely inside the
+    // `reliability` flyout (navGroups.ts), gated there by `gate: "oncall"`.
+    // A separate top-level rail item here would be a second gate to keep in
+    // sync.
     const filterMenus = () => {
       updateIncidentsMenu();
       updateWorkflowsMenu();
@@ -1256,7 +1259,11 @@ export default defineComponent({
           }
         })
         .catch((error) => {
-          console.error("Failed to load the full configuration:", error);
+          if (error?.response?.status === 404) {
+            console.warn("Full configuration not found for this org (404):", error);
+          } else {
+            console.error("Failed to load the full configuration:", error);
+          }
           // Fail open: reveal the base menu even if the config never resolves.
           menuReady.value = true;
           // Session replay must not be lost to a failed config fetch — the rum
@@ -1451,9 +1458,8 @@ export default defineComponent({
       navLinks,
       selectedOrg,
       orgOptions,
-      leftDrawerOpen: true,
-      miniMode,
       isMobile,
+      miniMode,
       mobileNavOpen,
       user,
       zoBackendUrl,
